@@ -2356,6 +2356,33 @@ struct Checker {
 				} else if (!typesEqual(lhs, rhs)) {
 					errorLine(expr.token, "Cannot compare ", lhs, " and ", rhs);
 					return nullptr;
+				} else {
+					// Equality is defined only for kinds with a well-defined comparison:
+					// value kinds compare bitwise, strings by content, cstr/cptr by
+					// address. Nullable values compare only against the null literal.
+					// Aggregates (arrays, slices, nullables) have no equality.
+					bool comparable = false;
+					switch (lhs->kind) {
+						case ResolvedType::BOOL:
+						case ResolvedType::ENUM:
+						case ResolvedType::STRING:
+						case ResolvedType::CSTR:
+						case ResolvedType::CPTR:
+						case ResolvedType::BYTE:
+						case ResolvedType::FUNCTION:
+							comparable = true;
+							break;
+						case ResolvedType::NULLABLE:
+							comparable = (bin.rhs && bin.rhs->kind == Expression::NULL_LITERAL)
+								|| (bin.lhs && bin.lhs->kind == Expression::NULL_LITERAL);
+							break;
+						default:
+							break;
+					}
+					if (!comparable) {
+						errorLine(expr.token, "Cannot compare ", lhs, " and ", rhs);
+						return nullptr;
+					}
 				}
 				result = primitiveType(ResolvedType::BOOL);
 				break;

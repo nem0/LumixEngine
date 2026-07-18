@@ -223,6 +223,16 @@ typedef struct ls_bytecode {
 	u32 string_capacity;
 } ls_bytecode;
 
+#define LS_MAX_CALL_DEPTH 4096u
+
+typedef struct runtime_call_frame {
+	const ls_function_bc* function;
+	i32 function_index;
+	u32 pc;
+	u32 frame_base;
+	u32 stack_top;
+} runtime_call_frame;
+
 typedef struct ls_runtime {
 	ls_host* host;
 	const ls_bytecode* bytecode;
@@ -240,6 +250,9 @@ typedef struct ls_runtime {
 	// `ls_call_result` uses it to locate the raw result bytes. Host pushes
 	// invalidate it.
 	i32 result_function;
+
+	runtime_call_frame call_stack[LS_MAX_CALL_DEPTH];
+	u32 call_depth;
 
 	// Indexed by bytecode function index.
 	ls_native_fn* native_callbacks;

@@ -521,3 +521,28 @@ TEST(ExternSinDoesNotAutoBindBuiltin) {
 	CAPI_END(module);
 	return true;
 }
+
+TEST(DeepRecursionFailsCleanly) {
+	// The flat interpreter call loop bounds script call depth (LS_MAX_CALL_DEPTH)
+	// and reports a runtime error instead of overflowing the C stack.
+	const char* source = R"(
+		fn deep(n : i32) : i32 {
+			if n == 0 {
+				return 0;
+			}
+			return deep(n - 1);
+		}
+
+		fn main() : i32 {
+			return deep(100000);
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	test_diagnostics.output_enabled = false;
+	EXPECT_TRUE(!ls_call(runtime, toLs("main")));
+	CAPI_END(module);
+	return true;
+}

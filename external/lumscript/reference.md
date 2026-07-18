@@ -1599,6 +1599,16 @@ not ready
 
 `and` and `or` short-circuit.
 
+Ordering comparisons (`<`, `<=`, `>`, `>=`) require numeric operands of the same type. Equality (`==`, `!=`) is defined for:
+
+- numeric types, `bool`, `byte`, and enums — value comparison
+- `string` — content comparison
+- `cstr` and `cptr` — address comparison (two `cstr` values with equal content but different storage are not equal)
+- function values — same function
+- nullable values — only against the `null` literal
+
+Arrays, slices, unions, and two nullable values have no built-in equality; comparing them is a compile-time error. Structs resolve `==` through `operator` declarations (see below).
+
 If an operator is used with non-builtin value types, the compiler may resolve it to a matching `operator` declaration instead of a built-in primitive rule.
 Primitive operands keep their built-in semantics and cannot be overridden by `operator` declarations.
 `and` and `or` keep their built-in short-circuit semantics and are not candidates for operator declarations.

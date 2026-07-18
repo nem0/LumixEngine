@@ -1044,3 +1044,67 @@ TEST(TypelessStructLiteralLhsOperatorOperandFails) {
 	return true;
 }
 
+
+TEST(SliceEqualityFails) {
+	// Aggregates have no equality; the old generic comparison silently compared
+	// nothing and always returned true.
+	const char* source = R"(
+		fn main() : bool {
+			var a : [2]i32 = undefined;
+			var s1 : []i32 = a[:];
+			var s2 : []i32 = a[:];
+			return s1 == s2;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ArrayEqualityFails) {
+	const char* source = R"(
+		fn main() : bool {
+			var a : [2]i32 = undefined;
+			var b : [2]i32 = undefined;
+			return a == b;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(NullableEqualityAgainstNullableFails) {
+	// Nullable values compare only against the null literal.
+	const char* source = R"(
+		fn main() : bool {
+			var a : ?i32 = 1;
+			var b : ?i32 = 2;
+			return a == b;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(NullableEqualityAgainstNullLiteralRuntime) {
+	const char* source = R"(
+		fn main() : i32 {
+			var a : ?i32 = 1;
+			var b : ?i32 = null;
+			var total : i32 = 0;
+			if a != null {
+				total += 1;
+			}
+			if b == null {
+				total += 41;
+			}
+			return total;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}

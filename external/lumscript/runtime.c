@@ -29,7 +29,6 @@ static int string_equals(ls_string_view a, ls_string_view b) {
 }
 
 #define LS_STACK_CAPACITY_BYTES (65536u * 8u)
-
 static u32 runtime_type_size(ls_type_kind kind) {
 	switch (kind) {
 		case LS_TYPE_VOID: return 0u;
@@ -277,7 +276,7 @@ static u8* runtime_frame_ptr(ls_runtime* runtime, u32 offset) {
 		u8* out__ = runtime_frame_ptr(runtime, dst__); \
 		memcpy(&a, lhs__, sizeof(TYPE)); \
 		memcpy(&b, rhs__, sizeof(TYPE)); \
-		if (!b) { runtime->frame_base = saved_frame_base; return 0; } \
+		if (!b) goto runtime_execute_function_fail; \
 		TYPE result__ = (TYPE)(EXPR); \
 		memcpy(out__, &result__, sizeof(TYPE)); \
 	} while (0)
@@ -327,6 +326,10 @@ static u8* runtime_frame_ptr(ls_runtime* runtime, u32 offset) {
 static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 	const ls_function_bc* fn = runtime_find_function(runtime->bytecode, function_index);
 	if (!fn) return 0;
+	const u32 initial_frame_base = runtime->frame_base;
+	const u32 initial_stack_top = runtime->stack_top;
+	const i32 initial_result_function = runtime->result_function;
+	const u32 initial_call_depth = runtime->call_depth;
 
 	const u32 arg_base = runtime->stack_top >= fn->param_size ? runtime->stack_top - fn->param_size : 0u;
 	if (fn->kind == LS_FUNCTION_NATIVE) {
@@ -345,6 +348,8 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 
 		runtime->stack_top = expected_top;
 		runtime->result_function = function_index;
+		runtime->frame_base = initial_frame_base;
+		runtime->call_depth = initial_call_depth;
 		return 1;
 	}
 
@@ -352,11 +357,12 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 	const u32 frame_base = arg_base;
 	const u32 frame_stack_top = frame_base + fn->frame_size;
 
-	if (frame_stack_top > runtime->stack_capacity) return 0;
+	if (frame_stack_top > runtime->stack_capacity) goto runtime_execute_function_fail;
 
 	runtime->frame_base = frame_base;
 	runtime->stack_top = frame_stack_top;
 
+	i32 current_function_index = function_index;
 	u32 pc = 0;
 	for (;;) {
 		const ls_op op = (ls_op)fn->code[pc++];
@@ -504,7 +510,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				i64 index = 0;
 				u8* index_ptr = runtime_frame_ptr(runtime, index_reg);
 				memcpy(&index, index_ptr, 8u);
-				if (index < 0 || (u64)index >= length) return 0;
+				if (index < 0 || (u64)index >= length) goto runtime_execute_function_fail;
 				break;
 			}
 			case LS_OP_SLICE: {
@@ -524,9 +530,9 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				memcpy(&begin, begin_ptr, 8u);
 				memcpy(&end, end_ptr, 8u);
 				u8* base = (u8*)base_ptr;
-				if (begin < 0 || end < begin || (u64)end > (u64)length) return 0;
+				if (begin < 0 || end < begin || (u64)end > (u64)length) goto runtime_execute_function_fail;
 				const u64 offset = (u64)begin * element_size;
-				if (element_size != 0u && offset / element_size != (u64)begin) return 0;
+				if (element_size != 0u && offset / element_size != (u64)begin) goto runtime_execute_function_fail;
 				void* new_base = base ? base + offset : NULL;
 				const i64 new_length = end - begin;
 				memcpy(out, &new_base, sizeof(new_base));
@@ -548,9 +554,9 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				memcpy(&length, slice + sizeof(void*), 8u);
 				memcpy(&index, index_ptr, 8u);
 				u8* base = (u8*)base_ptr;
-				if (!base || index < 0 || (u64)index >= (u64)length) return 0;
+				if (!base || index < 0 || (u64)index >= (u64)length) goto runtime_execute_function_fail;
 				const u64 offset = (u64)index * element_size;
-				if (element_size != 0u && offset / element_size != (u64)index) return 0;
+				if (element_size != 0u && offset / element_size != (u64)index) goto runtime_execute_function_fail;
 				if (element_size > 0u) memmove(out, base + offset, element_size);
 				break;
 			}
@@ -569,9 +575,9 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				memcpy(&length, slice + sizeof(void*), 8u);
 				memcpy(&index, index_ptr, 8u);
 				u8* base = (u8*)base_ptr;
-				if (!base || index < 0 || (u64)index >= (u64)length) return 0;
+				if (!base || index < 0 || (u64)index >= (u64)length) goto runtime_execute_function_fail;
 				const u64 offset = (u64)index * element_size;
-				if (element_size != 0u && offset / element_size != (u64)index) return 0;
+				if (element_size != 0u && offset / element_size != (u64)index) goto runtime_execute_function_fail;
 				if (element_size > 0u) memmove(base + offset, value, element_size);
 				break;
 			}
@@ -590,9 +596,9 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				memcpy(&length, slice + sizeof(void*), 8u);
 				memcpy(&index, index_ptr, 8u);
 				u8* base = (u8*)base_ptr;
-				if (!base || index < 0 || (u64)index >= (u64)length) return 0;
+				if (!base || index < 0 || (u64)index >= (u64)length) goto runtime_execute_function_fail;
 				const u64 offset = (u64)index * element_size;
-				if (element_size != 0u && offset / element_size != (u64)index) return 0;
+				if (element_size != 0u && offset / element_size != (u64)index) goto runtime_execute_function_fail;
 				void* ref = base + offset;
 				memcpy(out, &ref, sizeof(ref));
 				break;
@@ -612,28 +618,65 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				const u32 size = runtime_read_u32(fn->code, &pc);
 				if (size > 0u) {
 					u8* src_ptr = runtime_frame_ptr(runtime, src);
-					if (runtime->frame_base + size > runtime->stack_capacity) return 0;
+					if (runtime->frame_base + size > runtime->stack_capacity) goto runtime_execute_function_fail;
 					memmove(runtime->stack + runtime->frame_base, src_ptr, size);
 					runtime->stack_top = runtime->frame_base + size;
 				}
 				else {
 					runtime->stack_top = runtime->frame_base;
 				}
-				runtime->result_function = function_index;
-				runtime->frame_base = saved_frame_base;
-				return 1;
+				if (runtime->call_depth == initial_call_depth) {
+					runtime->result_function = current_function_index;
+					runtime->frame_base = initial_frame_base;
+					return 1;
+				}
+				{
+					const runtime_call_frame caller = runtime->call_stack[--runtime->call_depth];
+					fn = caller.function;
+					current_function_index = caller.function_index;
+					pc = caller.pc;
+					runtime->frame_base = caller.frame_base;
+					runtime->stack_top = caller.stack_top;
+				}
+				break;
 			}
 			case LS_OP_CALL_DIRECT: {
 				const i32 callee_index = (i32)runtime_read_u32(fn->code, &pc);
 				const u32 arg_top = runtime_read_u32(fn->code, &pc);
 				const u32 caller_top = runtime->stack_top;
-				runtime->stack_top = runtime->frame_base + arg_top;
-				const int ok = runtime_execute_function(runtime, callee_index);
-				runtime->stack_top = caller_top;
-				if (!ok) {
-					runtime->frame_base = saved_frame_base;
-					return 0;
+				const ls_function_bc* callee = runtime_find_function(runtime->bytecode, callee_index);
+				if (!callee) goto runtime_execute_function_fail;
+				
+				if (callee->kind == LS_FUNCTION_NATIVE) {
+					if ((u32)callee_index >= runtime->native_callback_count) goto runtime_execute_function_fail;
+					ls_native_fn callback = runtime->native_callbacks[(u32)callee_index];
+					if (!callback) goto runtime_execute_function_fail;
+					const u32 call_stack_top = runtime->frame_base + arg_top;
+					const u32 arg_base = call_stack_top >= callee->param_size ? call_stack_top - callee->param_size : 0u;
+					const u32 expected_top = arg_base + callee->return_size;
+					if (expected_top > runtime->stack_capacity) goto runtime_execute_function_fail;
+					ls_call_frame frame;
+					frame.args = runtime->stack + arg_base;
+					frame.result = runtime->stack + arg_base;
+					callback(runtime, frame);
+					runtime->stack_top = caller_top;
+					break;
 				}
+
+				if (runtime->call_depth >= LS_MAX_CALL_DEPTH) goto runtime_execute_function_fail;
+
+				const u32 call_stack_top = runtime->frame_base + arg_top;
+				const u32 callee_frame_base = call_stack_top >= callee->param_size ? call_stack_top - callee->param_size : 0u;
+				const u32 callee_stack_top = callee_frame_base + callee->frame_size;
+				if (callee_stack_top > runtime->stack_capacity) goto runtime_execute_function_fail;
+
+				runtime->call_stack[runtime->call_depth] = (runtime_call_frame){ fn, current_function_index, pc, runtime->frame_base, caller_top };
+				runtime->call_depth++;
+				fn = callee;
+				current_function_index = callee_index;
+				pc = 0;
+				runtime->frame_base = callee_frame_base;
+				runtime->stack_top = callee_stack_top;
 				break;
 			}
 			case LS_OP_CALL_INDIRECT: {
@@ -653,7 +696,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				runtime->stack_top = caller_top;
 				if (!ok) {
 					runtime->frame_base = saved_frame_base;
-					return 0;
+					goto runtime_execute_function_fail;
 				}
 				break;
 			}
@@ -686,7 +729,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				const u32 src = runtime_read_u32(fn->code, &pc);
 				ls_string_box* box = NULL;
 				memcpy(&box, runtime_frame_ptr(runtime, src), sizeof(box));
-				if (!box || memchr(box->value.begin, '\0', (size_t)(box->value.end - box->value.begin))) { runtime->frame_base = saved_frame_base; return 0; }
+				if (!box || memchr(box->value.begin, '\0', (size_t)(box->value.end - box->value.begin))) goto runtime_execute_function_fail;
 				const char* value = box->value.begin;
 				memcpy(runtime_frame_ptr(runtime, dst), &value, sizeof(value));
 				break;
@@ -696,9 +739,9 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				const u32 src = runtime_read_u32(fn->code, &pc);
 				const char* value = NULL;
 				memcpy(&value, runtime_frame_ptr(runtime, src), sizeof(value));
-				if (!value) { runtime->frame_base = saved_frame_base; return 0; }
+				if (!value) goto runtime_execute_function_fail;
 				ls_string_box* box = runtime_copy_string_box(runtime, (ls_string_view){value, value + strlen(value)});
-				if (!box) { runtime->frame_base = saved_frame_base; return 0; }
+				if (!box) goto runtime_execute_function_fail;
 				memcpy(runtime_frame_ptr(runtime, dst), &box, sizeof(box));
 				break;
 			}
@@ -787,8 +830,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				break;
 			}
 			default:
-				runtime->frame_base = saved_frame_base;
-				return 0;
+				goto runtime_execute_function_fail;
 		}
 	}
 
@@ -796,7 +838,11 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 	// (see LS_OP_RETURN above and emitReturn in bytecode_compiler.cpp), which
 	// always returns out of this function directly. Reaching here means pc
 	// ran off the end of fn->code without one, i.e. malformed bytecode.
-	runtime->frame_base = saved_frame_base;
+runtime_execute_function_fail:
+	runtime->stack_top = initial_stack_top;
+	runtime->frame_base = initial_frame_base;
+	runtime->result_function = initial_result_function;
+	runtime->call_depth = initial_call_depth;
 	return 0;
 }
 
