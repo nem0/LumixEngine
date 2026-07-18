@@ -8,7 +8,12 @@
 //   is (k + 1) / 2 in integer arithmetic
 // - runs a single fannkuch(9) instead of the bench() harness
 
-fn fannkuch(n : i32, perm1 : []i32, perm : []i32, count : []i32) : i32 {
+fn main() : i32 {
+	const n = 9;
+	var perm1 : [9]i32 = undefined;
+	var perm : [9]i32 = undefined;
+	var count : [9]i32 = undefined;
+
 	for i = 0..n {
 		perm1[i] = i;
 	}
@@ -76,11 +81,4 @@ fn fannkuch(n : i32, perm1 : []i32, perm : []i32, count : []i32) : i32 {
 	}
 
 	return flips;
-}
-
-fn main() : i32 {
-	var perm1 : [9]i32 = undefined;
-	var perm : [9]i32 = undefined;
-	var count : [9]i32 = undefined;
-	return fannkuch(9, perm1, perm, count);
 }

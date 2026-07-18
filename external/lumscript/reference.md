@@ -46,6 +46,8 @@
 
 LumScript is a small, statically typed scripting language for Lumix Engine.
 
+See the [benchmark results](benchmarks/results.md) for current performance comparisons.
+
 ## Table of contents
 
 - [Design goals](#design-goals)

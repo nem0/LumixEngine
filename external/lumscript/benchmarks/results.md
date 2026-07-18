@@ -16,31 +16,85 @@ Ports of the [bolt benchmarks](https://github.com/Beariish/bolt/tree/main/benchm
 - Lua: 5.4.2 (interpreter, luabinaries Win64 build in `../build/lua`)
 - C: MSVC 19.51, `cl /O2`
 
-Measured 2026-07-18. Times are a single run; expect a few percent of noise.
+Measured 2026-07-19. Times are a single run; expect a few percent of noise.
 
 ## Results
 
 | Benchmark | Workload | Result | lumc | lua 5.4 | node --jitless | node | C /O2 |
 |---|---|---|---:|---:|---:|---:|---:|
-| recursion | fib(30) | 832040 | 43 ms | 31 ms | 45 ms | 5.1 ms | 2.7 ms |
-| mandel | 256x256, 255 iters | 1694719 | 166 ms | 85 ms | 134 ms | 7.0 ms | 4.0 ms |
-| fannkuch | n=9 | 30 | 630 ms | 158 ms | 262 ms | 18.7 ms | 13.3 ms |
-| nbodies | 500k steps | -0.169097 | 2343 ms | 730 ms | 1260 ms | 34.1 ms | 21.2 ms |
+| recursion | fib(30) | 832040 | 26 ms | 37 ms | 44 ms | 5.1 ms | 2.7 ms |
+| mandel | 256x256, 255 iters | 1694719 | 71 ms | 83 ms | 150 ms | 7.2 ms | 4.0 ms |
+| fannkuch | n=9 | 30 | 148 ms | 172 ms | 265 ms | 17.7 ms | 13.6 ms |
+| nbodies | 500k steps | -0.169097 | 570 ms | 916 ms | 1435 ms | 45.8 ms | 22.0 ms |
 
 Relative to lumc (higher = faster than lumc):
 
 | Benchmark | lua 5.4 | node --jitless | node | C /O2 |
 |---|---:|---:|---:|---:|
-| recursion | 1.4x | 1.0x | 8.4x | 15.9x |
-| mandel | 2.0x | 1.2x | 24x | 42x |
-| fannkuch | 4.0x | 2.4x | 34x | 47x |
-| nbodies | 3.2x | 1.9x | 69x | 111x |
+| recursion | 0.7x | 0.6x | 5.1x | 9.8x |
+| mandel | 0.9x | 0.5x | 9.8x | 17.9x |
+| fannkuch | 0.9x | 0.6x | 8.4x | 10.9x |
+| nbodies | 0.6x | 0.4x | 12.4x | 25.9x |
+
+## Bytecode instruction counts
+
+Counts from disassembly of the benchmark programs:
+
+| Benchmark | LumScript | Lua 5.4 | Node.js V8 |
+|---|---:|---:|---:|
+| recursion | 16 | 44 | 73 |
+| mandel | 68 | 124 | 165 |
+| fannkuch | 81 | 147 | 207 |
+| nbodies | 319 | 471 | 628 |
+
+LumScript counts are executable instructions from `lumc --dump-bytecode`; Lua
+counts are instructions from `luac -l`. Node.js counts include the benchmark's
+top-level script and user-defined functions, excluding Node.js internal code.
+
+## Graphs
+
+### Runtime (lower is better)
+
+Each chart uses the same engine order: lumc, Lua 5.4, Node.js jitless,
+Node.js JIT, and C `/O2`.
+
+```mermaid
+xychart-beta
+    title "recursion: fib(30)"
+    x-axis [lumc, lua, jitless, node, C]
+    y-axis "milliseconds" 0 --> 50
+    bar [26, 37, 44, 5.1, 2.7]
+```
+
+```mermaid
+xychart-beta
+    title "mandel"
+    x-axis [lumc, lua, jitless, node, C]
+    y-axis "milliseconds" 0 --> 200
+    bar [71, 83, 150, 7.2, 4.0]
+```
+
+```mermaid
+xychart-beta
+    title "fannkuch"
+    x-axis [lumc, lua, jitless, node, C]
+    y-axis "milliseconds" 0 --> 300
+    bar [148, 172, 265, 17.7, 13.6]
+```
+
+```mermaid
+xychart-beta
+    title "nbodies"
+    x-axis [lumc, lua, jitless, node, C]
+    y-axis "milliseconds" 0 --> 1500
+    bar [570, 916, 1435, 45.8, 22.0]
+```
 
 ## Notes
 
 - The fairest interpreter-to-interpreter comparisons are lumc vs `node
-  --jitless` (V8's Ignition) and vs Lua 5.4: lumc is within 1.0-1.4x on
-  call-heavy and float-arithmetic code (recursion, mandel) and 2.4-4.0x behind
+  --jitless` (V8's Ignition) and vs Lua 5.4: lumc is within 0.6-1.2x on
+  call-heavy and float-arithmetic code (recursion, mandel) and 0.7-2.2x behind
   on array/struct-heavy code (fannkuch, nbodies). Lua's lead there comes from
   its word-sized dynamic values and single-op table access, versus lumc's raw
   byte-register frames where each element access decodes several operands and
@@ -54,9 +108,9 @@ Relative to lumc (higher = faster than lumc):
   gap on array-heavy code is per-op overhead, not safety checks.
 - nbodies is the most adversarial for the interpreter: its inner loop is a
   dense sequence of `bodies[i].field` accesses, each expanding to a
-  slice-ref/load/store op with its own dispatch. Fusing these accesses (or
-  caching the element pointer across consecutive accesses to the same element)
-  is the most promising optimization target.
+  slice-ref/load/store op with its own dispatch. Local-slice field access was
+  partially fused in the current LumScript result. All benchmark ports now use
+  the equivalent `time / (d * sqrt(d))` formulation.
 - The C recursion port reads `n` from argv; with a constant argument MSVC
   folds `fib(30)` to a literal at compile time and the benchmark measures
   nothing.

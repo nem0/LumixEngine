@@ -3671,6 +3671,8 @@ struct Checker {
 		extern fn sin_f64(v : f64) : f64;
 		extern fn cos_f64(v : f64) : f64;
 		extern fn sqrt_f64(v : f64) : f64;
+		extern fn pow(v : f32, exponent : f32) : f32;
+		extern fn pow_f64(v : f64, exponent : f64) : f64;
 	)";
 
 	static inline const char builtin_mem_source[] = R"(

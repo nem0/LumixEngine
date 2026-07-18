@@ -158,6 +158,12 @@ static void emitI32(ByteArray& code, i32 value) {
 	emitBytes(code, &value, sizeof(value));
 }
 
+static void emitI16(ByteArray& code, i32 value) {
+	ASSERT(value >= -32768 && value <= 32767);
+	const i16 narrow = (i16)value;
+	emitBytes(code, &narrow, sizeof(narrow));
+}
+
 static void patchI32(ByteArray& code, u32 offset, i32 value) {
 	const u32 bits = (u32)value;
 	code[offset + 0u] = (u8)(bits & 0xFFu);
@@ -202,7 +208,7 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 static bool tryEmitReference(FunctionCompiler& ctx, Expression& expr);
 static void emitCallDirect(FunctionCompiler& ctx, u32 callee_index, u32 arg_size, u32 return_size);
 static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& expr);
-static void patchJumpRelative(ByteArray& code, u32 operand_pos, u32 target_pos);
+static bool patchJumpRelative(FunctionCompiler& ctx, u32 operand_pos, u32 target_pos);
 static u32 emitJumpPlaceholder(FunctionCompiler& ctx, ls_op op);
 
 struct FunctionCompiler {
@@ -212,7 +218,9 @@ struct FunctionCompiler {
 		, code(*bytecode->arena)
 		, deferreds(*bytecode->arena)
 		, defer_marks(*bytecode->arena)
-		, loops(*bytecode->arena) {}
+		, loops(*bytecode->arena) {
+		diagnostics.host = bytecode->host;
+	}
 
 	ls_bytecode* bytecode = nullptr;
 	ResolvedType* return_type = nullptr;
@@ -221,12 +229,20 @@ struct FunctionCompiler {
 	ExpArray<Statement*> deferreds;
 	ExpArray<i32> defer_marks;
 	ExpArray<LoopBinding> loops;
+	OutputFormatter diagnostics;
+	bool failed = false;
 	// Locals and temporaries share one absolute frame offset space. `next_local_offset`
 	// is the floor below which temporaries must not be rewound, while `temp_top`
 	// is the next free byte for expression temporaries.
 	u32 temp_top = 0;
 	u32 frame_high_water = 0;
 	u32 next_local_offset = 0;
+
+	void reportError(const char* message) {
+		if (failed) return;
+		failed = true;
+		diagnostics.error("Function ", out.name, ": ", message);
+	}
 
 	// Allocates frame space. Named locals pass their declaration's slot so that
 	// identifier expressions can read the location back without a lookup;
@@ -502,8 +518,48 @@ static void emitLoadLocalBytes(FunctionCompiler& ctx, u32 offset, u32 byte_size)
 	setTempTop(ctx, dst + byte_size);
 }
 
+static bool isNumericBinaryOpcode(ls_op op) {
+	return (op >= LS_OP_ADD_I8 && op <= LS_OP_ADD_F64) ||
+		(op >= LS_OP_SUB_I8 && op <= LS_OP_SUB_F64) ||
+		(op >= LS_OP_MUL_I8 && op <= LS_OP_MUL_F64) ||
+		(op >= LS_OP_DIV_I8 && op <= LS_OP_DIV_F64) ||
+		(op >= LS_OP_MOD_I8 && op <= LS_OP_MOD_U64);
+}
+
+static bool tryRedirectLastNumericBinaryToLocal(FunctionCompiler& ctx, u32 dst, u32 src) {
+	if (ctx.code.size() < 13u) return false;
+	const u32 op_pos = (u32)ctx.code.size() - 13u;
+	const ls_op op = (ls_op)ctx.code[op_pos];
+	if (!isNumericBinaryOpcode(op)) return false;
+	u32 result = 0;
+	memcpy(&result, ctx.code.data + op_pos + 1u, sizeof(result));
+	if (result != src) return false;
+	memcpy(ctx.code.data + op_pos + 1u, &dst, sizeof(dst));
+	return true;
+}
+
+static bool tryRedirectLastConstantToLocal(FunctionCompiler& ctx, u32 dst, u32 src, u32 byte_size) {
+	const u32 instruction_size = 5u + byte_size;
+	if (ctx.code.size() < instruction_size) return false;
+	const u32 op_pos = (u32)ctx.code.size() - instruction_size;
+	const ls_op op = (ls_op)ctx.code[op_pos];
+	if ((byte_size == 1u && op != LS_OP_LOAD_CONST_1) ||
+		(byte_size == 2u && op != LS_OP_LOAD_CONST_2) ||
+		(byte_size == 4u && op != LS_OP_LOAD_CONST_4) ||
+		(byte_size == 8u && op != LS_OP_LOAD_CONST_8)) return false;
+	u32 result = 0;
+	memcpy(&result, ctx.code.data + op_pos + 1u, sizeof(result));
+	if (result != src) return false;
+	memcpy(ctx.code.data + op_pos + 1u, &dst, sizeof(dst));
+	return true;
+}
+
 static void emitStoreLocalBytes(FunctionCompiler& ctx, u32 offset, u32 byte_size, bool clamp_to_locals = true) {
 	const u32 src = ctx.temp_top - byte_size;
+	if (tryRedirectLastNumericBinaryToLocal(ctx, offset, src) || tryRedirectLastConstantToLocal(ctx, offset, src, byte_size)) {
+		ctx.temp_top = clamp_to_locals && src < ctx.next_local_offset ? ctx.next_local_offset : src;
+		return;
+	}
 	emitOp(ctx.code, LS_OP_COPY);
 	emitFixedReg(ctx, offset);
 	emitTempReg(ctx, src);
@@ -576,6 +632,17 @@ static void emitCompareOp(FunctionCompiler& ctx, ls_op op, ls_type_kind kind) {
 	ctx.temp_top = lhs + 1u;
 }
 
+static void emitCompareOpAt(FunctionCompiler& ctx, ls_op op, ls_type_kind kind, u32 dst, u32 lhs, u32 rhs) {
+	bool swap_operands = false;
+	if (op == LS_OP_GT) { op = LS_OP_LT; swap_operands = true; }
+	else if (op == LS_OP_GE) { op = LS_OP_LE; swap_operands = true; }
+	emitOp(ctx.code, op);
+	emitFixedReg(ctx, dst);
+	emitFixedReg(ctx, swap_operands ? rhs : lhs);
+	emitFixedReg(ctx, swap_operands ? lhs : rhs);
+	emitU8(ctx.code, (u8)kind);
+}
+
 static void emitUnaryOp(FunctionCompiler& ctx, ls_op op, u32 size) {
 	const u32 src = ctx.temp_top - size;
 	emitOp(ctx.code, op);
@@ -591,6 +658,16 @@ static void emitCast(FunctionCompiler& ctx, ls_type_kind src_kind, ls_type_kind 
 	emitU8(ctx.code, (u8)src_kind);
 	emitU8(ctx.code, (u8)dst_kind);
 	setTempTop(ctx, src + typeKindByteSize(dst_kind));
+}
+
+static void emitCastFromLocal(FunctionCompiler& ctx, u32 src, ls_type_kind src_kind, ls_type_kind dst_kind) {
+	const u32 dst = ctx.temp_top;
+	emitOp(ctx.code, LS_OP_CAST);
+	emitTempReg(ctx, dst);
+	emitFixedReg(ctx, src);
+	emitU8(ctx.code, (u8)src_kind);
+	emitU8(ctx.code, (u8)dst_kind);
+	setTempTop(ctx, dst + typeKindByteSize(dst_kind));
 }
 
 static void emitStringToCStr(FunctionCompiler& ctx) {
@@ -637,6 +714,118 @@ static void emitStoreAt(FunctionCompiler& ctx, u32 scale, i32 offset, u32 size) 
 	emitI32(ctx.code, offset);
 	emitU32(ctx.code, size);
 	ctx.temp_top = base;
+}
+
+static void emitLoadAtLocalI32(FunctionCompiler& ctx, u32 base_offset, u32 index_offset, u32 length, u32 scale, i32 offset, u32 size) {
+	const u32 dst = ctx.temp_top;
+	emitOp(ctx.code, LS_OP_LOAD_AT_LOCAL_I32);
+	emitTempReg(ctx, dst);
+	emitFixedReg(ctx, base_offset);
+	emitFixedReg(ctx, index_offset);
+	emitU32(ctx.code, scale);
+	emitI32(ctx.code, offset);
+	emitU32(ctx.code, length);
+	emitU32(ctx.code, size);
+	setTempTop(ctx, dst + size);
+}
+
+static void emitLoadAtLocalI32KeepIndex(FunctionCompiler& ctx, u32 base_offset, u32 length, u32 scale, i32 offset, u32 size) {
+	const u32 index = ctx.temp_top - typeKindByteSize(LS_TYPE_I32);
+	const u32 dst = ctx.temp_top;
+	emitOp(ctx.code, LS_OP_LOAD_AT_LOCAL_I32);
+	emitTempReg(ctx, dst);
+	emitFixedReg(ctx, base_offset);
+	emitTempReg(ctx, index);
+	emitU32(ctx.code, scale);
+	emitI32(ctx.code, offset);
+	emitU32(ctx.code, length);
+	emitU32(ctx.code, size);
+	setTempTop(ctx, dst + size);
+}
+
+static void emitLoadAtLocalI32TempIndex(FunctionCompiler& ctx, u32 base_offset, u32 length, u32 scale, i32 offset, u32 size) {
+	const u32 index = ctx.temp_top - typeKindByteSize(LS_TYPE_I32);
+	emitOp(ctx.code, LS_OP_LOAD_AT_LOCAL_I32);
+	emitTempReg(ctx, index);
+	emitFixedReg(ctx, base_offset);
+	emitTempReg(ctx, index);
+	emitU32(ctx.code, scale);
+	emitI32(ctx.code, offset);
+	emitU32(ctx.code, length);
+	emitU32(ctx.code, size);
+	setTempTop(ctx, index + size);
+}
+
+static void emitLoadAtLocalI32To(FunctionCompiler& ctx, u32 dst, u32 base_offset, u32 index_offset, u32 length, u32 scale, i32 offset, u32 size) {
+	emitOp(ctx.code, LS_OP_LOAD_AT_LOCAL_I32);
+	emitFixedReg(ctx, dst);
+	emitFixedReg(ctx, base_offset);
+	emitFixedReg(ctx, index_offset);
+	emitU32(ctx.code, scale);
+	emitI32(ctx.code, offset);
+	emitU32(ctx.code, length);
+	emitU32(ctx.code, size);
+}
+
+static void emitStoreAtLocalI32(FunctionCompiler& ctx, u32 base_offset, u32 index_offset, u32 length, u32 scale, i32 offset, u32 size) {
+	const u32 value = ctx.temp_top - size;
+	emitOp(ctx.code, LS_OP_STORE_AT_LOCAL_I32);
+	emitFixedReg(ctx, base_offset);
+	emitFixedReg(ctx, index_offset);
+	emitTempReg(ctx, value);
+	emitU32(ctx.code, scale);
+	emitI32(ctx.code, offset);
+	emitU32(ctx.code, length);
+	emitU32(ctx.code, size);
+	ctx.temp_top = value;
+}
+
+static void emitStoreAtLocalI32TempIndex(FunctionCompiler& ctx, u32 base_offset, u32 length, u32 scale, i32 offset, u32 size) {
+	const u32 value = ctx.temp_top - size;
+	const u32 index = value - typeKindByteSize(LS_TYPE_I32);
+	emitOp(ctx.code, LS_OP_STORE_AT_LOCAL_I32);
+	emitFixedReg(ctx, base_offset);
+	emitTempReg(ctx, index);
+	emitTempReg(ctx, value);
+	emitU32(ctx.code, scale);
+	emitI32(ctx.code, offset);
+	emitU32(ctx.code, length);
+	emitU32(ctx.code, size);
+	ctx.temp_top = index;
+}
+
+static void emitStoreAtLocalI32Value(FunctionCompiler& ctx, u32 base_offset, u32 index_offset, u32 value_offset, u32 length, u32 scale, i32 offset, u32 size) {
+	emitOp(ctx.code, LS_OP_STORE_AT_LOCAL_I32);
+	emitFixedReg(ctx, base_offset);
+	emitFixedReg(ctx, index_offset);
+	emitFixedReg(ctx, value_offset);
+	emitU32(ctx.code, scale);
+	emitI32(ctx.code, offset);
+	emitU32(ctx.code, length);
+	emitU32(ctx.code, size);
+}
+
+static void emitStoreAtLocalI32TempIndexValue(FunctionCompiler& ctx, u32 base_offset, u32 value_offset, u32 length, u32 scale, i32 offset, u32 size) {
+	const u32 index_offset = ctx.temp_top - typeKindByteSize(LS_TYPE_I32);
+	emitStoreAtLocalI32Value(ctx, base_offset, index_offset, value_offset, length, scale, offset, size);
+	ctx.temp_top = index_offset;
+}
+
+static void emitCopyAtLocalI32(FunctionCompiler& ctx, u32 src_base_offset, u32 src_index_offset, u32 dst_base_offset, u32 dst_index_offset, u32 length, u32 scale, u32 size) {
+	emitOp(ctx.code, LS_OP_COPY_AT_LOCAL_I32);
+	emitFixedReg(ctx, src_base_offset);
+	emitFixedReg(ctx, src_index_offset);
+	emitFixedReg(ctx, dst_base_offset);
+	emitFixedReg(ctx, dst_index_offset);
+	emitU32(ctx.code, scale);
+	emitU32(ctx.code, length);
+	emitU32(ctx.code, size);
+}
+
+static void emitCopyAtLocalI32TempSource(FunctionCompiler& ctx, u32 src_base_offset, u32 dst_base_offset, u32 dst_index_offset, u32 length, u32 scale, u32 size) {
+	const u32 src_index = ctx.temp_top - typeKindByteSize(LS_TYPE_I32);
+	emitCopyAtLocalI32(ctx, src_base_offset, src_index, dst_base_offset, dst_index_offset, length, scale, size);
+	ctx.temp_top = src_index;
 }
 
 static void emitRefAt(FunctionCompiler& ctx, u32 scale, i32 offset) {
@@ -738,6 +927,222 @@ static void emitSliceStoreAt(FunctionCompiler& ctx, u32 element_size, i32 field_
 	ctx.temp_top = slice;
 }
 
+static void emitSliceLoadLocal(FunctionCompiler& ctx, u32 slice_offset, u32 element_size) {
+	const u32 index = ctx.temp_top - typeKindByteSize(LS_TYPE_I64);
+	const u32 dst = index;
+	emitOp(ctx.code, LS_OP_SLICE_LOAD_LOCAL);
+	emitTempReg(ctx, dst);
+	emitFixedReg(ctx, slice_offset);
+	emitTempReg(ctx, index);
+	emitU32(ctx.code, element_size);
+	setTempTop(ctx, dst + element_size);
+}
+
+static void emitSliceStoreLocal(FunctionCompiler& ctx, u32 slice_offset, u32 element_size) {
+	const u32 value = ctx.temp_top - element_size;
+	const u32 index = value - typeKindByteSize(LS_TYPE_I64);
+	emitOp(ctx.code, LS_OP_SLICE_STORE_LOCAL);
+	emitFixedReg(ctx, slice_offset);
+	emitTempReg(ctx, index);
+	emitTempReg(ctx, value);
+	emitU32(ctx.code, element_size);
+	ctx.temp_top = index;
+}
+
+static void emitSliceLoadLocalI32(FunctionCompiler& ctx, u32 slice_offset, u32 element_size) {
+	const u32 index = ctx.temp_top - typeKindByteSize(LS_TYPE_I32);
+	const u32 dst = index;
+	emitOp(ctx.code, LS_OP_SLICE_LOAD_LOCAL_I32);
+	emitTempReg(ctx, dst);
+	emitFixedReg(ctx, slice_offset);
+	emitTempReg(ctx, index);
+	emitU32(ctx.code, element_size);
+	setTempTop(ctx, dst + element_size);
+}
+
+static void emitSliceStoreLocalI32(FunctionCompiler& ctx, u32 slice_offset, u32 element_size) {
+	const u32 value = ctx.temp_top - element_size;
+	const u32 index = value - typeKindByteSize(LS_TYPE_I32);
+	emitOp(ctx.code, LS_OP_SLICE_STORE_LOCAL_I32);
+	emitFixedReg(ctx, slice_offset);
+	emitTempReg(ctx, index);
+	emitTempReg(ctx, value);
+	emitU32(ctx.code, element_size);
+	ctx.temp_top = index;
+}
+
+static void emitSliceLoadLocalI32At(FunctionCompiler& ctx, u32 slice_offset, u32 index_offset, u32 element_size) {
+	const u32 dst = ctx.temp_top;
+	emitOp(ctx.code, LS_OP_SLICE_LOAD_LOCAL_I32);
+	emitTempReg(ctx, dst);
+	emitFixedReg(ctx, slice_offset);
+	emitFixedReg(ctx, index_offset);
+	emitU32(ctx.code, element_size);
+	setTempTop(ctx, dst + element_size);
+}
+
+static void emitSliceLoadLocalI32To(FunctionCompiler& ctx, u32 dst, u32 slice_offset, u32 index_offset, u32 element_size) {
+	emitOp(ctx.code, LS_OP_SLICE_LOAD_LOCAL_I32);
+	emitFixedReg(ctx, dst);
+	emitFixedReg(ctx, slice_offset);
+	emitFixedReg(ctx, index_offset);
+	emitU32(ctx.code, element_size);
+}
+
+static void emitSliceStoreLocalI32At(FunctionCompiler& ctx, u32 slice_offset, u32 index_offset, u32 element_size) {
+	const u32 value = ctx.temp_top - element_size;
+	emitOp(ctx.code, LS_OP_SLICE_STORE_LOCAL_I32);
+	emitFixedReg(ctx, slice_offset);
+	emitFixedReg(ctx, index_offset);
+	emitTempReg(ctx, value);
+	emitU32(ctx.code, element_size);
+	ctx.temp_top = value;
+}
+
+static void emitSliceStoreLocalI32ValueAt(FunctionCompiler& ctx, u32 slice_offset, u32 index_offset, u32 value_offset, u32 element_size) {
+	emitOp(ctx.code, LS_OP_SLICE_STORE_LOCAL_I32);
+	emitFixedReg(ctx, slice_offset);
+	emitFixedReg(ctx, index_offset);
+	emitFixedReg(ctx, value_offset);
+	emitU32(ctx.code, element_size);
+}
+
+static bool patchI16(ByteArray& code, u32 offset, i32 value) {
+	if (value < -32768 || value > 32767) return false;
+	const u16 bits = (u16)(i16)value;
+	code[offset + 0u] = (u8)(bits & 0xFFu);
+	code[offset + 1u] = (u8)((bits >> 8u) & 0xFFu);
+	return true;
+}
+
+static void emitSliceStoreLocalI32TempValueAt(FunctionCompiler& ctx, u32 slice_offset, u32 index_offset, u32 value_offset, u32 element_size) {
+	emitOp(ctx.code, LS_OP_SLICE_STORE_LOCAL_I32);
+	emitFixedReg(ctx, slice_offset);
+	emitTempReg(ctx, index_offset);
+	emitFixedReg(ctx, value_offset);
+	emitU32(ctx.code, element_size);
+	ctx.temp_top = index_offset;
+}
+
+static void emitSliceLoadAtLocal(FunctionCompiler& ctx, u32 slice_offset, u32 element_size, i32 field_offset, u32 field_size) {
+	const u32 index = ctx.temp_top - typeKindByteSize(LS_TYPE_I64);
+	const u32 dst = index;
+	emitOp(ctx.code, LS_OP_SLICE_LOAD_AT_LOCAL);
+	emitTempReg(ctx, dst);
+	emitFixedReg(ctx, slice_offset);
+	emitTempReg(ctx, index);
+	emitU32(ctx.code, element_size);
+	emitI32(ctx.code, field_offset);
+	emitU32(ctx.code, field_size);
+	setTempTop(ctx, dst + field_size);
+}
+
+static void emitSliceLoadAtLocalAt(FunctionCompiler& ctx, u32 slice_offset, u32 index_offset, u32 element_size, i32 field_offset, u32 field_size) {
+	const u32 dst = ctx.temp_top;
+	emitOp(ctx.code, LS_OP_SLICE_LOAD_AT_LOCAL);
+	emitTempReg(ctx, dst);
+	emitFixedReg(ctx, slice_offset);
+	emitFixedReg(ctx, index_offset);
+	emitU32(ctx.code, element_size);
+	emitI32(ctx.code, field_offset);
+	emitU32(ctx.code, field_size);
+	setTempTop(ctx, dst + field_size);
+}
+
+static void emitSliceLoadAtLocalTo(FunctionCompiler& ctx, u32 dst, u32 slice_offset, u32 index_offset, u32 element_size, i32 field_offset, u32 field_size) {
+	emitOp(ctx.code, LS_OP_SLICE_LOAD_AT_LOCAL);
+	emitFixedReg(ctx, dst);
+	emitFixedReg(ctx, slice_offset);
+	emitFixedReg(ctx, index_offset);
+	emitU32(ctx.code, element_size);
+	emitI32(ctx.code, field_offset);
+	emitU32(ctx.code, field_size);
+}
+
+static void emitSliceLoadAtLocalI32(FunctionCompiler& ctx, u32 slice_offset, u32 element_size, i32 field_offset, u32 field_size) {
+	const u32 index = ctx.temp_top - typeKindByteSize(LS_TYPE_I32);
+	const u32 dst = index;
+	emitOp(ctx.code, LS_OP_SLICE_LOAD_AT_LOCAL_I32);
+	emitTempReg(ctx, dst);
+	emitFixedReg(ctx, slice_offset);
+	emitTempReg(ctx, index);
+	emitU32(ctx.code, element_size);
+	emitI32(ctx.code, field_offset);
+	emitU32(ctx.code, field_size);
+	setTempTop(ctx, dst + field_size);
+}
+
+static void emitSliceLoadAtLocalI32At(FunctionCompiler& ctx, u32 slice_offset, u32 index_offset, u32 element_size, i32 field_offset, u32 field_size) {
+	const u32 dst = ctx.temp_top;
+	emitOp(ctx.code, LS_OP_SLICE_LOAD_AT_LOCAL_I32);
+	emitTempReg(ctx, dst);
+	emitFixedReg(ctx, slice_offset);
+	emitFixedReg(ctx, index_offset);
+	emitU32(ctx.code, element_size);
+	emitI32(ctx.code, field_offset);
+	emitU32(ctx.code, field_size);
+	setTempTop(ctx, dst + field_size);
+}
+
+static void emitSliceLoadAtLocalI32To(FunctionCompiler& ctx, u32 dst, u32 slice_offset, u32 index_offset, u32 element_size, i32 field_offset, u32 field_size) {
+	emitOp(ctx.code, LS_OP_SLICE_LOAD_AT_LOCAL_I32);
+	emitFixedReg(ctx, dst);
+	emitFixedReg(ctx, slice_offset);
+	emitFixedReg(ctx, index_offset);
+	emitU32(ctx.code, element_size);
+	emitI32(ctx.code, field_offset);
+	emitU32(ctx.code, field_size);
+}
+
+static void emitSliceStoreAtLocal(FunctionCompiler& ctx, u32 slice_offset, u32 element_size, i32 field_offset, u32 field_size) {
+	const u32 value = ctx.temp_top - field_size;
+	const u32 index = value - typeKindByteSize(LS_TYPE_I64);
+	emitOp(ctx.code, LS_OP_SLICE_STORE_AT_LOCAL);
+	emitFixedReg(ctx, slice_offset);
+	emitTempReg(ctx, index);
+	emitTempReg(ctx, value);
+	emitU32(ctx.code, element_size);
+	emitI32(ctx.code, field_offset);
+	emitU32(ctx.code, field_size);
+	ctx.temp_top = index;
+}
+
+static void emitSliceStoreAtLocalAt(FunctionCompiler& ctx, u32 slice_offset, u32 index_offset, u32 element_size, i32 field_offset, u32 field_size) {
+	const u32 value = ctx.temp_top - field_size;
+	emitOp(ctx.code, LS_OP_SLICE_STORE_AT_LOCAL);
+	emitFixedReg(ctx, slice_offset);
+	emitFixedReg(ctx, index_offset);
+	emitTempReg(ctx, value);
+	emitU32(ctx.code, element_size);
+	emitI32(ctx.code, field_offset);
+	emitU32(ctx.code, field_size);
+	ctx.temp_top = value;
+}
+
+static void emitSliceStoreAtLocalI32(FunctionCompiler& ctx, u32 slice_offset, u32 element_size, i32 field_offset, u32 field_size) {
+	const u32 value = ctx.temp_top - field_size;
+	const u32 index = value - typeKindByteSize(LS_TYPE_I32);
+	emitOp(ctx.code, LS_OP_SLICE_STORE_AT_LOCAL_I32);
+	emitFixedReg(ctx, slice_offset);
+	emitTempReg(ctx, index);
+	emitTempReg(ctx, value);
+	emitU32(ctx.code, element_size);
+	emitI32(ctx.code, field_offset);
+	emitU32(ctx.code, field_size);
+	ctx.temp_top = index;
+}
+
+static void emitSliceStoreAtLocalI32At(FunctionCompiler& ctx, u32 slice_offset, u32 index_offset, u32 element_size, i32 field_offset, u32 field_size) {
+	const u32 value = ctx.temp_top - field_size;
+	emitOp(ctx.code, LS_OP_SLICE_STORE_AT_LOCAL_I32);
+	emitFixedReg(ctx, slice_offset);
+	emitFixedReg(ctx, index_offset);
+	emitTempReg(ctx, value);
+	emitU32(ctx.code, element_size);
+	emitI32(ctx.code, field_offset);
+	emitU32(ctx.code, field_size);
+	ctx.temp_top = value;
+}
 static void emitSliceOp(FunctionCompiler& ctx, u32 element_size) {
 	const u32 end = ctx.temp_top - typeKindByteSize(LS_TYPE_I64);
 	const u32 begin = end - typeKindByteSize(LS_TYPE_I64);
@@ -767,14 +1172,29 @@ static void emitSliceLength(FunctionCompiler& ctx) {
 	const u32 slice = ctx.temp_top - typeKindByteSize(LS_TYPE_SLICE);
 	emitOp(ctx.code, LS_OP_SLICE_LENGTH);
 	emitTempReg(ctx, slice);
+	emitTempReg(ctx, slice);
 	setTempTop(ctx, slice + typeKindByteSize(LS_TYPE_I64));
+}
+
+static void emitSliceLengthLocal(FunctionCompiler& ctx, u32 slice_offset) {
+	const u32 dst = ctx.temp_top;
+	emitOp(ctx.code, LS_OP_SLICE_LENGTH);
+	emitTempReg(ctx, dst);
+	emitFixedReg(ctx, slice_offset);
+	setTempTop(ctx, dst + typeKindByteSize(LS_TYPE_I64));
+}
+
+static void emitSliceLengthToLocal(FunctionCompiler& ctx, u32 dst, u32 slice_offset) {
+	emitOp(ctx.code, LS_OP_SLICE_LENGTH);
+	emitFixedReg(ctx, dst);
+	emitFixedReg(ctx, slice_offset);
 }
 
 static void emitCallDirect(FunctionCompiler& ctx, u32 callee_index, u32 arg_size, u32 return_size) {
 	const u32 arg = ctx.temp_top - arg_size;
 	emitOp(ctx.code, LS_OP_CALL_DIRECT);
 	emitU32(ctx.code, callee_index);
-	emitTempReg(ctx, ctx.temp_top);
+	emitTempReg(ctx, arg);
 	setTempTop(ctx, arg + return_size);
 }
 
@@ -795,6 +1215,23 @@ static void emitReturn(FunctionCompiler& ctx) {
 	else emitFixedReg(ctx, 0u);
 	emitU32(ctx.code, return_size);
 	ctx.temp_top = ctx.next_local_offset;
+}
+
+static void emitReturnFromLocal(FunctionCompiler& ctx, u32 source) {
+	emitOp(ctx.code, LS_OP_RETURN);
+	if (ctx.out.return_size > 0u) emitFixedReg(ctx, source);
+	else emitFixedReg(ctx, 0u);
+	emitU32(ctx.code, ctx.out.return_size);
+	ctx.temp_top = ctx.next_local_offset;
+}
+
+static bool tryEmitDirectLocalReturn(FunctionCompiler& ctx, Expression& expr) {
+	if (expr.kind != Expression::IDENTIFIER || expr.resolved_type != ctx.return_type) return false;
+	IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
+	if (!id.slot || id.slot->storage != StorageSlot::LOCAL || id.slot->type != expr.resolved_type) return false;
+	if (!ctx.deferreds.empty()) return false;
+	emitReturnFromLocal(ctx, id.slot->offset);
+	return true;
 }
 
 
@@ -960,7 +1397,7 @@ static void compileExpressionAsType(FunctionCompiler& ctx, Expression& expr, Res
 				emitLoadLocalBytes(ctx, source_offset, 4);
 				emitIntegerConstant(ctx, LS_TYPE_I32, i);
 				emitCompareOp(ctx, LS_OP_EQ, LS_TYPE_I32);
-				const u32 next_member_jump = emitJumpPlaceholder(ctx, LS_OP_JUMP_IF_FALSE);
+				const u32 next_member_jump = emitJumpPlaceholder(ctx, LS_OP_JZ_U8);
 
 				emitIntegerConstant(ctx, LS_TYPE_I32, target_index);
 				const u32 member_size = typeByteSize(*source.members[i]);
@@ -969,12 +1406,12 @@ static void compileExpressionAsType(FunctionCompiler& ctx, Expression& expr, Res
 				if (payload_size > member_size) emitZeroBytes(ctx, payload_size - member_size);
 				end_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP));
 
-				patchJumpRelative(ctx.code, next_member_jump, (u32)ctx.code.size());
+				patchJumpRelative(ctx, next_member_jump, (u32)ctx.code.size());
 				ctx.temp_top = result_top;
 			}
 			emitZeroBytes(ctx, typeByteSize(expected_type));
 			const u32 end = (u32)ctx.code.size();
-			for (u32 jump : end_jumps) patchJumpRelative(ctx.code, jump, end);
+			for (u32 jump : end_jumps) patchJumpRelative(ctx, jump, end);
 			return;
 		}
 		for (i32 i = 0; i < un.members.size(); ++i) {
@@ -1063,6 +1500,104 @@ static void emitNumericStoreOp(FunctionCompiler& ctx, ls_type_kind kind, Token::
 	}
 }
 
+static bool isI32Index(Expression& expr) {
+	return expr.resolved_type && valueKindForType(*expr.resolved_type) == LS_TYPE_I32;
+}
+
+static bool getDirectLocalI32Index(Expression& expr, u32& offset) {
+	if (expr.kind != Expression::IDENTIFIER) return false;
+	IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
+	if (!id.slot || id.slot->storage != StorageSlot::LOCAL || id.slot->kind != LS_TYPE_I32) return false;
+	offset = id.slot->offset;
+	return true;
+}
+
+static bool isSideEffectFreeExpression(Expression& expr) {
+	switch (expr.kind) {
+		case Expression::INT_LITERAL:
+		case Expression::FLOAT_LITERAL:
+		case Expression::BOOL_LITERAL:
+		case Expression::NULL_LITERAL:
+		case Expression::UNDEFINED:
+		case Expression::IDENTIFIER:
+			return true;
+		case Expression::CAST: return isSideEffectFreeExpression(*static_cast<CastExpression&>(expr).expression);
+		case Expression::UNARY: return isSideEffectFreeExpression(*static_cast<UnaryExpression&>(expr).expression);
+		case Expression::BINARY: {
+			BinaryExpression& binary = static_cast<BinaryExpression&>(expr);
+			return isSideEffectFreeExpression(*binary.lhs) && isSideEffectFreeExpression(*binary.rhs);
+		}
+		case Expression::BRACKET: {
+			BracketExpression& bracket = static_cast<BracketExpression&>(expr);
+			if (!isSideEffectFreeExpression(*bracket.base)) return false;
+			for (Expression* arg : bracket.args) if (!isSideEffectFreeExpression(*arg)) return false;
+			return true;
+		}
+		case Expression::MEMBER: return isSideEffectFreeExpression(*static_cast<MemberExpression&>(expr).expression);
+		default: return false;
+	}
+}
+
+static void compileIndexExpressionI32(FunctionCompiler& ctx, Expression& expr) {
+	const ls_type_kind kind = compileExpression(ctx, expr, LS_TYPE_I32);
+	if (kind != LS_TYPE_I32) emitCast(ctx, kind, LS_TYPE_I32);
+}
+
+static bool emitNumericStoreOpToLocal(FunctionCompiler& ctx, u32 offset, ls_type_kind kind, Token::Type op) {
+	ls_op base;
+	switch (op) {
+		case Token::PLUS_EQUAL:  base = LS_OP_ADD_I8; break;
+		case Token::MINUS_EQUAL: base = LS_OP_SUB_I8; break;
+		case Token::STAR_EQUAL:  base = LS_OP_MUL_I8; break;
+		case Token::SLASH_EQUAL: base = LS_OP_DIV_I8; break;
+		default: return false;
+	}
+	const u32 size = typeKindByteSize(kind);
+	const u32 rhs = ctx.temp_top - size;
+	emitOp(ctx.code, (ls_op)((u32)base + numericKindIndex(kind)));
+	emitFixedReg(ctx, offset);
+	emitFixedReg(ctx, offset);
+	emitTempReg(ctx, rhs);
+	ctx.temp_top = rhs;
+	return true;
+}
+
+static bool emitNumericStoreOpToLocalReg(FunctionCompiler& ctx, u32 offset, u32 rhs_offset, ls_type_kind kind, Token::Type op) {
+	ls_op base;
+	switch (op) {
+		case Token::PLUS_EQUAL:  base = LS_OP_ADD_I8; break;
+		case Token::MINUS_EQUAL: base = LS_OP_SUB_I8; break;
+		case Token::STAR_EQUAL:  base = LS_OP_MUL_I8; break;
+		case Token::SLASH_EQUAL: base = LS_OP_DIV_I8; break;
+		default: return false;
+	}
+	emitOp(ctx.code, (ls_op)((u32)base + numericKindIndex(kind)));
+	emitFixedReg(ctx, offset);
+	emitFixedReg(ctx, offset);
+	emitFixedReg(ctx, rhs_offset);
+	return true;
+}
+
+static bool getDirectLocalI64Index(Expression& expr, u32& offset) {
+	if (expr.kind != Expression::IDENTIFIER) return false;
+	IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
+	if (!id.slot || id.slot->storage != StorageSlot::LOCAL || id.slot->kind != LS_TYPE_I64) return false;
+	offset = id.slot->offset;
+	return true;
+}
+
+static bool emitIncrementRegister(FunctionCompiler& ctx, u32 offset, ls_type_kind kind, bool decrement = false) {
+	if (kind != LS_TYPE_I32 && kind != LS_TYPE_I64) return false;
+	if (decrement) emitOp(ctx.code, kind == LS_TYPE_I32 ? LS_OP_DEC_I32 : LS_OP_DEC_I64);
+	else emitOp(ctx.code, kind == LS_TYPE_I32 ? LS_OP_INC_I32 : LS_OP_INC_I64);
+	emitFixedReg(ctx, offset);
+	return true;
+}
+
+static bool emitIncrementLocal(FunctionCompiler& ctx, u32 offset, ls_type_kind kind, bool decrement = false) {
+	return emitIncrementRegister(ctx, offset, kind, decrement);
+}
+
 // Compound assignment compute step: the current lhs value is already on top of
 // temporaries; combine it with `rhs`, either through an overloaded operator or a
 // numeric opcode, leaving the result in the lhs value's place.
@@ -1072,6 +1607,11 @@ static void emitCompoundValue(FunctionCompiler& ctx, Expression& rhs, ls_type_ki
 		compileExpressionAsType(ctx, rhs, *fn_type->param_types[1]);
 		emitCallDirect(ctx, op_fn->bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type));
 		return;
+	}
+	if (rhs.kind == Expression::INT_LITERAL && static_cast<IntLiteralExpression&>(rhs).value == 1u &&
+		(op == Token::PLUS_EQUAL || op == Token::MINUS_EQUAL)) {
+		const u32 lhs = ctx.temp_top - typeKindByteSize(value_kind);
+		if (emitIncrementRegister(ctx, lhs, value_kind, op == Token::MINUS_EQUAL)) return;
 	}
 	compileExpression(ctx, rhs, value_kind);
 	emitNumericStoreOp(ctx, value_kind, op);
@@ -1083,12 +1623,98 @@ static void emitBracketStore(FunctionCompiler& ctx, BracketExpression& br, Expre
 
 	if (op == Token::EQUAL) {
 		if (is_slice) {
+			IdentifierExpression* base_id = br.base->kind == Expression::IDENTIFIER ? static_cast<IdentifierExpression*>(br.base) : nullptr;
+			StorageSlot* base_slot = base_id ? base_id->slot : nullptr;
+			if (base_slot && base_slot->storage == StorageSlot::LOCAL && base_slot->type->kind == ResolvedType::SLICE) {
+				const bool index_is_i32 = isI32Index(*br.args[0]);
+				u32 direct_index_offset = 0;
+				if (index_is_i32 && isSideEffectFreeExpression(rhs) && getDirectLocalI32Index(*br.args[0], direct_index_offset)) {
+					if (rhs.kind == Expression::IDENTIFIER) {
+						IdentifierExpression& rhs_id = static_cast<IdentifierExpression&>(rhs);
+						if (rhs_id.slot && rhs_id.slot->storage == StorageSlot::LOCAL && rhs_id.slot->byte_size == element_size) {
+							emitSliceStoreLocalI32ValueAt(ctx, base_slot->offset, direct_index_offset, rhs_id.slot->offset, element_size);
+							return;
+						}
+					}
+					compileExpressionAsType(ctx, rhs, *br.resolved_type);
+					emitSliceStoreLocalI32At(ctx, base_slot->offset, direct_index_offset, element_size);
+					return;
+				}
+				if (index_is_i32) compileIndexExpressionI32(ctx, *br.args[0]);
+				else compileIndexExpression(ctx, *br.args[0]);
+				if (index_is_i32 && rhs.kind == Expression::IDENTIFIER) {
+					IdentifierExpression& rhs_id = static_cast<IdentifierExpression&>(rhs);
+					if (rhs_id.slot && rhs_id.slot->storage == StorageSlot::LOCAL && rhs_id.slot->byte_size == element_size) {
+						const u32 index_offset = ctx.temp_top - typeKindByteSize(LS_TYPE_I32);
+						emitSliceStoreLocalI32TempValueAt(ctx, base_slot->offset, index_offset, rhs_id.slot->offset, element_size);
+						return;
+					}
+				}
+				compileExpressionAsType(ctx, rhs, *br.resolved_type);
+				if (index_is_i32) emitSliceStoreLocalI32(ctx, base_slot->offset, element_size);
+				else emitSliceStoreLocal(ctx, base_slot->offset, element_size);
+				return;
+			}
 			compileExpression(ctx, *br.base, LS_TYPE_SLICE);
 			compileIndexExpression(ctx, *br.args[0]);
 			compileExpressionAsType(ctx, rhs, *br.resolved_type);
 			emitSliceStore(ctx, element_size);
 		}
 		else {
+			IdentifierExpression* base_id = br.base->kind == Expression::IDENTIFIER ? static_cast<IdentifierExpression*>(br.base) : nullptr;
+			StorageSlot* base_slot = base_id ? base_id->slot : nullptr;
+			u32 index_offset = 0;
+			if (base_slot && base_slot->storage == StorageSlot::LOCAL && base_slot->type->kind == ResolvedType::ARRAY && isI32Index(*br.args[0])) {
+				const u32 length = static_cast<ArrayResolvedType*>(br.base->resolved_type)->size;
+				if (getDirectLocalI32Index(*br.args[0], index_offset) && rhs.kind == Expression::BRACKET && isSideEffectFreeExpression(rhs)) {
+					BracketExpression& rhs_br = static_cast<BracketExpression&>(rhs);
+					IdentifierExpression* rhs_base_id = rhs_br.base->kind == Expression::IDENTIFIER ? static_cast<IdentifierExpression*>(rhs_br.base) : nullptr;
+					StorageSlot* rhs_base_slot = rhs_base_id ? rhs_base_id->slot : nullptr;
+					if (rhs_base_slot && rhs_base_slot->storage == StorageSlot::LOCAL && rhs_base_slot->type->kind == ResolvedType::ARRAY &&
+						rhs_br.resolved_type == br.resolved_type &&
+						static_cast<ArrayResolvedType*>(rhs_br.base->resolved_type)->size == length && isI32Index(*rhs_br.args[0])) {
+						u32 src_index_offset = 0;
+						if (getDirectLocalI32Index(*rhs_br.args[0], src_index_offset)) {
+							emitCopyAtLocalI32(ctx, rhs_base_slot->offset, src_index_offset, base_slot->offset, index_offset, length, element_size, element_size);
+						}
+						else {
+							compileIndexExpressionI32(ctx, *rhs_br.args[0]);
+							emitCopyAtLocalI32TempSource(ctx, rhs_base_slot->offset, base_slot->offset, index_offset, length, element_size, element_size);
+						}
+						return;
+					}
+				}
+				if (getDirectLocalI32Index(*br.args[0], index_offset) && rhs.kind == Expression::IDENTIFIER) {
+					IdentifierExpression& rhs_id = static_cast<IdentifierExpression&>(rhs);
+					if (rhs_id.slot && rhs_id.slot->storage == StorageSlot::LOCAL && rhs_id.slot->kind == value_kind) {
+						emitStoreAtLocalI32Value(ctx, base_slot->offset, index_offset, rhs_id.slot->offset, length, element_size, 0, element_size);
+						return;
+					}
+				}
+				if (rhs.kind == Expression::IDENTIFIER) {
+					IdentifierExpression& rhs_id = static_cast<IdentifierExpression&>(rhs);
+					if (rhs_id.slot && rhs_id.slot->storage == StorageSlot::LOCAL && rhs_id.slot->kind == value_kind) {
+						if (getDirectLocalI32Index(*br.args[0], index_offset)) {
+							emitStoreAtLocalI32Value(ctx, base_slot->offset, index_offset, rhs_id.slot->offset, length, element_size, 0, element_size);
+						}
+						else {
+							compileIndexExpressionI32(ctx, *br.args[0]);
+							emitStoreAtLocalI32TempIndexValue(ctx, base_slot->offset, rhs_id.slot->offset, length, element_size, 0, element_size);
+						}
+						return;
+					}
+				}
+				if (getDirectLocalI32Index(*br.args[0], index_offset)) {
+					compileExpressionAsType(ctx, rhs, *br.resolved_type);
+					emitStoreAtLocalI32(ctx, base_slot->offset, index_offset, length, element_size, 0, element_size);
+				}
+				else {
+					compileIndexExpressionI32(ctx, *br.args[0]);
+					compileExpressionAsType(ctx, rhs, *br.resolved_type);
+					emitStoreAtLocalI32TempIndex(ctx, base_slot->offset, length, element_size, 0, element_size);
+				}
+				return;
+			}
 			if (!tryEmitReference(ctx, *br.base)) {
 				compileExpression(ctx, *br.base, LS_TYPE_INVALID);
 				emitLocalRef(ctx, ctx.temp_top - typeByteSize(*br.base->resolved_type));
@@ -1102,6 +1728,34 @@ static void emitBracketStore(FunctionCompiler& ctx, BracketExpression& br, Expre
 	}
 
 	if (is_slice) {
+		IdentifierExpression* base_id = br.base->kind == Expression::IDENTIFIER ? static_cast<IdentifierExpression*>(br.base) : nullptr;
+		StorageSlot* base_slot = base_id ? base_id->slot : nullptr;
+		if (base_slot && base_slot->storage == StorageSlot::LOCAL && base_slot->type->kind == ResolvedType::SLICE) {
+			const bool index_is_i32 = isI32Index(*br.args[0]);
+			u32 direct_index_offset = 0;
+			if (index_is_i32 && !op_fn && (rhs.kind == Expression::INT_LITERAL || rhs.kind == Expression::FLOAT_LITERAL) && getDirectLocalI32Index(*br.args[0], direct_index_offset)) {
+				emitSliceLoadLocalI32At(ctx, base_slot->offset, direct_index_offset, element_size);
+				emitCompoundValue(ctx, rhs, value_kind, op, op_fn);
+				emitSliceStoreLocalI32At(ctx, base_slot->offset, direct_index_offset, element_size);
+				return;
+			}
+			const ls_type_kind index_kind = index_is_i32 ? LS_TYPE_I32 : LS_TYPE_I64;
+			const u32 index_offset = ctx.addLocal(nullptr, index_kind);
+			const u32 value_offset = ctx.addLocal(br.resolved_type, value_kind);
+			if (index_is_i32) compileIndexExpressionI32(ctx, *br.args[0]);
+			else compileIndexExpression(ctx, *br.args[0]);
+			emitStoreLocalBytes(ctx, index_offset, typeKindByteSize(index_kind));
+			emitLoadLocalBytes(ctx, index_offset, typeKindByteSize(index_kind));
+			if (index_is_i32) emitSliceLoadLocalI32(ctx, base_slot->offset, element_size);
+			else emitSliceLoadLocal(ctx, base_slot->offset, element_size);
+			emitCompoundValue(ctx, rhs, value_kind, op, op_fn);
+			emitStoreLocalBytes(ctx, value_offset, typeByteSize(*br.resolved_type));
+			emitLoadLocalBytes(ctx, index_offset, typeKindByteSize(index_kind));
+			emitLoadLocalBytes(ctx, value_offset, typeByteSize(*br.resolved_type));
+			if (index_is_i32) emitSliceStoreLocalI32(ctx, base_slot->offset, element_size);
+			else emitSliceStoreLocal(ctx, base_slot->offset, element_size);
+			return;
+		}
 		// Evaluate the base and index once. Compound assignment needs them for both
 		// the checked load and checked store, and either expression may have effects.
 		const u32 slice_offset = ctx.addLocal(br.base->resolved_type, LS_TYPE_SLICE);
@@ -1127,6 +1781,31 @@ static void emitBracketStore(FunctionCompiler& ctx, BracketExpression& br, Expre
 	}
 
 	const u32 ref_size = typeKindByteSize(LS_TYPE_CPTR);
+	{
+		IdentifierExpression* base_id = br.base->kind == Expression::IDENTIFIER ? static_cast<IdentifierExpression*>(br.base) : nullptr;
+		StorageSlot* base_slot = base_id ? base_id->slot : nullptr;
+		if (base_slot && base_slot->storage == StorageSlot::LOCAL && base_slot->type->kind == ResolvedType::ARRAY &&
+			isI32Index(*br.args[0])) {
+			const u32 length = static_cast<ArrayResolvedType*>(br.base->resolved_type)->size;
+			u32 index_offset = 0;
+			const bool direct_index = getDirectLocalI32Index(*br.args[0], index_offset);
+			if (direct_index) {
+				emitLoadAtLocalI32(ctx, base_slot->offset, index_offset, length, element_size, 0, element_size);
+			}
+			else {
+				compileIndexExpressionI32(ctx, *br.args[0]);
+				emitLoadAtLocalI32KeepIndex(ctx, base_slot->offset, length, element_size, 0, element_size);
+			}
+			emitCompoundValue(ctx, rhs, value_kind, op, op_fn);
+			if (direct_index) {
+				emitStoreAtLocalI32(ctx, base_slot->offset, index_offset, length, element_size, 0, element_size);
+			}
+			else {
+				emitStoreAtLocalI32TempIndex(ctx, base_slot->offset, length, element_size, 0, element_size);
+			}
+			return;
+		}
+	}
 	const u32 index_size = typeKindByteSize(LS_TYPE_I64);
 	const u32 ref_offset = ctx.addLocal(nullptr, LS_TYPE_I64, true);
 	if (!tryEmitReference(ctx, *br.base)) {
@@ -1193,69 +1872,83 @@ static void emitSlice(FunctionCompiler& ctx, SliceExpression& br) {
 	emitSliceOp(ctx, typeByteSize(*element_type));
 }
 
-static void patchJumpRelative(ByteArray& code, u32 operand_pos, u32 target_pos) {
-	patchI32(code, operand_pos, (i32)((i32)target_pos - (i32)(operand_pos + 4u)));
+static bool patchJumpRelative(FunctionCompiler& ctx, u32 operand_pos, u32 target_pos) {
+	const i64 distance = (i64)target_pos - (i64)(operand_pos + 2u);
+	if (distance < -32768 || distance > 32767 || !patchI16(ctx.code, operand_pos, (i32)distance)) {
+		ctx.reportError("branch target is too far away (maximum range is 32767 bytes)");
+		return false;
+	}
+	return true;
 }
 
 static ls_op compareJumpTypeBase(ls_type_kind kind) {
 	switch (kind) {
-		case LS_TYPE_BOOL: return LS_OP_EQ_JUMP_FALSE_BOOL;
-		case LS_TYPE_I8: return LS_OP_EQ_JUMP_FALSE_I8;
-		case LS_TYPE_U8: return LS_OP_EQ_JUMP_FALSE_U8;
-		case LS_TYPE_I16: return LS_OP_EQ_JUMP_FALSE_I16;
-		case LS_TYPE_U16: return LS_OP_EQ_JUMP_FALSE_U16;
-		case LS_TYPE_I32: return LS_OP_EQ_JUMP_FALSE_I32;
-		case LS_TYPE_U32: return LS_OP_EQ_JUMP_FALSE_U32;
-		case LS_TYPE_I64: return LS_OP_EQ_JUMP_FALSE_I64;
-		case LS_TYPE_U64: return LS_OP_EQ_JUMP_FALSE_U64;
-		case LS_TYPE_F32: return LS_OP_EQ_JUMP_FALSE_F32;
-		case LS_TYPE_F64: return LS_OP_EQ_JUMP_FALSE_F64;
-		case LS_TYPE_STRING: return LS_OP_EQ_JUMP_FALSE_STRING;
-		case LS_TYPE_ENUM: return LS_OP_EQ_JUMP_FALSE_ENUM;
+		case LS_TYPE_BOOL: return LS_OP_JE_U8;
+		case LS_TYPE_I8: return LS_OP_JE_I8;
+		case LS_TYPE_U8: return LS_OP_JE_U8;
+		case LS_TYPE_I16: return LS_OP_JE_I16;
+		case LS_TYPE_U16: return LS_OP_JE_U16;
+		case LS_TYPE_I32: return LS_OP_JE_I32;
+		case LS_TYPE_U32: return LS_OP_JE_U32;
+		case LS_TYPE_I64: return LS_OP_JE_I64;
+		case LS_TYPE_U64: return LS_OP_JE_U64;
+		case LS_TYPE_F32: return LS_OP_JE_F32;
+		case LS_TYPE_F64: return LS_OP_JE_F64;
+		case LS_TYPE_STRING: return LS_OP_JE_STRING;
+		case LS_TYPE_ENUM: return LS_OP_JUMP;
 		default: return LS_OP_JUMP;
 	}
 }
 
 static ls_op compareJumpOp(ls_op compare_op, ls_type_kind kind, bool jump_if_true, bool& swap_operands) {
 	swap_operands = false;
+	if ((kind == LS_TYPE_BOOL || kind == LS_TYPE_STRING || kind == LS_TYPE_ENUM) && (compare_op == LS_OP_EQ || compare_op == LS_OP_NE)) {
+		const bool jump_on_equal = jump_if_true ? compare_op == LS_OP_EQ : compare_op == LS_OP_NE;
+		if (jump_on_equal) {
+			if (kind == LS_TYPE_BOOL) return LS_OP_JE_U8;
+			if (kind == LS_TYPE_STRING) return LS_OP_JE_STRING;
+		}
+		return LS_OP_JUMP;
+	}
 	if (jump_if_true) {
+		const u32 base = (u32)compareJumpTypeBase(kind);
+		if (base == (u32)LS_OP_JUMP) return LS_OP_JUMP;
 		switch (compare_op) {
-			case LS_OP_EQ: compare_op = LS_OP_NE; break;
-			case LS_OP_NE: compare_op = LS_OP_EQ; break;
-			case LS_OP_LT: compare_op = LS_OP_LE; swap_operands = true; break;
-			case LS_OP_LE: compare_op = LS_OP_LT; swap_operands = true; break;
-			case LS_OP_GT: compare_op = LS_OP_LE; break;
-			case LS_OP_GE: compare_op = LS_OP_LT; break;
-			default: break;
+			case LS_OP_EQ: return (ls_op)(base + 0u);
+			case LS_OP_GE: return (ls_op)(base + 1u);
+			case LS_OP_GT: return (ls_op)(base + 2u);
+			case LS_OP_LT: return (ls_op)(base + 3u);
+			case LS_OP_LE: return (ls_op)(base + 4u);
+			default: return LS_OP_JUMP;
 		}
 	}
-	else {
-		switch (compare_op) {
-			case LS_OP_GT: compare_op = LS_OP_LT; swap_operands = true; break;
-			case LS_OP_GE: compare_op = LS_OP_LE; swap_operands = true; break;
-			default: break;
-		}
-	}
-	if ((kind == LS_TYPE_BOOL || kind == LS_TYPE_STRING || kind == LS_TYPE_ENUM) && compare_op != LS_OP_EQ && compare_op != LS_OP_NE) return LS_OP_JUMP;
+	if (compare_op == LS_OP_NE) compare_op = LS_OP_EQ;
+	else if (compare_op == LS_OP_GT) compare_op = LS_OP_LE;
+	else if (compare_op == LS_OP_GE) compare_op = LS_OP_LT;
+	else if (compare_op == LS_OP_LT) compare_op = LS_OP_GE;
+	else if (compare_op == LS_OP_LE) compare_op = LS_OP_GT;
+	else if (compare_op == LS_OP_EQ) return LS_OP_JUMP;
+	if ((kind == LS_TYPE_BOOL || kind == LS_TYPE_STRING || kind == LS_TYPE_ENUM) && compare_op != LS_OP_EQ) return LS_OP_JUMP;
 	const u32 base = (u32)compareJumpTypeBase(kind);
 	if (base == (u32)LS_OP_JUMP) return LS_OP_JUMP;
 	switch (compare_op) {
 		case LS_OP_EQ: return (ls_op)(base + 0u);
-		case LS_OP_NE: return (ls_op)(base + 1u);
-		case LS_OP_LT: return (ls_op)(base + 2u);
-		case LS_OP_LE: return (ls_op)(base + 3u);
+		case LS_OP_GE: return (ls_op)(base + 1u);
+		case LS_OP_GT: return (ls_op)(base + 2u);
+		case LS_OP_LT: return (ls_op)(base + 3u);
+		case LS_OP_LE: return (ls_op)(base + 4u);
 		default: return LS_OP_JUMP;
 	}
 }
 
 static bool tryFuseCompareJump(FunctionCompiler& ctx, ls_op jump_op, u32& operand_pos) {
 	if (ctx.code.size() < 14) return false;
-	if (jump_op != LS_OP_JUMP_IF_FALSE && jump_op != LS_OP_JUMP_IF_TRUE) return false;
+	if (jump_op != LS_OP_JZ_U8 && jump_op != LS_OP_JNZ_U8) return false;
 
 	const u32 compare_pos = (u32)ctx.code.size() - 14u;
 	const ls_op compare_op = (ls_op)ctx.code[compare_pos];
 	const ls_type_kind kind = (ls_type_kind)ctx.code[compare_pos + 13u];
-	const bool jump_if_true = jump_op == LS_OP_JUMP_IF_TRUE;
+	const bool jump_if_true = jump_op == LS_OP_JNZ_U8;
 	bool swap_operands = false;
 	const ls_op fused_op = compareJumpOp(compare_op, kind, jump_if_true, swap_operands);
 	if (fused_op == LS_OP_JUMP) return false;
@@ -1268,11 +1961,32 @@ static bool tryFuseCompareJump(FunctionCompiler& ctx, ls_op jump_op, u32& operan
 		memcpy(ctx.code.data + compare_pos + 9u, temp, sizeof(temp));
 	}
 	memmove(ctx.code.data + compare_pos + 1u, ctx.code.data + compare_pos + 5u, 8u);
-	ctx.code.count = compare_pos + 13u;
+	ctx.code.count = compare_pos + 11u;
 	operand_pos = compare_pos + 9u;
-	patchI32(ctx.code, operand_pos, 0);
+	patchI16(ctx.code, operand_pos, 0);
 	ctx.temp_top -= 1u;
 	return true;
+}
+
+static u32 emitCompareJumpAtOp(FunctionCompiler& ctx, ls_type_kind kind, u32 lhs, u32 rhs, u32 op_offset) {
+	const ls_op op = (ls_op)((u32)compareJumpTypeBase(kind) + op_offset);
+	emitOp(ctx.code, op);
+	emitFixedReg(ctx, lhs);
+	emitFixedReg(ctx, rhs);
+	const u32 operand_pos = (u32)ctx.code.size();
+	emitI16(ctx.code, 0);
+	return operand_pos;
+}
+
+static u32 emitCompareJumpAt(FunctionCompiler& ctx, ls_type_kind kind, u32 lhs, u32 rhs) {
+	return emitCompareJumpAtOp(ctx, kind, lhs, rhs, 1u); // JGE
+}
+
+static bool isKnownNonEmptyRange(Expression& begin, Expression& end, ls_type_kind kind) {
+	if (kind != LS_TYPE_I8 && kind != LS_TYPE_U8 && kind != LS_TYPE_I16 && kind != LS_TYPE_U16 &&
+		kind != LS_TYPE_I32 && kind != LS_TYPE_U32 && kind != LS_TYPE_I64 && kind != LS_TYPE_U64) return false;
+	if (begin.kind != Expression::INT_LITERAL || end.kind != Expression::INT_LITERAL) return false;
+	return static_cast<IntLiteralExpression&>(begin).value < static_cast<IntLiteralExpression&>(end).value;
 }
 
 // Emit a jump with a placeholder relative offset; returns the position of the
@@ -1283,13 +1997,81 @@ static u32 emitJumpPlaceholder(FunctionCompiler& ctx, ls_op op) {
 	if (tryFuseCompareJump(ctx, op, operand_pos)) return operand_pos;
 
 	emitOp(ctx.code, op);
-	if (op == LS_OP_JUMP_IF_FALSE || op == LS_OP_JUMP_IF_TRUE) {
+	if (op == LS_OP_JZ_U8 || op == LS_OP_JNZ_U8) {
 		emitTempReg(ctx, ctx.temp_top - 1u);
 		ctx.temp_top -= 1u;
 	}
 	operand_pos = (u32)ctx.code.size();
-	emitI32(ctx.code, 0);
+	emitI16(ctx.code, 0);
 	return operand_pos;
+}
+
+static bool tryEmitJzForNotEqualZero(FunctionCompiler& ctx, Expression& condition, u32& operand_pos, u32& reg, ls_type_kind& kind) {
+	if (condition.kind != Expression::BINARY) return false;
+	BinaryExpression& binary = static_cast<BinaryExpression&>(condition);
+	if (binary.op != Token::BANG_EQUAL) return false;
+	Expression* value = nullptr;
+	if (binary.rhs->kind == Expression::INT_LITERAL && static_cast<IntLiteralExpression&>(*binary.rhs).value == 0u) value = binary.lhs;
+	else if (binary.lhs->kind == Expression::INT_LITERAL && static_cast<IntLiteralExpression&>(*binary.lhs).value == 0u) value = binary.rhs;
+	if (!value || value->kind != Expression::IDENTIFIER) return false;
+	IdentifierExpression& id = static_cast<IdentifierExpression&>(*value);
+	if (!id.slot || id.slot->storage != StorageSlot::LOCAL) return false;
+	if (id.slot->kind != LS_TYPE_I32 && id.slot->kind != LS_TYPE_I64) return false;
+	reg = id.slot->offset;
+	kind = id.slot->kind;
+	emitOp(ctx.code, id.slot->kind == LS_TYPE_I32 ? LS_OP_JZ_I32 : LS_OP_JZ_I64);
+	emitFixedReg(ctx, id.slot->offset);
+	operand_pos = (u32)ctx.code.size();
+	emitI16(ctx.code, 0);
+	return true;
+}
+
+static bool tryEmitJnzForEqualZero(FunctionCompiler& ctx, Expression& condition, u32& operand_pos) {
+	if (condition.kind != Expression::BINARY) return false;
+	BinaryExpression& binary = static_cast<BinaryExpression&>(condition);
+	if (binary.op != Token::EQUAL_EQUAL) return false;
+	Expression* value = nullptr;
+	if (binary.rhs->kind == Expression::INT_LITERAL && static_cast<IntLiteralExpression&>(*binary.rhs).value == 0u) value = binary.lhs;
+	else if (binary.lhs->kind == Expression::INT_LITERAL && static_cast<IntLiteralExpression&>(*binary.lhs).value == 0u) value = binary.rhs;
+	if (!value || !value->resolved_type) return false;
+	const ls_type_kind kind = valueKindForType(*value->resolved_type);
+	if (kind != LS_TYPE_I32 && kind != LS_TYPE_I64) return false;
+	u32 reg = 0;
+	if (value->kind == Expression::IDENTIFIER) {
+		IdentifierExpression& id = static_cast<IdentifierExpression&>(*value);
+		if (!id.slot || id.slot->storage != StorageSlot::LOCAL || id.slot->kind != kind) return false;
+		reg = id.slot->offset;
+		emitOp(ctx.code, kind == LS_TYPE_I32 ? LS_OP_JNZ_I32 : LS_OP_JNZ_I64);
+		emitFixedReg(ctx, reg);
+	}
+	else {
+		compileExpression(ctx, *value, kind);
+		reg = ctx.temp_top - typeKindByteSize(kind);
+		emitOp(ctx.code, kind == LS_TYPE_I32 ? LS_OP_JNZ_I32 : LS_OP_JNZ_I64);
+		emitTempReg(ctx, reg);
+		ctx.temp_top = reg;
+	}
+	operand_pos = (u32)ctx.code.size();
+	emitI16(ctx.code, 0);
+	return true;
+}
+
+static bool tryEmitJlezForNotGreaterZero(FunctionCompiler& ctx, Expression& condition, u32& operand_pos, u32& reg, ls_type_kind& kind) {
+	if (condition.kind != Expression::BINARY) return false;
+	BinaryExpression& binary = static_cast<BinaryExpression&>(condition);
+	if (binary.op != Token::GT) return false;
+	if (binary.rhs->kind != Expression::INT_LITERAL || static_cast<IntLiteralExpression&>(*binary.rhs).value != 0u) return false;
+	if (binary.lhs->kind != Expression::IDENTIFIER) return false;
+	IdentifierExpression& id = static_cast<IdentifierExpression&>(*binary.lhs);
+	if (!id.slot || id.slot->storage != StorageSlot::LOCAL) return false;
+	if (id.slot->kind != LS_TYPE_I32 && id.slot->kind != LS_TYPE_I64) return false;
+	reg = id.slot->offset;
+	kind = id.slot->kind;
+	emitOp(ctx.code, id.slot->kind == LS_TYPE_I32 ? LS_OP_JLEZ_I32 : LS_OP_JLEZ_I64);
+	emitFixedReg(ctx, reg);
+	operand_pos = (u32)ctx.code.size();
+	emitI16(ctx.code, 0);
+	return true;
 }
 
 static void emitDeferredStatements(FunctionCompiler& ctx, u32 defer_mark, ls_type_kind return_kind, ls_string_view current_label) {
@@ -1301,7 +2083,7 @@ static void emitDeferredStatements(FunctionCompiler& ctx, u32 defer_mark, ls_typ
 static ls_type_kind compileBinary(FunctionCompiler& ctx, BinaryExpression& expr, ls_type_kind hint) {
 	if (expr.op == Token::AND || expr.op == Token::OR) {
 		compileExpression(ctx, *expr.lhs, LS_TYPE_BOOL);
-		const ls_op short_circuit_op = expr.op == Token::AND ? LS_OP_JUMP_IF_FALSE : LS_OP_JUMP_IF_TRUE;
+		const ls_op short_circuit_op = expr.op == Token::AND ? LS_OP_JZ_U8 : LS_OP_JNZ_U8;
 		const u32 short_circuit_jump = emitJumpPlaceholder(ctx, short_circuit_op);
 		// The short-circuit result and the evaluated-rhs result share one register,
 		// so both paths must produce it at the same temporary offset.
@@ -1310,10 +2092,10 @@ static ls_type_kind compileBinary(FunctionCompiler& ctx, BinaryExpression& expr,
 		compileExpression(ctx, *expr.rhs, LS_TYPE_BOOL);
 		const u32 end_jump = emitJumpPlaceholder(ctx, LS_OP_JUMP);
 
-		patchJumpRelative(ctx.code, short_circuit_jump, (u32)ctx.code.size());
+		patchJumpRelative(ctx, short_circuit_jump, (u32)ctx.code.size());
 		ctx.temp_top = result_top;
 		emitConst1(ctx, expr.op == Token::AND ? 0u : 1u);
-		patchJumpRelative(ctx.code, end_jump, (u32)ctx.code.size());
+		patchJumpRelative(ctx, end_jump, (u32)ctx.code.size());
 		return LS_TYPE_BOOL;
 	}
 
@@ -1358,6 +2140,114 @@ static ls_type_kind compileBinary(FunctionCompiler& ctx, BinaryExpression& expr,
 			return LS_TYPE_BOOL;
 		}
 	}
+	if (expr.op == Token::STAR && expr.lhs && expr.rhs && expr.lhs->kind == Expression::IDENTIFIER && expr.rhs->kind == Expression::UNARY) {
+		IdentifierExpression& lhs_id = static_cast<IdentifierExpression&>(*expr.lhs);
+		UnaryExpression& rhs_unary = static_cast<UnaryExpression&>(*expr.rhs);
+		if (rhs_unary.op == Token::MINUS && rhs_unary.expression->kind == Expression::IDENTIFIER) {
+			IdentifierExpression& rhs_id = static_cast<IdentifierExpression&>(*rhs_unary.expression);
+			const ls_type_kind kind = valueKindForType(*expr.lhs->resolved_type);
+			if (lhs_id.slot && rhs_id.slot && lhs_id.slot == rhs_id.slot && lhs_id.slot->storage == StorageSlot::LOCAL &&
+				lhs_id.slot->type == expr.lhs->resolved_type && rhs_id.slot->type == rhs_unary.expression->resolved_type &&
+				kind == valueKindForType(*rhs_unary.expression->resolved_type) && isNumericKind(kind)) {
+				const u32 size = typeKindByteSize(kind);
+				const u32 result = ctx.temp_top;
+				emitOp(ctx.code, LS_OP_COPY);
+				emitTempReg(ctx, result);
+				emitFixedReg(ctx, lhs_id.slot->offset);
+				emitU32(ctx.code, size);
+				ctx.temp_top = result + size;
+				emitUnaryOp(ctx, (ls_op)((u32)LS_OP_NEG_I8 + numericKindIndex(kind)), size);
+				emitOp(ctx.code, (ls_op)((u32)LS_OP_MUL_I8 + numericKindIndex(kind)));
+				emitTempReg(ctx, result);
+				emitFixedReg(ctx, lhs_id.slot->offset);
+				emitTempReg(ctx, result);
+				return kind;
+			}
+		}
+	}
+	if (expr.lhs && expr.rhs && expr.lhs->kind == Expression::IDENTIFIER && expr.rhs->kind == Expression::IDENTIFIER) {
+		IdentifierExpression& lhs_id = static_cast<IdentifierExpression&>(*expr.lhs);
+		IdentifierExpression& rhs_id = static_cast<IdentifierExpression&>(*expr.rhs);
+		const ls_type_kind lhs_kind = valueKindForType(*expr.lhs->resolved_type);
+		const ls_type_kind rhs_kind = valueKindForType(*expr.rhs->resolved_type);
+		if (lhs_id.slot && rhs_id.slot && lhs_id.slot->storage == StorageSlot::LOCAL && rhs_id.slot->storage == StorageSlot::LOCAL &&
+			lhs_id.slot->type == expr.lhs->resolved_type && rhs_id.slot->type == expr.rhs->resolved_type && lhs_kind == rhs_kind && isNumericKind(lhs_kind)) {
+			const u32 result = ctx.temp_top;
+			if (expr.op == Token::PLUS || expr.op == Token::MINUS || expr.op == Token::STAR || expr.op == Token::SLASH || expr.op == Token::PERCENT) {
+				const ls_op base = expr.op == Token::PLUS ? LS_OP_ADD_I8 : expr.op == Token::MINUS ? LS_OP_SUB_I8 : expr.op == Token::STAR ? LS_OP_MUL_I8 : expr.op == Token::SLASH ? LS_OP_DIV_I8 : LS_OP_MOD_I8;
+				emitOp(ctx.code, (ls_op)((u32)base + numericKindIndex(lhs_kind)));
+				emitFixedReg(ctx, result);
+				emitFixedReg(ctx, lhs_id.slot->offset);
+				emitFixedReg(ctx, rhs_id.slot->offset);
+				ctx.temp_top = result + typeKindByteSize(lhs_kind);
+				return lhs_kind;
+			}
+			if (expr.op == Token::EQUAL_EQUAL || expr.op == Token::BANG_EQUAL || expr.op == Token::LT || expr.op == Token::LT_EQUAL || expr.op == Token::GT || expr.op == Token::GT_EQUAL) {
+				const ls_op cmp_op = expr.op == Token::EQUAL_EQUAL ? LS_OP_EQ : expr.op == Token::BANG_EQUAL ? LS_OP_NE : expr.op == Token::LT ? LS_OP_LT : expr.op == Token::LT_EQUAL ? LS_OP_LE : expr.op == Token::GT ? LS_OP_GT : LS_OP_GE;
+				emitCompareOpAt(ctx, cmp_op, lhs_kind, result, lhs_id.slot->offset, rhs_id.slot->offset);
+				ctx.temp_top = result + 1u;
+				return LS_TYPE_BOOL;
+			}
+		}
+	}
+	if (expr.lhs && expr.rhs &&
+		(expr.rhs->kind == Expression::INT_LITERAL || expr.rhs->kind == Expression::FLOAT_LITERAL || expr.rhs->kind == Expression::BOOL_LITERAL) &&
+		expr.lhs->kind == Expression::IDENTIFIER && expr.lhs->resolved_type && isNumericKind(valueKindForType(*expr.lhs->resolved_type))) {
+		IdentifierExpression& lhs_id = static_cast<IdentifierExpression&>(*expr.lhs);
+		const ls_type_kind lhs_kind = valueKindForType(*expr.lhs->resolved_type);
+		if (lhs_id.slot && lhs_id.slot->storage == StorageSlot::LOCAL && lhs_id.slot->type == expr.lhs->resolved_type &&
+			(expr.op == Token::PLUS || expr.op == Token::MINUS || expr.op == Token::STAR || expr.op == Token::SLASH || expr.op == Token::PERCENT ||
+			 expr.op == Token::EQUAL_EQUAL || expr.op == Token::BANG_EQUAL || expr.op == Token::LT || expr.op == Token::LT_EQUAL || expr.op == Token::GT || expr.op == Token::GT_EQUAL)) {
+			const u32 result = ctx.temp_top;
+			const ls_type_kind rhs_kind = compileExpression(ctx, *expr.rhs, lhs_kind);
+			if (rhs_kind == lhs_kind) {
+				if (expr.op == Token::PLUS || expr.op == Token::MINUS || expr.op == Token::STAR || expr.op == Token::SLASH || expr.op == Token::PERCENT) {
+					ls_op base = expr.op == Token::PLUS ? LS_OP_ADD_I8 : expr.op == Token::MINUS ? LS_OP_SUB_I8 : expr.op == Token::STAR ? LS_OP_MUL_I8 : expr.op == Token::SLASH ? LS_OP_DIV_I8 : LS_OP_MOD_I8;
+					emitOp(ctx.code, (ls_op)((u32)base + numericKindIndex(lhs_kind)));
+					emitFixedReg(ctx, result);
+					emitFixedReg(ctx, lhs_id.slot->offset);
+					emitFixedReg(ctx, result);
+					ctx.temp_top = result + typeKindByteSize(lhs_kind);
+					return lhs_kind;
+				}
+				ls_op cmp_op = expr.op == Token::EQUAL_EQUAL ? LS_OP_EQ : expr.op == Token::BANG_EQUAL ? LS_OP_NE : expr.op == Token::LT ? LS_OP_LT : expr.op == Token::LT_EQUAL ? LS_OP_LE : expr.op == Token::GT ? LS_OP_GT : LS_OP_GE;
+				emitCompareOpAt(ctx, cmp_op, lhs_kind, result, lhs_id.slot->offset, result);
+				ctx.temp_top = result + 1u;
+				return LS_TYPE_BOOL;
+			}
+			ctx.temp_top = result;
+		}
+	}
+
+	if (expr.lhs && expr.rhs && (expr.op == Token::PLUS || expr.op == Token::MINUS || expr.op == Token::STAR || expr.op == Token::SLASH) &&
+		((expr.lhs->kind == Expression::IDENTIFIER && expr.rhs->kind != Expression::IDENTIFIER) ||
+		 (expr.rhs->kind == Expression::IDENTIFIER && expr.lhs->kind != Expression::IDENTIFIER))) {
+		Expression* direct_expr = expr.lhs->kind == Expression::IDENTIFIER ? expr.lhs : expr.rhs;
+		Expression* computed_expr = direct_expr == expr.lhs ? expr.rhs : expr.lhs;
+		IdentifierExpression& direct_id = static_cast<IdentifierExpression&>(*direct_expr);
+		const ls_type_kind kind = valueKindForType(*direct_expr->resolved_type);
+		if (direct_id.slot && direct_id.slot->storage == StorageSlot::LOCAL && direct_id.slot->type == direct_expr->resolved_type && isNumericKind(kind)) {
+			const ls_type_kind computed_kind = compileExpression(ctx, *computed_expr, kind);
+			if (computed_kind == kind) {
+				const u32 size = typeKindByteSize(kind);
+				const u32 result = ctx.temp_top - size;
+				const ls_op base = expr.op == Token::PLUS ? LS_OP_ADD_I8 : expr.op == Token::MINUS ? LS_OP_SUB_I8 : expr.op == Token::STAR ? LS_OP_MUL_I8 : LS_OP_DIV_I8;
+				emitOp(ctx.code, (ls_op)((u32)base + numericKindIndex(kind)));
+				emitTempReg(ctx, result);
+				if (direct_expr == expr.lhs) {
+					emitFixedReg(ctx, direct_id.slot->offset);
+					emitTempReg(ctx, result);
+				}
+				else {
+					emitTempReg(ctx, result);
+					emitFixedReg(ctx, direct_id.slot->offset);
+				}
+				ctx.temp_top = result + size;
+				return kind;
+			}
+			ctx.temp_top -= typeKindByteSize(computed_kind);
+		}
+	}
 
 	const ls_type_kind lhs_hint = numericKindForOp(expr.lhs ? defaultLiteralKind(*expr.lhs, hint) : LS_TYPE_INVALID, hint);
 	const ls_type_kind rhs_hint = numericKindForOp(expr.rhs ? defaultLiteralKind(*expr.rhs, lhs_hint) : LS_TYPE_INVALID, lhs_hint);
@@ -1398,16 +2288,16 @@ static ls_type_kind compileBinary(FunctionCompiler& ctx, BinaryExpression& expr,
 
 static ls_type_kind compileTernary(FunctionCompiler& ctx, TernaryExpression& expr, ls_type_kind hint) {
 	compileExpression(ctx, *expr.condition, LS_TYPE_BOOL);
-	const u32 false_jump = emitJumpPlaceholder(ctx, LS_OP_JUMP_IF_FALSE);
+	const u32 false_jump = emitJumpPlaceholder(ctx, LS_OP_JZ_U8);
 	const u32 result_top = ctx.temp_top;
 
 	ls_type_kind true_kind = compileExpression(ctx, *expr.true_expr, hint);
 	const u32 end_jump = emitJumpPlaceholder(ctx, LS_OP_JUMP);
 
-	patchJumpRelative(ctx.code, false_jump, (u32)ctx.code.size());
+	patchJumpRelative(ctx, false_jump, (u32)ctx.code.size());
 	ctx.temp_top = result_top;
 	ls_type_kind false_kind = compileExpression(ctx, *expr.false_expr, hint);
-	patchJumpRelative(ctx.code, end_jump, (u32)ctx.code.size());
+	patchJumpRelative(ctx, end_jump, (u32)ctx.code.size());
 
 	// Both branches should produce the same type (ensured by type checker)
 	ASSERT(true_kind == false_kind);
@@ -1446,8 +2336,20 @@ static ls_type_kind compileCall(FunctionCompiler& ctx, CallExpression& expr, ls_
 			}
 			else {
 				ASSERT(arg_type->kind == ResolvedType::SLICE);
-				compileExpression(ctx, *expr.args[0], LS_TYPE_SLICE);
-				emitSliceLength(ctx);
+				if (expr.args[0]->kind == Expression::IDENTIFIER) {
+					IdentifierExpression& id = static_cast<IdentifierExpression&>(*expr.args[0]);
+					if (id.slot && id.slot->storage == StorageSlot::LOCAL && id.slot->type->kind == ResolvedType::SLICE) {
+						emitSliceLengthLocal(ctx, id.slot->offset);
+					}
+					else {
+						compileExpression(ctx, *expr.args[0], LS_TYPE_SLICE);
+						emitSliceLength(ctx);
+					}
+				}
+				else {
+					compileExpression(ctx, *expr.args[0], LS_TYPE_SLICE);
+					emitSliceLength(ctx);
+				}
 			}
 			return LS_TYPE_I64;
 		}
@@ -1506,9 +2408,31 @@ static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& membe
 	i32 slice_field_offset = 0;
 	ResolvedType* slice_field_type = nullptr;
 	if (getSliceMemberAccess(member, bracket, element_size, slice_field_offset, slice_field_type)) {
-		compileExpression(ctx, *bracket->base, LS_TYPE_SLICE);
-		compileIndexExpression(ctx, *bracket->args[0]);
-		emitSliceLoadAt(ctx, element_size, slice_field_offset, typeByteSize(*slice_field_type));
+		IdentifierExpression* base_id = bracket->base->kind == Expression::IDENTIFIER ? static_cast<IdentifierExpression*>(bracket->base) : nullptr;
+		StorageSlot* base_slot = base_id ? base_id->slot : nullptr;
+		if (base_slot && base_slot->storage == StorageSlot::LOCAL && base_slot->type->kind == ResolvedType::SLICE) {
+			const bool index_is_i32 = isI32Index(*bracket->args[0]);
+			u32 index_offset = 0;
+			if (index_is_i32 && getDirectLocalI32Index(*bracket->args[0], index_offset)) {
+				emitSliceLoadAtLocalI32At(ctx, base_slot->offset, index_offset, element_size, slice_field_offset, typeByteSize(*slice_field_type));
+			}
+			else if (index_is_i32) {
+				compileIndexExpressionI32(ctx, *bracket->args[0]);
+				emitSliceLoadAtLocalI32(ctx, base_slot->offset, element_size, slice_field_offset, typeByteSize(*slice_field_type));
+			}
+			else if (getDirectLocalI64Index(*bracket->args[0], index_offset)) {
+				emitSliceLoadAtLocalAt(ctx, base_slot->offset, index_offset, element_size, slice_field_offset, typeByteSize(*slice_field_type));
+			}
+			else {
+				compileIndexExpression(ctx, *bracket->args[0]);
+				emitSliceLoadAtLocal(ctx, base_slot->offset, element_size, slice_field_offset, typeByteSize(*slice_field_type));
+			}
+		}
+		else {
+			compileExpression(ctx, *bracket->base, LS_TYPE_SLICE);
+			compileIndexExpression(ctx, *bracket->args[0]);
+			emitSliceLoadAt(ctx, element_size, slice_field_offset, typeByteSize(*slice_field_type));
+		}
 		return valueKindForType(*slice_field_type);
 	}
 	if (member.expression->kind == Expression::IDENTIFIER) {
@@ -1715,6 +2639,14 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 				return LS_TYPE_NULL_VALUE;
 			}
 			const ls_type_kind dst_kind = toTypeKind(*expr.resolved_type);
+			const ls_type_kind resolved_src_kind = toTypeKind(*cast.expression->resolved_type);
+			if (isNumericKind(resolved_src_kind) && isNumericKind(dst_kind) && cast.expression->kind == Expression::IDENTIFIER) {
+				IdentifierExpression& id = static_cast<IdentifierExpression&>(*cast.expression);
+				if (id.slot && id.slot->storage == StorageSlot::LOCAL) {
+					emitCastFromLocal(ctx, id.slot->offset, resolved_src_kind, dst_kind);
+					return dst_kind;
+				}
+			}
 			const ls_type_kind src_kind = compileExpression(ctx, *cast.expression, toTypeKind(*cast.expression->resolved_type));
 			if (cast.expression->resolved_type->kind == ResolvedType::STRING && expr.resolved_type->kind == ResolvedType::CSTR) {
 				emitStringToCStr(ctx); return dst_kind;
@@ -1768,6 +2700,27 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 				emitCallDirect(ctx, fn.bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type));
 				return valueKindForType(*fn_type->return_type);
 			}
+			if (un.op == Token::MINUS && (un.expression->kind == Expression::INT_LITERAL || un.expression->kind == Expression::FLOAT_LITERAL)) {
+				const ls_type_kind kind = un.expression->kind == Expression::INT_LITERAL
+					? toTypeKind(*un.expression->resolved_type)
+					: defaultLiteralKind(*un.expression, hint);
+				if (un.expression->kind == Expression::INT_LITERAL) {
+					const u64 value = static_cast<IntLiteralExpression&>(*un.expression).value;
+					if (kind == LS_TYPE_F32) emitConst4(ctx, bitcastF32ToU32(-(float)value));
+					else if (kind == LS_TYPE_F64) emitConst8(ctx, bitcastF64ToU64(-(double)value));
+					else emitIntegerConstant(ctx, kind, 0u - value);
+					return kind;
+				}
+				if (kind == LS_TYPE_F32) {
+					const float value = (float)static_cast<FloatLiteralExpression&>(*un.expression).value;
+					emitConst4(ctx, bitcastF32ToU32(-value));
+				}
+				else {
+					const double value = static_cast<FloatLiteralExpression&>(*un.expression).value;
+					emitConst8(ctx, bitcastF64ToU64(-value));
+				}
+				return kind;
+			}
 			const ls_type_kind kind = compileExpression(ctx, *un.expression, hint);
 			switch (un.op) {
 				case Token::MINUS: {
@@ -1795,10 +2748,42 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 			}
 			const u32 element_size = typeByteSize(*br.resolved_type);
 			if (br.base->resolved_type->kind == ResolvedType::SLICE) {
-				compileExpression(ctx, *br.base, LS_TYPE_SLICE);
-				compileIndexExpression(ctx, *br.args[0]);
-				emitSliceLoad(ctx, element_size);
+				IdentifierExpression* base_id = br.base->kind == Expression::IDENTIFIER ? static_cast<IdentifierExpression*>(br.base) : nullptr;
+				StorageSlot* base_slot = base_id ? base_id->slot : nullptr;
+				if (base_slot && base_slot->storage == StorageSlot::LOCAL && base_slot->type->kind == ResolvedType::SLICE) {
+					if (isI32Index(*br.args[0])) {
+						u32 index_offset = 0;
+						if (getDirectLocalI32Index(*br.args[0], index_offset)) {
+							emitSliceLoadLocalI32At(ctx, base_slot->offset, index_offset, element_size);
+						}
+						else {
+							compileIndexExpressionI32(ctx, *br.args[0]);
+							emitSliceLoadLocalI32(ctx, base_slot->offset, element_size);
+						}
+					}
+					else {
+						compileIndexExpression(ctx, *br.args[0]);
+						emitSliceLoadLocal(ctx, base_slot->offset, element_size);
+					}
+				}
+				else {
+					compileExpression(ctx, *br.base, LS_TYPE_SLICE);
+					compileIndexExpression(ctx, *br.args[0]);
+					emitSliceLoad(ctx, element_size);
+				}
 			} else {
+				IdentifierExpression* base_id = br.base->kind == Expression::IDENTIFIER ? static_cast<IdentifierExpression*>(br.base) : nullptr;
+				StorageSlot* base_slot = base_id ? base_id->slot : nullptr;
+				u32 index_offset = 0;
+				if (base_slot && base_slot->storage == StorageSlot::LOCAL && base_slot->type->kind == ResolvedType::ARRAY && isI32Index(*br.args[0])) {
+					const u32 length = static_cast<ArrayResolvedType*>(br.base->resolved_type)->size;
+					if (getDirectLocalI32Index(*br.args[0], index_offset)) emitLoadAtLocalI32(ctx, base_slot->offset, index_offset, length, element_size, 0, element_size);
+				else {
+					compileIndexExpressionI32(ctx, *br.args[0]);
+					emitLoadAtLocalI32TempIndex(ctx, base_slot->offset, length, element_size, 0, element_size);
+				}
+					return valueKindForType(*br.resolved_type);
+				}
 				if (!tryEmitReference(ctx, *br.base)) {
 					compileExpression(ctx, *br.base, LS_TYPE_INVALID);
 					emitLocalRef(ctx, ctx.temp_top - typeByteSize(*br.base->resolved_type));
@@ -1869,6 +2854,38 @@ static bool emitLocalLiteralInitializer(FunctionCompiler& ctx, u32 offset, Expre
 	}
 }
 
+static bool emitLocalLengthInitializer(FunctionCompiler& ctx, u32 offset, Expression& expr) {
+	if (expr.kind != Expression::CALL) return false;
+	CallExpression& call = static_cast<CallExpression&>(expr);
+	if (call.args.size() != 1u || call.callee->kind != Expression::IDENTIFIER) return false;
+	IdentifierExpression& callee = static_cast<IdentifierExpression&>(*call.callee);
+	if (!equalStrings(callee.name, makeStringView("length"))) return false;
+	Expression* arg = call.args[0];
+	if (arg->kind != Expression::IDENTIFIER || !arg->resolved_type || arg->resolved_type->kind != ResolvedType::SLICE) return false;
+	IdentifierExpression& id = static_cast<IdentifierExpression&>(*arg);
+	if (!id.slot || id.slot->storage != StorageSlot::LOCAL || id.slot->type->kind != ResolvedType::SLICE) return false;
+	emitSliceLengthToLocal(ctx, offset, id.slot->offset);
+	return true;
+}
+
+static bool emitLocalArrayConstantLoad(FunctionCompiler& ctx, u32 dst, Expression& expr) {
+	if (expr.kind != Expression::BRACKET || !expr.resolved_type) return false;
+	BracketExpression& br = static_cast<BracketExpression&>(expr);
+	if (br.args.size() != 1 || br.args[0]->kind != Expression::INT_LITERAL) return false;
+	IdentifierExpression* base_id = br.base->kind == Expression::IDENTIFIER ? static_cast<IdentifierExpression*>(br.base) : nullptr;
+	StorageSlot* base_slot = base_id ? base_id->slot : nullptr;
+	if (!base_slot || base_slot->storage != StorageSlot::LOCAL || base_slot->type->kind != ResolvedType::ARRAY) return false;
+	const u64 index = static_cast<IntLiteralExpression&>(*br.args[0]).value;
+	const u32 length = static_cast<ArrayResolvedType*>(br.base->resolved_type)->size;
+	if (index >= length) return false;
+	const u32 element_size = typeByteSize(*br.resolved_type);
+	emitOp(ctx.code, LS_OP_COPY);
+	emitFixedReg(ctx, dst);
+	emitFixedReg(ctx, base_slot->offset + (u32)index * element_size);
+	emitU32(ctx.code, element_size);
+	return true;
+}
+
 static void compileAssign(FunctionCompiler& ctx, AssignStatement& assign) {
 	if (assign.lhs->kind == Expression::IDENTIFIER) {
 		IdentifierExpression* id = static_cast<IdentifierExpression*>(assign.lhs);
@@ -1912,9 +2929,61 @@ static void compileAssign(FunctionCompiler& ctx, AssignStatement& assign) {
 		}
 
 		if (assign.op == Token::EQUAL) {
+			if (slot && slot->storage == StorageSlot::LOCAL && emitLocalLiteralInitializer(ctx, slot->offset, *assign.rhs, value_kind)) return;
+			if (slot && slot->storage == StorageSlot::LOCAL && emitLocalArrayConstantLoad(ctx, slot->offset, *assign.rhs)) return;
+			if (slot && slot->storage == StorageSlot::LOCAL && assign.rhs->kind == Expression::IDENTIFIER) {
+				IdentifierExpression& rhs_id = static_cast<IdentifierExpression&>(*assign.rhs);
+				if (rhs_id.slot && rhs_id.slot->storage == StorageSlot::LOCAL && rhs_id.slot->byte_size == slot->byte_size) {
+					emitOp(ctx.code, LS_OP_COPY);
+					emitFixedReg(ctx, slot->offset);
+					emitFixedReg(ctx, rhs_id.slot->offset);
+					emitU32(ctx.code, slot->byte_size);
+					return;
+				}
+			}
+			if (slot && slot->storage == StorageSlot::LOCAL && assign.rhs->kind == Expression::BRACKET) {
+				BracketExpression& br = static_cast<BracketExpression&>(*assign.rhs);
+				IdentifierExpression* base_id = br.base->kind == Expression::IDENTIFIER ? static_cast<IdentifierExpression*>(br.base) : nullptr;
+				StorageSlot* base_slot = base_id ? base_id->slot : nullptr;
+				if (base_slot && base_slot->storage == StorageSlot::LOCAL && base_slot->type->kind == ResolvedType::ARRAY &&
+					isI32Index(*br.args[0]) && (value_kind == LS_TYPE_I32 || value_kind == LS_TYPE_I64)) {
+					const u32 length = static_cast<ArrayResolvedType*>(br.base->resolved_type)->size;
+					u32 index_offset = 0;
+					if (getDirectLocalI32Index(*br.args[0], index_offset)) {
+						emitLoadAtLocalI32To(ctx, slot->offset, base_slot->offset, index_offset, length, typeByteSize(*assign.lhs->resolved_type), 0, typeByteSize(*assign.lhs->resolved_type));
+					}
+					else {
+						compileIndexExpressionI32(ctx, *br.args[0]);
+						index_offset = ctx.temp_top - typeKindByteSize(LS_TYPE_I32);
+						emitLoadAtLocalI32To(ctx, slot->offset, base_slot->offset, index_offset, length, typeByteSize(*assign.lhs->resolved_type), 0, typeByteSize(*assign.lhs->resolved_type));
+						ctx.temp_top = index_offset;
+					}
+					return;
+				}
+				if (base_slot && base_slot->storage == StorageSlot::LOCAL && base_slot->type->kind == ResolvedType::SLICE && isI32Index(*br.args[0]) && value_kind == LS_TYPE_I32) {
+					compileIndexExpressionI32(ctx, *br.args[0]);
+					const u32 index_offset = ctx.temp_top - typeKindByteSize(LS_TYPE_I32);
+					emitSliceLoadLocalI32To(ctx, slot->offset, base_slot->offset, index_offset, typeByteSize(*assign.lhs->resolved_type));
+					ctx.temp_top = ctx.next_local_offset;
+					return;
+				}
+			}
 			compileExpressionAsType(ctx, *assign.rhs, *value_type);
 			emitStoreSlot(ctx, *slot);
 			return;
+		}
+		if (slot && slot->storage == StorageSlot::LOCAL && !assign.resolved_op_fn && isNumericKind(value_kind) && assign.rhs->kind == Expression::IDENTIFIER) {
+			IdentifierExpression& rhs_id = static_cast<IdentifierExpression&>(*assign.rhs);
+			if (rhs_id.slot && rhs_id.slot->storage == StorageSlot::LOCAL && rhs_id.slot->kind == value_kind &&
+				emitNumericStoreOpToLocalReg(ctx, slot->offset, rhs_id.slot->offset, value_kind, assign.op)) return;
+		}
+		if (slot && slot->storage == StorageSlot::LOCAL && !assign.resolved_op_fn && isNumericKind(value_kind) &&
+			(assign.rhs->kind == Expression::INT_LITERAL || assign.rhs->kind == Expression::FLOAT_LITERAL)) {
+			if (assign.op == Token::PLUS_EQUAL && assign.rhs->kind == Expression::INT_LITERAL && static_cast<IntLiteralExpression&>(*assign.rhs).value == 1u && emitIncrementLocal(ctx, slot->offset, value_kind)) return;
+			if (assign.op == Token::MINUS_EQUAL && assign.rhs->kind == Expression::INT_LITERAL && static_cast<IntLiteralExpression&>(*assign.rhs).value == 1u && emitIncrementLocal(ctx, slot->offset, value_kind, true)) return;
+			compileExpression(ctx, *assign.rhs, value_kind);
+			if (emitNumericStoreOpToLocal(ctx, slot->offset, value_kind, assign.op)) return;
+			ctx.temp_top = ctx.next_local_offset;
 		}
 	
 		emitLoadSlot(ctx, *slot);
@@ -1947,10 +3016,66 @@ static void compileAssign(FunctionCompiler& ctx, AssignStatement& assign) {
 			const u32 field_size = typeByteSize(*slice_field_type);
 			const ls_type_kind value_kind = valueKindForType(*slice_field_type);
 			if (assign.op == Token::EQUAL) {
+				IdentifierExpression* base_id = bracket->base->kind == Expression::IDENTIFIER ? static_cast<IdentifierExpression*>(bracket->base) : nullptr;
+				StorageSlot* base_slot = base_id ? base_id->slot : nullptr;
+				if (base_slot && base_slot->storage == StorageSlot::LOCAL && base_slot->type->kind == ResolvedType::SLICE) {
+					const bool index_is_i32 = isI32Index(*bracket->args[0]);
+					u32 index_offset = 0;
+					if (index_is_i32 && getDirectLocalI32Index(*bracket->args[0], index_offset)) {
+						compileExpressionAsType(ctx, *assign.rhs, *slice_field_type);
+						emitSliceStoreAtLocalI32At(ctx, base_slot->offset, index_offset, element_size, slice_field_offset, field_size);
+					}
+					else if (!index_is_i32 && getDirectLocalI64Index(*bracket->args[0], index_offset)) {
+						compileExpressionAsType(ctx, *assign.rhs, *slice_field_type);
+						emitSliceStoreAtLocalAt(ctx, base_slot->offset, index_offset, element_size, slice_field_offset, field_size);
+					}
+					else {
+						if (index_is_i32) compileIndexExpressionI32(ctx, *bracket->args[0]);
+						else compileIndexExpression(ctx, *bracket->args[0]);
+						compileExpressionAsType(ctx, *assign.rhs, *slice_field_type);
+						if (index_is_i32) emitSliceStoreAtLocalI32(ctx, base_slot->offset, element_size, slice_field_offset, field_size);
+						else emitSliceStoreAtLocal(ctx, base_slot->offset, element_size, slice_field_offset, field_size);
+					}
+					return;
+				}
 				compileExpression(ctx, *bracket->base, LS_TYPE_SLICE);
 				compileIndexExpression(ctx, *bracket->args[0]);
 				compileExpressionAsType(ctx, *assign.rhs, *slice_field_type);
 				emitSliceStoreAt(ctx, element_size, slice_field_offset, field_size);
+				return;
+			}
+			IdentifierExpression* base_id = bracket->base->kind == Expression::IDENTIFIER ? static_cast<IdentifierExpression*>(bracket->base) : nullptr;
+			StorageSlot* base_slot = base_id ? base_id->slot : nullptr;
+			if (base_slot && base_slot->storage == StorageSlot::LOCAL && base_slot->type->kind == ResolvedType::SLICE) {
+				const bool index_is_i32 = isI32Index(*bracket->args[0]);
+				u32 direct_index_offset = 0;
+				if (index_is_i32 && getDirectLocalI32Index(*bracket->args[0], direct_index_offset)) {
+					emitSliceLoadAtLocalI32At(ctx, base_slot->offset, direct_index_offset, element_size, slice_field_offset, field_size);
+					emitCompoundValue(ctx, *assign.rhs, value_kind, assign.op, assign.resolved_op_fn);
+					emitSliceStoreAtLocalI32At(ctx, base_slot->offset, direct_index_offset, element_size, slice_field_offset, field_size);
+					return;
+				}
+				if (!index_is_i32 && getDirectLocalI64Index(*bracket->args[0], direct_index_offset)) {
+					emitSliceLoadAtLocalAt(ctx, base_slot->offset, direct_index_offset, element_size, slice_field_offset, field_size);
+					emitCompoundValue(ctx, *assign.rhs, value_kind, assign.op, assign.resolved_op_fn);
+					emitSliceStoreAtLocalAt(ctx, base_slot->offset, direct_index_offset, element_size, slice_field_offset, field_size);
+					return;
+				}
+				const ls_type_kind index_kind = index_is_i32 ? LS_TYPE_I32 : LS_TYPE_I64;
+				const u32 index_offset = ctx.addLocal(nullptr, index_kind);
+				const u32 value_offset = ctx.addLocal(slice_field_type, value_kind);
+				if (index_is_i32) compileIndexExpressionI32(ctx, *bracket->args[0]);
+				else compileIndexExpression(ctx, *bracket->args[0]);
+				emitStoreLocalBytes(ctx, index_offset, typeKindByteSize(index_kind));
+				emitLoadLocalBytes(ctx, index_offset, typeKindByteSize(index_kind));
+				if (index_is_i32) emitSliceLoadAtLocalI32(ctx, base_slot->offset, element_size, slice_field_offset, field_size);
+				else emitSliceLoadAtLocal(ctx, base_slot->offset, element_size, slice_field_offset, field_size);
+				emitCompoundValue(ctx, *assign.rhs, value_kind, assign.op, assign.resolved_op_fn);
+				emitStoreLocalBytes(ctx, value_offset, field_size);
+				emitLoadLocalBytes(ctx, index_offset, typeKindByteSize(index_kind));
+				emitLoadLocalBytes(ctx, value_offset, field_size);
+				if (index_is_i32) emitSliceStoreAtLocalI32(ctx, base_slot->offset, element_size, slice_field_offset, field_size);
+				else emitSliceStoreAtLocal(ctx, base_slot->offset, element_size, slice_field_offset, field_size);
 				return;
 			}
 			const u32 slice_offset = ctx.addLocal(bracket->base->resolved_type, LS_TYPE_SLICE);
@@ -2004,6 +3129,29 @@ static void compileAssign(FunctionCompiler& ctx, AssignStatement& assign) {
 	ASSERT(false);
 }
 
+static bool emitLocalSliceMemberInitializer(FunctionCompiler& ctx, u32 dst, Expression& expr) {
+	if (expr.kind != Expression::MEMBER) return false;
+	MemberExpression& member = static_cast<MemberExpression&>(expr);
+	BracketExpression* bracket = nullptr;
+	u32 element_size = 0;
+	i32 field_offset = 0;
+	ResolvedType* field_type = nullptr;
+	if (!getSliceMemberAccess(member, bracket, element_size, field_offset, field_type)) return false;
+	IdentifierExpression* base_id = bracket->base->kind == Expression::IDENTIFIER ? static_cast<IdentifierExpression*>(bracket->base) : nullptr;
+	StorageSlot* base_slot = base_id ? base_id->slot : nullptr;
+	if (!base_slot || base_slot->storage != StorageSlot::LOCAL || base_slot->type->kind != ResolvedType::SLICE) return false;
+	u32 index_offset = 0;
+	if (isI32Index(*bracket->args[0]) && getDirectLocalI32Index(*bracket->args[0], index_offset)) {
+		emitSliceLoadAtLocalI32To(ctx, dst, base_slot->offset, index_offset, element_size, field_offset, typeByteSize(*field_type));
+		return true;
+	}
+	if (!isI32Index(*bracket->args[0]) && getDirectLocalI64Index(*bracket->args[0], index_offset)) {
+		emitSliceLoadAtLocalTo(ctx, dst, base_slot->offset, index_offset, element_size, field_offset, typeByteSize(*field_type));
+		return true;
+	}
+	return false;
+}
+
 static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind return_kind, ls_string_view current_label) {
 	switch (st.kind) {
 		case Statement::VAR_DECL: {
@@ -2012,8 +3160,46 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			const ls_type_kind kind = valueKindForType(*value_type);
 			const u32 offset = ctx.addLocal(value_type, kind, false, &var.slot);
 			const u32 byte_size = var.slot.byte_size;
+			if (kind == LS_TYPE_I64 && emitLocalLengthInitializer(ctx, offset, *var.expression)) return;
 			if (emitLocalLiteralInitializer(ctx, offset, *var.expression, kind)) return;
+			if (emitLocalSliceMemberInitializer(ctx, offset, *var.expression)) return;
+			if (emitLocalArrayConstantLoad(ctx, offset, *var.expression)) return;
 			if (var.expression->kind == Expression::UNDEFINED) return;
+			if (var.expression->kind == Expression::IDENTIFIER && var.expression->resolved_type == value_type) {
+				IdentifierExpression& id = static_cast<IdentifierExpression&>(*var.expression);
+				if (id.slot && id.slot->storage == StorageSlot::LOCAL && id.slot->byte_size == byte_size) {
+					emitOp(ctx.code, LS_OP_COPY);
+					emitFixedReg(ctx, offset);
+					emitFixedReg(ctx, id.slot->offset);
+					emitU32(ctx.code, byte_size);
+					return;
+				}
+			}
+			if ((kind == LS_TYPE_I32 || kind == LS_TYPE_I64) && var.expression->kind == Expression::BRACKET) {
+				BracketExpression& br = static_cast<BracketExpression&>(*var.expression);
+				IdentifierExpression* base_id = br.base->kind == Expression::IDENTIFIER ? static_cast<IdentifierExpression*>(br.base) : nullptr;
+				StorageSlot* base_slot = base_id ? base_id->slot : nullptr;
+				u32 index_offset = 0;
+				if (base_slot && base_slot->storage == StorageSlot::LOCAL && base_slot->type->kind == ResolvedType::ARRAY && isI32Index(*br.args[0])) {
+					const u32 length = static_cast<ArrayResolvedType*>(br.base->resolved_type)->size;
+					if (!getDirectLocalI32Index(*br.args[0], index_offset)) {
+						compileIndexExpressionI32(ctx, *br.args[0]);
+						index_offset = ctx.temp_top - typeKindByteSize(LS_TYPE_I32);
+					}
+					emitLoadAtLocalI32To(ctx, offset, base_slot->offset, index_offset, length, byte_size, 0, byte_size);
+					ctx.temp_top = ctx.next_local_offset;
+					return;
+				}
+				if (base_slot && base_slot->storage == StorageSlot::LOCAL && base_slot->type->kind == ResolvedType::SLICE && isI32Index(*br.args[0])) {
+					if (!getDirectLocalI32Index(*br.args[0], index_offset)) {
+						compileIndexExpressionI32(ctx, *br.args[0]);
+						index_offset = ctx.temp_top - typeKindByteSize(LS_TYPE_I32);
+					}
+					emitSliceLoadLocalI32To(ctx, offset, base_slot->offset, index_offset, byte_size);
+					ctx.temp_top = ctx.next_local_offset;
+					return;
+				}
+			}
 
 			compileExpressionAsType(ctx, *var.expression, *value_type);
 			emitStoreLocalBytes(ctx, offset, byte_size);
@@ -2026,17 +3212,20 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 		}
 		case Statement::IF: {
 			IfStatement& ifst = static_cast<IfStatement&>(st);
-			compileExpression(ctx, *ifst.condition, LS_TYPE_BOOL);
-			const u32 jump_false_pos = emitJumpPlaceholder(ctx, LS_OP_JUMP_IF_FALSE);
+			u32 jump_false_pos = 0;
+			if (!tryEmitJnzForEqualZero(ctx, *ifst.condition, jump_false_pos)) {
+				compileExpression(ctx, *ifst.condition, LS_TYPE_BOOL);
+				jump_false_pos = emitJumpPlaceholder(ctx, LS_OP_JZ_U8);
+			}
 			compileStatement(ctx, *ifst.body, return_kind, current_label);
 			if (ifst.else_branch) {
 				const u32 jump_end_pos = emitJumpPlaceholder(ctx, LS_OP_JUMP);
-				patchJumpRelative(ctx.code, jump_false_pos, (u32)ctx.code.size());
+				patchJumpRelative(ctx, jump_false_pos, (u32)ctx.code.size());
 				compileStatement(ctx, *ifst.else_branch, return_kind, current_label);
-				patchJumpRelative(ctx.code, jump_end_pos, (u32)ctx.code.size());
+				patchJumpRelative(ctx, jump_end_pos, (u32)ctx.code.size());
 			}
 			else {
-				patchJumpRelative(ctx.code, jump_false_pos, (u32)ctx.code.size());
+				patchJumpRelative(ctx, jump_false_pos, (u32)ctx.code.size());
 			}
 			return;
 		}
@@ -2044,9 +3233,24 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			WhileStatement& ws = static_cast<WhileStatement&>(st);
 
 			const u32 condition_pos = (u32)ctx.code.size();
-			compileExpression(ctx, *ws.condition, LS_TYPE_BOOL);
-
-			const u32 jump_false_pos = emitJumpPlaceholder(ctx, LS_OP_JUMP_IF_FALSE);
+			u32 jump_false_pos = 0;
+			u32 zero_condition_reg = 0;
+			ls_type_kind zero_condition_kind = LS_TYPE_I32;
+			u32 nonzero_condition_reg = 0;
+			ls_type_kind nonzero_condition_kind = LS_TYPE_I32;
+			const bool constant_true = ws.condition->kind == Expression::BOOL_LITERAL && static_cast<BoolLiteralExpression&>(*ws.condition).value;
+			const bool jump_false_to_exit = !constant_true && tryEmitJlezForNotGreaterZero(ctx, *ws.condition, jump_false_pos, zero_condition_reg, zero_condition_kind);
+			bool jump_false_equal_zero = false;
+			bool jump_false_nonzero = false;
+			if (!constant_true && !jump_false_to_exit) {
+				jump_false_equal_zero = tryEmitJnzForEqualZero(ctx, *ws.condition, jump_false_pos);
+				if (!jump_false_equal_zero) jump_false_nonzero = tryEmitJzForNotEqualZero(ctx, *ws.condition, jump_false_pos, nonzero_condition_reg, nonzero_condition_kind);
+			}
+			if (!constant_true && !jump_false_to_exit && !jump_false_equal_zero && !jump_false_nonzero) {
+				compileExpression(ctx, *ws.condition, LS_TYPE_BOOL);
+				jump_false_pos = emitJumpPlaceholder(ctx, LS_OP_JZ_U8);
+			}
+			const u32 body_pos = (u32)ctx.code.size();
 
 			LoopBinding& loop = ctx.loops.emplace_back();
 			loop.label = current_label;
@@ -2058,16 +3262,31 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 
 			compileStatement(ctx, *ws.body, return_kind, {});
 
-			const u32 jump_back_pos = emitJumpPlaceholder(ctx, LS_OP_JUMP);
-			patchJumpRelative(ctx.code, jump_back_pos, condition_pos);
+			u32 continue_target_pos = condition_pos;
+			if (jump_false_to_exit || jump_false_nonzero) {
+				continue_target_pos = (u32)ctx.code.size();
+				const ls_type_kind condition_kind = jump_false_to_exit ? zero_condition_kind : nonzero_condition_kind;
+				const u32 condition_reg = jump_false_to_exit ? zero_condition_reg : nonzero_condition_reg;
+				const bool jump_on_nonzero = jump_false_nonzero;
+				if (condition_kind == LS_TYPE_I32) emitOp(ctx.code, jump_on_nonzero ? LS_OP_JNZ_I32 : LS_OP_JGZ_I32);
+				else emitOp(ctx.code, jump_on_nonzero ? LS_OP_JNZ_I64 : LS_OP_JGZ_I64);
+				emitFixedReg(ctx, condition_reg);
+				const u32 jump_back_pos = (u32)ctx.code.size();
+				emitI16(ctx.code, 0);
+				patchJumpRelative(ctx, jump_back_pos, body_pos);
+			}
+			else {
+				const u32 jump_back_pos = emitJumpPlaceholder(ctx, LS_OP_JUMP);
+				patchJumpRelative(ctx, jump_back_pos, condition_pos);
+			}
 
 			const u32 loop_end = (u32)ctx.code.size();
-			patchJumpRelative(ctx.code, jump_false_pos, loop_end);
+			if (!constant_true) patchJumpRelative(ctx, jump_false_pos, loop_end);
 			for (u32 break_pos : *loop.break_jumps) {
-				patchJumpRelative(ctx.code, break_pos, loop_end);
+				patchJumpRelative(ctx, break_pos, loop_end);
 			}
 			for (u32 continue_pos : *loop.continue_jumps) {
-				patchJumpRelative(ctx.code, continue_pos, condition_pos);
+				patchJumpRelative(ctx, continue_pos, continue_target_pos);
 			}
 			ctx.loops.pop_back();
 			return;
@@ -2077,23 +3296,95 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			ResolvedType* value_type = fs.begin->resolved_type;
 			const ls_type_kind value_kind = valueKindForType(*value_type);
 			const u32 byte_size = typeByteSize(*value_type) == 0u ? 1u : typeByteSize(*value_type);
-			compileExpression(ctx, *fs.begin, value_kind);
+			const auto isDirectRangeValue = [&](Expression& expr) {
+				if (expr.kind == Expression::INT_LITERAL || expr.kind == Expression::FLOAT_LITERAL) return true;
+				if (expr.kind != Expression::IDENTIFIER || expr.resolved_type != value_type) return false;
+				IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
+				return id.slot && id.slot->storage == StorageSlot::LOCAL && id.slot->byte_size == byte_size;
+			};
+			const bool direct_bounds = isDirectRangeValue(*fs.begin) && isDirectRangeValue(*fs.end);
+			if (direct_bounds) {
+				ctx.pushScope();
+				const u32 loop_offset = ctx.addLocal(value_type, value_kind, true, &fs.slot);
+				u32 end_offset = 0;
+				bool end_snapshot = false;
+				if (fs.end->kind == Expression::IDENTIFIER) {
+					IdentifierExpression& end_id = static_cast<IdentifierExpression&>(*fs.end);
+					if (end_id.slot && end_id.slot->storage == StorageSlot::LOCAL) {
+						end_offset = ctx.addLocal(value_type, value_kind, true);
+						end_snapshot = true;
+					}
+				}
+				if (!end_snapshot) end_offset = ctx.addLocal(value_type, value_kind, true);
+				const auto emitDirectRangeValue = [&](Expression& expr, u32 dst) {
+					if (emitLocalLiteralInitializer(ctx, dst, expr, value_kind)) return;
+					IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
+					emitOp(ctx.code, LS_OP_COPY);
+					emitFixedReg(ctx, dst);
+					emitFixedReg(ctx, id.slot->offset);
+					emitU32(ctx.code, byte_size);
+				};
+				emitDirectRangeValue(*fs.begin, loop_offset);
+				emitDirectRangeValue(*fs.end, end_offset);
+				ctx.temp_top = ctx.next_local_offset;
+
+				const bool known_nonempty = isKnownNonEmptyRange(*fs.begin, *fs.end, value_kind);
+				const bool post_test = true;
+				const u32 condition_pos = (u32)ctx.code.size();
+				const u32 jump_false_pos = known_nonempty ? 0u : emitCompareJumpAt(ctx, value_kind, loop_offset, end_offset);
+				const u32 body_pos = (u32)ctx.code.size();
+				LoopBinding& loop = ctx.loops.emplace_back();
+				loop.label = current_label;
+				loop.defer_mark = (u32)ctx.deferreds.size();
+				void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
+				loop.break_jumps = ::new (break_storage) ExpArray<u32>(*ctx.bytecode->arena);
+				void* continue_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
+				loop.continue_jumps = ::new (continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
+				compileStatement(ctx, *fs.body, return_kind, {});
+				const u32 increment_pos = (u32)ctx.code.size();
+				if (!emitIncrementLocal(ctx, loop_offset, value_kind)) {
+					emitIntegerConstant(ctx, value_kind, 1u);
+					if (!emitNumericStoreOpToLocal(ctx, loop_offset, value_kind, Token::PLUS_EQUAL)) {
+					emitLoadLocalBytes(ctx, loop_offset, byte_size);
+					emitNumericBinary(ctx, LS_OP_ADD_I8, value_kind);
+					emitStoreLocalBytes(ctx, loop_offset, byte_size);
+					}
+				}
+				if (post_test) {
+					const u32 jump_back_pos = emitCompareJumpAtOp(ctx, value_kind, loop_offset, end_offset, 3u); // JLT
+					patchJumpRelative(ctx, jump_back_pos, body_pos);
+				}
+				else {
+					const u32 jump_back_pos = emitJumpPlaceholder(ctx, LS_OP_JUMP);
+					patchJumpRelative(ctx, jump_back_pos, condition_pos);
+				}
+				const u32 loop_end = (u32)ctx.code.size();
+				if (!known_nonempty) patchJumpRelative(ctx, jump_false_pos, loop_end);
+				for (u32 break_pos : *loop.break_jumps) patchJumpRelative(ctx, break_pos, loop_end);
+				for (u32 continue_pos : *loop.continue_jumps) patchJumpRelative(ctx, continue_pos, increment_pos);
+				ctx.loops.pop_back();
+				ctx.popScope(return_kind, current_label);
+				return;
+		}
+			const bool begin_is_literal = fs.begin->kind == Expression::INT_LITERAL || fs.begin->kind == Expression::FLOAT_LITERAL;
+			if (!begin_is_literal) compileExpression(ctx, *fs.begin, value_kind);
 			compileExpression(ctx, *fs.end, value_kind);
 			const u32 range_value_top = ctx.temp_top;
 
 			ctx.pushScope();
 			const u32 loop_offset = ctx.addLocal(value_type, value_kind, true, &fs.slot);
-			const u32 end_offset = ctx.addLocal(value_type, value_kind, true);
+			const u32 end_offset = range_value_top - byte_size;
 			ctx.temp_top = range_value_top;
-			emitStoreLocalBytes(ctx, end_offset, byte_size, false);
-			emitStoreLocalBytes(ctx, loop_offset, byte_size, false);
+			if (!begin_is_literal) {
+				ctx.temp_top -= byte_size;
+				emitStoreLocalBytes(ctx, loop_offset, byte_size, false);
+			}
+			else if (!emitLocalLiteralInitializer(ctx, loop_offset, *fs.begin, value_kind)) ASSERT(false);
 			ctx.temp_top = ctx.next_local_offset;
 
 			const u32 condition_pos = (u32)ctx.code.size();
-			emitLoadLocalBytes(ctx, loop_offset, byte_size);
-			emitLoadLocalBytes(ctx, end_offset, byte_size);
-			emitCompareOp(ctx, LS_OP_LT, value_kind);
-			const u32 jump_false_pos = emitJumpPlaceholder(ctx, LS_OP_JUMP_IF_FALSE);
+			const u32 jump_false_pos = emitCompareJumpAt(ctx, value_kind, loop_offset, end_offset);
+			const u32 body_pos = (u32)ctx.code.size();
 
 			LoopBinding& loop = ctx.loops.emplace_back();
 			loop.label = current_label;
@@ -2106,21 +3397,25 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			compileStatement(ctx, *fs.body, return_kind, {});
 
 			const u32 increment_pos = (u32)ctx.code.size();
-			emitLoadLocalBytes(ctx, loop_offset, byte_size);
-			emitIntegerConstant(ctx, value_kind, 1u);
-			emitNumericBinary(ctx, LS_OP_ADD_I8, value_kind);
-			emitStoreLocalBytes(ctx, loop_offset, byte_size);
+			if (!emitIncrementLocal(ctx, loop_offset, value_kind)) {
+				emitIntegerConstant(ctx, value_kind, 1u);
+				if (!emitNumericStoreOpToLocal(ctx, loop_offset, value_kind, Token::PLUS_EQUAL)) {
+				emitLoadLocalBytes(ctx, loop_offset, byte_size);
+				emitNumericBinary(ctx, LS_OP_ADD_I8, value_kind);
+				emitStoreLocalBytes(ctx, loop_offset, byte_size);
+				}
+			}
 
-			const u32 jump_back_pos = emitJumpPlaceholder(ctx, LS_OP_JUMP);
-			patchJumpRelative(ctx.code, jump_back_pos, condition_pos);
+			const u32 jump_back_pos = emitCompareJumpAtOp(ctx, value_kind, loop_offset, end_offset, 3u); // JLT
+			patchJumpRelative(ctx, jump_back_pos, body_pos);
 
 			const u32 loop_end = (u32)ctx.code.size();
-			patchJumpRelative(ctx.code, jump_false_pos, loop_end);
+			patchJumpRelative(ctx, jump_false_pos, loop_end);
 			for (u32 break_pos : *loop.break_jumps) {
-				patchJumpRelative(ctx.code, break_pos, loop_end);
+				patchJumpRelative(ctx, break_pos, loop_end);
 			}
 			for (u32 continue_pos : *loop.continue_jumps) {
-				patchJumpRelative(ctx.code, continue_pos, increment_pos);
+				patchJumpRelative(ctx, continue_pos, increment_pos);
 			}
 			ctx.loops.pop_back();
 			ctx.popScope(return_kind, current_label);
@@ -2155,18 +3450,18 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 						emitLoadLocalBytes(ctx, subject_offset, 4);
 						emitIntegerConstant(ctx, LS_TYPE_I32, member_index);
 						emitCompareOp(ctx, LS_OP_EQ, LS_TYPE_I32);
-						arm_body_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP_IF_TRUE));
+						arm_body_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JNZ_U8));
 					}
 
 					const u32 skip_jump = emitJumpPlaceholder(ctx, LS_OP_JUMP);
 					const u32 body_start = (u32)ctx.code.size();
-					for (u32 jump : arm_body_jumps) patchJumpRelative(ctx.code, jump, body_start);
+					for (u32 jump : arm_body_jumps) patchJumpRelative(ctx, jump, body_start);
 					compileStatement(ctx, *arm.body, return_kind, current_label);
 					match_end_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP));
-					patchJumpRelative(ctx.code, skip_jump, (u32)ctx.code.size());
+					patchJumpRelative(ctx, skip_jump, (u32)ctx.code.size());
 				}
 				const u32 end = (u32)ctx.code.size();
-				for (u32 jump : match_end_jumps) patchJumpRelative(ctx.code, jump, end);
+				for (u32 jump : match_end_jumps) patchJumpRelative(ctx, jump, end);
 				return;
 			}
 
@@ -2178,7 +3473,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 				arm_body_jumps.clear();
 
 				if (arm.is_fallback) {
-					for (u32 false_jump : pending_false_jumps) patchJumpRelative(ctx.code, false_jump, (u32)ctx.code.size());
+					for (u32 false_jump : pending_false_jumps) patchJumpRelative(ctx, false_jump, (u32)ctx.code.size());
 					pending_false_jumps.clear();
 					compileStatement(ctx, *arm.body, return_kind, current_label);
 					match_end_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP));
@@ -2186,42 +3481,42 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 				}
 
 				for (MatchPattern& pattern : arm.patterns) {
-					for (u32 false_jump : pending_false_jumps) patchJumpRelative(ctx.code, false_jump, (u32)ctx.code.size());
+					for (u32 false_jump : pending_false_jumps) patchJumpRelative(ctx, false_jump, (u32)ctx.code.size());
 					pending_false_jumps.clear();
 
 					if (pattern.end) {
 						emitLoadLocalBytes(ctx, subject_offset, subject_byte_size);
 						compileExpression(ctx, *pattern.begin, subject_kind);
 						emitCompareOp(ctx, LS_OP_GE, subject_kind);
-						pending_false_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP_IF_FALSE));
+						pending_false_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JZ_U8));
 
 						emitLoadLocalBytes(ctx, subject_offset, subject_byte_size);
 						compileExpression(ctx, *pattern.end, subject_kind);
 						emitCompareOp(ctx, LS_OP_LE, subject_kind);
-						pending_false_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP_IF_FALSE));
+						pending_false_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JZ_U8));
 						arm_body_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP));
 					}
 					else {
 						emitLoadLocalBytes(ctx, subject_offset, subject_byte_size);
 						compileExpression(ctx, *pattern.begin, subject_kind);
 						emitCompareOp(ctx, LS_OP_EQ, subject_kind);
-						arm_body_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP_IF_TRUE));
+						arm_body_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JNZ_U8));
 					}
 				}
 
 				const u32 skip_jump_pos = emitJumpPlaceholder(ctx, LS_OP_JUMP);
 				const u32 body_start = (u32)ctx.code.size();
-				for (u32 jump_pos : arm_body_jumps) patchJumpRelative(ctx.code, jump_pos, body_start);
-				for (u32 false_jump : pending_false_jumps) patchJumpRelative(ctx.code, false_jump, skip_jump_pos - 1u);
+				for (u32 jump_pos : arm_body_jumps) patchJumpRelative(ctx, jump_pos, body_start);
+				for (u32 false_jump : pending_false_jumps) patchJumpRelative(ctx, false_jump, skip_jump_pos - 1u);
 				pending_false_jumps.clear();
 				compileStatement(ctx, *arm.body, return_kind, current_label);
 				match_end_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP));
 				const u32 arm_end_pos = (u32)ctx.code.size();
-				patchJumpRelative(ctx.code, skip_jump_pos, arm_end_pos);
+				patchJumpRelative(ctx, skip_jump_pos, arm_end_pos);
 			}
 
 			const u32 end_pos = (u32)ctx.code.size();
-			for (u32 jump_pos : match_end_jumps) patchJumpRelative(ctx.code, jump_pos, end_pos);
+			for (u32 jump_pos : match_end_jumps) patchJumpRelative(ctx, jump_pos, end_pos);
 			return;
 		}
 		case Statement::DEFER: {
@@ -2267,6 +3562,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 				return;
 			}
 			if (ret.expression) {
+				if (tryEmitDirectLocalReturn(ctx, *ret.expression)) return;
 				compileExpressionAsType(ctx, *ret.expression, *ctx.return_type);
 			}
 			emitDeferredStatements(ctx, 0u, return_kind, current_label);
@@ -2371,6 +3667,7 @@ static bool compileFunctionBytecode(
 				// A 1-byte return excludes floats, so no other literal kind reaches here.
 				return false;
 		}
+		if (ctx.failed) return false;
 		emitReturn(ctx);
 		finalizeFunctionCode(ctx, function, *arena);
 		return true;
@@ -2395,6 +3692,7 @@ static bool compileFunctionBytecode(
 	for (Statement* st : body->statements) {
 		compileStatement(ctx, *st, function.return_kind, {});
 	}
+	if (ctx.failed) return false;
 	// Every code path in a non-void function is guaranteed by checkFunctionBody
 	// to already end in an explicit `return`, so this is unreachable for those.
 	// For void functions that fall off the end without one, this is the only
@@ -2485,6 +3783,10 @@ ls_bytecode* ls_bytecode_compile(
 			}
 		}
 		emitReturn(ctx);
+		if (ctx.failed) {
+			ls_bytecode_destroy(bytecode);
+			return nullptr;
+		}
 		finalizeFunctionCode(ctx, function, *arena);
 		bytecode->has_global_init = true;
 	}

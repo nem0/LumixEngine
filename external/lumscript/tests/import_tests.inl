@@ -958,6 +958,14 @@ TEST(CoreMathImportRuntime) {
 		fn sqrt64() : f64 {
 			return math.sqrt_f64(16.0);
 		}
+
+		fn pow32() : f32 {
+			return math.pow(4.0, 0.5);
+		}
+
+		fn pow64() : f64 {
+			return math.pow_f64(4.0, 0.5);
+		}
 	)";
 
 	CAPI_BEGIN(module, diagnostics);
@@ -974,8 +982,12 @@ TEST(CoreMathImportRuntime) {
 	EXPECT_FLOAT_EQ(1.0f, (float)ls_to_f64(runtime, -1));
 	EXPECT_TRUE(ls_call(runtime, toLs("sqrt32")));
 	EXPECT_FLOAT_EQ(3.0f, ls_to_f32(runtime, -1));
-	EXPECT_TRUE(ls_call(runtime, toLs("sqrt64")));
-	EXPECT_FLOAT_EQ(4.0f, (float)ls_to_f64(runtime, -1));
+		EXPECT_TRUE(ls_call(runtime, toLs("sqrt64")));
+		EXPECT_FLOAT_EQ(4.0f, (float)ls_to_f64(runtime, -1));
+		EXPECT_TRUE(ls_call(runtime, toLs("pow32")));
+		EXPECT_FLOAT_EQ(2.0f, ls_to_f32(runtime, -1));
+		EXPECT_TRUE(ls_call(runtime, toLs("pow64")));
+		EXPECT_FLOAT_EQ(2.0f, (float)ls_to_f64(runtime, -1));
 	CAPI_END(module);
 	return true;
 }

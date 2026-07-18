@@ -3,7 +3,6 @@
 //
 // Differences from the bolt original:
 // - fixed-size arrays instead of dynamic arrays; pairs store body indices
-// - pow(d, -1.5) is expressed as 1 / (d * sqrt(d)) since std:math has no pow
 // - runs a single sim_system(500000) instead of the bench() harness
 
 import "std:math" as math

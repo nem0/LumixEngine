@@ -133,6 +133,8 @@ static void runtime_native_sqrt_f32(ls_runtime* runtime, ls_call_frame frame) { 
 static void runtime_native_sin_f64(ls_runtime* runtime, ls_call_frame frame) { (void)runtime; LS_ARG(frame, f64, value); LS_TYPED_RESULT(frame, f64, sin(value)); }
 static void runtime_native_cos_f64(ls_runtime* runtime, ls_call_frame frame) { (void)runtime; LS_ARG(frame, f64, value); LS_TYPED_RESULT(frame, f64, cos(value)); }
 static void runtime_native_sqrt_f64(ls_runtime* runtime, ls_call_frame frame) { (void)runtime; LS_ARG(frame, f64, value); LS_TYPED_RESULT(frame, f64, sqrt(value)); }
+static void runtime_native_pow_f32(ls_runtime* runtime, ls_call_frame frame) { (void)runtime; LS_ARG(frame, f32, base); LS_ARG(frame, f32, exponent); LS_TYPED_RESULT(frame, f32, powf(base, exponent)); }
+static void runtime_native_pow_f64(ls_runtime* runtime, ls_call_frame frame) { (void)runtime; LS_ARG(frame, f64, base); LS_ARG(frame, f64, exponent); LS_TYPED_RESULT(frame, f64, pow(base, exponent)); }
 
 /* std:mem alloc(size, align) : byte[]. Allocates `size` bytes of heap memory. */
 static void runtime_native_alloc(ls_runtime* runtime, ls_call_frame frame) {
@@ -166,6 +168,8 @@ static void runtime_bind_builtin_callbacks(ls_runtime* runtime) {
 		else if (runtime_string_equals_cstr(fn->name, "sin_f64")) runtime->native_callbacks[i] = &runtime_native_sin_f64;
 		else if (runtime_string_equals_cstr(fn->name, "cos_f64")) runtime->native_callbacks[i] = &runtime_native_cos_f64;
 		else if (runtime_string_equals_cstr(fn->name, "sqrt_f64")) runtime->native_callbacks[i] = &runtime_native_sqrt_f64;
+		else if (runtime_string_equals_cstr(fn->name, "pow")) runtime->native_callbacks[i] = &runtime_native_pow_f32;
+		else if (runtime_string_equals_cstr(fn->name, "pow_f64")) runtime->native_callbacks[i] = &runtime_native_pow_f64;
 		else if (runtime_string_equals_cstr(fn->name, "alloc")) runtime->native_callbacks[i] = &runtime_native_alloc;
 		else if (runtime_string_equals_cstr(fn->name, "free")) runtime->native_callbacks[i] = &runtime_native_free;
 	}
@@ -190,6 +194,13 @@ static i32 runtime_read_i32(const u8* code, u32* pc) {
 	memcpy(&value, code + *pc, sizeof(value));
 	*pc += (u32)sizeof(value);
 	return value;
+}
+
+static i32 runtime_read_i16(const u8* code, u32* pc) {
+	i16 value = 0;
+	memcpy(&value, code + *pc, sizeof(value));
+	*pc += (u32)sizeof(value);
+	return (i32)value;
 }
 
 static double runtime_numeric_to_double(const u8* value, ls_type_kind kind) {
@@ -246,19 +257,15 @@ static u64 runtime_numeric_to_u64(const u8* value, ls_type_kind kind) {
 	}
 }
 
-static u8* runtime_frame_ptr(ls_runtime* runtime, u32 offset) {
-	return runtime->stack + runtime->frame_base + offset;
-}
-
 #define LS_REG_BINOP(TYPE, EXPR) \
 	do { \
 		const u32 dst__ = runtime_read_u32(fn->code, &pc); \
 		const u32 lhs_offset__ = runtime_read_u32(fn->code, &pc); \
 		const u32 rhs_offset__ = runtime_read_u32(fn->code, &pc); \
 		TYPE a = 0; TYPE b = 0; \
-		u8* lhs__ = runtime_frame_ptr(runtime, lhs_offset__); \
-		u8* rhs__ = runtime_frame_ptr(runtime, rhs_offset__); \
-		u8* out__ = runtime_frame_ptr(runtime, dst__); \
+		u8* lhs__ = runtime->frame + lhs_offset__; \
+		u8* rhs__ = runtime->frame + rhs_offset__; \
+		u8* out__ = runtime->frame + dst__; \
 		memcpy(&a, lhs__, sizeof(TYPE)); \
 		memcpy(&b, rhs__, sizeof(TYPE)); \
 		TYPE result__ = (TYPE)(EXPR); \
@@ -271,9 +278,9 @@ static u8* runtime_frame_ptr(ls_runtime* runtime, u32 offset) {
 		const u32 lhs_offset__ = runtime_read_u32(fn->code, &pc); \
 		const u32 rhs_offset__ = runtime_read_u32(fn->code, &pc); \
 		TYPE a = 0; TYPE b = 0; \
-		u8* lhs__ = runtime_frame_ptr(runtime, lhs_offset__); \
-		u8* rhs__ = runtime_frame_ptr(runtime, rhs_offset__); \
-		u8* out__ = runtime_frame_ptr(runtime, dst__); \
+		u8* lhs__ = runtime->frame + lhs_offset__; \
+		u8* rhs__ = runtime->frame + rhs_offset__; \
+		u8* out__ = runtime->frame + dst__; \
 		memcpy(&a, lhs__, sizeof(TYPE)); \
 		memcpy(&b, rhs__, sizeof(TYPE)); \
 		if (!b) goto runtime_execute_function_fail; \
@@ -285,17 +292,10 @@ static u8* runtime_frame_ptr(ls_runtime* runtime, u32 offset) {
 	do { \
 		const u32 offset__ = runtime_read_u32(fn->code, &pc); \
 		TYPE value__ = 0; \
-		u8* ptr__ = runtime_frame_ptr(runtime, offset__); \
+		u8* ptr__ = runtime->frame + offset__; \
 		memcpy(&value__, ptr__, sizeof(TYPE)); \
 		value__ = (TYPE)(0 - value__); \
 		memcpy(ptr__, &value__, sizeof(TYPE)); \
-	} while (0)
-
-#define LS_REG_NOT() \
-	do { \
-		const u32 offset__ = runtime_read_u32(fn->code, &pc); \
-		u8* ptr__ = runtime_frame_ptr(runtime, offset__); \
-		*ptr__ = *ptr__ ? 0u : 1u; \
 	} while (0)
 
 #define LS_REG_CMP_NUMERIC(OP) \
@@ -304,9 +304,9 @@ static u8* runtime_frame_ptr(ls_runtime* runtime, u32 offset) {
 		const u32 lhs_offset__ = runtime_read_u32(fn->code, &pc); \
 		const u32 rhs_offset__ = runtime_read_u32(fn->code, &pc); \
 		const ls_type_kind kind__ = (ls_type_kind)fn->code[pc++]; \
-		u8* lhs_ptr__ = runtime_frame_ptr(runtime, lhs_offset__); \
-		u8* rhs_ptr__ = runtime_frame_ptr(runtime, rhs_offset__); \
-		u8* out__ = runtime_frame_ptr(runtime, dst__); \
+		u8* lhs_ptr__ = runtime->frame + lhs_offset__; \
+		u8* rhs_ptr__ = runtime->frame + rhs_offset__; \
+		u8* out__ = runtime->frame + dst__; \
 		int result__ = 0; \
 		if (kind__ == LS_TYPE_STRING) { \
 			void* lhs_string__ = NULL; void* rhs_string__ = NULL; \
@@ -327,10 +327,10 @@ static u8* runtime_frame_ptr(ls_runtime* runtime, u32 offset) {
 	do { \
 		const u32 lhs_offset__ = runtime_read_u32(fn->code, &pc); \
 		const u32 rhs_offset__ = runtime_read_u32(fn->code, &pc); \
-		const i32 jump_offset__ = runtime_read_i32(fn->code, &pc); \
+		const i32 jump_offset__ = runtime_read_i16(fn->code, &pc); \
 		TYPE lhs__; TYPE rhs__; \
-		memcpy(&lhs__, runtime_frame_ptr(runtime, lhs_offset__), sizeof(lhs__)); \
-		memcpy(&rhs__, runtime_frame_ptr(runtime, rhs_offset__), sizeof(rhs__)); \
+		memcpy(&lhs__, runtime->frame + lhs_offset__, sizeof(lhs__)); \
+		memcpy(&rhs__, runtime->frame + rhs_offset__, sizeof(rhs__)); \
 		if (!(lhs__ OP rhs__)) pc = (u32)((i32)pc + jump_offset__); \
 	} while (0)
 
@@ -338,10 +338,10 @@ static u8* runtime_frame_ptr(ls_runtime* runtime, u32 offset) {
 	do { \
 		const u32 lhs_offset__ = runtime_read_u32(fn->code, &pc); \
 		const u32 rhs_offset__ = runtime_read_u32(fn->code, &pc); \
-		const i32 jump_offset__ = runtime_read_i32(fn->code, &pc); \
+		const i32 jump_offset__ = runtime_read_i16(fn->code, &pc); \
 		void* lhs__ = NULL; void* rhs__ = NULL; \
-		memcpy(&lhs__, runtime_frame_ptr(runtime, lhs_offset__), sizeof(lhs__)); \
-		memcpy(&rhs__, runtime_frame_ptr(runtime, rhs_offset__), sizeof(rhs__)); \
+		memcpy(&lhs__, runtime->frame + lhs_offset__, sizeof(lhs__)); \
+		memcpy(&rhs__, runtime->frame + rhs_offset__, sizeof(rhs__)); \
 		int equal__ = lhs__ == rhs__ || (lhs__ && rhs__ && string_equals(((ls_string_box*)lhs__)->value, ((ls_string_box*)rhs__)->value)); \
 		if (!(equal__ OP 1)) pc = (u32)((i32)pc + jump_offset__); \
 	} while (0)
@@ -383,6 +383,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 	if (frame_stack_top > runtime->stack_capacity) goto runtime_execute_function_fail;
 
 	runtime->frame_base = frame_base;
+	runtime->frame = runtime->stack + frame_base;
 	runtime->stack_top = frame_stack_top;
 
 	i32 current_function_index = function_index;
@@ -394,27 +395,27 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 			case LS_OP_LOAD_CONST_1: {
 				const u32 dst = runtime_read_u32(fn->code, &pc);
 				u8 value = fn->code[pc++];
-				u8* out = runtime_frame_ptr(runtime, dst);
+				u8* out = runtime->frame + dst;
 				*out = value;
 				break;
 			}
 			case LS_OP_LOAD_CONST_2: {
 				const u32 dst = runtime_read_u32(fn->code, &pc);
-				u8* out = runtime_frame_ptr(runtime, dst);
+				u8* out = runtime->frame + dst;
 				memcpy(out, fn->code + pc, 2u);
 				pc += 2u;
 				break;
 			}
 			case LS_OP_LOAD_CONST_4: {
 				const u32 dst = runtime_read_u32(fn->code, &pc);
-				u8* out = runtime_frame_ptr(runtime, dst);
+				u8* out = runtime->frame + dst;
 				memcpy(out, fn->code + pc, 4u);
 				pc += 4u;
 				break;
 			}
 			case LS_OP_LOAD_CONST_8: {
 				const u32 dst = runtime_read_u32(fn->code, &pc);
-				u8* out = runtime_frame_ptr(runtime, dst);
+				u8* out = runtime->frame + dst;
 				memcpy(out, fn->code + pc, 8u);
 				pc += 8u;
 				break;
@@ -423,7 +424,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				const u32 dst = runtime_read_u32(fn->code, &pc);
 				const u32 index = runtime_read_u32(fn->code, &pc);
 				void* value = runtime_copy_string_box(runtime, runtime->bytecode->strings[index]);
-				u8* out = runtime_frame_ptr(runtime, dst);
+				u8* out = runtime->frame + dst;
 				memcpy(out, &value, sizeof(value));
 				break;
 			}
@@ -431,8 +432,8 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				const u32 dst = runtime_read_u32(fn->code, &pc);
 				const u32 src_offset = runtime_read_u32(fn->code, &pc);
 				const u32 size = runtime_read_u32(fn->code, &pc);
-				u8* out = runtime_frame_ptr(runtime, dst);
-				u8* src = runtime_frame_ptr(runtime, src_offset);
+				u8* out = runtime->frame + dst;
+				u8* src = runtime->frame + src_offset;
 				memmove(out, src, size);
 				break;
 			}
@@ -440,7 +441,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				const u32 dst = runtime_read_u32(fn->code, &pc);
 				const u32 offset = runtime_read_u32(fn->code, &pc);
 				const u32 size = runtime_read_u32(fn->code, &pc);
-				u8* out = runtime_frame_ptr(runtime, dst);
+				u8* out = runtime->frame + dst;
 				u8* src = runtime->stack + offset;
 				memmove(out, src, size);
 				break;
@@ -450,7 +451,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				const u32 src_offset = runtime_read_u32(fn->code, &pc);
 				const u32 size = runtime_read_u32(fn->code, &pc);
 				u8* dst = runtime->stack + offset;
-				u8* src = runtime_frame_ptr(runtime, src_offset);
+				u8* src = runtime->frame + src_offset;
 				memmove(dst, src, size);
 				break;
 			}
@@ -458,7 +459,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				const u32 dst = runtime_read_u32(fn->code, &pc);
 				const u32 offset = runtime_read_u32(fn->code, &pc);
 				const u32 absolute = runtime->frame_base + offset;
-				u8* out = runtime_frame_ptr(runtime, dst);
+				u8* out = runtime->frame + dst;
 				void* ptr = runtime->stack + absolute;
 				memcpy(out, &ptr, sizeof(ptr));
 				break;
@@ -466,7 +467,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 			case LS_OP_GLOBAL_REF: {
 				const u32 dst = runtime_read_u32(fn->code, &pc);
 				const u32 offset = runtime_read_u32(fn->code, &pc);
-				u8* out = runtime_frame_ptr(runtime, dst);
+				u8* out = runtime->frame + dst;
 				void* ptr = runtime->stack + offset;
 				memcpy(out, &ptr, sizeof(ptr));
 				break;
@@ -480,9 +481,9 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				const u32 size = runtime_read_u32(fn->code, &pc);
 				i64 index = 0;
 				void* base_ptr = NULL;
-				u8* index_ptr = runtime_frame_ptr(runtime, index_reg);
-				u8* base_value = runtime_frame_ptr(runtime, base_reg);
-				u8* out = runtime_frame_ptr(runtime, dst);
+				u8* index_ptr = runtime->frame + index_reg;
+				u8* base_value = runtime->frame + base_reg;
+				u8* out = runtime->frame + dst;
 				memcpy(&index, index_ptr, 8u);
 				memcpy(&base_ptr, base_value, sizeof(base_ptr));
 				u8* base = (u8*)base_ptr;
@@ -499,14 +500,65 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				const u32 size = runtime_read_u32(fn->code, &pc);
 				i64 index = 0;
 				void* base_ptr = NULL;
-				u8* index_ptr = runtime_frame_ptr(runtime, index_reg);
-				u8* base_value = runtime_frame_ptr(runtime, base_reg);
-				u8* value = runtime_frame_ptr(runtime, value_reg);
+				u8* index_ptr = runtime->frame + index_reg;
+				u8* base_value = runtime->frame + base_reg;
+				u8* value = runtime->frame + value_reg;
 				memcpy(&index, index_ptr, 8u);
 				memcpy(&base_ptr, base_value, sizeof(base_ptr));
 				u8* base = (u8*)base_ptr;
 				u8* addr = base + index * (i64)scale + (i64)offset;
 				memmove(addr, value, size);
+				break;
+			}
+			case LS_OP_LOAD_AT_LOCAL_I32: {
+				const u32 dst = runtime_read_u32(fn->code, &pc);
+				const u32 base_offset = runtime_read_u32(fn->code, &pc);
+				const u32 index_reg = runtime_read_u32(fn->code, &pc);
+				const u32 scale = runtime_read_u32(fn->code, &pc);
+				const i32 offset = runtime_read_i32(fn->code, &pc);
+				const u32 length = runtime_read_u32(fn->code, &pc);
+				const u32 size = runtime_read_u32(fn->code, &pc);
+				i32 index = 0;
+				memcpy(&index, runtime->frame + index_reg, 4u);
+				if (index < 0 || (u32)index >= length) goto runtime_execute_function_fail;
+				const u64 address = (u64)runtime->frame_base + base_offset + (u64)(u32)index * scale + (i64)offset;
+				if (address + size > runtime->stack_capacity) goto runtime_execute_function_fail;
+				memmove(runtime->frame + dst, runtime->stack + address, size);
+				break;
+			}
+			case LS_OP_STORE_AT_LOCAL_I32: {
+				const u32 base_offset = runtime_read_u32(fn->code, &pc);
+				const u32 index_reg = runtime_read_u32(fn->code, &pc);
+				const u32 value_reg = runtime_read_u32(fn->code, &pc);
+				const u32 scale = runtime_read_u32(fn->code, &pc);
+				const i32 offset = runtime_read_i32(fn->code, &pc);
+				const u32 length = runtime_read_u32(fn->code, &pc);
+				const u32 size = runtime_read_u32(fn->code, &pc);
+				i32 index = 0;
+				memcpy(&index, runtime->frame + index_reg, 4u);
+				if (index < 0 || (u32)index >= length) goto runtime_execute_function_fail;
+				const u64 address = (u64)runtime->frame_base + base_offset + (u64)(u32)index * scale + (i64)offset;
+				if (address + size > runtime->stack_capacity) goto runtime_execute_function_fail;
+				memmove(runtime->stack + address, runtime->frame + value_reg, size);
+				break;
+			}
+			case LS_OP_COPY_AT_LOCAL_I32: {
+				const u32 src_base_offset = runtime_read_u32(fn->code, &pc);
+				const u32 src_index_reg = runtime_read_u32(fn->code, &pc);
+				const u32 dst_base_offset = runtime_read_u32(fn->code, &pc);
+				const u32 dst_index_reg = runtime_read_u32(fn->code, &pc);
+				const u32 scale = runtime_read_u32(fn->code, &pc);
+				const u32 length = runtime_read_u32(fn->code, &pc);
+				const u32 size = runtime_read_u32(fn->code, &pc);
+				i32 src_index = 0;
+				i32 dst_index = 0;
+				memcpy(&src_index, runtime->frame + src_index_reg, 4u);
+				memcpy(&dst_index, runtime->frame + dst_index_reg, 4u);
+				if (src_index < 0 || (u32)src_index >= length || dst_index < 0 || (u32)dst_index >= length) goto runtime_execute_function_fail;
+				const u64 src_address = (u64)runtime->frame_base + src_base_offset + (u64)(u32)src_index * scale;
+				const u64 dst_address = (u64)runtime->frame_base + dst_base_offset + (u64)(u32)dst_index * scale;
+				if (src_address + size > runtime->stack_capacity || dst_address + size > runtime->stack_capacity) goto runtime_execute_function_fail;
+				memmove(runtime->stack + dst_address, runtime->stack + src_address, size);
 				break;
 			}
 			case LS_OP_REF_AT: {
@@ -517,9 +569,9 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				const i32 offset = runtime_read_i32(fn->code, &pc);
 				i64 index = 0;
 				void* base_ptr = NULL;
-				u8* index_ptr = runtime_frame_ptr(runtime, index_reg);
-				u8* base_value = runtime_frame_ptr(runtime, base_reg);
-				u8* out = runtime_frame_ptr(runtime, dst);
+				u8* index_ptr = runtime->frame + index_reg;
+				u8* base_value = runtime->frame + base_reg;
+				u8* out = runtime->frame + dst;
 				memcpy(&index, index_ptr, 8u);
 				memcpy(&base_ptr, base_value, sizeof(base_ptr));
 				u8* base = (u8*)base_ptr;
@@ -531,7 +583,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				const u32 index_reg = runtime_read_u32(fn->code, &pc);
 				const u64 length = runtime_read_u64(fn->code, &pc);
 				i64 index = 0;
-				u8* index_ptr = runtime_frame_ptr(runtime, index_reg);
+				u8* index_ptr = runtime->frame + index_reg;
 				memcpy(&index, index_ptr, 8u);
 				if (index < 0 || (u64)index >= length) goto runtime_execute_function_fail;
 				break;
@@ -544,9 +596,9 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				const u32 element_size = runtime_read_u32(fn->code, &pc);
 				i64 end = 0, begin = 0, length = 0;
 				void* base_ptr = NULL;
-				u8* slice = runtime_frame_ptr(runtime, slice_reg);
-				u8* begin_ptr = runtime_frame_ptr(runtime, begin_reg);
-				u8* end_ptr = runtime_frame_ptr(runtime, end_reg);
+				u8* slice = runtime->frame + slice_reg;
+				u8* begin_ptr = runtime->frame + begin_reg;
+				u8* end_ptr = runtime->frame + end_reg;
 				u8* out = slice;
 				memcpy(&base_ptr, slice, sizeof(base_ptr));
 				memcpy(&length, slice + sizeof(void*), 8u);
@@ -570,8 +622,8 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				i64 index = 0;
 				i64 length = 0;
 				void* base_ptr = NULL;
-				u8* slice = runtime_frame_ptr(runtime, slice_reg);
-				u8* index_ptr = runtime_frame_ptr(runtime, index_reg);
+				u8* slice = runtime->frame + slice_reg;
+				u8* index_ptr = runtime->frame + index_reg;
 				u8* out = slice;
 				memcpy(&base_ptr, slice, sizeof(base_ptr));
 				memcpy(&length, slice + sizeof(void*), 8u);
@@ -591,9 +643,9 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				i64 index = 0;
 				i64 length = 0;
 				void* base_ptr = NULL;
-				u8* slice = runtime_frame_ptr(runtime, slice_reg);
-				u8* index_ptr = runtime_frame_ptr(runtime, index_reg);
-				u8* value = runtime_frame_ptr(runtime, value_reg);
+				u8* slice = runtime->frame + slice_reg;
+				u8* index_ptr = runtime->frame + index_reg;
+				u8* value = runtime->frame + value_reg;
 				memcpy(&base_ptr, slice, sizeof(base_ptr));
 				memcpy(&length, slice + sizeof(void*), 8u);
 				memcpy(&index, index_ptr, 8u);
@@ -602,6 +654,86 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				const u64 offset = (u64)index * element_size;
 				if (element_size != 0u && offset / element_size != (u64)index) goto runtime_execute_function_fail;
 				if (element_size > 0u) memmove(base + offset, value, element_size);
+				break;
+			}
+			case LS_OP_SLICE_LOAD_LOCAL: {
+				const u32 dst = runtime_read_u32(fn->code, &pc);
+				const u32 slice_offset = runtime_read_u32(fn->code, &pc);
+				const u32 index_reg = runtime_read_u32(fn->code, &pc);
+				const u32 element_size = runtime_read_u32(fn->code, &pc);
+				i64 index = 0;
+				i64 length = 0;
+				void* base_ptr = NULL;
+				u8* slice = runtime->frame + slice_offset;
+				u8* index_ptr = runtime->frame + index_reg;
+				u8* out = runtime->frame + dst;
+				memcpy(&base_ptr, slice, sizeof(base_ptr));
+				memcpy(&length, slice + sizeof(void*), 8u);
+				memcpy(&index, index_ptr, 8u);
+				if (!base_ptr || index < 0 || (u64)index >= (u64)length) goto runtime_execute_function_fail;
+				const u64 offset = (u64)index * element_size;
+				if (element_size != 0u && offset / element_size != (u64)index) goto runtime_execute_function_fail;
+				memmove(out, (u8*)base_ptr + offset, element_size);
+				break;
+			}
+			case LS_OP_SLICE_STORE_LOCAL: {
+				const u32 slice_offset = runtime_read_u32(fn->code, &pc);
+				const u32 index_reg = runtime_read_u32(fn->code, &pc);
+				const u32 value_reg = runtime_read_u32(fn->code, &pc);
+				const u32 element_size = runtime_read_u32(fn->code, &pc);
+				i64 index = 0;
+				i64 length = 0;
+				void* base_ptr = NULL;
+				u8* slice = runtime->frame + slice_offset;
+				u8* index_ptr = runtime->frame + index_reg;
+				u8* value = runtime->frame + value_reg;
+				memcpy(&base_ptr, slice, sizeof(base_ptr));
+				memcpy(&length, slice + sizeof(void*), 8u);
+				memcpy(&index, index_ptr, 8u);
+				if (!base_ptr || index < 0 || (u64)index >= (u64)length) goto runtime_execute_function_fail;
+				const u64 offset = (u64)index * element_size;
+				if (element_size != 0u && offset / element_size != (u64)index) goto runtime_execute_function_fail;
+				memmove((u8*)base_ptr + offset, value, element_size);
+				break;
+			}
+			case LS_OP_SLICE_LOAD_LOCAL_I32: {
+				const u32 dst = runtime_read_u32(fn->code, &pc);
+				const u32 slice_offset = runtime_read_u32(fn->code, &pc);
+				const u32 index_reg = runtime_read_u32(fn->code, &pc);
+				const u32 element_size = runtime_read_u32(fn->code, &pc);
+				i32 index = 0;
+				i64 length = 0;
+				void* base_ptr = NULL;
+				u8* slice = runtime->frame + slice_offset;
+				u8* index_ptr = runtime->frame + index_reg;
+				u8* out = runtime->frame + dst;
+				memcpy(&base_ptr, slice, sizeof(base_ptr));
+				memcpy(&length, slice + sizeof(void*), 8u);
+				memcpy(&index, index_ptr, 4u);
+				if (!base_ptr || index < 0 || (u64)index >= (u64)length) goto runtime_execute_function_fail;
+				const u64 offset = (u64)(u32)index * element_size;
+				if (element_size != 0u && offset / element_size != (u64)(u32)index) goto runtime_execute_function_fail;
+				memmove(out, (u8*)base_ptr + offset, element_size);
+				break;
+			}
+			case LS_OP_SLICE_STORE_LOCAL_I32: {
+				const u32 slice_offset = runtime_read_u32(fn->code, &pc);
+				const u32 index_reg = runtime_read_u32(fn->code, &pc);
+				const u32 value_reg = runtime_read_u32(fn->code, &pc);
+				const u32 element_size = runtime_read_u32(fn->code, &pc);
+				i32 index = 0;
+				i64 length = 0;
+				void* base_ptr = NULL;
+				u8* slice = runtime->frame + slice_offset;
+				u8* index_ptr = runtime->frame + index_reg;
+				u8* value = runtime->frame + value_reg;
+				memcpy(&base_ptr, slice, sizeof(base_ptr));
+				memcpy(&length, slice + sizeof(void*), 8u);
+				memcpy(&index, index_ptr, 4u);
+				if (!base_ptr || index < 0 || (u64)index >= (u64)length) goto runtime_execute_function_fail;
+				const u64 offset = (u64)(u32)index * element_size;
+				if (element_size != 0u && offset / element_size != (u64)(u32)index) goto runtime_execute_function_fail;
+				memmove((u8*)base_ptr + offset, value, element_size);
 				break;
 			}
 			case LS_OP_SLICE_LOAD_AT: {
@@ -613,8 +745,8 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				i64 index = 0;
 				i64 length = 0;
 				void* base_ptr = NULL;
-				u8* slice = runtime_frame_ptr(runtime, slice_reg);
-				u8* index_ptr = runtime_frame_ptr(runtime, index_reg);
+				u8* slice = runtime->frame + slice_reg;
+				u8* index_ptr = runtime->frame + index_reg;
 				memcpy(&base_ptr, slice, sizeof(base_ptr));
 				memcpy(&length, slice + sizeof(void*), 8u);
 				memcpy(&index, index_ptr, 8u);
@@ -634,15 +766,101 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				i64 index = 0;
 				i64 length = 0;
 				void* base_ptr = NULL;
-				u8* slice = runtime_frame_ptr(runtime, slice_reg);
-				u8* index_ptr = runtime_frame_ptr(runtime, index_reg);
-				u8* value = runtime_frame_ptr(runtime, value_reg);
+				u8* slice = runtime->frame + slice_reg;
+				u8* index_ptr = runtime->frame + index_reg;
+				u8* value = runtime->frame + value_reg;
 				memcpy(&base_ptr, slice, sizeof(base_ptr));
 				memcpy(&length, slice + sizeof(void*), 8u);
 				memcpy(&index, index_ptr, 8u);
 				if (!base_ptr || index < 0 || (u64)index >= (u64)length) goto runtime_execute_function_fail;
 				const u64 offset = (u64)index * element_size;
 				if (element_size != 0u && offset / element_size != (u64)index) goto runtime_execute_function_fail;
+				memmove((u8*)base_ptr + offset + field_offset, value, field_size);
+				break;
+			}
+			case LS_OP_SLICE_LOAD_AT_LOCAL: {
+				const u32 dst = runtime_read_u32(fn->code, &pc);
+				const u32 slice_offset = runtime_read_u32(fn->code, &pc);
+				const u32 index_reg = runtime_read_u32(fn->code, &pc);
+				const u32 element_size = runtime_read_u32(fn->code, &pc);
+				const i32 field_offset = runtime_read_i32(fn->code, &pc);
+				const u32 field_size = runtime_read_u32(fn->code, &pc);
+				i64 index = 0;
+				i64 length = 0;
+				void* base_ptr = NULL;
+				u8* slice = runtime->frame + slice_offset;
+				u8* index_ptr = runtime->frame + index_reg;
+				u8* out = runtime->frame + dst;
+				memcpy(&base_ptr, slice, sizeof(base_ptr));
+				memcpy(&length, slice + sizeof(void*), 8u);
+				memcpy(&index, index_ptr, 8u);
+				if (!base_ptr || index < 0 || (u64)index >= (u64)length) goto runtime_execute_function_fail;
+				const u64 offset = (u64)index * element_size;
+				if (element_size != 0u && offset / element_size != (u64)index) goto runtime_execute_function_fail;
+				memmove(out, (u8*)base_ptr + offset + field_offset, field_size);
+				break;
+			}
+			case LS_OP_SLICE_STORE_AT_LOCAL: {
+				const u32 slice_offset = runtime_read_u32(fn->code, &pc);
+				const u32 index_reg = runtime_read_u32(fn->code, &pc);
+				const u32 value_reg = runtime_read_u32(fn->code, &pc);
+				const u32 element_size = runtime_read_u32(fn->code, &pc);
+				const i32 field_offset = runtime_read_i32(fn->code, &pc);
+				const u32 field_size = runtime_read_u32(fn->code, &pc);
+				i64 index = 0;
+				i64 length = 0;
+				void* base_ptr = NULL;
+				u8* slice = runtime->frame + slice_offset;
+				u8* index_ptr = runtime->frame + index_reg;
+				u8* value = runtime->frame + value_reg;
+				memcpy(&base_ptr, slice, sizeof(base_ptr));
+				memcpy(&length, slice + sizeof(void*), 8u);
+				memcpy(&index, index_ptr, 8u);
+				if (!base_ptr || index < 0 || (u64)index >= (u64)length) goto runtime_execute_function_fail;
+				const u64 offset = (u64)index * element_size;
+				if (element_size != 0u && offset / element_size != (u64)index) goto runtime_execute_function_fail;
+				memmove((u8*)base_ptr + offset + field_offset, value, field_size);
+				break;
+			}
+			case LS_OP_SLICE_LOAD_AT_LOCAL_I32: {
+				const u32 dst = runtime_read_u32(fn->code, &pc);
+				const u32 slice_offset = runtime_read_u32(fn->code, &pc);
+				const u32 index_reg = runtime_read_u32(fn->code, &pc);
+				const u32 element_size = runtime_read_u32(fn->code, &pc);
+				const i32 field_offset = runtime_read_i32(fn->code, &pc);
+				const u32 field_size = runtime_read_u32(fn->code, &pc);
+				i32 index = 0;
+				i64 length = 0;
+				void* base_ptr = NULL;
+				u8* slice = runtime->frame + slice_offset;
+				u8* out = runtime->frame + dst;
+				memcpy(&base_ptr, slice, sizeof(base_ptr));
+				memcpy(&length, slice + sizeof(void*), 8u);
+				memcpy(&index, runtime->frame + index_reg, 4u);
+				if (!base_ptr || index < 0 || (u64)index >= (u64)length) goto runtime_execute_function_fail;
+				const u64 offset = (u64)(u32)index * element_size;
+				if (element_size != 0u && offset / element_size != (u64)(u32)index) goto runtime_execute_function_fail;
+				memmove(out, (u8*)base_ptr + offset + field_offset, field_size);
+				break;
+			}
+			case LS_OP_SLICE_STORE_AT_LOCAL_I32: {
+				const u32 slice_offset = runtime_read_u32(fn->code, &pc);
+				const u32 index_reg = runtime_read_u32(fn->code, &pc);
+				const u32 value_reg = runtime_read_u32(fn->code, &pc);
+				const u32 element_size = runtime_read_u32(fn->code, &pc);
+				const i32 field_offset = runtime_read_i32(fn->code, &pc);
+				const u32 field_size = runtime_read_u32(fn->code, &pc);
+				i32 index = 0;
+				i64 length = 0;
+				void* base_ptr = NULL;
+				u8* slice = runtime->frame + slice_offset;
+				u8* value = runtime->frame + value_reg;
+				memcpy(&base_ptr, slice, sizeof(base_ptr));
+				memcpy(&length, slice + sizeof(void*), 8u);
+				memcpy(&index, runtime->frame + index_reg, 4u);
+				if (!base_ptr || index < 0 || (u64)index >= (u64)length) goto runtime_execute_function_fail;
+				const u64 offset = (u64)(u32)index * element_size;
+				if (element_size != 0u && offset / element_size != (u64)(u32)index) goto runtime_execute_function_fail;
 				memmove((u8*)base_ptr + offset + field_offset, value, field_size);
 				break;
 			}
@@ -654,8 +872,8 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				i64 index = 0;
 				i64 length = 0;
 				void* base_ptr = NULL;
-				u8* slice = runtime_frame_ptr(runtime, slice_reg);
-				u8* index_ptr = runtime_frame_ptr(runtime, index_reg);
+				u8* slice = runtime->frame + slice_reg;
+				u8* index_ptr = runtime->frame + index_reg;
 				u8* out = slice;
 				memcpy(&base_ptr, slice, sizeof(base_ptr));
 				memcpy(&length, slice + sizeof(void*), 8u);
@@ -669,11 +887,11 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				break;
 			}
 			case LS_OP_SLICE_LENGTH: {
-				/* The length overwrites the slice value in place. */
+				const u32 dst = runtime_read_u32(fn->code, &pc);
 				const u32 slice_reg = runtime_read_u32(fn->code, &pc);
 				i64 length = 0;
-				u8* slice = runtime_frame_ptr(runtime, slice_reg);
-				u8* out = slice;
+				u8* slice = runtime->frame + slice_reg;
+				u8* out = runtime->frame + dst;
 				memcpy(&length, slice + sizeof(void*), 8u);
 				memcpy(out, &length, 8u);
 				break;
@@ -682,7 +900,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				const u32 src = runtime_read_u32(fn->code, &pc);
 				const u32 size = runtime_read_u32(fn->code, &pc);
 				if (size > 0u) {
-					u8* src_ptr = runtime_frame_ptr(runtime, src);
+					u8* src_ptr = runtime->frame + src;
 					if (runtime->frame_base + size > runtime->stack_capacity) goto runtime_execute_function_fail;
 					memmove(runtime->stack + runtime->frame_base, src_ptr, size);
 					runtime->stack_top = runtime->frame_base + size;
@@ -693,6 +911,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				if (runtime->call_depth == initial_call_depth) {
 					runtime->result_function = current_function_index;
 					runtime->frame_base = initial_frame_base;
+					runtime->frame = runtime->stack + initial_frame_base;
 					return 1;
 				}
 				{
@@ -701,28 +920,29 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 					current_function_index = caller.function_index;
 					pc = caller.pc;
 					runtime->frame_base = caller.frame_base;
+					runtime->frame = runtime->stack + caller.frame_base;
 					runtime->stack_top = caller.stack_top;
 				}
 				break;
 			}
 			case LS_OP_CALL_DIRECT: {
 				const i32 callee_index = (i32)runtime_read_u32(fn->code, &pc);
-				const u32 arg_top = runtime_read_u32(fn->code, &pc);
+				const u32 arg_base = runtime_read_u32(fn->code, &pc);
 				const u32 caller_top = runtime->stack_top;
 				const ls_function_bc* callee = runtime_find_function(runtime->bytecode, callee_index);
 				if (!callee) goto runtime_execute_function_fail;
+				if (caller_top < runtime->frame_base || arg_base > caller_top - runtime->frame_base) goto runtime_execute_function_fail;
 				
 				if (callee->kind == LS_FUNCTION_NATIVE) {
 					if ((u32)callee_index >= runtime->native_callback_count) goto runtime_execute_function_fail;
 					ls_native_fn callback = runtime->native_callbacks[(u32)callee_index];
 					if (!callback) goto runtime_execute_function_fail;
-					const u32 call_stack_top = runtime->frame_base + arg_top;
-					const u32 arg_base = call_stack_top >= callee->param_size ? call_stack_top - callee->param_size : 0u;
-					const u32 expected_top = arg_base + callee->return_size;
+					const u32 absolute_arg_base = runtime->frame_base + arg_base;
+					const u32 expected_top = absolute_arg_base + callee->return_size;
 					if (expected_top > runtime->stack_capacity) goto runtime_execute_function_fail;
 					ls_call_frame frame;
-					frame.args = runtime->stack + arg_base;
-					frame.result = runtime->stack + arg_base;
+					frame.args = runtime->stack + absolute_arg_base;
+					frame.result = runtime->stack + absolute_arg_base;
 					callback(runtime, frame);
 					runtime->stack_top = caller_top;
 					break;
@@ -730,8 +950,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 
 				if (runtime->call_depth >= LS_MAX_CALL_DEPTH) goto runtime_execute_function_fail;
 
-				const u32 call_stack_top = runtime->frame_base + arg_top;
-				const u32 callee_frame_base = call_stack_top >= callee->param_size ? call_stack_top - callee->param_size : 0u;
+				const u32 callee_frame_base = runtime->frame_base + arg_base;
 				const u32 callee_stack_top = callee_frame_base + callee->frame_size;
 				if (callee_stack_top > runtime->stack_capacity) goto runtime_execute_function_fail;
 
@@ -741,6 +960,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				current_function_index = callee_index;
 				pc = 0;
 				runtime->frame_base = callee_frame_base;
+				runtime->frame = runtime->stack + callee_frame_base;
 				runtime->stack_top = callee_stack_top;
 				break;
 			}
@@ -749,14 +969,14 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				const u32 arg_size = runtime_read_u32(fn->code, &pc);
 				const u32 return_size = runtime_read_u32(fn->code, &pc);
 				const u32 arg = dst + 4u;
-				u8* callee_ptr = runtime_frame_ptr(runtime, dst);
+				u8* callee_ptr = runtime->frame + dst;
 				u32 callee_index = 0;
 				memcpy(&callee_index, callee_ptr, sizeof(callee_index));
 				const u32 caller_top = runtime->stack_top;
 				runtime->stack_top = runtime->frame_base + arg + arg_size;
 				const int ok = runtime_execute_function(runtime, (i32)callee_index);
 				if (ok && return_size > 0u) {
-					memmove(runtime_frame_ptr(runtime, dst), runtime_frame_ptr(runtime, arg), return_size);
+					memmove(runtime->frame + dst, runtime->frame + arg, return_size);
 				}
 				runtime->stack_top = caller_top;
 				if (!ok) {
@@ -770,8 +990,8 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				const u32 src = runtime_read_u32(fn->code, &pc);
 				const ls_type_kind src_kind = (ls_type_kind)fn->code[pc++];
 				const ls_type_kind dst_kind = (ls_type_kind)fn->code[pc++];
-				u8* src_ptr = runtime_frame_ptr(runtime, src);
-				u8* out = runtime_frame_ptr(runtime, dst);
+				u8* src_ptr = runtime->frame + src;
+				u8* out = runtime->frame + dst;
 				switch (dst_kind) {
 					case LS_TYPE_BOOL: { u8 v = runtime_numeric_to_u64(src_ptr, src_kind) != 0u ? 1u : 0u; memcpy(out, &v, 1u); break; }
 					case LS_TYPE_I8:  { i8 v = (i8)runtime_numeric_to_i64(src_ptr, src_kind); memcpy(out, &v, 1u); break; }
@@ -793,21 +1013,21 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				const u32 dst = runtime_read_u32(fn->code, &pc);
 				const u32 src = runtime_read_u32(fn->code, &pc);
 				ls_string_box* box = NULL;
-				memcpy(&box, runtime_frame_ptr(runtime, src), sizeof(box));
+				memcpy(&box, runtime->frame + src, sizeof(box));
 				if (!box || memchr(box->value.begin, '\0', (size_t)(box->value.end - box->value.begin))) goto runtime_execute_function_fail;
 				const char* value = box->value.begin;
-				memcpy(runtime_frame_ptr(runtime, dst), &value, sizeof(value));
+				memcpy(runtime->frame + dst, &value, sizeof(value));
 				break;
 			}
 			case LS_OP_CSTR_TO_STRING: {
 				const u32 dst = runtime_read_u32(fn->code, &pc);
 				const u32 src = runtime_read_u32(fn->code, &pc);
 				const char* value = NULL;
-				memcpy(&value, runtime_frame_ptr(runtime, src), sizeof(value));
+				memcpy(&value, runtime->frame + src, sizeof(value));
 				if (!value) goto runtime_execute_function_fail;
 				ls_string_box* box = runtime_copy_string_box(runtime, (ls_string_view){value, value + strlen(value)});
 				if (!box) goto runtime_execute_function_fail;
-				memcpy(runtime_frame_ptr(runtime, dst), &box, sizeof(box));
+				memcpy(runtime->frame + dst, &box, sizeof(box));
 				break;
 			}
 			case LS_OP_NEG_I8: LS_REG_NEGOP(i8); break;
@@ -820,7 +1040,12 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 			case LS_OP_NEG_U64: LS_REG_NEGOP(u64); break;
 			case LS_OP_NEG_F32: LS_REG_NEGOP(f32); break;
 			case LS_OP_NEG_F64: LS_REG_NEGOP(f64); break;
-			case LS_OP_NOT: LS_REG_NOT(); break;
+			case LS_OP_NOT: {
+				const u32 offset = runtime_read_u32(fn->code, &pc);
+				u8* ptr = runtime->frame + offset;
+				*ptr = *ptr ? 0u : 1u;
+				break;
+			}
 			case LS_OP_ADD_I8: LS_REG_BINOP(i8, a + b); break;
 			case LS_OP_ADD_U8: LS_REG_BINOP(u8, a + b); break;
 			case LS_OP_ADD_I16: LS_REG_BINOP(i16, a + b); break;
@@ -869,73 +1094,206 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 			case LS_OP_MOD_U32: LS_REG_DIVOP(u32, a % b); break;
 			case LS_OP_MOD_I64: LS_REG_DIVOP(i64, a % b); break;
 			case LS_OP_MOD_U64: LS_REG_DIVOP(u64, a % b); break;
+			case LS_OP_INC_I32: {
+				const u32 dst = runtime_read_u32(fn->code, &pc);
+				i32 value = 0;
+				memcpy(&value, runtime->frame + dst, 4u);
+				value = (i32)((u32)value + 1u);
+				memcpy(runtime->frame + dst, &value, 4u);
+				break;
+			}
+			case LS_OP_INC_I64: {
+				const u32 dst = runtime_read_u32(fn->code, &pc);
+				i64 value = 0;
+				memcpy(&value, runtime->frame + dst, 8u);
+				value = (i64)((u64)value + 1u);
+				memcpy(runtime->frame + dst, &value, 8u);
+				break;
+			}
+			case LS_OP_DEC_I32: {
+				const u32 dst = runtime_read_u32(fn->code, &pc);
+				i32 value = 0;
+				memcpy(&value, runtime->frame + dst, 4u);
+				value = (i32)((u32)value - 1u);
+				memcpy(runtime->frame + dst, &value, 4u);
+				break;
+			}
+			case LS_OP_DEC_I64: {
+				const u32 dst = runtime_read_u32(fn->code, &pc);
+				i64 value = 0;
+				memcpy(&value, runtime->frame + dst, 8u);
+				value = (i64)((u64)value - 1u);
+				memcpy(runtime->frame + dst, &value, 8u);
+				break;
+			}
 			case LS_OP_EQ: LS_REG_CMP_NUMERIC(==); break;
 			case LS_OP_NE: LS_REG_CMP_NUMERIC(!=); break;
 			case LS_OP_LT: LS_REG_CMP_NUMERIC(<); break;
 			case LS_OP_LE: LS_REG_CMP_NUMERIC(<=); break;
-			case LS_OP_EQ_JUMP_FALSE_BOOL: LS_REG_CMP_JUMP(u8, ==); break;
-			case LS_OP_NE_JUMP_FALSE_BOOL: LS_REG_CMP_JUMP(u8, !=); break;
-			case LS_OP_EQ_JUMP_FALSE_I8: LS_REG_CMP_JUMP(i8, ==); break;
-			case LS_OP_NE_JUMP_FALSE_I8: LS_REG_CMP_JUMP(i8, !=); break;
-			case LS_OP_LT_JUMP_FALSE_I8: LS_REG_CMP_JUMP(i8, <); break;
-			case LS_OP_LE_JUMP_FALSE_I8: LS_REG_CMP_JUMP(i8, <=); break;
-			case LS_OP_EQ_JUMP_FALSE_U8: LS_REG_CMP_JUMP(u8, ==); break;
-			case LS_OP_NE_JUMP_FALSE_U8: LS_REG_CMP_JUMP(u8, !=); break;
-			case LS_OP_LT_JUMP_FALSE_U8: LS_REG_CMP_JUMP(u8, <); break;
-			case LS_OP_LE_JUMP_FALSE_U8: LS_REG_CMP_JUMP(u8, <=); break;
-			case LS_OP_EQ_JUMP_FALSE_I16: LS_REG_CMP_JUMP(i16, ==); break;
-			case LS_OP_NE_JUMP_FALSE_I16: LS_REG_CMP_JUMP(i16, !=); break;
-			case LS_OP_LT_JUMP_FALSE_I16: LS_REG_CMP_JUMP(i16, <); break;
-			case LS_OP_LE_JUMP_FALSE_I16: LS_REG_CMP_JUMP(i16, <=); break;
-			case LS_OP_EQ_JUMP_FALSE_U16: LS_REG_CMP_JUMP(u16, ==); break;
-			case LS_OP_NE_JUMP_FALSE_U16: LS_REG_CMP_JUMP(u16, !=); break;
-			case LS_OP_LT_JUMP_FALSE_U16: LS_REG_CMP_JUMP(u16, <); break;
-			case LS_OP_LE_JUMP_FALSE_U16: LS_REG_CMP_JUMP(u16, <=); break;
-			case LS_OP_EQ_JUMP_FALSE_I32: LS_REG_CMP_JUMP(i32, ==); break;
-			case LS_OP_NE_JUMP_FALSE_I32: LS_REG_CMP_JUMP(i32, !=); break;
-			case LS_OP_LT_JUMP_FALSE_I32: LS_REG_CMP_JUMP(i32, <); break;
-			case LS_OP_LE_JUMP_FALSE_I32: LS_REG_CMP_JUMP(i32, <=); break;
-			case LS_OP_EQ_JUMP_FALSE_U32: LS_REG_CMP_JUMP(u32, ==); break;
-			case LS_OP_NE_JUMP_FALSE_U32: LS_REG_CMP_JUMP(u32, !=); break;
-			case LS_OP_LT_JUMP_FALSE_U32: LS_REG_CMP_JUMP(u32, <); break;
-			case LS_OP_LE_JUMP_FALSE_U32: LS_REG_CMP_JUMP(u32, <=); break;
-			case LS_OP_EQ_JUMP_FALSE_I64: LS_REG_CMP_JUMP(i64, ==); break;
-			case LS_OP_NE_JUMP_FALSE_I64: LS_REG_CMP_JUMP(i64, !=); break;
-			case LS_OP_LT_JUMP_FALSE_I64: LS_REG_CMP_JUMP(i64, <); break;
-			case LS_OP_LE_JUMP_FALSE_I64: LS_REG_CMP_JUMP(i64, <=); break;
-			case LS_OP_EQ_JUMP_FALSE_U64: LS_REG_CMP_JUMP(u64, ==); break;
-			case LS_OP_NE_JUMP_FALSE_U64: LS_REG_CMP_JUMP(u64, !=); break;
-			case LS_OP_LT_JUMP_FALSE_U64: LS_REG_CMP_JUMP(u64, <); break;
-			case LS_OP_LE_JUMP_FALSE_U64: LS_REG_CMP_JUMP(u64, <=); break;
-			case LS_OP_EQ_JUMP_FALSE_F32: LS_REG_CMP_JUMP(f32, ==); break;
-			case LS_OP_NE_JUMP_FALSE_F32: LS_REG_CMP_JUMP(f32, !=); break;
-			case LS_OP_LT_JUMP_FALSE_F32: LS_REG_CMP_JUMP(f32, <); break;
-			case LS_OP_LE_JUMP_FALSE_F32: LS_REG_CMP_JUMP(f32, <=); break;
-			case LS_OP_EQ_JUMP_FALSE_F64: LS_REG_CMP_JUMP(f64, ==); break;
-			case LS_OP_NE_JUMP_FALSE_F64: LS_REG_CMP_JUMP(f64, !=); break;
-			case LS_OP_LT_JUMP_FALSE_F64: LS_REG_CMP_JUMP(f64, <); break;
-			case LS_OP_LE_JUMP_FALSE_F64: LS_REG_CMP_JUMP(f64, <=); break;
-			case LS_OP_EQ_JUMP_FALSE_STRING: LS_REG_CMP_JUMP_STRING(==); break;
-			case LS_OP_NE_JUMP_FALSE_STRING: LS_REG_CMP_JUMP_STRING(!=); break;
-			case LS_OP_EQ_JUMP_FALSE_ENUM: LS_REG_CMP_JUMP(i32, ==); break;
-			case LS_OP_NE_JUMP_FALSE_ENUM: LS_REG_CMP_JUMP(i32, !=); break;
+			case LS_OP_JE_I8: LS_REG_CMP_JUMP(i8, !=); break;
+			case LS_OP_JGE_I8: LS_REG_CMP_JUMP(i8, <); break;
+			case LS_OP_JGT_I8: LS_REG_CMP_JUMP(i8, <=); break;
+			case LS_OP_JLT_I8: LS_REG_CMP_JUMP(i8, >=); break;
+			case LS_OP_JLE_I8: LS_REG_CMP_JUMP(i8, >); break;
+			case LS_OP_JE_U8: LS_REG_CMP_JUMP(u8, !=); break;
+			case LS_OP_JGE_U8: LS_REG_CMP_JUMP(u8, <); break;
+			case LS_OP_JGT_U8: LS_REG_CMP_JUMP(u8, <=); break;
+			case LS_OP_JLT_U8: LS_REG_CMP_JUMP(u8, >=); break;
+			case LS_OP_JLE_U8: LS_REG_CMP_JUMP(u8, >); break;
+			case LS_OP_JE_I16: LS_REG_CMP_JUMP(i16, !=); break;
+			case LS_OP_JGE_I16: LS_REG_CMP_JUMP(i16, <); break;
+			case LS_OP_JGT_I16: LS_REG_CMP_JUMP(i16, <=); break;
+			case LS_OP_JLT_I16: LS_REG_CMP_JUMP(i16, >=); break;
+			case LS_OP_JLE_I16: LS_REG_CMP_JUMP(i16, >); break;
+			case LS_OP_JE_U16: LS_REG_CMP_JUMP(u16, !=); break;
+			case LS_OP_JGE_U16: LS_REG_CMP_JUMP(u16, <); break;
+			case LS_OP_JGT_U16: LS_REG_CMP_JUMP(u16, <=); break;
+			case LS_OP_JLT_U16: LS_REG_CMP_JUMP(u16, >=); break;
+			case LS_OP_JLE_U16: LS_REG_CMP_JUMP(u16, >); break;
+			case LS_OP_JE_I32: LS_REG_CMP_JUMP(i32, !=); break;
+			case LS_OP_JGE_I32: LS_REG_CMP_JUMP(i32, <); break;
+			case LS_OP_JGT_I32: LS_REG_CMP_JUMP(i32, <=); break;
+			case LS_OP_JLT_I32: LS_REG_CMP_JUMP(i32, >=); break;
+			case LS_OP_JLE_I32: LS_REG_CMP_JUMP(i32, >); break;
+			case LS_OP_JE_U32: LS_REG_CMP_JUMP(u32, !=); break;
+			case LS_OP_JGE_U32: LS_REG_CMP_JUMP(u32, <); break;
+			case LS_OP_JGT_U32: LS_REG_CMP_JUMP(u32, <=); break;
+			case LS_OP_JLT_U32: LS_REG_CMP_JUMP(u32, >=); break;
+			case LS_OP_JLE_U32: LS_REG_CMP_JUMP(u32, >); break;
+			case LS_OP_JE_I64: LS_REG_CMP_JUMP(i64, !=); break;
+			case LS_OP_JGE_I64: LS_REG_CMP_JUMP(i64, <); break;
+			case LS_OP_JGT_I64: LS_REG_CMP_JUMP(i64, <=); break;
+			case LS_OP_JLT_I64: LS_REG_CMP_JUMP(i64, >=); break;
+			case LS_OP_JLE_I64: LS_REG_CMP_JUMP(i64, >); break;
+			case LS_OP_JE_U64: LS_REG_CMP_JUMP(u64, !=); break;
+			case LS_OP_JGE_U64: LS_REG_CMP_JUMP(u64, <); break;
+			case LS_OP_JGT_U64: LS_REG_CMP_JUMP(u64, <=); break;
+			case LS_OP_JLT_U64: LS_REG_CMP_JUMP(u64, >=); break;
+			case LS_OP_JLE_U64: LS_REG_CMP_JUMP(u64, >); break;
+			case LS_OP_JE_F32: LS_REG_CMP_JUMP(f32, !=); break;
+			case LS_OP_JGE_F32: LS_REG_CMP_JUMP(f32, <); break;
+			case LS_OP_JGT_F32: LS_REG_CMP_JUMP(f32, <=); break;
+			case LS_OP_JLT_F32: LS_REG_CMP_JUMP(f32, >=); break;
+			case LS_OP_JLE_F32: LS_REG_CMP_JUMP(f32, >); break;
+			case LS_OP_JE_F64: LS_REG_CMP_JUMP(f64, !=); break;
+			case LS_OP_JGE_F64: LS_REG_CMP_JUMP(f64, <); break;
+			case LS_OP_JGT_F64: LS_REG_CMP_JUMP(f64, <=); break;
+			case LS_OP_JLT_F64: LS_REG_CMP_JUMP(f64, >=); break;
+			case LS_OP_JLE_F64: LS_REG_CMP_JUMP(f64, >); break;
+			case LS_OP_JE_STRING: LS_REG_CMP_JUMP_STRING(!=); break;
 			case LS_OP_JUMP: {
-				const i32 offset = runtime_read_i32(fn->code, &pc);
+				const i32 offset = runtime_read_i16(fn->code, &pc);
 				pc = (u32)((i32)pc + offset);
 				break;
 			}
-			case LS_OP_JUMP_IF_FALSE: {
+			case LS_OP_JZ_U8: {
 				const u32 cond = runtime_read_u32(fn->code, &pc);
-				const i32 offset = runtime_read_i32(fn->code, &pc);
-				u8* ptr = runtime_frame_ptr(runtime, cond);
+				const i32 offset = runtime_read_i16(fn->code, &pc);
+				u8* ptr = runtime->frame + cond;
 				if (*ptr == 0u) pc = (u32)((i32)pc + offset);
 				break;
 			}
-			case LS_OP_JUMP_IF_TRUE: {
+			case LS_OP_JNZ_U8: {
 				const u32 cond = runtime_read_u32(fn->code, &pc);
-				const i32 offset = runtime_read_i32(fn->code, &pc);
-				u8* ptr = runtime_frame_ptr(runtime, cond);
+				const i32 offset = runtime_read_i16(fn->code, &pc);
+				u8* ptr = runtime->frame + cond;
 				if (*ptr != 0u) pc = (u32)((i32)pc + offset);
+				break;
+			}
+			case LS_OP_JZ_I32: {
+				const u32 reg = runtime_read_u32(fn->code, &pc);
+				const i32 offset = runtime_read_i16(fn->code, &pc);
+				i32 value = 0;
+				memcpy(&value, runtime->frame + reg, 4u);
+				if (value == 0) pc = (u32)((i32)pc + offset);
+				break;
+			}
+			case LS_OP_JZ_I64: {
+				const u32 reg = runtime_read_u32(fn->code, &pc);
+				const i32 offset = runtime_read_i16(fn->code, &pc);
+				i64 value = 0;
+				memcpy(&value, runtime->frame + reg, 8u);
+				if (value == 0) pc = (u32)((i32)pc + offset);
+				break;
+			}
+			case LS_OP_JGZ_I32: {
+				const u32 reg = runtime_read_u32(fn->code, &pc);
+				const i32 offset = runtime_read_i16(fn->code, &pc);
+				i32 value = 0;
+				memcpy(&value, runtime->frame + reg, 4u);
+				if (value > 0) pc = (u32)((i32)pc + offset);
+				break;
+			}
+			case LS_OP_JGZ_I64: {
+				const u32 reg = runtime_read_u32(fn->code, &pc);
+				const i32 offset = runtime_read_i16(fn->code, &pc);
+				i64 value = 0;
+				memcpy(&value, runtime->frame + reg, 8u);
+				if (value > 0) pc = (u32)((i32)pc + offset);
+				break;
+			}
+			case LS_OP_JGEZ_I32: {
+				const u32 reg = runtime_read_u32(fn->code, &pc);
+				const i32 offset = runtime_read_i16(fn->code, &pc);
+				i32 value = 0;
+				memcpy(&value, runtime->frame + reg, 4u);
+				if (value >= 0) pc = (u32)((i32)pc + offset);
+				break;
+			}
+			case LS_OP_JGEZ_I64: {
+				const u32 reg = runtime_read_u32(fn->code, &pc);
+				const i32 offset = runtime_read_i16(fn->code, &pc);
+				i64 value = 0;
+				memcpy(&value, runtime->frame + reg, 8u);
+				if (value >= 0) pc = (u32)((i32)pc + offset);
+				break;
+			}
+			case LS_OP_JLTZ_I32: {
+				const u32 reg = runtime_read_u32(fn->code, &pc);
+				const i32 offset = runtime_read_i16(fn->code, &pc);
+				i32 value = 0;
+				memcpy(&value, runtime->frame + reg, 4u);
+				if (value < 0) pc = (u32)((i32)pc + offset);
+				break;
+			}
+			case LS_OP_JLTZ_I64: {
+				const u32 reg = runtime_read_u32(fn->code, &pc);
+				const i32 offset = runtime_read_i16(fn->code, &pc);
+				i64 value = 0;
+				memcpy(&value, runtime->frame + reg, 8u);
+				if (value < 0) pc = (u32)((i32)pc + offset);
+				break;
+			}
+			case LS_OP_JLEZ_I32: {
+				const u32 reg = runtime_read_u32(fn->code, &pc);
+				const i32 offset = runtime_read_i16(fn->code, &pc);
+				i32 value = 0;
+				memcpy(&value, runtime->frame + reg, 4u);
+				if (value <= 0) pc = (u32)((i32)pc + offset);
+				break;
+			}
+			case LS_OP_JLEZ_I64: {
+				const u32 reg = runtime_read_u32(fn->code, &pc);
+				const i32 offset = runtime_read_i16(fn->code, &pc);
+				i64 value = 0;
+				memcpy(&value, runtime->frame + reg, 8u);
+				if (value <= 0) pc = (u32)((i32)pc + offset);
+				break;
+			}
+			case LS_OP_JNZ_I32: {
+				const u32 reg = runtime_read_u32(fn->code, &pc);
+				const i32 offset = runtime_read_i16(fn->code, &pc);
+				i32 value = 0;
+				memcpy(&value, runtime->frame + reg, 4u);
+				if (value != 0) pc = (u32)((i32)pc + offset);
+				break;
+			}
+			case LS_OP_JNZ_I64: {
+				const u32 reg = runtime_read_u32(fn->code, &pc);
+				const i32 offset = runtime_read_i16(fn->code, &pc);
+				i64 value = 0;
+				memcpy(&value, runtime->frame + reg, 8u);
+				if (value != 0) pc = (u32)((i32)pc + offset);
 				break;
 			}
 			default:
@@ -950,6 +1308,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 runtime_execute_function_fail:
 	runtime->stack_top = initial_stack_top;
 	runtime->frame_base = initial_frame_base;
+	runtime->frame = runtime->stack + initial_frame_base;
 	runtime->result_function = initial_result_function;
 	runtime->call_depth = initial_call_depth;
 	return 0;
