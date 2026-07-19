@@ -6,7 +6,7 @@
 // type if available, otherwise the declared type.
 static ResolvedType* structFieldType(const StructResolvedType& st, i32 index) {
 	ASSERT(st.decl);
-	if (index < st.decl->fields.size()) return st.decl->fields[(u32)index].resolved_type;
+	if (index < st.field_types.size()) return st.field_types[(u32)index];
 	ASSERT(false);
 	return nullptr;
 }
@@ -625,11 +625,18 @@ struct Checker {
 			}
 			case Expression::MEMBER: {
 				MemberExpression& member = static_cast<MemberExpression&>(expr);
-				if (!member.expression || member.expression->kind != Expression::IDENTIFIER) return {};
+				if (!member.expression || member.expression->kind != Expression::IDENTIFIER) {
+					errorLine(expr.token, "Expected an import alias in type expression");
+					return {};
+				}
 				const ls_string_view qualifier = static_cast<IdentifierExpression*>(member.expression)->name;
+				if (!findImportedUnitByAlias(unit, qualifier)) {
+					errorLine(expr.token, "Unknown import alias ", qualifier);
+					return {};
+				}
 				SymbolRef ref = resolveSymbol(unit, qualifier, member.name, LookupPolicy::Checked);
 				if (!ref) {
-					// TODO create a test to hit this
+					errorLine(expr.token, "Unknown type ", qualifier, ".", member.name);
 					return {};
 				}
 				if (ref.symbol->resolved_type && ref.symbol->resolved_type->kind == ResolvedType::META) {
@@ -3384,6 +3391,18 @@ struct Checker {
 
 		if (!checkBranchWithNarrowing(ifst.body, narrow_in_true)) return false;
 		if (!checkBranchWithNarrowing(ifst.else_branch, !narrow_in_true)) return false;
+
+		// A terminating branch leaves only the branch where the nullable value was non-null.
+		const bool continues_with_narrowed_value = narrowed_type
+			&& ((!narrow_in_true && statementAlwaysReturns(*ifst.body))
+				|| (narrow_in_true && ifst.else_branch && statementAlwaysReturns(*ifst.else_branch)));
+		if (continues_with_narrowed_value) {
+			SemanticLocalBinding& nb = ctx.locals.emplace_back();
+			nb.name = narrowed_name;
+			nb.type = narrowed_type;
+			nb.is_immutable = narrowed_is_immutable;
+			nb.slot = narrowed_slot;
+		}
 		return true;
 	}
 

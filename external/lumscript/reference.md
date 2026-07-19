@@ -2,6 +2,7 @@
 
 # TODO
 
+* for i in slice/array
 * how can we push unions if we don't know the tag value of variants, i.e. U = A | B - we don't know if A's tag is 0 or 1
 * use case - comptime string hash
 * how should user implement print-s?
@@ -868,6 +869,26 @@ fn main() : void {
 		// e is promoted to entity.Entity in this branch
 	}
 }
+```
+
+Promotion also continues after a guard branch that always returns. In this case the only path that reaches `e` is the non-null one:
+
+```cpp
+if e == null { return; }
+
+use_entity(e); // e is promoted to entity.Entity
+```
+
+The same applies when the `else` branch returns:
+
+```cpp
+if e != null {
+	use_entity(e);
+} else {
+	return;
+}
+
+use_entity(e); // e is promoted to entity.Entity
 ```
 
 Using a nullable value without a required null check is a compile-time error.
@@ -1900,7 +1921,7 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 - `match` needs tighter rules for what counts as a valid pattern expression, how string subjects behave, and the exact duplicate/exhaustiveness policy for non-enum subjects.
 - `for` ranges should define whether bounds must match exactly, what type the loop variable has, and what happens for descending or overflowing ranges.
 - Static-sized arrays are missing rules for literal syntax, copy semantics, passing/returning by value, and comparison behavior. Nesting now reads left-to-right: `[4][8]i32` is an array of 4 arrays of 8 ints; `[][4]i32` is a slice of arrays of 4 ints.
-- Nullable promotion is only described for `if value != null`; the spec should say how `== null`, `else if`, compound conditions, and scope boundaries behave.
+- Nullable promotion should define `else if`, compound conditions, and scope boundaries in more detail.
 - `defer` should define behavior on `break`, `continue`, runtime errors, and nested scopes, not only normal exit and `return`.
 - Boolean operator coverage is incomplete because `not` appears in examples but is not specified alongside `and` and `or`.
 - Imports and `extern` bindings still need explicit collision policy for same-path/same-alias cases, builtin module boundaries, and imported declaration conflicts.

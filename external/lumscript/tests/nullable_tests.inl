@@ -65,6 +65,56 @@ TEST(NullableStructUseWithCheck) {
 	return true;
 }
 
+TEST(NullableGuardClauseNarrowing) {
+	const char* source = R"(
+		struct Vec3 {
+			x : f32;
+		}
+
+		fn get_x(v : ?Vec3) : f32 {
+			if v == null { return 0; }
+			return v.x;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(NullableGlobalGuardClauseNarrowing) {
+	const char* source = R"(
+		struct Vec3 {
+			x : f32;
+		}
+
+		var player : ?Vec3 = null;
+
+		fn get_x() : f32 {
+			if player == null { return 0; }
+			return player.x;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(NullableElseReturnNarrowing) {
+	const char* source = R"(
+		struct Vec3 {
+			x : f32;
+		}
+
+		fn get_x(v : ?Vec3) : f32 {
+			if v != null {
+			} else {
+				return 0;
+			}
+			return v.x;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(NullableComparisonRequiresNullCheckFails) {
 	const char* source = R"(
 		fn main() : void {

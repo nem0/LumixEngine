@@ -1110,7 +1110,7 @@ void serializeLumScriptMeta(MetaData& data) {
 	L("static void registerGeneratedEngineImport(HashMap<NativeFunctionKey, ls_native_fn, NativeFunctionKeyHash>& functions) {");
 	for (Module& m : data.modules) {
 		for (Component& c : m.components) {
-			L("functions.insert({StringView(\"core:entity\"), StringView(\"", c.id, "\")}, &lumscript_entity_", c.id, ");");
+			L("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", c.id, "\")}, &lumscript_entity_", c.id, ");");
 		}
 	}
 	wrapper_idx = 0;
@@ -1127,7 +1127,7 @@ void serializeLumScriptMeta(MetaData& data) {
 			any_function = true;
 		}
 		if (any_function) {
-			L("functions.insert({StringView(\"core:world\"), StringView(\"", m.id, "\")}, &lumscript_world_", m.id, ");");
+			L("functions.insert({StringView(\"core:", m.id, "\"), StringView(\"", m.id, "\")}, &lumscript_world_", m.id, ");");
 		}
 	}
 	emitGeneratedComponentImportRegistrations(out, data, &wrapper_idx);
