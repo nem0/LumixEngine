@@ -159,6 +159,7 @@ struct CodeEditor {
 	virtual StringView getPrefix() = 0;
 	
 	virtual void setReadOnly(bool readonly) = 0;
+	virtual void setBreakpoint(u32 line, bool enabled) = 0;
 	virtual void setText(StringView text) = 0;
 	virtual void serializeText(OutputMemoryStream& blob) = 0;
 	virtual void setTokenColors(Span<const u32> colors) = 0; // keep colors alive while CodeEditor uses them

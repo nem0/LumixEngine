@@ -936,6 +936,7 @@ struct CodeEditorImpl final : CodeEditor {
 		, m_allocator(app.getAllocator(), "code_editor")
 		, m_lines(m_allocator)
 		, m_underlines(m_allocator)
+		, m_breakpoints(m_allocator)
 		, m_cursors(m_allocator)
 		, m_undo_stack(m_allocator)
 		, m_dpi_scale(maximum(1.f, os::getDPI() / 96.f))
@@ -1817,6 +1818,21 @@ struct CodeEditorImpl final : CodeEditor {
 	
 	void focus() override { m_focus_editor = true; }
 
+	void setBreakpoint(u32 line, bool enabled) override {
+		if (enabled) {
+			for (u32 breakpoint : m_breakpoints) if (breakpoint == line) return;
+			m_breakpoints.push(line);
+		}
+		else {
+			for (i32 i = 0; i < m_breakpoints.size(); ++i) {
+				if (m_breakpoints[i] == line) {
+					m_breakpoints.erase(i);
+					return;
+				}
+			}
+		}
+	}
+
 	void copy(Span<char> out, const Cursor& cursor) const {
 		ASSERT(cursor.line == cursor.sel.line);
 		
@@ -1918,7 +1934,8 @@ struct CodeEditorImpl final : CodeEditor {
 		const u32 selection_color = ImGui::GetColorU32(ImGuiCol_TextSelectedBg);
 		const u32 scrollbar_bg_color = ImGui::GetColorU32(ImGuiCol_ScrollbarBg);
 		const float char_width = CalcTextSize("x").x;
-		const float line_num_width = s_show_line_numbers ? u32(log10(m_lines.size()) + 1) * char_width + 2 * style.FramePadding.x : 0;
+		const float breakpoint_width = s_show_line_numbers ? line_height : 0;
+		const float line_num_width = s_show_line_numbers ? breakpoint_width + u32(log10(m_lines.size()) + 1) * char_width + 2 * style.FramePadding.x : 0;
 
 		ImGuiID id = ImGui::GetID("codeditor");
 		ImRect bb = { min, min + content_size };
@@ -2022,8 +2039,15 @@ struct CodeEditorImpl final : CodeEditor {
 			float line_offset_y = j * line_height;
 			ImVec2 line_pos = min + ImVec2(0, line_offset_y);
 			if (s_show_line_numbers) {
+				// TODO optimize this
+				for (u32 breakpoint : m_breakpoints) {
+					if (breakpoint == (u32)j) {
+						dl->AddCircleFilled(line_pos + ImVec2(breakpoint_width * 0.5f, line_height * 0.5f), line_height * 0.3f, IM_COL32(0xe8, 0x4a, 0x4a, 0xff));
+						break;
+					}
+				}
 				StaticString<16> line_num_str(j + 1);
-				dl->AddText(line_pos, line_num_color, line_num_str);
+				dl->AddText(line_pos + ImVec2(breakpoint_width, 0), line_num_color, line_num_str);
 			}
 			const char* str = m_lines[j].value.c_str();
 			ImVec2 p = text_area_pos + ImVec2(0, line_offset_y);
@@ -2314,6 +2338,7 @@ struct CodeEditorImpl final : CodeEditor {
 	StudioApp& m_app;
 	Array<Line> m_lines;
 	Array<Underline> m_underlines;
+	Array<u32> m_breakpoints;
 	Array<Cursor> m_cursors;
 	float m_scroll_diff = 0;
 	i32 m_first_visible_line = 0;

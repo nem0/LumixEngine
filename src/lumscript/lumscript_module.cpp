@@ -107,9 +107,11 @@ struct LumScriptModuleImpl : LumScriptModule {
 
 	void update(float time_delta) override {
 		if (!m_script.is_ready || !m_script.runtime) return;
+		if (ls_debug_is_suspended(m_script.runtime)) return;
 
 		ls_push_f32(m_script.runtime, time_delta);
-		if (!ls_call(m_script.runtime, toLs("update"))) {
+		const ls_result result = ls_call(m_script.runtime, toLs("update"));
+		if (result == LS_RESULT_FAILURE) {
 			logError("LumScript update failed");
 		}
 	}
@@ -136,6 +138,23 @@ struct LumScriptModuleImpl : LumScriptModule {
 	}
 
 	bool isReady() const override { return m_script.is_ready; }
+	ls_runtime* getDebugRuntime() override { return m_script.runtime; }
+	const Path& getDebugPath() const override { return m_script.path; }
+
+	void setDebugEnabled(bool enabled) override {
+		m_debug_enabled = enabled;
+		if (m_script.runtime) ls_debug_enable(m_script.runtime, enabled ? 1 : 0);
+	}
+
+	bool setDebugBreakpoint(const Path& source, u32 line) override {
+		if (!m_script.bytecode) return false;
+		return ls_debug_set_breakpoint(m_script.bytecode, toLs(source.c_str()), line, nullptr) != LS_RESULT_FAILURE;
+	}
+
+	bool removeDebugBreakpoint(const Path& source, u32 line) override {
+		if (!m_script.bytecode) return false;
+		return ls_debug_remove_breakpoint(m_script.bytecode, toLs(source.c_str()), line) != LS_RESULT_FAILURE;
+	}
 
 	void startGame() override {
 		// Auto-load {world_name}.lum
@@ -264,6 +283,7 @@ private:
 			return false;
 		}
 		bindCoreFunctions(m_script.module, m_script.runtime, m_allocator);
+		ls_debug_enable(m_script.runtime, m_debug_enabled ? 1 : 0);
 
 		ls_push_ptr(m_script.runtime, &m_world);
 		ls_push_ptr(m_script.runtime, &static_cast<LumScriptSystem&>(m_system).getEngine().getInputSystem());
@@ -280,6 +300,7 @@ private:
 	IAllocator& m_allocator;
 	ls_host m_host;
 	Script m_script;
+	bool m_debug_enabled = false;
 };
 
 struct LumScriptSystemImpl : LumScriptSystem {
