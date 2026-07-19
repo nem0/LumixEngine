@@ -938,7 +938,6 @@ struct Parser {
 					m_output.error("Unexpected end of file");
 					return nullptr;
 				case Token::CASE:
-				case Token::ELSE:
 				case Token::RIGHT_BRACE:
 					return body;
 				default: {
@@ -967,18 +966,22 @@ struct Parser {
 				return nullptr;
 			}
 
+			if (peekToken().type != Token::CASE) {
+				m_output.errorAt(peekToken(), "Expected case");
+				return nullptr;
+			}
+
+			Token case_token = consumeToken();
 			MatchArm& arm = res->arms.emplace_back(m_unit.arena);
-			if (peekToken().type == Token::ELSE) {
-				consumeToken();
+			if (peekToken().type == Token::COLON) {
 				if (has_fallback) {
-					m_output.errorAt(peekToken(), "Duplicate match else");
+					m_output.errorAt(case_token, "Duplicate match fallback");
 					return nullptr;
 				}
 				has_fallback = true;
 				arm.is_fallback = true;
 			}
-			else if (peekToken().type == Token::CASE) {
-				consumeToken();
+			else {
 				for (;;) {
 					MatchPattern& pattern = arm.patterns.emplace_back();
 					if (!matchPattern(pattern)) return nullptr;
@@ -986,11 +989,6 @@ struct Parser {
 					consumeToken();
 				}
 			}
-			else {
-				m_output.errorAt(peekToken(), "Expected case or else");
-				return nullptr;
-			}
-
 			if (!consume(Token::COLON)) return nullptr;
 			arm.body = matchArmBody();
 			if (!arm.body) return nullptr;

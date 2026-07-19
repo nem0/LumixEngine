@@ -363,7 +363,7 @@ TEST(ComptimeLocalDeclarationFails) {
 }
 
 
-TEST(ComptimeTypeValueCanNotBeRuntimeReturnValueFails) {
+TEST(ComptimeTypeLiteralInRuntimeContextFails) {
 	const char* source = R"(
 		fn main() : type {
 			return i32;

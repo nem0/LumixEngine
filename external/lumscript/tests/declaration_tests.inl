@@ -18,6 +18,11 @@ TEST(BasicGlobalVar) {
 	return true;
 }
 
+TEST(GlobalTypeLiteralInitializerFails) {
+	EXPECT_COMPILE_FAIL("var x = i32;");
+	return true;
+}
+
 TEST(BasicGlobalConst) {
 	EXPECT_COMPILE("const enabled = true;");
 	return true;

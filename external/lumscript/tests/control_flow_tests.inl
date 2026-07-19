@@ -249,7 +249,7 @@ TEST(NonVoidFunctionReturnOnlyInsideForLoopFails) {
 	return true;
 }
 
-// A match statement without a fallback (`else`) arm is not treated as
+// A match statement without a fallback (`case:`) arm is not treated as
 // exhaustive by this check, even though the caller passes only covered values.
 TEST(NonVoidFunctionMatchWithoutFallbackFails) {
 	const char* source = R"(
@@ -277,7 +277,7 @@ TEST(NonVoidFunctionMatchWithFallbackAllArmsReturnCompiles) {
 			match v {
 				case 0:
 					return 0;
-				else:
+				case:
 					return 1;
 			}
 		}
@@ -297,7 +297,7 @@ TEST(NonVoidFunctionMatchWithFallbackOneArmMissingReturnFails) {
 			match v {
 				case 0:
 					var x : i32 = 0;
-				else:
+				case:
 					return 1;
 			}
 		}

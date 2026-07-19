@@ -230,6 +230,18 @@ struct LumScriptEditorWindow final : AssetEditorWindow {
 			}
 			else {
 				m_message = diagnostics_message;
+				const StringView diagnostics = diagnostics_message;
+				if (const char* line_marker = find(diagnostics, ": line ")) {
+					const StringView error_path(diagnostics.begin, line_marker);
+					line_marker += stringLength(": line ");
+					i32 line;
+					if (equalStrings(error_path, m_path.c_str())
+						&& fromCString(StringView(line_marker, diagnostics.end), line)
+						&& line > 0)
+					{
+						m_editor->underlineTokens(line - 1, 0, 0xffFFffFF, diagnostics_message.c_str());
+					}
+				}
 				logError("LumScript check failed: ", m_path, ": ", diagnostics_message);
 			}
 			ls_module_destroy(module);

@@ -111,7 +111,7 @@ TEST(UnionMatchImportedMemberWithoutNamespace) {
 	return true;
 }
 
-TEST(UnionMatchWithElse) {
+TEST(UnionMatchWithFallback) {
 	const char* source = R"(
 		struct A {
 			x : i32;
@@ -126,7 +126,7 @@ TEST(UnionMatchWithElse) {
 			match u {
 				case A:
 					var x : i32 = u.x;
-				else:
+				case:
 					var y : f32 = u.y;
 			}
 		}
@@ -439,6 +439,24 @@ TEST(UnionPrimitiveMembers) {
 	return true;
 }
 
+TEST(UnionTypeExpressionOutsideComptimeFails) {
+	const char* source = R"(
+		fn main() : void {
+			var type_value = i32 | f32;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(UnionTypeExpressionGlobalOutsideComptimeFails) {
+	const char* source = R"(
+		const Union = i32 | f32;
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(UnionErrorPropagation) {
 	const char* source = R"(
 		struct ParseError {
@@ -640,7 +658,7 @@ TEST(UnionMatchDispatchRuntime) {
 			match value {
 				case A:
 					return 1;
-				else:
+				case:
 					return 2;
 			}
 			return 0;

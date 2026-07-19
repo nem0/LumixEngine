@@ -149,6 +149,7 @@ struct TestContext {
 
 	struct Diagnostics {
 		bool output_enabled = true;
+		u32 size = 0;
 	} diagnostics;
 
 	ls_host host = {};
@@ -199,6 +200,7 @@ struct RuntimeGuard {
 
 static void testPrint(void* userdata, ls_string_view msg) {
 	TestContext* context = (TestContext*)userdata;
+	context->diagnostics.size += (u32)(msg.end - msg.begin);
 	if (!context->diagnostics.output_enabled) return;
 	for (const char* c = msg.begin; c != msg.end; ++c) {
 		putchar(*c);

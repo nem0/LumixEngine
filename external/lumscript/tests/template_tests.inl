@@ -2676,7 +2676,7 @@ TEST(TemplateFunctionBodyMatchSingleValuePattern) {
 			match v {
 				case 0:
 					return 1;
-				else:
+				case:
 					return 2;
 			}
 		}

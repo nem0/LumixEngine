@@ -2,10 +2,10 @@ import "core:world" as world
 import "core:input" as input
 import "core:inputdevicetype" as input_device_type
 import "core:entity" as entity
-import "core:animator" as animator
+import "core:animator"
 import "core:physical_controller" as controller
 import "core:rigid_actor" as rigid_actor
-import "core:physics" as physics
+import "core:physics"
 import "core:Keycode"
 import "core:quat" as quat
 import "core:vec3" as vec3
@@ -29,6 +29,7 @@ var crouched : bool = false;
 var aiming : bool = false;
 var handle_input : bool = true;
 var input_system : input.InputSystem = undefined;
+var physics_module : ?physics.PhysicsModule = null;
 
 fn processInputEvents() : void {
 	if not handle_input { return; }
@@ -53,12 +54,15 @@ fn processInputEvents() : void {
 						case .A: left = event.down;
 						case .D: right = event.down;
 						case .SHIFT: sprint = event.down;
-						case .C:
+						case .C: {
 							if event.down {
 								crouched = not crouched;
 							}
+						}
+						case:
 					}
 				}
+			case:
 		}
 	}
 }
@@ -67,6 +71,7 @@ fn init(w : world.World, inp : input.InputSystem) : void {
 	player = w.findByName("player");
 	// camera_pivot = TODO
 	input_system = inp;
+	physics_module = w.physics();
 
 	if player != null {
 		const anim = player.animator();
@@ -83,14 +88,16 @@ fn init(w : world.World, inp : input.InputSystem) : void {
 fn update(dt : f32) : void {
 	processInputEvents();
 
-	const num_hits = physics.getNumControllerHits();
-	for i = 0..num_hits {
-		const hit = physics.getControllerHit(i);
-		const obj = world.getEntity(hit.hit_entity);
-		const a = obj.rigid_actor();
-		if a != null {
-			const force = vec3.yawToDir(yaw) * 50.0;
-			a.applyForce(force);
+	if physics_module != null {
+		const num_hits = physics_module.getNumControllerHits();
+		for i = 0..num_hits {
+			const hit = physics_module.getControllerHit(i);
+			const obj = hit.hit_entity;
+			const a = obj.rigid_actor();
+			if a != null {
+				const force = vec3.yawToDir(yaw) * 50.0;
+				a.applyForce(force);
+			}
 		}
 	}
 
@@ -119,7 +126,7 @@ fn update(dt : f32) : void {
 						0;
 
 	var speed_x : f32 = left ? -3.0 :
-						right : 3.0 :
+						right ? 3.0 :
 						0;
 	if sprint {
 		speed_x = speed_x * 2.0;

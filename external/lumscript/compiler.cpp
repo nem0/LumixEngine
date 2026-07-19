@@ -5,10 +5,10 @@
 // Get the resolved type of a struct field, preferring the template-instantiated
 // type if available, otherwise the declared type.
 static ResolvedType* structFieldType(const StructResolvedType& st, i32 index) {
-	if (index < st.field_types.size()) return st.field_types[(u32)index];
-	if (!st.decl) return nullptr; // TODO silent fail
+	ASSERT(st.decl);
 	if (index < st.decl->fields.size()) return st.decl->fields[(u32)index].resolved_type;
-	return nullptr; // TODO silent fail
+	ASSERT(false);
+	return nullptr;
 }
 
 u32 typeByteSize(const ResolvedType& t) {
@@ -50,7 +50,7 @@ u32 typeByteSize(const ResolvedType& t) {
 			ASSERT(arr.size < 0xffFFffFF); // TODO
 			return (u32)arr.size * typeByteSize(*arr.element_type);
 		}
-		case ResolvedType::STRUCT: {
+	case ResolvedType::STRUCT: {
 			const StructResolvedType& st = static_cast<const StructResolvedType&>(t);
 			u32 count = 0;
 			if (st.decl) {
@@ -1307,6 +1307,18 @@ struct Checker {
 		return symbol.expression && symbol.expression->kind == Expression::FUNCTION ? static_cast<FunctionExpression*>(symbol.expression) : nullptr;
 	}
 
+	static const char* symbolKind(const Symbol& symbol) {
+		switch (symbol.storage) {
+			case Symbol::VARIABLE: return "variable";
+			case Symbol::CONST: return "constant";
+			case Symbol::IMPORT: return "namespace";
+			case Symbol::COMPTIME:
+				if (symbol.resolved_type && symbol.resolved_type->kind == ResolvedType::META) return "type";
+				return "compile-time value";
+		}
+		return "symbol";
+	}
+
 	ResolvedType* checkCallCandidate(Unit& unit,
 		FunctionCheckContext* ctx,
 		CallExpression& call,
@@ -2020,18 +2032,19 @@ struct Checker {
 		if (SymbolRef sym = resolveSymbol(unit, *call.callee)) {
 			FunctionExpression* fn = asFunctionExpression(*sym.symbol);
 			if (!fn) {
-				// TODO silent fail - can we even get here?
+				errorLine(expr.token, "Cannot call ", symbolKind(*sym.symbol), " '", sym.symbol->name, "' as a function");
 				return nullptr;
 			}
 			if (fn->is_template) {
 				FunctionExpression* instance = instantiateAndCheckTemplate(unit, ctx, expr, call, *sym.owner, *fn);
-				if (!instance) return nullptr; // TODO silent fail - error already emitted by instantiateAndCheckTemplate
+				if (!instance) return nullptr;
 				if (call.callee->kind == Expression::IDENTIFIER) static_cast<IdentifierExpression*>(call.callee)->symbol = sym.symbol;
 				FunctionResolvedType* fn_type = asFunctionType(instance->resolved_type);
-				return fn_type ? checkCallCandidate(unit, ctx, call, *fn_type, instance) : nullptr; // TODO silent fail - fn_type null
+				ASSERT(fn_type);
+				return checkCallCandidate(unit, ctx, call, *fn_type, instance);
 			}
 
-			errorLine(expr.token, "Cannot call non-function symbol ", sym.symbol->name);
+			errorLine(expr.token, "Cannot call ", symbolKind(*sym.symbol), " '", sym.symbol->name, "' as a function");
 			return nullptr;
 		}
 
@@ -2044,14 +2057,19 @@ struct Checker {
 
 		MemberExpression& mem = static_cast<MemberExpression&>(*call.callee);
 
-		if (!mem.expression || !mem.expression->resolved_type) {
-			// TODO silent fail - error msg
+		if (!mem.expression) {
+			errorLine(expr.token, "Expected receiver expression for function call ", mem.name);
+			return nullptr;
+		}
+
+		if (!mem.expression->resolved_type) {
+			errorLine(expr.token, "Cannot call function ", mem.name, " with UFCS receiver with unknown type");
 			return nullptr;
 		}
 
 		ResolvedType& receiver_type = *mem.expression->resolved_type;
 		if (receiver_type.kind != ResolvedType::STRUCT && receiver_type.kind != ResolvedType::ENUM) {
-			// TODO silent fail - error msg
+			errorLine(expr.token, "Cannot call member function ", mem.name, " on type ", &receiver_type, ", expected struct or enum");
 			return nullptr;
 		}
 
@@ -2079,7 +2097,10 @@ struct Checker {
 			fn = instance;
 		}
 		FunctionResolvedType* fn_type = asFunctionType(fn ? fn->resolved_type : ref.symbol->resolved_type);
-		if (!fn_type) return nullptr;
+		if (!fn_type) {
+			errorLine(expr.token, "Cannot call ", symbolKind(*ref.symbol), " '", ref.symbol->name, "' as a function");
+			return nullptr;
+		}
 		return checkCallCandidate(unit, ctx, call, *fn_type, fn, 1);
 	}
 
@@ -2893,9 +2914,15 @@ struct Checker {
 				expr.resolved_type = hint;
 				return expr.resolved_type;
 			case Expression::TYPE_LITERAL: {
-				if (!ctx || !ctx->comptime_only) return nullptr; // TODO silent fail
+				if (!ctx) {
+					errorLine(expr.token, "Cannot use type literal outside of a comptime context");
+					return nullptr;
+				}
+				if (!ctx->comptime_only) {
+					errorLine(expr.token, "Cannot use type literal in a non-comptime context");
+					return nullptr;
+				}
 				const ResolvedType::Kind kind = static_cast<TypeLiteralExpression&>(expr).type;
-				// META stands for the `type` keyword.
 				if (kind == ResolvedType::META) {
 					expr.resolved_type = makeType<MetaType>(unit);
 					return expr.resolved_type;
@@ -2905,7 +2932,14 @@ struct Checker {
 				return t;
 			}
 			case Expression::UNION_TYPE: {
-				if (!ctx || !ctx->comptime_only) return nullptr; // TODO silent fail
+				if (!ctx) {
+					errorLine(expr.token, "Cannot use union type outside of a comptime context");
+					return nullptr;
+				}
+				if (!ctx->comptime_only) {
+					errorLine(expr.token, "Cannot use union type in a non-comptime context");
+					return nullptr;
+				}
 				ResolvedType* type = resolveTypeExpr(unit, expr);
 				expr.resolved_type = type;
 				return type;

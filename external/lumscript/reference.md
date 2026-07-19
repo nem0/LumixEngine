@@ -184,6 +184,12 @@ JIT is intentionally out of scope for the first version.
 		- using a candidate parameter as that expected type makes overload selection recursive and creates surprising ambiguities
 		- requiring `Type { ... }` at an operator boundary keeps resolution based on natural operand types and avoids candidate-specific AST typing
 
+- match fallback uses an empty `case:`
+	- keeps every match arm under the `case` keyword
+	- avoids adding a separate `default` keyword
+	- `else` remains exclusive to `if`, avoiding dangling-`else` ambiguity when the last statement of a match arm is an `if`
+	- alternatives considered were `else:`, `default:`, and `case _:`
+
 - tagged unions
 	- the member type is the tag; no named variants (Rust-style `enum` payloads) keeps the feature small — two variants with the same payload type use wrapper structs
 		- var a : SomeUnion = SomeMember { 1, "foo" }; is possible and uses only existing language features
@@ -964,7 +970,7 @@ match e {
 
 Rules:
 
-- a union match must be exhaustive unless `else` is present
+- a union match must be exhaustive unless an empty `case:` fallback is present
 - duplicate member cases are compile-time errors
 - a case pattern that is not a member type of the subject is a compile-time error
 - an unqualified member type resolves against the union first, so `case ButtonEvent:` works even if the union was declared with `events.ButtonEvent`; qualify it only to disambiguate members with the same name
@@ -1284,6 +1290,7 @@ if health <= 0 {
 ### Match
 
 `match` is a non-fallthrough multi-way branch for enum and scalar values. Each `case` can contain any number of statements; execution stops at the end of the selected case and does not fall through to the next case.
+An empty `case:` is the fallback arm. `else` is reserved for `if` statements.
 
 Supported patterns:
 
@@ -1292,7 +1299,7 @@ Supported patterns:
 - ranges (`a..=b`, inclusive on both bounds)
 - member types, when matching a tagged union value (see [Tagged unions](#tagged-unions))
 - comma-separated alternatives
-- `else` fallback
+- empty `case:` fallback
 
 ```cpp
 match state {
@@ -1303,7 +1310,7 @@ match state {
 		update_running_state();
 	case .Paused:
 		log.logError("paused");
-	else:
+	case:
 		log.logError("unknown");
 }
 ```
@@ -1316,7 +1323,7 @@ match score {
 		log.logError("low");
 	case 10..=99:
 		log.logError("high");
-	else:
+	case:
 		log.logError("overflow");
 }
 ```
@@ -1334,7 +1341,7 @@ match key {
 }
 ```
 
-Enum matches must be exhaustive unless `else` is present. Duplicate enum cases are compile-time errors.
+Enum matches must be exhaustive unless an empty `case:` fallback is present. Duplicate enum cases and multiple fallback cases are compile-time errors.
 
 ### While
 

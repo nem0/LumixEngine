@@ -161,6 +161,23 @@ TEST(NullableFirstClassFunctionGlobalCannotBeCalledDirectly) {
 	return true;
 }
 
+TEST(CallingFailedImportedValueSymbolFails) {
+	const char* source = R"(
+		import "a" as a;
+
+		fn main() : void {
+			a.broken();
+		}
+	)";
+	const char* a_source = R"(
+		var broken = missing;
+	)";
+	LumScriptImportFile file = { toLs("a"), toLs(a_source) };
+	LumScriptImportFiles files = { &file, 1 };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(source, files);
+	return true;
+}
+
 TEST(FirstClassFunctionLiteralMemberAccessFails) {
 	const char* source = R"(
 		const foo = fn() : i32 {
@@ -182,6 +199,15 @@ TEST(MemberAccessOnFailedCallBaseDoesNotCrash) {
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(LeadingDotCallFailsCleanly) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn main() : void {
+			.missing();
+		}
+	)");
 	return true;
 }
 

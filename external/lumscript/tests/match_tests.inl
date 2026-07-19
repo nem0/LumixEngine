@@ -21,7 +21,7 @@ TEST(MatchTypechecks) {
 					return 0;
 				case 1..=9, 99:
 					return 1;
-				else:
+				case:
 					return 2;
 			}
 		}
@@ -38,7 +38,7 @@ TEST(MatchArmAllowsMultipleStatements) {
 				case 0:
 					result = 1;
 					result += 2;
-				else:
+				case:
 					result = 10;
 					result += 20;
 			}
@@ -49,13 +49,43 @@ TEST(MatchArmAllowsMultipleStatements) {
 	return true;
 }
 
+TEST(MatchFallbackAfterIf) {
+	const char* source = R"(
+		fn main(v : i32) : void {
+			match v {
+				case 0:
+					if false {}
+				case:
+					return;
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(MatchRejectsElseFallback) {
+	const char* source = R"(
+		fn main(v : i32) : void {
+			match v {
+				case 0:
+					return;
+				else:
+					return;
+			}
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(MatchRejectsPatternTypeMismatch) {
 	const char* source = R"(
 		fn main(v : i32) : void {
 			match v {
 				case "bad":
 					return;
-				else:
+				case:
 					return;
 			}
 		}
@@ -70,7 +100,7 @@ TEST(MatchRangeRequiresNumericTypeFails) {
 			match v {
 				case "a".."z":
 					return;
-				else:
+				case:
 					return;
 			}
 		}
@@ -85,7 +115,7 @@ TEST(MatchRangeTypeMismatchFails) {
 			match v {
 				case 1.."bad":
 					return;
-				else:
+				case:
 					return;
 			}
 		}
@@ -104,7 +134,7 @@ TEST(MatchRequiresScalarEnumOrStringFails) {
 		fn main() : void {
 			var v : Vec2 = Vec2 { 1, 2 };
 			match v {
-				else:
+				case:
 					return;
 			}
 		}
@@ -117,11 +147,11 @@ TEST(MatchDuplicateFallbackFails) {
 	const char* source = R"(
 		fn main(v : i32) : void {
 			match v {
-				else:
+				case:
 					return;
 				case 1:
 					return;
-				else:
+				case:
 					return;
 			}
 		}
@@ -256,7 +286,7 @@ TEST(MatchRuntime) {
 					return 0;
 				case 1..=9, 99:
 					return 1;
-				else:
+				case:
 					return 2;
 			}
 		}
@@ -289,7 +319,7 @@ TEST(MatchArmMultipleStatementsRuntime) {
 				case 0:
 					result = 1;
 					result += 2;
-				else:
+				case:
 					result = 10;
 					result += 20;
 			}
