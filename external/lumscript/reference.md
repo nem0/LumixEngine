@@ -2,6 +2,13 @@
 
 # TODO
 
+* get rid of std::free
+* try -
+	fn parse() : Error | Node;
+	fn foo() : Error | Value {
+		var v = try parse(); // propagates common subtype - Error
+	}
+
 * for i in slice/array
 * how can we push unions if we don't know the tag value of variants, i.e. U = A | B - we don't know if A's tag is 0 or 1
 * use case - comptime string hash

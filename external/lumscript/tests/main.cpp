@@ -244,6 +244,7 @@ static void nativeAddC(ls_runtime* runtime, ls_call_frame frame) {
 }
 
 #include "bytecode_tests.inl"
+#include "debugger_tests.inl"
 #include "casts_tests.inl"
 #include "types_tests.inl"
 #include "operator_tests.inl"

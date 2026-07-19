@@ -2346,6 +2346,24 @@ TEST(DivisionByZeroRuntimeError) {
 	return true;
 }
 
+TEST(HostCallWithTooFewArgumentsFails) {
+	const char* source = R"(
+		fn add(a : i32, b : i32) : i32 {
+			return a + b;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	
+	ls_push_i32(runtime, 20);
+	EXPECT_TRUE(!ls_call(runtime, toLs("add")));
+	EXPECT_EQ(20, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(UntypedLiteralsRuntime) {
 	const char* source = R"(
 		struct Vec3 {

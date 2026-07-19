@@ -440,6 +440,36 @@ TEST(testNativeFunctionCall) {
 	return true;
 }
 
+TEST(ScriptNativeScriptReentry) {
+	const char* source = R"(
+		extern fn bridge(value : i32) : i32;
+
+		fn helper(value : i32) : i32 {
+			return value + 1;
+		}
+
+		fn main() : i32 {
+			return bridge(41);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	auto bridge = [](ls_runtime* runtime, ls_call_frame frame) {
+		LS_ARG(frame, i32, value);
+		ls_push_i32(runtime, value);
+		if (ls_call(runtime, toLs("helper")) != LS_RESULT_OK) return;
+		LS_RESULT(frame, ls_to_i32(runtime, -1));
+	};
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("bridge"), bridge) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 // Indirect call whose return (8 bytes) is wider than the consumed 4-byte
 // function-value slot it is delivered into, nested inside an expression with
 // live temps below the arg window. Exercises the overlapping result

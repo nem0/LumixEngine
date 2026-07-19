@@ -75,9 +75,12 @@ typedef enum ls_type_kind {
 } ls_type_kind;
 
 // Generic status used by C API operations that only report success or failure.
+// `LS_RESULT_SUSPENDED` (returned by calls interrupted by the debugger) is
+// deliberately non-zero so `if (!result)` keeps meaning "failed".
 typedef enum ls_result {
 	LS_RESULT_FAILURE = 0,
-	LS_RESULT_OK = 1
+	LS_RESULT_OK = 1,
+	LS_RESULT_SUSPENDED = 2
 } ls_result;
 
 // Native print callback used by `ls_host`.
@@ -253,7 +256,8 @@ void* ls_to_ptr(ls_runtime* runtime, i32 index);
 
 // Execute a bytecode function by name.
 //
-// Push arguments onto the runtime stack with the `ls_push_*` helpers first.
+// Push every declared argument onto the runtime stack with the `ls_push_*`
+// helpers first. The call fails if fewer argument bytes are available.
 // After the call, the return value is left on top of the runtime stack.
 ls_result ls_call(ls_runtime* runtime, ls_string_view function_name);
 
@@ -264,6 +268,96 @@ ls_result ls_call_index(ls_runtime* runtime, i32 function_index);
 // Callers can then read the value from the runtime stack using the `ls_to_*`
 // helpers with index `-1`.
 ls_type_kind ls_bytecode_runtime_result_kind(ls_runtime* runtime, ls_string_view function_name);
+
+// Debugger.
+//
+// Suspension-based: when a debug-enabled runtime pauses, the interrupted
+// `ls_call` unwinds and returns `LS_RESULT_SUSPENDED` with the script state
+// kept intact. The host queries `ls_debug_pause_event`, inspects state, then
+// continues with `ls_debug_resume`. While suspended, don't push arguments or
+// start new calls on the runtime.
+//
+// Calls through a function value (indirect calls) are ordinary script-to-
+// script calls at the bytecode level and suspend normally, same as direct
+// calls. Host-provided native callbacks are plain C function calls with no
+// suspension support at all: none of this project's native functions call
+// back into script, so this hasn't needed guarding, but a native callback
+// that did call `ls_call`/`ls_call_index` reentrantly would be calling into
+// an interpreter loop nested on the live C stack, which cannot suspend out
+// from under it.
+//
+// Inspection calls are only valid while suspended; pointers they return are
+// invalidated by resume.
+
+typedef enum ls_debug_pause_reason {
+	LS_DEBUG_PAUSE_BREAKPOINT = 0,
+	LS_DEBUG_PAUSE_STEP,
+	LS_DEBUG_PAUSE_ERROR,
+} ls_debug_pause_reason;
+
+typedef enum ls_debug_action {
+	LS_DEBUG_CONTINUE = 0,
+	LS_DEBUG_STEP_INTO,
+	LS_DEBUG_STEP_OVER,
+	LS_DEBUG_STEP_OUT,
+	// Abort script execution; the interrupted `ls_call` fails.
+	LS_DEBUG_ABORT,
+} ls_debug_action;
+
+typedef struct ls_debug_location {
+	ls_string_view source_name;
+	u32 line;
+	u32 column;
+} ls_debug_location;
+
+// `location` is the statement about to execute in the innermost frame.
+typedef struct ls_debug_event {
+	ls_debug_pause_reason reason;
+	ls_debug_location location;
+	// Failure description when `reason` is `LS_DEBUG_PAUSE_ERROR`.
+	ls_string_view message;
+} ls_debug_event;
+
+// While disabled (the default) the runtime never suspends; breakpoints stay
+// set but stop trapping. Disabling a suspended runtime aborts its execution.
+void ls_debug_enable(ls_runtime* runtime, int enable);
+
+int ls_debug_is_suspended(ls_runtime* runtime);
+
+ls_result ls_debug_pause_event(ls_runtime* runtime, ls_debug_event* out_event);
+
+// Re-enter the interpreter where it paused. Must be called on the script
+// thread; fails when the runtime is not suspended. Returns like the original
+// `ls_call`: `LS_RESULT_OK` with the result on the runtime stack,
+// `LS_RESULT_SUSPENDED`, or `LS_RESULT_FAILURE`.
+ls_result ls_debug_resume(ls_runtime* runtime, ls_debug_action action);
+
+// Breakpoints. `line` is 1-based; the snapped statement line is written to
+// `*resolved_line` (may be null). Fails when the source or line is unknown.
+ls_result ls_debug_set_breakpoint(ls_bytecode* bytecode, ls_string_view source_name, u32 line, u32* resolved_line);
+ls_result ls_debug_remove_breakpoint(ls_bytecode* bytecode, ls_string_view source_name, u32 line);
+void ls_debug_remove_all_breakpoints(ls_bytecode* bytecode);
+
+// Call stack inspection. Frame 0 is the innermost frame. Also valid
+// immediately after a failed `ls_call`/`ls_call_index`, reporting the stack at
+// the point of failure; the next call overwrites it.
+u32 ls_debug_stack_depth(ls_runtime* runtime);
+ls_string_view ls_debug_frame_function_name(ls_runtime* runtime, u32 frame_index);
+ls_result ls_debug_frame_location(ls_runtime* runtime, u32 frame_index, ls_debug_location* out_location);
+
+// Variable inspection. Locals enumerate the parameters and locals in scope at
+// the frame's current statement. Values point at the raw bytes in live
+// frame/global storage (packed layout, see `ls_call_result`); writing through
+// them mutates the running script.
+u32 ls_debug_frame_local_count(ls_runtime* runtime, u32 frame_index);
+ls_string_view ls_debug_local_name(ls_runtime* runtime, u32 frame_index, u32 local_index);
+ls_type_kind ls_debug_local_kind(ls_runtime* runtime, u32 frame_index, u32 local_index);
+void* ls_debug_local_value(ls_runtime* runtime, u32 frame_index, u32 local_index, u32* size);
+
+u32 ls_debug_global_count(ls_runtime* runtime);
+ls_string_view ls_debug_global_name(ls_runtime* runtime, u32 global_index);
+ls_type_kind ls_debug_global_kind(ls_runtime* runtime, u32 global_index);
+void* ls_debug_global_value(ls_runtime* runtime, u32 global_index, u32* size);
 
 #ifdef __cplusplus
 }

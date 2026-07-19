@@ -233,6 +233,11 @@ typedef enum ls_op {
 	LS_OP_CSTR_TO_STRING,
 	LS_OP_RETURN,
 	LS_OP_RETURN_BASE,
+
+	// Debugger breakpoint trap. Never emitted by the compiler; written in place
+	// of a statement's first opcode byte by `ls_debug_set_breakpoint`, which
+	// saves the original byte so the patch can be reversed.
+	LS_OP_BREAK,
 } ls_op;
 
 typedef enum ls_function_kind {
@@ -248,6 +253,26 @@ typedef struct ls_bytecode_source_map_entry {
 	u32 line;
 	u32 column;
 } ls_bytecode_source_map_entry;
+
+// Debug-only description of one parameter or local's storage, used by
+// `ls_debug_frame_local_*`. Frame offsets are never reused within a
+// function (see FunctionCompiler::next_local_offset in bytecode_compiler.cpp),
+// so a local's live range is approximated as [scope_begin_offset, end of
+// function) rather than tracking true block-scope exit: it may be reported
+// as "in scope" past the end of the if/while/for block that actually
+// declared it, but the frame byte offset always holds a value of the right
+// type and size for that slot, so this is imprecise, never unsafe.
+typedef struct ls_bytecode_local_debug_entry {
+	ls_string_view name;
+	// Byte offset into the callee's frame (same space as instruction register
+	// operands, i.e. relative to `ls_runtime::frame`).
+	u32 offset;
+	u32 byte_size;
+	ls_type_kind kind;
+	// Bytecode offset (in the owning function's `code`) of the first
+	// instruction at which this local is live. Parameters are live from 0.
+	u32 scope_begin_offset;
+} ls_bytecode_local_debug_entry;
 
 typedef struct ls_function_bc {
 	ls_string_view name;
@@ -267,7 +292,30 @@ typedef struct ls_function_bc {
 	// instruction at code_offset until the next entry.
 	ls_bytecode_source_map_entry* source_map;
 	u32 source_map_count;
+
+	// Named parameters and locals, declaration order. Compiler temporaries
+	// (addLocal calls with no slot out-param) have no entry here.
+	ls_bytecode_local_debug_entry* locals;
+	u32 local_count;
 } ls_function_bc;
+
+// Debug-only description of one global's storage, used by `ls_debug_global_*`.
+typedef struct ls_bytecode_global_debug_entry {
+	ls_string_view name;
+	// Byte offset into the runtime's global memory region (`ls_runtime`'s
+	// stack, bytes [0, ls_bytecode::global_size)).
+	u32 offset;
+	u32 byte_size;
+	ls_type_kind kind;
+} ls_bytecode_global_debug_entry;
+
+// One active breakpoint patch: `function->code[code_offset]` was `original_byte`
+// before being overwritten with `LS_OP_BREAK`.
+typedef struct ls_bytecode_breakpoint {
+	u32 function_index;
+	u32 code_offset;
+	u8 original_byte;
+} ls_bytecode_breakpoint;
 
 typedef struct ls_bytecode {
 	ls_host* host;
@@ -283,38 +331,58 @@ typedef struct ls_bytecode {
 	ls_string_view* strings;
 	u32 string_count;
 	u32 string_capacity;
+
+	// One entry per named global in declaration order. Compiler temporaries
+	// and the synthetic global-initializer function are not globals and have
+	// no entry here.
+	ls_bytecode_global_debug_entry* global_debug;
+	u32 global_debug_count;
+
+	// Active breakpoint patches, set by `ls_debug_set_breakpoint`. Directly
+	// malloc'd/realloc'd and freed in `ls_bytecode_destroy`, same as this
+	// struct itself and `ls_runtime::stack`/`native_callbacks`: the arena's
+	// `restore` only rewinds to an earlier watermark (LIFO), which doesn't fit
+	// entries added/removed in arbitrary order across a debug session, so
+	// object-owned mutable collections like this one bypass the arena.
+	// Shared by every `ls_runtime` bound to this bytecode, since the patch
+	// lives in `ls_function_bc::code` itself.
+	ls_bytecode_breakpoint* breakpoints;
+	u32 breakpoint_count;
+	u32 breakpoint_capacity;
 } ls_bytecode;
 
 #define LS_MAX_CALL_DEPTH 4096u
 
 typedef struct runtime_call_frame {
 	const ls_function_bc* function;
-	i32 function_index;
-	u32 pc;
-	u32 frame_base;
-	u32 stack_top;
+	const u8* ip;
+	u8* frame;
+	u8* stack_top;
 } runtime_call_frame;
+
+typedef struct runtime_restore_point {
+	u8* frame;
+	u8* stack_top;
+	u32 result_size;
+	u32 call_depth;
+} runtime_restore_point;
 
 typedef struct ls_runtime {
 	ls_host* host;
 	const ls_bytecode* bytecode;
 	ls_arena* arena;
 
-	// Stack top: byte offset one past the topmost live value.
-	u32 stack_top;
-	// Base byte offset for the current call frame.
-	u32 frame_base;
-	// Cached pointer to the current call frame. This mirrors frame_base and is
-	// used by the interpreter's hot register-access path.
+	// One past the topmost live stack value.
+	u8* stack_top;
+	// Cached pointer to the current call frame.
 	u8* frame;
 
 	u8* stack;
-	u32 stack_capacity;
+	u8* stack_end;
 
-	// Index of the function whose return value sits on top of the stack, or -1.
-	// `ls_call_result` uses it to locate the raw result bytes. Host pushes
-	// invalidate it.
-	i32 result_function;
+	// Byte count of the last call result at the top of the stack. Host pushes
+	// invalidate it; zero represents no result or a void result.
+	u32 result_size;
 
 	runtime_call_frame call_stack[LS_MAX_CALL_DEPTH];
 	u32 call_depth;
@@ -322,6 +390,48 @@ typedef struct ls_runtime {
 	// Indexed by bytecode function index.
 	ls_native_fn* native_callbacks;
 	u32 native_callback_count;
+
+	// Snapshot of the call stack at the point of the most recent
+	// `ls_call`/`ls_call_index` failure, innermost frame first. Overwritten by
+	// the next call; `fail_frame_count` is 0 when the last call succeeded.
+	runtime_call_frame fail_frames[LS_MAX_CALL_DEPTH + 1u];
+	u32 fail_frame_count;
+
+	// Debugger suspension. See `ls_debug_enable`/`ls_debug_resume` in capi.h.
+	//
+	// `debug_enabled` arms breakpoint/error trapping; while false (the
+	// default) the interpreter runs at full speed and never suspends.
+	bool debug_enabled;
+	// True while a debug-enabled call is parked instead of having returned.
+	// `call_stack[0..call_depth)` holds ancestor frames exactly as during
+	// normal execution; `suspended_frame` holds the innermost (currently
+	// "executing") frame's resume point, since that one only lived in the
+	// interpreter loop's locals and would otherwise be lost when the loop's
+	// C stack frame returns to the host.
+	bool is_suspended;
+	runtime_call_frame suspended_frame;
+	// Runtime state at the beginning of each active host call. An entry stays
+	// live while that call is suspended, so nested script -> native -> script
+	// calls cannot overwrite their caller's restore point.
+	runtime_restore_point call_starts[LS_MAX_CALL_DEPTH];
+	u32 call_start_depth;
+	// Reported by `ls_debug_pause_event` while suspended.
+	ls_debug_event pause_event;
+
+	// Stepping, armed by `ls_debug_resume(LS_DEBUG_STEP_*)`. `step_action` is
+	// `LS_DEBUG_CONTINUE` (0, the calloc default) when no step is in
+	// progress. While armed, the interpreter suspends with
+	// `LS_DEBUG_PAUSE_STEP` at the first source line or call depth reached that
+	// differs from the step start and satisfies the action's call-depth rule,
+	// measured against `step_start_call_depth` (`runtime->call_depth` at the
+	// moment the step began): STEP_INTO has no depth rule (any depth stops
+	// it), STEP_OVER requires `call_depth <= step_start_call_depth` (calls
+	// made from the starting statement run to completion without stopping
+	// inside them), STEP_OUT requires `call_depth < step_start_call_depth`
+	// (stop only after returning to a shallower frame).
+	ls_debug_action step_action;
+	u32 step_start_line;
+	u32 step_start_call_depth;
 } ls_runtime;
 
 ls_result ls_runtime_set_native_function_callback_by_bytecode_index(
@@ -329,6 +439,12 @@ ls_result ls_runtime_set_native_function_callback_by_bytecode_index(
 	int bytecode_index,
 	ls_native_fn callback
 );
+
+// Re-enters the interpreter at `runtime->suspended_frame`. Internal entry
+// point used by `ls_debug_resume` (debugger.c); not part of the public C ABI.
+// Fails immediately when the runtime is not suspended. Returns like
+// `ls_call`: OK with the result on the stack, SUSPENDED, or FAILURE.
+ls_result ls_runtime_resume_suspended(ls_runtime* runtime);
 
 #ifdef __cplusplus
 }

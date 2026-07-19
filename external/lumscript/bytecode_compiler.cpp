@@ -248,7 +248,8 @@ struct FunctionCompiler {
 		, code(*bytecode->arena)
 		, deferreds(*bytecode->arena)
 		, defer_marks(*bytecode->arena)
-		, loops(*bytecode->arena) {
+		, loops(*bytecode->arena)
+		, locals_debug(*bytecode->arena) {
 		diagnostics.host = bytecode->host;
 	}
 
@@ -259,6 +260,7 @@ struct FunctionCompiler {
 	ExpArray<Statement*> deferreds;
 	ExpArray<i32> defer_marks;
 	ExpArray<LoopBinding> loops;
+	ExpArray<ls_bytecode_local_debug_entry> locals_debug;
 	OutputFormatter diagnostics;
 	bool failed = false;
 	// Locals and temporaries share one absolute frame offset space. `next_local_offset`
@@ -294,6 +296,23 @@ struct FunctionCompiler {
 			slot->storage = StorageSlot::LOCAL;
 		}
 		return offset;
+	}
+
+	// Records a named parameter/local for `ls_debug_frame_local_*`. Call
+	// after the slot's fields (offset/byte_size/kind) are filled — by
+	// `addLocal` for a `var`/loop variable, or directly for a function
+	// parameter (see the param loop in compileFunctionBytecode). Scope begins
+	// at the current bytecode offset; it's treated as open until the end of
+	// the function (see ls_bytecode_local_debug_entry in bytecode.h) since
+	// there's no block-scope-exit tracking to give a tighter bound.
+	void debugLocal(ls_string_view name, const StorageSlot& slot) {
+		ls_bytecode_local_debug_entry entry;
+		entry.name = name;
+		entry.offset = slot.offset;
+		entry.byte_size = slot.byte_size;
+		entry.kind = slot.kind;
+		entry.scope_begin_offset = (u32)code.size();
+		locals_debug.push_back(entry);
 	}
 
 	void pushScope() { defer_marks.push(deferreds.size()); }
@@ -970,6 +989,14 @@ static void finalizeFunctionCode(FunctionCompiler& ctx, ls_function_bc& function
 	if (function.code_size > 0u) {
 		function.code = static_cast<u8*>(arena.allocate(arena.user_data, function.code_size, alignof(u8)));
 		copyMemory(function.code, ctx.code.data, function.code_size);
+	}
+	function.local_count = (u32)ctx.locals_debug.size();
+	if (function.local_count > 0u) {
+		function.locals =
+			static_cast<ls_bytecode_local_debug_entry*>(arena.allocate(arena.user_data, sizeof(ls_bytecode_local_debug_entry) * function.local_count, alignof(ls_bytecode_local_debug_entry)));
+		for (u32 i = 0; i < function.local_count; ++i) {
+			function.locals[i] = ctx.locals_debug[(i32)i];
+		}
 	}
 }
 
@@ -3106,9 +3133,16 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			ResolvedType* value_type = var.resolved_type;
 			const ls_type_kind kind = valueKindForType(*value_type);
 			const u32 offset = ctx.addLocal(value_type, kind, false, &var.slot);
-			if (kind == LS_TYPE_I64 && emitLocalLengthInitializer(ctx, offset, *var.expression)) return;
-			if (var.expression->kind == Expression::UNDEFINED) return;
-			compileExpressionIntoLocal(ctx, *var.expression, offset, *value_type);
+			// Recorded after the initializer so scope_begin_offset is past this
+			// statement's own bytecode: a breakpoint set on this exact line
+			// (its code_offset equals where the initializer starts) must not
+			// yet report this local, since it isn't holding a real value there.
+			if (kind == LS_TYPE_I64 && emitLocalLengthInitializer(ctx, offset, *var.expression)) {
+				ctx.debugLocal(var.name, var.slot);
+				return;
+			}
+			if (var.expression->kind != Expression::UNDEFINED) compileExpressionIntoLocal(ctx, *var.expression, offset, *value_type);
+			ctx.debugLocal(var.name, var.slot);
 			return;
 		}
 		case Statement::ASSIGN: {
@@ -3191,6 +3225,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			if (direct_bounds) {
 				ctx.pushScope();
 				const u32 loop_offset = ctx.addLocal(value_type, value_kind, true, &fs.slot);
+				ctx.debugLocal(fs.loop_var, fs.slot);
 				u32 end_offset = 0;
 				bool end_snapshot = false;
 				if (fs.end->kind == Expression::IDENTIFIER) {
@@ -3250,6 +3285,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 
 			ctx.pushScope();
 			const u32 loop_offset = ctx.addLocal(value_type, value_kind, true, &fs.slot);
+			ctx.debugLocal(fs.loop_var, fs.slot);
 			const u32 end_offset = range_value_top - byte_size;
 			ctx.temp_top = range_value_top;
 			if (!begin_is_literal) {
@@ -3498,6 +3534,8 @@ static bool compileFunctionBytecode(ls_bytecode* bytecode, FunctionExpression* f
 	function.code_size = 0u;
 	function.source_map = nullptr;
 	function.source_map_count = 0u;
+	function.locals = nullptr;
+	function.local_count = 0u;
 
 	if (fn->is_extern) {
 		function.param_size = computeParamSize(fn->params);
@@ -3508,11 +3546,23 @@ static bool compileFunctionBytecode(ls_bytecode* bytecode, FunctionExpression* f
 	BlockStatement* body = static_cast<BlockStatement*>(fn->body);
 	Expression* literal = nullptr;
 	if (function.return_size == 1u && isSimpleReturnLiteral(*body, literal)) {
-		// Tiny literal function: emit the constant and return without setting up
-		// parameter locals (the literal references none).
-		function.param_size = computeParamSize(fn->params);
 		FunctionCompiler ctx(bytecode, function);
-		SourceScope source_scope(ctx.code, fn->token);
+		ReturnStatement* ret = static_cast<ReturnStatement*>(body->statements[0]);
+		SourceScope source_scope(ctx.code, ret->token);
+		ctx.return_type = return_type;
+		for (FunctionParam& param : fn->params) {
+			if (param.is_comptime) continue;
+			StorageSlot& slot = param.slot;
+			slot.type = param.resolved_type;
+			slot.kind = valueKindForType(*param.resolved_type);
+			slot.byte_size = param.is_ref ? typeKindByteSize(LS_TYPE_CPTR) : typeByteSize(*param.resolved_type);
+			if (slot.byte_size == 0u) slot.byte_size = 1u;
+			slot.offset = function.param_size;
+			slot.storage = param.is_ref ? StorageSlot::LOCAL_REF : StorageSlot::LOCAL;
+			function.param_size += slot.byte_size;
+			ctx.next_local_offset = function.param_size;
+			ctx.debugLocal(param.name, slot);
+		}
 		ctx.next_local_offset = function.param_size;
 		ctx.temp_top = function.param_size;
 		ctx.frame_high_water = function.param_size;
@@ -3543,6 +3593,7 @@ static bool compileFunctionBytecode(ls_bytecode* bytecode, FunctionExpression* f
 		slot.storage = param.is_ref ? StorageSlot::LOCAL_REF : StorageSlot::LOCAL;
 		function.param_size += slot.byte_size;
 		ctx.next_local_offset = function.param_size;
+		ctx.debugLocal(param.name, slot);
 	}
 	ctx.temp_top = function.param_size;
 	ctx.frame_high_water = function.param_size;
@@ -3571,6 +3622,7 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host) {
 	ASSERT(bytecode->arena);
 	ls_arena* arena = bytecode->arena;
 
+	ExpArray<ls_bytecode_global_debug_entry> global_debug(*arena);
 	bytecode->global_size = 0u;
 	for (Unit& unit : module->units) {
 		for (Symbol& sym : unit.symbols) {
@@ -3582,6 +3634,21 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host) {
 			sym.slot.type = sym.resolved_type;
 			sym.slot.kind = valueKindForType(*sym.resolved_type);
 			bytecode->global_size += sym.slot.byte_size;
+
+			ls_bytecode_global_debug_entry debug_entry;
+			debug_entry.name = sym.name;
+			debug_entry.offset = sym.slot.offset;
+			debug_entry.byte_size = sym.slot.byte_size;
+			debug_entry.kind = sym.slot.kind;
+			global_debug.push_back(debug_entry);
+		}
+	}
+	bytecode->global_debug_count = (u32)global_debug.size();
+	if (bytecode->global_debug_count > 0u) {
+		bytecode->global_debug = static_cast<ls_bytecode_global_debug_entry*>(
+			arena->allocate(arena->user_data, sizeof(ls_bytecode_global_debug_entry) * bytecode->global_debug_count, alignof(ls_bytecode_global_debug_entry)));
+		for (u32 i = 0; i < bytecode->global_debug_count; ++i) {
+			bytecode->global_debug[i] = global_debug[(i32)i];
 		}
 	}
 
@@ -3628,6 +3695,8 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host) {
 		function.code_size = 0u;
 		function.source_map = nullptr;
 		function.source_map_count = 0u;
+		function.locals = nullptr;
+		function.local_count = 0u;
 
 		FunctionCompiler ctx(bytecode, function);
 		for (Unit& unit : module->units) {
@@ -3652,5 +3721,6 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host) {
 
 void ls_bytecode_destroy(ls_bytecode* bytecode) {
 	if (!bytecode) return;
+	std::free(bytecode->breakpoints);
 	std::free(bytecode);
 }
