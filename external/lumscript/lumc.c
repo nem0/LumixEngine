@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #include <time.h>
 
 #include <malloc.h>
@@ -259,7 +260,42 @@ static u64 lumc_read_u64(const u8* code, u32 size, u32* pc) {
 	return value;
 }
 
-static void lumc_dump_bytecode(const ls_bytecode* bytecode) {
+static const ls_bytecode_source_map_entry* lumc_source_at(const ls_function_bc* fn, u32 code_offset) {
+	const ls_bytecode_source_map_entry* result = NULL;
+	for (u32 i = 0; i < fn->source_map_count; ++i) {
+		const ls_bytecode_source_map_entry* entry = &fn->source_map[i];
+		if (entry->code_offset > code_offset) break;
+		result = entry;
+	}
+	return result;
+}
+
+static void lumc_append_source_line(char* output, size_t* output_size, size_t output_capacity, const char* source, u32 line) {
+	const char* begin = source;
+	if (!begin || line == 0) return;
+	for (u32 current = 1; current < line && *begin; ++current) {
+		while (*begin && *begin != '\n') ++begin;
+		if (*begin == '\n') ++begin;
+	}
+	if (!*begin) return;
+	const char* end = begin;
+	while (*end && *end != '\r' && *end != '\n') ++end;
+	if (*output_size < output_capacity) {
+		int written = snprintf(output + *output_size, output_capacity - *output_size, " // %.*s", (int)(end - begin), begin);
+		if (written > 0) *output_size += (size_t)written;
+	}
+}
+
+static void lumc_appendf(char* output, size_t* output_size, size_t output_capacity, const char* format, ...) {
+	if (*output_size >= output_capacity) return;
+	va_list args;
+	va_start(args, format);
+	int written = vsnprintf(output + *output_size, output_capacity - *output_size, format, args);
+	va_end(args);
+	if (written > 0) *output_size += (size_t)written;
+}
+
+static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_text) {
 	for (u32 function_index = 0; function_index < bytecode->function_count; ++function_index) {
 		const ls_function_bc* fn = &bytecode->functions[function_index];
 		printf("function %u %.*s (%s, params=%u, frame=%u, returns=%u)\n",
@@ -270,8 +306,12 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode) {
 			fn->param_size, fn->frame_size, fn->return_size);
 
 		for (u32 pc = 0; pc < fn->code_size;) {
+			char line[4096];
+			size_t line_size = 0;
 			const u32 offset = pc;
 			const ls_op op = (ls_op)fn->code[pc++];
+			const ls_bytecode_source_map_entry* source = lumc_source_at(fn, offset);
+			#define printf(...) lumc_appendf(line, &line_size, sizeof(line), __VA_ARGS__)
 			printf("  %04u: %-25s", offset, lumc_opcode_name(op));
 			switch (op) {
 			case LS_OP_LOAD_CONST_1:
@@ -527,10 +567,18 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode) {
 			default:
 				break;
 			}
+			if (source) {
+				const size_t source_column = 120;
+				while (line_size < source_column && line_size + 1 < sizeof(line)) line[line_size++] = ' ';
+				lumc_append_source_line(line, &line_size, sizeof(line), source_text, source->line);
+			}
+			fputs(line, stdout);
 			putchar('\n');
 		}
 	}
 }
+
+#undef printf
 
 int main(int argc, char** argv) {
 	if (argc < 2) {
@@ -606,7 +654,7 @@ int main(int argc, char** argv) {
 		goto cleanup;
 	}
 	if (dump_bytecode) {
-		lumc_dump_bytecode(ctx.bytecode);
+		lumc_dump_bytecode(ctx.bytecode, ctx.source);
 		rc = 0;
 		goto cleanup;
 	}

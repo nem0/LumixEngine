@@ -238,6 +238,15 @@ typedef enum ls_function_kind {
 	LS_FUNCTION_NATIVE,
 } ls_function_kind;
 
+typedef struct ls_bytecode_source_map_entry {
+	// Byte offset of the first instruction associated with this source location.
+	u32 code_offset;
+	// Non-owning source identifier copied from the AST token.
+	ls_string_view source_name;
+	u32 line;
+	u32 column;
+} ls_bytecode_source_map_entry;
+
 typedef struct ls_function_bc {
 	ls_string_view name;
 	ls_function_kind kind;
@@ -251,6 +260,11 @@ typedef struct ls_function_bc {
 	ls_type_kind return_kind;
 	u8* code;
 	u32 code_size;
+
+	// Sorted by code_offset. Entries describe the source location for the
+	// instruction at code_offset until the next entry.
+	ls_bytecode_source_map_entry* source_map;
+	u32 source_map_count;
 } ls_function_bc;
 
 typedef struct ls_bytecode {

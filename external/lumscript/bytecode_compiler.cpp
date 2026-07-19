@@ -118,7 +118,7 @@ static ls_type_kind numericKindForOp(ls_type_kind lhs_kind, ls_type_kind hint) {
 }
 
 struct ByteArray {
-	explicit ByteArray(ls_arena& arena) : arena(arena) {}
+	explicit ByteArray(ls_arena& arena) : arena(arena), source_map(arena) {}
 
 	void push_back(u8 value) {
 		if (count == capacity) {
@@ -139,7 +139,27 @@ struct ByteArray {
 	u8* data = nullptr;
 	u32 count = 0;
 	u32 capacity = 0;
+	ExpArray<ls_bytecode_source_map_entry> source_map;
+	Token current_source = {};
+	bool has_current_source = false;
 };
+
+static void recordSourceMap(ByteArray& code) {
+	if (!code.has_current_source || code.current_source.type == Token::END_OF_FILE || code.current_source.line <= 0) return;
+	if (!code.source_map.empty() && code.source_map.back().code_offset == code.count) {
+		ls_bytecode_source_map_entry& entry = code.source_map.back();
+		entry.source_name = code.current_source.source_name;
+		entry.line = (u32)code.current_source.line;
+		entry.column = (u32)code.current_source.column;
+		return;
+	}
+	ls_bytecode_source_map_entry entry;
+	entry.code_offset = code.count;
+	entry.source_name = code.current_source.source_name;
+	entry.line = (u32)code.current_source.line;
+	entry.column = (u32)code.current_source.column;
+	code.source_map.push_back(entry);
+}
 
 static void emitBytes(ByteArray& code, const void* value, size_t size) {
 	const u8* bytes = static_cast<const u8*>(value);
@@ -169,8 +189,30 @@ static void emitU64(ByteArray& code, u64 value) {
 }
 
 static void emitOp(ByteArray& code, ls_op op) {
+	recordSourceMap(code);
 	emitU8(code, (u8)op);
 }
+
+// Nested expression/statement compilation temporarily owns the source
+// location used by subsequent opcode emissions, then restores its caller.
+struct SourceScope {
+	ByteArray& code;
+	Token previous_source;
+	bool previous_valid;
+
+	SourceScope(ByteArray& code, Token source)
+		: code(code)
+		, previous_source(code.current_source)
+		, previous_valid(code.has_current_source) {
+		code.current_source = source;
+		code.has_current_source = source.type != Token::END_OF_FILE && source.line > 0;
+	}
+
+	~SourceScope() {
+		code.current_source = previous_source;
+		code.has_current_source = previous_valid;
+	}
+};
 
 template <typename T>
 static T* appendArenaArray(ls_arena& arena, T*& data, u32& count, u32& capacity) {
@@ -909,6 +951,16 @@ static bool tryEmitDirectLocalReturn(FunctionCompiler& ctx, Expression& expr) {
 static void finalizeFunctionCode(FunctionCompiler& ctx, ls_function_bc& function, ls_arena& arena) {
 	function.frame_size = ctx.frame_high_water;
 	function.code_size = (u32)ctx.code.size();
+	function.source_map_count = (u32)ctx.code.source_map.size();
+	if (function.source_map_count > 0u) {
+		function.source_map = static_cast<ls_bytecode_source_map_entry*>(arena.allocate(
+			arena.user_data,
+			sizeof(ls_bytecode_source_map_entry) * function.source_map_count,
+			alignof(ls_bytecode_source_map_entry)));
+		for (u32 i = 0; i < function.source_map_count; ++i) {
+			function.source_map[i] = ctx.code.source_map[(i32)i];
+		}
+	}
 	if (function.code_size > 0u) {
 		function.code = static_cast<u8*>(arena.allocate(arena.user_data, function.code_size, alignof(u8)));
 		copyMemory(function.code, ctx.code.data, function.code_size);
@@ -2449,6 +2501,7 @@ static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& membe
 }
 
 static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, ls_type_kind hint) {
+	SourceScope source_scope(ctx.code, expr.token);
 	switch (expr.kind) {
 		case Expression::INT_LITERAL: {
 			const ls_type_kind kind = toTypeKind(*expr.resolved_type);
@@ -2984,6 +3037,7 @@ static void compileAssign(FunctionCompiler& ctx, AssignStatement& assign) {
 }
 
 static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind return_kind, ls_string_view current_label) {
+	SourceScope source_scope(ctx.code, st.token);
 	switch (st.kind) {
 		case Statement::VAR_DECL: {
 			VarDeclStatement& var = static_cast<VarDeclStatement&>(st);
@@ -3389,6 +3443,10 @@ static bool compileFunctionBytecode(
 	// representation width rather than assuming every value is one offset.
 	function.return_size = typeByteSize(*return_type);
 	function.frame_size = 0;
+	function.code = nullptr;
+	function.code_size = 0u;
+	function.source_map = nullptr;
+	function.source_map_count = 0u;
 
 	if (fn->is_extern) {
 		function.param_size = computeParamSize(fn->params);
@@ -3403,6 +3461,7 @@ static bool compileFunctionBytecode(
 		// parameter locals (the literal references none).
 		function.param_size = computeParamSize(fn->params);
 		FunctionCompiler ctx(bytecode, function);
+		SourceScope source_scope(ctx.code, fn->token);
 		ctx.next_local_offset = function.param_size;
 		ctx.temp_top = function.param_size;
 		ctx.frame_high_water = function.param_size;
@@ -3424,6 +3483,7 @@ static bool compileFunctionBytecode(
 	}
 
 	FunctionCompiler ctx(bytecode, function);
+	SourceScope source_scope(ctx.code, fn->token);
 	ctx.return_type = return_type;
 	for (FunctionParam& param : fn->params) {
 		if (param.is_comptime) continue;
@@ -3522,6 +3582,10 @@ ls_bytecode* ls_bytecode_compile(
 		function.return_kind = LS_TYPE_VOID;
 		function.return_size = 0;
 		function.frame_size = 0u;
+		function.code = nullptr;
+		function.code_size = 0u;
+		function.source_map = nullptr;
+		function.source_map_count = 0u;
 
 		FunctionCompiler ctx(bytecode, function);
 		for (Unit& unit : module->units) {
