@@ -127,6 +127,27 @@ static void lumscript_world_findByName(ls_runtime*, ls_call_frame frame) {
 	LS_RESULT(frame, world);
 }
 
+static void lumscript_entity_findChildByName(ls_runtime*, ls_call_frame frame) {
+	const LumScriptEntity parent = readArg<LumScriptEntity>(frame);
+	char name[128];
+	LS_STRING_ARG(frame, name_sv);
+	const i32 name_len = (i32)(name_sv.end - name_sv.begin);
+	if (name_len >= (i32)sizeof(name)) {
+		LS_RESULT(frame, u8(0));
+		return;
+	}
+	if (name_len > 0) memcpy(name, name_sv.begin, (size_t)name_len);
+	name[name_len] = '\0';
+	const EntityPtr entity = parent.world->findByName(parent.entity, name);
+	if (!entity.isValid()) {
+		LS_RESULT(frame, u8(0));
+		return;
+	}
+	LS_RESULT(frame, u8(1));
+	LS_RESULT(frame, entity.index);
+	LS_RESULT(frame, parent.world);
+}
+
 static void lumscript_entity_destroy(LumScriptEntity entity) {
 	entity.world->destroyEntity(entity.entity);
 }
@@ -186,6 +207,7 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	functions.insert({"core:entity", "setPosition"}, &wrap<lumscript_entity_setPosition>);
 	functions.insert({"core:entity", "setScale"}, &wrap<lumscript_entity_setScale>);
 	functions.insert({"core:entity", "setRotation"}, &wrap<lumscript_entity_setRotation>);
+	functions.insert({"core:entity", "findChildByName"}, &lumscript_entity_findChildByName);
 	// world
 	functions.insert({"core:world", "createEntity"}, &wrap<lumscript_world_createEntity>);
 	functions.insert({"core:world", "destroyEntity"}, &wrap<lumscript_world_destroyEntity>);

@@ -69,7 +69,9 @@ fn processInputEvents() : void {
 
 fn init(w : World, inp : InputSystem) : void {
 	player = w.findByName("player");
-	// camera_pivot = TODO
+	if player != null {
+		camera_pivot = player.findChildByName("camera_pivot");
+	}
 	input_system = inp;
 	physics_module = w.physics();
 
