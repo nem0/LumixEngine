@@ -22,19 +22,19 @@ Measured 2026-07-19. Times are a single run; expect a few percent of noise.
 
 | Benchmark | Workload | Result | lumc | lua 5.4 | node --jitless | node | C /O2 |
 |---|---|---|---:|---:|---:|---:|---:|
-| recursion | fib(30) | 832040 | 26 ms | 37 ms | 44 ms | 5.1 ms | 2.7 ms |
-| mandel | 256x256, 255 iters | 1694719 | 71 ms | 83 ms | 150 ms | 7.2 ms | 4.0 ms |
-| fannkuch | n=9 | 30 | 148 ms | 172 ms | 265 ms | 17.7 ms | 13.6 ms |
-| nbodies | 500k steps | -0.169097 | 570 ms | 916 ms | 1435 ms | 45.8 ms | 22.0 ms |
+| recursion | fib(30) | 832040 | 24.80 ms | 37 ms | 44 ms | 5.1 ms | 2.7 ms |
+| mandel | 256x256, 255 iters | 1694719 | 71.62 ms | 83 ms | 150 ms | 7.2 ms | 4.0 ms |
+| fannkuch | n=9 | 30 | 147.32 ms | 172 ms | 265 ms | 17.7 ms | 13.6 ms |
+| nbodies | 500k steps | -0.169097 | 567.56 ms | 916 ms | 1435 ms | 45.8 ms | 22.0 ms |
 
 Relative to lumc (higher = faster than lumc):
 
 | Benchmark | lua 5.4 | node --jitless | node | C /O2 |
 |---|---:|---:|---:|---:|
-| recursion | 0.7x | 0.6x | 5.1x | 9.8x |
-| mandel | 0.9x | 0.5x | 9.8x | 17.9x |
-| fannkuch | 0.9x | 0.6x | 8.4x | 10.9x |
-| nbodies | 0.6x | 0.4x | 12.4x | 25.9x |
+| recursion | 0.7x | 0.6x | 4.9x | 9.2x |
+| mandel | 0.9x | 0.5x | 9.9x | 17.9x |
+| fannkuch | 0.9x | 0.6x | 8.3x | 10.8x |
+| nbodies | 0.6x | 0.4x | 12.4x | 25.8x |
 
 ## Bytecode instruction counts
 

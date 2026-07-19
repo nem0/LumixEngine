@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
-#include <time.h>
+#include <windows.h>
 
 #include <malloc.h>
 
@@ -27,6 +27,18 @@ typedef struct lumc_context {
 	ls_bytecode* bytecode;
 	ls_runtime* runtime;
 } lumc_context;
+
+static double lumc_now_ms(void) {
+	static LARGE_INTEGER frequency;
+	static int initialized = 0;
+	LARGE_INTEGER counter;
+	if (!initialized) {
+		QueryPerformanceFrequency(&frequency);
+		initialized = 1;
+	}
+	QueryPerformanceCounter(&counter);
+	return (double)counter.QuadPart * 1000.0 / (double)frequency.QuadPart;
+}
 
 static const ls_host g_host_template = {
 	{NULL, NULL, NULL},
@@ -228,6 +240,7 @@ static const char* lumc_opcode_name(ls_op op) {
 		case LS_OP_STRING_TO_CSTR: return "STRING_TO_CSTR";
 		case LS_OP_CSTR_TO_STRING: return "CSTR_TO_STRING";
 		case LS_OP_RETURN: return "RETURN";
+		case LS_OP_RETURN_BASE: return "RETURN_BASE";
 		default: return "UNKNOWN";
 	}
 }
@@ -559,6 +572,9 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 				printf(" src=%u, size=%u", src, return_size);
 				break;
 			}
+			case LS_OP_RETURN_BASE: {
+				break;
+			}
 			case LS_OP_NOT:
 			case LS_OP_NEG_I8: case LS_OP_NEG_U8: case LS_OP_NEG_I16: case LS_OP_NEG_U16: case LS_OP_NEG_I32: case LS_OP_NEG_U32: case LS_OP_NEG_I64: case LS_OP_NEG_U64: case LS_OP_NEG_F32: case LS_OP_NEG_F64: {
 				printf(" dst=%u", lumc_read_u32(fn->code, fn->code_size, &pc));
@@ -696,13 +712,12 @@ int main(int argc, char** argv) {
 			}
 		}
 
-		clock_t start = clock();
+		double start = lumc_now_ms();
 		if (!ls_call(ctx.runtime, ls_from_cstr(function_name))) {
 			fprintf(stderr, "Runtime error\n");
 			goto cleanup;
 		}
-		clock_t end = clock();
-		double elapsed_ms = (double)(end - start) / CLOCKS_PER_SEC * 1000.0;
+		double elapsed_ms = lumc_now_ms() - start;
 
 		{
 			ls_type_kind result_kind = ls_bytecode_runtime_result_kind(ctx.runtime, ls_from_cstr(function_name));

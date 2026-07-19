@@ -37,6 +37,7 @@
 // - RETURN deposits the result at the callee frame base, which is already
 //   the caller's result location for direct calls; indirect calls relocate
 //   the result down into the consumed function-value slot
+// - RETURN_BASE is a zero-operand form for results already at the frame base
 // - native callbacks still see arguments/results through the public runtime
 //   stack helpers
 //
@@ -231,6 +232,7 @@ typedef enum ls_op {
 	LS_OP_STRING_TO_CSTR,
 	LS_OP_CSTR_TO_STRING,
 	LS_OP_RETURN,
+	LS_OP_RETURN_BASE,
 } ls_op;
 
 typedef enum ls_function_kind {

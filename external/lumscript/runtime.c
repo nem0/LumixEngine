@@ -58,10 +58,9 @@ static u32 runtime_type_size(ls_type_kind kind) {
 	}
 }
 
-static const ls_function_bc* runtime_find_function(const ls_bytecode* bytecode, i32 function_index) {
-	if (function_index < 0) return NULL;
-	if ((u32)function_index >= bytecode->function_count) return NULL;
-	return &bytecode->functions[(u32)function_index];
+static const ls_function_bc* runtime_find_function(const ls_bytecode* bytecode, u32 function_index) {
+	if (function_index >= bytecode->function_count) return NULL;
+	return &bytecode->functions[function_index];
 }
 
 static const ls_function_bc* runtime_find_function_by_name(const ls_bytecode* bytecode, ls_string_view name, i32* out_index) {
@@ -347,7 +346,8 @@ static u64 runtime_numeric_to_u64(const u8* value, ls_type_kind kind) {
 	} while (0)
 
 static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
-	const ls_function_bc* fn = runtime_find_function(runtime->bytecode, function_index);
+	if (function_index < 0) return 0;
+	const ls_function_bc* fn = runtime_find_function(runtime->bytecode, (u32)function_index);
 	if (!fn) return 0;
 	const u32 initial_frame_base = runtime->frame_base;
 	const u32 initial_stack_top = runtime->stack_top;
@@ -842,7 +842,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				break;
 			}
 			case LS_OP_CALL_DIRECT: {
-				const i32 callee_index = (i32)runtime_read_u32(fn->code, &pc);
+				const u32 callee_index = runtime_read_u32(fn->code, &pc);
 				const u32 arg_base = runtime_read_u32(fn->code, &pc);
 				const u32 caller_top = runtime->stack_top;
 				const ls_function_bc* callee = runtime_find_function(runtime->bytecode, callee_index);
@@ -873,7 +873,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				runtime->call_stack[runtime->call_depth] = (runtime_call_frame){ fn, current_function_index, pc, runtime->frame_base, caller_top };
 				runtime->call_depth++;
 				fn = callee;
-				current_function_index = callee_index;
+				current_function_index = (i32)callee_index;
 				pc = 0;
 				runtime->frame_base = callee_frame_base;
 				runtime->frame = runtime->stack + callee_frame_base;
@@ -1148,6 +1148,28 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index) {
 				if (value > 0) pc = (u32)((i32)pc + offset);
 				break;
 			}
+			case LS_OP_RETURN_BASE: {
+				const u32 size = fn->return_size;
+				if (runtime->frame_base + size > runtime->stack_capacity) goto runtime_execute_function_fail;
+
+				if (runtime->call_depth == initial_call_depth) {
+					runtime->stack_top = runtime->frame_base + size;
+					runtime->result_function = current_function_index;
+					runtime->frame_base = initial_frame_base;
+					runtime->frame = runtime->stack + initial_frame_base;
+					return 1;
+				}
+
+				--runtime->call_depth;
+				const runtime_call_frame caller = runtime->call_stack[runtime->call_depth];
+				fn = caller.function;
+				current_function_index = caller.function_index;
+				pc = caller.pc;
+				runtime->frame_base = caller.frame_base;
+				runtime->frame = runtime->stack + caller.frame_base;
+				runtime->stack_top = caller.stack_top;
+				break;
+			}
 			case LS_OP_JGEZ_I32: {
 				const u32 reg = runtime_read_u32(fn->code, &pc);
 				const i32 offset = runtime_read_i16(fn->code, &pc);
@@ -1311,7 +1333,8 @@ static void runtime_read_value(ls_runtime* runtime, i32 index, void* out, u32 si
 
 const void* ls_call_result(ls_runtime* runtime, u32* size) {
 	if (size) *size = 0u;
-	const ls_function_bc* fn = runtime_find_function(runtime->bytecode, runtime->result_function);
+	if (runtime->result_function < 0) return NULL;
+	const ls_function_bc* fn = runtime_find_function(runtime->bytecode, (u32)runtime->result_function);
 	if (!fn || fn->return_size == 0u || fn->return_size > runtime->stack_top) return NULL;
 	if (size) *size = fn->return_size;
 	return runtime->stack + runtime->stack_top - fn->return_size;

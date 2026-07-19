@@ -922,18 +922,17 @@ static void emitCallIndirect(FunctionCompiler& ctx, u32 arg_size, u32 return_siz
 
 static void emitReturn(FunctionCompiler& ctx) {
 	const u32 return_size = ctx.out.return_size;
-	emitOp(ctx.code, LS_OP_RETURN);
-	if (return_size > 0u) emitTempReg(ctx, ctx.temp_top - return_size);
-	else emitFixedReg(ctx, 0u);
-	emitU32(ctx.code, return_size);
+	const u32 source = return_size > 0u ? ctx.temp_top - return_size : 0u;
+	emitOp(ctx.code, source == 0u ? LS_OP_RETURN_BASE : LS_OP_RETURN);
+	if (source != 0u) emitFixedReg(ctx, source);
+	if (source != 0u) emitU32(ctx.code, return_size);
 	ctx.temp_top = ctx.next_local_offset;
 }
 
 static void emitReturnFromLocal(FunctionCompiler& ctx, u32 source) {
-	emitOp(ctx.code, LS_OP_RETURN);
-	if (ctx.out.return_size > 0u) emitFixedReg(ctx, source);
-	else emitFixedReg(ctx, 0u);
-	emitU32(ctx.code, ctx.out.return_size);
+	emitOp(ctx.code, source == 0u ? LS_OP_RETURN_BASE : LS_OP_RETURN);
+	if (source != 0u && ctx.out.return_size > 0u) emitFixedReg(ctx, source);
+	if (source != 0u) emitU32(ctx.code, ctx.out.return_size);
 	ctx.temp_top = ctx.next_local_offset;
 }
 
@@ -2914,6 +2913,21 @@ static void compileExpressionIntoLocal(FunctionCompiler& ctx, Expression& expr, 
 	emitStoreLocalBytes(ctx, dst, byte_size);
 }
 
+static bool tryEmitDirectReturn(FunctionCompiler& ctx, Expression& expr) {
+	if (!ctx.deferreds.empty()) return false;
+	const ls_type_kind kind = valueKindForType(*ctx.return_type);
+	if (expr.kind == Expression::BINARY &&
+		tryCompileBinaryIntoLocal(ctx, static_cast<BinaryExpression&>(expr), 0u, kind)) {
+		emitReturnFromLocal(ctx, 0u);
+		return true;
+	}
+	if (emitLocalLiteralInitializer(ctx, 0u, expr, kind)) {
+		emitReturnFromLocal(ctx, 0u);
+		return true;
+	}
+	return false;
+}
+
 static void compileAssign(FunctionCompiler& ctx, AssignStatement& assign) {
 	if (assign.lhs->kind == Expression::IDENTIFIER) {
 		IdentifierExpression* id = static_cast<IdentifierExpression*>(assign.lhs);
@@ -3387,6 +3401,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			}
 			if (ret.expression) {
 				if (tryEmitDirectLocalReturn(ctx, *ret.expression)) return;
+				if (tryEmitDirectReturn(ctx, *ret.expression)) return;
 				compileExpressionAsType(ctx, *ret.expression, *ctx.return_type);
 			}
 			emitDeferredStatements(ctx, 0u, return_kind, current_label);
