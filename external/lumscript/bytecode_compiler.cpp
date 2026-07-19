@@ -2776,6 +2776,26 @@ static bool emitLocalLiteralInitializer(FunctionCompiler& ctx, u32 offset, Expre
 			emitConstStringAt(ctx, offset, string_index);
 			return true;
 		}
+		case Expression::UNARY: {
+			UnaryExpression& unary = static_cast<UnaryExpression&>(expr);
+			if (unary.op != Token::MINUS || !unary.expression) return false;
+			if (unary.expression->kind == Expression::INT_LITERAL) {
+				if (!isIntegerKind(kind) && !isFloatKind(kind)) return false;
+				const u64 value = static_cast<IntLiteralExpression&>(*unary.expression).value;
+				if (kind == LS_TYPE_F32) emitConst4At(ctx, offset, bitcastF32ToU32(-(float)value));
+				else if (kind == LS_TYPE_F64) emitConst8At(ctx, offset, bitcastF64ToU64(-(double)value));
+				else emitIntegerConstantAt(ctx, offset, kind, 0u - value);
+				return true;
+			}
+			if (unary.expression->kind == Expression::FLOAT_LITERAL) {
+				if (!isFloatKind(kind)) return false;
+				const double value = static_cast<FloatLiteralExpression&>(*unary.expression).value;
+				if (kind == LS_TYPE_F32) emitConst4At(ctx, offset, bitcastF32ToU32(-(float)value));
+				else emitConst8At(ctx, offset, bitcastF64ToU64(-value));
+				return true;
+			}
+			return false;
+		}
 		default:
 			return false;
 	}
