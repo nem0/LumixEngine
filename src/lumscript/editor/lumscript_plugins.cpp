@@ -199,9 +199,9 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 		ImGui::TableNextColumn();
 		ImGui::Text("%.*s", int(name.end - name.begin), name.begin);
 		ImGui::TableNextColumn();
-		ImGui::TextUnformatted(typeName(kind));
-		ImGui::TableNextColumn();
 		ImGui::TextDisabled("<unavailable>");
+		ImGui::TableNextColumn();
+		ImGui::TextUnformatted(typeName(kind));
 		return;
 	}
 
@@ -214,9 +214,9 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 			, int(name.end - name.begin)
 			, name.begin);
 		ImGui::TableNextColumn();
-		ImGui::TextUnformatted("struct");
-		ImGui::TableNextColumn();
 		ImGui::Text("(%u B)", ls_type_get_size(type));
+		ImGui::TableNextColumn();
+		ImGui::TextUnformatted("struct");
 		if (open) {
 			for (u32 i = 0, c = ls_type_struct_field_count(type); i < c; ++i) {
 				const ls_string_view fname = ls_type_struct_field_name(type, i);
@@ -241,9 +241,9 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 			, int(name.end - name.begin)
 			, name.begin);
 		ImGui::TableNextColumn();
-		ImGui::TextUnformatted("union");
-		ImGui::TableNextColumn();
 		ImGui::Text("tag=%d (%u members)", tag, ls_type_union_member_count(type));
+		ImGui::TableNextColumn();
+		ImGui::TextUnformatted("union");
 		if (open) {
 			const u32 member_count = ls_type_union_member_count(type);
 			if (tag >= 0 && (u32)tag < member_count) {
@@ -272,13 +272,13 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 			, int(name.end - name.begin)
 			, name.begin);
 		ImGui::TableNextColumn();
-		ImGui::TextUnformatted("array");
-		ImGui::TableNextColumn();
 		{
 			const u32 len = ls_type_array_length(type);
 			const ls_type* elem = ls_type_array_element_type(type);
 			ImGui::Text("[%u] %s", len, elem ? typeName(ls_type_get_kind(elem)) : "?");
 		}
+		ImGui::TableNextColumn();
+		ImGui::TextUnformatted("array");
 		if (open) {
 			const u32 len = ls_type_array_length(type);
 			const ls_type* elem = ls_type_array_element_type(type);
@@ -313,9 +313,9 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 			, int(name.end - name.begin)
 			, name.begin);
 		ImGui::TableNextColumn();
-		ImGui::TextUnformatted("slice");
-		ImGui::TableNextColumn();
 		ImGui::Text("(%llu) %s", len, elem ? typeName(ls_type_get_kind(elem)) : "?");
+		ImGui::TableNextColumn();
+		ImGui::TextUnformatted("slice");
 		if (open) {
 			if (ptr && len > 0) {
 				char idx_buf[32];
@@ -344,14 +344,14 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 			, int(name.end - name.begin)
 			, name.begin);
 		ImGui::TableNextColumn();
-		ImGui::TextUnformatted("?");
-		ImGui::TableNextColumn();
 		if (ls_type_nullable_is_null(type, value)) {
 			ImGui::TextDisabled("null");
 		} else {
 			const ls_type* inner = ls_type_nullable_inner_type(type);
 			ImGui::TextUnformatted(inner ? typeName(ls_type_get_kind(inner)) : "?");
 		}
+		ImGui::TableNextColumn();
+		ImGui::TextUnformatted("?");
 		if (open) {
 			if (!ls_type_nullable_is_null(type, value)) {
 				const ls_type* inner = ls_type_nullable_inner_type(type);
@@ -384,9 +384,9 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 	ImGui::TableNextColumn();
 	ImGui::Text("%.*s", int(name.end - name.begin), name.begin);
 	ImGui::TableNextColumn();
-	ImGui::TextUnformatted(typeName(kind));
-	ImGui::TableNextColumn();
 	drawPrimitiveValue(kind, value);
+	ImGui::TableNextColumn();
+	ImGui::TextUnformatted(typeName(kind));
 	ImGui::Unindent();
 }
 
@@ -916,8 +916,8 @@ struct LumScriptVariablesWindow final : StudioApp::GUIPlugin {
 
 			if (ImGui::BeginTable("lumscript_variables", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY)) {
 				ImGui::TableSetupColumn("Name");
-				ImGui::TableSetupColumn("Type");
 				ImGui::TableSetupColumn("Value");
+				ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed);
 				ImGui::TableHeadersRow();
 
 				// Locals

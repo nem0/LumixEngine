@@ -12,21 +12,21 @@ import "std:math"
 
 var player : ?Entity = null;
 var camera_pivot : ?Entity = null;
-var forward : bool = false;
-var backward : bool = false;
-var left : bool = false;
-var right : bool = false;
+var forward = false;
+var backward = false;
+var left = false;
+var right = false;
 var yaw : f32 = 0.0;
 var pitch : f32 = 0.0;
-var sprint : bool = false;
-var speed_input_idx : i32 = -1;
-var falling_input_idx : i32 = -1;
-var aiming_input_idx : i32 = -1;
-var dir_input_idx : i32 = -1;
-var stance_input_idx : i32 = -1;
-var crouched : bool = false;
-var aiming : bool = false;
-var handle_input : bool = true;
+var sprint = false;
+var speed_input_idx = -1;
+var falling_input_idx = -1;
+var aiming_input_idx = -1;
+var dir_input_idx = -1;
+var stance_input_idx = -1;
+var crouched = false;
+var aiming = false;
+var handle_input = true;
 var input_system : InputSystem = undefined;
 var physics_module : ?PhysicsModule = null;
 
