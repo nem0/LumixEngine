@@ -65,6 +65,7 @@ typedef enum ls_type_kind {
 	LS_TYPE_UNTYPED_INT,
 	LS_TYPE_UNTYPED_FLOAT,
 	LS_TYPE_STRUCT,
+	LS_TYPE_TAGGED_UNION,
 	LS_TYPE_ENUM,
 	LS_TYPE_FUNCTION,
 	LS_TYPE_ARRAY,
@@ -306,6 +307,21 @@ const ls_type* ls_type_struct_field_type(const ls_type* type, u32 field_index);
 // Byte offset of the field from the start of the struct value. The host
 // uses this to read the field: `(u8*)struct_value + offset`.
 u32 ls_type_struct_field_offset(const ls_type* type, u32 field_index);
+
+// Introspect a tagged union type (valid when kind == LS_TYPE_TAGGED_UNION).
+// A tagged union value is stored as: [tag : i32] [payload : N bytes].
+// The tag identifies which member is active (0, 1, 2, ...).
+// All members share the same payload space (size = max member size).
+
+// Number of member types in the union.
+u32 ls_type_union_member_count(const ls_type* type);
+
+// Type handle for the member at `member_index`.
+const ls_type* ls_type_union_member_type(const ls_type* type, u32 member_index);
+
+// Returns the active tag from a tagged union value. The tag is the first 4
+// bytes of the value, interpreted as a signed i32.
+i32 ls_type_union_tag(const ls_type* type, const void* value);
 
 // Introspect an array or slice type (valid when kind is LS_TYPE_ARRAY
 // or LS_TYPE_SLICE).

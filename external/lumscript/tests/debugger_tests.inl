@@ -1256,3 +1256,116 @@ TEST(DebugNullableTypeIntrospection) {
 	CAPI_END(module);
 	return true;
 }
+
+TEST(DebugTaggedUnionMemberCountAndTypes) {
+	const char* source = R"(
+		struct A {
+			x : i32;
+		}
+		struct B {
+			y : f32;
+		}
+		comptime Union = A | B | i32;
+
+		fn main() : i32 {
+			var u : Union = A { 7 };
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 12u, nullptr));
+	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
+
+	const ls_type* type = ls_debug_local_type(runtime, 0, 0);
+	EXPECT_TRUE(type != nullptr);
+	EXPECT_EQ((int)LS_TYPE_TAGGED_UNION, (int)ls_type_get_kind(type));
+
+	// Union = A | B | i32  => 3 members, size = 4 (tag) + 4 (max payload) = 8
+	EXPECT_EQ(8u, ls_type_get_size(type));
+	EXPECT_EQ(3u, ls_type_union_member_count(type));
+
+	// Member 0: A (struct)
+	const ls_type* mem0 = ls_type_union_member_type(type, 0);
+	EXPECT_TRUE(mem0 != nullptr);
+	EXPECT_EQ((int)LS_TYPE_STRUCT, (int)ls_type_get_kind(mem0));
+	EXPECT_EQ(4u, ls_type_get_size(mem0));
+
+	// Member 1: B (struct)
+	const ls_type* mem1 = ls_type_union_member_type(type, 1);
+	EXPECT_TRUE(mem1 != nullptr);
+	EXPECT_EQ((int)LS_TYPE_STRUCT, (int)ls_type_get_kind(mem1));
+	EXPECT_EQ(4u, ls_type_get_size(mem1));
+
+	// Member 2: i32
+	const ls_type* mem2 = ls_type_union_member_type(type, 2);
+	EXPECT_TRUE(mem2 != nullptr);
+	EXPECT_EQ((int)LS_TYPE_I32, (int)ls_type_get_kind(mem2));
+	EXPECT_EQ(4u, ls_type_get_size(mem2));
+
+	// Out-of-bounds and null safety
+	EXPECT_TRUE(ls_type_union_member_type(type, 99) == nullptr);
+	EXPECT_EQ(0u, ls_type_union_member_count(nullptr));
+	EXPECT_TRUE(ls_type_union_member_type(nullptr, 0) == nullptr);
+	EXPECT_EQ(-1, ls_type_union_tag(nullptr, nullptr));
+
+	// Read the tag from the value bytes
+	u32 value_size = 0;
+	const void* value = ls_debug_local_value(runtime, 0, 0, &value_size);
+	EXPECT_TRUE(value != nullptr);
+	EXPECT_EQ(0, ls_type_union_tag(type, value));  // tag 0 = A is active
+	EXPECT_EQ(-1, ls_type_union_tag(type, nullptr));
+
+	EXPECT_EQ((int)LS_RESULT_OK, (int)ls_debug_resume(runtime, LS_DEBUG_CONTINUE));
+
+	CAPI_END(module);
+	return true;
+}
+
+TEST(DebugTaggedUnionTagChangesWithMember) {
+	const char* source = R"(
+		struct A {
+			x : i32;
+		}
+		struct B {
+			y : f32;
+		}
+		comptime Union = A | B | i32;
+
+		fn main() : i32 {
+			var u : Union = A { 7 };
+			u = B { 3.14 };
+			u = 42;
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 14u, nullptr));
+	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
+
+	const ls_type* type = ls_debug_local_type(runtime, 0, 0);
+	EXPECT_TRUE(type != nullptr);
+	EXPECT_EQ((int)LS_TYPE_TAGGED_UNION, (int)ls_type_get_kind(type));
+	EXPECT_EQ(3u, ls_type_union_member_count(type));
+
+	// After assigning i32(42), the tag should be 2
+	u32 value_size = 0;
+	const void* value = ls_debug_local_value(runtime, 0, 0, &value_size);
+	EXPECT_TRUE(value != nullptr);
+	EXPECT_EQ(2, ls_type_union_tag(type, value));
+
+	// Verify the payload holds the i32 value 42
+	i32 payload = 0;
+	memcpy(&payload, (const u8*)value + 4, sizeof(payload));
+	EXPECT_EQ(42, payload);
+
+	EXPECT_EQ((int)LS_RESULT_OK, (int)ls_debug_resume(runtime, LS_DEBUG_CONTINUE));
+
+	CAPI_END(module);
+	return true;
+}

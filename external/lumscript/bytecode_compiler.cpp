@@ -43,6 +43,7 @@ static ls_type_kind toTypeKind(const ResolvedType& type) {
 		case ResolvedType::NULLABLE: return LS_TYPE_NULL_VALUE;
 		case ResolvedType::ENUM: return LS_TYPE_ENUM;
 		case ResolvedType::STRUCT: return LS_TYPE_STRUCT;
+		case ResolvedType::UNION: return LS_TYPE_TAGGED_UNION;
 		default: return LS_TYPE_INVALID;
 	}
 }
@@ -273,6 +274,8 @@ struct TypeInfoBuilder {
 		info->byte_size = typeByteSize(*type);
 		info->field_count = 0u;
 		info->first_field_index = 0u;
+		info->member_count = 0u;
+		info->first_member_index = 0u;
 		info->element_type_index = LS_TYPE_INDEX_NONE;
 		info->array_length = LS_TYPE_INDEX_NONE;
 
@@ -305,6 +308,18 @@ struct TypeInfoBuilder {
 					if (dst) *dst = fi;
 					ResolvedType* ft = ft_types[i];
 					if (ft) running_offset += typeByteSize(*ft);
+				}
+				break;
+			}
+			case ResolvedType::UNION: {
+				UnionResolvedType* un = static_cast<UnionResolvedType*>(type);
+				info->kind = LS_TYPE_TAGGED_UNION;
+				info->member_count = (u32)un->members.size();
+				info->first_member_index = bc->type_member_count;
+				for (i32 i = 0; i < (i32)info->member_count; ++i) {
+					const u32 ti = un->members[i] ? resolve(un->members[i]) : LS_TYPE_INDEX_NONE;
+					u32* dst = appendArenaArray(*bc->arena, bc->type_member_indices, bc->type_member_count, bc->type_member_capacity);
+					if (dst) *dst = ti;
 				}
 				break;
 			}

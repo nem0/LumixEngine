@@ -276,6 +276,8 @@ typedef struct ls_type {
 	u32 byte_size;               // same as typeByteSize for this type
 	u32 field_count;             // 0 when kind != LS_TYPE_STRUCT
 	u32 first_field_index;       // index into bytecode->type_fields[]; unused when field_count == 0
+	u32 member_count;            // 0 when kind != LS_TYPE_TAGGED_UNION
+	u32 first_member_index;      // index into bytecode->type_member_indices[]; unused when member_count == 0
 	u32 element_type_index;      // LS_TYPE_INDEX_NONE when kind is not ARRAY, SLICE, or NULLABLE
 	u32 array_length;            // LS_TYPE_INDEX_NONE when not ARRAY or SLICE; 0 for SLICE (dynamic length)
 } ls_type;
@@ -380,6 +382,12 @@ typedef struct ls_bytecode {
 	ls_type_field_info* type_fields;
 	u32 type_field_count;
 	u32 type_field_capacity;
+
+	// Flat array of type indices for tagged union members, indexed by
+	// `ls_type::first_member_index` + member offset.
+	u32* type_member_indices;
+	u32 type_member_count;
+	u32 type_member_capacity;
 
 	// Active breakpoint patches, set by `ls_debug_set_breakpoint`. Directly
 	// malloc'd/realloc'd and freed in `ls_bytecode_destroy`, same as this

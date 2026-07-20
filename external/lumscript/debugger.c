@@ -374,6 +374,28 @@ u32 ls_type_struct_field_offset(const ls_type* type, u32 field_index) {
 	return type->bytecode->type_fields[fi].offset;
 }
 
+u32 ls_type_union_member_count(const ls_type* type) {
+	return (type && type->kind == LS_TYPE_TAGGED_UNION) ? type->member_count : 0u;
+}
+
+const ls_type* ls_type_union_member_type(const ls_type* type, u32 member_index) {
+	if (!type || type->kind != LS_TYPE_TAGGED_UNION || !type->bytecode) return NULL;
+	if (member_index >= type->member_count) return NULL;
+	const u32 mi = type->first_member_index + member_index;
+	if (mi >= type->bytecode->type_member_count) return NULL;
+	const u32 ti = type->bytecode->type_member_indices[mi];
+	if (ti >= type->bytecode->type_info_count) return NULL;
+	return (const ls_type*)&type->bytecode->type_info[ti];
+}
+
+i32 ls_type_union_tag(const ls_type* type, const void* value) {
+	(void)type;
+	if (!value) return -1;
+	i32 tag;
+	memcpy(&tag, value, sizeof(tag));
+	return tag;
+}
+
 const ls_type* ls_type_array_element_type(const ls_type* type) {
 	if (!type || !type->bytecode) return NULL;
 	if (type->kind != LS_TYPE_ARRAY && type->kind != LS_TYPE_SLICE) return NULL;
