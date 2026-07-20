@@ -379,6 +379,7 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 	}
 
 	// Primitive
+	ImGui::Indent();
 	ImGui::TableNextRow();
 	ImGui::TableNextColumn();
 	ImGui::Text("%.*s", int(name.end - name.begin), name.begin);
@@ -386,6 +387,7 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 	ImGui::TextUnformatted(typeName(kind));
 	ImGui::TableNextColumn();
 	drawPrimitiveValue(kind, value);
+	ImGui::Unindent();
 }
 
 struct LumScriptDebuggerWindow;
