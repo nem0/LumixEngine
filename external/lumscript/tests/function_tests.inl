@@ -573,7 +573,8 @@ TEST(ExternSinDoesNotAutoBindBuiltin) {
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(!ls_call(runtime, toLs("main")));
+	test_diagnostics.output_enabled = false;
+	EXPECT_EQ(LS_RESULT_SUSPENDED, ls_call(runtime, toLs("main")));
 	CAPI_END(module);
 	return true;
 }
@@ -598,7 +599,7 @@ TEST(DeepRecursionFailsCleanly) {
 
 	CAPI_RUNTIME(module, runtime);
 	test_diagnostics.output_enabled = false;
-	EXPECT_TRUE(!ls_call(runtime, toLs("main")));
+	EXPECT_EQ(LS_RESULT_SUSPENDED, ls_call(runtime, toLs("main")));
 	CAPI_END(module);
 	return true;
 }

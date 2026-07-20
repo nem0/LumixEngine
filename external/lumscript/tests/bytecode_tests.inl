@@ -2300,7 +2300,7 @@ TEST(DivisionByZeroRuntimeError) {
 	test_diagnostics.output_enabled = false;
 	ls_push_i32(runtime, 10);
 	ls_push_i32(runtime, 0);
-	EXPECT_TRUE(!ls_call(runtime, toLs("divide")));
+	EXPECT_EQ(LS_RESULT_SUSPENDED, ls_call(runtime, toLs("divide")));
 
 	TestContext diagnostics2;
 	RuntimeGuard runtime2(module, &diagnostics2.host);
@@ -2308,40 +2308,40 @@ TEST(DivisionByZeroRuntimeError) {
 	diagnostics2.diagnostics.output_enabled = false;
 	ls_push_i32(runtime2, 10);
 	ls_push_i32(runtime2, 0);
-	EXPECT_TRUE(!ls_call(runtime2, toLs("modulo")));
+	EXPECT_EQ(LS_RESULT_SUSPENDED, ls_call(runtime2, toLs("modulo")));
 
 	TestContext diagnostics3;
 	RuntimeGuard runtime3(module, &diagnostics3.host);
 	EXPECT_TRUE(runtime3);
 	diagnostics3.diagnostics.output_enabled = false;
 	ls_push_i32(runtime3, 0);
-	EXPECT_TRUE(!ls_call(runtime3, toLs("divide_assign")));
+	EXPECT_EQ(LS_RESULT_SUSPENDED, ls_call(runtime3, toLs("divide_assign")));
 
 	TestContext diagnostics4;
 	RuntimeGuard runtime4(module, &diagnostics4.host);
 	EXPECT_TRUE(runtime4);
 	diagnostics4.diagnostics.output_enabled = false;
 	ls_push_i32(runtime4, 10);
-	EXPECT_TRUE(!ls_call(runtime4, toLs("divide_constant_zero")));
+	EXPECT_EQ(LS_RESULT_SUSPENDED, ls_call(runtime4, toLs("divide_constant_zero")));
 
 	TestContext diagnostics5;
 	RuntimeGuard runtime5(module, &diagnostics5.host);
 	EXPECT_TRUE(runtime5);
 	diagnostics5.diagnostics.output_enabled = false;
 	ls_push_i32(runtime5, 10);
-	EXPECT_TRUE(!ls_call(runtime5, toLs("modulo_constant_zero")));
+	EXPECT_EQ(LS_RESULT_SUSPENDED, ls_call(runtime5, toLs("modulo_constant_zero")));
 
 	TestContext diagnostics6;
 	RuntimeGuard runtime6(module, &diagnostics6.host);
 	EXPECT_TRUE(runtime6);
 	diagnostics6.diagnostics.output_enabled = false;
-	EXPECT_TRUE(!ls_call(runtime6, toLs("divide_assign_constant_zero")));
+	EXPECT_EQ(LS_RESULT_SUSPENDED, ls_call(runtime6, toLs("divide_assign_constant_zero")));
 
 	TestContext diagnostics7;
 	RuntimeGuard runtime7(module, &diagnostics7.host);
 	EXPECT_TRUE(runtime7);
 	diagnostics7.diagnostics.output_enabled = false;
-	EXPECT_TRUE(!ls_call(runtime7, toLs("divide_float_constant_zero")));
+	EXPECT_EQ(LS_RESULT_SUSPENDED, ls_call(runtime7, toLs("divide_float_constant_zero")));
 	CAPI_END(module);
 	return true;
 }
@@ -2358,7 +2358,7 @@ TEST(HostCallWithTooFewArgumentsFails) {
 	CAPI_RUNTIME(module, runtime);
 	
 	ls_push_i32(runtime, 20);
-	EXPECT_TRUE(!ls_call(runtime, toLs("add")));
+	EXPECT_EQ(LS_RESULT_FAILURE, ls_call(runtime, toLs("add")));
 	EXPECT_EQ(20, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2594,6 +2594,6 @@ TEST(StaticArrayRuntimeOutOfBoundsFails) {
 	CAPI_RUNTIME(module, runtime);
 	test_diagnostics.output_enabled = false;
 	ls_push_i32(runtime, 5);
-	EXPECT_TRUE(!ls_call(runtime, toLs("main")));
+	EXPECT_EQ(LS_RESULT_SUSPENDED, ls_call(runtime, toLs("main")));
 	return true;
 }

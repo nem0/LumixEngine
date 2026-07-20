@@ -71,7 +71,8 @@ typedef enum ls_type_kind {
 	LS_TYPE_SLICE,
 	LS_TYPE_NULL_VALUE,
 	LS_TYPE_CPTR,
-	LS_TYPE_NAMESPACE
+	LS_TYPE_NAMESPACE,
+	LS_TYPE_NULLABLE
 } ls_type_kind;
 
 // Generic status used by C API operations that only report success or failure.
@@ -152,6 +153,7 @@ typedef struct ls_host {
 typedef struct ls_module ls_module;
 typedef struct ls_unit ls_unit;
 typedef struct ls_bytecode ls_bytecode;
+typedef struct ls_type ls_type;
 
 // Module lifetime.
 //
@@ -269,6 +271,66 @@ ls_result ls_call_index(ls_runtime* runtime, i32 function_index);
 // helpers with index `-1`.
 ls_type_kind ls_bytecode_runtime_result_kind(ls_runtime* runtime, ls_string_view function_name);
 
+// Type introspection.
+//
+// `ls_type` describes the shape of a script value - its kind, byte size,
+// and for compound types (struct, array, slice) the layout of their
+// sub-values. Handles are owned by the bytecode and stable for its lifetime.
+//
+// Obtain a type handle from the debug API (ls_debug_local_type,
+// ls_debug_global_type) or from module-level struct queries. The handle is
+// valid while the owning bytecode (or bytecode-compiled module) lives.
+//
+
+// Returns the kind category of the type.
+ls_type_kind ls_type_get_kind(const ls_type* type);
+
+// Returns the byte size of values of this type. Matches the byte_size
+// reported by ls_debug_local_value / ls_debug_global_value.
+u32 ls_type_get_size(const ls_type* type);
+
+// Introspect a struct type (valid when kind == LS_TYPE_STRUCT).
+// Fields are enumerated in declaration order with packed layout
+// (no alignment padding between fields).
+
+// Number of fields in the struct.
+u32 ls_type_struct_field_count(const ls_type* type);
+
+// Name of the field at `field_index`.
+ls_string_view ls_type_struct_field_name(const ls_type* type, u32 field_index);
+
+// Type handle for the field at `field_index`. Recursively queryable for
+// nested struct drill-down.
+const ls_type* ls_type_struct_field_type(const ls_type* type, u32 field_index);
+
+// Byte offset of the field from the start of the struct value. The host
+// uses this to read the field: `(u8*)struct_value + offset`.
+u32 ls_type_struct_field_offset(const ls_type* type, u32 field_index);
+
+// Introspect an array or slice type (valid when kind is LS_TYPE_ARRAY
+// or LS_TYPE_SLICE).
+
+// Element type of the array or slice.
+const ls_type* ls_type_array_element_type(const ls_type* type);
+
+// Compile-time element count. Returns the fixed length for LS_TYPE_ARRAY;
+// returns 0 for LS_TYPE_SLICE (whose length is dynamic at runtime).
+u32 ls_type_array_length(const ls_type* type);
+
+// Introspect a nullable type (valid when kind == LS_TYPE_NULLABLE).
+// A nullable value is stored as: [has_value : u8] [inner_value : N bytes].
+// Read the first byte: 0 = null, 1 = value present.
+
+// Inner (wrapped) type of the nullable.
+const ls_type* ls_type_nullable_inner_type(const ls_type* type);
+
+// Returns true when the nullable value is null (has_value byte is 0).
+bool ls_type_nullable_is_null(const ls_type* type, const void* value);
+
+// Returns a pointer past the has_value flag, i.e. to the inner value bytes.
+// Only valid when ls_type_nullable_is_null returns false.
+const void* ls_type_nullable_value_ptr(const ls_type* type, const void* value);
+
 // Debugger.
 //
 // Suspension-based: when a debug-enabled runtime pauses, the interrupted
@@ -318,10 +380,6 @@ typedef struct ls_debug_event {
 	ls_string_view message;
 } ls_debug_event;
 
-// While disabled (the default) the runtime never suspends; breakpoints stay
-// set but stop trapping. Disabling a suspended runtime aborts its execution.
-void ls_debug_enable(ls_runtime* runtime, int enable);
-
 int ls_debug_is_suspended(ls_runtime* runtime);
 
 ls_result ls_debug_pause_event(ls_runtime* runtime, ls_debug_event* out_event);
@@ -353,11 +411,13 @@ u32 ls_debug_frame_local_count(ls_runtime* runtime, u32 frame_index);
 ls_string_view ls_debug_local_name(ls_runtime* runtime, u32 frame_index, u32 local_index);
 ls_type_kind ls_debug_local_kind(ls_runtime* runtime, u32 frame_index, u32 local_index);
 void* ls_debug_local_value(ls_runtime* runtime, u32 frame_index, u32 local_index, u32* size);
+const ls_type* ls_debug_local_type(ls_runtime* runtime, u32 frame_index, u32 local_index);
 
 u32 ls_debug_global_count(ls_runtime* runtime);
 ls_string_view ls_debug_global_name(ls_runtime* runtime, u32 global_index);
 ls_type_kind ls_debug_global_kind(ls_runtime* runtime, u32 global_index);
 void* ls_debug_global_value(ls_runtime* runtime, u32 global_index, u32* size);
+const ls_type* ls_debug_global_type(ls_runtime* runtime, u32 global_index);
 
 #ifdef __cplusplus
 }

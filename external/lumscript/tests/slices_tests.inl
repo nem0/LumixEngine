@@ -485,7 +485,7 @@ TEST(SliceRuntimeOutOfBoundsFails) {
 	CAPI_RUNTIME(module, runtime);
 	test_diagnostics.output_enabled = false;
 	ls_push_i32(runtime, 2);
-	EXPECT_TRUE(!ls_call(runtime, toLs("main")));
+	EXPECT_EQ(LS_RESULT_SUSPENDED, ls_call(runtime, toLs("main")));
 	CAPI_END(module);
 	return true;
 }
@@ -589,7 +589,7 @@ TEST(SliceStructFieldRefOutOfBoundsFails) {
 	CAPI_RUNTIME(module, runtime);
 	test_diagnostics.output_enabled = false;
 	ls_push_i32(runtime, 2);
-	EXPECT_TRUE(!ls_call(runtime, toLs("main")));
+	EXPECT_EQ(LS_RESULT_SUSPENDED, ls_call(runtime, toLs("main")));
 	CAPI_END(module);
 	return true;
 }

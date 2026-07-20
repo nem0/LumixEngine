@@ -2,6 +2,16 @@
 
 # TODO
 
+* debugger:
+	- modify variables while paused
+	- variable expansion - struct, ...
+	- conditional breakpoints
+	- data breakpoints?
+	- REPL?
+
+* editor plugins in lumscript
+
+* getNumControllerHits + getControllerHit to slices
 * get rid of std::free
 * try -
 	fn parse() : Error | Node;
@@ -21,7 +31,6 @@
 			}
 		}
 	}
-* debugger
 * string interpolation
 * MT typecheck
 

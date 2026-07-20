@@ -117,10 +117,10 @@ static int debug_find_breakpoint_target(const ls_bytecode* bytecode, ls_string_v
 	return 1;
 }
 
-static ls_bytecode_breakpoint* debug_find_breakpoint(ls_bytecode* bytecode, u32 function_index, u32 code_offset) {
+static ls_bytecode_breakpoint* debug_find_breakpoint(ls_bytecode* bytecode, const u8* code) {
 	for (u32 i = 0; i < bytecode->breakpoint_count; ++i) {
 		ls_bytecode_breakpoint* bp = &bytecode->breakpoints[i];
-		if (bp->function_index == function_index && bp->code_offset == code_offset) return bp;
+		if (bp->code == code) return bp;
 	}
 	return NULL;
 }
@@ -134,7 +134,9 @@ ls_result ls_debug_set_breakpoint(ls_bytecode* bytecode, ls_string_view source_n
 	u32 found_line = 0u;
 	if (!debug_find_breakpoint_target(bytecode, source_name, line, &function_index, &code_offset, &found_line)) return LS_RESULT_FAILURE;
 
-	if (debug_find_breakpoint(bytecode, function_index, code_offset)) {
+	ls_function_bc* fn = &bytecode->functions[function_index];
+	u8* code = fn->code + code_offset;
+	if (debug_find_breakpoint(bytecode, code)) {
 		if (resolved_line) *resolved_line = found_line;
 		return LS_RESULT_OK;
 	}
@@ -147,12 +149,10 @@ ls_result ls_debug_set_breakpoint(ls_bytecode* bytecode, ls_string_view source_n
 		bytecode->breakpoint_capacity = new_capacity;
 	}
 
-	ls_function_bc* fn = &bytecode->functions[function_index];
 	ls_bytecode_breakpoint* bp = &bytecode->breakpoints[bytecode->breakpoint_count++];
-	bp->function_index = function_index;
-	bp->code_offset = code_offset;
-	bp->original_byte = fn->code[code_offset];
-	fn->code[code_offset] = (u8)LS_OP_BREAK;
+	bp->code = code;
+	bp->original_byte = *code;
+	*code = (u8)LS_OP_BREAK;
 
 	if (resolved_line) *resolved_line = found_line;
 	return LS_RESULT_OK;
@@ -166,10 +166,11 @@ ls_result ls_debug_remove_breakpoint(ls_bytecode* bytecode, ls_string_view sourc
 	u32 found_line = 0u;
 	if (!debug_find_breakpoint_target(bytecode, source_name, line, &function_index, &code_offset, &found_line)) return LS_RESULT_FAILURE;
 
+	const u8* code = bytecode->functions[function_index].code + code_offset;
 	for (u32 i = 0; i < bytecode->breakpoint_count; ++i) {
 		ls_bytecode_breakpoint* bp = &bytecode->breakpoints[i];
-		if (bp->function_index != function_index || bp->code_offset != code_offset) continue;
-		bytecode->functions[function_index].code[code_offset] = bp->original_byte;
+		if (bp->code != code) continue;
+		*bp->code = bp->original_byte;
 		bytecode->breakpoints[i] = bytecode->breakpoints[bytecode->breakpoint_count - 1u];
 		--bytecode->breakpoint_count;
 		return LS_RESULT_OK;
@@ -181,7 +182,7 @@ void ls_debug_remove_all_breakpoints(ls_bytecode* bytecode) {
 	if (!bytecode) return;
 	for (u32 i = 0; i < bytecode->breakpoint_count; ++i) {
 		const ls_bytecode_breakpoint* bp = &bytecode->breakpoints[i];
-		bytecode->functions[bp->function_index].code[bp->code_offset] = bp->original_byte;
+		*bp->code = bp->original_byte;
 	}
 	bytecode->breakpoint_count = 0u;
 }
@@ -189,8 +190,7 @@ void ls_debug_remove_all_breakpoints(ls_bytecode* bytecode) {
 // Ends a live suspension without resuming the interpreter: reports the
 // suspend point as a failed-call stack trace (fail_frames, same shape
 // ls_call's fail path leaves it in) and clears is_suspended so ls_call/
-// ls_call_index accept new calls again. Shared by ls_debug_enable(false) on a
-// suspended runtime and ls_debug_resume(LS_DEBUG_ABORT).
+// ls_call_index accept new calls again. Used by ls_debug_resume(LS_DEBUG_ABORT).
 static void debug_abandon_suspension(ls_runtime* runtime) {
 	u32 recorded = 0u;
 	if (recorded < (u32)(sizeof(runtime->fail_frames) / sizeof(runtime->fail_frames[0]))) {
@@ -209,11 +209,6 @@ static void debug_abandon_suspension(ls_runtime* runtime) {
 	runtime->result_size = initial->result_size;
 	--runtime->call_start_depth;
 	runtime->step_action = LS_DEBUG_CONTINUE;
-}
-
-void ls_debug_enable(ls_runtime* runtime, int enable) {
-	if (!enable && runtime->is_suspended) debug_abandon_suspension(runtime);
-	runtime->debug_enabled = enable != 0;
 }
 
 int ls_debug_is_suspended(ls_runtime* runtime) {
@@ -325,4 +320,87 @@ void* ls_debug_global_value(ls_runtime* runtime, u32 global_index, u32* size) {
 	if (runtime->stack + entry->offset + entry->byte_size > runtime->stack_end) return NULL;
 	if (size) *size = entry->byte_size;
 	return runtime->stack + entry->offset;
+}
+
+const ls_type* ls_debug_local_type(ls_runtime* runtime, u32 frame_index, u32 local_index) {
+	const ls_bytecode_local_debug_entry* entry = debug_local_at(runtime, frame_index, local_index, NULL);
+	if (!entry || entry->type_index >= runtime->bytecode->type_info_count) return NULL;
+	return (const ls_type*)&runtime->bytecode->type_info[entry->type_index];
+}
+
+const ls_type* ls_debug_global_type(ls_runtime* runtime, u32 global_index) {
+	if (global_index >= runtime->bytecode->global_debug_count) return NULL;
+	const ls_bytecode_global_debug_entry* entry = &runtime->bytecode->global_debug[global_index];
+	if (entry->type_index >= runtime->bytecode->type_info_count) return NULL;
+	return (const ls_type*)&runtime->bytecode->type_info[entry->type_index];
+}
+
+ls_type_kind ls_type_get_kind(const ls_type* type) {
+	return type ? type->kind : LS_TYPE_INVALID;
+}
+
+u32 ls_type_get_size(const ls_type* type) {
+	return type ? type->byte_size : 0u;
+}
+
+u32 ls_type_struct_field_count(const ls_type* type) {
+	return (type && type->kind == LS_TYPE_STRUCT) ? type->field_count : 0u;
+}
+
+ls_string_view ls_type_struct_field_name(const ls_type* type, u32 field_index) {
+	const ls_string_view empty = {NULL, NULL};
+	if (!type || type->kind != LS_TYPE_STRUCT || !type->bytecode) return empty;
+	if (field_index >= type->field_count) return empty;
+	const u32 fi = type->first_field_index + field_index;
+	if (fi >= type->bytecode->type_field_count) return empty;
+	return type->bytecode->type_fields[fi].name;
+}
+
+const ls_type* ls_type_struct_field_type(const ls_type* type, u32 field_index) {
+	if (!type || type->kind != LS_TYPE_STRUCT || !type->bytecode) return NULL;
+	if (field_index >= type->field_count) return NULL;
+	const u32 fi = type->first_field_index + field_index;
+	if (fi >= type->bytecode->type_field_count) return NULL;
+	const u32 ti = type->bytecode->type_fields[fi].type_index;
+	if (ti >= type->bytecode->type_info_count) return NULL;
+	return (const ls_type*)&type->bytecode->type_info[ti];
+}
+
+u32 ls_type_struct_field_offset(const ls_type* type, u32 field_index) {
+	if (!type || type->kind != LS_TYPE_STRUCT || !type->bytecode) return 0u;
+	if (field_index >= type->field_count) return 0u;
+	const u32 fi = type->first_field_index + field_index;
+	if (fi >= type->bytecode->type_field_count) return 0u;
+	return type->bytecode->type_fields[fi].offset;
+}
+
+const ls_type* ls_type_array_element_type(const ls_type* type) {
+	if (!type || !type->bytecode) return NULL;
+	if (type->kind != LS_TYPE_ARRAY && type->kind != LS_TYPE_SLICE) return NULL;
+	if (type->element_type_index >= type->bytecode->type_info_count) return NULL;
+	return (const ls_type*)&type->bytecode->type_info[type->element_type_index];
+}
+
+u32 ls_type_array_length(const ls_type* type) {
+	if (!type || type->kind != LS_TYPE_ARRAY) return 0u;
+	return type->array_length;
+}
+
+const ls_type* ls_type_nullable_inner_type(const ls_type* type) {
+	if (!type || !type->bytecode) return NULL;
+	if (type->kind != LS_TYPE_NULLABLE) return NULL;
+	if (type->element_type_index >= type->bytecode->type_info_count) return NULL;
+	return (const ls_type*)&type->bytecode->type_info[type->element_type_index];
+}
+
+bool ls_type_nullable_is_null(const ls_type* type, const void* value) {
+	(void)type;
+	if (!value) return true;
+	return *(const u8*)value == 0;
+}
+
+const void* ls_type_nullable_value_ptr(const ls_type* type, const void* value) {
+	(void)type;
+	if (!value) return NULL;
+	return (const u8*)value + 1;
 }

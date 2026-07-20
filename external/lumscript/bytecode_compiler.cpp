@@ -42,6 +42,7 @@ static ls_type_kind toTypeKind(const ResolvedType& type) {
 		case ResolvedType::SLICE: return LS_TYPE_SLICE;
 		case ResolvedType::NULLABLE: return LS_TYPE_NULL_VALUE;
 		case ResolvedType::ENUM: return LS_TYPE_ENUM;
+		case ResolvedType::STRUCT: return LS_TYPE_STRUCT;
 		default: return LS_TYPE_INVALID;
 	}
 }
@@ -231,6 +232,110 @@ struct LoopBinding {
 };
 
 struct FunctionCompiler;
+
+// During bytecode compilation, walks every type referenced by a local,
+// parameter, global, or return and builds the ls_type[] /
+// ls_type_field_info[] arrays in the bytecode. Uses ResolvedType*
+// pointer identity for deduplication so each unique type appears once.
+
+static ls_string_view copyStringViewToArena(ls_arena& arena, ls_string_view src) {
+	if (empty(src)) return src;
+	const usize len = size(src);
+	char* mem = (char*)arena.allocate(arena.user_data, len, 1);
+	if (!mem) return src;
+	memcpy(mem, src.begin, len);
+	return { mem, mem + len };
+}
+
+struct TypeInfoBuilder {
+	ls_bytecode* bc;
+	ExpArray<void*> type_map;  // keys (ResolvedType*), parallel to bc->type_info[]
+
+	TypeInfoBuilder(ls_arena& arena, ls_bytecode* bc)
+		: bc(bc), type_map(arena) {}
+
+	u32 resolve(ResolvedType* type) {
+		if (!type) return LS_TYPE_INDEX_NONE;
+
+		for (u32 i = 0; i < bc->type_info_count; ++i) {
+			if (type_map[(i32)i] == type) return i;
+		}
+
+		const u32 old_count = bc->type_info_count;
+		if (!appendArenaArray(*bc->arena, bc->type_info, bc->type_info_count, bc->type_info_capacity))
+			return LS_TYPE_INDEX_NONE;
+		type_map.push_back((void*)type);
+		const u32 index = old_count;
+
+		ls_type* info = &bc->type_info[index];
+		info->bytecode = bc;
+		info->kind = LS_TYPE_INVALID;
+		info->byte_size = typeByteSize(*type);
+		info->field_count = 0u;
+		info->first_field_index = 0u;
+		info->element_type_index = LS_TYPE_INDEX_NONE;
+		info->array_length = LS_TYPE_INDEX_NONE;
+
+		switch (type->kind) {
+			case ResolvedType::STRUCT: {
+				StructResolvedType* st = static_cast<StructResolvedType*>(type);
+				info->kind = LS_TYPE_STRUCT;
+				if (!st->decl) break;
+				info->field_count = (u32)st->decl->fields.size();
+				// First pass: resolve all field types (may recursively append
+				// type_fields for nested structs, which would shift first_field_index).
+				ExpArray<u32> ft_indices(*bc->arena);
+				ExpArray<ResolvedType*> ft_types(*bc->arena);
+				for (i32 i = 0; i < (i32)info->field_count; ++i) {
+					NamedDecl& field = st->decl->fields[i];
+					ResolvedType* ft = i < st->field_types.size() ? st->field_types[i] : field.resolved_type;
+					ft_indices.push_back(ft ? resolve(ft) : LS_TYPE_INDEX_NONE);
+					ft_types.push_back(ft);
+				}
+				// Now safe to record start index after all recursive appends.
+				info->first_field_index = bc->type_field_count;
+				u32 running_offset = 0u;
+				for (i32 i = 0; i < (i32)info->field_count; ++i) {
+					NamedDecl& field = st->decl->fields[i];
+					ls_type_field_info fi;
+					fi.name = copyStringViewToArena(*bc->arena, field.name);
+					fi.type_index = ft_indices[i];
+					fi.offset = running_offset;
+					ls_type_field_info* dst = appendArenaArray(*bc->arena, bc->type_fields, bc->type_field_count, bc->type_field_capacity);
+					if (dst) *dst = fi;
+					ResolvedType* ft = ft_types[i];
+					if (ft) running_offset += typeByteSize(*ft);
+				}
+				break;
+			}
+			case ResolvedType::ARRAY: {
+				ArrayResolvedType* arr = static_cast<ArrayResolvedType*>(type);
+				info->kind = LS_TYPE_ARRAY;
+				info->element_type_index = arr->element_type ? resolve(arr->element_type) : LS_TYPE_INDEX_NONE;
+				info->array_length = arr->size > 0 ? (u32)arr->size : 0u;
+				break;
+			}
+			case ResolvedType::SLICE: {
+				SliceResolvedType* sl = static_cast<SliceResolvedType*>(type);
+				info->kind = LS_TYPE_SLICE;
+				info->element_type_index = sl->element_type ? resolve(sl->element_type) : LS_TYPE_INDEX_NONE;
+				info->array_length = 0u;
+				break;
+			}
+			case ResolvedType::NULLABLE: {
+				NullableResolvedType* nl = static_cast<NullableResolvedType*>(type);
+				info->kind = LS_TYPE_NULLABLE;
+				info->element_type_index = nl->inner ? resolve(nl->inner) : LS_TYPE_INDEX_NONE;
+				break;
+			}
+			default:
+				info->kind = toTypeKind(*type);
+				break;
+		}
+		return index;
+	}
+};
+
 static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind return_kind, ls_string_view current_label);
 static void emitDeferredStatements(FunctionCompiler& ctx, u32 defer_mark, ls_type_kind return_kind, ls_string_view current_label);
 static void compileExpressionAsType(FunctionCompiler& ctx, Expression& expr, ResolvedType& expected_type);
@@ -254,6 +359,7 @@ struct FunctionCompiler {
 	}
 
 	ls_bytecode* bytecode = nullptr;
+	TypeInfoBuilder* type_builder = nullptr;
 	ResolvedType* return_type = nullptr;
 	ls_function_bc& out;
 	ByteArray code;
@@ -299,7 +405,7 @@ struct FunctionCompiler {
 	}
 
 	// Records a named parameter/local for `ls_debug_frame_local_*`. Call
-	// after the slot's fields (offset/byte_size/kind) are filled — by
+	// after the slot's fields (offset/byte_size/kind) are filled - by
 	// `addLocal` for a `var`/loop variable, or directly for a function
 	// parameter (see the param loop in compileFunctionBytecode). Scope begins
 	// at the current bytecode offset; it's treated as open until the end of
@@ -311,6 +417,7 @@ struct FunctionCompiler {
 		entry.offset = slot.offset;
 		entry.byte_size = slot.byte_size;
 		entry.kind = slot.kind;
+		entry.type_index = type_builder ? type_builder->resolve(slot.type) : LS_TYPE_INDEX_NONE;
 		entry.scope_begin_offset = (u32)code.size();
 		locals_debug.push_back(entry);
 	}
@@ -433,7 +540,7 @@ static void appendStringLiteral(ls_bytecode& bytecode, const ls_string_view& val
 	ASSERT(bytecode.arena);
 	ls_string_view* entry = appendArenaArray(*bytecode.arena, bytecode.strings, bytecode.string_count, bytecode.string_capacity);
 	ASSERT(entry);
-	*entry = value;
+	*entry = copyStringViewToArena(*bytecode.arena, value);
 	out_index = bytecode.string_count - 1u;
 }
 
@@ -585,8 +692,8 @@ static void emitStoreLocalBytes(FunctionCompiler& ctx, u32 offset, u32 byte_size
 //
 // compileValue() reports where an expression's result lives instead of always
 // materializing it at the temp top. Constants and frame-resident locals stay
-// deferred (no code emitted), so consumers that read operands in place —
-// arithmetic, comparisons, stores, indexed access — encode the frame offsets
+// deferred (no code emitted), so consumers that read operands in place - 
+// arithmetic, comparisons, stores, indexed access - encode the frame offsets
 // directly and the copy-through-temp traffic disappears. Everything else
 // compiles onto the temp stack exactly like compileExpression and is reported
 // as a temp register.
@@ -974,7 +1081,8 @@ static bool tryEmitDirectLocalReturn(FunctionCompiler& ctx, Expression& expr) {
 }
 
 
-// Size the frame and copy the finished code into the function's arena storage.
+// Size the frame and retain the compiler buffer until all functions can be
+// packed into one contiguous bytecode allocation.
 static void finalizeFunctionCode(FunctionCompiler& ctx, ls_function_bc& function, ls_arena& arena) {
 	function.frame_size = ctx.frame_high_water;
 	function.code_size = (u32)ctx.code.size();
@@ -984,11 +1092,12 @@ static void finalizeFunctionCode(FunctionCompiler& ctx, ls_function_bc& function
 			static_cast<ls_bytecode_source_map_entry*>(arena.allocate(arena.user_data, sizeof(ls_bytecode_source_map_entry) * function.source_map_count, alignof(ls_bytecode_source_map_entry)));
 		for (u32 i = 0; i < function.source_map_count; ++i) {
 			function.source_map[i] = ctx.code.source_map[(i32)i];
+			ls_bytecode_source_map_entry& dst = function.source_map[i];
+			dst.source_name = copyStringViewToArena(arena, dst.source_name);
 		}
 	}
 	if (function.code_size > 0u) {
-		function.code = static_cast<u8*>(arena.allocate(arena.user_data, function.code_size, alignof(u8)));
-		copyMemory(function.code, ctx.code.data, function.code_size);
+		function.code = ctx.code.data;
 	}
 	function.local_count = (u32)ctx.locals_debug.size();
 	if (function.local_count > 0u) {
@@ -996,8 +1105,30 @@ static void finalizeFunctionCode(FunctionCompiler& ctx, ls_function_bc& function
 			static_cast<ls_bytecode_local_debug_entry*>(arena.allocate(arena.user_data, sizeof(ls_bytecode_local_debug_entry) * function.local_count, alignof(ls_bytecode_local_debug_entry)));
 		for (u32 i = 0; i < function.local_count; ++i) {
 			function.locals[i] = ctx.locals_debug[(i32)i];
+			function.locals[i].name = copyStringViewToArena(arena, function.locals[i].name);
 		}
 	}
+}
+
+static bool packFunctionCode(ls_bytecode& bytecode, ls_arena& arena) {
+	size_t total_size = 0;
+	for (u32 i = 0; i < bytecode.function_count; ++i) {
+		const ls_function_bc& function = bytecode.functions[i];
+		if (function.code_size > SIZE_MAX - total_size) return false;
+		total_size += function.code_size;
+	}
+	if (total_size == 0u) return true;
+
+	u8* code = static_cast<u8*>(arena.allocate(arena.user_data, total_size, alignof(u8)));
+	if (!code) return false;
+	for (u32 i = 0; i < bytecode.function_count; ++i) {
+		ls_function_bc& function = bytecode.functions[i];
+		if (function.code_size == 0u) continue;
+		copyMemory(code, function.code, function.code_size);
+		function.code = code;
+		code += function.code_size;
+	}
+	return true;
 }
 
 static void compileIndexExpression(FunctionCompiler& ctx, Expression& expr) {
@@ -3514,13 +3645,13 @@ static u32 computeParamSize(const ExpArray<FunctionParam>& params) {
 	return count;
 }
 
-static bool compileFunctionBytecode(ls_bytecode* bytecode, FunctionExpression* fn, FunctionResolvedType* fn_type, ls_string_view name, bool is_builtin_native) {
+static bool compileFunctionBytecode(ls_bytecode* bytecode, TypeInfoBuilder* type_builder, FunctionExpression* fn, FunctionResolvedType* fn_type, ls_string_view name, bool is_builtin_native) {
 	ls_arena* arena = bytecode->arena;
 	ls_function_bc* out = appendFunction(*bytecode);
 	if (!out) return false;
 
 	ls_function_bc& function = *out;
-	function.name = name;
+	function.name = copyStringViewToArena(*arena, name);
 	function.kind = fn->is_extern ? LS_FUNCTION_NATIVE : LS_FUNCTION_SCRIPT;
 	function.is_builtin_native = is_builtin_native;
 	function.param_size = 0;
@@ -3547,6 +3678,7 @@ static bool compileFunctionBytecode(ls_bytecode* bytecode, FunctionExpression* f
 	Expression* literal = nullptr;
 	if (function.return_size == 1u && isSimpleReturnLiteral(*body, literal)) {
 		FunctionCompiler ctx(bytecode, function);
+		ctx.type_builder = type_builder;
 		ReturnStatement* ret = static_cast<ReturnStatement*>(body->statements[0]);
 		SourceScope source_scope(ctx.code, ret->token);
 		ctx.return_type = return_type;
@@ -3580,6 +3712,7 @@ static bool compileFunctionBytecode(ls_bytecode* bytecode, FunctionExpression* f
 	}
 
 	FunctionCompiler ctx(bytecode, function);
+	ctx.type_builder = type_builder;
 	SourceScope source_scope(ctx.code, fn->token);
 	ctx.return_type = return_type;
 	for (FunctionParam& param : fn->params) {
@@ -3622,6 +3755,8 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host) {
 	ASSERT(bytecode->arena);
 	ls_arena* arena = bytecode->arena;
 
+	TypeInfoBuilder type_builder(*arena, bytecode);
+
 	ExpArray<ls_bytecode_global_debug_entry> global_debug(*arena);
 	bytecode->global_size = 0u;
 	for (Unit& unit : module->units) {
@@ -3640,6 +3775,7 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host) {
 			debug_entry.offset = sym.slot.offset;
 			debug_entry.byte_size = sym.slot.byte_size;
 			debug_entry.kind = sym.slot.kind;
+			debug_entry.type_index = type_builder.resolve(sym.resolved_type);
 			global_debug.push_back(debug_entry);
 		}
 	}
@@ -3649,6 +3785,7 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host) {
 			arena->allocate(arena->user_data, sizeof(ls_bytecode_global_debug_entry) * bytecode->global_debug_count, alignof(ls_bytecode_global_debug_entry)));
 		for (u32 i = 0; i < bytecode->global_debug_count; ++i) {
 			bytecode->global_debug[i] = global_debug[(i32)i];
+			bytecode->global_debug[i].name = copyStringViewToArena(*arena, bytecode->global_debug[i].name);
 		}
 	}
 
@@ -3666,7 +3803,7 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host) {
 			if (!sym.expression || sym.expression->kind != Expression::FUNCTION) continue;
 			FunctionExpression* fn = static_cast<FunctionExpression*>(sym.expression);
 			if (fn->is_template) continue;
-			if (!compileFunctionBytecode(bytecode,
+			if (!compileFunctionBytecode(bytecode, &type_builder,
 					fn,
 					static_cast<FunctionResolvedType*>(fn->resolved_type),
 					sym.name,
@@ -3699,6 +3836,7 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host) {
 		function.local_count = 0u;
 
 		FunctionCompiler ctx(bytecode, function);
+		ctx.type_builder = &type_builder;
 		for (Unit& unit : module->units) {
 			for (Symbol& sym : unit.symbols) {
 				if (sym.slot.storage != StorageSlot::GLOBAL) continue;
@@ -3714,6 +3852,11 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host) {
 		}
 		finalizeFunctionCode(ctx, function, *arena);
 		bytecode->has_global_init = true;
+	}
+
+	if (!packFunctionCode(*bytecode, *arena)) {
+		ls_bytecode_destroy(bytecode);
+		return nullptr;
 	}
 
 	return bytecode;

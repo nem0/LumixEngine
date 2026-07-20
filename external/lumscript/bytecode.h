@@ -254,6 +254,32 @@ typedef struct ls_bytecode_source_map_entry {
 	u32 column;
 } ls_bytecode_source_map_entry;
 
+// Index into ls_bytecode::type_info, or this sentinel when no type metadata
+// is available (e.g. compiler temporaries).
+#define LS_TYPE_INDEX_NONE 0xffffffffu
+
+// Describes one field of a struct type. Used at debug time to enumerate
+// struct members and compute their byte offsets.
+typedef struct ls_type_field_info {
+	ls_string_view name;
+	u32 type_index;   // index into the owning bytecode's type_info[]
+	u32 offset;       // byte offset from the start of the struct value
+} ls_type_field_info;
+
+// The `const ls_type*` handle returned by the C API (capi.h) points directly
+// into the bytecode's type_info[] array.  The struct is fully defined here
+// (not opaque) so that debugger.c and runtime.c can access the members.
+// Host code only ever sees `const ls_type*` through the public API.
+typedef struct ls_type {
+	const struct ls_bytecode* bytecode;  // owning bytecode (for field/type lookups)
+	ls_type_kind kind;
+	u32 byte_size;               // same as typeByteSize for this type
+	u32 field_count;             // 0 when kind != LS_TYPE_STRUCT
+	u32 first_field_index;       // index into bytecode->type_fields[]; unused when field_count == 0
+	u32 element_type_index;      // LS_TYPE_INDEX_NONE when kind is not ARRAY, SLICE, or NULLABLE
+	u32 array_length;            // LS_TYPE_INDEX_NONE when not ARRAY or SLICE; 0 for SLICE (dynamic length)
+} ls_type;
+
 // Debug-only description of one parameter or local's storage, used by
 // `ls_debug_frame_local_*`. Frame offsets are never reused within a
 // function (see FunctionCompiler::next_local_offset in bytecode_compiler.cpp),
@@ -269,6 +295,10 @@ typedef struct ls_bytecode_local_debug_entry {
 	u32 offset;
 	u32 byte_size;
 	ls_type_kind kind;
+	// Index into ls_bytecode::type_info[], or LS_TYPE_INDEX_NONE.
+	// Lets the debugger resolve full type metadata (struct fields, array
+	// element types, etc.) from the flat debug kind.
+	u32 type_index;
 	// Bytecode offset (in the owning function's `code`) of the first
 	// instruction at which this local is live. Parameters are live from 0.
 	u32 scope_begin_offset;
@@ -307,13 +337,13 @@ typedef struct ls_bytecode_global_debug_entry {
 	u32 offset;
 	u32 byte_size;
 	ls_type_kind kind;
+	u32 type_index;  // LS_TYPE_INDEX_NONE when no type metadata
 } ls_bytecode_global_debug_entry;
 
-// One active breakpoint patch: `function->code[code_offset]` was `original_byte`
-// before being overwritten with `LS_OP_BREAK`.
+// One active breakpoint patch. `code` was `original_byte` before being
+// overwritten with `LS_OP_BREAK`.
 typedef struct ls_bytecode_breakpoint {
-	u32 function_index;
-	u32 code_offset;
+	u8* code;
 	u8 original_byte;
 } ls_bytecode_breakpoint;
 
@@ -337,6 +367,19 @@ typedef struct ls_bytecode {
 	// no entry here.
 	ls_bytecode_global_debug_entry* global_debug;
 	u32 global_debug_count;
+
+	// Type metadata for debugger introspection. Each entry describes one
+	// unique type (primitives, structs, arrays, slices). Entries are stable
+	// by pointer for the bytecode's lifetime - the `const ls_type*` returned
+	// by public API functions points directly into these arrays.
+	// `type_fields` is a flat array of struct field descriptors, indexed by
+	// `ls_type::first_field_index` + field offset.
+	ls_type* type_info;
+	u32 type_info_count;
+	u32 type_info_capacity;
+	ls_type_field_info* type_fields;
+	u32 type_field_count;
+	u32 type_field_capacity;
 
 	// Active breakpoint patches, set by `ls_debug_set_breakpoint`. Directly
 	// malloc'd/realloc'd and freed in `ls_bytecode_destroy`, same as this
@@ -366,6 +409,11 @@ typedef struct runtime_restore_point {
 	u32 result_size;
 	u32 call_depth;
 } runtime_restore_point;
+
+typedef struct runtime_step_trap {
+	u8* code;
+	u8 original_byte;
+} runtime_step_trap;
 
 typedef struct ls_runtime {
 	ls_host* host;
@@ -397,11 +445,8 @@ typedef struct ls_runtime {
 	runtime_call_frame fail_frames[LS_MAX_CALL_DEPTH + 1u];
 	u32 fail_frame_count;
 
-	// Debugger suspension. See `ls_debug_enable`/`ls_debug_resume` in capi.h.
+	// Debugger suspension. See `ls_debug_resume` in capi.h.
 	//
-	// `debug_enabled` arms breakpoint/error trapping; while false (the
-	// default) the interpreter runs at full speed and never suspends.
-	bool debug_enabled;
 	// True while a debug-enabled call is parked instead of having returned.
 	// `call_stack[0..call_depth)` holds ancestor frames exactly as during
 	// normal execution; `suspended_frame` holds the innermost (currently
@@ -432,6 +477,11 @@ typedef struct ls_runtime {
 	ls_debug_action step_action;
 	u32 step_start_line;
 	u32 step_start_call_depth;
+	// Temporary LS_OP_BREAK patches installed for one step action. They are
+	// runtime-owned so user breakpoints in ls_bytecode remain independent.
+	runtime_step_trap* step_traps;
+	u32 step_trap_count;
+	u32 step_trap_capacity;
 } ls_runtime;
 
 ls_result ls_runtime_set_native_function_callback_by_bytecode_index(

@@ -32,7 +32,6 @@ struct LumScriptModule : IModule {
 	virtual bool isReady() const = 0;
 	virtual ls_runtime* getDebugRuntime() = 0;
 	virtual const Path& getDebugPath() const = 0;
-	virtual void setDebugEnabled(bool enabled) = 0;
 	virtual bool setDebugBreakpoint(const Path& source, u32 line) = 0;
 	virtual bool removeDebugBreakpoint(const Path& source, u32 line) = 0;
 };

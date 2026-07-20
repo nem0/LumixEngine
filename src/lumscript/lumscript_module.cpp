@@ -141,11 +141,6 @@ struct LumScriptModuleImpl : LumScriptModule {
 	ls_runtime* getDebugRuntime() override { return m_script.runtime; }
 	const Path& getDebugPath() const override { return m_script.path; }
 
-	void setDebugEnabled(bool enabled) override {
-		m_debug_enabled = enabled;
-		if (m_script.runtime) ls_debug_enable(m_script.runtime, enabled ? 1 : 0);
-	}
-
 	bool setDebugBreakpoint(const Path& source, u32 line) override {
 		if (!m_script.bytecode) return false;
 		return ls_debug_set_breakpoint(m_script.bytecode, toLs(source.c_str()), line, nullptr) != LS_RESULT_FAILURE;
@@ -283,7 +278,6 @@ private:
 			return false;
 		}
 		bindCoreFunctions(m_script.module, m_script.runtime, m_allocator);
-		ls_debug_enable(m_script.runtime, m_debug_enabled ? 1 : 0);
 
 		ls_push_ptr(m_script.runtime, &m_world);
 		ls_push_ptr(m_script.runtime, &static_cast<LumScriptSystem&>(m_system).getEngine().getInputSystem());
@@ -300,7 +294,6 @@ private:
 	IAllocator& m_allocator;
 	ls_host m_host;
 	Script m_script;
-	bool m_debug_enabled = false;
 };
 
 struct LumScriptSystemImpl : LumScriptSystem {

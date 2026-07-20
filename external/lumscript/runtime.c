@@ -200,24 +200,107 @@ static bool runtime_debug_frame_location(const ls_function_bc* fn, u32 code_offs
 	return true;
 }
 
-static const ls_bytecode_breakpoint* runtime_find_breakpoint(const ls_bytecode* bytecode, i32 function_index, u32 code_offset) {
+static ls_string_view runtime_error_message(ls_op op) {
+	static const char generic[] = "runtime error";
+	static const char division_by_zero[] = "division by zero";
+	static const char modulo_by_zero[] = "modulo by zero";
+	static const char index_out_of_bounds[] = "index out of bounds";
+	static const char invalid_function[] = "invalid function call";
+	static const char invalid_string[] = "invalid string";
+
+	if (op >= LS_OP_DIV_I8 && op <= LS_OP_DIV_F64) return (ls_string_view){division_by_zero, division_by_zero + sizeof(division_by_zero) - 1u};
+	if (op >= LS_OP_MOD_I8 && op <= LS_OP_MOD_U64) return (ls_string_view){modulo_by_zero, modulo_by_zero + sizeof(modulo_by_zero) - 1u};
+	if (op >= LS_OP_LOAD_INDEXED && op <= LS_OP_SLICE_REF) return (ls_string_view){index_out_of_bounds, index_out_of_bounds + sizeof(index_out_of_bounds) - 1u};
+	if (op == LS_OP_CALL_DIRECT || op == LS_OP_CALL_INDIRECT) return (ls_string_view){invalid_function, invalid_function + sizeof(invalid_function) - 1u};
+	if (op == LS_OP_STRING_TO_CSTR || op == LS_OP_CSTR_TO_STRING) return (ls_string_view){invalid_string, invalid_string + sizeof(invalid_string) - 1u};
+	return (ls_string_view){generic, generic + sizeof(generic) - 1u};
+}
+
+static void runtime_report_error(const ls_runtime* runtime, const ls_function_bc* function, const u8* ip, ls_string_view message) {
+	if (!runtime->host->print) return;
+	ls_debug_location location;
+	if (runtime_debug_frame_location(function, (u32)(ip - function->code), &location) && location.source_name.begin) {
+		static const char separator[] = ": ";
+		char line_buffer[10];
+		char* line = line_buffer + sizeof(line_buffer);
+		u32 line_number = location.line;
+		do {
+			*--line = (char)('0' + line_number % 10u);
+			line_number /= 10u;
+		} while (line_number != 0u);
+		runtime->host->print(runtime->host->diagnostics_userdata, location.source_name);
+		runtime->host->print(runtime->host->diagnostics_userdata, (ls_string_view){separator, separator + 1u});
+		runtime->host->print(runtime->host->diagnostics_userdata, (ls_string_view){line, line_buffer + sizeof(line_buffer)});
+		runtime->host->print(runtime->host->diagnostics_userdata, (ls_string_view){separator + 1u, separator + sizeof(separator) - 1u});
+	}
+	static const char newline[] = "\n";
+	runtime->host->print(runtime->host->diagnostics_userdata, message);
+	runtime->host->print(runtime->host->diagnostics_userdata, (ls_string_view){newline, newline + sizeof(newline) - 1u});
+}
+
+static const ls_bytecode_breakpoint* runtime_find_breakpoint(const ls_bytecode* bytecode, const u8* code) {
 	for (u32 i = 0; i < bytecode->breakpoint_count; ++i) {
 		const ls_bytecode_breakpoint* breakpoint = &bytecode->breakpoints[i];
-		if (breakpoint->function_index == (u32)function_index && breakpoint->code_offset == code_offset) return breakpoint;
+		if (breakpoint->code == code) return breakpoint;
 	}
 	return NULL;
 }
 
-static bool runtime_should_pause_for_step(const ls_runtime* runtime, const ls_function_bc* function, u32 code_offset) {
-	if (runtime->step_action == LS_DEBUG_CONTINUE) return false;
+static const runtime_step_trap* runtime_find_step_trap(const ls_runtime* runtime, const u8* code) {
+	for (u32 i = 0; i < runtime->step_trap_count; ++i) {
+		const runtime_step_trap* trap = &runtime->step_traps[i];
+		if (trap->code == code) return trap;
+	}
+	return NULL;
+}
 
+// Step traps are private, short-lived patches. User breakpoints already own
+// their LS_OP_BREAK bytes and are intentionally left untouched here.
+static void runtime_clear_step_traps(ls_runtime* runtime) {
+	for (u32 i = 0; i < runtime->step_trap_count; ++i) {
+		const runtime_step_trap* trap = &runtime->step_traps[i];
+		*trap->code = trap->original_byte;
+	}
+	runtime->step_trap_count = 0u;
+}
+
+static bool runtime_should_pause_for_step(const ls_runtime* runtime, const ls_function_bc* function, u32 code_offset) {
 	ls_debug_location location;
 	if (!runtime_debug_frame_location(function, code_offset, &location)) return false;
 	if (location.line == runtime->step_start_line && runtime->call_depth == runtime->step_start_call_depth) return false;
-
 	if (runtime->step_action == LS_DEBUG_STEP_INTO) return true;
 	if (runtime->step_action == LS_DEBUG_STEP_OVER) return runtime->call_depth <= runtime->step_start_call_depth;
 	return runtime->call_depth < runtime->step_start_call_depth;
+}
+
+// Arm source-location traps only while executing a step. This shifts the
+// debugger's work from the interpreter's hot loop to resume/suspend time.
+static bool runtime_arm_step_traps(ls_runtime* runtime) {
+	u32 count = 0u;
+	for (u32 i = 0; i < runtime->bytecode->function_count; ++i) {
+		const ls_function_bc* function = &runtime->bytecode->functions[i];
+		for (u32 j = 0; j < function->source_map_count; ++j) {
+			const u32 offset = function->source_map[j].code_offset;
+			if (offset < function->code_size && function->code[offset] != (u8)LS_OP_BREAK) ++count;
+		}
+	}
+	if (count > runtime->step_trap_capacity) {
+		runtime_step_trap* traps = (runtime_step_trap*)realloc(runtime->step_traps, sizeof(runtime_step_trap) * count);
+		if (!traps) return false;
+		runtime->step_traps = traps;
+		runtime->step_trap_capacity = count;
+	}
+	for (u32 i = 0; i < runtime->bytecode->function_count; ++i) {
+		ls_function_bc* function = &runtime->bytecode->functions[i];
+		for (u32 j = 0; j < function->source_map_count; ++j) {
+			const u32 offset = function->source_map[j].code_offset;
+			if (offset >= function->code_size || function->code[offset] == (u8)LS_OP_BREAK) continue;
+			u8* code = function->code + offset;
+			runtime->step_traps[runtime->step_trap_count++] = (runtime_step_trap){ code, *code };
+			*code = (u8)LS_OP_BREAK;
+		}
+	}
+	return true;
 }
 
 static bool runtime_enter_script_call(
@@ -425,34 +508,30 @@ static u64 runtime_numeric_to_u64(const u8* value, ls_type_kind kind) {
 		if (!(equal__ OP 1)) ip += jump_offset__; \
 	} while (0)
 
-// Runs either a fresh call to `function_index` or a previously suspended
+// Runs either a fresh call to `function` or a previously suspended
 // frame. The runtime stack is already parked at the correct state when
 // `resume_frame` is non-NULL, so fresh-call setup is skipped in that case.
-static int runtime_execute_function(ls_runtime* runtime, i32 function_index, const runtime_call_frame* resume_frame) {
-	const ls_function_bc* fn;
+static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* function, const runtime_call_frame* resume_frame) {
+	const ls_function_bc* fn = function;
 	const u8* ip;
-	const u8* instruction_ip = NULL;
-	ls_op op;
+	ls_op op = (ls_op)0;
 	// Restore point for the whole host call, retained across suspend/resume.
 	runtime_restore_point* initial;
 	if (resume_frame) {
+		ASSERT(fn == resume_frame->function);
 		fn = resume_frame->function;
 		ip = resume_frame->ip;
 		if (runtime->call_start_depth == 0u) return EXEC_FAIL;
 		initial = &runtime->call_starts[runtime->call_start_depth - 1];
 		runtime->is_suspended = false;
 
-		const ls_bytecode_breakpoint* breakpoint = runtime_find_breakpoint(runtime->bytecode, (i32)(fn - runtime->bytecode->functions), (u32)(ip - fn->code));
+		const ls_bytecode_breakpoint* breakpoint = runtime_find_breakpoint(runtime->bytecode, ip);
 		if (breakpoint) {
-			instruction_ip = ip;
 			op = (ls_op)breakpoint->original_byte;
 			++ip;
 			goto runtime_execute_function_dispatch;
 		}
 	} else {
-		if (function_index < 0) return EXEC_FAIL;
-
-		fn = runtime_find_function(runtime->bytecode, (u32)function_index);
 		if (!fn) return EXEC_FAIL;
 
 		// Set before the frame-size check below can jump to the fail label, so a
@@ -471,7 +550,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index, con
 		if (fn->kind == LS_FUNCTION_NATIVE) {
 			runtime->result_size = 0u;
 			u8* result_stack_top = NULL;
-			if (!runtime_invoke_native(runtime, (u32)function_index, fn, args, &result_stack_top)) goto runtime_execute_function_fail;
+			if (!runtime_invoke_native(runtime, (u32)(fn - runtime->bytecode->functions), fn, args, &result_stack_top)) goto runtime_execute_function_fail;
 
 			runtime->stack_top = result_stack_top;
 			runtime->result_size = fn->return_size;
@@ -489,13 +568,6 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index, con
 	}
 
 	for (;;) {
-		// TODO get rid of this
-		if (runtime_should_pause_for_step(runtime, fn, (u32)(ip - fn->code))) {
-			runtime->pause_event.reason = LS_DEBUG_PAUSE_STEP;
-			runtime->pause_event.message = (ls_string_view){NULL, NULL};
-			goto runtime_execute_function_suspend;
-		}
-		instruction_ip = ip;
 		op = (ls_op)*ip;
 		ip++;
 		
@@ -933,8 +1005,9 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index, con
 				else {
 					runtime->stack_top = runtime->frame;
 				}
-				if (runtime->call_depth == initial->call_depth) {
-					runtime->step_action = LS_DEBUG_CONTINUE;
+			if (runtime->call_depth == initial->call_depth) {
+				runtime_clear_step_traps(runtime);
+				runtime->step_action = LS_DEBUG_CONTINUE;
 					runtime->result_size = size;
 					runtime->frame = initial->frame;
 					--runtime->call_start_depth;
@@ -1251,6 +1324,7 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index, con
 				if (runtime->frame + size > runtime->stack_end) goto runtime_execute_function_fail;
 
 				if (runtime->call_depth == initial->call_depth) {
+					runtime_clear_step_traps(runtime);
 					runtime->step_action = LS_DEBUG_CONTINUE;
 					runtime->stack_top = runtime->frame + size;
 					runtime->result_size = size;
@@ -1331,17 +1405,27 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index, con
 				break;
 			}
 			case LS_OP_BREAK: {
-				const ls_bytecode_breakpoint* bp = runtime_find_breakpoint(runtime->bytecode, (i32)(fn - runtime->bytecode->functions), (u32)(instruction_ip - fn->code));
-				if (!bp) goto runtime_execute_function_fail;
-				ip = instruction_ip;
+				// ip already points one byte past LS_OP_BREAK. Rewind it before a
+				// suspend so resuming re-executes the trapped original opcode.
+				const u8* code = ip - 1u;
+				const u32 code_offset = (u32)(code - fn->code);
+				const runtime_step_trap* step_trap = runtime_find_step_trap(runtime, code);
+				const ls_bytecode_breakpoint* bp = runtime_find_breakpoint(runtime->bytecode, code);
+				if (!step_trap && !bp) goto runtime_execute_function_fail;
+				--ip;
+				if (step_trap && runtime_should_pause_for_step(runtime, fn, code_offset)) {
+					runtime->pause_event.reason = LS_DEBUG_PAUSE_STEP;
+					runtime->pause_event.message = (ls_string_view){NULL, NULL};
+					goto runtime_execute_function_suspend;
+				}
 
-				if (runtime->debug_enabled) {
+				if (bp) {
 					runtime->pause_event.reason = LS_DEBUG_PAUSE_BREAKPOINT;
 					runtime->pause_event.message = (ls_string_view){NULL, NULL};
 					goto runtime_execute_function_suspend;
 				}
 
-				op = (ls_op)bp->original_byte;
+				op = (ls_op)(step_trap ? step_trap->original_byte : bp->original_byte);
 				++ip;
 				goto runtime_execute_function_dispatch;
 			}
@@ -1350,21 +1434,27 @@ static int runtime_execute_function(ls_runtime* runtime, i32 function_index, con
 		}
 	}
 
-	// Every function's bytecode is compiler-guaranteed to end in LS_OP_RETURN
-	// (see LS_OP_RETURN above and emitReturn in bytecode_compiler.cpp), which
-	// always returns out of this function directly. Reaching here means ip
-	// ran off the end of fn->code without one, i.e. malformed bytecode.
 runtime_execute_function_fail:
-	// A runtime error suspends instead of failing outright when debugging is
-	// enabled, using the same reified frame the LS_OP_BREAK path uses (state
-	// is left exactly as-is, not unwound).
-	if (runtime->debug_enabled) {
-		static const char runtime_error_message[] = "runtime error";
-		ip = instruction_ip;
-		runtime->pause_event.reason = LS_DEBUG_PAUSE_ERROR;
-		runtime->pause_event.message = (ls_string_view){runtime_error_message, runtime_error_message + sizeof(runtime_error_message) - 1u};
-		goto runtime_execute_function_suspend;
+	const ls_string_view error_message = runtime_error_message(op);
+	runtime_clear_step_traps(runtime);
+	// The dispatch loop advances ip while decoding operands. On this rare path,
+	// recover the preceding emitted opcode from the source map instead of
+	// maintaining a second instruction pointer on every successful dispatch.
+	{
+		const u32 code_offset = (u32)(ip - fn->code);
+		const ls_bytecode_source_map_entry* entry = NULL;
+		for (u32 i = 0; i < fn->source_map_count; ++i) {
+			if (fn->source_map[i].code_offset >= code_offset) break;
+			entry = &fn->source_map[i];
+		}
+		ip = entry ? fn->code + entry->code_offset : fn->code;
 	}
+	runtime_report_error(runtime, fn, ip, error_message);
+	// A runtime error suspends using the same reified frame as LS_OP_BREAK;
+	// state is left exactly as-is instead of being unwound.
+	runtime->pause_event.reason = LS_DEBUG_PAUSE_ERROR;
+	runtime->pause_event.message = error_message;
+	goto runtime_execute_function_suspend;
 
 	// Snapshot the call stack (innermost first) so `ls_debug_*` can report a
 	// trace after `ls_call` returns failure.
@@ -1391,6 +1481,7 @@ runtime_execute_function_fail:
 	return EXEC_FAIL;
 
 runtime_execute_function_suspend:
+	runtime_clear_step_traps(runtime);
 	runtime->step_action = LS_DEBUG_CONTINUE;
 	runtime->suspended_frame = (runtime_call_frame){ fn, ip, runtime->frame, runtime->stack_top };
 	runtime->is_suspended = true;
@@ -1434,10 +1525,9 @@ ls_runtime* ls_runtime_create(ls_bytecode* bytecode, ls_host* host) {
 
 	runtime->stack_top = runtime->stack + bytecode->global_size;
 	if (bytecode->has_global_init && bytecode->function_count > 0u) {
-		// debug_enabled is false at this point (ls_debug_enable can't run
-		// before this runtime exists), so this call can only return
-		// EXEC_OK/EXEC_FAIL, never EXEC_SUSPENDED.
-		if (runtime_execute_function(runtime, (i32)(bytecode->function_count - 1u), NULL) != EXEC_OK) {
+		// No host can resume a runtime before creation completes, so a
+		// suspension here is treated as creation failure below.
+		if (runtime_execute_function(runtime, &bytecode->functions[bytecode->function_count - 1u], NULL) != EXEC_OK) {
 			ls_runtime_destroy(runtime);
 			return NULL;
 		}
@@ -1448,8 +1538,10 @@ ls_runtime* ls_runtime_create(ls_bytecode* bytecode, ls_host* host) {
 
 void ls_runtime_destroy(ls_runtime* runtime) {
 	if (!runtime) return;
+	runtime_clear_step_traps(runtime);
 	free(runtime->stack);
 	free(runtime->native_callbacks);
+	free(runtime->step_traps);
 	free(runtime);
 }
 
@@ -1526,22 +1618,26 @@ static ls_result runtime_exec_result_to_ls_result(int exec_result) {
 
 ls_result ls_call(ls_runtime* runtime, ls_string_view function_name) {
 	if (runtime->is_suspended) return LS_RESULT_FAILURE;
-	i32 function_index = -1;
-	if (!runtime_find_function_by_name(runtime->bytecode, function_name, &function_index)) return LS_RESULT_FAILURE;
+	const ls_function_bc* function = runtime_find_function_by_name(runtime->bytecode, function_name, NULL);
+	if (!function) return LS_RESULT_FAILURE;
 	runtime->fail_frame_count = 0u;
-	return runtime_exec_result_to_ls_result(runtime_execute_function(runtime, function_index, NULL));
+	return runtime_exec_result_to_ls_result(runtime_execute_function(runtime, function, NULL));
 }
 
 ls_result ls_call_index(ls_runtime* runtime, i32 function_index) {
 	if (runtime->is_suspended) return LS_RESULT_FAILURE;
+	if (function_index < 0) return LS_RESULT_FAILURE;
+	const ls_function_bc* function = runtime_find_function(runtime->bytecode, (u32)function_index);
+	if (!function) return LS_RESULT_FAILURE;
 	runtime->fail_frame_count = 0u;
-	return runtime_exec_result_to_ls_result(runtime_execute_function(runtime, function_index, NULL));
+	return runtime_exec_result_to_ls_result(runtime_execute_function(runtime, function, NULL));
 }
 
 ls_result ls_runtime_resume_suspended(ls_runtime* runtime) {
 	if (!runtime->is_suspended) return LS_RESULT_FAILURE;
+	if (runtime->step_action != LS_DEBUG_CONTINUE && !runtime_arm_step_traps(runtime)) return LS_RESULT_FAILURE;
 	runtime->fail_frame_count = 0u;
-	return runtime_exec_result_to_ls_result(runtime_execute_function(runtime, 0, &runtime->suspended_frame));
+	return runtime_exec_result_to_ls_result(runtime_execute_function(runtime, runtime->suspended_frame.function, &runtime->suspended_frame));
 }
 
 ls_type_kind ls_bytecode_runtime_result_kind(ls_runtime* runtime, ls_string_view function_name) {

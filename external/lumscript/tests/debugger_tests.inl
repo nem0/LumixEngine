@@ -28,7 +28,8 @@ TEST(DebugStackTraceOnDivideByZero) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(!ls_call(runtime, toLs("main")));
+	test_diagnostics.output_enabled = false;
+	EXPECT_EQ(LS_RESULT_SUSPENDED, ls_call(runtime, toLs("main")));
 
 	EXPECT_EQ(2u, ls_debug_stack_depth(runtime));
 
@@ -249,7 +250,6 @@ TEST(DebugBreakpointSuspendsWhenEnabled) {
 	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, &resolved_line));
 	EXPECT_EQ(4u, resolved_line);
 
-	ls_debug_enable(runtime, 1);
 	EXPECT_TRUE(!ls_debug_is_suspended(runtime));
 
 	const ls_result call_result = ls_call(runtime, toLs("main"));
@@ -274,7 +274,7 @@ TEST(DebugBreakpointSuspendsWhenEnabled) {
 	return true;
 }
 
-TEST(DebugBreakpointIgnoredWhenDebuggingDisabled) {
+TEST(DebugBreakpointSuspendsByDefault) {
 	const char* source = R"(
 		fn main() : i32 {
 			var value : i32 = 1;
@@ -288,11 +288,9 @@ TEST(DebugBreakpointIgnoredWhenDebuggingDisabled) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
-	// ls_debug_enable is never called, so debugging stays off (the default):
-	// the patched LS_OP_BREAK byte must still run as if it were the original
-	// instruction, transparently, with no suspension.
-	EXPECT_TRUE(ls_call(runtime, toLs("main")));
-	EXPECT_TRUE(!ls_debug_is_suspended(runtime));
+	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
+	EXPECT_TRUE(ls_debug_is_suspended(runtime));
+	EXPECT_EQ((int)LS_RESULT_OK, (int)ls_debug_resume(runtime, LS_DEBUG_CONTINUE));
 	EXPECT_EQ(2, ls_to_i32(runtime, -1));
 
 	CAPI_END(module);
@@ -317,7 +315,6 @@ TEST(DebugBreakpointHitAgainAfterResume) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 6u, nullptr));
-	ls_debug_enable(runtime, 1);
 
 	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
 	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_debug_resume(runtime, LS_DEBUG_CONTINUE));
@@ -343,8 +340,8 @@ TEST(DebugErrorSuspendsWhenEnabled) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
+	test_diagnostics.output_enabled = false;
 
-	ls_debug_enable(runtime, 1);
 	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
 	EXPECT_TRUE(ls_debug_is_suspended(runtime));
 
@@ -364,7 +361,7 @@ TEST(DebugErrorSuspendsWhenEnabled) {
 	return true;
 }
 
-TEST(DebugDisablingSuspendedRuntimeAbortsAndUnblocksCalls) {
+TEST(DebugAbortingSuspendedRuntimeUnblocksCalls) {
 	const char* source = R"(
 		fn main() : i32 {
 			var value : i32 = 1;
@@ -378,14 +375,12 @@ TEST(DebugDisablingSuspendedRuntimeAbortsAndUnblocksCalls) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
-	ls_debug_enable(runtime, 1);
 	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
 
-	ls_debug_enable(runtime, 0);
+	EXPECT_EQ((int)LS_RESULT_FAILURE, (int)ls_debug_resume(runtime, LS_DEBUG_ABORT));
 	EXPECT_TRUE(!ls_debug_is_suspended(runtime));
 
-	// A fresh call now succeeds; the breakpoint is still set but debugging is
-	// off, so it doesn't trap again.
+	ls_debug_remove_all_breakpoints(runtime.bytecode);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(2, ls_to_i32(runtime, -1));
 
@@ -406,7 +401,6 @@ TEST(DebugFrameLocalsVisibleWhenSuspended) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
-	ls_debug_enable(runtime, 1);
 	ls_push_i32(runtime, 5);
 	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("compute")));
 
@@ -463,7 +457,6 @@ TEST(DebugFrameLocalsExcludeNotYetDeclaredLocal) {
 	// value, but "second" itself hasn't been declared yet at this statement,
 	// so only "a" and "first" should be reported.
 	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
-	ls_debug_enable(runtime, 1);
 	ls_push_i32(runtime, 7);
 	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("compute")));
 
@@ -492,7 +485,6 @@ TEST(DebugStepIntoStopsAtNextLine) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 3u, nullptr));
-	ls_debug_enable(runtime, 1);
 	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
 
 	ls_debug_event event;
@@ -533,7 +525,6 @@ TEST(DebugStepIntoEntersCalledFunction) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 8u, nullptr));
-	ls_debug_enable(runtime, 1);
 	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
 
 	ls_debug_event event;
@@ -570,7 +561,6 @@ TEST(DebugStepOverSkipsCalledFunction) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 8u, nullptr));
-	ls_debug_enable(runtime, 1);
 	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
 
 	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_debug_resume(runtime, LS_DEBUG_STEP_OVER));
@@ -604,7 +594,6 @@ TEST(DebugStepOutReturnsToCaller) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
-	ls_debug_enable(runtime, 1);
 	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
 
 	ls_debug_event event;
@@ -615,7 +604,7 @@ TEST(DebugStepOutReturnsToCaller) {
 	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_debug_resume(runtime, LS_DEBUG_STEP_OUT));
 	EXPECT_TRUE(ls_debug_pause_event(runtime, &event));
 	// Stops at the call site (line 9, "var y = helper();"), immediately after
-	// helper() returns into it — standard step-out convention (matches gdb's
+	// helper() returns into it - standard step-out convention (matches gdb's
 	// `finish`, VS Code step-out), not the following statement.
 	EXPECT_EQ(9u, event.location.line);
 	EXPECT_EQ(1u, ls_debug_stack_depth(runtime));
@@ -651,7 +640,6 @@ TEST(DebugBreakpointSuspendsThroughIndirectCall) {
 	// still suspend, not just run through, once CALL_INDIRECT no longer
 	// recurses through C.
 	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
-	ls_debug_enable(runtime, 1);
 
 	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
 
@@ -685,9 +673,8 @@ TEST(ScratchStepActionLeaksAfterCompletion) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
-	ls_debug_enable(runtime, 1);
 	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
-	// Step over "return a;" — runs to completion, never re-suspends.
+	// Step over "return a;" - runs to completion, never re-suspends.
 	EXPECT_EQ((int)LS_RESULT_OK, (int)ls_debug_resume(runtime, LS_DEBUG_STEP_OVER));
 
 	// Remove the breakpoint; a fresh call must now run to completion,
@@ -713,7 +700,6 @@ TEST(ScratchAbortLeaksStackTop) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
-	ls_debug_enable(runtime, 1);
 
 	u8* const stack_top_before = runtime.runtime->stack_top;
 	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
@@ -751,7 +737,6 @@ TEST(DebugAbortRestoresOuterCallAfterNativeReentry) {
 	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("bridge"), bridge) == LS_RESULT_OK);
 
 	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 9u, nullptr));
-	ls_debug_enable(runtime, 1);
 	ls_push_i32(runtime, 41);
 	u8* const stack_top_before = runtime.runtime->stack_top;
 	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
@@ -777,8 +762,8 @@ TEST(DebugContinuingRuntimeErrorReexecutesFailingInstruction) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
+	test_diagnostics.output_enabled = false;
 
-	ls_debug_enable(runtime, 1);
 	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
 
 	ls_debug_event event;
@@ -805,7 +790,6 @@ TEST(DebugStepIntoStopsInRecursiveCallOnSameSourceLine) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 2u, nullptr));
-	ls_debug_enable(runtime, 1);
 	ls_push_i32(runtime, 1);
 	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("recurse")));
 
@@ -836,7 +820,6 @@ TEST(DebugLiteralReturnFunctionExposesParameters) {
 		CAPI_END(module);
 		return false;
 	}
-	ls_debug_enable(runtime, 1);
 	ls_push_i32(runtime, 42);
 	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("always_true")));
 
@@ -849,6 +832,426 @@ TEST(DebugLiteralReturnFunctionExposesParameters) {
 	i32 int_value = 0;
 	memcpy(&int_value, value, sizeof(int_value));
 	EXPECT_EQ(42, int_value);
+
+	CAPI_END(module);
+	return true;
+}
+
+TEST(DebugStructFieldMetadata) {
+	const char* source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+		fn main() : i32 {
+			var v : Vec2 = Vec2 { 10, 20 };
+			return v.x + v.y;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	// Break at the return statement so v is in scope and initialized
+	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 8u, nullptr));
+	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
+
+	EXPECT_EQ(1u, ls_debug_frame_local_count(runtime, 0));
+	EXPECT_TRUE(equalStrings(ls_debug_local_name(runtime, 0, 0), toLs("v")));
+
+	const ls_type* type = ls_debug_local_type(runtime, 0, 0);
+	EXPECT_TRUE(type != nullptr);
+	EXPECT_EQ((int)LS_TYPE_STRUCT, (int)ls_type_get_kind(type));
+	EXPECT_EQ(8u, ls_type_get_size(type));
+
+	EXPECT_EQ(2u, ls_type_struct_field_count(type));
+
+	const ls_string_view f0_name = ls_type_struct_field_name(type, 0);
+	EXPECT_TRUE(equalStrings(f0_name, toLs("x")));
+	EXPECT_EQ(0u, ls_type_struct_field_offset(type, 0));
+	const ls_type* f0_type = ls_type_struct_field_type(type, 0);
+	EXPECT_TRUE(f0_type != nullptr);
+	EXPECT_EQ((int)LS_TYPE_I32, (int)ls_type_get_kind(f0_type));
+	EXPECT_EQ(4u, ls_type_get_size(f0_type));
+
+	const ls_string_view f1_name = ls_type_struct_field_name(type, 1);
+	EXPECT_TRUE(equalStrings(f1_name, toLs("y")));
+	EXPECT_EQ(4u, ls_type_struct_field_offset(type, 1));
+	const ls_type* f1_type = ls_type_struct_field_type(type, 1);
+	EXPECT_TRUE(f1_type != nullptr);
+	EXPECT_EQ((int)LS_TYPE_I32, (int)ls_type_get_kind(f1_type));
+	EXPECT_EQ(4u, ls_type_get_size(f1_type));
+
+	// Out-of-bounds field index
+	EXPECT_EQ(0u, size(ls_type_struct_field_name(type, 99)));
+	EXPECT_TRUE(ls_type_struct_field_type(type, 99) == nullptr);
+	EXPECT_EQ(0u, ls_type_struct_field_offset(type, 99));
+
+	// Null pointer safety
+	EXPECT_EQ(0, (int)ls_type_get_kind(nullptr));
+	EXPECT_EQ(0u, ls_type_get_size(nullptr));
+	EXPECT_EQ(0u, ls_type_struct_field_count(nullptr));
+
+	EXPECT_EQ((int)LS_RESULT_OK, (int)ls_debug_resume(runtime, LS_DEBUG_CONTINUE));
+	EXPECT_EQ(30, ls_to_i32(runtime, -1));
+
+	CAPI_END(module);
+	return true;
+}
+
+TEST(DebugStructReadFieldValue) {
+	const char* source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+		fn main() : i32 {
+			var v : Vec2 = Vec2 { 10, 20 };
+			return v.x + v.y;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 8u, nullptr));
+	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
+
+	const ls_type* type = ls_debug_local_type(runtime, 0, 0);
+	EXPECT_TRUE(type != nullptr);
+	EXPECT_EQ(8u, ls_type_get_size(type));
+	EXPECT_EQ(2u, ls_type_struct_field_count(type));
+
+	u32 value_size = 0;
+	const void* value = ls_debug_local_value(runtime, 0, 0, &value_size);
+	EXPECT_TRUE(value != nullptr);
+	EXPECT_EQ(8u, value_size);
+
+	// Read field via offset
+	const u32 x_offset = ls_type_struct_field_offset(type, 0);
+	i32 x_val = 0;
+	memcpy(&x_val, (const u8*)value + x_offset, sizeof(x_val));
+	EXPECT_EQ(10, x_val);
+
+	const u32 y_offset = ls_type_struct_field_offset(type, 1);
+	i32 y_val = 0;
+	memcpy(&y_val, (const u8*)value + y_offset, sizeof(y_val));
+	EXPECT_EQ(20, y_val);
+
+	// Verify offset and size of x and y match their types
+	const ls_type* x_type = ls_type_struct_field_type(type, 0);
+	EXPECT_EQ(4u, ls_type_get_size(x_type));
+	const ls_type* y_type = ls_type_struct_field_type(type, 1);
+	EXPECT_EQ(4u, ls_type_get_size(y_type));
+
+	EXPECT_EQ((int)LS_RESULT_OK, (int)ls_debug_resume(runtime, LS_DEBUG_CONTINUE));
+	EXPECT_EQ(30, ls_to_i32(runtime, -1));
+
+	CAPI_END(module);
+	return true;
+}
+
+TEST(DebugNestedStructFieldType) {
+	const char* source = R"(
+		struct Inner {
+			a : i32;
+			b : i32;
+		}
+		struct Outer {
+			inner : Inner;
+			sum : i32;
+		}
+		fn main() : i32 {
+			var o : Outer = undefined;
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 12u, nullptr));
+	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
+
+	const ls_type* type = ls_debug_local_type(runtime, 0, 0);
+	EXPECT_TRUE(type != nullptr);
+	EXPECT_EQ((int)LS_TYPE_STRUCT, (int)ls_type_get_kind(type));
+	EXPECT_EQ(12u, ls_type_get_size(type));
+	EXPECT_EQ(2u, ls_type_struct_field_count(type));
+
+	// Field 0: inner
+	const ls_string_view f0_name = ls_type_struct_field_name(type, 0);
+	EXPECT_TRUE(equalStrings(f0_name, toLs("inner")));
+	EXPECT_EQ(0u, ls_type_struct_field_offset(type, 0));
+
+	const ls_type* inner_type = ls_type_struct_field_type(type, 0);
+	EXPECT_TRUE(inner_type != nullptr);
+	EXPECT_EQ((int)LS_TYPE_STRUCT, (int)ls_type_get_kind(inner_type));
+	EXPECT_EQ(8u, ls_type_get_size(inner_type));
+	EXPECT_EQ(2u, ls_type_struct_field_count(inner_type));
+
+	EXPECT_TRUE(equalStrings(ls_type_struct_field_name(inner_type, 0), toLs("a")));
+	EXPECT_EQ(0u, ls_type_struct_field_offset(inner_type, 0));
+	EXPECT_EQ((int)LS_TYPE_I32, (int)ls_type_get_kind(ls_type_struct_field_type(inner_type, 0)));
+
+	EXPECT_TRUE(equalStrings(ls_type_struct_field_name(inner_type, 1), toLs("b")));
+	EXPECT_EQ(4u, ls_type_struct_field_offset(inner_type, 1));
+	EXPECT_EQ((int)LS_TYPE_I32, (int)ls_type_get_kind(ls_type_struct_field_type(inner_type, 1)));
+
+	// Field 1: sum
+	const ls_string_view f1_name = ls_type_struct_field_name(type, 1);
+	EXPECT_TRUE(equalStrings(f1_name, toLs("sum")));
+	EXPECT_EQ(8u, ls_type_struct_field_offset(type, 1));
+	const ls_type* sum_type = ls_type_struct_field_type(type, 1);
+	EXPECT_EQ((int)LS_TYPE_I32, (int)ls_type_get_kind(sum_type));
+	EXPECT_EQ(4u, ls_type_get_size(sum_type));
+
+	EXPECT_EQ((int)LS_RESULT_OK, (int)ls_debug_resume(runtime, LS_DEBUG_CONTINUE));
+
+	CAPI_END(module);
+	return true;
+}
+
+TEST(DebugStructWithArrayField) {
+	const char* source = R"(
+		struct WithArray {
+			data : [3]i32;
+			label : i32;
+		}
+		fn main() : i32 {
+			var w : WithArray = undefined;
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 8u, nullptr));
+	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
+
+	const ls_type* type = ls_debug_local_type(runtime, 0, 0);
+	EXPECT_TRUE(type != nullptr);
+	EXPECT_EQ((int)LS_TYPE_STRUCT, (int)ls_type_get_kind(type));
+	EXPECT_EQ(16u, ls_type_get_size(type));
+	EXPECT_EQ(2u, ls_type_struct_field_count(type));
+
+	// Field 0: data
+	EXPECT_TRUE(equalStrings(ls_type_struct_field_name(type, 0), toLs("data")));
+	EXPECT_EQ(0u, ls_type_struct_field_offset(type, 0));
+
+	const ls_type* arr_type = ls_type_struct_field_type(type, 0);
+	EXPECT_TRUE(arr_type != nullptr);
+	EXPECT_EQ((int)LS_TYPE_ARRAY, (int)ls_type_get_kind(arr_type));
+	EXPECT_EQ(12u, ls_type_get_size(arr_type));
+	EXPECT_EQ(3u, ls_type_array_length(arr_type));
+
+	const ls_type* elem_type = ls_type_array_element_type(arr_type);
+	EXPECT_TRUE(elem_type != nullptr);
+	EXPECT_EQ((int)LS_TYPE_I32, (int)ls_type_get_kind(elem_type));
+	EXPECT_EQ(4u, ls_type_get_size(elem_type));
+
+	// Field 1: label
+	EXPECT_TRUE(equalStrings(ls_type_struct_field_name(type, 1), toLs("label")));
+	EXPECT_EQ(12u, ls_type_struct_field_offset(type, 1));
+	const ls_type* label_type = ls_type_struct_field_type(type, 1);
+	EXPECT_EQ((int)LS_TYPE_I32, (int)ls_type_get_kind(label_type));
+
+	EXPECT_EQ((int)LS_RESULT_OK, (int)ls_debug_resume(runtime, LS_DEBUG_CONTINUE));
+
+	CAPI_END(module);
+	return true;
+}
+
+TEST(DebugStructSliceField) {
+	const char* source = R"(
+		struct WithSlice {
+			items : []i32;
+			count : i32;
+		}
+		fn main() : i32 {
+			var w : WithSlice = undefined;
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 8u, nullptr));
+	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
+
+	const ls_type* type = ls_debug_local_type(runtime, 0, 0);
+	EXPECT_TRUE(type != nullptr);
+	EXPECT_EQ((int)LS_TYPE_STRUCT, (int)ls_type_get_kind(type));
+	EXPECT_EQ(20u, ls_type_get_size(type));
+	EXPECT_EQ(2u, ls_type_struct_field_count(type));
+
+	// Iterate fields
+	bool found_items = false;
+	bool found_count = false;
+	for (u32 i = 0, field_count = ls_type_struct_field_count(type); i < field_count; ++i) {
+		ls_string_view fname = ls_type_struct_field_name(type, i);
+		if (equalStrings(fname, toLs("items"))) {
+			found_items = true;
+			EXPECT_EQ(0u, ls_type_struct_field_offset(type, i));
+			const ls_type* slice_type = ls_type_struct_field_type(type, i);
+			EXPECT_TRUE(slice_type != nullptr);
+			EXPECT_EQ((int)LS_TYPE_SLICE, (int)ls_type_get_kind(slice_type));
+			EXPECT_EQ(16u, ls_type_get_size(slice_type));
+			EXPECT_EQ(0u, ls_type_array_length(slice_type));
+
+			const ls_type* sl_elem = ls_type_array_element_type(slice_type);
+			EXPECT_TRUE(sl_elem != nullptr);
+			EXPECT_EQ((int)LS_TYPE_I32, (int)ls_type_get_kind(sl_elem));
+			EXPECT_EQ(4u, ls_type_get_size(sl_elem));
+		}
+		if (equalStrings(fname, toLs("count"))) {
+			found_count = true;
+		}
+	}
+	EXPECT_TRUE(found_items);
+	EXPECT_TRUE(found_count);
+
+	EXPECT_EQ((int)LS_RESULT_OK, (int)ls_debug_resume(runtime, LS_DEBUG_CONTINUE));
+
+	CAPI_END(module);
+	return true;
+}
+
+TEST(DebugStructGlobalInspection) {
+	const char* source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+		var g : Vec2 = Vec2 { 100, 200 };
+		fn main() : i32 {
+			return g.x + g.y;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 8u, nullptr));
+	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
+
+	EXPECT_TRUE(ls_debug_global_count(runtime) >= 1);
+
+	bool found_g = false;
+	for (u32 i = 0, count = ls_debug_global_count(runtime); i < count; ++i) {
+		if (equalStrings(ls_debug_global_name(runtime, i), toLs("g"))) {
+			found_g = true;
+
+			EXPECT_EQ((int)LS_TYPE_STRUCT, (int)ls_debug_global_kind(runtime, i));
+
+			const ls_type* g_type = ls_debug_global_type(runtime, i);
+			EXPECT_TRUE(g_type != nullptr);
+			EXPECT_EQ((int)LS_TYPE_STRUCT, (int)ls_type_get_kind(g_type));
+			EXPECT_EQ(8u, ls_type_get_size(g_type));
+			EXPECT_EQ(2u, ls_type_struct_field_count(g_type));
+
+			EXPECT_TRUE(equalStrings(ls_type_struct_field_name(g_type, 0), toLs("x")));
+			EXPECT_EQ(0u, ls_type_struct_field_offset(g_type, 0));
+			EXPECT_EQ((int)LS_TYPE_I32, (int)ls_type_get_kind(ls_type_struct_field_type(g_type, 0)));
+
+			EXPECT_TRUE(equalStrings(ls_type_struct_field_name(g_type, 1), toLs("y")));
+			EXPECT_EQ(4u, ls_type_struct_field_offset(g_type, 1));
+			EXPECT_EQ((int)LS_TYPE_I32, (int)ls_type_get_kind(ls_type_struct_field_type(g_type, 1)));
+
+			u32 value_size = 0;
+			const void* value = ls_debug_global_value(runtime, i, &value_size);
+			EXPECT_TRUE(value != nullptr);
+			EXPECT_EQ(8u, value_size);
+
+			i32 x_val = 0;
+			memcpy(&x_val, (const u8*)value, sizeof(x_val));
+			EXPECT_EQ(100, x_val);
+
+			i32 y_val = 0;
+			memcpy(&y_val, (const u8*)value + 4u, sizeof(y_val));
+			EXPECT_EQ(200, y_val);
+		}
+	}
+	EXPECT_TRUE(found_g);
+
+	EXPECT_EQ((int)LS_RESULT_OK, (int)ls_debug_resume(runtime, LS_DEBUG_CONTINUE));
+	EXPECT_EQ(300, ls_to_i32(runtime, -1));
+
+	CAPI_END(module);
+	return true;
+}
+
+TEST(DebugNullableTypeIntrospection) {
+	const char* source = R"(
+		fn main() : i32 {
+			var null_val : ?i32 = null;
+			var some_val : ?i32 = 42;
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 5u, nullptr));
+	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
+
+	// Find the two locals
+	int null_idx = -1, some_idx = -1;
+	for (u32 i = 0, count = ls_debug_frame_local_count(runtime, 0); i < count; ++i) {
+		const ls_string_view local_name = ls_debug_local_name(runtime, 0, i);
+		if (equalStrings(local_name, toLs("null_val"))) null_idx = (int)i;
+		if (equalStrings(local_name, toLs("some_val"))) some_idx = (int)i;
+	}
+	EXPECT_TRUE(null_idx >= 0);
+	EXPECT_TRUE(some_idx >= 0);
+
+	// Check null_val (should be null)
+	{
+		const ls_type* type = ls_debug_local_type(runtime, 0, (u32)null_idx);
+		EXPECT_TRUE(type != nullptr);
+		EXPECT_EQ((int)LS_TYPE_NULLABLE, (int)ls_type_get_kind(type));
+		EXPECT_EQ(5u, ls_type_get_size(type));  // 1 (flag) + 4 (i32)
+
+		const ls_type* inner = ls_type_nullable_inner_type(type);
+		EXPECT_TRUE(inner != nullptr);
+		EXPECT_EQ((int)LS_TYPE_I32, (int)ls_type_get_kind(inner));
+		EXPECT_EQ(4u, ls_type_get_size(inner));
+
+		u32 value_size = 0;
+		const void* value = ls_debug_local_value(runtime, 0, (u32)null_idx, &value_size);
+		EXPECT_TRUE(value != nullptr);
+		EXPECT_EQ(5u, value_size);
+		EXPECT_TRUE(ls_type_nullable_is_null(type, value));
+	}
+
+	// Check some_val (should be non-null with value 42)
+	{
+		const ls_type* type = ls_debug_local_type(runtime, 0, (u32)some_idx);
+		EXPECT_TRUE(type != nullptr);
+		EXPECT_EQ((int)LS_TYPE_NULLABLE, (int)ls_type_get_kind(type));
+		EXPECT_EQ(5u, ls_type_get_size(type));
+
+		u32 value_size = 0;
+		const void* value = ls_debug_local_value(runtime, 0, (u32)some_idx, &value_size);
+		EXPECT_TRUE(value != nullptr);
+		EXPECT_EQ(5u, value_size);
+		EXPECT_TRUE(!ls_type_nullable_is_null(type, value));
+
+		const ls_type* inner = ls_type_nullable_inner_type(type);
+		EXPECT_TRUE(inner != nullptr);
+		EXPECT_EQ((int)LS_TYPE_I32, (int)ls_type_get_kind(inner));
+
+		const void* inner_value = ls_type_nullable_value_ptr(type, value);
+		EXPECT_TRUE(inner_value != nullptr);
+		i32 v = 0;
+		memcpy(&v, inner_value, sizeof(v));
+		EXPECT_EQ(42, v);
+	}
+
+	EXPECT_EQ((int)LS_RESULT_OK, (int)ls_debug_resume(runtime, LS_DEBUG_CONTINUE));
 
 	CAPI_END(module);
 	return true;
