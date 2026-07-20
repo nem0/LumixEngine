@@ -1833,6 +1833,14 @@ struct CodeEditorImpl final : CodeEditor {
 		}
 	}
 
+	void setCurrentDebugLine(u32 line) override {
+		m_current_debug_line = (i32)line;
+	}
+
+	void clearCurrentDebugLine() override {
+		m_current_debug_line = -1;
+	}
+
 	void copy(Span<char> out, const Cursor& cursor) const {
 		ASSERT(cursor.line == cursor.sel.line);
 		
@@ -2038,6 +2046,13 @@ struct CodeEditorImpl final : CodeEditor {
 		for (int j = m_first_visible_line; j <= m_last_visible_line; ++j) {
 			float line_offset_y = j * line_height;
 			ImVec2 line_pos = min + ImVec2(0, line_offset_y);
+
+			if (m_current_debug_line == j) {
+				ImVec2 debug_line_start = text_area_pos + ImVec2(-line_num_width - style.FramePadding.x, line_offset_y);
+				ImVec2 debug_line_end = debug_line_start + ImVec2(content_size.x, line_height);
+				dl->AddRectFilled(debug_line_start, debug_line_end, IM_COL32(0xff, 0xd7, 0x00, 0x20));
+			}
+
 			if (s_show_line_numbers) {
 				// TODO optimize this
 				for (u32 breakpoint : m_breakpoints) {
@@ -2331,7 +2346,7 @@ struct CodeEditorImpl final : CodeEditor {
 	}
 
 	i32 m_first_untokenized_line = 0;
-	TagAllocator m_allocator; 
+	TagAllocator m_allocator;
 	float m_blink_timer = 0;
 	float m_time_since_cursor_moved = 0;
 	StringView m_highlighted_str;
@@ -2351,7 +2366,8 @@ struct CodeEditorImpl final : CodeEditor {
 	i32 m_undo_stack_idx = -1;
 	ImVec2 m_text_area_screen_pos;
 	float m_dpi_scale = 1;
-	
+	i32 m_current_debug_line = -1;
+
 	bool m_is_readonly = false;
 	bool m_handle_input = false;
 	bool m_handle_search_input = false;
