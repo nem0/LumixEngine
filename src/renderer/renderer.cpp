@@ -478,6 +478,11 @@ struct RendererImpl final : Renderer {
 			rb.handle = gpu::INVALID_TEXTURE;
 		}
 		
+		for (RenderPlugin* plugin : m_plugins) {
+			plugin->shutdown(*this);
+		}
+		m_plugins.clear();
+		
 		m_particle_emitter_manager.destroy();
 		m_texture_manager.destroy();
 		m_model_manager.destroy();
@@ -490,11 +495,6 @@ struct RendererImpl final : Renderer {
 		frame();
 		frame();
 		waitForRender();
-
-		for (RenderPlugin* plugin : m_plugins) {
-			plugin->shutdown(*this);
-		}
-		m_plugins.clear();
 		
 		m_frame_thread.finished = true;
 		m_frame_thread.semaphore.signal();
@@ -577,15 +577,6 @@ struct RendererImpl final : Renderer {
 	}
 
 	void shutdownStarted() override {
-		m_bloom.shutdown(*this);
-		m_atmo.shutdown(*this);
-		m_cubemap_sky.shutdown(*this);
-		m_dof.shutdown(*this);
-		m_film_grain.shutdown(*this);
-		m_tdao.shutdown(*this);
-		m_sss.shutdown(*this);
-		m_ssao.shutdown(*this);
-		m_taa.shutdown(*this);
 	}
 
 	void initBegin() override {
