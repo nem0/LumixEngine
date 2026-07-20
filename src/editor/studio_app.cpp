@@ -3080,7 +3080,7 @@ struct StudioAppImpl final : StudioApp {
 		if (action.shortcut == os::Keycode::INVALID) return false;
 
 		ImGuiKeyChord chord = m_imgui_key_map[(u32)action.shortcut];
-		ASSERT(chord != 0 || action.shortcut == os::Keycode::INVALID);
+		if (chord == 0 && action.shortcut != os::Keycode::INVALID) return false;
 		if (action.modifiers & Action::Modifiers::CTRL) chord |= ImGuiMod_Ctrl;
 		if (action.modifiers & Action::Modifiers::SHIFT) chord |= ImGuiMod_Shift;
 		if (action.modifiers & Action::Modifiers::ALT) chord |= ImGuiMod_Alt;
