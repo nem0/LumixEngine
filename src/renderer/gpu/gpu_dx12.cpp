@@ -997,7 +997,7 @@ struct RTVDSVHeap {
 };
 
 static ID3D12Resource* createBuffer(ID3D12Device* device, const void* data, u64 size, D3D12_HEAP_TYPE type, const char* debug_name) {
-	D3D12_HEAP_PROPERTIES upload_heap_props;
+	D3D12_HEAP_PROPERTIES upload_heap_props = {};
 	upload_heap_props.Type = type;
 	upload_heap_props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
 	upload_heap_props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
@@ -1942,12 +1942,17 @@ bool init(void* hwnd, InitFlags flags) {
 	DECL_D3D_API(D3D12GetDebugInterface);
 
 	if (debug) {
-		if (api_D3D12GetDebugInterface(IID_PPV_ARGS(&d3d->debug)) != S_OK) return false;
-		d3d->debug->EnableDebugLayer();
+		if (api_D3D12GetDebugInterface(IID_PPV_ARGS(&d3d->debug)) != S_OK) {
+			logWarning("Failed to get D3D12 debug interface (D3D12 SDK Layers / Graphics Tools not installed), continuing without debug layer");
+			d3d->debug = nullptr;
+		}
+		else {
+			d3d->debug->EnableDebugLayer();
 
-		//ID3D12Debug1* debug1;
-		//d3d->debug->QueryInterface(IID_PPV_ARGS(&debug1));
-		//debug1->SetEnableGPUBasedValidation(true);
+			//ID3D12Debug1* debug1;
+			//d3d->debug->QueryInterface(IID_PPV_ARGS(&debug1));
+			//debug1->SetEnableGPUBasedValidation(true);
+		}
 	}
 
 	// Enumerate and select the best adapter
