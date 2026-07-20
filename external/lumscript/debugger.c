@@ -27,7 +27,7 @@ static const ls_bytecode_source_map_entry* runtime_source_at(const ls_function_b
 // frame in `suspended_frame` (the loop's locals at the trap, saved because
 // they'd otherwise die with the C stack frame that returned) and its
 // ancestors in `call_stack[0..call_depth)`, exactly like `fail_frames` is
-// assembled — so this reads from whichever is current instead of duplicating
+// assembled - so this reads from whichever is current instead of duplicating
 // the assembly logic into a second array.
 static u32 debug_active_frame_count(ls_runtime* runtime) {
 	if (runtime->is_suspended) return 1u + runtime->call_depth;
@@ -239,7 +239,7 @@ ls_result ls_debug_resume(ls_runtime* runtime, ls_debug_action action) {
 	// call_depth is still whatever it was at suspend (resume hasn't touched
 	// it yet), i.e. the depth of the suspended innermost frame's caller chain.
 	// runtime.c clears step_action at the next suspend, whatever the reason
-	// (step condition met, a breakpoint, or an error) — from the host's
+	// (step condition met, a breakpoint, or an error) - from the host's
 	// perspective any suspension ends this step attempt.
 	runtime->step_action = action;
 	runtime->step_start_line = runtime->pause_event.location.line;

@@ -2251,7 +2251,7 @@ static ls_type_kind compileBinary(FunctionCompiler& ctx, BinaryExpression& expr,
 		return LS_TYPE_BOOL;
 	}
 
-	// Null check: `nullable == null` or `nullable != null` — only check has_value offset.
+	// Null check: `nullable == null` or `nullable != null` - only check has_value offset.
 	if (expr.op == Token::EQUAL_EQUAL || expr.op == Token::BANG_EQUAL) {
 		Expression* nullable_side = nullptr;
 		if (expr.rhs && expr.rhs->kind == Expression::NULL_LITERAL)

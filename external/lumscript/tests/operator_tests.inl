@@ -717,7 +717,7 @@ TEST(MixedStructPrimitiveOperatorRuntime) {
 }
 
 TEST(MixedStructPrimitiveOperatorWrongLiteralTypeFails) {
-	// f64 literal used where the only overload expects f32 on the left — no match.
+	// f64 literal used where the only overload expects f32 on the left - no match.
 	const char* source = R"(
 		struct Vec2 {
 			x : f32;

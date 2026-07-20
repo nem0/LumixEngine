@@ -439,7 +439,7 @@ TEST(TemplateTypeArgumentCannotBeUsedAsComptimeValueFails) {
 	return true;
 }
 
-// Uninstantiated template used as a function value — T is unknown, not allowed.
+// Uninstantiated template used as a function value - T is unknown, not allowed.
 TEST(TemplateFunctionUninstantiatedAsFirstClassValueFails) {
 	const char* source = R"(
 		fn identity(a : $T) : T {
@@ -965,7 +965,7 @@ TEST(TemplateStructImportedFieldTypeMismatchFails) {
 	return true;
 }
 
-// Two imported libs each with their own template — exercises that instantiation
+// Two imported libs each with their own template - exercises that instantiation
 // tables for distinct units don't collide.
 TEST(TemplateFunctionTwoLibsEachWithTemplateRuntime) {
 	const char* main_source = R"(
@@ -1690,7 +1690,7 @@ TEST(TemplateStructWrongNumberOfTypeArgsFails) {
 	return true;
 }
 
-// Box[Pair[i32, f32]] — outer has one type param, inner has two distinct ones.
+// Box[Pair[i32, f32]] - outer has one type param, inner has two distinct ones.
 TEST(TemplateNestedGenericTwoParamInnerRuntime) {
 	const char* source = R"(
 		struct Pair[A, B] {
@@ -1735,7 +1735,7 @@ TEST(TemplateNestedGenericTwoParamInnerTypeMismatchFails) {
 	return true;
 }
 
-// Box[Box[i32]] — two levels of the same generic wrapper.
+// Box[Box[i32]] - two levels of the same generic wrapper.
 TEST(TemplateNestedGenericSameStructTwiceRuntime) {
 	const char* source = R"(
 		struct Box[T] {
@@ -1756,7 +1756,7 @@ TEST(TemplateNestedGenericSameStructTwiceRuntime) {
 	return true;
 }
 
-// Map[K, Pair[V]] — multi-param outer wrapping a nested generic as one of its args.
+// Map[K, Pair[V]] - multi-param outer wrapping a nested generic as one of its args.
 TEST(TemplateNestedGenericAsSecondTypeArgRuntime) {
 	const char* source = R"(
 		struct Pair[T] {

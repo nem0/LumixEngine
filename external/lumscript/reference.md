@@ -199,12 +199,12 @@ JIT is intentionally out of scope for the first version.
 	- alternatives considered were `else:`, `default:`, and `case _:`
 
 - tagged unions
-	- the member type is the tag; no named variants (Rust-style `enum` payloads) keeps the feature small — two variants with the same payload type use wrapper structs
+	- the member type is the tag; no named variants (Rust-style `enum` payloads) keeps the feature small - two variants with the same payload type use wrapper structs
 		- var a : SomeUnion = SomeMember { 1, "foo" }; is possible and uses only existing language features
 	- structural set semantics (order-insensitive, flattening) so anonymous unions like `Error | ASTNode` compose across modules and call layers
 	- subset → superset widening is implicit so error unions propagate without manual re-wrapping; this leaves room for future propagation sugar (`try`-style)
 	- `as` yields `?Member` instead of trapping, reusing the forced-null-check machinery instead of adding a runtime abort path
-	- promotion in `match`/`is` is flow-typing with the same accepted unsoundness as nullable promotion — keeping the checker simple was preferred over a borrow-like aliasing rule
+	- promotion in `match`/`is` is flow-typing with the same accepted unsoundness as nullable promotion - keeping the checker simple was preferred over a borrow-like aliasing rule
 	- excluded from ADL/UFCS because a structural type has no declaring namespace
 	- **open questions**: `if` statement lowering details, propagation sugar, canonical member order exposure
 
@@ -919,7 +919,7 @@ if a != null {
 
 ### Tagged unions
 
-A union type is written as members separated by `|`. A union value holds exactly one of its member types at a time; a tag records which one (the active variant). The member type itself is the tag — there are no named variants.
+A union type is written as members separated by `|`. A union value holds exactly one of its member types at a time; a tag records which one (the active variant). The member type itself is the tag - there are no named variants.
 
 ```cpp
 struct ButtonEvent {
@@ -960,19 +960,19 @@ Unions are structural with set semantics:
 Any concrete runtime type can be a member: structs, enums, primitives, and `string`. Excluded:
 
 - `void`
-- `null` — `null` as a member is a compile-time error
+- `null` - `null` as a member is a compile-time error
 - nullable types (`?T`); nullable union syntax (`?(A | B)`) is not supported
-- function types — use nullable function types (`?fn(...)` ) or wrap in a struct instead
+- function types - use nullable function types (`?fn(...)` ) or wrap in a struct instead
 - unions (they flatten, see above)
-- slices (`[]T`) — a slice is a view without ownership; the union tag does not distinguish which backing storage a slice view represents
-- static arrays (`[N]T`) — use proper container types (structs, function-based interfaces) instead of unioning different array sizes
+- slices (`[]T`) - a slice is a view without ownership; the union tag does not distinguish which backing storage a slice view represents
+- static arrays (`[N]T`) - use proper container types (structs, function-based interfaces) instead of unioning different array sizes
 
 All members must be pairwise distinct types. Because the member type is the tag, two semantically different variants with the same payload type require wrapper structs.
 
 **Coercion**
 
 - a member value coerces implicitly to any union containing its type: `var e : InputEvent = b;`
-- a union value coerces implicitly to any union whose member set is a superset (the tag is remapped at the coercion site): an `A | B` value can be assigned where `A | B | C` is expected — this is what lets error unions propagate across call layers
+- a union value coerces implicitly to any union whose member set is a superset (the tag is remapped at the coercion site): an `A | B` value can be assigned where `A | B | C` is expected - this is what lets error unions propagate across call layers
 - no other implicit conversions apply; narrowing (superset to subset, or union to member) is never implicit
 
 **Testing and extraction: `is` and `as`**
@@ -1638,11 +1638,11 @@ not ready
 
 Ordering comparisons (`<`, `<=`, `>`, `>=`) require numeric operands of the same type. Equality (`==`, `!=`) is defined for:
 
-- numeric types, `bool`, `byte`, and enums — value comparison
-- `string` — content comparison
-- `cstr` and `cptr` — address comparison (two `cstr` values with equal content but different storage are not equal)
-- function values — same function
-- nullable values — only against the `null` literal
+- numeric types, `bool`, `byte`, and enums - value comparison
+- `string` - content comparison
+- `cstr` and `cptr` - address comparison (two `cstr` values with equal content but different storage are not equal)
+- function values - same function
+- nullable values - only against the `null` literal
 
 Arrays, slices, unions, and two nullable values have no built-in equality; comparing them is a compile-time error. Structs resolve `==` through `operator` declarations (see below).
 
@@ -1753,9 +1753,9 @@ import "engine:entity" as entity
 fn destroy(e : entity.Entity) : void {}
 
 fn example(e : entity.Entity) : void {
-	e.destroy();       // calls entity.destroy — method syntax prefers the receiver type's unit
-	destroy(e);        // calls local destroy — plain calls stay lexical, local is preferred over ADL
-	entity.destroy(e); // calls entity.destroy — explicit namespace, always unambiguous
+	e.destroy();       // calls entity.destroy - method syntax prefers the receiver type's unit
+	destroy(e);        // calls local destroy - plain calls stay lexical, local is preferred over ADL
+	entity.destroy(e); // calls entity.destroy - explicit namespace, always unambiguous
 }
 ```
 

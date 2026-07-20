@@ -226,7 +226,7 @@ Multiple growing elements split the remaining space proportionally:
 }
 ```
 
-Left-fill-right (the classic toolbar pattern) works correctly because growing is computed in a two-pass manner — fixed children are sized first, then remaining space is distributed among all `grow` children:
+Left-fill-right (the classic toolbar pattern) works correctly because growing is computed in a two-pass manner - fixed children are sized first, then remaining space is distributed among all `grow` children:
 
 ```css
 [box direction="row" width=400] {

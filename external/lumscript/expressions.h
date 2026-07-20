@@ -86,7 +86,7 @@ struct Expression {
 		// `struct { ... }` creates a comptime type value.
 		STRUCT,
 		UNDEFINED, // var a : i32 = undefined;
-		// `sizeof(T)` / `alignof(T)` — produces an untyped integer constant.
+		// `sizeof(T)` / `alignof(T)` - produces an untyped integer constant.
 		SIZEOF,
 		// $T
 		GENERIC_IDENTIFIER,
@@ -220,7 +220,7 @@ struct CallExpression : Expression {
 
 	Expression* callee = nullptr;
 	ExpArray<Expression*> args;
-	// Set by the type checker when this call has a pre-resolved direct target —
+	// Set by the type checker when this call has a pre-resolved direct target - 
 	// either a template instantiation or a UFCS-selected free function. The bytecode
 	// compiler uses this instead of re-deriving resolution per callee shape.
 	FunctionExpression* resolved_fn = nullptr;

@@ -384,7 +384,7 @@ struct Checker {
 	enum class LookupPolicy { NameOnly, Checked };
 
 	// Result of a symbol lookup. `check_failed` is set only under LookupPolicy::Checked
-	// when the symbol was found but its checkSymbol() failed — distinguishing a genuine
+	// when the symbol was found but its checkSymbol() failed - distinguishing a genuine
 	// declaration error from an undeclared name (both used to collapse to nullptr).
 	struct SymbolRef {
 		Unit* owner = nullptr;
@@ -2588,7 +2588,7 @@ struct Checker {
 				return nullptr;
 			}
 			case ResolvedType::META: {
-				// TypeName.member — only enums support member access through a type name
+				// TypeName.member - only enums support member access through a type name
 				ResolvedType* inner = static_cast<MetaType*>(base_type)->inner;
 				if (inner->kind == ResolvedType::ENUM) {
 					EnumResolvedType* en = static_cast<EnumResolvedType*>(inner);
@@ -2605,7 +2605,7 @@ struct Checker {
 				return nullptr;
 			}
 			case ResolvedType::ENUM: {
-				// If the name matches a variant, the user wrote instance.Variant — give a clear error.
+				// If the name matches a variant, the user wrote instance.Variant - give a clear error.
 				// Otherwise return nullptr silently so the call checker can try UFCS.
 				EnumResolvedType* en = static_cast<EnumResolvedType*>(base_type);
 				for (const EnumMember& m : en->decl->members) {
