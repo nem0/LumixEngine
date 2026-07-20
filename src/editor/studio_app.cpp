@@ -3085,7 +3085,7 @@ struct StudioAppImpl final : StudioApp {
 		if (action.modifiers & Action::Modifiers::SHIFT) chord |= ImGuiMod_Shift;
 		if (action.modifiers & Action::Modifiers::ALT) chord |= ImGuiMod_Alt;
 
-		return ImGui::Shortcut(chord, global ? ImGuiInputFlags_RouteGlobal : ImGuiInputFlags_RouteFocused);
+		return ImGui::Shortcut(chord, ImGuiInputFlags_Repeat | (global ? ImGuiInputFlags_RouteGlobal : ImGuiInputFlags_RouteFocused));
 	}
 
 	IAllocator& getAllocator() override { return m_allocator; }
