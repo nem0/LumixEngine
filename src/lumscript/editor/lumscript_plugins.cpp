@@ -183,6 +183,7 @@ static void drawPrimitiveValue(ls_type_kind kind, const void* value) {
 		case LS_TYPE_F32:  ImGui::Text("%g", *(const f32*)value); break;
 		case LS_TYPE_F64:  ImGui::Text("%g", *(const f64*)value); break;
 		case LS_TYPE_CPTR: ImGui::Text("0x%p", *(const void* const*)value); break;
+		case LS_TYPE_ENUM: ImGui::Text("%d", *(const i32*)value); break;
 		default:           ImGui::TextUnformatted("?"); break;
 	}
 }
