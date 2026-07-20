@@ -162,6 +162,7 @@ static const char* typeName(ls_type_kind kind) {
 		case LS_TYPE_SLICE: return "slice";
 		case LS_TYPE_CPTR: return "cptr";
 		case LS_TYPE_FUNCTION: return "function";
+		case LS_TYPE_TAGGED_UNION: return "union";
 		case LS_TYPE_NULLABLE: return "?";
 		case LS_TYPE_NULL_VALUE: return "null";
 		default: return "unknown";
@@ -223,6 +224,38 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 				void* fv = (u8*)value + offset;
 				const u32 fsize = ftype ? ls_type_get_size(ftype) : 0u;
 				drawVariable(fname, ftype ? ls_type_get_kind(ftype) : LS_TYPE_INVALID, ftype, fv, fsize);
+			}
+			ImGui::TreePop();
+		}
+		return;
+	}
+
+	if (kind == LS_TYPE_TAGGED_UNION && type) {
+		ImGui::TableNextRow();
+		ImGui::TableNextColumn();
+		const i32 tag = ls_type_union_tag(type, value);
+		const bool open = ImGui::TreeNodeEx(name.begin
+			, ImGuiTreeNodeFlags_SpanFullWidth
+			, "%.*s"
+			, int(name.end - name.begin)
+			, name.begin);
+		ImGui::TableNextColumn();
+		ImGui::TextUnformatted("union");
+		ImGui::TableNextColumn();
+		ImGui::Text("tag=%d (%u members)", tag, ls_type_union_member_count(type));
+		if (open) {
+			const u32 member_count = ls_type_union_member_count(type);
+			if (tag >= 0 && (u32)tag < member_count) {
+				const ls_type* member_type = ls_type_union_member_type(type, tag);
+				void* payload = (u8*)value + 4;
+				const u32 member_size = member_type ? ls_type_get_size(member_type) : 0u;
+				drawVariable(ls_string_view{ "active", "active" + 6 }
+					, member_type ? ls_type_get_kind(member_type) : LS_TYPE_INVALID
+					, member_type, payload, member_size);
+			} else {
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				ImGui::TextDisabled("<invalid tag>");
 			}
 			ImGui::TreePop();
 		}
