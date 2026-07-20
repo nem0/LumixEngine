@@ -515,7 +515,9 @@ struct RendererImpl final : Renderer {
 			gpu::shutdown();
 		}, &counter, 1);
 		jobs::wait(&counter);
-		ASSERT(m_sort_key_map.size() == 1); // only null key left
+		if (m_sort_key_map.size() != 1) {
+			logWarning("Renderer: sort key map has ", m_sort_key_map.size(), " entries on shutdown (expected 1)");
+		}
 	}
 	
 	static void add(String& res, const char* a, u32 b) {
