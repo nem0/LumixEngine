@@ -2,6 +2,7 @@
 
 # TODO
 
+* list of keywords and forbid identifier colliding with keywords
 * debugger:
 	- modify variables while paused
 	- conditional breakpoints
@@ -20,15 +21,8 @@
 * how to expose Span<const Item> foo() to script?
 * how can we push unions if we don't know the tag value of variants, i.e. U = A | B - we don't know if A's tag is 0 or 1
 * use case - comptime string hash
-* how should user implement print-s? macro or
-	fn print(v : varargs) : void {
-		for x in v {
-			match typeof(x) {
-				case string: { print_string(x); }
-				case i32: { print_i32(x); }
-			}
-		}
-	}
+* varargs - [Compile-time introspection](#compile-time-introspection) covers single-argument `print`; `print(a, " ", b)` still needs a variadic mechanism
+* function type decomposition - `t.params` / `t.return` so `.Fn` types can be introspected, not just named
 * string interpolation
 * MT typecheck
 
@@ -41,9 +35,7 @@
 * with/when/where/using?
 * context object?
 * multiple returns?
-* comptime reflection/introspection?
-* reflection?
-* first-class types at compile time?
+* runtime reflection? (compile-time introspection is specified, see [Compile-time introspection](#compile-time-introspection))
 * gc?
 * attributes?
 * fibers/coroutines?
@@ -99,6 +91,7 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 	- [Assignment](#assignment)
 	- [If / else](#if--else)
 	- [Match](#match)
+	- [Compile-time branches](#compile-time-branches)
 	- [While](#while)
 	- [For](#for)
 	- [Break / continue / labels](#break--continue--labels)
@@ -117,10 +110,23 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 	- [UFCS](#ufcs)
 	- [Field access](#field-access)
 	- [Struct literals](#struct-literals)
+- [Compile-time introspection](#compile-time-introspection)
+	- [typeof](#typeof)
+	- [Type members](#type-members)
+	- [TypeKind](#typekind)
+	- [Type equality](#type-equality)
+	- [Reflection sequences](#reflection-sequences)
+	- [Unroll for](#unroll-for)
+	- [Field iteration](#field-iteration)
+	- [Enum iteration](#enum-iteration)
+	- [Union iteration](#union-iteration)
+	- [What an unrolled loop binds](#what-an-unrolled-loop-binds)
+	- [Comptime-to-runtime materialization](#comptime-to-runtime-materialization)
+	- [Instantiation limits](#instantiation-limits)
 - [Runtime model](#runtime-model)
 	- [Native functions](#native-functions)
 - [Editor and diagnostics](#editor-and-diagnostics)
-- [Known limitations and pending spec decisions](#known-limitations-and-pending-spec-decisions)
+- [Known underspecified areas](#known-underspecified-areas)
 
 Current implementation includes:
 
@@ -220,6 +226,32 @@ JIT is intentionally out of scope for the first version.
 	- promotion in `match`/`is` is flow-typing with the same accepted unsoundness as nullable promotion - keeping the checker simple was preferred over a borrow-like aliasing rule
 	- excluded from ADL/UFCS because a structural type has no declaring namespace
 	- **open questions**: `if` statement lowering details, propagation sugar, canonical member order exposure
+
+- compile-time branches are implicit
+	- `if` and `match` become compile-time branches whenever their condition is compile-time known; there is no `comptime if` / `comptime match` spelling
+	- one construct instead of two: generic code reads like ordinary code, and a condition that changes from runtime to compile-time known does not require rewriting the statement
+	- Zig precedent: the same rule, and the same reason - once type-driven branching is expressible at all, a separate keyword is redundant noise on nearly every generic function
+	- the cost is that unselected arms are unchecked and nothing in the syntax says so - a rename or signature change is not reported until some build actually selects that arm:
+
+		```cpp
+		comptime DEBUG = false;
+
+		if DEBUG {
+			log_state(v); // not checked while DEBUG is false, even if log_state no longer exists
+		}
+		```
+
+		this is accepted deliberately: without pruning, generic code could not branch on type at all. Branches over configuration flags should be exercised by building every configuration
+	- alternative considered was an explicit `comptime if` / `comptime match` opt-in, which makes the unchecked region auditable at the cost of a second form of every branch
+
+- reflection members use `::`
+	- `T::kind`, `T::fields`, `T::values` and the rest live in a namespace disjoint from `.`, so they never compete with user-declared names (see [Type members](#type-members))
+	- the collision is enum-specific: enum member access is `State.Running`, so on `.` a reflection member and a declared member would fight for one spelling. Structs have no `Type.member` access, and cursors have no user-declarable members, so both keep `.`
+	- the deciding argument is extensibility, not disambiguation. Reserving `kind`, `name`, `child`, `length`, `fields`, `values`, `types` as enum member names would work today, but it makes adding a reflection member later a breaking change for every enum already using one of those names. A disjoint namespace costs nothing to grow
+	- `::` is otherwise unused in the grammar, and unlike `.` it has no meaning to overload
+	- `@` was considered - `T@kind` - and rejected because `@` has two other claimants: explicit field offsets (`x : f32 @ 4`, still open) and a possible attribute syntax
+	- a Zig-style `typeinfo(T)` returning a tagged union over per-kind info types was considered and rejected. It is attractive because the kind guard on `T::fields` would collapse into ordinary union promotion, but it needs the scrutinee bound to a name before matching, it requires union membership to admit compile-time-only types, and it needs roughly eight nameable built-in info types - trading seven reserved enum member names for eight reserved global type names, and reversing the decision that cursor types are [not nameable in source](#reflection-sequences)
+	- the cost of `::` is that reflection is a second member-access syntax to learn, and the kind guard on `T::fields` stays a bespoke checker rule rather than falling out of the type system
 
 - undefined behavior
 	- compared to C or C++, try to define as much behavior as possible
@@ -549,10 +581,10 @@ Rules:
 - a value used as a type must resolve to a compile-time type value
 - compile-time evaluation happens before concrete runtime code is lowered
 - compile-time application uses `[]`; runtime application uses `()`
-- primitive types such as `i32`, `f32`, `bool`, and `string` are built-in type values and cannot be shadowed
+- primitive types such as `i32`, `f32`, `bool`, and `string` are built-in type values and cannot be shadowed; so are the built-in `type` and `TypeKind`
 - using a runtime-only value where a compile-time value is required is a compile-time error
 - a comptime call may call only compile-time-known function values
-- functions cannot return `type`
+- declared functions cannot return `type`; the compile-time operator [`typeof`](#typeof) is not a function and is not covered by this rule
 - functions cannot create new struct or enum types from their body
 - new generic types are declared with `struct[...]` not by returning `type` from a function
 - native/extern functions are runtime-only unless explicitly marked otherwise by a future extension
@@ -817,6 +849,7 @@ Built-in and user types:
 - `cstr`
 - `cptr`
 - `type` (compile-time only)
+- `TypeKind` (compile-time only, see [TypeKind](#typekind))
 - user-defined `struct` types
 - user-defined `enum` types
 - function types
@@ -1145,6 +1178,7 @@ Type rules:
 - element type is fixed for all entries
 - assignment requires exact same element type and size
 - index expression must have an integer type
+- `length(arr)` on a `[N]T` produces the untyped compile-time integer constant `N`, so it can be used where a compile-time integer is required (`unroll for` bounds, array sizes, `comptime` parameters). When context does not require another type it concretizes to `isize`, matching `length` on a slice
 - postfix `[` in type position (after a type constructor like size and element) means indexing or slicing on runtime values; array types always use prefix `[N]T` notation
 
 ### Slices
@@ -1384,6 +1418,55 @@ match key {
 
 Enum matches must be exhaustive unless an empty `case:` fallback is present. Duplicate enum cases and multiple fallback cases are compile-time errors.
 
+### Compile-time branches
+
+`if` and `match` become compile-time branches when their condition or scrutinee is a compile-time-known value. There is no separate syntax: the branch is resolved during compilation, one arm is selected, and **the arms that are not selected are parsed but not type-checked**.
+
+That last rule is what makes generic code over heterogeneous types possible. The arms of a type-driven `match` are typically valid for only one `T` each:
+
+```cpp
+fn write(v : $T) : void {
+	match T::kind {                   // T::kind is compile-time known
+		case .Bool: io.write_bool(v);   // never checked unless T is bool
+		case .I32:  io.write_i64(v as i64);
+		case:       io.write_bytes(T::name);
+	}
+}
+```
+
+Without pruning, `io.write_bool(v)` would be a type error for every `T` that is not `bool`.
+
+`if` behaves the same way and is the form used to special-case one concrete type:
+
+```cpp
+if T == Vec3 {
+	io.write_bytes("Vec3(");   // only checked when T is Vec3
+	print(v.x);
+} else if T == Quat {
+	print_quat(v);
+} else {
+	write_generic(v);
+}
+```
+
+**Compile-time-known conditions**
+
+A condition or scrutinee is compile-time known when it is built only from values the compiler already has: literals, `comptime` bindings, `comptime` parameters, template arguments, and calls to compile-time-evaluable functions over such values. Reading a `var`, a `const` initialized from runtime data, or the result of a runtime call makes the expression runtime-valued, and the branch is an ordinary runtime branch.
+
+Whether a branch is compile-time is a property of one specific `if` or `match`, decided by that expression alone. It is never inferred from the surrounding function: a template body still contains ordinary runtime branches wherever the condition depends on runtime values.
+
+Rules:
+
+- when the condition or scrutinee is compile-time known, the branch is resolved at compile time; unselected arms are parsed and must be syntactically valid, but are not type-checked and produce no code
+- when it is not, the statement keeps its ordinary runtime semantics and every arm is type-checked
+- a compile-time `match` otherwise follows all [Match](#match) rules: non-fallthrough, comma-separated alternatives, exhaustive unless an empty `case:` fallback is present, duplicate cases and multiple fallbacks are compile-time errors
+- a compile-time `if` otherwise follows all [If / else](#if--else) rules; `else if` chains, and each arm including a plain `else` is pruned independently
+- naming the scrutinee changes nothing: `comptime k = T::kind; match k { ... }` is equivalent to matching on `T::kind` directly
+- these forms are legal anywhere a statement is legal; there is no requirement to be inside a template or `comptime` function body
+- a scrutinee of a compile-time-only type, such as `TypeKind`, can only appear in a compile-time branch, since such values have no runtime representation. A `type` value has no `match` pattern syntax at all and is dispatched with [`==`](#type-equality) or its [`::kind`](#type-members) instead
+
+Skipping the checker on unselected arms means code behind a compile-time-false condition is not validated at all; see [Design decisions](#design-decisions) for the tradeoff.
+
 ### While
 
 ```cpp
@@ -1455,7 +1538,7 @@ for i = 0..length(arr) {
 ```
 
 - `arr` must be a static-sized array or a slice
-- `i` has type `isize`; `v` has the element type of `arr`
+- `i` has type `isize`; `v` has the element type of `arr`. This holds for static arrays too: `length` on a `[N]T` is an untyped compile-time constant, and the desugared range concretizes it to `isize`
 - both `i` and `v` are immutable inside the loop body, like the single-variable `for` loop variable
 
 ### Break / continue / labels
@@ -1692,6 +1775,7 @@ Ordering comparisons (`<`, `<=`, `>`, `>=`) require numeric operands of the same
 - `cstr` and `cptr` - address comparison (two `cstr` values with equal content but different storage are not equal)
 - function values - same function
 - nullable values - only against the `null` literal
+- `type` values - type identity, compile-time only (see [Type equality](#type-equality))
 
 Arrays, slices, unions, and two nullable values have no built-in equality; comparing them is a compile-time error. Structs resolve `==` through `operator` declarations (see below).
 
@@ -1846,6 +1930,419 @@ const b = Vec3 { 4, 5, 6 };
 
 Named-field struct literals are not implemented.
 
+## Compile-time introspection
+
+Types are compile-time values (see [Comptime](#comptime)). Introspection lets compile-time code ask what a type *is* and enumerate its structure, so a single function template can handle every type in the language.
+
+The motivating example is a generic `print`:
+
+```cpp
+import "core:io" as io // extern write_bytes, write_i64, write_u64, write_f64, write_bool
+
+fn print(v : $T) : void {
+	match T::kind {
+		case .Bool:                          io.write_bool(v);
+		case .F32, .F64:                     io.write_f64(v as f64);
+		case .I8, .I16, .I32, .I64, .ISize:  io.write_i64(v as i64);
+		case .U8, .U16, .U32, .U64:          io.write_u64(v as u64); // no .Byte, no .CStr: see below
+		case .String:                        io.write_bytes(v);
+
+		case .Nullable:
+			if v != null {
+				print(v); // v is promoted; the recursive call instantiates at the inner type
+			} else {
+				io.write_bytes("null");
+			}
+
+		case .Slice, .Array:
+			io.write_bytes("[");
+			for i = 0..length(v) {
+				if i > 0 { io.write_bytes(", "); }
+				print(v[i]);
+			}
+			io.write_bytes("]");
+
+		case .Enum:
+			unroll for e in T::values {
+				if v == e.value {
+					io.write_bytes(e.name);
+					return;
+				}
+			}
+			io.write_bytes("<invalid ");
+			io.write_i64(v as i64);
+			io.write_bytes(">");
+
+		case .Struct:
+			io.write_bytes(T::name);
+			io.write_bytes(" { ");
+			unroll for i, f in v {
+				if i > 0 { io.write_bytes(", "); }
+				io.write_bytes(f.name);
+				io.write_bytes(" = ");
+				print(f.value);
+			}
+			io.write_bytes(" }");
+
+		case .Union:
+			unroll for M in T::types {
+				if v is M {
+					print(v); // v is promoted to M; recurses at T = M
+					return;
+				}
+			}
+
+		case:
+			io.write_bytes("<");
+			io.write_bytes(T::name);
+			io.write_bytes(">");
+	}
+}
+```
+
+Note what this example does *not* need. Because `T` is fully concrete at instantiation, `v` already has an exact static type in every arm - there is no type narrowing tied to the `case` patterns. In `case .Nullable:` the parameter simply *is* `?U`, so `if v != null` is ordinary [nullable promotion](#nullable-values); the only new rule is that the promoted read feeds `$T` deduction at the recursive call. Likewise `case .Union:` reuses the existing `is` promotion from [Tagged unions](#tagged-unions).
+
+`.Byte` and `.CStr` deliberately fall through to the `case:` fallback and print as `<byte>` and `<cstr>`. Both are blocked by the same gap: [Casts](#casts) lists no conversion between `byte` and an integer type, nor between `cstr` and `string`, so `v as u64` and `v as string` would not compile in those arms. Printing either one's contents requires a cast the language does not currently have.
+
+### typeof
+
+`typeof` is a compile-time operator that takes an expression and produces its concrete type as a compile-time `type` value:
+
+```cpp
+comptime A = typeof(1 + 2);      // i32
+comptime B = typeof(v[0]);       // the element type of v
+comptime C = typeof(make_vec3()); // the return type of the call, Vec3
+```
+
+Rules:
+
+- the operand is an expression, not a type - the mirror of [`sizeof` and `alignof`](#sizeof-and-alignof), which take a type. `sizeof(typeof(e))` is the size of `e`'s type. Reflection that starts from a *type* rather than an expression uses [type members](#type-members) instead
+- like `sizeof` and `alignof`, `typeof` is an operator resolved by the compiler, not a function: it cannot be bound to a name, passed as an argument, used as a function value, or reached through [UFCS](#ufcs); only its result is a value. The rule that functions cannot return `type` (see [Comptime](#comptime)) constrains declared functions and does not apply to it
+- the operand is type-checked but **not evaluated**, and no code is generated for it. `typeof(v[0])` on an empty slice is valid and yields the element type
+- it produces a `type` value, usable wherever a compile-time type is required (template arguments, variable type positions, `comptime` bindings, `==` comparison)
+- `typeof` observes flow typing: after `if v != null`, `typeof(v)` inside the branch is the promoted type `U`, not `?U`. The same applies inside an `is` or `match` arm on a tagged union
+- the result is compile-time only and never materializes into runtime code (see [Comptime-to-runtime materialization](#comptime-to-runtime-materialization))
+
+### Type members
+
+A `type` value exposes its structure through members accessed with `::` (see [Why `::` and not `.`](#tname) below). Unlike [`typeof`](#typeof), which takes an *expression*, these start from a *type* - typically a `$T` parameter, a `comptime type` parameter, or any `typeof` result:
+
+| member | result | valid for |
+| --- | --- | --- |
+| `t::kind` | `TypeKind` | every type |
+| `t::name` | `string` | every type |
+| `t::child` | `type` | `.Nullable`, `.Slice`, `.Array` |
+| `t::length` | comptime integer | `.Array` |
+| `t::fields` | sequence of field cursors | `.Struct` |
+| `t::values` | sequence of enum cursors | `.Enum` |
+| `t::types` | sequence of member types | `.Union` |
+
+```cpp
+comptime k = i32::kind;       // .I32
+comptime s = Vec3::kind;      // .Struct
+comptime n = Vec3::name;      // "Vec3"
+comptime e = ([]i32)::child;  // i32
+comptime m = ([4]i32)::length; // 4
+```
+
+- `t::kind` classifies the type into one [`TypeKind`](#typekind) discriminant
+- `t::name` is the type's source-level name, the same string in the table under [`t::name`](#tname) below
+- `t::child` is the single operand of a one-operand type constructor: the `U` of `?U`, the element of `[]U`, or the element of `[N]U`
+- `t::length` is the element count `N` of a `[N]T`, an untyped compile-time integer - the same value `length(v)` yields on an instance (see [Static-sized arrays](#static-sized-arrays)), but reachable from the type without one, so `unroll for i = 0..t::length` works on a type alone. It is not defined for `.Slice`, whose length is a runtime property
+- `t::fields`, `t::values`, and `t::types` are [reflection sequences](#reflection-sequences)
+
+All type members are compile-time only. `t` must be a concrete compile-time type; a `$T` that has not been instantiated yet is a compile-time error. Type members are not operators or functions - like any member access they cannot be taken as a value on their own, only applied to a type.
+
+**Kind-specific members are guarded.** `t::child`, `t::length`, `t::fields`, `t::values`, and `t::types` exist only for some kinds, and each is a compile-time error unless `t`'s kind is statically known to admit it. A manifest type - a type literal such as `[]i32` or a concrete `Vec3` - carries its kind by construction, so `([]i32)::child` needs no branch. The guard matters for a type of *unknown* kind, such as a `$T` parameter: there the kind must first be established, normally by an arm of a `match t::kind` or the taken side of an `if t::kind == ...`:
+
+```cpp
+match t::kind {
+	case .Struct:   unroll for f in t::fields { ... } // ok: kind proven
+	case .Nullable: foo(t::child);                    // ok: kind proven
+	case: ...
+}
+
+foo(t::child);   // error: t::child is not valid unless t is proven .Nullable/.Slice/.Array
+```
+
+This is the same [compile-time branch](#compile-time-branches) pruning used everywhere else: the arm that reads `t::fields` is checked only when it is selected, and it is selected only for a struct. Unlike the value-side `unroll for` forms, the guard here is *enforced* - a bare `t::fields` outside a kind-proving branch is reported, not merely error-prone.
+
+#### `t::name`
+
+`t::name` returns the source-level name of `t`:
+
+| type | `t::name` |
+| --- | --- |
+| builtins | `"i32"`, `"f64"`, `"string"` |
+| structs and enums | the declaration name, `"Vec3"`, `"State"` |
+| template instantiations | `"Pair[i32]"`, `"Optional[Vec3]"` |
+| nullable | `"?Vec3"` |
+| slices and arrays | `"[]i32"`, `"[4]i32"` |
+| unions | `"A \| B \| C"` in canonical member order |
+| function types | `"fn(i32, i32) : i32"` |
+
+`t::kind` and `t::name` are the only members every type has; a type's constituent parts are reached through the [reflection sequences](#reflection-sequences), which exist only for structs, enums, and unions.
+
+**Why `::` and not `.`.** Reflection members are reached with `::`, which puts them in a namespace disjoint from user-declared names. Enum member access uses `Type.member`, so on `.` a reflection member and an enum member would compete for the same spelling; with `::` they cannot. An `enum` may declare a member named `kind`, `name`, or `values`, and both readings stay available: `State.values` is the declared member, `State::values` is the reflection sequence.
+
+The decisive benefit is extensibility. Reserving `kind`, `name`, `child`, `length`, `fields`, `values`, and `types` as enum member names would work today, but it would make *adding* a reflection member in a future version a breaking change for every enum that already declares one. A disjoint namespace has no such cost.
+
+Cursor members stay on `.` (`f.name`, `f.type`, `f.value`, `e.value`). Cursors are compiler-synthesized values with no user-declarable members, so nothing can collide with them and the `::` namespace buys nothing. Struct fields likewise stay on `.`: a struct type has no `Type.member` access at all, so a field named `fields` is reached as `v.fields` on a value and never competes with `S::fields`.
+
+### TypeKind
+
+`TypeKind` is a built-in enum type, not a declaration in a module. Like `i32` or `string` it is always in scope, needs no import, and cannot be shadowed. Its definition is fixed by the language and shown here only for reference:
+
+```cpp
+enum TypeKind {
+	Bool,
+	I8, I16, I32, I64, ISize,
+	U8, U16, U32, U64, Byte,
+	F32, F64,
+	String,
+	CStr,
+	CPtr,
+	Void,
+	Type,      // the `type` type itself
+	Nullable,  // ?T
+	Slice,     // []T
+	Array,     // [N]T
+	Enum,
+	Struct,
+	Union,     // A | B
+	Fn         // fn(...) : R
+}
+```
+
+- the enum is exhaustive: every type has exactly one discriminant.
+- an instantiated struct template such as `Pair[i32]` is a `.Struct`
+- `TypeKind` values are compile-time only, so a `TypeKind` scrutinee always produces a [compile-time branch](#compile-time-branches)
+- member shorthand works as it does for any enum, so `case .Struct:` needs no qualification and the name `TypeKind` rarely has to be written out
+- adding a discriminant in a future version is a breaking change; it is reported at every exhaustive `match` that does not have an empty `case:` fallback
+
+`.Void` is reachable through `void::kind` and through `typeof` applied to a void-typed call, but never as the type of a value: a template instantiated with `T = void` is a compile-time error at the call site, because no value of type `void` exists to bind to the parameter.
+
+### Type equality
+
+`==` and `!=` are defined on `type` values and compare type identity. Both operands must be compile-time types, and the result is a compile-time `bool`. This is the way to special-case one concrete type rather than a whole kind:
+
+```cpp
+if T == Vec3 {
+	print_vec3(v);
+} else {
+	print_generic(v);
+}
+```
+
+Type comparison follows the identity rules of the types themselves: structural types compare structurally, so `A | B` equals `B | A` (see [Tagged unions](#tagged-unions)), while two distinct `struct` declarations with identical fields are different types.
+
+A type comparison is always compile-time known, so an `if` on one is always a [compile-time branch](#compile-time-branches) and the branch not taken is not type-checked. That is what lets the taken branch use members that exist only on the compared type.
+
+### Reflection sequences
+
+`t::fields`, `t::values`, and `t::types` produce a struct's fields, an enum's members, or a union's member types as compile-time sequences. Each is a `comptime` slice whose element type is compile-time only:
+
+| member | element |
+| --- | --- |
+| `t::fields` | a *field cursor*: `.name`, `.type` |
+| `t::values` | an *enum cursor*: `.name`, `.value` |
+| `t::types` | a `type` |
+
+As comptime slices they are first-class: they can be bound, measured, indexed, and iterated, all at compile time.
+
+```cpp
+comptime fs    = t::fields;    // element type inferred; see below
+comptime n     = length(fs);  // the field count
+comptime first = fs[0];       // a single field cursor
+unroll for f in fs { ... }    // re-iterate a bound sequence
+```
+
+- **binding requires inference.** The cursor element types are built in and not nameable in source, so `comptime fs = t::fields` is legal but `comptime fs : []FieldCursor = t::fields` is not - there is no such spelling. `t::types` is the exception: its element type `type` *is* nameable, so `comptime ts : []type = t::types` may carry the annotation
+- `length`, indexing, and `unroll for` work as on any comptime slice
+- element types are compile-time only, so none of these sequences [materialize](#comptime-to-runtime-materialization), and a runtime `for` over one is a compile-time error
+- once bound, the value is an ordinary comptime slice with no residual tie to `t`: it can be carried out of the branch that produced it and used anywhere, because the kind was proven at the point the sequence was obtained, not at the point it is used
+
+**Field cursors carry no `.value`.** A field cursor from `t::fields` has `.name` and `.type` only. It cannot carry `.value`, because a field's value has a different type for every field while a slice has one element type. The mutable, per-field `.value` exists only in the [value form](#field-iteration) of field iteration - `unroll for f in v` over a struct *value* - where each unrolled copy binds one cursor of a single known type. That cursor can never escape into a binding, so value-side field access is loop-only; there is no `comptime fs = v.fields`.
+
+### Unroll for
+
+`unroll for` duplicates its body at compile time, once per iteration, binding the loop variable to a different compile-time *value* in each copy. Each copy is then type-checked separately - which is what allows a loop over a struct's fields to touch a differently typed field every time, even though the loop variable is a field cursor in all of them.
+
+```cpp
+unroll for i = 0..N { ... }              // range form, N comptime-known
+unroll for x in seq { ... }              // sequence form
+unroll for i, x in seq { ... }           // sequence form with index
+```
+
+- the range form requires both bounds to be compile-time integer constants; `length(arr)` on a `[N]T` is one, so `unroll for i = 0..length(arr)` unrolls a static array while the same loop over a slice must use a runtime `for`
+- the sequence form requires a comptime slice - which includes the [reflection sequences](#reflection-sequences) `t::fields`, `t::values`, `t::types` and any binding of one - or a struct **value** operand for [value-side field iteration](#field-iteration) (see [What an unrolled loop binds](#what-an-unrolled-loop-binds)). A bare struct, enum, or union *type* is not iterable; iterate its reflection sequence instead
+- the loop variable itself is a compile-time binding and cannot be reassigned in the body; this constrains the *cursor*, not the storage it denotes, so a field cursor's `f.value = x` still writes through to the field (see [Field iteration](#field-iteration))
+- because it is compile-time, expressions derived from it are resolved per copy: `f.value` has that field's type, `v is M` tests that member, and the index in `unroll for i, x in seq` is a constant, so `if i > 0 { ... }` is decided at compile time
+- a comptime slice may also be iterated with a runtime `for` when its element type has a runtime representation, in which case the loop variable is an ordinary runtime value and none of the above applies
+
+Control flow inside an unrolled body:
+
+- `return` returns from the enclosing function
+- `break` transfers past the last copy; `continue` transfers to the next copy
+- labeled `break` / `continue` work normally, including labels on an enclosing `unroll for`
+
+`unroll for` is a compile-time *duplication* construct, not a compile-time *evaluation* construct: the copies are ordinary code. In particular `break` and `continue` emit real runtime branches out of the unrolled sequence, so an unrolled loop is not guaranteed to be free of control flow.
+
+### Field iteration
+
+A struct's fields are iterated in declaration order in two forms:
+
+- **type form** - `unroll for f in S::fields` over the [reflection sequence](#reflection-sequences) of a struct **type**. Cursors carry `.name` and `.type`
+- **value form** - `unroll for f in v` over a struct **value**. Cursors additionally carry `.value`
+
+```cpp
+struct S {
+	i : i32;
+	f : f32;
+}
+
+var v : S = undefined;
+
+unroll for i, f in v {         // value form
+	if f.type == i32 {         // compile-time branch: the f32 copy is pruned
+		io.write_bytes(f.name);
+		f.value = 42;          // writes through to v.i
+	}
+}
+```
+
+The loop variable is a *field cursor* with at most three members:
+
+- `f.name` - the field's declared name, a compile-time `string`
+- `f.type` - the field's type as a compile-time `type` value, equivalent to `typeof(f.value)`
+- `f.value` - **value form only** - the field itself. This is not a copy: it is the ordinary field access `v.i` under another spelling, so `f.value = x` is legal exactly when `v.i = x` would be (mutable when `v` is a `var`, rejected on a `const` or a [temporary](#temporaries), usable as a `ref` argument), and it has that field's exact type in each unrolled copy
+
+Rules:
+
+- the type form (`S::fields`) yields cursors with `.name` and `.type`; naming `.value` on one is a compile-time error, because a type has no storage to bind. It is an ordinary [reflection sequence](#reflection-sequences), so it can also be bound, counted with `length`, and indexed
+- the value form (`v`) additionally yields `.value`, but is loop-only: it is not a slice and cannot be bound (see [Reflection sequences](#reflection-sequences))
+- both forms take the optional index binding, with the same meaning it has over any other sequence:
+
+	```cpp
+	unroll for f in v { ... }        // fields of the value, no index
+	unroll for f in S::fields { ... } // fields of the type: no f.value
+	unroll for i, f in v { ... }     // index available for separators
+	```
+
+- the operand is evaluated in the enclosing scope, so a binding that shadows it (`unroll for v in v`) is legal but makes the operand unreachable inside the body
+- the cursor type is built in and not nameable in source; cursors exist only as loop bindings and comptime values derived from them
+- an ordinary runtime `for` over a struct value is a compile-time error: each field has a different type, so there is no single type for a runtime loop variable to have
+- the number of fields is `length(S::fields)`; the `i > 0` idiom covers separators without needing it
+
+The assignment in the example type-checks only because [type equality](#type-equality) is compile-time known, so the copy generated for the `f32` field never checks its body. The same loop without the `if` would be an error on the first field whose type rejects `42`.
+
+Because the cursor binds the field directly, there is no projection operator and no field-descriptor type: a field's type name is `f.type::name`, and its value is `f.value`.
+
+### Enum iteration
+
+`State::values` is the [reflection sequence](#reflection-sequences) of an enum **type**; iterating it visits the enum's declared members in declaration order.
+
+```cpp
+enum State { Idle, Running, Done }
+
+unroll for e in State::values {
+	if v == e.value {
+		io.write_bytes(e.name);
+		return;
+	}
+}
+```
+
+The loop variable is an *enum cursor* with two members:
+
+- `e.name` - the member's declared name, a compile-time `string`
+- `e.value` - the member itself, typed as the enum. Its discriminant is `e.value as i32`, following the ordinary [enum-to-integer cast](#casts) rules
+
+Rules:
+
+- the operand is an enum type's `::values`; an enum *value* is not iterable, since it denotes one member rather than the set of them
+- as a reflection sequence it can be bound, counted with `length`, and indexed, so a name table *can* be built: `State::values[i].name`
+- the optional index binding works as it does everywhere else: `unroll for i, e in State::values { ... }`
+- the cursor type is built in and not nameable in source
+- an ordinary runtime `for` over `State::values` is a compile-time error: the cursor is compile-time only
+
+`e.name` and `e.value as i32` are still ordinary compile-time constants in each copy, so they [materialize](#comptime-to-runtime-materialization) into runtime code exactly like any other comptime string or integer.
+
+### Union iteration
+
+`T::types` is the [reflection sequence](#reflection-sequences) of a tagged union **type**; iterating it visits the union's member types in the union's canonical order (deterministic but implementation-defined, see [Tagged unions](#tagged-unions)).
+
+```cpp
+unroll for M in T::types {
+	if v is M { print(v); return; }
+}
+```
+
+The loop variable is a compile-time `type` value, not a cursor. A struct field and an enum member each bundle a name with something else, so they need one; a union member *is* a type, and its name is `M::name`, so there is nothing to bundle. `T::types` is therefore a plain `[]type` - the one reflection sequence with a nameable element type.
+
+Rules:
+
+- the operand is a union type's `::types`; a union *value* is not iterable, since it holds one member at a time - use [`match`](#tagged-unions) or `is` on the value
+- `M` is usable anywhere a compile-time type is: `v is M`, `v as M`, a variable's declared type, a template argument
+- as a reflection sequence, `T::types` can be bound (`comptime ts : []type = T::types`), counted with `length`, and indexed
+- the `is` test and the promotion it performs are the ordinary union rules; unrolling emits one test per member
+- the optional index binding works as it does everywhere else
+- an ordinary runtime `for` over `T::types` is a compile-time error: `type` values have no runtime representation
+
+### What an unrolled loop binds
+
+The iteration forms differ in what the loop variable is, decided by the operand:
+
+| operand | binding | members |
+| --- | --- | --- |
+| comptime slice | its element | whatever the element type has |
+| `t::fields` (struct type) | field cursor | `.name`, `.type` |
+| `t::values` (enum type) | enum cursor | `.name`, `.value` |
+| `t::types` (union type) | a `type` | - |
+| struct value | field cursor | `.name`, `.type`, `.value` |
+
+The three reflection sequences are themselves comptime slices, so they are subcases of the first row; they are listed separately because their element types are built in and not otherwise nameable. The struct **value** is the only non-slice operand, and the only one that binds `.value`. Enum and union *values* are not iterable at all - iterate the type's `::values` or `::types` instead.
+
+### Comptime-to-runtime materialization
+
+Introspection results are compile-time values. Some of them can cross into runtime code as constants.
+
+Materializes into a runtime constant:
+
+- comptime `string` values, such as `t::name`, `f.name`, and `e.name`, become string constants
+- comptime integers, such as `sizeof`, `alignof`, `t::length`, and `e.value as i32`, become integer constants
+- an enum cursor's `e.value` becomes an ordinary enum constant
+
+These may be passed to functions including `extern fn`, assigned to `var` and `const`, and used in any runtime expression.
+
+Stays compile-time only:
+
+- `type` values, including `typeof(...)`, `t::child`, `f.type`, and a union iteration's binding `M`
+- `TypeKind` values, including `t::kind`
+- field and enum cursors, because a cursor carries a `type` and, for a field, a binding whose type differs per unrolled copy
+- any slice whose element type is compile-time only, which is every [reflection sequence](#reflection-sequences): `t::fields`, `t::values`, and `t::types` (a `[]type`)
+
+Using a compile-time-only value in runtime position is a compile-time error.
+
+### Instantiation limits
+
+Introspection makes it easy to write a template that instantiates itself at a larger type each time:
+
+```cpp
+fn f(v : $T) : void {
+	f(wrap_in_slice(v)); // T, []T, [][]T, ...
+}
+```
+
+Template instantiation therefore has an implementation-defined depth limit, using the same mechanism as the [comptime step limit](#comptime). Exceeding it is a compile-time error reporting the instantiation stack:
+
+```txt
+demo.lum: line 12, column 2: instantiation depth limit exceeded
+  in f[[][]i32]
+  in f[[]i32]
+  in f[i32]
+```
+
 ## Runtime model
 
 Current runtime executes compiled bytecode through the public `ls_runtime` API.
@@ -1982,3 +2479,7 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 - Boolean operator coverage is incomplete because `not` appears in examples but is not specified alongside `and` and `or`.
 - Imports and `extern` bindings still need explicit collision policy for same-path/same-alias cases, builtin module boundaries, and imported declaration conflicts.
 - Function values need clearer rules for equality/identity interactions with function declarations and literals.
+- Function type decomposition is deferred: a `.Fn` type exposes only [`t::kind`](#type-members) and `t::name`; its parameter and return types have no `t::child` (which is single-operand) and no reflection sequence, so they cannot be enumerated. `.Void` is therefore observable through `void::kind` or `typeof` on a void-typed call, but a function's return type is not reachable from the function type.
+- `unroll for` accepts a struct **value** as an operand, which a runtime `for` rejects, and that operand alone binds a cursor with `.value`. The loop variable's shape (element, field cursor, enum cursor, or `type`) depends on the operand rather than on the loop syntax; see [What an unrolled loop binds](#what-an-unrolled-loop-binds).
+- Type member and cursor names (`t::name`, `f.name`, `e.name`) are unqualified declaration names. Two modules that both declare `Vec3` produce the same `t::name`, and a generic `print` cannot distinguish them; whether these should be module-qualified is unresolved, and interacts with the import collision policy noted above.
+- `length` is both a builtin over arrays, slices, and [reflection sequences](#reflection-sequences), and an ordinary function name that core modules define on structs, such as `length(v)` for a `Vec3` magnitude in [Imports](#imports). Since [overloading is not supported](#functions), the rule for which one a call selects, and whether a user declaration may take the name at all, is unspecified.
