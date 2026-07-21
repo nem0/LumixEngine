@@ -41,11 +41,6 @@ ls_result ls_runtime_set_native_function_callback(ls_runtime* runtime, ls_unit* 
 	return ls_runtime_set_native_function_callback_by_bytecode_index(runtime, (int)fn->bytecode_index, callback);
 }
 
-int ls_module_get_struct_count(ls_module* module) {
-	(void)module;
-	return 0;
-}
-
 int ls_module_get_function_count(ls_module* module) {
 	if (!module) return 0;
 	i32 count = 0;

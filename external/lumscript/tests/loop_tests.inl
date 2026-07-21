@@ -339,3 +339,260 @@ TEST(ForLoopMismatchedConcreteBoundsFail) {
 	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
+
+TEST(ForInValueOverArrayCompiles) {
+	const char* source = R"(
+		fn main() : void {
+			var arr : [3]i32 = undefined;
+			for v in arr {
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ForInIndexValueOverArrayCompiles) {
+	const char* source = R"(
+		fn main() : void {
+			var arr : [3]i32 = undefined;
+			for i, v in arr {
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ForInValueOverSliceRuntime) {
+	const char* source = R"(
+		fn sum(values : []i32) : i32 {
+			var total : i32 = 0;
+			for v in values {
+				total += v;
+			}
+			return total;
+		}
+
+		fn main() : i32 {
+			var values : [3]i32 = undefined;
+			values[0] = 1;
+			values[1] = 2;
+			values[2] = 39;
+			return sum(values);
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ForInIndexValueOverSliceRuntime) {
+	const char* source = R"(
+		fn sum(values : []i32) : i32 {
+			var total : i32 = 0;
+			for i, v in values {
+				total += i as i32 * 100 + v;
+			}
+			return total;
+		}
+
+		fn main() : i32 {
+			var values : [3]i32 = undefined;
+			values[0] = 1;
+			values[1] = 2;
+			values[2] = 3;
+			return sum(values);
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(306, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ForInValueOverSubSliceRuntime) {
+	const char* source = R"(
+		fn main() : i32 {
+			var arr : [5]i32 = undefined;
+			arr[0] = 100;
+			arr[1] = 1;
+			arr[2] = 2;
+			arr[3] = 3;
+			arr[4] = 200;
+
+			var middle : []i32 = arr[1:4];
+			var total : i32 = 0;
+			for v in middle {
+				total += v;
+			}
+			return total;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(6, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ForInIndexValueOverSubSliceRuntime) {
+	const char* source = R"(
+		fn main() : i32 {
+			var arr : [5]i32 = undefined;
+			arr[0] = 100;
+			arr[1] = 10;
+			arr[2] = 20;
+			arr[3] = 30;
+			arr[4] = 200;
+
+			var middle : []i32 = arr[1:4];
+			var total : i32 = 0;
+			for i, v in middle {
+				total += i as i32 * 1000 + v;
+			}
+			return total;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	// slice-relative indices 0,1,2 (not the backing array's 1,2,3): 10+1020+2030 = 3060
+	EXPECT_EQ(3060, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ForInIndexTypeIsIsize) {
+	const char* source = R"(
+		fn main() : void {
+			var arr : [3]i32 = undefined;
+			for i, v in arr {
+				const check : isize = i;
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ForInValueVariableIsImmutable) {
+	const char* source = R"(
+		fn main() : void {
+			var arr : [3]i32 = undefined;
+			for v in arr {
+				v = 1;
+			}
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ForInIndexVariableIsImmutable) {
+	const char* source = R"(
+		fn main() : void {
+			var arr : [3]i32 = undefined;
+			for i, v in arr {
+				i = 1;
+			}
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ForInEmptySliceDoesNotExecuteRuntime) {
+	const char* source = R"(
+		fn main() : i32 {
+			var hits : i32 = 0;
+			var arr : [3]i32 = undefined;
+			var empty : []i32 = arr[0:0];
+			for v in empty {
+				hits += 1;
+			}
+			return hits;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(NestedForInRuntime) {
+	const char* source = R"(
+		fn main() : i32 {
+			var outer : [2]i32 = undefined;
+			outer[0] = 10;
+			outer[1] = 20;
+
+			var inner : [3]i32 = undefined;
+			inner[0] = 1;
+			inner[1] = 2;
+			inner[2] = 3;
+
+			var total : i32 = 0;
+			for oi, ov in outer {
+				for iv in inner {
+					total += ov + iv + oi as i32;
+				}
+			}
+			return total;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	// outer index 0, value 10: (10+1+0)+(10+2+0)+(10+3+0) = 36
+	// outer index 1, value 20: (20+1+1)+(20+2+1)+(20+3+1) = 69
+	EXPECT_EQ(105, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(NestedForInNoIndexRuntime) {
+	const char* source = R"(
+		fn main() : i32 {
+			var outer : [2]i32 = undefined;
+			outer[0] = 10;
+			outer[1] = 20;
+
+			var inner : [3]i32 = undefined;
+			inner[0] = 1;
+			inner[1] = 2;
+			inner[2] = 3;
+
+			var total : i32 = 0;
+			for ov in outer {
+				for iv in inner {
+					total += ov + iv;
+				}
+			}
+			return total;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	// outer value 10: (10+1)+(10+2)+(10+3) = 36
+	// outer value 20: (20+1)+(20+2)+(20+3) = 66
+	EXPECT_EQ(102, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}

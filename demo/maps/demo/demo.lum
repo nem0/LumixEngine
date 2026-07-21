@@ -12,6 +12,7 @@ import "std:math"
 
 var player : ?Entity = null;
 var camera_pivot : ?Entity = null;
+var handle_input = true;
 var forward = false;
 var backward = false;
 var left = false;
@@ -26,7 +27,6 @@ var dir_input_idx = -1;
 var stance_input_idx = -1;
 var crouched = false;
 var aiming = false;
-var handle_input = true;
 var input_system : InputSystem = undefined;
 var physics_module : ?PhysicsModule = null;
 

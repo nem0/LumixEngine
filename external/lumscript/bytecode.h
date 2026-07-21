@@ -266,6 +266,13 @@ typedef struct ls_type_field_info {
 	u32 offset;       // byte offset from the start of the struct value
 } ls_type_field_info;
 
+// Describes one value of an enum type. Used at debug time to enumerate
+// enum value names and their integer values.
+typedef struct ls_type_enum_value_info {
+	ls_string_view name;
+	i32 value;
+} ls_type_enum_value_info;
+
 // The `const ls_type*` handle returned by the C API (capi.h) points directly
 // into the bytecode's type_info[] array.  The struct is fully defined here
 // (not opaque) so that debugger.c and runtime.c can access the members.
@@ -278,8 +285,11 @@ typedef struct ls_type {
 	u32 first_field_index;       // index into bytecode->type_fields[]; unused when field_count == 0
 	u32 member_count;            // 0 when kind != LS_TYPE_TAGGED_UNION
 	u32 first_member_index;      // index into bytecode->type_member_indices[]; unused when member_count == 0
+	u32 value_count;             // 0 when kind != LS_TYPE_ENUM
+	u32 first_value_index;       // index into bytecode->type_enum_values[]; unused when value_count == 0
 	u32 element_type_index;      // LS_TYPE_INDEX_NONE when kind is not ARRAY, SLICE, or NULLABLE
 	u32 array_length;            // LS_TYPE_INDEX_NONE when not ARRAY or SLICE; 0 for SLICE (dynamic length)
+	ls_string_view name;         // type name (struct name, enum name, etc.), empty if anonymous or unnamed
 } ls_type;
 
 // Debug-only description of one parameter or local's storage, used by
@@ -388,6 +398,12 @@ typedef struct ls_bytecode {
 	u32* type_member_indices;
 	u32 type_member_count;
 	u32 type_member_capacity;
+
+	// Flat array of enum value descriptors, indexed by
+	// `ls_type::first_value_index` + value index.
+	ls_type_enum_value_info* type_enum_values;
+	u32 type_enum_value_count;
+	u32 type_enum_value_capacity;
 
 	// Active breakpoint patches, set by `ls_debug_set_breakpoint`. Directly
 	// malloc'd/realloc'd and freed in `ls_bytecode_destroy`, same as this

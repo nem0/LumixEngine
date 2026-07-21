@@ -193,7 +193,6 @@ ls_result ls_module_compile(
 	void* import_resolver_userdata
 );
 
-int ls_module_get_struct_count(ls_module* module);
 int ls_module_get_function_count(ls_module* module);
 int ls_module_get_global_count(ls_module* module);
 
@@ -286,6 +285,10 @@ ls_type_kind ls_bytecode_runtime_result_kind(ls_runtime* runtime, ls_string_view
 // Returns the kind category of the type.
 ls_type_kind ls_type_get_kind(const ls_type* type);
 
+// Returns the name of the type (struct name, enum name, etc.).
+// Returns an empty string_view for anonymous or unnamed types.
+ls_string_view ls_type_get_name(const ls_type* type);
+
 // Returns the byte size of values of this type. Matches the byte_size
 // reported by ls_debug_local_value / ls_debug_global_value.
 u32 ls_type_get_size(const ls_type* type);
@@ -322,6 +325,17 @@ const ls_type* ls_type_union_member_type(const ls_type* type, u32 member_index);
 // Returns the active tag from a tagged union value. The tag is the first 4
 // bytes of the value, interpreted as a signed i32.
 i32 ls_type_union_tag(const ls_type* type, const void* value);
+
+// Introspect an enum type (valid when kind == LS_TYPE_ENUM).
+
+// Number of values (members) in the enum.
+u32 ls_type_enum_value_count(const ls_type* type);
+
+// Name of the enum value at `value_index`.
+ls_string_view ls_type_enum_value_name(const ls_type* type, u32 value_index);
+
+// Integer value of the enum value at `value_index`.
+i32 ls_type_enum_value_value(const ls_type* type, u32 value_index);
 
 // Introspect an array or slice type (valid when kind is LS_TYPE_ARRAY
 // or LS_TYPE_SLICE).

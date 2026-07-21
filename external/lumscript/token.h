@@ -57,6 +57,7 @@ struct Token {
 		REF,
 		WHILE,
 		FOR,
+		IN_KW,
 		IF,
 		ELSE,
 		IMPORT,

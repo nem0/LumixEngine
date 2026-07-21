@@ -4,13 +4,11 @@
 
 * debugger:
 	- modify variables while paused
-	- variable expansion - struct, ...
 	- conditional breakpoints
 	- data breakpoints?
 	- REPL?
 
 * editor plugins in lumscript
-
 * getNumControllerHits + getControllerHit to slices
 * get rid of std::free
 * try -
@@ -19,10 +17,10 @@
 		var v = try parse(); // propagates common subtype - Error
 	}
 
-* for i in slice/array
+* how to expose Span<const Item> foo() to script?
 * how can we push unions if we don't know the tag value of variants, i.e. U = A | B - we don't know if A's tag is 0 or 1
 * use case - comptime string hash
-* how should user implement print-s?
+* how should user implement print-s? macro or
 	fn print(v : varargs) : void {
 		for x in v {
 			match typeof(x) {
@@ -53,6 +51,12 @@
 * iterators/yield 
 	fn each(a : arr) : yield i32 { ...
 	for x in each(a) { ... }
+* extern struct or explicit field offset (so we can access C struct directly)
+	struct S {
+		x : f32 @ 4; // 4bytes offset 
+	}
+	or 
+	extern struct S { // automatically matches c abi
 
 # Goals
  * **simple** - string concatenation: `"Hello " + "World!"`. Avoid verbose low level code.
@@ -1417,6 +1421,42 @@ while current < to {
 	++current;
 }
 ```
+
+**For-in over a slice/array**
+
+```cpp
+for v in arr {
+	log.logError(v);
+}
+
+for i, v in arr {
+	log.logError(i);
+	log.logError(v);
+}
+```
+
+`for v in arr` is syntax sugar for iterating the index range and binding the element:
+
+```cpp
+for i = 0..length(arr) {
+	const v = arr[i];
+	log.logError(v);
+}
+```
+
+`for i, v in arr` is the same desugaring, additionally exposing the index as `i`:
+
+```cpp
+for i = 0..length(arr) {
+	const v = arr[i];
+	log.logError(i);
+	log.logError(v);
+}
+```
+
+- `arr` must be a static-sized array or a slice
+- `i` has type `isize`; `v` has the element type of `arr`
+- both `i` and `v` are immutable inside the loop body, like the single-variable `for` loop variable
 
 ### Break / continue / labels
 

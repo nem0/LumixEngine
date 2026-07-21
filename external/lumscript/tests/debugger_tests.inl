@@ -1369,3 +1369,254 @@ TEST(DebugTaggedUnionTagChangesWithMember) {
 	CAPI_END(module);
 	return true;
 }
+
+TEST(TypeGetNameStruct) {
+	const char* source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+
+		fn main() : i32 {
+			var v : Vec2 = { 10, 20 };
+			return v.x + v.y;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 9u, nullptr));
+	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
+
+	const ls_type* type = ls_debug_local_type(runtime, 0, 0);
+	EXPECT_TRUE(type != nullptr);
+	EXPECT_EQ((int)LS_TYPE_STRUCT, (int)ls_type_get_kind(type));
+	EXPECT_TRUE(equalStrings(ls_type_get_name(type), toLs("Vec2")));
+
+	// Null pointer safety
+	EXPECT_EQ(0u, size(ls_type_get_name(nullptr)));
+
+	EXPECT_EQ((int)LS_RESULT_OK, (int)ls_debug_resume(runtime, LS_DEBUG_CONTINUE));
+	EXPECT_EQ(30, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(TypeGetNameEnum) {
+	const char* source = R"(
+		enum State {
+			Idle,
+			Running
+		}
+
+		fn main() : i32 {
+			var s : State = .Running;
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 9u, nullptr));
+	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
+
+	const ls_type* type = ls_debug_local_type(runtime, 0, 0);
+	EXPECT_TRUE(type != nullptr);
+	EXPECT_EQ((int)LS_TYPE_ENUM, (int)ls_type_get_kind(type));
+	EXPECT_TRUE(equalStrings(ls_type_get_name(type), toLs("State")));
+
+	EXPECT_EQ((int)LS_RESULT_OK, (int)ls_debug_resume(runtime, LS_DEBUG_CONTINUE));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(TypeEnumValueIntrospectionImplicit) {
+	const char* source = R"(
+		enum Color {
+			Red,
+			Green,
+			Blue
+		}
+
+		fn main() : i32 {
+			var c : Color = .Red;
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 10u, nullptr));
+	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
+
+	const ls_type* type = ls_debug_local_type(runtime, 0, 0);
+	EXPECT_TRUE(type != nullptr);
+	EXPECT_EQ((int)LS_TYPE_ENUM, (int)ls_type_get_kind(type));
+
+	EXPECT_EQ(3u, ls_type_enum_value_count(type));
+	EXPECT_TRUE(equalStrings(ls_type_enum_value_name(type, 0), toLs("Red")));
+	EXPECT_EQ(0, ls_type_enum_value_value(type, 0));
+	EXPECT_TRUE(equalStrings(ls_type_enum_value_name(type, 1), toLs("Green")));
+	EXPECT_EQ(1, ls_type_enum_value_value(type, 1));
+	EXPECT_TRUE(equalStrings(ls_type_enum_value_name(type, 2), toLs("Blue")));
+	EXPECT_EQ(2, ls_type_enum_value_value(type, 2));
+
+	// Out-of-bounds safety
+	EXPECT_EQ(0u, size(ls_type_enum_value_name(type, 99)));
+	EXPECT_EQ(0, ls_type_enum_value_value(type, 99));
+
+	EXPECT_EQ((int)LS_RESULT_OK, (int)ls_debug_resume(runtime, LS_DEBUG_CONTINUE));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(TypeEnumValueIntrospectionExplicit) {
+	const char* source = R"(
+		enum Status {
+			Idle = 10,
+			Running = 20,
+			Error = 30
+		}
+
+		fn main() : i32 {
+			var s : Status = .Idle;
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 10u, nullptr));
+	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
+
+	const ls_type* type = ls_debug_local_type(runtime, 0, 0);
+	EXPECT_TRUE(type != nullptr);
+	EXPECT_EQ((int)LS_TYPE_ENUM, (int)ls_type_get_kind(type));
+
+	EXPECT_EQ(3u, ls_type_enum_value_count(type));
+	EXPECT_TRUE(equalStrings(ls_type_enum_value_name(type, 0), toLs("Idle")));
+	EXPECT_EQ(10, ls_type_enum_value_value(type, 0));
+	EXPECT_TRUE(equalStrings(ls_type_enum_value_name(type, 1), toLs("Running")));
+	EXPECT_EQ(20, ls_type_enum_value_value(type, 1));
+	EXPECT_TRUE(equalStrings(ls_type_enum_value_name(type, 2), toLs("Error")));
+	EXPECT_EQ(30, ls_type_enum_value_value(type, 2));
+
+	EXPECT_EQ((int)LS_RESULT_OK, (int)ls_debug_resume(runtime, LS_DEBUG_CONTINUE));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(TypeEnumValueIntrospectionMixed) {
+	const char* source = R"(
+		enum E {
+			A,
+			B = 5,
+			C,
+			D = 10,
+			E
+		}
+
+		fn main() : i32 {
+			var e : E = .A;
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 12u, nullptr));
+	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
+
+	const ls_type* type = ls_debug_local_type(runtime, 0, 0);
+	EXPECT_TRUE(type != nullptr);
+	EXPECT_EQ((int)LS_TYPE_ENUM, (int)ls_type_get_kind(type));
+
+	EXPECT_EQ(5u, ls_type_enum_value_count(type));
+	EXPECT_EQ(0, ls_type_enum_value_value(type, 0));
+	EXPECT_EQ(5, ls_type_enum_value_value(type, 1));
+	EXPECT_EQ(6, ls_type_enum_value_value(type, 2));
+	EXPECT_EQ(10, ls_type_enum_value_value(type, 3));
+	EXPECT_EQ(11, ls_type_enum_value_value(type, 4));
+
+	EXPECT_EQ((int)LS_RESULT_OK, (int)ls_debug_resume(runtime, LS_DEBUG_CONTINUE));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(TypeEnumValueIntrospectionNullSafety) {
+	EXPECT_EQ(0u, ls_type_enum_value_count(nullptr));
+	EXPECT_EQ(0u, size(ls_type_enum_value_name(nullptr, 0)));
+	EXPECT_EQ(0, ls_type_enum_value_value(nullptr, 0));
+	return true;
+}
+
+TEST(TypeGetNameNestedStruct) {
+	const char* source = R"(
+		struct Inner {
+			a : i32;
+			b : i32;
+		}
+
+		struct Outer {
+			inner : Inner;
+			sum : i32;
+		}
+
+		fn main() : i32 {
+			var v : Outer = { { 1, 2 }, 3 };
+			return v.sum;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 14u, nullptr));
+	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
+
+	const ls_type* outer = ls_debug_local_type(runtime, 0, 0);
+	EXPECT_TRUE(outer != nullptr);
+	EXPECT_EQ((int)LS_TYPE_STRUCT, (int)ls_type_get_kind(outer));
+	EXPECT_TRUE(equalStrings(ls_type_get_name(outer), toLs("Outer")));
+
+	const ls_type* inner = ls_type_struct_field_type(outer, 0);
+	EXPECT_TRUE(inner != nullptr);
+	EXPECT_EQ((int)LS_TYPE_STRUCT, (int)ls_type_get_kind(inner));
+	EXPECT_TRUE(equalStrings(ls_type_get_name(inner), toLs("Inner")));
+
+	EXPECT_EQ((int)LS_RESULT_OK, (int)ls_debug_resume(runtime, LS_DEBUG_CONTINUE));
+	EXPECT_EQ(3, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(TypeGetNamePrimitiveReturnsEmpty) {
+	const char* source = R"(
+		fn main() : i32 {
+			var x : i32 = 42;
+			return x;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
+	EXPECT_EQ((int)LS_RESULT_SUSPENDED, (int)ls_call(runtime, toLs("main")));
+
+	const ls_type* type = ls_debug_local_type(runtime, 0, 0);
+	EXPECT_TRUE(type != nullptr);
+	EXPECT_EQ((int)LS_TYPE_I32, (int)ls_type_get_kind(type));
+	// Primitive types have no name
+	EXPECT_EQ(0u, size(ls_type_get_name(type)));
+
+	EXPECT_EQ((int)LS_RESULT_OK, (int)ls_debug_resume(runtime, LS_DEBUG_CONTINUE));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}

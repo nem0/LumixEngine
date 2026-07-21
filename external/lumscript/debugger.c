@@ -339,6 +339,11 @@ ls_type_kind ls_type_get_kind(const ls_type* type) {
 	return type ? type->kind : LS_TYPE_INVALID;
 }
 
+ls_string_view ls_type_get_name(const ls_type* type) {
+	const ls_string_view empty = {NULL, NULL};
+	return type ? type->name : empty;
+}
+
 u32 ls_type_get_size(const ls_type* type) {
 	return type ? type->byte_size : 0u;
 }
@@ -394,6 +399,27 @@ i32 ls_type_union_tag(const ls_type* type, const void* value) {
 	i32 tag;
 	memcpy(&tag, value, sizeof(tag));
 	return tag;
+}
+
+u32 ls_type_enum_value_count(const ls_type* type) {
+	return (type && type->kind == LS_TYPE_ENUM) ? type->value_count : 0u;
+}
+
+ls_string_view ls_type_enum_value_name(const ls_type* type, u32 value_index) {
+	const ls_string_view empty = {NULL, NULL};
+	if (!type || type->kind != LS_TYPE_ENUM || !type->bytecode) return empty;
+	if (value_index >= type->value_count) return empty;
+	const u32 vi = type->first_value_index + value_index;
+	if (vi >= type->bytecode->type_enum_value_count) return empty;
+	return type->bytecode->type_enum_values[vi].name;
+}
+
+i32 ls_type_enum_value_value(const ls_type* type, u32 value_index) {
+	if (!type || type->kind != LS_TYPE_ENUM || !type->bytecode) return 0;
+	if (value_index >= type->value_count) return 0;
+	const u32 vi = type->first_value_index + value_index;
+	if (vi >= type->bytecode->type_enum_value_count) return 0;
+	return type->bytecode->type_enum_values[vi].value;
 }
 
 const ls_type* ls_type_array_element_type(const ls_type* type) {

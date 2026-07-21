@@ -14,6 +14,25 @@ struct Parser {
 		m_output.host = host;
 	}
 
+	// Counter for synthesizing unique hidden index names for `for v in arr` (no
+	// explicit index binding), so nested such loops never shadow one another.
+	i32 m_for_index_counter = 0;
+
+	ls_string_view makeForIndexName() {
+		char digits[32];
+		toCString(m_for_index_counter++, digits, sizeof(digits));
+		usize digits_len = 0;
+		while (digits[digits_len] != '\0') ++digits_len;
+
+		static const char prefix[] = "$for_index";
+		const usize prefix_len = sizeof(prefix) - 1;
+		ls_arena& a = m_unit.arena;
+		char* buffer = static_cast<char*>(a.allocate(a.user_data, prefix_len + digits_len, 1));
+		copyMemory(buffer, prefix, prefix_len);
+		copyMemory(buffer + prefix_len, digits, digits_len);
+		return ls_string_view{buffer, buffer + prefix_len + digits_len};
+	}
+
 	template <typename T, typename... Args>
 	T* make(Args&&... args) {
 		ls_arena& a = m_unit.arena;
@@ -109,6 +128,7 @@ struct Parser {
 			case Token::REF: return "ref";
 			case Token::WHILE: return "while";
 			case Token::FOR: return "for";
+			case Token::IN_KW: return "in";
 			case Token::IF: return "if";
 			case Token::ELSE: return "else";
 			case Token::IMPORT: return "import";
@@ -793,12 +813,77 @@ struct Parser {
 		return res;
 	}
 
+	// `for v in arr { body }` and `for i, v in arr { body }` are sugar for
+	// `for i = 0..length(arr) { const v = arr[i]; body }`, desugared here so the
+	// checker and bytecode compiler only ever see the plain range form.
+	ForStatement* forInStatement(Token for_token, ls_string_view index_name, ls_string_view value_name) {
+		ForStatement* res = makeStmt<ForStatement>(for_token);
+		res->loop_var = index_name;
+
+		Expression* arr = expression(ExprMode::HEAD);
+		if (!arr) return nullptr;
+
+		IntLiteralExpression* zero = makeExpr<IntLiteralExpression>(for_token);
+		zero->value = 0;
+		res->begin = zero;
+
+		IdentifierExpression* length_id = makeExpr<IdentifierExpression>(for_token);
+		length_id->name = makeStringView("length");
+		CallExpression* length_call = makeExpr<CallExpression>(for_token, m_unit.arena);
+		length_call->callee = length_id;
+		length_call->args.push(arr);
+		res->end = length_call;
+
+		BlockStatement* parsed_body = blockStatement();
+		if (!parsed_body) return nullptr;
+
+		if (empty(value_name)) {
+			res->body = parsed_body;
+			return res;
+		}
+
+		BlockStatement* body = makeStmt<BlockStatement>(for_token, m_unit.arena);
+
+		IdentifierExpression* index_id = makeExpr<IdentifierExpression>(for_token);
+		index_id->name = index_name;
+		BracketExpression* index_expr = makeExpr<BracketExpression>(for_token, m_unit.arena);
+		index_expr->base = arr;
+		index_expr->args.push(index_id);
+
+		VarDeclStatement* value_decl = makeStmt<VarDeclStatement>(for_token);
+		value_decl->is_immutable = true;
+		value_decl->name = value_name;
+		value_decl->expression = index_expr;
+		body->statements.push(value_decl);
+
+		for (Statement* stmt : parsed_body->statements) body->statements.push(stmt);
+
+		res->body = body;
+		return res;
+	}
+
 	ForStatement* forStatement() {
 		Token for_token = consumeToken();
 		if (for_token.type != Token::FOR) return nullptr;
 
+		ls_string_view first_name;
+		if (!consume(Token::IDENTIFIER, first_name, "Expected identifier")) return nullptr;
+
+		if (peekToken().type == Token::IN_KW) {
+			consumeToken();
+			return forInStatement(for_token, makeForIndexName(), first_name);
+		}
+
+		if (peekToken().type == Token::COMMA) {
+			consumeToken();
+			ls_string_view second_name;
+			if (!consume(Token::IDENTIFIER, second_name, "Expected identifier")) return nullptr;
+			if (!consume(Token::IN_KW)) return nullptr;
+			return forInStatement(for_token, first_name, second_name);
+		}
+
 		ForStatement* res = makeStmt<ForStatement>(for_token);
-		if (!consume(Token::IDENTIFIER, res->loop_var, "Expected identifier")) return nullptr;
+		res->loop_var = first_name;
 		if (!consume(Token::EQUAL)) return nullptr;
 
 		res->begin = expression(ExprMode::HEAD);

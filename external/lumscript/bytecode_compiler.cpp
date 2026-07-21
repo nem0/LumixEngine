@@ -276,13 +276,17 @@ struct TypeInfoBuilder {
 		info->first_field_index = 0u;
 		info->member_count = 0u;
 		info->first_member_index = 0u;
+		info->value_count = 0u;
+		info->first_value_index = 0u;
 		info->element_type_index = LS_TYPE_INDEX_NONE;
 		info->array_length = LS_TYPE_INDEX_NONE;
+		info->name = {};
 
 		switch (type->kind) {
 			case ResolvedType::STRUCT: {
 				StructResolvedType* st = static_cast<StructResolvedType*>(type);
 				info->kind = LS_TYPE_STRUCT;
+				if (st->decl) info->name = copyStringViewToArena(*bc->arena, st->decl->cached_name);
 				if (!st->decl) break;
 				info->field_count = (u32)st->decl->fields.size();
 				// First pass: resolve all field types (may recursively append
@@ -337,6 +341,31 @@ struct TypeInfoBuilder {
 				info->array_length = 0u;
 				break;
 			}
+		case ResolvedType::ENUM: {
+			EnumResolvedType* en = static_cast<EnumResolvedType*>(type);
+			info->kind = LS_TYPE_ENUM;
+			if (en->decl) {
+				info->name = copyStringViewToArena(*bc->arena, en->decl->cached_name);
+				info->value_count = (u32)en->decl->members.size();
+				info->first_value_index = bc->type_enum_value_count;
+				u64 implicit_value = 0;
+				for (i32 i = 0; i < (i32)info->value_count; ++i) {
+					EnumMember& member = en->decl->members[i];
+					u64 v = implicit_value;
+					if (member.value) {
+						ASSERT(member.value->kind == Expression::INT_LITERAL);
+						v = static_cast<IntLiteralExpression*>(member.value)->value;
+					}
+					implicit_value = v + 1;
+					ls_type_enum_value_info ev;
+					ev.name = copyStringViewToArena(*bc->arena, member.name);
+					ev.value = (i32)v;
+					ls_type_enum_value_info* dst = appendArenaArray(*bc->arena, bc->type_enum_values, bc->type_enum_value_count, bc->type_enum_value_capacity);
+					if (dst) *dst = ev;
+				}
+			}
+			break;
+		}
 			case ResolvedType::NULLABLE: {
 				NullableResolvedType* nl = static_cast<NullableResolvedType*>(type);
 				info->kind = LS_TYPE_NULLABLE;

@@ -169,7 +169,22 @@ static const char* typeName(ls_type_kind kind) {
 	}
 }
 
-static void drawPrimitiveValue(ls_type_kind kind, const void* value) {
+static void drawTypeColumn(ls_type_kind kind, const ls_type* type) {
+	if (type) {
+		const ls_string_view name = ls_type_get_name(type);
+		if (name.begin && name.begin != name.end) {
+			ImGui::Text("%.*s", int(name.end - name.begin), name.begin);
+			return;
+		}
+	}
+	if (kind == LS_TYPE_INVALID) {
+		ImGui::TextUnformatted("invalid");
+		return;
+	}
+	ImGui::TextUnformatted(typeName(kind));
+}
+
+static void drawPrimitiveValue(ls_type_kind kind, const void* value, const ls_type* type) {
 	switch (kind) {
 		case LS_TYPE_BOOL: ImGui::TextUnformatted(*(const bool*)value ? "true" : "false"); break;
 		case LS_TYPE_I8:   ImGui::Text("%d", *(const i8*)value); break;
@@ -183,8 +198,40 @@ static void drawPrimitiveValue(ls_type_kind kind, const void* value) {
 		case LS_TYPE_F32:  ImGui::Text("%g", *(const f32*)value); break;
 		case LS_TYPE_F64:  ImGui::Text("%g", *(const f64*)value); break;
 		case LS_TYPE_CPTR: ImGui::Text("0x%p", *(const void* const*)value); break;
-		case LS_TYPE_ENUM: ImGui::Text("%d", *(const i32*)value); break;
-		default:           ImGui::TextUnformatted("?"); break;
+		case LS_TYPE_STRING: {
+			const void* str_ptr = *(const void* const*)value;
+			if (str_ptr) {
+				const char* begin = *(const char**)str_ptr;
+				const char* end = *(const char**)((const u8*)str_ptr + sizeof(void*));
+				if (begin && end) {
+					ImGui::Text("\"%.*s\"", int(end - begin), begin);
+				} else {
+					ImGui::TextUnformatted("\"\"");
+				}
+			} else {
+				ImGui::TextUnformatted("null");
+			}
+			break;
+		}
+		case LS_TYPE_ENUM: {
+			const i32 v = *(const i32*)value;
+			if (type) {
+				const u32 count = ls_type_enum_value_count(type);
+				for (u32 i = 0; i < count; ++i) {
+					if (ls_type_enum_value_value(type, i) == v) {
+						const ls_string_view ev_name = ls_type_enum_value_name(type, i);
+						ImGui::Text("%.*s (%d)", int(ev_name.end - ev_name.begin), ev_name.begin, v);
+						break;
+					}
+				}
+			} else {
+				ImGui::Text("%d", v);
+			}
+			break;
+		}
+		case LS_TYPE_FUNCTION: ImGui::TextUnformatted("<function>"); break;
+		case LS_TYPE_NULL_VALUE: ImGui::TextUnformatted("null"); break;
+		default:               ImGui::TextUnformatted("invalid"); break;
 	}
 }
 
@@ -201,7 +248,7 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 		ImGui::TableNextColumn();
 		ImGui::TextDisabled("<unavailable>");
 		ImGui::TableNextColumn();
-		ImGui::TextUnformatted(typeName(kind));
+		drawTypeColumn(kind, type);
 		return;
 	}
 
@@ -216,7 +263,7 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 		ImGui::TableNextColumn();
 		ImGui::Text("(%u B)", ls_type_get_size(type));
 		ImGui::TableNextColumn();
-		ImGui::TextUnformatted("struct");
+		drawTypeColumn(kind, type);
 		if (open) {
 			for (u32 i = 0, c = ls_type_struct_field_count(type); i < c; ++i) {
 				const ls_string_view fname = ls_type_struct_field_name(type, i);
@@ -241,18 +288,42 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 			, int(name.end - name.begin)
 			, name.begin);
 		ImGui::TableNextColumn();
-		ImGui::Text("tag=%d (%u members)", tag, ls_type_union_member_count(type));
+		{
+			const u32 member_count = ls_type_union_member_count(type);
+			if (tag >= 0 && (u32)tag < member_count) {
+				const ls_type* member_type = ls_type_union_member_type(type, tag);
+				ImGui::Text("tag=%d: ", tag);
+				ImGui::SameLine();
+				if (member_type) drawTypeColumn(ls_type_get_kind(member_type), member_type);
+				else ImGui::TextUnformatted("?");
+				ImGui::SameLine();
+				ImGui::Text("(%u members)", member_count);
+			} else {
+				ImGui::Text("tag=%d (invalid) (%u members)", tag, member_count);
+			}
+		}
 		ImGui::TableNextColumn();
-		ImGui::TextUnformatted("union");
+		drawTypeColumn(kind, type);
 		if (open) {
 			const u32 member_count = ls_type_union_member_count(type);
 			if (tag >= 0 && (u32)tag < member_count) {
 				const ls_type* member_type = ls_type_union_member_type(type, tag);
 				void* payload = (u8*)value + 4;
-				const u32 member_size = member_type ? ls_type_get_size(member_type) : 0u;
-				drawVariable(ls_string_view{ "active", "active" + 6 }
-					, member_type ? ls_type_get_kind(member_type) : LS_TYPE_INVALID
-					, member_type, payload, member_size);
+				if (member_type && ls_type_get_kind(member_type) == LS_TYPE_STRUCT) {
+					for (u32 i = 0, c = ls_type_struct_field_count(member_type); i < c; ++i) {
+						const ls_string_view fname = ls_type_struct_field_name(member_type, i);
+						const u32 offset = ls_type_struct_field_offset(member_type, i);
+						const ls_type* ftype = ls_type_struct_field_type(member_type, i);
+						void* fv = (u8*)payload + offset;
+						const u32 fsize = ftype ? ls_type_get_size(ftype) : 0u;
+						drawVariable(fname, ftype ? ls_type_get_kind(ftype) : LS_TYPE_INVALID, ftype, fv, fsize);
+					}
+				} else {
+					const ls_type_kind member_kind = member_type ? ls_type_get_kind(member_type) : LS_TYPE_INVALID;
+					const u32 member_size = member_type ? ls_type_get_size(member_type) : 0u;
+					const char* value_str = "value";
+					drawVariable(ls_string_view{value_str, value_str + 5}, member_kind, member_type, payload, member_size);
+				}
 			} else {
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn();
@@ -272,13 +343,17 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 			, int(name.end - name.begin)
 			, name.begin);
 		ImGui::TableNextColumn();
+		ImGui::TextUnformatted("");
+		ImGui::TableNextColumn();
 		{
 			const u32 len = ls_type_array_length(type);
 			const ls_type* elem = ls_type_array_element_type(type);
-			ImGui::Text("[%u] %s", len, elem ? typeName(ls_type_get_kind(elem)) : "?");
+			ImGui::Text("[%u]", len);
+			if (elem) {
+				ImGui::SameLine();
+				drawTypeColumn(ls_type_get_kind(elem), elem);
+			}
 		}
-		ImGui::TableNextColumn();
-		ImGui::TextUnformatted("array");
 		if (open) {
 			const u32 len = ls_type_array_length(type);
 			const ls_type* elem = ls_type_array_element_type(type);
@@ -313,9 +388,13 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 			, int(name.end - name.begin)
 			, name.begin);
 		ImGui::TableNextColumn();
-		ImGui::Text("(%llu) %s", len, elem ? typeName(ls_type_get_kind(elem)) : "?");
+		ImGui::TextUnformatted("");
 		ImGui::TableNextColumn();
-		ImGui::TextUnformatted("slice");
+		ImGui::Text("(%llu)", len);
+		if (elem) {
+			ImGui::SameLine();
+			drawTypeColumn(ls_type_get_kind(elem), elem);
+		}
 		if (open) {
 			if (ptr && len > 0) {
 				char idx_buf[32];
@@ -348,7 +427,8 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 			ImGui::TextDisabled("null");
 		} else {
 			const ls_type* inner = ls_type_nullable_inner_type(type);
-			ImGui::TextUnformatted(inner ? typeName(ls_type_get_kind(inner)) : "?");
+			if (inner) drawTypeColumn(ls_type_get_kind(inner), inner);
+			else ImGui::TextUnformatted("?");
 		}
 		ImGui::TableNextColumn();
 		ImGui::TextUnformatted("?");
@@ -384,9 +464,9 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 	ImGui::TableNextColumn();
 	ImGui::Text("%.*s", int(name.end - name.begin), name.begin);
 	ImGui::TableNextColumn();
-	drawPrimitiveValue(kind, value);
+	drawPrimitiveValue(kind, value, type);
 	ImGui::TableNextColumn();
-	ImGui::TextUnformatted(typeName(kind));
+	drawTypeColumn(kind, type);
 	ImGui::Unindent();
 }
 
@@ -800,9 +880,10 @@ struct LumScriptDebuggerWindow final : StudioApp::GUIPlugin {
 			ls_debug_pause_event(runtime, &event);
 			ImGui::Separator();
 
-			if (ImGui::BeginTable("debugger_callstack", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY)) {
+			if (ImGui::BeginTable("debugger_callstack", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY)) {
 				ImGui::TableSetupColumn("#");
-				ImGui::TableSetupColumn("Function @ Source");
+				ImGui::TableSetupColumn("Function");
+				ImGui::TableSetupColumn("Source");
 				ImGui::TableHeadersRow();
 				for (u32 i = 0, n = ls_debug_stack_depth(runtime); i < n; ++i) {
 					ls_debug_location location;
@@ -812,7 +893,9 @@ struct LumScriptDebuggerWindow final : StudioApp::GUIPlugin {
 					ImGui::TableNextColumn();
 					ImGui::Text("%u", i);
 					ImGui::TableNextColumn();
-					ImGui::TextWrapped("%.*s @ %.*s:%u", int(name.end - name.begin), name.begin,
+					ImGui::TextWrapped("%.*s", int(name.end - name.begin), name.begin);
+					ImGui::TableNextColumn();
+					ImGui::TextWrapped("%.*s:%u",
 						int(location.source_name.end - location.source_name.begin), location.source_name.begin, location.line);
 					if (ImGui::IsItemHovered()) {
 						ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
