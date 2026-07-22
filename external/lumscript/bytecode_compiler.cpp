@@ -2993,6 +2993,12 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 			}
 			return hint;
 		}
+		case Expression::ARRAY_LITERAL: {
+			ArrayLiteralExpression& lit = static_cast<ArrayLiteralExpression&>(expr);
+			ArrayResolvedType& array = static_cast<ArrayResolvedType&>(*expr.resolved_type);
+			for (Expression* value : lit.values) compileExpressionAsType(ctx, *value, *array.element_type);
+			return LS_TYPE_ARRAY;
+		}
 		default: ASSERT(false); return LS_TYPE_INVALID;
 	}
 }
@@ -3397,6 +3403,11 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 		}
 		case Statement::IF: {
 			IfStatement& ifst = static_cast<IfStatement&>(st);
+			if (ifst.comptime_known) {
+				Statement* selected = ifst.comptime_value ? static_cast<Statement*>(ifst.body) : ifst.else_branch;
+				if (selected) compileStatement(ctx, *selected, return_kind, current_label);
+				return;
+			}
 			ExpArray<u32> false_jumps(*ctx.bytecode->arena);
 			emitCondJumps(ctx, *ifst.condition, false, false_jumps);
 			compileStatement(ctx, *ifst.body, return_kind, current_label);
@@ -3460,6 +3471,40 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			ResolvedType* value_type = fs.begin->resolved_type;
 			const ls_type_kind value_kind = valueKindForType(*value_type);
 			const u32 byte_size = typeByteSize(*value_type) == 0u ? 1u : typeByteSize(*value_type);
+			if (fs.is_unroll) {
+				const i64 begin = fs.unroll_begin;
+				const i64 end = fs.unroll_end;
+				ctx.pushScope();
+				const u32 loop_offset = ctx.addLocal(value_type, value_kind, true, &fs.slot);
+				ctx.debugLocal(fs.loop_var, fs.slot);
+				LoopBinding& loop = ctx.loops.emplace_back();
+				loop.label = current_label;
+				loop.defer_mark = (u32)ctx.deferreds.size();
+				void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
+				loop.break_jumps = ::new (break_storage) ExpArray<u32>(*ctx.bytecode->arena);
+				void* continue_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
+				loop.continue_jumps = ::new (continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
+
+				for (i64 value = begin; value < end; ++value) {
+					IntLiteralExpression iteration;
+					iteration.value = (u64)value;
+					emitLocalLiteralInitializer(ctx, loop_offset, iteration, value_kind);
+					const u32 continue_start = (u32)loop.continue_jumps->size();
+					compileStatement(ctx, *fs.body, return_kind, current_label);
+					const u32 next_iteration = (u32)ctx.code.size();
+					if (value + 1 < end) emitIncrementOrAddOne(ctx, loop_offset, value_kind);
+					const u32 continue_target = (u32)ctx.code.size();
+					for (u32 j = continue_start; j < loop.continue_jumps->size(); ++j) {
+						patchJumpRelative(ctx, (*loop.continue_jumps)[j], continue_target);
+					}
+					(void)next_iteration;
+				}
+				const u32 loop_end = (u32)ctx.code.size();
+				for (u32 break_pos : *loop.break_jumps) patchJumpRelative(ctx, break_pos, loop_end);
+				ctx.loops.pop_back();
+				ctx.popScope(return_kind, current_label);
+				return;
+			}
 			const auto isDirectRangeValue = [&](Expression& expr) {
 				if (expr.kind == Expression::INT_LITERAL || expr.kind == Expression::FLOAT_LITERAL) return true;
 				if (expr.kind != Expression::IDENTIFIER || expr.resolved_type != value_type) return false;
@@ -3574,6 +3619,10 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 		}
 		case Statement::MATCH: {
 			MatchStatement& ms = static_cast<MatchStatement&>(st);
+			if (ms.comptime_known) {
+				compileStatement(ctx, *ms.arms[(u32)ms.comptime_arm].body, return_kind, current_label);
+				return;
+			}
 			ResolvedType* subject_type = ms.subject->resolved_type;
 			const ls_type_kind subject_kind = valueKindForType(*subject_type);
 			const u32 subject_byte_size = typeByteSize(*subject_type) == 0u ? 1u : typeByteSize(*subject_type);

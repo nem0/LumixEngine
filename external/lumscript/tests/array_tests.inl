@@ -32,6 +32,111 @@ TEST(StaticArrayTypecheckAndIndexing) {
 	return true;
 }
 
+TEST(ArrayLiteralInfersFixedArray) {
+	const char* source = R"(
+		fn main() : i32 {
+			var values = [1, 2, 3];
+			return values[0] + values[2];
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ArrayLiteralChecksExpectedFixedArrayType) {
+	const char* source = R"(
+		fn main() : i32 {
+			var values : [3]i32 = [1, 2, 3];
+			return values[1];
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ArrayLiteralConvertsToSlice) {
+	const char* source = R"(
+		fn main() : i32 {
+			var values : []i32 = [1, 2, 3];
+			return values[2];
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ArrayLiteralInfersNestedArrays) {
+	const char* source = R"(
+		fn main() : i32 {
+			var values = [[1, 2], [3, 4]];
+			return values[0][1] + values[1][0];
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ArrayLiteralCanInitializeComptimeArray) {
+	const char* source = R"(
+		comptime values : [3]i32 = [1, 2, 3];
+		fn main() : i32 {
+			return values[0] + values[2];
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ArrayLiteralCanBePassedAsSlice) {
+	const char* source = R"(
+		fn first(values : []i32) : i32 { return values[0]; }
+		fn main() : i32 { return first([7, 8, 9]); }
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ArrayLiteralAllowsExpectedElementConversion) {
+	const char* source = R"(
+		fn main() : f32 {
+			var values : [2]f32 = [1, 2];
+			return values[0] + values[1];
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ArrayLiteralRejectsWrongFixedArrayLength) {
+	const char* source = R"(
+		fn main() : void {
+			var values : [2]i32 = [1, 2, 3];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ArrayLiteralRejectsIncompatibleElement) {
+	const char* source = R"(
+		fn main() : void {
+			var values : [2]i32 = [1, "bad"];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ArrayLiteralRejectsEmptyLiteral) {
+	const char* source = R"(
+		fn main() : void {
+			var values = [];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(StaticArrayConstantIndexOutOfRangeFails) {
 	const char* source = R"(
 		fn main() : void {

@@ -128,6 +128,7 @@ struct Parser {
 			case Token::REF: return "ref";
 			case Token::WHILE: return "while";
 			case Token::FOR: return "for";
+			case Token::UNROLL: return "unroll";
 			case Token::IN_KW: return "in";
 			case Token::IF: return "if";
 			case Token::ELSE: return "else";
@@ -345,6 +346,22 @@ struct Parser {
 					return nullptr;
 				}
 				return structLiteralBody(nullptr, token);
+			case Token::LEFT_BRACKET: {
+				ArrayLiteralExpression* expr = makeExpr<ArrayLiteralExpression>(token, m_unit.arena);
+				while (peekToken().type != Token::RIGHT_BRACKET) {
+					if (peekToken().type == Token::END_OF_FILE) {
+						m_output.error("Unexpected end of file");
+						return nullptr;
+					}
+					Expression* value = expression();
+					if (!value) return nullptr;
+					expr->values.push(value);
+					if (peekToken().type != Token::COMMA) break;
+					consumeToken();
+				}
+				if (!consume(Token::RIGHT_BRACKET)) return nullptr;
+				return expr;
+			}
 			case Token::LEFT_PAREN: {
 				Expression* expr = expression();
 				if (!expr) return nullptr;
@@ -921,6 +938,18 @@ struct Parser {
 		return forRangeStatement(for_token, first_name, begin);
 	}
 
+	ForStatement* unrollForStatement() {
+		Token unroll_token = consumeToken();
+		if (unroll_token.type != Token::UNROLL) return nullptr;
+		if (peekToken().type != Token::FOR) {
+			m_output.errorAt(peekToken(), "Expected for after unroll");
+			return nullptr;
+		}
+		ForStatement* res = forStatement();
+		if (res) res->is_unroll = true;
+		return res;
+	}
+
 	WhileStatement* whileStatement() {
 		Token while_token = consumeToken();
 		if (while_token.type != Token::WHILE) return nullptr;
@@ -1041,7 +1070,7 @@ struct Parser {
 	BlockStatement* matchArmBody() {
 		BlockStatement* body = makeStmt<BlockStatement>(peekToken(), m_unit.arena);
 		for (;;) {
-			switch (peekToken().type) {
+		 switch (peekToken().type) {
 				case Token::END_OF_FILE:
 					m_output.error("Unexpected end of file");
 					return nullptr;
@@ -1117,6 +1146,7 @@ struct Parser {
 			case Token::LEFT_BRACE: return blockStatement();
 			case Token::WHILE: return whileStatement();
 			case Token::FOR: return forStatement();
+			case Token::UNROLL: return unrollForStatement();
 			case Token::CONST:
 			case Token::VAR: return varDecl();
 			case Token::RETURN: return returnStatement();

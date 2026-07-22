@@ -78,6 +78,8 @@ struct IfStatement : Statement {
 	Expression* condition = nullptr;
 	BlockStatement* body = nullptr;
 	Statement* else_branch = nullptr;
+	bool comptime_known = false;
+	bool comptime_value = false;
 };
 
 struct MatchPattern {
@@ -98,6 +100,8 @@ struct MatchStatement : Statement {
 
 	Expression* subject = nullptr;
 	ExpArray<MatchArm> arms;
+	bool comptime_known = false;
+	i32 comptime_arm = -1;
 };
 
 struct WhileStatement : Statement {
@@ -115,6 +119,9 @@ struct ForStatement : Statement {
 	Expression* end = nullptr;
 	BlockStatement* body = nullptr;
 	StorageSlot slot;
+	bool is_unroll = false;
+	i64 unroll_begin = 0;
+	i64 unroll_end = 0;
 };
 
 struct BreakStatement : Statement {

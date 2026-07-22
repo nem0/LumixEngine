@@ -2,6 +2,10 @@
 
 # TODO
 
+* 1'000'000 / 1_000_000
+* FourCC? `ABCD`
+* i32::min, i32::max, T::size, T::alignmennt, T::kind
+* bit set / flags / something else?
 * null propagation a?.b?.c;
 * list of keywords and forbid identifier colliding with keywords
 * debugger:
@@ -1219,6 +1223,29 @@ var d : [16]i32 = undefined;
 d[0] = 42;
 const first : i32 = d[0];
 ```
+
+Array literals use brackets and infer a fixed-size array type from their
+elements:
+
+```cpp
+var a = [1, 2, 3];             // inferred as [3]i32
+var b : [3]i32 = [1, 2, 3];
+var c : []i32 = [1, 2, 3];     // array-to-slice conversion
+comptime values : []i32 = [1, 2, 3];
+```
+
+Literal rules:
+
+- `[x, y, z]` has array type `[3]T`, where `T` is inferred from the elements
+  or supplied by the expected type.
+- Every element must be compatible with the inferred or expected element type.
+- Assignment to `[N]T` requires exactly `N` elements.
+- Assignment to `[]T` creates a slice view of the literal's backing array; it
+  does not copy the elements.
+- Empty array literals are not currently supported; `[N]T` requires a
+  positive compile-time `N`.
+- Nested literals construct nested arrays, for example
+  `[[1, 2], [3, 4]]` has type `[2][2]i32`.
 
 Type rules:
 
@@ -2640,7 +2667,7 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 - `StringIsReservedKeyword`
 - `match` needs tighter rules for what counts as a valid pattern expression, how string subjects behave, and the exact duplicate/exhaustiveness policy for non-enum subjects.
 - `for` ranges should define whether bounds must match exactly, what type the loop variable has, and what happens for descending or overflowing ranges.
-- Static-sized arrays are missing rules for literal syntax, copy semantics, passing/returning by value, and comparison behavior. Nesting now reads left-to-right: `[4][8]i32` is an array of 4 arrays of 8 ints; `[][4]i32` is a slice of arrays of 4 ints.
+- Static-sized arrays still need complete rules for copy semantics, passing/returning by value, and comparison behavior. Nesting reads left-to-right: `[4][8]i32` is an array of 4 arrays of 8 ints; `[][4]i32` is a slice of arrays of 4 ints.
 - Nullable promotion should define `else if`, compound conditions, and scope boundaries in more detail.
 - `defer` should define behavior on `break`, `continue`, runtime errors, and nested scopes, not only normal exit and `return`.
 - Imports and `extern` bindings still need explicit collision policy for same-path/same-alias cases, builtin module boundaries, and imported declaration conflicts.

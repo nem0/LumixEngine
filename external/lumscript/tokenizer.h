@@ -221,7 +221,14 @@ struct Tokenizer {
 			case 'u': {
 				if (u32(m_current - m_start_token) < 2) return makeToken(Token::IDENTIFIER);
 				switch (m_start_token[1]) {
-					case 'n': return checkKeyword("defined", 2, 7, Token::UNDEFINED);
+					case 'n': {
+						if (u32(m_current - m_start_token) < 3) return makeToken(Token::IDENTIFIER);
+						switch (m_start_token[2]) {
+							case 'd': return checkKeyword("efined", 3, 6, Token::UNDEFINED);
+							case 'r': return checkKeyword("oll", 3, 3, Token::UNROLL);
+						}
+						break;
+					}
 					case '8': return checkKeyword("", 2, 0, Token::U8);
 					case '1': return checkKeyword("6", 2, 1, Token::U16);
 					case '3': return checkKeyword("2", 2, 1, Token::U32);

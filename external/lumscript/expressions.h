@@ -78,6 +78,7 @@ struct Expression {
 		SLICE,
 		// Struct literal such as `Vec3 { 1, 2, 3 }`.
 		STRUCT_LITERAL,
+		ARRAY_LITERAL,
 		// `fn (...) ... { ... }` creates a function value. A named function is just a
 		// symbol bound to one of these expressions.
 		FUNCTION,
@@ -278,6 +279,12 @@ struct StructLiteralExpression : Expression {
 	StructLiteralExpression(ls_arena& arena) : Expression(STRUCT_LITERAL), values(arena) {}
 
 	Expression* type = nullptr;
+	ExpArray<Expression*> values;
+};
+
+struct ArrayLiteralExpression : Expression {
+	ArrayLiteralExpression(ls_arena& arena) : Expression(ARRAY_LITERAL), values(arena) {}
+
 	ExpArray<Expression*> values;
 };
 
