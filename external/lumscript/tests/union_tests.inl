@@ -605,6 +605,7 @@ TEST(UnionIsAndAsRuntime) {
 		fn main() : i32 {
 			var value : Union = A { 7 };
 			var result : i32 = 0;
+			var maybe_b : ?B = value as B;
 			if value is A {
 				result = value.x;
 			}
@@ -615,7 +616,6 @@ TEST(UnionIsAndAsRuntime) {
 			if maybe_a != null {
 				result = result + maybe_a.x;
 			}
-			var maybe_b : ?B = value as B;
 			if maybe_b == null {
 				return result + 1;
 			}

@@ -3153,6 +3153,32 @@ struct Checker {
 		return false;
 	}
 
+	// True when every path exits the loop containing the statement.  This is
+	// intentionally conservative: a loop body may run zero times, but a
+	// branch inside the body can still make the statements after that branch
+	// reachable only through its other arm.
+	static bool statementAlwaysExitsLoop(Statement& st) {
+		switch (st.kind) {
+			case Statement::BREAK:
+			case Statement::CONTINUE: return true;
+			case Statement::BLOCK: {
+				BlockStatement& block = static_cast<BlockStatement&>(st);
+				for (Statement* child : block.statements) {
+					if (statementAlwaysExitsLoop(*child)) return true;
+				}
+				return false;
+			}
+			case Statement::LABEL: return statementAlwaysExitsLoop(*static_cast<LabelStatement&>(st).statement);
+			case Statement::IF: {
+				IfStatement& ifst = static_cast<IfStatement&>(st);
+				return ifst.else_branch
+					&& statementAlwaysExitsLoop(*ifst.body)
+					&& statementAlwaysExitsLoop(*ifst.else_branch);
+			}
+			default: return false;
+		}
+	}
+
 	bool checkFunctionBody(Unit& unit, FunctionExpression& fn) {
 		if (!fn.body) return true;
 		ASSERT(fn.body->kind == Statement::BLOCK);
@@ -3341,6 +3367,7 @@ struct Checker {
 		// Detect `x != null` / `x == null` to narrow x inside the respective branch.
 		ls_string_view narrowed_name = {};
 		ResolvedType* narrowed_type = nullptr;
+		ResolvedType* subject_type = nullptr;
 		bool narrowed_is_immutable = false;
 		bool narrow_in_true = false;
 		StorageSlot* narrowed_slot = nullptr;
@@ -3370,6 +3397,7 @@ struct Checker {
 				}
 			}
 			else if (bin->op == Token::IS && bin->lhs && bin->lhs->kind == Expression::IDENTIFIER) {
+				subject_type = bin->lhs->resolved_type;
 				ResolvedType* member = bin->rhs ? unwrapMeta(bin->rhs->resolved_type) : nullptr;
 				if (member) {
 					IdentifierExpression* id = static_cast<IdentifierExpression*>(bin->lhs);
@@ -3387,12 +3415,37 @@ struct Checker {
 			}
 		}
 
-		auto checkBranchWithNarrowing = [&](Statement* branch, bool apply_narrowing) -> bool {
-			if (apply_narrowing && narrowed_type) {
+		ResolvedType* residual_type = nullptr;
+		if (subject_type && subject_type->kind == ResolvedType::UNION && narrowed_type) {
+			UnionResolvedType& subject_union = static_cast<UnionResolvedType&>(*subject_type);
+			u32 residual_count = 0;
+			ResolvedType* residual_member = nullptr;
+			for (ResolvedType* candidate : subject_union.members) {
+				if (typesEqual(candidate, narrowed_type)) continue;
+				residual_member = candidate;
+				++residual_count;
+			}
+			if (residual_count == 0) {
+				errorLine(ifst.token, "Union narrowing leaves no members");
+				return false;
+			}
+			if (residual_count == 1) {
+				residual_type = residual_member;
+			} else {
+				UnionResolvedType* residual_union = makeType<UnionResolvedType>(unit, unit.arena);
+				for (ResolvedType* candidate : subject_union.members) {
+					if (!typesEqual(candidate, narrowed_type)) residual_union->members.push(candidate);
+				}
+				residual_type = residual_union;
+			}
+		}
+
+		auto checkBranchWithNarrowing = [&](Statement* branch, ResolvedType* branch_type) -> bool {
+			if (branch && branch_type) {
 				pushScope(ctx);
 				SemanticLocalBinding& nb = ctx.locals.emplace_back();
 				nb.name = narrowed_name;
-				nb.type = narrowed_type;
+				nb.type = branch_type;
 				nb.is_immutable = narrowed_is_immutable;
 				nb.slot = narrowed_slot;
 				bool ok = checkStatement(unit, ctx, branch, return_type, {});
@@ -3402,17 +3455,24 @@ struct Checker {
 			return checkStatement(unit, ctx, branch, return_type, {});
 		};
 
-		if (!checkBranchWithNarrowing(ifst.body, narrow_in_true)) return false;
-		if (!checkBranchWithNarrowing(ifst.else_branch, !narrow_in_true)) return false;
+		ResolvedType* true_branch_type = narrow_in_true ? narrowed_type : residual_type;
+		ResolvedType* false_branch_type = narrow_in_true ? residual_type : narrowed_type;
+		if (!checkBranchWithNarrowing(ifst.body, true_branch_type)) return false;
+		if (!checkBranchWithNarrowing(ifst.else_branch, false_branch_type)) return false;
 
-		// A terminating branch leaves only the branch where the nullable value was non-null.
-		const bool continues_with_narrowed_value = narrowed_type
-			&& ((!narrow_in_true && statementAlwaysReturns(*ifst.body))
-				|| (narrow_in_true && ifst.else_branch && statementAlwaysReturns(*ifst.else_branch)));
-		if (continues_with_narrowed_value) {
+		// A terminating branch leaves only the type from the branch that can
+		// continue.  For unions this is the residual, not the tested member.
+		const bool true_exits = ifst.body && statementAlwaysReturns(*ifst.body);
+		const bool false_exits = ifst.else_branch && statementAlwaysReturns(*ifst.else_branch);
+		const bool true_exits_loop = ifst.body && !ctx.loop_labels.empty() && statementAlwaysExitsLoop(*ifst.body);
+		const bool false_exits_loop = ifst.else_branch && !ctx.loop_labels.empty() && statementAlwaysExitsLoop(*ifst.else_branch);
+		ResolvedType* continues_type = nullptr;
+		if (true_exits || true_exits_loop) continues_type = false_branch_type;
+		else if (false_exits || false_exits_loop) continues_type = true_branch_type;
+		if (continues_type) {
 			SemanticLocalBinding& nb = ctx.locals.emplace_back();
 			nb.name = narrowed_name;
-			nb.type = narrowed_type;
+			nb.type = continues_type;
 			nb.is_immutable = narrowed_is_immutable;
 			nb.slot = narrowed_slot;
 		}
