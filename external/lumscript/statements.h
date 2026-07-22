@@ -60,6 +60,7 @@ struct VarDeclStatement : Statement {
 	bool else_return_zero = false;
 	u64 else_return_target_mask = 0;
 	bool is_immutable = false;
+	bool is_comptime = false;
 	StorageSlot slot;
 };
 

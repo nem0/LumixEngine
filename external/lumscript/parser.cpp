@@ -165,6 +165,7 @@ struct Parser {
 			case Token::BYTE: return "byte";
 			case Token::SIZEOF: return "sizeof";
 			case Token::ALIGNOF: return "alignof";
+			case Token::TYPEOF: return "typeof";
 			case Token::COMPTIME: return "comptime";
 			default: ASSERT(false); return "Unknown";
 		}
@@ -360,6 +361,14 @@ struct Parser {
 					consumeToken();
 				}
 				if (!consume(Token::RIGHT_BRACKET)) return nullptr;
+				return expr;
+			}
+			case Token::TYPEOF: {
+				TypeofExpression* expr = makeExpr<TypeofExpression>(token);
+				if (!consume(Token::LEFT_PAREN)) return nullptr;
+				expr->operand = expression();
+				if (!expr->operand) return nullptr;
+				if (!consume(Token::RIGHT_PAREN)) return nullptr;
 				return expr;
 			}
 			case Token::LEFT_PAREN: {
@@ -822,10 +831,11 @@ struct Parser {
 
 	VarDeclStatement* varDecl() {
 		Token type_token = consumeToken();
-		if (type_token.type != Token::CONST && type_token.type != Token::VAR) return nullptr;
+		if (type_token.type != Token::CONST && type_token.type != Token::VAR && type_token.type != Token::COMPTIME) return nullptr;
 
 		VarDeclStatement* res = makeStmt<VarDeclStatement>(type_token);
 		res->is_immutable = type_token.type == Token::CONST;
+		res->is_comptime = type_token.type == Token::COMPTIME;
 		if (!consume(Token::IDENTIFIER, res->name, "Expected identifier")) return nullptr;
 		if (peekToken().type == Token::COLON) {
 			consumeToken();
@@ -1148,7 +1158,8 @@ struct Parser {
 			case Token::FOR: return forStatement();
 			case Token::UNROLL: return unrollForStatement();
 			case Token::CONST:
-			case Token::VAR: return varDecl();
+			case Token::VAR:
+			case Token::COMPTIME: return varDecl();
 			case Token::RETURN: return returnStatement();
 			case Token::IF: return ifStatement();
 			case Token::DEFER: return deferStatement();

@@ -87,6 +87,7 @@ struct Expression {
 		// `struct { ... }` creates a comptime type value.
 		STRUCT,
 		UNDEFINED, // var a : i32 = undefined;
+		TYPEOF,
 		// `sizeof(T)` / `alignof(T)` - produces an untyped integer constant.
 		SIZEOF,
 		// $T
@@ -280,6 +281,12 @@ struct StructLiteralExpression : Expression {
 
 	Expression* type = nullptr;
 	ExpArray<Expression*> values;
+};
+
+struct TypeofExpression : Expression {
+	TypeofExpression() : Expression(TYPEOF) {}
+
+	Expression* operand = nullptr;
 };
 
 struct ArrayLiteralExpression : Expression {

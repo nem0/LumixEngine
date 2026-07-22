@@ -96,6 +96,7 @@ struct Token {
 		ALIGNOF,
 		COMPTIME,
 		TYPE_KW,
+		TYPEOF,
 	};
 
 	Type type = END_OF_FILE;

@@ -3357,6 +3357,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 	switch (st.kind) {
 		case Statement::VAR_DECL: {
 			VarDeclStatement& var = static_cast<VarDeclStatement&>(st);
+			if (var.is_comptime) return;
 			ResolvedType* value_type = var.resolved_type;
 			const ls_type_kind kind = valueKindForType(*value_type);
 			const u32 offset = ctx.addLocal(value_type, kind, false, &var.slot);

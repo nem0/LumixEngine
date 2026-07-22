@@ -214,7 +214,11 @@ struct Tokenizer {
 				if (u32(m_current - m_start_token) < 2) return makeToken(Token::IDENTIFIER);
 				switch (m_start_token[1]) {
 					case 'r': return checkKeyword("ue", 2, 2, Token::TRUE);
-					case 'y': return checkKeyword("pe", 2, 2, Token::TYPE_KW);
+					case 'y': {
+						if (u32(m_current - m_start_token) == 6 && compareMemory(m_start_token + 2, "peof", 4) == 0)
+							return makeToken(Token::TYPEOF);
+						return checkKeyword("pe", 2, 2, Token::TYPE_KW);
+					}
 				}
 				break;
 			}

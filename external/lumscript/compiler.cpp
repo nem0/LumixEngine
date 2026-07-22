@@ -245,6 +245,8 @@ struct Checker {
 		ls_string_view name = {};
 		ResolvedType* type = nullptr;
 		bool is_immutable = false;
+		bool is_comptime = false;
+		ComptimeValue comptime_value;
 		// Slot of the underlying declaration (frame slot for locals, the symbol's
 		// global slot when the binding narrows a global).
 		StorageSlot* slot = nullptr;
@@ -419,7 +421,7 @@ struct Checker {
 
 	// TODO full comptime eval 
 	// TODO error msgs
-	ComptimeValue resolveComptimeValue(Unit& unit, Expression& expr, TemplateBindings* bindings = nullptr) {
+	ComptimeValue resolveComptimeValue(Unit& unit, Expression& expr, TemplateBindings* bindings = nullptr, FunctionCheckContext* ctx = nullptr) {
 		switch (expr.kind) {
 			case Expression::RESOLVED_TYPE:
 				return ComptimeValue(static_cast<ResolvedTypeExpression&>(expr).type);
@@ -581,6 +583,12 @@ struct Checker {
 				}
 				return out;
 			}
+			case Expression::TYPEOF: {
+				TypeofExpression& typeof_expr = static_cast<TypeofExpression&>(expr);
+				return typeof_expr.operand && typeof_expr.operand->resolved_type
+					? ComptimeValue(typeof_expr.operand->resolved_type)
+					: ComptimeValue();
+			}
 			case Expression::INT_LITERAL: {
 				const u64 value = static_cast<IntLiteralExpression&>(expr).value;
 				if (value > 9223372036854775807ull) {
@@ -600,6 +608,11 @@ struct Checker {
 			}
 			case Expression::IDENTIFIER: {
 				IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
+				if (ctx) {
+					if (SemanticLocalBinding* local = findLocal(*ctx, id.name)) {
+						return local->is_comptime ? local->comptime_value : ComptimeValue();
+					}
+				}
 				if (TemplateBinding* binding = findTemplateBinding(bindings, id.name)) {
 					if (binding->arg.kind == ComptimeValue::TYPE) expr.resolved_type = binding->arg.type;
 					return binding->arg;
@@ -679,8 +692,8 @@ struct Checker {
 			}
 			case Expression::BINARY: {
 				BinaryExpression& bin = static_cast<BinaryExpression&>(expr);
-				ComptimeValue lhs = resolveComptimeValue(unit, *bin.lhs, bindings);
-				ComptimeValue rhs = resolveComptimeValue(unit, *bin.rhs, bindings);
+				ComptimeValue lhs = resolveComptimeValue(unit, *bin.lhs, bindings, ctx);
+				ComptimeValue rhs = resolveComptimeValue(unit, *bin.rhs, bindings, ctx);
 				if (lhs.kind == ComptimeValue::INVALID || rhs.kind == ComptimeValue::INVALID) {
 					// TODO create a test to hit this
 					return {};
@@ -750,7 +763,7 @@ struct Checker {
 					// TODO create a test to hit this
 					return {};
 				}
-				ComptimeValue out = resolveComptimeValue(unit, *un.expression, bindings);
+				ComptimeValue out = resolveComptimeValue(unit, *un.expression, bindings, ctx);
 				if (out.kind == ComptimeValue::INVALID) {
 					// TODO create a test to hit this
 					return {};
@@ -764,14 +777,14 @@ struct Checker {
 			}
 			case Expression::TERNARY: {
 				TernaryExpression& tern = static_cast<TernaryExpression&>(expr);
-				ComptimeValue cond = resolveComptimeValue(unit, *tern.condition, bindings);
+				ComptimeValue cond = resolveComptimeValue(unit, *tern.condition, bindings, ctx);
 				if (cond.kind == ComptimeValue::INVALID)
 					// TODO create a test to hit this
 					return {};
 
 				ComptimeValue result = cond.asInt() != 0
-					? resolveComptimeValue(unit, *tern.true_expr, bindings)
-					: resolveComptimeValue(unit, *tern.false_expr, bindings);
+					? resolveComptimeValue(unit, *tern.true_expr, bindings, ctx)
+					: resolveComptimeValue(unit, *tern.false_expr, bindings, ctx);
 				return result;
 			}
 			case Expression::UNDEFINED:
@@ -973,6 +986,13 @@ struct Checker {
 			}
 			case Expression::NULL_LITERAL: out = makeType<NullLiteralExpression>(unit); break;
 			case Expression::UNDEFINED: out = makeType<UndefinedExpression>(unit); break;
+			case Expression::TYPEOF: {
+				TypeofExpression* s = static_cast<TypeofExpression*>(src);
+				TypeofExpression* typeof_expr = makeType<TypeofExpression>(unit);
+				typeof_expr->operand = cloneExpression(unit, s->operand, bindings);
+				out = typeof_expr;
+				break;
+			}
 			case Expression::TYPE_LITERAL: out = makeType<TypeLiteralExpression>(unit, static_cast<TypeLiteralExpression*>(src)->type); break;
 			case Expression::GENERIC_IDENTIFIER: {
 				GenericIdentifierExpression* s = static_cast<GenericIdentifierExpression*>(src);
@@ -1161,6 +1181,7 @@ struct Checker {
 				st->else_return_zero = s->else_return_zero;
 				st->else_return_target_mask = s->else_return_target_mask;
 				st->is_immutable = s->is_immutable;
+				st->is_comptime = s->is_comptime;
 				out = st;
 				break;
 			}
@@ -1261,8 +1282,8 @@ struct Checker {
 
 	// Resolve a type-denoting expression to a semantic type. Keeping this type-only
 	// wrapper prevents general compile-time values from being accepted in annotations.
-	ResolvedType* resolveTypeExpr(Unit& unit, Expression& expr, TemplateBindings* bindings = nullptr) {
-		ComptimeValue value = resolveComptimeValue(unit, expr, bindings);
+	ResolvedType* resolveTypeExpr(Unit& unit, Expression& expr, TemplateBindings* bindings = nullptr, FunctionCheckContext* ctx = nullptr) {
+		ComptimeValue value = resolveComptimeValue(unit, expr, bindings, ctx);
 		if (value.kind == ComptimeValue::INVALID) return nullptr;
 		if (value.kind != ComptimeValue::TYPE) {
 			errorLine(expr.token, "Expected a type expression, but got ", value.kind);
@@ -1939,7 +1960,7 @@ struct Checker {
 			return LS_RESULT_FAILURE;
 		}
 
-		if (sym.expression && (sym.expression->kind == Expression::TYPE_LITERAL || sym.expression->kind == Expression::UNION_TYPE)) {
+		if (sym.expression && (sym.expression->kind == Expression::TYPE_LITERAL || sym.expression->kind == Expression::UNION_TYPE || sym.expression->kind == Expression::TYPEOF)) {
 			MetaType* meta = makeType<MetaType>(unit);
 			meta->inner = expr_type;
 			sym.resolved_type = meta;
@@ -2361,8 +2382,17 @@ struct Checker {
 		// typeless struct literals are not allowed in operators
 		// so we can't use structs as hints
 		const bool lhs_is_struct = lhs && lhs->kind == ResolvedType::STRUCT;
+		const bool previous_comptime_only = ctx && ctx->comptime_only;
+		if (ctx && bin.op == Token::IS) ctx->comptime_only = true;
 		ResolvedType* rhs = checkExpr(unit, ctx, *bin.rhs, lhs_is_struct ? nullptr : (lhs ? lhs : hint));
+		if (ctx && bin.op == Token::IS) ctx->comptime_only = previous_comptime_only;
 		if (!rhs) return nullptr;
+		if (bin.op == Token::IS && rhs->kind != ResolvedType::META && bin.rhs->kind == Expression::TYPE_LITERAL) {
+			MetaType* meta = makeType<MetaType>(unit);
+			meta->inner = rhs;
+			rhs = meta;
+			bin.rhs->resolved_type = meta;
+		}
 		// Retry the lhs once the rhs gives it a non-struct contextual type.
 		// try to use rhs's type as hint for lhs, e.g. 2 * v, or .Idle == e
 		if (!lhs) lhs = checkExpr(unit, ctx, *bin.lhs, rhs->kind == ResolvedType::STRUCT ? nullptr : rhs);
@@ -2381,6 +2411,20 @@ struct Checker {
 			}
 			errorLine(expr.token, "Type ", member, " is not a member of union ", lhs);
 			return nullptr;
+		}
+		if (bin.op == Token::EQUAL_EQUAL || bin.op == Token::BANG_EQUAL) {
+			const bool lhs_type_value = lhs->kind == ResolvedType::META
+				|| bin.lhs->kind == Expression::TYPE_LITERAL || bin.lhs->kind == Expression::TYPEOF;
+			const bool rhs_type_value = rhs->kind == ResolvedType::META
+				|| bin.rhs->kind == Expression::TYPE_LITERAL || bin.rhs->kind == Expression::TYPEOF;
+			if (lhs_type_value || rhs_type_value) {
+				if (!lhs_type_value || !rhs_type_value) {
+					errorLine(expr.token, "Type equality requires two compile-time type values");
+					return nullptr;
+				}
+				expr.resolved_type = primitiveType(ResolvedType::BOOL);
+				return expr.resolved_type;
+			}
 		}
 
 		// operator overload, at least one of operands must be struct
@@ -3074,6 +3118,29 @@ struct Checker {
 				expr.resolved_type = static_cast<ResolvedTypeExpression&>(expr).type;
 				return expr.resolved_type;
 			}
+			case Expression::TYPEOF: {
+				if (!ctx || !ctx->comptime_only) {
+					errorLine(expr.token, "typeof can only be used in a comptime context");
+					return nullptr;
+				}
+				TypeofExpression& typeof_expr = static_cast<TypeofExpression&>(expr);
+				if (!typeof_expr.operand || typeof_expr.operand->kind == Expression::TYPE_LITERAL
+					|| typeof_expr.operand->kind == Expression::UNION_TYPE
+					|| typeof_expr.operand->kind == Expression::FUNCTION_TYPE
+					|| typeof_expr.operand->kind == Expression::ARRAY_TYPE
+					|| typeof_expr.operand->kind == Expression::SLICE_TYPE
+					|| typeof_expr.operand->kind == Expression::NULLABLE_TYPE) {
+					errorLine(expr.token, "typeof expects a value expression");
+					return nullptr;
+				}
+				const bool previous_comptime_only = ctx->comptime_only;
+				ctx->comptime_only = false;
+				ResolvedType* operand_type = checkExpr(unit, ctx, *typeof_expr.operand, nullptr);
+				ctx->comptime_only = previous_comptime_only;
+				if (!operand_type) return nullptr;
+				expr.resolved_type = operand_type;
+				return operand_type;
+			}
 			case Expression::TYPE_LITERAL: {
 				if (!ctx) {
 					errorLine(expr.token, "Cannot use type literal outside of a comptime context");
@@ -3384,7 +3451,7 @@ struct Checker {
 
 		ResolvedType* annotation = nullptr;
 		if (var.type_expr) {
-			annotation = resolveTypeExpr(unit, *var.type_expr);
+			annotation = resolveTypeExpr(unit, *var.type_expr, nullptr, &ctx);
 			if (!annotation) {
 				// TODO can we even get here?
 				return false;
@@ -3405,8 +3472,24 @@ struct Checker {
 			}
 		}
 
+		const bool previous_comptime_only = ctx.comptime_only;
+		if (var.is_comptime) ctx.comptime_only = true;
 		ResolvedType* expr_type = checkExprMaterialized(unit, &ctx, *var.expression, annotation);
+		ctx.comptime_only = previous_comptime_only;
 		if (!expr_type) return false;
+		if (var.is_comptime) {
+			ComptimeValue value = resolveComptimeValue(unit, *var.expression, nullptr, &ctx);
+			if (value.kind == ComptimeValue::INVALID) return false;
+			var.resolved_type = value.kind == ComptimeValue::TYPE ? static_cast<ResolvedType*>(makeType<MetaType>(unit)) : expr_type;
+			if (value.kind == ComptimeValue::TYPE) static_cast<MetaType*>(var.resolved_type)->inner = value.type;
+			SemanticLocalBinding& binding = ctx.locals.emplace_back();
+			binding.name = var.name;
+			binding.type = var.resolved_type;
+			binding.is_immutable = true;
+			binding.is_comptime = true;
+			binding.comptime_value = value;
+			return true;
+		}
 		if (var.else_return) {
 			if (!annotation || expr_type->kind != ResolvedType::UNION) {
 				errorLine(var.token, "else return requires a union initializer and an explicit target type");
@@ -3553,7 +3636,7 @@ struct Checker {
 		// it simply falls through to ordinary two-arm checking below.
 		ComptimeValue comptime_condition;
 		++suppress_errors;
-		comptime_condition = resolveComptimeValue(unit, *ifst.condition);
+		comptime_condition = resolveComptimeValue(unit, *ifst.condition, nullptr, &ctx);
 		--suppress_errors;
 		if (comptime_condition.kind == ComptimeValue::BOOL) {
 			const bool previous_comptime_only = ctx.comptime_only;
@@ -3696,7 +3779,7 @@ struct Checker {
 	bool checkForStatement(Unit& unit, FunctionCheckContext& ctx, ForStatement& fs, ResolvedType* return_type, ls_string_view pending_label) {
 		// TODO collision with templates
 		// Bounds are checked without a forced hint first so an untyped bound can adopt
-		// the other bound's concrete type (`for i = 0..length(s)` iterates as isize).
+		// the other bound's concrete type (`for i in 0..length(s)` iterates as isize).
 		// Two untyped bounds default to i32.
 		i64 sequence_length = 0;
 		const bool unroll_sequence = fs.is_unroll && resolveComptimeSequenceLength(unit, *fs.end, sequence_length);
