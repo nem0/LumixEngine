@@ -55,6 +55,10 @@ struct VarDeclStatement : Statement {
 	Expression* type_expr = nullptr;
 	ResolvedType* resolved_type = nullptr;
 	Expression* expression = nullptr;
+	ResolvedType* else_return_type = nullptr;
+	bool else_return = false;
+	bool else_return_zero = false;
+	u64 else_return_target_mask = 0;
 	bool is_immutable = false;
 	StorageSlot slot;
 };

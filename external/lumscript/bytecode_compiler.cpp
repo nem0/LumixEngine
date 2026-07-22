@@ -1399,6 +1399,52 @@ static void compileExpressionAsType(FunctionCompiler& ctx, Expression& expr, Res
 	compileExpression(ctx, expr, valueKindForType(expected_type));
 }
 
+static bool unionTypeHasMember(const ResolvedType& type, const ResolvedType& member) {
+	if (type.kind == ResolvedType::UNION) {
+		for (ResolvedType* candidate : static_cast<const UnionResolvedType&>(type).members) {
+			if (candidate == &member) return true;
+		}
+		return false;
+	}
+	return &type == &member;
+}
+
+// Convert a union already stored in a frame local to another union/member.
+// `allowed` limits which source members may be emitted, so the same source
+// value can feed both the successful declaration path and the residual return.
+static void compileUnionLocalAsType(FunctionCompiler& ctx, const UnionResolvedType& source, u32 source_offset,
+	ResolvedType& expected, const ResolvedType& allowed) {
+	const u32 result_top = ctx.temp_top;
+	ExpArray<u32> end_jumps(*ctx.bytecode->arena);
+	for (i32 i = 0; i < source.members.size(); ++i) {
+		ResolvedType* member = source.members[i];
+		if (!unionTypeHasMember(allowed, *member)) continue;
+		const u32 next_member_jump = emitCompareJumpValues(ctx, LS_OP_EQ, LS_TYPE_I32,
+			makeRegValue(source_offset, LS_TYPE_I32, false), makeConstIntValue((u64)i, LS_TYPE_I32), false);
+		if (expected.kind == ResolvedType::UNION) {
+			UnionResolvedType& target = static_cast<UnionResolvedType&>(expected);
+			i32 target_index = -1;
+			for (i32 j = 0; j < target.members.size(); ++j) {
+				if (target.members[j] == member) { target_index = j; break; }
+			}
+			ASSERT(target_index >= 0);
+			emitIntegerConstant(ctx, LS_TYPE_I32, target_index);
+		}
+		emitLoadLocalBytes(ctx, source_offset + 4u, typeByteSize(*member));
+		if (expected.kind == ResolvedType::UNION) {
+			const u32 payload_size = typeByteSize(expected) - 4u;
+			const u32 member_size = typeByteSize(*member);
+			if (payload_size > member_size) emitZeroBytes(ctx, payload_size - member_size);
+		}
+		end_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP));
+		patchJumpRelative(ctx, next_member_jump, (u32)ctx.code.size());
+		ctx.temp_top = result_top;
+	}
+	emitZeroBytes(ctx, typeByteSize(expected));
+	const u32 end = (u32)ctx.code.size();
+	for (u32 jump : end_jumps) patchJumpRelative(ctx, jump, end);
+}
+
 // Numeric opcode groups (ADD/SUB/MUL/DIV/MOD/NEG) are laid out in the same kind
 // order, so the concrete opcode is the group base plus this per-kind index.
 static u32 numericKindIndex(ls_type_kind kind) {
@@ -3308,6 +3354,30 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			ResolvedType* value_type = var.resolved_type;
 			const ls_type_kind kind = valueKindForType(*value_type);
 			const u32 offset = ctx.addLocal(value_type, kind, false, &var.slot);
+			if (var.else_return) {
+				UnionResolvedType& source = static_cast<UnionResolvedType&>(*var.expression->resolved_type);
+				const u32 source_offset = ctx.addLocal(&source, valueKindForType(source));
+				compileExpressionIntoLocal(ctx, *var.expression, source_offset, source);
+				ExpArray<u32> success_jumps(*ctx.bytecode->arena);
+				for (i32 i = 0; i < source.members.size(); ++i) {
+					if ((var.else_return_target_mask & (1ull << (u32)i)) == 0) continue;
+					success_jumps.push(emitCompareJumpValues(ctx, LS_OP_EQ, LS_TYPE_I32,
+						makeRegValue(source_offset, LS_TYPE_I32, false), makeConstIntValue((u64)i, LS_TYPE_I32), true));
+				}
+				if (var.else_return_type->kind != ResolvedType::UNION)
+					emitLoadLocalBytes(ctx, source_offset + 4u, typeByteSize(*var.else_return_type));
+				else compileUnionLocalAsType(ctx, source, source_offset, *ctx.return_type, *var.else_return_type);
+				emitDeferredStatements(ctx, 0u, return_kind, current_label);
+				emitReturn(ctx);
+				const u32 success_pos = (u32)ctx.code.size();
+				for (u32 jump : success_jumps) patchJumpRelative(ctx, jump, success_pos);
+				if (value_type->kind != ResolvedType::UNION)
+					emitLoadLocalBytes(ctx, source_offset + 4u, typeByteSize(*value_type));
+				else compileUnionLocalAsType(ctx, source, source_offset, *value_type, *value_type);
+				emitStoreLocalBytes(ctx, offset, typeByteSize(*value_type));
+				ctx.debugLocal(var.name, var.slot);
+				return;
+			}
 			// Recorded after the initializer so scope_begin_offset is past this
 			// statement's own bytecode: a breakpoint set on this exact line
 			// (its code_offset equals where the initializer starts) must not

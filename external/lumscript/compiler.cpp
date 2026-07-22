@@ -1079,6 +1079,9 @@ struct Checker {
 				st->name = s->name;
 				st->type_expr = cloneExpression(unit, s->type_expr, bindings);
 				st->expression = cloneExpression(unit, s->expression, bindings);
+				st->else_return = s->else_return;
+				st->else_return_zero = s->else_return_zero;
+				st->else_return_target_mask = s->else_return_target_mask;
 				st->is_immutable = s->is_immutable;
 				out = st;
 				break;
@@ -3140,7 +3143,9 @@ struct Checker {
 					if (arm.is_fallback) has_fallback = true;
 					if (!blockAlwaysReturns(*arm.body)) return false;
 				}
-				return has_fallback;
+				return has_fallback || (ms.subject && ms.subject->resolved_type
+					&& (ms.subject->resolved_type->kind == ResolvedType::UNION
+						|| ms.subject->resolved_type->kind == ResolvedType::ENUM));
 			}
 			default: return false;
 		}
@@ -3219,7 +3224,7 @@ struct Checker {
 		return false;
 	}
 
-	bool checkVarDeclStatement(Unit& unit, FunctionCheckContext& ctx, VarDeclStatement& var) {
+	bool checkVarDeclStatement(Unit& unit, FunctionCheckContext& ctx, VarDeclStatement& var, ResolvedType* return_type) {
 		// TODO collision with templates
 		if (findLocal(ctx, var.name)) {
 			errorLine(var.token, "Variable ", var.name, " shadows an existing local or parameter");
@@ -3256,7 +3261,47 @@ struct Checker {
 
 		ResolvedType* expr_type = checkExprMaterialized(unit, &ctx, *var.expression, annotation);
 		if (!expr_type) return false;
-		if (annotation && !canImplicitlyConvert(expr_type, annotation)) {
+		if (var.else_return) {
+			if (!annotation || expr_type->kind != ResolvedType::UNION) {
+				errorLine(var.token, "else return requires a union initializer and an explicit target type");
+				return false;
+			}
+			UnionResolvedType& source = static_cast<UnionResolvedType&>(*expr_type);
+			u32 target_count = 0;
+			for (ResolvedType* member : source.members) {
+				if (typesEqual(member, annotation)) {
+					++target_count;
+					continue;
+				}
+				if (annotation->kind == ResolvedType::UNION) {
+					for (ResolvedType* target_member : static_cast<UnionResolvedType&>(*annotation).members) {
+						if (typesEqual(member, target_member)) { ++target_count; break; }
+					}
+				}
+			}
+			if (target_count == 0 || (annotation->kind == ResolvedType::UNION && static_cast<UnionResolvedType&>(*annotation).members.size() != target_count)) {
+				errorLine(var.token, "else return target type must be a nonempty subset of initializer union");
+				return false;
+			}
+			if (target_count == (u32)source.members.size()) {
+				errorLine(var.token, "else return target type must be a proper subset of initializer union");
+				return false;
+			}
+			UnionResolvedType* residual = makeType<UnionResolvedType>(unit, unit.arena);
+			for (i32 member_index = 0; member_index < source.members.size(); ++member_index) {
+				ResolvedType* member = source.members[member_index];
+				bool selected = typesEqual(member, annotation);
+				if (!selected && annotation->kind == ResolvedType::UNION) {
+					for (ResolvedType* target_member : static_cast<UnionResolvedType&>(*annotation).members) {
+						if (typesEqual(member, target_member)) { selected = true; break; }
+					}
+				}
+				if (selected) var.else_return_target_mask |= 1ull << (u32)member_index;
+				if (!selected) residual->members.push(member);
+			}
+			var.else_return_type = residual->members.size() == 1 ? residual->members[0] : residual;
+		}
+		if (!var.else_return && annotation && !canImplicitlyConvert(expr_type, annotation)) {
 			errorLine(var.token, "Cannot convert initializer expression of type ", expr_type, " to annotated type ", annotation);
 			return false;
 		}
@@ -3781,7 +3826,7 @@ struct Checker {
 				return ok;
 			}
 			case Statement::FOR: return checkForStatement(unit, ctx, static_cast<ForStatement&>(*st), return_type, pending_label);
-			case Statement::VAR_DECL: return checkVarDeclStatement(unit, ctx, static_cast<VarDeclStatement&>(*st));
+			case Statement::VAR_DECL: return checkVarDeclStatement(unit, ctx, static_cast<VarDeclStatement&>(*st), return_type);
 			case Statement::ASSIGN: return checkAssignStatement(unit, ctx, static_cast<AssignStatement&>(*st));
 			case Statement::IF: return checkIfStatement(unit, ctx, static_cast<IfStatement&>(*st), return_type);
 			case Statement::LABEL: return checkLabelStatement(unit, ctx, static_cast<LabelStatement&>(*st), return_type);
