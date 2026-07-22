@@ -136,6 +136,26 @@ TEST(ComptimeTypeBindingTypechecks) {
 	return true;
 }
 
+TEST(ComptimeCompositeTypeBindingsTypecheck) {
+	const char* source = R"(
+		comptime Slice = []i32;
+		comptime Array = [4]i32;
+		comptime Optional = ?i32;
+		comptime Callback = fn() : void;
+
+		fn callback() : void {}
+
+		fn main(slice : Slice, array : Array, optional : Optional, callback_value : Callback) : void {
+			var slice_value : []i32 = slice;
+			var array_value : [4]i32 = array;
+			var optional_value : ?i32 = optional;
+			callback_value();
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(ComptimeEnumBindingTypechecks) {
 	const char* source = R"(
 		comptime State = enum {
@@ -359,6 +379,22 @@ TEST(ComptimeLocalDeclarationFails) {
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ComptimeLocalValueMaterializesAtRuntime) {
+	const char* source = R"(
+		fn main() : i32 {
+			comptime value = 42;
+			return value;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 

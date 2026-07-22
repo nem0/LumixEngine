@@ -1199,6 +1199,46 @@ TEST(UnionElseReturnResidualReturnWidening) {
 	return true;
 }
 
+TEST(UnionElseReturnResidualReturnWideningRuns) {
+	const char* source = R"(
+		struct A { x : i32; }
+		struct B { y : i32; }
+		struct C { z : i32; }
+		fn make() : A | B | C { return B { 2 }; }
+		fn take() : B | C {
+			var a : A = make() else return;
+			return C { a.x };
+		}
+		fn main() : i32 {
+			var value : B | C = take();
+			if value is B { return value.y; }
+			return value.z;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(2, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(UnionElseReturnRejectsIncompatibleResidualReturn) {
+	const char* source = R"(
+		struct A { x : i32; }
+		struct B { y : i32; }
+		struct C { z : i32; }
+		fn make() : A | B { return B { 2 }; }
+		fn take() : C {
+			var a : A = make() else return;
+			return C { a.x };
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(UnionNarrowingAfterContinue) {
 	const char* source = R"(
 		struct A { x : i32; }
