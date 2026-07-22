@@ -483,12 +483,21 @@ struct Parser {
 		Token token = peekToken();
 		switch (token.type) {
 			case Token::MINUS:
-			case Token::NOT:
 			case Token::REF: {
 				consumeToken();
 				UnaryExpression* expr = makeExpr<UnaryExpression>(token);
 				expr->op = token.type;
 				expr->expression = unaryExpression(mode);
+				if (!expr->expression) return nullptr;
+				return expr;
+			}
+			case Token::NOT: {
+				consumeToken();
+				UnaryExpression* expr = makeExpr<UnaryExpression>(token);
+				expr->op = token.type;
+				// `not` binds below comparisons and `is`, but above `and`/`or`.
+				// The current precedence values put that boundary at 3.
+				expr->expression = binaryExpression(3, mode);
 				if (!expr->expression) return nullptr;
 				return expr;
 			}

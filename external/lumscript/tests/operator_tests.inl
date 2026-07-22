@@ -557,7 +557,7 @@ TEST(UnaryMinusRequiresNumericOperandFails) {
 TEST(NotBindsLooserThanEquality) {
 	const char* source = R"(
 		fn main() : i32 {
-			const a : bool = false;
+			const a : bool = true;
 			const b : bool = false;
 			// not (a == b) is true; (not a) == b would be false
 			return not a == b ? 1 : 0;
