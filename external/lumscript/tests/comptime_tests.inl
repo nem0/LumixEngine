@@ -439,3 +439,411 @@ TEST(ComptimeImportedValueNotVisibleWithoutImportFails) {
 	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
+
+TEST(ComptimeIfPrunesUnselectedArm) {
+	const char* source = R"(
+		fn main() : void {
+			if false {
+				var impossible : MissingType = undefined;
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeIfTemplateSpecializationPrunesUnselectedArm) {
+	const char* source = R"(
+		fn write(value : $T) : void {
+			if T == i32 {
+				var number : i32 = value;
+			} else {
+				var text : string = value;
+			}
+		}
+
+		fn main() : void {
+			write(42);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeIfElseIfAndElsePruneUnselectedArms) {
+	const char* source = R"(
+		comptime enabled = false;
+		fn main() : i32 {
+			if enabled {
+				var bad : MissingType = undefined;
+			} else if true {
+				return 7;
+			} else {
+				var also_bad : MissingType = undefined;
+			}
+			return 0;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeMatchPrunesUnselectedCase) {
+	const char* source = R"(
+		enum State { Idle, Running }
+		comptime state = State.Idle;
+
+		fn main() : i32 {
+			match state {
+				case .Idle:
+					return 1;
+				case .Running:
+					var bad : MissingType = undefined;
+				case:
+					var also_bad : MissingType = undefined;
+			}
+			return 0;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(RuntimeIfChecksBothArms) {
+	const char* source = R"(
+		fn main(flag : bool) : void {
+			if flag {
+				var ok : i32 = 1;
+			} else {
+				var bad : MissingType = undefined;
+			}
+		}
+	)";
+	// A runtime condition must check both arms even when a call site passes a constant.
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ComptimeIfSelectedArmExecutes) {
+	const char* source = R"(
+		comptime enabled = true;
+		fn main() : i32 {
+			var result : i32 = 0;
+			if enabled {
+				result = 7;
+			} else {
+				var bad : MissingType = undefined;
+			}
+			return result;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(7, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(TemplateRuntimeIfDoesNotBecomeComptime) {
+	const char* source = R"(
+		fn choose(T : comptime type, flag : bool) : void {
+			if flag {
+				var ok : T = undefined;
+			} else {
+				var bad : MissingType = undefined;
+			}
+		}
+
+		fn main() : void {
+			choose(i32, true);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ComptimeIfFunctionCallConditionPrunesArm) {
+	const char* source = R"(
+		fn enabled() : bool { return true; }
+		comptime flag = enabled();
+
+		fn main() : i32 {
+			if flag {
+				return 3;
+			} else {
+				var bad : MissingType = undefined;
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeValueParameterIfPrunesArm) {
+	const char* source = R"(
+		fn choose(flag : comptime bool) : i32 {
+			if flag {
+				return 5;
+			} else {
+				var bad : MissingType = undefined;
+			}
+		}
+
+		fn main() : i32 {
+			return choose(true);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeIfRejectsSyntacticallyInvalidUnselectedArm) {
+	const char* source = R"(
+		fn main() : void {
+			if false {
+				var broken = ;
+			}
+		}
+	)";
+	// Unselected arms are not type-checked, but they must still be syntactically valid.
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ComptimeIfPrunesReturnInUnselectedArm) {
+	const char* source = R"(
+		fn main() : i32 {
+			if false {
+				return "wrong type";
+			}
+			return 9;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeIfNestedPruning) {
+	const char* source = R"(
+		comptime outer = true;
+		comptime inner = false;
+		fn main() : i32 {
+			if outer {
+				if inner {
+					var bad : MissingType = undefined;
+				} else {
+					return 11;
+				}
+			} else {
+				var also_bad : MissingType = undefined;
+			}
+			return 0;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeMatchCommaAlternativesAndFallback) {
+	const char* source = R"(
+		enum State { Idle, Running, Paused }
+		comptime state = State.Running;
+
+		fn main() : i32 {
+			match state {
+				case .Idle, .Running:
+					return 1;
+				case:
+					var bad : MissingType = undefined;
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeMatchRequiresExhaustiveCases) {
+	const char* source = R"(
+		enum State { Idle, Running }
+		comptime state = State.Idle;
+		fn main() : void {
+			match state {
+				case .Idle:
+					return;
+			}
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ComptimeMatchRejectsDuplicateCases) {
+	const char* source = R"(
+		enum State { Idle, Running }
+		comptime state = State.Idle;
+		fn main() : void {
+			match state {
+				case .Idle:
+					return;
+				case .Idle:
+					return;
+				case .Running:
+					return;
+			}
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ComptimeMatchSelectedArmExecutes) {
+	const char* source = R"(
+		enum State { Idle, Running }
+		comptime state = State.Running;
+		fn main() : i32 {
+			match state {
+				case .Idle:
+					var bad : MissingType = undefined;
+				case .Running:
+					return 8;
+			}
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(8, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeMatchFunctionCallScrutinee) {
+	const char* source = R"(
+		enum State { Idle, Running }
+		fn current() : State { return State.Running; }
+		comptime state = current();
+		fn main() : i32 {
+			match state {
+				case .Idle:
+					var bad : MissingType = undefined;
+				case .Running:
+					return 9;
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeMatchSelectedFallbackExecutes) {
+	const char* source = R"(
+		enum State { Idle, Running, Paused }
+		comptime state = State.Paused;
+		fn main() : i32 {
+			match state {
+				case .Idle:
+					return 1;
+				case .Running:
+					return 2;
+				case:
+					return 3;
+			}
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(3, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeMatchPrunesInvalidAlternativeArm) {
+	const char* source = R"(
+		enum State { Idle, Running, Paused }
+		comptime state = State.Idle;
+		fn main() : i32 {
+			match state {
+				case .Idle, .Running:
+					return 4;
+				case .Paused:
+					var bad : MissingType = undefined;
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(UnrollForRange) {
+	const char* source = R"(
+		fn main() : i32 {
+			var total : i32 = 0;
+			unroll for i = 0..3 { total += i; }
+			return total;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(UnrollForComptimeSequenceWithIndex) {
+	const char* source = R"(
+		comptime values : []i32 = [1, 2, 3];
+		fn main() : i32 {
+			var total : i32 = 0;
+			unroll for i, value in values { total += i + value; }
+			return total;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(UnrollForBreakContinue) {
+	const char* source = R"(
+		fn main() : i32 {
+			var total : i32 = 0;
+			unroll for i = 0..4 {
+				if i == 1 { continue; }
+				if i == 3 { break; }
+				total += i;
+			}
+			return total;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(UnrollForLabeledBreakContinue) {
+	const char* source = R"(
+		fn main() : void {
+			outer:
+			unroll for i = 0..2 {
+				unroll for j = 0..2 {
+					if i == j { continue outer; }
+					if j > 0 { break outer; }
+				}
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(UnrollForPerCopyCompileTimeBranch) {
+	const char* source = R"(
+		fn main() : i32 {
+			var total : i32 = 0;
+			unroll for i = 0..3 { if i > 0 { total += i; } }
+			return total;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}

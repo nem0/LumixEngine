@@ -1012,3 +1012,336 @@ TEST(UnionComposedDuplicateFlattens) {
 	EXPECT_COMPILE(source);
 	return true;
 }
+
+TEST(UnionElseReturnExtractsMemberRuntime) {
+	const char* source = R"(
+		struct A { x : i32; }
+		struct B { y : i32; }
+
+		fn choose(flag : bool) : A | B {
+			if flag { return A { 7 }; }
+			return B { 9 };
+		}
+
+		fn take(flag : bool) : B {
+			var a : A = choose(flag) else return;
+			return B { a.x };
+		}
+
+		fn main() : i32 {
+			return take(true).y + take(false).y;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(16, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(UnionElseReturnExtractsSubunion) {
+	const char* source = R"(
+		struct A { x : i32; }
+		struct B { y : i32; }
+		struct C { z : i32; }
+		comptime U = A | B | C;
+
+		fn take(value : U) : A {
+			var rest : B | C = value else return;
+			match rest {
+				case B: return A { rest.y };
+				case C: return A { rest.z };
+			}
+		}
+
+		fn main() : i32 {
+			return take(B { 3 }).x + take(C { 4 }).x + take(A { 5 }).x;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(12, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(UnionElseReturnRejectsNonSubsetTarget) {
+	const char* source = R"(
+		struct A { x : i32; }
+		struct B { y : i32; }
+		struct C { z : i32; }
+		fn main(value : A | B) : void {
+			var c : C = value else return;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(UnionElseReturnRejectsWholeUnionTarget) {
+	const char* source = R"(
+		struct A { x : i32; }
+		struct B { y : i32; }
+		comptime U = A | B;
+		fn main(value : U) : void {
+			var same : U = value else return;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(UnionElseReturnRejectsNonUnionInitializer) {
+	const char* source = R"(
+		struct A { x : i32; }
+		fn main() : void {
+			var a : A = A { 1 } else return;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(UnionIfElseResidualNarrowing) {
+	const char* source = R"(
+		struct A { x : i32; }
+		struct B { y : i32; }
+		fn main(value : A | B) : i32 {
+			if value is A {
+				return value.x;
+			} else {
+				return value.y;
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(UnionEarlyReturnResidualNarrowing) {
+	const char* source = R"(
+		struct A { x : i32; }
+		struct B { y : i32; }
+		fn main(value : A | B) : i32 {
+			if value is A { return value.x; }
+			return value.y;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(UnionElseReturnEvaluatesExpressionOnce) {
+	const char* source = R"(
+		struct A { x : i32; }
+		struct B { y : i32; }
+		var calls : i32 = 0;
+		fn make() : A | B {
+			calls += 1;
+			return A { 6 };
+		}
+		fn main() : i32 {
+			var a : A = make() else return;
+			return calls + a.x;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(7, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(UnionElseReturnRunsDeferOnFailure) {
+	const char* source = R"(
+		struct A { x : i32; }
+		struct B { y : i32; }
+		var cleaned : i32 = 0;
+		fn cleanup() : void { cleaned = 1; }
+		fn make() : A | B { return B { 4 }; }
+		fn take() : B {
+			defer cleanup();
+			var a : A = make() else return;
+			return B { a.x };
+		}
+		fn main() : i32 {
+			take();
+		return cleaned;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(UnionElseReturnResidualReturnWidening) {
+	const char* source = R"(
+		struct A { x : i32; }
+		struct B { y : i32; }
+		struct C { z : i32; }
+		fn make() : A | B | C { return B { 2 }; }
+		fn take() : B | C {
+			var a : A = make() else return;
+			return C { a.x };
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(UnionNarrowingAfterContinue) {
+	const char* source = R"(
+		struct A { x : i32; }
+		struct B { y : i32; }
+		fn main(value : A | B) : i32 {
+			while true {
+				if value is A { continue; }
+				return value.y;
+			}
+			return 0;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(UnionNarrowingAfterBreak) {
+	const char* source = R"(
+		struct A { x : i32; }
+		struct B { y : i32; }
+		fn main(value : A | B) : i32 {
+			while true {
+				if value is A { break; }
+				return value.y;
+			}
+		return 0;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(UnionNotBindsLooserThanIs) {
+	const char* source = R"(
+		struct A {
+			x : i32;
+		}
+		struct B {
+			y : i32;
+		}
+		fn main() : i32 {
+			var e : A | B = B { 7 };
+			// not (e is A) is true; (not e) is A would not compile
+			return not e is A ? 1 : 0;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(UnionNotBindsLooserThanIsMatchingVariant) {
+	const char* source = R"(
+		struct A {
+			x : i32;
+		}
+		struct B {
+			y : i32;
+		}
+		fn main() : i32 {
+			var e : A | B = B { 7 };
+			// not (e is B) is false - the active variant matches
+			return not e is B ? 1 : 0;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(UnionNotIsOnBoolSubjectError) {
+	const char* source = R"(
+		struct B {
+			y : i32;
+		}
+		fn main() : i32 {
+			var e : bool = true;
+			// is requires a union subject, so this fails either way it groups
+			return not e is B ? 1 : 0;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(UnionNotIsAcrossAnd) {
+	const char* source = R"(
+		struct A {
+			x : i32;
+		}
+		struct B {
+			y : i32;
+		}
+		fn main() : i32 {
+			var e : A | B = A { 1 };
+			var f : A | B = A { 2 };
+			// (not (e is A)) and (not (f is B)) is false and true -> false
+			return not e is A and not f is B ? 1 : 0;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}

@@ -2456,6 +2456,19 @@ struct Checker {
 		ResolvedType* false_type = checkExpr(unit, ctx, *tern.false_expr, hint);
 		if (!false_type) return nullptr;
 
+		// The hint only reaches literals directly, so a branch can stay untyped while the other
+		// is concrete, e.g. `c ? x : 2 + 3`. Pin the untyped one to the concrete one.
+		if (isUntypedNumeric(*true_type) != isUntypedNumeric(*false_type)) {
+			if (isUntypedNumeric(*true_type)) {
+				true_type = materializeUntyped(*tern.true_expr, false_type);
+				if (!true_type) return nullptr;
+			}
+			else {
+				false_type = materializeUntyped(*tern.false_expr, true_type);
+				if (!false_type) return nullptr;
+			}
+		}
+
 		if (!typesEqual(true_type, false_type)) {
 			errorLine(expr.token, "Ternary branches have different types: ", true_type, " and ", false_type);
 			return nullptr;

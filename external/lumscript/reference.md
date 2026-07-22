@@ -2,6 +2,8 @@
 
 # TODO
 
+* change for i = 0..N to for i in 0..n - almost everybody else does that
+* null propagation a?.b?.c;
 * list of keywords and forbid identifier colliding with keywords
 * debugger:
 	- modify variables while paused
@@ -12,17 +14,10 @@
 * editor plugins in lumscript
 * getNumControllerHits + getControllerHit to slices
 * get rid of std::free
-* try -
-	fn parse() : Error | Node;
-	fn foo() : Error | Value {
-		var v = try parse(); // propagates common subtype - Error
-	}
-
 * how to expose Span<const Item> foo() to script?
 * how can we push unions if we don't know the tag value of variants, i.e. U = A | B - we don't know if A's tag is 0 or 1
 * use case - comptime string hash
 * varargs - [Compile-time introspection](#compile-time-introspection) covers single-argument `print`; `print(a, " ", b)` still needs a variadic mechanism
-* function type decomposition - `t.params` / `t.return` so `.Fn` types can be introspected, not just named
 * string interpolation
 * MT typecheck
 
@@ -80,12 +75,14 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 	- [Untyped literals](#untyped-literals)
 	- [Nullable values](#nullable-values)
 	- [Tagged unions](#tagged-unions)
+		- [Narrowing](#narrowing)
 	- [Strings](#strings)
 	- [Function types](#function-types)
 	- [Static-sized arrays](#static-sized-arrays)
 	- [Slices](#slices)
 - [Memory](#memory)
 - [Variables](#variables)
+	- [Union extraction and propagation](#union-extraction-and-propagation)
 - [Statements](#statements)
 	- [Blocks](#blocks)
 	- [Assignment](#assignment)
@@ -104,6 +101,7 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 	- [Casts](#casts)
 	- [Sizeof and alignof](#sizeof-and-alignof)
 	- [Comparison and boolean operators](#comparison-and-boolean-operators)
+	- [Operator precedence](#operator-precedence)
 	- [Ternary operator](#ternary-operator)
 	- [Calls](#calls)
 	- [Argument-dependent lookup](#argument-dependent-lookup)
@@ -120,12 +118,13 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 	- [Field iteration](#field-iteration)
 	- [Enum iteration](#enum-iteration)
 	- [Union iteration](#union-iteration)
+	- [Function type introspection](#function-type-introspection)
 	- [What an unrolled loop binds](#what-an-unrolled-loop-binds)
 	- [Comptime-to-runtime materialization](#comptime-to-runtime-materialization)
 	- [Instantiation limits](#instantiation-limits)
 - [Runtime model](#runtime-model)
 	- [Native functions](#native-functions)
-- [Editor and diagnostics](#editor-and-diagnostics)
+- [Diagnostic](#diagnostic)
 - [Known underspecified areas](#known-underspecified-areas)
 
 Current implementation includes:
@@ -206,6 +205,10 @@ JIT is intentionally out of scope for the first version.
 		- every modern language that designed enums carefully (Rust, Swift, Kotlin, Zig) keeps arithmetic off enums and handles bit-flag patterns through a separate mechanism (wrapper struct, macro, or protocol)
 		- bit-flag use cases are served by wrapping the integer in a struct
 		- allowing enum operators creates resolution complexity (shorthand `.Foo` in match-and-commit overload resolution) for no practical gain
+	- `not` binds looser than the comparisons and `is`, but tighter than `and` and `or`
+		- word operators keep the word-operator convention: `and`, `or`, and `not` sit together at the bottom of the precedence ladder, as in Python and Lua, rather than `not` sitting with unary `-` the way C's `!` does
+		- the two constraints are independent: looser than the comparisons makes `not a == b` and `not e is T` read as written, while tighter than `and` keeps De Morgan rewriting direct (`not a and not b` negates each operand, not the conjunction)
+		- C's placement is a known trap - `!a == b` silently means `(!a) == b`. Requiring `bool` operands would turn that into a compile-time error here anyway, so the precedence choice is about ergonomics rather than safety
 	- typeless struct literals do not participate in operator overload resolution
 		- expected-type inference remains useful when one destination type is already known, such as an annotated variable, return, or function argument
 		- using a candidate parameter as that expected type makes overload selection recursive and creates surprising ambiguities
@@ -221,11 +224,13 @@ JIT is intentionally out of scope for the first version.
 	- the member type is the tag; no named variants (Rust-style `enum` payloads) keeps the feature small - two variants with the same payload type use wrapper structs
 		- var a : SomeUnion = SomeMember { 1, "foo" }; is possible and uses only existing language features
 	- structural set semantics (order-insensitive, flattening) so anonymous unions like `Error | ASTNode` compose across modules and call layers
-	- subset → superset widening is implicit so error unions propagate without manual re-wrapping; this leaves room for future propagation sugar (`try`-style)
+	- subset → superset widening is implicit so error unions propagate without manual re-wrapping, including through [`else return`](#union-extraction-and-propagation)
 	- `as` yields `?Member` instead of trapping, reusing the forced-null-check machinery instead of adding a runtime abort path
 	- promotion in `match`/`is` is flow-typing with the same accepted unsoundness as nullable promotion - keeping the checker simple was preferred over a borrow-like aliasing rule
+	- [narrowing](#narrowing) is one residual-type rule (member set minus excluded members) shared by the `else` branch, the `match` fallback arm, and post-early-return flow; promotion to a single member is just the case where one member is left
+		- only a bare `e is T` narrows - negated and compound conditions are not analyzed. This keeps the checker's flow analysis to a single syntactic form, at the cost of `not (e is T)` reading as unnarrowed
 	- excluded from ADL/UFCS because a structural type has no declaring namespace
-	- **open questions**: `if` statement lowering details, propagation sugar, canonical member order exposure
+	- **open questions**: propagation sugar, canonical member order exposure
 
 - compile-time branches are implicit
 	- `if` and `match` become compile-time branches whenever their condition is compile-time known; there is no `comptime if` / `comptime match` spelling
@@ -775,7 +780,7 @@ Rules:
   - `>`
   - `>=`
   - unary `-`
-- `and` and `or` remain built-in short-circuit operators and are not overloaded
+- `and`, `or`, and `not` remain built-in boolean operators and are not overloaded
 - declaring an operator overload for a built-in primitive signature, such as `operator +(f32, f32)`, is a compile-time error
 - declaring an operator overload where any parameter is an enum type is a compile-time error; use a wrapper struct for bit-flag patterns instead
 - overload resolution uses exact type matching on the operands' natural types
@@ -1024,10 +1029,50 @@ All members must be pairwise distinct types. Because the member type is the tag,
 **Testing and extraction: `is` and `as`**
 
 - `e is ButtonEvent` evaluates to `bool`: whether the active variant is `ButtonEvent`
-- `if e is ButtonEvent { ... }` promotes `e` to `ButtonEvent` inside the branch, like nullable promotion in `if e != null`
+- `if e is ButtonEvent { ... }` promotes `e` to `ButtonEvent` inside the branch, like nullable promotion in `if e != null`; the `else` branch and the code after an early return narrow it too (see [Narrowing](#narrowing))
 - `e as ButtonEvent` evaluates to `?ButtonEvent`: the payload when the active variant matches, `null` otherwise; the usual forced null check applies before use
 - there is no trapping variant cast
 - `is` / `as` with a type that is not a member of the union is a compile-time error
+
+#### Narrowing
+
+A branch that rules out some members narrows the value to the **residual type**: the subject's member set minus the members the branch excluded. With one member left the residual is that member type, and narrowing to it is the promotion described above; with several left it is the smaller union.
+
+```cpp
+comptime Shape = Circle | Square | Triangle;
+
+fn area(s : Shape) : f32 {
+	if s is Circle {
+		return s.r * s.r * 3.14159; // s is Circle
+	} else {
+		// s is Square | Triangle
+		if s is Square {
+			return s.w * s.w;       // s is Square
+		}
+		return s.b * s.h * 0.5;     // s is Triangle: last member left
+	}
+}
+```
+
+The same subtraction applies after a branch that always leaves the enclosing scope, so an early return narrows the code that follows it:
+
+```cpp
+fn handle(e : Error | Warning | Value) : void {
+	if e is Error { return; }
+	// e is Warning | Value here
+	if e is Warning { log_warning(e); return; }
+	use(e); // e is Value
+}
+```
+
+Rules:
+
+- narrowing applies to the `if` branch, the `else` branch, and the statements after a branch that always exits the scope (`return`, `break`, `continue`), matching the [nullable](#nullable-values) guard forms
+- the residual of an `else if` chain accumulates: each arm narrows against what the arms before it already excluded
+- narrowing to an empty member set is a compile-time error; it means the condition can never hold
+- only a bare `e is T` on a named subject narrows. A negated or compound condition (`not (e is T)`, `e is T and flag`) is not analyzed, and the subject keeps its declared type in both branches
+- a narrowed subject keeps the residual type for member access, `is`, `as`, `match`, and [`typeof`](#typeof)
+- narrowing is flow-typing with the same accepted unsoundness as promotion: assigning to the subject inside a narrowed region is allowed and is not re-checked (see [Nullable values](#nullable-values))
 
 **Match**
 
@@ -1048,7 +1093,8 @@ Rules:
 - duplicate member cases are compile-time errors
 - a case pattern that is not a member type of the subject is a compile-time error
 - an unqualified member type resolves against the union first, so `case ButtonEvent:` works even if the union was declared with `events.ButtonEvent`; qualify it only to disambiguate members with the same name
-- comma-separated alternatives (`case A, B:`) are allowed; the subject is not promoted in such a case since no single member type applies
+- comma-separated alternatives (`case A, B:`) narrow the subject to `A | B`, the [residual](#narrowing) of that arm, rather than promoting it to a single member type
+- inside an empty `case:` fallback the subject narrows to the residual of every member matched by the arms above it, so a fallback after `case A:` on an `A | B | C` subject reads the subject as `B | C`
 - promotion is flow-typing, same as nullable promotion: assigning to the subject inside a case (which may switch the active variant) is allowed and is not re-checked; the earlier promotion does not keep later uses safe (see [Nullable values](#nullable-values) for the analogous caveat)
 
 **Namespaces, ADL, and UFCS**
@@ -1295,6 +1341,44 @@ Rules:
 - variables are block scoped
 - shadowing is a compile-time error: a new declaration in the same scope or an inner scope cannot re-use a name that is already visible
 - a **name** is any identifier introduced by `var`, `const`, `comptime`, `fn`, `struct`, `enum`, or `import` alias; the same rules apply to all of them
+
+### Union extraction and propagation
+
+A `var` declaration can extract one or more members from a tagged union and return every other member from the enclosing function:
+
+```cpp
+fn parse() : IOError | SyntaxError | Warning | ASTNode;
+
+fn load() : IOError | SyntaxError | Warning | Result {
+	var node : ASTNode = parse() else return;
+	return Result { node };
+}
+```
+
+The declaration
+
+```cpp
+var v : T = expression else return;
+```
+
+evaluates `expression` exactly once. Its static type must be a tagged union `U`. Treat a non-union `T` as the singleton member set `{T}`; a union `T` denotes all of its members. The member set denoted by `T` must be a nonempty proper subset of `U`'s member set.
+
+- if the active member of the result belongs to `T`, the result narrowed to `T` initializes `v`
+- otherwise, the residual value (with the same active member and payload) is returned with type `U - T`; that residual type must be implicitly convertible to the enclosing function's return type
+- when `T` is a union, `v` remains tagged and has static type `T`; the tag is remapped if needed, as with ordinary union widening
+- the failure path is an ordinary `return`, so applicable [`defer`](#defer) statements run
+- `T` equal to `U`, a `T` containing any member absent from `U`, and a non-union initializer are compile-time errors
+
+Subunion extraction can handle several members locally while propagating the rest:
+
+```cpp
+fn inspect() : IOError | SyntaxError | Warning | ASTNode {
+	var issue : SyntaxError | Warning = parse() else return;
+	return issue;
+}
+```
+
+Here `issue` retains whichever of `SyntaxError` or `Warning` was active. The failure residual is `IOError | ASTNode`.
 
 ### Temporaries
 
@@ -1612,7 +1696,7 @@ fn done() : void {
 }
 ```
 
-Returned expression must match function return type. Use explicit cast when needed.
+The returned expression must be implicitly convertible to the function's return type. Use an explicit cast when no implicit conversion applies.
 
 ## Expressions
 
@@ -1768,6 +1852,24 @@ not ready
 
 `and` and `or` short-circuit.
 
+`not` is the unary boolean negation operator. Its operand must be `bool`; applying it to any other type, including numeric types and nullable values, is a compile-time error. There is no implicit conversion to `bool`, so test explicitly (`not n == 0`, `p == null`) rather than negating a non-boolean directly.
+
+`not` is a prefix operator that binds looser than the comparisons, `is`, and arithmetic, but tighter than `and` and `or`. It therefore negates a whole comparison or `is` test without parentheses, while still distributing over the operands of a conjunction:
+
+| expression | parses as |
+|---|---|
+| `not a and b` | `(not a) and b` |
+| `a and not b` | `a and (not b)` |
+| `not a and not b` | `(not a) and (not b)` |
+| `not a == b` | `not (a == b)` |
+| `not e is ButtonEvent` | `not (e is ButtonEvent)` |
+| `not a is T and not b is U` | `(not (a is T)) and (not (b is U))` |
+| `not a + b` | `not (a + b)` - compile-time error, `a + b` is not `bool` |
+
+Binding tighter than `and` and `or` is what keeps De Morgan rewriting direct: `not a and not b` negates each operand rather than the conjunction. Binding looser than the comparisons is what makes `not a == b` read as written; this is the placement `and`, `or`, and `not` have in Python and Lua.
+
+`not` is right-associative with itself, so `not not ready` is `not (not ready)`. Since `not` accepts only `bool`, negating a non-boolean is a compile-time error rather than silently different behaviour - unlike C, where `!a == b` compiles as `(!a) == b`.
+
 Ordering comparisons (`<`, `<=`, `>`, `>=`) require numeric operands of the same type. Equality (`==`, `!=`) is defined for:
 
 - numeric types, `bool`, `byte`, and enums - value comparison
@@ -1781,8 +1883,34 @@ Arrays, slices, unions, and two nullable values have no built-in equality; compa
 
 If an operator is used with non-builtin value types, the compiler may resolve it to a matching `operator` declaration instead of a built-in primitive rule.
 Primitive operands keep their built-in semantics and cannot be overridden by `operator` declarations.
-`and` and `or` keep their built-in short-circuit semantics and are not candidates for operator declarations.
+`and` and `or` keep their built-in short-circuit semantics, and `not` keeps its built-in `bool`-only semantics; none of the three are candidates for operator declarations.
 Compound assignment follows the same rule: a non-primitive left-hand target uses the corresponding binary operator, while a primitive left-hand target stays on the built-in path. In the latter case, the right-hand operand must be implicitly convertible to the left-hand target type; an expression such as `5 *= Vec2 { 1, 2 }` is therefore invalid.
+
+### Operator precedence
+
+From loosest to tightest. Operators on the same row have equal precedence and associate left to right unless noted.
+
+| | operators | associativity |
+|---|---|---|
+| 1 | `? :` | right |
+| 2 | `\|` (union types), `or` | left |
+| 3 | `and` | left |
+| 4 | `not` (prefix) | right |
+| 5 | `==`, `!=` | left |
+| 6 | `<`, `>`, `<=`, `>=`, `is` | left |
+| 7 | `+`, `-` (binary) | left |
+| 8 | `*`, `/`, `%` | left |
+| 9 | `as` | left |
+| 10 | `-` (prefix), `ref` | right |
+| 11 | `.`, `()`, `[]` | left |
+
+Notes:
+
+- `not` is the only prefix operator below the arithmetic levels; it negates a whole comparison or `is` test without parentheses, while `and` and `or` still separate its operands (see [Comparison and boolean operators](#comparison-and-boolean-operators))
+- `as` binds tighter than arithmetic but looser than prefix `-`, so `-x as f32` is `(-x) as f32` and `a + b as f32` is `a + (b as f32)`
+- `|` shares a level with `or`, but the two never compete: `|` combines types and `or` combines `bool` values (see [Tagged unions](#tagged-unions))
+- assignment (`=`) and compound assignment (`+=`, `*=`, and the rest) are statements, not expressions, so they take no precedence level and cannot appear inside an expression
+- `sizeof`, `alignof`, and `typeof` are call-like compile-time operators whose operand is parenthesised, so they need no precedence level either
 
 ### Ternary operator
 
@@ -1808,7 +1936,7 @@ Rules:
 - condition must be `bool`; no implicit conversion
 - both true and false branches must have the same type
 - the operator is right-associative, enabling nested ternary: `a ? b ? c : d : e` parses as `a ? (b ? c : d) : e`
-- the operator has lower precedence than arithmetic and comparison operators, so `a > b ? 1 : 2` evaluates the comparison first
+- the operator has the lowest precedence of any operator, so `a > b ? 1 : 2` evaluates the comparison first (see [Operator precedence](#operator-precedence))
 - short-circuit evaluation: only the selected branch is evaluated, not both
 
 ### Calls
@@ -2002,7 +2130,9 @@ fn print(v : $T) : void {
 
 Note what this example does *not* need. Because `T` is fully concrete at instantiation, `v` already has an exact static type in every arm - there is no type narrowing tied to the `case` patterns. In `case .Nullable:` the parameter simply *is* `?U`, so `if v != null` is ordinary [nullable promotion](#nullable-values); the only new rule is that the promoted read feeds `$T` deduction at the recursive call. Likewise `case .Union:` reuses the existing `is` promotion from [Tagged unions](#tagged-unions).
 
-`.Byte` and `.CStr` deliberately fall through to the `case:` fallback and print as `<byte>` and `<cstr>`. Both are blocked by the same gap: [Casts](#casts) lists no conversion between `byte` and an integer type, nor between `cstr` and `string`, so `v as u64` and `v as string` would not compile in those arms. Printing either one's contents requires a cast the language does not currently have.
+`.Void`, `.Type`, `.CPtr`, and `.Fn` fall through to `case:` because no value of those kinds is meaningfully printable here - there is no value of type `void`, `type` is compile-time only, and `cptr`/`fn` have no byte representation `print` can walk.
+
+`.Byte` and `.CStr` also fall through, but for a narrower reason: both *are* ordinary runtime values with printable contents, blocked only by a missing cast. [Casts](#casts) lists no conversion between `byte` and an integer type, nor between `cstr` and `string`, so `v as u64` and `v as string` would not compile in those arms. Printing either one's contents requires a cast the language does not currently have.
 
 ### typeof
 
@@ -2036,6 +2166,8 @@ A `type` value exposes its structure through members accessed with `::` (see [Wh
 | `t::fields` | sequence of field cursors | `.Struct` |
 | `t::values` | sequence of enum cursors | `.Enum` |
 | `t::types` | sequence of member types | `.Union` |
+| `t::params` | sequence of parameter types | `.Fn` |
+| `t::ret` | `type` | `.Fn` |
 
 ```cpp
 comptime k = i32::kind;       // .I32
@@ -2043,6 +2175,8 @@ comptime s = Vec3::kind;      // .Struct
 comptime n = Vec3::name;      // "Vec3"
 comptime e = ([]i32)::child;  // i32
 comptime m = ([4]i32)::length; // 4
+comptime ps = (fn(i32, f32) : bool)::params; // []type: [i32, f32]
+comptime r = (fn(i32, f32) : bool)::ret;     // bool
 ```
 
 - `t::kind` classifies the type into one [`TypeKind`](#typekind) discriminant
@@ -2050,10 +2184,11 @@ comptime m = ([4]i32)::length; // 4
 - `t::child` is the single operand of a one-operand type constructor: the `U` of `?U`, the element of `[]U`, or the element of `[N]U`
 - `t::length` is the element count `N` of a `[N]T`, an untyped compile-time integer - the same value `length(v)` yields on an instance (see [Static-sized arrays](#static-sized-arrays)), but reachable from the type without one, so `unroll for i = 0..t::length` works on a type alone. It is not defined for `.Slice`, whose length is a runtime property
 - `t::fields`, `t::values`, and `t::types` are [reflection sequences](#reflection-sequences)
+- `t::params` is the [reflection sequence](#reflection-sequences) of a `.Fn` type's parameter types, in declaration order; `t::ret` is its return type, named `ret` rather than `return` to avoid the keyword. Function type syntax carries no parameter names (`fn(i32, i32) : i32`), so `t::params` is a plain `[]type` - there is no parameter cursor to bundle a name with, the same reasoning that makes [union iteration](#union-iteration)'s `t::types` a plain `[]type` rather than a cursor sequence
 
 All type members are compile-time only. `t` must be a concrete compile-time type; a `$T` that has not been instantiated yet is a compile-time error. Type members are not operators or functions - like any member access they cannot be taken as a value on their own, only applied to a type.
 
-**Kind-specific members are guarded.** `t::child`, `t::length`, `t::fields`, `t::values`, and `t::types` exist only for some kinds, and each is a compile-time error unless `t`'s kind is statically known to admit it. A manifest type - a type literal such as `[]i32` or a concrete `Vec3` - carries its kind by construction, so `([]i32)::child` needs no branch. The guard matters for a type of *unknown* kind, such as a `$T` parameter: there the kind must first be established, normally by an arm of a `match t::kind` or the taken side of an `if t::kind == ...`:
+**Kind-specific members are guarded.** `t::child`, `t::length`, `t::fields`, `t::values`, `t::types`, `t::params`, and `t::ret` exist only for some kinds, and each is a compile-time error unless `t`'s kind is statically known to admit it. A manifest type - a type literal such as `[]i32` or a concrete `Vec3` - carries its kind by construction, so `([]i32)::child` needs no branch. The guard matters for a type of *unknown* kind, such as a `$T` parameter: there the kind must first be established, normally by an arm of a `match t::kind` or the taken side of an `if t::kind == ...`:
 
 ```cpp
 match t::kind {
@@ -2140,13 +2275,14 @@ A type comparison is always compile-time known, so an `if` on one is always a [c
 
 ### Reflection sequences
 
-`t::fields`, `t::values`, and `t::types` produce a struct's fields, an enum's members, or a union's member types as compile-time sequences. Each is a `comptime` slice whose element type is compile-time only:
+`t::fields`, `t::values`, `t::types`, and `t::params` produce a struct's fields, an enum's members, a union's member types, or a `.Fn` type's parameter types as compile-time sequences. Each is a `comptime` slice whose element type is compile-time only:
 
 | member | element |
 | --- | --- |
 | `t::fields` | a *field cursor*: `.name`, `.type` |
 | `t::values` | an *enum cursor*: `.name`, `.value` |
 | `t::types` | a `type` |
+| `t::params` | a `type` |
 
 As comptime slices they are first-class: they can be bound, measured, indexed, and iterated, all at compile time.
 
@@ -2157,7 +2293,7 @@ comptime first = fs[0];       // a single field cursor
 unroll for f in fs { ... }    // re-iterate a bound sequence
 ```
 
-- **binding requires inference.** The cursor element types are built in and not nameable in source, so `comptime fs = t::fields` is legal but `comptime fs : []FieldCursor = t::fields` is not - there is no such spelling. `t::types` is the exception: its element type `type` *is* nameable, so `comptime ts : []type = t::types` may carry the annotation
+- **binding requires inference.** The cursor element types are built in and not nameable in source, so `comptime fs = t::fields` is legal but `comptime fs : []FieldCursor = t::fields` is not - there is no such spelling. `t::types` and `t::params` are the exception: their element type `type` *is* nameable, so `comptime ts : []type = t::types` or `comptime ps : []type = t::params` may carry the annotation
 - `length`, indexing, and `unroll for` work as on any comptime slice
 - element types are compile-time only, so none of these sequences [materialize](#comptime-to-runtime-materialization), and a runtime `for` over one is a compile-time error
 - once bound, the value is an ordinary comptime slice with no residual tie to `t`: it can be carried out of the branch that produced it and used anywhere, because the kind was proven at the point the sequence was obtained, not at the point it is used
@@ -2278,7 +2414,7 @@ unroll for M in T::types {
 }
 ```
 
-The loop variable is a compile-time `type` value, not a cursor. A struct field and an enum member each bundle a name with something else, so they need one; a union member *is* a type, and its name is `M::name`, so there is nothing to bundle. `T::types` is therefore a plain `[]type` - the one reflection sequence with a nameable element type.
+The loop variable is a compile-time `type` value, not a cursor. A struct field and an enum member each bundle a name with something else, so they need one; a union member *is* a type, and its name is `M::name`, so there is nothing to bundle. `T::types` is therefore a plain `[]type` - the same reasoning applies to a `.Fn` type's [`t::params`](#type-members), whose elements are unnamed parameter types with nothing to bundle either (see [Function type introspection](#function-type-introspection)).
 
 Rules:
 
@@ -2288,6 +2424,34 @@ Rules:
 - the `is` test and the promotion it performs are the ordinary union rules; unrolling emits one test per member
 - the optional index binding works as it does everywhere else
 - an ordinary runtime `for` over `T::types` is a compile-time error: `type` values have no runtime representation
+
+### Function type introspection
+
+`t::params` and `t::ret` decompose a `.Fn` type into its parameter types and return type, completing the type-member table for the one kind that previously exposed only `t::kind` and `t::name`.
+
+```cpp
+comptime Handler = fn(i32, f32) : bool;
+
+comptime ps = Handler::params; // []type: [i32, f32]
+comptime r  = Handler::ret;    // bool
+
+unroll for P in ps {
+	io.write_bytes(P::name);
+	io.write_bytes(" ");
+}
+```
+
+- `t::params` is the [reflection sequence](#reflection-sequences) of parameter types, in declaration order; `t::ret` is a single `type`, following the same shape as [`t::child`](#type-members) for other one-operand-or-fewer constructors
+- function type syntax (`fn(i32, i32) : i32`) never names its parameters, so there is nothing for a parameter cursor to bundle a name with - `t::params` is a plain `[]type`, like [`t::types`](#union-iteration) for unions
+- `t::ret` may be `void`; unlike a value's static type, which can never be `void` (see [`TypeKind`](#typekind)), a function type is free to name `void` as its return type, and `t::ret` observes it directly without going through `typeof` on a call
+- both are guarded like any [kind-specific member](#type-members): valid only once `t`'s kind is proven `.Fn`
+- neither reaches into a parameter's or return type's own structure automatically; a `.Struct` element of `t::params` is introspected by recursing, the same as any other `type` value: `t::params[0]::fields`
+
+Rules:
+
+- `t::params` can be bound (`comptime ps : []type = Handler::params`), counted with `length`, indexed, and unrolled, like any reflection sequence with a nameable element type
+- an ordinary runtime `for` over `t::params` is a compile-time error: `type` values have no runtime representation
+- `t::ret` is compile-time only, like `t::child` and every other member that produces a `type`
 
 ### What an unrolled loop binds
 
@@ -2299,9 +2463,10 @@ The iteration forms differ in what the loop variable is, decided by the operand:
 | `t::fields` (struct type) | field cursor | `.name`, `.type` |
 | `t::values` (enum type) | enum cursor | `.name`, `.value` |
 | `t::types` (union type) | a `type` | - |
+| `t::params` (function type) | a `type` | - |
 | struct value | field cursor | `.name`, `.type`, `.value` |
 
-The three reflection sequences are themselves comptime slices, so they are subcases of the first row; they are listed separately because their element types are built in and not otherwise nameable. The struct **value** is the only non-slice operand, and the only one that binds `.value`. Enum and union *values* are not iterable at all - iterate the type's `::values` or `::types` instead.
+The reflection sequences are themselves comptime slices, so they are subcases of the first row; they are listed separately because their element types are built in and not otherwise nameable. The struct **value** is the only non-slice operand, and the only one that binds `.value`. Enum and union *values* are not iterable at all - iterate the type's `::values` or `::types` instead; likewise a function *value*'s parameter and return types are reached through its type, `typeof(f)::params`, not through `f` directly.
 
 ### Comptime-to-runtime materialization
 
@@ -2317,10 +2482,10 @@ These may be passed to functions including `extern fn`, assigned to `var` and `c
 
 Stays compile-time only:
 
-- `type` values, including `typeof(...)`, `t::child`, `f.type`, and a union iteration's binding `M`
+- `type` values, including `typeof(...)`, `t::child`, `t::ret`, `f.type`, and a union or function-parameter iteration's binding (`M` or `P`)
 - `TypeKind` values, including `t::kind`
 - field and enum cursors, because a cursor carries a `type` and, for a field, a binding whose type differs per unrolled copy
-- any slice whose element type is compile-time only, which is every [reflection sequence](#reflection-sequences): `t::fields`, `t::values`, and `t::types` (a `[]type`)
+- any slice whose element type is compile-time only, which is every [reflection sequence](#reflection-sequences): `t::fields`, `t::values`, `t::types`, and `t::params` (each of the latter two a `[]type`)
 
 Using a compile-time-only value in runtime position is a compile-time error.
 
@@ -2476,10 +2641,8 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 - Static-sized arrays are missing rules for literal syntax, copy semantics, passing/returning by value, and comparison behavior. Nesting now reads left-to-right: `[4][8]i32` is an array of 4 arrays of 8 ints; `[][4]i32` is a slice of arrays of 4 ints.
 - Nullable promotion should define `else if`, compound conditions, and scope boundaries in more detail.
 - `defer` should define behavior on `break`, `continue`, runtime errors, and nested scopes, not only normal exit and `return`.
-- Boolean operator coverage is incomplete because `not` appears in examples but is not specified alongside `and` and `or`.
 - Imports and `extern` bindings still need explicit collision policy for same-path/same-alias cases, builtin module boundaries, and imported declaration conflicts.
 - Function values need clearer rules for equality/identity interactions with function declarations and literals.
-- Function type decomposition is deferred: a `.Fn` type exposes only [`t::kind`](#type-members) and `t::name`; its parameter and return types have no `t::child` (which is single-operand) and no reflection sequence, so they cannot be enumerated. `.Void` is therefore observable through `void::kind` or `typeof` on a void-typed call, but a function's return type is not reachable from the function type.
 - `unroll for` accepts a struct **value** as an operand, which a runtime `for` rejects, and that operand alone binds a cursor with `.value`. The loop variable's shape (element, field cursor, enum cursor, or `type`) depends on the operand rather than on the loop syntax; see [What an unrolled loop binds](#what-an-unrolled-loop-binds).
 - Type member and cursor names (`t::name`, `f.name`, `e.name`) are unqualified declaration names. Two modules that both declare `Vec3` produce the same `t::name`, and a generic `print` cannot distinguish them; whether these should be module-qualified is unresolved, and interacts with the import collision policy noted above.
 - `length` is both a builtin over arrays, slices, and [reflection sequences](#reflection-sequences), and an ordinary function name that core modules define on structs, such as `length(v)` for a `Vec3` magnitude in [Imports](#imports). Since [overloading is not supported](#functions), the rule for which one a call selects, and whether a user declaration may take the name at all, is unspecified.

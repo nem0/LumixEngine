@@ -31,6 +31,26 @@ TEST(TernaryOperatorWithBool) {
 	return true;
 }
 
+TEST(TernaryUntypedBranchAdoptsConcreteBranchType) {
+	const char* source = R"(
+		fn main() : i32 {
+			const x : i32 = 9;
+			// the false branch stays untyped through the binary expression
+			const a = false ? x : 2 + 3;
+			const b = true ? 2 + 3 : x;
+			return a + b;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(10, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(TernaryOperatorTypeMismatch) {
 	const char* source = R"(
 		fn main() : void {
@@ -533,6 +553,244 @@ TEST(UnaryMinusRequiresNumericOperandFails) {
 	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
+
+TEST(NotBindsLooserThanEquality) {
+	const char* source = R"(
+		fn main() : i32 {
+			const a : bool = false;
+			const b : bool = false;
+			// not (a == b) is true; (not a) == b would be false
+			return not a == b ? 1 : 0;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(NotBindsLooserThanComparison) {
+	const char* source = R"(
+		fn main() : i32 {
+			const a : i32 = 1;
+			const b : i32 = 2;
+			// not (a < b) is false; (not a) < b would not compile
+			return not a < b ? 1 : 0;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(NotBindsTighterThanAnd) {
+	const char* source = R"(
+		fn main() : i32 {
+			const a : bool = false;
+			const b : bool = true;
+			// (not a) and (not b) is false; not (a and (not b)) would be true
+			return not a and not b ? 1 : 0;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(NotBindsTighterThanAndOnRight) {
+	const char* source = R"(
+		fn main() : i32 {
+			const a : bool = true;
+			const b : bool = false;
+			// a and (not b) is true
+			return a and not b ? 1 : 0;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(NotIsRightAssociative) {
+	const char* source = R"(
+		fn main() : i32 {
+			const ready : bool = true;
+			// not (not ready) is true
+			return not not ready ? 1 : 0;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(NotBindsLooserThanArithmeticFails) {
+	const char* source = R"(
+		fn main() : void {
+			const a : i32 = 1;
+			const b : i32 = 2;
+			// parses as not (a + b); the operand is i32, not bool
+			const negated = not a + b;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+#define EXPECT_EXPR_I32(expr, expected) \
+	do { \
+		const char* source = "fn main() : i32 { return " expr "; }"; \
+		CAPI_BEGIN(module, diagnostics); \
+		EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr)); \
+		CAPI_RUNTIME(module, runtime); \
+		EXPECT_TRUE(ls_call(runtime, toLs("main"))); \
+		EXPECT_EQ(expected, ls_to_i32(runtime, -1)); \
+		CAPI_END(module); \
+	} while (false)
+
+TEST(MultiplicativeBindsTighterThanAdditive) {
+	EXPECT_EXPR_I32("2 + 3 * 4", 14);			// (2 + 3) * 4 would be 20
+	EXPECT_EXPR_I32("3 * 4 + 2", 14);
+	EXPECT_EXPR_I32("20 - 12 / 4", 17);			// (20 - 12) / 4 would be 2
+	EXPECT_EXPR_I32("1 + 7 % 4", 4);			// (1 + 7) % 4 would be 0
+	return true;
+}
+
+TEST(AdditiveIsLeftAssociative) {
+	EXPECT_EXPR_I32("10 - 3 - 2", 5);			// 10 - (3 - 2) would be 9
+	return true;
+}
+
+TEST(MultiplicativeIsLeftAssociative) {
+	EXPECT_EXPR_I32("100 / 5 / 2", 10);			// 100 / (5 / 2) would be 50
+	EXPECT_EXPR_I32("13 % 7 * 2", 12);			// 13 % (7 * 2) would be 13
+	return true;
+}
+
+TEST(UnaryMinusBindsTighterThanBinaryOperators) {
+	EXPECT_EXPR_I32("-2 + 3", 1);				// -(2 + 3) would be -5
+	EXPECT_EXPR_I32("7 + -2 * 3", 1);			// operand of * is -2, not 2
+	return true;
+}
+
+TEST(ParenthesesOverridePrecedence) {
+	EXPECT_EXPR_I32("(2 + 3) * 4", 20);
+	EXPECT_EXPR_I32("10 - (3 - 2)", 9);
+	return true;
+}
+
+TEST(ArithmeticBindsTighterThanComparison) {
+	// (1 + 1) < 3 is true; comparing first would not typecheck
+	EXPECT_EXPR_I32("1 + 1 < 3 ? 1 : 0", 1);
+	EXPECT_EXPR_I32("1 < 1 + 3 ? 1 : 0", 1);
+	return true;
+}
+
+TEST(ComparisonBindsTighterThanEquality) {
+	// (1 < 2) == true is true; 1 < (2 == true) would not typecheck
+	EXPECT_EXPR_I32("1 < 2 == true ? 1 : 0", 1);
+	return true;
+}
+
+TEST(EqualityBindsTighterThanAnd) {
+	// true and (1 == 1) is true; (true and 1) == 1 would not typecheck
+	EXPECT_EXPR_I32("true and 1 == 1 ? 1 : 0", 1);
+	return true;
+}
+
+TEST(AndBindsTighterThanOr) {
+	// true or (false and false) is true; (true or false) and false would be false
+	EXPECT_EXPR_I32("true or false and false ? 1 : 0", 1);
+	// (false and false) or true is true
+	EXPECT_EXPR_I32("false and false or true ? 1 : 0", 1);
+	return true;
+}
+
+TEST(TernaryBindsLooserThanArithmetic) {
+	// true ? 1 : (2 + 3) is 1; (true ? 1 : 2) + 3 would be 4
+	EXPECT_EXPR_I32("true ? 1 : 2 + 3", 1);
+	// (1 + 1 == 2) ? 7 : 8 is 7
+	EXPECT_EXPR_I32("1 + 1 == 2 ? 7 : 8", 7);
+	return true;
+}
+
+TEST(TernaryIsRightAssociative) {
+	// false ? 1 : (false ? 2 : 3) is 3
+	EXPECT_EXPR_I32("false ? 1 : false ? 2 : 3", 3);
+	EXPECT_EXPR_I32("false ? 1 : true ? 2 : 3", 2);
+	return true;
+}
+
+#undef EXPECT_EXPR_I32
 
 TEST(CustomOperatorGlobalCompoundAssignmentRuntime) {
 	const char* main_source = R"(
