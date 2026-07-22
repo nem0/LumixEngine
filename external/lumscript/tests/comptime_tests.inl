@@ -783,7 +783,7 @@ TEST(UnrollForRange) {
 	const char* source = R"(
 		fn main() : i32 {
 			var total : i32 = 0;
-			unroll for i = 0..3 { total += i; }
+			unroll for i in 0..3 { total += i; }
 			return total;
 		}
 	)";
@@ -808,7 +808,7 @@ TEST(UnrollForBreakContinue) {
 	const char* source = R"(
 		fn main() : i32 {
 			var total : i32 = 0;
-			unroll for i = 0..4 {
+			unroll for i in 0..4 {
 				if i == 1 { continue; }
 				if i == 3 { break; }
 				total += i;
@@ -824,8 +824,8 @@ TEST(UnrollForLabeledBreakContinue) {
 	const char* source = R"(
 		fn main() : void {
 			outer:
-			unroll for i = 0..2 {
-				unroll for j = 0..2 {
+			unroll for i in 0..2 {
+				unroll for j in 0..2 {
 					if i == j { continue outer; }
 					if j > 0 { break outer; }
 				}
@@ -840,7 +840,7 @@ TEST(UnrollForPerCopyCompileTimeBranch) {
 	const char* source = R"(
 		fn main() : i32 {
 			var total : i32 = 0;
-			unroll for i = 0..3 { if i > 0 { total += i; } }
+			unroll for i in 0..3 { if i > 0 { total += i; } }
 			return total;
 		}
 	)";

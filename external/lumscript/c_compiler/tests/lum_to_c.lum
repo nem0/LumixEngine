@@ -132,7 +132,7 @@ fn main() : i32 {
 		case .Running:
 			value += 0;
 	}
-	outer: for i = 0..2 {
+	outer: for i in 0..2 {
 		continue outer;
 	}
 	stop: while true {

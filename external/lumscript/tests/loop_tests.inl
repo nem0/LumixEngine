@@ -21,11 +21,22 @@ TEST(BreakContinueTypecheck) {
 TEST(ForLoopCompiles) {
 	const char* source = R"(
 		fn main() : void {
-			for i = 0..9 {
+			for i in 0..9 {
 			}
 		}
 	)";
 	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ForLoopOldRangeSyntaxFails) {
+	const char* source = R"(
+		fn main() : void {
+			for i = 0..9 {
+			}
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
@@ -36,7 +47,7 @@ TEST(ForLoopI64Bounds) {
 		fn main() : void {
 			var from : i64 = 0;
 			var to : i64 = 9;
-			for i = from..to {
+			for i in from..to {
 			}
 		}
 	)";
@@ -49,7 +60,7 @@ TEST(ForLoopRangeBoundsMustMatchTypeFails) {
 		fn main() : void {
 			var from : i32 = 0;
 			var to : f32 = 1.5;
-			for i = from..to {
+			for i in from..to {
 			}
 		}
 	)";
@@ -60,7 +71,7 @@ TEST(ForLoopRangeBoundsMustMatchTypeFails) {
 TEST(ForLoopRangeRequiresNumericBoundsFails) {
 	const char* source = R"(
 		fn main() : void {
-			for i = 0.."9" {
+			for i in 0.."9" {
 			}
 		}
 	)";
@@ -71,7 +82,7 @@ TEST(ForLoopRangeRequiresNumericBoundsFails) {
 TEST(ForLoopVariableIsImmutable) {
 	const char* source = R"(
 		fn main() : void {
-			for i = 0..9 {
+			for i in 0..9 {
 				i = 1;
 			}
 		}
@@ -169,7 +180,7 @@ TEST(DuplicateLoopLabelFails) {
 			outer: while true {
 				break;
 			}
-			outer: for i = 0..1 {
+			outer: for i in 0..1 {
 			}
 		}
 	)";
@@ -220,7 +231,7 @@ TEST(ForLoopRuntime) {
 
 		fn main() : i32 {
 			var sum : i32 = 0;
-			for i = lower()..upper() {
+			for i in lower()..upper() {
 				sum += i;
 			}
 			return bound_hits * 100 + sum;
@@ -251,7 +262,7 @@ TEST(ForLoopRangeEvaluatedOnce) {
 
 		fn main() : i32 {
 			var sum : i32 = 0;
-			for i = lower()..upper() {
+			for i in lower()..upper() {
 				sum += i;
 			}
 			return range_hits * 100 + sum;
@@ -301,7 +312,7 @@ TEST(ForLoopUntypedBoundAdoptsEndTypeRuntime) {
 	const char* source = R"(
 		fn count(values : []i32) : i32 {
 			var total : i32 = 0;
-			for i = 0..length(values) {
+			for i in 0..length(values) {
 				total += values[i];
 			}
 			return total;
@@ -330,7 +341,7 @@ TEST(ForLoopMismatchedConcreteBoundsFail) {
 			const from : i32 = 0;
 			const to : i64 = 10;
 			var total : i32 = 0;
-			for i = from..to {
+			for i in from..to {
 				total += 1;
 			}
 			return total;

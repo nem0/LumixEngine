@@ -2546,7 +2546,7 @@ TEST(ComptimeFunctionParameterDependentArraySizeRuntime) {
 	const char* source = R"(
 		fn splat(value : f32, n : comptime i32) : [n]f32 {
 			var result : [n]f32 = undefined;
-			for i = 0..(n - 1) {
+			for i in 0..(n - 1) {
 				result[i] = value;
 			}
 			return result;

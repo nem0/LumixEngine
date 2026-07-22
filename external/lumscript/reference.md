@@ -2,7 +2,6 @@
 
 # TODO
 
-* change for i = 0..N to for i in 0..n - almost everybody else does that
 * null propagation a?.b?.c;
 * list of keywords and forbid identifier colliding with keywords
 * debugger:
@@ -160,6 +159,9 @@ JIT is intentionally out of scope for the first version.
 	- consistent with prefix nullable `?T`: types read outside-in rather than inside-out
 	- consistent direction with slices: `[]T` reads left-to-right like `?T`, unlike C-style postfix where nesting order is confusing (`T[4][8]`)
 	- runtime operations (indexing `arr[i]`, slicing `arr[start:end]`) remain postfix on values, creating clear distinction: postfix `[` = runtime value operation, prefix `[` = compile-time type constructor
+
+- `for` uses `in` for both ranges and sequences
+	- `in` is familiar from other languages' loop syntax, reducing the learning curve
 
 - raw memory api
 	- we want raw memory api so users can implement their own containers, arenas and other features
@@ -706,14 +708,14 @@ Function parameters can also be marked `comptime` to require compile-time consta
 
 ```cpp
 fn repeat(text : string, count : comptime i32) : void {
-	for i = 0..count {
+	for i in 0..count {
 		print(text);
 	}
 }
 
 fn splat(value : f32, n : comptime i32) : [n]f32 {
 	var result : [n]f32 = undefined;
-	for i = 0..n {
+	for i in 0..n {
 		result[i] = value;
 	}
 	return result;
@@ -1565,14 +1567,14 @@ Conditions must be `bool`. Runtime enforces a configurable step budget to limit 
 ### For
 
 ```cpp
-for i = 0..10 {
+for i in 0..10 {
 	log.logError(i);
 }
 ```
 
 The `a..b` range is exclusive on the upper bound. The range expressions are evaluated once before the loop starts. The loop variable is introduced by the `for` statement and is immutable inside the loop body.
 
-Both bounds must have the same integer type, which becomes the type of the loop variable. An untyped bound adopts the other bound's concrete type (`for i = 0..length(s)` iterates with an `isize` loop variable); if both bounds are untyped they default to `i32`.
+Both bounds must have the same integer type, which becomes the type of the loop variable. An untyped bound adopts the other bound's concrete type (`for i in 0..length(s)` iterates with an `isize` loop variable); if both bounds are untyped they default to `i32`.
 
 If the lower bound is greater than or equal to the upper bound, the loop body does not execute.
 
@@ -1605,7 +1607,7 @@ for i, v in arr {
 `for v in arr` is syntax sugar for iterating the index range and binding the element:
 
 ```cpp
-for i = 0..length(arr) {
+for i in 0..length(arr) {
 	const v = arr[i];
 	log.logError(v);
 }
@@ -1614,7 +1616,7 @@ for i = 0..length(arr) {
 `for i, v in arr` is the same desugaring, additionally exposing the index as `i`:
 
 ```cpp
-for i = 0..length(arr) {
+for i in 0..length(arr) {
 	const v = arr[i];
 	log.logError(i);
 	log.logError(v);
@@ -2084,7 +2086,7 @@ fn print(v : $T) : void {
 
 		case .Slice, .Array:
 			io.write_bytes("[");
-			for i = 0..length(v) {
+			for i in 0..length(v) {
 				if i > 0 { io.write_bytes(", "); }
 				print(v[i]);
 			}
@@ -2182,7 +2184,7 @@ comptime r = (fn(i32, f32) : bool)::ret;     // bool
 - `t::kind` classifies the type into one [`TypeKind`](#typekind) discriminant
 - `t::name` is the type's source-level name, the same string in the table under [`t::name`](#tname) below
 - `t::child` is the single operand of a one-operand type constructor: the `U` of `?U`, the element of `[]U`, or the element of `[N]U`
-- `t::length` is the element count `N` of a `[N]T`, an untyped compile-time integer - the same value `length(v)` yields on an instance (see [Static-sized arrays](#static-sized-arrays)), but reachable from the type without one, so `unroll for i = 0..t::length` works on a type alone. It is not defined for `.Slice`, whose length is a runtime property
+- `t::length` is the element count `N` of a `[N]T`, an untyped compile-time integer - the same value `length(v)` yields on an instance (see [Static-sized arrays](#static-sized-arrays)), but reachable from the type without one, so `unroll for i in 0..t::length` works on a type alone. It is not defined for `.Slice`, whose length is a runtime property
 - `t::fields`, `t::values`, and `t::types` are [reflection sequences](#reflection-sequences)
 - `t::params` is the [reflection sequence](#reflection-sequences) of a `.Fn` type's parameter types, in declaration order; `t::ret` is its return type, named `ret` rather than `return` to avoid the keyword. Function type syntax carries no parameter names (`fn(i32, i32) : i32`), so `t::params` is a plain `[]type` - there is no parameter cursor to bundle a name with, the same reasoning that makes [union iteration](#union-iteration)'s `t::types` a plain `[]type` rather than a cursor sequence
 
@@ -2305,12 +2307,12 @@ unroll for f in fs { ... }    // re-iterate a bound sequence
 `unroll for` duplicates its body at compile time, once per iteration, binding the loop variable to a different compile-time *value* in each copy. Each copy is then type-checked separately - which is what allows a loop over a struct's fields to touch a differently typed field every time, even though the loop variable is a field cursor in all of them.
 
 ```cpp
-unroll for i = 0..N { ... }              // range form, N comptime-known
+unroll for i in 0..N { ... }             // range form, N comptime-known
 unroll for x in seq { ... }              // sequence form
 unroll for i, x in seq { ... }           // sequence form with index
 ```
 
-- the range form requires both bounds to be compile-time integer constants; `length(arr)` on a `[N]T` is one, so `unroll for i = 0..length(arr)` unrolls a static array while the same loop over a slice must use a runtime `for`
+- the range form requires both bounds to be compile-time integer constants; `length(arr)` on a `[N]T` is one, so `unroll for i in 0..length(arr)` unrolls a static array while the same loop over a slice must use a runtime `for`
 - the sequence form requires a comptime slice - which includes the [reflection sequences](#reflection-sequences) `t::fields`, `t::values`, `t::types` and any binding of one - or a struct **value** operand for [value-side field iteration](#field-iteration) (see [What an unrolled loop binds](#what-an-unrolled-loop-binds)). A bare struct, enum, or union *type* is not iterable; iterate its reflection sequence instead
 - the loop variable itself is a compile-time binding and cannot be reassigned in the body; this constrains the *cursor*, not the storage it denotes, so a field cursor's `f.value = x` still writes through to the field (see [Field iteration](#field-iteration))
 - because it is compile-time, expressions derived from it are resolved per copy: `f.value` has that field's type, `v is M` tests that member, and the index in `unroll for i, x in seq` is a constant, so `if i > 0 { ... }` is decided at compile time

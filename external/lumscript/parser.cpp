@@ -830,14 +830,11 @@ struct Parser {
 	}
 
 	// `for v in arr { body }` and `for i, v in arr { body }` are sugar for
-	// `for i = 0..length(arr) { const v = arr[i]; body }`, desugared here so the
+	// `for i in 0..length(arr) { const v = arr[i]; body }`, desugared here so the
 	// checker and bytecode compiler only ever see the plain range form.
-	ForStatement* forInStatement(Token for_token, ls_string_view index_name, ls_string_view value_name) {
+	ForStatement* forInStatement(Token for_token, ls_string_view index_name, ls_string_view value_name, Expression* arr) {
 		ForStatement* res = makeStmt<ForStatement>(for_token);
 		res->loop_var = index_name;
-
-		Expression* arr = expression(ExprMode::HEAD);
-		if (!arr) return nullptr;
 
 		IntLiteralExpression* zero = makeExpr<IntLiteralExpression>(for_token);
 		zero->value = 0;
@@ -878,6 +875,20 @@ struct Parser {
 		return res;
 	}
 
+	ForStatement* forRangeStatement(Token for_token, ls_string_view loop_var, Expression* begin) {
+		ForStatement* res = makeStmt<ForStatement>(for_token);
+		res->loop_var = loop_var;
+		res->begin = begin;
+		if (!consume(Token::RANGE)) return nullptr;
+
+		res->end = expression(ExprMode::HEAD);
+		if (!res->end) return nullptr;
+
+		res->body = blockStatement();
+		if (!res->body) return nullptr;
+		return res;
+	}
+
 	ForStatement* forStatement() {
 		Token for_token = consumeToken();
 		if (for_token.type != Token::FOR) return nullptr;
@@ -887,7 +898,11 @@ struct Parser {
 
 		if (peekToken().type == Token::IN_KW) {
 			consumeToken();
-			return forInStatement(for_token, makeForIndexName(), first_name);
+			Expression* begin_or_sequence = expression(ExprMode::HEAD);
+			if (!begin_or_sequence) return nullptr;
+			if (peekToken().type == Token::RANGE)
+				return forRangeStatement(for_token, first_name, begin_or_sequence);
+			return forInStatement(for_token, makeForIndexName(), first_name, begin_or_sequence);
 		}
 
 		if (peekToken().type == Token::COMMA) {
@@ -895,23 +910,15 @@ struct Parser {
 			ls_string_view second_name;
 			if (!consume(Token::IDENTIFIER, second_name, "Expected identifier")) return nullptr;
 			if (!consume(Token::IN_KW)) return nullptr;
-			return forInStatement(for_token, first_name, second_name);
+			Expression* sequence = expression(ExprMode::HEAD);
+			if (!sequence) return nullptr;
+			return forInStatement(for_token, first_name, second_name, sequence);
 		}
 
-		ForStatement* res = makeStmt<ForStatement>(for_token);
-		res->loop_var = first_name;
-		if (!consume(Token::EQUAL)) return nullptr;
-
-		res->begin = expression(ExprMode::HEAD);
-		if (!res->begin) return nullptr;
-		if (!consume(Token::RANGE)) return nullptr;
-
-		res->end = expression(ExprMode::HEAD);
-		if (!res->end) return nullptr;
-
-		res->body = blockStatement();
-		if (!res->body) return nullptr;
-		return res;
+		if (!consume(Token::IN_KW)) return nullptr;
+		Expression* begin = expression(ExprMode::HEAD);
+		if (!begin) return nullptr;
+		return forRangeStatement(for_token, first_name, begin);
 	}
 
 	WhileStatement* whileStatement() {

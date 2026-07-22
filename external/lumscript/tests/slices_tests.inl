@@ -546,7 +546,7 @@ TEST(SliceStructFieldWriteThroughParameterRuntime) {
 		}
 
 		fn advance(bodies : []Body) : void {
-			for i = 0..length(bodies) {
+			for i in 0..length(bodies) {
 				bodies[i].x -= 1;
 				bodies[i].y = 100;
 			}

@@ -114,7 +114,7 @@ TEST(UnrollForComptimeSequenceRuntimeForRejected) {
 
 TEST(UnrollForBindingIsImmutable) {
 	const char* source = R"(
-		fn main() : void { unroll for i = 0..2 { i = 1; } }
+		fn main() : void { unroll for i in 0..2 { i = 1; } }
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
@@ -158,7 +158,7 @@ TEST(RuntimeForStructValueRejected) {
 
 TEST(UnrollForRuntimeRangeBoundRejected) {
 	const char* source = R"(
-		fn main(limit : i32) : void { unroll for i = 0..limit { } }
+		fn main(limit : i32) : void { unroll for i in 0..limit { } }
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
@@ -405,7 +405,7 @@ TEST(IntrospectionArrayLengthIsComptimeInteger) {
 	const char* source = R"(
 		comptime count = ([3]i32)::length;
 		fn main() : i32 {
-			unroll for i = 0..count { }
+			unroll for i in 0..count { }
 			return count;
 		}
 	)";
@@ -896,7 +896,7 @@ TEST(IntrospectionGenericPrintRendersEveryKind) {
 
 				case .Slice, .Array:
 					write_bytes("[");
-					for i = 0..length(v) {
+					for i in 0..length(v) {
 						if i > 0 { write_bytes(", "); }
 						print(v[i]);
 					}
