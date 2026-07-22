@@ -15,7 +15,7 @@ fn level(x : f64, y : f64) : i32 {
 	var zre = x;
 	var zim = y;
 
-	for l = 0..255 {
+	for l in 0..255 {
 		const tre = zre * zre - zim * zim;
 		const tim = zre * zim + zim * zre;
 
@@ -39,9 +39,9 @@ fn main() : i32 {
 	const dy = 4.0 / (n as f64);
 
 	var result : i32 = 0;
-	for i = 0..n {
+	for i in 0..n {
 		const x = xmin + (i as f64) * dx;
-		for j = 0..n {
+		for j in 0..n {
 			const y = ymin + (j as f64) * dy;
 			result += level(x, y);
 		}

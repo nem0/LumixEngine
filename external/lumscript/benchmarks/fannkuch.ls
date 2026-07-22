@@ -14,7 +14,7 @@ fn main() : i32 {
 	var perm : [9]i32 = undefined;
 	var count : [9]i32 = undefined;
 
-	for i = 0..n {
+	for i in 0..n {
 		perm1[i] = i;
 	}
 
@@ -30,7 +30,7 @@ fn main() : i32 {
 			i -= 1;
 		}
 
-		for j = 0..n {
+		for j in 0..n {
 			perm[j] = perm1[j];
 		}
 
@@ -38,7 +38,7 @@ fn main() : i32 {
 		var k = perm[0];
 
 		while k != 0 {
-			for j = 0..(k + 1) / 2 {
+			for j in 0..(k + 1) / 2 {
 				const t = perm[j];
 				perm[j] = perm[k - j];
 				perm[k - j] = t;
@@ -64,7 +64,7 @@ fn main() : i32 {
 			}
 
 			const p0 = perm1[0];
-			for j = 0..r {
+			for j in 0..r {
 				perm1[j] = perm1[j + 1];
 			}
 

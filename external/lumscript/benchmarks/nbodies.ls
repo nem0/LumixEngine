@@ -28,7 +28,7 @@ struct BodyPair {
 
 fn combinations(n : i32, pairs : []BodyPair) : void {
 	var count : i32 = 0;
-	for i = 0..n - 1 {
+	for i in 0..n - 1 {
 		for j = i + 1..n {
 			pairs[count] = BodyPair { i, j };
 			count += 1;
@@ -78,7 +78,7 @@ fn offset_momentum(bodies : []Body) : void {
 	var py = 0.0;
 	var pz = 0.0;
 
-	for bi = 0..length(bodies) {
+	for bi in 0..length(bodies) {
 		px -= bodies[bi].vx * bodies[bi].mass;
 		py -= bodies[bi].vy * bodies[bi].mass;
 		pz -= bodies[bi].vz * bodies[bi].mass;
@@ -92,7 +92,7 @@ fn offset_momentum(bodies : []Body) : void {
 fn sum_energy(bodies : []Body, pairs : []BodyPair) : f64 {
 	var e = 0.0;
 
-	for pi_ = 0..length(pairs) {
+	for pi_ in 0..length(pairs) {
 		const b1 = bodies[pairs[pi_].first];
 		const b2 = bodies[pairs[pi_].second];
 
@@ -103,7 +103,7 @@ fn sum_energy(bodies : []Body, pairs : []BodyPair) : f64 {
 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
 	}
 
-	for bi = 0..length(bodies) {
+	for bi in 0..length(bodies) {
 		const body = bodies[bi];
 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
 	}
@@ -115,8 +115,8 @@ fn advance(time : f64, iters : i32, bodies : []Body, pairs : []BodyPair) : void 
 	const n_pairs = length(pairs);
 	const n_bodies = length(bodies);
 
-	for i = 0..iters {
-		for pi_ = 0..n_pairs {
+	for i in 0..iters {
+		for pi_ in 0..n_pairs {
 			const first = pairs[pi_].first;
 			const second = pairs[pi_].second;
 
@@ -139,7 +139,7 @@ fn advance(time : f64, iters : i32, bodies : []Body, pairs : []BodyPair) : void 
 			bodies[second].vz += dz * b1m;
 		}
 
-		for bi = 0..n_bodies {
+		for bi in 0..n_bodies {
 			bodies[bi].px += time * bodies[bi].vx;
 			bodies[bi].py += time * bodies[bi].vy;
 			bodies[bi].pz += time * bodies[bi].vz;
