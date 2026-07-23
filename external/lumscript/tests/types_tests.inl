@@ -266,6 +266,28 @@ TEST(SelfReferentialStructFunctionFieldCompiles) {
 	return true;
 }
 
+TEST(FunctionTypeNamedParametersCompile) {
+	const char* source = R"(
+		comptime Handler = fn(ref i32, comptime type, value : i32, f32, enabled : bool) : void;
+
+		struct Callbacks {
+			unary : fn(value : i32) : i32;
+			mixed : fn(left : i32, f32, right : bool) : void;
+		}
+
+		fn identity(value : i32) : i32 {
+			return value;
+		}
+
+		fn main() : i32 {
+			const callback : fn(argument : i32) : i32 = identity;
+			return callback(42);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(IndirectByValueStructRecursionFails) {
 	const char* source = R"(
 		struct A {

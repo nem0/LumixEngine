@@ -539,12 +539,6 @@ TEST(BytecodeDivideAssignment) {
 	return true;
 }
 
-
-
-
-
-
-
 TEST(BytecodeDeferRunsOnReturn) {
 	const char* source = R"(
 		var g : i32 = 1;

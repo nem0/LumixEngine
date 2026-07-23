@@ -25,3 +25,4 @@ scripts/itch_io/
 !data/editor/scripts/plugins/
 external/lumscript/build/
 *.dmp
+vc140.pdb

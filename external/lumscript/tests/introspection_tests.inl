@@ -41,6 +41,53 @@ TEST(FunctionTypeIntrospectionBindsAndIndexesParams) {
 	return true;
 }
 
+TEST(FunctionTypeIntrospectionNamedParams) {
+	const char* source = R"(
+		comptime F = fn(a : i32, b : f32) : void;
+		comptime p0 = F::params[0];
+		comptime p1 = F::params[1];
+		comptime n0 = p0.name;
+		comptime n1 = p1.name;
+		comptime t0 = p0.type;
+		comptime t1 = p1.type;
+
+		fn main() : i32 {
+			return 0;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(FunctionTypeIntrospectionNamedParamsUnnamedGetsEmptyString) {
+	const char* source = R"(
+		comptime F = fn(i32, f32) : void;
+		comptime p0 = F::params[0];
+		comptime n0 = p0.name;
+
+		fn main() : i32 {
+			return 0;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(FunctionTypeIntrospectionMixedNamedUnnamed) {
+	const char* source = R"(
+		comptime F = fn(a : i32, f32, c : bool) : void;
+		comptime p0 = F::params[0];
+		comptime p1 = F::params[1];
+		comptime p2 = F::params[2];
+
+		fn main() : i32 {
+			return 0;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(FunctionTypeIntrospectionParamsStayComptimeOnly) {
 	const char* source = R"(
 		comptime Handler = fn(i32) : void;
@@ -320,6 +367,24 @@ TEST(IntrospectionTypeofProducesExpressionType) {
 	return true;
 }
 
+TEST(IntrospectionTypeofTypeMembersProducesExpressionTypes) {
+	const char* source = R"(
+		comptime Kind = typeof(i32::kind);
+		comptime NestedKind = typeof(typeof(i32::kind));
+		comptime Name = typeof(i32::name);
+		comptime Child = typeof(?i32::child);
+		comptime Length = typeof([3]i32::length);
+
+		fn acceptKind(value : Kind) : void {}
+		fn acceptNestedKind(value : NestedKind) : void {}
+		fn acceptName(value : Name) : void {}
+		fn acceptChild(value : Child) : void {}
+		fn acceptLength(value : Length) : void {}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(IntrospectionTypeofRejectsTypeOperand) {
 	const char* source = R"(
 		comptime T = typeof(i32);
@@ -367,7 +432,7 @@ TEST(IntrospectionKindClassifiesEveryTypeForm) {
 		comptime u = U::kind;
 		comptime f = F::kind;
 		fn main() : void {
-			if b == .Bool && n == .Nullable && s == .Slice && a == .Array && e == .Enum && r == .Struct && u == .Union && f == .Fn { }
+			if b == .Bool and n == .Nullable and s == .Slice and a == .Array and e == .Enum and r == .Struct and u == .Union and f == .Fn { }
 			else { var bad : MissingType = undefined; }
 		}
 	)";
@@ -442,7 +507,7 @@ TEST(IntrospectionTypeNamesCoverConstructedTypes) {
 		comptime array = Array::name;
 		comptime function = Function::name;
 		fn main() : void {
-			if nullable == "?S" && slice == "[]i32" && array == "[2]i32" && function == "fn(i32, f32) : bool" { }
+			if nullable == "?S" and slice == "[]i32" and array == "[2]i32" and function == "fn(i32, f32) : bool" { }
 			else { var bad : MissingType = undefined; }
 		}
 	)";
@@ -478,7 +543,7 @@ TEST(IntrospectionTypeEqualityUsesIdentity) {
 		comptime U1 = i32 | f32;
 		comptime U2 = f32 | i32;
 		fn main() : void {
-			if U1 == U2 && A != B { } else { var bad : MissingType = undefined; }
+			if U1 == U2 and A != B { } else { var bad : MissingType = undefined; }
 		}
 	)";
 	EXPECT_COMPILE(source);
@@ -495,6 +560,18 @@ TEST(IntrospectionUnknownKindBranchGuardsChildAndRet) {
 			}
 		}
 		fn main() : void { inspect(?i32); inspect(fn(i32) : void); }
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(IntrospectionChildAndArrayLength) {
+	const char* source = R"(
+		comptime NullableChild = ?i32::child;
+		comptime SliceChild = []f32::child;
+		comptime ArrayChild = [3]i64::child;
+		comptime ArrayLength = [3]i64::length;
+		fn main() : ArrayChild { return undefined; }
 	)";
 	EXPECT_COMPILE(source);
 	return true;
@@ -613,7 +690,7 @@ TEST(IntrospectionFieldAndEnumSequencesPreserveDeclarationOrder) {
 		comptime field = S::fields[0];
 		comptime value = E::values[0];
 		fn main() : void {
-			if field.name == "first" && value.name == "First" { }
+			if field.name == "first" and value.name == "First" { }
 			else { var bad : MissingType = undefined; }
 		}
 	)";
@@ -627,7 +704,7 @@ TEST(IntrospectionFunctionParametersPreserveDeclarationOrder) {
 		comptime first = F::params[0];
 		comptime second = F::params[1];
 		fn main() : void {
-			if first == i32 && second == f32 { }
+			if first == i32 and second == f32 { }
 			else { var bad : MissingType = undefined; }
 		}
 	)";
@@ -685,17 +762,51 @@ TEST(IntrospectionFunctionReturnStaysComptimeOnly) {
 TEST(IntrospectionTypeKindCoversBuiltinDiscriminants) {
 	const char* source = R"(
 		fn main() : void {
-			if bool::kind == .Bool && i8::kind == .I8 && i16::kind == .I16 && i32::kind == .I32 && i64::kind == .I64 && isize::kind == .ISize { }
+			if bool::kind == .Bool and i8::kind == .I8 and i16::kind == .I16 and i32::kind == .I32 and i64::kind == .I64 and isize::kind == .ISize { }
 			else { var bad : MissingType = undefined; }
-			if u8::kind == .U8 && u16::kind == .U16 && u32::kind == .U32 && u64::kind == .U64 && byte::kind == .Byte { }
+			if u8::kind == .U8 and u16::kind == .U16 and u32::kind == .U32 and u64::kind == .U64 and byte::kind == .Byte { }
 			else { var bad : MissingType = undefined; }
-			if f32::kind == .F32 && f64::kind == .F64 && string::kind == .String && cstr::kind == .CStr && cptr::kind == .CPtr { }
+			if f32::kind == .F32 and f64::kind == .F64 and string::kind == .String and cstr::kind == .CStr and cptr::kind == .CPtr { }
 			else { var bad : MissingType = undefined; }
-			if void::kind == .Void && type::kind == .Type { }
+			if void::kind == .Void and type::kind == .Type { }
 			else { var bad : MissingType = undefined; }
 		}
 	)";
 	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(IntrospectionNumericTypeMinMax) {
+	const char* source = R"(
+		comptime i8_min = i8::min;
+		comptime i8_max = i8::max;
+		comptime u8_min = u8::min;
+		comptime u8_max = u8::max;
+		comptime i32_min = i32::min;
+		comptime i32_max = i32::max;
+		comptime u32_min = u32::min;
+		comptime u32_max = u32::max;
+		comptime f32_min = f32::min;
+		comptime f32_max = f32::max;
+		comptime f64_min = f64::min;
+		comptime f64_max = f64::max;
+		fn main() : void {
+			if i8_min == -128 and i8_max == 127 and u8_min == 0 and u8_max == 255
+				and i32_min == -2147483648 and i32_max == 2147483647
+				and u32_min == 0 and u32_max == 4294967295
+				and f32_min < 0.0 and f32_max > 0.0 and f64_min < 0.0 and f64_max > 0.0 { }
+			else { var bad : MissingType = undefined; }
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(IntrospectionNumericTypeMinMaxRejectsNonNumeric) {
+	const char* source = R"(
+		comptime value = bool::min;
+	)";
+	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
@@ -706,7 +817,7 @@ TEST(IntrospectionTypeNamesCoverDeclarationsTemplatesAndUnions) {
 		struct Pair[T] { first : T; second : T; }
 		comptime U = f32 | i32;
 		fn main() : void {
-			if i32::name == "i32" && S::name == "S" && E::name == "E" && Pair[i32]::name == "Pair[i32]" && U::name == "i32 | f32" { }
+			if i32::name == "i32" and S::name == "S" and E::name == "E" and Pair[i32]::name == "Pair[i32]" and U::name == "i32 | f32" { }
 			else { var bad : MissingType = undefined; }
 		}
 	)";
@@ -717,13 +828,13 @@ TEST(IntrospectionTypeNamesCoverDeclarationsTemplatesAndUnions) {
 TEST(IntrospectionTypeNamesCoverAllPrimitiveTypes) {
 	const char* source = R"(
 		fn main() : void {
-			if bool::name == "bool" && i8::name == "i8" && i16::name == "i16" && i32::name == "i32" && i64::name == "i64" && isize::name == "isize" { }
+			if bool::name == "bool" and i8::name == "i8" and i16::name == "i16" and i32::name == "i32" and i64::name == "i64" and isize::name == "isize" { }
 			else { var bad : MissingType = undefined; }
-			if u8::name == "u8" && u16::name == "u16" && u32::name == "u32" && u64::name == "u64" && byte::name == "byte" { }
+			if u8::name == "u8" and u16::name == "u16" and u32::name == "u32" and u64::name == "u64" and byte::name == "byte" { }
 			else { var bad : MissingType = undefined; }
-			if f32::name == "f32" && f64::name == "f64" && string::name == "string" && cstr::name == "cstr" && cptr::name == "cptr" { }
+			if f32::name == "f32" and f64::name == "f64" and string::name == "string" and cstr::name == "cstr" and cptr::name == "cptr" { }
 			else { var bad : MissingType = undefined; }
-			if void::name == "void" && type::name == "type" { }
+			if void::name == "void" and type::name == "type" { }
 			else { var bad : MissingType = undefined; }
 		}
 	)";
@@ -738,9 +849,9 @@ TEST(IntrospectionTypeNamesCoverNestedTypes) {
 		comptime NullableSlice = ?[]i32;
 		comptime NullableArray = ?[2]i32;
 		fn main() : void {
-			if SliceArray::name == "[][4]i32" && ArraySlice::name == "[2][]i32" { }
+			if SliceArray::name == "[][4]i32" and ArraySlice::name == "[2][]i32" { }
 			else { var bad : MissingType = undefined; }
-			if NullableSlice::name == "?[]i32" && NullableArray::name == "?[2]i32" { }
+			if NullableSlice::name == "?[]i32" and NullableArray::name == "?[2]i32" { }
 			else { var bad : MissingType = undefined; }
 		}
 	)";
@@ -753,7 +864,7 @@ TEST(IntrospectionTypeNamesCoverZeroParameterFunction) {
 		comptime VoidFunction = fn() : void;
 		comptime IntFunction = fn() : i32;
 		fn main() : void {
-			if VoidFunction::name == "fn() : void" && IntFunction::name == "fn() : i32" { }
+			if VoidFunction::name == "fn() : void" and IntFunction::name == "fn() : i32" { }
 			else { var bad : MissingType = undefined; }
 		}
 	)";
@@ -766,7 +877,7 @@ TEST(IntrospectionTypeNamesCanonicalizeUnionOrder) {
 		comptime First = i32 | f32;
 		comptime Second = f32 | i32;
 		fn main() : void {
-			if First::name == "i32 | f32" && Second::name == "i32 | f32" { }
+			if First::name == "i32 | f32" and Second::name == "i32 | f32" { }
 			else { var bad : MissingType = undefined; }
 		}
 	)";

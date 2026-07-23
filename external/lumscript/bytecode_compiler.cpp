@@ -94,6 +94,51 @@ static u32 typeKindByteSize(ls_type_kind kind) {
 	}
 }
 
+static bool sameResolvedType(const ResolvedType* a, const ResolvedType* b) {
+	if (a == b) return true;
+	if (!a || !b || a->kind != b->kind) return false;
+	switch (a->kind) {
+		case ResolvedType::FUNCTION: {
+			const auto* fa = static_cast<const FunctionResolvedType*>(a);
+			const auto* fb = static_cast<const FunctionResolvedType*>(b);
+			if (fa->param_types.size() != fb->param_types.size()) return false;
+			if (!sameResolvedType(fa->return_type, fb->return_type)) return false;
+			for (i32 i = 0; i < fa->param_types.size(); ++i)
+				if (!sameResolvedType(fa->param_types[i], fb->param_types[i])) return false;
+			return true;
+		}
+		case ResolvedType::ARRAY: {
+			const auto* aa = static_cast<const ArrayResolvedType*>(a);
+			const auto* ab = static_cast<const ArrayResolvedType*>(b);
+			return aa->size == ab->size && sameResolvedType(aa->element_type, ab->element_type);
+		}
+		case ResolvedType::SLICE: {
+			const auto* sa = static_cast<const SliceResolvedType*>(a);
+			const auto* sb = static_cast<const SliceResolvedType*>(b);
+			return sameResolvedType(sa->element_type, sb->element_type);
+		}
+		case ResolvedType::NULLABLE: {
+			const auto* na = static_cast<const NullableResolvedType*>(a);
+			const auto* nb = static_cast<const NullableResolvedType*>(b);
+			return sameResolvedType(na->inner, nb->inner);
+		}
+		case ResolvedType::UNION: {
+			const auto* ua = static_cast<const UnionResolvedType*>(a);
+			const auto* ub = static_cast<const UnionResolvedType*>(b);
+			if (ua->members.size() != ub->members.size()) return false;
+			for (ResolvedType* member : ua->members) {
+				bool found = false;
+				for (ResolvedType* other : ub->members) {
+					if (sameResolvedType(member, other)) { found = true; break; }
+				}
+				if (!found) return false;
+			}
+			return true;
+		}
+		default: return false;
+	}
+}
+
 static ls_type_kind defaultLiteralKind(const Expression& expr, ls_type_kind hint) {
 	if (expr.kind == Expression::INT_LITERAL) {
 		return isIntegerKind(hint) ? hint : LS_TYPE_I32;
@@ -1301,7 +1346,7 @@ static void compileExpressionAsType(FunctionCompiler& ctx, Expression& expr, Res
 			if (source.members.size() == un.members.size()) {
 				bool same_layout = true;
 				for (i32 i = 0; i < un.members.size(); ++i) {
-					if (source.members[i] != un.members[i]) {
+					if (!sameResolvedType(source.members[i], un.members[i])) {
 						same_layout = false;
 						break;
 					}
@@ -1322,7 +1367,7 @@ static void compileExpressionAsType(FunctionCompiler& ctx, Expression& expr, Res
 			for (i32 i = 0; i < source.members.size(); ++i) {
 				i32 target_index = -1;
 				for (i32 j = 0; j < un.members.size(); ++j) {
-					if (source.members[i] == un.members[j]) {
+					if (sameResolvedType(source.members[i], un.members[j])) {
 						target_index = j;
 						break;
 					}
@@ -1348,7 +1393,7 @@ static void compileExpressionAsType(FunctionCompiler& ctx, Expression& expr, Res
 			return;
 		}
 		for (i32 i = 0; i < un.members.size(); ++i) {
-			if (expr.resolved_type != un.members[i]) continue;
+			if (!sameResolvedType(expr.resolved_type, un.members[i])) continue;
 			emitIntegerConstant(ctx, LS_TYPE_I32, i);
 			compileExpressionAsType(ctx, expr, *un.members[i]);
 			const u32 payload_size = typeByteSize(expected_type) - 4;
@@ -1402,11 +1447,11 @@ static void compileExpressionAsType(FunctionCompiler& ctx, Expression& expr, Res
 static bool unionTypeHasMember(const ResolvedType& type, const ResolvedType& member) {
 	if (type.kind == ResolvedType::UNION) {
 		for (ResolvedType* candidate : static_cast<const UnionResolvedType&>(type).members) {
-			if (candidate == &member) return true;
+			if (sameResolvedType(candidate, &member)) return true;
 		}
 		return false;
 	}
-	return &type == &member;
+	return sameResolvedType(&type, &member);
 }
 
 // Convert a union already stored in a frame local to another union/member.
@@ -1425,7 +1470,7 @@ static void compileUnionLocalAsType(FunctionCompiler& ctx, const UnionResolvedTy
 			UnionResolvedType& target = static_cast<UnionResolvedType&>(expected);
 			i32 target_index = -1;
 			for (i32 j = 0; j < target.members.size(); ++j) {
-				if (target.members[j] == member) { target_index = j; break; }
+				if (sameResolvedType(target.members[j], member)) { target_index = j; break; }
 			}
 			ASSERT(target_index >= 0);
 			emitIntegerConstant(ctx, LS_TYPE_I32, target_index);
@@ -2456,7 +2501,7 @@ static ls_type_kind compileBinary(FunctionCompiler& ctx, BinaryExpression& expr,
 		ResolvedType* member = static_cast<MetaType*>(expr.rhs->resolved_type)->inner;
 		i32 member_index = -1;
 		for (i32 i = 0; i < source.members.size(); ++i) {
-			if (source.members[i] == member) {
+			if (sameResolvedType(source.members[i], member)) {
 				member_index = i;
 				break;
 			}
@@ -2827,6 +2872,33 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 				emitLoadSlot(ctx, *slot);
 				return slot->kind != LS_TYPE_INVALID ? slot->kind : LS_TYPE_I32;
 			}
+			if (id.comptime_value.kind != ComptimeValue::INVALID) {
+				const ComptimeValue& value = id.comptime_value;
+				switch (value.kind) {
+					case ComptimeValue::INT: {
+						const ls_type_kind kind = valueKindForType(*expr.resolved_type);
+						emitIntegerConstant(ctx, kind, (u64)value.int_value);
+						return kind;
+					}
+					case ComptimeValue::FLOAT: {
+						const ls_type_kind kind = valueKindForType(*expr.resolved_type);
+						if (kind == LS_TYPE_F32) emitConst4(ctx, bitcastF32ToU32((float)value.float_value));
+						else emitConst8(ctx, bitcastF64ToU64(value.float_value));
+						return kind;
+					}
+					case ComptimeValue::BOOL:
+						emitIntegerConstant(ctx, LS_TYPE_BOOL, value.bool_value ? 1u : 0u);
+						return LS_TYPE_BOOL;
+					case ComptimeValue::STRING: {
+						u32 string_index = 0;
+						appendStringLiteral(*ctx.bytecode, value.string_value, string_index);
+						emitConstString(ctx, string_index);
+						return LS_TYPE_STRING;
+					}
+					case ComptimeValue::TYPE:
+					case ComptimeValue::INVALID: break;
+				}
+			}
 			// function template instance
 			FunctionExpression* fn = id.resolved_fn ? id.resolved_fn : static_cast<FunctionExpression*>(id.symbol->expression);
 			emitIntegerConstant(ctx, LS_TYPE_FUNCTION, fn->bytecode_index);
@@ -2841,7 +2913,7 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 				NullableResolvedType& nullable = static_cast<NullableResolvedType&>(*expr.resolved_type);
 				i32 member_index = -1;
 				for (i32 i = 0; i < source.members.size(); ++i) {
-					if (source.members[i] == nullable.inner) {
+					if (sameResolvedType(source.members[i], nullable.inner)) {
 						member_index = i;
 						break;
 					}
@@ -2954,6 +3026,18 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 			}
 		}
 		case Expression::CALL: return compileCall(ctx, static_cast<CallExpression&>(expr), hint);
+		case Expression::TYPE_MEMBER: {
+			TypeMemberExpression& member = static_cast<TypeMemberExpression&>(expr);
+			if (equalStrings(member.name, "length")) {
+				const ls_type_kind kind = valueKindForType(*expr.resolved_type);
+				emitIntegerConstant(ctx, kind, (u64)member.comptime_int);
+				return kind;
+			}
+			u32 string_index = 0;
+			appendStringLiteral(*ctx.bytecode, member.comptime_string, string_index);
+			emitConstString(ctx, string_index);
+			return LS_TYPE_STRING;
+		}
 		case Expression::MEMBER: return compileMember(ctx, static_cast<MemberExpression&>(expr));
 		case Expression::BRACKET: {
 			BracketExpression& br = static_cast<BracketExpression&>(expr);
@@ -3645,7 +3729,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 						ResolvedType* member = static_cast<MetaType*>(pattern.begin->resolved_type)->inner;
 						i32 member_index = -1;
 						for (i32 i = 0; i < subject_union.members.size(); ++i) {
-							if (subject_union.members[i] == member) {
+							if (sameResolvedType(subject_union.members[i], member)) {
 								member_index = i;
 								break;
 							}

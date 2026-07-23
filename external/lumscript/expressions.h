@@ -71,6 +71,8 @@ struct Expression {
 		CAST,
 		// Field or namespace access such as `a.x` or `.Running`.
 		MEMBER,
+		// Compile-time reflection access such as `T::name`.
+		TYPE_MEMBER,
 		// Generic bracket postfix used before semantic disambiguation
 		// (indexing vs. template instantiation).
 		BRACKET,
@@ -120,6 +122,9 @@ struct IdentifierExpression : Expression {
 	ls_string_view name = {};
 	Symbol* symbol = nullptr;
 	FunctionExpression* resolved_fn = nullptr;
+	// A local comptime binding has no runtime slot; the checker copies its value
+	// here so bytecode compilation can materialize uses as constants.
+	ComptimeValue comptime_value;
 	// Set by the checker when this identifier resolves to runtime storage (local,
 	// parameter, or global); null for compile-time symbols (functions, types, etc.).
 	StorageSlot* slot = nullptr;
@@ -189,10 +194,18 @@ struct NullableTypeExpression : Expression {
 	Expression* inner = nullptr;
 };
 
+struct FunctionTypeParam {
+	// Empty for positional-only parameters.
+	ls_string_view name;
+	bool is_ref = false;
+	bool is_comptime = false;
+	Expression* type_expr = nullptr;
+};
+
 struct FunctionTypeExpression : Expression {
 	FunctionTypeExpression(ls_arena& arena) : Expression(FUNCTION_TYPE), params(arena) {}
 
-	ExpArray<Expression*> params;
+	ExpArray<FunctionTypeParam> params;
 	Expression* return_type = nullptr;
 };
 
@@ -259,6 +272,15 @@ struct MemberExpression : Expression {
 	ls_string_view name = {};
 	FunctionExpression* resolved_fn = nullptr;
 	struct Symbol* resolved_symbol = nullptr;
+};
+
+struct TypeMemberExpression : Expression {
+	TypeMemberExpression() : Expression(TYPE_MEMBER) {}
+
+	Expression* expression = nullptr;
+	ls_string_view name = {};
+	ls_string_view comptime_string = {};
+	i64 comptime_int = 0;
 };
 
 struct BracketExpression : Expression {

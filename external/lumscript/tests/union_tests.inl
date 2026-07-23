@@ -295,7 +295,7 @@ TEST(UnionNullMemberError) {
 	return true;
 }
 
-TEST(UnionNullableUnionError) {
+TEST(UnionNullableUnion) {
 	const char* source = R"(
 		struct A {
 			x : i32;
@@ -307,7 +307,21 @@ TEST(UnionNullableUnionError) {
 
 		var u : OptionalUnion = null;
 	)";
-	EXPECT_COMPILE_FAIL(source);
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(UnionNullableMemberPrecedence) {
+	const char* source = R"(
+		comptime Parsed = ?i32 | string;
+		comptime Expected = (?i32) | string;
+
+		fn main() : void {
+			var parsed : Parsed = "text";
+			var expected : Expected = parsed;
+		}
+	)";
+	EXPECT_COMPILE(source);
 	return true;
 }
 
@@ -811,27 +825,65 @@ TEST(UnionStringMembers) {
 	return true;
 }
 
-TEST(UnionFunctionTypeMemberError) {
+TEST(UnionAllConcreteRuntimeMemberKinds) {
 	const char* source = R"(
-		comptime CallbackOrInt = (fn(i32) : i32) | i32;
+		enum Kind {
+			First,
+			Second
+		}
+		struct Record {
+			value : i32;
+		}
+
+		comptime AllKinds = byte | bool | i8 | u8 | i16 | u16 | i32 | u32 | i64 | u64 | isize | f32 | f64 | string | cstr | cptr | []i32 | []f32 | [3]i32 | [4]i32 | (fn(u8) : void) | Kind | Record;
+
+		fn main() : void {
+			var value : AllKinds = undefined;
+		}
 	)";
-	EXPECT_COMPILE_FAIL(source);
+	EXPECT_COMPILE(source);
 	return true;
 }
 
-TEST(UnionSliceMemberError) {
+TEST(UnionStructTemplateMember) {
 	const char* source = R"(
-		comptime SliceOrInt = ([]i32) | i32;
+		struct Box[T] {
+			value : T;
+		}
+
+		comptime Boxes = Box[i32] | Box[f32];
+
+		fn main() : void {
+			var value : Boxes = Box[i32] { 42 };
+		}
 	)";
-	EXPECT_COMPILE_FAIL(source);
+	EXPECT_COMPILE(source);
 	return true;
 }
 
-TEST(UnionArrayMemberError) {
+TEST(UnionGenericTypeMember) {
 	const char* source = R"(
-		comptime ArrayOrInt = ([4]i32) | i32;
+		comptime make = fn(value : $T) : i32 | T {
+			return value;
+		}
+
+		fn main() : void {
+			var value : i32 | f32 = make(1.5 as f32);
+		}
 	)";
-	EXPECT_COMPILE_FAIL(source);
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(UnionSliceMembers) {
+	const char* source = R"(
+		comptime Slices = []i32 | []f32;
+
+		fn main() : void {
+			var value : Slices = undefined;
+		}
+	)";
+	EXPECT_COMPILE(source);
 	return true;
 }
 
@@ -959,14 +1011,6 @@ TEST(UnionInFunctionParameter) {
 TEST(UnionVoidMemberError) {
 	const char* source = R"(
 		comptime Union = void | i32;
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
-TEST(UnionNullableMemberError) {
-	const char* source = R"(
-		comptime Union = ?i32 | i32;
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;

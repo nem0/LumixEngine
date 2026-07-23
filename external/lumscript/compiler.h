@@ -140,13 +140,7 @@ struct Unit {
 };
 
 struct ls_module {
-	ls_module(ls_host* host)
-		: host(host)
-		, arena(host->arena)
-		, units(arena) {
-		for (i32 i = 0; i < ResolvedType::META; ++i)
-			primitives[i].kind = static_cast<ResolvedType::Kind>(i);
-	}
+	ls_module(ls_host* host);
 
 	ls_host* host;
 	ls_arena& arena;
@@ -154,4 +148,6 @@ struct ls_module {
 	// One canonical instance per primitive kind, indexed by ResolvedType::Kind.
 	// Pointer equality suffices for primitives; use typesEqual() for compound types.
 	ResolvedType primitives[ResolvedType::META];
+	EnumExpression type_kind_decl;
+	EnumResolvedType type_kind;
 };

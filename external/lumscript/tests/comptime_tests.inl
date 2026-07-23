@@ -29,6 +29,18 @@ TEST(ComptimeBinaryExpression) {
 
 
 
+TEST(ComptimeTernary) {
+	const char* source = R"(
+		comptime X = true ? 1 : 4;
+
+		fn main() : i32 {
+			return X;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(ComptimePrimitiveValueTypechecks) {
 	const char* source = R"(
 		comptime N = 32;
@@ -151,6 +163,19 @@ TEST(ComptimeCompositeTypeBindingsTypecheck) {
 			var optional_value : ?i32 = optional;
 			callback_value();
 		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeCompositeTypeExpressions) {
+	const char* source = R"(
+		comptime Slice = []i32;
+		comptime Array = [4]i32;
+		comptime Optional = ?i32;
+		comptime Callback = fn() : void;
+
+		fn main(slice : Slice, array : Array, optional : Optional, callback : Callback) : void {}
 	)";
 	EXPECT_COMPILE(source);
 	return true;
@@ -377,8 +402,12 @@ TEST(ComptimeLocalDeclarationFails) {
 		fn main() : void {
 			comptime N = 32;
 		}
+
+		fn foo() : void {
+			comptime N = 32;
+		}
 	)";
-	EXPECT_COMPILE_FAIL(source);
+	EXPECT_COMPILE(source);
 	return true;
 }
 

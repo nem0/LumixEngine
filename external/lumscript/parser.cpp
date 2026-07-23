@@ -91,6 +91,7 @@ struct Parser {
 			case Token::RIGHT_BRACKET: return "]";
 			case Token::SEMICOLON: return ";";
 			case Token::COLON: return ":";
+			case Token::DOUBLE_COLON: return "::";
 			case Token::COMMA: return ",";
 			case Token::DOT: return ".";
 			case Token::RANGE: return "..";
@@ -268,6 +269,93 @@ struct Parser {
 		return addSymbol(sym);
 	}
 
+	static bool isExpressionDelimiter(Token::Type token) {
+		switch (token) {
+			case Token::END_OF_FILE:
+			case Token::RIGHT_PAREN:
+			case Token::RIGHT_BRACE:
+			case Token::RIGHT_BRACKET:
+			case Token::SEMICOLON:
+			case Token::COLON:
+			case Token::COMMA:
+			case Token::DOT:
+			case Token::LEFT_PAREN:
+			case Token::LEFT_BRACE:
+			case Token::LEFT_BRACKET:
+			case Token::RANGE:
+			case Token::RANGE_INCLUSIVE:
+			case Token::QUESTION:
+			case Token::PIPE:
+			case Token::PLUS:
+			case Token::MINUS:
+			case Token::STAR:
+			case Token::SLASH:
+			case Token::PERCENT:
+			case Token::EQUAL:
+			case Token::PLUS_EQUAL:
+			case Token::MINUS_EQUAL:
+			case Token::STAR_EQUAL:
+			case Token::SLASH_EQUAL:
+			case Token::PLUS_PLUS:
+			case Token::MINUS_MINUS:
+			case Token::EQUAL_EQUAL:
+			case Token::BANG_EQUAL:
+			case Token::GT:
+			case Token::LT:
+			case Token::GT_EQUAL:
+			case Token::LT_EQUAL:
+			case Token::AS:
+			case Token::AND:
+			case Token::OR:
+			case Token::IS:
+				return true;
+			default:
+				return false;
+		}
+	}
+
+	Expression* bracketPrimary(Token token, ExprMode mode) {
+		// `[]` can be only slice, we don't support empty arrays
+		if (peekToken().type == Token::RIGHT_BRACKET) {
+			consumeToken();
+			SliceTypeExpression* slice = makeExpr<SliceTypeExpression>(token);
+			slice->element_type = type();
+			return slice->element_type ? slice : nullptr;
+		}
+
+		Expression* first = expression(mode);
+		if (!first) return nullptr;
+
+		// `[expr,` can only be array literal
+		if (peekToken().type == Token::COMMA) {
+			ArrayLiteralExpression* array = makeExpr<ArrayLiteralExpression>(token, m_unit.arena);
+			array->values.push(first);
+			while (peekToken().type == Token::COMMA) {
+				consumeToken();
+				Expression* value = expression(mode);
+				if (!value) return nullptr;
+				array->values.push(value);
+			}
+			if (!consume(Token::RIGHT_BRACKET)) return nullptr;
+			return array;
+		}
+
+		if (!consume(Token::RIGHT_BRACKET)) return nullptr;
+
+		// `[N]T` is array
+		if (!isExpressionDelimiter(peekToken().type)) {
+			ArrayTypeExpression* array = makeExpr<ArrayTypeExpression>(token);
+			array->size = first;
+			array->element_type = type();
+			return array->element_type ? array : nullptr;
+		}
+
+		// `[a]` is array literal with 1 element
+		ArrayLiteralExpression* array = makeExpr<ArrayLiteralExpression>(token, m_unit.arena);
+		array->values.push(first);
+		return array;
+	}
+
 	// Parse a primary expression, i.e. a syntactic starting point before postfix chaining.
 	Expression* primaryExpression(ExprMode mode) {
 		Token token = consumeToken();
@@ -286,7 +374,7 @@ struct Parser {
 				return expr;
 			}
 			case Token::FN: {
-				FunctionExpression* expr = functionExpression();
+				Expression* expr = functionOrTypeExpression(token);
 				if (expr) expr->token = token;
 				return expr;
 			}
@@ -302,6 +390,11 @@ struct Parser {
 			}
 			case Token::NULL_KW: return makeExpr<NullLiteralExpression>(token);
 			case Token::UNDEFINED: return makeExpr<UndefinedExpression>(token);
+			case Token::QUESTION: {
+				NullableTypeExpression* nullable = makeExpr<NullableTypeExpression>(token);
+				nullable->inner = type(false);
+				return nullable->inner ? nullable : nullptr;
+			}
 			case Token::VOID:
 			case Token::BOOL:
 			case Token::I8:
@@ -320,7 +413,7 @@ struct Parser {
 			case Token::CSTR:
 			case Token::BYTE:
 			case Token::TYPE_KW:
-				return makeExpr<TypeLiteralExpression>(token, primitiveKindFromToken(token.type));
+				return postfixSuffixes(makeExpr<TypeLiteralExpression>(token, primitiveKindFromToken(token.type)), mode);
 			case Token::SIZEOF:
 			case Token::ALIGNOF: {
 				SizeofExpression* expr = makeExpr<SizeofExpression>(token);
@@ -347,22 +440,7 @@ struct Parser {
 					return nullptr;
 				}
 				return structLiteralBody(nullptr, token);
-			case Token::LEFT_BRACKET: {
-				ArrayLiteralExpression* expr = makeExpr<ArrayLiteralExpression>(token, m_unit.arena);
-				while (peekToken().type != Token::RIGHT_BRACKET) {
-					if (peekToken().type == Token::END_OF_FILE) {
-						m_output.error("Unexpected end of file");
-						return nullptr;
-					}
-					Expression* value = expression();
-					if (!value) return nullptr;
-					expr->values.push(value);
-					if (peekToken().type != Token::COMMA) break;
-					consumeToken();
-				}
-				if (!consume(Token::RIGHT_BRACKET)) return nullptr;
-				return expr;
-			}
+			case Token::LEFT_BRACKET: return bracketPrimary(token, mode);
 			case Token::TYPEOF: {
 				TypeofExpression* expr = makeExpr<TypeofExpression>(token);
 				if (!consume(Token::LEFT_PAREN)) return nullptr;
@@ -405,6 +483,23 @@ struct Parser {
 					}
 
 					MemberExpression* member = makeExpr<MemberExpression>(dot);
+					member->expression = expr;
+					member->name = name.value;
+					expr = member;
+					break;
+				}
+				case Token::DOUBLE_COLON: {
+					Token colon = consumeToken();
+					Token name = consumeToken();
+					if (name.type != Token::IDENTIFIER) {
+						m_output.errorAt(name, "Expected identifier");
+						return nullptr;
+					}
+					if (!equalStrings(name.value, "kind") && !equalStrings(name.value, "name") && !equalStrings(name.value, "child") && !equalStrings(name.value, "length") && !equalStrings(name.value, "ret")) {
+						m_output.errorAt(name, "Unsupported type member");
+						return nullptr;
+					}
+					TypeMemberExpression* member = makeExpr<TypeMemberExpression>(colon);
 					member->expression = expr;
 					member->name = name.value;
 					expr = member;
@@ -607,9 +702,123 @@ struct Parser {
 		}
 	}
 
-	Expression* typeFromToken(Token token) {
+	bool functionTypeParam(FunctionTypeParam& param) {
+		if (peekToken().type == Token::COMPTIME) {
+			consumeToken();
+			param.is_comptime = true;
+		}
+		if (peekToken().type == Token::REF) {
+			consumeToken();
+			param.is_ref = true;
+		}
+		Expression* argument = expression();
+		if (!argument) return false;
+		if (peekToken().type != Token::COLON) {
+			param.type_expr = argument;
+			return true;
+		}
+
+		if (argument->kind != Expression::IDENTIFIER) {
+			m_output.errorAt(argument->token, "Expected parameter name");
+			return false;
+		}
+		param.name = static_cast<IdentifierExpression*>(argument)->name;
+		consumeToken();
+		if (peekToken().type == Token::COMPTIME) {
+			consumeToken();
+			param.is_comptime = true;
+		}
+		if (peekToken().type == Token::REF) {
+			consumeToken();
+			param.is_ref = true;
+		}
+		param.type_expr = expression();
+		return param.type_expr != nullptr;
+	}
+
+	bool functionTypeSignature(FunctionTypeExpression& fn) {
+		if (!consume(Token::LEFT_PAREN)) return false;
+		while (peekToken().type != Token::RIGHT_PAREN) {
+			FunctionTypeParam& param = fn.params.emplace_back();
+			if (!functionTypeParam(param)) return false;
+			if (peekToken().type != Token::COMMA) break;
+			consumeToken();
+		}
+		if (!consume(Token::RIGHT_PAREN) || !consume(Token::COLON)) return false;
+		fn.return_type = type();
+		return fn.return_type != nullptr;
+	}
+
+	bool functionParams(FunctionExpression& fn, const FunctionTypeExpression& signature) {
+		for (const FunctionTypeParam& type_param : signature.params) {
+			if (empty(type_param.name)) {
+				m_output.errorAt(signature.token, "Function parameters require names");
+				return false;
+			}
+			FunctionParam& param = fn.params.emplace_back();
+			param.name = type_param.name;
+			param.is_comptime = type_param.is_comptime;
+			param.is_ref = type_param.is_ref;
+			param.type_expr = type_param.type_expr;
+			for (i32 i = 0; i < fn.params.size() - 1; ++i) {
+				if (!equalStrings(fn.params[i].name, param.name)) continue;
+				m_output.error("Duplicate parameter: ", param.name);
+				return false;
+			}
+		}
+		return true;
+	}
+
+	Expression* type(bool allow_union = true) {
+		// Parse prefix brackets and nullable syntax recursively.
+		// Examples:
+		// - [4]i32: array of 4 ints
+		// - []i32: slice of ints
+		// - [4]?i32: array of 4 nullable ints
+		// - ?[4]i32: nullable array of 4 ints
+		// - [2][3]i32: array of 2 arrays of 3 ints
+		Token token = consumeToken();
 		Expression* res = nullptr;
+
 		switch (token.type) {
+			case Token::LEFT_BRACKET: {
+				if (peekToken().type == Token::RIGHT_BRACKET) {
+					consumeToken();
+					SliceTypeExpression* slice = makeExpr<SliceTypeExpression>(token);
+					slice->element_type = type(false);
+					if (!slice->element_type) return nullptr;
+					res = slice;
+					break;
+				}
+
+				Expression* size = expression();
+				if (!size) return nullptr;
+				if (!consume(Token::RIGHT_BRACKET)) return nullptr;
+				ArrayTypeExpression* array = makeExpr<ArrayTypeExpression>(token);
+				array->size = size;
+				array->element_type = type(false);
+				if (!array->element_type) return nullptr;
+				res = array;
+				break;
+			}
+			case Token::QUESTION: {
+				Expression* inner = type(false);
+				if (!inner) return nullptr;
+				NullableTypeExpression* nullable = makeExpr<NullableTypeExpression>(token);
+				nullable->inner = inner;
+				res = nullable;
+				break;
+			}
+			case Token::DOLLAR: {
+				Token name = consumeToken();
+				if (name.type != Token::IDENTIFIER) {
+					m_output.errorAt(name, "Expected inferred generic type name");
+					return nullptr;
+				}
+				GenericIdentifierExpression* generic = makeExpr<GenericIdentifierExpression>(token);
+				generic->name = name.value;
+				return generic;
+			}
 			case Token::IDENTIFIER: {
 				IdentifierExpression* id = makeExpr<IdentifierExpression>(token);
 				id->name = token.value;
@@ -630,130 +839,62 @@ struct Parser {
 			}
 			case Token::FN: {
 				FunctionTypeExpression* fn = makeExpr<FunctionTypeExpression>(token, m_unit.arena);
-				if (!consume(Token::LEFT_PAREN)) return nullptr;
-				while (peekToken().type != Token::RIGHT_PAREN) {
-					Expression* param = type();
-					if (!param) return nullptr;
-					fn->params.push(param);
-					if (peekToken().type != Token::COMMA) break;
-					consumeToken();
-				}
-				if (!consume(Token::RIGHT_PAREN)) return nullptr;
-				if (!consume(Token::COLON)) return nullptr;
-				fn->return_type = type();
-				if (!fn->return_type) return nullptr;
+				if (!functionTypeSignature(*fn)) return nullptr;
 				res = fn;
 				break;
 			}
 			case Token::LEFT_PAREN: {
-				res = type();
-				if (!res) return nullptr;
-				if (!consume(Token::RIGHT_PAREN)) return nullptr;
+				res = type(true);
+				if (!res || !consume(Token::RIGHT_PAREN)) return nullptr;
 				break;
 			}
 			default: {
 				const ResolvedType::Kind kind = primitiveKindFromToken(token.type);
-				if (kind == ResolvedType::INVALID) return nullptr;
-				res = makeExpr<TypeLiteralExpression>(token, kind);
+				if (kind != ResolvedType::INVALID) res = makeExpr<TypeLiteralExpression>(token, kind);
 				break;
 			}
 		}
+		if (!res) {
+			m_output.errorAt(token, "Expected type");
+			return nullptr;
+		}
 
+		// TODO should we move this inside case Token::IDENTIFIER:?
 		// Brackets after a (possibly qualified) name in type position are template
 		// instantiation; array/slice syntax is prefix ([N]T, []T), so there is no ambiguity.
-		if (res->kind == Expression::IDENTIFIER || res->kind == Expression::MEMBER) {
-			if (peekToken().type == Token::LEFT_BRACKET) {
-				Token bracket = consumeToken();
-				BracketExpression* call = makeExpr<BracketExpression>(bracket, m_unit.arena);
-				call->base = res;
-				while (peekToken().type != Token::RIGHT_BRACKET) {
-					if (peekToken().type == Token::END_OF_FILE) {
-						m_output.error("Unexpected end of file");
-						return nullptr;
-					}
-
-					Expression* arg = expression(ExprMode::HEAD);
-					if (!arg) return nullptr;
-					call->args.push(arg);
-					if (peekToken().type != Token::COMMA) break;
-					consumeToken();
-				}
-				if (!consume(Token::RIGHT_BRACKET)) return nullptr;
-				res = call;
-			}
-		}
-
-		if (peekToken().type == Token::PIPE) {
-			UnionTypeExpression* union_type = makeExpr<UnionTypeExpression>(res->token, m_unit.arena);
-			union_type->members.push(res);
-			while (peekToken().type == Token::PIPE) {
-				consumeToken();
-				Expression* member = type();
-				if (!member) return nullptr;
-				union_type->members.push(member);
-			}
-			return union_type;
-		}
-
-		return res;
-	}
-
-	Expression* type() {
-		// Parse prefix brackets and nullable syntax recursively.
-		// Examples:
-		// - [4]i32: array of 4 ints
-		// - []i32: slice of ints
-		// - [4]?i32: array of 4 nullable ints
-		// - ?[4]i32: nullable array of 4 ints
-		// - [2][3]i32: array of 2 arrays of 3 ints
-		if (peekToken().type == Token::LEFT_BRACKET) {
+		if ((res->kind == Expression::IDENTIFIER || res->kind == Expression::MEMBER)
+			&& peekToken().type == Token::LEFT_BRACKET)
+		{
 			Token bracket = consumeToken();
-			if (peekToken().type == Token::RIGHT_BRACKET) {
+			BracketExpression* call = makeExpr<BracketExpression>(bracket, m_unit.arena);
+			call->base = res;
+			while (peekToken().type != Token::RIGHT_BRACKET) {
+				if (peekToken().type == Token::END_OF_FILE) {
+					m_output.error("Unexpected end of file");
+					return nullptr;
+				}
+
+				Expression* arg = expression(ExprMode::HEAD);
+				if (!arg) return nullptr;
+				call->args.push(arg);
+				if (peekToken().type != Token::COMMA) break;
 				consumeToken();
-				SliceTypeExpression* slice = makeExpr<SliceTypeExpression>(bracket);
-				slice->element_type = type();
-				if (!slice->element_type) return nullptr;
-				return slice;
-			} else {
-				Expression* size = expression();
-				if (!size) return nullptr;
-				if (!consume(Token::RIGHT_BRACKET)) return nullptr;
-				ArrayTypeExpression* array = makeExpr<ArrayTypeExpression>(bracket);
-				array->size = size;
-				array->element_type = type();
-				if (!array->element_type) return nullptr;
-				return array;
 			}
-		}
-		// Handle nullable
-		Token first = peekToken();
-		if (first.type == Token::QUESTION) {
-			consumeToken();
-			Expression* inner = type();
-			if (!inner) return nullptr;
-			NullableTypeExpression* nullable = makeExpr<NullableTypeExpression>(first);
-			nullable->inner = inner;
-			return nullable;
+			if (!consume(Token::RIGHT_BRACKET)) return nullptr;
+			res = call;
 		}
 
-		if (first.type == Token::DOLLAR) {
-			consumeToken();
-			Token name = consumeToken();
-			if (name.type != Token::IDENTIFIER) {
-				m_output.errorAt(name, "Expected inferred generic type name");
-				return nullptr;
-			}
-			GenericIdentifierExpression* generic = makeExpr<GenericIdentifierExpression>(first);
-			generic->name = name.value;
-			return generic;
-		}
+		if (!allow_union || peekToken().type != Token::PIPE) return res;
 
-		Token base_token = consumeToken();
-		Expression* res = typeFromToken(base_token);
-		if (!res) {
-			m_output.errorAt(base_token, "Expected type");
+		UnionTypeExpression* union_type = makeExpr<UnionTypeExpression>(res->token, m_unit.arena);
+		union_type->members.push(res);
+		while (peekToken().type == Token::PIPE) {
+			consumeToken();
+			Expression* member = type();
+			if (!member) return nullptr;
+			union_type->members.push(member);
 		}
-		return res;
+		return union_type;
 	}
 
 	// Parse a binary expression, e.g. `a + b` or `x * y`. 
@@ -822,11 +963,6 @@ struct Parser {
 	// Parse an expression, e.g. `a + b * c` or `a ? b : c`.
 	Expression* expression(ExprMode mode = ExprMode::FULL) {
 		return ternaryExpression(mode);
-	}
-
-	// Parse a comptime declaration, e.g. `comptime x = expr;`.
-	bool comptime() {
-		return symbolDecl(Symbol::COMPTIME);
 	}
 
 	VarDeclStatement* varDecl() {
@@ -1008,20 +1144,30 @@ struct Parser {
 		return res;
 	}
 
-	bool functionParam(FunctionParam& param) {
-		if (!consume(Token::IDENTIFIER, param.name, "Expected parameter name")) return false;
-		if (!consume(Token::COLON)) return false;
-		if (peekToken().type == Token::COMPTIME) {
-			consumeToken();
-			param.is_comptime = true;
+	Expression* functionOrTypeExpression(Token token) {
+		if (peekToken().type != Token::LEFT_PAREN) {
+			m_output.errorAt(peekToken(), "Expected (");
+			return nullptr;
 		}
-		if (peekToken().type == Token::REF) {
-			consumeToken();
-			param.is_ref = true;
+
+		FunctionTypeExpression* type_expr = makeExpr<FunctionTypeExpression>(token, m_unit.arena);
+		if (!functionTypeSignature(*type_expr)) return nullptr;
+
+		if (peekToken().type != Token::LEFT_BRACE) return type_expr;
+		FunctionExpression* fn = make<FunctionExpression>(m_unit.arena);
+		if (!functionParams(*fn, *type_expr)) return nullptr;
+		fn->return_type = type_expr->return_type;
+		fn->body = blockStatement();
+		if (!fn->body) return nullptr;
+		ExpArray<ls_string_view> generic_names(m_unit.arena);
+		for (FunctionParam& param : fn->params) {
+			if (param.is_comptime || isGeneric(*param.type_expr)) {
+				param.is_generic = true;
+				fn->is_template = true;
+			}
+			if (!collectGenericParams(*param.type_expr, generic_names)) return nullptr;
 		}
-		param.type_expr = type();
-		if (!param.type_expr) return false;
-		return true;
+		return fn;
 	}
 
 	ContinueStatement* continueStatement() {
@@ -1256,22 +1402,11 @@ struct Parser {
 
 	// Parse a runtime parameter list and return type, e.g. `(a : i32) : i32`.
 	bool functionSignature(FunctionExpression* fn) {
-		if (!consume(Token::LEFT_PAREN)) return false;
-		while (peekToken().type != Token::RIGHT_PAREN) {
-			FunctionParam& arg = fn->params.emplace_back();
-			if (!functionParam(arg)) return false;
-			for (i32 i = 0; i < fn->params.size() - 1; ++i) {
-				if (!equalStrings(fn->params[i].name, arg.name)) continue;
-				m_output.error("Duplicate parameter: ", arg.name);
-				return false;
-			}
-			if (peekToken().type != Token::COMMA) break;
-			consumeToken();
-		}
-		if (!consume(Token::RIGHT_PAREN)) return false;
-		if (!consume(Token::COLON)) return false;
-		fn->return_type = type();
-		return fn->return_type != nullptr;
+		FunctionTypeExpression signature(m_unit.arena);
+		if (!functionTypeSignature(signature)) return false;
+		if (!functionParams(*fn, signature)) return false;
+		fn->return_type = signature.return_type;
+		return true;
 	}
 
 	static bool isGeneric(const Expression& expr) {
@@ -1300,6 +1435,7 @@ struct Parser {
 			case Expression::UNARY: return isGeneric(*static_cast<const UnaryExpression&>(expr).expression);
 			case Expression::CAST: return isGeneric(*static_cast<const CastExpression&>(expr).expression);
 			case Expression::MEMBER: return isGeneric(*static_cast<const MemberExpression&>(expr).expression);
+			case Expression::TYPE_MEMBER: return isGeneric(*static_cast<const TypeMemberExpression&>(expr).expression);
 			case Expression::SLICE: {
 				const auto& slice = static_cast<const SliceExpression&>(expr);
 				if (isGeneric(*slice.base)) return true;
@@ -1321,8 +1457,8 @@ struct Parser {
 			case Expression::NULLABLE_TYPE: return isGeneric(*static_cast<const NullableTypeExpression&>(expr).inner);
 			case Expression::FUNCTION_TYPE: {
 				const auto& fn = static_cast<const FunctionTypeExpression&>(expr);
-				for (const Expression* param : fn.params) {
-					if (isGeneric(*param)) return true;
+				for (const FunctionTypeParam& param : fn.params) {
+					if (isGeneric(*param.type_expr)) return true;
 				}
 				return isGeneric(*fn.return_type);
 			}
@@ -1351,8 +1487,8 @@ struct Parser {
 			}
 			case Expression::FUNCTION_TYPE: {
 				const auto& fn = static_cast<const FunctionTypeExpression&>(expr);
-				for (const Expression* param : fn.params) {
-					if (!collectGenericParams(*param, names)) return false;
+				for (const FunctionTypeParam& param : fn.params) {
+					if (!collectGenericParams(*param.type_expr, names)) return false;
 				}
 				return collectGenericParams(*fn.return_type, names);
 			}
@@ -1552,14 +1688,12 @@ struct Parser {
 			Token token = consumeToken();
 			switch (token.type) {
 				case Token::END_OF_FILE: return LS_RESULT_OK;
-				case Token::CONST:
-				case Token::VAR:
-					if (!symbolDecl(token.type == Token::CONST ? Symbol::CONST : Symbol::VARIABLE)) return LS_RESULT_FAILURE;
-					break;
+				case Token::CONST: if (!symbolDecl(Symbol::CONST)) return LS_RESULT_FAILURE; break;
+				case Token::VAR: if (!symbolDecl(Symbol::VARIABLE)) return LS_RESULT_FAILURE; break;
+				case Token::COMPTIME: if (!symbolDecl(Symbol::COMPTIME)) return LS_RESULT_FAILURE; break;
 				case Token::FN: if (!functionDecl()) return LS_RESULT_FAILURE; break;
 				case Token::STRUCT: if (!structDecl()) return LS_RESULT_FAILURE; break;
 				case Token::ENUM: if (!enumDecl()) return LS_RESULT_FAILURE; break;
-				case Token::COMPTIME: if (!comptime()) return LS_RESULT_FAILURE; break;
 				case Token::IMPORT: if (!importDecl()) return LS_RESULT_FAILURE; break;
 				case Token::EXTERN: if (!externDecl()) return LS_RESULT_FAILURE; break;
 				case Token::OPERATOR: if (!operatorDecl()) return LS_RESULT_FAILURE; break;

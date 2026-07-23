@@ -2,9 +2,9 @@
 
 # TODO
 
+* ref in function type - var a : fn(ref i32) = foo;
 * 1'000'000 / 1_000_000
 * FourCC? `ABCD`
-* i32::min, i32::max, T::size, T::alignmennt, T::kind
 * bit set / flags / something else?
 * null propagation a?.b?.c;
 * list of keywords and forbid identifier colliding with keywords
@@ -1014,15 +1014,9 @@ Unions are structural with set semantics:
 
 **Members**
 
-Any concrete runtime type can be a member: structs, enums, primitives, and `string`. Excluded:
+Every union member must be a concrete runtime type. This includes structs, enums, primitives, nullable types, slices, static arrays, function types, and `string`.
 
-- `void`
-- `null` - `null` as a member is a compile-time error
-- nullable types (`?T`); nullable union syntax (`?(A | B)`) is not supported
-- function types - use nullable function types (`?fn(...)` ) or wrap in a struct instead
-- unions (they flatten, see above)
-- slices (`[]T`) - a slice is a view without ownership; the union tag does not distinguish which backing storage a slice view represents
-- static arrays (`[N]T`) - use proper container types (structs, function-based interfaces) instead of unioning different array sizes
+`void` cannot be a member because it has no runtime value or value syntax for selecting a `void` union variant. Union types are not members themselves; they flatten into their constituent members, as described above.
 
 All members must be pairwise distinct types. Because the member type is the tag, two semantically different variants with the same payload type require wrapper structs.
 
@@ -1181,7 +1175,10 @@ Function type syntax:
 
 ```cpp
 fn(i32, i32) : i32
+fn(a : i32, b : i32) : void
 ```
+
+Parameters may optionally be named. Named and unnamed parameters can be mixed in the same function type.
 
 Example:
 
@@ -2190,6 +2187,8 @@ A `type` value exposes its structure through members accessed with `::` (see [Wh
 | --- | --- | --- |
 | `t::kind` | `TypeKind` | every type |
 | `t::name` | `string` | every type |
+| `t::min` | value of `t` | numeric types |
+| `t::max` | value of `t` | numeric types |
 | `t::child` | `type` | `.Nullable`, `.Slice`, `.Array` |
 | `t::length` | comptime integer | `.Array` |
 | `t::fields` | sequence of field cursors | `.Struct` |
@@ -2200,20 +2199,23 @@ A `type` value exposes its structure through members accessed with `::` (see [Wh
 
 ```cpp
 comptime k = i32::kind;       // .I32
+comptime lo = i32::min;       // -2147483648
+comptime hi = i32::max;       // 2147483647
 comptime s = Vec3::kind;      // .Struct
 comptime n = Vec3::name;      // "Vec3"
-comptime e = ([]i32)::child;  // i32
-comptime m = ([4]i32)::length; // 4
+comptime e = []i32::child;  // i32
+comptime m = [4]i32::length; // 4
 comptime ps = (fn(i32, f32) : bool)::params; // []type: [i32, f32]
 comptime r = (fn(i32, f32) : bool)::ret;     // bool
 ```
 
 - `t::kind` classifies the type into one [`TypeKind`](#typekind) discriminant
 - `t::name` is the type's source-level name, the same string in the table under [`t::name`](#tname) below
-- `t::child` is the single operand of a one-operand type constructor: the `U` of `?U`, the element of `[]U`, or the element of `[N]U`
+- `t::min` and `t::max` are the lowest and highest finite values representable by a concrete numeric type. For floating-point types, `t::min` is the most negative finite value, not the smallest positive normal value.
+- `t::child` is the single operand of a one-operand type constructor: the `U` of `?U`, the element of `[]U`, or the element of `[N]U`; compound type expressions can be written directly before the member, as in `?i32::child` or `[]i32::child`
 - `t::length` is the element count `N` of a `[N]T`, an untyped compile-time integer - the same value `length(v)` yields on an instance (see [Static-sized arrays](#static-sized-arrays)), but reachable from the type without one, so `unroll for i in 0..t::length` works on a type alone. It is not defined for `.Slice`, whose length is a runtime property
 - `t::fields`, `t::values`, and `t::types` are [reflection sequences](#reflection-sequences)
-- `t::params` is the [reflection sequence](#reflection-sequences) of a `.Fn` type's parameter types, in declaration order; `t::ret` is its return type, named `ret` rather than `return` to avoid the keyword. Function type syntax carries no parameter names (`fn(i32, i32) : i32`), so `t::params` is a plain `[]type` - there is no parameter cursor to bundle a name with, the same reasoning that makes [union iteration](#union-iteration)'s `t::types` a plain `[]type` rather than a cursor sequence
+- `t::params` is the [reflection sequence](#reflection-sequences) of a `.Fn` type's parameter types, in declaration order; `t::ret` is its return type, named `ret` rather than `return` to avoid the keyword. Each element of `t::params` is a parameter cursor with `.name` and `.type` members; `.name` is `""` for unnamed parameters.
 
 All type members are compile-time only. `t` must be a concrete compile-time type; a `$T` that has not been instantiated yet is a compile-time error. Type members are not operators or functions - like any member access they cannot be taken as a value on their own, only applied to a type.
 
@@ -2243,13 +2245,13 @@ This is the same [compile-time branch](#compile-time-branches) pruning used ever
 | nullable | `"?Vec3"` |
 | slices and arrays | `"[]i32"`, `"[4]i32"` |
 | unions | `"A \| B \| C"` in canonical member order |
-| function types | `"fn(i32, i32) : i32"` |
+| function types | `"fn(i32, i32) : i32"` or `"fn(a : i32, b : i32) : void"` |
 
-`t::kind` and `t::name` are the only members every type has; a type's constituent parts are reached through the [reflection sequences](#reflection-sequences), which exist only for structs, enums, and unions.
+`t::kind` and `t::name` are the only members available for every type; `t::min` and `t::max` are restricted to numeric types. A type's constituent parts are reached through the [reflection sequences](#reflection-sequences), which exist only for structs, enums, and unions.
 
 **Why `::` and not `.`.** Reflection members are reached with `::`, which puts them in a namespace disjoint from user-declared names. Enum member access uses `Type.member`, so on `.` a reflection member and an enum member would compete for the same spelling; with `::` they cannot. An `enum` may declare a member named `kind`, `name`, or `values`, and both readings stay available: `State.values` is the declared member, `State::values` is the reflection sequence.
 
-The decisive benefit is extensibility. Reserving `kind`, `name`, `child`, `length`, `fields`, `values`, and `types` as enum member names would work today, but it would make *adding* a reflection member in a future version a breaking change for every enum that already declares one. A disjoint namespace has no such cost.
+The decisive benefit is extensibility. Reserving `kind`, `name`, `min`, `max`, `child`, `length`, `fields`, `values`, and `types` as enum member names would work today, but it would make *adding* a reflection member in a future version a breaking change for every enum that already declares one. A disjoint namespace has no such cost.
 
 Cursor members stay on `.` (`f.name`, `f.type`, `f.value`, `e.value`). Cursors are compiler-synthesized values with no user-declarable members, so nothing can collide with them and the `::` namespace buys nothing. Struct fields likewise stay on `.`: a struct type has no `Type.member` access at all, so a field named `fields` is reached as `v.fields` on a value and never competes with `S::fields`.
 
@@ -2470,8 +2472,7 @@ unroll for P in ps {
 }
 ```
 
-- `t::params` is the [reflection sequence](#reflection-sequences) of parameter types, in declaration order; `t::ret` is a single `type`, following the same shape as [`t::child`](#type-members) for other one-operand-or-fewer constructors
-- function type syntax (`fn(i32, i32) : i32`) never names its parameters, so there is nothing for a parameter cursor to bundle a name with - `t::params` is a plain `[]type`, like [`t::types`](#union-iteration) for unions
+- `t::params` is the [reflection sequence](#reflection-sequences) of parameter cursors, in declaration order; each cursor has `.name` and `.type`. Named parameters carry their declared name in `.name`; unnamed parameters have `""`. `t::ret` is a single `type`, following the same shape as [`t::child`](#type-members) for other one-operand-or-fewer constructors
 - `t::ret` may be `void`; unlike a value's static type, which can never be `void` (see [`TypeKind`](#typekind)), a function type is free to name `void` as its return type, and `t::ret` observes it directly without going through `typeof` on a call
 - both are guarded like any [kind-specific member](#type-members): valid only once `t`'s kind is proven `.Fn`
 - neither reaches into a parameter's or return type's own structure automatically; a `.Struct` element of `t::params` is introspected by recursing, the same as any other `type` value: `t::params[0]::fields`
@@ -2492,7 +2493,7 @@ The iteration forms differ in what the loop variable is, decided by the operand:
 | `t::fields` (struct type) | field cursor | `.name`, `.type` |
 | `t::values` (enum type) | enum cursor | `.name`, `.value` |
 | `t::types` (union type) | a `type` | - |
-| `t::params` (function type) | a `type` | - |
+| `t::params` (function type) | parameter cursor | `.name`, `.type` |
 | struct value | field cursor | `.name`, `.type`, `.value` |
 
 The reflection sequences are themselves comptime slices, so they are subcases of the first row; they are listed separately because their element types are built in and not otherwise nameable. The struct **value** is the only non-slice operand, and the only one that binds `.value`. Enum and union *values* are not iterable at all - iterate the type's `::values` or `::types` instead; likewise a function *value*'s parameter and return types are reached through its type, `typeof(f)::params`, not through `f` directly.

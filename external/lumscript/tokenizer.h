@@ -273,7 +273,7 @@ struct Tokenizer {
 			case '[': return makeToken(Token::LEFT_BRACKET);
 			case ']': return makeToken(Token::RIGHT_BRACKET);
 			case ';': return makeToken(Token::SEMICOLON);
-			case ':': return makeToken(Token::COLON);
+			case ':': return makeToken(match(':') ? Token::DOUBLE_COLON : Token::COLON);
 			case ',': return makeToken(Token::COMMA);
 			case '.': {
 				if (match('.')) {

@@ -18,6 +18,7 @@ struct Token {
 		RIGHT_BRACKET,
 		SEMICOLON,
 		COLON,
+		DOUBLE_COLON,
 		COMMA,
 		DOT,
 		RANGE,
