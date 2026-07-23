@@ -963,7 +963,7 @@ struct Checker {
 					// TODO create a test to hit this
 					return {};
 
-				ComptimeValue result = cond.asInt() != 0
+				ComptimeValue result = cond.asBool()
 					? resolveComptimeValue(unit, *tern.true_expr, bindings, ctx)
 					: resolveComptimeValue(unit, *tern.false_expr, bindings, ctx);
 				return result;

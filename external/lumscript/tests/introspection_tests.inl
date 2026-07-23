@@ -810,6 +810,15 @@ TEST(IntrospectionNumericTypeMinMaxRejectsNonNumeric) {
 	return true;
 }
 
+TEST(IntrospectionNumericTypeBoundsFoldBeforeBytecode) {
+	const char* source = R"(
+		fn min_value() : i32 { return i32::min; }
+		fn max_value() : u64 { return u64::max; }
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(IntrospectionTypeNamesCoverDeclarationsTemplatesAndUnions) {
 	const char* source = R"(
 		struct S { value : i32; }
