@@ -988,7 +988,7 @@ TEST(IntrospectionUnrollSequenceIndicesAreComptimeValues) {
 		comptime U = i32 | f32;
 		fn main() : void {
 			unroll for index, T in U::types {
-				if index == 0 || index == 1 { }
+				if index == 0 or index == 1 { }
 				else { var bad : MissingType = undefined; }
 			}
 		}
