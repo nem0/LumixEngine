@@ -114,6 +114,7 @@ struct Expression {
 	Kind kind = INVALID;
 	ResolvedType* resolved_type = nullptr;
 	Token token = {};
+	bool parenthesized = false;
 };
 
 struct IdentifierExpression : Expression {

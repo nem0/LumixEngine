@@ -69,11 +69,17 @@ struct StructResolvedType : ResolvedType {
 	ExpArray<ResolvedType*> field_types;
 };
 
-struct FunctionResolvedType : ResolvedType {
-	FunctionResolvedType(ls_arena& arena) : ResolvedType(FUNCTION), param_names(arena), param_types(arena) {}
+struct FunctionResolvedParam {
+	ls_string_view name;
+	ResolvedType* type = nullptr;
+	bool is_ref = false;
+	bool is_comptime = false;
+};
 
-	ExpArray<ls_string_view> param_names;
-	ExpArray<ResolvedType*> param_types;
+struct FunctionResolvedType : ResolvedType {
+	FunctionResolvedType(ls_arena& arena) : ResolvedType(FUNCTION), params(arena) {}
+
+	ExpArray<FunctionResolvedParam> params;
 	ResolvedType* return_type = nullptr;
 	FunctionExpression* decl = nullptr;
 };

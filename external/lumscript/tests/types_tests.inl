@@ -288,6 +288,35 @@ TEST(FunctionTypeNamedParametersCompile) {
 	return true;
 }
 
+TEST(FunctionTypeRefQualifierIsPartOfType) {
+	const char* source = R"(
+		fn set(value : ref i32) : void { value = 7; }
+		const callback : fn(value : i32) : void = set;
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(FunctionTypeRefQualifierIndirectCall) {
+	const char* source = R"(
+		fn set(value : ref i32) : void { value = 7; }
+		const callback : fn(value : ref i32) : void = set;
+
+		fn main() : i32 {
+			var value : i32 = 1;
+			callback(ref value);
+			return value;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(7, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(IndirectByValueStructRecursionFails) {
 	const char* source = R"(
 		struct A {

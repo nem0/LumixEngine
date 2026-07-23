@@ -212,13 +212,13 @@ struct CCompiler {
 			const FunctionResolvedType* function = static_cast<const FunctionResolvedType*>(value);
 			if (!type(function->return_type)) return false;
 			text(" (*"); text(name); text(")(");
-			for (i32 i = 0; i < function->param_types.size(); ++i) {
+			for (i32 i = 0; i < function->params.size(); ++i) {
 				if (i) text(", ");
 				const bool is_ref = function->decl && i < function->decl->params.size() && function->decl->params[i].is_ref;
-				if (!type(function->param_types[i])) return false;
+				if (!type(function->params[i].type)) return false;
 				if (is_ref) text("*");
 			}
-			if (function->param_types.empty()) text("void");
+			if (function->params.empty()) text("void");
 			text(")"); return true;
 		}
 		const ResolvedType* element = value;
@@ -393,7 +393,7 @@ struct CCompiler {
 					if (symbol && symbol->expression && symbol->expression->kind == Expression::FUNCTION) { callee_fn = static_cast<const FunctionExpression*>(symbol->expression); callee_type = callee_fn->resolved_type; }
 				}
 				const FunctionResolvedType* fn_type = callee_type && callee_type->kind == ResolvedType::FUNCTION ? static_cast<const FunctionResolvedType*>(callee_type) : nullptr;
-				for (i32 i = 0; i < call->args.size(); ++i) { if (i) text(", "); if (((callee_fn && callee_fn->params[i].resolved_type && callee_fn->params[i].resolved_type->kind == ResolvedType::CSTR) || (fn_type && fn_type->param_types[i]->kind == ResolvedType::CSTR)) && (call->args[i]->kind == Expression::STRING_LITERAL || call->args[i]->resolved_type->kind == ResolvedType::STRING)) { text("("); expression(call->args[i]); text(").data"); } else expression(call->args[i]); }
+				for (i32 i = 0; i < call->args.size(); ++i) { if (i) text(", "); if (((callee_fn && callee_fn->params[i].resolved_type && callee_fn->params[i].resolved_type->kind == ResolvedType::CSTR) || (fn_type && fn_type->params[i].type->kind == ResolvedType::CSTR)) && (call->args[i]->kind == Expression::STRING_LITERAL || call->args[i]->resolved_type->kind == ResolvedType::STRING)) { text("("); expression(call->args[i]); text(").data"); } else expression(call->args[i]); }
 				text(")"); return;
 			}
 			case Expression::FUNCTION: {
@@ -749,7 +749,7 @@ static bool compileTypes(CCompiler& compiler, const Unit& unit) {
 			const FunctionExpression* fn = static_cast<const FunctionExpression*>(symbol.expression);
 			const FunctionResolvedType* fn_type = static_cast<const FunctionResolvedType*>(fn->resolved_type);
 			if (fn_type && fn_type->return_type && fn_type->return_type->kind == ResolvedType::NULLABLE) compiler.nullableDeclaration(static_cast<const NullableResolvedType*>(fn_type->return_type));
-			if (fn_type) for (ResolvedType* param : fn_type->param_types) if (param && param->kind == ResolvedType::NULLABLE) compiler.nullableDeclaration(static_cast<const NullableResolvedType*>(param));
+			if (fn_type) for (const FunctionResolvedParam& param : fn_type->params) if (param.type && param.type->kind == ResolvedType::NULLABLE) compiler.nullableDeclaration(static_cast<const NullableResolvedType*>(param.type));
 		}
 	}
 	return compiler.ok;

@@ -120,21 +120,58 @@ static void appendReflectedTypeName(char*& out, char* end, const ResolvedType& t
 			text(names[type.kind - ResolvedType::VOID]); return;
 		}
 		case ResolvedType::ENUM: view(static_cast<const EnumResolvedType&>(type).decl->cached_name); return;
-		case ResolvedType::STRUCT: view(static_cast<const StructResolvedType&>(type).decl->cached_name); return;
+		case ResolvedType::STRUCT: {
+			const StructResolvedType& st = static_cast<const StructResolvedType&>(type);
+			view(st.decl->cached_name);
+			for (const TemplateStructInstance& instance : st.decl->template_struct_instances) {
+				if (instance.type != &type) continue;
+				text("[");
+				for (i32 i = 0; i < instance.args.size(); ++i) {
+					if (i) text(", ");
+					const ComptimeValue& arg = instance.args[i];
+					if (arg.kind == ComptimeValue::TYPE) appendReflectedTypeName(out, end, *arg.type);
+				}
+				text("]");
+				break;
+			}
+			return;
+		}
 		case ResolvedType::FUNCTION: {
 			const FunctionResolvedType& fn = static_cast<const FunctionResolvedType&>(type); text("fn(");
-			for (i32 i = 0; i < fn.param_types.size(); ++i) { if (i) text(", "); if (i < fn.param_names.size() && !empty(fn.param_names[i])) { view(fn.param_names[i]); text(" : "); } appendReflectedTypeName(out, end, *fn.param_types[i]); }
+			for (i32 i = 0; i < fn.params.size(); ++i) {
+				if (i) text(", ");
+				if (fn.params[i].is_comptime) text("comptime ");
+				if (fn.params[i].is_ref) text("ref ");
+				if (!empty(fn.params[i].name)) { view(fn.params[i].name); text(" : "); }
+				appendReflectedTypeName(out, end, *fn.params[i].type);
+			}
 			text(") : "); appendReflectedTypeName(out, end, *fn.return_type); return;
 		}
 		case ResolvedType::ARRAY: {
 			const ArrayResolvedType& a = static_cast<const ArrayResolvedType&>(type); text("[");
-			char digits[32]; char* d = digits + sizeof(digits); i64 n = a.size; if (!n) *--d = '0';
-			while (n) { *--d = char('0' + n % 10); n /= 10; } while (d != digits && out < end) *out++ = *d++;
+			char digits[32]; char* digits_end = digits + sizeof(digits); char* d = digits_end; i64 n = a.size; if (!n) *--d = '0';
+			while (n) { *--d = char('0' + n % 10); n /= 10; } while (d != digits_end && out < end) *out++ = *d++;
 			text("]"); appendReflectedTypeName(out, end, *a.element_type); return;
 		}
 		case ResolvedType::SLICE: text("[]"); appendReflectedTypeName(out, end, *static_cast<const SliceResolvedType&>(type).element_type); return;
 		case ResolvedType::NULLABLE: text("?"); appendReflectedTypeName(out, end, *static_cast<const NullableResolvedType&>(type).inner); return;
-		case ResolvedType::UNION: { const UnionResolvedType& u = static_cast<const UnionResolvedType&>(type); for (i32 i = 0; i < u.members.size(); ++i) { if (i) text(" | "); appendReflectedTypeName(out, end, *u.members[i]); } return; }
+		case ResolvedType::UNION: {
+			const UnionResolvedType& u = static_cast<const UnionResolvedType&>(type);
+			for (i32 rank = 0; rank < u.members.size(); ++rank) {
+				for (i32 i = 0; i < u.members.size(); ++i) {
+					i32 member_rank = 0;
+					for (i32 j = 0; j < u.members.size(); ++j) {
+						if (u.members[j]->kind < u.members[i]->kind
+							|| (u.members[j]->kind == u.members[i]->kind && j < i)) ++member_rank;
+					}
+					if (member_rank != rank) continue;
+					if (rank) text(" | ");
+					appendReflectedTypeName(out, end, *u.members[i]);
+					break;
+				}
+			}
+			return;
+		}
 		default: text("type"); return;
 	}
 }
@@ -210,10 +247,13 @@ struct Checker {
 			case ResolvedType::FUNCTION: {
 				const auto* fa = static_cast<const FunctionResolvedType*>(a);
 				const auto* fb = static_cast<const FunctionResolvedType*>(b);
-				if (fa->param_types.size() != fb->param_types.size()) return false;
+				if (fa->params.size() != fb->params.size()) return false;
 				if (!typesEqual(fa->return_type, fb->return_type)) return false;
-				for (i32 i = 0; i < fa->param_types.size(); ++i)
-					if (!typesEqual(fa->param_types[i], fb->param_types[i])) return false;
+				for (i32 i = 0; i < fa->params.size(); ++i) {
+					if (fa->params[i].is_ref != fb->params[i].is_ref
+						|| fa->params[i].is_comptime != fb->params[i].is_comptime) return false;
+					if (!typesEqual(fa->params[i].type, fb->params[i].type)) return false;
+				}
 				return true;
 			}
 			case ResolvedType::ARRAY: {
@@ -405,9 +445,9 @@ struct Checker {
 			case ResolvedType::FUNCTION: {
 				const FunctionResolvedType* fn = static_cast<const FunctionResolvedType*>(type);
 				error("fn(");
-				for (i32 i = 0; i < fn->param_types.size(); ++i) {
+				for (i32 i = 0; i < fn->params.size(); ++i) {
 					if (i > 0) error(", ");
-					error(fn->param_types[i]);
+					error(fn->params[i].type);
 				}
 				error(") : ");
 				error(fn->return_type);
@@ -527,8 +567,11 @@ struct Checker {
 						// TODO create a test to hit this
 						return {};
 					}
-					resolved->param_names.push(param.name);
-					resolved->param_types.push(pt);
+					FunctionResolvedParam& resolved_param = resolved->params.emplace_back();
+					resolved_param.name = param.name;
+					resolved_param.type = pt;
+					resolved_param.is_ref = param.is_ref;
+					resolved_param.is_comptime = param.is_comptime;
 				}
 				resolved->return_type = resolveTypeExpr(unit, *fn.return_type, bindings);
 				if (!resolved->return_type) {
@@ -727,7 +770,7 @@ struct Checker {
 				TypeMemberExpression& member = static_cast<TypeMemberExpression&>(expr);
 					ComptimeValue base = member.expression ? resolveComptimeValue(unit, *member.expression, bindings, ctx) : ComptimeValue();
 					if (base.kind != ComptimeValue::TYPE || !base.type) return {};
-					if (equalStrings(member.name, "name")) return ComptimeValue(member.comptime_string);
+					if (equalStrings(member.name, "name")) return ComptimeValue(reflectedTypeName(unit, *base.type));
 					if (equalStrings(member.name, "kind")) return ComptimeValue(typeKindValue(base.type->kind));
 					if (equalStrings(member.name, "child")) {
 						switch (base.type->kind) {
@@ -1276,6 +1319,7 @@ struct Checker {
 			default: out = makeType<Expression>(unit, src->kind); break;
 		}
 		out->token = src->token;
+		out->parenthesized = src->parenthesized;
 		return out;
 	}
 
@@ -1536,8 +1580,11 @@ struct Checker {
 				errorLine(fn.token, "Function parameter ", param.name, " cannot be a nullable reference");
 				return nullptr;
 			}
-			fn_type->param_names.push(param.name);
-			fn_type->param_types.push(param.resolved_type);
+			FunctionResolvedParam& resolved_param = fn_type->params.emplace_back();
+			resolved_param.name = param.name;
+			resolved_param.type = param.resolved_type;
+			resolved_param.is_ref = param.is_ref;
+			resolved_param.is_comptime = param.is_comptime;
 		}
 		fn_type->return_type = resolveTypeExpr(unit, *fn.return_type);
 		if (!fn_type->return_type) return nullptr;
@@ -1577,8 +1624,8 @@ struct Checker {
 		u32 ufcs_param_offset = 0)
 	{
 		// num args mismatch
-		if (fn_type.param_types.size() != call.args.size() + ufcs_param_offset) {
-			errorLine(call.token, "Function call argument count mismatch: expected ", fn_type.param_types.size() - ufcs_param_offset, ", got ", call.args.size());
+		if (fn_type.params.size() != call.args.size() + ufcs_param_offset) {
+			errorLine(call.token, "Function call argument count mismatch: expected ", fn_type.params.size() - ufcs_param_offset, ", got ", call.args.size());
 			return nullptr;
 		}
 
@@ -1586,10 +1633,10 @@ struct Checker {
 		if (ufcs_param_offset) {
 			MemberExpression& mem = static_cast<MemberExpression&>(*call.callee);
 			ResolvedType* receiver_type = mem.expression->resolved_type;
-			if (!receiver_type || !canImplicitlyConvert(receiver_type, fn_type.param_types[0])) {
+			if (!receiver_type || !canImplicitlyConvert(receiver_type, fn_type.params[0].type)) {
 				return nullptr;
 			}
-			if (fn_type.decl && fn_type.decl->params[0].is_ref) {
+			if (fn_type.params[0].is_ref) {
 				bool writable = false;
 				receiver_type = checkAssignableExpr(unit, ctx, *mem.expression, writable);
 				if (!receiver_type || !writable) {
@@ -1601,33 +1648,31 @@ struct Checker {
 
 		for (i32 i = 0; i < call.args.size(); ++i) {
 			const i32 param_index = ufcs_param_offset + i;
-			ResolvedType* param_type = fn_type.param_types[param_index];
+			ResolvedType* param_type = fn_type.params[param_index].type;
 			Expression* arg = call.args[i];
-			if (fn_type.decl && param_index < fn_type.decl->params.size()) {
-				if (fn_type.decl->params[param_index].is_comptime) continue;
-				if (fn_type.decl->params[param_index].is_ref) {
-					if (arg->kind != Expression::UNARY) {
-						errorLine(call.args[i]->token, "Cannot pass non-ref expression as ref argument ", i + 1, " of function call");
-						return nullptr;
-					}
-					UnaryExpression* un = static_cast<UnaryExpression*>(arg);
-					if (un->op != Token::REF) {
-						errorLine(call.args[i]->token, "Cannot pass non-ref expression as ref argument ", i + 1, " of function call");
-						return nullptr;
-					}
-					bool writable = false;
-					ResolvedType* arg_type = checkAssignableExpr(unit, ctx, *un->expression, writable);
-					if (!arg_type) return nullptr;
-					if (!writable) {
-						errorLine(call.args[i]->token, "Cannot pass non-writable expression as ref argument ", i + 1, " of function call");
-						return nullptr;
-					}
-					if (!typesEqual(arg_type, param_type)) {
-						errorLine(call.args[i]->token, "Cannot convert ", arg_type, " to ", param_type, " for ref argument ", i + 1, " of function call");
-						return nullptr;
-					}
-					continue;
+			if (fn_type.params[param_index].is_comptime) continue;
+			if (fn_type.params[param_index].is_ref) {
+				if (arg->kind != Expression::UNARY) {
+					errorLine(call.args[i]->token, "Cannot pass non-ref expression as ref argument ", i + 1, " of function call");
+					return nullptr;
 				}
+				UnaryExpression* un = static_cast<UnaryExpression*>(arg);
+				if (un->op != Token::REF) {
+					errorLine(call.args[i]->token, "Cannot pass non-ref expression as ref argument ", i + 1, " of function call");
+					return nullptr;
+				}
+				bool writable = false;
+				ResolvedType* arg_type = checkAssignableExpr(unit, ctx, *un->expression, writable);
+				if (!arg_type) return nullptr;
+				if (!writable) {
+					errorLine(call.args[i]->token, "Cannot pass non-writable expression as ref argument ", i + 1, " of function call");
+					return nullptr;
+				}
+				if (!typesEqual(arg_type, param_type)) {
+					errorLine(call.args[i]->token, "Cannot convert ", arg_type, " to ", param_type, " for ref argument ", i + 1, " of function call");
+					return nullptr;
+				}
+				continue;
 			}
 
 			ResolvedType* arg_type = checkExprMaterialized(unit, ctx, *arg, param_type);
@@ -1666,10 +1711,10 @@ struct Checker {
 			if (cand.op != op) continue;
 
 			FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(cand.fn->resolved_type);
-			if (fn_type->param_types.size() != arity) continue;
+			if (fn_type->params.size() != arity) continue;
 
-			if (!operandMatchesParam(*operands[0], *operand_types[0], *fn_type->param_types[0])) continue;;
-			if (arity > 1 && !operandMatchesParam(*operands[1], *operand_types[1], *fn_type->param_types[1])) continue;
+			if (!operandMatchesParam(*operands[0], *operand_types[0], *fn_type->params[0].type)) continue;;
+			if (arity > 1 && !operandMatchesParam(*operands[1], *operand_types[1], *fn_type->params[1].type)) continue;
 
 			if (matched_fn) return OverloadResult::AMBIGUOUS;
 
@@ -1681,7 +1726,7 @@ struct Checker {
 
 		// Commit pass: pin untyped numeric operands to the winning signature.
 		for (i32 j = 0; j < arity; ++j) {
-			ResolvedType* param = matched_type->param_types[(u32)j];
+			ResolvedType* param = matched_type->params[(u32)j].type;
 			if (!materializeUntyped(*operands[j], param)) {
 				errorLine(operands[j]->token, "Cannot convert operand ", j + 1, " of operator ", operatorSymbolName(op), " to ", param);
 				return OverloadResult::FAILED;
@@ -1970,15 +2015,15 @@ struct Checker {
 		// Signature was built and published by checkSymbol before dispatching here.
 		FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(fn.resolved_type);
 		if (const Token::Type op_token = tokenFromOperatorName(sym.name); op_token != Token::ERROR) {
-			const i32 arity = (i32)fn_type->param_types.size();
+			const i32 arity = (i32)fn_type->params.size();
 			if ((op_token == Token::MINUS ? (arity != 1 && arity != 2) : arity != 2)) {
 				errorLine(sym.token, "Invalid operator arity");
 				return LS_RESULT_FAILURE;
 			}
 
 			bool struct_signature = false;
-			for (ResolvedType* param : fn_type->param_types) {
-				if (param->kind == ResolvedType::STRUCT) {
+			for (const FunctionResolvedParam& param : fn_type->params) {
+				if (param.type->kind == ResolvedType::STRUCT) {
 					struct_signature = true;
 					break;
 				}
@@ -1988,8 +2033,8 @@ struct Checker {
 				return LS_RESULT_FAILURE;
 			}
 
-			for (ResolvedType* param : fn_type->param_types) {
-				if (param->kind == ResolvedType::ENUM) {
+			for (const FunctionResolvedParam& param : fn_type->params) {
+				if (param.type->kind == ResolvedType::ENUM) {
 					errorLine(sym.token, "Operator overloads with enum parameters are not allowed; use a wrapper struct instead");
 					return LS_RESULT_FAILURE;
 				}
@@ -2836,9 +2881,14 @@ struct Checker {
 				return nullptr;
 			}
 			expr.resolved_type = &module.type_kind;
+			member.comptime_int = typeKindValue(base_value.type->kind);
 			return expr.resolved_type;
 		}
 		if (equalStrings(member.name, "child")) {
+			if (!ctx || !ctx->comptime_only) {
+				errorLine(expr.token, "Type member child can only be used in a comptime context");
+				return nullptr;
+			}
 			ResolvedType* child = nullptr;
 			switch (base_value.type->kind) {
 				case ResolvedType::NULLABLE: child = static_cast<NullableResolvedType*>(base_value.type)->inner; break;
@@ -2850,8 +2900,10 @@ struct Checker {
 				errorLine(expr.token, "Type member child requires a nullable, slice, or array type");
 				return nullptr;
 			}
-			expr.resolved_type = child;
-			return child;
+			MetaType* meta = makeType<MetaType>(unit);
+			meta->inner = child;
+			expr.resolved_type = meta;
+			return meta;
 		}
 		if (equalStrings(member.name, "length")) {
 			if (base_value.type->kind != ResolvedType::ARRAY) {
@@ -2866,8 +2918,14 @@ struct Checker {
 			errorLine(expr.token, "Type member ret requires a function type");
 			return nullptr;
 		}
-		expr.resolved_type = static_cast<FunctionResolvedType*>(base_value.type)->return_type;
-		return expr.resolved_type;
+		if (!ctx || !ctx->comptime_only) {
+			errorLine(expr.token, "Type member ret can only be used in a comptime context");
+			return nullptr;
+		}
+		MetaType* meta = makeType<MetaType>(unit);
+		meta->inner = static_cast<FunctionResolvedType*>(base_value.type)->return_type;
+		expr.resolved_type = meta;
+		return meta;
 	}
 
 	ResolvedType* checkMemberExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint) {
@@ -3211,8 +3269,8 @@ struct Checker {
 			if (fn->is_template) {
 				FunctionResolvedType& target = *static_cast<FunctionResolvedType*>(hint);
 				TemplateBindings bindings(ref.owner->arena);
-				if (fn->params.size() != target.param_types.size()) {
-					errorLine(expr.token, "Mismatched number of parameters for function template : expected ", target.param_types.size(), ", got ", fn->params.size());
+				if (fn->params.size() != target.params.size()) {
+					errorLine(expr.token, "Mismatched number of parameters for function template : expected ", target.params.size(), ", got ", fn->params.size());
 					return nullptr;
 				}
 				for (FunctionParam& param : fn->params) {
@@ -3221,7 +3279,7 @@ struct Checker {
 						errorLine(expr.token, "Cannot infer template argument for comptime parameter ", param.name);
 						return nullptr;
 					}
-					if (!inferTemplateArg(*ref.owner, bindings, *param.type_expr, ComptimeValue(target.param_types[target_param_index]))) {
+				if (!inferTemplateArg(*ref.owner, bindings, *param.type_expr, ComptimeValue(target.params[target_param_index].type))) {
 						errorLine(expr.token, "Cannot infer template argument for parameter ", param.name);
 						return nullptr;
 					}
@@ -4501,9 +4559,9 @@ struct Checker {
 				if (fn.is_template) continue;
 				FunctionResolvedType* fn_type = buildFunctionType(unit, fn);
 				if (!fn_type) return LS_RESULT_FAILURE;
-				for (ResolvedType* param : fn_type->param_types) {
-					if (param->kind != ResolvedType::STRUCT) continue;
-					static_cast<StructResolvedType*>(param)->decl->operators.push({op, &fn});
+				for (const FunctionResolvedParam& param : fn_type->params) {
+					if (param.type->kind != ResolvedType::STRUCT) continue;
+					static_cast<StructResolvedType*>(param.type)->decl->operators.push({op, &fn});
 					break;
 				}
 			}

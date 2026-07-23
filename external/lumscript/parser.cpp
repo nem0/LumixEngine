@@ -314,7 +314,7 @@ struct Parser {
 		}
 	}
 
-	Expression* bracketPrimary(Token token, ExprMode mode) {
+	Expression* bracketPrimary(Token token) {
 		// `[]` can be only slice, we don't support empty arrays
 		if (peekToken().type == Token::RIGHT_BRACKET) {
 			consumeToken();
@@ -323,7 +323,7 @@ struct Parser {
 			return slice->element_type ? slice : nullptr;
 		}
 
-		Expression* first = expression(mode);
+		Expression* first = expression();
 		if (!first) return nullptr;
 
 		// `[expr,` can only be array literal
@@ -332,7 +332,7 @@ struct Parser {
 			array->values.push(first);
 			while (peekToken().type == Token::COMMA) {
 				consumeToken();
-				Expression* value = expression(mode);
+				Expression* value = expression();
 				if (!value) return nullptr;
 				array->values.push(value);
 			}
@@ -342,18 +342,27 @@ struct Parser {
 
 		if (!consume(Token::RIGHT_BRACKET)) return nullptr;
 
-		// `[N]T` is array
-		if (!isExpressionDelimiter(peekToken().type)) {
-			ArrayTypeExpression* array = makeExpr<ArrayTypeExpression>(token);
-			array->size = first;
-			array->element_type = type();
-			return array->element_type ? array : nullptr;
+		// array literals with one element:
+		// foo([1]);
+		// var a = [1];
+		// var a = [[1]];
+		// for value in [1] {}
+		// foo("abc", [1]);
+		switch (peekToken().type) {
+			case Token::RIGHT_PAREN:
+			case Token::SEMICOLON:
+			case Token::RIGHT_BRACKET:
+			case Token::LEFT_BRACE:
+			case Token::COMMA:
+				ArrayLiteralExpression* array = makeExpr<ArrayLiteralExpression>(token, m_unit.arena);
+				array->values.push(first);
+				return array;
 		}
-
-		// `[a]` is array literal with 1 element
-		ArrayLiteralExpression* array = makeExpr<ArrayLiteralExpression>(token, m_unit.arena);
-		array->values.push(first);
-		return array;
+	
+		ArrayTypeExpression* array = makeExpr<ArrayTypeExpression>(token);
+		array->size = first;
+		array->element_type = type();
+		return array->element_type ? array : nullptr;
 	}
 
 	// Parse a primary expression, i.e. a syntactic starting point before postfix chaining.
@@ -440,7 +449,7 @@ struct Parser {
 					return nullptr;
 				}
 				return structLiteralBody(nullptr, token);
-			case Token::LEFT_BRACKET: return bracketPrimary(token, mode);
+			case Token::LEFT_BRACKET: return bracketPrimary(token);
 			case Token::TYPEOF: {
 				TypeofExpression* expr = makeExpr<TypeofExpression>(token);
 				if (!consume(Token::LEFT_PAREN)) return nullptr;
@@ -453,6 +462,7 @@ struct Parser {
 				Expression* expr = expression();
 				if (!expr) return nullptr;
 				if (!consume(Token::RIGHT_PAREN)) return nullptr;
+				expr->parenthesized = true;
 				return expr;
 			}
 			case Token::NUMBER: {
@@ -490,6 +500,10 @@ struct Parser {
 				}
 				case Token::DOUBLE_COLON: {
 					Token colon = consumeToken();
+					if (expr->parenthesized) {
+						m_output.errorAt(colon, "Parenthesized expressions cannot be used for type member access");
+						return nullptr;
+					}
 					Token name = consumeToken();
 					if (name.type != Token::IDENTIFIER) {
 						m_output.errorAt(name, "Expected identifier");

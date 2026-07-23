@@ -101,10 +101,13 @@ static bool sameResolvedType(const ResolvedType* a, const ResolvedType* b) {
 		case ResolvedType::FUNCTION: {
 			const auto* fa = static_cast<const FunctionResolvedType*>(a);
 			const auto* fb = static_cast<const FunctionResolvedType*>(b);
-			if (fa->param_types.size() != fb->param_types.size()) return false;
+			if (fa->params.size() != fb->params.size()) return false;
 			if (!sameResolvedType(fa->return_type, fb->return_type)) return false;
-			for (i32 i = 0; i < fa->param_types.size(); ++i)
-				if (!sameResolvedType(fa->param_types[i], fb->param_types[i])) return false;
+			for (i32 i = 0; i < fa->params.size(); ++i) {
+				if (fa->params[i].is_ref != fb->params[i].is_ref
+					|| fa->params[i].is_comptime != fb->params[i].is_comptime) return false;
+				if (!sameResolvedType(fa->params[i].type, fb->params[i].type)) return false;
+			}
 			return true;
 		}
 		case ResolvedType::ARRAY: {
@@ -575,17 +578,17 @@ static u32 structFieldByteOffset(StructResolvedType& st, ls_string_view name, Re
 }
 
 static bool paramIsRef(const FunctionResolvedType& fn_type, u32 param_index) {
-	return fn_type.decl && param_index < (u32)fn_type.decl->params.size() && fn_type.decl->params[param_index].is_ref;
+	return param_index < (u32)fn_type.params.size() && fn_type.params[param_index].is_ref;
 }
 
 static bool paramIsComptime(const FunctionResolvedType& fn_type, u32 param_index) {
-	return fn_type.decl && param_index < (u32)fn_type.decl->params.size() && fn_type.decl->params[param_index].is_comptime;
+	return param_index < (u32)fn_type.params.size() && fn_type.params[param_index].is_comptime;
 }
 
 static void compileCallArgs(FunctionCompiler& ctx, CallExpression& expr, const FunctionResolvedType& fn_type, u32 arg_offset) {
 	for (i32 i = 0; i < expr.args.size(); ++i) {
 		const u32 param_index = arg_offset + i;
-		ResolvedType* param_type = fn_type.param_types[param_index];
+		ResolvedType* param_type = fn_type.params[param_index].type;
 		if (paramIsComptime(fn_type, param_index)) continue;
 		if (paramIsRef(fn_type, param_index)) {
 			Expression* arg = expr.args[i];
@@ -602,9 +605,9 @@ static void compileCallArgs(FunctionCompiler& ctx, CallExpression& expr, const F
 // (reference parameters occupy a pointer, everything else its value width).
 static u32 callArgWindowSize(const FunctionResolvedType& fn_type) {
 	u32 total = 0u;
-	for (i32 i = 0; i < fn_type.param_types.size(); ++i) {
+	for (i32 i = 0; i < fn_type.params.size(); ++i) {
 		if (paramIsComptime(fn_type, i)) continue;
-		const u32 byte_size = u32(paramIsRef(fn_type, i) ? typeKindByteSize(LS_TYPE_CPTR) : typeByteSize(*fn_type.param_types[i]));
+		const u32 byte_size = u32(paramIsRef(fn_type, i) ? typeKindByteSize(LS_TYPE_CPTR) : typeByteSize(*fn_type.params[i].type));
 		total += byte_size == 0u ? 1u : byte_size;
 	}
 	return total;
@@ -616,7 +619,7 @@ static ls_type_kind emitDirectCall(FunctionCompiler& ctx, CallExpression& expr, 
 		if (paramIsRef(fn_type, 0)) {
 			tryEmitReference(ctx, *receiver);
 		} else {
-			const ls_type_kind receiver_kind = !fn_type.param_types.empty() ? valueKindForType(*fn_type.param_types[0]) : LS_TYPE_INVALID;
+			const ls_type_kind receiver_kind = !fn_type.params.empty() ? valueKindForType(*fn_type.params[0].type) : LS_TYPE_INVALID;
 			compileExpression(ctx, *receiver, receiver_kind);
 		}
 	}
@@ -2051,7 +2054,7 @@ static void emitIncrementOrAddOne(FunctionCompiler& ctx, u32 offset, ls_type_kin
 static void emitCompoundValue(FunctionCompiler& ctx, Expression& rhs, ls_type_kind value_kind, Token::Type op, FunctionExpression* op_fn) {
 	if (op_fn) {
 		const FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(op_fn->resolved_type);
-		compileExpressionAsType(ctx, rhs, *fn_type->param_types[1]);
+		compileExpressionAsType(ctx, rhs, *fn_type->params[1].type);
 		emitCallDirect(ctx, op_fn->bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type));
 		return;
 	}
@@ -2491,8 +2494,8 @@ static ls_type_kind compileBinary(FunctionCompiler& ctx, BinaryExpression& expr,
 	if (expr.resolved_fn) {
 		FunctionExpression& fn = *expr.resolved_fn;
 		FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(fn.resolved_type);
-		compileExpressionAsType(ctx, *expr.lhs, *fn_type->param_types[0]);
-		compileExpressionAsType(ctx, *expr.rhs, *fn_type->param_types[1]);
+		compileExpressionAsType(ctx, *expr.lhs, *fn_type->params[0].type);
+		compileExpressionAsType(ctx, *expr.rhs, *fn_type->params[1].type);
 		emitCallDirect(ctx, fn.bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type));
 		return valueKindForType(*fn_type->return_type);
 	}
@@ -2989,7 +2992,7 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 			if (un.resolved_fn) {
 				FunctionExpression& fn = *un.resolved_fn;
 				FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(fn.resolved_type);
-				compileExpressionAsType(ctx, *un.expression, *fn_type->param_types[0]);
+				compileExpressionAsType(ctx, *un.expression, *fn_type->params[0].type);
 				emitCallDirect(ctx, fn.bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type));
 				return valueKindForType(*fn_type->return_type);
 			}
@@ -3028,11 +3031,12 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 		case Expression::CALL: return compileCall(ctx, static_cast<CallExpression&>(expr), hint);
 		case Expression::TYPE_MEMBER: {
 			TypeMemberExpression& member = static_cast<TypeMemberExpression&>(expr);
-			if (equalStrings(member.name, "length")) {
+			if (equalStrings(member.name, "length") || equalStrings(member.name, "kind")) {
 				const ls_type_kind kind = valueKindForType(*expr.resolved_type);
 				emitIntegerConstant(ctx, kind, (u64)member.comptime_int);
 				return kind;
 			}
+			ASSERT(equalStrings(member.name, "name"));
 			u32 string_index = 0;
 			appendStringLiteral(*ctx.bytecode, member.comptime_string, string_index);
 			emitConstString(ctx, string_index);
@@ -3322,7 +3326,7 @@ static void compileAssign(FunctionCompiler& ctx, AssignStatement& assign) {
 				emitLoadLocalBytes(ctx, slot->offset, ref_size);
 				emitConst8(ctx, 0u);
 				emitLoadAt(ctx, 1u, 0, value_size);
-				compileExpressionAsType(ctx, *assign.rhs, *fn_type->param_types[1]);
+				compileExpressionAsType(ctx, *assign.rhs, *fn_type->params[1].type);
 				emitCallDirect(ctx, assign.resolved_op_fn->bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type));
 				emitStoreAt(ctx, 1u, 0, value_size);
 				return;
@@ -3361,7 +3365,7 @@ static void compileAssign(FunctionCompiler& ctx, AssignStatement& assign) {
 
 		if (assign.resolved_op_fn) {
 			const FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(assign.resolved_op_fn->resolved_type);
-			compileExpressionAsType(ctx, *assign.rhs, *fn_type->param_types[1]);
+				compileExpressionAsType(ctx, *assign.rhs, *fn_type->params[1].type);
 			emitCallDirect(ctx, assign.resolved_op_fn->bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type));
 		} else {
 			compileExpression(ctx, *assign.rhs, value_kind);

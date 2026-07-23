@@ -593,3 +593,21 @@ TEST(ArrayOfNullableArrays) {
 	EXPECT_COMPILE(source);
 	return true;
 }
+
+
+TEST(ArrayLiteralForms) {
+	const char* source = R"(
+		fn foo(a : $T, b : $R) : void {}
+		struct Value { value : i32; }
+
+		fn main() : void {
+			var a1 : [3]i32 = ([1, 2, 3]);
+			var a2 : [3]i32 = [1, 2, 3];
+			var nested = [[1]];
+			foo([1, 2, 3], [4, 5, 6]);
+			for value in [Value { 1 }, Value { 2 }] {}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
