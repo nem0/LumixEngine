@@ -8,6 +8,9 @@
 
 struct Unit;
 
+ComptimeValue numericTypeBound(ResolvedType::Kind kind, bool is_max);
+i64 typeKindValue(ResolvedType::Kind kind);
+
 struct Symbol {
 	enum Storage {
 		// Runtime storage. The initializer expression is evaluated at runtime unless

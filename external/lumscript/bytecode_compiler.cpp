@@ -3031,9 +3031,26 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 		case Expression::CALL: return compileCall(ctx, static_cast<CallExpression&>(expr), hint);
 		case Expression::TYPE_MEMBER: {
 			TypeMemberExpression& member = static_cast<TypeMemberExpression&>(expr);
+			if (equalStrings(member.name, "min") || equalStrings(member.name, "max")) {
+				const ComptimeValue value = numericTypeBound(expr.resolved_type->kind, equalStrings(member.name, "max"));
+				const ls_type_kind kind = valueKindForType(*expr.resolved_type);
+				if (value.kind == ComptimeValue::FLOAT) {
+					if (kind == LS_TYPE_F32) emitConst4(ctx, bitcastF32ToU32((float)value.float_value));
+					else emitConst8(ctx, bitcastF64ToU64(value.float_value));
+				}
+				else {
+					ASSERT(value.kind == ComptimeValue::INT);
+					emitIntegerConstant(ctx, kind, (u64)value.int_value);
+				}
+				return kind;
+			}
 			if (equalStrings(member.name, "length") || equalStrings(member.name, "kind")) {
 				const ls_type_kind kind = valueKindForType(*expr.resolved_type);
-				emitIntegerConstant(ctx, kind, (u64)member.comptime_int);
+				ASSERT(member.reflected_type);
+				const i64 value = equalStrings(member.name, "kind")
+					? typeKindValue(member.reflected_type->kind)
+					: static_cast<ArrayResolvedType*>(member.reflected_type)->size;
+				emitIntegerConstant(ctx, kind, (u64)value);
 				return kind;
 			}
 			ASSERT(equalStrings(member.name, "name"));

@@ -509,7 +509,7 @@ struct Parser {
 						m_output.errorAt(name, "Expected identifier");
 						return nullptr;
 					}
-					if (!equalStrings(name.value, "kind") && !equalStrings(name.value, "name") && !equalStrings(name.value, "child") && !equalStrings(name.value, "length") && !equalStrings(name.value, "ret")) {
+					if (!equalStrings(name.value, "kind") && !equalStrings(name.value, "name") && !equalStrings(name.value, "child") && !equalStrings(name.value, "length") && !equalStrings(name.value, "ret") && !equalStrings(name.value, "min") && !equalStrings(name.value, "max")) {
 						m_output.errorAt(name, "Unsupported type member");
 						return nullptr;
 					}

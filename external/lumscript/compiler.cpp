@@ -185,6 +185,39 @@ static ls_string_view reflectedTypeName(Unit& unit, const ResolvedType& type) {
 	return {copy, copy + (out - buffer)};
 }
 
+ComptimeValue numericTypeBound(ResolvedType::Kind kind, bool is_max) {
+	switch (kind) {
+		case ResolvedType::I8: return ComptimeValue((i64)(is_max ? 127 : -128));
+		case ResolvedType::I16: return ComptimeValue((i64)(is_max ? 32767 : -32768));
+		case ResolvedType::I32: return ComptimeValue((i64)(is_max ? 2147483647 : -2147483648ll));
+		case ResolvedType::I64:
+		case ResolvedType::ISIZE: return ComptimeValue((i64)(is_max ? 9223372036854775807ll : (-9223372036854775807ll - 1)));
+		case ResolvedType::U8: return ComptimeValue((i64)(is_max ? 255 : 0));
+		case ResolvedType::U16: return ComptimeValue((i64)(is_max ? 65535 : 0));
+		case ResolvedType::U32: return ComptimeValue((i64)(is_max ? 4294967295ll : 0));
+		case ResolvedType::U64: return ComptimeValue((i64)(is_max ? -1 : 0));
+		case ResolvedType::BYTE: return ComptimeValue((i64)(is_max ? 255 : 0));
+		case ResolvedType::F32: return ComptimeValue(is_max ? (double)FLT_MAX : -(double)FLT_MAX);
+		case ResolvedType::F64: return ComptimeValue(is_max ? DBL_MAX : -DBL_MAX);
+		default: return {};
+	}
+}
+
+i64 typeKindValue(ResolvedType::Kind kind) {
+	switch (kind) {
+		case ResolvedType::BOOL: return 0; case ResolvedType::I8: return 1; case ResolvedType::I16: return 2;
+		case ResolvedType::I32: return 3; case ResolvedType::I64: return 4; case ResolvedType::ISIZE: return 5;
+		case ResolvedType::U8: return 6; case ResolvedType::U16: return 7; case ResolvedType::U32: return 8;
+		case ResolvedType::U64: return 9; case ResolvedType::BYTE: return 10; case ResolvedType::F32: return 11;
+		case ResolvedType::F64: return 12; case ResolvedType::STRING: return 13; case ResolvedType::CSTR: return 14;
+		case ResolvedType::CPTR: return 15; case ResolvedType::VOID: return 16; case ResolvedType::META: return 17;
+		case ResolvedType::NULLABLE: return 18; case ResolvedType::SLICE: return 19; case ResolvedType::ARRAY: return 20;
+		case ResolvedType::ENUM: return 21; case ResolvedType::STRUCT: return 22; case ResolvedType::UNION: return 23;
+		case ResolvedType::FUNCTION: return 24; case ResolvedType::UNTYPED_INT: return 3; case ResolvedType::UNTYPED_FLOAT: return 12;
+		default: return -1;
+	}
+}
+
 struct Checker {
 	ls_module& module;
 	OutputFormatter error_stream;
@@ -205,21 +238,6 @@ struct Checker {
 	static bool isUntypedNumeric(const ResolvedType& t) { return t.kind == ResolvedType::UNTYPED_INT || t.kind == ResolvedType::UNTYPED_FLOAT; }
 	static bool isNumericOrUntyped(const ResolvedType& t) { return isNumericType(t) || isUntypedNumeric(t); }
 	static bool isIntegerOrUntyped(const ResolvedType& t) { return isIntegerType(t) || t.kind == ResolvedType::UNTYPED_INT; }
-	static i64 typeKindValue(ResolvedType::Kind kind) {
-		switch (kind) {
-			case ResolvedType::BOOL: return 0; case ResolvedType::I8: return 1; case ResolvedType::I16: return 2;
-			case ResolvedType::I32: return 3; case ResolvedType::I64: return 4; case ResolvedType::ISIZE: return 5;
-			case ResolvedType::U8: return 6; case ResolvedType::U16: return 7; case ResolvedType::U32: return 8;
-			case ResolvedType::U64: return 9; case ResolvedType::BYTE: return 10; case ResolvedType::F32: return 11;
-			case ResolvedType::F64: return 12; case ResolvedType::STRING: return 13; case ResolvedType::CSTR: return 14;
-			case ResolvedType::CPTR: return 15; case ResolvedType::VOID: return 16; case ResolvedType::META: return 17;
-			case ResolvedType::NULLABLE: return 18; case ResolvedType::SLICE: return 19; case ResolvedType::ARRAY: return 20;
-			case ResolvedType::ENUM: return 21; case ResolvedType::STRUCT: return 22; case ResolvedType::UNION: return 23;
-			case ResolvedType::FUNCTION: return 24; case ResolvedType::UNTYPED_INT: return 3; case ResolvedType::UNTYPED_FLOAT: return 12;
-			default: return -1;
-		}
-	}
-
 	template <typename T, typename... Args> static T* makeType(Unit& unit, Args&&... args) {
 		// Semantic nodes live as long as their owning unit. Allocating them from the
 		// unit arena also keeps cached types and template instances pointer-stable.
@@ -783,6 +801,9 @@ struct Checker {
 					if (equalStrings(member.name, "length") && base.type->kind == ResolvedType::ARRAY) {
 						return ComptimeValue(static_cast<ArrayResolvedType*>(base.type)->size);
 					}
+					if (equalStrings(member.name, "min") || equalStrings(member.name, "max")) {
+						return numericTypeBound(base.type->kind, equalStrings(member.name, "max"));
+					}
 					if (equalStrings(member.name, "ret") && base.type->kind == ResolvedType::FUNCTION) {
 						return ComptimeValue(static_cast<FunctionResolvedType*>(base.type)->return_type);
 					}
@@ -1280,7 +1301,7 @@ struct Checker {
 				mem->expression = cloneExpression(unit, s->expression, bindings);
 				mem->name = s->name;
 				mem->comptime_string = s->comptime_string;
-				mem->comptime_int = s->comptime_int;
+				mem->reflected_type = s->reflected_type;
 				out = mem;
 				break;
 			}
@@ -2864,12 +2885,20 @@ struct Checker {
 	ResolvedType* checkTypeMemberExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr) {
 		TypeMemberExpression& member = static_cast<TypeMemberExpression&>(expr);
 		// TODO does not parser handle this already?
-		if (!equalStrings(member.name, "kind") && !equalStrings(member.name, "name") && !equalStrings(member.name, "child") && !equalStrings(member.name, "length") && !equalStrings(member.name, "ret")) {
+		if (!equalStrings(member.name, "kind")
+			&& !equalStrings(member.name, "name")
+			&& !equalStrings(member.name, "child")
+			&& !equalStrings(member.name, "length")
+			&& !equalStrings(member.name, "ret")
+			&& !equalStrings(member.name, "min")
+			&& !equalStrings(member.name, "max"))
+		{
 			errorLine(expr.token, "Unknown type member ", member.name);
 			return nullptr;
 		}
 		ComptimeValue base_value = resolveComptimeValue(unit, *member.expression, nullptr, ctx);
 		if (base_value.kind != ComptimeValue::TYPE || !base_value.type) return nullptr;
+		member.reflected_type = base_value.type;
 		if (equalStrings(member.name, "name")) {
 			member.comptime_string = reflectedTypeName(unit, *base_value.type);
 			expr.resolved_type = primitiveType(ResolvedType::STRING);
@@ -2881,7 +2910,6 @@ struct Checker {
 				return nullptr;
 			}
 			expr.resolved_type = &module.type_kind;
-			member.comptime_int = typeKindValue(base_value.type->kind);
 			return expr.resolved_type;
 		}
 		if (equalStrings(member.name, "child")) {
@@ -2910,8 +2938,15 @@ struct Checker {
 				errorLine(expr.token, "Type member length requires an array type");
 				return nullptr;
 			}
-			member.comptime_int = static_cast<ArrayResolvedType*>(base_value.type)->size;
 			expr.resolved_type = primitiveType(ResolvedType::UNTYPED_INT);
+			return expr.resolved_type;
+		}
+		if (equalStrings(member.name, "min") || equalStrings(member.name, "max")) {
+			if (!isNumericType(*base_value.type) && base_value.type->kind != ResolvedType::BYTE) {
+				errorLine(expr.token, "Type member ", member.name, " requires a numeric type");
+				return nullptr;
+			}
+			expr.resolved_type = base_value.type;
 			return expr.resolved_type;
 		}
 		if (base_value.type->kind != ResolvedType::FUNCTION) {

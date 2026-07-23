@@ -281,7 +281,7 @@ struct TypeMemberExpression : Expression {
 	Expression* expression = nullptr;
 	ls_string_view name = {};
 	ls_string_view comptime_string = {};
-	i64 comptime_int = 0;
+	ResolvedType* reflected_type = nullptr;
 };
 
 struct BracketExpression : Expression {
