@@ -29,7 +29,7 @@ struct BodyPair {
 fn combinations(n : i32, pairs : []BodyPair) : void {
 	var count : i32 = 0;
 	for i in 0..n - 1 {
-		for j = i + 1..n {
+		for j in i + 1..n {
 			pairs[count] = BodyPair { i, j };
 			count += 1;
 		}
