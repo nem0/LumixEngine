@@ -509,7 +509,15 @@ struct Parser {
 						m_output.errorAt(name, "Expected identifier");
 						return nullptr;
 					}
-					if (!equalStrings(name.value, "kind") && !equalStrings(name.value, "name") && !equalStrings(name.value, "child") && !equalStrings(name.value, "length") && !equalStrings(name.value, "ret") && !equalStrings(name.value, "min") && !equalStrings(name.value, "max")) {
+					if (!equalStrings(name.value, "kind")
+						&& !equalStrings(name.value, "name")
+						&& !equalStrings(name.value, "child")
+						&& !equalStrings(name.value, "length")
+						&& !equalStrings(name.value, "ret")
+						&& !equalStrings(name.value, "min")
+						&& !equalStrings(name.value, "max")
+						&& !equalStrings(name.value, "types"))
+					{
 						m_output.errorAt(name, "Unsupported type member");
 						return nullptr;
 					}
@@ -1006,96 +1014,46 @@ struct Parser {
 		return res;
 	}
 
-	// `for v in arr { body }` and `for i, v in arr { body }` are sugar for
-	// `for i in 0..length(arr) { const v = arr[i]; body }`, desugared here so the
-	// checker and bytecode compiler only ever see the plain range form.
-	ForStatement* forInStatement(Token for_token, ls_string_view index_name, ls_string_view value_name, Expression* arr) {
-		ForStatement* res = makeStmt<ForStatement>(for_token);
-		res->loop_var = index_name;
-
-		IntLiteralExpression* zero = makeExpr<IntLiteralExpression>(for_token);
-		zero->value = 0;
-		res->begin = zero;
-
-		IdentifierExpression* length_id = makeExpr<IdentifierExpression>(for_token);
-		length_id->name = makeStringView("length");
-		CallExpression* length_call = makeExpr<CallExpression>(for_token, m_unit.arena);
-		length_call->callee = length_id;
-		length_call->args.push(arr);
-		res->end = length_call;
-
-		BlockStatement* parsed_body = blockStatement();
-		if (!parsed_body) return nullptr;
-
-		if (empty(value_name)) {
-			res->body = parsed_body;
-			return res;
-		}
-
-		BlockStatement* body = makeStmt<BlockStatement>(for_token, m_unit.arena);
-
-		IdentifierExpression* index_id = makeExpr<IdentifierExpression>(for_token);
-		index_id->name = index_name;
-		BracketExpression* index_expr = makeExpr<BracketExpression>(for_token, m_unit.arena);
-		index_expr->base = arr;
-		index_expr->args.push(index_id);
-
-		VarDeclStatement* value_decl = makeStmt<VarDeclStatement>(for_token);
-		value_decl->is_immutable = true;
-		value_decl->name = value_name;
-		value_decl->expression = index_expr;
-		body->statements.push(value_decl);
-
-		for (Statement* stmt : parsed_body->statements) body->statements.push(stmt);
-
-		res->body = body;
-		return res;
-	}
-
-	ForStatement* forRangeStatement(Token for_token, ls_string_view loop_var, Expression* begin) {
-		ForStatement* res = makeStmt<ForStatement>(for_token);
-		res->loop_var = loop_var;
-		res->begin = begin;
-		if (!consume(Token::RANGE)) return nullptr;
-
-		res->end = expression(ExprMode::HEAD);
-		if (!res->end) return nullptr;
-
-		res->body = blockStatement();
-		if (!res->body) return nullptr;
-		return res;
-	}
-
 	ForStatement* forStatement() {
 		Token for_token = consumeToken();
 		if (for_token.type != Token::FOR) return nullptr;
 
-		ls_string_view first_name;
-		if (!consume(Token::IDENTIFIER, first_name, "Expected identifier")) return nullptr;
+		ForStatement* res = makeStmt<ForStatement>(for_token);
+		if (!consume(Token::IDENTIFIER, res->key_var, "Expected identifier")) return nullptr;
 
-		if (peekToken().type == Token::IN_KW) {
-			consumeToken();
-			Expression* begin_or_sequence = expression(ExprMode::HEAD);
-			if (!begin_or_sequence) return nullptr;
-			if (peekToken().type == Token::RANGE)
-				return forRangeStatement(for_token, first_name, begin_or_sequence);
-			return forInStatement(for_token, makeForIndexName(), first_name, begin_or_sequence);
-		}
-
+		bool is_key_value = false;
 		if (peekToken().type == Token::COMMA) {
+			is_key_value = true;
 			consumeToken();
-			ls_string_view second_name;
-			if (!consume(Token::IDENTIFIER, second_name, "Expected identifier")) return nullptr;
-			if (!consume(Token::IN_KW)) return nullptr;
-			Expression* sequence = expression(ExprMode::HEAD);
-			if (!sequence) return nullptr;
-			return forInStatement(for_token, first_name, second_name, sequence);
+			if (!consume(Token::IDENTIFIER, res->value_var, "Expected identifier")) return nullptr;
+		}
+		else {
+			res->value_var = res->key_var;
+			res->key_var = makeForIndexName();
 		}
 
 		if (!consume(Token::IN_KW)) return nullptr;
-		Expression* begin = expression(ExprMode::HEAD);
-		if (!begin) return nullptr;
-		return forRangeStatement(for_token, first_name, begin);
+			
+		res->begin = expression(ExprMode::HEAD);
+		if (!res->begin) return nullptr;
+
+		if (peekToken().type == Token::RANGE) {
+			if (is_key_value) {
+				m_output.errorAt(peekToken(), "Expected only one identifier for range-based for loop");
+				return nullptr;
+			}
+
+			if (!consume(Token::RANGE)) return nullptr;
+
+			res->end = expression(ExprMode::HEAD);
+			if (!res->end) return nullptr;
+		}
+
+		res->is_key_value = is_key_value;
+
+		res->body = blockStatement();
+		if (!res->body) return nullptr;
+		return res;
 	}
 
 	ForStatement* unrollForStatement() {

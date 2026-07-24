@@ -3607,8 +3607,186 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			ctx.loops.pop_back();
 			return;
 		}
+		// TODO clean up
 		case Statement::FOR: {
 			ForStatement& fs = static_cast<ForStatement&>(st);
+			if (fs.is_unroll && !fs.end) {
+				// `fs.unroll_elements` holds the actual compile-time element expressions
+				// (see resolveUnrollElements in compiler.cpp), so each iteration is baked
+				// as a literal init directly from the source array literal; no runtime
+				// array/slice storage is needed at all.
+				ResolvedType* container_type = fs.begin->resolved_type;
+				ResolvedType* element_type = container_type->kind == ResolvedType::ARRAY
+					? static_cast<ArrayResolvedType*>(container_type)->element_type
+					: static_cast<SliceResolvedType*>(container_type)->element_type;
+				const ls_type_kind element_kind = valueKindForType(*element_type);
+
+				ctx.pushScope();
+				const u32 index_offset = fs.is_key_value ? ctx.addLocal(nullptr, LS_TYPE_I64, true, &fs.index_slot) : 0u;
+				if (fs.is_key_value) ctx.debugLocal(fs.key_var, fs.index_slot);
+				const u32 loop_offset = ctx.addLocal(element_type, element_kind, true, &fs.slot);
+				ctx.debugLocal(fs.value_var, fs.slot);
+				ctx.temp_top = ctx.next_local_offset;
+
+				LoopBinding& loop = ctx.loops.emplace_back();
+				loop.label = current_label;
+				loop.defer_mark = (u32)ctx.deferreds.size();
+				void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
+				loop.break_jumps = ::new (break_storage) ExpArray<u32>(*ctx.bytecode->arena);
+				void* continue_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
+				loop.continue_jumps = ::new (continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
+
+				const i32 count = fs.unroll_elements->values.size();
+				for (i32 i = 0; i < count; ++i) {
+					if (fs.is_key_value) {
+						IntLiteralExpression index_lit;
+						index_lit.value = (u64)i;
+						emitLocalLiteralInitializer(ctx, index_offset, index_lit, LS_TYPE_I64);
+					}
+					Expression& element_expr = *fs.unroll_elements->values[i];
+					if (!emitLocalLiteralInitializer(ctx, loop_offset, element_expr, element_kind)) {
+						compileExpressionIntoLocal(ctx, element_expr, loop_offset, *element_type);
+					}
+					const u32 continue_start = (u32)loop.continue_jumps->size();
+					compileStatement(ctx, *fs.body, return_kind, {});
+					const u32 continue_target = (u32)ctx.code.size();
+					for (u32 j = continue_start; j < loop.continue_jumps->size(); ++j) {
+						patchJumpRelative(ctx, (*loop.continue_jumps)[j], continue_target);
+					}
+				}
+				const u32 loop_end = (u32)ctx.code.size();
+				for (u32 break_pos : *loop.break_jumps) patchJumpRelative(ctx, break_pos, loop_end);
+				ctx.loops.pop_back();
+				ctx.popScope(return_kind, current_label);
+				return;
+			}
+			if (!fs.end) {
+				// Iteration over an array or slice: `for v in xs` binds only the
+				// element; `for i, v in xs` also binds the index (as isize) to
+				// fs.index_slot. The index register doubles as the loop counter
+				// in both cases.
+				ResolvedType* container_type = fs.begin->resolved_type;
+				StorageSlot* index_slot = fs.is_key_value ? &fs.index_slot : nullptr;
+				if (container_type->kind == ResolvedType::ARRAY) {
+					ArrayResolvedType& array_type = static_cast<ArrayResolvedType&>(*container_type);
+					ResolvedType* element_type = array_type.element_type;
+					const ls_type_kind element_kind = valueKindForType(*element_type);
+					const u32 element_size = typeByteSize(*element_type) == 0u ? 1u : typeByteSize(*element_type);
+					IdentifierExpression* base_id = fs.begin->kind == Expression::IDENTIFIER ? static_cast<IdentifierExpression*>(fs.begin) : nullptr;
+					StorageSlot* base_slot = base_id ? base_id->slot : nullptr;
+					if (!base_slot || base_slot->storage != StorageSlot::LOCAL || base_slot->type->kind != ResolvedType::ARRAY) {
+						return; // TODO non-local array base
+					}
+					const u32 length = (u32)array_type.size;
+
+					ctx.pushScope();
+					emitLocalRef(ctx, base_slot->offset);
+					const u32 ptr_value_top = ctx.temp_top;
+					const u32 base_ptr_offset = ctx.addLocal(nullptr, LS_TYPE_CPTR, true);
+					ctx.temp_top = ptr_value_top;
+					emitStoreLocalBytes(ctx, base_ptr_offset, typeKindByteSize(LS_TYPE_CPTR), false);
+					ctx.temp_top = ctx.next_local_offset;
+
+					const u32 index_offset = ctx.addLocal(nullptr, LS_TYPE_I64, true, index_slot);
+					IntLiteralExpression zero_lit;
+					zero_lit.value = 0;
+					emitLocalLiteralInitializer(ctx, index_offset, zero_lit, LS_TYPE_I64);
+					if (index_slot) ctx.debugLocal(fs.key_var, *index_slot);
+					const u32 loop_offset = ctx.addLocal(element_type, element_kind, true, &fs.slot);
+					ctx.debugLocal(fs.value_var, fs.slot);
+					const u32 length_offset = ctx.addLocal(nullptr, LS_TYPE_I64, true);
+					IntLiteralExpression length_lit;
+					length_lit.value = length;
+					emitLocalLiteralInitializer(ctx, length_offset, length_lit, LS_TYPE_I64);
+					ctx.temp_top = ctx.next_local_offset;
+
+					const u32 condition_pos = (u32)ctx.code.size();
+					const u32 jump_false_pos = emitCompareJumpAt(ctx, LS_TYPE_I64, index_offset, length_offset);
+					LoopBinding& loop = ctx.loops.emplace_back();
+					loop.label = current_label;
+					loop.defer_mark = (u32)ctx.deferreds.size();
+					void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
+					loop.break_jumps = ::new (break_storage) ExpArray<u32>(*ctx.bytecode->arena);
+					void* continue_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
+					loop.continue_jumps = ::new (continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
+
+					emitBoundsCheckReg(ctx, index_offset, *container_type);
+					emitOp(ctx.code, LS_OP_LOAD_INDEXED);
+					emitFixedReg(ctx, loop_offset);
+					emitFixedReg(ctx, base_ptr_offset);
+					emitFixedReg(ctx, index_offset);
+					emitU32(ctx.code, element_size);
+					emitI32(ctx.code, 0);
+					emitU32(ctx.code, element_size);
+
+					compileStatement(ctx, *fs.body, return_kind, {});
+					const u32 increment_pos = (u32)ctx.code.size();
+					emitIncrementOrAddOne(ctx, index_offset, LS_TYPE_I64);
+					const u32 jump_back_pos = emitJumpPlaceholder(ctx, LS_OP_JUMP);
+					patchJumpRelative(ctx, jump_back_pos, condition_pos);
+					const u32 loop_end = (u32)ctx.code.size();
+					patchJumpRelative(ctx, jump_false_pos, loop_end);
+					for (u32 break_pos : *loop.break_jumps) patchJumpRelative(ctx, break_pos, loop_end);
+					for (u32 continue_pos : *loop.continue_jumps) patchJumpRelative(ctx, continue_pos, increment_pos);
+					ctx.loops.pop_back();
+					ctx.popScope(return_kind, current_label);
+					return;
+				}
+				if (container_type->kind != ResolvedType::SLICE) return; // TODO
+				SliceResolvedType& slice_type = static_cast<SliceResolvedType&>(*container_type);
+				ResolvedType* element_type = slice_type.element_type;
+				const ls_type_kind element_kind = valueKindForType(*element_type);
+				const u32 element_size = typeByteSize(*element_type) == 0u ? 1u : typeByteSize(*element_type);
+				const u32 slice_byte_size = typeByteSize(*container_type);
+
+				ctx.pushScope();
+				compileExpression(ctx, *fs.begin, LS_TYPE_SLICE);
+				const u32 slice_value_top = ctx.temp_top;
+				const u32 slice_offset = ctx.addLocal(container_type, LS_TYPE_SLICE, true);
+				ctx.temp_top = slice_value_top;
+				emitStoreLocalBytes(ctx, slice_offset, slice_byte_size, false);
+				ctx.temp_top = ctx.next_local_offset;
+
+				const u32 index_offset = ctx.addLocal(nullptr, LS_TYPE_I64, true, index_slot);
+				IntLiteralExpression zero_lit;
+				zero_lit.value = 0;
+				emitLocalLiteralInitializer(ctx, index_offset, zero_lit, LS_TYPE_I64);
+				if (index_slot) ctx.debugLocal(fs.key_var, *index_slot);
+				const u32 loop_offset = ctx.addLocal(element_type, element_kind, true, &fs.slot);
+				ctx.debugLocal(fs.value_var, fs.slot);
+				const u32 length_offset = ctx.addLocal(nullptr, LS_TYPE_I64, true);
+				emitSliceLengthToLocal(ctx, length_offset, slice_offset);
+				ctx.temp_top = ctx.next_local_offset;
+
+				const u32 condition_pos = (u32)ctx.code.size();
+				const u32 jump_false_pos = emitCompareJumpAt(ctx, LS_TYPE_I64, index_offset, length_offset);
+				LoopBinding& loop = ctx.loops.emplace_back();
+				loop.label = current_label;
+				loop.defer_mark = (u32)ctx.deferreds.size();
+				void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
+				loop.break_jumps = ::new (break_storage) ExpArray<u32>(*ctx.bytecode->arena);
+				void* continue_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
+				loop.continue_jumps = ::new (continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
+
+				emitOp(ctx.code, LS_OP_SLICE_LOAD_LOCAL);
+				emitFixedReg(ctx, loop_offset);
+				emitFixedReg(ctx, slice_offset);
+				emitFixedReg(ctx, index_offset);
+				emitU32(ctx.code, element_size);
+
+				compileStatement(ctx, *fs.body, return_kind, {});
+				const u32 increment_pos = (u32)ctx.code.size();
+				emitIncrementOrAddOne(ctx, index_offset, LS_TYPE_I64);
+				const u32 jump_back_pos = emitJumpPlaceholder(ctx, LS_OP_JUMP);
+				patchJumpRelative(ctx, jump_back_pos, condition_pos);
+				const u32 loop_end = (u32)ctx.code.size();
+				patchJumpRelative(ctx, jump_false_pos, loop_end);
+				for (u32 break_pos : *loop.break_jumps) patchJumpRelative(ctx, break_pos, loop_end);
+				for (u32 continue_pos : *loop.continue_jumps) patchJumpRelative(ctx, continue_pos, increment_pos);
+				ctx.loops.pop_back();
+				ctx.popScope(return_kind, current_label);
+				return;
+			}
 			ResolvedType* value_type = fs.begin->resolved_type;
 			const ls_type_kind value_kind = valueKindForType(*value_type);
 			const u32 byte_size = typeByteSize(*value_type) == 0u ? 1u : typeByteSize(*value_type);
@@ -3617,7 +3795,8 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 				const i64 end = fs.unroll_end;
 				ctx.pushScope();
 				const u32 loop_offset = ctx.addLocal(value_type, value_kind, true, &fs.slot);
-				ctx.debugLocal(fs.loop_var, fs.slot);
+				ctx.debugLocal(fs.value_var, fs.slot);
+				ctx.temp_top = ctx.next_local_offset;
 				LoopBinding& loop = ctx.loops.emplace_back();
 				loop.label = current_label;
 				loop.defer_mark = (u32)ctx.deferreds.size();
@@ -3631,7 +3810,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 					iteration.value = (u64)value;
 					emitLocalLiteralInitializer(ctx, loop_offset, iteration, value_kind);
 					const u32 continue_start = (u32)loop.continue_jumps->size();
-					compileStatement(ctx, *fs.body, return_kind, current_label);
+					compileStatement(ctx, *fs.body, return_kind, {});
 					const u32 next_iteration = (u32)ctx.code.size();
 					if (value + 1 < end) emitIncrementOrAddOne(ctx, loop_offset, value_kind);
 					const u32 continue_target = (u32)ctx.code.size();
@@ -3656,7 +3835,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			if (direct_bounds) {
 				ctx.pushScope();
 				const u32 loop_offset = ctx.addLocal(value_type, value_kind, true, &fs.slot);
-				ctx.debugLocal(fs.loop_var, fs.slot);
+				ctx.debugLocal(fs.value_var, fs.slot);
 				u32 end_offset = 0;
 				bool end_snapshot = false;
 				if (fs.end->kind == Expression::IDENTIFIER) {
@@ -3716,7 +3895,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 
 			ctx.pushScope();
 			const u32 loop_offset = ctx.addLocal(value_type, value_kind, true, &fs.slot);
-			ctx.debugLocal(fs.loop_var, fs.slot);
+			ctx.debugLocal(fs.value_var, fs.slot);
 			const u32 end_offset = range_value_top - byte_size;
 			ctx.temp_top = range_value_top;
 			if (!begin_is_literal) {

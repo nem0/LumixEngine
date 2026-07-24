@@ -242,11 +242,14 @@ struct Checker {
 	ls_module& module;
 	OutputFormatter error_stream;
 	i32 suppress_errors = 0;
+	SliceResolvedType* slice_of_types; // []type for Union::types type member
 
 	Checker(ls_module& module)
 		: module(module)
 	{
 		error_stream.host = module.host;
+		slice_of_types = makeType<SliceResolvedType>(module.arena);
+		slice_of_types->element_type = makeType<MetaType>(module.arena);
 	}
 
 	// `isNumericType` and `isIntegerType` deliberately report concrete types only, so the
@@ -258,10 +261,9 @@ struct Checker {
 	static bool isUntypedNumeric(const ResolvedType& t) { return t.kind == ResolvedType::UNTYPED_INT || t.kind == ResolvedType::UNTYPED_FLOAT; }
 	static bool isNumericOrUntyped(const ResolvedType& t) { return isNumericType(t) || isUntypedNumeric(t); }
 	static bool isIntegerOrUntyped(const ResolvedType& t) { return isIntegerType(t) || t.kind == ResolvedType::UNTYPED_INT; }
-	template <typename T, typename... Args> static T* makeType(Unit& unit, Args&&... args) {
+	template <typename T, typename... Args> static T* makeType(ls_arena& arena, Args&&... args) {
 		// Semantic nodes live as long as their owning unit. Allocating them from the
 		// unit arena also keeps cached types and template instances pointer-stable.
-		ls_arena& arena = unit.arena;
 		void* mem = arena.allocate(arena.user_data, sizeof(T), alignof(T));
 		return ::new (mem) T(static_cast<Args&&>(args)...);
 	}
@@ -592,14 +594,14 @@ struct Checker {
 				return ComptimeValue(static_cast<ResolvedTypeExpression&>(expr).type);
 			case Expression::TYPE_LITERAL: {
 				const ResolvedType::Kind kind = static_cast<TypeLiteralExpression&>(expr).type;
-				if (kind == ResolvedType::META) return ComptimeValue(makeType<MetaType>(unit));
+				if (kind == ResolvedType::META) return ComptimeValue(makeType<MetaType>(module.arena));
 				if (kind >= ResolvedType::VOID && kind <= ResolvedType::BYTE) return ComptimeValue(primitiveType(kind));
 				// TODO create a test to hit this
 				return {};
 			}
 			case Expression::FUNCTION_TYPE: {
 				FunctionTypeExpression& fn = static_cast<FunctionTypeExpression&>(expr);
-				FunctionResolvedType* resolved = makeType<FunctionResolvedType>(unit, unit.arena);
+				FunctionResolvedType* resolved = makeType<FunctionResolvedType>(unit.arena, unit.arena);
 				for (FunctionTypeParam& param : fn.params) {
 					ResolvedType* pt = resolveTypeExpr(unit, *param.type_expr, bindings);
 					if (!pt) {
@@ -621,7 +623,7 @@ struct Checker {
 			}
 			case Expression::ARRAY_TYPE: {
 				ArrayTypeExpression& arr = static_cast<ArrayTypeExpression&>(expr);
-				ArrayResolvedType* resolved = makeType<ArrayResolvedType>(unit);
+				ArrayResolvedType* resolved = makeType<ArrayResolvedType>(unit.arena);
 				resolved->element_type = resolveTypeExpr(unit, *arr.element_type, bindings);
 				i64 size = 0;
 				if (!resolved->element_type) {
@@ -641,7 +643,7 @@ struct Checker {
 			}
 			case Expression::SLICE_TYPE: {
 				SliceTypeExpression& sl = static_cast<SliceTypeExpression&>(expr);
-				SliceResolvedType* resolved = makeType<SliceResolvedType>(unit);
+				SliceResolvedType* resolved = makeType<SliceResolvedType>(unit.arena);
 				resolved->element_type = resolveTypeExpr(unit, *sl.element_type, bindings);
 				if (!resolved->element_type) {
 					// TODO create a test to hit this
@@ -651,7 +653,7 @@ struct Checker {
 			}
 			case Expression::NULLABLE_TYPE: {
 				NullableTypeExpression& nullable = static_cast<NullableTypeExpression&>(expr);
-				NullableResolvedType* resolved = makeType<NullableResolvedType>(unit);
+				NullableResolvedType* resolved = makeType<NullableResolvedType>(unit.arena);
 				resolved->inner = resolveTypeExpr(unit, *nullable.inner, bindings);
 				if (!resolved->inner) {
 					// TODO create a test to hit this
@@ -661,7 +663,7 @@ struct Checker {
 			}
 			case Expression::UNION_TYPE: {
 				UnionTypeExpression& un = static_cast<UnionTypeExpression&>(expr);
-				UnionResolvedType* resolved = makeType<UnionResolvedType>(unit, unit.arena);
+				UnionResolvedType* resolved = makeType<UnionResolvedType>(unit.arena, unit.arena);
 				for (Expression* member_expr : un.members) {
 					ResolvedType* member = resolveTypeExpr(unit, *member_expr, bindings);
 					if (!member) return {};
@@ -1077,30 +1079,6 @@ struct Checker {
 				errorLine(expr.token, "Expression cannot be used as a compile-time value");
 				return {};
 		}
-	}
-
-	bool resolveComptimeSequenceLength(Unit& unit, Expression& expr, i64& out) {
-		if (expr.kind != Expression::CALL) return false;
-		CallExpression& call = static_cast<CallExpression&>(expr);
-		if (!call.callee || call.args.size() != 1 || call.callee->kind != Expression::IDENTIFIER) return false;
-		if (!equalStrings(static_cast<IdentifierExpression*>(call.callee)->name, makeStringView("length"))) return false;
-		Expression* sequence = call.args[0];
-		if (sequence->kind == Expression::ARRAY_LITERAL) {
-			out = static_cast<ArrayLiteralExpression*>(sequence)->values.size();
-			return true;
-		}
-		if (sequence->kind != Expression::IDENTIFIER) return false;
-		SymbolRef ref = resolveSymbol(unit, {}, static_cast<IdentifierExpression*>(sequence)->name, LookupPolicy::Checked);
-		if (!ref || !ref.symbol) return false;
-		if (ref.symbol->expression && ref.symbol->expression->kind == Expression::ARRAY_LITERAL) {
-			out = static_cast<ArrayLiteralExpression*>(ref.symbol->expression)->values.size();
-			return true;
-		}
-		if (ref.symbol->resolved_type && ref.symbol->resolved_type->kind == ResolvedType::ARRAY) {
-			out = static_cast<ArrayResolvedType*>(ref.symbol->resolved_type)->size;
-			return true;
-		}
-		return false;
 	}
 
 	// TODO Legacy wrappers for backwards compatibility, inline and remove
@@ -1530,31 +1508,31 @@ struct Checker {
 		switch (arg.kind) {
 			case ComptimeValue::INVALID: break;
 			case ComptimeValue::TYPE: {
-				ResolvedTypeExpression* expr = makeType<ResolvedTypeExpression>(unit);
+				ResolvedTypeExpression* expr = makeType<ResolvedTypeExpression>(unit.arena);
 				expr->type = arg.type;
 				return expr;
 			}
 			case ComptimeValue::INT: {
 				if (arg.int_value < 0) {
-					UnaryExpression* un = makeType<UnaryExpression>(unit);
+					UnaryExpression* un = makeType<UnaryExpression>(unit.arena);
 					un->op = Token::MINUS;
-					IntLiteralExpression* lit = makeType<IntLiteralExpression>(unit);
+					IntLiteralExpression* lit = makeType<IntLiteralExpression>(unit.arena);
 					lit->value = (u64)(-(arg.int_value + 1)) + 1u;
 					un->expression = lit;
 					return un;
 				}
-				IntLiteralExpression* lit = makeType<IntLiteralExpression>(unit);
+				IntLiteralExpression* lit = makeType<IntLiteralExpression>(unit.arena);
 				lit->value = (u64)arg.int_value;
 				return lit;
 			}
 			case ComptimeValue::FLOAT: {
-				FloatLiteralExpression* lit = makeType<FloatLiteralExpression>(unit);
+				FloatLiteralExpression* lit = makeType<FloatLiteralExpression>(unit.arena);
 				lit->value = arg.float_value;
 				return lit;
 			}
-			case ComptimeValue::BOOL: return makeType<BoolLiteralExpression>(unit, arg.bool_value);
+			case ComptimeValue::BOOL: return makeType<BoolLiteralExpression>(unit.arena, arg.bool_value);
 			case ComptimeValue::STRING: {
-				StringLiteralExpression* lit = makeType<StringLiteralExpression>(unit);
+				StringLiteralExpression* lit = makeType<StringLiteralExpression>(unit.arena);
 				lit->value = arg.string_value;
 				return lit;
 			}
@@ -1573,90 +1551,90 @@ struct Checker {
 					out = makeComptimeValueExpression(unit, binding->arg);
 					break;
 				}
-				IdentifierExpression* id = makeType<IdentifierExpression>(unit);
+				IdentifierExpression* id = makeType<IdentifierExpression>(unit.arena);
 				id->name = s->name;
 				out = id;
 				break;
 			}
 			case Expression::UNION_TYPE: {
 				UnionTypeExpression* s = static_cast<UnionTypeExpression*>(src);
-				UnionTypeExpression* un = makeType<UnionTypeExpression>(unit, unit.arena);
+				UnionTypeExpression* un = makeType<UnionTypeExpression>(unit.arena, unit.arena);
 				for (Expression* member : s->members) un->members.push(cloneExpression(unit, member, bindings));
 				out = un;
 				break;
 			}
 			case Expression::INT_LITERAL: {
 				IntLiteralExpression* s = static_cast<IntLiteralExpression*>(src);
-				IntLiteralExpression* lit = makeType<IntLiteralExpression>(unit);
+				IntLiteralExpression* lit = makeType<IntLiteralExpression>(unit.arena);
 				lit->value = s->value;
 				out = lit;
 				break;
 			}
 			case Expression::FLOAT_LITERAL: {
 				FloatLiteralExpression* s = static_cast<FloatLiteralExpression*>(src);
-				FloatLiteralExpression* lit = makeType<FloatLiteralExpression>(unit);
+				FloatLiteralExpression* lit = makeType<FloatLiteralExpression>(unit.arena);
 				lit->value = s->value;
 				out = lit;
 				break;
 			}
-			case Expression::BOOL_LITERAL: out = makeType<BoolLiteralExpression>(unit, static_cast<BoolLiteralExpression*>(src)->value); break;
+			case Expression::BOOL_LITERAL: out = makeType<BoolLiteralExpression>(unit.arena, static_cast<BoolLiteralExpression*>(src)->value); break;
 			case Expression::STRING_LITERAL: {
 				StringLiteralExpression* s = static_cast<StringLiteralExpression*>(src);
-				StringLiteralExpression* lit = makeType<StringLiteralExpression>(unit);
+				StringLiteralExpression* lit = makeType<StringLiteralExpression>(unit.arena);
 				lit->value = s->value;
 				out = lit;
 				break;
 			}
-			case Expression::NULL_LITERAL: out = makeType<NullLiteralExpression>(unit); break;
-			case Expression::UNDEFINED: out = makeType<UndefinedExpression>(unit); break;
+			case Expression::NULL_LITERAL: out = makeType<NullLiteralExpression>(unit.arena); break;
+			case Expression::UNDEFINED: out = makeType<UndefinedExpression>(unit.arena); break;
 			case Expression::TYPEOF: {
 				TypeofExpression* s = static_cast<TypeofExpression*>(src);
-				TypeofExpression* typeof_expr = makeType<TypeofExpression>(unit);
+				TypeofExpression* typeof_expr = makeType<TypeofExpression>(unit.arena);
 				typeof_expr->operand = cloneExpression(unit, s->operand, bindings);
 				out = typeof_expr;
 				break;
 			}
-			case Expression::TYPE_LITERAL: out = makeType<TypeLiteralExpression>(unit, static_cast<TypeLiteralExpression*>(src)->type); break;
+			case Expression::TYPE_LITERAL: out = makeType<TypeLiteralExpression>(unit.arena, static_cast<TypeLiteralExpression*>(src)->type); break;
 			case Expression::GENERIC_IDENTIFIER: {
 				GenericIdentifierExpression* s = static_cast<GenericIdentifierExpression*>(src);
 				if (const TemplateBinding* binding = findTemplateBinding(bindings, s->name)) {
 					out = makeComptimeValueExpression(unit, binding->arg);
 					break;
 				}
-				GenericIdentifierExpression* generic = makeType<GenericIdentifierExpression>(unit);
+				GenericIdentifierExpression* generic = makeType<GenericIdentifierExpression>(unit.arena);
 				generic->name = s->name;
 				out = generic;
 				break;
 			}
 			case Expression::RESOLVED_TYPE: {
-				ResolvedTypeExpression* type = makeType<ResolvedTypeExpression>(unit);
+				ResolvedTypeExpression* type = makeType<ResolvedTypeExpression>(unit.arena);
 				type->type = static_cast<ResolvedTypeExpression*>(src)->type;
 				out = type;
 				break;
 			}
 			case Expression::ARRAY_TYPE: {
 				ArrayTypeExpression* s = static_cast<ArrayTypeExpression*>(src);
-				ArrayTypeExpression* arr = makeType<ArrayTypeExpression>(unit);
+				ArrayTypeExpression* arr = makeType<ArrayTypeExpression>(unit.arena);
 				arr->size = cloneExpression(unit, s->size, bindings);
 				arr->element_type = cloneExpression(unit, s->element_type, bindings);
 				out = arr;
 				break;
 			}
 			case Expression::SLICE_TYPE: {
-				SliceTypeExpression* sl = makeType<SliceTypeExpression>(unit);
+				SliceTypeExpression* sl = makeType<SliceTypeExpression>(unit.arena);
 				sl->element_type = cloneExpression(unit, static_cast<SliceTypeExpression*>(src)->element_type, bindings);
 				out = sl;
 				break;
 			}
 			case Expression::NULLABLE_TYPE: {
-				NullableTypeExpression* nullable = makeType<NullableTypeExpression>(unit);
+				NullableTypeExpression* nullable = makeType<NullableTypeExpression>(unit.arena);
 				nullable->inner = cloneExpression(unit, static_cast<NullableTypeExpression*>(src)->inner, bindings);
 				out = nullable;
 				break;
 			}
 			case Expression::FUNCTION_TYPE: {
 				FunctionTypeExpression* s = static_cast<FunctionTypeExpression*>(src);
-				FunctionTypeExpression* fn = makeType<FunctionTypeExpression>(unit, unit.arena);
+				FunctionTypeExpression* fn = makeType<FunctionTypeExpression>(unit.arena, unit.arena);
 				for (FunctionTypeParam& param : s->params) {
 					FunctionTypeParam& clone = fn->params.emplace_back();
 					clone.name = param.name;
@@ -1670,7 +1648,7 @@ struct Checker {
 			}
 			case Expression::SIZEOF: {
 				SizeofExpression* s = static_cast<SizeofExpression*>(src);
-				SizeofExpression* sz = makeType<SizeofExpression>(unit);
+				SizeofExpression* sz = makeType<SizeofExpression>(unit.arena);
 				sz->type_expr = cloneExpression(unit, s->type_expr, bindings);
 				sz->is_align = s->is_align;
 				out = sz;
@@ -1678,7 +1656,7 @@ struct Checker {
 			}
 			case Expression::CALL: {
 				CallExpression* s = static_cast<CallExpression*>(src);
-				CallExpression* call = makeType<CallExpression>(unit, unit.arena);
+				CallExpression* call = makeType<CallExpression>(unit.arena, unit.arena);
 				call->callee = cloneExpression(unit, s->callee, bindings);
 				for (Expression* arg : s->args) call->args.push(cloneExpression(unit, arg, bindings));
 				out = call;
@@ -1686,7 +1664,7 @@ struct Checker {
 			}
 			case Expression::UNARY: {
 				UnaryExpression* s = static_cast<UnaryExpression*>(src);
-				UnaryExpression* un = makeType<UnaryExpression>(unit);
+				UnaryExpression* un = makeType<UnaryExpression>(unit.arena);
 				un->op = s->op;
 				un->expression = cloneExpression(unit, s->expression, bindings);
 				out = un;
@@ -1694,7 +1672,7 @@ struct Checker {
 			}
 			case Expression::BINARY: {
 				BinaryExpression* s = static_cast<BinaryExpression*>(src);
-				BinaryExpression* bin = makeType<BinaryExpression>(unit);
+				BinaryExpression* bin = makeType<BinaryExpression>(unit.arena);
 				bin->op = s->op;
 				bin->lhs = cloneExpression(unit, s->lhs, bindings);
 				bin->rhs = cloneExpression(unit, s->rhs, bindings);
@@ -1703,7 +1681,7 @@ struct Checker {
 			}
 			case Expression::TERNARY: {
 				TernaryExpression* s = static_cast<TernaryExpression*>(src);
-				TernaryExpression* tern = makeType<TernaryExpression>(unit);
+				TernaryExpression* tern = makeType<TernaryExpression>(unit.arena);
 				tern->condition = cloneExpression(unit, s->condition, bindings);
 				tern->true_expr = cloneExpression(unit, s->true_expr, bindings);
 				tern->false_expr = cloneExpression(unit, s->false_expr, bindings);
@@ -1712,7 +1690,7 @@ struct Checker {
 			}
 			case Expression::CAST: {
 				CastExpression* s = static_cast<CastExpression*>(src);
-				CastExpression* cast = makeType<CastExpression>(unit);
+				CastExpression* cast = makeType<CastExpression>(unit.arena);
 				cast->expression = cloneExpression(unit, s->expression, bindings);
 				cast->type_expr = cloneExpression(unit, s->type_expr, bindings);
 				out = cast;
@@ -1720,13 +1698,13 @@ struct Checker {
 			}
 			case Expression::MEMBER: {
 				MemberExpression* s = static_cast<MemberExpression*>(src);
-				MemberExpression* mem = makeType<MemberExpression>(unit);
+				MemberExpression* mem = makeType<MemberExpression>(unit.arena);
 				// In a qualified type name (`lib.Foo`), the left-hand identifier is
 				// an import alias, not a template binding. Keep it intact so a generic
 				// parameter with the same spelling cannot rewrite the qualifier.
 				if (s->expression && s->expression->kind == Expression::IDENTIFIER
 					&& findImportedUnitByAlias(unit, static_cast<IdentifierExpression*>(s->expression)->name)) {
-					IdentifierExpression* id = makeType<IdentifierExpression>(unit);
+					IdentifierExpression* id = makeType<IdentifierExpression>(unit.arena);
 					id->name = static_cast<IdentifierExpression*>(s->expression)->name;
 					id->token = s->expression->token;
 					mem->expression = id;
@@ -1739,7 +1717,7 @@ struct Checker {
 			}
 			case Expression::TYPE_MEMBER: {
 				TypeMemberExpression* s = static_cast<TypeMemberExpression*>(src);
-				TypeMemberExpression* mem = makeType<TypeMemberExpression>(unit);
+				TypeMemberExpression* mem = makeType<TypeMemberExpression>(unit.arena);
 				mem->expression = cloneExpression(unit, s->expression, bindings);
 				mem->name = s->name;
 				mem->comptime_string = s->comptime_string;
@@ -1749,7 +1727,7 @@ struct Checker {
 			}
 			case Expression::BRACKET: {
 				BracketExpression* s = static_cast<BracketExpression*>(src);
-				BracketExpression* br = makeType<BracketExpression>(unit, unit.arena);
+				BracketExpression* br = makeType<BracketExpression>(unit.arena, unit.arena);
 				br->base = cloneExpression(unit, s->base, bindings);
 				for (Expression* arg : s->args) br->args.push(cloneExpression(unit, arg, bindings));
 				out = br;
@@ -1757,7 +1735,7 @@ struct Checker {
 			}
 			case Expression::SLICE: {
 				SliceExpression* s = static_cast<SliceExpression*>(src);
-				SliceExpression* sl = makeType<SliceExpression>(unit);
+				SliceExpression* sl = makeType<SliceExpression>(unit.arena);
 				sl->base = cloneExpression(unit, s->base, bindings);
 				sl->begin = cloneExpression(unit, s->begin, bindings);
 				sl->end = cloneExpression(unit, s->end, bindings);
@@ -1766,7 +1744,7 @@ struct Checker {
 			}
 			case Expression::STRUCT_LITERAL: {
 				StructLiteralExpression* s = static_cast<StructLiteralExpression*>(src);
-				StructLiteralExpression* lit = makeType<StructLiteralExpression>(unit, unit.arena);
+				StructLiteralExpression* lit = makeType<StructLiteralExpression>(unit.arena, unit.arena);
 				lit->type = cloneExpression(unit, s->type, bindings);
 				for (Expression* value : s->values) lit->values.push(cloneExpression(unit, value, bindings));
 				out = lit;
@@ -1774,12 +1752,12 @@ struct Checker {
 			}
 			case Expression::ARRAY_LITERAL: {
 				ArrayLiteralExpression* s = static_cast<ArrayLiteralExpression*>(src);
-				ArrayLiteralExpression* lit = makeType<ArrayLiteralExpression>(unit, unit.arena);
+				ArrayLiteralExpression* lit = makeType<ArrayLiteralExpression>(unit.arena, unit.arena);
 				for (Expression* value : s->values) lit->values.push(cloneExpression(unit, value, bindings));
 				out = lit;
 				break;
 			}
-			default: out = makeType<Expression>(unit, src->kind); break;
+			default: out = makeType<Expression>(unit.arena, src->kind); break;
 		}
 		out->token = src->token;
 		out->parenthesized = src->parenthesized;
@@ -1792,28 +1770,28 @@ struct Checker {
 		switch (src->kind) {
 			case Statement::BLOCK: {
 				BlockStatement* s = static_cast<BlockStatement*>(src);
-				BlockStatement* block = makeType<BlockStatement>(unit, unit.arena);
+				BlockStatement* block = makeType<BlockStatement>(unit.arena, unit.arena);
 				for (Statement* st : s->statements) block->statements.push(cloneStatement(unit, st, bindings));
 				out = block;
 				break;
 			}
 			case Statement::EXPRESSION: {
 				ExpressionStatement* s = static_cast<ExpressionStatement*>(src);
-				ExpressionStatement* st = makeType<ExpressionStatement>(unit);
+				ExpressionStatement* st = makeType<ExpressionStatement>(unit.arena);
 				st->expression = cloneExpression(unit, s->expression, bindings);
 				out = st;
 				break;
 			}
 			case Statement::RETURN: {
 				ReturnStatement* s = static_cast<ReturnStatement*>(src);
-				ReturnStatement* st = makeType<ReturnStatement>(unit);
+				ReturnStatement* st = makeType<ReturnStatement>(unit.arena);
 				st->expression = cloneExpression(unit, s->expression, bindings);
 				out = st;
 				break;
 			}
 			case Statement::VAR_DECL: {
 				VarDeclStatement* s = static_cast<VarDeclStatement*>(src);
-				VarDeclStatement* st = makeType<VarDeclStatement>(unit);
+				VarDeclStatement* st = makeType<VarDeclStatement>(unit.arena);
 				st->name = s->name;
 				st->type_expr = cloneExpression(unit, s->type_expr, bindings);
 				st->expression = cloneExpression(unit, s->expression, bindings);
@@ -1827,7 +1805,7 @@ struct Checker {
 			}
 			case Statement::ASSIGN: {
 				AssignStatement* s = static_cast<AssignStatement*>(src);
-				AssignStatement* st = makeType<AssignStatement>(unit);
+				AssignStatement* st = makeType<AssignStatement>(unit.arena);
 				st->lhs = cloneExpression(unit, s->lhs, bindings);
 				st->rhs = cloneExpression(unit, s->rhs, bindings);
 				st->op = s->op;
@@ -1836,7 +1814,7 @@ struct Checker {
 			}
 			case Statement::IF: {
 				IfStatement* s = static_cast<IfStatement*>(src);
-				IfStatement* st = makeType<IfStatement>(unit);
+				IfStatement* st = makeType<IfStatement>(unit.arena);
 				st->condition = cloneExpression(unit, s->condition, bindings);
 				st->body = static_cast<BlockStatement*>(cloneStatement(unit, s->body, bindings));
 				st->else_branch = cloneStatement(unit, s->else_branch, bindings);
@@ -1847,7 +1825,7 @@ struct Checker {
 			}
 			case Statement::MATCH: {
 				MatchStatement* s = static_cast<MatchStatement*>(src);
-				MatchStatement* st = makeType<MatchStatement>(unit, unit.arena);
+				MatchStatement* st = makeType<MatchStatement>(unit.arena, unit.arena);
 				st->subject = cloneExpression(unit, s->subject, bindings);
 				st->comptime_known = false;
 				st->comptime_arm = -1;
@@ -1866,7 +1844,7 @@ struct Checker {
 			}
 			case Statement::WHILE: {
 				WhileStatement* s = static_cast<WhileStatement*>(src);
-				WhileStatement* st = makeType<WhileStatement>(unit);
+				WhileStatement* st = makeType<WhileStatement>(unit.arena);
 				st->condition = cloneExpression(unit, s->condition, bindings);
 				st->body = static_cast<BlockStatement*>(cloneStatement(unit, s->body, bindings));
 				out = st;
@@ -1874,11 +1852,14 @@ struct Checker {
 			}
 			case Statement::FOR: {
 				ForStatement* s = static_cast<ForStatement*>(src);
-				ForStatement* st = makeType<ForStatement>(unit);
-				st->loop_var = s->loop_var;
+				ForStatement* st = makeType<ForStatement>(unit.arena);
+				st->key_var = s->key_var;
+				st->value_var = s->value_var;
+				st->is_key_value = s->is_key_value;
 				st->is_unroll = s->is_unroll;
 				st->unroll_begin = s->unroll_begin;
 				st->unroll_end = s->unroll_end;
+				st->unroll_elements = s->unroll_elements;
 				st->begin = cloneExpression(unit, s->begin, bindings);
 				st->end = cloneExpression(unit, s->end, bindings);
 				st->body = static_cast<BlockStatement*>(cloneStatement(unit, s->body, bindings));
@@ -1887,28 +1868,28 @@ struct Checker {
 			}
 			case Statement::BREAK: {
 				BreakStatement* s = static_cast<BreakStatement*>(src);
-				BreakStatement* st = makeType<BreakStatement>(unit);
+				BreakStatement* st = makeType<BreakStatement>(unit.arena);
 				st->label = s->label;
 				out = st;
 				break;
 			}
 			case Statement::CONTINUE: {
 				ContinueStatement* s = static_cast<ContinueStatement*>(src);
-				ContinueStatement* st = makeType<ContinueStatement>(unit);
+				ContinueStatement* st = makeType<ContinueStatement>(unit.arena);
 				st->label = s->label;
 				out = st;
 				break;
 			}
 			case Statement::DEFER: {
 				DeferStatement* s = static_cast<DeferStatement*>(src);
-				DeferStatement* st = makeType<DeferStatement>(unit);
+				DeferStatement* st = makeType<DeferStatement>(unit.arena);
 				st->statement = cloneStatement(unit, s->statement, bindings);
 				out = st;
 				break;
 			}
 			case Statement::LABEL: {
 				LabelStatement* s = static_cast<LabelStatement*>(src);
-				LabelStatement* st = makeType<LabelStatement>(unit);
+				LabelStatement* st = makeType<LabelStatement>(unit.arena);
 				st->name = s->name;
 				st->statement = cloneStatement(unit, s->statement, bindings);
 				out = st;
@@ -2032,7 +2013,7 @@ struct Checker {
 		ASSERT(!fn.is_template);
 		if (fn.resolved_type) return static_cast<FunctionResolvedType*>(fn.resolved_type);
 
-		FunctionResolvedType* fn_type = makeType<FunctionResolvedType>(unit, unit.arena);
+		FunctionResolvedType* fn_type = makeType<FunctionResolvedType>(unit.arena, unit.arena);
 		fn_type->decl = &fn;
 		for (FunctionParam& param : fn.params) {
 			param.resolved_type = resolveTypeExpr(unit, *param.type_expr);
@@ -2307,7 +2288,7 @@ struct Checker {
 		// new instance + cache it
 		TemplateStructInstance& new_instance = st.template_struct_instances.emplace_back(unit.arena);
 		for (const ComptimeValue& arg : args) new_instance.args.push(arg);
-		StructResolvedType* st_type = makeType<StructResolvedType>(unit, unit.arena);
+		StructResolvedType* st_type = makeType<StructResolvedType>(unit.arena, unit.arena);
 		st_type->decl = &st;
 		new_instance.type = st_type;
 
@@ -2415,7 +2396,7 @@ struct Checker {
 		TemplateFunctionInstance& instance = fn.template_function_instances.emplace_back(unit.arena);
 		for (const TemplateBinding& binding : bindings.values) instance.args.push(binding.arg);
 
-		FunctionExpression* clone = makeType<FunctionExpression>(unit, unit.arena);
+		FunctionExpression* clone = makeType<FunctionExpression>(unit.arena, unit.arena);
 		clone->token = fn.token;
 		clone->is_template = false;
 		clone->is_extern = fn.is_extern;
@@ -2538,9 +2519,9 @@ struct Checker {
 		StructExpression& st = static_cast<StructExpression&>(*sym.expression);
 		st.cached_name = sym.name;
 		st.cached_owner = &unit;
-		StructResolvedType* st_type = makeType<StructResolvedType>(unit, unit.arena);
+		StructResolvedType* st_type = makeType<StructResolvedType>(unit.arena, unit.arena);
 		st_type->decl = &st;
-		MetaType* meta = makeType<MetaType>(unit);
+		MetaType* meta = makeType<MetaType>(unit.arena);
 		meta->inner = st_type;
 		sym.resolved_type = meta;
 		if (!st.comptime_params.empty()) {
@@ -2572,9 +2553,9 @@ struct Checker {
 		EnumExpression& en = static_cast<EnumExpression&>(*sym.expression);
 		en.cached_name = sym.name;
 		en.cached_owner = &unit;
-		EnumResolvedType* en_type = makeType<EnumResolvedType>(unit);
+		EnumResolvedType* en_type = makeType<EnumResolvedType>(unit.arena);
 		en_type->decl = &en;
-		MetaType* meta = makeType<MetaType>(unit);
+		MetaType* meta = makeType<MetaType>(unit.arena);
 		meta->inner = en_type;
 		sym.resolved_type = meta;
 		return LS_RESULT_OK;
@@ -2617,7 +2598,7 @@ struct Checker {
 				errorLine(sym.token, "Comptime type binding does not resolve to a type: ", sym.name);
 				return LS_RESULT_FAILURE;
 			}
-			MetaType* meta = makeType<MetaType>(unit);
+			MetaType* meta = makeType<MetaType>(unit.arena);
 			meta->inner = value.type;
 			sym.resolved_type = meta;
 		} else {
@@ -3047,7 +3028,7 @@ struct Checker {
 		if (ctx && bin.op == Token::IS) ctx->comptime_only = previous_comptime_only;
 		if (!rhs) return nullptr;
 		if (bin.op == Token::IS && rhs->kind != ResolvedType::META && bin.rhs->kind == Expression::TYPE_LITERAL) {
-			MetaType* meta = makeType<MetaType>(unit);
+			MetaType* meta = makeType<MetaType>(unit.arena);
 			meta->inner = rhs;
 			rhs = meta;
 			bin.rhs->resolved_type = meta;
@@ -3317,7 +3298,7 @@ struct Checker {
 			const UnionResolvedType* un = static_cast<const UnionResolvedType*>(src_type);
 			for (ResolvedType* member : un->members) {
 				if (!typesEqual(member, dst_type)) continue;
-				NullableResolvedType* nullable = makeType<NullableResolvedType>(unit);
+				NullableResolvedType* nullable = makeType<NullableResolvedType>(unit.arena);
 				nullable->inner = dst_type;
 				expr.resolved_type = nullable;
 				return nullable;
@@ -3334,18 +3315,6 @@ struct Checker {
 
 	ResolvedType* checkTypeMemberExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr) {
 		TypeMemberExpression& member = static_cast<TypeMemberExpression&>(expr);
-		// TODO does not parser handle this already?
-		if (!equalStrings(member.name, "kind")
-			&& !equalStrings(member.name, "name")
-			&& !equalStrings(member.name, "child")
-			&& !equalStrings(member.name, "length")
-			&& !equalStrings(member.name, "ret")
-			&& !equalStrings(member.name, "min")
-			&& !equalStrings(member.name, "max"))
-		{
-			errorLine(expr.token, "Unknown type member ", member.name);
-			return nullptr;
-		}
 		ComptimeValue base_value = resolveComptimeValue(unit, *member.expression, nullptr, ctx);
 		if (base_value.kind != ComptimeValue::TYPE || !base_value.type) return nullptr;
 		member.reflected_type = base_value.type;
@@ -3353,6 +3322,14 @@ struct Checker {
 			member.comptime_string = reflectedTypeName(unit, *base_value.type);
 			expr.resolved_type = primitiveType(ResolvedType::STRING);
 			return expr.resolved_type;
+		}
+		if (equalStrings(member.name, "types")) {
+			ResolvedType* utype = base_value.type;
+			if (utype->kind != ResolvedType::UNION) {
+				errorLine(expr.token, "Type member ::types requires a union type");
+				return nullptr;
+			}
+			return slice_of_types;
 		}
 		if (equalStrings(member.name, "kind")) {
 			if (!ctx || !ctx->comptime_only) {
@@ -3378,7 +3355,7 @@ struct Checker {
 				errorLine(expr.token, "Type member child requires a nullable, slice, or array type");
 				return nullptr;
 			}
-			MetaType* meta = makeType<MetaType>(unit);
+			MetaType* meta = makeType<MetaType>(unit.arena);
 			meta->inner = child;
 			expr.resolved_type = meta;
 			return meta;
@@ -3407,7 +3384,7 @@ struct Checker {
 			errorLine(expr.token, "Type member ret can only be used in a comptime context");
 			return nullptr;
 		}
-		MetaType* meta = makeType<MetaType>(unit);
+		MetaType* meta = makeType<MetaType>(unit.arena);
 		meta->inner = static_cast<FunctionResolvedType*>(base_value.type)->return_type;
 		expr.resolved_type = meta;
 		return meta;
@@ -3636,7 +3613,7 @@ struct Checker {
 			}
 		}
 
-		SliceResolvedType* slice = makeType<SliceResolvedType>(unit);
+		SliceResolvedType* slice = makeType<SliceResolvedType>(unit.arena);
 		slice->element_type = arr ? arr->element_type : static_cast<SliceResolvedType*>(base_type)->element_type;
 		expr.resolved_type = slice;
 		return slice;
@@ -3711,7 +3688,7 @@ struct Checker {
 			}
 		}
 
-		ArrayResolvedType* array = makeType<ArrayResolvedType>(unit);
+		ArrayResolvedType* array = makeType<ArrayResolvedType>(unit.arena);
 		array->element_type = element_type;
 		array->size = lit.values.size();
 		expr.resolved_type = array;
@@ -3901,7 +3878,7 @@ struct Checker {
 					errorLine(expr.token, "Cannot use type literal outside of a comptime context");
 					return nullptr;
 				}
-				auto* meta = makeType<MetaType>(unit);
+				auto* meta = makeType<MetaType>(unit.arena);
 				expr.resolved_type = meta;
 				const ResolvedType::Kind kind = static_cast<TypeLiteralExpression&>(expr).type;
 				if (kind == ResolvedType::META) {
@@ -4249,7 +4226,7 @@ struct Checker {
 		if (var.is_comptime) {
 			ComptimeValue value = resolveComptimeValue(unit, *var.expression, nullptr, &ctx);
 			if (value.kind == ComptimeValue::INVALID) return false;
-			var.resolved_type = value.kind == ComptimeValue::TYPE ? static_cast<ResolvedType*>(makeType<MetaType>(unit)) : expr_type;
+			var.resolved_type = value.kind == ComptimeValue::TYPE ? static_cast<ResolvedType*>(makeType<MetaType>(unit.arena)) : expr_type;
 			if (value.kind == ComptimeValue::TYPE) static_cast<MetaType*>(var.resolved_type)->inner = value.type;
 			SemanticLocalBinding& binding = ctx.locals.emplace_back();
 			binding.name = var.name;
@@ -4285,7 +4262,7 @@ struct Checker {
 				errorLine(var.token, "else return target type must be a proper subset of initializer union");
 				return false;
 			}
-			UnionResolvedType* residual = makeType<UnionResolvedType>(unit, unit.arena);
+			UnionResolvedType* residual = makeType<UnionResolvedType>(unit.arena, unit.arena);
 			for (i32 member_index = 0; member_index < source.members.size(); ++member_index) {
 				ResolvedType* member = source.members[member_index];
 				bool selected = typesEqual(member, annotation);
@@ -4505,7 +4482,7 @@ struct Checker {
 			if (residual_count == 1) {
 				residual_type = residual_member;
 			} else {
-				UnionResolvedType* residual_union = makeType<UnionResolvedType>(unit, unit.arena);
+				UnionResolvedType* residual_union = makeType<UnionResolvedType>(unit.arena, unit.arena);
 				for (ResolvedType* candidate : subject_union.members) {
 					if (!typesEqual(candidate, narrowed_type)) residual_union->members.push(candidate);
 				}
@@ -4552,56 +4529,98 @@ struct Checker {
 		return true;
 	}
 
+	// `unroll for` over an array/slice needs the actual element expressions at
+	// codegen time (each iteration is baked as a separate literal init), so trace
+	// through comptime identifier indirections down to the literal that backs them.
+	ArrayLiteralExpression* resolveUnrollElements(Expression& expr) {
+		if (expr.kind == Expression::ARRAY_LITERAL) return static_cast<ArrayLiteralExpression*>(&expr);
+		if (expr.kind != Expression::IDENTIFIER) return nullptr;
+		IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
+		if (!id.symbol || id.symbol->storage != Symbol::COMPTIME || !id.symbol->expression) return nullptr;
+		return resolveUnrollElements(*id.symbol->expression);
+	}
+
 	bool checkForStatement(Unit& unit, FunctionCheckContext& ctx, ForStatement& fs, ResolvedType* return_type, ls_string_view pending_label) {
 		// TODO collision with templates
 		// Bounds are checked without a forced hint first so an untyped bound can adopt
 		// the other bound's concrete type (`for i in 0..length(s)` iterates as isize).
 		// Two untyped bounds default to i32.
-		i64 sequence_length = 0;
-		const bool unroll_sequence = fs.is_unroll && resolveComptimeSequenceLength(unit, *fs.end, sequence_length);
+		
 		ResolvedType* begin_type = checkExpr(unit, &ctx, *fs.begin, nullptr);
+		if (!begin_type) return false;
+
 		ResolvedType* end_type = nullptr;
-		if (begin_type) {
+
+		if (fs.end) {
 			end_type = checkExpr(unit, &ctx, *fs.end, isUntypedNumeric(*begin_type) ? nullptr : begin_type);
-		}
-		if (begin_type && end_type) {
-			if (begin_type->kind == ResolvedType::UNTYPED_INT) {
-				begin_type = materializeUntyped(*fs.begin, isIntegerType(*end_type) ? end_type : nullptr);
+			if (end_type) {
+				if (begin_type->kind == ResolvedType::UNTYPED_INT) {
+					begin_type = materializeUntyped(*fs.begin, isIntegerType(*end_type) ? end_type : nullptr);
+				}
+				if (begin_type && end_type->kind == ResolvedType::UNTYPED_INT) {
+					end_type = materializeUntyped(*fs.end, isIntegerType(*begin_type) ? begin_type : nullptr);
+				}
 			}
-			if (begin_type && end_type->kind == ResolvedType::UNTYPED_INT) {
-				end_type = materializeUntyped(*fs.end, isIntegerType(*begin_type) ? begin_type : nullptr);
+
+			if (!begin_type || !end_type || !isIntegerType(*begin_type) || !isIntegerType(*end_type)) {
+				errorLine(fs.token, "For loop bounds must be of integer type, got ", begin_type, " and ", end_type);
+				return false;
 			}
-			if (unroll_sequence && begin_type->kind == ResolvedType::ISIZE) {
-				begin_type = primitiveType(ResolvedType::I32);
-				fs.begin->resolved_type = begin_type;
-				end_type = begin_type;
-				fs.end->resolved_type = end_type;
+
+			if (!typesEqual(begin_type, end_type)) {
+				errorLine(fs.token, "For loop bounds must have the same type, got ", begin_type, " and ", end_type);
+				return false;
 			}
 		}
-		if (!begin_type || !end_type || !isIntegerType(*begin_type) || !isIntegerType(*end_type)) {
-			errorLine(fs.token, "For loop bounds must be of integer type, got ", begin_type, " and ", end_type);
-			return false;
-		}
-		if (!typesEqual(begin_type, end_type)) {
-			errorLine(fs.token, "For loop bounds must have the same type, got ", begin_type, " and ", end_type);
-			return false;
-		}
-		if (fs.is_unroll) {
-			++suppress_errors;
-			const bool begin_known = resolveComptimeIntValue(unit, fs.begin, fs.unroll_begin);
-			bool end_known = resolveComptimeIntValue(unit, fs.end, fs.unroll_end);
-			if (!end_known) end_known = resolveComptimeSequenceLength(unit, *fs.end, fs.unroll_end);
-			--suppress_errors;
-			if (!begin_known || !end_known) {
-				errorLine(fs.token, "Unrolled range bounds must be compile-time integer values");
+		else {
+			if (begin_type->kind != ResolvedType::ARRAY && begin_type->kind != ResolvedType::SLICE) {
+				errorLine(fs.token, "For loop over a single bound must be an array or slice, got ", begin_type);
 				return false;
 			}
 		}
 
+		if (fs.is_unroll) {
+			if (fs.end) {
+				const ComptimeValue begin_value = resolveComptimeValue(unit, *fs.begin);
+				const ComptimeValue end_value = resolveComptimeValue(unit, *fs.end);
+				if (begin_value.kind != ComptimeValue::INT || end_value.kind != ComptimeValue::INT) {
+					errorLine(fs.token, "unroll for bounds must be compile-time constant integers");
+					return false;
+				}
+				fs.unroll_begin = begin_value.int_value;
+				fs.unroll_end = end_value.int_value;
+			}
+			else {
+				fs.unroll_elements = resolveUnrollElements(*fs.begin);
+				if (!fs.unroll_elements) {
+					errorLine(fs.token, "unroll for over an array or slice requires a compile-time constant array literal");
+					return false;
+				}
+			}
+		}
+
+		// Both range loops and single-variable array/slice loops carry the
+		// user-visible name in value_var (key_var is an auto-generated hidden
+		// index in that case). The paired `for i, v in xs` form leaves a real
+		// name in key_var too, bound to the iteration index below.
+		ResolvedType* element_type = begin_type;
+		if (!fs.end) {
+			element_type = begin_type->kind == ResolvedType::ARRAY
+				? static_cast<ArrayResolvedType*>(begin_type)->element_type
+				: static_cast<SliceResolvedType*>(begin_type)->element_type;
+		}
+
 		pushScope(ctx);
+		if (!fs.end && fs.is_key_value) {
+			SemanticLocalBinding& key_binding = ctx.locals.emplace_back();
+			key_binding.name = fs.key_var;
+			key_binding.type = primitiveType(ResolvedType::ISIZE);
+			key_binding.is_immutable = true;
+			key_binding.slot = &fs.index_slot;
+		}
 		SemanticLocalBinding& binding = ctx.locals.emplace_back();
-		binding.name = fs.loop_var;
-		binding.type = begin_type;
+		binding.name = fs.value_var;
+		binding.type = element_type;
 		binding.is_immutable = true;
 		binding.slot = &fs.slot;
 		ctx.loop_labels.push(pending_label);
@@ -4779,7 +4798,7 @@ struct Checker {
 					}
 					covered_union_members[member_index] = true;
 					++covered_union_count;
-					MetaType* meta = makeType<MetaType>(unit);
+					MetaType* meta = makeType<MetaType>(unit.arena);
 					meta->inner = member;
 					pattern.begin->resolved_type = meta;
 					continue;

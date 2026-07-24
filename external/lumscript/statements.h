@@ -115,14 +115,18 @@ struct WhileStatement : Statement {
 struct ForStatement : Statement {
 	ForStatement() : Statement(FOR) {}
 
-	ls_string_view loop_var = {};
+	ls_string_view key_var = {};
+	ls_string_view value_var = {};
 	Expression* begin = nullptr;
 	Expression* end = nullptr;
 	BlockStatement* body = nullptr;
 	StorageSlot slot;
+	StorageSlot index_slot; // only used for the `for i, v in xs` array/slice form
+	bool is_key_value = false; // true for `for i, v in xs`; false for `for v in xs` and range loops
 	bool is_unroll = false;
 	i64 unroll_begin = 0;
 	i64 unroll_end = 0;
+	ArrayLiteralExpression* unroll_elements = nullptr; // resolved compile-time source for `unroll for` over an array/slice
 };
 
 struct BreakStatement : Statement {

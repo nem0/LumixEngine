@@ -214,6 +214,7 @@ struct UnionTypeExpression : Expression {
 	UnionTypeExpression(ls_arena& arena) : Expression(UNION_TYPE), members(arena) {}
 
 	ExpArray<Expression*> members;
+	ResolvedType* cursor_type = nullptr; // cached type of of U::types
 };
 
 struct ResolvedTypeExpression : Expression {

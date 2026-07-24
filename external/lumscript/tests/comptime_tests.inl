@@ -37,7 +37,12 @@ TEST(ComptimeTernary) {
 			return X;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -51,7 +56,12 @@ TEST(ComptimePrimitiveValueTypechecks) {
 			return N;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(32, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -63,7 +73,12 @@ TEST(ComptimeStringValueTypechecks) {
 			return Name;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_TRUE(equalStrings(ls_to_string(runtime, -1), toLs("Lumix")));
+	CAPI_END(module);
 	return true;
 }
 
@@ -75,7 +90,12 @@ TEST(ComptimeBoolValueTypechecks) {
 			return Enabled;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_TRUE(ls_to_bool(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -87,7 +107,14 @@ TEST(ComptimeFloatValueTypechecks) {
 			return Scale;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	{
+		CAPI_BEGIN(module, diagnostics);
+		EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+		CAPI_RUNTIME(module, runtime);
+		EXPECT_TRUE(ls_call(runtime, toLs("main")));
+		EXPECT_FLOAT_EQ(1.5, ls_to_f64(runtime, -1));
+		CAPI_END(module);
+	}
 
 	const char* does_not_implicitly_convert = R"(
 		comptime Scale = 1.5;
@@ -108,7 +135,12 @@ TEST(ComptimeAnnotatedPrimitiveValueTypechecks) {
 			return N;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(32, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -132,7 +164,11 @@ TEST(ComptimePrimitiveValueCanBeStaticArraySize) {
 			var values : [N]i32 = undefined;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	CAPI_END(module);
 	return true;
 }
 
@@ -144,7 +180,12 @@ TEST(ComptimeTypeBindingTypechecks) {
 			return 42;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -183,7 +224,12 @@ TEST(ComptimeArray) {
 		comptime A = [i32, f32];
 		fn foo() : A[1] { return 3.14; }
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("foo")));
+	EXPECT_FLOAT_EQ(3.14f, ls_to_f32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -199,18 +245,23 @@ TEST(ComptimeArray2) {
 			return a[0] + a[1];
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
 TEST(ComptimeArray3) {
 	const char* source = R"(
-		fn bar() : [2]i32 { 
+		fn bar() : [2]i32 {
 			var a : [2]i32 = [15, 25];
 			return a;
 		}
 		comptime B = bar();
-		fn foo() : [2]i32 { 
+		fn foo() : [2]i32 {
 			var a : [2]i32 = [B[0] + B[1], 2];
 			return a;
 		}
@@ -220,9 +271,43 @@ TEST(ComptimeArray3) {
 			return a[0] + a[1];
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
+
+
+TEST(ComptimeArrayUnrollFor) {
+	const char* source = R"(
+		comptime A = [1, 2, 3]
+		
+		fn foo() : i32 {
+			var sum : i32 = 0;
+			unroll for i in A {
+				sum += i;
+			}
+			return sum;
+		}
+
+		comptime B = foo();
+
+		fn main() : i32 {
+			return B;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(6, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 
 TEST(ComptimeStruct) {
 	const char* source = R"(
@@ -252,7 +337,12 @@ TEST(ComptimeFunctionReturningTypeBindingTypechecks) {
 		comptime T = foo();
 		fn main() : T { return 42; }
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -280,7 +370,12 @@ TEST(ComptimeEnumBindingTypechecks) {
 			return State.Idle;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -328,7 +423,12 @@ TEST(ComptimeFunctionBindingTypechecks) {
 			return add(20, 22);
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -341,7 +441,12 @@ TEST(ComptimeNestedExpressionTypechecks) {
 			return B;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -357,7 +462,12 @@ TEST(ComptimeInitializerCanCallTopLevelFunction) {
 			return N;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(32, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -373,7 +483,12 @@ TEST(ComptimeInitializerCanCallComptimeFunctionBinding) {
 			return N;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(32, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -393,7 +508,12 @@ TEST(ComptimeFunctionCanCallOtherComptimeFunction) {
 			return N;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(32, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -495,7 +615,11 @@ TEST(ComptimeLocalDeclarationFails) {
 			comptime N = 32;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	CAPI_END(module);
 	return true;
 }
 
@@ -562,7 +686,10 @@ TEST(ComptimeImportedValueVisibleWithAlias) {
 		{ toLs("constants"), toLs("comptime N = 32;") }
 	};
 	LumScriptImportFiles imports = { files, lengthOf(files) };
-	EXPECT_COMPILE_WITH_IMPORTS(main_source, imports);
+	EXPECT_RUNTIME_WITH_IMPORTS(main_source, imports, runtime, {
+		EXPECT_TRUE(ls_call(runtime, toLs("main")));
+		EXPECT_EQ(32, ls_to_i32(runtime, -1));
+	});
 	return true;
 }
 
@@ -579,7 +706,10 @@ TEST(ComptimeImportedTypeVisibleWithAlias) {
 		{ toLs("types"), toLs("comptime Int = i32;") }
 	};
 	LumScriptImportFiles imports = { files, lengthOf(files) };
-	EXPECT_COMPILE_WITH_IMPORTS(main_source, imports);
+	EXPECT_RUNTIME_WITH_IMPORTS(main_source, imports, runtime, {
+		EXPECT_TRUE(ls_call(runtime, toLs("main")));
+		EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	});
 	return true;
 }
 
@@ -601,7 +731,11 @@ TEST(ComptimeIfPrunesUnselectedArm) {
 			}
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	CAPI_END(module);
 	return true;
 }
 
@@ -619,7 +753,11 @@ TEST(ComptimeIfTemplateSpecializationPrunesUnselectedArm) {
 			write(42);
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	CAPI_END(module);
 	return true;
 }
 
@@ -637,7 +775,12 @@ TEST(ComptimeIfElseIfAndElsePruneUnselectedArms) {
 			return 0;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(7, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -658,7 +801,12 @@ TEST(ComptimeMatchPrunesUnselectedCase) {
 			return 0;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -730,7 +878,12 @@ TEST(ComptimeIfFunctionCallConditionPrunesArm) {
 			}
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(3, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -748,7 +901,12 @@ TEST(ComptimeValueParameterIfPrunesArm) {
 			return choose(true);
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(5, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -774,7 +932,12 @@ TEST(ComptimeIfPrunesReturnInUnselectedArm) {
 			return 9;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(9, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -795,7 +958,12 @@ TEST(ComptimeIfNestedPruning) {
 			return 0;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(11, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -813,7 +981,12 @@ TEST(ComptimeMatchCommaAlternativesAndFallback) {
 			}
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -887,7 +1060,12 @@ TEST(ComptimeMatchFunctionCallScrutinee) {
 			}
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(9, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -928,7 +1106,12 @@ TEST(ComptimeMatchPrunesInvalidAlternativeArm) {
 			}
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(4, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -940,7 +1123,12 @@ TEST(UnrollForRange) {
 			return total;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(3, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -949,11 +1137,16 @@ TEST(UnrollForComptimeSequenceWithIndex) {
 		comptime values : []i32 = [1, 2, 3];
 		fn main() : i32 {
 			var total : i32 = 0;
-			unroll for i, value in values { total += i + value; }
+			unroll for i, value in values { total += i as i32 + value; }
 			return total;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(9, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -969,23 +1162,57 @@ TEST(UnrollForBreakContinue) {
 			return total;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(2, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(UnrollForArrayBreakRuntime) {
+	const char* source = R"(
+		comptime values : []i32 = [10, 20, 30, 40];
+		fn main() : i32 {
+			var total : i32 = 0;
+			unroll for value in values {
+				if value == 30 { break; }
+				total += value;
+			}
+			return total;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(30, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
 TEST(UnrollForLabeledBreakContinue) {
 	const char* source = R"(
-		fn main() : void {
+		fn main() : i32 {
+			var total : i32 = 0;
 			outer:
-			unroll for i in 0..2 {
-				unroll for j in 0..2 {
-					if i == j { continue outer; }
-					if j > 0 { break outer; }
+			unroll for i in 0..3 {
+				unroll for j in 0..3 {
+					if j == 1 { continue outer; }
+					if i == 2 { break outer; }
+					total += 1;
 				}
 			}
+			return total;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(2, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -997,7 +1224,12 @@ TEST(UnrollForPerCopyCompileTimeBranch) {
 			return total;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(3, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
