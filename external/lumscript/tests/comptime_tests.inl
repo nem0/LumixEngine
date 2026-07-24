@@ -308,6 +308,96 @@ TEST(ComptimeArrayUnrollFor) {
 	return true;
 }
 
+// KNOWN BUG: evalComptimeStmt has no Statement::FOR case, so folding foo()
+// fails and B falls back to calling foo() at each use instead of being a
+// folded constant. A breakpoint in foo() should never fire; it fires twice.
+TEST(ComptimeArrayUnrollForFoldsWithoutRunningFooAtRuntime) {
+	const char* source = R"(
+		comptime A = [1, 2, 3]
+
+		fn foo() : i32 {
+			var sum : i32 = 0;
+			unroll for i in A {
+				sum += i;
+			}
+			return sum;
+		}
+
+		comptime B = foo();
+
+		fn main() : i32 {
+			var first : i32 = B;
+			var second : i32 = B;
+			return first + second;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
+	EXPECT_EQ((int)LS_RESULT_OK, (int)ls_call(runtime, toLs("main")));
+	EXPECT_EQ(12, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+// "Comptime evaluation cannot depend on runtime storage" (reference.md) applies
+// to writes too, not just reads - mutating a global should be rejected here.
+TEST(ComptimeCallMutatingGlobalFails) {
+	const char* source = R"(
+		var call_count : i32 = 0;
+
+		fn foo() : i32 {
+			call_count += 1;
+			return call_count;
+		}
+
+		comptime B = foo();
+
+		fn main() : i32 {
+			return B;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ComptimeCallReadingGlobalFails) {
+	const char* source = R"(
+		var runtime_value : i32 = 16;
+
+		fn foo() : i32 {
+			return runtime_value;
+		}
+
+		comptime N = foo();
+
+		fn main() : i32 {
+			return N;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ComptimeCallToExternTransitivelyFails) {
+	const char* source = R"(
+		extern fn native_value() : i32;
+
+		fn foo() : i32 {
+			return native_value();
+		}
+
+		comptime N = foo();
+
+		fn main() : i32 {
+			return N;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 
 TEST(ComptimeStruct) {
 	const char* source = R"(

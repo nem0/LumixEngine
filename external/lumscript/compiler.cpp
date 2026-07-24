@@ -2605,6 +2605,7 @@ struct Checker {
 			sym.resolved_type = annotation ? annotation : expr_type;
 			// Fold the initializer to its runtime byte layout so uses can be emitted
 			// inline as constants instead of through a runtime global slot.
+			// TODO why do we need this when we have resolveComptimeValue? 
 			foldComptimeSymbol(unit, sym);
 		}
 		return LS_RESULT_OK;
