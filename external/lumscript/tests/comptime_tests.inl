@@ -168,6 +168,94 @@ TEST(ComptimeCompositeTypeBindingsTypecheck) {
 	return true;
 }
 
+TEST(ComptimeVariableInitielizedWithFunctionReturningNumericValue) {
+	const char* source = R"(
+		fn foo() : i32 { return 2; }
+		comptime N = foo();
+		fn main() : [N]i32 { return [1, 2]; }
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeArray) {
+	const char* source = R"(
+		comptime A = [i32, f32];
+		fn foo() : A[1] { return 3.14; }
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeArray2) {
+	const char* source = R"(
+		fn foo() : [2]i32 { 
+			var a : [2]i32 = [40, 2];
+			return a;
+		}
+		comptime A = foo();
+		fn main() : i32 {
+			var a : [2]i32 = A;
+			return a[0] + a[1];
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeArray3) {
+	const char* source = R"(
+		fn bar() : [2]i32 { 
+			var a : [2]i32 = [15, 25];
+			return a;
+		}
+		comptime B = bar();
+		fn foo() : [2]i32 { 
+			var a : [2]i32 = [B[0] + B[1], 2];
+			return a;
+		}
+		comptime A = foo();
+		fn main() : i32 {
+			var a : [2]i32 = A;
+			return a[0] + a[1];
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeStruct) {
+	const char* source = R"(
+		struct S {
+			a : [2]i32;
+			b : i32;
+		}
+		comptime S_value = S { [19, 21], 2 };
+
+		fn main() : i32 {
+			var s : S = S_value;
+			return s.a[0] + s.a[1] + s.b;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeFunctionReturningTypeBindingTypechecks) {
+	const char* source = R"(
+		fn foo() : type { return i32; }
+		comptime T = foo();
+		fn main() : T { return 42; }
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(ComptimeCompositeTypeExpressions) {
 	const char* source = R"(
 		comptime Slice = []i32;
@@ -428,13 +516,13 @@ TEST(ComptimeLocalValueMaterializesAtRuntime) {
 }
 
 
-TEST(ComptimeTypeLiteralInRuntimeContextFails) {
+TEST(ComptimeTypeLiteralInRuntimeContext) {
 	const char* source = R"(
 		fn main() : type {
 			return i32;
 		}
 	)";
-	EXPECT_COMPILE_FAIL(source);
+	EXPECT_COMPILE(source);
 	return true;
 }
 
@@ -910,5 +998,234 @@ TEST(UnrollForPerCopyCompileTimeBranch) {
 		}
 	)";
 	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeCallInitAggregateFolds) {
+	// A comptime global initialized by a function returning an aggregate must be
+	// folded to a constant and materialized inline (no runtime global slot / call).
+	const char* source = R"(
+		fn foo() : [2]i32 {
+			var a : [2]i32 = [40, 2];
+			return a;
+		}
+		comptime A = foo();
+		fn main() : i32 {
+			var a : [2]i32 = A;
+			return a[0] + a[1];
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeCallInitStructFolds) {
+	const char* source = R"(
+		struct Vec { x : i32; y : i32; }
+		fn make() : Vec {
+			var v : Vec = Vec { 30, 12 };
+			return v;
+		}
+		comptime V = make();
+		fn main() : i32 {
+			var v : Vec = V;
+			return v.x + v.y;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeCallInitLocalReassignFolds) {
+	// Body uses a local variable, an assignment, then returns an aggregate built
+	// from the local: exercises the byte-buffer interpreter's frame and ASSIGN.
+	const char* source = R"(
+		fn build() : [3]i32 {
+			var n : i32 = 10;
+			n = 20;
+			var a : [3]i32 = [n, 21, 1];
+			return a;
+		}
+		comptime A = build();
+		fn main() : i32 {
+			var a : [3]i32 = A;
+			return a[0] + a[1] + a[2];
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeNestedAggregateFolds) {
+	const char* source = R"(
+		struct Inner { a : [2]i32; }
+		struct Outer { inner : Inner; b : i32; }
+		comptime O = Outer { Inner { [19, 21] }, 2 };
+		fn main() : i32 {
+			var o : Outer = O;
+			return o.inner.a[0] + o.inner.a[1] + o.b;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeCallInitLoopFolds) {
+	// A comptime initializer whose body has a while loop and compound assignment
+	// must be interpreted at compile time and folded to a constant.
+	const char* source = R"(
+		fn sum_to(n : i32) : i32 {
+			var total : i32 = 0;
+			var i : i32 = 0;
+			while i < n {
+				total += i;
+				i = i + 1;
+			}
+			return total;
+		}
+		fn pick() : i32 { return sum_to(5); }
+		comptime C = pick();
+		fn main() : i32 {
+			return C + 32;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1)); // 0+1+2+3+4 = 10, +32 = 42
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeCallInitIfFolds) {
+	const char* source = R"(
+		fn choose() : i32 {
+			var x : i32 = 3;
+			if x > 2 {
+				x = 42;
+			} else {
+				x = 0;
+			}
+			return x;
+		}
+		comptime C = choose();
+		fn main() : i32 {
+			return C;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeCallInitLoopBuildsArray) {
+	// Loop that fills an aggregate local, returned as the comptime value.
+	const char* source = R"(
+		fn build() : [3]i32 {
+			var a : [3]i32 = [0, 0, 0];
+			a[0] = 20;
+			a[1] = 21;
+			a[2] = 1;
+			return a;
+		}
+		comptime A = build();
+		fn main() : i32 {
+			var a : [3]i32 = A;
+			return a[0] + a[1] + a[2];
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeParametricRecursionFolds) {
+	// A parametric, recursive comptime function must be interpreted at compile time.
+	// Using the result as an array length forces compile-time evaluation, and the
+	// runtime use must observe the same folded constant.
+	const char* source = R"(
+		fn fib(n : i32) : i32 {
+			if n < 2 { return n; }
+			return fib(n - 1) + fib(n - 2);
+		}
+		comptime C = fib(9);
+		fn main() : [C]i32 {
+			var a : [C]i32 = undefined;
+			return a;
+		}
+	)";
+	EXPECT_COMPILE(source); // [fib(9)]i32 == [34]i32 must type-check
+	return true;
+}
+
+TEST(ComptimeParametricCallFoldsToValue) {
+	const char* source = R"(
+		fn square(n : i32) : i32 { return n * n; }
+		comptime C = square(6) + 6;
+		fn main() : i32 { return C; }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1)); // 36 + 6
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeCallInitReadsLocalAggregateRvalue) {
+	// The interpreter must fold a body that reads local aggregate elements/fields as
+	// rvalues (a[i] with a runtime-style index, p.x) inside a loop.
+	const char* source = R"(
+		struct P { x : i32; y : i32; }
+		fn compute() : i32 {
+			var a : [3]i32 = [10, 11, 12];
+			var p : P = P { 4, 5 };
+			var sum : i32 = 0;
+			var i : i32 = 0;
+			while i < 3 {
+				sum = sum + a[i];
+				i = i + 1;
+			}
+			return sum + p.x + p.y;
+		}
+		comptime C = compute();
+		fn main() : i32 { return C; }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1)); // 10+11+12 + 4 + 5
+	CAPI_END(module);
 	return true;
 }

@@ -17,6 +17,7 @@
 // - The ABI is intentionally plain C: no templates, references, or exceptions.
 
 #include <assert.h>
+#include <stdbool.h>
 
 #ifndef ASSERT
 	#define ASSERT(x) assert(x)

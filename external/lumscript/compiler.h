@@ -52,13 +52,26 @@ struct Symbol {
 	// expressions at this slot (see symbolHasGlobalStorage); its values are filled
 	// in by ls_bytecode_compile's global layout pass before function bodies compile.
 	StorageSlot slot;
+	// Folded compile-time value for COMPTIME value symbols, laid out exactly as the
+	// runtime memory representation of `resolved_type` (see typeByteSize / struct
+	// field ordering). Set by the checker when the initializer could be fully
+	// evaluated at compile time; the bytecode compiler emits these bytes inline at
+	// each use site so the symbol needs no runtime slot. Null when folding was not
+	// possible, in which case uses fall back to compiling the initializer expression.
+	const u8* comptime_bytes = nullptr;
+	u32 comptime_byte_size = 0;
 };
 
 // True when the symbol occupies runtime storage in the global data segment.
 // The checker uses this to decide whether an identifier gets a slot pointer;
 // ls_bytecode_compile's global layout pass must lay out exactly these symbols.
+//
+// Comptime symbols are excluded: they are compile-time constants and are
+// materialized inline at each use site (folded to a value), so they never
+// occupy a runtime global slot nor need a global-init store.
 inline bool symbolHasGlobalStorage(const Symbol& sym) {
 	return sym.expression
+		&& sym.storage != Symbol::COMPTIME
 		&& (!sym.resolved_type || sym.resolved_type->kind != ResolvedType::META)
 		&& sym.expression->kind != Expression::FUNCTION
 		&& sym.expression->kind != Expression::STRUCT

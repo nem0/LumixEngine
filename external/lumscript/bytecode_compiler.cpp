@@ -747,6 +747,25 @@ static void emitZeroBytes(FunctionCompiler& ctx, u32 byte_size) {
 	if (byte_size == 1u) emitConst1(ctx, 0u);
 }
 
+// Push `size` raw constant bytes (in target memory layout) onto the temp stack,
+// chunked into the widest LOAD_CONST ops. Used to materialize folded comptime
+// values inline (see Symbol::comptime_bytes).
+static void emitConstBytes(FunctionCompiler& ctx, const u8* data, u32 size) {
+	u32 off = 0u;
+	while (size - off >= 8u) {
+		u64 v; memcpy(&v, data + off, 8); emitConst8(ctx, v); off += 8u;
+	}
+	if (size - off >= 4u) {
+		u32 v; memcpy(&v, data + off, 4); emitConst4(ctx, v); off += 4u;
+	}
+	if (size - off >= 2u) {
+		u16 v; memcpy(&v, data + off, 2); emitConst2(ctx, v); off += 2u;
+	}
+	if (size - off >= 1u) {
+		emitConst1(ctx, data[off]); off += 1u;
+	}
+}
+
 static void emitConstString(FunctionCompiler& ctx, u32 string_index) {
 	const u32 dst = ctx.temp_top;
 	emitOp(ctx.code, LS_OP_LOAD_CONST_STRING);
@@ -1251,6 +1270,10 @@ static bool tryEmitReference(FunctionCompiler& ctx, Expression& expr) {
 		case Expression::IDENTIFIER: {
 			IdentifierExpression* id = static_cast<IdentifierExpression*>(&expr);
 			StorageSlot* slot = id->slot;
+			// Comptime value symbols have no runtime slot; they are not directly
+			// addressable. Report no reference so the caller materializes the
+			// (constant) value into a temporary and references that instead.
+			if (!slot) return false;
 			emitSlotRef(ctx, *slot);
 			return true;
 		}
@@ -2901,6 +2924,18 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 					case ComptimeValue::TYPE:
 					case ComptimeValue::INVALID: break;
 				}
+			}
+			// Comptime value symbol: no runtime slot exists, so materialize the
+			// value inline. Prefer the folded constant bytes; otherwise fall back to
+			// compiling the initializer expression at this use site.
+			if (id.symbol && id.symbol->storage == Symbol::COMPTIME && id.symbol->comptime_bytes) {
+				emitConstBytes(ctx, id.symbol->comptime_bytes, id.symbol->comptime_byte_size);
+				return valueKindForType(*expr.resolved_type);
+			}
+			if (id.symbol && id.symbol->storage == Symbol::COMPTIME && id.symbol->expression
+				&& id.symbol->expression->kind != Expression::FUNCTION
+				&& (!id.symbol->resolved_type || id.symbol->resolved_type->kind != ResolvedType::META)) {
+				return compileExpression(ctx, *id.symbol->expression, hint);
 			}
 			// function template instance
 			FunctionExpression* fn = id.resolved_fn ? id.resolved_fn : static_cast<FunctionExpression*>(id.symbol->expression);
