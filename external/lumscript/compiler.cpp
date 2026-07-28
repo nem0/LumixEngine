@@ -3,17 +3,39 @@
 #include <float.h>
 #include <cstring>
 
-static const char* const* typeKindMemberNames(u32& count) {
-	static constexpr const char* names[] = {
-		"Bool", "I8", "I16", "I32", "I64", "ISize",
-		"U8", "U16", "U32", "U64", "Byte", "F32",
-		"F64", "String", "CStr", "CPtr", "Void", "Type",
-		"Nullable", "Slice", "Array", "Enum", "Struct", "Union",
-		"Fn",
-	};
-	count = sizeof(names) / sizeof(names[0]);
-	return names;
-}
+struct TypeKindInfo {
+	ResolvedType::Kind kind;
+	const char* member_name;
+	const char* primitive_name;
+};
+
+static constexpr TypeKindInfo TYPE_KIND_INFOS[] = {
+	{ResolvedType::BOOL, "Bool", "bool"},
+	{ResolvedType::I8, "I8", "i8"},
+	{ResolvedType::I16, "I16", "i16"},
+	{ResolvedType::I32, "I32", "i32"},
+	{ResolvedType::I64, "I64", "i64"},
+	{ResolvedType::ISIZE, "ISize", "isize"},
+	{ResolvedType::U8, "U8", "u8"},
+	{ResolvedType::U16, "U16", "u16"},
+	{ResolvedType::U32, "U32", "u32"},
+	{ResolvedType::U64, "U64", "u64"},
+	{ResolvedType::BYTE, "Byte", "byte"},
+	{ResolvedType::F32, "F32", "f32"},
+	{ResolvedType::F64, "F64", "f64"},
+	{ResolvedType::STRING, "String", "string"},
+	{ResolvedType::CSTR, "CStr", "cstr"},
+	{ResolvedType::CPTR, "CPtr", "cptr"},
+	{ResolvedType::VOID, "Void", "void"},
+	{ResolvedType::META, "Type", "type"},
+	{ResolvedType::NULLABLE, "Nullable", nullptr},
+	{ResolvedType::SLICE, "Slice", nullptr},
+	{ResolvedType::ARRAY, "Array", nullptr},
+	{ResolvedType::ENUM, "Enum", nullptr},
+	{ResolvedType::STRUCT, "Struct", nullptr},
+	{ResolvedType::UNION, "Union", nullptr},
+	{ResolvedType::FUNCTION, "Fn", nullptr},
+};
 
 ls_module::ls_module(ls_host* host)
 	: host(host)
@@ -24,11 +46,9 @@ ls_module::ls_module(ls_host* host)
 	for (i32 i = 0; i < ResolvedType::META; ++i)
 		primitives[i].kind = static_cast<ResolvedType::Kind>(i);
 	type_kind_decl.cached_name = makeStringView("TypeKind");
-	u32 type_kind_member_count;
-	const char* const* names = typeKindMemberNames(type_kind_member_count);
-	for (u32 i = 0; i < type_kind_member_count; ++i) {
+	for (const TypeKindInfo& info : TYPE_KIND_INFOS) {
 		EnumMember& member = type_kind_decl.members.emplace_back();
-		member.name = makeStringView(names[i]);
+		member.name = makeStringView(info.member_name);
 	}
 	type_kind.kind = ResolvedType::ENUM;
 	type_kind.decl = &type_kind_decl;
@@ -98,7 +118,7 @@ u32 typeByteSize(const ResolvedType& t) {
 			return 8;
 		case ResolvedType::META:
 			return 0;
-		default: 
+		default:
 			ASSERT(false);
 			return 1;
 	}
@@ -283,18 +303,12 @@ static ls_string_view reflectedTypeName(Unit& unit, const ResolvedType& type) {
 }
 
 i64 typeKindValue(ResolvedType::Kind kind) {
-	switch (kind) {
-		case ResolvedType::BOOL: return 0; case ResolvedType::I8: return 1; case ResolvedType::I16: return 2;
-		case ResolvedType::I32: return 3; case ResolvedType::I64: return 4; case ResolvedType::ISIZE: return 5;
-		case ResolvedType::U8: return 6; case ResolvedType::U16: return 7; case ResolvedType::U32: return 8;
-		case ResolvedType::U64: return 9; case ResolvedType::BYTE: return 10; case ResolvedType::F32: return 11;
-		case ResolvedType::F64: return 12; case ResolvedType::STRING: return 13; case ResolvedType::CSTR: return 14;
-		case ResolvedType::CPTR: return 15; case ResolvedType::VOID: return 16; case ResolvedType::META: return 17;
-		case ResolvedType::NULLABLE: return 18; case ResolvedType::SLICE: return 19; case ResolvedType::ARRAY: return 20;
-		case ResolvedType::ENUM: return 21; case ResolvedType::STRUCT: return 22; case ResolvedType::UNION: return 23;
-		case ResolvedType::FUNCTION: return 24; case ResolvedType::UNTYPED_INT: return 3; case ResolvedType::UNTYPED_FLOAT: return 12;
-		default: return -1;
+	if (kind == ResolvedType::UNTYPED_INT) kind = ResolvedType::I32;
+	if (kind == ResolvedType::UNTYPED_FLOAT) kind = ResolvedType::F64;
+	for (u32 i = 0; i < sizeof(TYPE_KIND_INFOS) / sizeof(TYPE_KIND_INFOS[0]); ++i) {
+		if (TYPE_KIND_INFOS[i].kind == kind) return i;
 	}
+	return -1;
 }
 
 struct Checker {
@@ -307,7 +321,7 @@ struct Checker {
 
 		Unit& unit;
 		ExpArray<Local> locals;
-		
+
 		ComptimeFrame(Unit& unit) : unit(unit), locals(unit.arena) {}
 		Local* find(ls_string_view name) {
 			for (i32 i = (i32)locals.size() - 1; i >= 0; --i) {
@@ -347,9 +361,14 @@ struct Checker {
 	}
 
 	static const char* primitiveTypeName(ResolvedType::Kind kind) {
-		static const char* names[] = {"void", "bool", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "isize", "f32", "f64", "string", "cstr", "cptr", "byte"};
-		ASSERT(kind >= ResolvedType::VOID && kind <= ResolvedType::BYTE);
-		return names[kind - ResolvedType::VOID];
+		for (const TypeKindInfo& info : TYPE_KIND_INFOS) {
+			if (info.kind == kind) {
+				ASSERT(info.primitive_name);
+				return info.primitive_name;
+			}
+		}
+		ASSERT(false);
+		return "<invalid>";
 	}
 
 	static bool typesEqual(const ResolvedType* a, const ResolvedType* b) {
@@ -455,7 +474,7 @@ struct Checker {
 		if (a.kind != b.kind) return false;
 		if (!typesEqual(a.type, b.type)) return false;
 		if (a.kind == ComptimeResult::TYPE) return true;
-		
+
 		if (a.type->kind == ResolvedType::STRING) {
 			ls_string_view* lhs;
 			ls_string_view* rhs;
@@ -664,7 +683,7 @@ struct Checker {
 			errorLine(expr->token, "Expected compile-time integer value, got ", t.type);
 			return false;
 		}
-		const u32 size = t.type->kind == ResolvedType::UNTYPED_INT ? 8u : typeByteSize(*t.type);
+		const u32 size = typeByteSize(*t.type);
 		out = comptimeNumericToI64(t.value, t.type->kind);
 		comptime_stack_ptr -= size;
 		return true;
@@ -1528,7 +1547,7 @@ struct Checker {
 			NamedDecl& param = st.comptime_params[i];
 			ComptimeResult arg = evalComptime(arg_unit, *arg_exprs[i], nullptr, nullptr, nullptr, param.resolved_type);
 			if (!arg) return nullptr;
-			
+
 			if (!comptimeValueMatchesExpected(arg, param.resolved_type)) {
 				errorLine(st.token, "Template struct argument ", i + 1, " type mismatch: expected ", param.resolved_type, ", got ", arg.kind);
 				return nullptr;
@@ -1842,7 +1861,7 @@ struct Checker {
 		if (!checkExprMaterialized(unit, &comptime_ctx, *sym.expression, annotation)) {
 			return LS_RESULT_FAILURE;
 		}
-		
+
 		ComptimeResult t = evalComptime(unit, *sym.expression, nullptr, nullptr, nullptr, annotation);
 		if (!t) return LS_RESULT_FAILURE;
 
@@ -2402,17 +2421,6 @@ struct Checker {
 			case Token::PERCENT: result = resolveNumeric(NumericMode::INTEGER); break;
 			case Token::EQUAL_EQUAL:
 			case Token::BANG_EQUAL: {
-				++suppress_errors;
-				ResolvedType* lhs_t = asType(evalComptime(unit, *bin.lhs), bin.lhs->token);
-				if (lhs_t) {
-					ResolvedType* rhs_t = asType(evalComptime(unit, *bin.rhs), bin.rhs->token);
-					--suppress_errors;
-					if (lhs_t && rhs_t && lhs_t->kind == ResolvedType::META && rhs_t->kind == ResolvedType::META) {
-						result = primitiveType(ResolvedType::BOOL);
-						--suppress_errors;
-					}	
-				}
-
 				if (lhs->kind == ResolvedType::UNION || rhs->kind == ResolvedType::UNION) {
 					errorLine(expr.token, "Cannot compare union values");
 					return nullptr;
@@ -2689,7 +2697,7 @@ struct Checker {
 				errorLine(expr.token, "Unknown identifier ", id->name);
 				return nullptr;
 			}
-			
+
 			SymbolRef sym = resolveSymbol(*imported_unit, {}, member.name, LookupPolicy::Checked);
 			if (sym.symbol) {
 				if (sym.check_failed) return nullptr;
@@ -2970,7 +2978,7 @@ struct Checker {
 		}
 		SymbolRef ref = resolveSymbol(unit, {}, id.name, LookupPolicy::Checked, first_arg_type);
 		if (ref.ambiguous) {
-			// TODO list collisions 
+			// TODO list collisions
 			errorLine(expr.token, "Ambiguous identifier ", id.name);
 			return nullptr;
 		}
@@ -3075,7 +3083,7 @@ struct Checker {
 			case Expression::SIZEOF: {
 				SizeofExpression& sz = static_cast<SizeofExpression&>(expr);
 				if (!resolveSizeofValue(unit, sz)) return nullptr;
-				
+
 				ResolvedType* int_hint = unwrapNullable(hint);
 				if (int_hint && isNumericType(*int_hint)) {
 					if (!intLiteralFitsType(sz.value, int_hint->kind)) {
@@ -3183,7 +3191,7 @@ struct Checker {
 				if (fn.resolved_type) return fn.resolved_type;
 				FunctionResolvedType* fn_type = buildFunctionType(unit, fn);
 				if (!fn_type) return nullptr;
-				
+
 				// resolved_type must be set before checkFunctionBody (it reads the return
 				// type from it), but a body checked under suppressed errors that fails must
 				// not stay cached: clearing it lets a later non-suppressed check re-run the
@@ -3645,7 +3653,7 @@ struct Checker {
 				return true;
 			}
 			default:
-			 	// parser rejects all other operators
+			// parser rejects all other operators
 				ASSERT(false);
 				return false;
 		}
@@ -3813,7 +3821,7 @@ struct Checker {
 		// Bounds are checked without a forced hint first so an untyped bound can adopt
 		// the other bound's concrete type (`for i in 0..length(s)` iterates as isize).
 		// Two untyped bounds default to i32.
-		
+
 		ResolvedType* begin_type = checkExpr(unit, &ctx, *fs.begin, nullptr);
 		if (!begin_type) return false;
 
@@ -3979,15 +3987,7 @@ struct Checker {
 				if (pattern.end) {
 					ComptimeResult end = evalComptime(unit, *pattern.end);
 					if (!end) return false;
-					// TODO
-					#if 0
-					// TODO we should typecheck this before evaluating
-					if (comptime_subject.kind != ComptimeValue::INT && comptime_subject.kind != ComptimeValue::FLOAT) return false;
-					if (begin.kind != ComptimeValue::INT && begin.kind != ComptimeValue::FLOAT) return false;
-					if (end.kind != ComptimeValue::INT && end.kind != ComptimeValue::FLOAT) return false;
-					// TODO add test to hit this
-					return comptime_subject.asFloat() >= begin.asFloat() && comptime_subject.asFloat() <= end.asFloat();
-					#endif
+					// TODO range patterns in comptime match are not implemented
 					return false;
 				}
 				return comptimeValuesEqual(comptime_subject, begin);
@@ -4460,12 +4460,46 @@ struct Checker {
 		return {ComptimeResult::VALUE, getPrimitiveType<T>(), address};
 	}
 
+	ComptimeResult copyComptimeValue(ResolvedType* type, const void* bytes, u32 size) {
+		u8* value = comptime_stack_ptr;
+		memcpy(value, bytes, size);
+		comptime_stack_ptr += size;
+		return {ComptimeResult::VALUE, type, value};
+	}
+
+	ComptimeResult copyComptimeValue(ResolvedType* type, const void* bytes) {
+		return copyComptimeValue(type, bytes, typeByteSize(*type));
+	}
+
 	ComptimeResult makeComptimeEnumResult(ResolvedType* type, i64 value) {
-		u8* ptr = comptime_stack_ptr;
 		i32 enum_value = (i32)value;
-		memcpy(comptime_stack_ptr, &enum_value, sizeof(enum_value));
-		comptime_stack_ptr += sizeof(enum_value);
-		return {ComptimeResult::VALUE, type, ptr};
+		return copyComptimeValue(type, &enum_value, sizeof(enum_value));
+	}
+
+	template <typename Storage, typename Arithmetic>
+	bool applyComptimeCompoundAssignment(Token token, Token::Type op, u8* lhs_bytes, const u8* rhs_bytes) {
+		Storage lhs_value;
+		Storage rhs_value;
+		memcpy(&lhs_value, lhs_bytes, sizeof(lhs_value));
+		memcpy(&rhs_value, rhs_bytes, sizeof(rhs_value));
+		Arithmetic lhs = (Arithmetic)lhs_value;
+		const Arithmetic rhs = (Arithmetic)rhs_value;
+		switch (op) {
+			case Token::PLUS_EQUAL: lhs += rhs; break;
+			case Token::MINUS_EQUAL: lhs -= rhs; break;
+			case Token::STAR_EQUAL: lhs *= rhs; break;
+			case Token::SLASH_EQUAL:
+				if (rhs == 0) {
+					errorLine(token, "Division by zero");
+					return false;
+				}
+				lhs /= rhs;
+				break;
+			default: ASSERT(false); return false;
+		}
+		lhs_value = (Storage)lhs;
+		memcpy(lhs_bytes, &lhs_value, sizeof(lhs_value));
+		return true;
 	}
 
 	ComptimeResult evalComptime(Unit& unit, Statement& statement, ComptimeFrame& frame) {
@@ -4500,7 +4534,8 @@ struct Checker {
 					ComptimeFrame::Local& value_binding = frame.locals.emplace_back();
 					value_binding.name = fs.value_var;
 					value_binding.type = element_type;
-					value_binding.bytes = static_cast<u8*>(unit.arena.allocate(unit.arena.user_data, typeByteSize(*element_type), 1));
+					const u32 element_size = typeByteSize(*element_type);
+					value_binding.bytes = static_cast<u8*>(unit.arena.allocate(unit.arena.user_data, element_size, 1));
 					ComptimeFrame::Local* key_binding = nullptr;
 					if (fs.is_key_value) {
 						key_binding = &frame.locals.emplace_back();
@@ -4516,7 +4551,7 @@ struct Checker {
 							errorLine(fs.body->token, "Cannot convert comptime for element to ", element_type);
 							return {};
 						}
-						memcpy(value_binding.bytes, element.value, typeByteSize(*element_type));
+						memcpy(value_binding.bytes, element.value, element_size);
 						if (key_binding) {
 							i64 index = i;
 							memcpy(key_binding->bytes, &index, sizeof(index));
@@ -4602,110 +4637,24 @@ struct Checker {
 					errorLine(assign.token, "Comptime compound assignment requires numeric values");
 					return {};
 				}
-				// TODO simplify
-				const bool floating = isFloatType(*lhs_type);
-				if (floating) {
-					if (lhs_type->kind == ResolvedType::F32) {
-						float lhs;
-						float rhs;
-						memcpy(&lhs, lhs_bytes, sizeof(lhs));
-						memcpy(&rhs, value.value, sizeof(rhs));
-						switch (assign.op) {
-							case Token::PLUS_EQUAL: lhs += rhs; break;
-							case Token::MINUS_EQUAL: lhs -= rhs; break;
-							case Token::STAR_EQUAL: lhs *= rhs; break;
-							case Token::SLASH_EQUAL:
-								if (rhs == 0.0f) { errorLine(assign.token, "Division by zero"); return {}; }
-								lhs /= rhs;
-								break;
-							default: ASSERT(false); return {};
-						}
-						memcpy(lhs_bytes, &lhs, sizeof(lhs));
-					} else {
-						double lhs;
-						double rhs;
-						memcpy(&lhs, lhs_bytes, sizeof(lhs));
-						memcpy(&rhs, value.value, sizeof(rhs));
-						switch (assign.op) {
-							case Token::PLUS_EQUAL: lhs += rhs; break;
-							case Token::MINUS_EQUAL: lhs -= rhs; break;
-							case Token::STAR_EQUAL: lhs *= rhs; break;
-							case Token::SLASH_EQUAL:
-								if (rhs == 0.0) { errorLine(assign.token, "Division by zero"); return {}; }
-								lhs /= rhs;
-								break;
-							default: ASSERT(false); return {};
-						}
-						memcpy(lhs_bytes, &lhs, sizeof(lhs));
-					}
-				} else {
-					const bool unsigned_target = lhs_type->kind == ResolvedType::U8
-						|| lhs_type->kind == ResolvedType::U16
-						|| lhs_type->kind == ResolvedType::U32
-						|| lhs_type->kind == ResolvedType::U64
-						|| lhs_type->kind == ResolvedType::BYTE;
-					if (unsigned_target) {
-						u64 lhs;
-						u64 rhs;
-						switch (lhs_type->kind) {
-							case ResolvedType::U8:
-							case ResolvedType::BYTE: { u8 v; memcpy(&v, lhs_bytes, sizeof(v)); lhs = v; break; }
-							case ResolvedType::U16: { u16 v; memcpy(&v, lhs_bytes, sizeof(v)); lhs = v; break; }
-							case ResolvedType::U32: { u32 v; memcpy(&v, lhs_bytes, sizeof(v)); lhs = v; break; }
-							case ResolvedType::U64: memcpy(&lhs, lhs_bytes, sizeof(lhs)); break;
-							default: ASSERT(false); return {};
-						}
-						switch (value.type->kind) {
-							case ResolvedType::U8:
-							case ResolvedType::BYTE: { u8 v; memcpy(&v, value.value, sizeof(v)); rhs = v; break; }
-							case ResolvedType::U16: { u16 v; memcpy(&v, value.value, sizeof(v)); rhs = v; break; }
-							case ResolvedType::U32: { u32 v; memcpy(&v, value.value, sizeof(v)); rhs = v; break; }
-							case ResolvedType::U64: memcpy(&rhs, value.value, sizeof(rhs)); break;
-							default: ASSERT(false); return {};
-						}
-						switch (assign.op) {
-							case Token::PLUS_EQUAL: lhs += rhs; break;
-							case Token::MINUS_EQUAL: lhs -= rhs; break;
-							case Token::STAR_EQUAL: lhs *= rhs; break;
-							case Token::SLASH_EQUAL:
-								if (rhs == 0) { errorLine(assign.token, "Division by zero"); return {}; }
-								lhs /= rhs;
-								break;
-							default: ASSERT(false); return {};
-						}
-						writeComptimeNumeric(lhs_bytes, (const u8*)&lhs, ResolvedType::U64, lhs_type->kind);
-					} else {
-						i64 lhs;
-						i64 rhs;
-						switch (lhs_type->kind) {
-							case ResolvedType::I8: { i8 v; memcpy(&v, lhs_bytes, sizeof(v)); lhs = v; break; }
-							case ResolvedType::I16: { i16 v; memcpy(&v, lhs_bytes, sizeof(v)); lhs = v; break; }
-							case ResolvedType::I32: { i32 v; memcpy(&v, lhs_bytes, sizeof(v)); lhs = v; break; }
-							case ResolvedType::I64:
-							case ResolvedType::ISIZE: memcpy(&lhs, lhs_bytes, sizeof(lhs)); break;
-							default: ASSERT(false); return {};
-						}
-						switch (value.type->kind) {
-							case ResolvedType::I8: { i8 v; memcpy(&v, value.value, sizeof(v)); rhs = v; break; }
-							case ResolvedType::I16: { i16 v; memcpy(&v, value.value, sizeof(v)); rhs = v; break; }
-							case ResolvedType::I32: { i32 v; memcpy(&v, value.value, sizeof(v)); rhs = v; break; }
-							case ResolvedType::I64:
-							case ResolvedType::ISIZE: memcpy(&rhs, value.value, sizeof(rhs)); break;
-							default: ASSERT(false); return {};
-						}
-						switch (assign.op) {
-							case Token::PLUS_EQUAL: lhs += rhs; break;
-							case Token::MINUS_EQUAL: lhs -= rhs; break;
-							case Token::STAR_EQUAL: lhs *= rhs; break;
-							case Token::SLASH_EQUAL:
-								if (rhs == 0) { errorLine(assign.token, "Division by zero"); return {}; }
-								lhs /= rhs;
-								break;
-							default: ASSERT(false); return {};
-						}
-						writeComptimeNumeric(lhs_bytes, (const u8*)&lhs, ResolvedType::I64, lhs_type->kind);
-					}
+				ASSERT(typesEqual(lhs_type, value.type));
+				bool applied = false;
+				switch (lhs_type->kind) {
+					case ResolvedType::I8: applied = applyComptimeCompoundAssignment<i8, i64>(assign.token, assign.op, lhs_bytes, value.value); break;
+					case ResolvedType::I16: applied = applyComptimeCompoundAssignment<i16, i64>(assign.token, assign.op, lhs_bytes, value.value); break;
+					case ResolvedType::I32: applied = applyComptimeCompoundAssignment<i32, i64>(assign.token, assign.op, lhs_bytes, value.value); break;
+					case ResolvedType::I64:
+					case ResolvedType::ISIZE: applied = applyComptimeCompoundAssignment<i64, i64>(assign.token, assign.op, lhs_bytes, value.value); break;
+					case ResolvedType::U8:
+					case ResolvedType::BYTE: applied = applyComptimeCompoundAssignment<u8, u64>(assign.token, assign.op, lhs_bytes, value.value); break;
+					case ResolvedType::U16: applied = applyComptimeCompoundAssignment<u16, u64>(assign.token, assign.op, lhs_bytes, value.value); break;
+					case ResolvedType::U32: applied = applyComptimeCompoundAssignment<u32, u64>(assign.token, assign.op, lhs_bytes, value.value); break;
+					case ResolvedType::U64: applied = applyComptimeCompoundAssignment<u64, u64>(assign.token, assign.op, lhs_bytes, value.value); break;
+					case ResolvedType::F32: applied = applyComptimeCompoundAssignment<f32, f32>(assign.token, assign.op, lhs_bytes, value.value); break;
+					case ResolvedType::F64: applied = applyComptimeCompoundAssignment<f64, f64>(assign.token, assign.op, lhs_bytes, value.value); break;
+					default: ASSERT(false); return {};
 				}
+				if (!applied) return {};
 				return {ComptimeResult::VOID};
 			}
 			case Statement::IF: {
@@ -4759,7 +4708,7 @@ struct Checker {
 			if (ft) offset += typeByteSize(*ft);
 		}
 		return offset;
-	}	
+	}
 
 	bool resolveComptimeLValue(Unit& unit, Expression& expr, ComptimeFrame& frame, u8*& out_ptr, ResolvedType*& out_type) {
 		switch (expr.kind) {
@@ -4833,7 +4782,7 @@ struct Checker {
 		return result;
 	}
 
-	template <> float modulo(float lhs, float rhs) { 
+	template <> float modulo(float lhs, float rhs) {
 		errorLine({}, "Modulo operator is not defined for floating point types");
 		return 0;
 	}
@@ -4943,10 +4892,8 @@ struct Checker {
 
 				// .enum_value
 				if (!member.expression) {
-					u32 type_kind_member_count;
-					const char* const* names = typeKindMemberNames(type_kind_member_count);
-					for (u32 i = 0; i < type_kind_member_count; ++i) {
-						if (equalStrings(names[i], member.name)) {
+					for (u32 i = 0; i < sizeof(TYPE_KIND_INFOS) / sizeof(TYPE_KIND_INFOS[0]); ++i) {
+						if (equalStrings(TYPE_KIND_INFOS[i].member_name, member.name)) {
 							// TODO add test to hit this
 							return makeComptimeResult((i64)i, comptime_stack_ptr);
 						}
@@ -5004,7 +4951,7 @@ struct Checker {
 			case Expression::BRACKET: {
 				auto& be = static_cast<BracketExpression&>(expr);
 				ASSERT(be.base);
-				
+
 				// A[i], where A is a comptime array
 				if (be.args.size() == 1) {
 					Unit* elem_owner = &unit;
@@ -5044,9 +4991,7 @@ struct Checker {
 							}
 							const u32 element_size = typeByteSize(*arr_type->element_type);
 							const u8* elem_bytes = array_value.value + index * element_size;
-							memcpy(comptime_stack_ptr, elem_bytes, element_size);
-							comptime_stack_ptr += element_size;
-							return {ComptimeResult::VALUE, arr_type->element_type, comptime_stack_ptr - element_size};
+							return copyComptimeValue(arr_type->element_type, elem_bytes);
 						}
 
 						if (frame) {
@@ -5065,9 +5010,7 @@ struct Checker {
 								}
 								u32 element_size = typeByteSize(*arr_type->element_type);
 								u8* elem_bytes = values + index * element_size;
-								memcpy(comptime_stack_ptr, elem_bytes, element_size);
-								comptime_stack_ptr += element_size;
-								return {ComptimeResult::VALUE, arr_type->element_type, comptime_stack_ptr - element_size};
+								return copyComptimeValue(arr_type->element_type, elem_bytes);
 							}
 						}
 					}
@@ -5076,7 +5019,7 @@ struct Checker {
 				if (be.base->kind != Expression::IDENTIFIER && be.base->kind != Expression::MEMBER) {
 					errorLine(be.base->token, "[] can only be applied to a type name or member");
 					return {};
-				}				
+				}
 
 				ResolvedType* resolved_base = resolveTypeExpr(unit, *be.base, bindings, ctx, frame);
 				if (!resolved_base) {
@@ -5168,45 +5111,39 @@ struct Checker {
 				}
 
 				switch (lhs.type->kind) {
-					case ResolvedType::F32: return arithmeticOp<float>(be.op, lhs.value, rhs.value, res_bytes); break;
-					case ResolvedType::F64: return arithmeticOp<double>(be.op, lhs.value, rhs.value, res_bytes); break;
-					case ResolvedType::I8: return arithmeticOp<i8>(be.op, lhs.value, rhs.value, res_bytes); break;
-					case ResolvedType::I16: return arithmeticOp<i16>(be.op, lhs.value, rhs.value, res_bytes); break;
-					case ResolvedType::I32: return arithmeticOp<i32>(be.op, lhs.value, rhs.value, res_bytes); break;
-					case ResolvedType::I64: return arithmeticOp<i64>(be.op, lhs.value, rhs.value, res_bytes); break;
-					case ResolvedType::U8: return arithmeticOp<u8>(be.op, lhs.value, rhs.value, res_bytes); break;
-					case ResolvedType::U16: return arithmeticOp<u16>(be.op, lhs.value, rhs.value, res_bytes); break;
-					case ResolvedType::U32: return arithmeticOp<u32>(be.op, lhs.value, rhs.value, res_bytes); break;
-					case ResolvedType::U64: return arithmeticOp<u64>(be.op, lhs.value, rhs.value, res_bytes); break;
+					case ResolvedType::F32: return arithmeticOp<float>(be.op, lhs.value, rhs.value, res_bytes);
+					case ResolvedType::F64: return arithmeticOp<double>(be.op, lhs.value, rhs.value, res_bytes);
+					case ResolvedType::I8: return arithmeticOp<i8>(be.op, lhs.value, rhs.value, res_bytes);
+					case ResolvedType::I16: return arithmeticOp<i16>(be.op, lhs.value, rhs.value, res_bytes);
+					case ResolvedType::I32: return arithmeticOp<i32>(be.op, lhs.value, rhs.value, res_bytes);
+					case ResolvedType::I64: return arithmeticOp<i64>(be.op, lhs.value, rhs.value, res_bytes);
+					case ResolvedType::U8: return arithmeticOp<u8>(be.op, lhs.value, rhs.value, res_bytes);
+					case ResolvedType::U16: return arithmeticOp<u16>(be.op, lhs.value, rhs.value, res_bytes);
+					case ResolvedType::U32: return arithmeticOp<u32>(be.op, lhs.value, rhs.value, res_bytes);
+					case ResolvedType::U64: return arithmeticOp<u64>(be.op, lhs.value, rhs.value, res_bytes);
 					default: errorLine(be.token, "Arithmetic operations are not supported for type ", lhs.type); return {};
 				}
 			}
 			case Expression::STRING_LITERAL: {
 				auto& sl = static_cast<StringLiteralExpression&>(expr);
 				ls_string_view* str = &sl.value;
-				u8* value = comptime_stack_ptr;
-				memcpy(comptime_stack_ptr, &str, sizeof(str));
-				comptime_stack_ptr += sizeof(str);
-				return {ComptimeResult::VALUE, primitiveType(ResolvedType::STRING), value};
+				return copyComptimeValue(primitiveType(ResolvedType::STRING), &str);
 			}
 			case Expression::ARRAY_LITERAL: {
 				auto& al = static_cast<ArrayLiteralExpression&>(expr);
 				u8* value = comptime_stack_ptr;
-				u8* write_ptr = value;
 				for (Expression* element_expr : al.values) {
 					// TODO are we sure we don't have to check the element_expr type against the array type?
-					ComptimeResult element_type = evalComptime(unit, *element_expr, ctx, bindings, frame);
-					if (!element_type) return {};
+					if (!evalComptime(unit, *element_expr, ctx, bindings, frame)) return {};
 				}
 				return {ComptimeResult::VALUE, expr.resolved_type, value};
 			}
 			case Expression::STRUCT_LITERAL: {
 				auto& sl = static_cast<StructLiteralExpression&>(expr);
-				
+
 				u8* value = comptime_stack_ptr;
 				for (Expression* field_expr : sl.values) {
-					ComptimeResult field_type = evalComptime(unit, *field_expr, ctx, bindings, frame);
-					if (!field_type) return {};
+					if (!evalComptime(unit, *field_expr, ctx, bindings, frame)) return {};
 				}
 
 				return {ComptimeResult::VALUE, sl.type->resolved_type, value};
@@ -5223,15 +5160,9 @@ struct Checker {
 				ResolvedType* rhs = asType(evalComptime(unit, *ce.type_expr, ctx, bindings, frame), ce.type_expr->token);
 				if (!rhs) return {};
 
-				const bool src_numeric = isNumericType(*lhs.type);
-				const bool dst_numeric = isNumericType(*rhs);
-				const bool src_enum = lhs.type->kind == ResolvedType::ENUM;
-				const bool dst_enum = rhs->kind == ResolvedType::ENUM;
-
 				const u32 src_size = typeByteSize(*lhs.type);
-				u8 src_bytes[8];
-				memcpy(src_bytes, comptime_stack_ptr - src_size, src_size);
 				comptime_stack_ptr -= src_size;
+				const u8* src_bytes = comptime_stack_ptr;
 
 				const u32 dst_size = writeComptimeNumeric(comptime_stack_ptr, src_bytes, lhs.type->kind, rhs->kind);
 				u8* value = comptime_stack_ptr;
@@ -5334,7 +5265,7 @@ struct Checker {
 				ArrayResolvedType* array_type = makeType<ArrayResolvedType>(module.arena);
 				array_type->element_type = asType(evalComptime(unit, *at.element_type, ctx, bindings, frame), at.element_type->token);
 				if (!array_type->element_type) return {};
-		
+
 				if (!resolveComptimeIntValue(unit, at.size, array_type->size, bindings)) return {};
 				if (array_type->size <= 0) {
 					errorLine(at.size->token, "Static array size must be greater than zero");
@@ -5360,28 +5291,14 @@ struct Checker {
 						id.resolved_type = binding->arg.type;
 						return binding->arg;
 					}
-					
-					u8* value = comptime_stack_ptr;
-					const u32 size = typeByteSize(*binding->arg.type);
-					memcpy(comptime_stack_ptr, binding->arg.value, size);
-					comptime_stack_ptr += size;
-					return {ComptimeResult::VALUE, binding->arg.type, value};
+
+					return copyComptimeValue(binding->arg.type, binding->arg.value);
 				}
 
 				if (frame) {
 					if (ComptimeFrame::Local* local = frame->find(id.name)) {
-						u8* value = comptime_stack_ptr;
-						const u32 size = typeByteSize(*local->type);
-						memcpy(comptime_stack_ptr, local->bytes, size);
-						comptime_stack_ptr += size;
-						return {ComptimeResult::VALUE, local->type, value};
+						return copyComptimeValue(local->type, local->bytes);
 					}
-				}
-
-				if (TemplateBinding* binding = findTemplateBinding(bindings, id.name)) {
-					// TODO test to hit this
-					if (binding->arg.kind == ComptimeResult::TYPE) expr.resolved_type = binding->arg.type;
-					return binding->arg;
 				}
 
 				SymbolRef ref = resolveSymbol(unit, {}, id.name, LookupPolicy::Checked);
@@ -5401,16 +5318,10 @@ struct Checker {
 					ASSERT(ref.symbol->comptime_byte_size == 0);
 					return {ComptimeResult::TYPE, static_cast<MetaType*>(ref.symbol->resolved_type)->inner};
 				}
-				
-				u8* value = comptime_stack_ptr;
-				memcpy(comptime_stack_ptr, ref.symbol->comptime_bytes, ref.symbol->comptime_byte_size);
-				comptime_stack_ptr += ref.symbol->comptime_byte_size;
-				return {ComptimeResult::VALUE, ref.symbol->resolved_type, value};
+
+				return copyComptimeValue(ref.symbol->resolved_type, ref.symbol->comptime_bytes, ref.symbol->comptime_byte_size);
 			}
 			case Expression::TYPE_LITERAL: {
-				auto& tl = static_cast<TypeLiteralExpression&>(expr);
-				ResolvedType* type = nullptr;
-				MetaType* meta = makeType<MetaType>(module.arena);
 				const ResolvedType::Kind kind = static_cast<TypeLiteralExpression&>(expr).type;
 				if (kind >= ResolvedType::VOID && kind <= ResolvedType::BYTE) return {ComptimeResult::TYPE, primitiveType(kind)};
 				if (kind == ResolvedType::META) return {ComptimeResult::TYPE, makeType<MetaType>(module.arena)};
@@ -5428,7 +5339,7 @@ struct Checker {
 				}
 
 				ASSERT(un.op == Token::MINUS);
-				switch (operand_type.type->kind) { 
+				switch (operand_type.type->kind) {
 					case ResolvedType::I32: {
 						i32 value;
 						memcpy(&value, operand_type.value, sizeof(value));
@@ -5473,11 +5384,8 @@ struct Checker {
 			case Expression::SIZEOF: {
 				auto& sz = static_cast<SizeofExpression&>(expr);
 				if (!resolveSizeofValue(unit, sz, bindings)) return {};
-				u8* value = comptime_stack_ptr;
-				memcpy(comptime_stack_ptr, &sz.value, sizeof(sz.value));
-				comptime_stack_ptr += sizeof(sz.value);
 				// TODO not untyped int?
-				return {ComptimeResult::VALUE, primitiveType(ResolvedType::U64), value};
+				return copyComptimeValue(primitiveType(ResolvedType::U64), &sz.value);
 			}
 			case Expression::FLOAT_LITERAL: {
 				auto& fl = static_cast<FloatLiteralExpression&>(expr);
@@ -5489,10 +5397,7 @@ struct Checker {
 			}
 			case Expression::BOOL_LITERAL: {
 				auto& bl = static_cast<BoolLiteralExpression&>(expr);
-				u8* value = comptime_stack_ptr;
-				memcpy(comptime_stack_ptr, &bl.value, sizeof(bl.value));
-				comptime_stack_ptr += sizeof(bl.value);
-				return {ComptimeResult::VALUE, primitiveType(ResolvedType::BOOL), value};
+				return copyComptimeValue(primitiveType(ResolvedType::BOOL), &bl.value);
 			}
 			default:
 				errorLine(expr.token, "Expression is not a compile-time constant");

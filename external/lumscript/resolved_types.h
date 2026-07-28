@@ -118,7 +118,7 @@ struct ComptimeResult {
 	};
 	Kind kind = FAILURE;
 	ResolvedType* type = nullptr; // type of value if kind == VALUE, or the type itself if kind == TYPE
-	u8* value = nullptr; // pointer to the value bytes if kind == VALUE, otherwise nullptr 
+	u8* value = nullptr; // pointer to the value bytes if kind == VALUE, otherwise nullptr
 
 	operator bool() const { return kind != FAILURE; }
 };

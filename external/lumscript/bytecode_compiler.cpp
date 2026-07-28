@@ -2898,44 +2898,11 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 				emitLoadSlot(ctx, *slot);
 				return slot->kind != LS_TYPE_INVALID ? slot->kind : LS_TYPE_I32;
 			}
-			//ASSERT(false);
-			// TODO
-			#if 0
-			if (id.comptime_value.kind != ComptimeValue::INVALID) {
-				const ComptimeValue& value = id.comptime_value;
-				switch (value.kind) {
-					case ComptimeValue::INT: {
-						const ls_type_kind kind = valueKindForType(*expr.resolved_type);
-						emitIntegerConstant(ctx, kind, (u64)value.int_value);
-						return kind;
-					}
-					case ComptimeValue::FLOAT: {
-						const ls_type_kind kind = valueKindForType(*expr.resolved_type);
-						if (kind == LS_TYPE_F32) emitConst4(ctx, bitcastF32ToU32((float)value.float_value));
-						else emitConst8(ctx, bitcastF64ToU64(value.float_value));
-						return kind;
-					}
-					case ComptimeValue::BOOL:
-						emitIntegerConstant(ctx, LS_TYPE_BOOL, value.bool_value ? 1u : 0u);
-						return LS_TYPE_BOOL;
-					case ComptimeValue::STRING: {
-						u32 string_index = 0;
-						appendStringLiteral(*ctx.bytecode, value.string_value, string_index);
-						emitConstString(ctx, string_index);
-						return LS_TYPE_STRING;
-					}
-					case ComptimeValue::TYPE:
-					case ComptimeValue::INVALID: break;
-				}
-			}
-			#endif
-
-			// TODO local comptime
 			if (id.comptime_bytes) {
 				emitConstBytes(ctx, id.comptime_bytes, typeByteSize(*id.resolved_type));
 				return valueKindForType(*expr.resolved_type);
 			}
-			
+
 			// Comptime value symbol: no runtime slot exists, so materialize the
 			// value inline. Prefer the folded constant bytes; otherwise fall back to
 			// compiling the initializer expression at this use site.
@@ -2943,14 +2910,14 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 				emitConstBytes(ctx, id.symbol->comptime_bytes, id.symbol->comptime_byte_size);
 				return valueKindForType(*expr.resolved_type);
 			}
-			
+
 			// TODO what is this?
 			if (id.symbol && id.symbol->storage == Symbol::COMPTIME && id.symbol->expression
 				&& id.symbol->expression->kind != Expression::FUNCTION
 				&& (!id.symbol->resolved_type || id.symbol->resolved_type->kind != ResolvedType::META)) {
 				return compileExpression(ctx, *id.symbol->expression, hint);
 			}
-			
+
 			// function template instance
 			FunctionExpression* fn = id.resolved_fn ? id.resolved_fn : static_cast<FunctionExpression*>(id.symbol->expression);
 			emitIntegerConstant(ctx, LS_TYPE_FUNCTION, fn->bytecode_index);
@@ -3079,36 +3046,6 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 		}
 		case Expression::CALL: return compileCall(ctx, static_cast<CallExpression&>(expr), hint);
 		case Expression::TYPE_MEMBER: {
-			#if 0
-			TypeMemberExpression& member = static_cast<TypeMemberExpression&>(expr);
-			if (equalStrings(member.name, "min") || equalStrings(member.name, "max")) {
-				const ComptimeValue value = numericTypeBound(expr.resolved_type->kind, equalStrings(member.name, "max"));
-				const ls_type_kind kind = valueKindForType(*expr.resolved_type);
-				if (value.kind == ComptimeValue::FLOAT) {
-					if (kind == LS_TYPE_F32) emitConst4(ctx, bitcastF32ToU32((float)value.float_value));
-					else emitConst8(ctx, bitcastF64ToU64(value.float_value));
-				}
-				else {
-					ASSERT(value.kind == ComptimeValue::INT);
-					emitIntegerConstant(ctx, kind, (u64)value.int_value);
-				}
-				return kind;
-			}
-			if (equalStrings(member.name, "length") || equalStrings(member.name, "kind")) {
-				const ls_type_kind kind = valueKindForType(*expr.resolved_type);
-				ASSERT(member.reflected_type);
-				const i64 value = equalStrings(member.name, "kind")
-					? typeKindValue(member.reflected_type->kind)
-					: static_cast<ArrayResolvedType*>(member.reflected_type)->size;
-				emitIntegerConstant(ctx, kind, (u64)value);
-				return kind;
-			}
-			ASSERT(equalStrings(member.name, "name"));
-			u32 string_index = 0;
-			appendStringLiteral(*ctx.bytecode, member.comptime_string, string_index);
-			emitConstString(ctx, string_index);
-			return LS_TYPE_STRING;
-			#endif
 			return LS_TYPE_INVALID;
 		}
 		case Expression::MEMBER: return compileMember(ctx, static_cast<MemberExpression&>(expr));
