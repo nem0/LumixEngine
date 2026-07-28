@@ -274,18 +274,17 @@ static void appendReflectedTypeName(char*& out, char* end, const ResolvedType& t
 		case ResolvedType::NULLABLE: text("?"); appendReflectedTypeName(out, end, *static_cast<const NullableResolvedType&>(type).inner); return;
 		case ResolvedType::UNION: {
 			const UnionResolvedType& u = static_cast<const UnionResolvedType&>(type);
-			for (i32 rank = 0; rank < u.members.size(); ++rank) {
-				for (i32 i = 0; i < u.members.size(); ++i) {
-					i32 member_rank = 0;
-					for (i32 j = 0; j < u.members.size(); ++j) {
-						if (u.members[j]->kind < u.members[i]->kind
-							|| (u.members[j]->kind == u.members[i]->kind && j < i)) ++member_rank;
-					}
-					if (member_rank != rank) continue;
-					if (rank) text(" | ");
-					appendReflectedTypeName(out, end, *u.members[i]);
-					break;
-				}
+			i32 order[256]; const i32 n = u.members.size() < 256 ? u.members.size() : 256;
+			for (i32 i = 0; i < n; ++i) order[i] = i;
+			for (i32 i = 1; i < n; ++i) {
+				const i32 key = order[i];
+				i32 j = i - 1;
+				while (j >= 0 && u.members[order[j]]->kind > u.members[key]->kind) { order[j + 1] = order[j]; --j; }
+				order[j + 1] = key;
+			}
+			for (i32 i = 0; i < n; ++i) {
+				if (i) text(" | ");
+				appendReflectedTypeName(out, end, *u.members[order[i]]);
 			}
 			return;
 		}
@@ -1340,6 +1339,22 @@ struct Checker {
 		return "symbol";
 	}
 
+	ResolvedType* checkRefArgument(Unit& unit, FunctionCheckContext* ctx, Expression* arg, i32 arg_index) {
+		if (arg->kind != Expression::UNARY || static_cast<UnaryExpression*>(arg)->op != Token::REF) {
+			errorLine(arg->token, "Cannot pass non-ref expression as ref argument ", arg_index + 1, " of function call");
+			return nullptr;
+		}
+		UnaryExpression* un = static_cast<UnaryExpression*>(arg);
+		bool writable = false;
+		ResolvedType* arg_type = checkAssignableExpr(unit, ctx, *un->expression, writable);
+		if (!arg_type) return nullptr;
+		if (!writable) {
+			errorLine(arg->token, "Cannot pass non-writable expression as ref argument ", arg_index + 1, " of function call");
+			return nullptr;
+		}
+		return arg_type;
+	}
+
 	ResolvedType* checkCallCandidate(Unit& unit,
 		FunctionCheckContext* ctx,
 		CallExpression& call,
@@ -1376,22 +1391,8 @@ struct Checker {
 			Expression* arg = call.args[i];
 			if (fn_type.params[param_index].is_comptime) continue;
 			if (fn_type.params[param_index].is_ref) {
-				if (arg->kind != Expression::UNARY) {
-					errorLine(call.args[i]->token, "Cannot pass non-ref expression as ref argument ", i + 1, " of function call");
-					return nullptr;
-				}
-				UnaryExpression* un = static_cast<UnaryExpression*>(arg);
-				if (un->op != Token::REF) {
-					errorLine(call.args[i]->token, "Cannot pass non-ref expression as ref argument ", i + 1, " of function call");
-					return nullptr;
-				}
-				bool writable = false;
-				ResolvedType* arg_type = checkAssignableExpr(unit, ctx, *un->expression, writable);
+				ResolvedType* arg_type = checkRefArgument(unit, ctx, arg, i);
 				if (!arg_type) return nullptr;
-				if (!writable) {
-					errorLine(call.args[i]->token, "Cannot pass non-writable expression as ref argument ", i + 1, " of function call");
-					return nullptr;
-				}
 				if (!typesEqual(arg_type, param_type)) {
 					errorLine(call.args[i]->token, "Cannot convert ", arg_type, " to ", param_type, " for ref argument ", i + 1, " of function call");
 					return nullptr;
@@ -1437,7 +1438,7 @@ struct Checker {
 			FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(cand.fn->resolved_type);
 			if (fn_type->params.size() != arity) continue;
 
-			if (!operandMatchesParam(*operands[0], *operand_types[0], *fn_type->params[0].type)) continue;;
+			if (!operandMatchesParam(*operands[0], *operand_types[0], *fn_type->params[0].type)) continue;
 			if (arity > 1 && !operandMatchesParam(*operands[1], *operand_types[1], *fn_type->params[1].type)) continue;
 
 			if (matched_fn) return OverloadResult::AMBIGUOUS;
@@ -1984,22 +1985,8 @@ struct Checker {
 
 			ResolvedType* arg_type = nullptr;
 			if (param.is_ref) {
-				if (arg->kind != Expression::UNARY) {
-					errorLine(arg->token, "Cannot pass non-ref expression as ref argument ", i + 1, " of function call");
-					return nullptr;
-				}
-				UnaryExpression* un = static_cast<UnaryExpression*>(arg);
-				if (un->op != Token::REF) {
-					errorLine(arg->token, "Cannot pass non-ref expression as ref argument ", i + 1, " of function call");
-					return nullptr;
-				}
-				bool writable = false;
-				arg_type = checkAssignableExpr(unit, ctx, *un->expression, writable);
+				arg_type = checkRefArgument(unit, ctx, arg, i);
 				if (!arg_type) return nullptr;
-				if (!writable) {
-					errorLine(arg->token, "Cannot pass non-writable expression as ref argument ", i + 1, " of function call");
-					return nullptr;
-				}
 			} else {
 				arg_type = checkExprMaterialized(unit, ctx, *arg, expected);
 				if (!arg_type) return nullptr;
@@ -2177,14 +2164,8 @@ struct Checker {
 			return nullptr;
 		}
 		switch (expr.kind) {
-			case Expression::INT_LITERAL: {
-				expr.resolved_type = concrete;
-				return concrete;
-			}
-			case Expression::SIZEOF: {
-				expr.resolved_type = concrete;
-				return concrete;
-			}
+			case Expression::INT_LITERAL:
+			case Expression::SIZEOF:
 			case Expression::FLOAT_LITERAL: {
 				expr.resolved_type = concrete;
 				return concrete;
@@ -2774,6 +2755,18 @@ struct Checker {
 		}
 	}
 
+	bool checkIndexableBase(Expression& expr, ResolvedType* base_type) {
+		if (base_type->kind == ResolvedType::NULLABLE) {
+			errorLine(expr.token, "Cannot index nullable type without a null check");
+			return false;
+		}
+		if (base_type->kind != ResolvedType::ARRAY && base_type->kind != ResolvedType::SLICE) {
+			errorLine(expr.token, "Cannot index type ", base_type);
+			return false;
+		}
+		return true;
+	}
+
 	ResolvedType* checkBracketExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint) {
 		BracketExpression& br = static_cast<BracketExpression&>(expr);
 		++suppress_errors;
@@ -2788,15 +2781,7 @@ struct Checker {
 		ResolvedType* base_type = checkExpr(unit, ctx, *br.base, nullptr);
 		if (!base_type) return nullptr;
 
-		if (base_type->kind == ResolvedType::NULLABLE) {
-			errorLine(expr.token, "Cannot index nullable type without a null check");
-			return nullptr;
-		}
-
-		if (base_type->kind != ResolvedType::ARRAY && base_type->kind != ResolvedType::SLICE) {
-			errorLine(expr.token, "Cannot index type ", base_type);
-			return nullptr;
-		}
+		if (!checkIndexableBase(expr, base_type)) return nullptr;
 
 		if (br.args.size() != 1) {
 			errorLine(expr.token, "Indexing expects exactly one argument");
@@ -2835,15 +2820,7 @@ struct Checker {
 		ResolvedType* base_type = checkExpr(unit, ctx, *sl.base, nullptr);
 		if (!base_type) return nullptr;
 
-		if (base_type->kind == ResolvedType::NULLABLE) {
-			errorLine(expr.token, "Cannot index nullable type without a null check");
-			return nullptr;
-		}
-
-		if (base_type->kind != ResolvedType::ARRAY && base_type->kind != ResolvedType::SLICE) {
-			errorLine(expr.token, "Cannot index type ", base_type);
-			return nullptr;
-		}
+		if (!checkIndexableBase(expr, base_type)) return nullptr;
 
 		Expression* bounds[] = {sl.begin, sl.end};
 		for (Expression* bound : bounds) {
@@ -3660,9 +3637,16 @@ struct Checker {
 	}
 
 	bool checkIfStatement(Unit& unit, FunctionCheckContext& ctx, IfStatement& ifst, ResolvedType* return_type) {
-		const bool condition_has_type_value = ifst.condition && ifst.condition->kind == Expression::BINARY
-			&& (static_cast<BinaryExpression*>(ifst.condition)->lhs->kind == Expression::RESOLVED_TYPE
-				|| static_cast<BinaryExpression*>(ifst.condition)->rhs->kind == Expression::RESOLVED_TYPE);
+		auto contains_comptime_type_expr = [&](auto&& self, Expression* expression) -> bool {
+			if (!expression) return false;
+			if (expression->kind == Expression::TYPE_MEMBER || expression->kind == Expression::RESOLVED_TYPE) return true;
+			if (expression->kind == Expression::BINARY) {
+				BinaryExpression* binary = static_cast<BinaryExpression*>(expression);
+				return self(self, binary->lhs) || self(self, binary->rhs);
+			}
+			return false;
+		};
+		const bool condition_has_type_value = contains_comptime_type_expr(contains_comptime_type_expr, ifst.condition);
 		const bool previous_comptime_only = ctx.comptime_only;
 		if (condition_has_type_value) ctx.comptime_only = true;
 		ResolvedType* cond = checkExpr(unit, &ctx, *ifst.condition, primitiveType(ResolvedType::BOOL));
@@ -3677,18 +3661,21 @@ struct Checker {
 		// Suppress resolver diagnostics here because a runtime condition is valid;
 		// it simply falls through to ordinary two-arm checking below.
 		++suppress_errors;
+		u8* comptime_eval_start = comptime_stack_ptr;
 		ComptimeResult cmptime_t = evalComptime(unit, *ifst.condition);
 		--suppress_errors;
+		if (!comptime_eval_start) comptime_eval_start = comptime_stack;
 		if (cmptime_t && cmptime_t.kind == ComptimeResult::VALUE && cmptime_t.type->kind == ResolvedType::BOOL) {
 			bool comptime_bool_value;
-			memcpy(&comptime_bool_value, comptime_stack_ptr - sizeof(bool), sizeof(bool));
-			comptime_stack_ptr -= sizeof(bool);
+			memcpy(&comptime_bool_value, cmptime_t.value, sizeof(bool));
+			comptime_stack_ptr = comptime_eval_start;
 
 			ifst.comptime_known = true;
 			ifst.comptime_value = comptime_bool_value;
 			Statement* selected = ifst.comptime_value ? static_cast<Statement*>(ifst.body) : ifst.else_branch;
 			return checkStatement(unit, ctx, selected, return_type, {});
 		}
+		comptime_stack_ptr = comptime_eval_start;
 
 		// Detect `x != null` / `x == null` to narrow x inside the respective branch.
 		ls_string_view narrowed_name = {};
@@ -3960,8 +3947,10 @@ struct Checker {
 		// below still runs for every arm so exhaustiveness and duplicate checks are
 		// not bypassed.
 		++suppress_errors;
+		u8* comptime_eval_start = comptime_stack_ptr;
 		ComptimeResult comptime_subject = evalComptime(unit, *ms.subject);
 		--suppress_errors;
+		if (!comptime_eval_start) comptime_eval_start = comptime_stack;
 		if (comptime_subject && !subject_is_union) {
 			const auto matches = [&](MatchPattern& pattern) {
 				if (subject_is_enum && pattern.begin->kind == Expression::MEMBER && !static_cast<MemberExpression*>(pattern.begin)->expression) {
@@ -4008,11 +3997,13 @@ struct Checker {
 				if (ms.comptime_arm == (i32)i) break;
 			}
 			if (ms.comptime_arm < 0) {
+				comptime_stack_ptr = comptime_eval_start;
 				errorLine(ms.token, "Compile-time match subject does not match any arm");
 				return false;
 			}
 			ms.comptime_known = true;
 		}
+		comptime_stack_ptr = comptime_eval_start;
 
 		bool has_fallback = false;
 		// Track covered enum members for exhaustiveness checking.
@@ -4830,7 +4821,52 @@ struct Checker {
 		switch (expr.kind) {
 			case Expression::TYPE_MEMBER: {
 				auto& tme = static_cast<TypeMemberExpression&>(expr);
-				errorLine(expr.token, "Not implemented yet");
+				if (equalStrings(tme.name, "name")) {
+					return copyComptimeValue(primitiveType(ResolvedType::STRING), &tme.comptime_string);
+				}
+				if (equalStrings(tme.name, "kind")) {
+					if (!tme.reflected_type) return {};
+					return makeComptimeEnumResult(&module.type_kind, typeKindValue(tme.reflected_type->kind));
+				}
+				if (equalStrings(tme.name, "child")) {
+					if (!tme.reflected_type) return {};
+					ResolvedType* child = nullptr;
+					switch (tme.reflected_type->kind) {
+						case ResolvedType::NULLABLE: child = static_cast<NullableResolvedType*>(tme.reflected_type)->inner; break;
+						case ResolvedType::SLICE: child = static_cast<SliceResolvedType*>(tme.reflected_type)->element_type; break;
+						case ResolvedType::ARRAY: child = static_cast<ArrayResolvedType*>(tme.reflected_type)->element_type; break;
+						default: return {};
+					}
+					return {ComptimeResult::TYPE, child};
+				}
+				if (equalStrings(tme.name, "length")) {
+					if (!tme.reflected_type || tme.reflected_type->kind != ResolvedType::ARRAY) return {};
+					i64 length = static_cast<ArrayResolvedType*>(tme.reflected_type)->size;
+					return copyComptimeValue(primitiveType(ResolvedType::UNTYPED_INT), &length);
+				}
+				if (equalStrings(tme.name, "ret")) {
+					if (!tme.reflected_type || tme.reflected_type->kind != ResolvedType::FUNCTION) return {};
+					return {ComptimeResult::TYPE, static_cast<FunctionResolvedType*>(tme.reflected_type)->return_type};
+				}
+				if (equalStrings(tme.name, "min") || equalStrings(tme.name, "max")) {
+					if (!tme.reflected_type) return {};
+					const bool min = equalStrings(tme.name, "min");
+					switch (tme.reflected_type->kind) {
+						case ResolvedType::I8: return makeComptimeResult<i8>(min ? (i8)-128 : (i8)127, comptime_stack_ptr);
+						case ResolvedType::I16: return makeComptimeResult<i16>(min ? (i16)-32768 : (i16)32767, comptime_stack_ptr);
+						case ResolvedType::I32: return makeComptimeResult<i32>(min ? (i32)(-2147483647 - 1) : (i32)2147483647, comptime_stack_ptr);
+						case ResolvedType::I64:
+						case ResolvedType::ISIZE: return makeComptimeResult<i64>(min ? (i64)(-9223372036854775807LL - 1) : (i64)9223372036854775807LL, comptime_stack_ptr);
+						case ResolvedType::U8:
+						case ResolvedType::BYTE: return makeComptimeResult<u8>(min ? (u8)0 : (u8)255, comptime_stack_ptr);
+						case ResolvedType::U16: return makeComptimeResult<u16>(min ? (u16)0 : (u16)65535, comptime_stack_ptr);
+						case ResolvedType::U32: return makeComptimeResult<u32>(min ? (u32)0 : (u32)4294967295u, comptime_stack_ptr);
+						case ResolvedType::U64: return makeComptimeResult<u64>(min ? (u64)0 : (u64)18446744073709551615ULL, comptime_stack_ptr);
+						case ResolvedType::F32: return makeComptimeResult<f32>(min ? -FLT_MAX : FLT_MAX, comptime_stack_ptr);
+						case ResolvedType::F64: return makeComptimeResult<f64>(min ? -DBL_MAX : DBL_MAX, comptime_stack_ptr);
+						default: return {};
+					}
+				}
 				return {};
 			}
 			case Expression::CALL: {
@@ -4894,7 +4930,8 @@ struct Checker {
 				if (!member.expression) {
 					for (u32 i = 0; i < sizeof(TYPE_KIND_INFOS) / sizeof(TYPE_KIND_INFOS[0]); ++i) {
 						if (equalStrings(TYPE_KIND_INFOS[i].member_name, member.name)) {
-							// TODO add test to hit this
+							if (expr.resolved_type && expr.resolved_type->kind == ResolvedType::ENUM)
+								return makeComptimeEnumResult(expr.resolved_type, (i64)i);
 							return makeComptimeResult((i64)i, comptime_stack_ptr);
 						}
 					}
@@ -5331,6 +5368,19 @@ struct Checker {
 			}
 			case Expression::UNARY: {
 				auto& un = static_cast<UnaryExpression&>(expr);
+				if (un.op == Token::MINUS && un.expression->kind == Expression::INT_LITERAL && expr.resolved_type) {
+					const u64 magnitude = static_cast<IntLiteralExpression&>(*un.expression).value;
+					switch (expr.resolved_type->kind) {
+						case ResolvedType::I8: return makeComptimeResult<i8>((i8)(-(i64)magnitude), comptime_stack_ptr);
+						case ResolvedType::I16: return makeComptimeResult<i16>((i16)(-(i64)magnitude), comptime_stack_ptr);
+						case ResolvedType::I32: return makeComptimeResult<i32>((i32)(-(i64)magnitude), comptime_stack_ptr);
+						case ResolvedType::I64:
+						case ResolvedType::ISIZE: return makeComptimeResult<i64>(-(i64)magnitude, comptime_stack_ptr);
+						case ResolvedType::F32: return makeComptimeResult<f32>(-(f32)magnitude, comptime_stack_ptr);
+						case ResolvedType::F64: return makeComptimeResult<f64>(-(f64)magnitude, comptime_stack_ptr);
+						default: break;
+					}
+				}
 				ComptimeResult operand_type = evalComptime(unit, *un.expression, ctx, bindings, frame);
 				if (!operand_type) return {};
 				if (operand_type.kind != ComptimeResult::VALUE) {

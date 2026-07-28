@@ -923,6 +923,34 @@ TEST(ComptimeIfPrunesUnselectedArm) {
 	return true;
 }
 
+TEST(ComptimeIfLocalBindingPrunesUnselectedArm) {
+	const char* source = R"(
+		fn main() : void {
+			comptime enabled = true;
+			if enabled {
+			} else {
+				var impossible : MissingType = undefined;
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeIfTypeofConditionPrunesUnselectedArm) {
+	const char* source = R"(
+		fn main() : void {
+			var value : i32 = 0;
+			if typeof(value) == i32 {
+			} else {
+				var impossible : MissingType = undefined;
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(ComptimeIfTemplateSpecializationPrunesUnselectedArm) {
 	const char* source = R"(
 		fn write(value : $T) : void {
@@ -991,6 +1019,60 @@ TEST(ComptimeMatchPrunesUnselectedCase) {
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(1, ls_to_i32(runtime, -1));
 	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeMatchLocalBindingPrunesUnselectedArm) {
+	const char* source = R"(
+		enum State { Idle, Running }
+
+		fn main() : void {
+			comptime state = State.Idle;
+			match state {
+				case .Idle:
+					return;
+				case .Running:
+					var bad : MissingType = undefined;
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeMatchLocalComptimeArgumentPrunesUnselectedArm) {
+	const char* source = R"(
+		enum State { Idle, Running }
+		fn identity(value : State) : State { return value; }
+
+		fn main() : void {
+			comptime state = State.Idle;
+			match identity(state) {
+				case .Idle:
+					return;
+				case .Running:
+					var bad : MissingType = undefined;
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeMatchRangeSelectsMatchingArm) {
+	const char* source = R"(
+		comptime score : i32 = 5;
+
+		fn main() : void {
+			match score {
+				case 1..=9:
+					return;
+				case:
+					var bad : MissingType = undefined;
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
 	return true;
 }
 
@@ -1068,6 +1150,85 @@ TEST(ComptimeIfFunctionCallConditionPrunesArm) {
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(3, ls_to_i32(runtime, -1));
 	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeIfDirectNullaryFunctionCallPrunesArm) {
+	const char* source = R"(
+		fn enabled() : bool { return true; }
+
+		fn main() : void {
+			if enabled() {
+			} else {
+				var bad : MissingType = undefined;
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeIfInterpretedFunctionCallPrunesArm) {
+	const char* source = R"(
+		fn enabled() : bool {
+			var result : bool = true;
+			return result;
+		}
+
+		fn main() : void {
+			if enabled() {
+			} else {
+				var bad : MissingType = undefined;
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeIfConstantArgumentFunctionCallPrunesArm) {
+	const char* source = R"(
+		fn greater(a : i32, b : i32) : bool { return a > b; }
+
+		fn main() : void {
+			if greater(2, 1) {
+			} else {
+				var bad : MissingType = undefined;
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeIfLocalComptimeArgumentFunctionCallPrunesArm) {
+	const char* source = R"(
+		fn identity(value : bool) : bool { return value; }
+
+		fn main() : void {
+			comptime enabled = true;
+			if identity(enabled) {
+			} else {
+				var bad : MissingType = undefined;
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(RuntimeFunctionCallIfChecksBothArms) {
+	const char* source = R"(
+		fn identity(value : bool) : bool { return value; }
+
+		fn main(flag : bool) : void {
+			if identity(flag) {
+			} else {
+				var bad : MissingType = undefined;
+			}
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
