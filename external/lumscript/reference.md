@@ -1009,8 +1009,7 @@ Unions are structural with set semantics:
 - member order does not matter: `A | B` and `B | A` are the same type
 - a union member that is itself a union flattens: if `comptime AB = A | B`, then `AB | C` is `A | B | C`
 - two union types with the same member set are the same type, regardless of how or where they were spelled
-- writing the same member twice directly (`A | A`, including through aliases) is a compile-time error
-- duplicates that arise from flattening composed unions silently collapse into the set: if `comptime AB = A | B` and `comptime BC = B | C`, then `AB | BC` is `A | B | C`
+- duplicate members collapse into the set, whether written directly or introduced by flattening: `A | A` is `A`, and if `comptime AB = A | B` and `comptime BC = B | C`, then `AB | BC` is `A | B | C`
 
 **Members**
 

@@ -123,12 +123,12 @@ struct IdentifierExpression : Expression {
 	ls_string_view name = {};
 	Symbol* symbol = nullptr;
 	FunctionExpression* resolved_fn = nullptr;
-	// A local comptime binding has no runtime slot; the checker copies its value
-	// here so bytecode compilation can materialize uses as constants.
-	ComptimeValue comptime_value;
 	// Set by the checker when this identifier resolves to runtime storage (local,
 	// parameter, or global); null for compile-time symbols (functions, types, etc.).
 	StorageSlot* slot = nullptr;
+
+	// for comptime locals, we need to store folded value for bytecode compiler to use
+	u8* comptime_bytes = nullptr;
 };
 
 struct GenericIdentifierExpression : Expression {
@@ -214,13 +214,11 @@ struct UnionTypeExpression : Expression {
 	UnionTypeExpression(ls_arena& arena) : Expression(UNION_TYPE), members(arena) {}
 
 	ExpArray<Expression*> members;
-	ResolvedType* cursor_type = nullptr; // cached type of of U::types
+	ResolvedType* cursor_type = nullptr; // cached type of of U::types[0]
 };
 
 struct ResolvedTypeExpression : Expression {
 	ResolvedTypeExpression() : Expression(RESOLVED_TYPE) {}
-
-	ResolvedType* type = nullptr;
 };
 
 struct SizeofExpression : Expression {

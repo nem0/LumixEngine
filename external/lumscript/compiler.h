@@ -8,7 +8,6 @@
 
 struct Unit;
 
-ComptimeValue numericTypeBound(ResolvedType::Kind kind, bool is_max);
 i64 typeKindValue(ResolvedType::Kind kind);
 
 struct Symbol {

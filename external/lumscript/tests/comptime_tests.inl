@@ -19,11 +19,88 @@ TEST(ComptimeFunction) {
 
 TEST(ComptimeBinaryExpression) {
 	const char* source = R"(
-		comptime N = 32 - 2;
-		comptime enabled = 2 > 1;
-		comptime scale = 1.5 * 2.7;
+		comptime N = (32 - 2) * 3 / 5 + 1;
+		comptime Remainder = 32 % 7;
+		comptime enabled = 2 > 1 and 4 <= 4;
+		comptime scale = 1.5 * 2.0 + 0.5;
+
+		fn main() : i32 {
+			if (enabled == false or N != 19 or Remainder != 4 or scale != 3.5) {
+				return 1;
+			}
+			return 0;
+		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeBinaryExpressionEdgeCases) {
+	const char* source = R"(
+		comptime integer_division = 5 / 2;
+		comptime remainder = 5 % 2;
+		comptime unsigned_wrap = (255 as u8) + (1 as u8);
+		comptime signed_wrap = (127 as i8) + (1 as i8);
+		comptime f32_value = (1.25 as f32) * (2.0 as f32) / (0.5 as f32);
+		comptime comparisons = 2 < 3 and 7 >= 7 and 3.5 > 3.0;
+
+		fn main() : i32 {
+			if (integer_division != 2
+				or remainder != 1
+				or unsigned_wrap as i32 != 0
+				or signed_wrap as i32 != -128
+				or f32_value != 5.0
+				or comparisons == false)
+			{
+				return 1;
+			}
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeBinaryExpressionU64EdgeCases) {
+	const char* source = R"(
+		comptime max = 18446744073709551615 as u64;
+		comptime wrapped = max + (1 as u64);
+		comptime half = max / (2 as u64);
+
+		fn wrap() : u64 { return wrapped; }
+		fn divide() : u64 { return half; }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("wrap")));
+	EXPECT_TRUE(ls_to_u64(runtime, -1) == 0);
+	EXPECT_TRUE(ls_call(runtime, toLs("divide")));
+	EXPECT_TRUE(ls_to_u64(runtime, -1) == 9223372036854775807ull);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeBinaryExpressionDivisionByZeroFails) {
+	EXPECT_COMPILE_FAIL(R"(
+		comptime value = 1 / 0;
+	)");
+	EXPECT_COMPILE_FAIL(R"(
+		comptime value = 1 % 0;
+	)");
+	EXPECT_COMPILE_FAIL(R"(
+		comptime value = 1.0 / 0.0;
+	)");
 	return true;
 }
 
@@ -140,6 +217,23 @@ TEST(ComptimeAnnotatedPrimitiveValueTypechecks) {
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(32, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeAnnotatedFloatValueTypechecks) {
+	const char* source = R"(
+		comptime N : f32 = 1.5;
+
+		fn main() : f32 {
+			return N;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_FLOAT_EQ(1.5, ls_to_f32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -695,7 +789,7 @@ TEST(ComptimeInitializerMustBeComptimeFails) {
 	return true;
 }
 
-TEST(ComptimeLocalDeclarationFails) {
+TEST(ComptimeLocalDeclaration) {
 	const char* source = R"(
 		fn main() : void {
 			comptime N = 32;

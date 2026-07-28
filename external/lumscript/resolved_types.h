@@ -109,34 +109,24 @@ struct UnionResolvedType : ResolvedType {
 	ExpArray<ResolvedType*> members;
 };
 
-// A compile-time constant: a template argument or the result of comptime
-// evaluation. Types are comptime values too (TYPE kind).
-struct ComptimeValue {
-	enum Kind { INVALID, TYPE, INT, FLOAT, BOOL, STRING } kind;
-	union {
-		ResolvedType* type;
-		i64 int_value;
-		double float_value;
-		bool bool_value;
+struct ComptimeResult {
+	enum Kind {
+		FAILURE,
+		VALUE,
+		TYPE,
+		VOID
 	};
-	ls_string_view string_value;
+	Kind kind = FAILURE;
+	ResolvedType* type = nullptr; // type of value if kind == VALUE, or the type itself if kind == TYPE
+	u8* value = nullptr; // pointer to the value bytes if kind == VALUE, otherwise nullptr 
 
-	ComptimeValue() : kind(INVALID), int_value(0) {}
-	ComptimeValue(ResolvedType* t) : kind(TYPE), type(t) {}
-	ComptimeValue(i64 i) : kind(INT), int_value(i) {}
-	ComptimeValue(double f) : kind(FLOAT), float_value(f) {}
-	ComptimeValue(bool b) : kind(BOOL), bool_value(b) {}
-	ComptimeValue(ls_string_view s) : kind(STRING), string_value(s) {}
-
-	double asFloat() const { return kind == FLOAT ? float_value : (double)int_value; }
-	i64 asInt() const { return kind == INT ? int_value : (i64)float_value; }
-	bool asBool() const { return kind == BOOL ? bool_value : (bool)int_value; }
+	operator bool() const { return kind != FAILURE; }
 };
 
 struct TemplateStructInstance {
 	TemplateStructInstance(ls_arena& arena) : args(arena) {}
 
-	ExpArray<ComptimeValue> args;
+	ExpArray<ComptimeResult> args;
 	StructResolvedType* type = nullptr;
 	bool check_failed = false;
 };
@@ -144,7 +134,7 @@ struct TemplateStructInstance {
 struct TemplateFunctionInstance {
 	TemplateFunctionInstance(ls_arena& arena) : args(arena) {}
 
-	ExpArray<ComptimeValue> args;
+	ExpArray<ComptimeResult> args;
 	FunctionExpression* instance = nullptr;
 	FunctionResolvedType* type = nullptr;
 	bool check_failed = false;

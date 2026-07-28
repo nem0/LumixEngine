@@ -82,7 +82,7 @@ u32 typeByteSize(const ResolvedType& t) {
 			ASSERT(arr.size < 0xffFFffFF); // TODO
 			return (u32)arr.size * typeByteSize(*arr.element_type);
 		}
-	case ResolvedType::STRUCT: {
+		case ResolvedType::STRUCT: {
 			const StructResolvedType& st = static_cast<const StructResolvedType&>(t);
 			u32 count = 0;
 			if (st.decl) {
@@ -93,38 +93,115 @@ u32 typeByteSize(const ResolvedType& t) {
 			}
 			return count ? count : 1;
 		}
-		default: return 1;
+		case ResolvedType::UNTYPED_FLOAT:
+		case ResolvedType::UNTYPED_INT:
+			return 8;
+		case ResolvedType::META:
+			return 0;
+		default: 
+			ASSERT(false);
+			return 1;
+	}
+}
+
+// TODO merge
+// Mirrors runtime_numeric_to_{i64,u64,double} in runtime.c so `comptime` casts fold to the
+// same bits the VM's LS_OP_CAST would produce at runtime.
+static i64 comptimeNumericToI64(const u8* p, ResolvedType::Kind kind) {
+	switch (kind) {
+		case ResolvedType::BOOL: return p[0] != 0 ? 1 : 0;
+		case ResolvedType::I8: { i8 v; memcpy(&v, p, 1); return (i64)v; }
+		case ResolvedType::U8:
+		case ResolvedType::BYTE: { u8 v; memcpy(&v, p, 1); return (i64)v; }
+		case ResolvedType::I16: { i16 v; memcpy(&v, p, 2); return (i64)v; }
+		case ResolvedType::U16: { u16 v; memcpy(&v, p, 2); return (i64)v; }
+		case ResolvedType::I32:
+		case ResolvedType::ENUM: { i32 v; memcpy(&v, p, 4); return (i64)v; }
+		case ResolvedType::U32: { u32 v; memcpy(&v, p, 4); return (i64)v; }
+		case ResolvedType::I64:
+		case ResolvedType::ISIZE:
+		case ResolvedType::UNTYPED_INT: { i64 v; memcpy(&v, p, 8); return v; }
+		case ResolvedType::U64: { u64 v; memcpy(&v, p, 8); return (i64)v; }
+		case ResolvedType::F32: { float v; memcpy(&v, p, 4); return (i64)v; }
+		case ResolvedType::F64: { double v; memcpy(&v, p, 8); return (i64)v; }
+		default: return 0;
+	}
+}
+
+static u64 comptimeNumericToU64(const u8* p, ResolvedType::Kind kind) {
+	switch (kind) {
+		case ResolvedType::BOOL: return p[0] != 0 ? 1u : 0u;
+		case ResolvedType::I8: { i8 v; memcpy(&v, p, 1); return (u64)v; }
+		case ResolvedType::U8:
+		case ResolvedType::BYTE: { u8 v; memcpy(&v, p, 1); return (u64)v; }
+		case ResolvedType::I16: { i16 v; memcpy(&v, p, 2); return (u64)v; }
+		case ResolvedType::U16: { u16 v; memcpy(&v, p, 2); return (u64)v; }
+		case ResolvedType::I32:
+		case ResolvedType::ENUM: { i32 v; memcpy(&v, p, 4); return (u64)v; }
+		case ResolvedType::U32: { u32 v; memcpy(&v, p, 4); return (u64)v; }
+		case ResolvedType::I64:
+		case ResolvedType::ISIZE:
+		case ResolvedType::UNTYPED_INT: { i64 v; memcpy(&v, p, 8); return (u64)v; }
+		case ResolvedType::U64: { u64 v; memcpy(&v, p, 8); return v; }
+		case ResolvedType::F32: { float v; memcpy(&v, p, 4); return (u64)v; }
+		case ResolvedType::F64: { double v; memcpy(&v, p, 8); return (u64)v; }
+		default: return 0u;
+	}
+}
+
+static double comptimeNumericToF64(const u8* p, ResolvedType::Kind kind) {
+	switch (kind) {
+		case ResolvedType::BOOL: return p[0] != 0 ? 1.0 : 0.0;
+		case ResolvedType::I8: { i8 v; memcpy(&v, p, 1); return (double)v; }
+		case ResolvedType::U8:
+		case ResolvedType::BYTE: { u8 v; memcpy(&v, p, 1); return (double)v; }
+		case ResolvedType::I16: { i16 v; memcpy(&v, p, 2); return (double)v; }
+		case ResolvedType::U16: { u16 v; memcpy(&v, p, 2); return (double)v; }
+		case ResolvedType::I32:
+		case ResolvedType::ENUM: { i32 v; memcpy(&v, p, 4); return (double)v; }
+		case ResolvedType::U32: { u32 v; memcpy(&v, p, 4); return (double)v; }
+		case ResolvedType::I64:
+		case ResolvedType::ISIZE: { i64 v; memcpy(&v, p, 8); return (double)v; }
+		case ResolvedType::U64: { u64 v; memcpy(&v, p, 8); return (double)v; }
+		case ResolvedType::F32: { float v; memcpy(&v, p, 4); return (double)v; }
+		case ResolvedType::F64:
+		case ResolvedType::UNTYPED_FLOAT: { double v; memcpy(&v, p, 8); return v; }
+		default: return 0.0;
+	}
+}
+
+// Converts `src_bytes` (encoded as `src_kind`) to `dst_kind`, writes it to `dst`, and returns
+// the number of bytes written. Shared by comptime CAST folding and int-literal materialization,
+// both of which need to reinterpret one numeric encoding as another.
+static u32 writeComptimeNumeric(u8* dst, const u8* src_bytes, ResolvedType::Kind src_kind, ResolvedType::Kind dst_kind) {
+	switch (dst_kind) {
+		case ResolvedType::I8: { i8 v = (i8)comptimeNumericToI64(src_bytes, src_kind); memcpy(dst, &v, 1); return 1; }
+		case ResolvedType::U8: { u8 v = (u8)comptimeNumericToU64(src_bytes, src_kind); memcpy(dst, &v, 1); return 1; }
+		case ResolvedType::I16: { i16 v = (i16)comptimeNumericToI64(src_bytes, src_kind); memcpy(dst, &v, 2); return 2; }
+		case ResolvedType::U16: { u16 v = (u16)comptimeNumericToU64(src_bytes, src_kind); memcpy(dst, &v, 2); return 2; }
+		case ResolvedType::I32:
+		case ResolvedType::ENUM: { i32 v = (i32)comptimeNumericToI64(src_bytes, src_kind); memcpy(dst, &v, 4); return 4; }
+		case ResolvedType::U32: { u32 v = (u32)comptimeNumericToU64(src_bytes, src_kind); memcpy(dst, &v, 4); return 4; }
+		case ResolvedType::I64:
+		case ResolvedType::ISIZE: { i64 v = comptimeNumericToI64(src_bytes, src_kind); memcpy(dst, &v, 8); return 8; }
+		case ResolvedType::U64: { u64 v = comptimeNumericToU64(src_bytes, src_kind); memcpy(dst, &v, 8); return 8; }
+		case ResolvedType::F32: { float v = (float)comptimeNumericToF64(src_bytes, src_kind); memcpy(dst, &v, 4); return 4; }
+		case ResolvedType::F64: { double v = comptimeNumericToF64(src_bytes, src_kind); memcpy(dst, &v, 8); return 8; }
+		case ResolvedType::UNTYPED_FLOAT: { double v = comptimeNumericToF64(src_bytes, src_kind); memcpy(dst, &v, 8); return 8; }
+		case ResolvedType::UNTYPED_INT: { i64 v = comptimeNumericToI64(src_bytes, src_kind); memcpy(dst, &v, 8); return 8; }
+		default: ASSERT(false); return 0;
 	}
 }
 
 struct TemplateBinding {
 	ls_string_view name = {};
-	ComptimeValue arg;
+	ComptimeResult arg;
 };
 
 struct TemplateBindings {
 	TemplateBindings(ls_arena& arena) : values(arena) {}
 
 	ExpArray<TemplateBinding> values; // TODO allocation
-};
-
-// Execution frame for the compile-time byte-buffer interpreter (foldComptimeBytes /
-// evalComptimeBody). Each local holds its value laid out exactly as the runtime
-// representation of its type, so aggregates can be read/written by offset.
-struct ComptimeFrame {
-	struct Local {
-		ls_string_view name;
-		u8* bytes;
-		ResolvedType* type;
-	};
-	ExpArray<Local> locals;
-	ComptimeFrame(ls_arena& arena) : locals(arena) {}
-	Local* find(ls_string_view name) {
-		for (i32 i = locals.size() - 1; i >= 0; --i) {
-			if (equalStrings(locals[i].name, name)) return &locals[i];
-		}
-		return nullptr;
-	}
 };
 
 static void appendReflectedTypeName(char*& out, char* end, const ResolvedType& type) {
@@ -148,8 +225,8 @@ static void appendReflectedTypeName(char*& out, char* end, const ResolvedType& t
 				text("[");
 				for (i32 i = 0; i < instance.args.size(); ++i) {
 					if (i) text(", ");
-					const ComptimeValue& arg = instance.args[i];
-					if (arg.kind == ComptimeValue::TYPE) appendReflectedTypeName(out, end, *arg.type);
+					const ComptimeResult& arg = instance.args[i];
+					if (arg.kind == ComptimeResult::TYPE) appendReflectedTypeName(out, end, *arg.type);
 				}
 				text("]");
 				break;
@@ -205,24 +282,6 @@ static ls_string_view reflectedTypeName(Unit& unit, const ResolvedType& type) {
 	return {copy, copy + (out - buffer)};
 }
 
-ComptimeValue numericTypeBound(ResolvedType::Kind kind, bool is_max) {
-	switch (kind) {
-		case ResolvedType::I8: return ComptimeValue((i64)(is_max ? 127 : -128));
-		case ResolvedType::I16: return ComptimeValue((i64)(is_max ? 32767 : -32768));
-		case ResolvedType::I32: return ComptimeValue((i64)(is_max ? 2147483647 : -2147483648ll));
-		case ResolvedType::I64:
-		case ResolvedType::ISIZE: return ComptimeValue((i64)(is_max ? 9223372036854775807ll : (-9223372036854775807ll - 1)));
-		case ResolvedType::U8: return ComptimeValue((i64)(is_max ? 255 : 0));
-		case ResolvedType::U16: return ComptimeValue((i64)(is_max ? 65535 : 0));
-		case ResolvedType::U32: return ComptimeValue((i64)(is_max ? 4294967295ll : 0));
-		case ResolvedType::U64: return ComptimeValue((i64)(is_max ? -1 : 0));
-		case ResolvedType::BYTE: return ComptimeValue((i64)(is_max ? 255 : 0));
-		case ResolvedType::F32: return ComptimeValue(is_max ? (double)FLT_MAX : -(double)FLT_MAX);
-		case ResolvedType::F64: return ComptimeValue(is_max ? DBL_MAX : -DBL_MAX);
-		default: return {};
-	}
-}
-
 i64 typeKindValue(ResolvedType::Kind kind) {
 	switch (kind) {
 		case ResolvedType::BOOL: return 0; case ResolvedType::I8: return 1; case ResolvedType::I16: return 2;
@@ -239,10 +298,24 @@ i64 typeKindValue(ResolvedType::Kind kind) {
 }
 
 struct Checker {
-	ls_module& module;
-	OutputFormatter error_stream;
-	i32 suppress_errors = 0;
-	SliceResolvedType* slice_of_types; // []type for Union::types type member
+	struct ComptimeFrame {
+		struct Local {
+			ls_string_view name;
+			u8* bytes;
+			ResolvedType* type;
+		};
+
+		Unit& unit;
+		ExpArray<Local> locals;
+		
+		ComptimeFrame(Unit& unit) : unit(unit), locals(unit.arena) {}
+		Local* find(ls_string_view name) {
+			for (i32 i = (i32)locals.size() - 1; i >= 0; --i) {
+				if (equalStrings(locals[i].name, name)) return &locals[i];
+			}
+			return nullptr;
+		}
+	};
 
 	Checker(ls_module& module)
 		: module(module)
@@ -378,20 +451,24 @@ struct Checker {
 		return findTemplateBinding(const_cast<TemplateBindings*>(bindings), name);
 	}
 
-	bool comptimeValuesEqual(const ComptimeValue& a, const ComptimeValue& b) {
+	bool comptimeValuesEqual(const ComptimeResult& a, const ComptimeResult& b) {
 		if (a.kind != b.kind) return false;
-		switch (a.kind) {
-			case ComptimeValue::INVALID: return false;
-			case ComptimeValue::TYPE: return typesEqual(a.type, b.type);
-			case ComptimeValue::INT: return a.int_value == b.int_value;
-			case ComptimeValue::FLOAT: return a.float_value == b.float_value;
-			case ComptimeValue::BOOL: return a.bool_value == b.bool_value;
-			case ComptimeValue::STRING: return equalStrings(a.string_value, b.string_value);
+		if (!typesEqual(a.type, b.type)) return false;
+		if (a.kind == ComptimeResult::TYPE) return true;
+		
+		if (a.type->kind == ResolvedType::STRING) {
+			ls_string_view* lhs;
+			ls_string_view* rhs;
+			memcpy(&lhs, a.value, sizeof(lhs));
+			memcpy(&rhs, b.value, sizeof(rhs));
+			return equalStrings(*lhs, *rhs);
 		}
-		return false;
+
+		u32 size = typeByteSize(*a.type);
+		return memcmp(a.value, b.value, size) == 0;
 	}
 
-	bool bindTemplateArg(TemplateBindings& bindings, ls_string_view name, const ComptimeValue& arg) {
+	bool bindTemplateArg(TemplateBindings& bindings, ls_string_view name, const ComptimeResult& arg) {
 		if (TemplateBinding* existing = findTemplateBinding(&bindings, name)) {
 			return comptimeValuesEqual(existing->arg, arg);
 		}
@@ -413,7 +490,7 @@ struct Checker {
 		ResolvedType* type = nullptr;
 		bool is_immutable = false;
 		bool is_comptime = false;
-		ComptimeValue comptime_value;
+		ComptimeResult comptime_value;
 		// Slot of the underlying declaration (frame slot for locals, the symbol's
 		// global slot when the binding narrows a global).
 		StorageSlot* slot = nullptr;
@@ -452,17 +529,6 @@ struct Checker {
 	}
 
 	void error(ResolvedType* type) { error(static_cast<const ResolvedType*>(type)); }
-
-	void error(const ComptimeValue::Kind kind) {
-		switch (kind) {
-			case ComptimeValue::INVALID: error("invalid"); return;
-			case ComptimeValue::TYPE: error("type"); return;
-			case ComptimeValue::INT: error("integer"); return;
-			case ComptimeValue::FLOAT: error("float"); return; 
-			case ComptimeValue::BOOL: error("bool"); return;
-			case ComptimeValue::STRING: error("string"); return;
-		}
-	}
 
 	void error(const ResolvedType* type) {
 		if (!type) {
@@ -564,7 +630,7 @@ struct Checker {
 	};
 
 	// `sizeof(T)` / `alignof(T)`. Rejects a value-denoting name (the operand must be a type).
-	bool resolveSizeofValue(Unit& unit, SizeofExpression& sz, ComptimeValue& out, TemplateBindings* bindings = nullptr) {
+	bool resolveSizeofValue(Unit& unit, SizeofExpression& sz, TemplateBindings* bindings = nullptr) {
 		ResolvedType* measured = resolveTypeExpr(unit, *sz.type_expr, bindings);
 		if (!measured) return false;
 		// Preserve the concrete operand for backends that need to emit a native
@@ -581,853 +647,29 @@ struct Checker {
 				if (member_align > align) align = member_align;
 			}
 		}
-		out = ComptimeValue(sz.is_align ? align : size);
-		sz.value = (u64)out.int_value;
+		sz.value = (u64)sz.is_align ? align : size;
 		return true;
 	}
 
-	// TODO full comptime eval 
-	// TODO error msgs
-	ComptimeValue resolveComptimeValue(Unit& unit, Expression& expr, TemplateBindings* bindings = nullptr, FunctionCheckContext* ctx = nullptr, ComptimeFrame* frame = nullptr) {
-		switch (expr.kind) {
-			case Expression::RESOLVED_TYPE:
-				return ComptimeValue(static_cast<ResolvedTypeExpression&>(expr).type);
-			case Expression::TYPE_LITERAL: {
-				const ResolvedType::Kind kind = static_cast<TypeLiteralExpression&>(expr).type;
-				if (kind == ResolvedType::META) return ComptimeValue(makeType<MetaType>(module.arena));
-				if (kind >= ResolvedType::VOID && kind <= ResolvedType::BYTE) return ComptimeValue(primitiveType(kind));
-				// TODO create a test to hit this
-				return {};
-			}
-			case Expression::FUNCTION_TYPE: {
-				FunctionTypeExpression& fn = static_cast<FunctionTypeExpression&>(expr);
-				FunctionResolvedType* resolved = makeType<FunctionResolvedType>(unit.arena, unit.arena);
-				for (FunctionTypeParam& param : fn.params) {
-					ResolvedType* pt = resolveTypeExpr(unit, *param.type_expr, bindings);
-					if (!pt) {
-						// TODO create a test to hit this
-						return {};
-					}
-					FunctionResolvedParam& resolved_param = resolved->params.emplace_back();
-					resolved_param.name = param.name;
-					resolved_param.type = pt;
-					resolved_param.is_ref = param.is_ref;
-					resolved_param.is_comptime = param.is_comptime;
-				}
-				resolved->return_type = resolveTypeExpr(unit, *fn.return_type, bindings);
-				if (!resolved->return_type) {
-					// TODO create a test to hit this
-					return {};
-				}
-				return ComptimeValue(resolved);
-			}
-			case Expression::ARRAY_TYPE: {
-				ArrayTypeExpression& arr = static_cast<ArrayTypeExpression&>(expr);
-				ArrayResolvedType* resolved = makeType<ArrayResolvedType>(unit.arena);
-				resolved->element_type = resolveTypeExpr(unit, *arr.element_type, bindings);
-				i64 size = 0;
-				if (!resolved->element_type) {
-					// TODO create a test to hit this
-					return {};
-				}
-				if (!resolveComptimeIntValue(unit, arr.size, size, bindings)) {
-					// TODO create a test to hit this
-					return {};
-				}
-				if (size <= 0) {
-					errorLine(arr.size->token, "Array size must be a positive integer");
-					return {};
-				}
-				resolved->size = size;
-				return ComptimeValue(resolved);
-			}
-			case Expression::SLICE_TYPE: {
-				SliceTypeExpression& sl = static_cast<SliceTypeExpression&>(expr);
-				SliceResolvedType* resolved = makeType<SliceResolvedType>(unit.arena);
-				resolved->element_type = resolveTypeExpr(unit, *sl.element_type, bindings);
-				if (!resolved->element_type) {
-					// TODO create a test to hit this
-					return {};
-				}
-				return ComptimeValue(resolved);
-			}
-			case Expression::NULLABLE_TYPE: {
-				NullableTypeExpression& nullable = static_cast<NullableTypeExpression&>(expr);
-				NullableResolvedType* resolved = makeType<NullableResolvedType>(unit.arena);
-				resolved->inner = resolveTypeExpr(unit, *nullable.inner, bindings);
-				if (!resolved->inner) {
-					// TODO create a test to hit this
-					return {};
-				}
-				return ComptimeValue(resolved);
-			}
-			case Expression::UNION_TYPE: {
-				UnionTypeExpression& un = static_cast<UnionTypeExpression&>(expr);
-				UnionResolvedType* resolved = makeType<UnionResolvedType>(unit.arena, unit.arena);
-				for (Expression* member_expr : un.members) {
-					ResolvedType* member = resolveTypeExpr(unit, *member_expr, bindings);
-					if (!member) return {};
-					const auto add_member = [&](auto&& self, ResolvedType* candidate, Token token, bool allow_duplicate) -> bool {
-						if (candidate->kind == ResolvedType::UNION) {
-							for (ResolvedType* nested : static_cast<UnionResolvedType*>(candidate)->members) if (!self(self, nested, token, true)) return false;
-							return true;
-						}
-						for (ResolvedType* existing : resolved->members) {
-							if (typesEqual(existing, candidate)) {
-								if (allow_duplicate) return true;
-								errorLine(token, "Duplicate union member");
-								return false;
-							}
-						}
-						if (candidate->kind == ResolvedType::VOID) {
-							errorLine(token, "Invalid union member");
-							return false;
-						}
-						resolved->members.push(candidate);
-						return true;
-					};
-					if (!add_member(add_member, member, member_expr->token, false)) return {};
-				}
-				return ComptimeValue(resolved);
-			}
-			case Expression::BRACKET: {
-				BracketExpression& br = static_cast<BracketExpression&>(expr);
-				if (!br.base) {
-					// TODO create a test to hit this
-					return {};
-				}
-				// Interpreter rvalue: a scalar element of a frame-local aggregate (a[i]).
-				if (frame && br.args.size() == 1) {
-					u8* ptr = nullptr;
-					ResolvedType* elem = nullptr;
-					if (resolveComptimeLValue(unit, expr, *frame, ptr, elem)) {
-						ComptimeValue v = readComptimeScalar(*elem, ptr);
-						if (v.kind != ComptimeValue::INVALID) return v;
-					}
-				}
-				// Comptime array/sequence indexing: A[i], where A is a comptime array
-				// literal. Distinct from struct-template instantiation (base is a type),
-				// which the code below handles.
-				if (br.args.size() == 1) {
-					Unit* elem_owner = &unit;
-					ArrayLiteralExpression* arr = nullptr;
-					if (br.base->kind == Expression::ARRAY_LITERAL) {
-						arr = static_cast<ArrayLiteralExpression*>(br.base);
-					} else if (br.base->kind == Expression::IDENTIFIER) {
-						SymbolRef ref = resolveSymbol(unit, {}, static_cast<IdentifierExpression*>(br.base)->name, LookupPolicy::Checked);
-						if (ref && ref.symbol && ref.symbol->storage == Symbol::COMPTIME
-							&& ref.symbol->expression && ref.symbol->expression->kind == Expression::ARRAY_LITERAL)
-						{
-							arr = static_cast<ArrayLiteralExpression*>(ref.symbol->expression);
-							elem_owner = ref.owner;
-						}
-					}
-					if (arr) {
-						i64 index = 0;
-						if (!resolveComptimeIntValue(unit, br.args[0], index, bindings)) {
-							errorLine(br.args[0]->token, "Comptime array index must be a compile-time integer");
-							return {};
-						}
-						if (index < 0 || index >= (i64)arr->values.size()) {
-							errorLine(br.base->token, "Comptime array index out of bounds");
-							return {};
-						}
-						return resolveComptimeValue(*elem_owner, *arr->values[index], bindings, ctx);
-					}
-				}
-				if (br.base->kind != Expression::IDENTIFIER && br.base->kind != Expression::MEMBER) {
-					errorLine(br.base->token, "[] can only be applied to a type name or member");
-					return {};
-				}
-				ResolvedType* resolved_base = resolveTypeExpr(unit, *br.base, bindings);
-				if (!resolved_base) {
-					// TODO create a test to hit this
-					return {};
-				}
-				const bool from_binding = br.base->kind == Expression::IDENTIFIER
-					&& findTemplateBinding(bindings, static_cast<IdentifierExpression*>(br.base)->name);
-				if (!from_binding) {
-					SymbolRef ref = resolveSymbol(unit, *br.base);
-					if (!ref || !ref.symbol->resolved_type || ref.symbol->resolved_type->kind != ResolvedType::META) {
-						// TODO create a test to hit this
-						return {};
-					}
-				}
-				if (resolved_base->kind != ResolvedType::STRUCT) {
-					// TODO create a test to hit this
-					return {};
-				}
-				StructResolvedType* st = static_cast<StructResolvedType*>(resolved_base);
-				if (!st->decl || st->decl->comptime_params.empty()) {
-					// TODO create a test to hit this
-					return {};
-				}
-				Unit* owner = findTypeNamespaceUnit(*st);
-				if (!owner)	{
-					// TODO create a test to hit this
-					return {};
-				}
-				ResolvedType* type = instantiateStructTemplate(*owner, *st->decl, br.args, &unit);
-				if (type) expr.resolved_type = type;
-				return type ? ComptimeValue(type) : ComptimeValue();
-			}
-			case Expression::GENERIC_IDENTIFIER: {
-				GenericIdentifierExpression& generic = static_cast<GenericIdentifierExpression&>(expr);
-				TemplateBinding* binding = findTemplateBinding(bindings, generic.name);
-				if (!binding) {
-					// TODO error msg
-					return {};
-				}
-				if (binding->arg.kind != ComptimeValue::TYPE) {
-					// TODO create a test to hit this
-					return {};
-				}
-				expr.resolved_type = binding->arg.type;
-				return binding->arg;
-			}
-			case Expression::SIZEOF: {
-				ComptimeValue out;
-				if (!resolveSizeofValue(unit, static_cast<SizeofExpression&>(expr), out, bindings)) {
-					// TODO create a test to hit this
-					return {};
-				}
-				return out;
-			}
-			case Expression::TYPEOF: {
-				TypeofExpression& typeof_expr = static_cast<TypeofExpression&>(expr);
-				return typeof_expr.operand && typeof_expr.operand->resolved_type
-					? ComptimeValue(typeof_expr.operand->resolved_type)
-					: ComptimeValue();
-			}
-			case Expression::INT_LITERAL: {
-				const u64 value = static_cast<IntLiteralExpression&>(expr).value;
-				if (value > 9223372036854775807ull) {
-					// TODO create a test to hit this
-					return {};
-				}
-				return ComptimeValue((i64)value);
-			}
-			case Expression::FLOAT_LITERAL: {
-				return ComptimeValue(static_cast<FloatLiteralExpression&>(expr).value);
-			}
-			case Expression::BOOL_LITERAL: {
-				return ComptimeValue(static_cast<BoolLiteralExpression&>(expr).value);
-			}
-			case Expression::STRING_LITERAL: {
-				return ComptimeValue(static_cast<StringLiteralExpression&>(expr).value);
-			}
-			case Expression::IDENTIFIER: {
-				IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
-				if (frame) {
-					if (ComptimeFrame::Local* local = frame->find(id.name)) {
-						return readComptimeScalar(*local->type, local->bytes);
-					}
-				}
-				if (ctx) {
-					if (SemanticLocalBinding* local = findLocal(*ctx, id.name)) {
-						return local->is_comptime ? local->comptime_value : ComptimeValue();
-					}
-				}
-				if (TemplateBinding* binding = findTemplateBinding(bindings, id.name)) {
-					if (binding->arg.kind == ComptimeValue::TYPE) expr.resolved_type = binding->arg.type;
-					return binding->arg;
-				}
-				SymbolRef ref = resolveSymbol(unit, {}, id.name, LookupPolicy::Checked);
-				if (!ref) {
-					// TODO create a test to hit this
-					return {};
-				}
-				id.symbol = ref.symbol;
-				if (ref.symbol->resolved_type && ref.symbol->resolved_type->kind == ResolvedType::META) {
-					return ComptimeValue(unwrapMeta(ref.symbol->resolved_type));
-				}
-				if (ref.symbol->storage != Symbol::COMPTIME) {
-					errorLine(id.token, "Symbol '", id.name, "' is not a compile-time value");
-					return {};
-				}
-				if (!ref.symbol->expression) {
-					// TODO create a test to hit this
-					return {};
-				}
-				return resolveComptimeValue(*ref.owner, *ref.symbol->expression, bindings);
-			}
-			case Expression::TYPE_MEMBER: {
-				TypeMemberExpression& member = static_cast<TypeMemberExpression&>(expr);
-					ComptimeValue base = member.expression ? resolveComptimeValue(unit, *member.expression, bindings, ctx) : ComptimeValue();
-					if (base.kind != ComptimeValue::TYPE || !base.type) return {};
-					if (equalStrings(member.name, "name")) return ComptimeValue(reflectedTypeName(unit, *base.type));
-					if (equalStrings(member.name, "kind")) return ComptimeValue(typeKindValue(base.type->kind));
-					if (equalStrings(member.name, "child")) {
-						switch (base.type->kind) {
-							case ResolvedType::NULLABLE: return ComptimeValue(static_cast<NullableResolvedType*>(base.type)->inner);
-							case ResolvedType::SLICE: return ComptimeValue(static_cast<SliceResolvedType*>(base.type)->element_type);
-							case ResolvedType::ARRAY: return ComptimeValue(static_cast<ArrayResolvedType*>(base.type)->element_type);
-							default: return {};
-						}
-					}
-					if (equalStrings(member.name, "length") && base.type->kind == ResolvedType::ARRAY) {
-						return ComptimeValue(static_cast<ArrayResolvedType*>(base.type)->size);
-					}
-					if (equalStrings(member.name, "min") || equalStrings(member.name, "max")) {
-						return numericTypeBound(base.type->kind, equalStrings(member.name, "max"));
-					}
-					if (equalStrings(member.name, "ret") && base.type->kind == ResolvedType::FUNCTION) {
-						return ComptimeValue(static_cast<FunctionResolvedType*>(base.type)->return_type);
-					}
-					return {};
-			}
-			case Expression::MEMBER: {
-				MemberExpression& member = static_cast<MemberExpression&>(expr);
-				// Interpreter rvalue: a scalar field of a frame-local aggregate (a.field).
-				if (frame && member.expression) {
-					u8* ptr = nullptr;
-					ResolvedType* field = nullptr;
-					if (resolveComptimeLValue(unit, expr, *frame, ptr, field)) {
-						ComptimeValue v = readComptimeScalar(*field, ptr);
-						if (v.kind != ComptimeValue::INVALID) return v;
-					}
-				}
-				if (!member.expression) {
-					u32 type_kind_member_count;
-					const char* const* names = typeKindMemberNames(type_kind_member_count);
-					for (u32 i = 0; i < type_kind_member_count; ++i) {
-						if (equalStrings(names[i], member.name)) return ComptimeValue((i64)i);
-					}
-					return {};
-				}
-				if (member.expression && member.expression->kind == Expression::IDENTIFIER) {
-					ls_string_view type_name = static_cast<IdentifierExpression*>(member.expression)->name;
-					SymbolRef type_ref = resolveSymbol(unit, {}, type_name, LookupPolicy::Checked);
-					if (type_ref && type_ref.symbol->resolved_type && type_ref.symbol->resolved_type->kind == ResolvedType::META) {
-						ResolvedType* inner = unwrapMeta(type_ref.symbol->resolved_type);
-						if (inner->kind == ResolvedType::ENUM) {
-							EnumResolvedType* en = static_cast<EnumResolvedType*>(inner);
-							for (u32 i = 0; i < en->decl->members.size(); ++i) {
-								const EnumMember& enum_member = en->decl->members[i];
-								if (!equalStrings(enum_member.name, member.name)) continue;
-								return enum_member.value
-									? resolveComptimeValue(unit, *enum_member.value, bindings)
-									: ComptimeValue((i64)i);
-							}
-						}
-					}
-				}
-				if (!member.expression || member.expression->kind != Expression::IDENTIFIER) {
-					errorLine(expr.token, "Expected an import alias in type expression");
-					return {};
-				}
-				const ls_string_view qualifier = static_cast<IdentifierExpression*>(member.expression)->name;
-				if (!findImportedUnitByAlias(unit, qualifier)) {
-					errorLine(expr.token, "Unknown import alias ", qualifier);
-					return {};
-				}
-				SymbolRef ref = resolveSymbol(unit, qualifier, member.name, LookupPolicy::Checked);
-				if (!ref) {
-					errorLine(expr.token, "Unknown type ", qualifier, ".", member.name);
-					return {};
-				}
-				if (ref.symbol->resolved_type && ref.symbol->resolved_type->kind == ResolvedType::META) {
-					return ComptimeValue(unwrapMeta(ref.symbol->resolved_type));
-				}
-				if (ref.symbol->storage != Symbol::COMPTIME || !ref.symbol->expression) {
-					// TODO create a test to hit this
-					return {};
-				}
-				return resolveComptimeValue(*ref.owner, *ref.symbol->expression, bindings);
-			}
-			case Expression::CALL: {
-				CallExpression& call = static_cast<CallExpression&>(expr);
-				if (!call.callee || call.callee->kind != Expression::IDENTIFIER) return {};
-				SymbolRef ref = resolveSymbol(unit, {}, static_cast<IdentifierExpression*>(call.callee)->name, LookupPolicy::Checked);
-				if (!ref || !ref.symbol->expression || ref.symbol->expression->kind != Expression::FUNCTION) return {};
-				FunctionExpression* fn = static_cast<FunctionExpression*>(ref.symbol->expression);
-				if (fn->is_template || fn->is_extern || !fn->body || fn->body->kind != Statement::BLOCK) return {};
-				// Fast path: nullary function whose body is a single `return <expr>`
-				// folds by evaluating that expression directly (no interpreter frame).
-				if (call.args.empty()) {
-					BlockStatement* body = static_cast<BlockStatement*>(fn->body);
-					if (body->statements.size() == 1 && body->statements[0]->kind == Statement::RETURN) {
-						ReturnStatement* ret = static_cast<ReturnStatement*>(body->statements[0]);
-						return ret->expression ? resolveComptimeValue(*ref.owner, *ret->expression, bindings) : ComptimeValue();
-					}
-				}
-				// General path: interpret the body for a scalar-returning function,
-				// binding folded arguments (evaluated in the current frame) as locals.
-				if (fn->params.size() != call.args.size()) return {};
-				FunctionResolvedType* fn_type = asFunctionType(fn->resolved_type);
-				ResolvedType* rt = fn_type ? fn_type->return_type : nullptr;
-				if (!rt || !(isNumericType(*rt) || rt->kind == ResolvedType::BOOL || rt->kind == ResolvedType::ENUM)) return {};
-				// Give a self-contained budget when entered fresh (e.g. from a
-				// speculative check-time call); nested calls share the ongoing budget.
-				if (comptime_call_depth == 0) comptime_fuel = 20000000;
-				ComptimeFrame callee(unit.arena);
-				for (i32 i = 0; i < fn->params.size(); ++i) {
-					FunctionParam& param = fn->params[i];
-					if (param.is_ref || !param.resolved_type) return {};
-					u8* arg_bytes = static_cast<u8*>(unit.arena.allocate(unit.arena.user_data, typeByteSize(*param.resolved_type), 1));
-					if (!foldComptimeBytes(unit, *call.args[i], *param.resolved_type, arg_bytes, frame)) return {};
-					ComptimeFrame::Local& binding = callee.locals.emplace_back();
-					binding.name = param.name;
-					binding.bytes = arg_bytes;
-					binding.type = param.resolved_type;
-				}
-				u8 scalar_buf[8] = {};
-				if (!evalComptimeBody(*ref.owner, static_cast<BlockStatement&>(*fn->body), *rt, scalar_buf, callee)) return {};
-				return readComptimeScalar(*rt, scalar_buf);
-			}
-			case Expression::BINARY: {
-				BinaryExpression& bin = static_cast<BinaryExpression&>(expr);
-				ComptimeValue lhs = resolveComptimeValue(unit, *bin.lhs, bindings, ctx, frame);
-				ComptimeValue rhs = resolveComptimeValue(unit, *bin.rhs, bindings, ctx, frame);
-				if (lhs.kind == ComptimeValue::INVALID || rhs.kind == ComptimeValue::INVALID) {
-					// TODO create a test to hit this
-					return {};
-				}
-				if (bin.op == Token::EQUAL_EQUAL || bin.op == Token::BANG_EQUAL) {
-					const bool equal = comptimeValuesEqual(lhs, rhs);
-					return ComptimeValue(bin.op == Token::EQUAL_EQUAL ? equal : !equal);
-				}
-				if (bin.op == Token::AND || bin.op == Token::OR) {
-					if (lhs.kind != ComptimeValue::BOOL || rhs.kind != ComptimeValue::BOOL) return {};
-					const bool value = bin.op == Token::AND
-						? (lhs.bool_value && rhs.bool_value)
-						: (lhs.bool_value || rhs.bool_value);
-					return ComptimeValue(value);
-				}
-				const bool numeric = (lhs.kind == ComptimeValue::INT || lhs.kind == ComptimeValue::FLOAT)
-					&& (rhs.kind == ComptimeValue::INT || rhs.kind == ComptimeValue::FLOAT);
-				if (!numeric) return {};
-				bool lhs_float = lhs.kind == ComptimeValue::FLOAT;
-				bool rhs_float = rhs.kind == ComptimeValue::FLOAT;
-				bool result_float = lhs_float || rhs_float;
-
-				double lhs_f = lhs.asFloat();
-				double rhs_f = rhs.asFloat();
-				double result_f = 0;
-				i64 result_i = 0;
-
-				switch (bin.op) {
-					case Token::PLUS:
-						result_float ? (result_f = lhs_f + rhs_f) : (result_i = lhs.int_value + rhs.int_value);
-						break;
-					case Token::MINUS:
-						result_float ? (result_f = lhs_f - rhs_f) : (result_i = lhs.int_value - rhs.int_value);
-						break;
-					case Token::STAR:
-						result_float ? (result_f = lhs_f * rhs_f) : (result_i = lhs.int_value * rhs.int_value);
-						break;
-					case Token::SLASH: {
-						if (result_float ? (rhs_f == 0) : (rhs.int_value == 0)) return {};
-						result_float ? (result_f = lhs_f / rhs_f) : (result_i = lhs.int_value / rhs.int_value);
-						break;
-					}
-					case Token::PERCENT:
-						if (!result_float && rhs.int_value == 0) {
-							// TODO create a test to hit this
-							return {};
-						}
-						if (result_float) {
-							// TODO create a test to hit this
-							return {};
-						}
-						result_i = lhs.int_value % rhs.int_value;
-						break;
-					case Token::LT: return ComptimeValue(result_float ? lhs_f < rhs_f : lhs.int_value < rhs.int_value);
-					case Token::LT_EQUAL: return ComptimeValue(result_float ? lhs_f <= rhs_f : lhs.int_value <= rhs.int_value);
-					case Token::GT: return ComptimeValue(result_float ? lhs_f > rhs_f : lhs.int_value > rhs.int_value);
-					case Token::GT_EQUAL: return ComptimeValue(result_float ? lhs_f >= rhs_f : lhs.int_value >= rhs.int_value);
-					default:
-						// TODO create a test to hit this
-						return {};
-				}
-				return result_float ? ComptimeValue(result_f) : ComptimeValue(result_i);
-			}
-			case Expression::UNARY: {
-				UnaryExpression& un = static_cast<UnaryExpression&>(expr);
-				if (un.op != Token::MINUS) {
-					// TODO create a test to hit this
-					return {};
-				}
-				ComptimeValue out = resolveComptimeValue(unit, *un.expression, bindings, ctx, frame);
-				if (out.kind == ComptimeValue::INVALID) {
-					// TODO create a test to hit this
-					return {};
-				}
-				if (out.kind == ComptimeValue::FLOAT) {
-					out.float_value = -out.float_value;
-				} else {
-					out.int_value = -out.int_value;
-				}
-				return out;
-			}
-			case Expression::TERNARY: {
-				TernaryExpression& tern = static_cast<TernaryExpression&>(expr);
-				ComptimeValue cond = resolveComptimeValue(unit, *tern.condition, bindings, ctx, frame);
-				if (cond.kind == ComptimeValue::INVALID)
-					// TODO create a test to hit this
-					return {};
-
-				ComptimeValue result = cond.asBool()
-					? resolveComptimeValue(unit, *tern.true_expr, bindings, ctx, frame)
-					: resolveComptimeValue(unit, *tern.false_expr, bindings, ctx, frame);
-				return result;
-			}
-			case Expression::UNDEFINED:
-				errorLine(expr.token, "Undefined expression cannot be used as a compile-time value");
-				return {};
-			default:
-				errorLine(expr.token, "Expression cannot be used as a compile-time value");
-				return {};
-		}
-	}
 
 	// TODO Legacy wrappers for backwards compatibility, inline and remove
-	bool resolveComptimeIntValue(Unit& unit, Expression* expr, i64& out, TemplateBindings* bindings = nullptr) {
-		ComptimeValue val = resolveComptimeValue(unit, *expr, bindings);
-		if (val.kind == ComptimeValue::INVALID) return false;
-		out = val.asInt();
+	bool resolveComptimeIntValue(Unit& unit, Expression* expr, i64& out, TemplateBindings* bindings = nullptr, ComptimeFrame* frame = nullptr) {
+		ComptimeResult t = evalComptime(unit, *expr, nullptr, bindings, frame);
+		if (!t) return false;
+		if (t.kind != ComptimeResult::VALUE) {
+			errorLine(expr->token, "Expected compile-time integer value, got type");
+			return false;
+		}
+		if (!isIntegerOrUntyped(*t.type)) {
+			errorLine(expr->token, "Expected compile-time integer value, got ", t.type);
+			return false;
+		}
+		const u32 size = t.type->kind == ResolvedType::UNTYPED_INT ? 8u : typeByteSize(*t.type);
+		out = comptimeNumericToI64(t.value, t.type->kind);
+		comptime_stack_ptr -= size;
 		return true;
 	}
 
-	// --- Compile-time byte-buffer interpreter -------------------------------
-	//
-	// Folds a comptime value symbol's initializer into its runtime byte layout so
-	// the bytecode compiler can emit it inline as a constant (no runtime slot, no
-	// global-init store). Handles aggregates (arrays/structs, arbitrarily nested)
-	// and constant scalars, and interprets nullary non-template function bodies
-	// made of variable declarations, assignments and a return. Any construct it
-	// does not understand makes the fold fail silently (returns false); the caller
-	// then falls back to compiling the initializer expression at each use site.
-
-	// Byte offset of a struct field, matching bytecode_compiler's sequential,
-	// unpadded layout.
-	u32 comptimeFieldOffset(const StructResolvedType& st, i32 field_index) {
-		u32 offset = 0;
-		for (i32 i = 0; i < field_index; ++i) {
-			ResolvedType* ft = structFieldType(st, i);
-			if (ft) offset += typeByteSize(*ft);
-		}
-		return offset;
-	}
-
-	// Write a scalar comptime value into `out` using the runtime representation of
-	// `type`. Returns false for kinds that have no compile-time byte form here.
-	bool writeComptimeScalar(u8* out, const ResolvedType& type, const ComptimeValue& v) {
-		switch (type.kind) {
-			case ResolvedType::F32: { float f = (float)v.asFloat(); memcpy(out, &f, 4); return true; }
-			case ResolvedType::F64: { double d = v.asFloat(); memcpy(out, &d, 8); return true; }
-			case ResolvedType::BOOL:
-			case ResolvedType::I8: case ResolvedType::U8: case ResolvedType::BYTE:
-			case ResolvedType::I16: case ResolvedType::U16:
-			case ResolvedType::I32: case ResolvedType::U32: case ResolvedType::ENUM:
-			case ResolvedType::I64: case ResolvedType::U64: case ResolvedType::ISIZE: {
-				const u64 bits = (v.kind == ComptimeValue::BOOL) ? (v.bool_value ? 1u : 0u) : (u64)v.asInt();
-				const u32 size = typeByteSize(type);
-				for (u32 i = 0; i < size; ++i) out[i] = (u8)(bits >> (8 * i));
-				return true;
-			}
-			default: return false;
-		}
-	}
-
-	// Read a scalar comptime value back out of its runtime byte representation.
-	// Inverse of writeComptimeScalar; used to expose interpreter locals to the
-	// scalar evaluator (resolveComptimeValue).
-	ComptimeValue readComptimeScalar(const ResolvedType& type, const u8* bytes) {
-		switch (type.kind) {
-			case ResolvedType::F32: { float f; memcpy(&f, bytes, 4); return ComptimeValue((double)f); }
-			case ResolvedType::F64: { double d; memcpy(&d, bytes, 8); return ComptimeValue(d); }
-			case ResolvedType::BOOL: return ComptimeValue(bytes[0] != 0);
-			case ResolvedType::I8: case ResolvedType::U8: case ResolvedType::BYTE:
-			case ResolvedType::I16: case ResolvedType::U16:
-			case ResolvedType::I32: case ResolvedType::U32: case ResolvedType::ENUM:
-			case ResolvedType::I64: case ResolvedType::U64: case ResolvedType::ISIZE: {
-				const u32 size = typeByteSize(type);
-				u64 bits = 0;
-				for (u32 i = 0; i < size; ++i) bits |= (u64)bytes[i] << (8 * i);
-				// Sign-extend signed integer kinds narrower than 64 bits.
-				const bool is_signed = type.kind == ResolvedType::I8 || type.kind == ResolvedType::I16
-					|| type.kind == ResolvedType::I32 || type.kind == ResolvedType::I64
-					|| type.kind == ResolvedType::ISIZE;
-				if (is_signed && size < 8 && (bits & (1ull << (size * 8 - 1)))) {
-					bits |= ~((1ull << (size * 8)) - 1);
-				}
-				return ComptimeValue((i64)bits);
-			}
-			default: return ComptimeValue();
-		}
-	}
-
-	// Resolve an assignable expression to a destination inside an interpreter local:
-	// a bare local, a struct field (`local.field`), or an array element
-	// (`local[const-index]`), nested arbitrarily. Returns false when the target is
-	// not a foldable location.
-	bool resolveComptimeLValue(Unit& unit, Expression& expr, ComptimeFrame& frame, u8*& out_ptr, ResolvedType*& out_type) {
-		switch (expr.kind) {
-			case Expression::IDENTIFIER: {
-				ComptimeFrame::Local* local = frame.find(static_cast<IdentifierExpression&>(expr).name);
-				if (!local) return false;
-				out_ptr = local->bytes;
-				out_type = local->type;
-				return true;
-			}
-			case Expression::MEMBER: {
-				MemberExpression& member = static_cast<MemberExpression&>(expr);
-				if (!member.expression) return false;
-				u8* base_ptr = nullptr;
-				ResolvedType* base_type = nullptr;
-				if (!resolveComptimeLValue(unit, *member.expression, frame, base_ptr, base_type)) return false;
-				if (base_type->kind != ResolvedType::STRUCT) return false;
-				StructResolvedType& st = static_cast<StructResolvedType&>(*base_type);
-				if (!st.decl) return false;
-				for (i32 i = 0; i < st.decl->fields.size(); ++i) {
-					if (!equalStrings(st.decl->fields[i].name, member.name)) continue;
-					ResolvedType* field_type = structFieldType(st, i);
-					if (!field_type) return false;
-					out_ptr = base_ptr + comptimeFieldOffset(st, i);
-					out_type = field_type;
-					return true;
-				}
-				return false;
-			}
-			case Expression::BRACKET: {
-				BracketExpression& br = static_cast<BracketExpression&>(expr);
-				if (!br.base || br.args.size() != 1) return false;
-				u8* base_ptr = nullptr;
-				ResolvedType* base_type = nullptr;
-				if (!resolveComptimeLValue(unit, *br.base, frame, base_ptr, base_type)) return false;
-				if (base_type->kind != ResolvedType::ARRAY) return false;
-				ArrayResolvedType& arr = static_cast<ArrayResolvedType&>(*base_type);
-				ComptimeValue index = resolveComptimeValue(unit, *br.args[0], nullptr, nullptr, &frame);
-				if (index.kind != ComptimeValue::INT) return false;
-				const i64 i = index.int_value;
-				if (i < 0 || i >= arr.size) return false;
-				out_ptr = base_ptr + (u32)i * typeByteSize(*arr.element_type);
-				out_type = arr.element_type;
-				return true;
-			}
-			default: return false;
-		}
-	}
-
-	// Bounds nested comptime call interpretation so mutually-recursive comptime
-	// functions fail the fold (fall back to runtime) instead of overflowing the stack.
-	i32 comptime_call_depth = 0;
-	// Total interpreter steps left for the current top-level fold; shared across
-	// nested calls so exponential/non-terminating comptime code fails the fold
-	// instead of hanging the compiler. Reset by foldComptimeSymbol.
-	i64 comptime_fuel = 0;
-
-	// Interpret a nullary function body, writing its returned value into `out`.
-	// Returns true only when a `return` produced a foldable value.
-	bool evalComptimeBody(Unit& unit, BlockStatement& body, ResolvedType& ret_type, u8* out, ComptimeFrame& frame) {
-		if (comptime_call_depth >= 256) return false;
-		++comptime_call_depth;
-		bool returned = false;
-		const bool ok = evalComptimeBlock(unit, body, ret_type, out, frame, comptime_fuel, returned) && returned;
-		--comptime_call_depth;
-		return ok;
-	}
-
-	// Execute a statement list. `returned` is set when a return was hit (its value
-	// written to `out`); the caller stops running further statements. Returns false
-	// on any construct/value the interpreter cannot evaluate.
-	bool evalComptimeBlock(Unit& unit, BlockStatement& body, ResolvedType& ret_type, u8* out, ComptimeFrame& frame, i64& fuel, bool& returned) {
-		const i32 scope_mark = frame.locals.size();
-		for (Statement* stmt : body.statements) {
-			if (!evalComptimeStmt(unit, *stmt, ret_type, out, frame, fuel, returned)) return false;
-			if (returned) break;
-		}
-		// Drop locals declared in this block so sibling blocks (loop bodies) start clean.
-		if (frame.locals.size() > scope_mark) frame.locals.resize(scope_mark);
-		return true;
-	}
-
-	bool evalComptimeStmt(Unit& unit, Statement& stmt, ResolvedType& ret_type, u8* out, ComptimeFrame& frame, i64& fuel, bool& returned) {
-		if (--fuel < 0) return false;
-		switch (stmt.kind) {
-			case Statement::BLOCK:
-				return evalComptimeBlock(unit, static_cast<BlockStatement&>(stmt), ret_type, out, frame, fuel, returned);
-			case Statement::VAR_DECL: {
-				VarDeclStatement& decl = static_cast<VarDeclStatement&>(stmt);
-				if (!decl.resolved_type || !decl.expression) return false;
-				ResolvedType* local_type = decl.resolved_type;
-				u8* bytes = static_cast<u8*>(unit.arena.allocate(unit.arena.user_data, typeByteSize(*local_type), 1));
-				if (!foldComptimeBytes(unit, *decl.expression, *local_type, bytes, &frame)) return false;
-				ComptimeFrame::Local& local = frame.locals.emplace_back();
-				local.name = decl.name;
-				local.bytes = bytes;
-				local.type = local_type;
-				return true;
-			}
-			case Statement::ASSIGN: {
-				AssignStatement& assign = static_cast<AssignStatement&>(stmt);
-				if (!assign.lhs || !assign.rhs) return false;
-				u8* dst = nullptr;
-				ResolvedType* dst_type = nullptr;
-				if (!resolveComptimeLValue(unit, *assign.lhs, frame, dst, dst_type)) return false;
-				if (assign.op == Token::EQUAL) {
-					return foldComptimeBytes(unit, *assign.rhs, *dst_type, dst, &frame);
-				}
-				// Compound assignment: evaluate `dst <op> rhs` as a scalar.
-				Token::Type bin_op;
-				switch (assign.op) {
-					case Token::PLUS_EQUAL: bin_op = Token::PLUS; break;
-					case Token::MINUS_EQUAL: bin_op = Token::MINUS; break;
-					case Token::STAR_EQUAL: bin_op = Token::STAR; break;
-					case Token::SLASH_EQUAL: bin_op = Token::SLASH; break;
-					default: return false;
-				}
-				ComptimeValue cur = readComptimeScalar(*dst_type, dst);
-				ComptimeValue rhs = resolveComptimeValue(unit, *assign.rhs, nullptr, nullptr, &frame);
-				if (cur.kind == ComptimeValue::INVALID || rhs.kind == ComptimeValue::INVALID) return false;
-				ComptimeValue result = applyComptimeBinary(bin_op, cur, rhs);
-				if (result.kind == ComptimeValue::INVALID) return false;
-				return writeComptimeScalar(dst, *dst_type, result);
-			}
-			case Statement::RETURN: {
-				ReturnStatement& ret = static_cast<ReturnStatement&>(stmt);
-				if (!ret.expression) { returned = (typeByteSize(ret_type) == 0); return returned; }
-				if (!foldComptimeBytes(unit, *ret.expression, ret_type, out, &frame)) return false;
-				returned = true;
-				return true;
-			}
-			case Statement::IF: {
-				IfStatement& ifs = static_cast<IfStatement&>(stmt);
-				ComptimeValue cond = resolveComptimeValue(unit, *ifs.condition, nullptr, nullptr, &frame);
-				if (cond.kind == ComptimeValue::INVALID) return false;
-				if (cond.asBool()) return evalComptimeStmt(unit, *ifs.body, ret_type, out, frame, fuel, returned);
-				if (ifs.else_branch) return evalComptimeStmt(unit, *ifs.else_branch, ret_type, out, frame, fuel, returned);
-				return true;
-			}
-			case Statement::WHILE: {
-				WhileStatement& ws = static_cast<WhileStatement&>(stmt);
-				for (;;) {
-					if (--fuel < 0) return false;
-					ComptimeValue cond = resolveComptimeValue(unit, *ws.condition, nullptr, nullptr, &frame);
-					if (cond.kind == ComptimeValue::INVALID) return false;
-					if (!cond.asBool()) return true;
-					if (!evalComptimeStmt(unit, *ws.body, ret_type, out, frame, fuel, returned)) return false;
-					if (returned) return true;
-				}
-			}
-			default:
-				return false; // unsupported construct: fold fails, caller falls back
-		}
-	}
-
-	// Apply a numeric/comparison binary operator to two folded scalars. Mirrors the
-	// arithmetic in resolveComptimeValue's BINARY case. INVALID on unsupported ops.
-	ComptimeValue applyComptimeBinary(Token::Type op, const ComptimeValue& lhs, const ComptimeValue& rhs) {
-		const bool numeric = (lhs.kind == ComptimeValue::INT || lhs.kind == ComptimeValue::FLOAT)
-			&& (rhs.kind == ComptimeValue::INT || rhs.kind == ComptimeValue::FLOAT);
-		if (!numeric) return ComptimeValue();
-		const bool result_float = lhs.kind == ComptimeValue::FLOAT || rhs.kind == ComptimeValue::FLOAT;
-		const double lf = lhs.asFloat(), rf = rhs.asFloat();
-		switch (op) {
-			case Token::PLUS: return result_float ? ComptimeValue(lf + rf) : ComptimeValue(lhs.int_value + rhs.int_value);
-			case Token::MINUS: return result_float ? ComptimeValue(lf - rf) : ComptimeValue(lhs.int_value - rhs.int_value);
-			case Token::STAR: return result_float ? ComptimeValue(lf * rf) : ComptimeValue(lhs.int_value * rhs.int_value);
-			case Token::SLASH:
-				if (result_float) return rf == 0 ? ComptimeValue() : ComptimeValue(lf / rf);
-				return rhs.int_value == 0 ? ComptimeValue() : ComptimeValue(lhs.int_value / rhs.int_value);
-			default: return ComptimeValue();
-		}
-	}
-
-	// Fold `expr` (of resolved type `type`) into `out`. `frame` supplies locals when
-	// interpreting a function body; it is null at top level.
-	bool foldComptimeBytes(Unit& unit, Expression& expr, ResolvedType& type, u8* out, ComptimeFrame* frame) {
-		switch (expr.kind) {
-			case Expression::ARRAY_LITERAL: {
-				if (type.kind != ResolvedType::ARRAY) return false;
-				ArrayResolvedType& arr = static_cast<ArrayResolvedType&>(type);
-				ArrayLiteralExpression& lit = static_cast<ArrayLiteralExpression&>(expr);
-				if ((i64)lit.values.size() != arr.size) return false;
-				const u32 stride = typeByteSize(*arr.element_type);
-				for (i32 i = 0; i < lit.values.size(); ++i) {
-					if (!foldComptimeBytes(unit, *lit.values[i], *arr.element_type, out + (u32)i * stride, frame)) return false;
-				}
-				return true;
-			}
-			case Expression::STRUCT_LITERAL: {
-				if (type.kind != ResolvedType::STRUCT) return false;
-				StructResolvedType& st = static_cast<StructResolvedType&>(type);
-				StructLiteralExpression& lit = static_cast<StructLiteralExpression&>(expr);
-				if (!st.decl || lit.values.size() != st.decl->fields.size()) return false;
-				for (i32 i = 0; i < lit.values.size(); ++i) {
-					ResolvedType* field_type = structFieldType(st, i);
-					if (!field_type) return false;
-					if (!foldComptimeBytes(unit, *lit.values[i], *field_type, out + comptimeFieldOffset(st, i), frame)) return false;
-				}
-				return true;
-			}
-			case Expression::IDENTIFIER: {
-				IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
-				if (frame) {
-					if (ComptimeFrame::Local* local = frame->find(id.name)) {
-						memcpy(out, local->bytes, typeByteSize(type));
-						return true;
-					}
-				}
-				SymbolRef ref = resolveSymbol(unit, {}, id.name, LookupPolicy::Checked);
-				if (ref && ref.symbol && ref.symbol->storage == Symbol::COMPTIME && ref.symbol->expression) {
-					if (ref.symbol->comptime_bytes && ref.symbol->comptime_byte_size == typeByteSize(type)) {
-						memcpy(out, ref.symbol->comptime_bytes, ref.symbol->comptime_byte_size);
-						return true;
-					}
-					return foldComptimeBytes(*ref.owner, *ref.symbol->expression, type, out, nullptr);
-				}
-				break; // fall through to scalar path
-			}
-			case Expression::CALL: {
-				CallExpression& call = static_cast<CallExpression&>(expr);
-				if (!call.callee || call.callee->kind != Expression::IDENTIFIER) break;
-				SymbolRef ref = resolveSymbol(unit, {}, static_cast<IdentifierExpression&>(*call.callee).name, LookupPolicy::Checked);
-				if (!ref || !ref.symbol->expression || ref.symbol->expression->kind != Expression::FUNCTION) break;
-				FunctionExpression& fn = static_cast<FunctionExpression&>(*ref.symbol->expression);
-				if (fn.is_template || fn.is_extern || !fn.body || fn.body->kind != Statement::BLOCK) break;
-				if (fn.params.size() != call.args.size()) break;
-				// Fold each argument (evaluated in the caller's frame) and bind it as a
-				// local of the callee frame, so parametric comptime functions execute.
-				ComptimeFrame callee_frame(unit.arena);
-				for (i32 i = 0; i < fn.params.size(); ++i) {
-					FunctionParam& param = fn.params[i];
-					if (param.is_ref || !param.resolved_type) break;
-					u8* arg_bytes = static_cast<u8*>(unit.arena.allocate(unit.arena.user_data, typeByteSize(*param.resolved_type), 1));
-					if (!foldComptimeBytes(unit, *call.args[i], *param.resolved_type, arg_bytes, frame)) return false;
-					ComptimeFrame::Local& binding = callee_frame.locals.emplace_back();
-					binding.name = param.name;
-					binding.bytes = arg_bytes;
-					binding.type = param.resolved_type;
-				}
-				if (callee_frame.locals.size() != fn.params.size()) break; // a param was unbindable
-				return evalComptimeBody(*ref.owner, static_cast<BlockStatement&>(*fn.body), type, out, callee_frame);
-			}
-			default: break;
-		}
-		// Scalar fallback: constant-fold to a single value (works for literals,
-		// arithmetic, ternaries, enum members and scalar expressions, including ones
-		// that reference interpreter locals through `frame`).
-		ComptimeValue v = resolveComptimeValue(unit, expr, nullptr, nullptr, frame);
-		if (v.kind == ComptimeValue::INVALID) return false;
-		return writeComptimeScalar(out, type, v);
-	}
-
-	// Attempt to fold a comptime value symbol's initializer to bytes and cache it on
-	// the symbol. Silent no-op when the value is not a compile-time constant.
-	void foldComptimeSymbol(Unit& unit, Symbol& sym) {
-		if (sym.storage != Symbol::COMPTIME || !sym.expression || !sym.resolved_type) return;
-		if (sym.resolved_type->kind == ResolvedType::META) return; // type value, not a runtime value
-		const u32 size = typeByteSize(*sym.resolved_type);
-		if (size == 0) return;
-		comptime_fuel = 20000000; // total step budget for this fold
-		comptime_call_depth = 0;
-		u8* bytes = static_cast<u8*>(unit.arena.allocate(unit.arena.user_data, size, 1));
-		if (!foldComptimeBytes(unit, *sym.expression, *sym.resolved_type, bytes, nullptr)) return;
-		sym.comptime_bytes = bytes;
-		sym.comptime_byte_size = size;
-	}
 
 	ResolvedType* checkExprMaterialized(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* target) {
 		ResolvedType* t = checkExpr(unit, ctx, expr, target);
@@ -1504,39 +746,66 @@ struct Checker {
 		return ref;
 	}
 
-	Expression* makeComptimeValueExpression(Unit& unit, const ComptimeValue& arg) {
+	Expression* makeComptimeValueExpression(Unit& unit, const ComptimeResult& arg) {
 		switch (arg.kind) {
-			case ComptimeValue::INVALID: break;
-			case ComptimeValue::TYPE: {
+			case ComptimeResult::FAILURE: return nullptr;
+			case ComptimeResult::TYPE: {
 				ResolvedTypeExpression* expr = makeType<ResolvedTypeExpression>(unit.arena);
-				expr->type = arg.type;
+				expr->resolved_type = arg.type;
 				return expr;
 			}
-			case ComptimeValue::INT: {
-				if (arg.int_value < 0) {
-					UnaryExpression* un = makeType<UnaryExpression>(unit.arena);
-					un->op = Token::MINUS;
-					IntLiteralExpression* lit = makeType<IntLiteralExpression>(unit.arena);
-					lit->value = (u64)(-(arg.int_value + 1)) + 1u;
-					un->expression = lit;
-					return un;
+			case ComptimeResult::VALUE: {
+				if (!arg.type || !arg.value) return nullptr;
+				switch (arg.type->kind) {
+					case ResolvedType::BOOL: {
+						bool value;
+						memcpy(&value, arg.value, sizeof(value));
+						BoolLiteralExpression* expr = makeType<BoolLiteralExpression>(unit.arena, value);
+						expr->resolved_type = arg.type;
+						return expr;
+					}
+					case ResolvedType::STRING: {
+						StringLiteralExpression* expr = makeType<StringLiteralExpression>(unit.arena);
+						ls_string_view* value;
+						memcpy(&value, arg.value, sizeof(value));
+						expr->value = *value;
+						expr->resolved_type = arg.type;
+						return expr;
+					}
+					case ResolvedType::F32:
+					case ResolvedType::F64: {
+						FloatLiteralExpression* expr = makeType<FloatLiteralExpression>(unit.arena);
+						expr->value = comptimeNumericToF64(arg.value, arg.type->kind);
+						expr->resolved_type = arg.type;
+						return expr;
+					}
+					case ResolvedType::ENUM:
+					default:
+						if (!isIntegerType(*arg.type) && arg.type->kind != ResolvedType::ENUM) return nullptr;
+						if (arg.type->kind >= ResolvedType::U8 && arg.type->kind <= ResolvedType::U64) {
+							IntLiteralExpression* expr = makeType<IntLiteralExpression>(unit.arena);
+							expr->value = comptimeNumericToU64(arg.value, arg.type->kind);
+							expr->resolved_type = arg.type;
+							return expr;
+						}
+						const i64 value = comptimeNumericToI64(arg.value, arg.type->kind);
+						if (value >= 0) {
+							IntLiteralExpression* expr = makeType<IntLiteralExpression>(unit.arena);
+							expr->value = (u64)value;
+							expr->resolved_type = arg.type;
+							return expr;
+						}
+						UnaryExpression* neg = makeType<UnaryExpression>(unit.arena);
+						IntLiteralExpression* magnitude = makeType<IntLiteralExpression>(unit.arena);
+						magnitude->value = (u64)(-(value + 1)) + 1u;
+						neg->expression = magnitude;
+						neg->op = Token::MINUS;
+						neg->resolved_type = arg.type;
+						return neg;
 				}
-				IntLiteralExpression* lit = makeType<IntLiteralExpression>(unit.arena);
-				lit->value = (u64)arg.int_value;
-				return lit;
-			}
-			case ComptimeValue::FLOAT: {
-				FloatLiteralExpression* lit = makeType<FloatLiteralExpression>(unit.arena);
-				lit->value = arg.float_value;
-				return lit;
-			}
-			case ComptimeValue::BOOL: return makeType<BoolLiteralExpression>(unit.arena, arg.bool_value);
-			case ComptimeValue::STRING: {
-				StringLiteralExpression* lit = makeType<StringLiteralExpression>(unit.arena);
-				lit->value = arg.string_value;
-				return lit;
 			}
 		}
+
 		ASSERT(false);
 		return nullptr;
 	}
@@ -1608,7 +877,7 @@ struct Checker {
 			}
 			case Expression::RESOLVED_TYPE: {
 				ResolvedTypeExpression* type = makeType<ResolvedTypeExpression>(unit.arena);
-				type->type = static_cast<ResolvedTypeExpression*>(src)->type;
+				type->resolved_type = static_cast<ResolvedTypeExpression*>(src)->resolved_type;
 				out = type;
 				break;
 			}
@@ -1901,17 +1170,9 @@ struct Checker {
 		return out;
 	}
 
-	// Resolve a type-denoting expression to a semantic type. Keeping this type-only
-	// wrapper prevents general compile-time values from being accepted in annotations.
-	ResolvedType* resolveTypeExpr(Unit& unit, Expression& expr, TemplateBindings* bindings = nullptr, FunctionCheckContext* ctx = nullptr) {
-		ComptimeValue value = resolveComptimeValue(unit, expr, bindings, ctx);
-		if (value.kind == ComptimeValue::INVALID) return nullptr;
-		if (value.kind != ComptimeValue::TYPE) {
-			errorLine(expr.token, "Expected a type expression, but got ", value.kind);
-			// TODO create a test to hit this
-			return nullptr;
-		}
-		return value.type;
+	ResolvedType* resolveTypeExpr(Unit& unit, Expression& expr, TemplateBindings* bindings = nullptr, FunctionCheckContext* ctx = nullptr, ComptimeFrame* frame = nullptr) {
+		// TODO
+		return asType(evalComptime(unit, expr, ctx, bindings, frame), expr.token);
 	}
 
 	// The common numeric type two operands must share, or null if they are not numerically
@@ -2205,25 +1466,30 @@ struct Checker {
 		while (ctx.locals.size() > mark) ctx.locals.pop_back();
 	}
 
-	static bool comptimeValueMatchesExpected(const ComptimeValue& value, ResolvedType* expected) {
-		if (!expected) return value.kind == ComptimeValue::TYPE;
-		if (value.kind == ComptimeValue::INVALID) return false;
-		if (expected->kind == ResolvedType::META) return value.kind == ComptimeValue::TYPE;
-		if (value.kind == ComptimeValue::TYPE) return false;
-		switch (expected->kind) {
-			case ResolvedType::BOOL: return value.kind == ComptimeValue::BOOL;
-			case ResolvedType::STRING: return value.kind == ComptimeValue::STRING;
-			case ResolvedType::F32:
-			case ResolvedType::F64:
-				if (value.kind == ComptimeValue::FLOAT)
-					return expected->kind == ResolvedType::F64 || (value.float_value <= (double)FLT_MAX && value.float_value >= -(double)FLT_MAX);
-				if (value.kind != ComptimeValue::INT) return false;
-				return intLiteralFitsType(value.int_value < 0 ? (u64)(-(value.int_value + 1)) + 1u : (u64)value.int_value, expected->kind);
-			default:
-				if (!isIntegerType(*expected) || value.kind != ComptimeValue::INT) return false;
-				if (value.int_value < 0) return negatedIntLiteralFitsType((u64)(-(value.int_value + 1)) + 1u, expected->kind);
-				return intLiteralFitsType((u64)value.int_value, expected->kind);
+	bool comptimeValueMatchesExpected(const ComptimeResult& value, ResolvedType* expected) {
+		if (value.kind == ComptimeResult::FAILURE) return false;
+		if (!expected) return value.kind == ComptimeResult::TYPE;
+		if (expected->kind == ResolvedType::META) return value.kind == ComptimeResult::TYPE;
+		if (value.kind == ComptimeResult::TYPE) return false;
+		if (canImplicitlyConvert(value.type, expected)) return true;
+		if (!isNumericType(*value.type) || !isNumericType(*expected)) return false;
+
+		const u8* bytes = value.value;
+		if (!bytes) return false;
+		const bool is_unsigned = value.type->kind >= ResolvedType::U8 && value.type->kind <= ResolvedType::U64;
+		if (isIntegerType(*value.type)) {
+			if (is_unsigned) return intLiteralFitsType(comptimeNumericToU64(bytes, value.type->kind), expected->kind);
+			const i64 integer = comptimeNumericToI64(bytes, value.type->kind);
+			return integer < 0
+				? negatedIntLiteralFitsType((u64)(-(integer + 1)) + 1u, expected->kind)
+				: intLiteralFitsType((u64)integer, expected->kind);
 		}
+		if (isFloatType(*value.type) && isFloatType(*expected)) {
+			const double floating = comptimeNumericToF64(bytes, value.type->kind);
+			if (expected->kind == ResolvedType::F64) return true;
+			return (double)(float)floating == floating;
+		}
+		return false;
 	}
 
 	bool resolveStructFields(Unit& unit, const Symbol* sym, StructExpression& st, StructResolvedType& st_type, TemplateBindings* bindings) {
@@ -2254,17 +1520,15 @@ struct Checker {
 		}
 
 		Unit& arg_unit = argument_unit ? *argument_unit : unit;
-		ExpArray<ComptimeValue> args(unit.arena);
+		ExpArray<ComptimeResult> args(unit.arena);
 		args.resize(st.comptime_params.size());
 
 		// eval args
 		for (i32 i = 0; i < st.comptime_params.size(); ++i) {
 			NamedDecl& param = st.comptime_params[i];
-			ComptimeValue arg = resolveComptimeValue(arg_unit, *arg_exprs[i]);
-			if (arg.kind == ComptimeValue::INVALID) {
-				errorLine(st.token, "Could not resolve template struct argument ", i + 1);
-				return nullptr;
-			}
+			ComptimeResult arg = evalComptime(arg_unit, *arg_exprs[i], nullptr, nullptr, nullptr, param.resolved_type);
+			if (!arg) return nullptr;
+			
 			if (!comptimeValueMatchesExpected(arg, param.resolved_type)) {
 				errorLine(st.token, "Template struct argument ", i + 1, " type mismatch: expected ", param.resolved_type, ", got ", arg.kind);
 				return nullptr;
@@ -2287,7 +1551,7 @@ struct Checker {
 
 		// new instance + cache it
 		TemplateStructInstance& new_instance = st.template_struct_instances.emplace_back(unit.arena);
-		for (const ComptimeValue& arg : args) new_instance.args.push(arg);
+		for (const ComptimeResult& arg : args) new_instance.args.push(arg);
 		StructResolvedType* st_type = makeType<StructResolvedType>(unit.arena, unit.arena);
 		st_type->decl = &st;
 		new_instance.type = st_type;
@@ -2307,17 +1571,17 @@ struct Checker {
 	}
 
 	// TODO error msgs here instead of in the callers
-	bool inferTemplateArg(Unit& unit, TemplateBindings& bindings, Expression& pattern, const ComptimeValue& actual) {
-		ResolvedType* actual_type = actual.kind == ComptimeValue::TYPE ? actual.type : nullptr;
+	bool inferTemplateArg(Unit& unit, TemplateBindings& bindings, Expression& pattern, const ComptimeResult& actual) {
+		ResolvedType* actual_type = actual.kind == ComptimeResult::TYPE ? actual.type : nullptr;
 		switch (pattern.kind) {
 			case Expression::GENERIC_IDENTIFIER: {
 				GenericIdentifierExpression& generic = static_cast<GenericIdentifierExpression&>(pattern);
-				ComptimeValue value = actual_type ? ComptimeValue(unwrapNullable(actual_type)) : actual;
+				ComptimeResult value = actual_type ? ComptimeResult{ComptimeResult::TYPE, unwrapNullable(actual_type)} : actual;
 				return bindTemplateArg(bindings, generic.name, value);
 			}
 			case Expression::IDENTIFIER: {
 				IdentifierExpression& id = static_cast<IdentifierExpression&>(pattern);
-				ComptimeValue value = actual_type ? ComptimeValue(unwrapNullable(actual_type)) : actual;
+				ComptimeResult value = actual_type ? ComptimeResult{ComptimeResult::TYPE, unwrapNullable(actual_type)} : actual;
 				if (findTemplateBinding(&bindings, id.name)) return bindTemplateArg(bindings, id.name, value);
 				if (actual_type && !resolveSymbol(unit, {}, id.name, LookupPolicy::NameOnly)) {
 					return bindTemplateArg(bindings, id.name, value);
@@ -2328,7 +1592,7 @@ struct Checker {
 				if (!actual_type || actual_type->kind != ResolvedType::ARRAY) return false;
 				ArrayTypeExpression& p = static_cast<ArrayTypeExpression&>(pattern);
 				ArrayResolvedType& a = static_cast<ArrayResolvedType&>(*actual_type);
-				return inferTemplateArg(unit, bindings, *p.element_type, ComptimeValue(a.element_type));
+				return inferTemplateArg(unit, bindings, *p.element_type, ComptimeResult{ComptimeResult::TYPE, a.element_type});
 			}
 			case Expression::SLICE_TYPE: {
 				if (!actual_type) return false;
@@ -2336,11 +1600,11 @@ struct Checker {
 				if (actual_type->kind == ResolvedType::SLICE) actual_element = static_cast<SliceResolvedType*>(actual_type)->element_type;
 				else if (actual_type->kind == ResolvedType::ARRAY) actual_element = static_cast<ArrayResolvedType*>(actual_type)->element_type;
 				else return false;
-				return inferTemplateArg(unit, bindings, *static_cast<SliceTypeExpression&>(pattern).element_type, ComptimeValue(actual_element));
+				return inferTemplateArg(unit, bindings, *static_cast<SliceTypeExpression&>(pattern).element_type, ComptimeResult{ComptimeResult::TYPE, actual_element});
 			}
 			case Expression::NULLABLE_TYPE: {
 				if (!actual_type || actual_type->kind != ResolvedType::NULLABLE) return false;
-				return inferTemplateArg(unit, bindings, *static_cast<NullableTypeExpression&>(pattern).inner, ComptimeValue(static_cast<NullableResolvedType*>(actual_type)->inner));
+				return inferTemplateArg(unit, bindings, *static_cast<NullableTypeExpression&>(pattern).inner, ComptimeResult{ComptimeResult::TYPE, static_cast<NullableResolvedType*>(actual_type)->inner});
 			}
 			case Expression::BRACKET: {
 				if (!actual_type || actual_type->kind != ResolvedType::STRUCT) break;
@@ -2352,7 +1616,7 @@ struct Checker {
 				if (static_cast<StructResolvedType*>(expected_base)->decl != actual_struct->decl) return false;
 				if (br.args.size() != actual_struct->decl->comptime_params.size()) return false;
 				for (i32 i = 0; i < br.args.size(); ++i) {
-					ComptimeValue actual_arg;
+					ComptimeResult actual_arg;
 					if (!actual_struct->decl) return false;
 					bool found = false;
 					for (TemplateStructInstance& instance : actual_struct->decl->template_struct_instances) {
@@ -2369,7 +1633,7 @@ struct Checker {
 			}
 		}
 
-		if (actual.kind != ComptimeValue::TYPE) return false;
+		if (actual.kind != ComptimeResult::TYPE) return false;
 
 		ResolvedType* pattern_type = resolveTypeExpr(unit, pattern, &bindings);
 		if (!pattern_type) return false;
@@ -2572,41 +1836,30 @@ struct Checker {
 			}
 		}
 
+		// TODO I don't like this
 		FunctionCheckContext comptime_ctx(unit.arena);
 		comptime_ctx.comptime_only = true;
-		// TODO shouldn't we use resolveComptimeValue here instead?
-		ResolvedType* expr_type = checkExprMaterialized(unit, &comptime_ctx, *sym.expression, annotation);
-		if (!expr_type) return LS_RESULT_FAILURE;
+		if (!checkExprMaterialized(unit, &comptime_ctx, *sym.expression, annotation)) {
+			return LS_RESULT_FAILURE;
+		}
+		
+		ComptimeResult t = evalComptime(unit, *sym.expression, nullptr, nullptr, nullptr, annotation);
+		if (!t) return LS_RESULT_FAILURE;
 
-		if (annotation && !canImplicitlyConvert(expr_type, annotation)) {
-			errorLine(sym.token, "Cannot convert comptime initializer type ", expr_type, " to annotated type ", annotation, " for: ", sym.name);
+		if (annotation && t.kind == ComptimeResult::VALUE && !canImplicitlyConvert(t.type, annotation)) {
+			errorLine(sym.token, "Cannot convert comptime initializer type ", t.type, " to annotated type ", annotation, " for: ", sym.name);
 			return LS_RESULT_FAILURE;
 		}
 
-		const bool is_type_value = expr_type->kind == ResolvedType::META
-			|| sym.expression->kind == Expression::TYPE_LITERAL
-			|| sym.expression->kind == Expression::ARRAY_TYPE
-			|| sym.expression->kind == Expression::SLICE_TYPE
-			|| sym.expression->kind == Expression::NULLABLE_TYPE
-			|| sym.expression->kind == Expression::FUNCTION_TYPE
-			|| sym.expression->kind == Expression::UNION_TYPE
-			|| sym.expression->kind == Expression::TYPEOF
-			|| sym.expression->kind == Expression::RESOLVED_TYPE;
-		if (is_type_value) {
-			ComptimeValue value = resolveComptimeValue(unit, *sym.expression, nullptr, &comptime_ctx);
-			if (value.kind != ComptimeValue::TYPE || !value.type) {
-				errorLine(sym.token, "Comptime type binding does not resolve to a type: ", sym.name);
-				return LS_RESULT_FAILURE;
-			}
-			MetaType* meta = makeType<MetaType>(unit.arena);
-			meta->inner = value.type;
+		if (t.kind != ComptimeResult::TYPE) {
+			sym.comptime_byte_size = typeByteSize(*t.type);
+			sym.comptime_bytes = comptime_stack_ptr - sym.comptime_byte_size;
+			sym.resolved_type = t.type;
+		}
+		else {
+			auto* meta = makeType<MetaType>(unit.arena);
+			meta->inner = t.type;
 			sym.resolved_type = meta;
-		} else {
-			sym.resolved_type = annotation ? annotation : expr_type;
-			// Fold the initializer to its runtime byte layout so uses can be emitted
-			// inline as constants instead of through a runtime global slot.
-			// TODO why do we need this when we have resolveComptimeValue? 
-			foldComptimeSymbol(unit, sym);
 		}
 		return LS_RESULT_OK;
 	}
@@ -2672,7 +1925,7 @@ struct Checker {
 		}
 		if (ufcs_param_offset) {
 			MemberExpression& mem = static_cast<MemberExpression&>(*call.callee);
-			if (!inferTemplateArg(template_unit, bindings, *fn.params[0].type_expr, ComptimeValue(mem.expression->resolved_type))) {
+			if (!inferTemplateArg(template_unit, bindings, *fn.params[0].type_expr, ComptimeResult{ComptimeResult::TYPE, mem.expression->resolved_type})) {
 				errorLine(call_expr.token, "Cannot infer template arguments for receiver of ", fn.token.value);
 				return nullptr;
 			}
@@ -2697,10 +1950,10 @@ struct Checker {
 			}
 
 			if (param.is_comptime) {
-				ComptimeValue template_arg;
-				template_arg = resolveComptimeValue(unit, *arg, &bindings);
+				if (expected && !checkExprMaterialized(unit, ctx, *arg, expected)) return nullptr;
+				ComptimeResult template_arg = evalComptime(unit, *arg, ctx, &bindings, nullptr, expected);
 				if (!comptimeValueMatchesExpected(template_arg, expected)) {
-					errorLine(arg->token, "Could not resolve comptime template argument");
+					errorLine(arg->token, "Could not resolve comptime template argument, expected ", expected, ", got ", template_arg.type);
 					return nullptr;
 				}
 				if (!bindTemplateArg(bindings, param.name, template_arg)) {
@@ -2736,7 +1989,7 @@ struct Checker {
 					return nullptr;
 				}
 			}
-			if (!inferTemplateArg(template_unit, bindings, *param.type_expr, ComptimeValue(arg_type))) {
+			if (!inferTemplateArg(template_unit, bindings, *param.type_expr, ComptimeResult{ComptimeResult::TYPE, arg_type})) {
 				errorLine(arg->token, "Cannot infer template parameter type for argument ", i + 1, " of ", fn.token.value);
 				return nullptr;
 			}
@@ -3150,13 +2403,16 @@ struct Checker {
 			case Token::EQUAL_EQUAL:
 			case Token::BANG_EQUAL: {
 				++suppress_errors;
-				ComptimeValue lhs_value = resolveComptimeValue(unit, *bin.lhs);
-				ComptimeValue rhs_value = resolveComptimeValue(unit, *bin.rhs);
-				--suppress_errors;
-				if (lhs_value.kind == ComptimeValue::TYPE && rhs_value.kind == ComptimeValue::TYPE) {
-					result = primitiveType(ResolvedType::BOOL);
-					break;
+				ResolvedType* lhs_t = asType(evalComptime(unit, *bin.lhs), bin.lhs->token);
+				if (lhs_t) {
+					ResolvedType* rhs_t = asType(evalComptime(unit, *bin.rhs), bin.rhs->token);
+					--suppress_errors;
+					if (lhs_t && rhs_t && lhs_t->kind == ResolvedType::META && rhs_t->kind == ResolvedType::META) {
+						result = primitiveType(ResolvedType::BOOL);
+						--suppress_errors;
+					}	
 				}
+
 				if (lhs->kind == ResolvedType::UNION || rhs->kind == ResolvedType::UNION) {
 					errorLine(expr.token, "Cannot compare union values");
 					return nullptr;
@@ -3316,16 +2572,17 @@ struct Checker {
 
 	ResolvedType* checkTypeMemberExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr) {
 		TypeMemberExpression& member = static_cast<TypeMemberExpression&>(expr);
-		ComptimeValue base_value = resolveComptimeValue(unit, *member.expression, nullptr, ctx);
-		if (base_value.kind != ComptimeValue::TYPE || !base_value.type) return nullptr;
-		member.reflected_type = base_value.type;
+		ResolvedType* t = asType(evalComptime(unit, *member.expression), member.expression->token);
+		if (!t) return nullptr;
+
+		member.reflected_type = t;
 		if (equalStrings(member.name, "name")) {
-			member.comptime_string = reflectedTypeName(unit, *base_value.type);
+			member.comptime_string = reflectedTypeName(unit, *t);
 			expr.resolved_type = primitiveType(ResolvedType::STRING);
 			return expr.resolved_type;
 		}
 		if (equalStrings(member.name, "types")) {
-			ResolvedType* utype = base_value.type;
+			ResolvedType* utype = t;
 			if (utype->kind != ResolvedType::UNION) {
 				errorLine(expr.token, "Type member ::types requires a union type");
 				return nullptr;
@@ -3346,10 +2603,10 @@ struct Checker {
 				return nullptr;
 			}
 			ResolvedType* child = nullptr;
-			switch (base_value.type->kind) {
-				case ResolvedType::NULLABLE: child = static_cast<NullableResolvedType*>(base_value.type)->inner; break;
-				case ResolvedType::SLICE: child = static_cast<SliceResolvedType*>(base_value.type)->element_type; break;
-				case ResolvedType::ARRAY: child = static_cast<ArrayResolvedType*>(base_value.type)->element_type; break;
+			switch (t->kind) {
+				case ResolvedType::NULLABLE: child = static_cast<NullableResolvedType*>(t)->inner; break;
+				case ResolvedType::SLICE: child = static_cast<SliceResolvedType*>(t)->element_type; break;
+				case ResolvedType::ARRAY: child = static_cast<ArrayResolvedType*>(t)->element_type; break;
 				default: break;
 			}
 			if (!child) {
@@ -3362,7 +2619,7 @@ struct Checker {
 			return meta;
 		}
 		if (equalStrings(member.name, "length")) {
-			if (base_value.type->kind != ResolvedType::ARRAY) {
+			if (t->kind != ResolvedType::ARRAY) {
 				errorLine(expr.token, "Type member length requires an array type");
 				return nullptr;
 			}
@@ -3370,14 +2627,14 @@ struct Checker {
 			return expr.resolved_type;
 		}
 		if (equalStrings(member.name, "min") || equalStrings(member.name, "max")) {
-			if (!isNumericType(*base_value.type) && base_value.type->kind != ResolvedType::BYTE) {
+			if (!isNumericType(*t) && t->kind != ResolvedType::BYTE) {
 				errorLine(expr.token, "Type member ", member.name, " requires a numeric type");
 				return nullptr;
 			}
-			expr.resolved_type = base_value.type;
+			expr.resolved_type = t;
 			return expr.resolved_type;
 		}
-		if (base_value.type->kind != ResolvedType::FUNCTION) {
+		if (t->kind != ResolvedType::FUNCTION) {
 			errorLine(expr.token, "Type member ret requires a function type");
 			return nullptr;
 		}
@@ -3386,7 +2643,7 @@ struct Checker {
 			return nullptr;
 		}
 		MetaType* meta = makeType<MetaType>(unit.arena);
-		meta->inner = static_cast<FunctionResolvedType*>(base_value.type)->return_type;
+		meta->inner = static_cast<FunctionResolvedType*>(t)->return_type;
 		expr.resolved_type = meta;
 		return meta;
 	}
@@ -3702,7 +2959,11 @@ struct Checker {
 			if (SemanticLocalBinding* local = findLocal(*ctx, id.name)) {
 				id.symbol = nullptr;
 				id.slot = local->slot;
-				id.comptime_value = local->comptime_value;
+				if (local->is_comptime) {
+				u32 size = typeByteSize(*local->type);
+				id.comptime_bytes = (u8*)unit.arena.allocate(unit.arena.user_data, size, 1);
+				memcpy(id.comptime_bytes, local->comptime_value.value, size);
+				}
 				expr.resolved_type = local->type;
 				return expr.resolved_type;
 			}
@@ -3742,12 +3003,12 @@ struct Checker {
 						errorLine(expr.token, "Cannot infer template argument for comptime parameter ", param.name);
 						return nullptr;
 					}
-				if (!inferTemplateArg(*ref.owner, bindings, *param.type_expr, ComptimeValue(target.params[target_param_index].type))) {
+				if (!inferTemplateArg(*ref.owner, bindings, *param.type_expr, ComptimeResult{ComptimeResult::TYPE, target.params[target_param_index].type})) {
 						errorLine(expr.token, "Cannot infer template argument for parameter ", param.name);
 						return nullptr;
 					}
 				}
-				if (!inferTemplateArg(*ref.owner, bindings, *fn->return_type, ComptimeValue(target.return_type))) {
+				if (!inferTemplateArg(*ref.owner, bindings, *fn->return_type, ComptimeResult{ComptimeResult::TYPE, target.return_type})) {
 					errorLine(expr.token, "Cannot infer return type for function template");
 					return nullptr;
 				}
@@ -3813,8 +3074,7 @@ struct Checker {
 			}
 			case Expression::SIZEOF: {
 				SizeofExpression& sz = static_cast<SizeofExpression&>(expr);
-				ComptimeValue v;
-				if (!resolveSizeofValue(unit, sz, v)) return nullptr;
+				if (!resolveSizeofValue(unit, sz)) return nullptr;
 				
 				ResolvedType* int_hint = unwrapNullable(hint);
 				if (int_hint && isNumericType(*int_hint)) {
@@ -3847,7 +3107,6 @@ struct Checker {
 					errorLine(expr.token, "Cannot use type value in a non-comptime context");
 					return nullptr;
 				}
-				expr.resolved_type = static_cast<ResolvedTypeExpression&>(expr).type;
 				return expr.resolved_type;
 			}
 			case Expression::TYPEOF: {
@@ -3898,7 +3157,7 @@ struct Checker {
 					errorLine(expr.token, "Cannot use union type in a non-comptime context");
 					return nullptr;
 				}
-				ResolvedType* type = resolveTypeExpr(unit, expr);
+				ResolvedType* type = resolveTypeExpr(unit, expr, nullptr, ctx);
 				expr.resolved_type = type;
 				return type;
 			}
@@ -3914,7 +3173,7 @@ struct Checker {
 					errorLine(expr.token, "Cannot use type expression in a non-comptime context");
 					return nullptr;
 				}
-				ResolvedType* type = resolveTypeExpr(unit, expr);
+				ResolvedType* type = resolveTypeExpr(unit, expr, nullptr, ctx);
 				expr.resolved_type = type;
 				return type;
 			}
@@ -4225,10 +3484,18 @@ struct Checker {
 		ctx.comptime_only = previous_comptime_only;
 		if (!expr_type) return false;
 		if (var.is_comptime) {
-			ComptimeValue value = resolveComptimeValue(unit, *var.expression, nullptr, &ctx);
-			if (value.kind == ComptimeValue::INVALID) return false;
-			var.resolved_type = value.kind == ComptimeValue::TYPE ? static_cast<ResolvedType*>(makeType<MetaType>(unit.arena)) : expr_type;
-			if (value.kind == ComptimeValue::TYPE) static_cast<MetaType*>(var.resolved_type)->inner = value.type;
+			ComptimeResult value = evalComptime(unit, *var.expression);
+			if (!value) return false;
+
+			if (value.kind == ComptimeResult::TYPE) {
+				auto* meta = makeType<MetaType>(unit.arena);
+				meta->inner = value.type;
+				var.resolved_type = meta;
+			}
+			else {
+				var.resolved_type = value.type;
+			}
+
 			SemanticLocalBinding& binding = ctx.locals.emplace_back();
 			binding.name = var.name;
 			binding.type = var.resolved_type;
@@ -4385,34 +3652,34 @@ struct Checker {
 	}
 
 	bool checkIfStatement(Unit& unit, FunctionCheckContext& ctx, IfStatement& ifst, ResolvedType* return_type) {
-		// A condition made entirely from compile-time values selects one branch.
-		// Suppress resolver diagnostics here because a runtime condition is valid;
-		// it simply falls through to ordinary two-arm checking below.
-		ComptimeValue comptime_condition;
-		++suppress_errors;
-		comptime_condition = resolveComptimeValue(unit, *ifst.condition, nullptr, &ctx);
-		--suppress_errors;
-		if (comptime_condition.kind == ComptimeValue::BOOL) {
-			const bool previous_comptime_only = ctx.comptime_only;
-			ctx.comptime_only = true;
-			ResolvedType* cond = checkExpr(unit, &ctx, *ifst.condition, primitiveType(ResolvedType::BOOL));
-			ctx.comptime_only = previous_comptime_only;
-			if (!cond) return false;
-			if (!typesEqual(cond, primitiveType(ResolvedType::BOOL))) {
-				errorLine(ifst.token, "If condition must be of type bool, got ", cond);
-				return false;
-			}
-			ifst.comptime_known = true;
-			ifst.comptime_value = comptime_condition.bool_value;
-			Statement* selected = ifst.comptime_value ? static_cast<Statement*>(ifst.body) : ifst.else_branch;
-			return checkStatement(unit, ctx, selected, return_type, {});
-		}
-
+		const bool condition_has_type_value = ifst.condition && ifst.condition->kind == Expression::BINARY
+			&& (static_cast<BinaryExpression*>(ifst.condition)->lhs->kind == Expression::RESOLVED_TYPE
+				|| static_cast<BinaryExpression*>(ifst.condition)->rhs->kind == Expression::RESOLVED_TYPE);
+		const bool previous_comptime_only = ctx.comptime_only;
+		if (condition_has_type_value) ctx.comptime_only = true;
 		ResolvedType* cond = checkExpr(unit, &ctx, *ifst.condition, primitiveType(ResolvedType::BOOL));
+		ctx.comptime_only = previous_comptime_only;
 		if (!cond) return false;
 		if (!typesEqual(cond, primitiveType(ResolvedType::BOOL))) {
 			errorLine(ifst.token, "If condition must be of type bool, got ", cond);
 			return false;
+		}
+
+		// A condition made entirely from compile-time values selects one branch.
+		// Suppress resolver diagnostics here because a runtime condition is valid;
+		// it simply falls through to ordinary two-arm checking below.
+		++suppress_errors;
+		ComptimeResult cmptime_t = evalComptime(unit, *ifst.condition);
+		--suppress_errors;
+		if (cmptime_t && cmptime_t.kind == ComptimeResult::VALUE && cmptime_t.type->kind == ResolvedType::BOOL) {
+			bool comptime_bool_value;
+			memcpy(&comptime_bool_value, comptime_stack_ptr - sizeof(bool), sizeof(bool));
+			comptime_stack_ptr -= sizeof(bool);
+
+			ifst.comptime_known = true;
+			ifst.comptime_value = comptime_bool_value;
+			Statement* selected = ifst.comptime_value ? static_cast<Statement*>(ifst.body) : ifst.else_branch;
+			return checkStatement(unit, ctx, selected, return_type, {});
 		}
 
 		// Detect `x != null` / `x == null` to narrow x inside the respective branch.
@@ -4582,14 +3849,10 @@ struct Checker {
 
 		if (fs.is_unroll) {
 			if (fs.end) {
-				const ComptimeValue begin_value = resolveComptimeValue(unit, *fs.begin);
-				const ComptimeValue end_value = resolveComptimeValue(unit, *fs.end);
-				if (begin_value.kind != ComptimeValue::INT || end_value.kind != ComptimeValue::INT) {
+				if (!resolveComptimeIntValue(unit, fs.begin, fs.unroll_begin) || !resolveComptimeIntValue(unit, fs.end, fs.unroll_end)) {
 					errorLine(fs.token, "unroll for bounds must be compile-time constant integers");
 					return false;
 				}
-				fs.unroll_begin = begin_value.int_value;
-				fs.unroll_end = end_value.int_value;
 			}
 			else {
 				fs.unroll_elements = resolveUnrollElements(*fs.begin);
@@ -4688,35 +3951,44 @@ struct Checker {
 		// like a compile-time if condition selects one branch. Pattern validation
 		// below still runs for every arm so exhaustiveness and duplicate checks are
 		// not bypassed.
-		ComptimeValue comptime_subject;
 		++suppress_errors;
-		comptime_subject = resolveComptimeValue(unit, *ms.subject);
+		ComptimeResult comptime_subject = evalComptime(unit, *ms.subject);
 		--suppress_errors;
-		if (comptime_subject.kind != ComptimeValue::INVALID && !subject_is_union) {
+		if (comptime_subject && !subject_is_union) {
 			const auto matches = [&](MatchPattern& pattern) {
-				if (subject_is_enum && pattern.begin->kind == Expression::MEMBER
-					&& !static_cast<MemberExpression*>(pattern.begin)->expression) {
+				if (subject_is_enum && pattern.begin->kind == Expression::MEMBER && !static_cast<MemberExpression*>(pattern.begin)->expression) {
 					const ls_string_view name = static_cast<MemberExpression*>(pattern.begin)->name;
 					const EnumResolvedType* en = static_cast<const EnumResolvedType*>(subject);
 					for (u32 i = 0; i < en->decl->members.size(); ++i) {
 						const EnumMember& member = en->decl->members[i];
 						if (!equalStrings(member.name, name)) continue;
-						ComptimeValue value = member.value
-							? resolveComptimeValue(unit, *member.value)
-							: ComptimeValue((i64)i);
+						ComptimeResult value = member.value
+							? evalComptime(unit, *member.value)
+							: makeComptimeEnumResult(const_cast<EnumResolvedType*>(en), (i64)i);
+						if (!value) return false;
+						if (value.type != subject) {
+							i64 numeric = comptimeNumericToI64(value.value, value.type->kind);
+							value = makeComptimeEnumResult(const_cast<EnumResolvedType*>(en), numeric);
+						}
 						return comptimeValuesEqual(comptime_subject, value);
 					}
 					return false;
 				}
-				ComptimeValue begin = resolveComptimeValue(unit, *pattern.begin);
-				if (begin.kind == ComptimeValue::INVALID) return false;
+				ComptimeResult begin = evalComptime(unit, *pattern.begin);
+				if (!begin) return false;
 				if (pattern.end) {
-					ComptimeValue end = resolveComptimeValue(unit, *pattern.end);
-					if (end.kind == ComptimeValue::INVALID
-						|| (comptime_subject.kind != ComptimeValue::INT && comptime_subject.kind != ComptimeValue::FLOAT)
-						|| (begin.kind != ComptimeValue::INT && begin.kind != ComptimeValue::FLOAT)
-						|| (end.kind != ComptimeValue::INT && end.kind != ComptimeValue::FLOAT)) return false;
+					ComptimeResult end = evalComptime(unit, *pattern.end);
+					if (!end) return false;
+					// TODO
+					#if 0
+					// TODO we should typecheck this before evaluating
+					if (comptime_subject.kind != ComptimeValue::INT && comptime_subject.kind != ComptimeValue::FLOAT) return false;
+					if (begin.kind != ComptimeValue::INT && begin.kind != ComptimeValue::FLOAT) return false;
+					if (end.kind != ComptimeValue::INT && end.kind != ComptimeValue::FLOAT) return false;
+					// TODO add test to hit this
 					return comptime_subject.asFloat() >= begin.asFloat() && comptime_subject.asFloat() <= end.asFloat();
+					#endif
+					return false;
 				}
 				return comptimeValuesEqual(comptime_subject, begin);
 			};
@@ -5160,6 +4432,1080 @@ struct Checker {
 		sym.check_state = Symbol::CHECKED;
 		return LS_RESULT_OK;
 	}
+
+	ResolvedType* asType(ComptimeResult result, Token token) {
+		if (result.kind == ComptimeResult::FAILURE) return nullptr;
+		if (result.kind == ComptimeResult::TYPE) return result.type;
+		errorLine(token, "Expected a type, got a value of type ", result.type);
+		return nullptr;
+	}
+
+	template <typename T> ResolvedType* getPrimitiveType();
+	template <> ResolvedType* getPrimitiveType<i8>() { return primitiveType(ResolvedType::I8); }
+	template <> ResolvedType* getPrimitiveType<i16>() { return primitiveType(ResolvedType::I16); }
+	template <> ResolvedType* getPrimitiveType<i32>() { return primitiveType(ResolvedType::I32); }
+	template <> ResolvedType* getPrimitiveType<i64>() { return primitiveType(ResolvedType::I64); }
+	template <> ResolvedType* getPrimitiveType<u8>() { return primitiveType(ResolvedType::U8); }
+	template <> ResolvedType* getPrimitiveType<u16>() { return primitiveType(ResolvedType::U16); }
+	template <> ResolvedType* getPrimitiveType<u32>() { return primitiveType(ResolvedType::U32); }
+	template <> ResolvedType* getPrimitiveType<u64>() { return primitiveType(ResolvedType::U64); }
+	template <> ResolvedType* getPrimitiveType<f32>() { return primitiveType(ResolvedType::F32); }
+	template <> ResolvedType* getPrimitiveType<f64>() { return primitiveType(ResolvedType::F64); }
+	template <> ResolvedType* getPrimitiveType<bool>() { return primitiveType(ResolvedType::BOOL); }
+
+	template <typename T>
+	ComptimeResult makeComptimeResult(T value, u8* address) {
+		memcpy(address, &value, sizeof(value));
+		comptime_stack_ptr = address + sizeof(value);
+		return {ComptimeResult::VALUE, getPrimitiveType<T>(), address};
+	}
+
+	ComptimeResult makeComptimeEnumResult(ResolvedType* type, i64 value) {
+		u8* ptr = comptime_stack_ptr;
+		i32 enum_value = (i32)value;
+		memcpy(comptime_stack_ptr, &enum_value, sizeof(enum_value));
+		comptime_stack_ptr += sizeof(enum_value);
+		return {ComptimeResult::VALUE, type, ptr};
+	}
+
+	ComptimeResult evalComptime(Unit& unit, Statement& statement, ComptimeFrame& frame) {
+		switch (statement.kind) {
+			case Statement::BREAK:
+			case Statement::CONTINUE:
+			case Statement::LABEL:
+			case Statement::MATCH:
+			case Statement::EXPRESSION: {
+				errorLine(statement.token, "Comptime evaluation of statement kind ", statement.kind, " not implemented yet");
+				return {};
+			}
+			case Statement::FOR: {
+				ForStatement& fs = static_cast<ForStatement&>(statement);
+				ASSERT(fs.begin);
+
+				// Array/slice unroll loops use the resolved source literal. Keep the
+				// loop bindings in the frame and overwrite their storage for each copy.
+				if (!fs.end) {
+					if (!fs.unroll_elements) {
+						errorLine(fs.token, "Comptime for loop requires an unrolled array or range");
+						return {};
+					}
+					ResolvedType* container_type = fs.begin->resolved_type;
+					if (!container_type || (container_type->kind != ResolvedType::ARRAY && container_type->kind != ResolvedType::SLICE)) {
+						errorLine(fs.begin->token, "Comptime array for loop requires an array or slice");
+						return {};
+					}
+					ResolvedType* element_type = container_type->kind == ResolvedType::ARRAY
+						? static_cast<ArrayResolvedType*>(container_type)->element_type
+						: static_cast<SliceResolvedType*>(container_type)->element_type;
+					ComptimeFrame::Local& value_binding = frame.locals.emplace_back();
+					value_binding.name = fs.value_var;
+					value_binding.type = element_type;
+					value_binding.bytes = static_cast<u8*>(unit.arena.allocate(unit.arena.user_data, typeByteSize(*element_type), 1));
+					ComptimeFrame::Local* key_binding = nullptr;
+					if (fs.is_key_value) {
+						key_binding = &frame.locals.emplace_back();
+						key_binding->name = fs.key_var;
+						key_binding->type = primitiveType(ResolvedType::ISIZE);
+						key_binding->bytes = static_cast<u8*>(unit.arena.allocate(unit.arena.user_data, sizeof(i64), alignof(i64)));
+					}
+
+					for (i32 i = 0; i < fs.unroll_elements->values.size(); ++i) {
+						ComptimeResult element = evalComptime(unit, *fs.unroll_elements->values[i], nullptr, nullptr, &frame);
+						if (!element) return element;
+						if (element.kind != ComptimeResult::VALUE || !canImplicitlyConvert(element.type, element_type)) {
+							errorLine(fs.body->token, "Cannot convert comptime for element to ", element_type);
+							return {};
+						}
+						memcpy(value_binding.bytes, element.value, typeByteSize(*element_type));
+						if (key_binding) {
+							i64 index = i;
+							memcpy(key_binding->bytes, &index, sizeof(index));
+						}
+						ComptimeResult body = evalComptime(unit, *fs.body, frame);
+						if (!body) return body;
+						if (body.kind != ComptimeResult::VOID) return body;
+					}
+					return {ComptimeResult::VOID};
+				}
+
+				ComptimeResult begin = evalComptime(unit, *fs.begin, nullptr, nullptr, &frame);
+				if (!begin) return begin;
+				ComptimeResult end = evalComptime(unit, *fs.end, nullptr, nullptr, &frame);
+				if (!end) return end;
+				if (begin.kind != ComptimeResult::VALUE || end.kind != ComptimeResult::VALUE
+					|| !isIntegerOrUntyped(*begin.type) || !isIntegerOrUntyped(*end.type)) {
+					errorLine(fs.token, "Comptime for loop bounds must be integer values");
+					return {};
+				}
+				i64 begin_value = comptimeNumericToI64(begin.value, begin.type->kind);
+				i64 end_value = comptimeNumericToI64(end.value, end.type->kind);
+				ResolvedType* loop_type = fs.begin->resolved_type;
+				if (!loop_type || !isIntegerType(*loop_type)) loop_type = primitiveType(ResolvedType::I64);
+				ComptimeFrame::Local& value_binding = frame.locals.emplace_back();
+				value_binding.name = fs.value_var;
+				value_binding.type = loop_type;
+				value_binding.bytes = static_cast<u8*>(unit.arena.allocate(unit.arena.user_data, typeByteSize(*loop_type), 1));
+				ComptimeFrame::Local* key_binding = nullptr;
+				if (fs.is_key_value) {
+					key_binding = &frame.locals.emplace_back();
+					key_binding->name = fs.key_var;
+					key_binding->type = primitiveType(ResolvedType::ISIZE);
+					key_binding->bytes = static_cast<u8*>(unit.arena.allocate(unit.arena.user_data, sizeof(i64), alignof(i64)));
+				}
+				for (i64 value = begin_value; value < end_value; ++value) {
+					const u64 bits = static_cast<u64>(value);
+					writeComptimeNumeric(value_binding.bytes, (const u8*)&bits, ResolvedType::U64, loop_type->kind);
+					if (key_binding) memcpy(key_binding->bytes, &value, sizeof(value));
+					ComptimeResult body = evalComptime(unit, *fs.body, frame);
+					if (!body) return body;
+					if (body.kind != ComptimeResult::VOID) return body;
+				}
+				return {ComptimeResult::VOID};
+			}
+			case Statement::WHILE: {
+				WhileStatement& ws = static_cast<WhileStatement&>(statement);
+				while (true) {
+					ComptimeResult cond = evalComptime(unit, *ws.condition, nullptr, nullptr, &frame);
+					if (!cond) return cond;
+
+					if (cond.kind != ComptimeResult::VALUE || cond.type->kind != ResolvedType::BOOL) {
+						errorLine(ws.condition->token, "Comptime while condition must be a boolean value, got ", cond.type);
+						return {};
+					}
+					if (!*(bool*)cond.value) break;
+					ComptimeResult body = evalComptime(unit, *ws.body, frame);
+					if (!body) return body;
+				}
+				return {ComptimeResult::VOID};
+			}
+			case Statement::ASSIGN: {
+				AssignStatement& assign = static_cast<AssignStatement&>(statement);
+				ComptimeResult value = evalComptime(unit, *assign.rhs, nullptr, nullptr, &frame);
+				if (!value) return value;
+
+				u8* lhs_bytes = nullptr;
+				ResolvedType* lhs_type = nullptr;
+				if (!resolveComptimeLValue(unit, *assign.lhs, frame, lhs_bytes, lhs_type)) {
+					errorLine(assign.lhs->token, "Comptime assignment lhs is not writable");
+					return {};
+				}
+
+				if (!canImplicitlyConvert(value.type, lhs_type)) {
+					errorLine(assign.lhs->token, "Cannot assign value of type ", value.type, " to comptime variable of type ", lhs_type);
+					return {};
+				}
+				if (assign.op == Token::EQUAL) {
+					memcpy(lhs_bytes, value.value, typeByteSize(*lhs_type));
+					return {ComptimeResult::VOID};
+				}
+				if (!isNumericType(*lhs_type) || !isNumericType(*value.type)) {
+					errorLine(assign.token, "Comptime compound assignment requires numeric values");
+					return {};
+				}
+				// TODO simplify
+				const bool floating = isFloatType(*lhs_type);
+				if (floating) {
+					if (lhs_type->kind == ResolvedType::F32) {
+						float lhs;
+						float rhs;
+						memcpy(&lhs, lhs_bytes, sizeof(lhs));
+						memcpy(&rhs, value.value, sizeof(rhs));
+						switch (assign.op) {
+							case Token::PLUS_EQUAL: lhs += rhs; break;
+							case Token::MINUS_EQUAL: lhs -= rhs; break;
+							case Token::STAR_EQUAL: lhs *= rhs; break;
+							case Token::SLASH_EQUAL:
+								if (rhs == 0.0f) { errorLine(assign.token, "Division by zero"); return {}; }
+								lhs /= rhs;
+								break;
+							default: ASSERT(false); return {};
+						}
+						memcpy(lhs_bytes, &lhs, sizeof(lhs));
+					} else {
+						double lhs;
+						double rhs;
+						memcpy(&lhs, lhs_bytes, sizeof(lhs));
+						memcpy(&rhs, value.value, sizeof(rhs));
+						switch (assign.op) {
+							case Token::PLUS_EQUAL: lhs += rhs; break;
+							case Token::MINUS_EQUAL: lhs -= rhs; break;
+							case Token::STAR_EQUAL: lhs *= rhs; break;
+							case Token::SLASH_EQUAL:
+								if (rhs == 0.0) { errorLine(assign.token, "Division by zero"); return {}; }
+								lhs /= rhs;
+								break;
+							default: ASSERT(false); return {};
+						}
+						memcpy(lhs_bytes, &lhs, sizeof(lhs));
+					}
+				} else {
+					const bool unsigned_target = lhs_type->kind == ResolvedType::U8
+						|| lhs_type->kind == ResolvedType::U16
+						|| lhs_type->kind == ResolvedType::U32
+						|| lhs_type->kind == ResolvedType::U64
+						|| lhs_type->kind == ResolvedType::BYTE;
+					if (unsigned_target) {
+						u64 lhs;
+						u64 rhs;
+						switch (lhs_type->kind) {
+							case ResolvedType::U8:
+							case ResolvedType::BYTE: { u8 v; memcpy(&v, lhs_bytes, sizeof(v)); lhs = v; break; }
+							case ResolvedType::U16: { u16 v; memcpy(&v, lhs_bytes, sizeof(v)); lhs = v; break; }
+							case ResolvedType::U32: { u32 v; memcpy(&v, lhs_bytes, sizeof(v)); lhs = v; break; }
+							case ResolvedType::U64: memcpy(&lhs, lhs_bytes, sizeof(lhs)); break;
+							default: ASSERT(false); return {};
+						}
+						switch (value.type->kind) {
+							case ResolvedType::U8:
+							case ResolvedType::BYTE: { u8 v; memcpy(&v, value.value, sizeof(v)); rhs = v; break; }
+							case ResolvedType::U16: { u16 v; memcpy(&v, value.value, sizeof(v)); rhs = v; break; }
+							case ResolvedType::U32: { u32 v; memcpy(&v, value.value, sizeof(v)); rhs = v; break; }
+							case ResolvedType::U64: memcpy(&rhs, value.value, sizeof(rhs)); break;
+							default: ASSERT(false); return {};
+						}
+						switch (assign.op) {
+							case Token::PLUS_EQUAL: lhs += rhs; break;
+							case Token::MINUS_EQUAL: lhs -= rhs; break;
+							case Token::STAR_EQUAL: lhs *= rhs; break;
+							case Token::SLASH_EQUAL:
+								if (rhs == 0) { errorLine(assign.token, "Division by zero"); return {}; }
+								lhs /= rhs;
+								break;
+							default: ASSERT(false); return {};
+						}
+						writeComptimeNumeric(lhs_bytes, (const u8*)&lhs, ResolvedType::U64, lhs_type->kind);
+					} else {
+						i64 lhs;
+						i64 rhs;
+						switch (lhs_type->kind) {
+							case ResolvedType::I8: { i8 v; memcpy(&v, lhs_bytes, sizeof(v)); lhs = v; break; }
+							case ResolvedType::I16: { i16 v; memcpy(&v, lhs_bytes, sizeof(v)); lhs = v; break; }
+							case ResolvedType::I32: { i32 v; memcpy(&v, lhs_bytes, sizeof(v)); lhs = v; break; }
+							case ResolvedType::I64:
+							case ResolvedType::ISIZE: memcpy(&lhs, lhs_bytes, sizeof(lhs)); break;
+							default: ASSERT(false); return {};
+						}
+						switch (value.type->kind) {
+							case ResolvedType::I8: { i8 v; memcpy(&v, value.value, sizeof(v)); rhs = v; break; }
+							case ResolvedType::I16: { i16 v; memcpy(&v, value.value, sizeof(v)); rhs = v; break; }
+							case ResolvedType::I32: { i32 v; memcpy(&v, value.value, sizeof(v)); rhs = v; break; }
+							case ResolvedType::I64:
+							case ResolvedType::ISIZE: memcpy(&rhs, value.value, sizeof(rhs)); break;
+							default: ASSERT(false); return {};
+						}
+						switch (assign.op) {
+							case Token::PLUS_EQUAL: lhs += rhs; break;
+							case Token::MINUS_EQUAL: lhs -= rhs; break;
+							case Token::STAR_EQUAL: lhs *= rhs; break;
+							case Token::SLASH_EQUAL:
+								if (rhs == 0) { errorLine(assign.token, "Division by zero"); return {}; }
+								lhs /= rhs;
+								break;
+							default: ASSERT(false); return {};
+						}
+						writeComptimeNumeric(lhs_bytes, (const u8*)&lhs, ResolvedType::I64, lhs_type->kind);
+					}
+				}
+				return {ComptimeResult::VOID};
+			}
+			case Statement::IF: {
+				IfStatement& ifs = static_cast<IfStatement&>(statement);
+				ComptimeResult cond = evalComptime(unit, *ifs.condition, nullptr, nullptr, &frame);
+				if (!cond) return cond;
+				if (cond.kind != ComptimeResult::VALUE || cond.type->kind != ResolvedType::BOOL) {
+					errorLine(ifs.condition->token, "Comptime if condition must be a boolean value, got ", cond.type);
+					return {};
+				}
+				if (*(bool*)cond.value) {
+					return evalComptime(unit, *ifs.body, frame);
+				} else if (ifs.else_branch) {
+					return evalComptime(unit, *ifs.else_branch, frame);
+				}
+				return {ComptimeResult::VOID};
+			}
+			case Statement::VAR_DECL: {
+				VarDeclStatement& decl = static_cast<VarDeclStatement&>(statement);
+				ComptimeResult result = evalComptime(unit, *decl.expression, nullptr, nullptr, &frame);
+				if (!result) return result;
+
+				ComptimeFrame::Local& binding = frame.locals.emplace_back();
+				binding.name = decl.name;
+				binding.bytes = result.value;
+				binding.type = result.type;
+				return {ComptimeResult::VOID, nullptr, nullptr};
+			}
+			case Statement::RETURN: {
+				ReturnStatement& ret = static_cast<ReturnStatement&>(statement);
+				return evalComptime(unit, *ret.expression, nullptr, nullptr, &frame);
+			}
+			case Statement::BLOCK: {
+				BlockStatement& block = static_cast<BlockStatement&>(statement);
+				for (Statement* child : block.statements) {
+					ComptimeResult result = evalComptime(unit, *child, frame);
+					if (!result) return result;
+					if (result.kind != ComptimeResult::VOID) return result;
+				}
+				return {ComptimeResult::VOID};
+			}
+		}
+		errorLine(statement.token, "Comptime evaluation of statement kind ", statement.kind, " not implemented yet");
+		return {};
+	}
+
+	static u32 fieldOffset(const StructResolvedType& st, i32 field_index) {
+		u32 offset = 0;
+		for (i32 i = 0; i < field_index; ++i) {
+			ResolvedType* ft = structFieldType(st, i);
+			if (ft) offset += typeByteSize(*ft);
+		}
+		return offset;
+	}	
+
+	bool resolveComptimeLValue(Unit& unit, Expression& expr, ComptimeFrame& frame, u8*& out_ptr, ResolvedType*& out_type) {
+		switch (expr.kind) {
+			case Expression::IDENTIFIER: {
+				ComptimeFrame::Local* local = frame.find(static_cast<IdentifierExpression&>(expr).name);
+				if (!local) return false;
+				out_ptr = local->bytes;
+				out_type = local->type;
+				return true;
+			}
+			case Expression::MEMBER: {
+				MemberExpression& member = static_cast<MemberExpression&>(expr);
+				if (!member.expression) return false;
+				u8* base_ptr = nullptr;
+				ResolvedType* base_type = nullptr;
+				if (!resolveComptimeLValue(unit, *member.expression, frame, base_ptr, base_type)) return false;
+				if (base_type->kind != ResolvedType::STRUCT) return false;
+				StructResolvedType& st = static_cast<StructResolvedType&>(*base_type);
+				if (!st.decl) return false;
+				for (i32 i = 0; i < st.decl->fields.size(); ++i) {
+					if (!equalStrings(st.decl->fields[i].name, member.name)) continue;
+					ResolvedType* field_type = structFieldType(st, i);
+					if (!field_type) return false;
+					out_ptr = base_ptr + fieldOffset(st, i);
+					out_type = field_type;
+					return true;
+				}
+				return false;
+			}
+			case Expression::BRACKET: {
+				BracketExpression& br = static_cast<BracketExpression&>(expr);
+				if (!br.base || br.args.size() != 1) return false;
+				u8* base_ptr = nullptr;
+				ResolvedType* base_type = nullptr;
+				if (!resolveComptimeLValue(unit, *br.base, frame, base_ptr, base_type)) return false;
+				if (base_type->kind != ResolvedType::ARRAY) return false;
+				ArrayResolvedType& arr = static_cast<ArrayResolvedType&>(*base_type);
+				ComptimeResult index = evalComptime(unit, *br.args[0], nullptr, nullptr, &frame);
+				if (!index || index.kind != ComptimeResult::VALUE || !isIntegerOrUntyped(*index.type)) return false;
+				const i64 i = comptimeNumericToI64(index.value, index.type->kind);
+				if (i < 0 || i >= arr.size) return false;
+				out_ptr = base_ptr + (u32)i * typeByteSize(*arr.element_type);
+				out_type = arr.element_type;
+				return true;
+			}
+			default: return false;
+		}
+	}
+
+	ComptimeResult readComptimeScalar(const ResolvedType& type, const u8* bytes, u8* address) {
+		switch (type.kind) {
+			case ResolvedType::F32: { float f; memcpy(&f, bytes, 4); return makeComptimeResult(f, address); }
+			case ResolvedType::F64: { double d; memcpy(&d, bytes, 8); return makeComptimeResult(d, address); }
+			case ResolvedType::BOOL: return makeComptimeResult(bytes[0] != 0, address);
+			case ResolvedType::I8: { i8 v; memcpy(&v, bytes, 1); return makeComptimeResult(v, address); }
+			case ResolvedType::I16: { i16 v; memcpy(&v, bytes, 2); return makeComptimeResult(v, address); }
+			case ResolvedType::I32: { i32 v; memcpy(&v, bytes, 4); return makeComptimeResult(v, address); }
+			case ResolvedType::I64: { i64 v; memcpy(&v, bytes, 8); return makeComptimeResult(v, address); }
+			case ResolvedType::U8: { u8 v; memcpy(&v, bytes, 1); return makeComptimeResult(v, address); }
+			case ResolvedType::U16: { u16 v; memcpy(&v, bytes, 2); return makeComptimeResult(v, address); }
+			case ResolvedType::U32: { u32 v; memcpy(&v, bytes, 4); return makeComptimeResult(v, address); }
+			case ResolvedType::U64: { u64 v; memcpy(&v, bytes, 8); return makeComptimeResult(v, address); }
+			default: return {};
+		}
+	}
+
+	template <typename T>
+	T modulo(T lhs, T rhs) {
+		T result = lhs % rhs;
+		if (result < 0) result += rhs;
+		return result;
+	}
+
+	template <> float modulo(float lhs, float rhs) { 
+		errorLine({}, "Modulo operator is not defined for floating point types");
+		return 0;
+	}
+	template <> double modulo(double lhs, double rhs) {
+		errorLine({}, "Modulo operator is not defined for floating point types");
+		return 0;
+	}
+
+	template <typename T>
+	ComptimeResult arithmeticOp(Token::Type op, const u8* lhs_bytes, const u8* rhs_bytes, u8* address) {
+		T lhs, rhs;
+		memcpy(&lhs, lhs_bytes, sizeof(lhs));
+		memcpy(&rhs, rhs_bytes, sizeof(rhs));
+		switch (op) {
+			case Token::PERCENT:
+				if (rhs == 0) {
+					errorLine({}, "Modulo by zero");
+					return {};
+				}
+				return makeComptimeResult(modulo(lhs, rhs), address);
+			case Token::PLUS: return makeComptimeResult((T)(lhs + rhs), address);
+			case Token::MINUS: return makeComptimeResult((T)(lhs - rhs), address);
+			case Token::STAR: return makeComptimeResult((T)(lhs * rhs), address);
+			case Token::SLASH:
+				if (rhs == 0) {
+					errorLine({}, "Division by zero");
+					return {};
+				}
+				return makeComptimeResult((T)(lhs / rhs), address);
+			case Token::LT: return makeComptimeResult(lhs < rhs, address);
+			case Token::LT_EQUAL: return makeComptimeResult(lhs <= rhs, address);
+			case Token::GT: return makeComptimeResult(lhs > rhs, address);
+			case Token::GT_EQUAL: return makeComptimeResult(lhs >= rhs, address);
+			default: ASSERT(false); return {};
+		}
+	}
+
+	ComptimeResult evalComptime(Unit& unit, Expression& expr, FunctionCheckContext* ctx = nullptr, TemplateBindings* bindings = nullptr, ComptimeFrame* frame = nullptr, ResolvedType* hint = nullptr) {
+		// TODO free?
+		if (!comptime_stack) {
+			comptime_stack = (u8*)module.arena.allocate(module.arena.user_data, 1024 * 1024, 1);
+			comptime_stack_ptr = comptime_stack;
+		}
+
+		switch (expr.kind) {
+			case Expression::TYPE_MEMBER: {
+				auto& tme = static_cast<TypeMemberExpression&>(expr);
+				errorLine(expr.token, "Not implemented yet");
+				return {};
+			}
+			case Expression::CALL: {
+				auto& call = static_cast<CallExpression&>(expr);
+				if (call.callee->kind != Expression::IDENTIFIER) return {};
+				SymbolRef ref = resolveSymbol(unit, {}, static_cast<IdentifierExpression*>(call.callee)->name, LookupPolicy::Checked);
+				if (!ref) return {};
+				if (ref.symbol->expression->kind != Expression::FUNCTION) return {};
+				FunctionExpression* fn = static_cast<FunctionExpression*>(ref.symbol->expression);
+				if (fn->is_template) return {};
+				if (fn->is_extern) return {};
+
+				// Fast path: nullary function whose body is a single `return <expr>`
+				// folds by evaluating that expression directly (no interpreter frame).
+				if (call.args.empty()) {
+					BlockStatement* body = static_cast<BlockStatement*>(fn->body);
+					if (body->statements.size() == 1 && body->statements[0]->kind == Statement::RETURN) {
+						ReturnStatement* ret = static_cast<ReturnStatement*>(body->statements[0]);
+						if (!ret->expression) {
+							// TODO calling void function in comptime context does not make sense, does it?
+							errorLine(expr.token, "Void function cannot be called in comptime context");
+							return ComptimeResult{};
+						}
+						return evalComptime(*ref.owner, *ret->expression, ctx, bindings, frame);
+					}
+				}
+				// General path: interpret the body for a scalar-returning function,
+				// binding folded arguments (evaluated in the current frame) as locals.
+				if (fn->params.size() != call.args.size()) return {};
+
+				FunctionResolvedType* fn_type = asFunctionType(fn->resolved_type);
+				if (!fn_type) return {};
+
+				ResolvedType* rt = fn_type ? fn_type->return_type : nullptr;
+				ComptimeFrame callee_frame(unit);
+				for (i32 i = 0; i < call.args.size(); ++i) {
+					ComptimeResult arg = evalComptime(unit, *call.args[i], ctx, bindings, frame);
+					if (!arg) return {};
+					ComptimeFrame::Local& binding = callee_frame.locals.emplace_back();
+					binding.name = fn->params[i].name;
+					binding.bytes = arg.value;
+					binding.type = arg.type;
+				}
+
+				ComptimeResult result = evalComptime(unit, *fn->body, callee_frame);
+				return result;
+			}
+			case Expression::MEMBER: {
+				// TODO review this whole branch
+				auto& member = static_cast<MemberExpression&>(expr);
+
+				if (frame && member.expression && member.expression->kind == Expression::IDENTIFIER) {
+					u8* member_ptr = nullptr;
+					ResolvedType* member_type = nullptr;
+					if (resolveComptimeLValue(unit, member, *frame, member_ptr, member_type)) {
+						return readComptimeScalar(*member_type, member_ptr, comptime_stack_ptr);
+					}
+				}
+
+				// .enum_value
+				if (!member.expression) {
+					u32 type_kind_member_count;
+					const char* const* names = typeKindMemberNames(type_kind_member_count);
+					for (u32 i = 0; i < type_kind_member_count; ++i) {
+						if (equalStrings(names[i], member.name)) {
+							// TODO add test to hit this
+							return makeComptimeResult((i64)i, comptime_stack_ptr);
+						}
+					}
+					return {};
+				}
+
+				if (member.expression->kind != Expression::IDENTIFIER) {
+					errorLine(expr.token, "Expected identifier");
+					return {};
+				}
+
+				// enum.value
+				const ls_string_view qualifier = static_cast<IdentifierExpression*>(member.expression)->name;
+				SymbolRef type_ref = resolveSymbol(unit, {}, qualifier, LookupPolicy::Checked);
+				if (type_ref && type_ref.symbol->resolved_type && type_ref.symbol->resolved_type->kind == ResolvedType::META) {
+					ResolvedType* inner = unwrapMeta(type_ref.symbol->resolved_type);
+					if (inner->kind == ResolvedType::ENUM) {
+						EnumResolvedType* en = static_cast<EnumResolvedType*>(inner);
+						for (u32 i = 0; i < en->decl->members.size(); ++i) {
+							const EnumMember& enum_member = en->decl->members[i];
+							if (!equalStrings(enum_member.name, member.name)) continue;
+							if (!enum_member.value) return makeComptimeEnumResult(inner, (i64)i);
+							ComptimeResult value = evalComptime(unit, *enum_member.value, ctx, bindings, frame);
+							if (!value) return {};
+							i64 numeric = comptimeNumericToI64(value.value, value.type->kind);
+							return makeComptimeEnumResult(inner, numeric);
+						}
+					}
+				}
+
+				// namespace.*
+				if (!findImportedUnitByAlias(unit, qualifier)) {
+					errorLine(expr.token, "Unknown import alias ", qualifier);
+					return {};
+				}
+
+				SymbolRef ref = resolveSymbol(unit, qualifier, member.name, LookupPolicy::Checked);
+				if (!ref) {
+					errorLine(expr.token, "Unknown type ", qualifier, ".", member.name);
+					return {};
+				}
+
+				if (ref.symbol->resolved_type && ref.symbol->resolved_type->kind == ResolvedType::META) {
+					return ComptimeResult{ComptimeResult::TYPE, unwrapMeta(ref.symbol->resolved_type)};
+				}
+
+				if (ref.symbol->storage != Symbol::COMPTIME || !ref.symbol->expression) {
+					// TODO create a test to hit this
+					return {};
+				}
+				// TODO do not eval expression here, symbol should have been evaluated already
+				return evalComptime(*ref.owner, *ref.symbol->expression, ctx, bindings, frame);
+			}
+			case Expression::BRACKET: {
+				auto& be = static_cast<BracketExpression&>(expr);
+				ASSERT(be.base);
+				
+				// A[i], where A is a comptime array
+				if (be.args.size() == 1) {
+					Unit* elem_owner = &unit;
+					if (be.base->kind == Expression::ARRAY_LITERAL) {
+						// TODO add test to hit this
+						errorLine(be.base->token, "Indexing a compile-time array literal directly is not supported");
+						return {};
+					}
+					else if (be.base->kind == Expression::IDENTIFIER) {
+						SymbolRef ref = resolveSymbol(unit, {}, static_cast<IdentifierExpression*>(be.base)->name, LookupPolicy::Checked);
+						if (ref && ref.symbol && ref.symbol->storage == Symbol::COMPTIME && ref.symbol->expression->kind == Expression::ARRAY_LITERAL) {
+							ArrayLiteralExpression* arr = static_cast<ArrayLiteralExpression*>(ref.symbol->expression);
+							i64 index = 0;
+							if (!resolveComptimeIntValue(unit, be.args[0], index, bindings)) {
+								errorLine(be.args[0]->token, "Comptime array index must be a compile-time integer");
+								return {};
+							}
+							if (index < 0 || index >= (i64)arr->values.size()) {
+								errorLine(be.base->token, "Comptime array index out of bounds");
+								return {};
+							}
+							return evalComptime(*ref.owner, *arr->values[index], ctx, bindings, frame);
+						}
+
+						if (ref && ref.symbol && ref.symbol->storage == Symbol::COMPTIME && ref.symbol->resolved_type && ref.symbol->resolved_type->kind == ResolvedType::ARRAY) {
+							ComptimeResult array_value = evalComptime(*ref.owner, *ref.symbol->expression, ctx, bindings, frame);
+							if (!array_value || array_value.kind != ComptimeResult::VALUE) return {};
+							i64 index = 0;
+							if (!resolveComptimeIntValue(unit, be.args[0], index, bindings)) {
+								errorLine(be.args[0]->token, "Comptime array index must be a compile-time integer");
+								return {};
+							}
+							ArrayResolvedType* arr_type = static_cast<ArrayResolvedType*>(ref.symbol->resolved_type);
+							if (index < 0 || index >= (i64)arr_type->size) {
+								errorLine(be.base->token, "Comptime array index out of bounds");
+								return {};
+							}
+							const u32 element_size = typeByteSize(*arr_type->element_type);
+							const u8* elem_bytes = array_value.value + index * element_size;
+							memcpy(comptime_stack_ptr, elem_bytes, element_size);
+							comptime_stack_ptr += element_size;
+							return {ComptimeResult::VALUE, arr_type->element_type, comptime_stack_ptr - element_size};
+						}
+
+						if (frame) {
+							ComptimeFrame::Local* local = frame->find(static_cast<IdentifierExpression*>(be.base)->name);
+							if (local && local->type && local->type->kind == ResolvedType::ARRAY) {
+								i64 index = 0;
+								if (!resolveComptimeIntValue(unit, be.args[0], index, bindings, frame)) {
+									errorLine(be.args[0]->token, "Comptime array index must be a compile-time integer");
+									return {};
+								}
+								u8* values = local->bytes;
+								ArrayResolvedType* arr_type = static_cast<ArrayResolvedType*>(local->type);
+								if (index < 0 || index >= (i64)arr_type->size) {
+									errorLine(be.base->token, "Comptime array index out of bounds");
+									return {};
+								}
+								u32 element_size = typeByteSize(*arr_type->element_type);
+								u8* elem_bytes = values + index * element_size;
+								memcpy(comptime_stack_ptr, elem_bytes, element_size);
+								comptime_stack_ptr += element_size;
+								return {ComptimeResult::VALUE, arr_type->element_type, comptime_stack_ptr - element_size};
+							}
+						}
+					}
+				}
+
+				if (be.base->kind != Expression::IDENTIFIER && be.base->kind != Expression::MEMBER) {
+					errorLine(be.base->token, "[] can only be applied to a type name or member");
+					return {};
+				}				
+
+				ResolvedType* resolved_base = resolveTypeExpr(unit, *be.base, bindings, ctx, frame);
+				if (!resolved_base) {
+					// TODO create a test to hit this
+					return {};
+				}
+
+				const bool from_binding = be.base->kind == Expression::IDENTIFIER && findTemplateBinding(bindings, static_cast<IdentifierExpression*>(be.base)->name);
+				if (!from_binding) {
+					SymbolRef ref = resolveSymbol(unit, *be.base);
+					if (!ref || !ref.symbol->resolved_type || ref.symbol->resolved_type->kind != ResolvedType::META) {
+						// TODO create a test to hit this
+						return {};
+					}
+				}
+				if (resolved_base->kind != ResolvedType::STRUCT) {
+					// TODO create a test to hit this
+					return {};
+				}
+				StructResolvedType* st = static_cast<StructResolvedType*>(resolved_base);
+				if (!st->decl || st->decl->comptime_params.empty()) {
+					// TODO create a test to hit this
+					return {};
+				}
+				Unit* owner = findTypeNamespaceUnit(*st);
+				if (!owner)	{
+					// TODO create a test to hit this
+					return {};
+				}
+				ResolvedType* type = instantiateStructTemplate(*owner, *st->decl, be.args, &unit);
+				if (type) expr.resolved_type = type;
+				return type ? ComptimeResult{ComptimeResult::TYPE, type} : ComptimeResult{};
+			}
+			case Expression::FUNCTION_TYPE: {
+				auto& ft = static_cast<FunctionTypeExpression&>(expr);
+				FunctionResolvedType* fn_type = makeType<FunctionResolvedType>(unit.arena, unit.arena);
+				for (FunctionTypeParam& param : ft.params) {
+					ResolvedType* param_type = resolveTypeExpr(unit, *param.type_expr, bindings, ctx);
+					if (!param_type) return {};
+					if (param.is_ref && param_type->kind == ResolvedType::NULLABLE) {
+						errorLine(expr.token, "Function parameter ", param.name, " cannot be a nullable reference");
+						return {};
+					}
+					FunctionResolvedParam& resolved_param = fn_type->params.emplace_back();
+					resolved_param.name = param.name;
+					resolved_param.type = param_type;
+					resolved_param.is_ref = param.is_ref;
+					resolved_param.is_comptime = param.is_comptime;
+				}
+				fn_type->return_type = resolveTypeExpr(unit, *ft.return_type, bindings, ctx);
+				if (!fn_type->return_type) return {};
+				return {ComptimeResult::TYPE, fn_type};
+			}
+			case Expression::GENERIC_IDENTIFIER: {
+				// this should be rechecked with checkExpr later
+				return {};
+			}
+			case Expression::BINARY: {
+				u8* res_bytes = comptime_stack_ptr;
+				auto& be = static_cast<BinaryExpression&>(expr);
+				ComptimeResult lhs = evalComptime(unit, *be.lhs, ctx, bindings, frame);
+				if (!lhs) return {};
+				ComptimeResult rhs = evalComptime(unit, *be.rhs, ctx, bindings, frame);
+				if (!rhs) return {};
+
+				if (be.op == Token::EQUAL_EQUAL) return makeComptimeResult(comptimeValuesEqual(lhs, rhs), res_bytes);
+				if (be.op == Token::BANG_EQUAL) return makeComptimeResult(!comptimeValuesEqual(lhs, rhs), res_bytes);
+				if (be.op == Token::AND || be.op == Token::OR) {
+					// TODO add test to hit this
+					if (lhs.kind != ComptimeResult::VALUE || rhs.kind != ComptimeResult::VALUE) {
+						errorLine(be.token, "Logical operators can only be applied to bool values, got ", lhs.type, " and ", rhs.type);
+						return {};
+					}
+					bool lhs_bool; memcpy(&lhs_bool, lhs.value, sizeof(lhs_bool));
+					bool rhs_bool; memcpy(&rhs_bool, rhs.value, sizeof(rhs_bool));
+					return be.op == Token::AND
+						? makeComptimeResult(lhs_bool && rhs_bool, res_bytes)
+						: makeComptimeResult(lhs_bool || rhs_bool, res_bytes);
+				}
+
+				if (!isNumericType(*lhs.type) || !isNumericType(*rhs.type)) {
+					errorLine(be.token, "Expected numeric values, got ", lhs.type, " and ", rhs.type);
+					return {};
+				}
+
+				if (!typesEqual(lhs.type, rhs.type)) {
+					errorLine(be.token, "Expected matching numeric types, got ", lhs.type, " and ", rhs.type);
+					return {};
+				}
+
+				switch (lhs.type->kind) {
+					case ResolvedType::F32: return arithmeticOp<float>(be.op, lhs.value, rhs.value, res_bytes); break;
+					case ResolvedType::F64: return arithmeticOp<double>(be.op, lhs.value, rhs.value, res_bytes); break;
+					case ResolvedType::I8: return arithmeticOp<i8>(be.op, lhs.value, rhs.value, res_bytes); break;
+					case ResolvedType::I16: return arithmeticOp<i16>(be.op, lhs.value, rhs.value, res_bytes); break;
+					case ResolvedType::I32: return arithmeticOp<i32>(be.op, lhs.value, rhs.value, res_bytes); break;
+					case ResolvedType::I64: return arithmeticOp<i64>(be.op, lhs.value, rhs.value, res_bytes); break;
+					case ResolvedType::U8: return arithmeticOp<u8>(be.op, lhs.value, rhs.value, res_bytes); break;
+					case ResolvedType::U16: return arithmeticOp<u16>(be.op, lhs.value, rhs.value, res_bytes); break;
+					case ResolvedType::U32: return arithmeticOp<u32>(be.op, lhs.value, rhs.value, res_bytes); break;
+					case ResolvedType::U64: return arithmeticOp<u64>(be.op, lhs.value, rhs.value, res_bytes); break;
+					default: errorLine(be.token, "Arithmetic operations are not supported for type ", lhs.type); return {};
+				}
+			}
+			case Expression::STRING_LITERAL: {
+				auto& sl = static_cast<StringLiteralExpression&>(expr);
+				ls_string_view* str = &sl.value;
+				u8* value = comptime_stack_ptr;
+				memcpy(comptime_stack_ptr, &str, sizeof(str));
+				comptime_stack_ptr += sizeof(str);
+				return {ComptimeResult::VALUE, primitiveType(ResolvedType::STRING), value};
+			}
+			case Expression::ARRAY_LITERAL: {
+				auto& al = static_cast<ArrayLiteralExpression&>(expr);
+				u8* value = comptime_stack_ptr;
+				u8* write_ptr = value;
+				for (Expression* element_expr : al.values) {
+					// TODO are we sure we don't have to check the element_expr type against the array type?
+					ComptimeResult element_type = evalComptime(unit, *element_expr, ctx, bindings, frame);
+					if (!element_type) return {};
+				}
+				return {ComptimeResult::VALUE, expr.resolved_type, value};
+			}
+			case Expression::STRUCT_LITERAL: {
+				auto& sl = static_cast<StructLiteralExpression&>(expr);
+				
+				u8* value = comptime_stack_ptr;
+				for (Expression* field_expr : sl.values) {
+					ComptimeResult field_type = evalComptime(unit, *field_expr, ctx, bindings, frame);
+					if (!field_type) return {};
+				}
+
+				return {ComptimeResult::VALUE, sl.type->resolved_type, value};
+			}
+			case Expression::CAST: {
+				auto& ce = static_cast<CastExpression&>(expr);
+				ComptimeResult lhs = evalComptime(unit, *ce.expression, ctx, bindings, frame);
+				if (!lhs) return {};
+				if (lhs.kind != ComptimeResult::VALUE) {
+					errorLine(ce.expression->token, "Cast source must be a value, got a type");
+					return {};
+				}
+
+				ResolvedType* rhs = asType(evalComptime(unit, *ce.type_expr, ctx, bindings, frame), ce.type_expr->token);
+				if (!rhs) return {};
+
+				const bool src_numeric = isNumericType(*lhs.type);
+				const bool dst_numeric = isNumericType(*rhs);
+				const bool src_enum = lhs.type->kind == ResolvedType::ENUM;
+				const bool dst_enum = rhs->kind == ResolvedType::ENUM;
+
+				const u32 src_size = typeByteSize(*lhs.type);
+				u8 src_bytes[8];
+				memcpy(src_bytes, comptime_stack_ptr - src_size, src_size);
+				comptime_stack_ptr -= src_size;
+
+				const u32 dst_size = writeComptimeNumeric(comptime_stack_ptr, src_bytes, lhs.type->kind, rhs->kind);
+				u8* value = comptime_stack_ptr;
+				comptime_stack_ptr += dst_size;
+
+				return {ComptimeResult::VALUE, rhs, value};
+			}
+			case Expression::NULL_LITERAL: {
+				auto& nl = static_cast<NullLiteralExpression&>(expr);
+				if (!nl.resolved_type) {
+					// e.g. `comptime A = B | null;`
+					errorLine(nl.token, "Null literal must have a type");
+					return {};
+				}
+				// TODO make a test to hit this
+				u64 size = typeByteSize(*nl.resolved_type);
+				u8* value = comptime_stack_ptr;
+				memset(comptime_stack_ptr, 0, size);
+				comptime_stack_ptr += size;
+				return {ComptimeResult::VALUE, nl.resolved_type, value};
+			}
+			case Expression::TYPEOF: {
+				auto& toe = static_cast<TypeofExpression&>(expr);
+				return {ComptimeResult::TYPE, toe.operand->resolved_type};
+			}
+			case Expression::UNION_TYPE: {
+				auto& ut = static_cast<UnionTypeExpression&>(expr);
+				UnionResolvedType* union_type = makeType<UnionResolvedType>(module.arena, module.arena);
+				for (Expression* member_expr : ut.members) {
+					ResolvedType* member_type = asType(evalComptime(unit, *member_expr, ctx, bindings, frame), member_expr->token);
+					if (!member_type) return {};
+					if (member_type->kind == ResolvedType::VOID) {
+						errorLine(member_expr->token, "Union cannot contain void");
+						return {};
+					}
+
+					if (member_type->kind == ResolvedType::UNION) {
+						for (ResolvedType* member : static_cast<UnionResolvedType*>(member_type)->members) {
+							bool duplicate = false;
+							for (ResolvedType* existing : union_type->members) {
+								if (typesEqual(existing, member)) {
+									duplicate = true;
+									break;
+								}
+							}
+							if (!duplicate) union_type->members.push(member);
+						}
+					}
+					else {
+						bool duplicate = false;
+						for (ResolvedType* existing : union_type->members) {
+							if (typesEqual(existing, member_type)) {
+								duplicate = true;
+								break;
+							}
+						}
+						if (!duplicate) union_type->members.push(member_type);
+					}
+				}
+
+				return {ComptimeResult::TYPE, union_type};
+			}
+			case Expression::TERNARY: {
+				auto& te = static_cast<TernaryExpression&>(expr);
+				ComptimeResult cond_type = evalComptime(unit, *te.condition, ctx, bindings, frame);
+				if (!cond_type) return {};
+				if (cond_type.kind != ComptimeResult::VALUE) {
+					errorLine(te.condition->token, "Ternary condition must be a compile-time constant value, got a type");
+					return {};
+				}
+
+				if (cond_type.type->kind != ResolvedType::BOOL) {
+					errorLine(te.condition->token, "Ternary condition must be a compile-time constant bool, got ", cond_type);
+					return {};
+				}
+
+				bool cond_value;
+				memcpy(&cond_value, comptime_stack_ptr - sizeof(bool), sizeof(bool));
+				if (cond_value) return evalComptime(unit, *te.true_expr, ctx, bindings, frame);
+				return evalComptime(unit, *te.false_expr, ctx, bindings, frame);
+			}
+			case Expression::SLICE_TYPE: {
+				auto& st = static_cast<SliceTypeExpression&>(expr);
+				SliceResolvedType* slice_type = makeType<SliceResolvedType>(module.arena);
+				slice_type->element_type = asType(evalComptime(unit, *st.element_type, ctx, bindings, frame), st.element_type->token);
+				if (!slice_type->element_type) return {};
+
+				return {ComptimeResult::TYPE, slice_type};
+			}
+			case Expression::NULLABLE_TYPE: {
+				auto& nt = static_cast<NullableTypeExpression&>(expr);
+				NullableResolvedType* nullable_type = makeType<NullableResolvedType>(module.arena);
+				nullable_type->inner = asType(evalComptime(unit, *nt.inner, ctx, bindings, frame), nt.inner->token);
+				if (!nullable_type->inner) return {};
+
+				return {ComptimeResult::TYPE, nullable_type};
+			}
+			case Expression::ARRAY_TYPE: {
+				auto& at = static_cast<ArrayTypeExpression&>(expr);
+				ArrayResolvedType* array_type = makeType<ArrayResolvedType>(module.arena);
+				array_type->element_type = asType(evalComptime(unit, *at.element_type, ctx, bindings, frame), at.element_type->token);
+				if (!array_type->element_type) return {};
+		
+				if (!resolveComptimeIntValue(unit, at.size, array_type->size, bindings)) return {};
+				if (array_type->size <= 0) {
+					errorLine(at.size->token, "Static array size must be greater than zero");
+					return {};
+				}
+
+				return {ComptimeResult::TYPE, array_type};
+			}
+			case Expression::RESOLVED_TYPE: {
+				auto& rte = static_cast<ResolvedTypeExpression&>(expr);
+				return {ComptimeResult::TYPE, rte.resolved_type};
+			}
+			case Expression::IDENTIFIER: {
+				auto& id = static_cast<IdentifierExpression&>(expr);
+				if (ctx) {
+					if (SemanticLocalBinding* local = findLocal(*ctx, id.name)) {
+						return local->is_comptime ? local->comptime_value : ComptimeResult{};
+					}
+				}
+
+				if (const TemplateBinding* binding = findTemplateBinding(bindings, id.name)) {
+					if (binding->arg.kind == ComptimeResult::TYPE) {
+						id.resolved_type = binding->arg.type;
+						return binding->arg;
+					}
+					
+					u8* value = comptime_stack_ptr;
+					const u32 size = typeByteSize(*binding->arg.type);
+					memcpy(comptime_stack_ptr, binding->arg.value, size);
+					comptime_stack_ptr += size;
+					return {ComptimeResult::VALUE, binding->arg.type, value};
+				}
+
+				if (frame) {
+					if (ComptimeFrame::Local* local = frame->find(id.name)) {
+						u8* value = comptime_stack_ptr;
+						const u32 size = typeByteSize(*local->type);
+						memcpy(comptime_stack_ptr, local->bytes, size);
+						comptime_stack_ptr += size;
+						return {ComptimeResult::VALUE, local->type, value};
+					}
+				}
+
+				if (TemplateBinding* binding = findTemplateBinding(bindings, id.name)) {
+					// TODO test to hit this
+					if (binding->arg.kind == ComptimeResult::TYPE) expr.resolved_type = binding->arg.type;
+					return binding->arg;
+				}
+
+				SymbolRef ref = resolveSymbol(unit, {}, id.name, LookupPolicy::Checked);
+				if (!ref) {
+					// TODO create a test to hit this
+					return {};
+				}
+
+				if (ref.symbol->storage != Symbol::COMPTIME) {
+					errorLine(id.token, "Symbol '", id.name, "' is not a compile-time value");
+					return {};
+				}
+
+				id.symbol = ref.symbol;
+
+				if (ref.symbol->resolved_type->kind == ResolvedType::META) {
+					ASSERT(ref.symbol->comptime_byte_size == 0);
+					return {ComptimeResult::TYPE, static_cast<MetaType*>(ref.symbol->resolved_type)->inner};
+				}
+				
+				u8* value = comptime_stack_ptr;
+				memcpy(comptime_stack_ptr, ref.symbol->comptime_bytes, ref.symbol->comptime_byte_size);
+				comptime_stack_ptr += ref.symbol->comptime_byte_size;
+				return {ComptimeResult::VALUE, ref.symbol->resolved_type, value};
+			}
+			case Expression::TYPE_LITERAL: {
+				auto& tl = static_cast<TypeLiteralExpression&>(expr);
+				ResolvedType* type = nullptr;
+				MetaType* meta = makeType<MetaType>(module.arena);
+				const ResolvedType::Kind kind = static_cast<TypeLiteralExpression&>(expr).type;
+				if (kind >= ResolvedType::VOID && kind <= ResolvedType::BYTE) return {ComptimeResult::TYPE, primitiveType(kind)};
+				if (kind == ResolvedType::META) return {ComptimeResult::TYPE, makeType<MetaType>(module.arena)};
+
+				errorLine(expr.token, "Type literal is not a compile-time constant");
+				return {};
+			}
+			case Expression::UNARY: {
+				auto& un = static_cast<UnaryExpression&>(expr);
+				ComptimeResult operand_type = evalComptime(unit, *un.expression, ctx, bindings, frame);
+				if (!operand_type) return {};
+				if (operand_type.kind != ComptimeResult::VALUE) {
+					errorLine(un.expression->token, "Unary operator operand must be a compile-time constant value, got a type");
+					return {};
+				}
+
+				ASSERT(un.op == Token::MINUS);
+				switch (operand_type.type->kind) { 
+					case ResolvedType::I32: {
+						i32 value;
+						memcpy(&value, operand_type.value, sizeof(value));
+						value = -value;
+						memcpy(operand_type.value, &value, sizeof(value));
+						return operand_type;
+					}
+					case ResolvedType::U64: {
+						u8* value = comptime_stack_ptr - sizeof(u64);
+						u64 val;
+						memcpy(&val, comptime_stack_ptr - sizeof(u64), sizeof(u64));
+						if (val > 0x8000000000000000ULL) {
+							errorLine(un.token, "Negation of unsigned integer ", val, " overflows");
+							return {};
+						}
+						i64 res = -(i64)val;
+						memcpy(comptime_stack_ptr - sizeof(i64), &res, sizeof(i64));
+						return {ComptimeResult::VALUE, primitiveType(ResolvedType::I64), value};
+					}
+					case ResolvedType::F64: {
+						u8* value = comptime_stack_ptr - sizeof(f64);
+						f64 fval;
+						memcpy(&fval, comptime_stack_ptr - sizeof(f64), sizeof(f64));
+						fval = -fval;
+						memcpy(comptime_stack_ptr - sizeof(f64), &fval, sizeof(f64));
+						return {ComptimeResult::VALUE, primitiveType(ResolvedType::F64), value};
+					}
+					default:
+						errorLine(un.token, "Negation is only valid for numeric types, got ", operand_type);
+						return {};
+				}
+				break;
+			}
+			case Expression::INT_LITERAL: {
+				auto& il = static_cast<IntLiteralExpression&>(expr);
+				if (!expr.resolved_type) expr.resolved_type = primitiveType(ResolvedType::UNTYPED_INT);
+				u8* value = comptime_stack_ptr;
+				const u32 dst_size = writeComptimeNumeric(comptime_stack_ptr, (const u8*)&il.value, ResolvedType::U64, expr.resolved_type->kind);
+				comptime_stack_ptr += dst_size;
+				return {ComptimeResult::VALUE, expr.resolved_type, value};
+			}
+			case Expression::SIZEOF: {
+				auto& sz = static_cast<SizeofExpression&>(expr);
+				if (!resolveSizeofValue(unit, sz, bindings)) return {};
+				u8* value = comptime_stack_ptr;
+				memcpy(comptime_stack_ptr, &sz.value, sizeof(sz.value));
+				comptime_stack_ptr += sizeof(sz.value);
+				// TODO not untyped int?
+				return {ComptimeResult::VALUE, primitiveType(ResolvedType::U64), value};
+			}
+			case Expression::FLOAT_LITERAL: {
+				auto& fl = static_cast<FloatLiteralExpression&>(expr);
+				if (!expr.resolved_type) expr.resolved_type = primitiveType(ResolvedType::UNTYPED_FLOAT);
+				u8* value = comptime_stack_ptr;
+				const u32 dst_size = writeComptimeNumeric(comptime_stack_ptr, (const u8*)&fl.value, ResolvedType::F64, expr.resolved_type->kind);
+				comptime_stack_ptr += dst_size;
+				return {ComptimeResult::VALUE, expr.resolved_type, value};
+			}
+			case Expression::BOOL_LITERAL: {
+				auto& bl = static_cast<BoolLiteralExpression&>(expr);
+				u8* value = comptime_stack_ptr;
+				memcpy(comptime_stack_ptr, &bl.value, sizeof(bl.value));
+				comptime_stack_ptr += sizeof(bl.value);
+				return {ComptimeResult::VALUE, primitiveType(ResolvedType::BOOL), value};
+			}
+			default:
+				errorLine(expr.token, "Expression is not a compile-time constant");
+				return {};
+		}
+	}
+
+	ls_module& module;
+	OutputFormatter error_stream;
+	i32 suppress_errors = 0;
+	SliceResolvedType* slice_of_types; // []type for Union::types type member
+	u8* comptime_stack = nullptr;
+	u8* comptime_stack_ptr = nullptr;
 
 }; // struct Checker
 

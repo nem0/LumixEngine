@@ -236,7 +236,10 @@ TEST(UnionFlattening) {
 			z : bool;
 		}
 		comptime AB = A | B;
-		comptime ABC = AB | C;
+		comptime BC = B | C;
+		comptime ABC = AB | BC;
+
+		var value : ABC = A { 1 };
 	)";
 	EXPECT_COMPILE(source);
 	return true;
@@ -257,14 +260,22 @@ TEST(UnionIdentityUnordered) {
 	return true;
 }
 
-TEST(UnionDuplicateMemberError) {
+TEST(UnionDuplicateMemberFlattening) {
 	const char* source = R"(
 		struct A {
 			x : i32;
 		}
-		comptime Union = A | A;
+		struct C {
+			y : i32;
+		}
+		comptime Direct = A | A;
+		comptime AC = A | C;
+		comptime Nested = A | AC;
+
+		var direct : Direct = A { 1 };
+		var nested : Nested = C { 2 };
 	)";
-	EXPECT_COMPILE_FAIL(source);
+	EXPECT_COMPILE(source);
 	return true;
 }
 

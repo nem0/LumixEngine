@@ -45,9 +45,12 @@ TEST(StringIsReservedKeyword) {
 TEST(StringEqualityAndInequalityRuntime) {
 	const char* source = R"(
 		fn main() : i32 {
-			if "abc" == "abc" {
+			var a = "abc";
+			if a == "abc" {
 				if "abc" != "abd" {
-					return 42;
+					if "abc" == "abc" {
+						return 42;
+					}
 				}
 			}
 			return 0;
