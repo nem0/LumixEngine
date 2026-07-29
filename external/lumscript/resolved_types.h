@@ -67,6 +67,7 @@ struct StructResolvedType : ResolvedType {
 	// NamedDecl::resolved_type cannot describe the fields of a concrete value.
 	// Keep the substituted field types on the canonical struct instance instead.
 	ExpArray<ResolvedType*> field_types;
+	bool is_compiler_only = false;
 };
 
 struct FunctionResolvedParam {
@@ -109,7 +110,7 @@ struct UnionResolvedType : ResolvedType {
 	ExpArray<ResolvedType*> members;
 };
 
-struct ComptimeResult {
+struct ComptimeValue {
 	enum Kind {
 		FAILURE,
 		VALUE,
@@ -117,8 +118,8 @@ struct ComptimeResult {
 		VOID
 	};
 	Kind kind = FAILURE;
-	ResolvedType* type = nullptr; // type of value if kind == VALUE, or the type itself if kind == TYPE
-	u8* value = nullptr; // pointer to the value bytes if kind == VALUE, otherwise nullptr
+	ResolvedType* type = nullptr; // value type, or the represented type when kind == TYPE
+	u8* value = nullptr; // pointer to scalar value bytes if kind == VALUE
 
 	operator bool() const { return kind != FAILURE; }
 };
@@ -126,7 +127,7 @@ struct ComptimeResult {
 struct TemplateStructInstance {
 	TemplateStructInstance(ls_arena& arena) : args(arena) {}
 
-	ExpArray<ComptimeResult> args;
+	ExpArray<ComptimeValue> args;
 	StructResolvedType* type = nullptr;
 	bool check_failed = false;
 };
@@ -134,7 +135,7 @@ struct TemplateStructInstance {
 struct TemplateFunctionInstance {
 	TemplateFunctionInstance(ls_arena& arena) : args(arena) {}
 
-	ExpArray<ComptimeResult> args;
+	ExpArray<ComptimeValue> args;
 	FunctionExpression* instance = nullptr;
 	FunctionResolvedType* type = nullptr;
 	bool check_failed = false;

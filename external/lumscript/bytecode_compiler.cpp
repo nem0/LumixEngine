@@ -4,6 +4,7 @@
 #include "utils.h"
 
 #include <cstdlib>
+#include <cfloat>
 #include <cstring>
 
 static u64 bitcastF64ToU64(double value) {
@@ -1296,6 +1297,15 @@ static bool tryEmitReference(FunctionCompiler& ctx, Expression& expr) {
 		}
 		case Expression::BRACKET: {
 			BracketExpression* br = static_cast<BracketExpression*>(&expr);
+			if (!empty(br->struct_field_name)) {
+				StructResolvedType* st = static_cast<StructResolvedType*>(br->base->resolved_type);
+				ResolvedType* field_type = nullptr;
+				u32 offset = structFieldByteOffset(*st, br->struct_field_name, field_type);
+				if (!tryEmitReference(ctx, *br->base)) return false;
+				emitConst8(ctx, 0u);
+				emitRefAt(ctx, 1u, (i32)offset);
+				return true;
+			}
 			if (br->base->resolved_type->kind == ResolvedType::SLICE) {
 				compileExpression(ctx, *br->base, LS_TYPE_SLICE);
 				compileIndexExpression(ctx, *br->args[0]);
@@ -2700,6 +2710,18 @@ static ls_type_kind compileCall(FunctionCompiler& ctx, CallExpression& expr, ls_
 }
 
 static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& member) {
+	if (member.comptime_value.kind == ComptimeValue::VALUE && member.comptime_value.value) {
+		if (member.comptime_value.type->kind == ResolvedType::STRING) {
+			ls_string_view* value;
+			memcpy(&value, member.comptime_value.value, sizeof(value));
+			u32 string_index = 0;
+			appendStringLiteral(*ctx.bytecode, *value, string_index);
+			emitConstString(ctx, string_index);
+			return LS_TYPE_STRING;
+		}
+		emitConstBytes(ctx, member.comptime_value.value, typeByteSize(*member.comptime_value.type));
+		return valueKindForType(*member.comptime_value.type);
+	}
 	if (!member.expression) {
 		// .enum_member
 		ASSERT(member.resolved_type && member.resolved_type->kind == ResolvedType::ENUM);
@@ -3046,11 +3068,51 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 		}
 		case Expression::CALL: return compileCall(ctx, static_cast<CallExpression&>(expr), hint);
 		case Expression::TYPE_MEMBER: {
+			TypeMemberExpression& member = static_cast<TypeMemberExpression&>(expr);
+			switch (member.kind) {
+				case TypeMemberExpression::NAME: {
+					u32 string_index = 0;
+					appendStringLiteral(*ctx.bytecode, member.comptime_string, string_index);
+					emitConstString(ctx, string_index);
+					return LS_TYPE_STRING;
+				}
+				case TypeMemberExpression::LENGTH: {
+					emitIntegerConstant(ctx, LS_TYPE_I64, (u64)static_cast<ArrayResolvedType*>(member.reflected_type)->size);
+					return LS_TYPE_I64;
+				}
+				case TypeMemberExpression::MIN:
+				case TypeMemberExpression::MAX: {
+					const bool is_min = member.kind == TypeMemberExpression::MIN;
+					switch (member.reflected_type->kind) {
+						case ResolvedType::I8: emitIntegerConstant(ctx, LS_TYPE_I8, (u64)(is_min ? -128 : 127)); return LS_TYPE_I8;
+						case ResolvedType::I16: emitIntegerConstant(ctx, LS_TYPE_I16, (u64)(is_min ? -32768 : 32767)); return LS_TYPE_I16;
+						case ResolvedType::I32: emitIntegerConstant(ctx, LS_TYPE_I32, (u64)(is_min ? (i64)-2147483648LL : 2147483647LL)); return LS_TYPE_I32;
+						case ResolvedType::I64:
+						case ResolvedType::ISIZE: emitIntegerConstant(ctx, LS_TYPE_I64, (u64)(is_min ? (i64)-9223372036854775807LL - 1 : (i64)9223372036854775807LL)); return LS_TYPE_I64;
+						case ResolvedType::U8:
+						case ResolvedType::BYTE: emitIntegerConstant(ctx, LS_TYPE_U8, is_min ? 0u : 255u); return LS_TYPE_U8;
+						case ResolvedType::U16: emitIntegerConstant(ctx, LS_TYPE_U16, is_min ? 0u : 65535u); return LS_TYPE_U16;
+						case ResolvedType::U32: emitIntegerConstant(ctx, LS_TYPE_U32, is_min ? 0u : 4294967295u); return LS_TYPE_U32;
+						case ResolvedType::U64: emitIntegerConstant(ctx, LS_TYPE_U64, is_min ? 0u : 0xffffffffffffffffULL); return LS_TYPE_U64;
+						case ResolvedType::F32: emitConst4(ctx, bitcastF32ToU32(is_min ? -FLT_MAX : FLT_MAX)); return LS_TYPE_F32;
+						case ResolvedType::F64: emitConst8(ctx, bitcastF64ToU64(is_min ? -DBL_MAX : DBL_MAX)); return LS_TYPE_F64;
+						default: break;
+					}
+				}
+				default: break;
+			}
 			return LS_TYPE_INVALID;
 		}
 		case Expression::MEMBER: return compileMember(ctx, static_cast<MemberExpression&>(expr));
 		case Expression::BRACKET: {
 			BracketExpression& br = static_cast<BracketExpression&>(expr);
+			if (!empty(br.struct_field_name)) {
+				MemberExpression member;
+				member.expression = br.base;
+				member.name = br.struct_field_name;
+				member.resolved_type = br.resolved_type;
+				return compileMember(ctx, member);
+			}
 			if (br.resolved_type->kind == ResolvedType::FUNCTION) {
 				FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(br.resolved_type);
 				if (fn_type->decl) { // TODO when can this be null
@@ -3564,6 +3626,28 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 		// TODO clean up
 		case Statement::FOR: {
 			ForStatement& fs = static_cast<ForStatement&>(st);
+			if (fs.is_expanded) {
+				ctx.pushScope();
+				LoopBinding& loop = ctx.loops.emplace_back();
+				loop.label = current_label;
+				loop.defer_mark = (u32)ctx.deferreds.size();
+				void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
+				loop.break_jumps = ::new (break_storage) ExpArray<u32>(*ctx.bytecode->arena);
+				void* continue_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
+				loop.continue_jumps = ::new (continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
+				for (Statement* body : fs.body->statements) {
+					const u32 continue_start = (u32)loop.continue_jumps->size();
+					compileStatement(ctx, *body, return_kind, {});
+					const u32 continue_target = (u32)ctx.code.size();
+					for (u32 j = continue_start; j < loop.continue_jumps->size(); ++j)
+						patchJumpRelative(ctx, (*loop.continue_jumps)[j], continue_target);
+				}
+				const u32 loop_end = (u32)ctx.code.size();
+				for (u32 break_pos : *loop.break_jumps) patchJumpRelative(ctx, break_pos, loop_end);
+				ctx.loops.pop_back();
+				ctx.popScope(return_kind, current_label);
+				return;
+			}
 			if (fs.is_unroll && !fs.end) {
 				// `fs.unroll_elements` holds the actual compile-time element expressions
 				// (see resolveUnrollElements in compiler.cpp), so each iteration is baked

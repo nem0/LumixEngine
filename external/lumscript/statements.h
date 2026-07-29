@@ -124,6 +124,7 @@ struct ForStatement : Statement {
 	StorageSlot index_slot; // only used for the `for i, v in xs` array/slice form
 	bool is_key_value = false; // true for `for i, v in xs`; false for `for v in xs` and range loops
 	bool is_unroll = false;
+	bool is_expanded = false;
 	i64 unroll_begin = 0;
 	i64 unroll_end = 0;
 	ArrayLiteralExpression* unroll_elements = nullptr; // resolved compile-time source for `unroll for` over an array/slice

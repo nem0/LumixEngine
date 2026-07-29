@@ -52,6 +52,18 @@ struct FunctionParam {
 };
 
 struct Expression {
+	enum EvalStage : u8 {
+		// The expression is not statically known while this AST is checked. It may
+		// still fold when an evaluator supplies known parameter bindings.
+		RUNTIME,
+		// The expression is statically known and can be materialized into runtime
+		// code as a constant.
+		COMPTIME_VALUE,
+		// The expression is statically known, but has no runtime representation
+		// (for example `type` and `TypeKind` values).
+		COMPTIME_ONLY,
+	};
+
 	enum Kind {
 		INVALID,
 		IDENTIFIER,
@@ -113,6 +125,8 @@ struct Expression {
 
 	Kind kind = INVALID;
 	ResolvedType* resolved_type = nullptr;
+	ComptimeValue comptime_value;
+	EvalStage eval_stage = RUNTIME;
 	Token token = {};
 	bool parenthesized = false;
 };
@@ -214,7 +228,6 @@ struct UnionTypeExpression : Expression {
 	UnionTypeExpression(ls_arena& arena) : Expression(UNION_TYPE), members(arena) {}
 
 	ExpArray<Expression*> members;
-	ResolvedType* cursor_type = nullptr; // cached type of of U::types[0]
 };
 
 struct ResolvedTypeExpression : Expression {
@@ -275,10 +288,24 @@ struct MemberExpression : Expression {
 };
 
 struct TypeMemberExpression : Expression {
+	enum Kind {
+		NAME,
+		KIND,
+		RET,
+		PARAMS,
+		FIELDS,
+		VALUES,
+		TYPES,
+		MIN,
+		MAX,
+		CHILD,
+		LENGTH
+	};
+
 	TypeMemberExpression() : Expression(TYPE_MEMBER) {}
 
 	Expression* expression = nullptr;
-	ls_string_view name = {};
+	Kind kind;
 	ls_string_view comptime_string = {};
 	ResolvedType* reflected_type = nullptr;
 };
@@ -288,6 +315,9 @@ struct BracketExpression : Expression {
 
 	Expression* base = nullptr;
 	ExpArray<Expression*> args;
+	// Set when this is compile-time string access to a struct field. Empty means
+	// the bracket is ordinary array/slice/template access.
+	ls_string_view struct_field_name = {};
 };
 
 struct SliceExpression : Expression {

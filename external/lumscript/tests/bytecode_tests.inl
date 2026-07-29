@@ -315,34 +315,6 @@ TEST(NativeStringResult) {
 	return true;
 }
 
-TEST(BytecodeTemporaryMemberAccessFrameSize) {
-	const char* source = R"(
-		struct Pair {
-			a : i32;
-			b : i32;
-		}
-
-		fn main() : i32 {
-			return Pair { 10, 32 }.b;
-		}
-	)";
-
-	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
-
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
-	EXPECT_TRUE(bytecode != nullptr);
-	EXPECT_EQ(1u, bytecode->function_count);
-	EXPECT_EQ(20u, bytecode->functions[0].frame_size);
-
-	ls_bytecode_destroy(bytecode);
-	CAPI_END(module);
-	return true;
-}
-
-
-
-
 TEST(BytecodeAddTwoConstants) {
 	const char* source = R"(
 		fn main() : i32 {

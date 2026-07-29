@@ -487,7 +487,7 @@ struct Parser {
 				case Token::DOT: {
 					Token dot = consumeToken();
 					Token name = consumeToken();
-					if (name.type != Token::IDENTIFIER) {
+					if (name.type != Token::IDENTIFIER && name.type != Token::TYPE_KW) {
 						m_output.errorAt(name, "Expected identifier");
 						return nullptr;
 					}
@@ -509,21 +509,25 @@ struct Parser {
 						m_output.errorAt(name, "Expected identifier");
 						return nullptr;
 					}
-					if (!equalStrings(name.value, "kind")
-						&& !equalStrings(name.value, "name")
-						&& !equalStrings(name.value, "child")
-						&& !equalStrings(name.value, "length")
-						&& !equalStrings(name.value, "ret")
-						&& !equalStrings(name.value, "min")
-						&& !equalStrings(name.value, "max")
-						&& !equalStrings(name.value, "types"))
-					{
+					
+					TypeMemberExpression* member = makeExpr<TypeMemberExpression>(colon);
+					member->expression = expr;
+					if (equalStrings(name.value, "kind")) member->kind = TypeMemberExpression::KIND;
+					else if (equalStrings(name.value, "name")) member->kind = TypeMemberExpression::NAME;
+					else if (equalStrings(name.value, "ret")) member->kind = TypeMemberExpression::RET;
+					else if (equalStrings(name.value, "params")) member->kind = TypeMemberExpression::PARAMS;
+					else if (equalStrings(name.value, "fields")) member->kind = TypeMemberExpression::FIELDS;
+					else if (equalStrings(name.value, "values")) member->kind = TypeMemberExpression::VALUES;
+					else if (equalStrings(name.value, "types")) member->kind = TypeMemberExpression::TYPES;
+					else if (equalStrings(name.value, "min")) member->kind = TypeMemberExpression::MIN;
+					else if (equalStrings(name.value, "max")) member->kind = TypeMemberExpression::MAX;
+					else if (equalStrings(name.value, "child")) member->kind = TypeMemberExpression::CHILD;
+					else if (equalStrings(name.value, "length")) member->kind = TypeMemberExpression::LENGTH;
+					else {
 						m_output.errorAt(name, "Unsupported type member");
 						return nullptr;
 					}
-					TypeMemberExpression* member = makeExpr<TypeMemberExpression>(colon);
-					member->expression = expr;
-					member->name = name.value;
+
 					expr = member;
 					break;
 				}

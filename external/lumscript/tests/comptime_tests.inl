@@ -951,6 +951,85 @@ TEST(ComptimeIfTypeofConditionPrunesUnselectedArm) {
 	return true;
 }
 
+TEST(EvalStageRejectsTypeofRuntimeMaterialization) {
+	const char* source = R"(
+		fn main() : void {
+			var value : i32 = 0;
+			var type_value = typeof(value);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ComptimeStructCanContainTypeValues) {
+	const char* source = R"(
+		struct Descriptor { name : string; value_type : type; }
+		comptime descriptors = [
+			Descriptor { "integer", i32 },
+			Descriptor { "float", f32 }
+		];
+		comptime First = descriptors[0].value_type;
+		comptime second_name = descriptors[1].name;
+
+		fn accept(value : First) : void {}
+		fn main() : void {
+			if second_name == "float" { }
+			else { var bad : MissingType = undefined; }
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(EvalStageAllowsTypeofComptimeBinding) {
+	const char* source = R"(
+		fn main() : void {
+			var value : i32 = 0;
+			comptime type_value = typeof(value);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(EvalStageRejectsTypeProducingCallRuntimeMaterialization) {
+	const char* source = R"(
+		fn make_type() : type { return i32; }
+
+		fn main() : void {
+			var type_value = make_type();
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(EvalStageRejectsTypeProducingCallExpressionStatement) {
+	const char* source = R"(
+		fn make_type() : type { return i32; }
+
+		fn main() : void {
+			make_type();
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(EvalStageTypeKindComparisonPrunesUnselectedArm) {
+	const char* source = R"(
+		fn main() : void {
+			if i32::kind == .I32 {
+			} else {
+				var bad : MissingType = undefined;
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(ComptimeIfTemplateSpecializationPrunesUnselectedArm) {
 	const char* source = R"(
 		fn write(value : $T) : void {

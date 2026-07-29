@@ -59,6 +59,7 @@ struct Symbol {
 	// possible, in which case uses fall back to compiling the initializer expression.
 	const u8* comptime_bytes = nullptr;
 	u32 comptime_byte_size = 0;
+	ComptimeValue comptime_value;
 };
 
 // True when the symbol occupies runtime storage in the global data segment.

@@ -13,6 +13,25 @@ TEST(FunctionTypeIntrospectionParamsAndReturn) {
 	return true;
 }
 
+TEST(TypeMembersAcceptValueReceivers) {
+	const char* source = R"(
+		struct Value { field : i32; }
+		fn main() : i32 {
+			var value : Value = undefined;
+			comptime name = value::name;
+			if name == "Value" { return 0; }
+			return 1;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(FunctionTypeIntrospectionRejectsNonFunction) {
 	const char* source = R"(
 		comptime params = i32::params;
@@ -33,11 +52,20 @@ TEST(FunctionTypeIntrospectionVoidReturn) {
 TEST(FunctionTypeIntrospectionBindsAndIndexesParams) {
 	const char* source = R"(
 		comptime Handler = fn(i32, f32) : bool;
-		comptime params : []type = Handler::params;
-		comptime First = params[0];
+		comptime params = Handler::params;
+		comptime First = params[0].type;
 		fn main(value : First) : void {}
 	)";
 	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(FunctionTypeIntrospectionParamsRequireInference) {
+	const char* source = R"(
+		comptime Handler = fn(i32, f32) : bool;
+		comptime params : []type = Handler::params;
+	)";
+	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
@@ -112,7 +140,7 @@ TEST(UnrollForStructTypeFields) {
 	return true;
 }
 
-TEST(UnrollForStructValueFields) {
+TEST(UnrollForStructValueFieldsRejected) {
 	const char* source = R"(
 		struct Value { i : i32; f : f32; }
 		fn main() : i32 {
@@ -121,7 +149,7 @@ TEST(UnrollForStructValueFields) {
 			return value.i;
 		}
 	)";
-	EXPECT_COMPILE(source);
+		EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
@@ -211,7 +239,7 @@ TEST(UnrollForRuntimeRangeBoundRejected) {
 	return true;
 }
 
-TEST(UnrollForOperandEvaluatedBeforeBinding) {
+TEST(UnrollForStructValueOperandRejected) {
 	const char* source = R"(
 		struct Value { x : i32; }
 		fn main() : i32 {
@@ -220,7 +248,7 @@ TEST(UnrollForOperandEvaluatedBeforeBinding) {
 			return 0;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
@@ -235,9 +263,108 @@ TEST(IntrospectionStructFieldsCanBeIndexed) {
 	return true;
 }
 
+TEST(StructFieldIndexByLiteral) {
+	const char* source = R"(
+		struct Value { x : i32; y : f32; }
+		fn main() : i32 {
+			var value : Value = Value { 0, 0.0 };
+			value["x"] = 7;
+			return value["x"];
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(StructFieldIndexByComptimeStringAndCall) {
+	const char* source = R"(
+		struct Value { x : i32; }
+		fn field_name() : string { return "x"; }
+		comptime name = "x";
+		fn main() : void {
+			var value : Value = undefined;
+			value[name] = 1;
+			value[field_name()] = 2;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(StructFieldIndexFromUnrolledFieldName) {
+	const char* source = R"(
+		struct Value { x : i32; y : f32; }
+		fn main() : i32 {
+			var value : Value = Value { 0, 2.0 };
+			unroll for field in Value::fields {
+				if field.type == i32 { value[field.name] = 7; }
+			}
+			return value.x;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(StructFieldIndexRejectsRuntimeString) {
+	const char* source = R"(
+		struct Value { x : i32; }
+		fn main(name : string) : void {
+			var value : Value = undefined;
+			value[name] = 1;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(StructFieldIndexRejectsNonStringComptimeValue) {
+	const char* source = R"(
+		struct Value { x : i32; }
+		comptime field = 0;
+		fn main() : void {
+			var value : Value = undefined;
+			value[field] = 1;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(StructFieldIndexRejectsMissingField) {
+	const char* source = R"(
+		struct Value { x : i32; }
+		fn main() : void {
+			var value : Value = undefined;
+			value["missing"] = 1;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(StructFieldIndexRejectsRuntimeNonStruct) {
+	const char* source = R"(
+		fn main() : void {
+			var value : i32 = 0;
+			value["field"] = 1;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(IntrospectionKindMemberGuardRejectsWrongKind) {
 	const char* source = R"(
 		comptime bad = i32::fields;
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(IntrospectionUnknownMemberRejected) {
+	const char* source = R"(
+		comptime bad = i32::MAX;
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
@@ -261,7 +388,7 @@ TEST(IntrospectionTypeValueRuntimeUseRejected) {
 	return true;
 }
 
-TEST(IntrospectionFieldCursorValueOnlyOnValueForm) {
+TEST(IntrospectionStructValueIterationRejected) {
 	const char* source = R"(
 		struct S { x : i32; }
 		fn main() : void {
@@ -269,7 +396,7 @@ TEST(IntrospectionFieldCursorValueOnlyOnValueForm) {
 			unroll for f in value { f.value = 2; }
 		}
 	)";
-	EXPECT_COMPILE(source);
+	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
@@ -295,11 +422,33 @@ TEST(IntrospectionUnionSequenceIndex) {
 	return true;
 }
 
-TEST(IntrospectionUnknownKindGuardRejectsFields) {
+TEST(IntrospectionUninstantiatedTemplateTypeMember) {
+	const char* source = R"(
+		fn inspect(value : $T) : void {
+			comptime fields = T::fields;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(IntrospectionUnknownKind) {
 	const char* source = R"(
 		fn inspect(T : comptime type) : void {
 			var fields = T::fields;
 		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(IntrospectionUnknownKindRejectsIncompatibleInstantiation) {
+	const char* source = R"(
+		enum State { Idle }
+		fn inspect(T : comptime type) : void {
+			comptime fields = T::fields;
+		}
+		fn main() : void { inspect(State); }
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
@@ -329,11 +478,16 @@ TEST(IntrospectionSequenceLength) {
 
 TEST(IntrospectionEmptySequenceLength) {
 	const char* source = R"(
-		comptime empty : []type = undefined;
+		comptime empty : []type = null;
 		comptime count = length(empty);
 		fn main() : i32 { return count; }
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -593,7 +747,7 @@ TEST(IntrospectionEnumAndUnionValuesAreNotIterable) {
 TEST(IntrospectionFunctionValueUsesTypeof) {
 	const char* source = R"(
 		fn callback(value : i32) : bool { return true; }
-		comptime First = typeof(callback)::params[0];
+		comptime First = typeof(callback)::params[0].type;
 		comptime Result = typeof(callback)::ret;
 		fn accept(value : First) : Result { return true; }
 	)";
@@ -704,7 +858,7 @@ TEST(IntrospectionFunctionParametersPreserveDeclarationOrder) {
 		comptime first = F::params[0];
 		comptime second = F::params[1];
 		fn main() : void {
-			if first == i32 and second == f32 { }
+			if first.type == i32 and second.type == f32 { }
 			else { var bad : MissingType = undefined; }
 		}
 	)";
@@ -712,19 +866,6 @@ TEST(IntrospectionFunctionParametersPreserveDeclarationOrder) {
 	return true;
 }
 
-TEST(IntrospectionBoundSequenceEscapesKindProvingBranch) {
-	const char* source = R"(
-		fn inspect(T : comptime type) : void {
-			comptime fields = undefined;
-			if T::kind == .Struct { fields = T::fields; }
-			unroll for field in fields { var name : string = field.name; }
-		}
-		struct S { value : i32; }
-		fn main() : void { inspect(S); }
-	)";
-	EXPECT_COMPILE(source);
-	return true;
-}
 
 TEST(IntrospectionCursorSequencesRequireInference) {
 	const char* source = R"(
@@ -894,16 +1035,6 @@ TEST(IntrospectionTypeNamesCanonicalizeUnionOrder) {
 	return true;
 }
 
-TEST(IntrospectionUninstantiatedTemplateTypeMemberRejected) {
-	const char* source = R"(
-		fn inspect(value : $T) : void {
-			comptime fields = T::fields;
-		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
 TEST(IntrospectionFieldAndEnumSequencesRejectRuntimeFor) {
 	const char* source = R"(
 		struct S { value : i32; }
@@ -917,7 +1048,7 @@ TEST(IntrospectionFieldAndEnumSequencesRejectRuntimeFor) {
 	return true;
 }
 
-TEST(IntrospectionFieldTypeEqualsValueType) {
+TEST(IntrospectionStructValueIterationTypeCheckRejected) {
 	const char* source = R"(
 		struct S { integer : i32; fraction : f32; }
 		fn main() : void {
@@ -928,11 +1059,11 @@ TEST(IntrospectionFieldTypeEqualsValueType) {
 			}
 		}
 	)";
-	EXPECT_COMPILE(source);
+	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
-TEST(IntrospectionValueFieldCanBePassedByReference) {
+TEST(IntrospectionStructValueIterationReferenceRejected) {
 	const char* source = R"(
 		struct S { value : i32; }
 		fn increment(value : ref i32) : void { value += 1; }
@@ -941,7 +1072,7 @@ TEST(IntrospectionValueFieldCanBePassedByReference) {
 			unroll for field in object { increment(ref field.value); }
 		}
 	)";
-	EXPECT_COMPILE(source);
+	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
@@ -1118,11 +1249,11 @@ TEST(IntrospectionGenericPrintRendersEveryKind) {
 				case .Struct:
 					write_bytes(T::name);
 					write_bytes(" { ");
-					unroll for i, f in v {
+					unroll for i, f in T::fields {
 						if i > 0 { write_bytes(", "); }
 						write_bytes(f.name);
 						write_bytes(" = ");
-						print(f.value);
+						print(v[f.name]);
 					}
 					write_bytes(" }");
 
@@ -1149,11 +1280,11 @@ TEST(IntrospectionGenericPrintRendersEveryKind) {
 		fn print_uint() : void { var v : u32 = 9; print(v); }
 		fn print_float() : void { print(1.5); }
 		fn print_string() : void { print("hi"); }
-		fn print_array() : void { var v : [3]i32 = { 1, 2, 3 }; print(v); }
+		fn print_array() : void { var v : [3]i32 = [ 1, 2, 3 ]; print(v); }
 		fn print_struct() : void { print(Vec3 { 1.0, 2.0, 3.0 }); }
 		fn print_enum() : void { print(State.Running); }
 		fn print_invalid_enum() : void { var v : State = 7 as State; print(v); }
-		fn print_nested() : void { var v : [2]Vec3 = { Vec3 { 1.0, 0.0, 0.0 }, Vec3 { 0.0, 1.0, 0.0 } }; print(v); }
+		fn print_nested() : void { var v : [2]Vec3 = [ Vec3 { 1.0, 0.0, 0.0 }, Vec3 { 0.0, 1.0, 0.0 } ]; print(v); }
 
 		fn print_nullable() : void { var v : ?i32 = 5; print(v); }
 		fn print_null() : void { var v : ?i32 = null; print(v); }

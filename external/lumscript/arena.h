@@ -49,15 +49,24 @@ static inline void* ls_default_arena_allocate(void* userdata, size_t size, size_
 	uintptr base_addr = (uintptr)arena->base;
 	size_t start = (size_t)(ls_default_arena_align_up_uintptr(base_addr + (uintptr)arena->cursor, align) - base_addr);
 	size_t end = start + size;
-	if (end < start || end > arena->reserve_size) return NULL;
+	if (end < start || end > arena->reserve_size) {
+		ASSERT(false);
+		return NULL;
+	}
 
 	size_t committed_end = (size_t)ls_default_arena_align_up_uintptr((uintptr)end, arena->page_size);
-	if (committed_end > arena->reserve_size) return NULL;
+	if (committed_end > arena->reserve_size) {
+		ASSERT(false);
+		return NULL;
+	}
 	if (committed_end > arena->committed_size) {
 		void* commit_base = (char*)arena->base + arena->committed_size;
 		size_t commit_size = committed_end - arena->committed_size;
 		void* committed = VirtualAlloc(commit_base, commit_size, MEM_COMMIT, PAGE_READWRITE);
-		if (!committed) return NULL;
+		if (!committed) {
+			ASSERT(false);
+			return NULL;
+		}
 		arena->committed_size = committed_end;
 	}
 	arena->cursor = end;

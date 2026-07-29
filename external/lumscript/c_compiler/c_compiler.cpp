@@ -430,6 +430,9 @@ struct CCompiler {
 			case Expression::BRACKET: {
 				const BracketExpression* bracket = static_cast<const BracketExpression*>(value);
 				if (!bracket->base || !bracket->base->resolved_type || bracket->args.size() != 1) { unsupported(); return; }
+				if (!empty(bracket->struct_field_name)) {
+					expression(bracket->base); text("."); text(bracket->struct_field_name); return;
+				}
 				if (bracket->base->resolved_type->kind == ResolvedType::ARRAY) {
 					expression(bracket->base); text("["); expression(bracket->args[0]); text("]"); return;
 				}

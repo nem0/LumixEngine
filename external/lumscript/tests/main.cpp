@@ -257,7 +257,7 @@ static void nativeAddC(ls_runtime* runtime, ls_call_frame frame) {
 #include "shadowing_tests.inl"
 #include "declaration_tests.inl"
 #include "comptime_tests.inl"
-//#include "introspection_tests.inl"
+#include "introspection_tests.inl"
 #include "control_flow_tests.inl"
 #include "enum_tests.inl"
 #include "nullable_tests.inl"
@@ -303,7 +303,7 @@ int main(int argc, char** argv) {
 			++passed_count;
 		}
 		else {
-			printf("FAILED: %s\n", test->name);
+			printf("FAILED: %s\n\n", test->name);
 		}
 	}
 
@@ -314,6 +314,6 @@ int main(int argc, char** argv) {
 
     const auto end_time = std::chrono::steady_clock::now();
     const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-    printf("%d/%d tests passed in %lld ms\n", passed_count, test_count, (long long)elapsed_ms);
+    printf("%d/%d tests passed (%d failed) in %lld ms\n", passed_count, test_count, test_count - passed_count, (long long)elapsed_ms);
     return passed_count == test_count ? 0 : -1;
 }
