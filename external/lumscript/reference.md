@@ -729,6 +729,8 @@ Defaults when context is insufficient:
 
 There are still no implicit numeric casts between concrete types.
 
+Introspection is not a concretizing context. `typeof` on an untyped integer or float expression is a compile-time error; cast the expression or give its binding an explicit type first.
+
 ### Nullable values
 
 Nullable syntax uses `?Type`.
@@ -1666,6 +1668,7 @@ const c = sizeof(Vec3);  // number of bytes the struct occupies
 Rules:
 
 - the operand is a type, not a value
+- the operand must be a concrete type. Untyped integer and float values have no size or alignment, and `sizeof`/`alignof` do not default them; use a concrete type such as `sizeof(i32)`, or cast or annotate the value before obtaining its type
 - both produce an untyped integer constant, usable wherever a compile-time integer is required (array sizes, struct template value arguments, `comptime` parameters, other comptime expressions)
 - `sizeof(T)` is the size of `T` measured in `byte` units: `byte`, `bool`, `i8`, and `u8` are 1 byte; `i16`/`u16` are 2; `i32`/`u32`/`f32`/enums/function values are 4; `i64`/`u64`/`isize`/`f64`/strings/pointers are 8; a slice is a pointer plus an `i64` length; an array is `size * sizeof(element)`; a struct is the sum of its field sizes; and a tagged union is `sizeof(i32)` for the tag plus the size of its largest member
 - `alignof(T)` is derived from the byte size and capped at pointer alignment
@@ -2004,10 +2007,10 @@ Note what this example does *not* need. Because `T` is fully concrete at instant
 
 ### typeof
 
-`typeof` is a compile-time operator that takes an expression and produces its concrete type as a compile-time `type` value:
+`typeof` is a compile-time operator that takes an expression with an already concrete type and produces that type as a compile-time `type` value:
 
 ```cpp
-comptime A = typeof(1 + 2);      // i32
+comptime A = typeof((1 + 2) as i32); // i32
 comptime B = typeof(v[0]);       // the element type of v
 comptime C = typeof(make_vec3()); // the return type of the call, Vec3
 ```
@@ -2015,6 +2018,7 @@ comptime C = typeof(make_vec3()); // the return type of the call, Vec3
 Rules:
 
 - the operand is an expression, not a type - the mirror of [`sizeof` and `alignof`](#sizeof-and-alignof), which take a type. `sizeof(typeof(e))` is the size of `e`'s type. Reflection that starts from a *type* rather than an expression uses [type members](#type-members) instead
+- `typeof` does not default untyped numeric expressions. `typeof(1)`, `typeof(1.0)`, and `typeof(value)` when `value` is an untyped numeric `comptime` binding are compile-time errors. Cast the expression (`typeof(1 as i32)`) or annotate the binding first. Consequently, `sizeof(typeof(1))` and `alignof(typeof(1.0))` are also errors
 - like `sizeof` and `alignof`, `typeof` is an operator resolved by the compiler, not a function: it cannot be bound to a name, passed as an argument, used as a function value, or reached through [UFCS](#ufcs); only its result is a value. The rule that functions cannot return `type` (see [Comptime](#comptime)) constrains declared functions and does not apply to it
 - the operand is type-checked but **not evaluated**, and no code is generated for it. `typeof(v[0])` on an empty slice is valid and yields the element type
 - it produces a `type` value, usable wherever a compile-time type is required (template arguments, variable type positions, `comptime` bindings, `==` comparison)

@@ -38,6 +38,19 @@ TEST(BasicAssign) {
 	return true;
 }
 
+TEST(AssignmentToMemberWithoutBaseFails) {
+	const char* source = R"(
+		fn set(v : ref i32) : void {
+		}
+
+		fn main() : void {
+			set(ref .field);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(StructLiteralFieldsAllowImplicitConversions) {
 	const char* source = R"(
 		struct Values {
@@ -455,5 +468,55 @@ TEST(StructMethodCallOnReturnValue) {
 		}
 	)";
 	EXPECT_COMPILE(source);
+	return true;
+}
+
+
+TEST(UnknownSymbolRuntimeVarDeclFails) {
+	const char* source = R"(
+		var tmp : Missing = undefined;
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+
+TEST(ConstImportedValueUsedInComptimeFails) {
+	const char* main_source = R"(
+		import "lib" as lib
+
+		fn main() : i32 {
+			var value : [lib.COUNT]i32 = undefined;
+			return 42;
+		}
+	)";
+	const char* lib_source = R"(
+		const COUNT = 4;
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("lib"), toLs(lib_source) },
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+
+TEST(UnknownImportedValueUsedInComptimeFails) {
+	const char* main_source = R"(
+		import "lib" as lib
+
+		fn main() : i32 {
+			var value : [lib.Missing]i32 = undefined;
+			return 42;
+		}
+	)";
+	const char* lib_source = R"(
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("lib"), toLs(lib_source) },
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
 	return true;
 }

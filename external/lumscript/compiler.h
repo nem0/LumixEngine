@@ -8,8 +8,6 @@
 
 struct Unit;
 
-i64 typeKindValue(ResolvedType::Kind kind);
-
 struct Symbol {
 	enum Storage {
 		// Runtime storage. The initializer expression is evaluated at runtime unless

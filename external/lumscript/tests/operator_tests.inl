@@ -184,6 +184,21 @@ TEST(NonOverloadableOperatorFails) {
 	return true;
 }
 
+TEST(StructNonOverloadableOperatorFails) {
+	const char* source = R"(
+		struct Value {
+			x : i32;
+		}
+
+		fn main() : void {
+			const value = Value { 1 };
+			const result = value and value;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(PrimitiveOperatorOverloadFails) {
 	const char* source = R"(
 		operator +(a : f32, b : f32) : f32 {
@@ -548,6 +563,17 @@ TEST(UnaryMinusRequiresNumericOperandFails) {
 		fn main() : void {
 			const value : string = "abc";
 			const negated = -value;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(UnaryMinusUnsignedFails) {
+	const char* source = R"(
+		fn main() : u8 {
+			const value : u8 = 1;
+			return -value;
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);

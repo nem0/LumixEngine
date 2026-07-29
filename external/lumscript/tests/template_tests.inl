@@ -64,6 +64,20 @@ TEST(TemplateFunctionRefArgumentRejectsUnassignableExpression) {
 	return true;
 }
 
+TEST(TemplateFunctionNullableRefParameterFailsDuringInstantiation) {
+	const char* source = R"(
+		fn clear(v : ref ?$T) : void {
+		}
+
+		fn main() : void {
+			var value : ?i32 = 10;
+			clear(ref value);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(TemplateFunctionBodyCanUseTemplateParam) {
 	const char* source = R"(
 		fn identity(a : $T) : T {

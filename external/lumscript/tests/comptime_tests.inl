@@ -71,6 +71,99 @@ TEST(ComptimeBinaryExpressionEdgeCases) {
 	return true;
 }
 
+TEST(ComptimeUnaryNot) {
+	const char* source = R"(
+		comptime negated = not false;
+		comptime double_negated = not not true;
+
+		fn main() : i32 {
+			return negated and double_negated ? 0 : 1;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeUnaryMinusNumericWidths) {
+	const char* source = R"(
+		comptime i8_value : i8 = -(1 as i8);
+		comptime i16_value : i16 = -(2 as i16);
+		comptime i32_value : i32 = -(3 as i32);
+		comptime i64_value : i64 = -(4 as i64);
+		comptime f32_value : f32 = -(1.5 as f32);
+		comptime f64_value : f64 = -(2.5 as f64);
+
+		fn main() : i32 {
+			if (i8_value as i32 != -1
+				or i16_value as i32 != -2
+				or i32_value != -3
+				or i64_value != -4
+				or f32_value != -1.5
+				or f64_value != -2.5)
+			{
+				return 1;
+			}
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeUnaryMinusPreservesIsize) {
+	const char* source = R"(
+		comptime value : isize = -1;
+
+		fn main() : isize {
+			return value;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_TRUE(ls_to_i64(runtime, -1) == -1);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeUnaryMinusSignedMinimums) {
+	const char* source = R"(
+		comptime i8_min : i8 = -128;
+		comptime i16_min : i16 = -32768;
+		comptime i32_min : i32 = -2147483648;
+		comptime i64_min : i64 = -9223372036854775808;
+
+		fn main() : i32 {
+			if (i8_min as i32 != -128
+				or i16_min as i32 != -32768
+				or i32_min != -2147483648
+				or i64_min != -9223372036854775808)
+			{
+				return 1;
+			}
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(ComptimeBinaryExpressionU64EdgeCases) {
 	const char* source = R"(
 		comptime max = 18446744073709551615 as u64;
@@ -103,8 +196,6 @@ TEST(ComptimeBinaryExpressionDivisionByZeroFails) {
 	)");
 	return true;
 }
-
-
 
 TEST(ComptimeTernary) {
 	const char* source = R"(
@@ -180,27 +271,38 @@ TEST(ComptimeFloatValueTypechecks) {
 	const char* source = R"(
 		comptime Scale = 1.5;
 
-		fn main() : f64 {
+		fn as_f64() : f64 {
 			return Scale;
 		}
-	)";
-	{
-		CAPI_BEGIN(module, diagnostics);
-		EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
-		CAPI_RUNTIME(module, runtime);
-		EXPECT_TRUE(ls_call(runtime, toLs("main")));
-		EXPECT_FLOAT_EQ(1.5, ls_to_f64(runtime, -1));
-		CAPI_END(module);
-	}
 
-	const char* does_not_implicitly_convert = R"(
-		comptime Scale = 1.5;
-
-		fn main() : f32 {
+		fn as_f32() : f32 {
 			return Scale;
 		}
+
+		fn local_as_f32() : f32 {
+			comptime Local = 2.5;
+			return Local;
+		}
 	)";
-	EXPECT_COMPILE_FAIL(does_not_implicitly_convert);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("as_f64")));
+	EXPECT_FLOAT_EQ(1.5, ls_to_f64(runtime, -1));
+	EXPECT_TRUE(ls_call(runtime, toLs("as_f32")));
+	EXPECT_FLOAT_EQ(1.5, ls_to_f32(runtime, -1));
+	EXPECT_TRUE(ls_call(runtime, toLs("local_as_f32")));
+	EXPECT_FLOAT_EQ(2.5, ls_to_f32(runtime, -1));
+	CAPI_END(module);
+
+	EXPECT_COMPILE_FAIL(R"(
+		comptime Scale : f64 = 1.5;
+		fn main() : f32 { return Scale; }
+	)");
+	EXPECT_COMPILE_FAIL(R"(
+		comptime Scale = 340282400000000000000000000000000000000.0;
+		fn main() : f32 { return Scale; }
+	)");
 	return true;
 }
 
@@ -559,6 +661,42 @@ TEST(ComptimeEnumBindingTypechecks) {
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(0, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeEnumShorthandInitializerFails) {
+	const char* source = R"(
+		enum State { Idle, Running }
+		comptime state : State = .Idle;
+
+		fn main() : i32 {
+			return state as i32;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeEnumShorthandExplicitValue) {
+	const char* source = R"(
+		enum State { Idle = 2, Running = 7 }
+		comptime state : State = .Running;
+
+		fn main() : i32 {
+			return state as i32;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(7, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1883,5 +2021,125 @@ TEST(ComptimeCallInitReadsLocalAggregateRvalue) {
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1)); // 10+11+12 + 4 + 5
 	CAPI_END(module);
+	return true;
+}
+
+TEST(IndexingComptimeArrayDirectlyFails) {
+	EXPECT_COMPILE_FAIL(R"(
+		comptime value = [1, 2, 3][0];
+	)");
+	return true;
+}
+
+TEST(ComptimeSliceIndexOutOfBounds) {
+	const char* source = R"(
+		struct S { value : i32; }
+		comptime field = S::fields[2];
+		fn main() : string { return field.name; }
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ComptimeSliceIndexNegative) {
+	const char* source = R"(
+		struct S { value : i32; }
+		comptime field = S::fields[-1];
+		fn main() : string { return field.name; }
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+
+TEST(SliceIndexNotIntegerFails) {
+	const char* source = R"(
+		struct S { value : i32; }
+		comptime field = S::fields["value"];
+		fn main() : string { return field.name; }
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ComptimeArrayIndexNotIntegerFails) {
+	const char* source = R"(
+		comptime A = [i32, f32];
+		fn foo() : A[false] { return 3.14; }
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(SliceIndexNotInteger2Fails) {
+	const char* source = R"(
+		struct S { value : i32; }
+		comptime A = S::fields;
+		fn foo() : A[false] { return 3.14; }
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ComptimeArrayIndexNegativeFails) {
+	const char* source = R"(
+		comptime A = [i32, f32];
+		fn foo() : A[-1] { return 3.14; }
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ComptimeArrayIndexOutOfBoundsFails) {
+	const char* source = R"(
+		comptime A = [i32, f32];
+		fn foo() : A[2] { return 3.14; }
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(NegatedNonBooleanFails) {
+	const char* source = R"(
+		comptime A = 0;
+		comptime B = [not A]i32;
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ComptimeUntypedInt) {
+	const char* source = R"(
+		comptime A = 128;
+		comptime B : i8 = -A;
+		comptime Sum = 64 + 64;
+		comptime C : i8 = -Sum;
+		comptime Huge = 18446744073709551615;
+		fn negative() : i8 { return B; }
+		fn derived_negative() : i8 { return C; }
+		fn positive() : i16 { return A; }
+		fn huge() : u64 { return Huge; }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("negative")));
+	EXPECT_EQ(-128, ls_to_i8(runtime, -1));
+	EXPECT_TRUE(ls_call(runtime, toLs("derived_negative")));
+	EXPECT_EQ(-128, ls_to_i8(runtime, -1));
+	EXPECT_TRUE(ls_call(runtime, toLs("positive")));
+	EXPECT_EQ(128, ls_to_i16(runtime, -1));
+	EXPECT_TRUE(ls_call(runtime, toLs("huge")));
+	EXPECT_TRUE(ls_to_u64(runtime, -1) == 18446744073709551615ull);
+	CAPI_END(module);
+
+	EXPECT_COMPILE_FAIL(R"(
+		comptime A : i32 = 127;
+		comptime B : i8 = A;
+	)");
+	EXPECT_COMPILE_FAIL(R"(
+		comptime Sum = 100 + 100;
+		fn main() : i8 { return Sum; }
+	)");
 	return true;
 }

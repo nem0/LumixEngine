@@ -1228,26 +1228,19 @@ struct Parser {
 		if (!res->subject) return nullptr;
 		if (!consume(Token::LEFT_BRACE)) return nullptr;
 
-		bool has_fallback = false;
 		while (peekToken().type != Token::RIGHT_BRACE) {
 			if (peekToken().type == Token::END_OF_FILE) {
 				m_output.error("Unexpected end of file");
 				return nullptr;
 			}
 
-			if (peekToken().type != Token::CASE) {
+			if (!consume(Token::CASE)) {
 				m_output.errorAt(peekToken(), "Expected case");
 				return nullptr;
 			}
 
-			Token case_token = consumeToken();
 			MatchArm& arm = res->arms.emplace_back(m_unit.arena);
 			if (peekToken().type == Token::COLON) {
-				if (has_fallback) {
-					m_output.errorAt(case_token, "Duplicate match fallback");
-					return nullptr;
-				}
-				has_fallback = true;
 				arm.is_fallback = true;
 			}
 			else {

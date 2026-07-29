@@ -64,6 +64,25 @@ TEST(IfConditionMustBeBoolFails) {
 	return true;
 }
 
+TEST(VoidFunctionCanNotReturnValue) {
+	const char* source = R"(
+		fn main() : void {
+			return 1;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(NonvoidFunctionEmptyReturnFails) {
+	const char* source = R"(
+		fn main() : i32 {
+			return;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
 TEST(FirstClassFunctionsTypecheck) {
 	const char* source = R"(
 		fn add(a : i32, b : i32) : i32 {

@@ -64,6 +64,21 @@ TEST(MatchFallbackAfterIf) {
 	return true;
 }
 
+TEST(MatchTwoFallbacksFail) {
+	const char* source = R"(
+		fn main(v : i32) : void {
+			match v {
+				case 0:
+					if false {}
+				case:
+				case:
+					return;
+			}
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
 TEST(MatchRejectsElseFallback) {
 	const char* source = R"(
 		fn main(v : i32) : void {

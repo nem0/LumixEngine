@@ -20,7 +20,19 @@
 #include <stdbool.h>
 
 #ifndef ASSERT
-	#define ASSERT(x) assert(x)
+	#ifdef LS_TESTS
+		#include <stdio.h>
+		#include <stdlib.h>
+		#define ASSERT(x) do { \
+			if (!(x)) { \
+				fprintf(stderr, "TEST ASSERT FAILED at %s:%d: %s\n", __FILE__, __LINE__, #x); \
+				fflush(stderr); \
+				exit(-1); \
+			} \
+		} while (false)
+	#else
+		#define ASSERT(x) assert(x)
+	#endif
 #endif
 
 typedef char i8;

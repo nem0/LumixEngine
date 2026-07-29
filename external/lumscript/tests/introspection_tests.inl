@@ -514,7 +514,7 @@ TEST(ComptimeTypeKindMatchPrunesUnselectedCase) {
 
 TEST(IntrospectionTypeofProducesExpressionType) {
 	const char* source = R"(
-		comptime Result = typeof(1 + 2);
+		comptime Result = typeof((1 + 2) as i32);
 		fn accept(value : Result) : void {}
 	)";
 	EXPECT_COMPILE(source);
@@ -527,7 +527,7 @@ TEST(IntrospectionTypeofTypeMembersProducesExpressionTypes) {
 		comptime NestedKind = typeof(typeof(i32::kind));
 		comptime Name = typeof(i32::name);
 		comptime Child = typeof(?i32::child);
-		comptime Length = typeof([3]i32::length);
+		comptime Length = typeof([3]i32::length as isize);
 
 		fn acceptKind(value : Kind) : void {}
 		fn acceptNestedKind(value : NestedKind) : void {}
@@ -547,6 +547,24 @@ TEST(IntrospectionTypeofRejectsTypeOperand) {
 	return true;
 }
 
+TEST(IntrospectionTypeofRejectsUntypedNumerics) {
+	EXPECT_COMPILE_FAIL(R"(
+		comptime T = typeof(1 + 2);
+	)");
+	EXPECT_COMPILE_FAIL(R"(
+		comptime T = typeof(1.5);
+	)");
+	EXPECT_COMPILE_FAIL(R"(
+		comptime value = 1;
+		comptime T = typeof(value);
+	)");
+	EXPECT_COMPILE_FAIL(R"(
+		comptime value = 1.5;
+		comptime T = typeof(value);
+	)");
+	return true;
+}
+
 TEST(IntrospectionTypeofObservesNullablePromotion) {
 	const char* source = R"(
 		fn inspect(value : ?i32) : void {
@@ -562,7 +580,7 @@ TEST(IntrospectionTypeofObservesNullablePromotion) {
 
 TEST(IntrospectionTypeofStaysComptimeOnly) {
 	const char* source = R"(
-		fn main() : void { var T = typeof(1); }
+		fn main() : void { var T = typeof(1 as i32); }
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;

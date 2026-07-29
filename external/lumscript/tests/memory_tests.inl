@@ -31,6 +31,32 @@ TEST(SizeofRequiresTypeNotValueFails) {
 	return true;
 }
 
+TEST(SizeofAndAlignofRejectUntypedNumerics) {
+	EXPECT_COMPILE_FAIL(R"(
+		comptime value = 1;
+		comptime size = sizeof(value);
+	)");
+	EXPECT_COMPILE_FAIL(R"(
+		comptime value = 1.5;
+		comptime size = sizeof(value);
+	)");
+	EXPECT_COMPILE_FAIL(R"(
+		comptime value = 1;
+		comptime alignment = alignof(value);
+	)");
+	EXPECT_COMPILE_FAIL(R"(
+		comptime value = 1.5;
+		comptime alignment = alignof(value);
+	)");
+	EXPECT_COMPILE_FAIL(R"(
+		comptime size = sizeof(typeof(1));
+	)");
+	EXPECT_COMPILE_FAIL(R"(
+		comptime alignment = alignof(typeof(1.5));
+	)");
+	return true;
+}
+
 TEST(IsizeVariableTypechecks) {
 	const char* source = R"(
 		fn main() : void {
