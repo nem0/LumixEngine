@@ -159,6 +159,7 @@ struct ls_module {
 	ls_host* host;
 	ls_arena& arena;
 	ExpArray<Unit> units;
+	ExpArray<UnionResolvedType*> union_types;
 	// One canonical instance per primitive kind, indexed by ResolvedType::Kind.
 	// Pointer equality suffices for primitives; use typesEqual() for compound types.
 	ResolvedType primitives[ResolvedType::META];

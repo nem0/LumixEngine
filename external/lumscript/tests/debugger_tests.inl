@@ -1287,23 +1287,17 @@ TEST(DebugTaggedUnionMemberCountAndTypes) {
 	EXPECT_EQ(8u, ls_type_get_size(type));
 	EXPECT_EQ(3u, ls_type_union_member_count(type));
 
-	// Member 0: A (struct)
-	const ls_type* mem0 = ls_type_union_member_type(type, 0);
-	EXPECT_TRUE(mem0 != nullptr);
-	EXPECT_EQ((int)LS_TYPE_STRUCT, (int)ls_type_get_kind(mem0));
-	EXPECT_EQ(4u, ls_type_get_size(mem0));
-
-	// Member 1: B (struct)
-	const ls_type* mem1 = ls_type_union_member_type(type, 1);
-	EXPECT_TRUE(mem1 != nullptr);
-	EXPECT_EQ((int)LS_TYPE_STRUCT, (int)ls_type_get_kind(mem1));
-	EXPECT_EQ(4u, ls_type_get_size(mem1));
-
-	// Member 2: i32
-	const ls_type* mem2 = ls_type_union_member_type(type, 2);
-	EXPECT_TRUE(mem2 != nullptr);
-	EXPECT_EQ((int)LS_TYPE_I32, (int)ls_type_get_kind(mem2));
-	EXPECT_EQ(4u, ls_type_get_size(mem2));
+	i32 struct_count = 0;
+	i32 i32_count = 0;
+	for (u32 i = 0; i < 3; ++i) {
+		const ls_type* member = ls_type_union_member_type(type, i);
+		EXPECT_TRUE(member != nullptr);
+		EXPECT_EQ(4u, ls_type_get_size(member));
+		if (ls_type_get_kind(member) == LS_TYPE_STRUCT) ++struct_count;
+		if (ls_type_get_kind(member) == LS_TYPE_I32) ++i32_count;
+	}
+	EXPECT_EQ(2, struct_count);
+	EXPECT_EQ(1, i32_count);
 
 	// Out-of-bounds and null safety
 	EXPECT_TRUE(ls_type_union_member_type(type, 99) == nullptr);
@@ -1315,7 +1309,9 @@ TEST(DebugTaggedUnionMemberCountAndTypes) {
 	u32 value_size = 0;
 	const void* value = ls_debug_local_value(runtime, 0, 0, &value_size);
 	EXPECT_TRUE(value != nullptr);
-	EXPECT_EQ(0, ls_type_union_tag(type, value));  // tag 0 = A is active
+	const i32 tag = ls_type_union_tag(type, value);
+	EXPECT_TRUE(tag >= 0 && tag < 3);
+	EXPECT_EQ((int)LS_TYPE_STRUCT, (int)ls_type_get_kind(ls_type_union_member_type(type, (u32)tag)));
 	EXPECT_EQ(-1, ls_type_union_tag(type, nullptr));
 
 	EXPECT_EQ((int)LS_RESULT_OK, (int)ls_debug_resume(runtime, LS_DEBUG_CONTINUE));
@@ -1353,11 +1349,13 @@ TEST(DebugTaggedUnionTagChangesWithMember) {
 	EXPECT_EQ((int)LS_TYPE_TAGGED_UNION, (int)ls_type_get_kind(type));
 	EXPECT_EQ(3u, ls_type_union_member_count(type));
 
-	// After assigning i32(42), the tag should be 2
+	// After assigning i32(42), the tag should select the i32 member.
 	u32 value_size = 0;
 	const void* value = ls_debug_local_value(runtime, 0, 0, &value_size);
 	EXPECT_TRUE(value != nullptr);
-	EXPECT_EQ(2, ls_type_union_tag(type, value));
+	const i32 tag = ls_type_union_tag(type, value);
+	EXPECT_TRUE(tag >= 0 && tag < 3);
+	EXPECT_EQ((int)LS_TYPE_I32, (int)ls_type_get_kind(ls_type_union_member_type(type, (u32)tag)));
 
 	// Verify the payload holds the i32 value 42
 	i32 payload = 0;

@@ -1329,6 +1329,46 @@ TEST(TypelessStructLiteralLhsOperatorOperandFails) {
 }
 
 
+TEST(ComptimeOnlyOperatorOperandFails) {
+	const char* source = R"(
+		struct Descriptor { value_type : type; }
+
+		operator +(a : Descriptor, b : Descriptor) : i32 {
+			return 1;
+		}
+
+		comptime first = Descriptor { i32 };
+		comptime second = Descriptor { f32 };
+
+		fn main() : i32 {
+			return first + second;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ComptimeOnlyIndexedOperatorOperandFails) {
+	const char* source = R"(
+		struct Descriptor { value_type : type; }
+
+		operator +(a : Descriptor, b : Descriptor) : i32 {
+			return 1;
+		}
+
+		comptime descriptors = [
+			Descriptor { i32 },
+			Descriptor { f32 }
+		];
+
+		fn main() : i32 {
+			return descriptors[0] + descriptors[1];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(SliceEqualityFails) {
 	// Aggregates have no equality; the old generic comparison silently compared
 	// nothing and always returned true.

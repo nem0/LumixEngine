@@ -20,6 +20,28 @@ TEST(AlignofProducesComptimeInt) {
 	return true;
 }
 
+TEST(SizeofLocalComptimeType) {
+	const char* source = R"(
+		fn main() : void {
+			comptime T = i32;
+			const s = sizeof(T);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(SizeofLocalComptimeValueFails) {
+	const char* source = R"(
+		fn main() : void {
+			comptime T : i32 = 42;
+			const s = sizeof(T);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(SizeofRequiresTypeNotValueFails) {
 	const char* source = R"(
 		fn main() : void {

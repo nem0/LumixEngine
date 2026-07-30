@@ -728,11 +728,12 @@ If a numeric expression is consumed where no concrete numeric type is available,
 - a comparison of untyped values: `12 == 13` compares `i32` values
 - a range with two untyped bounds: `for i in 0..4 {}` uses an `i32` loop variable
 
-A union target provides context only when exactly one member is compatible with the untyped numeric value:
+A union target provides context only when exactly one member has a compatible numeric category. The
+value's representability does not disambiguate between multiple numeric members:
 
 ```cpp
 const number : i32 | string = 12; // 12 becomes i32
-const ambiguous : i32 | i64 = 12; // compile-time error: both members match
+const ambiguous : i32 | i64 = 2147483648; // compile-time error: both numeric members match
 ```
 
 ```cpp
@@ -866,13 +867,11 @@ All members must be pairwise distinct types. Because the member type is the tag,
 - a union value coerces implicitly to any union whose member set is a superset (the tag is remapped at the coercion site): an `A | B` value can be assigned where `A | B | C` is expected - this is what lets error unions propagate across call layers
 - no other implicit conversions apply; narrowing (superset to subset, or union to member) is never implicit
 
-**Testing and extraction: `is` and `as`**
+**Testing: `is`**
 
 - `e is ButtonEvent` evaluates to `bool`: whether the active variant is `ButtonEvent`
 - `if e is ButtonEvent { ... }` promotes `e` to `ButtonEvent` inside the branch, like nullable promotion in `if e != null`; the `else` branch and the code after an early return narrow it too (see [Narrowing](#narrowing))
-- `e as ButtonEvent` evaluates to `?ButtonEvent`: the payload when the active variant matches, `null` otherwise; the usual forced null check applies before use
-- there is no trapping variant cast
-- `is` / `as` with a type that is not a member of the union is a compile-time error
+- `is` with a type that is not a member of the union is a compile-time error
 
 #### Narrowing
 
@@ -911,7 +910,7 @@ Rules:
 - the residual of an `else if` chain accumulates: each arm narrows against what the arms before it already excluded
 - narrowing to an empty member set is a compile-time error; it means the condition can never hold
 - only a bare `e is T` on a named subject narrows. A negated or compound condition (`not (e is T)`, `e is T and flag`) is not analyzed, and the subject keeps its declared type in both branches
-- a narrowed subject keeps the residual type for member access, `is`, `as`, `match`, and [`typeof`](#typeof)
+- a narrowed subject keeps the residual type for member access, `is`, `match`, and [`typeof`](#typeof)
 - narrowing is flow-typing with the same accepted unsoundness as promotion: assigning to the subject inside a narrowed region is allowed and is not re-checked (see [Nullable values](#nullable-values))
 
 **Match**
@@ -948,7 +947,7 @@ A structural union has no declaring namespace. Union-typed values do not partici
 
 **Comparison**
 
-`==` and `!=` are not defined for union values; comparing two unions is a compile-time error. Narrow first (`is`, `as`, or `match`) and compare the payloads.
+`==` and `!=` are not defined for union values; comparing two unions is a compile-time error. Narrow first with `is` or `match`, then compare the payloads.
 
 **Layout**
 
@@ -1660,8 +1659,6 @@ const state : State = numeric as State;
 Integer-to-enum cast does not validate membership.
 
 Struct casts are not supported.
-
-`as` on a tagged union value with a member type produces a nullable payload, for example `e as ButtonEvent` has type `?ButtonEvent` (see [Tagged unions](#tagged-unions)).
 
 Slice reinterpret casts convert between a byte slice and a typed slice:
 
@@ -2634,7 +2631,6 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 		- var a : SomeUnion = SomeMember { 1, "foo" }; is possible and uses only existing language features
 	- structural set semantics (order-insensitive, flattening) so anonymous unions like `Error | ASTNode` compose across modules and call layers
 	- subset → superset widening is implicit so error unions propagate without manual re-wrapping, including through [`else return`](#union-extraction-and-propagation)
-	- `as` yields `?Member` instead of trapping, reusing the forced-null-check machinery instead of adding a runtime abort path
 	- promotion in `match`/`is` is flow-typing with the same accepted unsoundness as nullable promotion - keeping the checker simple was preferred over a borrow-like aliasing rule
 	- [narrowing](#narrowing) is one residual-type rule (member set minus excluded members) shared by the `else` branch, the `match` fallback arm, and post-early-return flow; promotion to a single member is just the case where one member is left
 		- only a bare `e is T` narrows - negated and compound conditions are not analyzed. This keeps the checker's flow analysis to a single syntactic form, at the cost of `not (e is T)` reading as unnarrowed
@@ -2676,6 +2672,7 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 
 * ref in function type - var a : fn(ref i32) = foo;
 * 1'000'000 / 1_000_000
+* hex - 0x1234ABCD
 * FourCC? `ABCD`
 * bit set / flags / something else?
 * null propagation a?.b?.c;

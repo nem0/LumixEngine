@@ -985,7 +985,7 @@ TEST(IntrospectionTypeNamesCoverDeclarationsTemplatesAndUnions) {
 		struct Pair[T] { first : T; second : T; }
 		comptime U = f32 | i32;
 		fn main() : void {
-			if i32::name == "i32" and S::name == "S" and E::name == "E" and Pair[i32]::name == "Pair[i32]" and U::name == "i32 | f32" { }
+			if i32::name == "i32" and S::name == "S" and E::name == "E" and Pair[i32]::name == "Pair[i32]" and U::name == "f32 | i32" { }
 			else { var bad : MissingType = undefined; }
 		}
 	)";

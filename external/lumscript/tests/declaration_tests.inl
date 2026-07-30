@@ -520,3 +520,13 @@ TEST(UnknownImportedValueUsedInComptimeFails) {
 	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
 	return true;
 }
+
+
+TEST(ComptimeNegativeIntegerLiteralRangeChecks) {
+	const char* source = R"(
+		comptime X : i8 = -128;
+		comptime Y : bool = -128 > X;
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}

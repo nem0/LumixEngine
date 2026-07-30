@@ -131,6 +131,35 @@ TEST(UntypedLiteralsConcretizeInAllContexts) {
 			const ambiguous : i32 | i64 = 1;
 		}
 	)");
+	EXPECT_COMPILE_FAIL(R"(
+		fn main() : void {
+			const ambiguous : i8 | i16 = 255;
+		}
+	)");
+	return true;
+}
+
+TEST(UntypedLiteralsConcretizeInAllContextsWithUnion) {
+	EXPECT_COMPILE(R"(
+		fn main() : void {
+			const u : i8 | bool = 1;
+		}
+	)");
+
+	return true;
+}
+
+TEST(ComptimeUntypedIntegerMustFitAnnotatedType) {
+	EXPECT_COMPILE_FAIL(R"(
+		comptime value : i8 = 128;
+	)");
+	return true;
+}
+
+TEST(ComptimeUntypedIntegerUnionMustBeUnambiguous) {
+	EXPECT_COMPILE_FAIL(R"(
+		comptime value : i8 | i16 = 1;
+	)");
 	return true;
 }
 
@@ -214,6 +243,20 @@ TEST(UntypedIntegerLiteralsInferI64ForLargeValues) {
 			const negative = -2147483649;
 			takes_i64(value);
 			takes_i64(negative);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(UntypedIntegerExpressionsInferI64ForLargeValues) {
+	const char* source = R"(
+		fn takes_i64(v : i64) : void {
+		}
+
+		fn main() : void {
+			const value = 2147483648 + 1;
+			takes_i64(value);
 		}
 	)";
 	EXPECT_COMPILE(source);

@@ -2236,6 +2236,21 @@ TEST(ComptimeUntypedInt) {
 	return true;
 }
 
+TEST(NegativeComptimeUntypedIntAdoptsSignedContext) {
+	const char* source = R"(
+		comptime N = -1;
+
+		fn takes_i8(value : i8) : void {
+		}
+
+		fn main() : void {
+			takes_i8(N);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(ComptimeUntypedIntFails) {
 	EXPECT_COMPILE_FAIL(R"(
 		comptime A : i32 = 127;

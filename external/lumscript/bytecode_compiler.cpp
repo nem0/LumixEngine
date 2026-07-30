@@ -3001,27 +3001,6 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 		case Expression::TERNARY: return compileTernary(ctx, static_cast<TernaryExpression&>(expr), hint);
 		case Expression::CAST: {
 			CastExpression& cast = static_cast<CastExpression&>(expr);
-			if (cast.expression->resolved_type->kind == ResolvedType::UNION && expr.resolved_type->kind == ResolvedType::NULLABLE) {
-				UnionResolvedType& source = static_cast<UnionResolvedType&>(*cast.expression->resolved_type);
-				NullableResolvedType& nullable = static_cast<NullableResolvedType&>(*expr.resolved_type);
-				i32 member_index = -1;
-				for (i32 i = 0; i < source.members.size(); ++i) {
-					if (sameResolvedType(source.members[i], nullable.inner)) {
-						member_index = i;
-						break;
-					}
-				}
-				ASSERT(member_index >= 0);
-				const u32 source_size = typeByteSize(source);
-				const u32 source_offset = ctx.addLocal(&source, valueKindForType(source));
-				compileExpression(ctx, *cast.expression, valueKindForType(source));
-				emitStoreLocalBytes(ctx, source_offset, source_size);
-				emitLoadLocalBytes(ctx, source_offset, 4);
-				emitIntegerConstant(ctx, LS_TYPE_I32, member_index);
-				emitCompareOp(ctx, LS_OP_EQ, LS_TYPE_I32);
-				emitLoadLocalBytes(ctx, source_offset + 4, typeByteSize(*nullable.inner));
-				return LS_TYPE_NULL_VALUE;
-			}
 			const ls_type_kind dst_kind = toTypeKind(*expr.resolved_type);
 			const ls_type_kind resolved_src_kind = toTypeKind(*cast.expression->resolved_type);
 			if (isNumericKind(resolved_src_kind) && isNumericKind(dst_kind) && cast.expression->kind == Expression::IDENTIFIER) {

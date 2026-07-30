@@ -160,6 +160,76 @@ TEST(UnionMatchNarrowing) {
 	return true;
 }
 
+TEST(ComptimeBindingDoesNotUnboxNullable) {
+	const char* source = R"(
+		comptime n : ?i32 = 1;
+		fn main() : i32 { return n; }
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ComptimeUnionBindingKeepsDeclaredType) {
+	const char* source = R"(
+		struct A { x : i32; }
+		struct B { y : f32; }
+		comptime Union = A | B;
+		comptime u : Union = A { 5 };
+		comptime is_a = u is A;
+
+		fn main() : void {
+			if is_a { } else { var bad : MissingType = undefined; }
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeUnionSubsetWidening) {
+	const char* source = R"(
+		struct A { x : i32; }
+		struct B { y : i32; }
+		struct C { z : i32; }
+		comptime Small = A | B;
+		comptime Large = A | B | C;
+		comptime small : Small = A { 5 };
+		comptime large : Large = small;
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeReorderedUnionPreservesMemberTag) {
+	const char* source = R"(
+		struct A { x : i32; }
+		struct B { y : i32; }
+		comptime AB = A | B;
+		comptime BA = B | A;
+		comptime source : AB = A { 7 };
+		comptime same_first_member = AB::types[0] == BA::types[0];
+
+		fn main() : i32 {
+			if not same_first_member { return -2; }
+			comptime reordered : BA = source;
+			var runtime : BA = reordered;
+			match runtime {
+				case A:
+					return runtime.x;
+				case B:
+					return -1;
+			}
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(7, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(UnionIsOperator) {
 	const char* source = R"(
 		struct A {
@@ -181,7 +251,7 @@ TEST(UnionIsOperator) {
 	return true;
 }
 
-TEST(UnionAsOperator) {
+TEST(UnionMemberCastError) {
 	const char* source = R"(
 		struct A {
 			x : i32;
@@ -194,12 +264,9 @@ TEST(UnionAsOperator) {
 		fn main() : void {
 			var u : Union = A { 5 };
 			var maybe_a : ?A = u as A;
-			if maybe_a != null {
-				var x : i32 = maybe_a.x;
-			}
 		}
 	)";
-	EXPECT_COMPILE(source);
+	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
@@ -529,28 +596,6 @@ TEST(UnionMatchNotExhaustive) {
 	return true;
 }
 
-TEST(UnionAsWrongMember) {
-	const char* source = R"(
-		struct A {
-			x : i32;
-		}
-		struct B {
-			y : f32;
-		}
-		comptime Union = A | B;
-
-		fn main() : void {
-			var u : Union = A { 5 };
-			var maybe_b : ?B = u as B;
-			if maybe_b != null {
-				var y : f32 = maybe_b.y;
-			}
-		}
-	)";
-	EXPECT_COMPILE(source);
-	return true;
-}
-
 TEST(UnionSizeof) {
 	const char* source = R"(
 		struct A {
@@ -617,7 +662,7 @@ TEST(UnionNarrowedValueRuntime) {
 	return true;
 }
 
-TEST(UnionIsAndAsRuntime) {
+TEST(UnionIsRuntime) {
 	const char* source = R"(
 		struct A {
 			x : i32;
@@ -630,28 +675,18 @@ TEST(UnionIsAndAsRuntime) {
 		fn main() : i32 {
 			var value : Union = A { 7 };
 			var result : i32 = 0;
-			var maybe_b : ?B = value as B;
-			if value is A {
-				result = value.x;
-			}
 			if value is B {
 				return 0;
 			}
-			var maybe_a : ?A = value as A;
-			if maybe_a != null {
-				result = result + maybe_a.x;
-			}
-			if maybe_b == null {
-				return result + 1;
-			}
-			return 0;
+			result = value.x;
+			return result + 1;
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
-	EXPECT_EQ(15, ls_to_i32(runtime, -1));
+	EXPECT_EQ(8, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -926,26 +961,6 @@ TEST(UnionIsNonMemberError) {
 			if u is C {
 			}
 		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
-TEST(UnionAsNonMemberError) {
-	const char* source = R"(
-		struct A {
-			x : i32;
-		}
-		struct B {
-			y : f32;
-		}
-		struct C {
-			z : bool;
-		}
-		comptime Union = A | B;
-
-		var u : Union = A { 5 };
-		var maybe_c : ?C = u as C;
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
