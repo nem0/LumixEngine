@@ -767,6 +767,45 @@ static void emitConstBytes(FunctionCompiler& ctx, const u8* data, u32 size) {
 	}
 }
 
+static bool emitUntypedComptimeNumeric(FunctionCompiler& ctx, const u8* data, const ResolvedType& source, const ResolvedType& target, ls_type_kind hinted_kind = LS_TYPE_INVALID) {
+	ls_type_kind target_kind = toTypeKind(target);
+	if (target_kind == LS_TYPE_INVALID) target_kind = hinted_kind;
+	if (target_kind == LS_TYPE_INVALID) target_kind = source.kind == ResolvedType::UNTYPED_FLOAT ? LS_TYPE_F64 : LS_TYPE_I32;
+	if (source.kind == ResolvedType::UNTYPED_INT || isIntegerKind(toTypeKind(source))) {
+		u64 bits;
+		memcpy(&bits, data, sizeof(bits));
+		if (isFloatKind(target_kind)) {
+			i64 value;
+			memcpy(&value, &bits, sizeof(value));
+			if (target_kind == LS_TYPE_F32)
+				emitConst4(ctx, bitcastF32ToU32((float)value));
+			else
+				emitConst8(ctx, bitcastF64ToU64((double)value));
+			return true;
+		}
+		if (isIntegerKind(target_kind) && target_kind != LS_TYPE_BOOL) {
+			emitIntegerConstant(ctx, target_kind, bits);
+			return true;
+		}
+	}
+	if ((source.kind == ResolvedType::UNTYPED_FLOAT || isFloatKind(toTypeKind(source))) && isFloatKind(target_kind)) {
+		double value;
+		if (source.kind == ResolvedType::F32) {
+			float f;
+			memcpy(&f, data, sizeof(f));
+			value = f;
+		} else {
+			memcpy(&value, data, sizeof(value));
+		}
+		if (target_kind == LS_TYPE_F32)
+			emitConst4(ctx, bitcastF32ToU32((float)value));
+		else
+			emitConst8(ctx, bitcastF64ToU64(value));
+		return true;
+	}
+	return false;
+}
+
 static void emitConstString(FunctionCompiler& ctx, u32 string_index) {
 	const u32 dst = ctx.temp_top;
 	emitOp(ctx.code, LS_OP_LOAD_CONST_STRING);
@@ -1566,7 +1605,9 @@ static Value compileValue(FunctionCompiler& ctx, Expression& expr, ls_type_kind 
 	switch (expr.kind) {
 		case Expression::INT_LITERAL: {
 			Value v;
-			const ls_type_kind kind = toTypeKind(*expr.resolved_type);
+			const ls_type_kind kind = expr.resolved_type && expr.resolved_type->kind != ResolvedType::UNTYPED_INT
+				? toTypeKind(*expr.resolved_type)
+				: defaultLiteralKind(expr, hint);
 			const u64 value = static_cast<IntLiteralExpression&>(expr).value;
 			if (isFloatKind(kind)) {
 				v.kind = Value::CONST_FLOAT;
@@ -2722,6 +2763,10 @@ static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& membe
 		emitConstBytes(ctx, member.comptime_value.value, typeByteSize(*member.comptime_value.type));
 		return valueKindForType(*member.comptime_value.type);
 	}
+	if (member.resolved_symbol && member.resolved_symbol->storage == Symbol::COMPTIME
+		&& member.resolved_symbol->comptime_bytes
+		&& emitUntypedComptimeNumeric(ctx, member.resolved_symbol->comptime_bytes, *member.resolved_symbol->resolved_type, *member.resolved_type))
+		return valueKindForType(*member.resolved_type);
 	if (!member.expression) {
 		// .enum_member
 		ASSERT(member.resolved_type && member.resolved_type->kind == ResolvedType::ENUM);
@@ -2848,8 +2893,10 @@ static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& membe
 static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, ls_type_kind hint) {
 	SourceScope source_scope(ctx.code, expr.token);
 	switch (expr.kind) {
-		case Expression::INT_LITERAL: {
-			const ls_type_kind kind = toTypeKind(*expr.resolved_type);
+	case Expression::INT_LITERAL: {
+			const ls_type_kind kind = expr.resolved_type && expr.resolved_type->kind != ResolvedType::UNTYPED_INT
+				? toTypeKind(*expr.resolved_type)
+				: defaultLiteralKind(expr, hint);
 			const u64 int_value = static_cast<IntLiteralExpression&>(expr).value;
 			if (kind == LS_TYPE_F32) {
 				emitConst4(ctx, bitcastF32ToU32((float)int_value));
@@ -2921,6 +2968,9 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 				return slot->kind != LS_TYPE_INVALID ? slot->kind : LS_TYPE_I32;
 			}
 			if (id.comptime_bytes) {
+				if (expr.comptime_value.type
+					&& emitUntypedComptimeNumeric(ctx, id.comptime_bytes, *expr.comptime_value.type, *expr.resolved_type, hint))
+					return isNumericKind(hint) ? hint : (isFloatKind(toTypeKind(*expr.comptime_value.type)) ? LS_TYPE_F64 : LS_TYPE_I32);
 				emitConstBytes(ctx, id.comptime_bytes, typeByteSize(*id.resolved_type));
 				return valueKindForType(*expr.resolved_type);
 			}
@@ -2929,6 +2979,8 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 			// value inline. Prefer the folded constant bytes; otherwise fall back to
 			// compiling the initializer expression at this use site.
 			if (id.symbol && id.symbol->storage == Symbol::COMPTIME && id.symbol->comptime_bytes) {
+				if (emitUntypedComptimeNumeric(ctx, id.symbol->comptime_bytes, *id.symbol->resolved_type, *expr.resolved_type, hint))
+					return isNumericKind(hint) ? hint : (isFloatKind(toTypeKind(*id.symbol->resolved_type)) ? LS_TYPE_F64 : LS_TYPE_I32);
 				emitConstBytes(ctx, id.symbol->comptime_bytes, id.symbol->comptime_byte_size);
 				return valueKindForType(*expr.resolved_type);
 			}
@@ -3035,7 +3087,11 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 				return valueKindForType(*fn_type->return_type);
 			}
 			if (un.op == Token::MINUS && (un.expression->kind == Expression::INT_LITERAL || un.expression->kind == Expression::FLOAT_LITERAL)) {
-				const ls_type_kind kind = un.expression->kind == Expression::INT_LITERAL ? toTypeKind(*un.expression->resolved_type) : defaultLiteralKind(*un.expression, hint);
+				const ls_type_kind kind = un.expression->kind == Expression::INT_LITERAL
+					? (un.expression->resolved_type && un.expression->resolved_type->kind != ResolvedType::UNTYPED_INT
+						? toTypeKind(*un.expression->resolved_type)
+						: defaultLiteralKind(*un.expression, hint))
+					: defaultLiteralKind(*un.expression, hint);
 				if (un.expression->kind == Expression::INT_LITERAL) {
 					const u64 value = static_cast<IntLiteralExpression&>(*un.expression).value;
 					if (kind == LS_TYPE_F32)

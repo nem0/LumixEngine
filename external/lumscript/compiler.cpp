@@ -559,6 +559,9 @@ struct Checker {
 
 	bool comptimeValuesEqual(const ComptimeValue& a, const ComptimeValue& b) {
 		if (a.kind != b.kind) return false;
+		if (a.kind == ComptimeValue::VALUE && a.type && b.type && isNumericOrUntyped(*a.type) && isNumericOrUntyped(*b.type)) {
+			return compareComptimeNumeric(a, b) == 0;
+		}
 		if (!typesEqual(a.type, b.type)) return false;
 		if (a.kind == ComptimeValue::TYPE) return true;
 		if (a.kind != ComptimeValue::VALUE || !a.type) return false;
@@ -1382,12 +1385,37 @@ struct Checker {
 		}
 	}
 
+	static u8* getComptimeBytes(const IdentifierExpression& expr) {
+		ASSERT(expr.eval_stage != Expression::RUNTIME);
+		if (expr.comptime_bytes) return expr.comptime_bytes;
+		return expr.symbol->comptime_bytes;
+	}
+
 	// Check whether an expression that has already resolved as untyped numeric can
 	// be pinned to `concrete`, without changing the AST. This is shared by normal
 	// materialization and overload matching so a candidate never matches only to
 	// fail during the commit pass.
 	static bool canMaterializeUntyped(const Expression& expr, const ResolvedType& concrete) {
 		switch (expr.kind) {
+			case Expression::IDENTIFIER: {
+				auto& ie = static_cast<const IdentifierExpression&>(expr);
+				ASSERT(ie.eval_stage != Expression::RUNTIME);
+				switch (ie.resolved_type->kind) {
+					case ResolvedType::UNTYPED_INT: {
+						i64 val = comptimeNumericToI64(getComptimeBytes(ie), ie.resolved_type->kind); 
+						return isNumericType(concrete) && intLiteralFitsType(val, concrete.kind);
+					}
+					case ResolvedType::UNTYPED_FLOAT: {
+						double val = comptimeNumericToF64(getComptimeBytes(ie), ie.resolved_type->kind);
+						if (!isFloatType(concrete)) return false;
+						return concrete.kind != ResolvedType::F32 || (val <= (double)FLT_MAX && val >= -(double)FLT_MAX);
+						return isFloatType(concrete);
+					}
+					default: break;
+				}
+				ASSERT(false);
+				return false;
+			}
 			case Expression::INT_LITERAL:
 				return isNumericType(concrete) && intLiteralFitsType(static_cast<const IntLiteralExpression&>(expr).value, concrete.kind);
 			case Expression::SIZEOF:
@@ -1414,8 +1442,9 @@ struct Checker {
 				return canMaterializeUntyped(*tern.true_expr, concrete)
 					&& canMaterializeUntyped(*tern.false_expr, concrete);
 			}
-			default: return true;
+			default: break;
 		}
+		return true;
 	}
 
 	FunctionResolvedType* buildFunctionType(Unit& unit, FunctionExpression& fn) {
@@ -1621,29 +1650,28 @@ struct Checker {
 	}
 
 	bool comptimeValueMatchesExpected(const ComptimeValue& value, ResolvedType* expected) {
-		if (value.kind == ComptimeValue::FAILURE) return false;
+		ASSERT(value.kind != ComptimeValue::FAILURE);
 		if (!expected) return value.kind == ComptimeValue::TYPE;
+
 		if (expected->kind == ResolvedType::META) return value.kind == ComptimeValue::TYPE;
 		if (value.kind == ComptimeValue::TYPE) return false;
-		if (canImplicitlyConvert(value.type, expected)) return true;
-		if (!isNumericType(*value.type) || !isNumericType(*expected)) return false;
+		
+		if (!canImplicitlyConvert(value.type, expected)) return false;
+		if (!isNumericOrUntyped(*value.type) || !isNumericType(*expected)) return typesEqual(value.type, expected);
 
-		const u8* bytes = value.value;
-		if (!bytes) return false;
-		const bool is_unsigned = value.type->kind >= ResolvedType::U8 && value.type->kind <= ResolvedType::U64;
-		if (isIntegerType(*value.type)) {
-			if (is_unsigned) return intLiteralFitsType(comptimeNumericToU64(bytes, value.type->kind), expected->kind);
-			const i64 integer = comptimeNumericToI64(bytes, value.type->kind);
-			return integer < 0
-				? negatedIntLiteralFitsType((u64)(-(integer + 1)) + 1u, expected->kind)
-				: intLiteralFitsType((u64)integer, expected->kind);
+		switch (value.type->kind) {
+			case ResolvedType::UNTYPED_INT: {
+				i64 val = comptimeNumericToI64(value.value, value.type->kind);
+				return intLiteralFitsType(val, expected->kind);
+			}
+			case ResolvedType::UNTYPED_FLOAT: {
+				double val = comptimeNumericToF64(value.value, value.type->kind);
+				if (expected->kind == ResolvedType::F32) return val <= (double)FLT_MAX && val >= -(double)FLT_MAX;
+				return true;
+			}
+			default: break;
 		}
-		if (isFloatType(*value.type) && isFloatType(*expected)) {
-			const double floating = comptimeNumericToF64(bytes, value.type->kind);
-			if (expected->kind == ResolvedType::F64) return true;
-			return (double)(float)floating == floating;
-		}
-		return false;
+		return canImplicitlyConvert(value.type, expected);
 	}
 
 	bool resolveStructFields(Unit& unit, const Symbol* sym, StructExpression& st, StructResolvedType& st_type, TemplateBindings* bindings) {
@@ -1978,6 +2006,16 @@ struct Checker {
 		return LS_RESULT_OK;
 	}
 
+	ComptimeValue convertComptimeValueToType(const ComptimeValue& value, ResolvedType* target) {
+		ASSERT(value && target);
+		ASSERT(value.kind == ComptimeValue::VALUE);
+		ASSERT(isUntypedNumeric(*value.type));
+
+		u8* bytes = comptime_stack_ptr;
+		comptime_stack_ptr += writeComptimeNumeric(bytes, value.value, value.type->kind, target->kind);
+		return {ComptimeValue::VALUE, target, bytes};
+	}
+
 	ls_result checkComptimeValueSymbol(Unit& unit, Symbol& sym) {
 		// Plain comptime value: comptime N = expr;
 		ResolvedType* annotation = nullptr;
@@ -1986,14 +2024,20 @@ struct Checker {
 			if (!annotation) return LS_RESULT_FAILURE;
 		}
 
-		if (!checkExprMaterialized(unit, nullptr, *sym.expression, annotation)) return LS_RESULT_FAILURE;
+		if (!checkExpr(unit, nullptr, *sym.expression, annotation)) return LS_RESULT_FAILURE;
 
 		ComptimeValue t = evalComptime(unit, *sym.expression, nullptr, nullptr, nullptr, annotation);
 		if (!t) return LS_RESULT_FAILURE;
+
 		if (annotation && t.kind == ComptimeValue::VALUE && !canImplicitlyConvert(t.type, annotation)) {
 			errorLine(sym.token, "Cannot convert comptime initializer type ", t.type, " to annotated type ", annotation, " for: ", sym.name);
 			return LS_RESULT_FAILURE;
 		}
+		
+		if (annotation && t.kind == ComptimeValue::VALUE && isUntypedNumeric(*t.type)) {
+			t = convertComptimeValueToType(t, annotation);
+		}
+
 		sym.comptime_value = t;
 
 		if (t.kind == ComptimeValue::VALUE) {
@@ -2101,6 +2145,8 @@ struct Checker {
 			if (param.is_comptime) {
 				if (expected && !checkExprMaterialized(unit, ctx, *arg, expected)) return nullptr;
 				ComptimeValue template_arg = evalComptime(unit, *arg, ctx, &bindings, nullptr, expected);
+				if (!template_arg) return nullptr;
+				
 				if (!comptimeValueMatchesExpected(template_arg, expected)) {
 					errorLine(arg->token, "Could not resolve comptime template argument, expected ", expected, ", got ", template_arg.type);
 					return nullptr;
@@ -2337,6 +2383,7 @@ struct Checker {
 		if (un.op == Token::MINUS && un.expression->kind == Expression::INT_LITERAL) {
 			// Range-check the negated integer literal against the expected type.
 			IntLiteralExpression* lit = static_cast<IntLiteralExpression*>(un.expression);
+			lit->resolved_type = primitiveType(ResolvedType::UNTYPED_INT);
 			ResolvedType* int_hint = unwrapNullable(hint);
 			if (int_hint && isNumericType(*int_hint)) {
 				if (!negatedIntLiteralFitsType(lit->value, int_hint->kind)) {
@@ -2349,7 +2396,6 @@ struct Checker {
 				return int_hint;
 			}
 			// No concrete target: stay untyped until materialization chooses a width.
-			lit->resolved_type = primitiveType(ResolvedType::UNTYPED_INT);
 			expr.resolved_type = lit->resolved_type;
 			expr.eval_stage = Expression::COMPTIME_VALUE;
 			return expr.resolved_type;
@@ -2512,6 +2558,7 @@ struct Checker {
 				errorLine(expr.token, "Cannot apply operator ", operatorSymbolName(bin.op), " to ", lhs, " and ", rhs);
 				return nullptr;
 			}
+
 			if (mode != NumericMode::COMPARISON && isUntypedNumeric(*unified)) {
 				return unified;
 			}
@@ -3030,7 +3077,7 @@ struct Checker {
 		ResolvedType* index_type = checkExpr(unit, ctx, *br.args[0], primitiveType(ResolvedType::I32));
 		if (!index_type) return nullptr;
 
-		if (!isIntegerType(*index_type)) {
+		if (!isIntegerOrUntyped(*index_type)) {
 			errorLine(expr.token, "Cannot index with type ", index_type, ", expected integer type");
 			return nullptr;
 		}
@@ -3071,7 +3118,7 @@ struct Checker {
 			ResolvedType* bound_type = checkExpr(unit, ctx, *bound, primitiveType(ResolvedType::I32));
 			if (!bound_type) return nullptr;
 
-			if (!isIntegerType(*bound_type)) {
+			if (!isIntegerOrUntyped(*bound_type)) {
 				errorLine(expr.token, "Cannot slice with type ", bound_type, ", expected integer type");
 				return nullptr;
 			}
@@ -3283,34 +3330,12 @@ struct Checker {
 	ResolvedType* checkExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint, ResolvedType* first_arg_type = nullptr) {
 		switch (expr.kind) {
 			case Expression::INT_LITERAL: {
-				ResolvedType* int_hint = unwrapNullable(hint);
-				if (int_hint && isNumericType(*int_hint)) {
-					const u64 value = static_cast<IntLiteralExpression&>(expr).value;
-					if (!intLiteralFitsType(value, int_hint->kind)) {
-						errorLine(expr.token, "Integer literal does not fit in ", int_hint);
-						return nullptr;
-					}
-					expr.resolved_type = int_hint;
-				} else {
-					// No concrete numeric target yet: stay untyped and let unification with the
-					// surrounding operand (or a later materialization point) pin the width.
 					expr.resolved_type = primitiveType(ResolvedType::UNTYPED_INT);
-				}
 				expr.eval_stage = Expression::COMPTIME_VALUE;
 				return expr.resolved_type;
 			}
 			case Expression::FLOAT_LITERAL: {
-				ResolvedType* float_hint = unwrapNullable(hint);
-				if (float_hint && float_hint->kind == ResolvedType::F32) {
-					const double value = static_cast<FloatLiteralExpression&>(expr).value;
-					if (value > (double)FLT_MAX || value < -(double)FLT_MAX) {
-						errorLine(expr.token, "Float literal does not fit in f32");
-						return nullptr;
-					}
-					expr.resolved_type = float_hint;
-				} else {
-					expr.resolved_type = (float_hint && isFloatType(*float_hint)) ? float_hint : primitiveType(ResolvedType::UNTYPED_FLOAT);
-				}
+				expr.resolved_type = primitiveType(ResolvedType::UNTYPED_FLOAT);
 				expr.eval_stage = Expression::COMPTIME_VALUE;
 				return expr.resolved_type;
 			}
@@ -3360,6 +3385,10 @@ struct Checker {
 				}
 				ResolvedType* operand_type = checkExpr(unit, ctx, *typeof_expr.operand, nullptr);
 				if (!operand_type) return nullptr;
+				if (isUntypedNumeric(*operand_type)) {
+					errorLine(expr.token, "typeof cannot be applied to an untyped numeric value; cast or annotate it first");
+					return nullptr;
+				}
 				expr.resolved_type = operand_type;
 				expr.eval_stage = Expression::COMPTIME_ONLY;
 				return operand_type;
@@ -3703,11 +3732,15 @@ struct Checker {
 			}
 		}
 
-		ResolvedType* expr_type = checkExprMaterialized(unit, &ctx, *var.expression, annotation);
-		if (!expr_type) return false;
 		if (var.is_comptime) {
+			ResolvedType* expr_type = checkExpr(unit, &ctx, *var.expression, annotation);
+			if (!expr_type) return false;
+
 			ComptimeValue value = evalComptime(unit, *var.expression);
 			if (!value) return false;
+			if (annotation && value.kind == ComptimeValue::VALUE && isUntypedNumeric(*value.type)) {
+				value = convertComptimeValueToType(value, annotation);
+			}
 
 			if (value.kind == ComptimeValue::TYPE) {
 				auto* meta = makeType<MetaType>(unit.arena);
@@ -3715,7 +3748,7 @@ struct Checker {
 				var.resolved_type = meta;
 			}
 			else {
-				var.resolved_type = value.type;
+				var.resolved_type = annotation ? annotation : value.type;
 			}
 
 			SemanticLocalBinding& binding = ctx.locals.emplace_back();
@@ -3726,6 +3759,10 @@ struct Checker {
 			binding.comptime_value = value;
 			return true;
 		}
+
+		ResolvedType* expr_type = checkExprMaterialized(unit, &ctx, *var.expression, annotation);
+		if (!expr_type) return false;
+
 		if (!requireMaterializable(*var.expression, "a runtime variable initializer")) return false;
 		if (var.else_return) {
 			if (!annotation || expr_type->kind != ResolvedType::UNION) {
@@ -4351,7 +4388,7 @@ struct Checker {
 					pattern.begin->resolved_type = meta;
 					continue;
 				}
-				ResolvedType* begin = checkExpr(unit, &ctx, *pattern.begin, subject);
+				ResolvedType* begin = checkExprMaterialized(unit, &ctx, *pattern.begin, subject);
 				if (!begin || !typesEqual(begin, subject)) return false;
 				if (pattern.end) {
 					// Range patterns are only valid for numeric types.
@@ -4359,7 +4396,7 @@ struct Checker {
 						errorLine(pattern.begin->token, "Range patterns are only valid for numeric types, got ", subject);
 						return false;
 					}
-					ResolvedType* end = checkExpr(unit, &ctx, *pattern.end, subject);
+					ResolvedType* end = checkExprMaterialized(unit, &ctx, *pattern.end, subject);
 					if (!end || !typesEqual(end, subject)) return false;
 				}
 				// Track enum coverage and detect duplicates.
@@ -5550,6 +5587,8 @@ struct Checker {
 				ComptimeValue rhs = evalComptime(unit, *be.rhs, ctx, bindings, frame);
 				if (!rhs) return {};
 
+				// TODO if only one side is untyped, we should promote it to the other side's type
+
 				if (be.op == Token::EQUAL_EQUAL) return makeComptimeResult(comptimeValuesEqual(lhs, rhs), res_bytes);
 				if (be.op == Token::BANG_EQUAL) return makeComptimeResult(!comptimeValuesEqual(lhs, rhs), res_bytes);
 				if (be.op == Token::AND || be.op == Token::OR) {
@@ -5565,10 +5604,11 @@ struct Checker {
 						: makeComptimeResult(lhs_bool || rhs_bool, res_bytes);
 				}
 
-				if (!isNumericType(*lhs.type) || !isNumericType(*rhs.type)) {
+				if (!isNumericOrUntyped(*lhs.type) || !isNumericOrUntyped(*rhs.type)) {
 					errorLine(be.token, "Expected numeric values, got ", lhs.type, " and ", rhs.type);
 					return {};
 				}
+
 
 				if (!typesEqual(lhs.type, rhs.type)) {
 					errorLine(be.token, "Expected matching numeric types, got ", lhs.type, " and ", rhs.type);
@@ -5586,6 +5626,16 @@ struct Checker {
 					case ResolvedType::U16: return arithmeticOp<u16>(be.op, lhs.value, rhs.value, res_bytes);
 					case ResolvedType::U32: return arithmeticOp<u32>(be.op, lhs.value, rhs.value, res_bytes);
 					case ResolvedType::U64: return arithmeticOp<u64>(be.op, lhs.value, rhs.value, res_bytes);
+					case ResolvedType::UNTYPED_INT: {
+						ComptimeValue v = arithmeticOp<u64>(be.op, lhs.value, rhs.value, res_bytes);
+						v.type = primitiveType(ResolvedType::UNTYPED_INT);
+						return v;
+					}
+					case ResolvedType::UNTYPED_FLOAT: {
+						ComptimeValue v = arithmeticOp<double>(be.op, lhs.value, rhs.value, res_bytes);
+						v.type = primitiveType(ResolvedType::UNTYPED_FLOAT);
+						return v;
+					}
 					default: errorLine(be.token, "Arithmetic operations are not supported for type ", lhs.type); return {};
 				}
 			}
@@ -5882,8 +5932,7 @@ struct Checker {
 			case Expression::SIZEOF: {
 				auto& sz = static_cast<SizeofExpression&>(expr);
 				if (!resolveSizeofValue(unit, sz, bindings)) return {};
-				// TODO not untyped int?
-				return copyComptimeValue(primitiveType(ResolvedType::U64), &sz.value);
+				return copyComptimeValue(primitiveType(ResolvedType::UNTYPED_INT), &sz.value);
 			}
 			case Expression::FLOAT_LITERAL: {
 				auto& fl = static_cast<FloatLiteralExpression&>(expr);

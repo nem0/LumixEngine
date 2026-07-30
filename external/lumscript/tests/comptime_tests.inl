@@ -9,6 +9,68 @@ TEST(ComptimeBasic) {
 	return true;
 }
 
+TEST(ComptimeUntypedIntNarrowParameterMustFail) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn takes(value : comptime i8) : void {}
+		comptime value = 200;
+		fn main() : void {
+			takes(value);
+		}
+	)");
+	return true;
+}
+
+TEST(ComptimeUntypedU64NarrowingMustFail) {
+	EXPECT_COMPILE_FAIL(R"(
+		comptime value = 18446744073709551615;
+		fn main() : i8 {
+			return value;
+		}
+	)");
+	return true;
+}
+
+TEST(ComptimeUntypedIntToInexactFloatMustFail) {
+	EXPECT_COMPILE_FAIL(R"(
+		comptime value = 16777217;
+		fn main() : f32 {
+			return value;
+		}
+	)");
+	return true;
+}
+
+TEST(ComptimeUntypedIntNarrowTemplateArgumentMustFail) {
+	EXPECT_COMPILE_FAIL(R"(
+		comptime Box = struct[N : i8] { value : i32; };
+		fn main() : void {
+			var box : Box[200] = undefined;
+		}
+	)");
+	return true;
+}
+
+TEST(ComptimeTypeParameterRejectsValue) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn make(T : comptime type) : void {}
+		fn main() : void {
+			make(1);
+		}
+	)");
+	return true;
+}
+
+TEST(ComptimeValueParameterRejectsVoid) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn noop() : void {}
+		fn takes(value : comptime i32) : void {}
+		fn main() : void {
+			takes(noop());
+		}
+	)");
+	return true;
+}
+
 TEST(ComptimeFunction) {
 	const char* source = R"(
 		comptime foo = fn() : void {};
@@ -28,14 +90,14 @@ TEST(ComptimeBinaryExpression) {
 			if (enabled == false or N != 19 or Remainder != 4 or scale != 3.5) {
 				return 1;
 			}
-			return 0;
+			return 2;
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
-	EXPECT_EQ(0, ls_to_i32(runtime, -1));
+	EXPECT_EQ(2, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -294,11 +356,34 @@ TEST(ComptimeFloatValueTypechecks) {
 	EXPECT_TRUE(ls_call(runtime, toLs("local_as_f32")));
 	EXPECT_FLOAT_EQ(2.5, ls_to_f32(runtime, -1));
 	CAPI_END(module);
+	return true;
+}
 
+TEST(ComptimeUntypedFractionMaterializesAsF32) {
+	const char* source = R"(
+		comptime value = 0.1;
+		fn main() : f32 {
+			return value;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_FLOAT_EQ(0.1f, ls_to_f32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeFloatWithAnnotatedTypeMismatchFails) {
 	EXPECT_COMPILE_FAIL(R"(
 		comptime Scale : f64 = 1.5;
 		fn main() : f32 { return Scale; }
 	)");
+	return true;
+}
+
+TEST(ComptimeFloatOverflowFails) {
 	EXPECT_COMPILE_FAIL(R"(
 		comptime Scale = 340282400000000000000000000000000000000.0;
 		fn main() : f32 { return Scale; }
@@ -336,6 +421,22 @@ TEST(ComptimeAnnotatedFloatValueTypechecks) {
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_FLOAT_EQ(1.5, ls_to_f32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeAnnotatedLocalFloatValueTypechecks) {
+	const char* source = R"(
+		fn main() : f32 {
+			comptime value : f32 = 1.5;
+			return value;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_FLOAT_EQ(1.5f, ls_to_f32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -2132,14 +2233,30 @@ TEST(ComptimeUntypedInt) {
 	EXPECT_TRUE(ls_call(runtime, toLs("huge")));
 	EXPECT_TRUE(ls_to_u64(runtime, -1) == 18446744073709551615ull);
 	CAPI_END(module);
+	return true;
+}
 
+TEST(ComptimeUntypedIntFails) {
 	EXPECT_COMPILE_FAIL(R"(
 		comptime A : i32 = 127;
 		comptime B : i8 = A;
 	)");
+	return true;
+}
+
+TEST(ComptimeUntypedIntFails2) {
 	EXPECT_COMPILE_FAIL(R"(
 		comptime Sum = 100 + 100;
 		fn main() : i8 { return Sum; }
+	)");
+	return true;
+}
+
+
+TEST(ComptimeUnaryTypeMatch) {
+	EXPECT_COMPILE(R"(
+		comptime A = 128;
+		comptime B : i8 = -A;
 	)");
 	return true;
 }

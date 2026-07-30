@@ -706,7 +706,34 @@ Numeric literals and expressions composed only from untyped numeric constants re
 - decimal literals start as untyped float
 - arithmetic on untyped constants produces another untyped constant; for example, `12 + 13` is an untyped integer constant with value `25`
 
-Context (target type, argument type, return type, cast, expression expectation) concretizes them.
+An untyped numeric expression is concretized (given a concrete numeric type) in these contexts:
+
+- a variable, `const`, or `comptime` initializer with an explicit numeric type annotation: `const count : i16 = 12`
+- an assignment to a numeric target: `var count : i16 = 0; count = 12;`
+- an argument passed to a typed function parameter, including a `comptime` parameter: `takes_i16(12)` for `fn takes_i16(value : i16) : void`; this also supplies the type used by an inferred function type parameter
+- a return expression in a function with a numeric return type: `fn count() : i16 { return 12; }`
+- an element of an array literal or a field of a struct literal when its expected type is numeric: `const values : [2]i16 = [12, 13]` or `Pair { 12 }` for `struct Pair { value : i16; }`
+- an operand of a numeric operation when the other operand is concrete: `const total : i64 = 10; total + 12`; a selected operator overload similarly adopts its parameter type
+- the untyped branch of a ternary expression when the other branch is concrete: `flag ? total : 12`, where `total : i64`
+- a range-loop bound when the other bound has a concrete integer type: `for i in 0..length(values)`, where `length(values)` is `isize`
+- a numeric pattern or subject where the surrounding construct requires a concrete numeric value: `match total { case 12: {} }`, where `total : i64`
+- an explicit cast: `12 as i16`; the untyped source is first materialized, then the cast is applied
+
+An unannotated `comptime` binding is the exception: its numeric initializer remains an untyped compile-time constant until a later use supplies a concrete type. An explicit annotation still concretizes it immediately, for example `comptime c : i16 = 12`.
+
+If a numeric expression is consumed where no concrete numeric type is available, it is materialized using its default type:
+
+- inferred runtime initializers: `const a = 12` and `var b = 12` both infer `i32`; an unannotated `comptime c = 12` remains untyped instead
+- a discarded expression: `12 + 13;` defaults its operands and result to `i32`
+- a comparison of untyped values: `12 == 13` compares `i32` values
+- a range with two untyped bounds: `for i in 0..4 {}` uses an `i32` loop variable
+
+A union target provides context only when exactly one member is compatible with the untyped numeric value:
+
+```cpp
+const number : i32 | string = 12; // 12 becomes i32
+const ambiguous : i32 | i64 = 12; // compile-time error: both members match
+```
 
 ```cpp
 fn takes_f32(value : f32) : void {}
@@ -714,6 +741,7 @@ fn takes_f32(value : f32) : void {}
 const a = 12 + 13;       // defaults to i32
 const b : f32 = 12 + 13; // the expression is concretized as f32
 const c = 12.5;          // defaults to f64
+comptime d = 12;         // remains untyped until a use supplies a type
 takes_f32(12);           // 12 is concretized as f32
 const big = 2147483648;  // infers i64
 const huge = 18446744073709551615; // infers u64
@@ -729,7 +757,7 @@ Defaults when context is insufficient:
 
 There are still no implicit numeric casts between concrete types.
 
-Introspection is not a concretizing context. `typeof` on an untyped integer or float expression is a compile-time error; cast the expression or give its binding an explicit type first.
+Introspection is not a concretizing context. `typeof` on an untyped integer or float expression, including an unannotated `comptime` numeric binding, is a compile-time error; cast the expression or give its binding an explicit type first.
 
 ### Nullable values
 
@@ -1158,7 +1186,7 @@ fn free(memory : []byte) : void
 ```cpp
 var counter : i32 = 0;
 const step = 1;
-comptime max_entities = 1024;
+comptime max_entities = 1024; // remains an untyped compile-time constant
 
 fn tick() : i32 {
 	counter += step;
@@ -1175,6 +1203,7 @@ Rules:
 - all `var` and `const` declarations must have an initializer
 - to intentionally skip initialization, use explicit `undefined` (for example `var x : i32 = undefined`)
 - explicit type is optional if inference can resolve from initializer
+- `var` and `const` declarations concretize untyped numeric initializers during declaration-time inference. Integers use the narrowest representable type (`i32`, then `i64`, then `u64`); untyped decimal literals infer `f64`. An unannotated `comptime` binding preserves its untyped value until a later use supplies a concrete numeric target
 - `const` cannot be reassigned
 - variables are block scoped
 - shadowing is a compile-time error: a new declaration in the same scope or an inner scope cannot re-use a name that is already visible
@@ -2349,6 +2378,7 @@ Materializes into a runtime constant:
 - comptime `string` values, such as `t::name`, `f.name`, and `e.name`, become string constants
 - comptime integers, such as `sizeof`, `alignof`, `t::length`, and `e.value as i32`, become integer constants
 - an enum descriptor's `e.value` is an ordinary enum constant
+- an untyped numeric `comptime` binding becomes a runtime constant only after a consuming context concretizes it
 
 These may be passed to functions including `extern fn`, assigned to `var` and `const`, and used in any runtime expression.
 

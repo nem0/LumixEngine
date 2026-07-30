@@ -55,7 +55,7 @@ struct Symbol {
 	// evaluated at compile time; the bytecode compiler emits these bytes inline at
 	// each use site so the symbol needs no runtime slot. Null when folding was not
 	// possible, in which case uses fall back to compiling the initializer expression.
-	const u8* comptime_bytes = nullptr;
+	u8* comptime_bytes = nullptr;
 	u32 comptime_byte_size = 0;
 	ComptimeValue comptime_value;
 };

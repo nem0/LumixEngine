@@ -65,6 +65,109 @@ TEST(UntypedConstantExpressionsUseExpectedTypes) {
 	return true;
 }
 
+TEST(UntypedLiteralsConcretizeInAllContexts) {
+	const char* source = R"(
+		struct Pair { value : i16; }
+		struct Box { value : i16; }
+
+		operator +(lhs : Box, rhs : i16) : i16 { return lhs.value + rhs; }
+		fn takes_i16(value : i16) : i16 { return value; }
+		fn takes_comptime(value : comptime i16) : i16 { return value; }
+		fn returns_i16() : i16 { return 1; }
+		fn identity(value : $T) : T { return value; }
+
+		comptime global_value : i16 = 1;
+		comptime Number = i32 | string;
+
+		fn main() : i32 {
+			var assigned : i16 = 0;
+			assigned = 2;
+			const annotated : i16 = 3;
+			comptime local_value : i16 = 4;
+			const array : [2]i16 = [5, 6];
+			const pair = Pair { 7 };
+			const call = takes_i16(8);
+			const comptime_call = takes_comptime(9);
+			const returned = returns_i16();
+			const wide : i64 = 10;
+			const arithmetic = wide + 11;
+			const conditional = true ? wide : 12;
+			const overloaded = Box { 13 } + 14;
+			const cast = 15 as i16;
+			const inferred = identity(16);
+			const default_value = 17;
+			const union_value : Number = 18;
+
+			for index in 0..length(array) {
+				if typeof(index) != isize { var impossible : MissingType = undefined; }
+			}
+			match wide {
+				case 10: {}
+				case: {}
+			}
+
+			if typeof(global_value) != i16 { var impossible : MissingType = undefined; }
+			if typeof(assigned) != i16 { var impossible : MissingType = undefined; }
+			if typeof(annotated) != i16 { var impossible : MissingType = undefined; }
+			if typeof(local_value) != i16 { var impossible : MissingType = undefined; }
+			if typeof(array[0]) != i16 { var impossible : MissingType = undefined; }
+			if typeof(pair.value) != i16 { var impossible : MissingType = undefined; }
+			if typeof(call) != i16 { var impossible : MissingType = undefined; }
+			if typeof(comptime_call) != i16 { var impossible : MissingType = undefined; }
+			if typeof(returned) != i16 { var impossible : MissingType = undefined; }
+			if typeof(arithmetic) != i64 { var impossible : MissingType = undefined; }
+			if typeof(conditional) != i64 { var impossible : MissingType = undefined; }
+			if typeof(overloaded) != i16 { var impossible : MissingType = undefined; }
+			if typeof(cast) != i16 { var impossible : MissingType = undefined; }
+			if typeof(inferred) != i32 { var impossible : MissingType = undefined; }
+			if typeof(default_value) != i32 { var impossible : MissingType = undefined; }
+			if typeof(union_value) != Number { var impossible : MissingType = undefined; }
+			return 0;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	EXPECT_COMPILE_FAIL(R"(
+		fn main() : void {
+			const ambiguous : i32 | i64 = 1;
+		}
+	)");
+	return true;
+}
+
+TEST(UntypedComptimeBindingsRemainUntypedUntilConsumed) {
+	const char* source = R"(
+		comptime integer = 12;
+		comptime decimal = 1.5;
+
+		fn as_i8() : i8 { return integer; }
+		fn as_i64() : i64 { return integer; }
+		fn as_f32() : f32 { return decimal; }
+		fn as_f64() : f64 { return decimal; }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("as_i8")));
+	EXPECT_EQ(12, ls_to_i8(runtime, -1));
+	EXPECT_TRUE(ls_call(runtime, toLs("as_i64")));
+	EXPECT_EQ(12, ls_to_i64(runtime, -1));
+	EXPECT_TRUE(ls_call(runtime, toLs("as_f32")));
+	EXPECT_FLOAT_EQ(1.5f, ls_to_f32(runtime, -1));
+	EXPECT_TRUE(ls_call(runtime, toLs("as_f64")));
+	EXPECT_FLOAT_EQ(1.5, ls_to_f64(runtime, -1));
+	CAPI_END(module);
+
+	EXPECT_COMPILE_FAIL(R"(
+		comptime integer = 12;
+		comptime T = typeof(integer);
+	)");
+	EXPECT_COMPILE_FAIL(R"(
+		comptime decimal = 1.5;
+		comptime T = typeof(decimal);
+	)");
+	return true;
+}
+
 TEST(UntypedNumericExpressionsUseDefaultTypes) {
 	const char* integer_source = R"(
 		fn takes_i64(v : i64) : void {
