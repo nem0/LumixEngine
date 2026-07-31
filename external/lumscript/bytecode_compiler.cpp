@@ -4025,10 +4025,10 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			if (subject_type->kind == ResolvedType::UNION) {
 				UnionResolvedType& subject_union = static_cast<UnionResolvedType&>(*subject_type);
 				ExpArray<u32> match_end_jumps(*ctx.bytecode->arena);
+				MatchArm* fallback = nullptr;
 				for (MatchArm& arm : ms.arms) {
 					if (arm.is_fallback) {
-						compileStatement(ctx, *arm.body, return_kind, current_label);
-						match_end_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP));
+						fallback = &arm;
 						continue;
 					}
 
@@ -4055,6 +4055,10 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 					match_end_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP));
 					patchJumpRelative(ctx, skip_jump, (u32)ctx.code.size());
 				}
+				if (fallback) {
+					compileStatement(ctx, *fallback->body, return_kind, current_label);
+					match_end_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP));
+				}
 				const u32 end = (u32)ctx.code.size();
 				for (u32 jump : match_end_jumps) patchJumpRelative(ctx, jump, end);
 				return;
@@ -4063,15 +4067,13 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			ExpArray<u32> match_end_jumps(*ctx.bytecode->arena);
 			ExpArray<u32> pending_false_jumps(*ctx.bytecode->arena);
 			ExpArray<u32> arm_body_jumps(*ctx.bytecode->arena);
+			MatchArm* fallback = nullptr;
 
 			for (MatchArm& arm : ms.arms) {
 				arm_body_jumps.clear();
 
 				if (arm.is_fallback) {
-					for (u32 false_jump : pending_false_jumps) patchJumpRelative(ctx, false_jump, (u32)ctx.code.size());
-					pending_false_jumps.clear();
-					compileStatement(ctx, *arm.body, return_kind, current_label);
-					match_end_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP));
+					fallback = &arm;
 					continue;
 				}
 
@@ -4101,6 +4103,12 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 				match_end_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP));
 				const u32 arm_end_pos = (u32)ctx.code.size();
 				patchJumpRelative(ctx, skip_jump_pos, arm_end_pos);
+			}
+			if (fallback) {
+				for (u32 false_jump : pending_false_jumps) patchJumpRelative(ctx, false_jump, (u32)ctx.code.size());
+				pending_false_jumps.clear();
+				compileStatement(ctx, *fallback->body, return_kind, current_label);
+				match_end_jumps.push(emitJumpPlaceholder(ctx, LS_OP_JUMP));
 			}
 
 			const u32 end_pos = (u32)ctx.code.size();

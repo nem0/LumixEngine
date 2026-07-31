@@ -353,3 +353,27 @@ TEST(MatchArmMultipleStatementsRuntime) {
 	CAPI_END(module);
 	return true;
 }
+
+TEST(MatchFallbackFirstRuntime) {
+	const char* source = R"(
+		fn main(v : i32) : i32 {
+			match v {
+				case:
+					return 10;
+				case 7:
+					return 20;
+			}
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	ls_push_i32(runtime, 7);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(20, ls_to_i32(runtime, -1));
+	ls_push_i32(runtime, 3);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(10, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
