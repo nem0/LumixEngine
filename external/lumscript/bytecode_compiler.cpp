@@ -2228,6 +2228,11 @@ static void emitSlice(FunctionCompiler& ctx, SliceExpression& br) {
 	} else if (base_type->kind == ResolvedType::SLICE) {
 		element_type = static_cast<SliceResolvedType*>(base_type)->element_type;
 		compileExpression(ctx, *br.base, LS_TYPE_SLICE);
+	} else {
+		element_type = base_type;
+		// A scalar slice view uses the scalar's address and has exactly one element.
+		if (!tryEmitReference(ctx, *br.base)) return;
+		emitConst8(ctx, 1u);
 	}
 
 	// Save the source pair because an omitted end bound reuses its dynamic length,

@@ -60,6 +60,178 @@ TEST(SliceImplicitConversion) {
 	return true;
 }
 
+TEST(ScalarSliceViewTypeInferenceAndLength) {
+	const char* source = R"(
+		fn main() : i32 {
+			var value : i32 = 7;
+			var view = value[:];
+			view[0] = 11;
+			return value + length(view) as i32;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(12, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ScalarSliceViewSupportsPrimitiveTypes) {
+	const char* source = R"(
+		fn main() : i32 {
+			var signed : i8 = -3;
+			var unsigned : u64 = 7;
+			var real : f32 = 2.5;
+			var signed_view = signed[:];
+			var unsigned_view = unsigned[:];
+			var real_view = real[:];
+			signed_view[0] = 4;
+			unsigned_view[0] = 9;
+			real_view[0] = 3.5;
+			return signed as i32 + unsigned as i32 + real as i32
+				+ length(signed_view) as i32 + length(unsigned_view) as i32 + length(real_view) as i32;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(19, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ScalarSliceViewWorksForRefParameters) {
+	const char* source = R"(
+		fn update(value : ref i32) : void {
+			var view : []i32 = value[:];
+			view[0] += 5;
+		}
+
+		fn main() : i32 {
+			var value : i32 = 10;
+			update(ref value);
+			return value;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(15, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ScalarSliceViewWorksForFieldsAndArrayElements) {
+	const char* source = R"(
+		struct Pair {
+			first : i32;
+			second : i32;
+		}
+
+		fn main() : i32 {
+			var pair = Pair { 2, 3 };
+			var values : [2]i32 = [4, 5];
+			var first = pair.first[:];
+			var second = values[1][:];
+			first[0] += 10;
+			second[0] += 20;
+			return pair.first + values[1] + length(first) as i32 + length(second) as i32;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(39, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ScalarSliceViewCanBeReslicedAndCopied) {
+	const char* source = R"(
+		fn consume(values : []i32) : i32 {
+			return values[0];
+		}
+
+		fn main() : i32 {
+			var value : i32 = 21;
+			var view : []i32 = value[:];
+			var subview : []i32 = view[:];
+			var copy : []i32 = subview;
+			copy[0] += 1;
+			return consume(subview) + length(copy) as i32;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(23, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ScalarSliceViewRejectsNonAddressableSources) {
+	const char* literal_source = R"(
+		fn main() : void {
+			var view : []i32 = 4[:];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(literal_source);
+
+	const char* expression_source = R"(
+		fn main() : void {
+			var value : i32 = 4;
+			var view : []i32 = (value + 1)[:];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(expression_source);
+
+	const char* const_source = R"(
+		fn main() : void {
+			const value : i32 = 4;
+			var view : []i32 = value[:];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(const_source);
+
+	const char* parameter_source = R"(
+		fn view(value : i32) : []i32 {
+			return value[:];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(parameter_source);
+
+	const char* array_parameter_source = R"(
+		fn view(values : [2]i32) : []i32 {
+			return values[:];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(array_parameter_source);
+
+	const char* const_field_source = R"(
+		struct Pair {
+			value : i32;
+		}
+
+		fn main() : void {
+			const pair = Pair { 4 };
+			var view : []i32 = pair.value[:];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(const_field_source);
+	return true;
+}
+
 TEST(SliceImplicitConversionFromTemporaryArray) {
 	const char* source = R"(
 		fn consume(values : []i32) : i32 {

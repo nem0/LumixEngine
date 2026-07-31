@@ -1106,6 +1106,8 @@ Slice syntax uses `[]T`, where `T` is the element type.
 Slice creation forms:
 
 - `arr[start:end]` creates a slice from a static array or another slice
+- `value[:]` creates a one-element slice view over writable addressable runtime
+  storage of type `T`
 - `arr[start:]` uses the remainder of the storage to the end
 - `arr[:end]` starts at the beginning
 - `arr[:]` creates a slice over the whole range
@@ -1114,6 +1116,15 @@ Slice creation forms:
 - slicing never copies elements
 - slicing a slice produces another slice over the same backing storage
 - an array can be passed to a parameter of slice type implicitly
+- For a scalar variable, `value[:]` creates a one-element `[]T` view, where
+  `T` is the variable's type. It does not create an array or copy the value;
+  `slice[0]` reads and writes the variable itself, and `length(slice)` is
+  always one
+- the source must be writable, addressable runtime storage; `const` variables
+  and non-`ref` parameters cannot be used as slice sources
+- `ref` parameters can be used as slice sources because they refer to writable
+  caller storage
+- arbitrary expressions and temporaries cannot be used as slice sources
 
 ```cpp
 var x : []i32 = arr[1:2];
@@ -1659,6 +1670,29 @@ const state : State = numeric as State;
 Integer-to-enum cast does not validate membership.
 
 Struct casts are not supported.
+
+An addressable runtime variable can be viewed as a one-element slice of the
+same element type with `[:]`:
+
+```cpp
+fn bump(values : []i32) : void {
+	values[0] += 1;
+}
+
+	fn main() : i32 {
+	var value : i32 = 4;
+	var values : []i32 = value[:];
+	bump(values);
+	return value; // 5
+}
+```
+
+The view is non-owning, so changing `values[0]` changes `value`. Its length is
+one. The source must be writable addressable runtime storage. A `const`
+variable, non-`ref` parameter, literal, temporary, or compile-time value cannot
+be used as a slice source. A `ref` parameter can be used because it refers to
+writable caller storage. The slice must not be used after the source storage
+stops being valid.
 
 Slice reinterpret casts convert between a byte slice and a typed slice:
 

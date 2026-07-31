@@ -149,6 +149,47 @@ TEST(RuntimeCasts) {
 	return true;
 }
 
+TEST(RuntimeScalarToSliceView) {
+	const char* source = R"(
+		fn main() : i32 {
+			var value : i32 = 4;
+			var values : []i32 = value[:];
+			values[0] += 3;
+			return value + length(values) as i32;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(8, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(RuntimeScalarToSliceViewPassesAlias) {
+	const char* source = R"(
+		fn increment(values : []i32) : void {
+			values[0] += 1;
+		}
+
+		fn main() : i32 {
+			var value : i32 = 4;
+			increment(value[:]);
+			return value;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(5, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(BoolToIntCastFails) {
 	const char* source = R"(
 		fn main() : i32 {

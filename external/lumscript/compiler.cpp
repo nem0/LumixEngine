@@ -3207,7 +3207,36 @@ struct Checker {
 		ResolvedType* base_type = checkExpr(unit, ctx, *sl.base, nullptr);
 		if (!base_type) return nullptr;
 
-		if (!checkIndexableBase(expr.token, base_type)) return nullptr;
+		if (base_type->kind != ResolvedType::ARRAY && base_type->kind != ResolvedType::SLICE) {
+			if (sl.begin || sl.end) {
+				errorLine(expr.token, "Scalar slice views require omitted bounds");
+				return nullptr;
+			}
+			bool writable = false;
+			++suppress_errors;
+			ResolvedType* source_type = checkAssignableExpr(unit, ctx, *sl.base, writable);
+			--suppress_errors;
+			if (!source_type || !writable) {
+				errorLine(expr.token, "Cannot create a slice from immutable storage");
+				return nullptr;
+			}
+			SliceResolvedType* slice = makeType<SliceResolvedType>(unit.arena);
+			slice->element_type = base_type;
+			expr.resolved_type = slice;
+			expr.eval_stage = Expression::RUNTIME;
+			return slice;
+		}
+
+		if (base_type->kind == ResolvedType::ARRAY) {
+			bool writable = false;
+			++suppress_errors;
+			ResolvedType* source_type = checkAssignableExpr(unit, ctx, *sl.base, writable);
+			--suppress_errors;
+			if (!source_type || !writable) {
+				errorLine(expr.token, "Cannot create a slice from immutable storage");
+				return nullptr;
+			}
+		}
 
 		Expression* bounds[] = {sl.begin, sl.end};
 		for (Expression* bound : bounds) {
