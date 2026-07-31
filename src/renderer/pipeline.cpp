@@ -3127,7 +3127,7 @@ struct PipelineImpl final : Pipeline {
 							stream->useProgram(program);
 							stream->bindIndexBuffer(mesh.index_buffer_handle);
 							stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-							stream->bindVertexBuffer(1, slice.buffer, slice.offset, sizeof(Vec3) * 3);
+							stream->bindVertexBuffer(1, slice.buffer, slice.offset, instanced_decl.getStride());
 							stream->drawIndexedInstanced(mesh.indices_count, count, mesh.index_type);
 							--i;
 						}
