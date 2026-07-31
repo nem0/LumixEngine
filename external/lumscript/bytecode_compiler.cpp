@@ -3674,7 +3674,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 					const u32 continue_start = (u32)loop.continue_jumps->size();
 					compileStatement(ctx, *body, return_kind, {});
 					const u32 continue_target = (u32)ctx.code.size();
-					for (u32 j = continue_start; j < loop.continue_jumps->size(); ++j)
+					for (i32 j = continue_start; j < loop.continue_jumps->size(); ++j)
 						patchJumpRelative(ctx, (*loop.continue_jumps)[j], continue_target);
 				}
 				const u32 loop_end = (u32)ctx.code.size();
@@ -3723,7 +3723,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 					const u32 continue_start = (u32)loop.continue_jumps->size();
 					compileStatement(ctx, *fs.body, return_kind, {});
 					const u32 continue_target = (u32)ctx.code.size();
-					for (u32 j = continue_start; j < loop.continue_jumps->size(); ++j) {
+					for (i32 j = continue_start; j < loop.continue_jumps->size(); ++j) {
 						patchJumpRelative(ctx, (*loop.continue_jumps)[j], continue_target);
 					}
 				}
@@ -3887,7 +3887,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 					const u32 next_iteration = (u32)ctx.code.size();
 					if (value + 1 < end) emitIncrementOrAddOne(ctx, loop_offset, value_kind);
 					const u32 continue_target = (u32)ctx.code.size();
-					for (u32 j = continue_start; j < loop.continue_jumps->size(); ++j) {
+					for (i32 j = continue_start; j < loop.continue_jumps->size(); ++j) {
 						patchJumpRelative(ctx, (*loop.continue_jumps)[j], continue_target);
 					}
 					(void)next_iteration;

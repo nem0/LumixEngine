@@ -521,7 +521,6 @@ TEST(UnknownImportedValueUsedInComptimeFails) {
 	return true;
 }
 
-
 TEST(ComptimeNegativeIntegerLiteralRangeChecks) {
 	const char* source = R"(
 		comptime X : i8 = -128;
@@ -530,3 +529,16 @@ TEST(ComptimeNegativeIntegerLiteralRangeChecks) {
 	EXPECT_COMPILE(source);
 	return true;
 }
+
+TEST(TernarnyUntypedBranches) {
+	const char* source = R"(
+		var forward = true;
+		var backward = false;
+		var speed_y : f32 = forward ? 3.0 :
+							backward ? -3.0 :
+							0;
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+

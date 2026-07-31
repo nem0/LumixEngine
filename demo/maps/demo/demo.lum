@@ -34,7 +34,7 @@ fn processInputEvents() : void {
 	if not handle_input { return; }
 
 	const event_count = input_system.getEventCount();
-	for i = 0..event_count {
+	for i in 0..event_count {
 		const event = input_system.getEvent(i);
 		match event {
 			case AxisEvent:
@@ -92,7 +92,7 @@ fn update(dt : f32) : void {
 
 	if physics_module != null {
 		const num_hits = physics_module.getNumControllerHits();
-		for i = 0..num_hits {
+		for i in 0..num_hits {
 			const hit = physics_module.getControllerHit(i);
 			const obj = hit.hit_entity;
 			const a = obj.rigid_actor();
