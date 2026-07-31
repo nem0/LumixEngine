@@ -1584,7 +1584,11 @@ true
 false
 1
 12.5
+'0'
+'A'
 ```
+
+Rune literals are enclosed in single quotes and represent one Unicode code point. They are untyped integer constants, like integer literals, and are concretized by their context. For example, `'0'` can be used with a `u8` value and has the value `48` (`U+0030`).
 
 ### Arithmetic
 

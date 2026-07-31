@@ -83,6 +83,7 @@ struct Parser {
 			case Token::IDENTIFIER: return "identifier";
 			case Token::NUMBER: return "number";
 			case Token::STRING: return "string";
+			case Token::RUNE: return "rune";
 			case Token::LEFT_PAREN: return "(";
 			case Token::RIGHT_PAREN: return ")";
 			case Token::LEFT_BRACE: return "{";
@@ -223,6 +224,36 @@ struct Parser {
 			m_output.errorAt(token, "Integer literal does not fit in u64");
 			return nullptr;
 		}
+		IntLiteralExpression* expr = makeExpr<IntLiteralExpression>(token);
+		expr->value = value;
+		return expr;
+	}
+
+	Expression* runeLiteral(Token token) {
+		const u8* p = (const u8*)data(token.value);
+		const u8* const end = p + size(token.value);
+		u32 value = 0;
+		auto invalid = [&]() -> Expression* {
+			m_output.errorAt(token, "Rune literal must contain exactly one Unicode code point");
+			return nullptr;
+		};
+		if (p == end) return invalid();
+		if (*p < 0x80) {
+			value = *p++;
+		}
+		else {
+			u32 length = 0;
+			if (*p >= 0xc2 && *p <= 0xdf) { value = *p++ & 0x1f; length = 1; }
+			else if (*p >= 0xe0 && *p <= 0xef) { value = *p++ & 0x0f; length = 2; }
+			else if (*p >= 0xf0 && *p <= 0xf4) { value = *p++ & 0x07; length = 3; }
+			else return invalid();
+			for (u32 i = 0; i < length; ++i) {
+				if (p == end || (*p & 0xc0) != 0x80) return invalid();
+				value = (value << 6) | (*p++ & 0x3f);
+			}
+			if ((length == 1 && value < 0x80) || (length == 2 && value < 0x800) || (length == 3 && value < 0x10000)) return invalid();
+		}
+		if (p != end || value > 0x10ffff || (value >= 0xd800 && value <= 0xdfff)) return invalid();
 		IntLiteralExpression* expr = makeExpr<IntLiteralExpression>(token);
 		expr->value = value;
 		return expr;
@@ -468,6 +499,7 @@ struct Parser {
 			case Token::NUMBER: {
 				return numberLiteral(token);
 			}
+			case Token::RUNE: return runeLiteral(token);
 			case Token::TRUE:
 			case Token::FALSE:
 				return makeExpr<BoolLiteralExpression>(token, token.type == Token::TRUE);

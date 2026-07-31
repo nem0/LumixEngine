@@ -97,6 +97,20 @@ struct Tokenizer {
 		return res;
 	}
 
+	Token runeToken() {
+		const char* value_begin = m_current;
+		while (m_current != data(m_document) + size(m_document) && peekChar() != '\'') {
+			if (peekChar() == '\n') return makeToken(Token::ERROR);
+			advance();
+		}
+		if (m_current == data(m_document) + size(m_document)) return makeToken(Token::ERROR);
+		const char* value_end = m_current;
+		advance();
+		Token res = makeToken(Token::RUNE);
+		res.value = ls_string_view{value_begin, value_end};
+		return res;
+	}
+
 	Token checkKeyword(const char* rest, u32 start, u32 len, TokenType type) {
 		if (u32(m_current - m_start_token) != start + len) return makeToken(Token::IDENTIFIER);
 		if (compareMemory(m_start_token + start, rest, len) != 0) return makeToken(Token::IDENTIFIER);
@@ -266,6 +280,7 @@ struct Tokenizer {
 
 		switch (c) {
 			case '"': return stringToken();
+			case '\'': return runeToken();
 			case '(': return makeToken(Token::LEFT_PAREN);
 			case ')': return makeToken(Token::RIGHT_PAREN);
 			case '{': return makeToken(Token::LEFT_BRACE);

@@ -46,6 +46,94 @@ TEST(UntypedLiteralsUseExpectedTypes) {
 	return true;
 }
 
+TEST(RuneLiteralConcretizesToU8Runtime) {
+	const char* source = R"(
+		fn main() : i32 {
+			const digit : u8 = '0';
+			return digit as i32;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(48, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(RuneLiteralConcretizesInU8Comparison) {
+	const char* source = R"(
+		fn is_digit_zero(value : u8) : bool {
+			return value == '0';
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(RuneLiteralUnicodeCodePointRuntime) {
+	const char* source = R"(
+		fn main() : i32 {
+			const rune : u32 = '😀';
+			return rune as i32;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(128512, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(RuneLiteralUsesUntypedIntegerContexts) {
+	const char* source = R"(
+		fn takes_i16(value : i16) : i16 { return value; }
+
+		fn main() : i32 {
+			const default_value = 'A';
+			const assigned : i16 = 'B';
+			comptime comptime_value : i16 = 'C';
+			const called = takes_i16('D');
+			const cast = 'E' as i16;
+			const arithmetic = assigned + 'F';
+			if typeof(default_value) != i32 { var impossible : MissingType = undefined; }
+			return called as i32 + cast as i32 + arithmetic as i32 + comptime_value as i32;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(RuneLiteralRejectsValuesOutsideExpectedType) {
+	const char* source = R"(
+		fn main() : void {
+			const value : u8 = '😀';
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(RuneLiteralRequiresExactlyOneCodePoint) {
+	const char* empty_source = R"(
+		fn main() : void {
+			const value : i32 = '';
+		}
+	)";
+	EXPECT_COMPILE_FAIL(empty_source);
+
+	const char* multiple_source = R"(
+		fn main() : void {
+			const value : i32 = 'ab';
+		}
+	)";
+	EXPECT_COMPILE_FAIL(multiple_source);
+	return true;
+}
+
 TEST(UntypedConstantExpressionsUseExpectedTypes) {
 	const char* source = R"(
 		fn takes_f32(v : f32) : f32 {

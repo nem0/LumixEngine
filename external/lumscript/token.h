@@ -9,6 +9,7 @@ struct Token {
 		IDENTIFIER,
 		NUMBER,
 		STRING,
+		RUNE,
 
 		LEFT_PAREN,
 		RIGHT_PAREN,
