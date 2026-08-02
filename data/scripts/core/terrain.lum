@@ -13,8 +13,8 @@ extern fn terrain(e : Entity) : ?Terrain;
 extern fn getHeightAt(entity : Terrain, x : f32, z : f32) : f32;
 extern fn getNormalAt(entity : Terrain, x : f32, z : f32) : Vec3;
 extern fn getTerrainSize(entity : Terrain) : Vec2;
-extern fn getTerrainMaterialPath(entity : Terrain) : string;
-extern fn setTerrainMaterialPath(entity : Terrain, path : string) : void;
+extern fn getTerrainMaterialPath(entity : Terrain) : []const u8;
+extern fn setTerrainMaterialPath(entity : Terrain, path : []const u8) : void;
 extern fn getTerrainXZScale(entity : Terrain) : f32;
 extern fn setTerrainXZScale(entity : Terrain, scale : f32) : void;
 extern fn getTerrainTesselation(entity : Terrain) : i32;
@@ -29,8 +29,8 @@ extern fn getGrassRotationMode(item : TerrainGrassArrayItem) : GrassRotationMode
 extern fn setGrassRotationMode(item : TerrainGrassArrayItem, value : GrassRotationMode) : void;
 extern fn getGrassDistance(item : TerrainGrassArrayItem) : f32;
 extern fn setGrassDistance(item : TerrainGrassArrayItem, value : f32) : void;
-extern fn getGrassPath(item : TerrainGrassArrayItem) : string;
-extern fn setGrassPath(item : TerrainGrassArrayItem, path : string) : void;
+extern fn getGrassPath(item : TerrainGrassArrayItem) : []const u8;
+extern fn setGrassPath(item : TerrainGrassArrayItem, path : []const u8) : void;
 extern fn getGrassSpacing(item : TerrainGrassArrayItem) : f32;
 extern fn setGrassSpacing(item : TerrainGrassArrayItem, spacing : f32) : void;
 

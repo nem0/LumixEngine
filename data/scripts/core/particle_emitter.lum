@@ -7,14 +7,14 @@ import "core:vec4"
 struct ParticleEmitter { entity : i32; module : cptr; }
 
 extern fn particle_emitter(e : Entity) : ?ParticleEmitter;
-extern fn getGlobalID(entity : ParticleEmitter, name : string) : i32;
+extern fn getGlobalID(entity : ParticleEmitter, name : []const u8) : i32;
 extern fn setFloatGlobal(entity : ParticleEmitter, id : i32, value : f32) : void;
 extern fn setVec3Global(entity : ParticleEmitter, id : i32, value : Vec3) : void;
 extern fn setVec4Global(entity : ParticleEmitter, id : i32, value : Vec4) : void;
 extern fn emitRibbons(entity : ParticleEmitter, emitter_index : i32, num_ribbons : i32) : void;
 extern fn killRibbon(entity : ParticleEmitter, emitter_index : i32, ribbon_index : i32) : void;
-extern fn getParticleEmitterPath(entity : ParticleEmitter) : string;
-extern fn setParticleEmitterPath(entity : ParticleEmitter, path : string) : void;
+extern fn getParticleEmitterPath(entity : ParticleEmitter) : []const u8;
+extern fn setParticleEmitterPath(entity : ParticleEmitter, path : []const u8) : void;
 extern fn getParticleEmitterAutodestroy(entity : ParticleEmitter) : bool;
 extern fn setParticleEmitterAutodestroy(entity : ParticleEmitter, enable : bool) : void;
 

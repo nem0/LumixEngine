@@ -7,8 +7,8 @@ struct AmbientSound { entity : i32; module : cptr; }
 extern fn ambient_sound(e : Entity) : ?AmbientSound;
 extern fn pause(entity : AmbientSound) : void;
 extern fn resume(entity : AmbientSound) : void;
-extern fn getAmbientSoundClip(entity : AmbientSound) : string;
-extern fn setAmbientSoundClip(entity : AmbientSound, clip : string) : void;
+extern fn getAmbientSoundClip(entity : AmbientSound) : []const u8;
+extern fn setAmbientSoundClip(entity : AmbientSound, clip : []const u8) : void;
 extern fn isAmbientSound3D(entity : AmbientSound) : bool;
 extern fn setAmbientSound3D(entity : AmbientSound, is_3d : bool) : void;
 

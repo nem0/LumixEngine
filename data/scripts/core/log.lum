@@ -1,2 +1,2 @@
-extern fn logError(v : string) : void;
-extern fn logInfo(v : string) : void;
+extern fn logError(v : []const u8) : void;
+extern fn logInfo(v : []const u8) : void;

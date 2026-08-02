@@ -6,11 +6,11 @@ import "core:vec4"
 struct ModelInstance { entity : i32; module : cptr; }
 
 extern fn model_instance(e : Entity) : ?ModelInstance;
-extern fn overrideMaterialVec4(entity : ModelInstance, mesh_index : i32, uniform_name : string, value : Vec4) : bool;
-extern fn setMaterialOverride(entity : ModelInstance, mesh_idx : i32, path : string) : void;
-extern fn getMaterialOverride(entity : ModelInstance, mesh_idx : i32) : string;
+extern fn overrideMaterialVec4(entity : ModelInstance, mesh_index : i32, uniform_name : []const u8, value : Vec4) : bool;
+extern fn setMaterialOverride(entity : ModelInstance, mesh_idx : i32, path : []const u8) : void;
+extern fn getMaterialOverride(entity : ModelInstance, mesh_idx : i32) : []const u8;
 extern fn isModelInstanceEnabled(entity : ModelInstance) : bool;
 extern fn enableModelInstance(entity : ModelInstance, enable : bool) : void;
-extern fn getModelInstancePath(entity : ModelInstance) : string;
-extern fn setModelInstancePath(entity : ModelInstance, path : string) : void;
+extern fn getModelInstancePath(entity : ModelInstance) : []const u8;
+extern fn setModelInstancePath(entity : ModelInstance, path : []const u8) : void;
 

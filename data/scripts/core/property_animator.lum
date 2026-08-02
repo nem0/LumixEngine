@@ -9,6 +9,6 @@ extern fn isPropertyAnimatorEnabled(entity : PropertyAnimator) : bool;
 extern fn enablePropertyAnimator(entity : PropertyAnimator, enabled : bool) : void;
 extern fn getPropertyAnimatorLooped(entity : PropertyAnimator) : bool;
 extern fn setPropertyAnimatorLooped(entity : PropertyAnimator, looped : bool) : void;
-extern fn getPropertyAnimatorAnimation(entity : PropertyAnimator) : string;
-extern fn setPropertyAnimatorAnimation(entity : PropertyAnimator, path : string) : void;
+extern fn getPropertyAnimatorAnimation(entity : PropertyAnimator) : []const u8;
+extern fn setPropertyAnimatorAnimation(entity : PropertyAnimator, path : []const u8) : void;
 

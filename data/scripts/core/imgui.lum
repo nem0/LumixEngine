@@ -1,4 +1,4 @@
-extern fn begin(name : string) : bool;
-extern fn textUnformatted(text : string) : void;
-extern fn button(label : string) : bool;
+extern fn begin(name : []const u8) : bool;
+extern fn textUnformatted(text : []const u8) : void;
+extern fn button(label : []const u8) : bool;
 extern fn end() : void;

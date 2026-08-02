@@ -6,8 +6,8 @@ import "core:vec2"
 struct UI3D { entity : i32; module : cptr; }
 
 extern fn ui_3d(e : Entity) : ?UI3D;
-extern fn getUI3DPath(entity : UI3D) : string;
-extern fn setUI3DPath(entity : UI3D, path : string) : void;
+extern fn getUI3DPath(entity : UI3D) : []const u8;
+extern fn setUI3DPath(entity : UI3D, path : []const u8) : void;
 extern fn getUI3DVirtualSize(entity : UI3D) : Vec2;
 extern fn setUI3DVirtualSize(entity : UI3D, value : Vec2) : void;
 extern fn getUI3DOrientToCamera(entity : UI3D) : bool;

@@ -11,6 +11,6 @@ extern fn scriptsCount(component : Script) : i32;
 extern fn scripts(component : Script, idx : i32) : ?ScriptScriptArrayItem;
 extern fn isScriptEnabled(item : ScriptScriptArrayItem) : bool;
 extern fn enableScript(item : ScriptScriptArrayItem, enable : bool) : void;
-extern fn getScriptPath(item : ScriptScriptArrayItem) : string;
-extern fn setScriptPath(item : ScriptScriptArrayItem, path : string) : void;
+extern fn getScriptPath(item : ScriptScriptArrayItem) : []const u8;
+extern fn setScriptPath(item : ScriptScriptArrayItem, path : []const u8) : void;
 

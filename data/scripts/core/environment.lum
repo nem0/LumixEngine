@@ -9,8 +9,8 @@ struct Environment { entity : i32; module : cptr; }
 extern fn environment(e : Entity) : ?Environment;
 extern fn getEnvironmentCastShadows(entity : Environment) : bool;
 extern fn setEnvironmentCastShadows(entity : Environment, enable : bool) : void;
-extern fn getEnvironmentSkyTexture(entity : Environment) : string;
-extern fn setEnvironmentSkyTexture(entity : Environment, path : string) : void;
+extern fn getEnvironmentSkyTexture(entity : Environment) : []const u8;
+extern fn setEnvironmentSkyTexture(entity : Environment, path : []const u8) : void;
 extern fn getEnvironmentShadowmapCascades(entity : Environment) : Vec4;
 extern fn setEnvironmentShadowmapCascades(entity : Environment, value : Vec4) : void;
 

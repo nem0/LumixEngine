@@ -714,14 +714,14 @@ void appendLumScriptDeclType(OutputStream& out, StringView type) {
 			out.add(s ? s->name : type);
 			break;
 		}
-		case LumScriptType::PATH_T: out.add("string"); break;
+		case LumScriptType::PATH_T: out.add("[]const u8"); break;
 		default: out.add("void"); break;
 	}
 }
 
 void appendLumScriptDeclArgType(OutputStream& out, const Arg& arg) {
 	if (isLumScriptStringArg(arg)) {
-		out.add("string");
+		out.add("[]const u8");
 		return;
 	}
 	appendLumScriptDeclType(out, arg.type);

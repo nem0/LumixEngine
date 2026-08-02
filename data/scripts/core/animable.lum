@@ -5,6 +5,6 @@ import "core:entity"
 struct Animable { entity : i32; module : cptr; }
 
 extern fn animable(e : Entity) : ?Animable;
-extern fn getAnimableAnimation(entity : Animable) : string;
-extern fn setAnimableAnimation(entity : Animable, path : string) : void;
+extern fn getAnimableAnimation(entity : Animable) : []const u8;
+extern fn setAnimableAnimation(entity : Animable, path : []const u8) : void;
 

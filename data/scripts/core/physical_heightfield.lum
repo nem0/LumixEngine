@@ -5,8 +5,8 @@ import "core:entity"
 struct Heightfield { entity : i32; module : cptr; }
 
 extern fn physical_heightfield(e : Entity) : ?Heightfield;
-extern fn getHeightfieldSource(entity : Heightfield) : string;
-extern fn setHeightfieldSource(entity : Heightfield, path : string) : void;
+extern fn getHeightfieldSource(entity : Heightfield) : []const u8;
+extern fn setHeightfieldSource(entity : Heightfield, path : []const u8) : void;
 extern fn getHeightfieldXZScale(entity : Heightfield) : f32;
 extern fn setHeightfieldXZScale(entity : Heightfield, scale : f32) : void;
 extern fn getHeightfieldYScale(entity : Heightfield) : f32;

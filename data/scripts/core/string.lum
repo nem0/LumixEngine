@@ -1,0 +1,48 @@
+
+enum ParseError {
+    NotANumber,
+    Overeflow
+}
+
+// parse string until not a number character is encountered
+// var a : u64 = parseU64(text) else return;
+fn parseU64(a : []const u8) : u64 | ParseError {
+    var len = length(a);
+    if len < 1 { return ParseError.NotANumber; }
+    
+    var res : u64 = 0;
+
+    for i, c in a {
+        if c < '0' or c > '9' { 
+            if i == 0 { return ParseError.NotANumber; }
+            break; // end of number
+        }
+        const digit = (c - '0') as u64;
+        if res > (u64::max - digit) / 10 {
+            return ParseError.Overeflow;
+        }
+
+        res = 10 * res + digit;
+    }
+
+    return res;
+}
+
+fn parseU32(a : []u8) : u32 | ParseError {
+    var tmp : u64 = parseU64(a) else return;
+    if tmp > u32::max { return ParseError.Overeflow; }
+    return tmp as u32;
+}
+
+fn parseU16(a : []u8) : u16 | ParseError {
+    var tmp : u64 = parseU64(a) else return;
+    if tmp > u16::max { return ParseError.Overeflow; }
+    return tmp as u16;
+}
+
+fn parseU8(a : []u8) : u8 | ParseError {
+    var tmp : u64 = parseU64(a) else return;
+    if tmp > u8::max { return ParseError.Overeflow; }
+    return tmp as u8;
+}
+

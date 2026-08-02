@@ -6,6 +6,6 @@ import "core:world"
 struct UIModule { module : cptr; }
 
 extern fn ui(w : World) : ?UIModule;
-extern fn load(module : UIModule, path : string) : void;
+extern fn load(module : UIModule, path : []const u8) : void;
 extern fn isReady(module : UIModule) : bool;
 

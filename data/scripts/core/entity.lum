@@ -14,4 +14,4 @@ extern fn getScale(e : Entity) : Vec3;
 extern fn setPosition(e : Entity, position : DVec3) : void;
 extern fn setScale(e : Entity, scale : Vec3) : void;
 extern fn setRotation(e : Entity, rotation : Quat) : void;
-extern fn findChildByName(e: Entity, child_name : string) : ?Entity;
+extern fn findChildByName(e: Entity, child_name : []const u8) : ?Entity;

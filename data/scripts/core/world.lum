@@ -7,5 +7,5 @@ struct World { world : cptr; }
 extern fn createEntity(w : World) : Entity;
 extern fn destroyEntity(w : World, e : Entity) : void;
 extern fn hasEntity(w : World, e : Entity) : bool;
-extern fn findByName(w : World, name : string) : ?Entity;
+extern fn findByName(w : World, name : []const u8) : ?Entity;
 
