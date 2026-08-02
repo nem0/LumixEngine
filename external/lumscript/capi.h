@@ -359,6 +359,9 @@ const ls_type* ls_type_array_element_type(const ls_type* type);
 // returns 0 for LS_TYPE_SLICE (whose length is dynamic at runtime).
 u32 ls_type_array_length(const ls_type* type);
 
+// Returns whether the type is const-qualified.
+bool ls_type_is_const(const ls_type* type);
+
 // Introspect a nullable type (valid when kind == LS_TYPE_NULLABLE).
 // A nullable value is stored as: [has_value : u8] [inner_value : N bytes].
 // Read the first byte: 0 = null, 1 = value present.

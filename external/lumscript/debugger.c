@@ -434,6 +434,10 @@ u32 ls_type_array_length(const ls_type* type) {
 	return type->array_length;
 }
 
+bool ls_type_is_const(const ls_type* type) {
+	return type && type->is_const;
+}
+
 const ls_type* ls_type_nullable_inner_type(const ls_type* type) {
 	if (!type || !type->bytecode) return NULL;
 	if (type->kind != LS_TYPE_NULLABLE) return NULL;

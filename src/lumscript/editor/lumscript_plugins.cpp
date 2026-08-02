@@ -155,7 +155,6 @@ static const char* typeName(ls_type_kind kind) {
 		case LS_TYPE_U64: return "u64";
 		case LS_TYPE_F32: return "f32";
 		case LS_TYPE_F64: return "f64";
-		case LS_TYPE_STRING: return "string";
 		case LS_TYPE_STRUCT: return "struct";
 		case LS_TYPE_ENUM: return "enum";
 		case LS_TYPE_ARRAY: return "array";
@@ -184,6 +183,12 @@ static void drawTypeColumn(ls_type_kind kind, const ls_type* type) {
 	ImGui::TextUnformatted(typeName(kind));
 }
 
+static bool isStringSlice(const ls_type* type) {
+	if (!type || ls_type_get_kind(type) != LS_TYPE_SLICE || !ls_type_is_const(type)) return false;
+	const ls_type* elem = ls_type_array_element_type(type);
+	return elem && ls_type_get_kind(elem) == LS_TYPE_U8;
+}
+
 static void drawPrimitiveValue(ls_type_kind kind, const void* value, const ls_type* type) {
 	switch (kind) {
 		case LS_TYPE_BOOL: ImGui::TextUnformatted(*(const bool*)value ? "true" : "false"); break;
@@ -198,21 +203,6 @@ static void drawPrimitiveValue(ls_type_kind kind, const void* value, const ls_ty
 		case LS_TYPE_F32:  ImGui::Text("%g", *(const f32*)value); break;
 		case LS_TYPE_F64:  ImGui::Text("%g", *(const f64*)value); break;
 		case LS_TYPE_CPTR: ImGui::Text("0x%p", *(const void* const*)value); break;
-		case LS_TYPE_STRING: {
-			const void* str_ptr = *(const void* const*)value;
-			if (str_ptr) {
-				const char* begin = *(const char**)str_ptr;
-				const char* end = *(const char**)((const u8*)str_ptr + sizeof(void*));
-				if (begin && end) {
-					ImGui::Text("\"%.*s\"", int(end - begin), begin);
-				} else {
-					ImGui::TextUnformatted("\"\"");
-				}
-			} else {
-				ImGui::TextUnformatted("null");
-			}
-			break;
-		}
 		case LS_TYPE_ENUM: {
 			const i32 v = *(const i32*)value;
 			if (type) {
@@ -379,6 +369,23 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 		const u64 len = *(const u64*)((const u8*)value + 8);
 		const ls_type* elem = ls_type_array_element_type(type);
 		const u32 elem_size = elem ? ls_type_get_size(elem) : 1u;
+		if (isStringSlice(type)) {
+			ImGui::Indent();
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			ImGui::Text("%.*s", int(name.end - name.begin), name.begin);
+			ImGui::TableNextColumn();
+			if (!ptr) {
+				ImGui::TextUnformatted("null");
+			} else {
+				const u64 display_len = len > 0x7fffffffu ? 0x7fffffffu : len;
+				ImGui::Text("\"%.*s\"", (int)display_len, (const char*)ptr);
+			}
+			ImGui::TableNextColumn();
+			ImGui::TextUnformatted("string");
+			ImGui::Unindent();
+			return;
+		}
 
 		ImGui::TableNextRow();
 		ImGui::TableNextColumn();

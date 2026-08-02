@@ -333,6 +333,7 @@ struct TypeInfoBuilder {
 		info->first_value_index = 0u;
 		info->element_type_index = LS_TYPE_INDEX_NONE;
 		info->array_length = LS_TYPE_INDEX_NONE;
+		info->is_const = false;
 		info->name = {};
 
 		switch (type->kind) {
@@ -392,6 +393,7 @@ struct TypeInfoBuilder {
 				info->kind = LS_TYPE_SLICE;
 				info->element_type_index = sl->element_type ? resolve(sl->element_type) : LS_TYPE_INDEX_NONE;
 				info->array_length = 0u;
+				info->is_const = sl->is_const;
 				break;
 			}
 		case ResolvedType::ENUM: {

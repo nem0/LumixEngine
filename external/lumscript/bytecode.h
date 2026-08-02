@@ -286,6 +286,7 @@ typedef struct ls_type {
 	u32 first_value_index;       // index into bytecode->type_enum_values[]; unused when value_count == 0
 	u32 element_type_index;      // LS_TYPE_INDEX_NONE when kind is not ARRAY, SLICE, or NULLABLE
 	u32 array_length;            // LS_TYPE_INDEX_NONE when not ARRAY or SLICE; 0 for SLICE (dynamic length)
+	bool is_const;                // true for const slices
 	ls_string_view name;         // type name (struct name, enum name, etc.), empty if anonymous or unnamed
 } ls_type;
 
