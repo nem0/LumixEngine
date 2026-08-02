@@ -210,7 +210,7 @@ TEST(Extern) {
 
 TEST(BytecodeStringLiteralArgumentShouldCompile) {
 	const char* source = R"(
-		extern fn findByName(name : string) : void;
+		extern fn findByName(name : []const u8) : void;
 
 		fn main() : void {
 			findByName("testor");
@@ -231,7 +231,7 @@ TEST(BytecodeStringLiteralArgumentShouldCompile) {
 
 TEST(NativeStringArgument) {
 	const char* source = R"(
-		extern fn inspect(text : string, value : i32) : i32;
+		extern fn inspect(text : []const u8, value : i32) : i32;
 
 		fn main() : i32 {
 			return inspect("testor", 42);
@@ -259,7 +259,7 @@ TEST(NativeStringArgument) {
 
 TEST(NativeTwoStringArguments) {
 	const char* source = R"(
-		extern fn inspect(first : string, second : string) : i32;
+		extern fn inspect(first : []const u8, second : []const u8) : i32;
 
 		fn main() : i32 {
 			return inspect("first", "second");
@@ -288,7 +288,7 @@ TEST(NativeTwoStringArguments) {
 
 TEST(NativeStringResult) {
 	const char* source = R"(
-		extern fn getText() : string;
+		extern fn getText() : []const u8;
 
 		fn main() : i32 {
 			if getText() == "native result" {

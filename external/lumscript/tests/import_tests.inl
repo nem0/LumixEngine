@@ -175,8 +175,8 @@ TEST(ImportAliasMissingMemberReportsMemberName) {
 		}
 	)";
 	const char* imgui_source = R"(
-		fn textUnformatted(text : string) : void {}
-		fn button(label : string) : bool { return false; }
+		fn textUnformatted(text : []const u8) : void {}
+		fn button(label : []const u8) : bool { return false; }
 		fn endWindow() : void {}
 	)";
 	LumScriptImportFile files_storage[] = {

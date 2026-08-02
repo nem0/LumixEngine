@@ -34,7 +34,6 @@ static ls_type_kind toTypeKind(const ResolvedType& type) {
 		case ResolvedType::ISIZE: return LS_TYPE_I64;
 		case ResolvedType::F32: return LS_TYPE_F32;
 		case ResolvedType::F64: return LS_TYPE_F64;
-		case ResolvedType::STRING: return LS_TYPE_STRING;
 		case ResolvedType::CSTR: return LS_TYPE_CPTR;
 		case ResolvedType::CPTR: return LS_TYPE_CPTR;
 		case ResolvedType::BYTE: return LS_TYPE_U8;
@@ -88,7 +87,6 @@ static u32 typeKindByteSize(ls_type_kind kind) {
 		case LS_TYPE_I64:
 		case LS_TYPE_U64:
 		case LS_TYPE_F64:
-		case LS_TYPE_STRING:
 		case LS_TYPE_CPTR: return 8u;
 		case LS_TYPE_SLICE: return 16u;
 		default: return 8u;
@@ -119,7 +117,7 @@ static bool sameResolvedType(const ResolvedType* a, const ResolvedType* b) {
 		case ResolvedType::SLICE: {
 			const auto* sa = static_cast<const SliceResolvedType*>(a);
 			const auto* sb = static_cast<const SliceResolvedType*>(b);
-			return sameResolvedType(sa->element_type, sb->element_type);
+			return sa->is_const == sb->is_const && sameResolvedType(sa->element_type, sb->element_type);
 		}
 		case ResolvedType::NULLABLE: {
 			const auto* na = static_cast<const NullableResolvedType*>(a);
@@ -141,6 +139,12 @@ static bool sameResolvedType(const ResolvedType* a, const ResolvedType* b) {
 		}
 		default: return false;
 	}
+}
+
+static bool isConstU8Slice(const ResolvedType* type) {
+	if (!type || type->kind != ResolvedType::SLICE) return false;
+	const auto* slice = static_cast<const SliceResolvedType*>(type);
+	return slice->is_const && slice->element_type && slice->element_type->kind == ResolvedType::U8;
 }
 
 static ls_type_kind defaultLiteralKind(const Expression& expr, ls_type_kind hint) {
@@ -633,7 +637,12 @@ static void appendStringLiteral(ls_bytecode& bytecode, const ls_string_view& val
 	ASSERT(bytecode.arena);
 	ls_string_view* entry = appendArenaArray(*bytecode.arena, bytecode.strings, bytecode.string_count, bytecode.string_capacity);
 	ASSERT(entry);
-	*entry = copyStringViewToArena(*bytecode.arena, value);
+	const usize length = size(value);
+	char* copy = static_cast<char*>(bytecode.arena->allocate(bytecode.arena->user_data, length + 1, 1));
+	ASSERT(copy);
+	if (length) copyMemory(copy, value.begin, length);
+	copy[length] = '\0';
+	*entry = {copy, copy + length};
 	out_index = bytecode.string_count - 1u;
 }
 
@@ -806,18 +815,32 @@ static bool emitUntypedComptimeNumeric(FunctionCompiler& ctx, const u8* data, co
 	return false;
 }
 
-static void emitConstString(FunctionCompiler& ctx, u32 string_index) {
-	const u32 dst = ctx.temp_top;
-	emitOp(ctx.code, LS_OP_LOAD_CONST_STRING);
-	emitTempReg(ctx, dst);
-	emitU32(ctx.code, string_index);
-	setTempTop(ctx, dst + typeKindByteSize(LS_TYPE_STRING));
+static void emitConstStringSlice(FunctionCompiler& ctx, u32 string_index) {
+	const ls_string_view value = ctx.bytecode->strings[string_index];
+	emitConst8(ctx, (u64)(uintptr)value.begin);
+	emitConst8(ctx, (u64)(value.end - value.begin));
 }
 
-static void emitConstStringAt(FunctionCompiler& ctx, u32 dst, u32 string_index) {
-	emitOp(ctx.code, LS_OP_LOAD_CONST_STRING);
-	emitFixedReg(ctx, dst);
-	emitU32(ctx.code, string_index);
+static void emitConstStringSliceAt(FunctionCompiler& ctx, u32 dst, u32 string_index) {
+	const ls_string_view value = ctx.bytecode->strings[string_index];
+	emitConst8At(ctx, dst, (u64)(uintptr)value.begin);
+	emitConst8At(ctx, dst + 8u, (u64)(value.end - value.begin));
+}
+
+static void emitConstCStr(FunctionCompiler& ctx, u32 string_index) {
+	emitConst8(ctx, (u64)(uintptr)ctx.bytecode->strings[string_index].begin);
+}
+
+static void emitConstCStrAt(FunctionCompiler& ctx, u32 dst, u32 string_index) {
+	emitConst8At(ctx, dst, (u64)(uintptr)ctx.bytecode->strings[string_index].begin);
+}
+
+static void emitConstU8SliceValue(FunctionCompiler& ctx, const u8* bytes) {
+	struct { u8* data; i64 count; } value;
+	memcpy(&value, bytes, sizeof(value));
+	u32 string_index = 0;
+	appendStringLiteral(*ctx.bytecode, {(const char*)value.data, (const char*)value.data + value.count}, string_index);
+	emitConstStringSlice(ctx, string_index);
 }
 
 static void emitLoadLocalBytes(FunctionCompiler& ctx, u32 offset, u32 byte_size) {
@@ -1036,20 +1059,6 @@ static void emitCastFromLocal(FunctionCompiler& ctx, u32 src, ls_type_kind src_k
 	setTempTop(ctx, dst + typeKindByteSize(dst_kind));
 }
 
-static void emitStringToCStr(FunctionCompiler& ctx) {
-	const u32 src = ctx.temp_top - typeKindByteSize(LS_TYPE_STRING);
-	emitOp(ctx.code, LS_OP_STRING_TO_CSTR);
-	emitTempReg(ctx, src);
-	emitTempReg(ctx, src);
-}
-
-static void emitCStrToString(FunctionCompiler& ctx) {
-	const u32 src = ctx.temp_top - typeKindByteSize(LS_TYPE_CPTR);
-	emitOp(ctx.code, LS_OP_CSTR_TO_STRING);
-	emitTempReg(ctx, src);
-	emitTempReg(ctx, src);
-}
-
 // Discard the top `byte_size` bytes of temporaries (compile-time only).
 static void emitPop(FunctionCompiler& ctx, u32 byte_size) {
 	ctx.temp_top -= byte_size;
@@ -1172,6 +1181,20 @@ static void emitSliceLength(FunctionCompiler& ctx) {
 	emitTempReg(ctx, slice);
 	emitTempReg(ctx, slice);
 	setTempTop(ctx, slice + typeKindByteSize(LS_TYPE_I64));
+}
+
+// Compares two already-compiled slices and leaves a bool at the lhs register.
+// The operand registers are passed in rather than derived from `temp_top`:
+// compiling a slice expression can allocate scratch, so the two results are not
+// necessarily the top two slots.
+static void emitSliceEqual(FunctionCompiler& ctx, u32 lhs, u32 rhs, u32 element_size, ls_type_kind element_kind) {
+	emitOp(ctx.code, LS_OP_SLICE_EQ);
+	emitTempReg(ctx, lhs);
+	emitTempReg(ctx, lhs);
+	emitTempReg(ctx, rhs);
+	emitU32(ctx.code, element_size);
+	emitU8(ctx.code, (u8)element_kind);
+	setTempTop(ctx, lhs + typeKindByteSize(LS_TYPE_BOOL));
 }
 
 static void emitSliceLengthLocal(FunctionCompiler& ctx, u32 slice_offset) {
@@ -1506,11 +1529,6 @@ static void compileExpressionAsType(FunctionCompiler& ctx, Expression& expr, Res
 			emitConst8(ctx, (u64)array->size);
 			return;
 		}
-	}
-	if (expected_type.kind == ResolvedType::CSTR && expr.resolved_type && expr.resolved_type->kind == ResolvedType::STRING) {
-		compileExpression(ctx, expr, LS_TYPE_STRING);
-		emitStringToCStr(ctx);
-		return;
 	}
 	if (expr.kind == Expression::UNDEFINED) {
 		emitZeroBytes(ctx, typeByteSize(expected_type));
@@ -2276,7 +2294,6 @@ static ls_op compareJumpTypeBase(ls_type_kind kind) {
 		case LS_TYPE_U64: return LS_OP_JE_U64;
 		case LS_TYPE_F32: return LS_OP_JE_F32;
 		case LS_TYPE_F64: return LS_OP_JE_F64;
-		case LS_TYPE_STRING: return LS_OP_JE_STRING;
 		case LS_TYPE_ENUM: return LS_OP_JUMP;
 		default: return LS_OP_JUMP;
 	}
@@ -2284,11 +2301,10 @@ static ls_op compareJumpTypeBase(ls_type_kind kind) {
 
 static ls_op compareJumpOp(ls_op compare_op, ls_type_kind kind, bool jump_if_true, bool& swap_operands) {
 	swap_operands = false;
-	if ((kind == LS_TYPE_BOOL || kind == LS_TYPE_STRING || kind == LS_TYPE_ENUM) && (compare_op == LS_OP_EQ || compare_op == LS_OP_NE)) {
+	if ((kind == LS_TYPE_BOOL || kind == LS_TYPE_ENUM) && (compare_op == LS_OP_EQ || compare_op == LS_OP_NE)) {
 		const bool jump_on_equal = jump_if_true ? compare_op == LS_OP_EQ : compare_op == LS_OP_NE;
 		if (jump_on_equal) {
 			if (kind == LS_TYPE_BOOL) return LS_OP_JE_U8;
-			if (kind == LS_TYPE_STRING) return LS_OP_JE_STRING;
 		}
 		return LS_OP_JUMP;
 	}
@@ -2316,7 +2332,7 @@ static ls_op compareJumpOp(ls_op compare_op, ls_type_kind kind, bool jump_if_tru
 		compare_op = LS_OP_GT;
 	else if (compare_op == LS_OP_EQ)
 		return LS_OP_JUMP;
-	if ((kind == LS_TYPE_BOOL || kind == LS_TYPE_STRING || kind == LS_TYPE_ENUM) && compare_op != LS_OP_EQ) return LS_OP_JUMP;
+	if ((kind == LS_TYPE_BOOL || kind == LS_TYPE_ENUM) && compare_op != LS_OP_EQ) return LS_OP_JUMP;
 	const u32 base = (u32)compareJumpTypeBase(kind);
 	if (base == (u32)LS_OP_JUMP) return LS_OP_JUMP;
 	switch (compare_op) {
@@ -2472,6 +2488,15 @@ static bool isNullableNullCheck(BinaryExpression& expr) {
 	return (expr.lhs && expr.lhs->kind == Expression::NULL_LITERAL) || (expr.rhs && expr.rhs->kind == Expression::NULL_LITERAL);
 }
 
+// True when compileBinary must handle the expression as slice content equality.
+// The branch-compare fast path reads its operands as scalars, so slices have to
+// skip it and materialize a bool instead.
+static bool isSliceComparison(BinaryExpression& expr) {
+	if (expr.op != Token::EQUAL_EQUAL && expr.op != Token::BANG_EQUAL) return false;
+	return expr.lhs && expr.lhs->resolved_type && expr.lhs->resolved_type->kind == ResolvedType::SLICE
+		&& expr.rhs && expr.rhs->resolved_type && expr.rhs->resolved_type->kind == ResolvedType::SLICE;
+}
+
 // Emit branches taken when `cond` evaluates to `jump_if_true`; control falls
 // through otherwise. Appends the emitted jumps' operand positions to
 // `out_jumps` (short-circuit chains produce several). Comparisons compile
@@ -2502,7 +2527,7 @@ static void emitCondJumps(FunctionCompiler& ctx, Expression& cond, bool jump_if_
 			return;
 		}
 		const ls_op cmp_op = compareOpForToken(binary.op);
-		if (cmp_op != (ls_op)0 && !binary.resolved_fn && binary.lhs && binary.rhs && !isNullableNullCheck(binary)) {
+		if (cmp_op != (ls_op)0 && !binary.resolved_fn && binary.lhs && binary.rhs && !isNullableNullCheck(binary) && !isSliceComparison(binary)) {
 			Value lv = compileValue(ctx, *binary.lhs, LS_TYPE_INVALID);
 			Value rv = compileValue(ctx, *binary.rhs, isNumericKind(lv.type) ? lv.type : LS_TYPE_INVALID);
 			ls_type_kind operand_kind = lv.type == LS_TYPE_INVALID ? rv.type : lv.type;
@@ -2613,6 +2638,21 @@ static ls_type_kind compileBinary(FunctionCompiler& ctx, BinaryExpression& expr,
 			emitPop(ctx, typeByteSize(*nullable_type->inner)); // discard value bytes, has_value remains
 			emitIntegerConstant(ctx, LS_TYPE_BOOL, 0u);
 			emitCompareOp(ctx, expr.op == Token::EQUAL_EQUAL ? LS_OP_EQ : LS_OP_NE, LS_TYPE_BOOL);
+			return LS_TYPE_BOOL;
+		}
+
+		// Slice content equality: both operands are pushed whole, then compared
+		// element-wise by the runtime.
+		if (expr.lhs && expr.lhs->resolved_type && expr.lhs->resolved_type->kind == ResolvedType::SLICE
+			&& expr.rhs && expr.rhs->resolved_type && expr.rhs->resolved_type->kind == ResolvedType::SLICE)
+		{
+			SliceResolvedType& slice_type = static_cast<SliceResolvedType&>(*expr.lhs->resolved_type);
+			const u32 lhs_reg = ctx.temp_top;
+			compileExpression(ctx, *expr.lhs, LS_TYPE_SLICE);
+			const u32 rhs_reg = ctx.temp_top;
+			compileExpression(ctx, *expr.rhs, LS_TYPE_SLICE);
+			emitSliceEqual(ctx, lhs_reg, rhs_reg, typeByteSize(*slice_type.element_type), valueKindForType(*slice_type.element_type));
+			if (expr.op == Token::BANG_EQUAL) emitUnaryOp(ctx, LS_OP_NOT, 1u);
 			return LS_TYPE_BOOL;
 		}
 	}
@@ -2757,13 +2797,9 @@ static ls_type_kind compileCall(FunctionCompiler& ctx, CallExpression& expr, ls_
 
 static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& member) {
 	if (member.comptime_value.kind == ComptimeValue::VALUE && member.comptime_value.value) {
-		if (member.comptime_value.type->kind == ResolvedType::STRING) {
-			ls_string_view* value;
-			memcpy(&value, member.comptime_value.value, sizeof(value));
-			u32 string_index = 0;
-			appendStringLiteral(*ctx.bytecode, *value, string_index);
-			emitConstString(ctx, string_index);
-			return LS_TYPE_STRING;
+		if (isConstU8Slice(member.comptime_value.type)) {
+			emitConstU8SliceValue(ctx, member.comptime_value.value);
+			return LS_TYPE_SLICE;
 		}
 		emitConstBytes(ctx, member.comptime_value.value, typeByteSize(*member.comptime_value.type));
 		return valueKindForType(*member.comptime_value.type);
@@ -2825,8 +2861,12 @@ static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& membe
 				case Expression::STRING_LITERAL: {
 					u32 string_index = 0;
 					appendStringLiteral(*ctx.bytecode, static_cast<StringLiteralExpression*>(member.resolved_symbol->expression)->value, string_index);
-					emitConstString(ctx, string_index);
-					return LS_TYPE_STRING;
+					if (member.resolved_symbol->expression->resolved_type->kind == ResolvedType::CSTR) {
+						emitConstCStr(ctx, string_index);
+						return LS_TYPE_CPTR;
+					}
+					emitConstStringSlice(ctx, string_index);
+					return LS_TYPE_SLICE;
 				}
 				case Expression::NULL_LITERAL:
 				case Expression::UNDEFINED: emitZeroBytes(ctx, typeByteSize(*member.resolved_symbol->resolved_type)); return valueKindForType(*member.resolved_symbol->resolved_type);
@@ -2929,8 +2969,12 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 		case Expression::STRING_LITERAL: {
 			u32 string_index = 0;
 			appendStringLiteral(*ctx.bytecode, static_cast<StringLiteralExpression&>(expr).value, string_index);
-			emitConstString(ctx, string_index);
-			return LS_TYPE_STRING;
+			if (expr.resolved_type && expr.resolved_type->kind == ResolvedType::CSTR) {
+				emitConstCStr(ctx, string_index);
+				return LS_TYPE_CPTR;
+			}
+			emitConstStringSlice(ctx, string_index);
+			return LS_TYPE_SLICE;
 		}
 		case Expression::NULL_LITERAL: {
 			emitConst8(ctx, 0);
@@ -2976,7 +3020,8 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 				if (expr.comptime_value.type
 					&& emitUntypedComptimeNumeric(ctx, id.comptime_bytes, *expr.comptime_value.type, *expr.resolved_type, hint))
 					return isNumericKind(hint) ? hint : (isFloatKind(toTypeKind(*expr.comptime_value.type)) ? LS_TYPE_F64 : LS_TYPE_I32);
-				emitConstBytes(ctx, id.comptime_bytes, typeByteSize(*id.resolved_type));
+				if (isConstU8Slice(id.resolved_type)) emitConstU8SliceValue(ctx, id.comptime_bytes);
+				else emitConstBytes(ctx, id.comptime_bytes, typeByteSize(*id.resolved_type));
 				return valueKindForType(*expr.resolved_type);
 			}
 
@@ -2986,7 +3031,8 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 			if (id.symbol && id.symbol->storage == Symbol::COMPTIME && id.symbol->comptime_bytes) {
 				if (emitUntypedComptimeNumeric(ctx, id.symbol->comptime_bytes, *id.symbol->resolved_type, *expr.resolved_type, hint))
 					return isNumericKind(hint) ? hint : (isFloatKind(toTypeKind(*id.symbol->resolved_type)) ? LS_TYPE_F64 : LS_TYPE_I32);
-				emitConstBytes(ctx, id.symbol->comptime_bytes, id.symbol->comptime_byte_size);
+				if (isConstU8Slice(id.symbol->resolved_type)) emitConstU8SliceValue(ctx, id.symbol->comptime_bytes);
+				else emitConstBytes(ctx, id.symbol->comptime_bytes, id.symbol->comptime_byte_size);
 				return valueKindForType(*expr.resolved_type);
 			}
 
@@ -3016,14 +3062,6 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 				}
 			}
 			const ls_type_kind src_kind = compileExpression(ctx, *cast.expression, toTypeKind(*cast.expression->resolved_type));
-			if (cast.expression->resolved_type->kind == ResolvedType::STRING && expr.resolved_type->kind == ResolvedType::CSTR) {
-				emitStringToCStr(ctx);
-				return dst_kind;
-			}
-			if (cast.expression->resolved_type->kind == ResolvedType::CSTR && expr.resolved_type->kind == ResolvedType::STRING) {
-				emitCStrToString(ctx);
-				return dst_kind;
-			}
 			// Slice reinterpret (`byte[] as T[]` / `T[] as byte[]`) keeps the same backing
 			// reference (base offset). The length is in elements, so it rescales by the ratio
 			// of element offset counts: new_len = old_len * src_size / dst_size. One side is
@@ -3113,8 +3151,8 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 				case TypeMemberExpression::NAME: {
 					u32 string_index = 0;
 					appendStringLiteral(*ctx.bytecode, member.comptime_string, string_index);
-					emitConstString(ctx, string_index);
-					return LS_TYPE_STRING;
+					emitConstStringSlice(ctx, string_index);
+					return LS_TYPE_SLICE;
 				}
 				case TypeMemberExpression::LENGTH: {
 					emitIntegerConstant(ctx, LS_TYPE_I64, (u64)static_cast<ArrayResolvedType*>(member.reflected_type)->size);
@@ -3226,10 +3264,11 @@ static bool emitLocalLiteralInitializer(FunctionCompiler& ctx, u32 offset, Expre
 			emitIntegerConstantAt(ctx, offset, LS_TYPE_BOOL, static_cast<BoolLiteralExpression&>(expr).value ? 1u : 0u);
 			return true;
 		case Expression::STRING_LITERAL: {
-			if (kind != LS_TYPE_STRING) return false;
 			u32 string_index = 0;
 			appendStringLiteral(*ctx.bytecode, static_cast<StringLiteralExpression&>(expr).value, string_index);
-			emitConstStringAt(ctx, offset, string_index);
+			if (kind == LS_TYPE_CPTR) emitConstCStrAt(ctx, offset, string_index);
+			else if (kind == LS_TYPE_SLICE) emitConstStringSliceAt(ctx, offset, string_index);
+			else return false;
 			return true;
 		}
 		case Expression::UNARY: {

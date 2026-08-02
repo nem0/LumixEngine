@@ -2212,11 +2212,11 @@ TEST(ComptimeFunctionParameterF64Runtime) {
 
 TEST(ComptimeFunctionParameterStringRuntime) {
 	const char* source = R"(
-		fn choose(s : comptime string) : string {
+		fn choose(s : comptime []const u8) : []const u8 {
 			return s;
 		}
 
-		fn main() : string {
+		fn main() : []const u8 {
 			return choose("hello");
 		}
 	)";
@@ -2539,7 +2539,7 @@ TEST(ComptimeGenericStructWithValueParamRuntime) {
 
 TEST(ComptimeFunctionParameterRuntime) {
 	const char* source = R"(
-		fn repeat(text : string, count : comptime i32) : i32 {
+		fn repeat(text : []const u8, count : comptime i32) : i32 {
 			return count;
 		}
 
@@ -2582,7 +2582,7 @@ TEST(ComptimeFunctionParameterDependentArraySizeRuntime) {
 
 TEST(VarGlobalAsComptimeFunctionParameterFails) {
 	const char* source = R"(
-		fn repeat(text : string, count : comptime i32) : void {}
+		fn repeat(text : []const u8, count : comptime i32) : void {}
 		
 		var n : i32 = 5;
 		fn main() : void {
@@ -2595,7 +2595,7 @@ TEST(VarGlobalAsComptimeFunctionParameterFails) {
 
 TEST(ComptimeFunctionParameterNonConstantArgumentFails) {
 	const char* source = R"(
-		fn repeat(text : string, count : comptime i32) : void {}
+		fn repeat(text : []const u8, count : comptime i32) : void {}
 
 		fn main() : void {
 			var n : i32 = 5;

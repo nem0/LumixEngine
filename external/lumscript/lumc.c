@@ -102,9 +102,6 @@ static void lumc_write_result(FILE* out, ls_runtime* runtime, ls_type_kind kind)
 		case LS_TYPE_F64:
 			fprintf(out, "%lf", ls_to_f64(runtime, -1));
 			break;
-		case LS_TYPE_STRING:
-			lumc_print_string(out, ls_to_string(runtime, -1));
-			break;
 		default:
 			fprintf(out, "<%d>", (int)kind);
 			break;
@@ -138,7 +135,6 @@ static const char* lumc_type_name(ls_type_kind kind) {
 		case LS_TYPE_F64: return "f64";
 		case LS_TYPE_ENUM: return "enum";
 		case LS_TYPE_FUNCTION: return "function";
-		case LS_TYPE_STRING: return "string";
 		case LS_TYPE_CPTR: return "cptr";
 		case LS_TYPE_SLICE: return "slice";
 		default: return "invalid";
@@ -166,7 +162,6 @@ static const char* lumc_opcode_name(ls_op op) {
 		case LS_OP_LOAD_CONST_2: return "LOAD_CONST_2";
 		case LS_OP_LOAD_CONST_4: return "LOAD_CONST_4";
 		case LS_OP_LOAD_CONST_8: return "LOAD_CONST_8";
-		case LS_OP_LOAD_CONST_STRING: return "LOAD_CONST_STRING";
 		case LS_OP_COPY: return "COPY";
 		case LS_OP_GLOBAL_LOAD: return "GLOBAL_LOAD";
 		case LS_OP_GLOBAL_STORE: return "GLOBAL_STORE";
@@ -217,7 +212,6 @@ static const char* lumc_opcode_name(ls_op op) {
 		LS_COMPARE_JUMP_NAME(U64)
 		LS_COMPARE_JUMP_NAME(F32)
 		LS_COMPARE_JUMP_NAME(F64)
-		case LS_OP_JE_STRING: return "JE_STRING";
 		#undef LS_COMPARE_JUMP_NAME
 		case LS_OP_JUMP: return "JUMP";
 		case LS_OP_JZ_U8: return "JZ_U8";
@@ -237,8 +231,6 @@ static const char* lumc_opcode_name(ls_op op) {
 		case LS_OP_CALL_DIRECT: return "CALL_DIRECT";
 		case LS_OP_CALL_INDIRECT: return "CALL_INDIRECT";
 		case LS_OP_CAST: return "CAST";
-		case LS_OP_STRING_TO_CSTR: return "STRING_TO_CSTR";
-		case LS_OP_CSTR_TO_STRING: return "CSTR_TO_STRING";
 		case LS_OP_RETURN: return "RETURN";
 		case LS_OP_RETURN_BASE: return "RETURN_BASE";
 		default: return "UNKNOWN";
@@ -336,12 +328,6 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 				const u32 width = 1u << ((u32)op - (u32)LS_OP_LOAD_CONST_1);
 				for (u32 i = 0; i < width && pc + i < fn->code_size; ++i) printf(" %02x", fn->code[pc + i]);
 				pc += width;
-				break;
-			}
-			case LS_OP_LOAD_CONST_STRING: {
-				const u32 dst = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 index = lumc_read_u32(fn->code, fn->code_size, &pc);
-				printf(" dst=%u, value=string[%u]", dst, index);
 				break;
 			}
 			case LS_OP_COPY:
@@ -500,7 +486,6 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 			LS_COMPARE_JUMP_CASES(U64)
 			LS_COMPARE_JUMP_CASES(F32)
 			LS_COMPARE_JUMP_CASES(F64)
-			case LS_OP_JE_STRING:
 			#undef LS_COMPARE_JUMP_CASES
 			{
 				const u32 lhs = lumc_read_u32(fn->code, fn->code_size, &pc);
@@ -557,13 +542,6 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 				const ls_type_kind src_kind = (ls_type_kind)fn->code[pc++];
 				const ls_type_kind dst_kind = (ls_type_kind)fn->code[pc++];
 				printf(" dst=%u, src=%u, %s -> %s", dst, src, lumc_type_name(src_kind), lumc_type_name(dst_kind));
-				break;
-			}
-			case LS_OP_STRING_TO_CSTR:
-			case LS_OP_CSTR_TO_STRING: {
-				const u32 dst = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 src = lumc_read_u32(fn->code, fn->code_size, &pc);
-				printf(" dst=%u, src=%u", dst, src);
 				break;
 			}
 			case LS_OP_RETURN: {

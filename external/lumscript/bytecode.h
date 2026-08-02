@@ -57,11 +57,12 @@
 // - `SLICE` reads `base, length, begin, end` registers and writes a subslice
 // - `SLICE_*_LOCAL` reads/writes slice, index, and value/result frame registers
 // - `SLICE_*_AT_LOCAL` additionally carries element and field byte ranges
+// - `SLICE_EQ` reads two slice registers plus the element size and kind, and
+//   writes a bool; `!=` is `SLICE_EQ` followed by `NOT`
 // - all slice bounds are checked by the runtime
 //
 // Opcode layout summary:
-// - constants: LOAD_CONST_N (`dst`, inline payload), LOAD_CONST_STRING
-//   (`dst`, string index)
+// - constants: LOAD_CONST_N (`dst`, inline payload)
 // - frame copies: COPY (`dst`, `src`, `byte size`)
 // - global access: GLOBAL_LOAD/GLOBAL_STORE carry destination/source register,
 //   global byte offset, and byte size
@@ -88,7 +89,6 @@ typedef enum ls_op {
 	LS_OP_LOAD_CONST_2,
 	LS_OP_LOAD_CONST_4,
 	LS_OP_LOAD_CONST_8,
-	LS_OP_LOAD_CONST_STRING,
 	LS_OP_COPY,
 	LS_OP_GLOBAL_LOAD,
 	LS_OP_GLOBAL_STORE,
@@ -113,6 +113,7 @@ typedef enum ls_op {
 	LS_OP_SLICE_STORE_AT_LOCAL_I32,
 	LS_OP_SLICE_REF,
 	LS_OP_SLICE_LENGTH,
+	LS_OP_SLICE_EQ,
 
 	LS_OP_ADD_I8,
 	LS_OP_ADD_U8,
@@ -208,8 +209,6 @@ typedef enum ls_op {
 	LS_COMPARE_JUMP_OPS(F64)
 	#undef LS_COMPARE_JUMP_OPS
 
-	LS_OP_JE_STRING,
-
 	LS_OP_JUMP,
 	LS_OP_JZ_U8,
 	LS_OP_JNZ_U8,
@@ -229,8 +228,6 @@ typedef enum ls_op {
 	LS_OP_CALL_DIRECT,
 	LS_OP_CALL_INDIRECT,
 	LS_OP_CAST,
-	LS_OP_STRING_TO_CSTR,
-	LS_OP_CSTR_TO_STRING,
 	LS_OP_RETURN,
 	LS_OP_RETURN_BASE,
 

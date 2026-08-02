@@ -132,7 +132,7 @@ TEST(UnrollForStructTypeFields) {
 		struct Value { i : i32; f : f32; }
 		fn main() : void {
 			unroll for field in Value::fields {
-				if field.type == i32 { var name : string = field.name; }
+				if field.type == i32 { var name : []const u8 = field.name; }
 			}
 		}
 	)";
@@ -257,7 +257,7 @@ TEST(IntrospectionStructFieldsCanBeIndexed) {
 		struct S { x : i32; y : f32; }
 		comptime fields = S::fields;
 		comptime first = fields[0];
-		fn main() : void { var name : string = first.name; }
+		fn main() : void { var name : []const u8 = first.name; }
 	)";
 	EXPECT_COMPILE(source);
 	return true;
@@ -279,7 +279,7 @@ TEST(StructFieldIndexByLiteral) {
 TEST(StructFieldIndexByComptimeStringAndCall) {
 	const char* source = R"(
 		struct Value { x : i32; }
-		fn field_name() : string { return "x"; }
+		fn field_name() : []const u8 { return "x"; }
 		comptime name = "x";
 		fn main() : void {
 			var value : Value = undefined;
@@ -309,7 +309,7 @@ TEST(StructFieldIndexFromUnrolledFieldName) {
 TEST(StructFieldIndexRejectsRuntimeString) {
 	const char* source = R"(
 		struct Value { x : i32; }
-		fn main(name : string) : void {
+		fn main(name : []const u8) : void {
 			var value : Value = undefined;
 			value[name] = 1;
 		}
@@ -458,7 +458,7 @@ TEST(IntrospectionKindProvingBranchAllowsFields) {
 	const char* source = R"(
 		fn inspect(T : comptime type) : void {
 			if T::kind == .Struct {
-				unroll for f in T::fields { var name : string = f.name; }
+				unroll for f in T::fields { var name : []const u8 = f.name; }
 			}
 		}
 	)";
@@ -690,7 +690,7 @@ TEST(IntrospectionTypeNamesCoverConstructedTypes) {
 TEST(IntrospectionTypeNameMaterializes) {
 	const char* source = R"(
 		comptime name = i32::name;
-		fn main() : string { return name; }
+		fn main() : []const u8 { return name; }
 	)";
 	EXPECT_COMPILE(source);
 	return true;
@@ -777,7 +777,7 @@ TEST(IntrospectionEnumCursorNameMaterializes) {
 	const char* source = R"(
 		enum State { Idle, Running }
 		comptime first = State::values[0];
-		fn main() : string { return first.name; }
+		fn main() : []const u8 { return first.name; }
 	)";
 	EXPECT_COMPILE(source);
 	return true;
@@ -925,7 +925,7 @@ TEST(IntrospectionTypeKindCoversBuiltinDiscriminants) {
 			else { var bad : MissingType = undefined; }
 			if u8::kind == .U8 and u16::kind == .U16 and u32::kind == .U32 and u64::kind == .U64 and byte::kind == .Byte { }
 			else { var bad : MissingType = undefined; }
-			if f32::kind == .F32 and f64::kind == .F64 and string::kind == .String and cstr::kind == .CStr and cptr::kind == .CPtr { }
+			if f32::kind == .F32 and f64::kind == .F64 and cstr::kind == .CStr and cptr::kind == .CPtr { }
 			else { var bad : MissingType = undefined; }
 			if void::kind == .Void and type::kind == .Type { }
 			else { var bad : MissingType = undefined; }
@@ -993,6 +993,31 @@ TEST(IntrospectionTypeNamesCoverDeclarationsTemplatesAndUnions) {
 	return true;
 }
 
+TEST(IntrospectionNamesSelectUnrolledBranchWithSliceEquality) {
+	const char* source = R"(
+		struct S { hp : i32; mana : i32; }
+
+		fn main() : i32 {
+			var v : S = undefined;
+			v.hp = 1;
+			v.mana = 2;
+			var total : i32 = 0;
+			unroll for f in S::fields {
+				if f.name == "hp" { total += v[f.name]; }
+				else { total += 10 * v[f.name]; }
+			}
+			return total;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(21, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(IntrospectionTypeNamesCoverAllPrimitiveTypes) {
 	const char* source = R"(
 		fn main() : void {
@@ -1000,7 +1025,7 @@ TEST(IntrospectionTypeNamesCoverAllPrimitiveTypes) {
 			else { var bad : MissingType = undefined; }
 			if u8::name == "u8" and u16::name == "u16" and u32::name == "u32" and u64::name == "u64" and byte::name == "byte" { }
 			else { var bad : MissingType = undefined; }
-			if f32::name == "f32" and f64::name == "f64" and string::name == "string" and cstr::name == "cstr" and cptr::name == "cptr" { }
+			if f32::name == "f32" and f64::name == "f64" and cstr::name == "cstr" and cptr::name == "cptr" { }
 			else { var bad : MissingType = undefined; }
 			if void::name == "void" and type::name == "type" { }
 			else { var bad : MissingType = undefined; }
@@ -1150,7 +1175,7 @@ TEST(IntrospectionFieldCursorNameMaterializes) {
 	const char* source = R"(
 		struct S { value : i32; }
 		comptime field = S::fields[0];
-		fn main() : string { return field.name; }
+		fn main() : []const u8 { return field.name; }
 	)";
 	EXPECT_COMPILE(source);
 	return true;
@@ -1224,20 +1249,22 @@ static void printCaptureBool(ls_runtime*, ls_call_frame frame) {
 
 TEST(IntrospectionGenericPrintRendersEveryKind) {
 	const char* source = R"(
-		extern fn write_bytes(text : string) : void;
+		extern fn write_bytes(text : []const u8) : void;
 		extern fn write_i64(value : i64) : void;
 		extern fn write_u64(value : u64) : void;
 		extern fn write_f64(value : f64) : void;
 		extern fn write_bool(value : bool) : void;
 
 		fn print(v : $T) : void {
+			if T == []const u8 {
+				write_bytes(v);
+				return;
+			}
 			match T::kind {
 				case .Bool:                          write_bool(v);
 				case .F32, .F64:                     write_f64(v as f64);
 				case .I8, .I16, .I32, .I64, .ISize:  write_i64(v as i64);
 				case .U8, .U16, .U32, .U64:          write_u64(v as u64);
-				case .String:                        write_bytes(v);
-
 				case .Nullable:
 					if v != null {
 						print(v);

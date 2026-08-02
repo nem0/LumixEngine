@@ -148,7 +148,6 @@ struct Parser {
 			case Token::OR: return "or";
 			case Token::NOT: return "not";
 			case Token::VOID: return "void";
-			case Token::STRING_KW: return "string";
 			case Token::I8: return "i8";
 			case Token::BOOL: return "bool";
 			case Token::I16: return "i16";
@@ -350,7 +349,13 @@ struct Parser {
 		if (peekToken().type == Token::RIGHT_BRACKET) {
 			consumeToken();
 			SliceTypeExpression* slice = makeExpr<SliceTypeExpression>(token);
-			slice->element_type = type();
+			if (peekToken().type == Token::CONST) {
+				consumeToken();
+				slice->is_const = true;
+			}
+			// `false` so that `[]u8 | i32` is a union of a slice and i32, not a slice of a union;
+			// the trailing `|` is picked up by binaryExpression
+			slice->element_type = type(false);
 			return slice->element_type ? slice : nullptr;
 		}
 
@@ -392,7 +397,7 @@ struct Parser {
 	
 		ArrayTypeExpression* array = makeExpr<ArrayTypeExpression>(token);
 		array->size = first;
-		array->element_type = type();
+		array->element_type = type(false);
 		return array->element_type ? array : nullptr;
 	}
 
@@ -448,7 +453,6 @@ struct Parser {
 			case Token::ISIZE:
 			case Token::F32:
 			case Token::F64:
-			case Token::STRING_KW:
 			case Token::CPTR:
 			case Token::CSTR:
 			case Token::BYTE:
@@ -737,7 +741,6 @@ struct Parser {
 
 	static ResolvedType::Kind primitiveKindFromToken(Token::Type type) {
 		switch (type) {
-			case Token::STRING_KW: return ResolvedType::STRING;
 			case Token::VOID: return ResolvedType::VOID;
 			case Token::BOOL: return ResolvedType::BOOL;
 			case Token::I8: return ResolvedType::I8;
@@ -843,6 +846,10 @@ struct Parser {
 				if (peekToken().type == Token::RIGHT_BRACKET) {
 					consumeToken();
 					SliceTypeExpression* slice = makeExpr<SliceTypeExpression>(token);
+					if (peekToken().type == Token::CONST) {
+						consumeToken();
+						slice->is_const = true;
+					}
 					slice->element_type = type(false);
 					if (!slice->element_type) return nullptr;
 					res = slice;

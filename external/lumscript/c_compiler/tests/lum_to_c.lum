@@ -30,7 +30,7 @@ var global_value : i32 = 3;
 var deferred_calls : i32 = 0;
 const value_layout : i32 = sizeof(Value) + alignof(i32);
 
-extern fn print(msg : string) : void;
+extern fn print(msg : []const u8) : void;
 extern fn MessageBoxA(window : cptr, text : cstr, caption : cstr, flags : u32) : i32;
 
 fn cleanup() : void {
@@ -57,7 +57,7 @@ fn twice(a : $T) : T {
 	return a + a;
 }
 
-fn echo(value : string) : string {
+fn echo(value : []const u8) : []const u8 {
 	return value;
 }
 
@@ -71,16 +71,13 @@ fn increment(v : ref i32) : void {
 
 fn main() : i32 {
 	defer cleanup();
-	var message : string = echo("Lum");
+	var message : []const u8 = echo("Lum");
 	print(message);
 	if 0 == 1 {
 		MessageBoxA(null, "Hello from LumScript", "lum_to_c", 0);
 	}
-	if message != "Lum" {
+	if length(message) != 3 or message[0] != 'L' or message[1] != 'u' or message[2] != 'm' {
 		return 8;
-	}
-	if message == "not Lum" {
-		return 9;
 	}
 	const local_add : fn(i32) : i32 = fn(v : i32) : i32 {
 		return v + 1;
@@ -107,7 +104,7 @@ fn main() : i32 {
 			return 4;
 		case 1..=2, 99:
 			value += 0;
-		else:
+		case:
 			return 5;
 	}
 	var values : [4]i32 = undefined;
@@ -120,6 +117,28 @@ fn main() : i32 {
 	var z : []i32 = values[0:4];
 	var z2 : []i32 = z[2:4];
 	z2[0] = z[0] + 4;
+	if z[0:2] != view {
+		return 7;
+	}
+	if z[0:2] == z2 {
+		return 8;
+	}
+	var text : []const u8 = "lumix";
+	if text != "lumix" {
+		return 9;
+	}
+	if text == "lumi" {
+		return 10;
+	}
+	var floats : [2]f32 = undefined;
+	floats[0] = -0.0;
+	floats[1] = 1.5;
+	var floats2 : [2]f32 = undefined;
+	floats2[0] = 0.0;
+	floats2[1] = 1.5;
+	if floats[:] != floats2[:] {
+		return 11;
+	}
 	if length(values) != 4 {
 		return 6;
 	}

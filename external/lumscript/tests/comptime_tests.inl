@@ -299,7 +299,7 @@ TEST(ComptimeStringValueTypechecks) {
 	const char* source = R"(
 		comptime Name = "Lumix";
 
-		fn main() : string {
+		fn main() : []const u8 {
 			return Name;
 		}
 	)";
@@ -1203,7 +1203,7 @@ TEST(EvalStageRejectsTypeofRuntimeMaterialization) {
 
 TEST(ComptimeStructCanContainTypeValues) {
 	const char* source = R"(
-		struct Descriptor { name : string; value_type : type; }
+		struct Descriptor { name : []const u8; value_type : type; }
 		comptime descriptors = [
 			Descriptor { "integer", i32 },
 			Descriptor { "float", f32 }
@@ -1218,6 +1218,42 @@ TEST(ComptimeStructCanContainTypeValues) {
 		}
 	)";
 	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeSliceEqualityBindsToComptimeValue) {
+	// The comparison itself has to fold during evaluation, not just be usable in
+	// a compile-time branch.
+	const char* source = R"(
+		comptime name = "float";
+		comptime matches = name == "float";
+		comptime differs = name != "integer";
+
+		fn main() : void {
+			if matches and differs { }
+			else { var bad : MissingType = undefined; }
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeSliceEqualitySelectsTemplateBranch) {
+	// A false comparison must prune its branch before the missing type is checked.
+	const char* source = R"(
+		comptime name = "vec3";
+
+		fn main() : i32 {
+			if name == "quat" { var bad : MissingType = undefined; return 0; }
+			return 42;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -1275,7 +1311,7 @@ TEST(ComptimeIfTemplateSpecializationPrunesUnselectedArm) {
 			if T == i32 {
 				var number : i32 = value;
 			} else {
-				var text : string = value;
+				var text : []const u8 = value;
 			}
 		}
 
@@ -2136,7 +2172,7 @@ TEST(ComptimeSliceIndexOutOfBounds) {
 	const char* source = R"(
 		struct S { value : i32; }
 		comptime field = S::fields[2];
-		fn main() : string { return field.name; }
+		fn main() : []const u8 { return field.name; }
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
@@ -2146,7 +2182,7 @@ TEST(ComptimeSliceIndexNegative) {
 	const char* source = R"(
 		struct S { value : i32; }
 		comptime field = S::fields[-1];
-		fn main() : string { return field.name; }
+		fn main() : []const u8 { return field.name; }
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
@@ -2157,7 +2193,7 @@ TEST(SliceIndexNotIntegerFails) {
 	const char* source = R"(
 		struct S { value : i32; }
 		comptime field = S::fields["value"];
-		fn main() : string { return field.name; }
+		fn main() : []const u8 { return field.name; }
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;

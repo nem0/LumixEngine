@@ -28,7 +28,7 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 	- [Nullable values](#nullable-values)
 	- [Tagged unions](#tagged-unions)
 		- [Narrowing](#narrowing)
-	- [Strings](#strings)
+	- [String literals](#string-literals)
 	- [Function types](#function-types)
 	- [Static-sized arrays](#static-sized-arrays)
 	- [Slices](#slices)
@@ -53,6 +53,7 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 	- [Casts](#casts)
 	- [Sizeof and alignof](#sizeof-and-alignof)
 	- [Comparison and boolean operators](#comparison-and-boolean-operators)
+		- [Slice equality](#slice-equality)
 	- [Operator precedence](#operator-precedence)
 	- [Ternary operator](#ternary-operator)
 	- [Calls](#calls)
@@ -403,7 +404,7 @@ Rules:
 - a value used as a type must resolve to a compile-time type value
 - compile-time evaluation happens before concrete runtime code is lowered
 - compile-time application uses `[]`; runtime application uses `()`
-- primitive types such as `i32`, `f32`, `bool`, and `string` are built-in type values and cannot be shadowed; so are the built-in `type` and `TypeKind`
+- primitive types such as `i32`, `f32`, and `bool` are built-in type values and cannot be shadowed; so are the built-in `type` and `TypeKind`
 - using a runtime-only value where a compile-time value is required is a compile-time error
 - a comptime call may call only compile-time-known function values
 - declared functions cannot return `type`; the compile-time operator [`typeof`](#typeof) is not a function and is not covered by this rule
@@ -522,7 +523,7 @@ struct Map[K, V] {
 Function parameters can also be marked `comptime` to require compile-time constant values. These are useful for values that must be known at compile time but do not require template bracket syntax:
 
 ```cpp
-fn repeat(text : string, count : comptime i32) : void {
+fn repeat(text : []const u8, count : comptime i32) : void {
 	for i in 0..count {
 		print(text);
 	}
@@ -599,6 +600,7 @@ Rules:
   - unary `-`
 - `and`, `or`, and `not` remain built-in boolean operators and are not overloaded
 - declaring an operator overload for a built-in primitive signature, such as `operator +(f32, f32)`, is a compile-time error
+- declaring `operator ==` or `operator !=` with slice parameters is a compile-time error for the same reason; slice equality is built in (see [Slice equality](#slice-equality))
 - declaring an operator overload where any parameter is an enum type is a compile-time error; use a wrapper struct for bit-flag patterns instead
 - overload resolution uses exact type matching on the operands' natural types
 - an untyped numeric expression matches a parameter when all of its literals fit and adopts that parameter type
@@ -667,7 +669,6 @@ Built-in and user types:
 - `isize`
 - `byte`
 - `f32`, `f64`
-- `string`
 - `cstr`
 - `cptr`
 - `type` (compile-time only)
@@ -732,7 +733,7 @@ A union target provides context only when exactly one member has a compatible nu
 value's representability does not disambiguate between multiple numeric members:
 
 ```cpp
-const number : i32 | string = 12; // 12 becomes i32
+const number : i32 | []const u8 = 12; // 12 becomes i32
 const ambiguous : i32 | i64 = 2147483648; // compile-time error: both numeric members match
 ```
 
@@ -855,7 +856,7 @@ Unions are structural with set semantics:
 
 **Members**
 
-Every union member must be a concrete runtime type. This includes structs, enums, primitives, nullable types, slices, static arrays, function types, and `string`.
+Every union member must be a concrete runtime type. This includes structs, enums, primitives, nullable types, slices, static arrays, and function types.
 
 `void` cannot be a member because it has no runtime value or value syntax for selecting a `void` union variant. Union types are not members themselves; they flatten into their constituent members, as described above.
 
@@ -957,20 +958,41 @@ A structural union has no declaring namespace. Union-typed values do not partici
 - `alignof(A | B)` is `max(alignof(i32), alignof(members))`
 - the tag is not directly observable; there is no union-to-integer cast
 
-### Strings
+### String literals
+
+A string literal has type `[]const u8`. It is a read-only slice over
+statically allocated UTF-8 bytes, and its length does not include the trailing
+NUL byte stored for native interoperability:
 
 ```cpp
-fn greet(name : string) : string {
-	const prefix = "Hello ";
-	return prefix + name;
+fn greet(name : []const u8) : void {
+	print("Hello ");
+	print(name);
+}
+
+const text : []const u8 = "Lumix";
+const bytes = "a\0b"; // length(bytes) == 3
+```
+
+String literals have no dedicated runtime type. They use ordinary slice
+operations such as indexing, slicing, iteration, and `length`. Their elements
+cannot be modified because the slice is `const`.
+
+There is no built-in concatenation operator. In particular, `"a" + "b"` is a
+compile-time error. Code that needs concatenation must copy the bytes into an
+owned container supplied by a library or application allocator. String
+interpolation is not implemented.
+
+Slices, including `[]const u8`, compare by content with `==` and `!=`, so
+string literals and byte slices can be compared directly:
+
+```cpp
+fn is_quit(command : []const u8) : bool {
+	return command == "quit";
 }
 ```
 
-- string literals produce `string`
-- concatenation uses `+`
-- string interpolation is not implemented
-
-`string` is LumScript's normal counted-string type. It carries a byte length, so it can represent arbitrary byte sequences, including embedded null bytes.
+See [Slice equality](#slice-equality) for the exact rule.
 
 `cstr` is a distinct borrowed, NUL-terminated C string type for native interop. It maps to `const char*` in C and is intended for declarations such as:
 
@@ -982,23 +1004,24 @@ fn main() : void {
 }
 ```
 
-`string` converts implicitly to `cstr` without copying, including when passing a normal string to a native function or initializing a `cstr` variable. The generated string storage is NUL-terminated:
+String literals convert implicitly to `cstr` without copying because their
+backing storage is NUL-terminated:
 
 ```cpp
-var text : string = getMessage();
-var native_text : cstr = text;
+var native_text : cstr = "hello";
 ```
 
-The conversion requires NUL-terminated storage and rejects strings containing an embedded null byte; C APIs conventionally stop at the first null and cannot otherwise observe the full LumScript string. The resulting `cstr` is borrowed: it is valid only while the source string remains alive and is not mutated or released. `cstr` has no ownership or freeing behavior.
+Literals containing an embedded null byte cannot convert to `cstr`; C APIs
+would stop at the first null and could not observe the complete slice. A
+general `[]const u8` does not implicitly convert to `cstr`, because a slice
+does not guarantee a trailing NUL byte. The language currently provides no
+conversion for this case; only string literals can be passed directly where a
+`cstr` is expected. `cstr` has no ownership or freeing behavior.
 
-Conversion in the other direction is also explicit and copies the C string into normal LumScript-owned string storage:
-
-```cpp
-var native_text : cstr = getNativeMessage();
-var text : string = native_text as string;
-```
-
-`cstr as string` scans up to the first null byte and copies those bytes. It is therefore `O(n)` and the resulting `string` remains valid if the native library later mutates or releases the original buffer. Converting a null `cstr` requires a nullable check first.
+There is no built-in conversion from `cstr` to `[]const u8`: determining the
+length requires a scan, and the resulting lifetime would depend on native
+storage. Native-facing libraries can expose that operation with an explicit
+lifetime policy.
 
 `cptr` is a separate opaque raw native pointer type. Use it for handles, raw memory, and dynamic-library symbol lookup; do not use it for C text when a `cstr` parameter is available. The `null` literal is valid wherever a `cptr` is expected and represents a null native pointer:
 
@@ -1101,7 +1124,19 @@ var arr : [4]i32 = foo();
 var slice : []i32 = arr[1:2];
 ```
 
-Slice syntax uses `[]T`, where `T` is the element type.
+Slice syntax uses `[]T`, where `T` is the element type. `[]const T` is a
+read-only slice view over elements of type `T`:
+
+```cpp
+var values : [3]u8 = [1, 2, 3];
+var writable : []u8 = values[:];
+var readable : []const u8 = values[:];
+```
+
+`[]T` and `[]const T` have the same pointer-and-length representation. The
+`const` qualifier applies to the viewed elements, not to the slice binding:
+the binding can be reassigned, but an element cannot be written through a
+`[]const T` view.
 
 Slice creation forms:
 
@@ -1115,29 +1150,40 @@ Slice creation forms:
 - omitted bounds default to the beginning or end of the source range
 - slicing never copies elements
 - slicing a slice produces another slice over the same backing storage
-- an array can be passed to a parameter of slice type implicitly
+- an array can be passed to a parameter of either slice type implicitly
+- a mutable `[]T` can be converted to `[]const T` without copying
+- a `[]const T` cannot be converted to `[]T` implicitly
 - For a scalar variable, `value[:]` creates a one-element `[]T` view, where
   `T` is the variable's type. It does not create an array or copy the value;
   `slice[0]` reads and writes the variable itself, and `length(slice)` is
   always one
-- the source must be writable, addressable runtime storage; `const` variables
-  and non-`ref` parameters cannot be used as slice sources
+- creating a writable `[]T` view requires writable, addressable runtime
+  storage; `const` variables and non-`ref` parameters cannot be used as such
+  slice sources
+- a `[]const T` source may be sliced and passed to another `[]const T`
+  parameter, but cannot be used to create a writable view
 - `ref` parameters can be used as slice sources because they refer to writable
   caller storage
-- arbitrary expressions and temporaries cannot be used as slice sources
+- arbitrary expressions and temporaries cannot be used as writable slice
+  sources; an expression specifically producing immutable backing storage may
+  be used as a `[]const T` source
 
 ```cpp
+var arr : [16]i32 = bar();
 var x : []i32 = arr[1:2];
 var y : []i32 = arr[1:];
 var z : []i32 = arr[:7];
 var z2 : []i32 = z[2:4];
 var w : []i32 = arr[:];
-var sub : []i32 = slice[1:3];
+var sub : []i32 = z[1:3];
 var q = arr[3:4];
+var read_only : []const i32 = arr[:];
 
 fn foo(slice : []i32) : void {}
-var arr : [16]i32 = bar();
+fn inspect(slice : []const i32) : void {}
 foo(arr); // automatic conversion
+inspect(arr); // automatic conversion to a read-only view
+inspect(read_only);
 ```
 
 Slice operations:
@@ -1145,11 +1191,17 @@ Slice operations:
 - slices can be indexed with `slice[i]`
 - indexing is bounds-checked at runtime
 - `length(slice)` returns the number of elements in the slice
+- `==` and `!=` compare two slices by content when the element type has built-in
+  equality (see [Slice equality](#slice-equality))
 - a slice can be initialized with `null`, which creates an empty slice
 - slices can be stored in variables, passed to functions, and returned from functions
 - assigning one slice to another copies only the pointer and length
 - a slice remains valid only while the backing storage remains alive and stable
 - writing an element through a slice mutates the viewed storage, not the slice binding, so element writes are allowed even when the binding itself is immutable (for example a function parameter of slice type)
+- indexing a `[]const T` produces a read-only `T` value and assigning through it
+  is a compile-time error
+- immutable backing storage may be exposed as `[]const T`, but never as a
+  writable `[]T` view
 
 ```cpp
 fn sum(values : []i32) : i32 {
@@ -1586,9 +1638,12 @@ false
 12.5
 '0'
 'A'
+"text"
 ```
 
 Rune literals are enclosed in single quotes and represent one Unicode code point. They are untyped integer constants, like integer literals, and are concretized by their context. For example, `'0'` can be used with a `u8` value and has the value `48` (`U+0030`).
+
+Double-quoted literals produce `[]const u8`; see [String literals](#string-literals).
 
 ### Arithmetic
 
@@ -1734,7 +1789,7 @@ Rules:
 - the operand is a type, not a value
 - the operand must be a concrete type. Untyped integer and float values have no size or alignment, and `sizeof`/`alignof` do not default them; use a concrete type such as `sizeof(i32)`, or cast or annotate the value before obtaining its type
 - both produce an untyped integer constant, usable wherever a compile-time integer is required (array sizes, struct template value arguments, `comptime` parameters, other comptime expressions)
-- `sizeof(T)` is the size of `T` measured in `byte` units: `byte`, `bool`, `i8`, and `u8` are 1 byte; `i16`/`u16` are 2; `i32`/`u32`/`f32`/enums/function values are 4; `i64`/`u64`/`isize`/`f64`/strings/pointers are 8; a slice is a pointer plus an `i64` length; an array is `size * sizeof(element)`; a struct is the sum of its field sizes; and a tagged union is `sizeof(i32)` for the tag plus the size of its largest member
+- `sizeof(T)` is the size of `T` measured in `byte` units: `byte`, `bool`, `i8`, and `u8` are 1 byte; `i16`/`u16` are 2; `i32`/`u32`/`f32`/enums/function values are 4; `i64`/`u64`/`isize`/`f64`/pointers are 8; a slice is a pointer plus an `i64` length; an array is `size * sizeof(element)`; a struct is the sum of its field sizes; and a tagged union is `sizeof(i32)` for the tag plus the size of its largest member
 - `alignof(T)` is derived from the byte size and capped at pointer alignment
 - they are most commonly used with the raw-memory allocator and slice reinterpret casts, for example `alloc(n * sizeof(i32), alignof(i32))`
 
@@ -1776,18 +1831,72 @@ Binding tighter than `and` and `or` is what keeps De Morgan rewriting direct: `n
 Ordering comparisons (`<`, `<=`, `>`, `>=`) require numeric operands of the same type. Equality (`==`, `!=`) is defined for:
 
 - numeric types, `bool`, `byte`, and enums - value comparison
-- `string` - content comparison
 - `cstr` and `cptr` - address comparison (two `cstr` values with equal content but different storage are not equal)
 - function values - same function
 - nullable values - only against the `null` literal
 - `type` values - type identity, compile-time only (see [Type equality](#type-equality))
+- slices whose element type has built-in equality - content comparison (see [Slice equality](#slice-equality))
 
-Arrays, slices, unions, and two nullable values have no built-in equality; comparing them is a compile-time error. Structs resolve `==` through `operator` declarations (see below).
+Arrays, unions, and two nullable values have no built-in equality; comparing them is a compile-time error, and so is comparing a slice whose element type has no built-in equality. Structs resolve `==` through `operator` declarations (see below).
 
 If an operator is used with non-builtin value types, the compiler may resolve it to a matching `operator` declaration instead of a built-in primitive rule.
 Primitive operands keep their built-in semantics and cannot be overridden by `operator` declarations.
 `and` and `or` keep their built-in short-circuit semantics, and `not` keeps its built-in `bool`-only semantics; none of the three are candidates for operator declarations.
 Compound assignment follows the same rule: a non-primitive left-hand target uses the corresponding binary operator, while a primitive left-hand target stays on the built-in path. In the latter case, the right-hand operand must be implicitly convertible to the left-hand target type; an expression such as `5 *= Vec2 { 1, 2 }` is therefore invalid.
+
+#### Slice equality
+
+`==` and `!=` on slices compare contents, not identity. This is what makes
+string comparison direct, since a [string literal](#string-literals) is an
+ordinary `[]const u8`:
+
+```cpp
+const a : []const u8 = "quit";
+const b : []const u8 = "quit";
+const same = a == b;          // true: equal bytes, unrelated storage
+
+var xs : [3]i32 = [1, 2, 3];
+var ys : [3]i32 = [1, 2, 3];
+const equal = xs[:] == ys[:]; // true
+```
+
+Rules:
+
+- two slices are equal when their lengths are equal and every element pair is
+  equal; unequal lengths are unequal without inspecting any element
+- comparison is defined only when the element type has built-in equality:
+  numeric types, `bool`, `byte`, and enums. Slices of structs, arrays, slices,
+  unions, nullables, function values, `cstr`, or `cptr` are a compile-time error
+  to compare
+- `[]T` and `[]const T` over the same element type compare with each other; they
+  have the same representation, and `const` restricts writing rather than the
+  values being read
+- comparing slices with different element types is a compile-time error, even
+  when the elements have the same size
+- backing storage does not participate: two views of the same storage with the
+  same length are equal, and so are two views of unrelated storage holding equal
+  elements
+- empty slices are equal regardless of where they point, so a slice initialized
+  with `null` equals any other empty slice of a comparable element type
+- an `operator ==` or `operator !=` declaration taking slice parameters is a
+  compile-time error; the built-in rule applies and cannot be overridden
+- the comparison inspects up to `length` elements, so it is O(n). It is the only
+  built-in `==` that is not constant time
+
+Static arrays have no built-in equality; slice them first, as `xs[:] == ys[:]`
+above.
+
+Slice equality is available during compile-time evaluation, so the compile-time
+byte slices produced by introspection - [`t::name`](#tname), `f.name`, and
+`e.name` - can be compared against string literals:
+
+```cpp
+unroll for f in S::fields {
+	if f.name == "hp" {
+		io.write_bytes(f.name);
+	}
+}
+```
 
 ### Operator precedence
 
@@ -1945,17 +2054,17 @@ position.y = 4;
 Left side must be a struct value, and field must exist.
 
 Struct fields can also be selected with square brackets when the index is a
-compile-time string:
+compile-time `[]const u8`:
 
 ```cpp
 struct Stats {
 	hp : i32;
-	name : string;
+	name : []const u8;
 }
 
-fn field_name() : string { return "hp"; }
+fn field_name() : []const u8 { return "hp"; }
 
-fn update(s : ref Stats, comptime_name : comptime string) : void {
+fn update(s : ref Stats, comptime_name : comptime []const u8) : void {
 	s["hp"] = 10;
 	s[comptime_name] = 20;
 	s[field_name()] = 30;
@@ -1969,9 +2078,9 @@ behavior, so it can be assigned to or passed by `ref` when the corresponding
 
 Rules:
 
-- the index must evaluate to a compile-time `string`
-- the string must exactly match a field declared by the struct
-- runtime strings are not allowed; this is not runtime reflection or map
+- the index must evaluate to a compile-time `[]const u8`
+- the bytes must exactly match a field name declared by the struct
+- runtime byte slices are not allowed; this is not runtime reflection or map
   lookup
 - the result is the selected field, not a copy, and nested paths such as
   `s["position.x"]` are not interpreted specially
@@ -2003,13 +2112,16 @@ The motivating example is a generic `print`:
 import "core:io" as io // extern write_bytes, write_i64, write_u64, write_f64, write_bool
 
 fn print(v : $T) : void {
+	if T == []const u8 {
+		io.write_bytes(v);
+		return;
+	}
+
 	match T::kind {
 		case .Bool:                          io.write_bool(v);
 		case .F32, .F64:                     io.write_f64(v as f64);
 		case .I8, .I16, .I32, .I64, .ISize:  io.write_i64(v as i64);
 		case .U8, .U16, .U32, .U64:          io.write_u64(v as u64); // no .Byte, no .CStr: see below
-		case .String:                        io.write_bytes(v);
-
 		case .Nullable:
 			if v != null {
 				print(v); // v is promoted; the recursive call instantiates at the inner type
@@ -2067,7 +2179,7 @@ Note what this example does *not* need. Because `T` is fully concrete at instant
 
 `.Void`, `.Type`, `.CPtr`, and `.Fn` fall through to `case:` because no value of those kinds is meaningfully printable here - there is no value of type `void`, `type` is compile-time only, and `cptr`/`fn` have no byte representation `print` can walk.
 
-`.Byte` and `.CStr` also fall through, but for a narrower reason: both *are* ordinary runtime values with printable contents, blocked only by a missing cast. [Casts](#casts) lists no conversion between `byte` and an integer type, nor between `cstr` and `string`, so `v as u64` and `v as string` would not compile in those arms. Printing either one's contents requires a cast the language does not currently have.
+`.Byte` and `.CStr` also fall through, but for a narrower reason: both *are* ordinary runtime values blocked only by a missing conversion. [Casts](#casts) lists no conversion between `byte` and an integer type, nor between `cstr` and `[]const u8`, so neither arm can pass a printable value to the corresponding output function.
 
 ### typeof
 
@@ -2096,7 +2208,7 @@ A `type` value exposes its structure through members accessed with `::`. A value
 | member | result | valid for |
 | --- | --- | --- |
 | `t::kind` | `TypeKind` | every type |
-| `t::name` | `string` | every type |
+| `t::name` | compile-time `[]const u8` | every type |
 | `t::min` | value of `t` | numeric types |
 | `t::max` | value of `t` | numeric types |
 | `t::child` | `type` | `.Nullable`, `.Slice`, `.Array` |
@@ -2124,12 +2236,12 @@ comptime value_fields = v::fields;                   // same as typeof(v)::field
 ```
 
 - `t::kind` classifies the type into one [`TypeKind`](#typekind) discriminant
-- `t::name` is the type's source-level name, the same string in the table under [`t::name`](#tname) below
+- `t::name` is the type's source-level name, represented by the bytes shown in the table under [`t::name`](#tname) below
 - `t::min` and `t::max` are the lowest and highest finite values representable by a concrete numeric type. For floating-point types, `t::min` is the most negative finite value, not the smallest positive normal value.
 - `t::child` is the single operand of a one-operand type constructor: the `U` of `?U`, the element of `[]U`, or the element of `[N]U`; compound type expressions can be written directly before the member, as in `?i32::child` or `[]i32::child`
 - `t::length` is the element count `N` of a `[N]T`, an untyped compile-time integer - the same value `length(v)` yields on an instance (see [Static-sized arrays](#static-sized-arrays)), but reachable from the type without one, so `unroll for i in 0..t::length` works on a type alone. It is not defined for `.Slice`, whose length is a runtime property
 - `t::fields`, `t::values`, and `t::types` are [reflection sequences](#reflection-sequences)
-- `t::params` is the [reflection sequence](#reflection-sequences) of a `.Fn` type's parameter descriptors, in declaration order; `t::ret` is its return type, named `ret` rather than `return` to avoid the keyword. Each descriptor is an ordinary compile-time struct with `.name` and `.type` members; `.name` is `""` for unnamed parameters.
+- `t::params` is the [reflection sequence](#reflection-sequences) of a `.Fn` type's parameter descriptors, in declaration order; `t::ret` is its return type, named `ret` rather than `return` to avoid the keyword. Each descriptor is an ordinary compile-time struct with `.name` and `.type` members; `.name` is a compile-time `[]const u8` and is `""` for unnamed parameters.
 
 All type members are compile-time only. A concrete type receiver is checked immediately. A generic receiver such as an uninstantiated `$T` defers the access as a compile-time constraint until the template is instantiated. A value receiver uses its statically known type, including any flow typing in effect at the access site. Type members are not operators or functions - like any member access they cannot be taken as a value on their own, only applied to a type or value receiver.
 
@@ -2151,11 +2263,11 @@ This is the same [compile-time branch](#compile-time-branches) pruning used ever
 
 | type | `t::name` |
 | --- | --- |
-| builtins | `"i32"`, `"f64"`, `"string"` |
+| builtins | `"i32"`, `"f64"`, `"u8"` |
 | structs and enums | the declaration name, `"Vec3"`, `"State"` |
 | template instantiations | `"Pair[i32]"`, `"Optional[Vec3]"` |
 | nullable | `"?Vec3"` |
-| slices and arrays | `"[]i32"`, `"[4]i32"` |
+| slices and arrays | `"[]i32"`, `"[]const u8"`, `"[4]i32"` |
 | unions | `"A \| B \| C"` in canonical member order |
 | function types | `"fn(i32, i32) : i32"` or `"fn(a : i32, b : i32) : void"` |
 
@@ -2163,7 +2275,7 @@ This is the same [compile-time branch](#compile-time-branches) pruning used ever
 
 ### TypeKind
 
-`TypeKind` is a built-in enum type, not a declaration in a module. Like `i32` or `string` it is always in scope, needs no import, and cannot be shadowed. Its definition is fixed by the language and shown here only for reference:
+`TypeKind` is a built-in enum type, not a declaration in a module. Like `i32` it is always in scope, needs no import, and cannot be shadowed. Its definition is fixed by the language and shown here only for reference:
 
 ```cpp
 enum TypeKind {
@@ -2171,7 +2283,6 @@ enum TypeKind {
 	I8, I16, I32, I64, ISize,
 	U8, U16, U32, U64, Byte,
 	F32, F64,
-	String,
 	CStr,
 	CPtr,
 	Void,
@@ -2290,7 +2401,7 @@ unroll for f in S::fields {
 
 The loop variable is a compile-time field descriptor with two members:
 
-- `f.name` - the field's declared name, a compile-time `string`
+- `f.name` - the field's declared name, a compile-time `[]const u8`
 - `f.type` - the field's type as a compile-time `type` value
 
 Rules:
@@ -2327,7 +2438,7 @@ unroll for e in State::values {
 
 The loop variable is an enum descriptor struct with two members:
 
-- `e.name` - the member's declared name, a compile-time `string`
+- `e.name` - the member's declared name, a compile-time `[]const u8`
 - `e.value` - the member itself, typed as the enum. Its discriminant is `e.value as i32`, following the ordinary [enum-to-integer cast](#casts) rules
 
 Rules:
@@ -2338,7 +2449,7 @@ Rules:
 - the descriptor type is compiler-provided and not nameable in source
 - an ordinary runtime `for` over `State::values` is a compile-time error: the descriptor slice is compile-time only
 
-`e.name` and `e.value as i32` are still ordinary compile-time constants in each copy, so they [materialize](#comptime-to-runtime-materialization) into runtime code exactly like any other comptime string or integer.
+`e.name` and `e.value as i32` are still ordinary compile-time constants in each copy, so they [materialize](#comptime-to-runtime-materialization) into runtime code exactly like any other compile-time byte slice or integer.
 
 ### Union iteration
 
@@ -2410,7 +2521,7 @@ Introspection results are compile-time values. Some of them can cross into runti
 
 Materializes into a runtime constant:
 
-- comptime `string` values, such as `t::name`, `f.name`, and `e.name`, become string constants
+- compile-time `[]const u8` values, such as `t::name`, `f.name`, and `e.name`, become read-only byte-slice constants
 - comptime integers, such as `sizeof`, `alignof`, `t::length`, and `e.value as i32`, become integer constants
 - an enum descriptor's `e.value` is an ordinary enum constant
 - an untyped numeric `comptime` binding becomes a runtime constant only after a consuming context concretizes it
@@ -2572,10 +2683,9 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 - `UnaryMinusRequiresNumericOperandFails`
 - `RefExpressionOnlyAllowedInArgumentsFails`
 - `RefArgumentTypeMismatchFails`
-- `StringIsReservedKeyword`
-- `match` needs tighter rules for what counts as a valid pattern expression, how string subjects behave, and the exact duplicate/exhaustiveness policy for non-enum subjects.
+- `match` needs tighter rules for what counts as a valid pattern expression and the exact duplicate/exhaustiveness policy for non-enum subjects.
 - `for` ranges should define whether bounds must match exactly, what type the loop variable has, and what happens for descending or overflowing ranges.
-- Static-sized arrays still need complete rules for copy semantics, passing/returning by value, and comparison behavior. Nesting reads left-to-right: `[4][8]i32` is an array of 4 arrays of 8 ints; `[][4]i32` is a slice of arrays of 4 ints.
+- Static-sized arrays still need complete rules for copy semantics and passing/returning by value. They have no built-in equality (see [Slice equality](#slice-equality)); whether that should stay, given that `xs[:] == ys[:]` expresses it, is open. Nesting reads left-to-right: `[4][8]i32` is an array of 4 arrays of 8 ints; `[][4]i32` is a slice of arrays of 4 ints.
 - Nullable promotion should define `else if`, compound conditions, and scope boundaries in more detail.
 - `defer` should define behavior on `break`, `continue`, runtime errors, and nested scopes, not only normal exit and `return`.
 - Imports and `extern` bindings still need explicit collision policy for same-path/same-alias cases, builtin module boundaries, and imported declaration conflicts.
@@ -2590,13 +2700,14 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 	- main reason we have struct templates at all are user-defined containers
 	- function templates do not use a separate bracketed parameter list; generic type parameters are introduced in the function signature with `$T`, and compile-time value parameters use `comptime`
 	- we want a pair of enclosing characters, single character is hard to read when nested: `Array@Array@i32`
-	- different begin and end, reads easier, especially when nested, e.g. if we used `"` - `Box"Pair"i32, string""`
+	- different begin and end, reads easier, especially when nested, e.g. if we used `"` - `Box"Pair"i32, u8""`
 	- so our options are `[]`, `<>`, `()`, `{}`
 	- there are already languages using `[]` and `<>` for type templates
 	- `<>` is harder to parse thana `[]`
 
 - static-sized arrays and slices use prefix notation
 	- arrays are `[N]T` and slices are `[]T`, not postfix `T[N]` or `T[]`
+	- `[]const T` is the read-only form of `[]T`; both have the same runtime layout
 	- avoids grammar ambiguity: `Identifier[...]` in type position could be array type, struct template instantiation, or comptime variable indexing; prefix `[` resolves this
 	- consistent with prefix nullable `?T`: types read outside-in rather than inside-out
 	- consistent direction with slices: `[]T` reads left-to-right like `?T`, unlike C-style postfix where nesting order is confusing (`T[4][8]`)
@@ -2658,6 +2769,16 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 		- using a candidate parameter as that expected type makes overload selection recursive and creates surprising ambiguities
 		- requiring `Type { ... }` at an operator boundary keeps resolution based on natural operand types and avoids candidate-specific AST typing
 
+- slice equality is built in
+	- strings are `[]const u8`, so without it the single most common comparison in scripting code has no direct spelling
+	- a library `equals(a, b)` is unusually awkward here: a slice has no declaring namespace, so neither [UFCS](#ufcs) nor [ADL](#argument-dependent-lookup) finds such a function, and every call site would need an explicit import and qualification - while `length(slice)` is already a builtin
+	- compile-time introspection makes it necessary rather than merely convenient: `t::name`, `f.name`, and `e.name` are compile-time `[]const u8`, and generic code cannot branch on them at all without comparison. The compiler already matches byte slices against declared names for [computed field access](#field-access)
+	- content, not pointer identity: identity is nearly useless for a view type, and making the common intent silently wrong is worse than rejecting it
+	- restricted to element types with built-in equality so that `==` never dispatches to a user `operator ==` in a loop. That would put an unbounded chain of user calls behind a primitive-looking operator and would need a rule for which side wins against the overload
+	- the cost is that `==` is O(n) for slices while every other built-in `==` is constant time. Accepted: the alternative is the same loop written out by hand at every call site
+	- a distinct `string` type was considered and rejected for now. It would need a conversion lattice with `[]const u8`, a carve-out so that slicing a string yields a string, a `TypeKind`, and a second spelling at every API boundary - all to hang `==` off a nominal type. It becomes worth revisiting if the type carries a real invariant, such as guaranteed UTF-8 or NUL-termination for free `cstr` interop
+	- ordering (`<`, `<=`, `>`, `>=`) is deliberately not included; lexicographic ordering is a library concern until sorting needs it
+
 - match fallback uses an empty `case:`
 	- keeps every match arm under the `case` keyword
 	- avoids adding a separate `default` keyword
@@ -2708,6 +2829,13 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 
 # TODO
 
+* should we make string literal to cstr cast explicit?
+* slice expressions leak frame space - each `arr[:]` in an expression permanently claims ~32 bytes that are never reclaimed, so a function's frame grows with the number of slice expressions it contains
+	- measured: two inline `arr[:]` uses give `frame_size` 124, six give 252; six scalar temp expressions give 24, so it is specific to slice materialization
+	- `temp_top` rewinds correctly between statements; what grows is `next_local_offset`
+	- cause is `addLocal` in bytecode_compiler.cpp: allocating while temps are live places the allocation at `temp_top` and raises the permanent locals floor past it, promoting mid-expression scratch into a function-lifetime local
+	- not a correctness bug (the frame is sized to fit), but it inflates every call and brings recursion closer to the runtime's stack cap
+	- fixing it means teaching `addLocal` to distinguish scratch from real locals, which touches every expression form; wants a regression test asserting `frame_size` does not scale with the number of slice expressions
 * ref in function type - var a : fn(ref i32) = foo;
 * 1'000'000 / 1_000_000
 * hex - 0x1234ABCD
@@ -2726,9 +2854,8 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 * get rid of std::free
 * how to expose Span<const Item> foo() to script?
 * how can we push unions if we don't know the tag value of variants, i.e. U = A | B - we don't know if A's tag is 0 or 1
-* use case - comptime string hash
+* use case - compile-time string hash
 * varargs - [Compile-time introspection](#compile-time-introspection) covers single-argument `print`; `print(a, " ", b)` still needs a variadic mechanism
-* string interpolation
 * MT typecheck
 
 ---

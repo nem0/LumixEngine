@@ -23,7 +23,6 @@ struct ResolvedType {
 		ISIZE,
 		F32,
 		F64,
-		STRING,
 		CSTR,
 		CPTR,
 		BYTE,
@@ -96,6 +95,7 @@ struct SliceResolvedType : ResolvedType {
 	SliceResolvedType() : ResolvedType(SLICE) {}
 
 	ResolvedType* element_type = nullptr;
+	bool is_const = false;
 };
 
 struct NullableResolvedType : ResolvedType {

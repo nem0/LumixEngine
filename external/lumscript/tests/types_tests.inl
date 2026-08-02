@@ -165,7 +165,7 @@ TEST(UntypedLiteralsConcretizeInAllContexts) {
 		fn identity(value : $T) : T { return value; }
 
 		comptime global_value : i16 = 1;
-		comptime Number = i32 | string;
+		comptime Number = i32 | []const u8;
 
 		fn main() : i32 {
 			var assigned : i16 = 0;

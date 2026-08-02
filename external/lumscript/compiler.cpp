@@ -23,7 +23,6 @@ static constexpr TypeKindInfo TYPE_KIND_INFOS[] = {
 	{ResolvedType::BYTE, "Byte", "byte"},
 	{ResolvedType::F32, "F32", "f32"},
 	{ResolvedType::F64, "F64", "f64"},
-	{ResolvedType::STRING, "String", "string"},
 	{ResolvedType::CSTR, "CStr", "cstr"},
 	{ResolvedType::CPTR, "CPtr", "cptr"},
 	{ResolvedType::VOID, "Void", "void"},
@@ -85,7 +84,6 @@ u32 typeByteSize(const ResolvedType& t) {
 		case ResolvedType::U64:
 		case ResolvedType::ISIZE:
 		case ResolvedType::F64:
-		case ResolvedType::STRING:
 		case ResolvedType::CSTR:
 		case ResolvedType::CPTR:
 			return 8;
@@ -258,9 +256,9 @@ static void appendReflectedTypeName(char*& out, char* end, const ResolvedType& t
 		case ResolvedType::VOID: case ResolvedType::BOOL: case ResolvedType::I8: case ResolvedType::I16:
 		case ResolvedType::I32: case ResolvedType::I64: case ResolvedType::U8: case ResolvedType::U16:
 		case ResolvedType::U32: case ResolvedType::U64: case ResolvedType::ISIZE: case ResolvedType::F32:
-		case ResolvedType::F64: case ResolvedType::STRING: case ResolvedType::CSTR: case ResolvedType::CPTR:
+		case ResolvedType::F64: case ResolvedType::CSTR: case ResolvedType::CPTR:
 		case ResolvedType::BYTE: {
-			static const char* names[] = {"void", "bool", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "isize", "f32", "f64", "string", "cstr", "cptr", "byte"};
+			static const char* names[] = {"void", "bool", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "isize", "f32", "f64", "cstr", "cptr", "byte"};
 			text(names[type.kind - ResolvedType::VOID]); return;
 		}
 		case ResolvedType::ENUM: view(static_cast<const EnumResolvedType&>(type).decl->cached_name); return;
@@ -297,7 +295,11 @@ static void appendReflectedTypeName(char*& out, char* end, const ResolvedType& t
 			while (n) { *--d = char('0' + n % 10); n /= 10; } while (d != digits_end && out < end) *out++ = *d++;
 			text("]"); appendReflectedTypeName(out, end, *a.element_type); return;
 		}
-		case ResolvedType::SLICE: text("[]"); appendReflectedTypeName(out, end, *static_cast<const SliceResolvedType&>(type).element_type); return;
+		case ResolvedType::SLICE: {
+			const auto& slice = static_cast<const SliceResolvedType&>(type);
+			text("[]"); if (slice.is_const) text("const ");
+			appendReflectedTypeName(out, end, *slice.element_type); return;
+		}
 		case ResolvedType::NULLABLE: text("?"); appendReflectedTypeName(out, end, *static_cast<const NullableResolvedType&>(type).inner); return;
 		case ResolvedType::UNION: {
 			const UnionResolvedType& u = static_cast<const UnionResolvedType&>(type);
@@ -350,10 +352,13 @@ struct Checker {
 	{
 		error_stream.host = module.host;
 		meta_value_type = makeType<MetaType>(module.arena);
+		const_u8_slice = makeType<SliceResolvedType>(module.arena);
+		const_u8_slice->element_type = primitiveType(ResolvedType::U8);
+		const_u8_slice->is_const = true;
 		slice_of_types = makeType<SliceResolvedType>(module.arena);
 		slice_of_types->element_type = meta_value_type;
 		const char* descriptor_names[] = {"name", "type"};
-		ResolvedType* descriptor_types[] = {primitiveType(ResolvedType::STRING), meta_value_type};
+		ResolvedType* descriptor_types[] = {const_u8_slice, meta_value_type};
 		field_descriptor_type = makeStructType(module.arena, descriptor_names, descriptor_types, 2);
 		param_descriptor_type = makeStructType(module.arena, descriptor_names, descriptor_types, 2);
 		slice_of_fields = makeType<SliceResolvedType>(module.arena);
@@ -371,6 +376,23 @@ struct Checker {
 	static bool isUntypedNumeric(const ResolvedType& t) { return t.kind == ResolvedType::UNTYPED_INT || t.kind == ResolvedType::UNTYPED_FLOAT; }
 	static bool isNumericOrUntyped(const ResolvedType& t) { return isNumericType(t) || isUntypedNumeric(t); }
 	static bool isIntegerOrUntyped(const ResolvedType& t) { return isIntegerType(t) || t.kind == ResolvedType::UNTYPED_INT; }
+
+	// Element types that slice `==` can compare. Restricted to scalars so the
+	// comparison never dispatches to a user `operator ==`, and so integral
+	// elements can be compared as raw bytes without padding getting in the way.
+	static bool hasBuiltinElementEquality(const ResolvedType& t) {
+		return isNumericType(t) || t.kind == ResolvedType::BOOL || t.kind == ResolvedType::BYTE || t.kind == ResolvedType::ENUM;
+	}
+
+	// `[]T` and `[]const T` compare with each other: `const` restricts writing,
+	// not the values being read.
+	static bool sliceTypesComparable(const ResolvedType* a, const ResolvedType* b) {
+		if (!a || !b || a->kind != ResolvedType::SLICE || b->kind != ResolvedType::SLICE) return false;
+		const SliceResolvedType* sa = static_cast<const SliceResolvedType*>(a);
+		const SliceResolvedType* sb = static_cast<const SliceResolvedType*>(b);
+		if (!sa->element_type || !typesEqual(sa->element_type, sb->element_type)) return false;
+		return hasBuiltinElementEquality(*sa->element_type);
+	}
 	template <typename T, typename... Args> static T* makeType(ls_arena& arena, Args&&... args) {
 		// Semantic nodes live as long as their owning unit. Allocating them from the
 		// unit arena also keeps cached types and template instances pointer-stable.
@@ -398,8 +420,9 @@ struct Checker {
 		return {ComptimeValue::VALUE, type, value};
 	}
 
-	ComptimeValue makeStringValue(Unit& unit, ls_string_view* value) {
-		return makePersistentValue(unit, primitiveType(ResolvedType::STRING), &value, sizeof(value));
+	ComptimeValue makeStringValue(Unit& unit, ls_string_view value) {
+		ComptimeSliceValue slice{(u8*)value.begin, (i64)(value.end - value.begin)};
+		return makePersistentValue(unit, const_u8_slice, &slice, sizeof(slice));
 	}
 
 	u32 comptimeSize(const ResolvedType& type) const {
@@ -476,7 +499,7 @@ struct Checker {
 			case ResolvedType::SLICE: {
 				const auto* sa = static_cast<const SliceResolvedType*>(a);
 				const auto* sb = static_cast<const SliceResolvedType*>(b);
-				return typesEqual(sa->element_type, sb->element_type);
+				return sa->is_const == sb->is_const && typesEqual(sa->element_type, sb->element_type);
 			}
 			case ResolvedType::NULLABLE: {
 				const auto* na = static_cast<const NullableResolvedType*>(a);
@@ -510,7 +533,6 @@ struct Checker {
 			}
 			return false;
 		}
-		if (src->kind == ResolvedType::STRING && dst->kind == ResolvedType::CSTR) return true;
 		// An untyped literal converts to any concrete numeric type (its width is chosen at the
 		// materialization point). This is only a safety net; callers materialize first.
 		if (src->kind == ResolvedType::UNTYPED_INT) return isNumericType(*dst);
@@ -519,6 +541,11 @@ struct Checker {
 			const auto* arr = static_cast<const ArrayResolvedType*>(src);
 			const auto* slice = static_cast<const SliceResolvedType*>(dst);
 			return typesEqual(arr->element_type, slice->element_type);
+		}
+		if (src->kind == ResolvedType::SLICE && dst->kind == ResolvedType::SLICE) {
+			const auto* source = static_cast<const SliceResolvedType*>(src);
+			const auto* target = static_cast<const SliceResolvedType*>(dst);
+			return !source->is_const && target->is_const && typesEqual(source->element_type, target->element_type);
 		}
 		if (dst->kind == ResolvedType::NULLABLE) {
 			const auto* nb = static_cast<const NullableResolvedType*>(dst);
@@ -539,21 +566,52 @@ struct Checker {
 		return findTemplateBinding(const_cast<TemplateBindings*>(bindings), name);
 	}
 
+	// Floats cannot be compared as bytes: NaN is not equal to itself and +0.0
+	// equals -0.0 despite differing bit patterns. Every other element kind this
+	// accepts is an integral scalar, so its bytes carry no padding.
+	bool comptimeSlicePayloadEqual(const u8* lhs, const u8* rhs, const ResolvedType& element, i64 count) const {
+		if (element.kind == ResolvedType::F32) {
+			for (i64 i = 0; i < count; ++i) {
+				float l, r;
+				memcpy(&l, lhs + i * sizeof(float), sizeof(l));
+				memcpy(&r, rhs + i * sizeof(float), sizeof(r));
+				if (!(l == r)) return false;
+			}
+			return true;
+		}
+		if (element.kind == ResolvedType::F64) {
+			for (i64 i = 0; i < count; ++i) {
+				double l, r;
+				memcpy(&l, lhs + i * sizeof(double), sizeof(l));
+				memcpy(&r, rhs + i * sizeof(double), sizeof(r));
+				if (!(l == r)) return false;
+			}
+			return true;
+		}
+		return compareMemory(lhs, rhs, (usize)count * comptimeSize(element)) == 0;
+	}
+
 	bool comptimeValuesEqual(const ComptimeValue& a, const ComptimeValue& b) {
 		if (a.kind != b.kind) return false;
 		if (a.kind == ComptimeValue::VALUE && a.type && b.type && isNumericOrUntyped(*a.type) && isNumericOrUntyped(*b.type)) {
 			return compareComptimeNumeric(a, b) == 0;
 		}
-		if (!typesEqual(a.type, b.type)) return false;
+		// `[]T` and `[]const T` hold the same values, so slice equality compares
+		// them; every other kind requires identical types.
+		const bool slices_comparable = sliceTypesComparable(a.type, b.type);
+		if (!slices_comparable && !typesEqual(a.type, b.type)) return false;
 		if (a.kind == ComptimeValue::TYPE) return true;
 		if (a.kind != ComptimeValue::VALUE || !a.type) return false;
 
-		if (a.type->kind == ResolvedType::STRING) {
-			ls_string_view* lhs;
-			ls_string_view* rhs;
+		if (slices_comparable || typesEqual(a.type, const_u8_slice)) {
+			ComptimeSliceValue lhs;
+			ComptimeSliceValue rhs;
 			memcpy(&lhs, a.value, sizeof(lhs));
 			memcpy(&rhs, b.value, sizeof(rhs));
-			return equalStrings(*lhs, *rhs);
+			if (lhs.count != rhs.count) return false;
+			if (lhs.count == 0) return true;
+			const SliceResolvedType& slice = static_cast<const SliceResolvedType&>(*a.type);
+			return comptimeSlicePayloadEqual(lhs.data, rhs.data, *slice.element_type, lhs.count);
 		}
 
 		u32 size = comptimeSize(*a.type);
@@ -839,10 +897,19 @@ struct Checker {
 		return true;
 	}
 
-
-	ResolvedType* checkExprAndMakeConcrete(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* target) {
+	ResolvedType* checkExprForTarget(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* target) {
 		ResolvedType* t = checkExpr(unit, ctx, expr, target);
 		if (!t) return nullptr;
+		if (target && target->kind == ResolvedType::SLICE && !static_cast<SliceResolvedType*>(target)->is_const && t->kind == ResolvedType::ARRAY) {
+			bool writable = false;
+			++suppress_errors;
+			ResolvedType* storage_type = checkAssignableExpr(unit, ctx, expr, writable);
+			--suppress_errors;
+			if (storage_type && !writable) {
+				errorLine(expr.token, "Cannot create a mutable slice from immutable storage");
+				return nullptr;
+			}
+		}
 		return makeConcrete(expr, target);
 	}
 
@@ -918,11 +985,12 @@ struct Checker {
 						expr->resolved_type = arg.type;
 						return expr;
 					}
-					case ResolvedType::STRING: {
+					case ResolvedType::SLICE: {
+						if (!typesEqual(arg.type, const_u8_slice)) return nullptr;
 						StringLiteralExpression* expr = makeType<StringLiteralExpression>(unit.arena);
-						ls_string_view* value;
+						ComptimeSliceValue value;
 						memcpy(&value, arg.value, sizeof(value));
-						expr->value = *value;
+						expr->value = {(const char*)value.data, (const char*)value.data + value.count};
 						expr->resolved_type = arg.type;
 						return expr;
 					}
@@ -1046,6 +1114,7 @@ struct Checker {
 			case Expression::SLICE_TYPE: {
 				SliceTypeExpression* sl = makeType<SliceTypeExpression>(unit.arena);
 				sl->element_type = cloneExpression(unit, static_cast<SliceTypeExpression*>(src)->element_type, bindings);
+				sl->is_const = static_cast<SliceTypeExpression*>(src)->is_const;
 				out = sl;
 				break;
 			}
@@ -1578,7 +1647,7 @@ struct Checker {
 				continue;
 			}
 
-			ResolvedType* arg_type = checkExprAndMakeConcrete(unit, ctx, *arg, param_type);
+			ResolvedType* arg_type = checkExprForTarget(unit, ctx, *arg, param_type);
 			if (!arg_type) return nullptr;
 			if (!requireMaterializable(*arg, "a runtime function argument")) return nullptr;
 
@@ -2077,7 +2146,8 @@ struct Checker {
 				ResolvedType* param_type = asType(evalComptime(unit, *param.type_expr), param.type_expr->token);
 				if (!param_type) return LS_RESULT_FAILURE;
 
-				if (!(param_type->kind >= ResolvedType::BOOL && param_type->kind <= ResolvedType::STRING)) {
+				if (!(param_type->kind >= ResolvedType::BOOL && param_type->kind <= ResolvedType::F64)
+					&& !typesEqual(param_type, const_u8_slice)) {
 					errorLine(sym.token, "Struct template value comptime parameters must be primitive values");
 					return LS_RESULT_FAILURE;
 				}
@@ -2187,7 +2257,7 @@ struct Checker {
 			if (!checkFunctionBody(unit, static_cast<FunctionExpression&>(expr))) return LS_RESULT_FAILURE;
 		}
 
-		ResolvedType* expr_type = checkExprAndMakeConcrete(unit, nullptr, expr, annotation);
+		ResolvedType* expr_type = checkExprForTarget(unit, nullptr, expr, annotation);
 		if (!expr_type) return LS_RESULT_FAILURE;
 
 		if (!requireMaterializable(expr, "a runtime global initializer")) return LS_RESULT_FAILURE;
@@ -2235,7 +2305,7 @@ struct Checker {
 			}
 
 			if (param.is_comptime) {
-				if (expected && !checkExprAndMakeConcrete(unit, ctx, *arg, expected)) return nullptr;
+				if (expected && !checkExprForTarget(unit, ctx, *arg, expected)) return nullptr;
 				ComptimeValue template_arg = evalComptime(unit, *arg, ctx, &bindings, nullptr, expected);
 				if (!template_arg) return nullptr;
 				
@@ -2255,7 +2325,7 @@ struct Checker {
 				arg_type = checkRefArgument(unit, ctx, arg, i);
 				if (!arg_type) return nullptr;
 			} else {
-				arg_type = checkExprAndMakeConcrete(unit, ctx, *arg, expected);
+				arg_type = checkExprForTarget(unit, ctx, *arg, expected);
 				if (!arg_type) return nullptr;
 				if (expected && !canImplicitlyConvert(arg_type, expected)) {
 					errorLine(arg->token, "Cannot convert ", arg_type, " to ", expected, " for argument ", i + 1, " of function call");
@@ -2585,10 +2655,14 @@ struct Checker {
 		if (bin.op == Token::EQUAL_EQUAL || bin.op == Token::BANG_EQUAL) {
 			const bool lhs_type_value = lhs->kind == ResolvedType::META
 				|| bin.lhs->kind == Expression::TYPE_LITERAL || bin.lhs->kind == Expression::TYPEOF
-				|| bin.lhs->kind == Expression::RESOLVED_TYPE;
+				|| bin.lhs->kind == Expression::RESOLVED_TYPE || bin.lhs->kind == Expression::ARRAY_TYPE
+				|| bin.lhs->kind == Expression::SLICE_TYPE || bin.lhs->kind == Expression::NULLABLE_TYPE
+				|| bin.lhs->kind == Expression::FUNCTION_TYPE || bin.lhs->kind == Expression::UNION_TYPE;
 			const bool rhs_type_value = rhs->kind == ResolvedType::META
 				|| bin.rhs->kind == Expression::TYPE_LITERAL || bin.rhs->kind == Expression::TYPEOF
-				|| bin.rhs->kind == Expression::RESOLVED_TYPE;
+				|| bin.rhs->kind == Expression::RESOLVED_TYPE || bin.rhs->kind == Expression::ARRAY_TYPE
+				|| bin.rhs->kind == Expression::SLICE_TYPE || bin.rhs->kind == Expression::NULLABLE_TYPE
+				|| bin.rhs->kind == Expression::FUNCTION_TYPE || bin.rhs->kind == Expression::UNION_TYPE;
 			if (lhs_type_value || rhs_type_value) {
 				if (!lhs_type_value || !rhs_type_value) {
 					errorLine(expr.token, "Type equality requires two compile-time type values");
@@ -2674,14 +2748,6 @@ struct Checker {
 		ResolvedType* result = nullptr;
 		switch (bin.op) {
 			case Token::PLUS:
-				if (typesEqual(lhs, primitiveType(ResolvedType::STRING)) && typesEqual(rhs, primitiveType(ResolvedType::STRING))) {
-					result = lhs;
-					break;
-				}
-				if (typesEqual(lhs, primitiveType(ResolvedType::STRING)) || typesEqual(rhs, primitiveType(ResolvedType::STRING))) {
-					errorLine(expr.token, "String concatenation requires both operands to be string, got ", lhs, " and ", rhs);
-					return nullptr;
-				}
 				[[fallthrough]];
 			case Token::MINUS:
 			case Token::STAR:
@@ -2692,22 +2758,28 @@ struct Checker {
 			case Token::PERCENT: result = resolveNumeric(NumericMode::INTEGER); break;
 			case Token::EQUAL_EQUAL:
 			case Token::BANG_EQUAL: {
-				// Equality also works on non-numerics (enums, strings); only unify when numeric.
+				// Equality also works on non-numerics such as enums; only unify when numeric.
 				if (isNumericOrUntyped(*lhs) || isNumericOrUntyped(*rhs)) {
 					if (!resolveNumeric(NumericMode::COMPARISON)) return nullptr;
+				} else if (lhs->kind == ResolvedType::SLICE || rhs->kind == ResolvedType::SLICE) {
+					// Checked before typesEqual because that treats `[]T` and
+					// `[]const T` as distinct types, which equality does not.
+					if (!sliceTypesComparable(lhs, rhs)) {
+						errorLine(expr.token, "Cannot compare ", lhs, " and ", rhs);
+						return nullptr;
+					}
 				} else if (!typesEqual(lhs, rhs)) {
 					errorLine(expr.token, "Cannot compare ", lhs, " and ", rhs);
 					return nullptr;
 				} else {
 					// Equality is defined only for kinds with a well-defined comparison:
-					// value kinds compare bitwise, strings by content, cstr/cptr by
+					// value kinds compare bitwise and cstr/cptr by
 					// address. Nullable values compare only against the null literal.
 					// Aggregates (arrays, slices, nullables) have no equality.
 					bool comparable = false;
 					switch (lhs->kind) {
 						case ResolvedType::BOOL:
 						case ResolvedType::ENUM:
-						case ResolvedType::STRING:
 						case ResolvedType::CSTR:
 						case ResolvedType::CPTR:
 						case ResolvedType::BYTE:
@@ -2843,9 +2915,7 @@ struct Checker {
 			slice_reinterpret = src_byte != dst_byte;
 		}
 		// bool->bool (and any other same-type cast) is covered by the trailing typesEqual.
-		const bool string_cstr_cast = (src_type->kind == ResolvedType::STRING && dst_type->kind == ResolvedType::CSTR)
-			|| (src_type->kind == ResolvedType::CSTR && dst_type->kind == ResolvedType::STRING);
-		const bool valid_cast = (src_numeric && dst_numeric) || (src_enum && dst_integer) || (src_integer && dst_enum) || slice_reinterpret || string_cstr_cast || typesEqual(src_type, dst_type);
+		const bool valid_cast = (src_numeric && dst_numeric) || (src_enum && dst_integer) || (src_integer && dst_enum) || slice_reinterpret || typesEqual(src_type, dst_type);
 		if (!valid_cast) {
 			errorLine(expr.token, "Cannot cast ", src_type, " to ", dst_type);
 			return nullptr;
@@ -2883,7 +2953,7 @@ struct Checker {
 			}
 			case TypeMemberExpression::NAME: {
 				member.comptime_string = reflectedTypeName(unit, *t);
-				expr.resolved_type = primitiveType(ResolvedType::STRING);
+				expr.resolved_type = const_u8_slice;
 				expr.eval_stage = Expression::COMPTIME_VALUE;
 				return expr.resolved_type;
 			}
@@ -2911,7 +2981,7 @@ struct Checker {
 				}
 				EnumResolvedType& en = *static_cast<EnumResolvedType*>(t);
 				const char* names[] = {"name", "value"};
-				ResolvedType* types[] = {primitiveType(ResolvedType::STRING), &en};
+				ResolvedType* types[] = {const_u8_slice, &en};
 				StructResolvedType* descriptor_type = makeStructType(unit.arena, names, types, 2);
 				SliceResolvedType* slice_type = makeType<SliceResolvedType>(unit.arena);
 				slice_type->element_type = descriptor_type;
@@ -3135,23 +3205,23 @@ struct Checker {
 				return nullptr;
 			}
 
-			ResolvedType* index_type = checkExpr(unit, ctx, *br.args[0], primitiveType(ResolvedType::STRING));
+			ResolvedType* index_type = checkExpr(unit, ctx, *br.args[0], const_u8_slice);
 			if (!index_type) return nullptr;
-			if (index_type->kind != ResolvedType::STRING) {
-				errorLine(expr.token, "Struct field access expects a compile-time string, got ", index_type);
+			if (!typesEqual(index_type, const_u8_slice)) {
+				errorLine(expr.token, "Struct field access expects a compile-time []const u8, got ", index_type);
 				return nullptr;
 			}
 
 			ComptimeValue index = evalComptime(unit, *br.args[0], ctx);
 			if (!index) return nullptr;
 
-			ls_string_view* field_name_ptr = nullptr;
-			copyMemory(&field_name_ptr, index.value, sizeof(field_name_ptr));
-			if (!field_name_ptr) {
-				errorLine(expr.token, "Struct field access expects a valid compile-time string");
+			ComptimeSliceValue field_name_value;
+			copyMemory(&field_name_value, index.value, sizeof(field_name_value));
+			if (!field_name_value.data) {
+				errorLine(expr.token, "Struct field access expects a valid compile-time []const u8");
 				return nullptr;
 			}
-			const ls_string_view field_name = *field_name_ptr;
+			const ls_string_view field_name{(const char*)field_name_value.data, (const char*)field_name_value.data + field_name_value.count};
 			StructResolvedType* st = static_cast<StructResolvedType*>(base_type);
 			for (i32 i = 0; i < st->decl->fields.size(); ++i) {
 				if (equalStrings(st->decl->fields[i].name, field_name)) {
@@ -3216,26 +3286,25 @@ struct Checker {
 			++suppress_errors;
 			ResolvedType* source_type = checkAssignableExpr(unit, ctx, *sl.base, writable);
 			--suppress_errors;
-			if (!source_type || !writable) {
-				errorLine(expr.token, "Cannot create a slice from immutable storage");
+			if (!source_type) {
+				errorLine(expr.token, "Cannot create a slice from non-addressable storage");
 				return nullptr;
 			}
 			SliceResolvedType* slice = makeType<SliceResolvedType>(unit.arena);
 			slice->element_type = base_type;
+			slice->is_const = !writable;
 			expr.resolved_type = slice;
 			expr.eval_stage = Expression::RUNTIME;
 			return slice;
 		}
 
+		bool source_writable = true;
 		if (base_type->kind == ResolvedType::ARRAY) {
 			bool writable = false;
 			++suppress_errors;
-			ResolvedType* source_type = checkAssignableExpr(unit, ctx, *sl.base, writable);
+			checkAssignableExpr(unit, ctx, *sl.base, writable);
 			--suppress_errors;
-			if (!source_type || !writable) {
-				errorLine(expr.token, "Cannot create a slice from immutable storage");
-				return nullptr;
-			}
+			source_writable = writable;
 		}
 
 		Expression* bounds[] = {sl.begin, sl.end};
@@ -3276,8 +3345,11 @@ struct Checker {
 			slice->element_type = arr->element_type;
 		}
 		else {
-			slice->element_type = static_cast<SliceResolvedType*>(base_type)->element_type;
+			const auto* source = static_cast<SliceResolvedType*>(base_type);
+			slice->element_type = source->element_type;
+			slice->is_const = source->is_const;
 		}
+		if (base_type->kind == ResolvedType::ARRAY) slice->is_const = !source_writable;
 
 		return slice;
 	}
@@ -3310,7 +3382,7 @@ struct Checker {
 		for (i32 i = 0; i < lit.values.size(); ++i) {
 			ResolvedType* field_type = structFieldType(*st, i);
 			ASSERT(field_type);
-			ResolvedType* value_type = checkExprAndMakeConcrete(unit, ctx, *lit.values[i], field_type);
+			ResolvedType* value_type = checkExprForTarget(unit, ctx, *lit.values[i], field_type);
 			if (!value_type) return nullptr;
 
 			if (!canImplicitlyConvert(value_type, field_type)) {
@@ -3345,7 +3417,7 @@ struct Checker {
 
 		ResolvedType* element_type = expected_element;
 		for (Expression* value : lit.values) {
-			ResolvedType* value_type = checkExprAndMakeConcrete(unit, ctx, *value, element_type);
+			ResolvedType* value_type = checkExprForTarget(unit, ctx, *value, element_type);
 			if (!value_type) return nullptr;
 			
 			if (!element_type) element_type = value_type;
@@ -3490,7 +3562,19 @@ struct Checker {
 			}
 			case Expression::UNDEFINED: expr.resolved_type = hint; expr.eval_stage = Expression::RUNTIME; return expr.resolved_type;
 			case Expression::BOOL_LITERAL: expr.resolved_type = primitiveType(ResolvedType::BOOL); expr.eval_stage = Expression::COMPTIME_VALUE; return expr.resolved_type;
-			case Expression::STRING_LITERAL: expr.resolved_type = primitiveType(ResolvedType::STRING); expr.eval_stage = Expression::COMPTIME_VALUE; return expr.resolved_type;
+			case Expression::STRING_LITERAL: {
+				StringLiteralExpression& literal = static_cast<StringLiteralExpression&>(expr);
+				if (hint && hint->kind == ResolvedType::CSTR) {
+					if (contains(literal.value, '\0')) {
+						errorLine(expr.token, "String literal containing a null byte cannot convert to cstr");
+						return nullptr;
+					}
+					expr.resolved_type = hint;
+				}
+				else expr.resolved_type = const_u8_slice;
+				expr.eval_stage = Expression::COMPTIME_VALUE;
+				return expr.resolved_type;
+			}
 			case Expression::NULL_LITERAL:
 				if (!hint) {
 					errorLine(expr.token, "Cannot use null literal without a type hint");
@@ -3642,13 +3726,8 @@ struct Checker {
 					is_writable = false;
 					return nullptr;
 				}
-				if (!base_writable) {
-					is_writable = false;
-					errorLine(expr.token, "Cannot assign to member ", member.name, " of non-writable base expression");
-					return nullptr;
-				}
 				ResolvedType* field_type = checkExpr(unit, ctx, expr, nullptr);
-				is_writable = field_type != nullptr;
+				is_writable = base_writable && field_type != nullptr;
 				expr.resolved_type = field_type;
 				return field_type;
 			}
@@ -3660,15 +3739,12 @@ struct Checker {
 					is_writable = false;
 					return nullptr;
 				}
-				// A slice is a view: writing an element mutates the viewed storage, not
-				// the slice binding itself, so the binding's immutability does not apply.
-				if (!base_writable && base_type->kind != ResolvedType::SLICE) {
-					is_writable = false;
-					errorLine(expr.token, "Cannot assign to element of non-writable base expression");
-					return nullptr;
-				}
 				ResolvedType* value_type = checkExpr(unit, ctx, expr, nullptr);
-				is_writable = value_type != nullptr;
+				// A mutable slice writes through to its backing storage regardless of
+				// whether the slice binding itself is immutable.
+				is_writable = value_type && (base_type->kind == ResolvedType::SLICE
+					? !static_cast<SliceResolvedType*>(base_type)->is_const
+					: base_writable);
 				expr.resolved_type = value_type;
 				return value_type;
 			}
@@ -3894,7 +3970,7 @@ struct Checker {
 			return true;
 		}
 
-		ResolvedType* expr_type = checkExprAndMakeConcrete(unit, &ctx, *var.expression, annotation);
+		ResolvedType* expr_type = checkExprForTarget(unit, &ctx, *var.expression, annotation);
 		if (!expr_type) return false;
 
 		if (!requireMaterializable(*var.expression, "a runtime variable initializer")) return false;
@@ -3974,7 +4050,7 @@ struct Checker {
 		const bool custom_compound = assign.op != Token::EQUAL && !isNumericType(*lhs_type);
 		ResolvedType* rhs_type = custom_compound
 			? checkExpr(unit, &ctx, *assign.rhs, nullptr)
-			: checkExprAndMakeConcrete(unit, &ctx, *assign.rhs, lhs_type);
+			: checkExprForTarget(unit, &ctx, *assign.rhs, lhs_type);
 		if (!rhs_type) return false;
 		if (!requireMaterializable(*assign.rhs, "an assignment value")) return false;
 		ResolvedType* assignment_target = lhs_type;
@@ -4387,16 +4463,15 @@ struct Checker {
 	}
 
 	bool checkMatchStatement(Unit& unit, FunctionCheckContext& ctx, MatchStatement& ms, ResolvedType* return_type) {
-		ResolvedType* subject = checkExprAndMakeConcrete(unit, &ctx, *ms.subject, nullptr);
+		ResolvedType* subject = checkExprForTarget(unit, &ctx, *ms.subject, nullptr);
 		if (!subject) return false;
 
-		// Subject must be a scalar numeric type, enum, or string.
+		// Subject must be a scalar numeric type, enum, or union.
 		const bool subject_is_numeric = isNumericOrUntyped(*subject);
 		const bool subject_is_enum = subject->kind == ResolvedType::ENUM;
-		const bool subject_is_string = subject->kind == ResolvedType::STRING;
 		const bool subject_is_union = subject->kind == ResolvedType::UNION;
-		if (!subject_is_numeric && !subject_is_enum && !subject_is_string && !subject_is_union) {
-			errorLine(ms.token, "Match statement subject must be a numeric type, enum, or string, got ", subject);
+		if (!subject_is_numeric && !subject_is_enum && !subject_is_union) {
+			errorLine(ms.token, "Match statement subject must be a numeric type, enum, or union, got ", subject);
 			return false;
 		}
 		// A compile-time subject selects one arm before checking match bodies, just
@@ -4525,7 +4600,7 @@ struct Checker {
 					pattern.begin->resolved_type = meta;
 					continue;
 				}
-				ResolvedType* begin = checkExprAndMakeConcrete(unit, &ctx, *pattern.begin, subject);
+				ResolvedType* begin = checkExprForTarget(unit, &ctx, *pattern.begin, subject);
 				if (!begin || !typesEqual(begin, subject)) return false;
 				if (pattern.end) {
 					// Range patterns are only valid for numeric types.
@@ -4533,7 +4608,7 @@ struct Checker {
 						errorLine(pattern.begin->token, "Range patterns are only valid for numeric types, got ", subject);
 						return false;
 					}
-					ResolvedType* end = checkExprAndMakeConcrete(unit, &ctx, *pattern.end, subject);
+					ResolvedType* end = checkExprForTarget(unit, &ctx, *pattern.end, subject);
 					if (!end || !typesEqual(end, subject)) return false;
 				}
 				// Track enum coverage and detect duplicates.
@@ -4641,7 +4716,7 @@ struct Checker {
 					errorLine(ret->token, "Return statement must return a value of type ", return_type);
 					return false;
 				}
-				ResolvedType* expr_type = checkExprAndMakeConcrete(unit, &ctx, *ret->expression, return_type);
+				ResolvedType* expr_type = checkExprForTarget(unit, &ctx, *ret->expression, return_type);
 				if (!expr_type) return false;
 				if (return_type->kind != ResolvedType::META && !requireMaterializable(*ret->expression, "a return value")) return false;
 				if (!canImplicitlyConvert(expr_type, return_type)) {
@@ -5267,7 +5342,7 @@ struct Checker {
 					case TypeMemberExpression::NAME: {
 						// TODO double allocation
 						if (empty(tme.comptime_string)) tme.comptime_string = reflectedTypeName(unit, *tme.reflected_type);
-						expr.comptime_value = makeStringValue(unit, &tme.comptime_string);
+						expr.comptime_value = makeStringValue(unit, tme.comptime_string);
 						return expr.comptime_value;
 					}
 					case TypeMemberExpression::TYPES: {
@@ -5293,9 +5368,10 @@ struct Checker {
 						const u32 descriptor_size = comptimeSize(*descriptor_type);
 						for (i32 i = 0; i < st.decl->fields.size(); ++i) {
 							u8* descriptor = slice.data + descriptor_size * i;
-							ls_string_view* name = &st.decl->fields[i].name;
+							const ls_string_view name = st.decl->fields[i].name;
+							ComptimeSliceValue name_slice{(u8*)name.begin, (i64)(name.end - name.begin)};
 							ResolvedType* type = structFieldType(st, i);
-							copyMemory(descriptor, &name, sizeof(name));
+							copyMemory(descriptor, &name_slice, sizeof(name_slice));
 							copyMemory(descriptor + type_offset, &type, sizeof(type));
 						}
 						return expr.comptime_value;
@@ -5319,8 +5395,9 @@ struct Checker {
 								enum_value = (i32)comptimeNumericToI64(value.value, value.type->kind);
 							}
 							u8* descriptor = slice.data + descriptor_size * i;
-							ls_string_view* name = &en.decl->members[i].name;
-							copyMemory(descriptor, &name, sizeof(name));
+							const ls_string_view name = en.decl->members[i].name;
+							ComptimeSliceValue name_slice{(u8*)name.begin, (i64)(name.end - name.begin)};
+							copyMemory(descriptor, &name_slice, sizeof(name_slice));
 							copyMemory(descriptor + comptimeFieldOffset(*static_cast<StructResolvedType*>(descriptor_type), 1), &enum_value, sizeof(enum_value));
 						}
 						return expr.comptime_value;
@@ -5339,8 +5416,9 @@ struct Checker {
 						const u32 descriptor_size = comptimeSize(*descriptor_type);
 						for (i32 i = 0; i < fn.params.size(); ++i) {
 							u8* descriptor = slice.data + descriptor_size * i;
-							ls_string_view* name = &fn.params[i].name;
-							copyMemory(descriptor, &name, sizeof(name));
+							const ls_string_view name = fn.params[i].name;
+							ComptimeSliceValue name_slice{(u8*)name.begin, (i64)(name.end - name.begin)};
+							copyMemory(descriptor, &name_slice, sizeof(name_slice));
 							copyMemory(descriptor + type_offset, &fn.params[i].type, sizeof(fn.params[i].type));
 						}
 						return expr.comptime_value;
@@ -5768,8 +5846,8 @@ struct Checker {
 			}
 			case Expression::STRING_LITERAL: {
 				auto& sl = static_cast<StringLiteralExpression&>(expr);
-				ls_string_view* str = &sl.value;
-				return copyComptimeValue(primitiveType(ResolvedType::STRING), &str);
+				ComptimeSliceValue value{(u8*)sl.value.begin, (i64)(sl.value.end - sl.value.begin)};
+				return copyComptimeValue(const_u8_slice, &value, sizeof(value));
 			}
 			case Expression::ARRAY_LITERAL: {
 				auto& al = static_cast<ArrayLiteralExpression&>(expr);
@@ -5886,6 +5964,7 @@ struct Checker {
 			case Expression::SLICE_TYPE: {
 				auto& st = static_cast<SliceTypeExpression&>(expr);
 				SliceResolvedType* slice_type = makeType<SliceResolvedType>(module.arena);
+				slice_type->is_const = st.is_const;
 				slice_type->element_type = asType(evalComptime(unit, *st.element_type, ctx, bindings, frame), st.element_type->token);
 				if (!slice_type->element_type) return {};
 
@@ -6066,6 +6145,7 @@ struct Checker {
 	OutputFormatter error_stream;
 	i32 suppress_errors = 0;
 	MetaType* meta_value_type;
+	SliceResolvedType* const_u8_slice;
 	SliceResolvedType* slice_of_types; // []type for Union::types type member
 	StructResolvedType* field_descriptor_type;
 	StructResolvedType* param_descriptor_type;

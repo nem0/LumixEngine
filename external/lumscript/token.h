@@ -77,7 +77,6 @@ struct Token {
 		OR,
 		NOT,
 		VOID,
-		STRING_KW,
 		I8,
 		BOOL,
 		I16,

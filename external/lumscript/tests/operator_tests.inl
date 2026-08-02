@@ -212,6 +212,33 @@ TEST(PrimitiveOperatorOverloadFails) {
 	return true;
 }
 
+TEST(SliceEqualityOperatorOverloadFails) {
+	// Slice equality is built in and cannot be overridden, like primitive equality.
+	const char* source = R"(
+		operator ==(a : []const u8, b : []const u8) : bool {
+			return false;
+		}
+
+		fn main() : void {
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(SliceInequalityOperatorOverloadFails) {
+	const char* source = R"(
+		operator !=(a : []i32, b : []i32) : bool {
+			return false;
+		}
+
+		fn main() : void {
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(NonMinusOperatorRequiresTwoParametersFails) {
 	const char* source = R"(
 		struct Vec2 {
@@ -561,7 +588,7 @@ TEST(BooleanNotRequiresBoolOperandFails) {
 TEST(UnaryMinusRequiresNumericOperandFails) {
 	const char* source = R"(
 		fn main() : void {
-			const value : string = "abc";
+			const value : []const u8 = "abc";
 			const negated = -value;
 		}
 	)";
@@ -1369,18 +1396,29 @@ TEST(ComptimeOnlyIndexedOperatorOperandFails) {
 	return true;
 }
 
-TEST(SliceEqualityFails) {
-	// Aggregates have no equality; the old generic comparison silently compared
-	// nothing and always returned true.
+TEST(SliceEqualityReturnsContentComparison) {
+	// Slices now have content equality. This used to assert a compile error, and
+	// before that the generic comparison silently compared nothing and always
+	// returned true - so check the value, not just that it compiles.
 	const char* source = R"(
-		fn main() : bool {
+		fn main() : i32 {
 			var a : [2]i32 = undefined;
+			a[0] = 1; a[1] = 2;
+			var b : [2]i32 = undefined;
+			b[0] = 1; b[1] = 3;
 			var s1 : []i32 = a[:];
 			var s2 : []i32 = a[:];
-			return s1 == s2;
+			var s3 : []i32 = b[:];
+			if s1 == s2 and s1 != s3 { return 42; }
+			return 0;
 		}
 	)";
-	EXPECT_COMPILE_FAIL(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 

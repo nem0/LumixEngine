@@ -1,3 +1,63 @@
+// Compiles `source` and returns the frame size of `main`, or 0 if it is absent.
+static u32 mainFrameSize(const char* source, const char* test_name) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	if (!module) return 0;
+	if (!ls_module_compile(module, toLs(source), makeStringView(test_name), nullptr, nullptr)) return 0;
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &context.host);
+	if (!bytecode) return 0;
+	u32 frame_size = 0;
+	for (u32 i = 0; i < bytecode->function_count; ++i) {
+		if (equalStrings(bytecode->functions[i].name, "main")) {
+			frame_size = bytecode->functions[i].frame_size;
+			break;
+		}
+	}
+	ls_bytecode_destroy(bytecode);
+	return frame_size;
+}
+
+TEST(SliceExpressionsDoNotGrowFrame) {
+	// Each `arr[:]` stashes its source in an addLocal whose next_local_offset
+	// bump is never undone (bytecode_compiler.cpp, compileBoundedRange), so the
+	// scratch is promoted to a function-lifetime local. Frame size should not
+	// scale with how many slice expressions a function contains.
+	const char* one = R"(
+		fn take(s : []i32) : i32 { return s[0]; }
+
+		fn main() : i32 {
+			var values : [3]i32 = undefined;
+			var total : i32 = 0;
+			total += take(values[:]);
+			return total;
+		}
+	)";
+	const char* many = R"(
+		fn take(s : []i32) : i32 { return s[0]; }
+
+		fn main() : i32 {
+			var values : [3]i32 = undefined;
+			var total : i32 = 0;
+			total += take(values[:]);
+			total += take(values[:]);
+			total += take(values[:]);
+			total += take(values[:]);
+			total += take(values[:]);
+			total += take(values[:]);
+			return total;
+		}
+	)";
+
+	const u32 one_frame = mainFrameSize(one, __func__);
+	const u32 many_frame = mainFrameSize(many, __func__);
+	EXPECT_TRUE(one_frame != 0);
+	EXPECT_TRUE(many_frame != 0);
+	// The six-slice version does the same work in the same scope, so it needs no
+	// more frame than the one-slice version.
+	EXPECT_EQ(one_frame, many_frame);
+	return true;
+}
+
 TEST(SliceTypeSyntax) {
 	const char* source = R"(
 		fn main() : void {
@@ -60,6 +120,190 @@ TEST(SliceImplicitConversion) {
 	return true;
 }
 
+TEST(ConstSliceTypeSyntaxAndConversion) {
+	const char* source = R"(
+		fn inspect(values : []const i32) : i32 {
+			return values[0] + length(values) as i32;
+		}
+
+		fn main() : i32 {
+			var values : [2]i32 = [4, 5];
+			var writable : []i32 = values[:];
+			var readable : []const i32 = writable;
+			return inspect(readable) + inspect(values);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(12, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ConstSliceRejectsElementWrite) {
+	const char* source = R"(
+		fn main() : void {
+			var values : [2]i32 = [1, 2];
+			var readable : []const i32 = values[:];
+			readable[0] = 3;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ConstSliceRejectsMutableConversion) {
+	const char* source = R"(
+		fn mutate(values : []i32) : void {}
+
+		fn main() : void {
+			var values : [2]i32 = [1, 2];
+			var readable : []const i32 = values[:];
+			mutate(readable);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ConstArrayCanCreateReadOnlySlice) {
+	const char* source = R"(
+		fn inspect(values : []const i32) : i32 {
+			return values[1];
+		}
+
+		fn main() : i32 {
+			const values : [2]i32 = [7, 9];
+			return inspect(values[:]);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(9, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ConstSliceReslicePreservesReadOnlyType) {
+	const char* source = R"(
+		fn main() : void {
+			var values : [3]i32 = [2, 4, 6];
+			var readable : []const i32 = values[:];
+			var subview = readable[1:];
+			subview[0] = 8;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ConstSliceCanBeReturned) {
+	const char* source = R"(
+		fn view(values : []const i32) : []const i32 {
+			return values;
+		}
+
+		fn main() : i32 {
+			var values : [2]i32 = [8, 9];
+			const readable : []const i32 = view(values[:]);
+			return readable[1];
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(9, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ConstArrayRejectsMutableSliceConversion) {
+	const char* source = R"(
+		fn mutate(values : []i32) : void {}
+
+		fn main() : void {
+			const values : [2]i32 = [1, 2];
+			mutate(values);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ConstArrayRejectsMutableSliceInitializer) {
+	const char* source = R"(
+		fn main() : void {
+			const values : [2]i32 = [1, 2];
+			var view : []i32 = values;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ConstArrayRejectsMutableSliceAssignment) {
+	const char* source = R"(
+		fn main() : void {
+			var storage : [2]i32 = [0, 0];
+			var view : []i32 = storage;
+			const values : [2]i32 = [1, 2];
+			view = values;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ConstArrayRejectsMutableSliceReturn) {
+	const char* source = R"(
+		fn view() : []i32 {
+			const values : [2]i32 = [1, 2];
+			return values;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ConstArrayFieldRejectsMutableSliceConversion) {
+	const char* source = R"(
+		struct Values {
+			items : [2]i32;
+		}
+
+		fn main() : void {
+			const values = Values { [1, 2] };
+			var view : []i32 = values.items;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(NestedConstSliceTypechecks) {
+	const char* source = R"(
+		fn inspect(values : [][]const i32) : i32 {
+			return values[0][1];
+		}
+
+		fn main() : i32 {
+			var values : [1][2]i32 = [[3, 7]];
+			var rows : [1][]const i32 = [values[0][:]];
+			return inspect(rows[:]);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(ScalarSliceViewTypeInferenceAndLength) {
 	const char* source = R"(
 		fn main() : i32 {
@@ -75,6 +319,28 @@ TEST(ScalarSliceViewTypeInferenceAndLength) {
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(12, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ConstScalarCanCreateReadOnlySlice) {
+	const char* source = R"(
+		fn inspect(value : []const i32) : i32 {
+			return value[0];
+		}
+
+		fn main() : i32 {
+			const value : i32 = 7;
+			var view = value[:];
+			return inspect(view);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(7, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -442,25 +708,6 @@ TEST(SliceIndexMustBeIntegerFail) {
 	return true;
 }
 
-TEST(SliceRequiresSliceOrArrayTypeFail) {
-	const char* prerequisite = R"(
-		fn main() : void {
-			var values : [4]i32 = undefined;
-			const slice = values[:];
-		}
-	)";
-	EXPECT_COMPILE(prerequisite);
-
-	const char* source = R"(
-		fn main() : void {
-			const x : i32 = 1;
-			const slice = x[:];
-		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
 TEST(SliceLengthAndIndexRuntime) {
 	const char* source = R"(
 		fn main() : i32 {
@@ -762,6 +1009,298 @@ TEST(SliceStructFieldRefOutOfBoundsFails) {
 	test_diagnostics.output_enabled = false;
 	ls_push_i32(runtime, 2);
 	EXPECT_EQ(LS_RESULT_SUSPENDED, ls_call(runtime, toLs("main")));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(SliceEqualityComparesContentRuntime) {
+	const char* source = R"(
+		fn main() : i32 {
+			var left : [3]i32 = undefined;
+			var right : [3]i32 = undefined;
+			left[0] = 1; left[1] = 2; left[2] = 3;
+			right[0] = 1; right[1] = 2; right[2] = 3;
+			var result : i32 = 0;
+			if left[:] == right[:] { result += 1; }
+			right[2] = 4;
+			if left[:] == right[:] { result += 10; }
+			if left[:] != right[:] { result += 100; }
+			return result;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(101, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(SliceEqualityUnequalLengthsAreUnequal) {
+	const char* source = R"(
+		fn main() : i32 {
+			var values : [4]i32 = undefined;
+			values[0] = 1; values[1] = 2; values[2] = 3; values[3] = 4;
+			const two = values[0:2];
+			const three = values[0:3];
+			if two == three { return 0; }
+			if two != three { return 42; }
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(SliceEqualitySameStorageIsEqual) {
+	const char* source = R"(
+		fn main() : i32 {
+			var values : [4]i32 = undefined;
+			values[0] = 7; values[1] = 8; values[2] = 9; values[3] = 10;
+			const whole = values[:];
+			const same = values[:];
+			if whole == same { return 42; }
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(SliceEqualityMixesMutableAndConstViews) {
+	const char* source = R"(
+		fn main() : i32 {
+			var values : [2]i32 = undefined;
+			values[0] = 5; values[1] = 6;
+			const writable : []i32 = values[:];
+			const readable : []const i32 = values[:];
+			if writable == readable { return 42; }
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(SliceEqualityEmptyAndNullSlicesAreEqual) {
+	const char* source = R"(
+		fn main() : i32 {
+			var values : [4]i32 = undefined;
+			const empty = values[2:2];
+			const cleared : []i32 = null;
+			if empty == cleared { return 42; }
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(SliceEqualityAcceptsEnumElements) {
+	const char* source = R"(
+		enum State { Idle, Running }
+
+		fn main() : i32 {
+			var left : [2]State = undefined;
+			var right : [2]State = undefined;
+			left[0] = .Idle; left[1] = .Running;
+			right[0] = .Idle; right[1] = .Running;
+			if left[:] == right[:] { return 42; }
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(SliceEqualityComparesFloatsNumericallyNotBitwise) {
+	// +0.0 and -0.0 are equal but have different bit patterns, so a memcmp
+	// implementation would report these slices as different.
+	const char* source = R"(
+		fn main() : i32 {
+			var left : [2]f32 = undefined;
+			var right : [2]f32 = undefined;
+			left[0] = 0.0; left[1] = 1.5;
+			right[0] = -0.0; right[1] = 1.5;
+			if left[:] == right[:] { return 42; }
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(SliceEqualityComparesF64Elements) {
+	const char* source = R"(
+		fn main() : i32 {
+			var left : [2]f64 = undefined;
+			var right : [2]f64 = undefined;
+			left[0] = 0.0; left[1] = 2.25;
+			right[0] = -0.0; right[1] = 2.25;
+			var result : i32 = 0;
+			if left[:] == right[:] { result += 42; }
+			right[1] = 2.5;
+			if left[:] != right[:] { result += 1; }
+			return result;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(43, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(SliceEqualityRejectsStructElementsFails) {
+	const char* source = R"(
+		struct Point { x : i32; }
+
+		fn main() : void {
+			var left : [2]Point = undefined;
+			var right : [2]Point = undefined;
+			const equal = left[:] == right[:];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(SliceEqualityRejectsStructElementsWithOperatorFails) {
+	// An `operator ==` on the element type does not make slices of it comparable.
+	const char* source = R"(
+		struct Point { x : i32; }
+
+		operator ==(a : Point, b : Point) : bool {
+			return a.x == b.x;
+		}
+
+		fn main() : void {
+			var left : [2]Point = undefined;
+			var right : [2]Point = undefined;
+			const equal = left[:] == right[:];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(SliceEqualityRejectsSliceElementsFails) {
+	const char* source = R"(
+		fn main() : void {
+			var values : [2][]i32 = undefined;
+			const equal = values[:] == values[:];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(SliceEqualityRejectsDifferentElementTypesFails) {
+	const char* source = R"(
+		fn main() : void {
+			var ints : [4]i32 = undefined;
+			var floats : [4]f32 = undefined;
+			const equal = ints[:] == floats[:];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(SliceEqualityRejectsSameSizedDifferentElementTypesFails) {
+	// i32 and u32 have the same size; equality still requires the same element type.
+	const char* source = R"(
+		fn main() : void {
+			var signed_values : [4]i32 = undefined;
+			var unsigned_values : [4]u32 = undefined;
+			const equal = signed_values[:] == unsigned_values[:];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(SliceEqualityOfArraysRequiresSlicing) {
+	// Static arrays have no built-in equality (see ArrayEqualityFails); slicing
+	// them is the spelling that works.
+	const char* source = R"(
+		fn main() : i32 {
+			var left : [3]i32 = undefined;
+			var right : [3]i32 = undefined;
+			left[0] = 1; left[1] = 2; left[2] = 3;
+			right[0] = 1; right[1] = 2; right[2] = 3;
+			if left[:] == right[:] { return 42; }
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(SliceEqualityOnFunctionParameters) {
+	const char* source = R"(
+		fn same(a : []const u8, b : []const u8) : bool {
+			return a == b;
+		}
+
+		fn main() : i32 {
+			if same("lumix", "lumix") and not same("lumix", "script") { return 42; }
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }

@@ -111,7 +111,7 @@ TEST(MatchRejectsPatternTypeMismatch) {
 
 TEST(MatchRangeRequiresNumericTypeFails) {
 	const char* source = R"(
-		fn main(v : string) : void {
+		fn main(v : []const u8) : void {
 			match v {
 				case "a".."z":
 					return;

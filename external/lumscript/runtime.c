@@ -11,6 +11,11 @@ typedef struct ls_string_box {
 	ls_string_view value;
 } ls_string_box;
 
+typedef struct ls_runtime_slice {
+	const void* data;
+	i64 length;
+} ls_runtime_slice;
+
 enum {
 	EXEC_FAIL = 0,
 	EXEC_OK = 1,
@@ -18,10 +23,40 @@ enum {
 };
 
 ls_string_view ls_arg_read_string(ls_call_frame* frame) {
-	ls_string_box* box = NULL;
-	memcpy(&box, frame->args, sizeof(box));
-	frame->args += sizeof(box);
-	return box ? box->value : (ls_string_view){NULL, NULL};
+	ls_runtime_slice slice = {NULL, 0};
+	memcpy(&slice, frame->args, sizeof(slice));
+	frame->args += sizeof(slice);
+	return (ls_string_view){(const char*)slice.data, (const char*)slice.data + slice.length};
+}
+
+// Content equality for slice values. Floats are compared element-wise because
+// NaN is not equal to itself and +0.0 equals -0.0 despite differing bits; every
+// other element kind the compiler admits here is an integral scalar whose bytes
+// carry no padding, so those go through memcmp.
+static int runtime_slice_equal(ls_runtime_slice a, ls_runtime_slice b, u32 element_size, ls_type_kind element_kind) {
+	if (a.length != b.length) return 0;
+	if (a.length == 0) return 1;
+	if (!a.data || !b.data) return 0;
+	if (a.data == b.data) return 1;
+	if (element_kind == LS_TYPE_F32) {
+		for (i64 i = 0; i < a.length; ++i) {
+			f32 lhs, rhs;
+			memcpy(&lhs, (const u8*)a.data + i * sizeof(f32), sizeof(lhs));
+			memcpy(&rhs, (const u8*)b.data + i * sizeof(f32), sizeof(rhs));
+			if (!(lhs == rhs)) return 0;
+		}
+		return 1;
+	}
+	if (element_kind == LS_TYPE_F64) {
+		for (i64 i = 0; i < a.length; ++i) {
+			f64 lhs, rhs;
+			memcpy(&lhs, (const u8*)a.data + i * sizeof(f64), sizeof(lhs));
+			memcpy(&rhs, (const u8*)b.data + i * sizeof(f64), sizeof(rhs));
+			if (!(lhs == rhs)) return 0;
+		}
+		return 1;
+	}
+	return memcmp(a.data, b.data, (size_t)a.length * element_size) == 0;
 }
 
 static int string_equals(ls_string_view a, ls_string_view b) {
@@ -54,7 +89,6 @@ static u32 runtime_type_size(ls_type_kind kind) {
 		case LS_TYPE_I64:
 		case LS_TYPE_U64:
 		case LS_TYPE_F64:
-		case LS_TYPE_STRING:
 		case LS_TYPE_CPTR:
 			return 8u;
 		case LS_TYPE_SLICE:
@@ -109,11 +143,13 @@ static ls_string_box* runtime_copy_string_box(ls_runtime* runtime, ls_string_vie
 	return runtime_make_string_box(runtime, (ls_string_view){size > 0 ? copy : empty, (size > 0 ? copy : empty) + size});
 }
 
+// TODO leak?
 void ls_result_string(ls_runtime* runtime, ls_call_frame* frame, ls_string_view value) {
-	void* box = runtime_copy_string_box(runtime, value);
+	ls_string_box* box = runtime_copy_string_box(runtime, value);
 	if (!box) return;
-	memcpy(frame->result, &box, sizeof(box));
-	frame->result += sizeof(box);
+	ls_runtime_slice slice = {box->value.begin, (i64)(box->value.end - box->value.begin)};
+	memcpy(frame->result, &slice, sizeof(slice));
+	frame->result += sizeof(slice);
 }
 
 static void runtime_push_bytes(ls_runtime* runtime, const void* value, u32 size) {
@@ -206,13 +242,11 @@ static ls_string_view runtime_error_message(ls_op op) {
 	static const char modulo_by_zero[] = "modulo by zero";
 	static const char index_out_of_bounds[] = "index out of bounds";
 	static const char invalid_function[] = "invalid function call";
-	static const char invalid_string[] = "invalid string";
 
 	if (op >= LS_OP_DIV_I8 && op <= LS_OP_DIV_F64) return (ls_string_view){division_by_zero, division_by_zero + sizeof(division_by_zero) - 1u};
 	if (op >= LS_OP_MOD_I8 && op <= LS_OP_MOD_U64) return (ls_string_view){modulo_by_zero, modulo_by_zero + sizeof(modulo_by_zero) - 1u};
 	if (op >= LS_OP_LOAD_INDEXED && op <= LS_OP_SLICE_REF) return (ls_string_view){index_out_of_bounds, index_out_of_bounds + sizeof(index_out_of_bounds) - 1u};
 	if (op == LS_OP_CALL_DIRECT || op == LS_OP_CALL_INDIRECT) return (ls_string_view){invalid_function, invalid_function + sizeof(invalid_function) - 1u};
-	if (op == LS_OP_STRING_TO_CSTR || op == LS_OP_CSTR_TO_STRING) return (ls_string_view){invalid_string, invalid_string + sizeof(invalid_string) - 1u};
 	return (ls_string_view){generic, generic + sizeof(generic) - 1u};
 }
 
@@ -470,14 +504,7 @@ static u64 runtime_numeric_to_u64(const u8* value, ls_type_kind kind) {
 		u8* rhs_ptr__ = runtime->frame + rhs_offset__; \
 		u8* out__ = runtime->frame + dst__; \
 		int result__ = 0; \
-		if (kind__ == LS_TYPE_STRING) { \
-			void* lhs_string__ = NULL; void* rhs_string__ = NULL; \
-			memcpy(&lhs_string__, lhs_ptr__, sizeof(lhs_string__)); \
-			memcpy(&rhs_string__, rhs_ptr__, sizeof(rhs_string__)); \
-			if (lhs_string__ == rhs_string__) result__ = 1; \
-			else if (lhs_string__ && rhs_string__) result__ = string_equals(((ls_string_box*)lhs_string__)->value, ((ls_string_box*)rhs_string__)->value); \
-			result__ = result__ OP 1; \
-		} else if (kind__ == LS_TYPE_F32 || kind__ == LS_TYPE_F64) { \
+		if (kind__ == LS_TYPE_F32 || kind__ == LS_TYPE_F64) { \
 			result__ = runtime_numeric_to_double(lhs_ptr__, kind__) OP runtime_numeric_to_double(rhs_ptr__, kind__); \
 		} else { \
 			result__ = runtime_numeric_to_i64(lhs_ptr__, kind__) OP runtime_numeric_to_i64(rhs_ptr__, kind__); \
@@ -494,18 +521,6 @@ static u64 runtime_numeric_to_u64(const u8* value, ls_type_kind kind) {
 		memcpy(&lhs__, runtime->frame + lhs_offset__, sizeof(lhs__)); \
 		memcpy(&rhs__, runtime->frame + rhs_offset__, sizeof(rhs__)); \
 		if (!(lhs__ OP rhs__)) ip += jump_offset__; \
-	} while (0)
-
-#define LS_REG_CMP_JUMP_STRING(OP) \
-	do { \
-		const u32 lhs_offset__ = runtime_read_u32(&ip); \
-		const u32 rhs_offset__ = runtime_read_u32(&ip); \
-		const i32 jump_offset__ = runtime_read_i16(&ip); \
-		void* lhs__ = NULL; void* rhs__ = NULL; \
-		memcpy(&lhs__, runtime->frame + lhs_offset__, sizeof(lhs__)); \
-		memcpy(&rhs__, runtime->frame + rhs_offset__, sizeof(rhs__)); \
-		int equal__ = lhs__ == rhs__ || (lhs__ && rhs__ && string_equals(((ls_string_box*)lhs__)->value, ((ls_string_box*)rhs__)->value)); \
-		if (!(equal__ OP 1)) ip += jump_offset__; \
 	} while (0)
 
 // Runs either a fresh call to `function` or a previously suspended
@@ -600,14 +615,6 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				u8* out = runtime->frame + dst;
 				memcpy(out, ip, 8u);
 				ip += 8u;
-				break;
-			}
-			case LS_OP_LOAD_CONST_STRING: {
-				const u32 dst = runtime_read_u32(&ip);
-				const u32 index = runtime_read_u32(&ip);
-				void* value = runtime_copy_string_box(runtime, runtime->bytecode->strings[index]);
-				u8* out = runtime->frame + dst;
-				memcpy(out, &value, sizeof(value));
 				break;
 			}
 			case LS_OP_COPY: {
@@ -993,6 +1000,20 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				memcpy(out, &length, 8u);
 				break;
 			}
+			case LS_OP_SLICE_EQ: {
+				const u32 dst = runtime_read_u32(&ip);
+				const u32 lhs_reg = runtime_read_u32(&ip);
+				const u32 rhs_reg = runtime_read_u32(&ip);
+				const u32 element_size = runtime_read_u32(&ip);
+				const ls_type_kind element_kind = (ls_type_kind)*ip++;
+				ls_runtime_slice lhs = {NULL, 0};
+				ls_runtime_slice rhs = {NULL, 0};
+				u8* out = runtime->frame + dst;
+				memcpy(&lhs, runtime->frame + lhs_reg, sizeof(lhs));
+				memcpy(&rhs, runtime->frame + rhs_reg, sizeof(rhs));
+				*out = (u8)(runtime_slice_equal(lhs, rhs, element_size, element_kind) ? 1u : 0u);
+				break;
+			}
 			case LS_OP_RETURN: {
 				const u32 src = runtime_read_u32(&ip);
 				const u32 size = runtime_read_u32(&ip);
@@ -1094,27 +1115,6 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 					case LS_TYPE_F64: { f64 v = runtime_numeric_to_double(src_ptr, src_kind); memcpy(out, &v, 8u); break; }
 					default: break; // should not happen
 				}
-				break;
-			}
-			case LS_OP_STRING_TO_CSTR: {
-				const u32 dst = runtime_read_u32(&ip);
-				const u32 src = runtime_read_u32(&ip);
-				ls_string_box* box = NULL;
-				memcpy(&box, runtime->frame + src, sizeof(box));
-				if (!box || memchr(box->value.begin, '\0', (size_t)(box->value.end - box->value.begin))) goto runtime_execute_function_fail;
-				const char* value = box->value.begin;
-				memcpy(runtime->frame + dst, &value, sizeof(value));
-				break;
-			}
-			case LS_OP_CSTR_TO_STRING: {
-				const u32 dst = runtime_read_u32(&ip);
-				const u32 src = runtime_read_u32(&ip);
-				const char* value = NULL;
-				memcpy(&value, runtime->frame + src, sizeof(value));
-				if (!value) goto runtime_execute_function_fail;
-				ls_string_box* box = runtime_copy_string_box(runtime, (ls_string_view){value, value + strlen(value)});
-				if (!box) goto runtime_execute_function_fail;
-				memcpy(runtime->frame + dst, &box, sizeof(box));
 				break;
 			}
 			case LS_OP_NEG_I8: LS_REG_NEGOP(i8); break;
@@ -1267,7 +1267,6 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 			case LS_OP_JGT_F64: LS_REG_CMP_JUMP(f64, <=); break;
 			case LS_OP_JLT_F64: LS_REG_CMP_JUMP(f64, >=); break;
 			case LS_OP_JLE_F64: LS_REG_CMP_JUMP(f64, >); break;
-			case LS_OP_JE_STRING: LS_REG_CMP_JUMP_STRING(!=); break;
 			case LS_OP_JUMP: {
 				const i32 offset = runtime_read_i16(&ip);
 				ip += offset;
@@ -1559,7 +1558,7 @@ void ls_push_i64(ls_runtime* runtime, i64 value) { runtime_push_bytes(runtime, &
 void ls_push_u64(ls_runtime* runtime, u64 value) { runtime_push_bytes(runtime, &value, 8u); }
 void ls_push_f32(ls_runtime* runtime, float value) { runtime_push_bytes(runtime, &value, 4u); }
 void ls_push_f64(ls_runtime* runtime, double value) { runtime_push_bytes(runtime, &value, 8u); }
-void ls_push_string(ls_runtime* runtime, ls_string_view value) { void* p = runtime_make_string_box(runtime, value); runtime_push_bytes(runtime, &p, (u32)sizeof(p)); }
+void ls_push_string(ls_runtime* runtime, ls_string_view value) { ls_runtime_slice slice = {value.begin, (i64)(value.end - value.begin)}; runtime_push_bytes(runtime, &slice, (u32)sizeof(slice)); }
 void ls_push_null(ls_runtime* runtime) { void* p = NULL; runtime_push_bytes(runtime, &p, (u32)sizeof(p)); }
 void ls_push_ptr(ls_runtime* runtime, void* value) { runtime_push_bytes(runtime, &value, (u32)sizeof(value)); }
 
@@ -1595,11 +1594,9 @@ float ls_to_f32(ls_runtime* runtime, i32 index) { float v = 0.0f; runtime_read_v
 double ls_to_f64(ls_runtime* runtime, i32 index) { double v = 0.0; runtime_read_value(runtime, index, &v, 8u); return v; }
 
 ls_string_view ls_to_string(ls_runtime* runtime, i32 index) {
-	ls_string_view result;
-	result.begin = NULL;
-	result.end = NULL;
-	void* p = ls_to_ptr(runtime, index);
-	return p ? ((ls_string_box*)p)->value : result;
+	ls_runtime_slice slice = {NULL, 0};
+	runtime_read_value(runtime, index, &slice, (u32)sizeof(slice));
+	return (ls_string_view){(const char*)slice.data, (const char*)slice.data + slice.length};
 }
 
 void* ls_to_ptr(ls_runtime* runtime, i32 index) {

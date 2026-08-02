@@ -143,14 +143,14 @@ TEST(GlobalVariablesTypecheck) {
 	const char* source = R"(
 		var counter : i32 = 1;
 		const step = 2;
-		var label : string = "count";
+		var label : []const u8 = "count";
 
 		fn increment() : i32 {
 			counter += step;
 			return counter;
 		}
 
-		fn get_label() : string {
+		fn get_label() : []const u8 {
 			return label;
 		}
 	)";

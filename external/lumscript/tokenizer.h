@@ -216,12 +216,7 @@ struct Tokenizer {
 			case 's': {
 				if (u32(m_current - m_start_token) < 2) return makeToken(Token::IDENTIFIER);
 				if (m_start_token[1] == 'i') return checkKeyword("zeof", 2, 4, Token::SIZEOF);
-				if (u32(m_current - m_start_token) < 4) return makeToken(Token::IDENTIFIER);
-				if (m_start_token[1] != 't' || m_start_token[2] != 'r') return makeToken(Token::IDENTIFIER);
-				switch (m_start_token[3]) {
-					case 'u': return checkKeyword("ct", 4, 2, Token::STRUCT);
-					case 'i': return checkKeyword("ng", 4, 2, Token::STRING_KW);
-				}
+				return checkKeyword("truct", 1, 5, Token::STRUCT);
 				break;
 			}
 			case 't': {

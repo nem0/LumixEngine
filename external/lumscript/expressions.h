@@ -201,6 +201,7 @@ struct SliceTypeExpression : Expression {
 	SliceTypeExpression() : Expression(SLICE_TYPE) {}
 
 	Expression* element_type = nullptr;
+	bool is_const = false;
 };
 
 struct NullableTypeExpression : Expression {

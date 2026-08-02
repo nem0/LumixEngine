@@ -391,8 +391,8 @@ TEST(UnionNullableUnion) {
 
 TEST(UnionNullableMemberPrecedence) {
 	const char* source = R"(
-		comptime Parsed = ?i32 | string;
-		comptime Expected = (?i32) | string;
+		comptime Parsed = ?i32 | []const u8;
+		comptime Expected = (?i32) | []const u8;
 
 		fn main() : void {
 			var parsed : Parsed = "text";
@@ -525,6 +525,30 @@ TEST(UnionPrimitiveMembers) {
 				case f32:
 					var y : f32 = 0.0;
 			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(UnionWithLeadingSliceMember) {
+	// `[]const u8 | i32` must be a union of a slice and i32, not a slice of `u8 | i32`
+	const char* source = R"(
+		comptime StringOrInt = []const u8 | i32;
+		comptime ArrayOrInt = [2]u8 | i32;
+
+		fn main() : void {
+			var u : StringOrInt = 42;
+			u = "hello";
+
+			match u {
+				case []const u8:
+					var s : []const u8 = "";
+				case i32:
+					var x : i32 = 0;
+			}
+
+			var a : ArrayOrInt = 42;
 		}
 	)";
 	EXPECT_COMPILE(source);
@@ -853,15 +877,15 @@ TEST(UnionEnumMembers) {
 
 TEST(UnionStringMembers) {
 	const char* source = R"(
-		comptime StringOrInt = string | i32;
+		comptime StringOrInt = []const u8 | i32;
 
 		fn main() : void {
 			var u : StringOrInt = "hello";
 			u = 42;
 
 			match u {
-				case string:
-					var s : string = u;
+				case []const u8:
+					var s : []const u8 = u;
 				case i32:
 					var i : i32 = u;
 			}
@@ -881,7 +905,7 @@ TEST(UnionAllConcreteRuntimeMemberKinds) {
 			value : i32;
 		}
 
-		comptime AllKinds = byte | bool | i8 | u8 | i16 | u16 | i32 | u32 | i64 | u64 | isize | f32 | f64 | string | cstr | cptr | []i32 | []f32 | [3]i32 | [4]i32 | (fn(u8) : void) | Kind | Record;
+		comptime AllKinds = byte | bool | i8 | u8 | i16 | u16 | i32 | u32 | i64 | u64 | isize | f32 | f64 | []const u8 | cstr | cptr | []i32 | []f32 | [3]i32 | [4]i32 | (fn(u8) : void) | Kind | Record;
 
 		fn main() : void {
 			var value : AllKinds = undefined;

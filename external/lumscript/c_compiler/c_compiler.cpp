@@ -50,8 +50,31 @@ struct CCompiler {
 	void pad() { for (i32 i = 0; i < indent; ++i) text("    "); }
 	void unsupported() { ok = false; }
 	void preamble() {
-		text("#include <stdbool.h>\n#include <stdint.h>\n#include <stddef.h>\n#include <stdio.h>\n#include <string.h>\n\n#ifdef _MSC_VER\n\t#define LS_ALIGNOF(T) __alignof(T)\n#else\n\t#define LS_ALIGNOF(T) __alignof__(T)\n#endif\n\ntypedef struct { void* data; int64_t length; } ls_slice;\ntypedef struct { const char* data; int64_t length; } ls_string;\nstatic bool ls_string_equal(ls_string a, ls_string b) { return a.length == b.length && memcmp(a.data, b.data, (size_t)a.length) == 0; }\nstatic ls_string ls_string_from_cstr(const char* value) { return (ls_string){ value, value ? (int64_t)strlen(value) : 0 }; }\n");
-		if (emit_print) text("void print(ls_string msg) { fwrite(msg.data, 1, (size_t)msg.length, stdout); }\n");
+		text("#include <stdbool.h>\n#include <stdint.h>\n#include <stddef.h>\n#include <stdio.h>\n#include <string.h>\n\n#ifdef _MSC_VER\n\t#define LS_ALIGNOF(T) __alignof(T)\n#else\n\t#define LS_ALIGNOF(T) __alignof__(T)\n#endif\n\ntypedef struct { void* data; int64_t length; } ls_slice;\n");
+		// Floats compare element-wise: NaN is not equal to itself and +0.0 equals
+		// -0.0 despite differing bits. Integral elements have no padding, so those
+		// go through memcmp.
+		text("static bool ls_slice_eq(ls_slice a, ls_slice b, int64_t element_size) {\n"
+			 "\tif (a.length != b.length) return false;\n"
+			 "\tif (a.length == 0) return true;\n"
+			 "\tif (!a.data || !b.data) return false;\n"
+			 "\tif (a.data == b.data) return true;\n"
+			 "\treturn memcmp(a.data, b.data, (size_t)(a.length * element_size)) == 0;\n"
+			 "}\n"
+			 "#define LS_SLICE_EQ_FLOAT(NAME, T) \\\n"
+			 "\tstatic bool NAME(ls_slice a, ls_slice b) { \\\n"
+			 "\t\tif (a.length != b.length) return false; \\\n"
+			 "\t\tif (a.length == 0) return true; \\\n"
+			 "\t\tif (!a.data || !b.data) return false; \\\n"
+			 "\t\tfor (int64_t i = 0; i < a.length; ++i) { \\\n"
+			 "\t\t\tif (!(((const T*)a.data)[i] == ((const T*)b.data)[i])) return false; \\\n"
+			 "\t\t} \\\n"
+			 "\t\treturn true; \\\n"
+			 "\t}\n"
+			 "LS_SLICE_EQ_FLOAT(ls_slice_eq_f32, float)\n"
+			 "LS_SLICE_EQ_FLOAT(ls_slice_eq_f64, double)\n"
+			 "#undef LS_SLICE_EQ_FLOAT\n");
+		if (emit_print) text("void print(ls_slice msg) { fwrite(msg.data, 1, (size_t)msg.length, stdout); }\n");
 		line();
 	}
 	void enumMemberName(const EnumExpression& en, ls_string_view member) {
@@ -78,7 +101,6 @@ struct CCompiler {
 			case ResolvedType::I32: text("i32"); return true; case ResolvedType::U32: text("u32"); return true;
 			case ResolvedType::I64: case ResolvedType::ISIZE: text("i64"); return true; case ResolvedType::U64: text("u64"); return true;
 			case ResolvedType::F32: text("f32"); return true; case ResolvedType::F64: text("f64"); return true;
-			case ResolvedType::STRING: text("string"); return true;
 			case ResolvedType::CSTR: text("cstr"); return true;
 			case ResolvedType::CPTR: text("ptr"); return true; case ResolvedType::SLICE: text("slice"); return true;
 			case ResolvedType::ENUM: text(static_cast<const EnumResolvedType*>(value)->decl->cached_name); return true;
@@ -108,7 +130,6 @@ struct CCompiler {
 			case ResolvedType::U64: text("uint64_t"); return true;
 			case ResolvedType::F32: text("float"); return true;
 			case ResolvedType::F64: text("double"); return true;
-			case ResolvedType::STRING: text("ls_string"); return true;
 			case ResolvedType::CSTR: text("const char*"); return true;
 			case ResolvedType::CPTR: text("void*"); return true;
 			case ResolvedType::SLICE: text("ls_slice"); return true;
@@ -127,7 +148,7 @@ struct CCompiler {
 	}
 
 	void stringLiteral(ls_string_view value) {
-		text("(ls_string){ \"");
+		text("(ls_slice){ (void*)\"");
 		for (const char* c = value.begin; c != value.end; ++c) {
 			char escaped[5];
 			const int count = snprintf(escaped, sizeof(escaped), "\\x%02X", (unsigned char)*c);
@@ -252,7 +273,7 @@ struct CCompiler {
 		if (!expression) return nullptr;
 		const ResolvedType* value = expression->resolved_type;
 		if (!value && expression->kind == Expression::IDENTIFIER) value = static_cast<const IdentifierExpression*>(expression)->symbol ? static_cast<const IdentifierExpression*>(expression)->symbol->resolved_type : nullptr;
-		if (!value && expression->kind == Expression::RESOLVED_TYPE) value = static_cast<const ResolvedTypeExpression*>(expression)->type;
+		if (!value && expression->kind == Expression::RESOLVED_TYPE) value = expression->resolved_type;
 		if (value && value->kind == ResolvedType::META) return static_cast<const MetaType*>(value)->inner;
 		return value;
 	}
@@ -304,16 +325,6 @@ struct CCompiler {
 			}
 			case Expression::CAST: {
 				const CastExpression* cast = static_cast<const CastExpression*>(value);
-				if (cast->expression->resolved_type && cast->resolved_type
-					&& cast->expression->resolved_type->kind == ResolvedType::STRING && cast->resolved_type->kind == ResolvedType::CSTR)
-				{
-					text("("); expression(cast->expression); text(").data"); return;
-				}
-				if (cast->expression->resolved_type && cast->resolved_type
-					&& cast->expression->resolved_type->kind == ResolvedType::CSTR && cast->resolved_type->kind == ResolvedType::STRING)
-				{
-					text("ls_string_from_cstr("); expression(cast->expression); text(")"); return;
-				}
 				text("("); if (!type(cast->resolved_type)) return; text(")"); expression(cast->expression); return;
 			}
 			case Expression::UNARY: {
@@ -335,12 +346,22 @@ struct CCompiler {
 				if (nullable && (binary->op == Token::EQUAL_EQUAL || binary->op == Token::BANG_EQUAL)) {
 					text("("); expression(nullable); text(".has_value "); text(binary->op == Token::EQUAL_EQUAL ? "== false" : "!= false"); text(")"); return;
 				}
-				if (binary->lhs && binary->rhs && binary->lhs->resolved_type && binary->rhs->resolved_type
-					&& binary->lhs->resolved_type->kind == ResolvedType::STRING && binary->rhs->resolved_type->kind == ResolvedType::STRING)
+				if ((binary->op == Token::EQUAL_EQUAL || binary->op == Token::BANG_EQUAL)
+					&& binary->lhs && binary->lhs->resolved_type && binary->lhs->resolved_type->kind == ResolvedType::SLICE
+					&& binary->rhs && binary->rhs->resolved_type && binary->rhs->resolved_type->kind == ResolvedType::SLICE)
 				{
-					if (binary->op != Token::EQUAL_EQUAL && binary->op != Token::BANG_EQUAL) { unsupported(); return; }
+					// C cannot compare the ls_slice struct directly.
+					const SliceResolvedType* slice_type = static_cast<const SliceResolvedType*>(binary->lhs->resolved_type);
+					const bool is_float = slice_type->element_type
+						&& (slice_type->element_type->kind == ResolvedType::F32 || slice_type->element_type->kind == ResolvedType::F64);
+					text("(");
 					if (binary->op == Token::BANG_EQUAL) text("!");
-					text("ls_string_equal("); expression(binary->lhs); text(", "); expression(binary->rhs); text(")"); return;
+					text(is_float
+						? (slice_type->element_type->kind == ResolvedType::F32 ? "ls_slice_eq_f32(" : "ls_slice_eq_f64(")
+						: "ls_slice_eq(");
+					expression(binary->lhs); text(", "); expression(binary->rhs);
+					if (!is_float) { text(", "); integer(typeByteSize(*slice_type->element_type)); }
+					text("))"); return;
 				}
 				if (binary->resolved_fn) {
 					const i32 index = operatorFunctionIndex(binary->resolved_fn);
@@ -370,18 +391,16 @@ struct CCompiler {
 					const MemberExpression* member = static_cast<const MemberExpression*>(call->callee);
 					const i32 function = directFunctionIndex(call->resolved_fn);
 					if (!member->expression || function < 0) { unsupported(); return; }
-					const FunctionResolvedType* fn_type = static_cast<const FunctionResolvedType*>(call->resolved_fn->resolved_type);
 					directFunctionName(function); text("(");
-					if ((member->expression->kind == Expression::STRING_LITERAL || member->expression->resolved_type->kind == ResolvedType::STRING) && call->resolved_fn->params[0].resolved_type->kind == ResolvedType::CSTR) { text("("); expression(member->expression); text(").data"); } else expression(member->expression);
-					for (i32 i = 0; i < call->args.size(); ++i) { text(", "); if ((call->args[i]->kind == Expression::STRING_LITERAL || call->args[i]->resolved_type->kind == ResolvedType::STRING) && call->resolved_fn->params[i + 1].resolved_type->kind == ResolvedType::CSTR) { text("("); expression(call->args[i]); text(").data"); } else expression(call->args[i]); }
+					if (member->expression->kind == Expression::STRING_LITERAL && call->resolved_fn->params[0].resolved_type->kind == ResolvedType::CSTR) { text("("); expression(member->expression); text(").data"); } else expression(member->expression);
+					for (i32 i = 0; i < call->args.size(); ++i) { text(", "); if (call->args[i]->kind == Expression::STRING_LITERAL && call->resolved_fn->params[i + 1].resolved_type->kind == ResolvedType::CSTR) { text("("); expression(call->args[i]); text(").data"); } else expression(call->args[i]); }
 					text(")"); return;
 				}
 				if (call->resolved_fn) {
 					const i32 function = directFunctionIndex(call->resolved_fn);
 					if (function < 0) { unsupported(); return; }
-					const FunctionResolvedType* fn_type = static_cast<const FunctionResolvedType*>(call->resolved_fn->resolved_type);
 					directFunctionName(function); text("(");
-					for (i32 i = 0; i < call->args.size(); ++i) { if (i) text(", "); if ((call->args[i]->kind == Expression::STRING_LITERAL || call->args[i]->resolved_type->kind == ResolvedType::STRING) && call->resolved_fn->params[i].resolved_type->kind == ResolvedType::CSTR) { text("("); expression(call->args[i]); text(").data"); } else expression(call->args[i]); }
+					for (i32 i = 0; i < call->args.size(); ++i) { if (i) text(", "); if (call->args[i]->kind == Expression::STRING_LITERAL && call->resolved_fn->params[i].resolved_type->kind == ResolvedType::CSTR) { text("("); expression(call->args[i]); text(").data"); } else expression(call->args[i]); }
 					text(")"); return;
 				}
 				expression(call->callee); text("(");
@@ -393,7 +412,7 @@ struct CCompiler {
 					if (symbol && symbol->expression && symbol->expression->kind == Expression::FUNCTION) { callee_fn = static_cast<const FunctionExpression*>(symbol->expression); callee_type = callee_fn->resolved_type; }
 				}
 				const FunctionResolvedType* fn_type = callee_type && callee_type->kind == ResolvedType::FUNCTION ? static_cast<const FunctionResolvedType*>(callee_type) : nullptr;
-				for (i32 i = 0; i < call->args.size(); ++i) { if (i) text(", "); if (((callee_fn && callee_fn->params[i].resolved_type && callee_fn->params[i].resolved_type->kind == ResolvedType::CSTR) || (fn_type && fn_type->params[i].type->kind == ResolvedType::CSTR)) && (call->args[i]->kind == Expression::STRING_LITERAL || call->args[i]->resolved_type->kind == ResolvedType::STRING)) { text("("); expression(call->args[i]); text(").data"); } else expression(call->args[i]); }
+				for (i32 i = 0; i < call->args.size(); ++i) { if (i) text(", "); if (((callee_fn && callee_fn->params[i].resolved_type && callee_fn->params[i].resolved_type->kind == ResolvedType::CSTR) || (fn_type && fn_type->params[i].type->kind == ResolvedType::CSTR)) && call->args[i]->kind == Expression::STRING_LITERAL) { text("("); expression(call->args[i]); text(").data"); } else expression(call->args[i]); }
 				text(")"); return;
 			}
 			case Expression::FUNCTION: {
@@ -518,7 +537,7 @@ struct CCompiler {
 		if (symbol.expression && symbol.expression->kind != Expression::UNDEFINED) {
 			text(" = ");
 			if (symbol.resolved_type->kind == ResolvedType::NULLABLE) nullableValue(static_cast<const NullableResolvedType*>(symbol.resolved_type), symbol.expression);
-			else if (symbol.resolved_type->kind == ResolvedType::CSTR && symbol.expression->resolved_type && symbol.expression->resolved_type->kind == ResolvedType::STRING) { text("("); expression(symbol.expression); text(").data"); }
+			else if (symbol.resolved_type->kind == ResolvedType::CSTR && symbol.expression->kind == Expression::STRING_LITERAL) { text("("); expression(symbol.expression); text(").data"); }
 			else expression(symbol.expression);
 		}
 		text(";"); line();
@@ -605,7 +624,7 @@ struct CCompiler {
 			}
 			case Statement::EXPRESSION: expression(static_cast<const ExpressionStatement*>(value)->expression); text(";"); return;
 			case Statement::RETURN: { const auto* ret = static_cast<const ReturnStatement*>(value); emitDeferredScopes(0); pad(); text("return"); if (ret->expression) { text(" "); expression(ret->expression); } text(";"); return; }
-			case Statement::VAR_DECL: { const auto* var = static_cast<const VarDeclStatement*>(value); if (var->resolved_type->kind == ResolvedType::NULLABLE) { nullableDeclaration(static_cast<const NullableResolvedType*>(var->resolved_type)); pad(); } if (!declaration(var->resolved_type, var->name)) return; if (var->expression && var->expression->kind != Expression::UNDEFINED) { text(" = "); if (var->resolved_type->kind == ResolvedType::NULLABLE) nullableValue(static_cast<const NullableResolvedType*>(var->resolved_type), var->expression); else if (var->resolved_type->kind == ResolvedType::CSTR && var->expression->resolved_type && var->expression->resolved_type->kind == ResolvedType::STRING) { text("("); expression(var->expression); text(").data"); } else expression(var->expression); } text(";"); if (var->resolved_type->kind == ResolvedType::NULLABLE) bindNullable(var->name, static_cast<const NullableResolvedType*>(var->resolved_type)); return; }
+			case Statement::VAR_DECL: { const auto* var = static_cast<const VarDeclStatement*>(value); if (var->resolved_type->kind == ResolvedType::NULLABLE) { nullableDeclaration(static_cast<const NullableResolvedType*>(var->resolved_type)); pad(); } if (!declaration(var->resolved_type, var->name)) return; if (var->expression && var->expression->kind != Expression::UNDEFINED) { text(" = "); if (var->resolved_type->kind == ResolvedType::NULLABLE) nullableValue(static_cast<const NullableResolvedType*>(var->resolved_type), var->expression); else if (var->resolved_type->kind == ResolvedType::CSTR && var->expression->kind == Expression::STRING_LITERAL) { text("("); expression(var->expression); text(").data"); } else expression(var->expression); } text(";"); if (var->resolved_type->kind == ResolvedType::NULLABLE) bindNullable(var->name, static_cast<const NullableResolvedType*>(var->resolved_type)); return; }
 			case Statement::ASSIGN: {
 				const auto* assign = static_cast<const AssignStatement*>(value);
 				if (assign->resolved_op_fn) {
@@ -627,7 +646,7 @@ struct CCompiler {
 				const auto* loop = static_cast<const ForStatement*>(value); if (loop_count == 64) { unsupported(); return; }
 				const i32 loop_index = loop_count++; const u32 id = next_loop_id++;
 				loop_defer_depths[loop_index] = deferred_scope_count; loop_labels[loop_index] = pending_loop_label; loop_ids[loop_index] = id; pending_loop_label = {};
-				text("for ("); if (!type(loop->begin->resolved_type)) { --loop_count; return; } text(" "); text(loop->loop_var); text(" = "); expression(loop->begin); text("; "); text(loop->loop_var); text(" < "); expression(loop->end); text("; ++"); text(loop->loop_var); text(") {"); line(); ++indent;
+				text("for ("); if (!type(loop->begin->resolved_type)) { --loop_count; return; } text(" "); text(loop->key_var); text(" = "); expression(loop->begin); text("; "); text(loop->key_var); text(" < "); expression(loop->end); text("; ++"); text(loop->key_var); text(") {"); line(); ++indent;
 				pad(); statement(loop->body); line(); pad(); loopLabel("continue", id); text(": ;"); line(); --indent; pad(); text("}"); line(); pad(); loopLabel("break", id); text(": ;"); --loop_count; return;
 			}
 			case Statement::BREAK: { const auto* br = static_cast<const BreakStatement*>(value); const i32 loop = findLoop(br->label); if (loop < 0) { unsupported(); return; } emitDeferredScopes(loop_defer_depths[loop]); pad(); if (empty(br->label)) text("break;"); else { text("goto "); loopLabel("break", loop_ids[loop]); text(";"); } return; }
@@ -772,7 +791,8 @@ static void configureRuntime(CCompiler& compiler, const Unit& unit) {
 		const FunctionExpression& fn = *static_cast<const FunctionExpression*>(symbol.expression);
 		const FunctionResolvedType* type = static_cast<const FunctionResolvedType*>(fn.resolved_type);
 		if (fn.is_extern && type && type->return_type && type->return_type->kind == ResolvedType::VOID
-			&& fn.params.size() == 1 && fn.params[0].resolved_type && fn.params[0].resolved_type->kind == ResolvedType::STRING)
+			&& fn.params.size() == 1 && fn.params[0].resolved_type && fn.params[0].resolved_type->kind == ResolvedType::SLICE
+			&& static_cast<SliceResolvedType*>(fn.params[0].resolved_type)->element_type->kind == ResolvedType::U8)
 		{
 			compiler.emit_print = true;
 		}
