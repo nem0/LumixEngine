@@ -280,12 +280,7 @@ struct Parser {
 
 		sym.expression = expression();
 		if (!sym.expression) return false;
-		if (storage != Symbol::COMPTIME) {
-			if (!consume(Token::SEMICOLON)) return false;
-		}
-		else if (peekToken().type == Token::SEMICOLON) {
-			consumeToken();
-		}
+		if (!consume(Token::SEMICOLON)) return false;
 
 		return addSymbol(sym);
 	}
@@ -707,38 +702,6 @@ struct Parser {
 		return expr;
 	}
 
-	bool templateParams(ExpArray<NamedDecl>& params) {
-		if (peekToken().type != Token::LEFT_BRACKET) return true;
-		consumeToken();
-		if (peekToken().type == Token::RIGHT_BRACKET) {
-			m_output.error("Template parameter list can not be empty");
-			return false;
-		}
-		while (peekToken().type != Token::RIGHT_BRACKET) {
-			if (peekToken().type == Token::END_OF_FILE) {
-				m_output.error("Unexpected end of file");
-				return false;
-			}
-
-			NamedDecl& param = params.emplace_back();
-			if (!consume(Token::IDENTIFIER, param.name, "Expected parameter name")) return false;
-			for (i32 i = 0; i < params.size() - 1; ++i) {
-				if (!equalStrings(params[i].name, param.name)) continue;
-				m_output.error("Duplicate template parameter: ", param.name);
-				return false;
-			}
-			if (peekToken().type == Token::COLON) {
-				consumeToken();
-				param.type_expr = type();
-				if (!param.type_expr) return false;
-			}
-			if (peekToken().type != Token::COMMA) break;
-			consumeToken();
-		}
-		if (!consume(Token::RIGHT_BRACKET)) return false;
-		return true;
-	}
-
 	static ResolvedType::Kind primitiveKindFromToken(Token::Type type) {
 		switch (type) {
 			case Token::VOID: return ResolvedType::VOID;
@@ -818,7 +781,11 @@ struct Parser {
 			}
 			FunctionParam& param = fn.params.emplace_back();
 			param.name = type_param.name;
-			param.is_comptime = type_param.is_comptime;
+			// A type value has no runtime representation, so a `type` parameter always
+			// specializes the function just like an explicitly comptime one.
+			param.is_comptime = type_param.is_comptime
+				|| (type_param.type_expr->kind == Expression::TYPE_LITERAL
+					&& static_cast<TypeLiteralExpression*>(type_param.type_expr)->type == ResolvedType::META);
 			param.is_ref = type_param.is_ref;
 			param.type_expr = type_param.type_expr;
 			for (i32 i = 0; i < fn.params.size() - 1; ++i) {
@@ -924,29 +891,51 @@ struct Parser {
 			return nullptr;
 		}
 
-		// TODO should we move this inside case Token::IDENTIFIER:?
-		// Brackets after a (possibly qualified) name in type position are template
-		// instantiation; array/slice syntax is prefix ([N]T, []T), so there is no ambiguity.
+		// A type factory call is an ordinary compile-time call used where a type is
+		// required, for example `Vec2(T)`.
 		if ((res->kind == Expression::IDENTIFIER || res->kind == Expression::MEMBER)
-			&& peekToken().type == Token::LEFT_BRACKET)
+			&& peekToken().type == Token::LEFT_PAREN)
 		{
-			Token bracket = consumeToken();
-			BracketExpression* call = makeExpr<BracketExpression>(bracket, m_unit.arena);
-			call->base = res;
-			while (peekToken().type != Token::RIGHT_BRACKET) {
+			Token paren = consumeToken();
+			CallExpression* call = makeExpr<CallExpression>(paren, m_unit.arena);
+			call->callee = res;
+			while (peekToken().type != Token::RIGHT_PAREN) {
 				if (peekToken().type == Token::END_OF_FILE) {
 					m_output.error("Unexpected end of file");
 					return nullptr;
 				}
-
-				Expression* arg = expression(ExprMode::HEAD);
+				Expression* arg = expression();
 				if (!arg) return nullptr;
 				call->args.push(arg);
 				if (peekToken().type != Token::COMMA) break;
 				consumeToken();
 			}
-			if (!consume(Token::RIGHT_BRACKET)) return nullptr;
+			if (!consume(Token::RIGHT_PAREN)) return nullptr;
 			res = call;
+		}
+
+		// Brackets index a compile-time sequence, e.g. `comptime Types = [i32, f32];` used
+		// as `Types[1]`. Array and slice syntax is prefix ([N]T, []T), so there is no
+		// ambiguity with a type annotation. Applying type arguments is a call, not an index.
+		if ((res->kind == Expression::IDENTIFIER || res->kind == Expression::MEMBER)
+			&& peekToken().type == Token::LEFT_BRACKET)
+		{
+			Token bracket = consumeToken();
+			BracketExpression* index = makeExpr<BracketExpression>(bracket, m_unit.arena);
+			index->base = res;
+			while (peekToken().type != Token::RIGHT_BRACKET) {
+				if (peekToken().type == Token::END_OF_FILE) {
+					m_output.error("Unexpected end of file");
+					return nullptr;
+				}
+				Expression* arg = expression(ExprMode::HEAD);
+				if (!arg) return nullptr;
+				index->args.push(arg);
+				if (peekToken().type != Token::COMMA) break;
+				consumeToken();
+			}
+			if (!consume(Token::RIGHT_BRACKET)) return nullptr;
+			res = index;
 		}
 
 		if (!allow_union || peekToken().type != Token::PIPE) return res;
@@ -1526,30 +1515,25 @@ struct Parser {
 
 	StructExpression* structExpression() {
 		StructExpression* st = make<StructExpression>(m_unit.arena);
-		if (!templateParams(st->comptime_params)) return nullptr;
-		m_comptime_params = st->comptime_params.empty() ? nullptr : &st->comptime_params;
-		if (!consume(Token::LEFT_BRACE)) { m_comptime_params = nullptr; return nullptr; }
+		if (!consume(Token::LEFT_BRACE)) return nullptr;
 		while (peekToken().type != Token::RIGHT_BRACE) {
 			if (peekToken().type == Token::END_OF_FILE) {
 				m_output.error("Unexpected end of file");
-				m_comptime_params = nullptr;
 				return nullptr;
 			}
 
 			NamedDecl& field = st->fields.emplace_back();
-			if (!consume(Token::IDENTIFIER, field.name, "Expected field name")) { m_comptime_params = nullptr; return nullptr; }
+			if (!consume(Token::IDENTIFIER, field.name, "Expected field name")) return nullptr;
 			for (i32 i = 0; i < st->fields.size() - 1; ++i) {
 				if (!equalStrings(st->fields[i].name, field.name)) continue;
 				m_output.error("Duplicate field: ", field.name);
-				m_comptime_params = nullptr;
 				return nullptr;
 			}
-			if (!consume(Token::COLON)) { m_comptime_params = nullptr; return nullptr; }
+			if (!consume(Token::COLON)) return nullptr;
 			field.type_expr = type();
-			if (!field.type_expr) { m_comptime_params = nullptr; return nullptr; }
-			if (!consume(Token::SEMICOLON)) { m_comptime_params = nullptr; return nullptr; }
+			if (!field.type_expr) return nullptr;
+			if (!consume(Token::SEMICOLON)) return nullptr;
 		}
-		m_comptime_params = nullptr;
 		if (!consume(Token::RIGHT_BRACE)) return nullptr;
 		return st;
 	}
@@ -1685,6 +1669,7 @@ struct Parser {
 
 		FunctionExpression* fn = functionExpression();
 		if (!fn) return false;
+		fn->token = name_token;
 		return namedComptimeDecl(name_token, fn);
 	}
 
@@ -1716,7 +1701,6 @@ struct Parser {
 	Unit& m_unit;
 	Tokenizer m_tokenizer;
 	OutputFormatter m_output;
-	const ExpArray<NamedDecl>* m_comptime_params = nullptr;
 };
 
 // Parse a module, e.g. `ls_module_parse(module, source, name)`.

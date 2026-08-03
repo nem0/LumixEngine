@@ -1099,17 +1099,15 @@ TEST(UfcsNotShadowedByLocalFunctionWithSameName) {
 		fn init(x : i32) : void {}
 
 		fn main() : void {
-			var a : arr.Array[i32] = undefined;
+			var a : arr.Array = undefined;
 			a.init();
 			init(5);
 		}
 	)";
 	const char* arr_source = R"(
-		struct Array[T] {
-			size : isize;
-		}
+		struct Array { size : isize; }
 
-		fn init(array : ref Array[$T]) : void {
+		fn init(array : ref Array) : void {
 			array.size = 0;
 		}
 	)";

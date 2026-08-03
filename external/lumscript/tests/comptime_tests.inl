@@ -9,6 +9,13 @@ TEST(ComptimeBasic) {
 	return true;
 }
 
+TEST(TopLevelComptimeRequiresSemicolon) {
+	EXPECT_COMPILE_FAIL(R"(
+		comptime value = 1
+	)");
+	return true;
+}
+
 TEST(ComptimeUntypedIntNarrowParameterMustFail) {
 	EXPECT_COMPILE_FAIL(R"(
 		fn takes(value : comptime i8) : void {}
@@ -40,13 +47,40 @@ TEST(ComptimeUntypedIntToInexactFloatMustFail) {
 	return true;
 }
 
-TEST(ComptimeUntypedIntNarrowTemplateArgumentMustFail) {
-	EXPECT_COMPILE_FAIL(R"(
-		comptime Box = struct[N : i8] { value : i32; };
-		fn main() : void {
-			var box : Box[200] = undefined;
+// The raw storage of an untyped integer cannot tell -1 from U64_MAX, so materializing one
+// has to consult the sign. A negated literal is special-cased, but a negative value can
+// also come out of any other folded expression.
+TEST(ComptimeNegativeUntypedIntFromExpressionMaterializes) {
+	const char* source = R"(
+		comptime value = 1 - 2;
+		fn main() : i32 {
+			return value;
 		}
-	)");
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(-1, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+// Same, with the negative produced by a comptime call rather than by an operator.
+TEST(ComptimeNegativeUntypedIntFromCallMaterializes) {
+	const char* source = R"(
+		fn negate(n : comptime i32) : i32 { return -n; }
+		comptime value = negate(1);
+		fn main() : i32 {
+			return value;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(-1, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -516,20 +550,6 @@ TEST(ComptimeVariableInitielizedWithFunctionReturningNumericValue) {
 	return true;
 }
 
-TEST(ComptimeArray) {
-	const char* source = R"(
-		comptime A = [i32, f32];
-		fn foo() : A[1] { return 3.14; }
-	)";
-	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
-	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("foo")));
-	EXPECT_FLOAT_EQ(3.14f, ls_to_f32(runtime, -1));
-	CAPI_END(module);
-	return true;
-}
-
 TEST(ComptimeArray2) {
 	const char* source = R"(
 		fn foo() : [2]i32 { 
@@ -580,7 +600,7 @@ TEST(ComptimeArray3) {
 
 TEST(ComptimeArrayUnrollFor) {
 	const char* source = R"(
-		comptime A = [1, 2, 3]
+		comptime A = [1, 2, 3];
 		
 		fn foo() : i32 {
 			var sum : i32 = 0;
@@ -610,7 +630,7 @@ TEST(ComptimeArrayUnrollFor) {
 // folded constant. A breakpoint in foo() should never fire; it fires twice.
 TEST(ComptimeArrayUnrollForFoldsWithoutRunningFooAtRuntime) {
 	const char* source = R"(
-		comptime A = [1, 2, 3]
+		comptime A = [1, 2, 3];
 
 		fn foo() : i32 {
 			var sum : i32 = 0;
@@ -751,7 +771,7 @@ TEST(ComptimeEnumBindingTypechecks) {
 		comptime State = enum {
 			Idle,
 			Running
-		}
+		};
 
 		fn main() : State {
 			return State.Idle;
@@ -807,7 +827,7 @@ TEST(ComptimeStructBindingTypechecks) {
 		comptime Vec2 = struct {
 			x : f32;
 			y : f32;
-		}
+		};
 
 		fn main() : Vec2 {
 			return Vec2 { 1.0, 2.0 };
@@ -817,19 +837,135 @@ TEST(ComptimeStructBindingTypechecks) {
 	return true;
 }
 
-TEST(ComptimeFunctionReturningTypeFails) {
+TEST(ComptimeFunctionReturnsStructType) {
 	const char* source = R"(
-		comptime make_vec2 = fn(T : type) : type {
+		fn pair(T : type) : type {
 			return struct {
-				x : T;
-				y : T;
+				a : T;
+				b : T;
 			};
 		}
 
-		comptime Vec2 = make_vec2(f32);
+		comptime Pair = pair(i32);
 
-		fn main() : Vec2 {
-			return Vec2 { 1.0, 2.0 };
+		fn main() : i32 {
+			var value : Pair = Pair { 20, 22 };
+			return value.a + value.b;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeFunctionReturnedStructTypeIsCanonical) {
+	const char* source = R"(
+		fn pair(T : type) : type {
+			return struct { a : T; b : T; };
+		}
+
+		comptime First = pair(i32);
+		comptime Second = pair(i32);
+
+		fn accept(value : First) : i32 { return value.a + value.b; }
+		fn main() : i32 { return accept(Second { 20, 22 }); }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(TypeFactoryCallInTypeAnnotation) {
+	const char* source = R"(
+		fn vec2(T : type) : type {
+			return struct { x : T; y : T; };
+		}
+
+		fn sum(value : vec2(i32)) : i32 { return value.x + value.y; }
+		fn main() : i32 { return sum(vec2(i32) { 20, 22 }); }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(TypeFactoryCallInGenericTypeAnnotation) {
+	const char* source = R"(
+		fn vec2(T : type) : type {
+			return struct { x : T; y : T; };
+		}
+
+		fn first(T : type, value : vec2(T)) : T { return value.x; }
+		fn main() : i32 { return first(i32, vec2(i32) { 42, 0 }); }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(TypeFactoryCallInfersGenericTypeAnnotation) {
+	const char* source = R"(
+		fn vec2(T : type) : type {
+			return struct { x : T; y : T; };
+		}
+
+		fn first(value : vec2($T)) : T { return value.x; }
+		fn main() : i32 { return first(vec2(i32) { 42, 0 }); }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(TypeFactoryValueDependentStructLayout) {
+	const char* source = R"(
+		fn array_type(T : type, N : comptime i32) : type {
+			return struct { values : [N]T; };
+		}
+
+		fn main() : i32 {
+			var value : array_type(i32, 4) = undefined;
+			value.values[0] = 42;
+			return value.values[0];
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(TypeFactoryValueDependentStructLayoutRejectsNegativeSize) {
+	const char* source = R"(
+		fn array_type(T : type, N : comptime i32) : type {
+			return struct { values : [N]T; };
+		}
+
+		fn main() : void {
+			var value : array_type(i32, -1) = undefined;
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -840,7 +976,7 @@ TEST(ComptimeFunctionBindingTypechecks) {
 	const char* source = R"(
 		comptime add = fn(a : i32, b : i32) : i32 {
 			return a + b;
-		}
+		};
 
 		fn main() : i32 {
 			return add(20, 22);
@@ -898,7 +1034,7 @@ TEST(ComptimeInitializerCanCallComptimeFunctionBinding) {
 	const char* source = R"(
 		comptime double = fn(v : i32) : i32 {
 			return v * 2;
-		}
+		};
 
 		comptime N = double(16);
 
@@ -940,7 +1076,7 @@ TEST(ComptimeFunctionCanCallOtherComptimeFunction) {
 	return true;
 }
 
-TEST(ComptimeInitializerCanNotCallTypeProducingFunction) {
+TEST(ComptimeInitializerCanCallTypeProducingFunction) {
 	const char* source = R"(
 		fn make_vec2(T : type) : type {
 			return struct {
@@ -955,7 +1091,7 @@ TEST(ComptimeInitializerCanNotCallTypeProducingFunction) {
 			return Vec2 { 1.0, 2.0 };
 		}
 	)";
-	EXPECT_COMPILE_FAIL(source);
+	EXPECT_COMPILE(source);
 	return true;
 }
 
@@ -2309,5 +2445,277 @@ TEST(ComptimeUnaryTypeMatch) {
 		comptime A = 128;
 		comptime B : i8 = -A;
 	)");
+	return true;
+}
+
+// A type factory is an ordinary comptime function, so its body is not restricted to a
+// single `return struct {...}`. Naming and identity of the produced type must not depend
+// on the body's shape.
+TEST(TypeFactoryWithMultiStatementBodyNamesItsType) {
+	const char* source = R"FACTORY(
+		fn tagged(T : type) : type {
+			comptime unused = 1;
+			return struct { value : T; };
+		}
+
+		comptime Tagged = tagged(i32);
+
+		fn main() : void {
+			if Tagged::name == "tagged(i32)" { }
+			else { var bad : MissingType = undefined; }
+		}
+	)FACTORY";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(TypeFactoryWithMultiStatementBodyProducesDistinctTypes) {
+	const char* source = R"(
+		fn tagged(T : type) : type {
+			comptime unused = 1;
+			return struct { value : T; };
+		}
+
+		fn take(value : tagged(i32)) : i32 { return value.value; }
+
+		fn main() : void {
+			var mismatched : tagged(f32) = tagged(f32) { 1.0 };
+			const bad = take(mismatched);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(TypeFactoryWithMultiStatementBodyInfersTypeArgument) {
+	const char* source = R"(
+		fn boxed(T : type) : type {
+			comptime unused = 1;
+			return struct { value : T; };
+		}
+
+		fn unwrap(b : boxed($T)) : T { return b.value; }
+
+		fn main() : i32 {
+			return unwrap(boxed(i32) { 42 });
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+// A factory call is a type expression, so it must also work when it is not the whole
+// annotation but nested under a slice, nullable, or array type.
+TEST(TypeFactoryCallNestedInSliceParameter) {
+	const char* source = R"(
+		fn vec2(T : type) : type {
+			return struct { x : T; y : T; };
+		}
+
+		fn first_x(values : []vec2(i32)) : i32 { return values[0].x; }
+
+		fn main() : i32 {
+			var values : [1]vec2(i32) = [vec2(i32) { 42, 0 }];
+			return first_x(values);
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(TypeFactoryCallNestedInNullableParameter) {
+	const char* source = R"(
+		fn vec2(T : type) : type {
+			return struct { x : T; y : T; };
+		}
+
+		fn is_null(value : ?vec2(i32)) : bool { return value == null; }
+
+		fn main() : i32 {
+			var value : ?vec2(i32) = null;
+			if is_null(value) { return 42; }
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(TypeFactoryCallNestedInNullableReturnType) {
+	const char* source = R"(
+		fn vec2(T : type) : type {
+			return struct { x : T; y : T; };
+		}
+
+		fn make() : ?vec2(i32) { return null; }
+
+		fn main() : i32 {
+			if make() == null { return 42; }
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+// Indexing a comptime list of types in type position. `[]` is no longer template
+// application, so it has to keep working as an index here.
+TEST(ComptimeTypeListIndexInTypePosition) {
+	const char* source = R"(
+		comptime A = [i32, f32];
+		fn foo() : A[1] { return 3.14; }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("foo")));
+	EXPECT_FLOAT_EQ(3.14f, ls_to_f32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+// Type factory arguments are ordinary comptime arguments, and the same diagnostics that
+// used to guard `struct[T, N : i32]` arguments still have to fire.
+TEST(TypeFactoryValueArgumentWrongTypeFails) {
+	const char* source = R"(
+		fn array_type(T : type, N : comptime i32) : type {
+			return struct { values : [N]T; };
+		}
+
+		fn main() : void {
+			var value : array_type(i32, true) = undefined;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+// A negative value is a valid argument for a signed comptime parameter. It is bounded
+// against the negative range, so it must not be rejected as out of range.
+TEST(TypeFactoryNegativeValueArgumentRuntime) {
+	const char* source = R"(
+		fn shifted(N : comptime i32) : type {
+			return struct { value : i32; };
+		}
+
+		fn main() : i32 {
+			var v : shifted(-1) = undefined;
+			v.value = 42;
+			return v.value;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+// A comptime value argument is an ordinary comptime expression, so a `sizeof` is as good
+// as a literal.
+TEST(TypeFactoryValueArgumentCanUseSizeof) {
+	const char* source = R"(
+		fn array_type(T : type, N : comptime i32) : type {
+			return struct { values : [N]T; };
+		}
+
+		fn main() : void {
+			var value : array_type(byte, sizeof(i64)) = undefined;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(TypeFactoryValueArgumentNonComptimeFails) {
+	const char* source = R"(
+		fn array_type(T : type, N : comptime i32) : type {
+			return struct { values : [N]T; };
+		}
+
+		fn main() : void {
+			var n : i32 = 4;
+			var value : array_type(i32, n) = undefined;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(TypeFactoryValueArgumentNarrowingFails) {
+	const char* source = R"(
+		fn boxed(N : comptime i8) : type {
+			return struct { value : i32; };
+		}
+
+		fn main() : void {
+			var value : boxed(200) = undefined;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(TypeFactoryMissingArgumentFails) {
+	const char* source = R"(
+		fn array_type(T : type, N : comptime i32) : type {
+			return struct { values : [N]T; };
+		}
+
+		fn main() : void {
+			var value : array_type(i32) = undefined;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(TypeFactoryTooManyArgumentsFails) {
+	const char* source = R"(
+		fn array_type(T : type, N : comptime i32) : type {
+			return struct { values : [N]T; };
+		}
+
+		fn main() : void {
+			var value : array_type(i32, 4, 8) = undefined;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(TypeFactoryUndefinedArgumentFails) {
+	const char* source = R"(
+		fn array_type(T : type, N : comptime i32) : type {
+			return struct { values : [N]T; };
+		}
+
+		fn main() : void {
+			var value : array_type(i32, undefined) = undefined;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
 	return true;
 }

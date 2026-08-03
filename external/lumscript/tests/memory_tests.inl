@@ -115,7 +115,7 @@ TEST(IsizeNoImplicitConversionFromI32Fails) {
 TEST(LengthReturnsIsize) {
 	const char* source = R"(
 		fn count(s : []i32) : isize {
-			return length(s);
+			return s.length;
 		}
 
 		fn main() : void {
@@ -357,7 +357,7 @@ TEST(SliceReinterpretToBytesLengthRuntime) {
 		fn main() : i32 {
 			var values : [4]i32 = undefined;
 			var bytes : []byte = values[:] as []byte;
-			return length(bytes) as i32;
+			return bytes.length as i32;
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -378,7 +378,7 @@ TEST(SliceReinterpretRoundTripLengthRuntime) {
 			var slice : []i32 = arr[:];
 			var bytes : []byte = slice as []byte;
 			var back : []i32 = bytes as []i32;
-			return length(back) as i32;
+			return back.length as i32;
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -422,7 +422,7 @@ TEST(ByteSliceReinterpretLengthRuntime) {
 		fn main() : i32 {
 			var raw : []byte = mem.alloc(4 * sizeof(i32), alignof(i32));
 			var ints : []i32 = raw as []i32;
-			const count = length(ints) as i32;
+			const count = ints.length as i32;
 			mem.free(raw);
 			return count;
 		}
@@ -480,7 +480,7 @@ TEST(MemberArrayToSliceAssignmentRuntime) {
 			arr[1] = 2;
 			arr[2] = 3;
 			s.items = arr;
-			return (length(s.items) as i32) + s.items[1];
+			return (s.items.length as i32) + s.items[1];
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);

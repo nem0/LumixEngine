@@ -349,7 +349,8 @@ struct TypeInfoBuilder {
 				ExpArray<ResolvedType*> ft_types(*bc->arena);
 				for (i32 i = 0; i < (i32)info->field_count; ++i) {
 					NamedDecl& field = st->decl->fields[i];
-					ResolvedType* ft = i < st->field_types.size() ? st->field_types[i] : field.resolved_type;
+					ASSERT(i < st->field_types.size());
+					ResolvedType* ft = st->field_types[i];
 					ft_indices.push_back(ft ? resolve(ft) : LS_TYPE_INDEX_NONE);
 					ft_types.push_back(ft);
 				}
@@ -542,6 +543,14 @@ struct FunctionCompiler {
 	}
 };
 
+// A `: type` function runs only during compilation, so it gets no bytecode. Every
+// non-template function has a function type once the module typechecks.
+static bool isTypeFactory(const FunctionExpression& fn) {
+	const FunctionResolvedType* type = static_cast<const FunctionResolvedType*>(fn.resolved_type);
+	ASSERT(type && type->return_type);
+	return type->return_type->kind == ResolvedType::META;
+}
+
 // TODO
 static ls_type_kind valueKindForType(ResolvedType& type) {
 	if (type.kind == ResolvedType::ENUM) return LS_TYPE_I32;
@@ -573,7 +582,8 @@ static u32 structFieldByteOffset(StructResolvedType& st, ls_string_view name, Re
 	u32 offset = 0u;
 	for (i32 i = 0; i < st.decl->fields.size(); ++i) {
 		NamedDecl& field = st.decl->fields[i];
-		ResolvedType* field_type = i < st.field_types.size() ? st.field_types[i] : field.resolved_type;
+		ASSERT(i < st.field_types.size());
+		ResolvedType* field_type = st.field_types[i];
 		if (equalStrings(field.name, name)) {
 			out_type = field_type;
 			return offset;
@@ -776,6 +786,10 @@ static void emitConstBytes(FunctionCompiler& ctx, const u8* data, u32 size) {
 	if (size - off >= 1u) {
 		emitConst1(ctx, data[off]); off += 1u;
 	}
+}
+
+static bool isUntypedNumeric(const ResolvedType* type) {
+	return type && (type->kind == ResolvedType::UNTYPED_INT || type->kind == ResolvedType::UNTYPED_FLOAT);
 }
 
 static bool emitUntypedComptimeNumeric(FunctionCompiler& ctx, const u8* data, const ResolvedType& source, const ResolvedType& target, ls_type_kind hinted_kind = LS_TYPE_INVALID) {
@@ -2744,28 +2758,6 @@ static ls_type_kind compileCall(FunctionCompiler& ctx, CallExpression& expr, ls_
 
 	if (expr.callee->kind == Expression::IDENTIFIER) {
 		IdentifierExpression* id = static_cast<IdentifierExpression*>(expr.callee);
-		if (equalStrings(id->name, makeStringView("length")) && expr.args.size() == 1 && expr.args[0]->resolved_type &&
-			(expr.args[0]->resolved_type->kind == ResolvedType::ARRAY || expr.args[0]->resolved_type->kind == ResolvedType::SLICE)) {
-			ResolvedType* arg_type = expr.args[0]->resolved_type;
-			if (arg_type->kind == ResolvedType::ARRAY) {
-				emitConst8(ctx, (u64) static_cast<ArrayResolvedType*>(arg_type)->size);
-			} else {
-				ASSERT(arg_type->kind == ResolvedType::SLICE);
-				if (expr.args[0]->kind == Expression::IDENTIFIER) {
-					IdentifierExpression& id = static_cast<IdentifierExpression&>(*expr.args[0]);
-					if (id.slot && id.slot->storage == StorageSlot::LOCAL && id.slot->type->kind == ResolvedType::SLICE) {
-						emitSliceLengthLocal(ctx, id.slot->offset);
-					} else {
-						compileExpression(ctx, *expr.args[0], LS_TYPE_SLICE);
-						emitSliceLength(ctx);
-					}
-				} else {
-					compileExpression(ctx, *expr.args[0], LS_TYPE_SLICE);
-					emitSliceLength(ctx);
-				}
-			}
-			return LS_TYPE_I64;
-		}
 		if (id->symbol) {
 			// TODO why is expr.resolved_fn null here?
 			FunctionExpression* fn = static_cast<FunctionExpression*>(id->symbol->expression);
@@ -2803,6 +2795,11 @@ static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& membe
 			emitConstU8SliceValue(ctx, member.comptime_value.value);
 			return LS_TYPE_SLICE;
 		}
+		// A folded value can be untyped while the expression has a concrete type, e.g.
+		// `.length` folds to an untyped integer but is an isize.
+		if (member.resolved_type && isUntypedNumeric(member.comptime_value.type)
+			&& emitUntypedComptimeNumeric(ctx, member.comptime_value.value, *member.comptime_value.type, *member.resolved_type))
+			return valueKindForType(*member.resolved_type);
 		emitConstBytes(ctx, member.comptime_value.value, typeByteSize(*member.comptime_value.type));
 		return valueKindForType(*member.comptime_value.type);
 	}
@@ -2818,6 +2815,21 @@ static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& membe
 		ls_type_kind kind = (i64)enum_value >= -2147483648LL && (i64)enum_value <= 2147483647LL ? LS_TYPE_I32 : LS_TYPE_I64;
 		emitIntegerConstant(ctx, kind, enum_value);
 		return kind;
+	}
+	// An array length and a comptime slice length are folded by the checker and taken by
+	// the comptime branch above, so only a runtime slice reaches here.
+	if (member.expression->resolved_type && member.expression->resolved_type->kind == ResolvedType::SLICE
+		&& equalStrings(member.name, makeStringView("length"))) {
+		if (member.expression->kind == Expression::IDENTIFIER) {
+			IdentifierExpression& id = static_cast<IdentifierExpression&>(*member.expression);
+			if (id.slot && id.slot->storage == StorageSlot::LOCAL && id.slot->type->kind == ResolvedType::SLICE) {
+				emitSliceLengthLocal(ctx, id.slot->offset);
+				return LS_TYPE_I64;
+			}
+		}
+		compileExpression(ctx, *member.expression, LS_TYPE_SLICE);
+		emitSliceLength(ctx);
+		return LS_TYPE_I64;
 	}
 	ResolvedType* base_rt = member.expression->resolved_type;
 	EnumResolvedType* enum_via_meta = (base_rt && base_rt->kind == ResolvedType::META && static_cast<MetaType*>(base_rt)->inner->kind == ResolvedType::ENUM)
@@ -3219,7 +3231,8 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 			if (type->kind == ResolvedType::STRUCT) {
 				StructResolvedType* st = static_cast<StructResolvedType*>(type);
 				for (i32 i = 0; i < lit.values.size(); ++i) {
-					ResolvedType* field_type = i < st->field_types.size() ? st->field_types[i] : st->decl->fields[i].resolved_type;
+					ASSERT(i < st->field_types.size());
+					ResolvedType* field_type = st->field_types[i];
 					compileExpressionAsType(ctx, *lit.values[i], *field_type);
 				}
 			} else {
@@ -3303,14 +3316,11 @@ static bool emitLocalLiteralInitializer(FunctionCompiler& ctx, u32 offset, Expre
 }
 
 static bool emitLocalLengthInitializer(FunctionCompiler& ctx, u32 offset, Expression& expr) {
-	if (expr.kind != Expression::CALL) return false;
-	CallExpression& call = static_cast<CallExpression&>(expr);
-	if (call.args.size() != 1u || call.callee->kind != Expression::IDENTIFIER) return false;
-	IdentifierExpression& callee = static_cast<IdentifierExpression&>(*call.callee);
-	if (!equalStrings(callee.name, makeStringView("length"))) return false;
-	Expression* arg = call.args[0];
-	if (arg->kind != Expression::IDENTIFIER || !arg->resolved_type || arg->resolved_type->kind != ResolvedType::SLICE) return false;
-	IdentifierExpression& id = static_cast<IdentifierExpression&>(*arg);
+	if (expr.kind != Expression::MEMBER) return false;
+	MemberExpression& member = static_cast<MemberExpression&>(expr);
+	if (!member.expression || member.expression->kind != Expression::IDENTIFIER || !member.expression->resolved_type
+		|| member.expression->resolved_type->kind != ResolvedType::SLICE || !equalStrings(member.name, makeStringView("length"))) return false;
+	IdentifierExpression& id = static_cast<IdentifierExpression&>(*member.expression);
 	if (!id.slot || id.slot->storage != StorageSlot::LOCAL || id.slot->type->kind != ResolvedType::SLICE) return false;
 	emitSliceLengthToLocal(ctx, offset, id.slot->offset);
 	return true;
@@ -4404,7 +4414,7 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host) {
 		for (Symbol& sym : unit.symbols) {
 			if (!sym.expression || sym.expression->kind != Expression::FUNCTION) continue;
 			FunctionExpression* fn = static_cast<FunctionExpression*>(sym.expression);
-			if (fn->is_template) continue;
+			if (fn->is_template || isTypeFactory(*fn)) continue;
 			fn->bytecode_index = function_count++;
 		}
 	}
@@ -4412,7 +4422,7 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host) {
 		for (Symbol& sym : unit.symbols) {
 			if (!sym.expression || sym.expression->kind != Expression::FUNCTION) continue;
 			FunctionExpression* fn = static_cast<FunctionExpression*>(sym.expression);
-			if (fn->is_template) continue;
+			if (fn->is_template || isTypeFactory(*fn)) continue;
 			if (!compileFunctionBytecode(bytecode, &type_builder,
 					fn,
 					static_cast<FunctionResolvedType*>(fn->resolved_type),

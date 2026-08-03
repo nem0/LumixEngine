@@ -186,7 +186,7 @@ TEST(UntypedLiteralsConcretizeInAllContexts) {
 			const default_value = 17;
 			const union_value : Number = 18;
 
-			for index in 0..length(array) {
+			for index in 0..array.length {
 				if typeof(index) != isize { var impossible : MissingType = undefined; }
 			}
 			match wide {

@@ -1,17 +1,19 @@
 import "std:mem" as mem
 
-struct Array[T] {
-	data : []T;
-	size : isize;
-	capacity : isize;
+fn Array(T : type) : type {
+	return struct {
+		data : []T;
+		size : isize;
+		capacity : isize;
+	};
 }
 
-fn init(array : ref Array[$T]) : void {
+fn init(array : ref Array($T)) : void {
 	array.size = 0;
 	array.capacity = 0;
 }
 
-fn destroy(array : ref Array[$T]) : void {
+fn destroy(array : ref Array($T)) : void {
 	if array.capacity > 0 {
 		mem.free(array.data as []byte);
 	}
@@ -20,7 +22,7 @@ fn destroy(array : ref Array[$T]) : void {
 	array.capacity = 0;
 }
 
-fn reserve(array : ref Array[$T], capacity : isize) : void {
+fn reserve(array : ref Array($T), capacity : isize) : void {
 	if capacity <= array.capacity {
 		return;
 	}
@@ -39,7 +41,7 @@ fn reserve(array : ref Array[$T], capacity : isize) : void {
 	array.capacity = capacity;
 }
 
-fn push(array : ref Array[$T], value : T) : void {
+fn push(array : ref Array($T), value : T) : void {
 	if array.size == array.capacity {
 		reserve(ref array, array.capacity * 2 + 4);
 	}
@@ -47,14 +49,14 @@ fn push(array : ref Array[$T], value : T) : void {
 	array.size += 1;
 }
 
-fn get(array : Array[$T], index : isize) : T {
+fn get(array : Array($T), index : isize) : T {
 	return array.data[index];
 }
 
-fn set(array : ref Array[$T], index : isize, value : T) : void {
+fn set(array : ref Array($T), index : isize, value : T) : void {
 	array.data[index] = value;
 }
 
-fn slice(array : Array[$T]) : []T {
+fn slice(array : Array($T)) : []T {
 	return array.data[:array.size];
 }

@@ -3,7 +3,7 @@ TEST(FunctionTypeIntrospectionParamsAndReturn) {
 		comptime Handler = fn(i32, f32) : bool;
 		comptime params = Handler::params;
 		comptime result = Handler::ret;
-		comptime count = length(params);
+		comptime count = params.length;
 
 		fn main() : i32 {
 			return count;
@@ -469,7 +469,7 @@ TEST(IntrospectionKindProvingBranchAllowsFields) {
 TEST(IntrospectionSequenceLength) {
 	const char* source = R"(
 		comptime U = i32 | f32;
-		comptime count = length(U::types);
+		comptime count = U::types.length;
 		fn main() : i32 { return count; }
 	)";
 	EXPECT_COMPILE(source);
@@ -479,7 +479,7 @@ TEST(IntrospectionSequenceLength) {
 TEST(IntrospectionEmptySequenceLength) {
 	const char* source = R"(
 		comptime empty : []type = null;
-		comptime count = length(empty);
+		comptime count = empty.length;
 		fn main() : i32 { return count; }
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -845,13 +845,13 @@ TEST(IntrospectionArrayLengthMaterializes) {
 	return true;
 }
 
-TEST(IntrospectionTypeMembersRequireComptimeType) {
+TEST(IntrospectionTypeParametersAreComptime) {
 	const char* source = R"(
 		fn inspect(T : type) : void {
 			comptime kind = T::kind;
 		}
 	)";
-	EXPECT_COMPILE_FAIL(source);
+	EXPECT_COMPILE(source);
 	return true;
 }
 
@@ -979,16 +979,21 @@ TEST(IntrospectionNumericTypeBoundsFoldBeforeBytecode) {
 }
 
 TEST(IntrospectionTypeNamesCoverDeclarationsTemplatesAndUnions) {
-	const char* source = R"(
+	const char* source = R"FACTORY(
 		struct S { value : i32; }
 		enum E { Value }
-		struct Pair[T] { first : T; second : T; }
+		fn pair(T : type) : type { return struct { first : T; second : T; }; }
+		fn box(T : type) : type { return struct { value : T; }; }
+		fn static_array(T : type, N : comptime i32) : type { return struct { values : [N]T; }; }
+		comptime PairI32 = pair(i32);
+		comptime Nested = box(pair(i32));
+		comptime Array = static_array(i32, 4);
 		comptime U = f32 | i32;
 		fn main() : void {
-			if i32::name == "i32" and S::name == "S" and E::name == "E" and Pair[i32]::name == "Pair[i32]" and U::name == "f32 | i32" { }
+			if i32::name == "i32" and S::name == "S" and E::name == "E" and PairI32::name == "pair(i32)" and Nested::name == "box(pair(i32))" and Array::name == "static_array(i32, 4)" and U::name == "f32 | i32" { }
 			else { var bad : MissingType = undefined; }
 		}
-	)";
+	)FACTORY";
 	EXPECT_COMPILE(source);
 	return true;
 }
@@ -1274,7 +1279,7 @@ TEST(IntrospectionGenericPrintRendersEveryKind) {
 
 				case .Slice, .Array:
 					write_bytes("[");
-					for i in 0..length(v) {
+					for i in 0..v.length {
 						if i > 0 { write_bytes(", "); }
 						print(v[i]);
 					}

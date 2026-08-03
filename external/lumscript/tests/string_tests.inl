@@ -2,7 +2,7 @@ TEST(StringLiteralIsConstU8Slice) {
 	const char* source = R"(
 		fn main() : i32 {
 			const text : []const u8 = "Lumix";
-			return length(text) as i32 + text[0] as i32;
+			return text.length as i32 + text[0] as i32;
 		}
 	)";
 

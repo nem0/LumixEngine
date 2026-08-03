@@ -62,9 +62,6 @@ struct StructResolvedType : ResolvedType {
 		, field_types(arena) {}
 
 	StructExpression* decl = nullptr;
-	// A generic declaration is shared by every specialization, therefore its
-	// NamedDecl::resolved_type cannot describe the fields of a concrete value.
-	// Keep the substituted field types on the canonical struct instance instead.
 	ExpArray<ResolvedType*> field_types;
 	bool is_compiler_only = false;
 };
@@ -124,20 +121,15 @@ struct ComptimeValue {
 	operator bool() const { return kind != FAILURE; }
 };
 
-struct TemplateStructInstance {
-	TemplateStructInstance(ls_arena& arena) : args(arena) {}
-
-	ExpArray<ComptimeValue> args;
-	StructResolvedType* type = nullptr;
-	bool check_failed = false;
-};
-
 struct TemplateFunctionInstance {
 	TemplateFunctionInstance(ls_arena& arena) : args(arena) {}
 
 	ExpArray<ComptimeValue> args;
 	FunctionExpression* instance = nullptr;
 	FunctionResolvedType* type = nullptr;
+	// Type produced by a `: type` function, recorded when the call is folded. Template
+	// argument inference through a factory call pattern matches against it.
+	ResolvedType* produced_type = nullptr;
 	bool check_failed = false;
 };
 

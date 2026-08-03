@@ -155,7 +155,7 @@ TEST(RuntimeScalarToSliceView) {
 			var value : i32 = 4;
 			var values : []i32 = value[:];
 			values[0] += 3;
-			return value + length(values) as i32;
+			return value + values.length as i32;
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);

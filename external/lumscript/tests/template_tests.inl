@@ -325,13 +325,10 @@ TEST(TemplateFunctionRefArgumentMustBeWritableFails) {
 
 TEST(TemplateStructFieldTypeMismatchFails) {
 	const char* source = R"(
-		struct Pair[T] {
-			first  : T;
-			second : T;
-		}
+		fn Pair(T : type) : type { return struct { first : T; second : T; }; }
 
 		fn main() : void {
-			var p : Pair[i32] = Pair[i32] { 1, 2.0 };
+			var p : Pair(i32) = Pair(i32) { 1, 2.0 };
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -340,14 +337,11 @@ TEST(TemplateStructFieldTypeMismatchFails) {
 
 TEST(TemplateStructTwoInstantiations) {
 	const char* source = R"(
-		struct Pair[T] {
-			first  : T;
-			second : T;
-		}
+		fn Pair(T : type) : type { return struct { first : T; second : T; }; }
 
 		fn main() : void {
-			var a : Pair[i32] = Pair[i32] { 1, 2 };
-			var b : Pair[f32] = Pair[f32] { 1.0, 2.0 };
+			var a : Pair(i32) = Pair(i32) { 1, 2 };
+			var b : Pair(f32) = Pair(f32) { 1.0, 2.0 };
 		}
 	)";
 	EXPECT_COMPILE(source);
@@ -356,13 +350,10 @@ TEST(TemplateStructTwoInstantiations) {
 
 TEST(TemplateStructInstantiationMismatchFails) {
 	const char* source = R"(
-		struct Pair[T] {
-			first  : T;
-			second : T;
-		}
+		fn Pair(T : type) : type { return struct { first : T; second : T; }; }
 
 		fn main() : void {
-			var a : Pair[i32] = Pair[f32] { 1.0, 2.0 };
+			var a : Pair(i32) = Pair(f32) { 1.0, 2.0 };
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -371,17 +362,14 @@ TEST(TemplateStructInstantiationMismatchFails) {
 
 TEST(TemplateStructPassedToFunctionMismatchFails) {
 	const char* source = R"(
-		struct Optional[T] {
-			value   : T;
-			present : bool;
-		}
+		fn Optional(T : type) : type { return struct { value : T; present : bool; }; }
 
-		fn get_value(opt : Optional[i32]) : i32 {
+		fn get_value(opt : Optional(i32)) : i32 {
 			return opt.value;
 		}
 
 		fn main() : i32 {
-			var opt : Optional[f32] = Optional[f32] { 1.0, true };
+			var opt : Optional(f32) = Optional(f32) { 1.0, true };
 			return get_value(opt);
 		}
 	)";
@@ -410,18 +398,6 @@ TEST(TemplateConflictingComptimeArgumentFails) {
 		fn main() : void {
 			choose(42, 7);
 		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
-TEST(TemplateStructDuplicateTypeParamNameFails) {
-	const char* source = R"(
-		struct Bad[T, T] {
-			a : T;
-		}
-
-		fn main() : void {}
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
@@ -583,12 +559,11 @@ TEST(TemplateFunctionFailedInstantiationAsFirstClassValueFails) {
 
 TEST(TemplateRecursiveStructFails) {
 	const char* source = R"(
-		struct Node[T] {
-			value : T;
-			next  : Node[T];
-		}
+		fn Node(T : type) : type { return struct { value : T; next : Node(T); }; }
 
-		fn main() : void {}
+		fn main() : void {
+			var node : Node(i32) = undefined;
+		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
@@ -596,16 +571,11 @@ TEST(TemplateRecursiveStructFails) {
 
 TEST(TemplateIndirectRecursiveStructFails) {
 	const char* source = R"(
-		struct A[T] {
-			b : B[T];
-		}
-
-		struct B[T] {
-			a : A[T];
-		}
+		fn A(T : type) : type { return struct { b : B(T); }; }
+		fn B(T : type) : type { return struct { a : A(T); }; }
 
 		fn main() : void {
-			var value : A[i32] = undefined;
+			var value : A(i32) = undefined;
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -614,10 +584,7 @@ TEST(TemplateIndirectRecursiveStructFails) {
 
 TEST(TemplateStructRecursionThroughSliceCompiles) {
 	const char* source = R"(
-		struct Node[T] {
-			value : T;
-			children : []Node[T];
-		}
+		fn Node(T : type) : type { return struct { value : T; children : []Node(T); }; }
 
 		fn main() : void {}
 	)";
@@ -627,56 +594,22 @@ TEST(TemplateStructRecursionThroughSliceCompiles) {
 
 TEST(TemplateStructRecursionThroughNullableFails) {
 	const char* source = R"(
-		struct Node[T] {
-			value : T;
-			next : ?Node[T];
-		}
+		fn Node(T : type) : type { return struct { value : T; next : ?Node(T); }; }
 
 		fn main() : void {
-			var node : Node[i32] = undefined;
+			var node : Node(i32) = undefined;
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
-TEST(FailedImportedTemplateStructInstanceRemainsInvalid) {
-	const char* first_source = R"(
-		struct Invalid[N : i32] {
-			values : [N]i32;
-		}
-
-		fn first() : void {
-			var value : Invalid[-1] = undefined;
-		}
-	)";
-	const char* second_source = R"(
-		import "lib"
-
-		fn second() : void {
-			var value : Invalid[-1] = undefined;
-		}
-	)";
-	TestContext context;
-	ls_module* module = ls_module_create(&context.host);
-	EXPECT_TRUE(module != nullptr);
-	context.diagnostics.output_enabled = false;
-	EXPECT_TRUE(ls_module_parse(module, toLs(first_source), toLs("lib")) == LS_RESULT_OK);
-	EXPECT_TRUE(ls_module_typecheck(module) == LS_RESULT_FAILURE);
-	EXPECT_TRUE(ls_module_parse(module, toLs(second_source), toLs("main")) == LS_RESULT_OK);
-	EXPECT_TRUE(ls_module_typecheck(module) == LS_RESULT_FAILURE);
-	ls_module_destroy(module);
-	return true;
-}
-
 TEST(TemplateOperatorOverloadFails) {
 	const char* source = R"(
-		struct Box[T] {
-			value : T;
-		}
+		fn Box(T : type) : type { return struct { value : T; }; }
 
-		operator +(a : Box[$T], b : Box[T]) : Box[T] {
-			return Box[T] { a.value + b.value };
+		operator +(a : Box($T), b : Box(T)) : Box(T) {
+			return Box(T) { a.value + b.value };
 		}
 
 		fn main() : void {}
@@ -688,17 +621,15 @@ TEST(TemplateOperatorOverloadFails) {
 // The correct pattern: non-templated operator on a concrete instantiation.
 TEST(OperatorOnConcreteTemplateStructRuntime) {
 	const char* source = R"(
-		struct Box[T] {
-			value : T;
-		}
+		fn Box(T : type) : type { return struct { value : T; }; }
 
-		operator +(a : Box[i32], b : Box[i32]) : Box[i32] {
-			return Box[i32] { a.value + b.value };
+		operator +(a : Box(i32), b : Box(i32)) : Box(i32) {
+			return Box(i32) { a.value + b.value };
 		}
 
 		fn main() : i32 {
-			const a = Box[i32] { 1 };
-			const b = Box[i32] { 41 };
+			const a = Box(i32) { 1 };
+			const b = Box(i32) { 41 };
 			const c = a + b;
 			return c.value;
 		}
@@ -714,17 +645,15 @@ TEST(OperatorOnConcreteTemplateStructRuntime) {
 
 TEST(OperatorOnConcreteTemplateStructTypeMismatchFails) {
 	const char* source = R"(
-		struct Box[T] {
-			value : T;
-		}
+		fn Box(T : type) : type { return struct { value : T; }; }
 
-		operator +(a : Box[i32], b : Box[i32]) : Box[i32] {
-			return Box[i32] { a.value + b.value };
+		operator +(a : Box(i32), b : Box(i32)) : Box(i32) {
+			return Box(i32) { a.value + b.value };
 		}
 
 		fn main() : void {
-			const a = Box[i32] { 1 };
-			const b = Box[f32] { 2.0 };
+			const a = Box(i32) { 1 };
+			const b = Box(f32) { 2.0 };
 			const c = a + b;
 		}
 	)";
@@ -734,17 +663,11 @@ TEST(OperatorOnConcreteTemplateStructTypeMismatchFails) {
 
 TEST(TemplateNestedGenericFieldTypeMismatchFails) {
 	const char* source = R"(
-		struct Pair[T] {
-			first  : T;
-			second : T;
-		}
-
-		struct Box[T] {
-			value : T;
-		}
+		fn Pair(T : type) : type { return struct { first : T; second : T; }; }
+		fn Box(T : type) : type { return struct { value : T; }; }
 
 		fn main() : void {
-			var p : Box[Pair[i32]] = Box[Pair[f32]] { Pair[f32] { 1.0, 2.0 } };
+			var p : Box(Pair(i32)) = Box(Pair(f32)) { Pair(f32) { 1.0, 2.0 } };
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -826,15 +749,12 @@ TEST(TemplateStructImportedAndInstantiatedRuntime) {
 		import "lib" as lib
 
 		fn main() : i32 {
-			var p : lib.Pair[i32] = lib.Pair[i32] { 1, 41 };
+			var p : lib.Pair(i32) = lib.Pair(i32) { 1, 41 };
 			return p.first + p.second;
 		}
 	)";
 	const char* lib_source = R"(
-		struct Pair[T] {
-			first  : T;
-			second : T;
-		}
+		fn Pair(T : type) : type { return struct { first : T; second : T; }; }
 	)";
 	LumScriptImportFile files_storage[] = {
 		{ toLs("lib"), toLs(lib_source) },
@@ -858,14 +778,12 @@ TEST(TemplateStructImportedAcceptsCallerTypeArgument) {
 		}
 
 		fn main() : i32 {
-			var box = lib.Box[LocalValue] { LocalValue { 42 } };
+			var box = lib.Box(LocalValue) { LocalValue { 42 } };
 			return box.value.value;
 		}
 	)";
 	const char* lib_source = R"(
-		struct Box[T] {
-			value : T;
-		}
+		fn Box(T : type) : type { return struct { value : T; }; }
 	)";
 	LumScriptImportFile files_storage[] = {
 		{ toLs("lib"), toLs(lib_source) },
@@ -878,53 +796,34 @@ TEST(TemplateStructImportedAcceptsCallerTypeArgument) {
 	return true;
 }
 
-// Caller-owned comptime values follow the same lookup rule as caller-owned type
-// arguments when applying a struct template imported from another module.
-TEST(TemplateStructImportedAcceptsCallerValueArgument) {
-	const char* main_source = R"(
-		import "lib" as lib
+// An instantiation that failed once is cached as failed. Asking for it again from another
+// unit must report the failure again instead of handing back the broken instance.
+TEST(FailedImportedFactoryInstanceRemainsInvalid) {
+	const char* first_source = R"(
+		fn Invalid(N : comptime i32) : type {
+			return struct { values : [N]i32; };
+		}
 
-		comptime LOCAL_COUNT = 4;
-
-		fn main() : i32 {
-			var value : lib.Fixed[LOCAL_COUNT] = undefined;
-			return 42;
+		fn first() : void {
+			var value : Invalid(-1) = undefined;
 		}
 	)";
-	const char* lib_source = R"(
-		struct Fixed[N : i32] {
-			values : [N]i32;
+	const char* second_source = R"(
+		import "lib"
+
+		fn second() : void {
+			var value : Invalid(-1) = undefined;
 		}
 	)";
-	LumScriptImportFile files_storage[] = {
-		{ toLs("lib"), toLs(lib_source) },
-	};
-	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
-	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
-	return true;
-}
-
-TEST(TemplateStructImportedAcceptsQualifiedValueArgument) {
-	const char* main_source = R"(
-		import "lib" as lib
-
-		fn main() : i32 {
-			var value : lib.Fixed[lib.COUNT] = undefined;
-			return 42;
-		}
-	)";
-	const char* lib_source = R"(
-		comptime COUNT = 4;
-
-		struct Fixed[N : i32] {
-			values : [N]i32;
-		}
-	)";
-	LumScriptImportFile files_storage[] = {
-		{ toLs("lib"), toLs(lib_source) },
-	};
-	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
-	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	context.diagnostics.output_enabled = false;
+	EXPECT_TRUE(ls_module_parse(module, toLs(first_source), toLs("lib")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_module_typecheck(module) == LS_RESULT_FAILURE);
+	EXPECT_TRUE(ls_module_parse(module, toLs(second_source), toLs("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_module_typecheck(module) == LS_RESULT_FAILURE);
+	ls_module_destroy(module);
 	return true;
 }
 
@@ -933,7 +832,7 @@ TEST(TemplateStructImportedFieldUsesDeclarationUnit) {
 		import "lib" as lib
 
 		fn main() : i32 {
-			var box : lib.Box[i32] = lib.Box[i32] { lib.Tag { 40 }, 2 };
+			var box : lib.Box(i32) = lib.Box(i32) { lib.Tag { 40 }, 2 };
 			return box.tag.value + box.value;
 		}
 	)";
@@ -942,12 +841,12 @@ TEST(TemplateStructImportedFieldUsesDeclarationUnit) {
 			value : i32;
 		}
 
-		struct Box[T] {
+		fn Box(T : type) : type { return struct {
 			// Tag is declared in this imported unit. Instantiating Box from the
 			// caller must resolve non-template field names in the declaration unit.
 			tag : Tag;
 			value : T;
-		}
+		}; }
 	)";
 	LumScriptImportFile files_storage[] = {
 		{ toLs("lib"), toLs(lib_source) },
@@ -962,14 +861,11 @@ TEST(TemplateStructImportedFieldTypeMismatchFails) {
 		import "lib" as lib
 
 		fn main() : void {
-			var p : lib.Pair[i32] = lib.Pair[i32] { 1, 2.0 };
+			var p : lib.Pair(i32) = lib.Pair(i32) { 1, 2.0 };
 		}
 	)";
 	const char* lib_source = R"(
-		struct Pair[T] {
-			first  : T;
-			second : T;
-		}
+		fn Pair(T : type) : type { return struct { first : T; second : T; }; }
 	)";
 	LumScriptImportFile files_storage[] = {
 		{ toLs("lib"), toLs(lib_source) },
@@ -1283,13 +1179,10 @@ TEST(TemplateFunctionSwapRuntime) {
 
 TEST(TemplateStructInstantiationRuntime) {
 	const char* source = R"(
-		struct Pair[T] {
-			first  : T;
-			second : T;
-		}
+		fn Pair(T : type) : type { return struct { first : T; second : T; }; }
 
 		fn main() : i32 {
-			var p : Pair[i32] = Pair[i32] { 1, 41 };
+			var p : Pair(i32) = Pair(i32) { 1, 41 };
 			return p.first + p.second;
 		}
 	)";
@@ -1304,17 +1197,11 @@ TEST(TemplateStructInstantiationRuntime) {
 
 TEST(TemplateNestedGenericRuntime) {
 	const char* source = R"(
-		struct Pair[T] {
-			first  : T;
-			second : T;
-		}
-
-		struct Box[T] {
-			value : T;
-		}
+		fn Pair(T : type) : type { return struct { first : T; second : T; }; }
+		fn Box(T : type) : type { return struct { value : T; }; }
 
 		fn main() : i32 {
-			var p : Box[Pair[i32]] = Box[Pair[i32]] { Pair[i32] { 1, 41 } };
+			var p : Box(Pair(i32)) = Box(Pair(i32)) { Pair(i32) { 1, 41 } };
 			return p.value.first + p.value.second;
 		}
 	)";
@@ -1373,13 +1260,10 @@ TEST(TemplateFunctionTwoInstantiationsSameCallSite) {
 
 TEST(TemplateStructMultipleTypeParamsRuntime) {
 	const char* source = R"(
-		struct Map[K, V] {
-			key   : K;
-			value : V;
-		}
+		fn Map(K : type, V : type) : type { return struct { key : K; value : V; }; }
 
 		fn main() : i32 {
-			var m : Map[bool, i32] = Map[bool, i32] { true, 42 };
+			var m : Map(bool, i32) = Map(bool, i32) { true, 42 };
 			return m.value;
 		}
 	)";
@@ -1394,17 +1278,14 @@ TEST(TemplateStructMultipleTypeParamsRuntime) {
 
 TEST(TemplateStructPassedToFunctionRuntime) {
 	const char* source = R"(
-		struct Optional[T] {
-			value   : T;
-			present : bool;
-		}
+		fn Optional(T : type) : type { return struct { value : T; present : bool; }; }
 
-		fn get_value(opt : Optional[i32]) : i32 {
+		fn get_value(opt : Optional(i32)) : i32 {
 			return opt.value;
 		}
 
 		fn main() : i32 {
-			var opt : Optional[i32] = Optional[i32] { 42, true };
+			var opt : Optional(i32) = Optional(i32) { 42, true };
 			return get_value(opt);
 		}
 	)";
@@ -1554,19 +1435,28 @@ TEST(TemplateFunctionBracketSyntaxFails) {
 	return true;
 }
 
-// Indexing a value of a template struct type must not be mistaken for template
-// instantiation; only the struct declaration name can be an instantiation base.
-TEST(TemplateStructValueIndexingFails) {
+// A template has no type of its own until it is instantiated, so naming one where a type
+// is expected must be diagnosed instead of dereferencing its missing resolved type.
+TEST(TemplateNameAsTypeAnnotationFails) {
 	const char* source = R"(
-		struct Foo[N : i32] {
-			a : i32;
+		fn Pair(T : type) : type { return struct { first : T; second : T; }; }
+
+		fn main() : void {
+			var p : Pair = undefined;
 		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
 
-		var v : Foo[2] = { 1 };
+// Brackets in type position index a compile-time sequence. Applying type arguments with
+// them must be rejected, not silently treated as an index.
+TEST(TemplateStructBracketSyntaxFails) {
+	const char* source = R"(
+		fn Pair(T : type) : type { return struct { first : T; second : T; }; }
 
-		fn main() : i32 {
-			var x = v[0];
-			return 0;
+		fn main() : void {
+			var p : Pair[i32] = undefined;
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -1597,20 +1487,6 @@ TEST(TemplateFunctionGenericNameDoesNotShadowTypeImportQualifier) {
 	};
 	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
 	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
-	return true;
-}
-
-// A specialization is a concrete type, not another template declaration.
-// The second bracket list must be rejected instead of replacing the first one.
-TEST(TemplateStructNestedSpecializationFails) {
-	const char* source = R"(
-		struct Foo[N : i32] {
-			a : i32;
-		}
-
-		comptime invalid = Foo[2][3];
-	)";
-	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
@@ -1689,35 +1565,14 @@ TEST(TemplateFunctionComptimeTypeParamImportedRuntime) {
 	return true;
 }
 
-TEST(TemplateStructWrongNumberOfTypeArgsFails) {
-	const char* source = R"(
-		struct Pair[T] {
-			first  : T;
-			second : T;
-		}
-
-		fn main() : void {
-			var p : Pair[i32, f32] = undefined;
-		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
-// Box[Pair[i32, f32]] - outer has one type param, inner has two distinct ones.
+// Box(Pair(i32, f32)) - outer has one type parameter, inner has two distinct ones.
 TEST(TemplateNestedGenericTwoParamInnerRuntime) {
 	const char* source = R"(
-		struct Pair[A, B] {
-			first  : A;
-			second : B;
-		}
-
-		struct Box[T] {
-			value : T;
-		}
+		fn Pair(A : type, B : type) : type { return struct { first : A; second : B; }; }
+		fn Box(T : type) : type { return struct { value : T; }; }
 
 		fn main() : i32 {
-			var p : Box[Pair[i32, f32]] = Box[Pair[i32, f32]] { Pair[i32, f32] { 42, 1.5 } };
+			var p : Box(Pair(i32, f32)) = Box(Pair(i32, f32)) { Pair(i32, f32) { 42, 1.5 } };
 			return p.value.first;
 		}
 	)";
@@ -1732,32 +1587,24 @@ TEST(TemplateNestedGenericTwoParamInnerRuntime) {
 
 TEST(TemplateNestedGenericTwoParamInnerTypeMismatchFails) {
 	const char* source = R"(
-		struct Pair[A, B] {
-			first  : A;
-			second : B;
-		}
-
-		struct Box[T] {
-			value : T;
-		}
+		fn Pair(A : type, B : type) : type { return struct { first : A; second : B; }; }
+		fn Box(T : type) : type { return struct { value : T; }; }
 
 		fn main() : void {
-			var p : Box[Pair[i32, f32]] = Box[Pair[f32, i32]] { Pair[f32, i32] { 1.0, 42 } };
+			var p : Box(Pair(i32, f32)) = Box(Pair(f32, i32)) { Pair(f32, i32) { 1.0, 42 } };
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
-// Box[Box[i32]] - two levels of the same generic wrapper.
+// Box(Box(i32)) - two levels of the same generic wrapper.
 TEST(TemplateNestedGenericSameStructTwiceRuntime) {
 	const char* source = R"(
-		struct Box[T] {
-			value : T;
-		}
+		fn Box(T : type) : type { return struct { value : T; }; }
 
 		fn main() : i32 {
-			var b : Box[Box[i32]] = Box[Box[i32]] { Box[i32] { 42 } };
+			var b : Box(Box(i32)) = Box(Box(i32)) { Box(i32) { 42 } };
 			return b.value.value;
 		}
 	)";
@@ -1770,21 +1617,14 @@ TEST(TemplateNestedGenericSameStructTwiceRuntime) {
 	return true;
 }
 
-// Map[K, Pair[V]] - multi-param outer wrapping a nested generic as one of its args.
+// Map(bool, Pair(i32)) - multi-parameter outer wrapping a nested generic as one argument.
 TEST(TemplateNestedGenericAsSecondTypeArgRuntime) {
 	const char* source = R"(
-		struct Pair[T] {
-			first  : T;
-			second : T;
-		}
-
-		struct Map[K, V] {
-			key   : K;
-			value : V;
-		}
+		fn Pair(T : type) : type { return struct { first : T; second : T; }; }
+		fn Map(K : type, V : type) : type { return struct { key : K; value : V; }; }
 
 		fn main() : i32 {
-			var m : Map[bool, Pair[i32]] = Map[bool, Pair[i32]] { true, Pair[i32] { 1, 41 } };
+			var m : Map(bool, Pair(i32)) = Map(bool, Pair(i32)) { true, Pair(i32) { 1, 41 } };
 			return m.value.first + m.value.second;
 		}
 	)";
@@ -1797,20 +1637,14 @@ TEST(TemplateNestedGenericAsSecondTypeArgRuntime) {
 	return true;
 }
 
-// Three levels deep: Box[Box[Pair[i32]]].
+// Three levels deep: Box(Box(Pair(i32))).
 TEST(TemplateNestedGenericThreeLevelsRuntime) {
 	const char* source = R"(
-		struct Pair[T] {
-			first  : T;
-			second : T;
-		}
-
-		struct Box[T] {
-			value : T;
-		}
+		fn Pair(T : type) : type { return struct { first : T; second : T; }; }
+		fn Box(T : type) : type { return struct { value : T; }; }
 
 		fn main() : i32 {
-			var b : Box[Box[Pair[i32]]] = Box[Box[Pair[i32]]] { Box[Pair[i32]] { Pair[i32] { 1, 41 } } };
+			var b : Box(Box(Pair(i32))) = Box(Box(Pair(i32))) { Box(Pair(i32)) { Pair(i32) { 1, 41 } } };
 			return b.value.value.first + b.value.value.second;
 		}
 	)";
@@ -1826,21 +1660,15 @@ TEST(TemplateNestedGenericThreeLevelsRuntime) {
 // Template function taking a nested generic as a parameter.
 TEST(TemplateFunctionWithNestedGenericParamRuntime) {
 	const char* source = R"(
-		struct Pair[T] {
-			first  : T;
-			second : T;
-		}
+		fn Pair(T : type) : type { return struct { first : T; second : T; }; }
+		fn Box(T : type) : type { return struct { value : T; }; }
 
-		struct Box[T] {
-			value : T;
-		}
-
-		fn unwrap(b : Box[Pair[$T]]) : T {
+		fn unwrap(b : Box(Pair($T))) : T {
 			return b.value.first;
 		}
 
 		fn main() : i32 {
-			const b = Box[Pair[i32]] { Pair[i32] { 42, 0 } };
+			const b = Box(Pair(i32)) { Pair(i32) { 42, 0 } };
 			return unwrap(b);
 		}
 	)";
@@ -1853,184 +1681,15 @@ TEST(TemplateFunctionWithNestedGenericParamRuntime) {
 	return true;
 }
 
-TEST(ComptimeGenericStructWithValueParamTypechecks) {
-	const char* source = R"(
-		comptime StaticArray = struct[T, N : i32] {
-			values : [N]T;
-		}
-
-		fn main() : void {
-			var values : StaticArray[i32, 4] = undefined;
-		}
-	)";
-	EXPECT_COMPILE(source);
-	return true;
-}
-
-TEST(TemplateStructValueArgumentCanUseSizeof) {
-	const char* source = R"(
-		struct StaticArray[T, N : i32] {
-			values : [N]T;
-		}
-
-		fn main() : void {
-			var values : StaticArray[byte, sizeof(i64)] = undefined;
-		}
-	)";
-	EXPECT_COMPILE(source);
-	return true;
-}
-
 TEST(TemplateStructSizeofUsesTypeBinding) {
 	const char* source = R"(
-		struct Storage[T] {
-			bytes : [sizeof(T)]byte;
-		}
+		fn Storage(T : type) : type { return struct { bytes : [sizeof(T)]byte; }; }
 
 		fn main() : void {
-			var storage : Storage[i64] = undefined;
+			var storage : Storage(i64) = undefined;
 		}
 	)";
 	EXPECT_COMPILE(source);
-	return true;
-}
-
-TEST(ComptimePrimitiveValueCanBeTemplateValueArg) {
-	const char* source = R"(
-		comptime N = 4;
-
-		comptime StaticArray = struct[T, Count : i32] {
-			values : [Count]T;
-		}
-
-		fn main() : void {
-			var values : StaticArray[i32, N] = undefined;
-		}
-	)";
-	EXPECT_COMPILE(source);
-	return true;
-}
-
-TEST(TemplateStructWithValueParamTypechecks) {
-	const char* source = R"(
-		struct StaticArray[T, N : i32] {
-			values : [N]T;
-		}
-
-		fn main() : void {
-			var values : StaticArray[i32, 4] = undefined;
-		}
-	)";
-	EXPECT_COMPILE(source);
-	return true;
-}
-
-TEST(TemplateStructMixedTypeAndValueParams) {
-	const char* source = R"(
-		struct Mixed[A, N : i32, B, M : i32] {
-			first : [N]A;
-			second : [M]B;
-		}
-
-		fn main() : void {
-			var a : Mixed[i32, 2, f32, 3] = undefined;
-			var b : Mixed[f32, 4, i32, 5] = undefined;
-		}
-	)";
-	EXPECT_COMPILE(source);
-	return true;
-}
-
-TEST(TemplateStructValueParamWrongTypeFails) {
-	const char* source = R"(
-		struct StaticArray[T, N : i32] {
-			values : [N]T;
-		}
-
-		fn main() : void {
-			var values : StaticArray[i32, true] = undefined;
-		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
-TEST(TemplateStructValueParamUnsupportedExpressionFails) {
-	const char* source = R"(
-		struct StaticArray[T, N : i32] {
-			values : [N]T;
-		}
-
-		fn main() : void {
-			var values : StaticArray[i32, undefined] = undefined;
-		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
-TEST(TemplateStructValueParamTypeFails) {
-	const char* source = R"(
-		struct S[t : type] {}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
-TEST(TemplateStructValueParamMissingArgFails) {
-	const char* source = R"(
-		struct StaticArray[T, N : i32] {
-			values : [N]T;
-		}
-
-		fn main() : void {
-			var values : StaticArray[i32] = undefined;
-		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
-TEST(TemplateStructValueParamNonComptimeExprFails) {
-	const char* source = R"(
-		struct StaticArray[T, N : i32] {
-			values : [N]T;
-		}
-
-		fn main() : void {
-			var n : i32 = 4;
-			var values : StaticArray[i32, n] = undefined;
-		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
-TEST(TemplateStructValueParamWrongCountFails) {
-	const char* source = R"(
-		struct StaticArray[T, N : i32] {
-			values : [N]T;
-		}
-
-		fn main() : void {
-			var values : StaticArray[i32, 4, 8] = undefined;
-		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
-	return true;
-}
-
-TEST(TemplateStructValueParamNegativeSizeFails) {
-	const char* source = R"(
-		struct StaticArray[T, N : i32] {
-			values : [N]T;
-		}
-
-		fn main() : void {
-			var values : StaticArray[i32, -1] = undefined;
-		}
-	)";
-	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
@@ -2253,16 +1912,13 @@ TEST(ComptimeFunctionParameterImportedRuntime) {
 	return true;
 }
 
-// Function explicitly returning a concrete template struct type.
+// Function explicitly returning a concrete factory-produced struct type.
 TEST(TemplateFunctionReturnsConcreteTemplateStructRuntime) {
 	const char* source = R"(
-		struct Pair[T] {
-			first  : T;
-			second : T;
-		}
+		fn Pair(T : type) : type { return struct { first : T; second : T; }; }
 
-		fn make_pair() : Pair[i32] {
-			return Pair[i32] { 1, 41 };
+		fn make_pair() : Pair(i32) {
+			return Pair(i32) { 1, 41 };
 		}
 
 		fn main() : i32 {
@@ -2279,15 +1935,13 @@ TEST(TemplateFunctionReturnsConcreteTemplateStructRuntime) {
 	return true;
 }
 
-// Template function whose return type is a derived template struct over T.
+// Template function whose return type is a derived factory-produced struct over T.
 TEST(TemplateFunctionReturnsDerivedTemplateStructRuntime) {
 	const char* source = R"(
-		struct Box[T] {
-			value : T;
-		}
+		fn Box(T : type) : type { return struct { value : T; }; }
 
-		fn wrap(v : $T) : Box[T] {
-			return Box[T] { v };
+		fn wrap(v : $T) : Box(T) {
+			return Box(T) { v };
 		}
 
 		fn main() : i32 {
@@ -2304,21 +1958,18 @@ TEST(TemplateFunctionReturnsDerivedTemplateStructRuntime) {
 	return true;
 }
 
-// Non-template struct containing a fully-instantiated template struct field.
+// Non-template struct containing a factory-produced struct field.
 TEST(NonTemplateStructWithTemplateStructFieldRuntime) {
 	const char* source = R"(
-		struct Pair[T] {
-			first  : T;
-			second : T;
-		}
+		fn Pair(T : type) : type { return struct { first : T; second : T; }; }
 
 		struct Wrapper {
-			p : Pair[i32];
+			p : Pair(i32);
 			x : i32;
 		}
 
 		fn main() : i32 {
-			var w : Wrapper = Wrapper { Pair[i32] { 1, 41 }, 0 };
+			var w : Wrapper = Wrapper { Pair(i32) { 1, 41 }, 0 };
 			return w.p.first + w.p.second + w.x;
 		}
 	)";
@@ -2410,16 +2061,13 @@ TEST(TemplateFunctionInferredInstantiationRefParamsRuntime) {
 	return true;
 }
 
-// Nullable of a fully-instantiated template struct.
+// Nullable of a factory-produced struct.
 TEST(NullableTemplateStructInstantiationRuntime) {
 	const char* source = R"(
-		struct Pair[T] {
-			first  : T;
-			second : T;
-		}
+		fn Pair(T : type) : type { return struct { first : T; second : T; }; }
 
 		fn main() : i32 {
-			var x : ?Pair[i32] = null;
+			var x : ?Pair(i32) = null;
 			if x == null {
 				return 42;
 			}
@@ -2475,16 +2123,13 @@ TEST(TemplateFunctionUndefinedArgumentFails) {
 	return true;
 }
 
-// Comptime template struct and function bindings verified at runtime.
+// Comptime type-factory and function bindings verified at runtime.
 TEST(ComptimeGenericStructBindingRuntime) {
 	const char* source = R"(
-		comptime Pair = struct[T] {
-			first  : T;
-			second : T;
-		}
+		fn Pair(T : type) : type { return struct { first : T; second : T; }; }
 
 		fn main() : i32 {
-			const p = Pair[i32] { 20, 22 };
+			const p = Pair(i32) { 20, 22 };
 			return p.first + p.second;
 		}
 	)";
@@ -2501,31 +2146,10 @@ TEST(ComptimeGenericFunctionBindingRuntime) {
 	const char* source = R"(
 		comptime identity = fn(value : $T) : T {
 			return value;
-		}
+		};
 
 		fn main() : i32 {
 			return identity(42);
-		}
-	)";
-	CAPI_BEGIN(module, diagnostics);
-	EXPECT_TRUE(ls_module_compile(module, toLs(source), {}, nullptr, nullptr));
-	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ls_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ls_to_i32(runtime, -1));
-	CAPI_END(module);
-	return true;
-}
-
-TEST(ComptimeGenericStructWithValueParamRuntime) {
-	const char* source = R"(
-		comptime StaticArray = struct[T, N : i32] {
-			values : [N]T;
-		}
-
-		fn main() : i32 {
-			var arr : StaticArray[i32, 4] = undefined;
-			arr.values[0] = 42;
-			return arr.values[0];
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);

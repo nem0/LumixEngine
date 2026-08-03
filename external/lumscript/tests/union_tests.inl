@@ -917,14 +917,16 @@ TEST(UnionAllConcreteRuntimeMemberKinds) {
 
 TEST(UnionStructTemplateMember) {
 	const char* source = R"(
-		struct Box[T] {
-			value : T;
+		fn box(T : type) : type {
+			return struct { value : T; };
 		}
 
-		comptime Boxes = Box[i32] | Box[f32];
+		comptime I32Box = box(i32);
+		comptime F32Box = box(f32);
+		comptime Boxes = I32Box | F32Box;
 
 		fn main() : void {
-			var value : Boxes = Box[i32] { 42 };
+			var value : Boxes = I32Box { 42 };
 		}
 	)";
 	EXPECT_COMPILE(source);
@@ -935,7 +937,7 @@ TEST(UnionGenericTypeMember) {
 	const char* source = R"(
 		comptime make = fn(value : $T) : i32 | T {
 			return value;
-		}
+		};
 
 		fn main() : void {
 			var value : i32 | f32 = make(1.5 as f32);

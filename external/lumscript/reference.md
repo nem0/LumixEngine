@@ -13,16 +13,15 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 ## Table of contents
 
 - [Quick example](#quick-example)
-- [Source files](#source-files)
 - [Declarations](#declarations)
 	- [Imports](#imports)
 	- [Structs](#structs)
 	- [Enums](#enums)
 	- [Functions](#functions)
+		- [Ref parameters](#ref-parameters)
 	- [Comptime](#comptime)
 	- [Templates](#templates)
 	- [Operators](#operators)
-	- [Ref parameters](#ref-parameters)
 - [Types](#types)
 	- [Untyped literals](#untyped-literals)
 	- [Nullable values](#nullable-values)
@@ -59,8 +58,6 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 	- [Calls](#calls)
 	- [Argument-dependent lookup](#argument-dependent-lookup)
 	- [UFCS](#ufcs)
-	- [Field access](#field-access)
-	- [Struct literals](#struct-literals)
 - [Compile-time introspection](#compile-time-introspection)
 	- [typeof](#typeof)
 	- [Type members](#type-members)
@@ -86,6 +83,11 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 ```cpp
 import "core:vec3"
 
+struct Player {
+	hp: i32;
+	height: f32;
+}
+
 fn add(a : Vec3, b : Vec3) : Vec3 {
 	const x = a.x + b.x;
 	const y : f32 = a.y + b.y;
@@ -93,6 +95,7 @@ fn add(a : Vec3, b : Vec3) : Vec3 {
 	return { x, y, z };
 }
 
+// comment
 fn main() : void {
 	var a : Vec3 = { 10, 20, 30 };
 	const b = Vec3 { 40, 50, 60 };
@@ -106,76 +109,55 @@ fn main() : void {
 }
 ```
 
-A module contains top-level `import`, `comptime`, `struct`, `enum`, `fn`, and variable declarations.
-
-## Source files
-
-- LumScript files use the `.lum` extension.
-- Whitespace is ignored.
+- A unit contains top-level `import`, `comptime`, `struct`, `enum`, `fn`, and variable declarations.
+- Whitespace is not significant.
 - Line comments start with `//`.
-
-```cpp
-// comment
-var speed : f32 = 12.5;
-```
 
 ## Declarations
 
 ### Imports
 
-Imports load another module by path.
+Imports load another unit by path.
 
 ```cpp
-import "math"
+import "player"                // project-local file
+import "weapon" as w           // import with alias
+import "std:math"              // built-in langauge import
+import "core:collections/list" // only std: is reserved
 ```
 
-The `.lum` suffix is omitted:
+* The `.lum` filename suffix is omitted.
+* Imports map source names to declarations in imported units. They are lookup sources, not scope injection.
+* Imported units also contribute operator declarations to overload resolution.
+* Import aliases qualify ordinary names such as functions and types; operators are selected automatically from the imported declarations when resolving expressions such as `a + b`.
+
+Symbol lookup:
 
 ```cpp
-import "std:math"
-import "core:collections/list" as list
-```
-
-Imports map source names to declarations in imported modules. They are lookup sources, not scope injection.
-
-Imported modules also contribute operator declarations to overload resolution.
-Alias-qualified names are not used for operator syntax; aliasing only affects ordinary name lookup.
-
-Import forms:
-
-```cpp
-import "math"
+import "core:vec4"
 import "core:vec3"
+import "core:vec2" as my_vec
 
 fn main() : f32 {
-	const v : Vec3 = Vec3 { 1, 2, 3 };
-	return length(v);
-}
-```
-
-```cpp
-import "core:vec3" as vec
-
-fn main() : f32 {
-	const v : vec.Vec3 = vec.Vec3 { 1, 2, 3 };
-	return v.x;
-}
-```
-
-```cpp
-import "std:math" as math
-
-fn main() : f32 {
-	return math.sin(0.0) + math.cos(0.0) + math.sqrt(4.0);
+	const v4 = Vec4 { 1, 2, 3, 4};
+	const v3 = Vec3 { 1, 2, 3 };
+	const v2 = my_vec.Vec2 { 4, 5 };
+	
+	// Vec2 without my_vec qualifier can not be resolved
+	// const v2_fail = Vec2 { 4, 5 }; 
+	
+	// compile time error if length is defined in both core:vec3 and core:vec4
+	// no overloading
+	// var l = length(v3); 
+	return v3.x + v2.x;
 }
 ```
 
 Builtin math functions live under `std:`. Use `std:math` for `sin`, `cos`, and `sqrt`.
-The `std:` prefix is reserved for builtin modules and should not be used for user-defined imports.
+The `std:` prefix is reserved for builtin modules and cannot be used for user-defined imports.
 
 Rules:
 
-- importing the same path with the same alias in the same file is a compile-time error
 - alias collisions are compile-time errors
 - import cycles are compile-time errors
 - imports are not transitive for symbol visibility
@@ -183,7 +165,6 @@ Rules:
 - a bare name resolves against the current module and then unaliased imports
 - if no match is found and the call has at least one argument, the first argument's type namespace is also searched (see [Argument-dependent lookup](#argument-dependent-lookup))
 - if a bare name matches more than one declaration, using it is a compile-time error
-- if a bare name matches both a local declaration and an unaliased import, using it is a compile-time error
 - unaliased imports are not a separate namespace and do not override local declarations
 
 ```cpp
@@ -192,8 +173,6 @@ import "core:quat" as core // compile-time error: alias collision
 ```
 
 ```cpp
-import "a"
-
 // a.lum
 import "b"
 
@@ -203,6 +182,9 @@ import "a" // compile-time error: import cycle
 
 ### Structs
 
+`struct` declares a named, nominal product type. A struct value contains one
+value for each declared field, in declaration order:
+
 ```cpp
 struct Transform {
 	x : f32;
@@ -211,56 +193,121 @@ struct Transform {
 }
 ```
 
-Rules:
+The declaration binds `Transform` as a compile-time type value. Anonymous
+struct types can also be created with `struct { ... }` in a compile-time
+expression; see [Comptime](#comptime).
 
+#### Fields
+
+- fields are declared as `name : type;`; the semicolon after every field is
+  required
 - field names must be unique within the struct
-- field types can be primitive, enum, function type, or previously declared struct
+- fields are ordered; that order is used by positional literals, reflection,
+  and the runtime representation
+- a field type may be any valid concrete type, including a primitive, enum,
+  function type, array, slice, nullable, union, or another struct
+- a struct type must be available when it is used as a field type; declarations
+  are not forward declarations
+- recursive containment by value is not allowed, including through arrays,
+  nullable types, unions, or another struct; use an indirection such as a
+  slice where appropriate
+- an empty struct is valid and has no fields
 - a trailing semicolon after the closing `}` is a compile-time error
 
+Two separate struct declarations are different nominal types even when their
+fields have identical names and types. Structs do not receive implicit casts to
+or from other structs.
+
+#### Values
+
+Struct values are constructed with positional literals. The values correspond
+to fields in declaration order, and every field must be supplied:
+
+```cpp
+const t : Transform = { 1.0, 2.0, true };
+const u = Transform { 3.0, 4.0, false };
+var empty : Transform = undefined;
+```
+
+- `{ ... }` requires an expected struct type from its context
+- `Type { ... }` supplies the struct type explicitly
+- the literal must contain exactly one value per field
+- each value is checked against its field type; untyped numeric literals may
+  be concretized to that type
+- named-field literals are not supported
+
+#### Access and assignment
+
+Fields are selected with `.`, and the selected field is an lvalue when the
+base value is writable:
+
+```cpp
+fn set_visible(t : ref Transform) : void {
+	t.visible = true;
+}
+
+fn is_visible(t : Transform) : bool {
+	return t.visible;
+}
+```
+
+Nested fields can be chained (`object.transform.x`). A field of a temporary
+struct value is readable but cannot be assigned to or passed by `ref`. A
+struct passed by value is a copy; use a `ref` parameter to modify the caller's
+value. Fields can also be selected with a compile-time string:
+
+```cpp
+value["field"] = 42;
+```
+
+`value["field"]` selects the same field and has the same lvalue behavior as
+`value.field`; it is not runtime map lookup. The index must evaluate to a
+compile-time `[]const u8`, and its bytes must exactly match a declared field
+name. The selected field is not a copy, and names such as
+`"position.x"` are not interpreted as nested paths.
+
+Structs have no built-in equality or ordering. Operators for a struct must be
+provided with `operator` declarations, subject to the rules in [Operators](#operators).
+Struct fields themselves retain their declared types; there is no automatic
+conversion of a whole struct.
+
 ### Enums
+
+Enums define a named set of integer-like constants:
 
 ```cpp
 enum State {
 	Idle,
 	Running,
-	Paused,
-	Done
+	Paused = 42, // explicit values are allowed
+	Done // == 43
 }
-```
 
-Explicit values are allowed:
-
-```cpp
-enum Priority {
-	Low = 0,
-	Medium = 5,
-	High = 10
-}
-```
-
-Enums are strongly typed:
-
-- no implicit conversion between enums and integers
-- use explicit `as` casts when needed
-- a trailing semicolon after the closing `}` is a compile-time error
-
-```cpp
+// const fail : i32 = Keycode.W; // compile-time error, no implicit conversion
 const key_code : i32 = Keycode.W as i32;
+
 ```
 
-Shorthand member syntax works when enum type is unambiguous:
-
-```cpp
-fn handle_state(state : State) : void {
-	if state == .Running {
-		// equivalent to state == State.Running
+* Enums are strongly typed 
+	- no implicit conversion between enums and integers
+	- use explicit `as` casts when needed
+* a trailing semicolon after the closing `}` is a compile-time error
+* Shorthand member syntax works when enum type is unambiguous:
+	```cpp
+	fn handle_state(state : State) : void {
+		if state == .Running {
+			// equivalent to state == State.Running
+		}
 	}
-}
 
-var priority : Priority = .High;
-```
+	var priority : Priority = .High;
+	```
 
 ### Functions
+
+Functions are executable values. A function can be declared with a name or
+created as an anonymous function literal. Every function has a parameter list
+and a return type.
 
 ```cpp
 fn clamp_min(v : i32, min_value : i32) : i32 {
@@ -271,301 +318,300 @@ fn clamp_min(v : i32, min_value : i32) : i32 {
 }
 ```
 
+The `fn name(...) : T { ... }` form declares a named module-level function.
+The function name is available for calls and recursion:
+
+```cpp
+fn factorial(n : i32) : i32 {
+	if n <= 1 { return 1; }
+	return n * factorial(n - 1);
+}
+```
+
+An anonymous function literal can be stored in a binding, passed to another
+function, returned, or called indirectly:
+
+```cpp
+const add = fn(a : i32, b : i32) : i32 {
+	return a + b;
+};
+
+fn apply(f : fn(i32, i32) : i32, a : i32, b : i32) : i32 {
+	return f(a, b);
+}
+
+const result = apply(add, 2, 3);
+```
+
+The type of a function value is written `fn(parameters) : return_type`; see
+[Function types](#function-types).
+
 Rules:
 
 - parameter names must be unique
-- top-level `fn foo() : T { ... }` is syntax sugar for a module-level `comptime foo = fn() : T { ... }` binding
-- overloading is not supported
-- parameters are immutable
-- nested functions are not supported
-- this does not include operator declarations; operators are a separate declaration form
+- a parameter binding is immutable; a `ref` parameter can still modify the
+  caller's storage through its reference
+- arguments must match the declared parameter types and count; there are no
+  overloaded function declarations
+- a non-`void` function must return a value compatible with its return type;
+  `void` functions may use `return;`
+- named `fn name(...) : T { ... }` declarations are module-level; nested
+  declarations in that form are not supported
+- function literals are expressions and can be bound locally with `const` or
+  `comptime`, for example `comptime helper = fn(v : i32) : i32 { return v; };`
+- a function literal does not need its own name; the binding name, if any,
+  names the function value
+- function declarations do not include `operator` declarations; operators are
+  a separate declaration form
+
+#### Ref parameters
+
+`ref` passes a writable location by alias instead of by value.
+
+```cpp
+fn increment(v : ref i32) : void {
+	v += 1;
+}
+
+fn main() : void {
+	var x : i32 = 10;
+	increment(ref x);
+}
+```
+
+`ref` constraints:
+
+- call-site argument must be prefixed with `ref`
+- argument must be writable and have stable storage
+- `const` values are not allowed
+- `ref` parameter types cannot be nullable
+- `ref` arguments cannot be nullable
+
+```cpp
+struct Stats {
+	hp : i32;
+};
+
+struct Player {
+	stats : Stats;
+};
+
+var global_counter : i32 = 0;
+
+fn bump(v : ref i32) : void {
+	v += 1;
+}
+
+fn main() : void {
+	var p = Player { Stats { 10 } };
+	bump(ref global_counter);
+	bump(ref p.stats.hp);
+}
+```
 
 ### Comptime
 
-`comptime` declares a module-level binding whose initializer is evaluated during compilation. It is used for values that must be known before runtime code is checked or generated.
-
-Primitive values can be bound at compile time:
-
-```cpp
-comptime N = 32;
-comptime enabled = true;
-comptime scale = 1.5;
-```
-
-These values can be used where the language requires a compile-time value, such as struct template arguments, static array sizes, `comptime` parameters, and other comptime expressions.
-
-Types are compile-time values. Structs, enums, and functions can therefore be written as expressions and bound to names:
+`comptime` declares an immutable binding whose initializer is evaluated during
+compilation. It is valid at module scope and inside a function body:
 
 ```cpp
-comptime Vec2 = struct {
-	x : f32;
-	y : f32;
-}
+comptime global_limit = 32;
 
-comptime State = enum {
-	Idle,
-	Running
-}
-
-comptime add = fn(a : i32, b : i32) : i32 {
-	return a + b;
+fn main() : i32 {
+	comptime local_limit = 8;
+	return global_limit + local_limit;
 }
 ```
 
-Declaration syntax is sugar over these bindings:
-
-```cpp
-struct Vec2 {
-	x : f32;
-	y : f32;
-}
-
-enum State {
-	Idle,
-	Running
-}
-
-fn add(a : i32, b : i32) : i32 {
-	return a + b;
-}
-```
-
-is equivalent to:
-
-```cpp
-comptime Vec2 = struct {
-	x : f32;
-	y : f32;
-}
-
-comptime State = enum {
-	Idle,
-	Running
-}
-
-comptime add = fn(a : i32, b : i32) : i32 {
-	return a + b;
-}
-```
-
-Struct template application uses square brackets. Runtime function calls use parentheses:
-
-```cpp
-var v : Vec2[f32] = Vec2[f32] { 1.0, 2.0 }; // [f32] applies the struct template
-```
-
-Comptime initializers may call functions that are known at compile time. Top-level functions are compile-time bindings to function values, so they can be evaluated during compilation when all arguments and all operations are compile-time-valid:
-
-```cpp
-fn double(v : i32) : i32 {
-	return v * 2;
-}
-
-comptime N = double(16); // N == 32
-```
-
-Comptime calls do not create new type declarations. Type construction is intentionally limited to `struct[...]` template expressions, so arbitrary compile-time functions cannot return freshly declared struct or enum types:
-
-```cpp
-fn make_vec2(T : type) : type {
-	return struct {
-		x : T;
-		y : T;
-	};
-}
-
-comptime Vec2 = make_vec2(f32); // compile-time error
-```
-
-Use a struct template instead:
-
-```cpp
-comptime Vec2 = struct[T] {
-	x : T;
-	y : T;
-}
-
-fn main() : void {
-	var v : Vec2[f32] = Vec2[f32] { 1.0, 2.0 };
-}
-```
-
-Comptime evaluation cannot depend on runtime storage:
+The initializer must produce a value the compiler can know without reading
+runtime storage. A runtime-only value in a `comptime` initializer is an error:
 
 ```cpp
 var runtime_value : i32 = 16;
-comptime N = double(runtime_value); // compile-time error
+comptime invalid = runtime_value; // compile-time error
 ```
+
+#### Compile-time values
+
+Primitive expressions, types, and function values can be bound with
+`comptime`:
+
+```cpp
+comptime count = 32;
+comptime enabled = true;
+comptime Vec2 = struct { x : f32; y : f32; };
+comptime State = enum { Idle, Running };
+comptime add = fn(a : i32, b : i32) : i32 {
+	return a + b;
+};
+```
+
+Type values exist only during compilation. Function values produced by a
+`comptime` binding can still be called by runtime code:
+
+```cpp
+fn main() : i32 {
+	return add(20, 22);
+}
+```
+
+An unannotated numeric `comptime` binding remains an untyped compile-time
+constant until a later use supplies a concrete numeric type. An explicit
+annotation fixes its type immediately:
+
+```cpp
+comptime value = 12;
+comptime narrow : i16 = 12;
+```
+
+#### Compile-time calls
+
+A `comptime` initializer may call a function that is known at compile time:
+
+```cpp
+fn double(value : i32) : i32 {
+	return value * 2;
+}
+
+comptime result = double(16); // 32
+```
+
+Functions returning `type` can construct types during compilation. These type
+factories are documented with generic functions in [Templates](#templates).
 
 Rules:
 
-- `comptime` bindings are immutable
-- a `comptime` binding can produce a type, function, integer, float, bool, or other compile-time value
-- a value used as a type must resolve to a compile-time type value
-- compile-time evaluation happens before concrete runtime code is lowered
-- compile-time application uses `[]`; runtime application uses `()`
-- primitive types such as `i32`, `f32`, and `bool` are built-in type values and cannot be shadowed; so are the built-in `type` and `TypeKind`
-- using a runtime-only value where a compile-time value is required is a compile-time error
-- a comptime call may call only compile-time-known function values
-- declared functions cannot return `type`; the compile-time operator [`typeof`](#typeof) is not a function and is not covered by this rule
-- functions cannot create new struct or enum types from their body
-- new generic types are declared with `struct[...]` not by returning `type` from a function
-- native/extern functions are runtime-only unless explicitly marked otherwise by a future extension
-- comptime evaluation has an implementation-defined recursion/step limit to prevent non-terminating compilation
+- `comptime` bindings are immutable and are not runtime storage
+- a binding may contain a primitive value, type, function value, aggregate,
+  or another compile-time value
+- a runtime value cannot be used where a compile-time value is required
+- a compile-time call can call only a compile-time-known function value
+- a type value has no runtime representation; parameters of type `type` are
+  handled during compilation
+- compile-time evaluation has an implementation-defined recursion and step
+  limit
 
 ### Templates
 
-Templates are compile-time functions or type constructors. Template parameters are written inside square brackets. A bare parameter name is a type parameter; a parameter with an explicit type annotation, such as `N : i32`, is a compile-time value parameter.
+Templates are functions specialized at compile time. They can have ordinary
+runtime parameters, inferred or explicit type parameters, compile-time value
+parameters, or any combination of these. Each distinct set of compile-time
+arguments produces a concrete instantiation; ordinary arguments remain
+runtime values and there is no runtime template-dispatch overhead.
 
-**Struct templates:**
+#### Inferred type parameters
 
-```cpp
-struct Pair[T] {
-	first  : T;
-	second : T;
-}
-
-struct Optional[T] {
-	value   : T;
-	present : bool;
-}
-```
-
-Struct template declaration syntax is sugar for a `comptime` binding to a generic struct expression:
+Prefix `$` introduces an inferred type parameter. After its first occurrence,
+use the parameter name without `$`:
 
 ```cpp
-comptime Pair = struct[T] {
-	first  : T;
-	second : T;
-}
-```
-
-Instantiation supplies concrete types in square brackets:
-
-```cpp
-fn main() : void {
-	var p : Pair[i32] = Pair[i32] { 1, 2 };
-	var s : Pair[f32] = Pair[f32] { 1.0, 2.0 };
-}
-```
-
-**Function templates:**
-
-```cpp
-fn identity(a : $T) : T {
-	return a;
+fn identity(value : $T) : T {
+	return value;
 }
 
 fn swap(a : ref $T, b : ref T) : void {
-	const tmp = a;
+	const temporary = a;
 	a = b;
-	b = tmp;
-}
-```
-
-`$T` in a parameter type introduces an inferred compile-time type parameter named `T`. Later uses of `T` in the same signature or body refer to that type.
-
-Function template declaration syntax is sugar for a `comptime` binding to a generic function expression:
-
-```cpp
-comptime identity = fn(a : $T) : T {
-	return a;
-}
-```
-
-The compiler infers type parameters from argument types only:
-
-```cpp
-fn default_value(fallback : $T) : T {
-	return fallback;
+	b = temporary;
 }
 
 fn main() : void {
-	const x = identity(42);                      // T inferred as i32
-	const y = identity(3.14);                    // T inferred as f32
+	const integer = identity(42); // T is i32
+	const decimal = identity(3.14); // T is f32
 
 	var a : i32 = 1;
 	var b : i32 = 2;
-	swap(ref a, ref b);                          // T inferred as i32
-
-	const v = default_value(0);                  // T inferred as i32
+	swap(ref a, ref b); // T is i32
 }
 ```
 
-Type parameters cannot be inferred from the return type context. Type parameters that cannot be inferred from arguments must be passed as explicit compile-time type parameters:
+Type parameters are inferred from argument types, not from the expected
+return type. The same parameter name cannot be introduced with `$` more than
+once in a signature, and parameter names must be unique.
+
+#### Explicit type parameters
+
+A parameter annotated with `type` is supplied explicitly as a type argument:
 
 ```cpp
-fn make(T : comptime type) : T {
+fn make(T : type) : T {
 	return undefined;
 }
 
 fn main() : void {
-	const x : i32 = make(i32);  // T must be explicit
+	const value : i32 = make(i32);
 }
 ```
 
-**Multiple type parameters:**
+Type parameters may be combined with inferred parameters:
 
 ```cpp
 fn first(a : $A, b : $B) : A {
 	return a;
 }
+```
 
-struct Map[K, V] {
-	key   : K;
-	value : V;
+#### Type factories
+
+A function returning `type` is a type factory. Calling it produces a concrete
+type, and the call uses ordinary parentheses in type positions and struct
+literals:
+
+```cpp
+fn Pair(T : type) : type {
+	return struct {
+		first : T;
+		second : T;
+	};
+}
+
+fn main() : void {
+	var integers : Pair(i32) = Pair(i32) { 1, 2 };
+	var decimals : Pair(f32) = Pair(f32) { 1.0, 2.0 };
 }
 ```
 
+A fully instantiated factory result, such as `Pair(i32)` or
+`Box(Pair(i32))`, is a concrete type and can be used in variable declarations,
+parameters, return types, and struct fields. Factory calls may also be made
+through imported module aliases, for example `lib.Pair(i32)`.
 
-**Compile-time value parameters:**
+#### Compile-time value parameters
 
-Function parameters can also be marked `comptime` to require compile-time constant values. These are useful for values that must be known at compile time but do not require template bracket syntax:
+A parameter annotated with `comptime` must receive a compile-time value at the
+call site. This permits dependent return types and array sizes:
 
 ```cpp
-fn repeat(text : []const u8, count : comptime i32) : void {
+fn splat(value : f32, count : comptime i32) : [count]f32 {
+	var result : [count]f32 = undefined;
 	for i in 0..count {
-		print(text);
-	}
-}
-
-fn splat(value : f32, n : comptime i32) : [n]f32 {
-	var result : [n]f32 = undefined;
-	for i in 0..n {
 		result[i] = value;
 	}
 	return result;
 }
 
 fn main() : void {
-	repeat("hi", 3);           // valid: 3 is a compile-time constant
-	repeat("hi", some_var);    // error: some_var is not a compile-time constant
-	
-	const arr = splat(1.0, 4); // arr has type [4]f32
+	const values = splat(1.0, 4); // [4]f32
 }
 ```
 
-Comptime parameters:
-- must be initialized with a compile-time constant value at the call site
-- allow dependent function signatures where return types or array sizes depend on the parameter value
-- are checked at compile time but do not require explicit bracket syntax at the call site
-- compose with inferred type parameters in the same function signature, for example `fn foo(a : $T, i : comptime i32) : void`
-- struct templates continue to support value parameters via bracket syntax: `struct[T, N : i32]`
+Compile-time value parameters can be combined with type parameters, including
+in a type factory: `fn array_type(T : type, N : comptime i32) : type`.
 
-Rules:
+#### Rules
 
-- a fully instantiated template type such as `Pair[i32]` or `Box[Pair[i32]]` is a concrete type and can be used anywhere a concrete type is valid: variable declarations, function parameters, return types, struct fields, and as type arguments to other struct templates
-- `$T` introduces a function type parameter once; later uses must be written as `T`, and repeating `$T` for the same name in a signature is a compile-time error
-- type parameter names must be unique within a function signature or struct template parameter list
-- template parameters are resolved at compile time; no runtime overhead is incurred
-- inferred function type parameters and explicit struct template arguments must satisfy the structural requirements of the template body (field access, arithmetic, etc.); mismatches are compile-time errors
-- recursive struct templates are not supported
-- function type parameters are inferred from value arguments; a function type parameter that cannot be inferred must be passed as a regular compile-time type parameter, for example `fn make(T : comptime type) : T`
-- type arguments in struct instantiations drive the expected type of value arguments, the same way a concrete parameter type does
-- the count of explicit struct template arguments must equal the count of struct template parameters
-- template functions and structs from imported modules can be instantiated in the importing module; alias-qualified syntax applies as normal: `lib.identity(42)`, `lib.Pair[i32] { 1, 2 }`
-- a function template becomes a concrete function value after its type parameters and `comptime` parameters are known; that concrete value can be used anywhere a function value of that signature is valid: assignment, passing as an argument, returning, storing in a variable
-- operator overloads cannot be templated; use a concrete instantiation instead
+- all template arguments are resolved and checked during compilation
+- inferred type parameters come from value arguments; an expected return type
+  does not provide inference
+- template arguments must satisfy the requirements of the instantiated body
+- a factory-produced type is concrete only after all its arguments are known
+- recursive factory-produced structs are invalid when recursion requires an
+  inline value; recursion through a slice is allowed
+- a concrete template instantiation can be assigned, passed, returned, or
+  stored wherever its function type is valid
+- imported templates use the same alias-qualified call syntax as ordinary
+  functions
+- operator declarations cannot be templates
 
 ### Operators
 
@@ -614,51 +660,6 @@ Rules:
 - primitive compound assignment means the left-hand target has a primitive type; it keeps the built-in behavior and cannot be overridden
 - for primitive compound assignment, the right-hand operand must be implicitly convertible to the left-hand target type; for example, `5 *= Vec2 { 1, 2 }` is invalid because `Vec2` cannot be converted to the integer type of `5`
 
-### Ref parameters
-
-`ref` passes a writable location by alias instead of by value.
-
-```cpp
-fn increment(v : ref i32) : void {
-	v += 1;
-}
-
-fn main() : void {
-	var x : i32 = 10;
-	increment(ref x);
-}
-```
-
-`ref` constraints:
-
-- call-site argument must be prefixed with `ref`
-- argument must be writable and have stable storage
-- `const` values are not allowed
-- `ref` parameter types cannot be nullable -- TODO why?
-- `ref` arguments cannot be nullable -- TODO why?
-
-```cpp
-struct Stats {
-	hp : i32;
-};
-
-struct Player {
-	stats : Stats;
-};
-
-var global_counter : i32 = 0;
-
-fn bump(v : ref i32) : void {
-	v += 1;
-}
-
-fn main() : void {
-	var p = Player { Stats { 10 } };
-	bump(ref global_counter);
-	bump(ref p.stats.hp);
-}
-```
-
 ## Types
 
 Built-in and user types:
@@ -680,86 +681,63 @@ Built-in and user types:
 
 `isize` is the signed integer type used for memory sizes, slice lengths, and indices. It is signed and a fixed 64 bits on all targets (not platform/pointer-width dependent).
 
-- it is the parameter type of the raw-memory allocator's size/alignment arguments, the return type of `length`, the type of a slice's length, and the type used for indexing
+- it is the parameter type of the raw-memory allocator's size/alignment arguments, the result type of array/slice `.length`, and the type used for indexing
 - indexing is bounds-checked against `0 <= i < length`, so a negative index is a runtime error
-
-See [Design decisions](#design-decisions) for why sizes are signed.
 
 `byte` is the smallest addressable unit of raw memory. It is distinct from `u8`: `u8` is a numeric type with a fixed width, while `byte` represents untyped storage. `sizeof` and `alignof` are measured in bytes. The raw-memory allocator works in terms of `[]byte` (a byte slice), and `[]byte` can be reinterpreted as a typed slice (see [Casts](#casts)).
 
-`Vec3`, `DVec3`, and `Quat` are core value types used heavily by engine APIs:
-
-```cpp
-import "core:vec3"
-import "core:dvec3"
-import "core:quat"
-
-const position = Vec3 { 1.0, 2.0, 3.0 };
-const world_position = DVec3 { 1000.0, 2000.0, 3000.0 };
-const rotation = Quat { 0.0, 0.0, 0.0, 1.0 };
-```
-
 ### Untyped literals
 
-Numeric literals and expressions composed only from untyped numeric constants remain untyped during checking:
+Numeric literals begin without a concrete numeric type:
 
-- integer literals start as untyped integer
-- decimal literals start as untyped float
-- arithmetic on untyped constants produces another untyped constant; for example, `12 + 13` is an untyped integer constant with value `25`
+- integer literals are untyped integers
+- decimal literals are untyped floats
+- arithmetic made entirely from untyped numeric constants remains untyped, so
+  `12 + 13` is an untyped integer constant with value `25`
 
-An untyped numeric expression is concretized (given a concrete numeric type) in these contexts:
+The compiler concretizes an untyped numeric expression when its surrounding
+context supplies a type. This includes an explicit annotation, assignment
+target, function parameter (including a `comptime` parameter), function return
+type, array or struct literal field, concrete arithmetic operand, ternary
+branch, range bound, numeric pattern, or explicit cast:
 
-- a variable, `const`, or `comptime` initializer with an explicit numeric type annotation: `const count : i16 = 12`
-- an assignment to a numeric target: `var count : i16 = 0; count = 12;`
-- an argument passed to a typed function parameter, including a `comptime` parameter: `takes_i16(12)` for `fn takes_i16(value : i16) : void`; this also supplies the type used by an inferred function type parameter
-- a return expression in a function with a numeric return type: `fn count() : i16 { return 12; }`
-- an element of an array literal or a field of a struct literal when its expected type is numeric: `const values : [2]i16 = [12, 13]` or `Pair { 12 }` for `struct Pair { value : i16; }`
-- an operand of a numeric operation when the other operand is concrete: `const total : i64 = 10; total + 12`; a selected operator overload similarly adopts its parameter type
-- the untyped branch of a ternary expression when the other branch is concrete: `flag ? total : 12`, where `total : i64`
-- a range-loop bound when the other bound has a concrete integer type: `for i in 0..length(values)`, where `length(values)` is `isize`
-- a numeric pattern or subject where the surrounding construct requires a concrete numeric value: `match total { case 12: {} }`, where `total : i64`
-- an explicit cast: `12 as i16`; the untyped source is first materialized, then the cast is applied
+```cpp
+fn takes_i16(value : i16) : void {}
 
-An unannotated `comptime` binding is the exception: its numeric initializer remains an untyped compile-time constant until a later use supplies a concrete type. An explicit annotation still concretizes it immediately, for example `comptime c : i16 = 12`.
+const a : i16 = 12;
+var b : i16 = 0;
+b = 12;
+takes_i16(12);
+```
 
-If a numeric expression is consumed where no concrete numeric type is available, it is materialized using its default type:
+An unannotated `comptime` binding is deliberately different: its numeric
+initializer remains untyped until a later use supplies a type. An explicit
+annotation concretizes it immediately:
 
-- inferred runtime initializers: `const a = 12` and `var b = 12` both infer `i32`; an unannotated `comptime c = 12` remains untyped instead
-- a discarded expression: `12 + 13;` defaults its operands and result to `i32`
-- a comparison of untyped values: `12 == 13` compares `i32` values
-- a range with two untyped bounds: `for i in 0..4 {}` uses an `i32` loop variable
+```cpp
+comptime deferred = 12;
+comptime fixed : i16 = 12;
+```
 
-A union target provides context only when exactly one member has a compatible numeric category. The
-value's representability does not disambiguate between multiple numeric members:
+When no context supplies a type, the compiler uses these defaults:
+
+- integers use `i32` when representable, then `i64`, then `u64`
+- integers that do not fit `u64` are compile-time errors
+- decimal literals use `f64`
+- untyped range bounds and comparisons use `i32`
+
+A union target supplies numeric context only when exactly one member has a
+compatible numeric category. Representability does not resolve ambiguity:
 
 ```cpp
 const number : i32 | []const u8 = 12; // 12 becomes i32
 const ambiguous : i32 | i64 = 2147483648; // compile-time error: both numeric members match
 ```
 
-```cpp
-fn takes_f32(value : f32) : void {}
-
-const a = 12 + 13;       // defaults to i32
-const b : f32 = 12 + 13; // the expression is concretized as f32
-const c = 12.5;          // defaults to f64
-comptime d = 12;         // remains untyped until a use supplies a type
-takes_f32(12);           // 12 is concretized as f32
-const big = 2147483648;  // infers i64
-const huge = 18446744073709551615; // infers u64
-```
-
-An untyped constant can be concretized as a numeric type only when its value is representable by that type. This contextual concretization is not an implicit cast between concrete numeric types.
-
-Defaults when context is insufficient:
-
-- integer literals infer `i32` when they fit, otherwise `i64`, otherwise `u64`
-- integer literals that do not fit `u64` are compile errors
-- decimal literals default to `f64`
-
-There are still no implicit numeric casts between concrete types.
-
-Introspection is not a concretizing context. `typeof` on an untyped integer or float expression, including an unannotated `comptime` numeric binding, is a compile-time error; cast the expression or give its binding an explicit type first.
+Concretization requires the value to be representable by the selected type; it
+is not an implicit cast between already-concrete numeric types. `typeof` is
+not a concretizing context, so `typeof(1)` and `typeof(deferred)` are errors.
+Cast or annotate the expression first.
 
 ### Nullable values
 
@@ -786,17 +764,7 @@ if e == null { return; }
 use_entity(e); // e is promoted to entity.Entity
 ```
 
-The same applies when the `else` branch returns:
-
-```cpp
-if e != null {
-	use_entity(e);
-} else {
-	return;
-}
-
-use_entity(e); // e is promoted to entity.Entity
-```
+The same promotion applies when the `else` branch returns.
 
 Using a nullable value without a required null check is a compile-time error.
 
@@ -971,11 +939,11 @@ fn greet(name : []const u8) : void {
 }
 
 const text : []const u8 = "Lumix";
-const bytes = "a\0b"; // length(bytes) == 3
+const bytes = "a\0b"; // bytes.length == 3
 ```
 
 String literals have no dedicated runtime type. They use ordinary slice
-operations such as indexing, slicing, iteration, and `length`. Their elements
+operations such as indexing, slicing, iteration, and `.length`. Their elements
 cannot be modified because the slice is `const`.
 
 There is no built-in concatenation operator. In particular, `"a" + "b"` is a
@@ -1069,13 +1037,7 @@ Function values can be stored, passed, returned, and called.
 
 ### Static-sized arrays
 
-Declaration syntax for fixed-size arrays uses prefix size:
-
-```cpp
-var d : [16]i32 = undefined;
-```
-
-Usage syntax:
+Fixed-size arrays use prefix size and ordinary indexing:
 
 ```cpp
 var d : [16]i32 = undefined;
@@ -1112,7 +1074,7 @@ Type rules:
 - element type is fixed for all entries
 - assignment requires exact same element type and size
 - index expression must have an integer type
-- `length(arr)` on a `[N]T` produces the untyped compile-time integer constant `N`, so it can be used where a compile-time integer is required (`unroll for` bounds, array sizes, `comptime` parameters). When context does not require another type it concretizes to `isize`, matching `length` on a slice
+- `.length` on a `[N]T` produces the untyped compile-time integer constant `N`, so it can be used where a compile-time integer is required (`unroll for` bounds, array sizes, `comptime` parameters). When context does not require another type it concretizes to `isize`, matching `.length` on a slice
 - postfix `[` in type position (after a type constructor like size and element) means indexing or slicing on runtime values; array types always use prefix `[N]T` notation
 
 ### Slices
@@ -1155,7 +1117,7 @@ Slice creation forms:
 - a `[]const T` cannot be converted to `[]T` implicitly
 - For a scalar variable, `value[:]` creates a one-element `[]T` view, where
   `T` is the variable's type. It does not create an array or copy the value;
-  `slice[0]` reads and writes the variable itself, and `length(slice)` is
+  `slice[0]` reads and writes the variable itself, and `slice.length` is
   always one
 - creating a writable `[]T` view requires writable, addressable runtime
   storage; `const` variables and non-`ref` parameters cannot be used as such
@@ -1190,7 +1152,7 @@ Slice operations:
 
 - slices can be indexed with `slice[i]`
 - indexing is bounds-checked at runtime
-- `length(slice)` returns the number of elements in the slice
+- `slice.length` returns the number of elements in the slice
 - `==` and `!=` compare two slices by content when the element type has built-in
   equality (see [Slice equality](#slice-equality))
 - a slice can be initialized with `null`, which creates an empty slice
@@ -1207,7 +1169,7 @@ Slice operations:
 fn sum(values : []i32) : i32 {
 	var total : i32 = 0;
 	var i : i32 = 0;
-	while i < length(values) {
+	while i < values.length {
 		total += values[i];
 		i += 1;
 	}
@@ -1464,7 +1426,7 @@ if T == Vec3 {
 
 **Compile-time-known conditions**
 
-A condition or scrutinee is compile-time known when it is built only from values the compiler already has: literals, `comptime` bindings, `comptime` parameters, template arguments, and calls to compile-time-evaluable functions over such values. Reading a `var`, a `const` initialized from runtime data, or the result of a runtime call makes the expression runtime-valued, and the branch is an ordinary runtime branch.
+A condition or scrutinee is compile-time known when it is built only from values the compiler already has: literals, `comptime` bindings, `comptime` parameters, factory arguments, and calls to compile-time-evaluable functions over such values. Reading a `var`, a `const` initialized from runtime data, or the result of a runtime call makes the expression runtime-valued, and the branch is an ordinary runtime branch.
 
 Whether a branch is compile-time is a property of one specific `if` or `match`, decided by that expression alone. It is never inferred from the surrounding function: a template body still contains ordinary runtime branches wherever the condition depends on runtime values.
 
@@ -1501,7 +1463,7 @@ for i in 0..10 {
 
 The `a..b` range is exclusive on the upper bound. The range expressions are evaluated once before the loop starts. The loop variable is introduced by the `for` statement and is immutable inside the loop body.
 
-Both bounds must have the same integer type, which becomes the type of the loop variable. An untyped bound adopts the other bound's concrete type (`for i in 0..length(s)` iterates with an `isize` loop variable); if both bounds are untyped they default to `i32`.
+Both bounds must have the same integer type, which becomes the type of the loop variable. An untyped bound adopts the other bound's concrete type (`for i in 0..s.length` iterates with an `isize` loop variable); if both bounds are untyped they default to `i32`.
 
 If the lower bound is greater than or equal to the upper bound, the loop body does not execute.
 
@@ -1534,7 +1496,7 @@ for i, v in arr {
 `for v in arr` is syntax sugar for iterating the index range and binding the element:
 
 ```cpp
-for i in 0..length(arr) {
+for i in 0..arr.length {
 	const v = arr[i];
 	log.logError(v);
 }
@@ -1543,7 +1505,7 @@ for i in 0..length(arr) {
 `for i, v in arr` is the same desugaring, additionally exposing the index as `i`:
 
 ```cpp
-for i in 0..length(arr) {
+for i in 0..arr.length {
 	const v = arr[i];
 	log.logError(i);
 	log.logError(v);
@@ -1551,7 +1513,7 @@ for i in 0..length(arr) {
 ```
 
 - `arr` must be a static-sized array or a slice
-- `i` has type `isize`; `v` has the element type of `arr`. This holds for static arrays too: `length` on a `[N]T` is an untyped compile-time constant, and the desugared range concretizes it to `isize`
+- `i` has type `isize`; `v` has the element type of `arr`. This holds for static arrays too: `.length` on a `[N]T` is an untyped compile-time constant, and the desugared range concretizes it to `isize`
 - both `i` and `v` are immutable inside the loop body, like the single-variable `for` loop variable
 
 ### Break / continue / labels
@@ -1788,7 +1750,7 @@ Rules:
 
 - the operand is a type, not a value
 - the operand must be a concrete type. Untyped integer and float values have no size or alignment, and `sizeof`/`alignof` do not default them; use a concrete type such as `sizeof(i32)`, or cast or annotate the value before obtaining its type
-- both produce an untyped integer constant, usable wherever a compile-time integer is required (array sizes, struct template value arguments, `comptime` parameters, other comptime expressions)
+- both produce an untyped integer constant, usable wherever a compile-time integer is required (array sizes, type-factory value arguments, `comptime` parameters, other comptime expressions)
 - `sizeof(T)` is the size of `T` measured in `byte` units: `byte`, `bool`, `i8`, and `u8` are 1 byte; `i16`/`u16` are 2; `i32`/`u32`/`f32`/enums/function values are 4; `i64`/`u64`/`isize`/`f64`/pointers are 8; a slice is a pointer plus an `i64` length; an array is `size * sizeof(element)`; a struct is the sum of its field sizes; and a tagged union is `sizeof(i32)` for the tag plus the size of its largest member
 - `alignof(T)` is derived from the byte size and capped at pointer alignment
 - they are most commonly used with the raw-memory allocator and slice reinterpret casts, for example `alloc(n * sizeof(i32), alignof(i32))`
@@ -2038,69 +2000,11 @@ This also permits mutable container operations without spelling `ref` at every c
 import "core:array" as array
 
 fn example() : void {
-	var values : array.Array[i32] = undefined;
+	var values : array.Array = undefined;
 	values.init();
 	values.push(42);
 }
 ```
-
-### Field access
-
-```cpp
-position.x
-position.y = 4;
-```
-
-Left side must be a struct value, and field must exist.
-
-Struct fields can also be selected with square brackets when the index is a
-compile-time `[]const u8`:
-
-```cpp
-struct Stats {
-	hp : i32;
-	name : []const u8;
-}
-
-fn field_name() : []const u8 { return "hp"; }
-
-fn update(s : ref Stats, comptime_name : comptime []const u8) : void {
-	s["hp"] = 10;
-	s[comptime_name] = 20;
-	s[field_name()] = 30;
-}
-```
-
-Computed field access is resolved during compilation and is equivalent to
-ordinary member access. The selected field keeps its declared type and lvalue
-behavior, so it can be assigned to or passed by `ref` when the corresponding
-`.field` expression would be valid.
-
-Rules:
-
-- the index must evaluate to a compile-time `[]const u8`
-- the bytes must exactly match a field name declared by the struct
-- runtime byte slices are not allowed; this is not runtime reflection or map
-  lookup
-- the result is the selected field, not a copy, and nested paths such as
-  `s["position.x"]` are not interpreted specially
-
-### Struct literals
-
-Positional literals:
-
-```cpp
-import "core:vec3"
-
-var a : Vec3 = { 1, 2, 3 };
-const b = Vec3 { 4, 5, 6 };
-```
-
-- `{ ... }` uses expected type from context
-- `Type { ... }` sets type explicitly
-- field count and field types must match declaration
-
-Named-field struct literals are not implemented.
 
 ## Compile-time introspection
 
@@ -2131,7 +2035,7 @@ fn print(v : $T) : void {
 
 		case .Slice, .Array:
 			io.write_bytes("[");
-			for i in 0..length(v) {
+			for i in 0..v.length {
 				if i > 0 { io.write_bytes(", "); }
 				print(v[i]);
 			}
@@ -2195,15 +2099,15 @@ Rules:
 
 - the operand is an expression, not a type - the mirror of [`sizeof` and `alignof`](#sizeof-and-alignof), which take a type. `sizeof(typeof(e))` is the size of `e`'s type. Reflection that starts from a *type* rather than an expression uses [type members](#type-members) instead
 - `typeof` does not default untyped numeric expressions. `typeof(1)`, `typeof(1.0)`, and `typeof(value)` when `value` is an untyped numeric `comptime` binding are compile-time errors. Cast the expression (`typeof(1 as i32)`) or annotate the binding first. Consequently, `sizeof(typeof(1))` and `alignof(typeof(1.0))` are also errors
-- like `sizeof` and `alignof`, `typeof` is an operator resolved by the compiler, not a function: it cannot be bound to a name, passed as an argument, used as a function value, or reached through [UFCS](#ufcs); only its result is a value. The rule that functions cannot return `type` (see [Comptime](#comptime)) constrains declared functions and does not apply to it
+- like `sizeof` and `alignof`, `typeof` is an operator resolved by the compiler, not a function: it cannot be bound to a name, passed as an argument, used as a function value, or reached through [UFCS](#ufcs); only its result is a value
 - the operand is type-checked but **not evaluated**, and no code is generated for it. `typeof(v[0])` on an empty slice is valid and yields the element type
-- it produces a `type` value, usable wherever a compile-time type is required (template arguments, variable type positions, `comptime` bindings, `==` comparison)
+- it produces a `type` value, usable wherever a compile-time type is required (type-factory arguments, variable type positions, `comptime` bindings, `==` comparison)
 - `typeof` observes flow typing: after `if v != null`, `typeof(v)` inside the branch is the promoted type `U`, not `?U`. The same applies inside an `is` or `match` arm on a tagged union
 - the result is compile-time only and never materializes into runtime code (see [Comptime-to-runtime materialization](#comptime-to-runtime-materialization))
 
 ### Type members
 
-A `type` value exposes its structure through members accessed with `::`. A value can use the same syntax: `value::name` is exactly equivalent to `typeof(value)::name`. The value expression is type-checked but not evaluated, so this also works for runtime values. The receiver may therefore be a type expression - typically a `$T` parameter, a `comptime type` parameter, or any `typeof` result - or an ordinary value expression:
+A `type` value exposes its structure through members accessed with `::`. A value can use the same syntax: `value::name` is exactly equivalent to `typeof(value)::name`. The value expression is type-checked but not evaluated, so this also works for runtime values. The receiver may therefore be a type expression - typically a `$T` parameter, a `type` parameter, or any `typeof` result - or an ordinary value expression:
 
 | member | result | valid for |
 | --- | --- | --- |
@@ -2239,7 +2143,7 @@ comptime value_fields = v::fields;                   // same as typeof(v)::field
 - `t::name` is the type's source-level name, represented by the bytes shown in the table under [`t::name`](#tname) below
 - `t::min` and `t::max` are the lowest and highest finite values representable by a concrete numeric type. For floating-point types, `t::min` is the most negative finite value, not the smallest positive normal value.
 - `t::child` is the single operand of a one-operand type constructor: the `U` of `?U`, the element of `[]U`, or the element of `[N]U`; compound type expressions can be written directly before the member, as in `?i32::child` or `[]i32::child`
-- `t::length` is the element count `N` of a `[N]T`, an untyped compile-time integer - the same value `length(v)` yields on an instance (see [Static-sized arrays](#static-sized-arrays)), but reachable from the type without one, so `unroll for i in 0..t::length` works on a type alone. It is not defined for `.Slice`, whose length is a runtime property
+- `t::length` is the element count `N` of a `[N]T`, an untyped compile-time integer - the same value `v.length` yields on an instance (see [Static-sized arrays](#static-sized-arrays)), but reachable from the type without one, so `unroll for i in 0..t::length` works on a type alone. It is not defined for `.Slice`, whose length is a runtime property
 - `t::fields`, `t::values`, and `t::types` are [reflection sequences](#reflection-sequences)
 - `t::params` is the [reflection sequence](#reflection-sequences) of a `.Fn` type's parameter descriptors, in declaration order; `t::ret` is its return type, named `ret` rather than `return` to avoid the keyword. Each descriptor is an ordinary compile-time struct with `.name` and `.type` members; `.name` is a compile-time `[]const u8` and is `""` for unnamed parameters.
 
@@ -2265,7 +2169,7 @@ This is the same [compile-time branch](#compile-time-branches) pruning used ever
 | --- | --- |
 | builtins | `"i32"`, `"f64"`, `"u8"` |
 | structs and enums | the declaration name, `"Vec3"`, `"State"` |
-| template instantiations | `"Pair[i32]"`, `"Optional[Vec3]"` |
+| factory-produced structs | `"Pair(i32)"`, `"Optional(Vec3)"` |
 | nullable | `"?Vec3"` |
 | slices and arrays | `"[]i32"`, `"[]const u8"`, `"[4]i32"` |
 | unions | `"A \| B \| C"` in canonical member order |
@@ -2298,7 +2202,7 @@ enum TypeKind {
 ```
 
 - the enum is exhaustive: every type has exactly one discriminant.
-- an instantiated struct template such as `Pair[i32]` is a `.Struct`
+- a factory-produced struct such as `Pair(i32)` is a `.Struct`
 - `TypeKind` values are compile-time only, so a `TypeKind` scrutinee always produces a [compile-time branch](#compile-time-branches)
 - member shorthand works as it does for any enum, so `case .Struct:` needs no qualification and the name `TypeKind` rarely has to be written out
 - adding a discriminant in a future version is a breaking change; it is reported at every exhaustive `match` that does not have an empty `case:` fallback
@@ -2332,18 +2236,17 @@ A type comparison is always compile-time known, so an `if` on one is always a [c
 | `t::types` | a `type` |
 | `t::params` | a parameter descriptor struct: `.name`, `.type` |
 
-As comptime slices they are first-class: they can be bound, measured, indexed, and iterated, all at compile time.
+As comptime slices they are first-class: they can be bound, measured with `.length`, indexed, and iterated with `unroll for`, all at compile time. Their element types contain compile-time-only information, so they cannot be materialized or traversed by a runtime `for`.
 
 ```cpp
 comptime fs    = t::fields;    // element type inferred; see below
-comptime n     = length(fs);  // the field count
+comptime n     = fs.length;    // the field count
 comptime first = fs[0];       // a single field descriptor
 unroll for f in fs { ... }    // re-iterate a bound sequence
 ```
 
 - **binding requires inference for descriptor slices.** Their compiler-provided struct types are not nameable in source, so `comptime fs = t::fields` and `comptime ps = t::params` are legal, but annotations naming those element types are not. `t::types` is the exception: its element type `type` is nameable, so `comptime ts : []type = t::types` may carry the annotation
-- `length`, indexing, and `unroll for` work as on any comptime slice
-- element types are compile-time only, so none of these sequences [materialize](#comptime-to-runtime-materialization), and a runtime `for` over one is a compile-time error
+- `.length`, indexing, and `unroll for` work as on any comptime slice
 - once bound, the value is an ordinary comptime slice with no residual tie to `t`: it can be carried out of the branch that produced it and used anywhere. For a generic receiver, the required kind constraint is checked when the template is instantiated.
 
 Type-side field descriptors carry `.name` and `.type`. They have no `.value`,
@@ -2361,7 +2264,7 @@ unroll for x in seq { ... }              // sequence form
 unroll for i, x in seq { ... }           // sequence form with index
 ```
 
-- the range form requires both bounds to be compile-time integer constants; `length(arr)` on a `[N]T` is one, so `unroll for i in 0..length(arr)` unrolls a static array while the same loop over a slice must use a runtime `for`
+- the range form requires both bounds to be compile-time integer constants; `arr.length` on a `[N]T` is one, so `unroll for i in 0..arr.length` unrolls a static array while the same loop over a slice must use a runtime `for`
 - the sequence form requires a comptime slice, which includes the [reflection sequences](#reflection-sequences) `t::fields`, `t::values`, `t::types` and any binding of one. A struct, enum, or union value is not iterable; iterate the corresponding type reflection sequence instead
 - the loop variable is a compile-time binding and cannot be reassigned in the body
 - because it is compile-time, expressions derived from it are resolved per copy: the index in `unroll for i, x in seq` is a constant, so `if i > 0 { ... }` is decided at compile time
@@ -2406,7 +2309,7 @@ The loop variable is a compile-time field descriptor with two members:
 
 Rules:
 
-- `S::fields` yields descriptors with `.name` and `.type`; naming `.value` on one is a compile-time error. It is an ordinary [reflection sequence](#reflection-sequences), so it can also be bound, counted with `length`, and indexed
+- `S::fields` yields descriptors with `.name` and `.type`; naming `.value` on one is a compile-time error
 - the form takes the optional index binding, with the same meaning it has over any other sequence:
 
 	```cpp
@@ -2416,7 +2319,7 @@ Rules:
 
 - reflection descriptor types are compiler-provided ordinary struct types and are not nameable in source
 - an ordinary runtime `for` over a struct value is a compile-time error: each field has a different type, so there is no single type for a runtime loop variable to have
-- the number of fields is `length(S::fields)`; the `i > 0` idiom covers separators without needing it
+- the number of fields is `S::fields.length`; the `i > 0` idiom covers separators without needing it
 
 The assignment in the example type-checks only because [type equality](#type-equality) is compile-time known, so the copy generated for the `f32` field never checks its body. The same loop without the `if` would be an error on the first field whose type rejects `42`.
 
@@ -2444,10 +2347,9 @@ The loop variable is an enum descriptor struct with two members:
 Rules:
 
 - the operand is an enum type's `::values`; an enum *value* is not iterable, since it denotes one member rather than the set of them
-- as a reflection sequence it can be bound, counted with `length`, and indexed, so a name table *can* be built: `State::values[i].name`
+- a name table can be built with indexed access such as `State::values[i].name`
 - the optional index binding works as it does everywhere else: `unroll for i, e in State::values { ... }`
 - the descriptor type is compiler-provided and not nameable in source
-- an ordinary runtime `for` over `State::values` is a compile-time error: the descriptor slice is compile-time only
 
 `e.name` and `e.value as i32` are still ordinary compile-time constants in each copy, so they [materialize](#comptime-to-runtime-materialization) into runtime code exactly like any other compile-time byte slice or integer.
 
@@ -2466,11 +2368,10 @@ The loop variable is a compile-time `type` value, not a descriptor. A struct fie
 Rules:
 
 - the operand is a union type's `::types`; a union *value* is not iterable, since it holds one member at a time - use [`match`](#tagged-unions) or `is` on the value
-- `M` is usable anywhere a compile-time type is: `v is M`, `v as M`, a variable's declared type, a template argument
-- as a reflection sequence, `T::types` can be bound (`comptime ts : []type = T::types`), counted with `length`, and indexed
+- `M` is usable anywhere a compile-time type is: `v is M`, `v as M`, a variable's declared type, a type-factory argument
+- `T::types` can be bound (`comptime ts : []type = T::types`) and indexed
 - the `is` test and the promotion it performs are the ordinary union rules; unrolling emits one test per member
 - the optional index binding works as it does everywhere else
-- an ordinary runtime `for` over `T::types` is a compile-time error: `type` values have no runtime representation
 
 ### Function type introspection
 
@@ -2497,8 +2398,7 @@ unroll for p in ps {
 
 Rules:
 
-- `t::params` can be bound with inference (`comptime ps = Handler::params`), counted with `length`, indexed, and unrolled. Its compiler-provided struct element type is not nameable, so an explicit slice annotation is not available
-- an ordinary runtime `for` over `t::params` is a compile-time error because its descriptors contain `type` values
+- `t::params` can be bound with inference (`comptime ps = Handler::params`) and its compiler-provided struct element type is not nameable, so an explicit slice annotation is not available
 - `t::ret` is compile-time only, like `t::child` and every other member that produces a `type`
 
 ### What an unrolled loop binds
@@ -2551,9 +2451,9 @@ Template instantiation therefore has an implementation-defined depth limit, usin
 
 ```txt
 demo.lum: line 12, column 2: instantiation depth limit exceeded
-  in f[[][]i32]
-  in f[[]i32]
-  in f[i32]
+  in f([][]i32)
+  in f([]i32)
+  in f(i32)
 ```
 
 ## Runtime model
@@ -2631,12 +2531,6 @@ fn main() : i32 {
 }
 ```
 
-### Extern declarations
-
-```cpp
-extern fn native_add(a : i32, b : i32) : i32;
-```
-
 `extern` declarations inform the compiler about a function's name and signature but do not provide an implementation. Each declaration is enumerated by `ls_unit_get_native_function_count` and `ls_unit_get_native_function_name`; bind it with `ls_runtime_set_native_function_callback` using the corresponding unit-local index. Use `ls_unit_get_path` to identify declarations from imported units.
 
 
@@ -2661,7 +2555,6 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 - `NestedFunctionCanNotCaptureOuterLocal`
 - `DuplicateDeclarationsFail`
 - `ConstCanNotBeUndefined`
-- `DuplicateUnaliasedImportFails`
 - `FunctionCallAssignmentFails`
 - `FunctionNamedSinCompilesAndRuns`
 - `ImportPathCanMatchPreviousAlias`
@@ -2691,27 +2584,22 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 - Imports and `extern` bindings still need explicit collision policy for same-path/same-alias cases, builtin module boundaries, and imported declaration conflicts.
 - Function values need clearer rules for equality/identity interactions with function declarations and literals.
 - Type member and descriptor names (`t::name`, `f.name`, `e.name`) are unqualified declaration names. Two modules that both declare `Vec3` produce the same `t::name`, and a generic `print` cannot distinguish them; whether these should be module-qualified is unresolved, and interacts with the import collision policy noted above.
-- `length` is both a builtin over arrays, slices, and [reflection sequences](#reflection-sequences), and an ordinary function name that core modules define on structs, such as `length(v)` for a `Vec3` magnitude in [Imports](#imports). Since [overloading is not supported](#functions), the rule for which one a call selects, and whether a user declaration may take the name at all, is unspecified.
+- `.length` is the built-in member for arrays, slices, and [reflection sequences](#reflection-sequences). It does not conflict with ordinary functions such as `length(v)` defined by a library for a struct magnitude.
 
 
 ## Design decisions
 
-- struct templates use []
-	- main reason we have struct templates at all are user-defined containers
-	- function templates do not use a separate bracketed parameter list; generic type parameters are introduced in the function signature with `$T`, and compile-time value parameters use `comptime`
-	- we want a pair of enclosing characters, single character is hard to read when nested: `Array@Array@i32`
-	- different begin and end, reads easier, especially when nested, e.g. if we used `"` - `Box"Pair"i32, u8""`
-	- so our options are `[]`, `<>`, `()`, `{}`
-	- there are already languages using `[]` and `<>` for type templates
-	- `<>` is harder to parse thana `[]`
+- type factories use ordinary function-call syntax
+	- generic types are functions returning `type`, so nested types read naturally as `Box(Pair(i32))`
+	- type arguments and runtime function arguments share the same call syntax
 
 - static-sized arrays and slices use prefix notation
 	- arrays are `[N]T` and slices are `[]T`, not postfix `T[N]` or `T[]`
 	- `[]const T` is the read-only form of `[]T`; both have the same runtime layout
-	- avoids grammar ambiguity: `Identifier[...]` in type position could be array type, struct template instantiation, or comptime variable indexing; prefix `[` resolves this
+	- avoids grammar ambiguity: type factories use `Identifier(...)`, while arrays and slices retain their unambiguous prefix notation
 	- consistent with prefix nullable `?T`: types read outside-in rather than inside-out
 	- consistent direction with slices: `[]T` reads left-to-right like `?T`, unlike C-style postfix where nesting order is confusing (`T[4][8]`)
-	- runtime operations (indexing `arr[i]`, slicing `arr[start:end]`) remain postfix on values, creating clear distinction: postfix `[` = runtime value operation, prefix `[` = compile-time type constructor
+	- runtime operations (indexing `arr[i]`, slicing `arr[start:end]`) remain postfix on values, creating a clear distinction from prefix array and slice type constructors
 
 - `for` uses `in` for both ranges and sequences
 	- `in` is familiar from other languages' loop syntax, reducing the learning curve
@@ -2720,7 +2608,7 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 	- we want raw memory api so users can implement their own containers, arenas and other features
 	- the primitive currency is the byte slice `[]byte`; `alloc` returns one and `free` takes one back (Zig-style allocator interface)
 	- `byte` is a distinct type from `u8` (untyped storage vs a numeric type); its bit width is implementation-defined, so `sizeof`/`alignof` are measured in `byte` units
-	- `sizeof`/`alignof` produce untyped integer constants rather than a fixed type, so they concretize to context (array size, struct template argument, `comptime` parameter, or `isize` in a size expression)
+	- `sizeof`/`alignof` produce untyped integer constants rather than a fixed type, so they concretize to context (array size, type-factory value argument, `comptime` parameter, or `isize` in a size expression)
 	- `[]byte as []T` / `[]T as []byte` reinterpret the same storage without copying so containers can expose a typed view over a raw allocation
 
 - signed sizes
@@ -2771,8 +2659,8 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 
 - slice equality is built in
 	- strings are `[]const u8`, so without it the single most common comparison in scripting code has no direct spelling
-	- a library `equals(a, b)` is unusually awkward here: a slice has no declaring namespace, so neither [UFCS](#ufcs) nor [ADL](#argument-dependent-lookup) finds such a function, and every call site would need an explicit import and qualification - while `length(slice)` is already a builtin
-	- compile-time introspection makes it necessary rather than merely convenient: `t::name`, `f.name`, and `e.name` are compile-time `[]const u8`, and generic code cannot branch on them at all without comparison. The compiler already matches byte slices against declared names for [computed field access](#field-access)
+	- a library `equals(a, b)` is unusually awkward here: a slice has no declaring namespace, so neither [UFCS](#ufcs) nor [ADL](#argument-dependent-lookup) finds such a function, and every call site would need an explicit import and qualification - while `slice.length` is built in
+	- compile-time introspection makes it necessary rather than merely convenient: `t::name`, `f.name`, and `e.name` are compile-time `[]const u8`, and generic code cannot branch on them at all without comparison. The compiler already matches byte slices against declared names for computed struct access (see [Structs](#structs))
 	- content, not pointer identity: identity is nearly useless for a view type, and making the common intent silently wrong is worse than rejecting it
 	- restricted to element types with built-in equality so that `==` never dispatches to a user `operator ==` in a loop. That would put an unbounded chain of user calls behind a primitive-looking operator and would need a rule for which side wins against the overload
 	- the cost is that `==` is O(n) for slices while every other built-in `==` is constant time. Accepted: the alternative is the same loop written out by hand at every call site

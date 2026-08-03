@@ -369,17 +369,12 @@ struct StructOperator {
 };
 
 struct StructExpression : Expression {
-	StructExpression(ls_arena& arena) : Expression(STRUCT), comptime_params(arena), fields(arena), operators(arena), template_struct_instances(arena) {}
+	StructExpression(ls_arena& arena) : Expression(STRUCT), fields(arena), operators(arena) {}
 
-	ExpArray<NamedDecl> comptime_params; // [...]
-	// Fields keep type annotation syntax so generic structs can be instantiated with
-	// different comptime arguments before producing concrete resolved field types.
 	ExpArray<NamedDecl> fields;
 	// Operator overloads hosted on this type (first struct operand).
 	// Populated during symbol checking; used for O(1)-ish operator lookup.
 	ExpArray<StructOperator> operators;
-	// Canonical template specializations for this struct declaration.
-	ExpArray<TemplateStructInstance> template_struct_instances;
 	// Cached by symbol checking: name and owner unit for fast type printing.
 	ls_string_view cached_name = {};
 	struct Unit* cached_owner = nullptr;

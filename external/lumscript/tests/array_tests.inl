@@ -611,3 +611,58 @@ TEST(ArrayLiteralForms) {
 	EXPECT_COMPILE(source);
 	return true;
 }
+
+// `.length` of an array is comptime-known, so the checker stores a comptime value on the
+// member expression. Its type must be usable by the bytecode compiler, which reads
+// `comptime_value.type` to pick the value kind.
+TEST(ArrayLengthRuntime) {
+	const char* source = R"(
+		fn main() : i32 {
+			var values : [3]i32 = [1, 2, 3];
+			return values.length as i32;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(3, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+// The result type is isize, so narrowing to i32 has to emit a conversion.
+TEST(ArrayLengthNarrowedToI32Runtime) {
+	const char* source = R"(
+		fn main() : i32 {
+			var values : [3]i32 = [1, 2, 3];
+			var count : i32 = values.length as i32;
+			return count * 10 + values[0];
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(31, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ArrayLengthInArithmeticRuntime) {
+	const char* source = R"(
+		fn main() : i32 {
+			var values : [4]i32 = [1, 2, 3, 4];
+			var total : isize = values.length + values.length;
+			return total as i32;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(8, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+

@@ -7,7 +7,7 @@ enum ParseError {
 // parse string until not a number character is encountered
 // var a : u64 = parseU64(text) else return;
 fn parseU64(a : []const u8) : u64 | ParseError {
-    var len = length(a);
+    var len = a.length;
     if len < 1 { return ParseError.NotANumber; }
     
     var res : u64 = 0;

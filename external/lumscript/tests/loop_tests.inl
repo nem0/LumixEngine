@@ -312,7 +312,7 @@ TEST(ForLoopUntypedBoundAdoptsEndTypeRuntime) {
 	const char* source = R"(
 		fn count(values : []i32) : i32 {
 			var total : i32 = 0;
-			for i in 0..length(values) {
+			for i in 0..values.length {
 				total += values[i];
 			}
 			return total;

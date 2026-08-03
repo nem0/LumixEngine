@@ -123,7 +123,7 @@ TEST(SliceImplicitConversion) {
 TEST(ConstSliceTypeSyntaxAndConversion) {
 	const char* source = R"(
 		fn inspect(values : []const i32) : i32 {
-			return values[0] + length(values) as i32;
+			return values[0] + values.length as i32;
 		}
 
 		fn main() : i32 {
@@ -310,7 +310,7 @@ TEST(ScalarSliceViewTypeInferenceAndLength) {
 			var value : i32 = 7;
 			var view = value[:];
 			view[0] = 11;
-			return value + length(view) as i32;
+			return value + view.length as i32;
 		}
 	)";
 
@@ -358,7 +358,7 @@ TEST(ScalarSliceViewSupportsPrimitiveTypes) {
 			unsigned_view[0] = 9;
 			real_view[0] = 3.5;
 			return signed as i32 + unsigned as i32 + real as i32
-				+ length(signed_view) as i32 + length(unsigned_view) as i32 + length(real_view) as i32;
+				+ signed_view.length as i32 + unsigned_view.length as i32 + real_view.length as i32;
 		}
 	)";
 
@@ -408,7 +408,7 @@ TEST(ScalarSliceViewWorksForFieldsAndArrayElements) {
 			var second = values[1][:];
 			first[0] += 10;
 			second[0] += 20;
-			return pair.first + values[1] + length(first) as i32 + length(second) as i32;
+			return pair.first + values[1] + first.length as i32 + second.length as i32;
 		}
 	)";
 
@@ -433,7 +433,7 @@ TEST(ScalarSliceViewCanBeReslicedAndCopied) {
 			var subview : []i32 = view[:];
 			var copy : []i32 = subview;
 			copy[0] += 1;
-			return consume(subview) + length(copy) as i32;
+			return consume(subview) + copy.length as i32;
 		}
 	)";
 
@@ -669,7 +669,7 @@ TEST(SliceNonIntegerEndFail) {
 TEST(SliceImplicitConversionLengthRuntime) {
 	const char* source = R"(
 		fn get_length(s : []i32) : isize {
-			return length(s);
+			return s.length;
 		}
 
 		fn main() : i32 {
@@ -717,7 +717,7 @@ TEST(SliceLengthAndIndexRuntime) {
 			values[2] = 7;
 			values[3] = 11;
 			const slice : []i32 = values[1:3];
-			return (length(slice) as i32) * 100 + slice[0] * 10 + slice[1];
+			return (slice.length as i32) * 100 + slice[0] * 10 + slice[1];
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -762,7 +762,7 @@ TEST(SliceFromSliceRuntime) {
 			values[3] = 11;
 			const slice : []i32 = values[1:4];
 			const sub : []i32 = slice[1:];
-			return (length(sub) as i32) * 100 + sub[0] * 10 + sub[1];
+			return (sub.length as i32) * 100 + sub[0] * 10 + sub[1];
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -799,7 +799,7 @@ TEST(SliceZeroLengthRuntime) {
 		fn main() : i32 {
 			var values : [4]i32 = undefined;
 			const slice : []i32 = values[2:2];
-			return length(slice) as i32;
+			return slice.length as i32;
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -816,7 +816,7 @@ TEST(SliceNullInitializationRuntime) {
 	const char* source = R"(
 		fn main() : i32 {
 			var slice : []i32 = null;
-			return length(slice) as i32;
+			return slice.length as i32;
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -834,7 +834,7 @@ TEST(SliceIterationRuntime) {
 		fn sum(values : []i32) : i32 {
 			var total : i32 = 0;
 			var i : isize = 0;
-			while i < length(values) {
+			while i < values.length {
 				total += values[i];
 				i += 1;
 			}
@@ -965,7 +965,7 @@ TEST(SliceStructFieldWriteThroughParameterRuntime) {
 		}
 
 		fn advance(bodies : []Body) : void {
-			for i in 0..length(bodies) {
+			for i in 0..bodies.length {
 				bodies[i].x -= 1;
 				bodies[i].y = 100;
 			}
@@ -1301,6 +1301,43 @@ TEST(SliceEqualityOnFunctionParameters) {
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+// A comptime slice folds `.length` to a constant; the folded value must still carry a
+// concrete type through bytecode generation.
+TEST(ComptimeSliceLengthRuntime) {
+	const char* source = R"(
+		comptime text = "lumix";
+
+		fn main() : i32 {
+			return text.length as i32;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(5, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeSliceLengthNarrowedToI32Runtime) {
+	const char* source = R"(
+		comptime text = "lumix";
+
+		fn main() : i32 {
+			var count : i32 = text.length as i32;
+			return count * 10;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(50, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
