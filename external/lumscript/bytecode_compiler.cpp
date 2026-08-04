@@ -36,6 +36,7 @@ static ls_type_kind toTypeKind(const ResolvedType& type) {
 		case ResolvedType::F64: return LS_TYPE_F64;
 		case ResolvedType::CSTR: return LS_TYPE_CPTR;
 		case ResolvedType::CPTR: return LS_TYPE_CPTR;
+		case ResolvedType::POINTER: return LS_TYPE_CPTR;
 		case ResolvedType::BYTE: return LS_TYPE_U8;
 		case ResolvedType::FUNCTION: return LS_TYPE_FUNCTION;
 		case ResolvedType::ARRAY: return LS_TYPE_ARRAY;
@@ -103,8 +104,7 @@ static bool sameResolvedType(const ResolvedType* a, const ResolvedType* b) {
 			if (fa->params.size() != fb->params.size()) return false;
 			if (!sameResolvedType(fa->return_type, fb->return_type)) return false;
 			for (i32 i = 0; i < fa->params.size(); ++i) {
-				if (fa->params[i].is_ref != fb->params[i].is_ref
-					|| fa->params[i].is_comptime != fb->params[i].is_comptime) return false;
+				if (fa->params[i].is_comptime != fb->params[i].is_comptime) return false;
 				if (!sameResolvedType(fa->params[i].type, fb->params[i].type)) return false;
 			}
 			return true;
@@ -113,6 +113,11 @@ static bool sameResolvedType(const ResolvedType* a, const ResolvedType* b) {
 			const auto* aa = static_cast<const ArrayResolvedType*>(a);
 			const auto* ab = static_cast<const ArrayResolvedType*>(b);
 			return aa->size == ab->size && sameResolvedType(aa->element_type, ab->element_type);
+		}
+		case ResolvedType::POINTER: {
+			const auto* pa = static_cast<const PointerResolvedType*>(a);
+			const auto* pb = static_cast<const PointerResolvedType*>(b);
+			return pa->is_const == pb->is_const && sameResolvedType(pa->inner, pb->inner);
 		}
 		case ResolvedType::SLICE: {
 			const auto* sa = static_cast<const SliceResolvedType*>(a);
@@ -389,6 +394,13 @@ struct TypeInfoBuilder {
 				info->array_length = arr->size > 0 ? (u32)arr->size : 0u;
 				break;
 			}
+			case ResolvedType::POINTER: {
+				PointerResolvedType* ptr = static_cast<PointerResolvedType*>(type);
+				info->kind = LS_TYPE_CPTR;
+				info->element_type_index = resolve(ptr->inner);
+				info->is_const = ptr->is_const;
+				break;
+			}
 			case ResolvedType::SLICE: {
 				SliceResolvedType* sl = static_cast<SliceResolvedType*>(type);
 				info->kind = LS_TYPE_SLICE;
@@ -594,10 +606,6 @@ static u32 structFieldByteOffset(StructResolvedType& st, ls_string_view name, Re
 	return 0xffFFffFF;
 }
 
-static bool paramIsRef(const FunctionResolvedType& fn_type, u32 param_index) {
-	return param_index < (u32)fn_type.params.size() && fn_type.params[param_index].is_ref;
-}
-
 static bool paramIsComptime(const FunctionResolvedType& fn_type, u32 param_index) {
 	return param_index < (u32)fn_type.params.size() && fn_type.params[param_index].is_comptime;
 }
@@ -607,12 +615,6 @@ static void compileCallArgs(FunctionCompiler& ctx, CallExpression& expr, const F
 		const u32 param_index = arg_offset + i;
 		ResolvedType* param_type = fn_type.params[param_index].type;
 		if (paramIsComptime(fn_type, param_index)) continue;
-		if (paramIsRef(fn_type, param_index)) {
-			Expression* arg = expr.args[i];
-			UnaryExpression* un = static_cast<UnaryExpression*>(arg);
-			tryEmitReference(ctx, *un->expression);
-			continue;
-		}
 		compileExpressionAsType(ctx, *expr.args[i], *param_type);
 	}
 }
@@ -624,7 +626,7 @@ static u32 callArgWindowSize(const FunctionResolvedType& fn_type) {
 	u32 total = 0u;
 	for (i32 i = 0; i < fn_type.params.size(); ++i) {
 		if (paramIsComptime(fn_type, i)) continue;
-		const u32 byte_size = u32(paramIsRef(fn_type, i) ? typeKindByteSize(LS_TYPE_CPTR) : typeByteSize(*fn_type.params[i].type));
+		const u32 byte_size = typeByteSize(*fn_type.params[i].type);
 		total += byte_size == 0u ? 1u : byte_size;
 	}
 	return total;
@@ -633,12 +635,8 @@ static u32 callArgWindowSize(const FunctionResolvedType& fn_type) {
 static ls_type_kind emitDirectCall(FunctionCompiler& ctx, CallExpression& expr, FunctionExpression& fn, Expression* receiver, u32 arg_offset, ls_type_kind hint) {
 	FunctionResolvedType& fn_type = *static_cast<FunctionResolvedType*>(fn.resolved_type);
 	if (receiver) {
-		if (paramIsRef(fn_type, 0)) {
-			tryEmitReference(ctx, *receiver);
-		} else {
-			const ls_type_kind receiver_kind = !fn_type.params.empty() ? valueKindForType(*fn_type.params[0].type) : LS_TYPE_INVALID;
-			compileExpression(ctx, *receiver, receiver_kind);
-		}
+		const ls_type_kind receiver_kind = !fn_type.params.empty() ? valueKindForType(*fn_type.params[0].type) : LS_TYPE_INVALID;
+		compileExpression(ctx, *receiver, receiver_kind);
 	}
 	compileCallArgs(ctx, expr, fn_type, arg_offset);
 	emitCallDirect(ctx, fn.bytecode_index, callArgWindowSize(fn_type), typeByteSize(*fn_type.return_type));
@@ -1356,6 +1354,20 @@ static bool tryEmitReference(FunctionCompiler& ctx, Expression& expr) {
 			emitSlotRef(ctx, *slot);
 			return true;
 		}
+		case Expression::DEREFERENCE: {
+			DereferenceExpression& dereference = static_cast<DereferenceExpression&>(expr);
+			compileExpression(ctx, *dereference.subject, LS_TYPE_CPTR);
+			if (dereference.subject->kind == Expression::IDENTIFIER) {
+				IdentifierExpression& id = static_cast<IdentifierExpression&>(*dereference.subject);
+				if (id.slot && id.slot->type && id.slot->type->kind == ResolvedType::POINTER
+					&& static_cast<PointerResolvedType*>(id.slot->type)->inner->kind == ResolvedType::UNION
+					&& expr.resolved_type->kind != ResolvedType::UNION) {
+					emitConst8(ctx, 0u);
+					emitRefAt(ctx, 1u, sizeof(i32));
+				}
+			}
+			return true;
+		}
 		case Expression::MEMBER: {
 			MemberExpression* member = static_cast<MemberExpression*>(&expr);
 			if (member->expression->kind == Expression::IDENTIFIER && member->resolved_symbol) {
@@ -1364,8 +1376,20 @@ static bool tryEmitReference(FunctionCompiler& ctx, Expression& expr) {
 					return true;
 				}
 			}
-			if (member->expression->resolved_type->kind != ResolvedType::STRUCT) return false;
-			StructResolvedType* st = static_cast<StructResolvedType*>(member->expression->resolved_type);
+			ResolvedType* base_type = member->expression->resolved_type;
+			if (base_type->kind == ResolvedType::POINTER) {
+				base_type = static_cast<PointerResolvedType*>(base_type)->inner;
+				if (base_type->kind != ResolvedType::STRUCT) return false;
+				StructResolvedType* st = static_cast<StructResolvedType*>(base_type);
+				ResolvedType* field_type = nullptr;
+				u32 offset = structFieldByteOffset(*st, member->name, field_type);
+				compileExpression(ctx, *member->expression, LS_TYPE_CPTR);
+				emitConst8(ctx, 0u);
+				emitRefAt(ctx, 1u, (i32)offset);
+				return true;
+			}
+			if (base_type->kind != ResolvedType::STRUCT) return false;
+			StructResolvedType* st = static_cast<StructResolvedType*>(base_type);
 			ResolvedType* field_type = nullptr;
 			u32 offset = structFieldByteOffset(*st, member->name, field_type);
 			if (!tryEmitReference(ctx, *member->expression)) return false;
@@ -1820,8 +1844,12 @@ static Value widenIndexToI64(FunctionCompiler& ctx, Value v, bool& is_i32) {
 // snapshot it into a temp. Used before evaluating a store's rhs, whose side
 // effects must not retroactively change an already-evaluated base or index.
 static void snapshotValue(FunctionCompiler& ctx, Value& v, ls_type_kind kind) {
-	if (v.kind != Value::REG || v.is_temp) return;
+	if (v.kind != Value::REG) return;
 	const u32 size = typeKindByteSize(kind);
+	// A temporary at the top of the stack is not protected from the next
+	// expression: compiling that expression starts at the same offset. Copy it
+	// before evaluating a side-effecting RHS.
+	if (v.is_temp && v.reg + size < ctx.temp_top) return;
 	const u32 dst = ctx.temp_top;
 	emitOp(ctx.code, LS_OP_COPY);
 	emitTempReg(ctx, dst);
@@ -2219,7 +2247,8 @@ static void emitBracketStore(FunctionCompiler& ctx, BracketExpression& br, Expre
 			}
 		}
 		if (!rhs_pure) {
-			snapshotValue(ctx, a.index, a.index_is_i32 ? LS_TYPE_I32 : LS_TYPE_I64);
+			a.index = widenIndexToI64(ctx, a.index, a.index_is_i32);
+			snapshotValue(ctx, a.index, LS_TYPE_I64);
 		}
 		Value v = compileValueAsType(ctx, rhs, *br.resolved_type);
 		emitArrayAccessStore(ctx, a, v, value_kind);
@@ -2241,7 +2270,8 @@ static void emitBracketStore(FunctionCompiler& ctx, BracketExpression& br, Expre
 	}
 	ArrayAccess a = compileArrayAccess(ctx, br);
 	if (!rhs_pure) {
-		snapshotValue(ctx, a.index, a.index_is_i32 ? LS_TYPE_I32 : LS_TYPE_I64);
+		a.index = widenIndexToI64(ctx, a.index, a.index_is_i32);
+		snapshotValue(ctx, a.index, LS_TYPE_I64);
 	}
 	emitArrayAccessLoad(ctx, a, -1, true);
 	emitCompoundValue(ctx, rhs, value_kind, op, op_fn);
@@ -2249,6 +2279,7 @@ static void emitBracketStore(FunctionCompiler& ctx, BracketExpression& br, Expre
 }
 
 static void emitSlice(FunctionCompiler& ctx, SliceExpression& br) {
+	const u32 result_offset = ctx.temp_top;
 	ResolvedType* base_type = br.base->resolved_type;
 	ResolvedType* element_type = nullptr;
 	if (base_type->kind == ResolvedType::ARRAY) {
@@ -2269,8 +2300,9 @@ static void emitSlice(FunctionCompiler& ctx, SliceExpression& br) {
 		emitConst8(ctx, 1u);
 	}
 
-	// Save the source pair because an omitted end bound reuses its dynamic length,
-	// while explicit bounds may themselves evaluate arbitrary expressions.
+	// Bounds may contain nested expressions, so reserve the source pair until both
+	// bounds are compiled. The result is compacted below before releasing it.
+	const u32 saved_next_local_offset = ctx.next_local_offset;
 	const u32 source_offset = ctx.addLocal(br.resolved_type, LS_TYPE_SLICE, true);
 	const u32 slice_size = typeByteSize(*br.resolved_type);
 	emitStoreLocalBytes(ctx, source_offset, slice_size);
@@ -2286,6 +2318,15 @@ static void emitSlice(FunctionCompiler& ctx, SliceExpression& br) {
 		emitLoadLocalBytes(ctx, source_offset + typeKindByteSize(LS_TYPE_CPTR), typeKindByteSize(LS_TYPE_I64));
 	}
 	emitSliceOp(ctx, typeByteSize(*element_type));
+	const u32 compiled_result_offset = ctx.temp_top - slice_size;
+	if (compiled_result_offset != result_offset) {
+		emitOp(ctx.code, LS_OP_COPY);
+		emitTempReg(ctx, result_offset);
+		emitTempReg(ctx, compiled_result_offset);
+		emitU32(ctx.code, slice_size);
+	}
+	ctx.next_local_offset = saved_next_local_offset;
+	ctx.temp_top = result_offset + slice_size;
 }
 
 static bool patchJumpRelative(FunctionCompiler& ctx, u32 operand_pos, u32 target_pos) {
@@ -2853,6 +2894,9 @@ static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& membe
 		emitSliceAccessLoad(ctx, a);
 		return valueKindForType(*slice_field_type);
 	}
+	if (base_rt && base_rt->kind == ResolvedType::POINTER) {
+		if (tryEmitReferenceLoad(ctx, member, typeByteSize(*member.resolved_type))) return valueKindForType(*member.resolved_type);
+	}
 	if (member.expression->kind == Expression::IDENTIFIER) {
 		IdentifierExpression* base = static_cast<IdentifierExpression*>(member.expression);
 		if (member.resolved_symbol && member.resolved_symbol->expression) {
@@ -2952,7 +2996,35 @@ static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& membe
 static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, ls_type_kind hint) {
 	SourceScope source_scope(ctx.code, expr.token);
 	switch (expr.kind) {
-	case Expression::INT_LITERAL: {
+		case Expression::ADDRESSOF: {
+			AddressOfExpression& address = static_cast<AddressOfExpression&>(expr);
+			if (address.subject->kind == Expression::DEREFERENCE) {
+				DereferenceExpression& dereference = static_cast<DereferenceExpression&>(*address.subject);
+				compileExpression(ctx, *dereference.subject, LS_TYPE_CPTR);
+			} else {
+				const bool emitted = tryEmitReference(ctx, *address.subject);
+				ASSERT(emitted);
+				if (!emitted) return LS_TYPE_INVALID;
+			}
+			return LS_TYPE_CPTR;
+		}
+		case Expression::DEREFERENCE: {
+			DereferenceExpression& dereference = static_cast<DereferenceExpression&>(expr);
+			compileExpression(ctx, *dereference.subject, LS_TYPE_CPTR);
+			emitConst8(ctx, 0u);
+			i32 offset = 0;
+			if (dereference.subject->kind == Expression::IDENTIFIER) {
+				IdentifierExpression& id = static_cast<IdentifierExpression&>(*dereference.subject);
+				if (id.slot && id.slot->type && id.slot->type->kind == ResolvedType::POINTER
+					&& static_cast<PointerResolvedType*>(id.slot->type)->inner->kind == ResolvedType::UNION
+					&& expr.resolved_type->kind != ResolvedType::UNION) {
+					offset = sizeof(i32);
+				}
+			}
+			emitLoadAt(ctx, 1u, offset, typeByteSize(*expr.resolved_type));
+			return valueKindForType(*expr.resolved_type);
+		}
+		case Expression::INT_LITERAL: {
 			const ls_type_kind kind = expr.resolved_type && expr.resolved_type->kind != ResolvedType::UNTYPED_INT
 				? toTypeKind(*expr.resolved_type)
 				: defaultLiteralKind(expr, hint);
@@ -3460,6 +3532,29 @@ static bool tryEmitDirectReturn(FunctionCompiler& ctx, Expression& expr) {
 }
 
 static void compileAssign(FunctionCompiler& ctx, AssignStatement& assign) {
+	if (assign.lhs->kind == Expression::DEREFERENCE) {
+		DereferenceExpression* deref = static_cast<DereferenceExpression*>(assign.lhs);
+		ResolvedType* value_type = assign.lhs->resolved_type;
+		const u32 value_size = typeByteSize(*value_type);
+		const ls_type_kind value_kind = valueKindForType(*value_type);
+		compileExpression(ctx, *deref->subject, LS_TYPE_CPTR);
+
+		if (assign.op == Token::EQUAL) {
+			emitConst8(ctx, 0u);
+			compileExpressionAsType(ctx, *assign.rhs, *value_type);
+			emitStoreAt(ctx, 1u, 0, value_size);
+			return;
+		}
+
+		const u32 ref_offset = ctx.temp_top - typeKindByteSize(LS_TYPE_CPTR);
+		emitConst8(ctx, 0u);
+		emitLoadLocalBytes(ctx, ref_offset, typeKindByteSize(LS_TYPE_CPTR));
+		emitConst8(ctx, 0u);
+		emitLoadAt(ctx, 1u, 0, value_size);
+		emitCompoundValue(ctx, *assign.rhs, value_kind, assign.op, assign.resolved_op_fn);
+		emitStoreAt(ctx, 1u, 0, value_size);
+		return;
+	}
 	if (assign.lhs->kind == Expression::IDENTIFIER) {
 		IdentifierExpression* id = static_cast<IdentifierExpression*>(assign.lhs);
 		StorageSlot* slot = id->slot;
@@ -3566,12 +3661,16 @@ static void compileAssign(FunctionCompiler& ctx, AssignStatement& assign) {
 			emitSliceAccessStore(ctx, a, makeRegValue(ctx.temp_top - field_size, value_kind, true), value_kind);
 			return;
 		}
-		StructResolvedType* st = static_cast<StructResolvedType*>(member->expression->resolved_type);
+		ResolvedType* base_type = member->expression->resolved_type;
+		const bool pointer_base = base_type->kind == ResolvedType::POINTER;
+		if (pointer_base) base_type = static_cast<PointerResolvedType*>(base_type)->inner;
+		StructResolvedType* st = static_cast<StructResolvedType*>(base_type);
 		ResolvedType* field_type = nullptr;
 		u32 field_offset = structFieldByteOffset(*st, member->name, field_type);
 		const u32 field_size = typeByteSize(*field_type);
 		const ls_type_kind value_kind = valueKindForType(*field_type);
-		emitAddressableReference(ctx, *member->expression);
+		if (pointer_base) compileExpression(ctx, *member->expression, LS_TYPE_CPTR);
+		else emitAddressableReference(ctx, *member->expression);
 
 		if (assign.op == Token::EQUAL) {
 			emitConst8(ctx, 0u);

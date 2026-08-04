@@ -154,10 +154,10 @@ TEST(TemporaryFromCastFails) {
 	return true;
 }
 
-TEST(TemporaryPassedByRefFails) {
+TEST(TemporaryAddressTakenFails) {
 	const char* source = R"(
-		fn increment(v : ref i32) : void {
-			v += 1;
+		fn increment(v : *i32) : void {
+			v.* += 1;
 		}
 
 		fn get_i32() : i32 {
@@ -165,7 +165,7 @@ TEST(TemporaryPassedByRefFails) {
 		}
 
 		fn main() : void {
-			increment(ref get_i32());
+			increment(&get_i32());
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);

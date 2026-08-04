@@ -36,6 +36,7 @@ struct ResolvedType {
 		SLICE,
 		NULLABLE,
 		UNION,
+		POINTER
 	};
 
 	explicit ResolvedType(Kind kind) : kind(kind) {}
@@ -69,7 +70,6 @@ struct StructResolvedType : ResolvedType {
 struct FunctionResolvedParam {
 	ls_string_view name;
 	ResolvedType* type = nullptr;
-	bool is_ref = false;
 	bool is_comptime = false;
 };
 
@@ -79,6 +79,13 @@ struct FunctionResolvedType : ResolvedType {
 	ExpArray<FunctionResolvedParam> params;
 	ResolvedType* return_type = nullptr;
 	FunctionExpression* decl = nullptr;
+};
+
+struct PointerResolvedType : ResolvedType {
+	PointerResolvedType() : ResolvedType(POINTER) {}
+
+	ResolvedType* inner = nullptr;
+	bool is_const = false;
 };
 
 struct ArrayResolvedType : ResolvedType {

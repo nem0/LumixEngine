@@ -113,6 +113,8 @@ static void lumscript_world_findByName(ls_runtime*, ls_call_frame frame) {
 	const i32 name_len = (i32)(name_sv.end - name_sv.begin);
 	if (name_len >= (i32)sizeof(name)) {
 		LS_RESULT(frame, u8(0));
+		LS_RESULT(frame, i32(0));
+		LS_RESULT(frame, (void*)nullptr);
 		return;
 	}
 	if (name_len > 0) memcpy(name, name_sv.begin, (size_t)name_len);
@@ -120,6 +122,8 @@ static void lumscript_world_findByName(ls_runtime*, ls_call_frame frame) {
 	const EntityPtr entity = world->findByName(INVALID_ENTITY, name);
 	if (!entity.isValid()) {
 		LS_RESULT(frame, u8(0));
+		LS_RESULT(frame, i32(0));
+		LS_RESULT(frame, (void*)nullptr);
 		return;
 	}
 	LS_RESULT(frame, u8(1));
@@ -134,6 +138,8 @@ static void lumscript_entity_findChildByName(ls_runtime*, ls_call_frame frame) {
 	const i32 name_len = (i32)(name_sv.end - name_sv.begin);
 	if (name_len >= (i32)sizeof(name)) {
 		LS_RESULT(frame, u8(0));
+		LS_RESULT(frame, i32(0));
+		LS_RESULT(frame, (void*)nullptr);
 		return;
 	}
 	if (name_len > 0) memcpy(name, name_sv.begin, (size_t)name_len);
@@ -141,6 +147,8 @@ static void lumscript_entity_findChildByName(ls_runtime*, ls_call_frame frame) {
 	const EntityPtr entity = parent.world->findByName(parent.entity, name);
 	if (!entity.isValid()) {
 		LS_RESULT(frame, u8(0));
+		LS_RESULT(frame, i32(0));
+		LS_RESULT(frame, (void*)nullptr);
 		return;
 	}
 	LS_RESULT(frame, u8(1));

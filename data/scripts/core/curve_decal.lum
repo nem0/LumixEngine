@@ -6,6 +6,7 @@ import "core:vec2"
 struct CurveDecal { entity : i32; module : cptr; }
 
 extern fn curve_decal(e : Entity) : ?CurveDecal;
+extern fn createCurveDecal(e : Entity) : ?CurveDecal;
 extern fn getCurveDecalMaterialPath(entity : CurveDecal) : []const u8;
 extern fn setCurveDecalMaterialPath(entity : CurveDecal, path : []const u8) : void;
 extern fn getCurveDecalHalfExtents(entity : CurveDecal) : f32;

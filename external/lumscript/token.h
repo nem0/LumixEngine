@@ -56,7 +56,6 @@ struct Token {
 		CONST,
 		DEFER,
 		RETURN,
-		REF,
 		WHILE,
 		FOR,
 		UNROLL,
@@ -98,6 +97,7 @@ struct Token {
 		COMPTIME,
 		TYPE_KW,
 		TYPEOF,
+		AMPERSAND
 	};
 
 	Type type = END_OF_FILE;

@@ -5,6 +5,7 @@ import "core:entity"
 struct PropertyAnimator { entity : i32; module : cptr; }
 
 extern fn property_animator(e : Entity) : ?PropertyAnimator;
+extern fn createPropertyAnimator(e : Entity) : ?PropertyAnimator;
 extern fn isPropertyAnimatorEnabled(entity : PropertyAnimator) : bool;
 extern fn enablePropertyAnimator(entity : PropertyAnimator, enabled : bool) : void;
 extern fn getPropertyAnimatorLooped(entity : PropertyAnimator) : bool;

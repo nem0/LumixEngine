@@ -51,30 +51,31 @@ TEST(TemplateFunctionIdentityF32) {
 	return true;
 }
 
-TEST(TemplateFunctionRefArgumentRejectsUnassignableExpression) {
+TEST(TemplateFunctionPointerArgumentRejectsUnassignableExpression) {
 	const char* source = R"(
-		fn increment(v : ref $T) : void {
+		fn increment(v : *$T) : void {
 		}
 
 		fn main() : void {
-			increment(ref 1);
+			increment(&1);
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
-TEST(TemplateFunctionNullableRefParameterFailsDuringInstantiation) {
+TEST(TemplateFunctionNullablePointerParameterInstantiates) {
 	const char* source = R"(
-		fn clear(v : ref ?$T) : void {
+		fn clear(v : ?*$T) : void {
 		}
 
 		fn main() : void {
-			var value : ?i32 = 10;
-			clear(ref value);
+			var value : i32 = 10;
+			var pointer : ?*i32 = &value;
+			clear(pointer);
 		}
 	)";
-	EXPECT_COMPILE_FAIL(source);
+	EXPECT_COMPILE(source);
 	return true;
 }
 
@@ -261,42 +262,42 @@ TEST(TemplateFunctionRepeatedTypeParamMismatchFailsDuringInference) {
 	return true;
 }
 
-TEST(TemplateFunctionSwapMismatchedTypesFails) {
+TEST(TemplateFunctionPointerSwapMismatchedTypesFails) {
 	const char* source = R"(
-		fn swap(a : ref $T, b : ref T) : void {
-			const tmp = a;
-			a = b;
-			b = tmp;
+		fn swap(a : *$T, b : *T) : void {
+			const tmp = a.*;
+			a.* = b.*;
+			b.* = tmp;
 		}
 
 		fn main() : void {
 			var x : i32 = 1;
 			var y : f32 = 2.0;
-			swap(ref x, ref y);
+			swap(&x, &y);
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
-TEST(TemplateFunctionRefArgumentRequiresRefSyntaxFails) {
+TEST(TemplateFunctionPointerArgumentRequiresAddressFails) {
 	const char* source = R"(
-		fn swap(a : ref $T, b : ref T) : void {
+		fn swap(a : *$T, b : *T) : void {
 		}
 
 		fn main() : void {
 			var x : i32 = 1;
 			var y : i32 = 2;
-			swap(x, ref y);
+			swap(x, &y);
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
-TEST(TemplateFunctionRefArgumentRejectsNonRefUnaryFails) {
+TEST(TemplateFunctionPointerArgumentRejectsNonAddressUnaryFails) {
 	const char* source = R"(
-		fn increment(v : ref $T) : void {
+		fn increment(v : *$T) : void {
 		}
 
 		fn main() : void {
@@ -308,15 +309,15 @@ TEST(TemplateFunctionRefArgumentRejectsNonRefUnaryFails) {
 	return true;
 }
 
-TEST(TemplateFunctionRefArgumentMustBeWritableFails) {
+TEST(TemplateFunctionPointerArgumentMustBeWritableFails) {
 	const char* source = R"(
-		fn swap(a : ref $T, b : ref T) : void {
+		fn swap(a : *$T, b : *T) : void {
 		}
 
 		fn main() : void {
 			const x : i32 = 1;
 			var y : i32 = 2;
-			swap(ref x, ref y);
+			swap(&x, &y);
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -1153,18 +1154,18 @@ TEST(TemplateFunctionIdentityI32Runtime) {
 	return true;
 }
 
-TEST(TemplateFunctionSwapRuntime) {
+TEST(TemplateFunctionPointerSwapRuntime) {
 	const char* source = R"(
-		fn swap(a : ref $T, b : ref T) : void {
-			const tmp = a;
-			a = b;
-			b = tmp;
+		fn swap(a : *$T, b : *T) : void {
+			const tmp = a.*;
+			a.* = b.*;
+			b.* = tmp;
 		}
 
 		fn main() : i32 {
 			var x : i32 = 1;
 			var y : i32 = 41;
-			swap(ref x, ref y);
+			swap(&x, &y);
 			return x + y;
 		}
 	)";
@@ -2036,19 +2037,19 @@ TEST(TemplateFunctionTooManyParametersForTarget) {
 	return true;
 }
 
-// Inferred type argument on a ref-parameter template function.
-TEST(TemplateFunctionInferredInstantiationRefParamsRuntime) {
+// Inferred type argument on a pointer-parameter template function.
+TEST(TemplateFunctionInferredInstantiationPointerParamsRuntime) {
 	const char* source = R"(
-		fn swap(a : ref $T, b : ref T) : void {
-			const tmp = a;
-			a = b;
-			b = tmp;
+		fn swap(a : *$T, b : *T) : void {
+			const tmp = a.*;
+			a.* = b.*;
+			b.* = tmp;
 		}
 
 		fn main() : i32 {
 			var x : i32 = 1;
 			var y : i32 = 41;
-			swap(ref x, ref y);
+			swap(&x, &y);
 			return x + y;
 		}
 	)";

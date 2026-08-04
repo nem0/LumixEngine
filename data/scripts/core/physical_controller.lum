@@ -6,6 +6,7 @@ import "core:vec3"
 struct Controller { entity : i32; module : cptr; }
 
 extern fn physical_controller(e : Entity) : ?Controller;
+extern fn createController(e : Entity) : ?Controller;
 extern fn getGravitySpeed(entity : Controller) : f32;
 extern fn move(entity : Controller, v : Vec3) : void;
 extern fn isCollisionDown(entity : Controller) : bool;

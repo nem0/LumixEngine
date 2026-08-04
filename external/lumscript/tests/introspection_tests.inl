@@ -631,14 +631,50 @@ TEST(IntrospectionKindStaysComptimeOnly) {
 TEST(IntrospectionChildHandlesAllUnaryTypeConstructors) {
 	const char* source = R"(
 		comptime Nullable = ?i32;
+		comptime Pointer = *i32;
 		comptime Slice = []i32;
 		comptime Array = [2]i32;
 		comptime NullableChild = Nullable::child;
+		comptime PointerChild = Pointer::child;
 		comptime SliceChild = Slice::child;
 		comptime ArrayChild = Array::child;
 		fn nullable(value : NullableChild) : void {}
+		fn pointer(value : PointerChild) : void {}
 		fn slice(value : SliceChild) : void {}
 		fn array(value : ArrayChild) : void {}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(IntrospectionPointerTypeKindAndName) {
+	const char* source = R"(
+		comptime Pointer = *i32;
+		comptime NullablePointer = ?*i32;
+		comptime pointer_kind = Pointer::kind;
+		comptime nullable_pointer_kind = NullablePointer::kind;
+		comptime pointer_name = Pointer::name;
+		comptime nullable_pointer_name = NullablePointer::name;
+		fn main() : void {
+			if pointer_kind == .Pointer and nullable_pointer_kind == .Nullable
+				and pointer_name == "*i32" and nullable_pointer_name == "?*i32" { }
+			else { var bad : MissingType = undefined; }
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(IntrospectionPointerValueUsesTypeof) {
+	const char* source = R"(
+		fn main() : void {
+			var value : i32 = 0;
+			var pointer : *i32 = &value;
+			comptime Kind = typeof(pointer)::kind;
+			comptime Child = typeof(pointer)::child;
+			if Kind == .Pointer and Child == i32 { }
+			else { var bad : MissingType = undefined; }
+		}
 	)";
 	EXPECT_COMPILE(source);
 	return true;
@@ -969,6 +1005,16 @@ TEST(IntrospectionNumericTypeMinMaxRejectsNonNumeric) {
 	return true;
 }
 
+TEST(IntrospectionNumericTypeMinMaxAreUntyped) {
+	EXPECT_COMPILE_FAIL(R"(
+		comptime T = typeof(i32::min);
+	)");
+	EXPECT_COMPILE_FAIL(R"(
+		comptime T = typeof(f64::max);
+	)");
+	return true;
+}
+
 TEST(IntrospectionNumericTypeBoundsFoldBeforeBytecode) {
 	const char* source = R"(
 		fn min_value() : i32 { return i32::min; }
@@ -1111,13 +1157,13 @@ TEST(IntrospectionStructValueIterationTypeCheckRejected) {
 	return true;
 }
 
-TEST(IntrospectionStructValueIterationReferenceRejected) {
+TEST(IntrospectionStructValueIterationPointerRejected) {
 	const char* source = R"(
 		struct S { value : i32; }
-		fn increment(value : ref i32) : void { value += 1; }
+		fn increment(value : *i32) : void { value.* += 1; }
 		fn main() : void {
 			var object : S = S { 1 };
-			unroll for field in object { increment(ref field.value); }
+			unroll for field in object { increment(&field.value); }
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);

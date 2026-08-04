@@ -8,6 +8,7 @@ import "core:vec3"
 struct BoneAttachment { entity : i32; module : cptr; }
 
 extern fn bone_attachment(e : Entity) : ?BoneAttachment;
+extern fn createBoneAttachment(e : Entity) : ?BoneAttachment;
 extern fn setRotation(entity : BoneAttachment, rot : Quat) : void;
 extern fn getBoneAttachmentParent(entity : BoneAttachment) : Entity;
 extern fn setBoneAttachmentParent(entity : BoneAttachment, parent : Entity) : void;

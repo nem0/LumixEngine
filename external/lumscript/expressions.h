@@ -117,6 +117,9 @@ struct Expression {
 		RESOLVED_TYPE,
 		// Ternary conditional operator: `condition ? true_expr : false_expr`
 		TERNARY,
+		POINTER_TYPE, // *T
+		DEREFERENCE, // .*
+		ADDRESSOF, // &
 	};
 
 	Expression() = default;
@@ -204,6 +207,23 @@ struct SliceTypeExpression : Expression {
 	bool is_const = false;
 };
 
+struct DereferenceExpression : Expression {
+	DereferenceExpression() : Expression(DEREFERENCE) {}
+	Expression* subject = nullptr;
+};
+
+struct AddressOfExpression : Expression {
+	AddressOfExpression() : Expression(ADDRESSOF) {}
+	Expression* subject = nullptr;
+};
+
+struct PointerTypeExpression : Expression {
+	PointerTypeExpression() : Expression(POINTER_TYPE) {}
+
+	Expression* inner = nullptr;
+	bool is_const = false;
+};
+
 struct NullableTypeExpression : Expression {
 	NullableTypeExpression() : Expression(NULLABLE_TYPE) {}
 
@@ -213,7 +233,6 @@ struct NullableTypeExpression : Expression {
 struct FunctionTypeParam {
 	// Empty for positional-only parameters.
 	ls_string_view name;
-	bool is_ref = false;
 	bool is_comptime = false;
 	Expression* type_expr = nullptr;
 };

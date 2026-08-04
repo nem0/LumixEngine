@@ -6,6 +6,7 @@ import "core:vec3"
 struct Animator { entity : i32; module : cptr; }
 
 extern fn animator(e : Entity) : ?Animator;
+extern fn createAnimator(e : Entity) : ?Animator;
 extern fn applySet(entity : Animator, idx : i32) : void;
 extern fn setBoolInput(entity : Animator, input_idx : i32, value : bool) : void;
 extern fn setFloatInput(entity : Animator, input_idx : i32, value : f32) : void;

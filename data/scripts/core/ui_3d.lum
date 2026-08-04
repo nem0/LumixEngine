@@ -6,6 +6,7 @@ import "core:vec2"
 struct UI3D { entity : i32; module : cptr; }
 
 extern fn ui_3d(e : Entity) : ?UI3D;
+extern fn createUI3D(e : Entity) : ?UI3D;
 extern fn getUI3DPath(entity : UI3D) : []const u8;
 extern fn setUI3DPath(entity : UI3D, path : []const u8) : void;
 extern fn getUI3DVirtualSize(entity : UI3D) : Vec2;

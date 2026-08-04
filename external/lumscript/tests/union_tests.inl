@@ -805,7 +805,7 @@ TEST(UnionWideningAcrossCallRuntime) {
 	return true;
 }
 
-TEST(UnionFieldGlobalAndRefRuntime) {
+TEST(UnionFieldGlobalAndPointerRuntime) {
 	const char* source = R"(
 		struct A {
 			x : i32;
@@ -821,20 +821,20 @@ TEST(UnionFieldGlobalAndRefRuntime) {
 
 		var global : Container = Container { A { 3 } };
 
-		fn set(value : ref Union) : void {
-			value = B { 8 };
+		fn set(value : *Union) : void {
+			value.* = B { 8 };
 		}
 
-		fn read(value : ref Union) : i32 {
-			if value is B {
-				return value.y;
+		fn read(value : *Union) : i32 {
+			if value.* is B {
+				return value.*.y;
 			}
 			return 0;
 		}
 
 		fn main() : i32 {
-			set(ref global.value);
-			return read(ref global.value);
+			set(&global.value);
+			return read(&global.value);
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);

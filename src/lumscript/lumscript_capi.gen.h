@@ -29,7 +29,11 @@ namespace Lumix::LumScript::generated {
 	static void lumscript_world_animation(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, World*, world);
 		IModule* module = world->getModule(reflection::getComponentType("property_animator"));
-		if (!module) { LS_RESULT(frame, u8(0)); return; }
+		if (!module) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
 		LS_RESULT(frame, u8(1));
 		LS_RESULT(frame, module);
 	}
@@ -37,7 +41,11 @@ namespace Lumix::LumScript::generated {
 	static void lumscript_world_audio(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, World*, world);
 		IModule* module = world->getModule(reflection::getComponentType("echo_zone"));
-		if (!module) { LS_RESULT(frame, u8(0)); return; }
+		if (!module) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
 		LS_RESULT(frame, u8(1));
 		LS_RESULT(frame, module);
 	}
@@ -45,7 +53,11 @@ namespace Lumix::LumScript::generated {
 	static void lumscript_world_core(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, World*, world);
 		IModule* module = world->getModule(reflection::getComponentType("spline"));
-		if (!module) { LS_RESULT(frame, u8(0)); return; }
+		if (!module) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
 		LS_RESULT(frame, u8(1));
 		LS_RESULT(frame, module);
 	}
@@ -53,7 +65,11 @@ namespace Lumix::LumScript::generated {
 	static void lumscript_world_lua_script(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, World*, world);
 		IModule* module = world->getModule(reflection::getComponentType("lua_script"));
-		if (!module) { LS_RESULT(frame, u8(0)); return; }
+		if (!module) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
 		LS_RESULT(frame, u8(1));
 		LS_RESULT(frame, module);
 	}
@@ -61,7 +77,11 @@ namespace Lumix::LumScript::generated {
 	static void lumscript_world_navigation(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, World*, world);
 		IModule* module = world->getModule(reflection::getComponentType("navmesh_zone"));
-		if (!module) { LS_RESULT(frame, u8(0)); return; }
+		if (!module) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
 		LS_RESULT(frame, u8(1));
 		LS_RESULT(frame, module);
 	}
@@ -69,7 +89,11 @@ namespace Lumix::LumScript::generated {
 	static void lumscript_world_physics(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, World*, world);
 		IModule* module = world->getModule(reflection::getComponentType("physical_heightfield"));
-		if (!module) { LS_RESULT(frame, u8(0)); return; }
+		if (!module) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
 		LS_RESULT(frame, u8(1));
 		LS_RESULT(frame, module);
 	}
@@ -77,7 +101,11 @@ namespace Lumix::LumScript::generated {
 	static void lumscript_world_renderer(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, World*, world);
 		IModule* module = world->getModule(reflection::getComponentType("camera"));
-		if (!module) { LS_RESULT(frame, u8(0)); return; }
+		if (!module) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
 		LS_RESULT(frame, u8(1));
 		LS_RESULT(frame, module);
 	}
@@ -85,7 +113,11 @@ namespace Lumix::LumScript::generated {
 	static void lumscript_world_ui(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, World*, world);
 		IModule* module = world->getModule(reflection::getComponentType("ui_3d"));
-		if (!module) { LS_RESULT(frame, u8(0)); return; }
+		if (!module) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
 		LS_RESULT(frame, u8(1));
 		LS_RESULT(frame, module);
 	}
@@ -96,6 +128,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -109,6 +143,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -122,6 +158,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -135,6 +173,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -148,6 +188,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -161,6 +203,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -174,6 +218,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -187,6 +233,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -200,6 +248,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -213,6 +263,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -226,6 +278,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -239,6 +293,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -252,6 +308,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -265,6 +323,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -278,6 +338,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -291,6 +353,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -304,6 +368,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -317,6 +383,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -330,6 +398,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -343,6 +413,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -356,6 +428,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -369,6 +443,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -382,6 +458,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -395,6 +473,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -408,6 +488,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -421,6 +503,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -434,6 +518,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -447,6 +533,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -460,6 +548,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -473,6 +563,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -486,6 +578,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -499,6 +593,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -512,6 +608,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -525,6 +623,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -538,6 +638,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -551,6 +653,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -564,6 +668,8 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -577,6 +683,920 @@ namespace Lumix::LumScript::generated {
 		IModule* module = world->getModule(component_type);
 		if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createPropertyAnimator(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("property_animator");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createAnimator(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("animator");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createAnimable(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("animable");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createEchoZone(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("echo_zone");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createChorusZone(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("chorus_zone");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createListener(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("audio_listener");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createAmbientSound(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("ambient_sound");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createSpline(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("spline");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createSignal(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("signal");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createScript(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("lua_script");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createInlineScript(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("lua_script_inline");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createZone(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("navmesh_zone");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createAgent(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("navmesh_agent");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createHeightfield(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("physical_heightfield");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createD6Joint(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("d6_joint");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createDistanceJoint(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("distance_joint");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createHingeJoint(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("hinge_joint");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createSphericalJoint(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("spherical_joint");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createController(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("physical_controller");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createActor(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("rigid_actor");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createWheel(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("wheel");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createVehicle(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("vehicle");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createInstancedCube(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("physical_instanced_cube");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createInstancedMesh(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("physical_instanced_mesh");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createCamera(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("camera");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createDecal(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("decal");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createEnvironment(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("environment");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createPointLight(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("point_light");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createReflectionProbe(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("reflection_probe");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createEnvironmentProbe(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("environment_probe");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createBoneAttachment(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("bone_attachment");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createParticleEmitter(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("particle_emitter");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createInstancedModel(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("instanced_model");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createModelInstance(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("model_instance");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createCurveDecal(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("curve_decal");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createTerrain(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("terrain");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createProceduralGeometry(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("procedural_geom");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		LS_RESULT(frame, u8(1));
+		LS_RESULT(frame, entity_index);
+		LS_RESULT(frame, module);
+	}
+	
+	static void lumscript_entity_createUI3D(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ENTITY_ARG(frame, entity, world);
+		const ComponentType component_type = reflection::getComponentType("ui_3d");
+		IModule* module = world->getModule(component_type);
+		if (!module || !world->hasEntity(EntityRef(entity_index))) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
+			return;
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			world->createComponent(component_type, EntityRef(entity_index));
+		}
+		if (!world->hasComponent(EntityRef(entity_index), component_type)) {
+			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -918,6 +1938,9 @@ namespace Lumix::LumScript::generated {
 		const i32 count = module->getScriptCount(EntityRef(entity_index));
 		if (item_idx < 0 || item_idx >= count) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -1758,6 +2781,9 @@ namespace Lumix::LumScript::generated {
 		const i32 count = module->getBoxCount(EntityRef(entity_index));
 		if (item_idx < 0 || item_idx >= count) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -1826,6 +2852,9 @@ namespace Lumix::LumScript::generated {
 		const i32 count = module->getSphereCount(EntityRef(entity_index));
 		if (item_idx < 0 || item_idx >= count) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -2638,6 +3667,9 @@ namespace Lumix::LumScript::generated {
 		const i32 count = module->getGrassCount(EntityRef(entity_index));
 		if (item_idx < 0 || item_idx >= count) {
 			LS_RESULT(frame, u8(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, i32(0));
+			LS_RESULT(frame, (void*)nullptr);
 			return;
 		}
 		LS_RESULT(frame, u8(1));
@@ -2759,43 +3791,81 @@ namespace Lumix::LumScript::generated {
 	}
 	
 	static void registerGeneratedEngineImport(HashMap<NativeFunctionKey, ls_native_fn, NativeFunctionKeyHash>& functions) {
+		functions.insert({StringView("core:property_animator"), StringView("createPropertyAnimator")}, &lumscript_entity_createPropertyAnimator);
 		functions.insert({StringView("core:property_animator"), StringView("property_animator")}, &lumscript_entity_property_animator);
+		functions.insert({StringView("core:animator"), StringView("createAnimator")}, &lumscript_entity_createAnimator);
 		functions.insert({StringView("core:animator"), StringView("animator")}, &lumscript_entity_animator);
+		functions.insert({StringView("core:animable"), StringView("createAnimable")}, &lumscript_entity_createAnimable);
 		functions.insert({StringView("core:animable"), StringView("animable")}, &lumscript_entity_animable);
+		functions.insert({StringView("core:echo_zone"), StringView("createEchoZone")}, &lumscript_entity_createEchoZone);
 		functions.insert({StringView("core:echo_zone"), StringView("echo_zone")}, &lumscript_entity_echo_zone);
+		functions.insert({StringView("core:chorus_zone"), StringView("createChorusZone")}, &lumscript_entity_createChorusZone);
 		functions.insert({StringView("core:chorus_zone"), StringView("chorus_zone")}, &lumscript_entity_chorus_zone);
+		functions.insert({StringView("core:audio_listener"), StringView("createListener")}, &lumscript_entity_createListener);
 		functions.insert({StringView("core:audio_listener"), StringView("audio_listener")}, &lumscript_entity_audio_listener);
+		functions.insert({StringView("core:ambient_sound"), StringView("createAmbientSound")}, &lumscript_entity_createAmbientSound);
 		functions.insert({StringView("core:ambient_sound"), StringView("ambient_sound")}, &lumscript_entity_ambient_sound);
+		functions.insert({StringView("core:spline"), StringView("createSpline")}, &lumscript_entity_createSpline);
 		functions.insert({StringView("core:spline"), StringView("spline")}, &lumscript_entity_spline);
+		functions.insert({StringView("core:signal"), StringView("createSignal")}, &lumscript_entity_createSignal);
 		functions.insert({StringView("core:signal"), StringView("signal")}, &lumscript_entity_signal);
+		functions.insert({StringView("core:lua_script"), StringView("createScript")}, &lumscript_entity_createScript);
 		functions.insert({StringView("core:lua_script"), StringView("lua_script")}, &lumscript_entity_lua_script);
+		functions.insert({StringView("core:lua_script_inline"), StringView("createInlineScript")}, &lumscript_entity_createInlineScript);
 		functions.insert({StringView("core:lua_script_inline"), StringView("lua_script_inline")}, &lumscript_entity_lua_script_inline);
+		functions.insert({StringView("core:navmesh_zone"), StringView("createZone")}, &lumscript_entity_createZone);
 		functions.insert({StringView("core:navmesh_zone"), StringView("navmesh_zone")}, &lumscript_entity_navmesh_zone);
+		functions.insert({StringView("core:navmesh_agent"), StringView("createAgent")}, &lumscript_entity_createAgent);
 		functions.insert({StringView("core:navmesh_agent"), StringView("navmesh_agent")}, &lumscript_entity_navmesh_agent);
+		functions.insert({StringView("core:physical_heightfield"), StringView("createHeightfield")}, &lumscript_entity_createHeightfield);
 		functions.insert({StringView("core:physical_heightfield"), StringView("physical_heightfield")}, &lumscript_entity_physical_heightfield);
+		functions.insert({StringView("core:d6_joint"), StringView("createD6Joint")}, &lumscript_entity_createD6Joint);
 		functions.insert({StringView("core:d6_joint"), StringView("d6_joint")}, &lumscript_entity_d6_joint);
+		functions.insert({StringView("core:distance_joint"), StringView("createDistanceJoint")}, &lumscript_entity_createDistanceJoint);
 		functions.insert({StringView("core:distance_joint"), StringView("distance_joint")}, &lumscript_entity_distance_joint);
+		functions.insert({StringView("core:hinge_joint"), StringView("createHingeJoint")}, &lumscript_entity_createHingeJoint);
 		functions.insert({StringView("core:hinge_joint"), StringView("hinge_joint")}, &lumscript_entity_hinge_joint);
+		functions.insert({StringView("core:spherical_joint"), StringView("createSphericalJoint")}, &lumscript_entity_createSphericalJoint);
 		functions.insert({StringView("core:spherical_joint"), StringView("spherical_joint")}, &lumscript_entity_spherical_joint);
+		functions.insert({StringView("core:physical_controller"), StringView("createController")}, &lumscript_entity_createController);
 		functions.insert({StringView("core:physical_controller"), StringView("physical_controller")}, &lumscript_entity_physical_controller);
+		functions.insert({StringView("core:rigid_actor"), StringView("createActor")}, &lumscript_entity_createActor);
 		functions.insert({StringView("core:rigid_actor"), StringView("rigid_actor")}, &lumscript_entity_rigid_actor);
+		functions.insert({StringView("core:wheel"), StringView("createWheel")}, &lumscript_entity_createWheel);
 		functions.insert({StringView("core:wheel"), StringView("wheel")}, &lumscript_entity_wheel);
+		functions.insert({StringView("core:vehicle"), StringView("createVehicle")}, &lumscript_entity_createVehicle);
 		functions.insert({StringView("core:vehicle"), StringView("vehicle")}, &lumscript_entity_vehicle);
+		functions.insert({StringView("core:physical_instanced_cube"), StringView("createInstancedCube")}, &lumscript_entity_createInstancedCube);
 		functions.insert({StringView("core:physical_instanced_cube"), StringView("physical_instanced_cube")}, &lumscript_entity_physical_instanced_cube);
+		functions.insert({StringView("core:physical_instanced_mesh"), StringView("createInstancedMesh")}, &lumscript_entity_createInstancedMesh);
 		functions.insert({StringView("core:physical_instanced_mesh"), StringView("physical_instanced_mesh")}, &lumscript_entity_physical_instanced_mesh);
+		functions.insert({StringView("core:camera"), StringView("createCamera")}, &lumscript_entity_createCamera);
 		functions.insert({StringView("core:camera"), StringView("camera")}, &lumscript_entity_camera);
+		functions.insert({StringView("core:decal"), StringView("createDecal")}, &lumscript_entity_createDecal);
 		functions.insert({StringView("core:decal"), StringView("decal")}, &lumscript_entity_decal);
+		functions.insert({StringView("core:environment"), StringView("createEnvironment")}, &lumscript_entity_createEnvironment);
 		functions.insert({StringView("core:environment"), StringView("environment")}, &lumscript_entity_environment);
+		functions.insert({StringView("core:point_light"), StringView("createPointLight")}, &lumscript_entity_createPointLight);
 		functions.insert({StringView("core:point_light"), StringView("point_light")}, &lumscript_entity_point_light);
+		functions.insert({StringView("core:reflection_probe"), StringView("createReflectionProbe")}, &lumscript_entity_createReflectionProbe);
 		functions.insert({StringView("core:reflection_probe"), StringView("reflection_probe")}, &lumscript_entity_reflection_probe);
+		functions.insert({StringView("core:environment_probe"), StringView("createEnvironmentProbe")}, &lumscript_entity_createEnvironmentProbe);
 		functions.insert({StringView("core:environment_probe"), StringView("environment_probe")}, &lumscript_entity_environment_probe);
+		functions.insert({StringView("core:bone_attachment"), StringView("createBoneAttachment")}, &lumscript_entity_createBoneAttachment);
 		functions.insert({StringView("core:bone_attachment"), StringView("bone_attachment")}, &lumscript_entity_bone_attachment);
+		functions.insert({StringView("core:particle_emitter"), StringView("createParticleEmitter")}, &lumscript_entity_createParticleEmitter);
 		functions.insert({StringView("core:particle_emitter"), StringView("particle_emitter")}, &lumscript_entity_particle_emitter);
+		functions.insert({StringView("core:instanced_model"), StringView("createInstancedModel")}, &lumscript_entity_createInstancedModel);
 		functions.insert({StringView("core:instanced_model"), StringView("instanced_model")}, &lumscript_entity_instanced_model);
+		functions.insert({StringView("core:model_instance"), StringView("createModelInstance")}, &lumscript_entity_createModelInstance);
 		functions.insert({StringView("core:model_instance"), StringView("model_instance")}, &lumscript_entity_model_instance);
+		functions.insert({StringView("core:curve_decal"), StringView("createCurveDecal")}, &lumscript_entity_createCurveDecal);
 		functions.insert({StringView("core:curve_decal"), StringView("curve_decal")}, &lumscript_entity_curve_decal);
+		functions.insert({StringView("core:terrain"), StringView("createTerrain")}, &lumscript_entity_createTerrain);
 		functions.insert({StringView("core:terrain"), StringView("terrain")}, &lumscript_entity_terrain);
+		functions.insert({StringView("core:procedural_geom"), StringView("createProceduralGeometry")}, &lumscript_entity_createProceduralGeometry);
 		functions.insert({StringView("core:procedural_geom"), StringView("procedural_geom")}, &lumscript_entity_procedural_geom);
+		functions.insert({StringView("core:ui_3d"), StringView("createUI3D")}, &lumscript_entity_createUI3D);
 		functions.insert({StringView("core:ui_3d"), StringView("ui_3d")}, &lumscript_entity_ui_3d);
 		functions.insert({StringView("core:audio"), StringView("setMasterVolume")}, &lumscript_audio_setMasterVolume_0);
 		functions.insert({StringView("core:audio"), StringView("audio")}, &lumscript_world_audio);

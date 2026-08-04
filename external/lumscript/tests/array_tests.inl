@@ -281,6 +281,81 @@ TEST(BytecodeStaticSizedArrayIndexing) {
 	return true;
 }
 
+TEST(BytecodeGlobalStructArrayFieldDynamicIndexing) {
+	const char* source = R"(
+		struct Storage {
+			values : [4]i32;
+		}
+
+		var storage : Storage = undefined;
+
+		fn main() : i32 {
+			for i in 0..4 {
+				storage.values[i] = i + 10;
+			}
+			return storage.values[0] + storage.values[1] + storage.values[2] + storage.values[3];
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(46, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeGlobalStructArrayFieldEntitySizedIndexing) {
+	const char* source = R"(
+		struct Entity {
+			index : i32;
+			world : cptr;
+		}
+
+		struct Piece {
+			entities : [4]Entity;
+		}
+
+		var piece : Piece = undefined;
+
+		fn make_entity(index : i32) : Entity {
+			return Entity { index, null };
+		}
+
+		fn main() : i32 {
+			for i in 0..4 {
+				piece.entities[i] = make_entity(i);
+			}
+			return piece.entities[0].index + piece.entities[1].index + piece.entities[2].index + piece.entities[3].index;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	EXPECT_TRUE(bytecode != nullptr);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(6, ls_to_i32(runtime, -1));
+
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
 TEST(BytecodeTemporaryArrayIndexing) {
 	const char* source = R"(
 		fn make() : [3]i32 {
@@ -369,17 +444,17 @@ TEST(BytecodeUndefinedArrayArgumentUsesFullByteSize) {
 	return true;
 }
 
-TEST(BytecodeRefParameterArrayCall) {
+TEST(BytecodePointerParameterArrayCall) {
 	const char* source = R"(
-		fn bump(value : ref i32) : void {
-			value += 2;
+		fn bump(value : *i32) : void {
+			value.* += 2;
 		}
 
 		fn main() : i32 {
 			var values : [3]i32 = undefined;
 			values[0] = 20;
 			values[1] = 20;
-			bump(ref values[1]);
+			bump(&values[1]);
 			return values[0] + values[1];
 		}
 	)";

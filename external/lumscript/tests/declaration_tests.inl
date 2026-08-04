@@ -40,11 +40,11 @@ TEST(BasicAssign) {
 
 TEST(AssignmentToMemberWithoutBaseFails) {
 	const char* source = R"(
-		fn set(v : ref i32) : void {
+		fn set(v : *i32) : void {
 		}
 
 		fn main() : void {
-			set(ref .field);
+			set(&.field);
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);

@@ -1107,9 +1107,7 @@ TEST(UfcsNotShadowedByLocalFunctionWithSameName) {
 	const char* arr_source = R"(
 		struct Array { size : isize; }
 
-		fn init(array : ref Array) : void {
-			array.size = 0;
-		}
+		fn init(array : Array) : void {}
 	)";
 	LumScriptImportFile files_storage[] = {
 		{ toLs("arr"), toLs(arr_source) },

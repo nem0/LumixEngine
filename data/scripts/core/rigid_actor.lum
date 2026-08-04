@@ -11,6 +11,7 @@ struct ActorBoxArrayItem { entity : i32; idx : i32; module : cptr; }
 struct ActorSphereArrayItem { entity : i32; idx : i32; module : cptr; }
 
 extern fn rigid_actor(e : Entity) : ?Actor;
+extern fn createActor(e : Entity) : ?Actor;
 extern fn putToSleep(entity : Actor) : void;
 extern fn addForceAtPos(entity : Actor, force : Vec3, pos : Vec3) : void;
 extern fn applyForce(entity : Actor, force : Vec3) : void;

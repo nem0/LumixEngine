@@ -1,0 +1,217 @@
+import "core:world"
+import "core:entity"
+import "core:dvec3"
+import "core:model_instance"
+import "core:input"
+import "core:inputdevicetype"
+import "core:Keycode"
+
+comptime GRID_W = 10;
+comptime GRID_H = 20;
+comptime CELL_SIZE : f64 = 2.1;
+comptime DROP_INTERVAL : f32 = 0.8;
+
+struct Block {
+	x : i32;
+	y : i32;
+}
+
+struct Piece {
+	x : i32;
+	y : i32;
+	blocks : [4]Block;
+	entities : [4]Entity;
+}
+
+var game_world : World = undefined;
+var input_system : InputSystem = undefined;
+var grid : [GRID_W][GRID_H]?Entity = undefined;
+var current : Piece = undefined;
+var has_current = false;
+var drop_timer : f32 = 0.0;
+var piece_number : i32 = 0;
+var score : i32 = 0;
+
+fn worldPosFromCell(cx : i32, cy : i32) : DVec3 {
+	return DVec3 {
+		(cx as f64 - (GRID_W as f64 / 2.0) - 0.5) * CELL_SIZE,
+		(cy as f64 - 1.0) * CELL_SIZE + 2.0,
+		0.0
+	};
+}
+
+fn createCubeAt(cx : i32, cy : i32) : Entity {
+	const entity = createEntity(game_world);
+	setPosition(entity, worldPosFromCell(cx, cy));
+	const model = createModelInstance(entity);
+	if model != null {
+		setModelInstancePath(model, "engine/models/cube.fbx");
+	}
+	return entity;
+}
+
+fn clearGrid() : void {
+	for x in 0..GRID_W {
+		for y in 0..GRID_H {
+			grid[x][y] = null;
+		}
+	}
+}
+
+fn shape(index : i32) : [4]Block {
+	match index {
+		case 0: return [Block { 0, 1 }, Block { 1, 1 }, Block { 2, 1 }, Block { 3, 1 }];
+		case 1: return [Block { 0, 0 }, Block { 0, 1 }, Block { 1, 1 }, Block { 2, 1 }];
+		case 2: return [Block { 2, 0 }, Block { 0, 1 }, Block { 1, 1 }, Block { 2, 1 }];
+		case 3: return [Block { 1, 0 }, Block { 2, 0 }, Block { 1, 1 }, Block { 2, 1 }];
+		case 4: return [Block { 1, 0 }, Block { 2, 0 }, Block { 0, 1 }, Block { 1, 1 }];
+		case 5: return [Block { 0, 0 }, Block { 1, 0 }, Block { 1, 1 }, Block { 2, 1 }];
+		case: return [Block { 1, 0 }, Block { 0, 1 }, Block { 1, 1 }, Block { 2, 1 }];
+	}
+}
+
+fn updateCurrentEntities() : void {
+	if not has_current { return; }
+	for i in 0..4 {
+		const block = current.blocks[i];
+		setPosition(current.entities[i], worldPosFromCell(current.x + block.x + 1, current.y + block.y + 1));
+	}
+}
+
+fn cellFree(cx : i32, cy : i32) : bool {
+	if cx < 1 or cx > GRID_W or cy < 1 { return false; }
+	if cy > GRID_H { return true; }
+	return grid[cx - 1][cy - 1] == null;
+}
+
+fn canPlace(px : i32, py : i32, blocks : [4]Block) : bool {
+	for i in 0..4 {
+		const block = blocks[i];
+		if not cellFree(px + block.x + 1, py + block.y + 1) { return false; }
+	}
+	return true;
+}
+
+fn spawnPiece() : void {
+	current.x = GRID_W / 2 - 1;
+	current.y = GRID_H - 3;
+	current.blocks = shape(piece_number % 7);
+	piece_number += 1;
+	for i in 0..4 {
+		const block = current.blocks[i];
+		current.entities[i] = createCubeAt(current.x + block.x + 1, current.y + block.y + 1);
+	}
+	has_current = true;
+}
+
+fn lockPiece() : void {
+	if not has_current { return; }
+	for i in 0..4 {
+		const block = current.blocks[i];
+		const cx = current.x + block.x;
+		const cy = current.y + block.y;
+		grid[cx][cy] = current.entities[i];
+	}
+	has_current = false;
+}
+
+fn clearLines() : void {
+	var y : i32 = 0;
+	while y < GRID_H {
+		var full = true;
+		for x in 0..GRID_W {
+			if grid[x][y] == null { full = false; }
+		}
+		if full {
+			for x in 0..GRID_W {
+				const entity = grid[x][y];
+				if entity != null { destroy(entity); }
+			}
+			for yy in y..(GRID_H - 1) {
+				for x in 0..GRID_W {
+					grid[x][yy] = grid[x][yy + 1];
+					const entity = grid[x][yy];
+					if entity != null {
+						setPosition(entity, worldPosFromCell(x + 1, yy + 1));
+					}
+				}
+			}
+			for x in 0..GRID_W { grid[x][GRID_H - 1] = null; }
+			score += 100;
+		} else {
+			y += 1;
+		}
+	}
+}
+
+fn rotateBlocks(blocks : [4]Block) : [4]Block {
+	var result : [4]Block = undefined;
+	for i in 0..4 {
+		result[i] = Block { -blocks[i].y, blocks[i].x };
+	}
+	return result;
+}
+
+fn moveDown() : void {
+	if canPlace(current.x, current.y - 1, current.blocks) {
+		current.y -= 1;
+		updateCurrentEntities();
+	} else {
+		lockPiece();
+		clearLines();
+		spawnPiece();
+	}
+}
+
+fn update(dt : f32) : void {
+	processInput(input_system);
+	if not has_current { return; }
+	drop_timer += dt;
+	if drop_timer >= DROP_INTERVAL {
+		drop_timer -= DROP_INTERVAL;
+		moveDown();
+	}
+}
+
+fn processInput(inp : InputSystem) : void {
+	const event_count = inp.getEventCount();
+	for i in 0..event_count {
+		const event = inp.getEvent(i);
+		match event {
+			case ButtonEvent: {
+				if event.device_type != .KEYBOARD or not event.down or not has_current { continue; }
+				const key = event.key_id as Keycode;
+				match key {
+					case .A:
+						if canPlace(current.x - 1, current.y, current.blocks) { current.x -= 1; updateCurrentEntities(); }
+					case .D:
+						if canPlace(current.x + 1, current.y, current.blocks) { current.x += 1; updateCurrentEntities(); }
+					case .S: moveDown();
+					case .E: {
+						const rotated = rotateBlocks(current.blocks);
+						if canPlace(current.x, current.y, rotated) { current.blocks = rotated; updateCurrentEntities(); }
+					}
+					case .SPACE: {
+						while canPlace(current.x, current.y - 1, current.blocks) { current.y -= 1; }
+						updateCurrentEntities();
+						lockPiece();
+						clearLines();
+						spawnPiece();
+					}
+					case:
+				}
+			}
+			case:
+		}
+	}
+}
+
+fn init(w : World, inp : InputSystem) : void {
+	game_world = w;
+	input_system = inp;
+	clearGrid();
+	drop_timer = 0.0;
+	piece_number = 0;
+	score = 0;
+	spawnPiece();
+}

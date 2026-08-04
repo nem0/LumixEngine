@@ -9,6 +9,7 @@ import "core:vec3"
 struct D6Joint { entity : i32; module : cptr; }
 
 extern fn d6_joint(e : Entity) : ?D6Joint;
+extern fn createD6Joint(e : Entity) : ?D6Joint;
 extern fn getD6JointXMotion(entity : D6Joint) : D6Motion;
 extern fn setD6JointXMotion(entity : D6Joint, motion : D6Motion) : void;
 extern fn getD6JointYMotion(entity : D6Joint) : D6Motion;

@@ -1,4 +1,3 @@
-
 enum ParseError {
     NotANumber,
     Overeflow

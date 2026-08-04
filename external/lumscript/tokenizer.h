@@ -26,6 +26,7 @@ struct Tokenizer {
 	}
 
 	static bool isDigit(char c) { return c >= '0' && c <= '9'; }
+	static bool isHexDigit(char c) { return isDigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'); }
 	static bool isIdentifierStart(char c) { return isLetter(c) || c == '_'; }
 	static bool isIdentifierChar(char c) { return isIdentifierStart(c) || isDigit(c); }
 
@@ -73,12 +74,28 @@ struct Tokenizer {
 		return true;
 	}
 
+	bool numberDigits(bool hex = false) {
+		auto is_number_digit = [hex](char c) { return hex ? isHexDigit(c) : isDigit(c); };
+		while (is_number_digit(peekChar())) advance();
+		while (peekChar() == '_') {
+			advance();
+			if (!is_number_digit(peekChar())) return false;
+			while (is_number_digit(peekChar())) advance();
+		}
+		return true;
+	}
+
 	Token numberToken() {
-		while (isDigit(peekChar())) advance();
+		if (m_start_token[0] == '0' && (peekChar() == 'x' || peekChar() == 'X')) {
+			advance();
+			if (!isHexDigit(peekChar())) return makeToken(Token::ERROR);
+			if (!numberDigits(true)) return makeToken(Token::ERROR);
+			return makeToken(Token::NUMBER);
+		}
+		if (!numberDigits()) return makeToken(Token::ERROR);
 		if (peekChar() == '.' && isDigit(peekNextChar())) {
 			advance();
-			if (!isDigit(peekChar())) return makeToken(Token::ERROR);
-			while (isDigit(peekChar())) advance();
+			if (!numberDigits()) return makeToken(Token::ERROR);
 		}
 		return makeToken(Token::NUMBER);
 	}
@@ -208,11 +225,7 @@ struct Tokenizer {
 				if (u32(m_current - m_start_token) < 2) return makeToken(Token::IDENTIFIER);
 				if (m_start_token[1] == 'r') return checkKeyword("r", 1, 1, Token::OR);
 				return checkKeyword("perator", 1, 7, Token::OPERATOR);
-			case 'r': {
-				if (u32(m_current - m_start_token) < 2) return makeToken(Token::IDENTIFIER);
-				if (u32(m_current - m_start_token) == 3) return checkKeyword("ef", 1, 2, Token::REF);
-				return checkKeyword("eturn", 1, 5, Token::RETURN);
-			}
+			case 'r': return checkKeyword("eturn", 1, 5, Token::RETURN);
 			case 's': {
 				if (u32(m_current - m_start_token) < 2) return makeToken(Token::IDENTIFIER);
 				if (m_start_token[1] == 'i') return checkKeyword("zeof", 2, 4, Token::SIZEOF);
@@ -291,6 +304,7 @@ struct Tokenizer {
 				}
 				return makeToken(Token::DOT);
 			}
+			case '&': return makeToken(Token::AMPERSAND);
 			case '?': return makeToken(Token::QUESTION);
 			case '$': return makeToken(Token::DOLLAR);
 			case '|': return makeToken(Token::PIPE);

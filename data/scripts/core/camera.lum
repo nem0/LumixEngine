@@ -7,6 +7,7 @@ import "core:vec2"
 struct Camera { entity : i32; module : cptr; }
 
 extern fn camera(e : Entity) : ?Camera;
+extern fn createCamera(e : Entity) : ?Camera;
 extern fn getRay(entity : Camera, screen_pos : Vec2) : Ray;
 extern fn getCameraScreenWidth(entity : Camera) : f32;
 extern fn getCameraScreenHeight(entity : Camera) : f32;

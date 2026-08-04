@@ -395,6 +395,58 @@ TEST(UntypedIntegerLiteralU64MaxCompiles) {
 	return true;
 }
 
+TEST(NumericLiteralDigitSeparatorsRuntime) {
+	const char* source = R"(
+		fn main() : bool {
+			return 18_446_744_073_709_551_615 as u64 == 18446744073709551615 as u64
+				and 12_345.625_0 == 12345.625;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_TRUE(ls_to_bool(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(NumericLiteralDigitSeparatorsRejectInvalidPlacement) {
+	EXPECT_COMPILE_FAIL("fn main() : void { const x = 1__0; }");
+	EXPECT_COMPILE_FAIL("fn main() : void { const x = 1_; }");
+	EXPECT_COMPILE_FAIL("fn main() : void { const x = 1_.0; }");
+	EXPECT_COMPILE_FAIL("fn main() : void { const x = 1._0; }");
+	return true;
+}
+
+TEST(HexadecimalIntegerLiteralsRuntime) {
+	const char* source = R"(
+		fn main() : bool {
+			return 0xABC == 2748
+				and 0Xabc == 2748
+				and 0xFF_FF == 65535
+				and 0xFFFF_FFFF_FFFF_FFFF as u64 == 18446744073709551615 as u64;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_TRUE(ls_to_bool(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(HexadecimalIntegerLiteralsRejectInvalidForms) {
+	EXPECT_COMPILE_FAIL("fn main() : void { const x = 0x; }");
+	EXPECT_COMPILE_FAIL("fn main() : void { const x = 0x_1; }");
+	EXPECT_COMPILE_FAIL("fn main() : void { const x = 0x1_; }");
+	EXPECT_COMPILE_FAIL("fn main() : void { const x = 0x1__2; }");
+	EXPECT_COMPILE_FAIL("fn main() : void { const x = 0xG; }");
+	EXPECT_COMPILE_FAIL("fn main() : void { const x = 0x1_0000_0000_0000_0000; }");
+	return true;
+}
+
 TEST(UntypedIntegerLiteralTooLargeForU64Fails) {
 	const char* source = R"(
 		fn main() : void {
@@ -487,7 +539,7 @@ TEST(DecimalLiteralDoesNotConcretizeToInteger) {
 }
 
 // A struct field whose type is a function returning a nullable of that same
-// struct is a valid reference cycle (the function holds a pointer-sized ref,
+// struct is a valid reference cycle (the function holds a pointer-sized value,
 // not an inline layout cycle). resolveSignature must not treat this as a
 // definition cycle.
 TEST(SelfReferentialStructFunctionFieldCompiles) {
@@ -502,7 +554,7 @@ TEST(SelfReferentialStructFunctionFieldCompiles) {
 
 TEST(FunctionTypeNamedParametersCompile) {
 	const char* source = R"(
-		comptime Handler = fn(ref i32, comptime type, value : i32, f32, enabled : bool) : void;
+		comptime Handler = fn(*i32, comptime type, value : i32, f32, enabled : bool) : void;
 
 		struct Callbacks {
 			unary : fn(value : i32) : i32;
@@ -522,23 +574,23 @@ TEST(FunctionTypeNamedParametersCompile) {
 	return true;
 }
 
-TEST(FunctionTypeRefQualifierIsPartOfType) {
+TEST(FunctionTypePointerQualifierIsPartOfType) {
 	const char* source = R"(
-		fn set(value : ref i32) : void { value = 7; }
+		fn set(value : *i32) : void { value.* = 7; }
 		const callback : fn(value : i32) : void = set;
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 
-TEST(FunctionTypeRefQualifierIndirectCall) {
+TEST(FunctionTypePointerQualifierIndirectCall) {
 	const char* source = R"(
-		fn set(value : ref i32) : void { value = 7; }
-		const callback : fn(value : ref i32) : void = set;
+		fn set(value : *i32) : void { value.* = 7; }
+		const callback : fn(value : *i32) : void = set;
 
 		fn main() : i32 {
 			var value : i32 = 1;
-			callback(ref value);
+			callback(&value);
 			return value;
 		}
 	)";

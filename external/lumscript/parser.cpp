@@ -127,7 +127,6 @@ struct Parser {
 			case Token::CONST: return "const";
 			case Token::DEFER: return "defer";
 			case Token::RETURN: return "return";
-			case Token::REF: return "ref";
 			case Token::WHILE: return "while";
 			case Token::FOR: return "for";
 			case Token::UNROLL: return "unroll";
@@ -430,6 +429,15 @@ struct Parser {
 			}
 			case Token::NULL_KW: return makeExpr<NullLiteralExpression>(token);
 			case Token::UNDEFINED: return makeExpr<UndefinedExpression>(token);
+			case Token::STAR: {
+				PointerTypeExpression* pointer = makeExpr<PointerTypeExpression>(token);
+				if (peekToken().type == Token::CONST) {
+					consumeToken();
+					pointer->is_const = true;
+				}
+				pointer->inner = type(false);
+				return pointer->inner ? pointer : nullptr;
+			}
 			case Token::QUESTION: {
 				NullableTypeExpression* nullable = makeExpr<NullableTypeExpression>(token);
 				nullable->inner = type(false);
@@ -518,6 +526,13 @@ struct Parser {
 				case Token::DOT: {
 					Token dot = consumeToken();
 					Token name = consumeToken();
+					if (name.type == Token::STAR) {
+						// dereference .*
+						DereferenceExpression* deref = makeExpr<DereferenceExpression>(dot);
+						deref->subject = expr;
+						expr = deref;
+						break;
+					}
 					if (name.type != Token::IDENTIFIER && name.type != Token::TYPE_KW) {
 						m_output.errorAt(name, "Expected identifier");
 						return nullptr;
@@ -660,11 +675,29 @@ struct Parser {
 	Expression* unaryExpression(ExprMode mode) {
 		Token token = peekToken();
 		switch (token.type) {
-			case Token::MINUS:
-			case Token::REF: {
+			case Token::AMPERSAND: {
+				consumeToken();
+				AddressOfExpression* expr = makeExpr<AddressOfExpression>(token);
+				expr->subject = binaryExpression(3, mode);
+				if (!expr->subject) return nullptr;
+				return expr->subject ? expr : nullptr;
+			}
+			case Token::STAR: {
+				consumeToken();
+				PointerTypeExpression* pointer = makeExpr<PointerTypeExpression>(token);
+				if (peekToken().type == Token::CONST) {
+					consumeToken();
+					pointer->is_const = true;
+				}
+				pointer->inner = type();
+				return pointer->inner ? pointer : nullptr;
+			}
+			case Token::MINUS: {
 				consumeToken();
 				UnaryExpression* expr = makeExpr<UnaryExpression>(token);
 				expr->op = token.type;
+				// Parse only another unary operand so `-1 as u64` casts the
+				// negated value rather than negating an unsigned cast result.
 				expr->expression = unaryExpression(mode);
 				if (!expr->expression) return nullptr;
 				return expr;
@@ -674,7 +707,6 @@ struct Parser {
 				UnaryExpression* expr = makeExpr<UnaryExpression>(token);
 				expr->op = token.type;
 				// `not` binds below comparisons and `is`, but above `and`/`or`.
-				// The current precedence values put that boundary at 3.
 				expr->expression = binaryExpression(3, mode);
 				if (!expr->expression) return nullptr;
 				return expr;
@@ -731,10 +763,6 @@ struct Parser {
 			consumeToken();
 			param.is_comptime = true;
 		}
-		if (peekToken().type == Token::REF) {
-			consumeToken();
-			param.is_ref = true;
-		}
 		Expression* argument = expression();
 		if (!argument) return false;
 		if (peekToken().type != Token::COLON) {
@@ -751,10 +779,6 @@ struct Parser {
 		if (peekToken().type == Token::COMPTIME) {
 			consumeToken();
 			param.is_comptime = true;
-		}
-		if (peekToken().type == Token::REF) {
-			consumeToken();
-			param.is_ref = true;
 		}
 		param.type_expr = expression();
 		return param.type_expr != nullptr;
@@ -786,7 +810,6 @@ struct Parser {
 			param.is_comptime = type_param.is_comptime
 				|| (type_param.type_expr->kind == Expression::TYPE_LITERAL
 					&& static_cast<TypeLiteralExpression*>(type_param.type_expr)->type == ResolvedType::META);
-			param.is_ref = type_param.is_ref;
 			param.type_expr = type_param.type_expr;
 			for (i32 i = 0; i < fn.params.size() - 1; ++i) {
 				if (!equalStrings(fn.params[i].name, param.name)) continue;
@@ -831,6 +854,17 @@ struct Parser {
 				array->element_type = type(false);
 				if (!array->element_type) return nullptr;
 				res = array;
+				break;
+			}
+			case Token::STAR: {
+				PointerTypeExpression* pointer = makeExpr<PointerTypeExpression>(token);
+				if (peekToken().type == Token::CONST) {
+					consumeToken();
+					pointer->is_const = true;
+				}
+				pointer->inner = type(false);
+				if (!pointer->inner) return nullptr;
+				res = pointer;
 				break;
 			}
 			case Token::QUESTION: {
@@ -1452,6 +1486,7 @@ struct Parser {
 			case Expression::ARRAY_TYPE: return isGeneric(*static_cast<const ArrayTypeExpression&>(expr).element_type);
 			case Expression::SLICE_TYPE: return isGeneric(*static_cast<const SliceTypeExpression&>(expr).element_type);
 			case Expression::NULLABLE_TYPE: return isGeneric(*static_cast<const NullableTypeExpression&>(expr).inner);
+			case Expression::POINTER_TYPE: return isGeneric(*static_cast<const PointerTypeExpression&>(expr).inner);
 			case Expression::FUNCTION_TYPE: {
 				const auto& fn = static_cast<const FunctionTypeExpression&>(expr);
 				for (const FunctionTypeParam& param : fn.params) {
@@ -1478,6 +1513,7 @@ struct Parser {
 			case Expression::ARRAY_TYPE: return collectGenericParams(*static_cast<const ArrayTypeExpression&>(expr).element_type, names);
 			case Expression::NULLABLE_TYPE: return collectGenericParams(*static_cast<const NullableTypeExpression&>(expr).inner, names);
 			case Expression::SLICE_TYPE: return collectGenericParams(*static_cast<const SliceTypeExpression&>(expr).element_type, names);
+			case Expression::POINTER_TYPE: return collectGenericParams(*static_cast<const PointerTypeExpression&>(expr).inner, names);
 			case Expression::BRACKET: {
 				const auto& br = static_cast<const BracketExpression&>(expr);
 				return collectGenericParams(*br.base, names);

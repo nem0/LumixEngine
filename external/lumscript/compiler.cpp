@@ -34,6 +34,7 @@ static constexpr TypeKindInfo TYPE_KIND_INFOS[] = {
 	{ResolvedType::STRUCT, "Struct", nullptr},
 	{ResolvedType::UNION, "Union", nullptr},
 	{ResolvedType::FUNCTION, "Fn", nullptr},
+	{ResolvedType::POINTER, "Pointer", nullptr},
 };
 
 ls_module::ls_module(ls_host* host)
@@ -115,6 +116,7 @@ u32 typeByteSize(const ResolvedType& t) {
 			return 8;
 		case ResolvedType::META:
 			return 0;
+		case ResolvedType::POINTER: return 8;
 		default:
 			ASSERT(false);
 			return 1;
@@ -270,7 +272,6 @@ static void appendReflectedTypeName(char*& out, char* end, const ResolvedType& t
 			for (i32 i = 0; i < fn.params.size(); ++i) {
 				if (i) text(", ");
 				if (fn.params[i].is_comptime) text("comptime ");
-				if (fn.params[i].is_ref) text("ref ");
 				if (!empty(fn.params[i].name)) { view(fn.params[i].name); text(" : "); }
 				appendReflectedTypeName(out, end, *fn.params[i].type);
 			}
@@ -286,6 +287,11 @@ static void appendReflectedTypeName(char*& out, char* end, const ResolvedType& t
 			const auto& slice = static_cast<const SliceResolvedType&>(type);
 			text("[]"); if (slice.is_const) text("const ");
 			appendReflectedTypeName(out, end, *slice.element_type); return;
+		}
+		case ResolvedType::POINTER: {
+			const auto& pointer = static_cast<const PointerResolvedType&>(type);
+			text("*"); if (pointer.is_const) text("const ");
+			appendReflectedTypeName(out, end, *pointer.inner); return;
 		}
 		case ResolvedType::NULLABLE: text("?"); appendReflectedTypeName(out, end, *static_cast<const NullableResolvedType&>(type).inner); return;
 		case ResolvedType::UNION: {
@@ -507,8 +513,7 @@ struct Checker {
 				if (fa->params.size() != fb->params.size()) return false;
 				if (!typesEqual(fa->return_type, fb->return_type)) return false;
 				for (i32 i = 0; i < fa->params.size(); ++i) {
-					if (fa->params[i].is_ref != fb->params[i].is_ref
-						|| fa->params[i].is_comptime != fb->params[i].is_comptime) return false;
+					if (fa->params[i].is_comptime != fb->params[i].is_comptime) return false;
 					if (!typesEqual(fa->params[i].type, fb->params[i].type)) return false;
 				}
 				return true;
@@ -517,6 +522,11 @@ struct Checker {
 				const auto* aa = static_cast<const ArrayResolvedType*>(a);
 				const auto* ab = static_cast<const ArrayResolvedType*>(b);
 				return aa->size == ab->size && typesEqual(aa->element_type, ab->element_type);
+			}
+			case ResolvedType::POINTER: {
+				const auto* pa = static_cast<const PointerResolvedType*>(a);
+				const auto* pb = static_cast<const PointerResolvedType*>(b);
+				return pa->is_const == pb->is_const && typesEqual(pa->inner, pb->inner);
 			}
 			case ResolvedType::SLICE: {
 				const auto* sa = static_cast<const SliceResolvedType*>(a);
@@ -568,6 +578,11 @@ struct Checker {
 			const auto* source = static_cast<const SliceResolvedType*>(src);
 			const auto* target = static_cast<const SliceResolvedType*>(dst);
 			return !source->is_const && target->is_const && typesEqual(source->element_type, target->element_type);
+		}
+		if (src->kind == ResolvedType::POINTER && dst->kind == ResolvedType::POINTER) {
+			const auto* source = static_cast<const PointerResolvedType*>(src);
+			const auto* target = static_cast<const PointerResolvedType*>(dst);
+			return !source->is_const && target->is_const && typesEqual(source->inner, target->inner);
 		}
 		if (dst->kind == ResolvedType::NULLABLE) {
 			const auto* nb = static_cast<const NullableResolvedType*>(dst);
@@ -1133,6 +1148,20 @@ struct Checker {
 				out = arr;
 				break;
 			}
+			case Expression::POINTER_TYPE: {
+				PointerTypeExpression* s = static_cast<PointerTypeExpression*>(src);
+				PointerTypeExpression* ptr = makeType<PointerTypeExpression>(unit.arena);
+				ptr->inner = cloneExpression(unit, s->inner, bindings);
+				ptr->is_const = s->is_const;
+				out = ptr;
+				break;
+			}
+			case Expression::DEREFERENCE: {
+				DereferenceExpression* deref = makeType<DereferenceExpression>(unit.arena);
+				deref->subject = cloneExpression(unit, static_cast<DereferenceExpression*>(src)->subject, bindings);
+				out = deref;
+				break;
+			}
 			case Expression::SLICE_TYPE: {
 				SliceTypeExpression* sl = makeType<SliceTypeExpression>(unit.arena);
 				sl->element_type = cloneExpression(unit, static_cast<SliceTypeExpression*>(src)->element_type, bindings);
@@ -1153,7 +1182,6 @@ struct Checker {
 					FunctionTypeParam& clone = fn->params.emplace_back();
 					clone.name = param.name;
 					clone.is_comptime = param.is_comptime;
-					clone.is_ref = param.is_ref;
 					clone.type_expr = cloneExpression(unit, param.type_expr, bindings);
 				}
 				fn->return_type = cloneExpression(unit, s->return_type, bindings);
@@ -1614,7 +1642,6 @@ struct Checker {
 			FunctionResolvedParam& resolved_param = fn_type->params.emplace_back();
 			resolved_param.name = param.name;
 			resolved_param.type = param.resolved_type;
-			resolved_param.is_ref = param.is_ref;
 			resolved_param.is_comptime = param.is_comptime;
 		}
 		fn_type->return_type = asType(evalComptime(unit, *fn.return_type), fn.return_type->token);
@@ -1647,22 +1674,6 @@ struct Checker {
 		return "symbol";
 	}
 
-	ResolvedType* checkRefArgument(Unit& unit, FunctionCheckContext* ctx, Expression* arg, i32 arg_index) {
-		if (arg->kind != Expression::UNARY || static_cast<UnaryExpression*>(arg)->op != Token::REF) {
-			errorLine(arg->token, "Cannot pass non-ref expression as ref argument ", arg_index + 1, " of function call");
-			return nullptr;
-		}
-		UnaryExpression* un = static_cast<UnaryExpression*>(arg);
-		bool writable = false;
-		ResolvedType* arg_type = checkAssignableExpr(unit, ctx, *un->expression, writable);
-		if (!arg_type) return nullptr;
-		if (!writable) {
-			errorLine(arg->token, "Cannot pass non-writable expression as ref argument ", arg_index + 1, " of function call");
-			return nullptr;
-		}
-		return arg_type;
-	}
-
 	ResolvedType* checkCallCandidate(Unit& unit,
 		FunctionCheckContext* ctx,
 		CallExpression& call,
@@ -1680,16 +1691,9 @@ struct Checker {
 		if (ufcs_param_offset) {
 			MemberExpression& mem = static_cast<MemberExpression&>(*call.callee);
 			ResolvedType* receiver_type = mem.expression->resolved_type;
-			if (!receiver_type || !canImplicitlyConvert(receiver_type, fn_type.params[0].type)) {
+			ResolvedType* parameter_type = fn_type.params[0].type;
+			if (!receiver_type || !canImplicitlyConvert(receiver_type, parameter_type)) {
 				return nullptr;
-			}
-			if (fn_type.params[0].is_ref) {
-				bool writable = false;
-				receiver_type = checkAssignableExpr(unit, ctx, *mem.expression, writable);
-				if (!receiver_type || !writable) {
-					errorLine(mem.expression->token, "Cannot pass non-writable UFCS receiver as ref argument");
-					return nullptr;
-				}
 			}
 		}
 
@@ -1698,15 +1702,6 @@ struct Checker {
 			ResolvedType* param_type = fn_type.params[param_index].type;
 			Expression* arg = call.args[i];
 			if (fn_type.params[param_index].is_comptime) continue;
-			if (fn_type.params[param_index].is_ref) {
-				ResolvedType* arg_type = checkRefArgument(unit, ctx, arg, i);
-				if (!arg_type) return nullptr;
-				if (!typesEqual(arg_type, param_type)) {
-					errorLine(call.args[i]->token, "Cannot convert ", arg_type, " to ", param_type, " for ref argument ", i + 1, " of function call");
-					return nullptr;
-				}
-				continue;
-			}
 
 			ResolvedType* arg_type = checkExprForTarget(unit, ctx, *arg, param_type);
 			if (!arg_type) return nullptr;
@@ -1957,6 +1952,10 @@ struct Checker {
 			case Expression::NULLABLE_TYPE: {
 				if (!actual_type || actual_type->kind != ResolvedType::NULLABLE) return false;
 				return inferTemplateArg(unit, bindings, *static_cast<NullableTypeExpression&>(pattern).inner, ComptimeValue{ComptimeValue::TYPE, static_cast<NullableResolvedType*>(actual_type)->inner});
+			}
+			case Expression::POINTER_TYPE: {
+				if (!actual_type || actual_type->kind != ResolvedType::POINTER) return false;
+				return inferTemplateArg(unit, bindings, *static_cast<PointerTypeExpression&>(pattern).inner, ComptimeValue{ComptimeValue::TYPE, static_cast<PointerResolvedType*>(actual_type)->inner});
 			}
 			case Expression::CALL: {
 				// `fn foo(v : Box($T))` - find the factory instance that produced the
@@ -2306,17 +2305,11 @@ struct Checker {
 				continue;
 			}
 
-			ResolvedType* arg_type = nullptr;
-			if (param.is_ref) {
-				arg_type = checkRefArgument(unit, ctx, arg, i);
-				if (!arg_type) return nullptr;
-			} else {
-				arg_type = checkExprForTarget(unit, ctx, *arg, expected);
-				if (!arg_type) return nullptr;
-				if (expected && !canImplicitlyConvert(arg_type, expected)) {
-					errorLine(arg->token, "Cannot convert ", arg_type, " to ", expected, " for argument ", i + 1, " of function call");
-					return nullptr;
-				}
+			ResolvedType* arg_type = checkExprForTarget(unit, ctx, *arg, expected);
+			if (!arg_type) return nullptr;
+			if (expected && !canImplicitlyConvert(arg_type, expected)) {
+				errorLine(arg->token, "Cannot convert ", arg_type, " to ", expected, " for argument ", i + 1, " of function call");
+				return nullptr;
 			}
 			if (!inferTemplateArg(template_unit, bindings, *param.type_expr, ComptimeValue{ComptimeValue::TYPE, arg_type})) {
 				errorLine(arg->token, "Cannot infer template parameter type for argument ", i + 1, " of ", fn.token.value);
@@ -2394,9 +2387,12 @@ struct Checker {
 			return nullptr;
 		}
 
-		ResolvedType& receiver_type = *mem.expression->resolved_type;
-		if (receiver_type.kind != ResolvedType::STRUCT && receiver_type.kind != ResolvedType::ENUM) {
-			errorLine(expr.token, "Cannot call member function ", mem.name, " on type ", &receiver_type, ", expected struct or enum");
+		ResolvedType* receiver_type = mem.expression->resolved_type;
+		if (receiver_type->kind == ResolvedType::POINTER) {
+			receiver_type = static_cast<PointerResolvedType*>(receiver_type)->inner;
+		}
+		if (receiver_type->kind != ResolvedType::STRUCT && receiver_type->kind != ResolvedType::ENUM) {
+			errorLine(expr.token, "Cannot call member function ", mem.name, " on type ", receiver_type, ", expected struct or enum");
 			return nullptr;
 		}
 
@@ -2404,7 +2400,7 @@ struct Checker {
 		// local and imported declarations, so e.g. a script's own `init` does not
 		// shadow `array.init` in `a.init()`. Lexical lookup is only a fallback.
 		SymbolRef ref;
-		if (Unit* namespace_unit = findTypeNamespaceUnit(receiver_type)) {
+		if (Unit* namespace_unit = findTypeNamespaceUnit(*receiver_type)) {
 			if (Symbol* candidate = findSymbol(*namespace_unit, mem.name)) {
 				ref = {namespace_unit, candidate};
 				if (checkSymbol(*namespace_unit, *candidate) == LS_RESULT_FAILURE) ref.check_failed = true;
@@ -2574,9 +2570,6 @@ struct Checker {
 					? Expression::COMPTIME_VALUE
 					: Expression::RUNTIME;
 				return expr.resolved_type;
-			case Token::REF:
-				// TODO error msg?
-				return nullptr;
 			default:
 				// TODO error msg
 				return nullptr;
@@ -2969,12 +2962,13 @@ struct Checker {
 			}
 			case TypeMemberExpression::CHILD: {
 				ResolvedType* child = nullptr;
-				switch (t->kind) {
+					switch (t->kind) {
 					case ResolvedType::NULLABLE: child = static_cast<NullableResolvedType*>(t)->inner; break;
 					case ResolvedType::SLICE: child = static_cast<SliceResolvedType*>(t)->element_type; break;
 					case ResolvedType::ARRAY: child = static_cast<ArrayResolvedType*>(t)->element_type; break;
+					case ResolvedType::POINTER: child = static_cast<PointerResolvedType*>(t)->inner; break;
 					default: 
-						errorLine(expr.token, "::child requires a nullable, slice, or array type");
+						errorLine(expr.token, "::child requires a nullable, pointer, slice, or array type");
 						return nullptr;
 				}
 				MetaType* meta = makeType<MetaType>(unit.arena);
@@ -2997,7 +2991,7 @@ struct Checker {
 					errorLine(expr.token, "::", (member.kind == TypeMemberExpression::MIN ? "min" : "max"), " requires a numeric type");
 					return nullptr;
 				}
-				expr.resolved_type = t;
+				expr.resolved_type = primitiveType(isFloatType(*t) ? ResolvedType::UNTYPED_FLOAT : ResolvedType::UNTYPED_INT);
 				expr.eval_stage = Expression::COMPTIME_VALUE;
 				return expr.resolved_type;
 			}
@@ -3088,6 +3082,11 @@ struct Checker {
 				if (value) expr.comptime_value = value;
 			}
 			return expr.resolved_type;
+		}
+
+		if (base_type->kind == ResolvedType::POINTER) {
+			PointerResolvedType* pointer = static_cast<PointerResolvedType*>(base_type);
+			base_type = pointer->inner;
 		}
 
 		switch (base_type->kind) {
@@ -3256,6 +3255,20 @@ struct Checker {
 		}
 		else if (br.base->eval_stage != Expression::RUNTIME) expr.eval_stage = Expression::COMPTIME_VALUE;
 		return expr.resolved_type;
+	}
+
+	ResolvedType* checkAddressOfExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr) {
+		AddressOfExpression& addr = static_cast<AddressOfExpression&>(expr);
+		bool writable = false;
+		ResolvedType* base_type = checkAssignableExpr(unit, ctx, *addr.subject, writable);
+		if (!base_type) return nullptr;
+
+		PointerResolvedType* ptr = makeType<PointerResolvedType>(unit.arena);
+		ptr->inner = base_type;
+		ptr->is_const = !writable;
+		expr.resolved_type = ptr;
+		expr.eval_stage = Expression::RUNTIME;
+		return ptr;
 	}
 
 	ResolvedType* checkSliceExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr) {
@@ -3613,6 +3626,7 @@ struct Checker {
 			case Expression::ARRAY_TYPE:
 			case Expression::SLICE_TYPE:
 			case Expression::NULLABLE_TYPE:
+			case Expression::POINTER_TYPE:
 			case Expression::FUNCTION_TYPE: {
 				ResolvedType* type = asType(evalComptime(unit, expr, ctx), expr.token);
 				expr.resolved_type = type;
@@ -3662,7 +3676,22 @@ struct Checker {
 			case Expression::SLICE: return checkSliceExpr(unit, ctx, expr);
 			case Expression::STRUCT_LITERAL: return checkStructLiteralExpr(unit, ctx, expr, hint);
 			case Expression::ARRAY_LITERAL: return checkArrayLiteralExpr(unit, ctx, expr, hint);
-			default: return nullptr;
+			case Expression::DEREFERENCE: {
+				auto& deref = static_cast<DereferenceExpression&>(expr);
+				ResolvedType* pointer_type = checkExpr(unit, ctx, *deref.subject, nullptr);
+				if (!pointer_type) return nullptr;
+				
+				if (pointer_type->kind != ResolvedType::POINTER) {
+					errorLine(expr.token, "Cannot dereference non-pointer type ", pointer_type);
+					return nullptr;
+				}
+				expr.resolved_type = static_cast<PointerResolvedType*>(pointer_type)->inner;
+				return expr.resolved_type;
+			}
+			case Expression::ADDRESSOF: return checkAddressOfExpr(unit, ctx, expr);
+			default:
+				errorLine(expr.token, "Cannot resolve expression of kind ", expr.kind);
+				return nullptr;
 		}
 	}
 
@@ -3725,10 +3754,35 @@ struct Checker {
 					is_writable = false;
 					return nullptr;
 				}
+				if (base_type->kind == ResolvedType::POINTER) {
+					base_writable = !static_cast<PointerResolvedType*>(base_type)->is_const;
+				}
 				ResolvedType* field_type = checkExpr(unit, ctx, expr, nullptr);
 				is_writable = base_writable && field_type != nullptr;
 				expr.resolved_type = field_type;
 				return field_type;
+			}
+			case Expression::DEREFERENCE: {
+				auto& deref = static_cast<DereferenceExpression&>(expr);
+				ResolvedType* inner_type = checkExpr(unit, ctx, *deref.subject, nullptr);
+				if (!inner_type) {
+					is_writable = false;
+					return nullptr;
+				}
+				if (inner_type->kind != ResolvedType::POINTER) {
+					errorLine(expr.token, "Cannot dereference non-pointer type ", inner_type);
+					is_writable = false;
+					return nullptr;
+				}
+				// TODO check pointer mutability
+				is_writable = true;
+				auto* ptr = static_cast<PointerResolvedType*>(inner_type);
+				if (ptr->is_const) {
+					errorLine(expr.token, "Expression is not assignable because it is a pointer to const");
+					is_writable = false;
+					return nullptr;
+				}
+				return ptr->inner;
 			}
 			case Expression::BRACKET: {
 				BracketExpression& br = static_cast<BracketExpression&>(expr);
@@ -4142,10 +4196,19 @@ struct Checker {
 		// Detect `x != null` / `x == null` to narrow x inside the respective branch.
 		ls_string_view narrowed_name = {};
 		ResolvedType* narrowed_type = nullptr;
+		ResolvedType* narrowed_member = nullptr;
 		ResolvedType* subject_type = nullptr;
 		bool narrowed_is_immutable = false;
 		bool narrow_in_true = false;
+		PointerResolvedType* narrowing_pointer = nullptr;
 		StorageSlot* narrowed_slot = nullptr;
+		auto bindingType = [&](ResolvedType* type) -> ResolvedType* {
+			if (!narrowing_pointer) return type;
+			PointerResolvedType* pointer = makeType<PointerResolvedType>(unit.arena);
+			pointer->inner = type;
+			pointer->is_const = narrowing_pointer->is_const;
+			return pointer;
+		};
 		if (ifst.condition && ifst.condition->kind == Expression::BINARY) {
 			BinaryExpression* bin = static_cast<BinaryExpression*>(ifst.condition);
 			if (bin->op == Token::BANG_EQUAL || bin->op == Token::EQUAL_EQUAL) {
@@ -4171,13 +4234,26 @@ struct Checker {
 					}
 				}
 			}
-			else if (bin->op == Token::IS && bin->lhs && bin->lhs->kind == Expression::IDENTIFIER) {
+			else if (bin->op == Token::IS && bin->lhs
+				&& (bin->lhs->kind == Expression::IDENTIFIER || bin->lhs->kind == Expression::DEREFERENCE)) {
+				IdentifierExpression* id = nullptr;
 				subject_type = bin->lhs->resolved_type;
+				if (bin->lhs->kind == Expression::IDENTIFIER) {
+					id = static_cast<IdentifierExpression*>(bin->lhs);
+				} else {
+					DereferenceExpression* deref = static_cast<DereferenceExpression*>(bin->lhs);
+					if (deref->subject->kind == Expression::IDENTIFIER && deref->subject->resolved_type
+						&& deref->subject->resolved_type->kind == ResolvedType::POINTER) {
+						id = static_cast<IdentifierExpression*>(deref->subject);
+						narrowing_pointer = static_cast<PointerResolvedType*>(id->resolved_type);
+						subject_type = narrowing_pointer->inner;
+					}
+				}
 				ResolvedType* member = bin->rhs ? unwrapMeta(bin->rhs->resolved_type) : nullptr;
-				if (member) {
-					IdentifierExpression* id = static_cast<IdentifierExpression*>(bin->lhs);
+				if (id && member) {
 					narrowed_name = id->name;
-					narrowed_type = member;
+					narrowed_member = member;
+					narrowed_type = bindingType(member);
 					if (SemanticLocalBinding* local = findLocal(ctx, id->name)) {
 						narrowed_is_immutable = local->is_immutable;
 						narrowed_slot = local->slot;
@@ -4191,12 +4267,12 @@ struct Checker {
 		}
 
 		ResolvedType* residual_type = nullptr;
-		if (subject_type && subject_type->kind == ResolvedType::UNION && narrowed_type) {
+		if (subject_type && subject_type->kind == ResolvedType::UNION && narrowed_member) {
 			UnionResolvedType& subject_union = static_cast<UnionResolvedType&>(*subject_type);
 			u32 residual_count = 0;
 			ResolvedType* residual_member = nullptr;
 			for (ResolvedType* candidate : subject_union.members) {
-				if (typesEqual(candidate, narrowed_type)) continue;
+				if (typesEqual(candidate, narrowed_member)) continue;
 				residual_member = candidate;
 				++residual_count;
 			}
@@ -4209,10 +4285,11 @@ struct Checker {
 			} else {
 				ExpArray<ResolvedType*> residual_members(unit.arena);
 				for (ResolvedType* candidate : subject_union.members) {
-					if (!typesEqual(candidate, narrowed_type)) residual_members.push(candidate);
+					if (!typesEqual(candidate, narrowed_member)) residual_members.push(candidate);
 				}
 				residual_type = getUnionType(residual_members);
 			}
+			residual_type = bindingType(residual_type);
 		}
 
 		auto checkBranchWithNarrowing = [&](Statement* branch, ResolvedType* branch_type) -> bool {
@@ -4981,6 +5058,14 @@ struct Checker {
 		return copyComptimeValue(type, bytes, comptimeSize(*type));
 	}
 
+	ComptimeValue makeUntypedIntResult(u64 value) {
+		return copyComptimeValue(primitiveType(ResolvedType::UNTYPED_INT), &value);
+	}
+
+	ComptimeValue makeUntypedFloatResult(f64 value) {
+		return copyComptimeValue(primitiveType(ResolvedType::UNTYPED_FLOAT), &value);
+	}
+
 	ComptimeValue makeComptimeEnumResult(ResolvedType* type, i64 value) {
 		i32 enum_value = (i32)value;
 		return copyComptimeValue(type, &enum_value, sizeof(enum_value));
@@ -5425,6 +5510,7 @@ struct Checker {
 							case ResolvedType::NULLABLE: child = static_cast<NullableResolvedType*>(tme.reflected_type)->inner; break;
 							case ResolvedType::SLICE: child = static_cast<SliceResolvedType*>(tme.reflected_type)->element_type; break;
 							case ResolvedType::ARRAY: child = static_cast<ArrayResolvedType*>(tme.reflected_type)->element_type; break;
+							case ResolvedType::POINTER: child = static_cast<PointerResolvedType*>(tme.reflected_type)->inner; break;
 							default: return {};
 						}
 						return {ComptimeValue::TYPE, child};
@@ -5442,18 +5528,18 @@ struct Checker {
 					case TypeMemberExpression::MAX: {
 						const bool min = tme.kind == TypeMemberExpression::MIN;
 						switch (tme.reflected_type->kind) {
-							case ResolvedType::I8: return makeComptimeResult<i8>(min ? (i8)-128 : (i8)127, comptime_stack_ptr);
-							case ResolvedType::I16: return makeComptimeResult<i16>(min ? (i16)-32768 : (i16)32767, comptime_stack_ptr);
-							case ResolvedType::I32: return makeComptimeResult<i32>(min ? (i32)(-2147483647 - 1) : (i32)2147483647, comptime_stack_ptr);
+							case ResolvedType::I8: return makeUntypedIntResult(min ? (u64)-128 : (u64)127);
+							case ResolvedType::I16: return makeUntypedIntResult(min ? (u64)-32768 : (u64)32767);
+							case ResolvedType::I32: return makeUntypedIntResult(min ? (u64)(-2147483647 - 1) : (u64)2147483647);
 							case ResolvedType::I64:
-							case ResolvedType::ISIZE: return makeComptimeResult<i64>(min ? (i64)(-9223372036854775807LL - 1) : (i64)9223372036854775807LL, comptime_stack_ptr);
+							case ResolvedType::ISIZE: return makeUntypedIntResult(min ? (u64)(-9223372036854775807LL - 1) : (u64)9223372036854775807LL);
 							case ResolvedType::U8:
-							case ResolvedType::BYTE: return makeComptimeResult<u8>(min ? (u8)0 : (u8)255, comptime_stack_ptr);
-							case ResolvedType::U16: return makeComptimeResult<u16>(min ? (u16)0 : (u16)65535, comptime_stack_ptr);
-							case ResolvedType::U32: return makeComptimeResult<u32>(min ? (u32)0 : (u32)4294967295u, comptime_stack_ptr);
-							case ResolvedType::U64: return makeComptimeResult<u64>(min ? (u64)0 : (u64)18446744073709551615ULL, comptime_stack_ptr);
-							case ResolvedType::F32: return makeComptimeResult<f32>(min ? -FLT_MAX : FLT_MAX, comptime_stack_ptr);
-							case ResolvedType::F64: return makeComptimeResult<f64>(min ? -DBL_MAX : DBL_MAX, comptime_stack_ptr);
+							case ResolvedType::BYTE: return makeUntypedIntResult(min ? (u64)0 : (u64)255);
+							case ResolvedType::U16: return makeUntypedIntResult(min ? (u64)0 : (u64)65535);
+							case ResolvedType::U32: return makeUntypedIntResult(min ? (u64)0 : (u64)4294967295u);
+							case ResolvedType::U64: return makeUntypedIntResult(min ? (u64)0 : (u64)18446744073709551615ULL);
+							case ResolvedType::F32: return makeUntypedFloatResult(min ? -(f64)FLT_MAX : (f64)FLT_MAX);
+							case ResolvedType::F64: return makeUntypedFloatResult(min ? -DBL_MAX : DBL_MAX);
 							default: return {};
 						}
 					}
@@ -5785,14 +5871,9 @@ struct Checker {
 				for (FunctionTypeParam& param : ft.params) {
 					ResolvedType* param_type = asType(evalComptime(unit, *param.type_expr, ctx, bindings), param.type_expr->token);
 					if (!param_type) return {};
-					if (param.is_ref && param_type->kind == ResolvedType::NULLABLE) {
-						errorLine(expr.token, "Function parameter ", param.name, " cannot be a nullable reference");
-						return {};
-					}
 					FunctionResolvedParam& resolved_param = fn_type->params.emplace_back();
 					resolved_param.name = param.name;
 					resolved_param.type = param_type;
-					resolved_param.is_ref = param.is_ref;
 					resolved_param.is_comptime = param.is_comptime;
 				}
 				fn_type->return_type = asType(evalComptime(unit, *ft.return_type, ctx, bindings), ft.return_type->token);
@@ -6003,6 +6084,14 @@ struct Checker {
 				if (!nullable_type->inner) return {};
 
 				return {ComptimeValue::TYPE, nullable_type};
+			}
+			case Expression::POINTER_TYPE: {
+				auto& pt = static_cast<PointerTypeExpression&>(expr);
+				PointerResolvedType* pointer_type = makeType<PointerResolvedType>(module.arena);
+				pointer_type->is_const = pt.is_const;
+				pointer_type->inner = asType(evalComptime(unit, *pt.inner, ctx, bindings, frame), pt.inner->token);
+				if (!pointer_type->inner) return {};
+				return {ComptimeValue::TYPE, pointer_type};
 			}
 			case Expression::ARRAY_TYPE: {
 				auto& at = static_cast<ArrayTypeExpression&>(expr);

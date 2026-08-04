@@ -824,6 +824,16 @@ struct LumScriptDebuggerWindow final : StudioApp::GUIPlugin {
 
 		ImGui::PopStyleVar();
 
+		if (suspended) {
+			ls_debug_event event = {};
+			if (ls_debug_pause_event(runtime, &event) == LS_RESULT_OK) {
+				ImGui::Text("Suspended: %s", pauseReason(event.reason));
+				if (event.reason == LS_DEBUG_PAUSE_ERROR && event.message.begin && event.message.end) {
+					ImGui::TextWrapped("%.*s", int(event.message.end - event.message.begin), event.message.begin);
+				}
+			}
+		}
+
 		const bool should_focus = just_suspended || m_step_requested;
 		m_step_requested = false;
 		if (should_focus && runtime && ls_debug_is_suspended(runtime)) {

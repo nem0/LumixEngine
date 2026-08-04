@@ -6,6 +6,7 @@ import "core:entity"
 struct EnvironmentProbe { entity : i32; module : cptr; }
 
 extern fn environment_probe(e : Entity) : ?EnvironmentProbe;
+extern fn createEnvironmentProbe(e : Entity) : ?EnvironmentProbe;
 extern fn isEnvironmentProbeEnabled(entity : EnvironmentProbe) : bool;
 extern fn enableEnvironmentProbe(entity : EnvironmentProbe, enable : bool) : void;
 

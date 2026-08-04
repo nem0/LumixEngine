@@ -6,6 +6,7 @@ import "core:entity"
 struct PointLight { entity : i32; module : cptr; }
 
 extern fn point_light(e : Entity) : ?PointLight;
+extern fn createPointLight(e : Entity) : ?PointLight;
 extern fn getPointLightRange(entity : PointLight) : f32;
 extern fn setPointLightRange(entity : PointLight, value : f32) : void;
 extern fn getPointLightCastShadows(entity : PointLight) : bool;

@@ -8,6 +8,7 @@ import "core:vec2"
 struct DistanceJoint { entity : i32; module : cptr; }
 
 extern fn distance_joint(e : Entity) : ?DistanceJoint;
+extern fn createDistanceJoint(e : Entity) : ?DistanceJoint;
 extern fn getDistanceJointConnectedBody(entity : DistanceJoint) : Entity;
 extern fn setDistanceJointConnectedBody(entity : DistanceJoint, connected_body : Entity) : void;
 extern fn getDistanceJointAxisPosition(entity : DistanceJoint) : Vec3;

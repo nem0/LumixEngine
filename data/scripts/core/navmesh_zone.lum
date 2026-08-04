@@ -7,6 +7,7 @@ import "core:vec3"
 struct Zone { entity : i32; module : cptr; }
 
 extern fn navmesh_zone(e : Entity) : ?Zone;
+extern fn createZone(e : Entity) : ?Zone;
 extern fn load(zone_entity : Zone) : bool;
 extern fn drawNavmesh(zone : Zone, pos : DVec3, inner_boundaries : bool, outer_boundaries : bool, portals : bool) : void;
 extern fn drawCompactHeightfield(zone : Zone) : void;

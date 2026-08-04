@@ -177,11 +177,21 @@ inline const char* fromCString(ls_string_view input, i64& value) {
 inline const char* fromCString(ls_string_view input, u64& value) {
 	const char* p = data(input);
 	const char* const end = p + size(input);
+	u64 base = 10;
+	if (end - p >= 2 && p[0] == '0' && (p[1] == 'x' || p[1] == 'X')) {
+		base = 16;
+		p += 2;
+	}
 	u64 result = 0;
-	while (p != end && *p >= '0' && *p <= '9') {
-		const u64 digit = (u64)(*p - '0');
-		if (result > (~0ull - digit) / 10u) return nullptr;
-		result = result * 10u + digit;
+	while (p != end) {
+		if (*p == '_') { ++p; continue; }
+		u64 digit;
+		if (*p >= '0' && *p <= '9') digit = (u64)(*p - '0');
+		else if (base == 16 && *p >= 'a' && *p <= 'f') digit = (u64)(*p - 'a' + 10);
+		else if (base == 16 && *p >= 'A' && *p <= 'F') digit = (u64)(*p - 'A' + 10);
+		else break;
+		if (digit >= base || result > (~0ull - digit) / base) return nullptr;
+		result = result * base + digit;
 		++p;
 	}
 	value = result;
@@ -198,7 +208,8 @@ inline const char* parseDouble(ls_string_view input, double& value) {
 	}
 
 	double whole = 0.0;
-	while (p != end && *p >= '0' && *p <= '9') {
+	while (p != end && ((*p >= '0' && *p <= '9') || *p == '_')) {
+		if (*p == '_') { ++p; continue; }
 		whole = whole * 10.0 + double(*p - '0');
 		++p;
 	}
@@ -207,7 +218,8 @@ inline const char* parseDouble(ls_string_view input, double& value) {
 	double scale = 1.0;
 	if (p != end && *p == '.') {
 		++p;
-		while (p != end && *p >= '0' && *p <= '9') {
+		while (p != end && ((*p >= '0' && *p <= '9') || *p == '_')) {
+			if (*p == '_') { ++p; continue; }
 			frac = frac * 10.0 + double(*p - '0');
 			scale *= 10.0;
 			++p;

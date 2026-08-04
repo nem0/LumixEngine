@@ -18,22 +18,22 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 	- [Structs](#structs)
 	- [Enums](#enums)
 	- [Functions](#functions)
-		- [Ref parameters](#ref-parameters)
 	- [Comptime](#comptime)
 	- [Templates](#templates)
 	- [Operators](#operators)
 - [Types](#types)
 	- [Untyped literals](#untyped-literals)
 	- [Nullable values](#nullable-values)
+	- [Pointers](#pointers)
 	- [Tagged unions](#tagged-unions)
 		- [Narrowing](#narrowing)
 	- [String literals](#string-literals)
 	- [Function types](#function-types)
 	- [Static-sized arrays](#static-sized-arrays)
 	- [Slices](#slices)
-- [Memory](#memory)
 - [Variables](#variables)
 	- [Union extraction and propagation](#union-extraction-and-propagation)
+	- [Temporaries](#temporaries)
 - [Statements](#statements)
 	- [Blocks](#blocks)
 	- [Assignment](#assignment)
@@ -58,6 +58,7 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 	- [Calls](#calls)
 	- [Argument-dependent lookup](#argument-dependent-lookup)
 	- [UFCS](#ufcs)
+- [Memory](#memory)
 - [Compile-time introspection](#compile-time-introspection)
 	- [typeof](#typeof)
 	- [Type members](#type-members)
@@ -210,7 +211,7 @@ expression; see [Comptime](#comptime).
   are not forward declarations
 - recursive containment by value is not allowed, including through arrays,
   nullable types, unions, or another struct; use an indirection such as a
-  slice where appropriate
+  pointer or slice where appropriate
 - an empty struct is valid and has no fields
 - a trailing semicolon after the closing `}` is a compile-time error
 
@@ -242,7 +243,7 @@ Fields are selected with `.`, and the selected field is an lvalue when the
 base value is writable:
 
 ```cpp
-fn set_visible(t : ref Transform) : void {
+fn set_visible(t : *Transform) : void {
 	t.visible = true;
 }
 
@@ -252,9 +253,9 @@ fn is_visible(t : Transform) : bool {
 ```
 
 Nested fields can be chained (`object.transform.x`). A field of a temporary
-struct value is readable but cannot be assigned to or passed by `ref`. A
-struct passed by value is a copy; use a `ref` parameter to modify the caller's
-value. Fields can also be selected with a compile-time string:
+struct value is readable but cannot be assigned to or used to form a pointer. A
+struct passed by value is a copy; use a pointer parameter to modify the
+caller's value. Fields can also be selected with a compile-time string:
 
 ```cpp
 value["field"] = 42;
@@ -349,8 +350,8 @@ The type of a function value is written `fn(parameters) : return_type`; see
 Rules:
 
 - parameter names must be unique
-- a parameter binding is immutable; a `ref` parameter can still modify the
-  caller's storage through its reference
+- a parameter binding is immutable; a pointer parameter can still modify the
+  pointed-to storage when its pointee is writable
 - arguments must match the declared parameter types and count; there are no
   overloaded function declarations
 - a non-`void` function must return a value compatible with its return type;
@@ -364,29 +365,6 @@ Rules:
 - function declarations do not include `operator` declarations; operators are
   a separate declaration form
 
-#### Ref parameters
-
-`ref` passes a writable location by alias instead of by value.
-
-```cpp
-fn increment(v : ref i32) : void {
-	v += 1;
-}
-
-fn main() : void {
-	var x : i32 = 10;
-	increment(ref x);
-}
-```
-
-`ref` constraints:
-
-- call-site argument must be prefixed with `ref`
-- argument must be writable and have stable storage
-- `const` values are not allowed
-- `ref` parameter types cannot be nullable
-- `ref` arguments cannot be nullable
-
 ```cpp
 struct Stats {
 	hp : i32;
@@ -398,14 +376,14 @@ struct Player {
 
 var global_counter : i32 = 0;
 
-fn bump(v : ref i32) : void {
-	v += 1;
+fn bump(v : *i32) : void {
+	v.* += 1;
 }
 
 fn main() : void {
 	var p = Player { Stats { 10 } };
-	bump(ref global_counter);
-	bump(ref p.stats.hp);
+	bump(&global_counter);
+	bump(&p.stats.hp);
 }
 ```
 
@@ -509,10 +487,10 @@ fn identity(value : $T) : T {
 	return value;
 }
 
-fn swap(a : ref $T, b : ref T) : void {
-	const temporary = a;
-	a = b;
-	b = temporary;
+fn swap(a : *$T, b : *T) : void {
+	const temporary = a.*;
+	a.* = b.*;
+	b.* = temporary;
 }
 
 fn main() : void {
@@ -521,7 +499,7 @@ fn main() : void {
 
 	var a : i32 = 1;
 	var b : i32 = 2;
-	swap(ref a, ref b); // T is i32
+	swap(&a, &b); // T is i32
 }
 ```
 
@@ -672,6 +650,7 @@ Built-in and user types:
 - `f32`, `f64`
 - `cstr`
 - `cptr`
+- typed pointers (`*T`, `*const T`, `?*T`, and `?*const T`; see [Pointers](#pointers))
 - `type` (compile-time only)
 - `TypeKind` (compile-time only, see [TypeKind](#typekind))
 - user-defined `struct` types
@@ -784,6 +763,81 @@ if a != null {
 	foo(a); // unsafe if `bar` can clear or replace `a`
 }
 ```
+
+### Pointers
+
+Typed pointers provide persistent, non-owning indirection. They are distinct
+from parameter aliases: a pointer is a value that can be stored in variables
+and struct fields.
+
+Pointer types use prefix `*`, while dereference uses postfix `.*`:
+
+```cpp
+struct S {
+	field : i32;
+}
+
+fn set_field(s : *S) : void {
+	s.field = 42;
+}
+
+fn main() : void {
+	var value : S = undefined;
+	var p : *S = &value;
+	p.field = 10;
+	const copy : S = p.*;
+}
+```
+
+Pointer rules:
+
+- `*T` is a non-null pointer to `T`; `?*T` is a nullable pointer to `T`
+- `&value` takes the address of addressable runtime storage and produces a
+  `*T` or `*const T` according to the storage's mutability
+- `pointer.*` reads or writes the pointed-to value; it is an lvalue when the
+  pointer refers to writable storage
+- `*const T` points to a read-only `T`; dereferencing it with `pointer.*` produces a read-only
+  value and cannot be used as an assignment target
+- `const p : *T` makes the pointer binding immutable, but the `T` reached
+  through `p` remains writable
+- field selection with `.` automatically dereferences a non-null pointer, so
+	`p.field` is equivalent to `p.*.field`
+- nullable pointers must be checked before dereference or field selection;
+  `if p != null` promotes `p` to `*T` in that branch
+- `null` is valid for `?*T`, but not for `*T`
+- pointers are copied by value and do not copy their pointees
+- `*T` converts implicitly to `*const T`; the reverse conversion is invalid
+- the same conversion applies through nullability: `?*T` converts to
+  `?*const T`
+- pointers do not imply ownership, allocation, or automatic lifetime
+- pointer equality compares addresses; pointer ordering and pointer arithmetic
+  are not defined
+- taking the address of a local or parameter does not extend its lifetime;
+  returning or storing such a pointer after the storage expires is a
+  compile-time error
+- recursive containment through a pointer is allowed; recursive containment
+  by value remains invalid
+
+For example, a linked-list node can point to another node:
+
+```cpp
+struct Node {
+	value : i32;
+	next : ?*Node;
+}
+```
+
+Read-only links can use a const pointee:
+
+```cpp
+struct View {
+	root : ?*const Node;
+}
+```
+
+Pointer allocation and ownership are separate from the pointer type. The
+language does not implicitly free or retain pointees; an allocation API and
+its lifetime rules must be used when pointers outlive their source variables.
 
 ### Tagged unions
 
@@ -1120,12 +1174,12 @@ Slice creation forms:
   `slice[0]` reads and writes the variable itself, and `slice.length` is
   always one
 - creating a writable `[]T` view requires writable, addressable runtime
-  storage; `const` variables and non-`ref` parameters cannot be used as such
-  slice sources
+  storage; `const` variables and pointers to read-only values cannot be used
+  as such slice sources
 - a `[]const T` source may be sliced and passed to another `[]const T`
   parameter, but cannot be used to create a writable view
-- `ref` parameters can be used as slice sources because they refer to writable
-  caller storage
+- a writable pointer's pointee can be used as a slice source because it refers
+  to writable caller storage
 - arbitrary expressions and temporaries cannot be used as writable slice
   sources; an expression specifically producing immutable backing storage may
   be used as a `[]const T` source
@@ -1176,34 +1230,6 @@ fn sum(values : []i32) : i32 {
 	return total;
 }
 ```
-
-## Memory
-
-Raw memory is allocated and released through the builtin `std:mem` module. Like other `std:` modules it is imported by path:
-
-```cpp
-import "std:mem" as mem
-
-fn main() : void {
-	var raw : []byte = mem.alloc(4 * sizeof(i32), alignof(i32));
-	var ints : []i32 = raw as []i32;
-	ints[0] = 42;
-	mem.free(raw);
-}
-```
-
-The module exposes two functions:
-
-```cpp
-fn alloc(size : isize, align : isize) : []byte
-fn free(memory : []byte) : void
-```
-
-- `alloc(size, align)` returns a `[]byte` of `size` `byte` units (see [`sizeof`](#sizeof-and-alignof)). The contents are zero-initialized. `size` and `align` are `isize`; a non-positive `size` yields an empty slice.
-- `align` is accepted for source compatibility but currently has no effect on allocation placement.
-- `free(memory)` releases an allocation. Pass the exact slice `alloc` returned (same base and length).
-- accessing a slice over freed memory traps at runtime (use-after-free detection): `free` marks the allocation's units dead, and any later `[]byte`/reinterpreted-slice read or write over them aborts execution.
-- the returned `[]byte` can be reinterpreted as a typed slice with `as` (see [Casts](#casts)); the length rescales by the element's `sizeof`.
 
 ## Variables
 
@@ -1597,11 +1623,23 @@ The returned expression must be implicitly convertible to the function's return 
 true
 false
 1
+1_000_000
+0xABC
+0xFF_FF
 12.5
+12_345.625_0
 '0'
 'A'
 "text"
 ```
+
+Integer literals are decimal by default. The `0x` or `0X` prefix selects
+hexadecimal; hexadecimal digits may use either letter case.
+
+Integer and floating-point literals may use `_` between digits for readability.
+Separators do not affect the value. A separator cannot be leading, trailing,
+repeated, adjacent to the decimal point, or adjacent to `0x`; forms such as
+`_1`, `1_`, `1__0`, `1_.0`, and `0x_FF` are not numeric literals.
 
 Rune literals are enclosed in single quotes and represent one Unicode code point. They are untyped integer constants, like integer literals, and are concretized by their context. For example, `'0'` can be used with a `u8` value and has the value `48` (`U+0030`).
 
@@ -1710,10 +1748,10 @@ fn bump(values : []i32) : void {
 
 The view is non-owning, so changing `values[0]` changes `value`. Its length is
 one. The source must be writable addressable runtime storage. A `const`
-variable, non-`ref` parameter, literal, temporary, or compile-time value cannot
-be used as a slice source. A `ref` parameter can be used because it refers to
-writable caller storage. The slice must not be used after the source storage
-stops being valid.
+variable, pointer to a read-only value, literal, temporary, or compile-time
+value cannot be used as a writable slice source. A writable pointer's pointee
+can be used because it refers to writable caller storage. The slice must not
+be used after the source storage stops being valid.
 
 Slice reinterpret casts convert between a byte slice and a typed slice:
 
@@ -1794,6 +1832,7 @@ Ordering comparisons (`<`, `<=`, `>`, `>=`) require numeric operands of the same
 
 - numeric types, `bool`, `byte`, and enums - value comparison
 - `cstr` and `cptr` - address comparison (two `cstr` values with equal content but different storage are not equal)
+- typed pointers - address comparison
 - function values - same function
 - nullable values - only against the `null` literal
 - `type` values - type identity, compile-time only (see [Type equality](#type-equality))
@@ -1875,7 +1914,7 @@ From loosest to tightest. Operators on the same row have equal precedence and as
 | 7 | `+`, `-` (binary) | left |
 | 8 | `*`, `/`, `%` | left |
 | 9 | `as` | left |
-| 10 | `-` (prefix), `ref` | right |
+| 10 | `-`, `*`, `&` (prefix) | right |
 | 11 | `.`, `()`, `[]` | left |
 
 Notes:
@@ -1975,7 +2014,9 @@ fn move_up(w : world.World, e : entity.Entity) : void {
 Rules:
 
 - if `x.foo(a, b)` is not resolved by other language features (enum, struct field, namespace), it's retried as `foo(x, a, b)`
-- if the resolved function takes its first parameter by `ref`, the receiver is passed by `ref`; `x.foo(a, b)` is then equivalent to `foo(ref x, a, b)`
+- the receiver is inserted unchanged; a pointer receiver requires a pointer
+  expression, such as `p.foo(a, b)` for a function whose first parameter is
+  `*T`
 - method syntax dispatches on the receiver: the declaring namespace of the receiver's type is searched first, and only if it has no match does lookup fall back to the current module and unaliased imports; a local function never shadows a same-named function from the receiver type's unit
 - does not apply to primitive receiver types, e.g. `4.foo(a, b)` is invalid
 - alias-qualified calls (`entity.destroy(e)`) are always unambiguous
@@ -1994,7 +2035,7 @@ fn example(e : entity.Entity) : void {
 }
 ```
 
-This also permits mutable container operations without spelling `ref` at every call site:
+Pointer-based mutable container operations use the same method-style syntax:
 
 ```cpp
 import "core:array" as array
@@ -2005,6 +2046,34 @@ fn example() : void {
 	values.push(42);
 }
 ```
+
+## Memory
+
+Raw memory is allocated and released through the builtin `std:mem` module. Like other `std:` modules it is imported by path:
+
+```cpp
+import "std:mem" as mem
+
+fn main() : void {
+	var raw : []byte = mem.alloc(4 * sizeof(i32), alignof(i32));
+	var ints : []i32 = raw as []i32;
+	ints[0] = 42;
+	mem.free(raw);
+}
+```
+
+The module exposes two functions:
+
+```cpp
+fn alloc(size : isize, align : isize) : []byte
+fn free(memory : []byte) : void
+```
+
+- `alloc(size, align)` returns a `[]byte` of `size` `byte` units (see [`sizeof`](#sizeof-and-alignof)). The contents are zero-initialized. `size` and `align` are `isize`; a non-positive `size` yields an empty slice.
+- `align` is accepted for source compatibility but currently has no effect on allocation placement.
+- `free(memory)` releases an allocation. Pass the exact slice `alloc` returned (same base and length).
+- accessing a slice over freed memory traps at runtime (use-after-free detection): `free` marks the allocation's units dead, and any later `[]byte`/reinterpreted-slice read or write over them aborts execution.
+- the returned `[]byte` can be reinterpreted as a typed slice with `as` (see [Casts](#casts)); the length rescales by the element's `sizeof`.
 
 ## Compile-time introspection
 
@@ -2113,9 +2182,9 @@ A `type` value exposes its structure through members accessed with `::`. A value
 | --- | --- | --- |
 | `t::kind` | `TypeKind` | every type |
 | `t::name` | compile-time `[]const u8` | every type |
-| `t::min` | value of `t` | numeric types |
-| `t::max` | value of `t` | numeric types |
-| `t::child` | `type` | `.Nullable`, `.Slice`, `.Array` |
+| `t::min` | untyped numeric value | numeric types |
+| `t::max` | untyped numeric value | numeric types |
+| `t::child` | `type` | `.Nullable`, `.Pointer`, `.Slice`, `.Array` |
 | `t::length` | comptime integer | `.Array` |
 | `t::fields` | slice of field descriptors | `.Struct` |
 | `t::values` | slice of enum descriptors | `.Enum` |
@@ -2141,8 +2210,8 @@ comptime value_fields = v::fields;                   // same as typeof(v)::field
 
 - `t::kind` classifies the type into one [`TypeKind`](#typekind) discriminant
 - `t::name` is the type's source-level name, represented by the bytes shown in the table under [`t::name`](#tname) below
-- `t::min` and `t::max` are the lowest and highest finite values representable by a concrete numeric type. For floating-point types, `t::min` is the most negative finite value, not the smallest positive normal value.
-- `t::child` is the single operand of a one-operand type constructor: the `U` of `?U`, the element of `[]U`, or the element of `[N]U`; compound type expressions can be written directly before the member, as in `?i32::child` or `[]i32::child`
+- `t::min` and `t::max` are untyped numeric values containing the lowest and highest finite values representable by a concrete numeric type. They adopt the expected type when consumed. For floating-point types, `t::min` is the most negative finite value, not the smallest positive normal value.
+- `t::child` is the single operand of a one-operand type constructor: the `U` of `?U`, `*U`, `[]U`, or `[N]U`; compound type expressions can be written directly before the member, as in `?i32::child`, `*i32::child`, or `[]i32::child`
 - `t::length` is the element count `N` of a `[N]T`, an untyped compile-time integer - the same value `v.length` yields on an instance (see [Static-sized arrays](#static-sized-arrays)), but reachable from the type without one, so `unroll for i in 0..t::length` works on a type alone. It is not defined for `.Slice`, whose length is a runtime property
 - `t::fields`, `t::values`, and `t::types` are [reflection sequences](#reflection-sequences)
 - `t::params` is the [reflection sequence](#reflection-sequences) of a `.Fn` type's parameter descriptors, in declaration order; `t::ret` is its return type, named `ret` rather than `return` to avoid the keyword. Each descriptor is an ordinary compile-time struct with `.name` and `.type` members; `.name` is a compile-time `[]const u8` and is `""` for unnamed parameters.
@@ -2171,6 +2240,7 @@ This is the same [compile-time branch](#compile-time-branches) pruning used ever
 | structs and enums | the declaration name, `"Vec3"`, `"State"` |
 | factory-produced structs | `"Pair(i32)"`, `"Optional(Vec3)"` |
 | nullable | `"?Vec3"` |
+| pointers | `"*Vec3"`, `"*const Vec3"`, `"?*Vec3"`, `"?*const Vec3"` |
 | slices and arrays | `"[]i32"`, `"[]const u8"`, `"[4]i32"` |
 | unions | `"A \| B \| C"` in canonical member order |
 | function types | `"fn(i32, i32) : i32"` or `"fn(a : i32, b : i32) : void"` |
@@ -2192,6 +2262,7 @@ enum TypeKind {
 	Void,
 	Type,      // the `type` type itself
 	Nullable,  // ?T
+	Pointer,   // *T
 	Slice,     // []T
 	Array,     // [N]T
 	Enum,
@@ -2601,6 +2672,13 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 	- consistent direction with slices: `[]T` reads left-to-right like `?T`, unlike C-style postfix where nesting order is confusing (`T[4][8]`)
 	- runtime operations (indexing `arr[i]`, slicing `arr[start:end]`) remain postfix on values, creating a clear distinction from prefix array and slice type constructors
 
+- pointer types and dereference use different positions
+	- we need an easy way to implement self-referential structures (e.g. linked lists) - pointers
+	- pointer types use familiar prefix notation: `*T` and `*const T`
+	- dereference uses postfix `p.*`, so `p.* = value` is unambiguously pointee assignment
+	- keeping dereference postfix avoids the parser ambiguity in expressions such as `foo(*X)`, where `*X` could otherwise be a pointer type value or a dereferenced pointer
+	- pointer field access remains concise: `p.field` automatically dereferences `p`, while `p.*.field` spells the same operation explicitly
+
 - `for` uses `in` for both ranges and sequences
 	- `in` is familiar from other languages' loop syntax, reducing the learning curve
 
@@ -2724,8 +2802,6 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 	- cause is `addLocal` in bytecode_compiler.cpp: allocating while temps are live places the allocation at `temp_top` and raises the permanent locals floor past it, promoting mid-expression scratch into a function-lifetime local
 	- not a correctness bug (the frame is sized to fit), but it inflates every call and brings recursion closer to the runtime's stack cap
 	- fixing it means teaching `addLocal` to distinguish scratch from real locals, which touches every expression form; wants a regression test asserting `frame_size` does not scale with the number of slice expressions
-* ref in function type - var a : fn(ref i32) = foo;
-* 1'000'000 / 1_000_000
 * hex - 0x1234ABCD
 * FourCC? `ABCD`
 * bit set / flags / something else?
@@ -2748,6 +2824,7 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 
 ---
 
+* do temporaries survive until the end of statement? e.g. foo(bar().view())
 * jit/llvm/AOT?
 * AST API in lumscript?
 * getter/setter?

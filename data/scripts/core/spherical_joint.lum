@@ -8,6 +8,7 @@ import "core:vec2"
 struct SphericalJoint { entity : i32; module : cptr; }
 
 extern fn spherical_joint(e : Entity) : ?SphericalJoint;
+extern fn createSphericalJoint(e : Entity) : ?SphericalJoint;
 extern fn getSphericalJointConnectedBody(entity : SphericalJoint) : Entity;
 extern fn setSphericalJointConnectedBody(entity : SphericalJoint, connected_body : Entity) : void;
 extern fn getSphericalJointAxisPosition(entity : SphericalJoint) : Vec3;

@@ -7,6 +7,7 @@ import "core:vec3"
 struct Decal { entity : i32; module : cptr; }
 
 extern fn decal(e : Entity) : ?Decal;
+extern fn createDecal(e : Entity) : ?Decal;
 extern fn getDecalMaterialPath(entity : Decal) : []const u8;
 extern fn setDecalMaterialPath(entity : Decal, path : []const u8) : void;
 extern fn getDecalHalfExtents(entity : Decal) : Vec3;

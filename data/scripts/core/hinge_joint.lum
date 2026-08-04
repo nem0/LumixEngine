@@ -8,6 +8,7 @@ import "core:vec2"
 struct HingeJoint { entity : i32; module : cptr; }
 
 extern fn hinge_joint(e : Entity) : ?HingeJoint;
+extern fn createHingeJoint(e : Entity) : ?HingeJoint;
 extern fn getHingeJointConnectedBody(entity : HingeJoint) : Entity;
 extern fn setHingeJointConnectedBody(entity : HingeJoint, connected_body : Entity) : void;
 extern fn getHingeJointAxisPosition(entity : HingeJoint) : Vec3;

@@ -7,6 +7,7 @@ import "core:vec4"
 struct Environment { entity : i32; module : cptr; }
 
 extern fn environment(e : Entity) : ?Environment;
+extern fn createEnvironment(e : Entity) : ?Environment;
 extern fn getEnvironmentCastShadows(entity : Environment) : bool;
 extern fn setEnvironmentCastShadows(entity : Environment, enable : bool) : void;
 extern fn getEnvironmentSkyTexture(entity : Environment) : []const u8;

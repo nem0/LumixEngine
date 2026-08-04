@@ -58,6 +58,24 @@ TEST(SliceExpressionsDoNotGrowFrame) {
 	return true;
 }
 
+TEST(SliceBoundsCanContainSliceExpressions) {
+	const char* source = R"(
+		fn main() : i32 {
+			var values = [10, 20, 30, 40];
+			var indices = [0, 1];
+			var tail = values[indices[:].length:];
+			return tail[0];
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(30, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(SliceTypeSyntax) {
 	const char* source = R"(
 		fn main() : void {
@@ -371,16 +389,16 @@ TEST(ScalarSliceViewSupportsPrimitiveTypes) {
 	return true;
 }
 
-TEST(ScalarSliceViewWorksForRefParameters) {
+TEST(ScalarSliceViewWorksForPointerParameters) {
 	const char* source = R"(
-		fn update(value : ref i32) : void {
-			var view : []i32 = value[:];
+		fn update(value : *i32) : void {
+			var view : []i32 = value.*[:];
 			view[0] += 5;
 		}
 
 		fn main() : i32 {
 			var value : i32 = 10;
-			update(ref value);
+			update(&value);
 			return value;
 		}
 	)";
@@ -989,7 +1007,7 @@ TEST(SliceStructFieldWriteThroughParameterRuntime) {
 	return true;
 }
 
-TEST(SliceStructFieldRefOutOfBoundsFails) {
+TEST(SliceStructFieldPointerOutOfBoundsFails) {
 	const char* source = R"(
 		struct Body {
 			x : i32;

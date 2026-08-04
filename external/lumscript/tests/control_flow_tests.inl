@@ -1,12 +1,12 @@
 TEST(DeferTypechecks) {
 	const char* source = R"(
-		fn cleanup(v : ref i32) : void {
-			v += 1;
+		fn cleanup(v : *i32) : void {
+			v.* += 1;
 		}
 
 		fn main() : i32 {
 			var x : i32 = 0;
-			defer cleanup(ref x);
+			defer cleanup(&x);
 			x += 2;
 			return x;
 		}

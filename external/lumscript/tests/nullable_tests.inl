@@ -184,18 +184,19 @@ TEST(NullableUnaryRequiresNullCheckFails) {
 	return true;
 }
 
-TEST(RefArgumentRejectsNullableTargetType) {
+TEST(NullablePointerParameterTypechecks) {
 	const char* source = R"(
-		fn clear(v : ref ?i32) : void {
-			v = null;
+		fn clear(v : ?*i32) : void {
+			if v != null { v.* = 0; }
 		}
 
 		fn main() : void {
-			var x : ?i32 = 10;
-			clear(ref x);
+			var x : i32 = 10;
+			var p : ?*i32 = &x;
+			clear(p);
 		}
 	)";
-	EXPECT_COMPILE_FAIL(source);
+	EXPECT_COMPILE(source);
 	return true;
 }
 

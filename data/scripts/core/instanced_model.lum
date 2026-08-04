@@ -5,6 +5,7 @@ import "core:entity"
 struct InstancedModel { entity : i32; module : cptr; }
 
 extern fn instanced_model(e : Entity) : ?InstancedModel;
+extern fn createInstancedModel(e : Entity) : ?InstancedModel;
 extern fn getInstancedModelPath(entity : InstancedModel) : []const u8;
 extern fn setInstancedModelPath(entity : InstancedModel, path : []const u8) : void;
 
