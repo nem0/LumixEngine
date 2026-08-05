@@ -78,7 +78,7 @@ fn offset_momentum(bodies : []Body) : void {
 	var py = 0.0;
 	var pz = 0.0;
 
-	for bi in 0..length(bodies) {
+	for bi in 0..bodies.length {
 		px -= bodies[bi].vx * bodies[bi].mass;
 		py -= bodies[bi].vy * bodies[bi].mass;
 		pz -= bodies[bi].vz * bodies[bi].mass;
@@ -92,7 +92,7 @@ fn offset_momentum(bodies : []Body) : void {
 fn sum_energy(bodies : []Body, pairs : []BodyPair) : f64 {
 	var e = 0.0;
 
-	for pi_ in 0..length(pairs) {
+	for pi_ in 0..pairs.length {
 		const b1 = bodies[pairs[pi_].first];
 		const b2 = bodies[pairs[pi_].second];
 
@@ -103,7 +103,7 @@ fn sum_energy(bodies : []Body, pairs : []BodyPair) : f64 {
 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
 	}
 
-	for bi in 0..length(bodies) {
+	for bi in 0..bodies.length {
 		const body = bodies[bi];
 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
 	}
@@ -112,8 +112,8 @@ fn sum_energy(bodies : []Body, pairs : []BodyPair) : f64 {
 }
 
 fn advance(time : f64, iters : i32, bodies : []Body, pairs : []BodyPair) : void {
-	const n_pairs = length(pairs);
-	const n_bodies = length(bodies);
+	const n_pairs = pairs.length;
+	const n_bodies = bodies.length;
 
 	for i in 0..iters {
 		for pi_ in 0..n_pairs {
