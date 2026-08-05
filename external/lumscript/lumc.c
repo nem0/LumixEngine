@@ -20,6 +20,8 @@
 #include "bytecode.h"
 #include "capi.h"
 
+ls_bytecode* ls_bytecode_compile_mir(ls_module* module, ls_host* host);
+
 typedef struct lumc_context {
 	ls_host host;
 	char* source;
@@ -576,8 +578,9 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 
 int main(int argc, char** argv) {
 	if (argc < 2) {
-		fputs("Usage: lumc [--dump-bytecode] <script.lum> [function_name] [args...]\n"
+		fputs("Usage: lumc [--dump-bytecode|--mir] <script.lum> [function_name] [args...]\n"
 			"  --dump-bytecode  Compile and print human-readable bytecode\n"
+			"  --mir            Compile using the MIR backend\n"
 			"  script.lum     - Path to LumScript source file\n"
 			"  function_name  - Function to call (default: main)\n"
 			"  args           - Arguments passed to the function\n", stderr);
@@ -592,7 +595,8 @@ int main(int argc, char** argv) {
 	ctx.host.print = &lumc_diagnostics_print;
 
 	const int dump_bytecode = strcmp(argv[1], "--dump-bytecode") == 0;
-	const int script_arg = dump_bytecode ? 2 : 1;
+	const int use_mir = strcmp(argv[1], "--mir") == 0;
+	const int script_arg = (dump_bytecode || use_mir) ? 2 : 1;
 	if (argc <= script_arg) {
 		fputs("Error: Missing script path\n", stderr);
 		return 1;
@@ -642,7 +646,7 @@ int main(int argc, char** argv) {
 		goto cleanup;
 	}
 
-	ctx.bytecode = ls_bytecode_compile(ctx.module, &ctx.host);
+	ctx.bytecode = use_mir ? ls_bytecode_compile_mir(ctx.module, &ctx.host) : ls_bytecode_compile(ctx.module, &ctx.host);
 	if (!ctx.bytecode) {
 		fprintf(stderr, "Error: Failed to compile bytecode\n");
 		goto cleanup;
@@ -690,6 +694,7 @@ int main(int argc, char** argv) {
 			}
 		}
 
+		// Bytecode compilation and runtime setup are intentionally outside the benchmark.
 		double start = lumc_now_ms();
 		if (!ls_call(ctx.runtime, ls_from_cstr(function_name))) {
 			fprintf(stderr, "Runtime error\n");

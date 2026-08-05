@@ -425,7 +425,7 @@ struct Checker {
 		// Semantic nodes live as long as their owning unit. Allocating them from the
 		// unit arena also keeps cached types and template instances pointer-stable.
 		void* mem = arena.allocate(arena.user_data, sizeof(T), alignof(T));
-		return ::new (mem) T(static_cast<Args&&>(args)...);
+		return ::new (NewPlaceholder{}, mem) T(static_cast<Args&&>(args)...);
 	}
 
 	StructResolvedType* makeStructType(ls_arena& arena, const char* const* names, ResolvedType* const* types, u32 count) {

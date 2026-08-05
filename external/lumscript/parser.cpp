@@ -37,7 +37,7 @@ struct Parser {
 	T* make(Args&&... args) {
 		ls_arena& a = m_unit.arena;
 		T* res = static_cast<T*>(a.allocate(a.user_data, sizeof(T), alignof(T)));
-		new (res) T(static_cast<Args&&>(args)...);
+		new (NewPlaceholder{}, res) T(static_cast<Args&&>(args)...);
 		return res;
 	}
 

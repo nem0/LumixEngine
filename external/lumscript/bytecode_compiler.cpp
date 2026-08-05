@@ -3782,9 +3782,9 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			loop.label = current_label;
 			loop.defer_mark = (u32)ctx.deferreds.size();
 			void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
-			loop.break_jumps = ::new (break_storage) ExpArray<u32>(*ctx.bytecode->arena);
+			loop.break_jumps = ::new (NewPlaceholder{}, break_storage) ExpArray<u32>(*ctx.bytecode->arena);
 			void* continue_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
-			loop.continue_jumps = ::new (continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
+			loop.continue_jumps = ::new (NewPlaceholder{}, continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
 
 			compileStatement(ctx, *ws.body, return_kind, {});
 
@@ -3822,9 +3822,9 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 				loop.label = current_label;
 				loop.defer_mark = (u32)ctx.deferreds.size();
 				void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
-				loop.break_jumps = ::new (break_storage) ExpArray<u32>(*ctx.bytecode->arena);
+				loop.break_jumps = ::new (NewPlaceholder{}, break_storage) ExpArray<u32>(*ctx.bytecode->arena);
 				void* continue_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
-				loop.continue_jumps = ::new (continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
+				loop.continue_jumps = ::new (NewPlaceholder{}, continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
 				for (Statement* body : fs.body->statements) {
 					const u32 continue_start = (u32)loop.continue_jumps->size();
 					compileStatement(ctx, *body, return_kind, {});
@@ -3860,9 +3860,9 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 				loop.label = current_label;
 				loop.defer_mark = (u32)ctx.deferreds.size();
 				void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
-				loop.break_jumps = ::new (break_storage) ExpArray<u32>(*ctx.bytecode->arena);
+				loop.break_jumps = ::new (NewPlaceholder{}, break_storage) ExpArray<u32>(*ctx.bytecode->arena);
 				void* continue_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
-				loop.continue_jumps = ::new (continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
+				loop.continue_jumps = ::new (NewPlaceholder{}, continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
 
 				const i32 count = fs.unroll_elements->values.size();
 				for (i32 i = 0; i < count; ++i) {
@@ -3934,9 +3934,9 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 					loop.label = current_label;
 					loop.defer_mark = (u32)ctx.deferreds.size();
 					void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
-					loop.break_jumps = ::new (break_storage) ExpArray<u32>(*ctx.bytecode->arena);
+					loop.break_jumps = ::new (NewPlaceholder{}, break_storage) ExpArray<u32>(*ctx.bytecode->arena);
 					void* continue_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
-					loop.continue_jumps = ::new (continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
+					loop.continue_jumps = ::new (NewPlaceholder{}, continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
 
 					emitBoundsCheckReg(ctx, index_offset, *container_type);
 					emitOp(ctx.code, LS_OP_LOAD_INDEXED);
@@ -3992,9 +3992,9 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 				loop.label = current_label;
 				loop.defer_mark = (u32)ctx.deferreds.size();
 				void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
-				loop.break_jumps = ::new (break_storage) ExpArray<u32>(*ctx.bytecode->arena);
+				loop.break_jumps = ::new (NewPlaceholder{}, break_storage) ExpArray<u32>(*ctx.bytecode->arena);
 				void* continue_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
-				loop.continue_jumps = ::new (continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
+				loop.continue_jumps = ::new (NewPlaceholder{}, continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
 
 				emitOp(ctx.code, LS_OP_SLICE_LOAD_LOCAL);
 				emitFixedReg(ctx, loop_offset);
@@ -4029,9 +4029,9 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 				loop.label = current_label;
 				loop.defer_mark = (u32)ctx.deferreds.size();
 				void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
-				loop.break_jumps = ::new (break_storage) ExpArray<u32>(*ctx.bytecode->arena);
+				loop.break_jumps = ::new (NewPlaceholder{}, break_storage) ExpArray<u32>(*ctx.bytecode->arena);
 				void* continue_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
-				loop.continue_jumps = ::new (continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
+				loop.continue_jumps = ::new (NewPlaceholder{}, continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
 
 				for (i64 value = begin; value < end; ++value) {
 					IntLiteralExpression iteration;
@@ -4095,9 +4095,9 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 				loop.label = current_label;
 				loop.defer_mark = (u32)ctx.deferreds.size();
 				void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
-				loop.break_jumps = ::new (break_storage) ExpArray<u32>(*ctx.bytecode->arena);
+				loop.break_jumps = ::new (NewPlaceholder{}, break_storage) ExpArray<u32>(*ctx.bytecode->arena);
 				void* continue_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
-				loop.continue_jumps = ::new (continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
+				loop.continue_jumps = ::new (NewPlaceholder{}, continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
 				compileStatement(ctx, *fs.body, return_kind, {});
 				const u32 increment_pos = (u32)ctx.code.size();
 				emitIncrementOrAddOne(ctx, loop_offset, value_kind);
@@ -4141,9 +4141,9 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			loop.label = current_label;
 			loop.defer_mark = (u32)ctx.deferreds.size();
 			void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
-			loop.break_jumps = ::new (break_storage) ExpArray<u32>(*ctx.bytecode->arena);
+			loop.break_jumps = ::new (NewPlaceholder{}, break_storage) ExpArray<u32>(*ctx.bytecode->arena);
 			void* continue_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
-			loop.continue_jumps = ::new (continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
+			loop.continue_jumps = ::new (NewPlaceholder{}, continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
 
 			compileStatement(ctx, *fs.body, return_kind, {});
 

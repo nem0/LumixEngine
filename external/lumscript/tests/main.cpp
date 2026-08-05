@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "../compiler.h"
+#include "../mir_builder.h"
 #include <chrono>
 
 #include "../arena.h"
@@ -44,7 +46,7 @@ void print(int val) { printf("%d", val); }
 		ls_module* module = ls_module_create(&context.host); \
 		EXPECT_TRUE(module != nullptr); \
 		bool compiled = ls_module_compile(module, toLs(src), makeStringView(__func__), nullptr, nullptr); \
-		ls_bytecode* bytecode = compiled ? ls_bytecode_compile(module, &context.host) : nullptr; \
+		ls_bytecode* bytecode = compiled ? ls_bytecode_compile_mir(module, &context.host) : nullptr; \
 		if (bytecode) ls_bytecode_destroy(bytecode); \
 		ls_module_destroy(module); \
 		EXPECT_TRUE(compiled); \
@@ -67,7 +69,7 @@ void print(int val) { printf("%d", val); }
 		ls_module* module = ls_module_create(&context.host); \
 		EXPECT_TRUE(module != nullptr); \
 		bool compiled = ls_module_compile(module, toLs(src), makeStringView(__func__), &resolveLumScriptImportC, &(files)); \
-		ls_bytecode* bytecode = compiled ? ls_bytecode_compile(module, &context.host) : nullptr; \
+		ls_bytecode* bytecode = compiled ? ls_bytecode_compile_mir(module, &context.host) : nullptr; \
 		if (bytecode) ls_bytecode_destroy(bytecode); \
 		ls_module_destroy(module); \
 		EXPECT_TRUE(compiled); \
@@ -159,7 +161,7 @@ struct RuntimeGuard {
 	// The tests run through the bytecode runtime, so this guard owns both the
 	// compiled bytecode and the runtime bound to it.
 	explicit RuntimeGuard(ls_module* module, ls_host* host)
-		: bytecode(ls_bytecode_compile(module, host))
+		: bytecode(ls_bytecode_compile_mir(module, host))
 		, runtime(bytecode ? ls_runtime_create(bytecode, nullptr) : nullptr)
 	{}
 
@@ -241,6 +243,360 @@ static void nativeAddC(ls_runtime* runtime, ls_call_frame frame) {
 	LS_ARG(frame, i32, a);
 	LS_ARG(frame, i32, b);
 	LS_RESULT(frame, a + b);
+}
+
+TEST(MIRBuildScalarReturn) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const char* source = "fn main() : i32 { return 2 + 3; }";
+	EXPECT_TRUE(ls_module_compile(module, makeStringView(source), makeStringView("mir_test"), nullptr, nullptr));
+
+	FunctionExpression* main_function = nullptr;
+	for (Unit& unit : module->units) {
+		for (Symbol& symbol : unit.symbols) {
+			if (symbol.expression && symbol.expression->kind == Expression::FUNCTION && equalStrings(symbol.name, makeStringView("main"))) {
+				main_function = static_cast<FunctionExpression*>(symbol.expression);
+				break;
+			}
+		}
+	}
+	EXPECT_TRUE(main_function != nullptr);
+	MirFunction* mir = mirBuildFunction(context.host.arena, main_function);
+	EXPECT_TRUE(mir != nullptr);
+	EXPECT_TRUE(mir->blocks.size() == 1);
+	MirBlock& block = mir->blocks[0];
+	EXPECT_TRUE(block.instructions.size() == 3);
+	EXPECT_TRUE(block.instructions[0].opcode == MIR_OP_CONST);
+	EXPECT_TRUE(block.instructions[1].opcode == MIR_OP_CONST);
+	EXPECT_TRUE(block.instructions[2].opcode == MIR_OP_ADD);
+	EXPECT_TRUE(block.has_terminator);
+	EXPECT_TRUE(block.terminator.kind == MIR_TERM_RETURN_VALUE);
+	EXPECT_TRUE(block.terminator.value == block.instructions[2].result);
+
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(MIRRuntimeF32Cast) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const char* source = "fn to_f32() : f32 { const x : i32 = 10; return x as f32; } fn to_i32() : i32 { const x : f32 = 12.75; return x as i32; }";
+	EXPECT_TRUE(ls_module_compile(module, makeStringView(source), makeStringView("mir_f32_cast_test"), nullptr, nullptr));
+	ls_bytecode* bytecode = ls_bytecode_compile_mir(module, &context.host);
+	EXPECT_TRUE(bytecode != nullptr);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("to_f32")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_to_f32(runtime, -1) == 10);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("to_i32")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_to_i32(runtime, -1) == 12);
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(MIRRuntimeScalarReturn) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const char* source = "fn main() : i32 { return 20 + 22; }";
+	EXPECT_TRUE(ls_module_compile(module, makeStringView(source), makeStringView("mir_runtime_test"), nullptr, nullptr));
+	ls_bytecode* bytecode = ls_bytecode_compile_mir(module, &context.host);
+	EXPECT_TRUE(bytecode != nullptr);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_to_i32(runtime, -1) == 42);
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(MIRRuntimeIntegerExpressions) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const char* source = "fn main() : i32 { return -(20 - 2 * 3); }";
+	EXPECT_TRUE(ls_module_compile(module, makeStringView(source), makeStringView("mir_integer_test"), nullptr, nullptr));
+	ls_bytecode* bytecode = ls_bytecode_compile_mir(module, &context.host);
+	EXPECT_TRUE(bytecode != nullptr);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_to_i32(runtime, -1) == -14);
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(MIRRuntimeLocalAndParameter) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const char* source = "fn main(v : i32) : i32 { var x : i32 = v + 2; return x * 3; }";
+	EXPECT_TRUE(ls_module_compile(module, makeStringView(source), makeStringView("mir_local_test"), nullptr, nullptr));
+	ls_bytecode* bytecode = ls_bytecode_compile_mir(module, &context.host);
+	EXPECT_TRUE(bytecode != nullptr);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	ls_push_i32(runtime, 4);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_to_i32(runtime, -1) == 18);
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(MIRRuntimeIf) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const char* source = "fn main(v : bool) : i32 { if v { return 1; } return 2; }";
+	EXPECT_TRUE(ls_module_compile(module, makeStringView(source), makeStringView("mir_if_test"), nullptr, nullptr));
+	ls_bytecode* bytecode = ls_bytecode_compile_mir(module, &context.host);
+	EXPECT_TRUE(bytecode != nullptr);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	ls_push_bool(runtime, true);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_to_i32(runtime, -1) == 1);
+	ls_push_bool(runtime, false);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_to_i32(runtime, -1) == 2);
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(MIRRuntimeWhile) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const char* source = "fn main() : i32 { while false {} return 7; }";
+	EXPECT_TRUE(ls_module_compile(module, makeStringView(source), makeStringView("mir_while_test"), nullptr, nullptr));
+	ls_bytecode* bytecode = ls_bytecode_compile_mir(module, &context.host);
+	EXPECT_TRUE(bytecode != nullptr);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_to_i32(runtime, -1) == 7);
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(MIRRuntimeCompare) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const char* source = "fn main(v : i32) : bool { return v >= 10; }";
+	EXPECT_TRUE(ls_module_compile(module, makeStringView(source), makeStringView("mir_compare_test"), nullptr, nullptr));
+	ls_bytecode* bytecode = ls_bytecode_compile_mir(module, &context.host);
+	EXPECT_TRUE(bytecode != nullptr);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	ls_push_i32(runtime, 10);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_to_bool(runtime, -1));
+	ls_push_i32(runtime, 9);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(!ls_to_bool(runtime, -1));
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(MIRRuntimeDefer) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const char* source = "fn main() : i32 { var x : i32 = 1; defer x += 2; return x; }";
+	EXPECT_TRUE(ls_module_compile(module, makeStringView(source), makeStringView("mir_defer_test"), nullptr, nullptr));
+	ls_bytecode* bytecode = ls_bytecode_compile_mir(module, &context.host);
+	EXPECT_TRUE(bytecode != nullptr);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_to_i32(runtime, -1) == 1);
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(MIRRuntimeCast) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const char* source = "fn main() : i64 { return 3 as i64; }";
+	EXPECT_TRUE(ls_module_compile(module, makeStringView(source), makeStringView("mir_cast_test"), nullptr, nullptr));
+	ls_bytecode* bytecode = ls_bytecode_compile_mir(module, &context.host);
+	EXPECT_TRUE(bytecode != nullptr);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_to_i64(runtime, -1) == 3);
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(MIRRuntimeDirectCall) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const char* source = "fn add(a : i32, b : i32) : i32 { return a + b; } fn main() : i32 { return add(20, 22); }";
+	EXPECT_TRUE(ls_module_compile(module, makeStringView(source), makeStringView("mir_call_test"), nullptr, nullptr));
+	ls_bytecode* bytecode = ls_bytecode_compile_mir(module, &context.host);
+	EXPECT_TRUE(bytecode != nullptr);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_to_i32(runtime, -1) == 42);
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(MIRRuntimeFloatExpressions) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const char* source = "fn main() : f64 { return 1.5 + 2.25; }";
+	EXPECT_TRUE(ls_module_compile(module, makeStringView(source), makeStringView("mir_float_test"), nullptr, nullptr));
+	ls_bytecode* bytecode = ls_bytecode_compile_mir(module, &context.host);
+	EXPECT_TRUE(bytecode != nullptr);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_to_f64(runtime, -1) == 3.75);
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(MIRRuntimeFloatCall) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const char* source = "fn add(a : f64, b : f64) : f64 { return a + b; } fn main() : f64 { return add(1.5, 2.25); }";
+	EXPECT_TRUE(ls_module_compile(module, makeStringView(source), makeStringView("mir_float_call_test"), nullptr, nullptr));
+	ls_bytecode* bytecode = ls_bytecode_compile_mir(module, &context.host);
+	EXPECT_TRUE(bytecode != nullptr);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_to_f64(runtime, -1) == 3.75);
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(MIRRuntimeLoopState) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const char* source = "fn main() : i32 { var i : i32 = 0; var sum : i32 = 0; while i < 3 { sum += i; i += 1; } return sum; }";
+	EXPECT_TRUE(ls_module_compile(module, makeStringView(source), makeStringView("mir_loop_state_test"), nullptr, nullptr));
+	ls_bytecode* bytecode = ls_bytecode_compile_mir(module, &context.host);
+	EXPECT_TRUE(bytecode != nullptr);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_to_i32(runtime, -1) == 3);
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(MIRRuntimeGlobalRead) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const char* source = "var g : i32 = 5; fn main() : i32 { return g; }";
+	EXPECT_TRUE(ls_module_compile(module, makeStringView(source), makeStringView("mir_global_test"), nullptr, nullptr));
+	ls_bytecode* bytecode = ls_bytecode_compile_mir(module, &context.host);
+	EXPECT_TRUE(bytecode != nullptr);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_to_i32(runtime, -1) == 5);
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(MIRRuntimeShortCircuit) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const char* source = "fn main() : bool { return false and (1 / 0 == 0); }";
+	EXPECT_TRUE(ls_module_compile(module, makeStringView(source), makeStringView("mir_short_circuit_test"), nullptr, nullptr));
+	ls_bytecode* bytecode = ls_bytecode_compile_mir(module, &context.host);
+	EXPECT_TRUE(bytecode != nullptr);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(!ls_to_bool(runtime, -1));
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(MIRRuntimeTernary) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const char* source = "fn main(v : bool) : i32 { return v ? 11 : 22; }";
+	EXPECT_TRUE(ls_module_compile(module, makeStringView(source), makeStringView("mir_ternary_test"), nullptr, nullptr));
+	ls_bytecode* bytecode = ls_bytecode_compile_mir(module, &context.host);
+	EXPECT_TRUE(bytecode != nullptr);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	ls_push_bool(runtime, true);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_to_i32(runtime, -1) == 11);
+	ls_push_bool(runtime, false);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_to_i32(runtime, -1) == 22);
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
+
+TEST(MIRRuntimeBreakContinue) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const char* source = "fn main() : i32 { var i : i32 = 0; var sum : i32 = 0; while true { i += 1; if i == 2 { continue; } if i == 4 { break; } sum += i; } return sum; }";
+	EXPECT_TRUE(ls_module_compile(module, makeStringView(source), makeStringView("mir_break_continue_test"), nullptr, nullptr));
+	ls_bytecode* bytecode = ls_bytecode_compile_mir(module, &context.host);
+	EXPECT_TRUE(bytecode != nullptr);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ls_call(runtime, makeStringView("main")) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_to_i32(runtime, -1) == 4);
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
 }
 
 #include "bytecode_tests.inl"

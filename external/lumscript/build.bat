@@ -91,28 +91,28 @@ del /q /f "%SCRIPT_DIR%*.obj" >nul 2>&1
 del /q /f "%SCRIPT_DIR%..\*.obj" >nul 2>&1
 
 if /I "%TARGET%"=="tests" (
-	%COMPILER% %CXXFLAGS% /c "%SCRIPT_DIR%tests/main.cpp" "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%capi.cpp"
+	%COMPILER% %CXXFLAGS% /c "%SCRIPT_DIR%tests/main.cpp" "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%mir_builder.cpp" "%SCRIPT_DIR%mir_bytecode.cpp" "%SCRIPT_DIR%capi.cpp"
 	if errorlevel 1 exit /b !errorlevel!
 	%COMPILER% %CFLAGS% /c "%SCRIPT_DIR%runtime.c" "%SCRIPT_DIR%debugger.c"
 	if errorlevel 1 exit /b !errorlevel!
-	%COMPILER% "main.obj" "parser.obj" "compiler.obj" "bytecode_compiler.obj" "runtime.obj" "debugger.obj" "capi.obj" /link %LDFLAGS%
+    %COMPILER% "main.obj" "parser.obj" "compiler.obj" "bytecode_compiler.obj" "mir_builder.obj" "mir_bytecode.obj" "runtime.obj" "debugger.obj" "capi.obj" /link %LDFLAGS%
 ) else (
 	if /I "%USE_CLANG%"=="1" (
 		%COMPILER% %CFLAGS% /c "%SCRIPT_DIR%lumc.c"
 		if errorlevel 1 exit /b !errorlevel!
-		%COMPILER% %CXXFLAGS% /c "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%capi.cpp"
+        %COMPILER% %CXXFLAGS% /c "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%mir_builder.cpp" "%SCRIPT_DIR%mir_bytecode.cpp" "%SCRIPT_DIR%capi.cpp"
 		if errorlevel 1 exit /b !errorlevel!
 		%COMPILER% %CFLAGS% /c "%SCRIPT_DIR%runtime.c" "%SCRIPT_DIR%debugger.c"
 		if errorlevel 1 exit /b !errorlevel!
-		%COMPILER% "lumc.obj" "parser.obj" "compiler.obj" "bytecode_compiler.obj" "runtime.obj" "debugger.obj" "capi.obj" /link %LDFLAGS%
+        %COMPILER% "lumc.obj" "parser.obj" "compiler.obj" "bytecode_compiler.obj" "mir_builder.obj" "mir_bytecode.obj" "runtime.obj" "debugger.obj" "capi.obj" /link %LDFLAGS%
 	) else (
 		%COMPILER% %CFLAGS% /c "%SCRIPT_DIR%lumc.c"
 		if errorlevel 1 exit /b !errorlevel!
-		%COMPILER% %CXXFLAGS% /c "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%capi.cpp"
+        %COMPILER% %CXXFLAGS% /c "%SCRIPT_DIR%parser.cpp" "%SCRIPT_DIR%compiler.cpp" "%SCRIPT_DIR%bytecode_compiler.cpp" "%SCRIPT_DIR%mir_builder.cpp" "%SCRIPT_DIR%mir_bytecode.cpp" "%SCRIPT_DIR%capi.cpp"
 		if errorlevel 1 exit /b !errorlevel!
 		%COMPILER% %CFLAGS% /c "%SCRIPT_DIR%runtime.c" "%SCRIPT_DIR%debugger.c"
 		if errorlevel 1 exit /b !errorlevel!
-		%COMPILER% "lumc.obj" "parser.obj" "compiler.obj" "bytecode_compiler.obj" "runtime.obj" "debugger.obj" "capi.obj" /link %LDFLAGS%
+        %COMPILER% "lumc.obj" "parser.obj" "compiler.obj" "bytecode_compiler.obj" "mir_builder.obj" "mir_bytecode.obj" "runtime.obj" "debugger.obj" "capi.obj" /link %LDFLAGS%
 	)
 )
 

@@ -30,18 +30,28 @@ set "passed=0"
 set "total=0"
 
 for /f "delims=" %%A in ('dir /b /o:n "!BENCH_DIR!\*.ls"') do (
-    set /a total+=1
-    set "bench=%%A"
+	set "bench=%%A"
 
-    echo Running: %%A
-    "!LUMC!" "!BENCH_DIR!\!bench!" 2>&1
-    if !errorlevel! equ 0 (
-        echo   [OK] %%A completed successfully
-        set /a passed+=1
-    ) else (
-        echo   [FAIL] %%A failed
-    )
-    echo.
+	echo Running: %%A [bytecode]
+	"!LUMC!" "!BENCH_DIR!\!bench!" 2>&1
+	if !errorlevel! equ 0 (
+		echo   [OK] %%A bytecode completed successfully
+		set /a passed+=1
+	) else (
+		echo   [FAIL] %%A bytecode failed
+	)
+	set /a total+=1
+
+	echo Running: %%A [MIR]
+	"!LUMC!" --mir "!BENCH_DIR!\!bench!" 2>&1
+	if !errorlevel! equ 0 (
+		echo   [OK] %%A MIR completed successfully
+		set /a passed+=1
+	) else (
+		echo   [FAIL] %%A MIR failed
+	)
+	set /a total+=1
+	echo.
 )
 
 echo === Summary ===

@@ -2,14 +2,10 @@
 
 #include "capi.h"
 
-void* operator new(decltype(sizeof(0)), void* ptr) noexcept;
-void operator delete(void*, void*) noexcept;
+struct NewPlaceholder {};
 
-inline void* operator new(decltype(sizeof(0)), void* ptr) noexcept {
-	return ptr;
-}
-
-inline void operator delete(void*, void*) noexcept {}
+inline void* operator new(decltype(sizeof(0)), NewPlaceholder, void* ptr) { return ptr; }
+inline void operator delete(void*, NewPlaceholder, void*) {}
 
 // allocates using arena
 // never deallocates on its own, so deallocation should be done in layer above
@@ -54,7 +50,7 @@ struct ExpArray {
 		T* bin = bins[outter_index];
 		ASSERT(bin);
 		T* out = bin + inner_index;
-		::new ((void*)out) T((Args&&)args...);
+		::new (NewPlaceholder{}, (void*)out) T((Args&&)args...);
 		++m_size;
 		return *out;
 	}
@@ -73,7 +69,7 @@ struct ExpArray {
 			const i32 inner_index = innerIndex(m_size);
 			T* bin = bins[outter_index];
 			ASSERT(bin);
-			::new ((void*)(bin + inner_index)) T();
+			::new (NewPlaceholder{}, (void*)(bin + inner_index)) T();
 			++m_size;
 		}
 	}
@@ -92,7 +88,7 @@ struct ExpArray {
 			const i32 inner_index = innerIndex(m_size);
 			T* bin = bins[outter_index];
 			ASSERT(bin);
-			::new ((void*)(bin + inner_index)) T(value);
+			::new (NewPlaceholder{}, (void*)(bin + inner_index)) T(value);
 			++m_size;
 		}
 	}
