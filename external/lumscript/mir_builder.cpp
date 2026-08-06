@@ -23,40 +23,33 @@ struct MirBuilder {
 	ls_string_view loop_label;
 
 	MirBuilder(ls_arena& arena, MirFunction& function)
-		: arena(arena), function(function), slots(arena), loops(arena), deferreds(arena), defer_marks(arena) {
+		: arena(arena)
+		, function(function)
+		, slots(arena)
+		, loops(arena)
+		, deferreds(arena)
+		, defer_marks(arena) {
 		loop_label = {};
 		block = mirFunctionCreateBlock(function);
 	}
 };
 
-static MirInstruction* mirAppend(MirBuilder& builder, MirOpcode opcode, ResolvedType* type, u32 operand_count) {
-	MirInstruction& instruction = builder.block->instructions.emplace_back();
-	instruction.opcode = opcode;
-	instruction.type = type;
-	instruction.operand_type = nullptr;
-	instruction.result = MIR_INVALID_ID;
-	instruction.source_location = MIR_INVALID_ID;
-	instruction.operand_count = operand_count;
-	instruction.immediate = 0;
-	instruction.offset = 0;
-	instruction.integer = 0;
-	instruction.floating = 0;
-	instruction.local = MIR_INVALID_ID;
-	instruction.function = MIR_INVALID_ID;
-	instruction.call_target = MIR_CALL_DIRECT;
-	instruction.call_name = {};
-	instruction.string = {};
-	instruction.arguments.values = nullptr;
-	instruction.arguments.sizes = nullptr;
-	instruction.arguments.count = 0;
-	for (u32 i = 0; i < 3; ++i) instruction.operands[i] = MIR_INVALID_ID;
-	if (opcode != MIR_OP_STORE && opcode != MIR_OP_COPY) instruction.result = mirFunctionNewValue(builder.function);
-	return &instruction;
+template <typename T, typename... Args> T* mirAppend(MirBuilder& builder, ResolvedType* type, Args&&... args) {
+	T* instruction = (T*)builder.arena.allocate(builder.arena.user_data, sizeof(T), alignof(T));
+	::new (NewPlaceholder{}, (void*)instruction) T(args...);
+	instruction->type = type;
+
+	instruction->result = MIR_INVALID_ID;
+	instruction->source_location = MIR_INVALID_ID;
+
+	if (instruction->opcode != MIR_OP_STORE && instruction->opcode != MIR_OP_COPY) instruction->result = mirFunctionNewValue(builder.function);
+	builder.block->instructions.push_back(instruction);
+	return instruction;
 }
 
-static MirInstruction* mirAppendI32Zero(MirBuilder& builder, ResolvedType* type) {
-	MirInstruction* instruction = mirAppend(builder, MIR_OP_CONST, type, 0);
-	instruction->immediate = MIR_CONST_I32;
+static MirConstInstruction* mirAppendI32Zero(MirBuilder& builder, ResolvedType* type) {
+	auto* instruction = mirAppend<MirConstInstruction>(builder, type);
+	instruction->kind = MIR_CONST_I32;
 	return instruction;
 }
 
@@ -67,12 +60,12 @@ static MirOpcode mirBinaryOpcode(Token::Type op) {
 		case Token::STAR: return MIR_OP_MUL;
 		case Token::SLASH: return MIR_OP_DIV;
 		case Token::PERCENT: return MIR_OP_MOD;
-		case Token::EQUAL_EQUAL:
-		case Token::BANG_EQUAL:
-		case Token::GT:
-		case Token::LT:
-		case Token::GT_EQUAL:
-		case Token::LT_EQUAL: return MIR_OP_COMPARE;
+		case Token::EQUAL_EQUAL: return MIR_OP_EQ;
+		case Token::BANG_EQUAL: return MIR_OP_NE;
+		case Token::GT: return MIR_OP_GT;
+		case Token::LT: return MIR_OP_LT;
+		case Token::GT_EQUAL: return MIR_OP_GE;
+		case Token::LT_EQUAL: return MIR_OP_LE;
 		default: return MIR_OP_UNDEFINED;
 	}
 }
@@ -110,18 +103,17 @@ static bool mirBuildArrayAccess(MirBuilder& builder, Expression* expression, Mir
 	MirValueId current_index = mirBuildExpression(builder, bracket.args[0]);
 	if (bracket.base->kind == Expression::BRACKET) {
 		if (!mirBuildArrayAccess(builder, bracket.base, base, index, element_type, extent)) return false;
-		MirInstruction* stride = mirAppend(builder, MIR_OP_CONST, bracket.args[0]->resolved_type, 0);
+		auto* stride = mirAppend<MirConstInstruction>(builder, bracket.args[0]->resolved_type);
 		stride->integer = mirArrayElementCount(array->element_type);
-		MirInstruction* scaled = mirAppend(builder, MIR_OP_MUL, bracket.args[0]->resolved_type, 2);
-		scaled->operands[0] = index;
-		scaled->operands[1] = stride->result;
-		MirInstruction* combined = mirAppend(builder, MIR_OP_ADD, bracket.args[0]->resolved_type, 2);
-		combined->operands[0] = scaled->result;
-		combined->operands[1] = current_index;
+		auto* scaled = mirAppend<MirBinaryInstruction>(builder, bracket.args[0]->resolved_type, MIR_OP_MUL);
+		scaled->lhs = index;
+		scaled->rhs = stride->result;
+		auto* combined = mirAppend<MirBinaryInstruction>(builder, bracket.args[0]->resolved_type, MIR_OP_ADD);
+		combined->lhs = scaled->result;
+		combined->rhs = current_index;
 		index = combined->result;
 		extent *= (u32)array->size;
-	}
-	else {
+	} else {
 		base = mirBuildAddress(builder, bracket.base);
 		index = current_index;
 		extent = (u32)array->size;
@@ -131,8 +123,7 @@ static bool mirBuildArrayAccess(MirBuilder& builder, Expression* expression, Mir
 }
 
 static void mirEmitActiveDefers(MirBuilder& builder) {
-	for (i32 i = (i32)builder.deferreds.size() - 1; i >= 0; --i)
-		mirBuildStatement(builder, builder.deferreds[(u32)i]);
+	for (i32 i = (i32)builder.deferreds.size() - 1; i >= 0; --i) mirBuildStatement(builder, builder.deferreds[(u32)i]);
 }
 
 static MirValueId mirBuildExpressionAsType(MirBuilder& builder, Expression* expression, ResolvedType* type) {
@@ -142,24 +133,27 @@ static MirValueId mirBuildExpressionAsType(MirBuilder& builder, Expression* expr
 		MirLocalId local = mirFindSlot(builder, slot);
 		if (local != MIR_INVALID_ID) {
 			ArrayResolvedType* array = static_cast<ArrayResolvedType*>(expression->resolved_type);
-			MirInstruction* address = mirAppend(builder, MIR_OP_LOCAL_ADDRESS, expression->resolved_type, 0);
+			auto* address = mirAppend<MirAddressInstruction>(builder, expression->resolved_type, MIR_OP_LOCAL_ADDRESS);
 			address->local = local;
-			MirInstruction* make = mirAppend(builder, MIR_OP_MAKE_SLICE, type, 1);
-			make->operands[0] = address->result;
-			make->local = array->element_type ? typeByteSize(*array->element_type) : 0;
-			make->function = (u32)array->size;
+			auto* make = mirAppend<MirSliceInstruction>(builder, type);
+			make->base = address->result;
+			make->element_size = array->element_type ? typeByteSize(*array->element_type) : 0;
+			make->length = (u32)array->size;
 			return make->result;
 		}
 	}
 	if (expression->kind == Expression::INT_LITERAL || expression->kind == Expression::FLOAT_LITERAL || expression->kind == Expression::BOOL_LITERAL) {
-		MirInstruction* instruction = mirAppend(builder, MIR_OP_CONST, type, 0);
+		auto* instruction = mirAppend<MirConstInstruction>(builder, type);
 		if (expression->kind == Expression::INT_LITERAL) {
 			const u64 value = static_cast<IntLiteralExpression*>(expression)->value;
-			if (type->kind == ResolvedType::F32 || type->kind == ResolvedType::F64) instruction->floating = (f64)value;
-			else instruction->integer = (i64)value;
-		}
-		else if (expression->kind == Expression::FLOAT_LITERAL) instruction->floating = static_cast<FloatLiteralExpression*>(expression)->value;
-		else instruction->integer = static_cast<BoolLiteralExpression*>(expression)->value ? 1 : 0;
+			if (type->kind == ResolvedType::F32 || type->kind == ResolvedType::F64)
+				instruction->floating = (f64)value;
+			else
+				instruction->integer = (i64)value;
+		} else if (expression->kind == Expression::FLOAT_LITERAL)
+			instruction->floating = static_cast<FloatLiteralExpression*>(expression)->value;
+		else
+			instruction->integer = static_cast<BoolLiteralExpression*>(expression)->value ? 1 : 0;
 		return instruction->result;
 	}
 	return mirBuildExpression(builder, expression);
@@ -179,33 +173,33 @@ static MirValueId mirBuildLogical(MirBuilder& builder, BinaryExpression& binary)
 	builder.block->has_terminator = true;
 
 	builder.block = short_block;
-	MirInstruction* short_value = mirAppend(builder, MIR_OP_CONST, binary.resolved_type, 0);
+	auto* short_value = mirAppend<MirConstInstruction>(builder, binary.resolved_type);
 	short_value->integer = is_and ? 0 : 1;
-	MirInstruction* short_address = mirAppend(builder, MIR_OP_LOCAL_ADDRESS, binary.resolved_type, 0);
+	auto* short_address = mirAppend<MirAddressInstruction>(builder, binary.resolved_type, MIR_OP_LOCAL_ADDRESS);
 	short_address->local = result_local;
-	MirInstruction* short_store = mirAppend(builder, MIR_OP_STORE, binary.resolved_type, 2);
-	short_store->operands[0] = short_address->result;
-	short_store->operands[1] = short_value->result;
+	auto* short_store = mirAppend<MirStoreInstruction>(builder, binary.resolved_type);
+	short_store->address = short_address->result;
+	short_store->value = short_value->result;
 	short_block->terminator.kind = MIR_TERM_JUMP;
 	short_block->terminator.targets[0] = merge_block->id;
 	short_block->has_terminator = true;
 
 	builder.block = rhs_block;
 	MirValueId rhs = mirBuildExpression(builder, binary.rhs);
-	MirInstruction* rhs_address = mirAppend(builder, MIR_OP_LOCAL_ADDRESS, binary.resolved_type, 0);
+	auto* rhs_address = mirAppend<MirAddressInstruction>(builder, binary.resolved_type, MIR_OP_LOCAL_ADDRESS);
 	rhs_address->local = result_local;
-	MirInstruction* rhs_store = mirAppend(builder, MIR_OP_STORE, binary.resolved_type, 2);
-	rhs_store->operands[0] = rhs_address->result;
-	rhs_store->operands[1] = rhs;
+	auto* rhs_store = mirAppend<MirStoreInstruction>(builder, binary.resolved_type);
+	rhs_store->address = rhs_address->result;
+	rhs_store->value = rhs;
 	rhs_block->terminator.kind = MIR_TERM_JUMP;
 	rhs_block->terminator.targets[0] = merge_block->id;
 	rhs_block->has_terminator = true;
 
 	builder.block = merge_block;
-	MirInstruction* result_address = mirAppend(builder, MIR_OP_LOCAL_ADDRESS, binary.resolved_type, 0);
+	auto* result_address = mirAppend<MirAddressInstruction>(builder, binary.resolved_type, MIR_OP_LOCAL_ADDRESS);
 	result_address->local = result_local;
-	MirInstruction* result = mirAppend(builder, MIR_OP_LOAD, binary.resolved_type, 1);
-	result->operands[0] = result_address->result;
+	auto* result = mirAppend<MirLoadInstruction>(builder, binary.resolved_type);
+	result->address = result_address->result;
 	return result->result;
 }
 
@@ -223,31 +217,31 @@ static MirValueId mirBuildTernary(MirBuilder& builder, TernaryExpression& ternar
 
 	builder.block = true_block;
 	MirValueId true_value = mirBuildExpression(builder, ternary.true_expr);
-	MirInstruction* true_address = mirAppend(builder, MIR_OP_LOCAL_ADDRESS, ternary.resolved_type, 0);
+	auto* true_address = mirAppend<MirAddressInstruction>(builder, ternary.resolved_type, MIR_OP_LOCAL_ADDRESS);
 	true_address->local = result_local;
-	MirInstruction* true_store = mirAppend(builder, MIR_OP_STORE, ternary.resolved_type, 2);
-	true_store->operands[0] = true_address->result;
-	true_store->operands[1] = true_value;
+	auto* true_store = mirAppend<MirStoreInstruction>(builder, ternary.resolved_type);
+	true_store->address = true_address->result;
+	true_store->value = true_value;
 	true_block->terminator.kind = MIR_TERM_JUMP;
 	true_block->terminator.targets[0] = merge_block->id;
 	true_block->has_terminator = true;
 
 	builder.block = false_block;
 	MirValueId false_value = mirBuildExpression(builder, ternary.false_expr);
-	MirInstruction* false_address = mirAppend(builder, MIR_OP_LOCAL_ADDRESS, ternary.resolved_type, 0);
+	auto* false_address = mirAppend<MirAddressInstruction>(builder, ternary.resolved_type, MIR_OP_LOCAL_ADDRESS);
 	false_address->local = result_local;
-	MirInstruction* false_store = mirAppend(builder, MIR_OP_STORE, ternary.resolved_type, 2);
-	false_store->operands[0] = false_address->result;
-	false_store->operands[1] = false_value;
+	auto* false_store = mirAppend<MirStoreInstruction>(builder, ternary.resolved_type);
+	false_store->address = false_address->result;
+	false_store->value = false_value;
 	false_block->terminator.kind = MIR_TERM_JUMP;
 	false_block->terminator.targets[0] = merge_block->id;
 	false_block->has_terminator = true;
 
 	builder.block = merge_block;
-	MirInstruction* result_address = mirAppend(builder, MIR_OP_LOCAL_ADDRESS, ternary.resolved_type, 0);
+	auto* result_address = mirAppend<MirAddressInstruction>(builder, ternary.resolved_type, MIR_OP_LOCAL_ADDRESS);
 	result_address->local = result_local;
-	MirInstruction* result = mirAppend(builder, MIR_OP_LOAD, ternary.resolved_type, 1);
-	result->operands[0] = result_address->result;
+	auto* result = mirAppend<MirLoadInstruction>(builder, ternary.resolved_type);
+	result->address = result_address->result;
 	return result->result;
 }
 
@@ -257,13 +251,13 @@ static MirValueId mirBuildAddress(MirBuilder& builder, Expression* expression) {
 		IdentifierExpression& identifier = *static_cast<IdentifierExpression*>(expression);
 		if (identifier.slot && identifier.slot->storage == StorageSlot::GLOBAL) {
 			if (identifier.slot->type && identifier.slot->type->kind == ResolvedType::NULLABLE) return MIR_INVALID_ID;
-			MirInstruction* address = mirAppend(builder, MIR_OP_GLOBAL_ADDRESS, expression->resolved_type, 0);
-			address->immediate = identifier.slot->offset;
+auto* address = mirAppend<MirAddressInstruction>(builder, expression->resolved_type, MIR_OP_GLOBAL_ADDRESS);
+			address->global_offset = identifier.slot->offset;
 			return address->result;
 		}
 		MirLocalId local = identifier.slot ? mirFindSlot(builder, identifier.slot) : MIR_INVALID_ID;
 		if (local == MIR_INVALID_ID) return MIR_INVALID_ID;
-		MirInstruction* address = mirAppend(builder, MIR_OP_LOCAL_ADDRESS, expression->resolved_type, 0);
+		auto* address = mirAppend<MirAddressInstruction>(builder, expression->resolved_type, MIR_OP_LOCAL_ADDRESS);
 		address->local = local;
 		return address->result;
 	}
@@ -281,7 +275,7 @@ static MirValueId mirBuildAddress(MirBuilder& builder, Expression* expression) {
 			total_offset += field_offset;
 			root = member.expression;
 		}
-		MirInstruction* address = mirAppend(builder, MIR_OP_LOCAL_ADDRESS, expression->resolved_type, 0);
+		auto* address = mirAppend<MirAddressInstruction>(builder, expression->resolved_type, MIR_OP_LOCAL_ADDRESS);
 		MirLocalId local = MIR_INVALID_ID;
 		if (root && root->kind == Expression::IDENTIFIER) {
 			IdentifierExpression& identifier = *static_cast<IdentifierExpression*>(root);
@@ -289,7 +283,7 @@ static MirValueId mirBuildAddress(MirBuilder& builder, Expression* expression) {
 		}
 		if (local == MIR_INVALID_ID) return MIR_INVALID_ID;
 		address->local = local;
-		address->offset = total_offset;
+		address->byte_offset = total_offset;
 		return address->result;
 	}
 	return MIR_INVALID_ID;
@@ -321,28 +315,28 @@ static MirValueId mirBuildIdentifier(MirBuilder& builder, IdentifierExpression& 
 		if (!function && expression.symbol && expression.symbol->expression && expression.symbol->expression->kind == Expression::FUNCTION)
 			function = static_cast<FunctionExpression*>(expression.symbol->expression);
 		if (!function) return MIR_INVALID_ID;
-		MirInstruction* value = mirAppend(builder, MIR_OP_CONST, expression.resolved_type, 0);
+		auto* value = mirAppend<MirConstInstruction>(builder, expression.resolved_type);
 		value->integer = function->bytecode_index;
 		return value->result;
 	}
 	if (expression.slot->storage == StorageSlot::GLOBAL) {
 		if (expression.slot->type && expression.slot->type->kind == ResolvedType::NULLABLE) return MIR_INVALID_ID;
-		MirInstruction* address = mirAppend(builder, MIR_OP_GLOBAL_ADDRESS, expression.resolved_type, 0);
-		address->immediate = expression.slot->offset;
-		MirInstruction* load = mirAppend(builder, MIR_OP_LOAD, expression.resolved_type, 1);
-		load->operands[0] = address->result;
+		auto* address = mirAppend<MirAddressInstruction>(builder, expression.resolved_type, MIR_OP_GLOBAL_ADDRESS);
+		address->global_offset = expression.slot->offset;
+		auto* load = mirAppend<MirLoadInstruction>(builder, expression.resolved_type);
+		load->address = address->result;
 		return load->result;
 	}
 	MirLocalId array_local = mirFindSlot(builder, expression.slot);
 	ResolvedType* storage_type = array_local != MIR_INVALID_ID ? builder.function.locals[array_local].type : expression.slot->type;
 	if (storage_type && storage_type->kind == ResolvedType::ARRAY && expression.resolved_type && expression.resolved_type->kind == ResolvedType::SLICE) {
 		ArrayResolvedType* array = static_cast<ArrayResolvedType*>(storage_type);
-		MirInstruction* address = mirAppend(builder, MIR_OP_LOCAL_ADDRESS, storage_type, 0);
+		auto* address = mirAppend<MirAddressInstruction>(builder, storage_type, MIR_OP_LOCAL_ADDRESS);
 		address->local = array_local;
-		MirInstruction* make = mirAppend(builder, MIR_OP_MAKE_SLICE, expression.resolved_type, 1);
-		make->operands[0] = address->result;
-		make->local = array->element_type ? typeByteSize(*array->element_type) : 0;
-		make->function = (u32)array->size;
+		auto* make = mirAppend<MirSliceInstruction>(builder, expression.resolved_type);
+		make->base = address->result;
+		make->element_size = array->element_type ? typeByteSize(*array->element_type) : 0;
+		make->length = (u32)array->size;
 		return make->result;
 	}
 	MirLocalId nullable_local = mirFindSlot(builder, expression.slot);
@@ -350,71 +344,70 @@ static MirValueId mirBuildIdentifier(MirBuilder& builder, IdentifierExpression& 
 	if (nullable_type && nullable_type->kind == ResolvedType::NULLABLE && expression.resolved_type && expression.resolved_type->kind != ResolvedType::NULLABLE) {
 		MirLocalId local = nullable_local;
 		ResolvedType* local_type = nullable_type;
-		MirInstruction* address = mirAppend(builder, MIR_OP_LOCAL_ADDRESS, local_type, 0);
+		auto* address = mirAppend<MirAddressInstruction>(builder, local_type, MIR_OP_LOCAL_ADDRESS);
 		address->local = local;
 		MirInstruction* index = mirAppendI32Zero(builder, expression.resolved_type);
-		MirInstruction* load = mirAppend(builder, MIR_OP_LOAD, expression.resolved_type, 2);
-		load->operands[0] = address->result;
-		load->operands[1] = index->result;
-		load->immediate = 1;
-		load->offset = 1;
-		load->local = 1;
-		load->function = 1;
+		auto* load = mirAppend<MirLoadInstruction>(builder, expression.resolved_type);
+		load->address = address->result;
+		load->index = index->result;
+		load->access = MIR_ACCESS_INDEXED;
+		load->field_offset = 1;
+		load->element_size = 1;
+		load->extent = 1;
 		return load->result;
 	}
 	MirLocalId local = mirFindSlot(builder, expression.slot);
 	if (local == MIR_INVALID_ID) return MIR_INVALID_ID;
-	MirInstruction* address = mirAppend(builder, MIR_OP_LOCAL_ADDRESS, expression.resolved_type, 0);
+	auto* address = mirAppend<MirAddressInstruction>(builder, expression.resolved_type, MIR_OP_LOCAL_ADDRESS);
 	address->local = local;
-	MirInstruction* load = mirAppend(builder, MIR_OP_LOAD, expression.resolved_type, 1);
-	load->operands[0] = address->result;
+	auto* load = mirAppend<MirLoadInstruction>(builder, expression.resolved_type);
+	load->address = address->result;
 	return load->result;
 }
 
 static MirValueId mirBuildExpression(MirBuilder& builder, Expression* expression) {
 	if (!expression) return MIR_INVALID_ID;
 	switch (expression->kind) {
-		case Expression::TERNARY:
-			return mirBuildTernary(builder, *static_cast<TernaryExpression*>(expression));
+		case Expression::TERNARY: return mirBuildTernary(builder, *static_cast<TernaryExpression*>(expression));
 		case Expression::INT_LITERAL: {
-			MirInstruction* instruction = mirAppend(builder, MIR_OP_CONST, expression->resolved_type, 0);
+			auto* instruction = mirAppend<MirConstInstruction>(builder, expression->resolved_type);
 			const u64 value = static_cast<IntLiteralExpression*>(expression)->value;
 			if (expression->resolved_type && (expression->resolved_type->kind == ResolvedType::F32 || expression->resolved_type->kind == ResolvedType::F64))
 				instruction->floating = (f64)value;
-			else instruction->integer = (i64)value;
+			else
+				instruction->integer = (i64)value;
 			return instruction->result;
 		}
 		case Expression::FLOAT_LITERAL: {
-			MirInstruction* instruction = mirAppend(builder, MIR_OP_CONST, expression->resolved_type, 0);
+			auto* instruction = mirAppend<MirConstInstruction>(builder, expression->resolved_type);
 			instruction->floating = static_cast<FloatLiteralExpression*>(expression)->value;
 			return instruction->result;
 		}
 		case Expression::BOOL_LITERAL: {
-			MirInstruction* instruction = mirAppend(builder, MIR_OP_CONST, expression->resolved_type, 0);
+			auto* instruction = mirAppend<MirConstInstruction>(builder, expression->resolved_type);
 			instruction->integer = static_cast<BoolLiteralExpression*>(expression)->value ? 1 : 0;
 			return instruction->result;
 		}
 		case Expression::STRING_LITERAL: {
-			MirInstruction* instruction = mirAppend(builder, MIR_OP_CONST, expression->resolved_type, 0);
+			auto* instruction = mirAppend<MirConstInstruction>(builder, expression->resolved_type);
 			instruction->string = static_cast<StringLiteralExpression*>(expression)->value;
 			return instruction->result;
 		}
 		case Expression::UNDEFINED: {
-			MirInstruction* instruction = mirAppend(builder, MIR_OP_UNDEFINED, expression->resolved_type, 0);
+			auto* instruction = mirAppend<MirUndefinedInstruction>(builder, expression->resolved_type);
 			return instruction->result;
 		}
 		case Expression::NULL_LITERAL: {
-			MirInstruction* instruction = mirAppend(builder, MIR_OP_CONST, expression->resolved_type, 0);
+			auto* instruction = mirAppend<MirConstInstruction>(builder, expression->resolved_type);
 			return instruction->result;
 		}
-		case Expression::IDENTIFIER:
-			return mirBuildIdentifier(builder, *static_cast<IdentifierExpression*>(expression));
+		case Expression::IDENTIFIER: return mirBuildIdentifier(builder, *static_cast<IdentifierExpression*>(expression));
 		case Expression::STRUCT_LITERAL: {
 			StructLiteralExpression& literal = *static_cast<StructLiteralExpression*>(expression);
 			if (!expression->resolved_type || expression->resolved_type->kind != ResolvedType::STRUCT) return MIR_INVALID_ID;
 			StructResolvedType* structure = static_cast<StructResolvedType*>(expression->resolved_type);
 			MirLocalId local = mirFunctionAddLocal(builder.function, expression->resolved_type, {}, false, true);
-			MirInstruction* address = mirAppend(builder, MIR_OP_LOCAL_ADDRESS, expression->resolved_type, 0);
+			auto* address = mirAppend<MirAddressInstruction>(builder, expression->resolved_type, MIR_OP_LOCAL_ADDRESS);
 			address->local = local;
 			u32 offset = 0;
 			for (u32 i = 0; i < (u32)literal.values.size(); ++i) {
@@ -424,49 +417,48 @@ static MirValueId mirBuildExpression(MirBuilder& builder, Expression* expression
 				while (index_type && index_type->kind == ResolvedType::ARRAY) index_type = static_cast<ArrayResolvedType*>(index_type)->element_type;
 				MirInstruction* index = mirAppendI32Zero(builder, index_type);
 				MirValueId value = mirBuildExpression(builder, literal.values[i]);
-				MirInstruction* store = mirAppend(builder, MIR_OP_STORE, field_type, 3);
-				store->operands[0] = address->result;
-				store->operands[1] = index->result;
-				store->operands[2] = value;
-				store->immediate = 1;
-				store->local = typeByteSize(*field_type);
-				store->offset = offset;
-				store->function = 1;
+				auto* store = mirAppend<MirStoreInstruction>(builder, field_type);
+				store->address = address->result;
+				store->index = index->result;
+				store->value = value;
+				store->access = MIR_ACCESS_INDEXED;
+				store->element_size = typeByteSize(*field_type);
+				store->field_offset = offset;
+				store->extent = 1;
 				offset += typeByteSize(*field_type);
 			}
-			MirInstruction* result = mirAppend(builder, MIR_OP_LOAD, expression->resolved_type, 1);
-			result->operands[0] = address->result;
+			auto* result = mirAppend<MirLoadInstruction>(builder, expression->resolved_type);
+			result->address = address->result;
 			return result->result;
 		}
 		case Expression::BRACKET: {
 			BracketExpression& bracket = *static_cast<BracketExpression*>(expression);
-		MirValueId base = MIR_INVALID_ID;
-		MirValueId index = MIR_INVALID_ID;
-		ResolvedType* element_type = nullptr;
-		u32 extent = 0;
-		u32 field_offset = 0;
-		if (bracket.base && bracket.base->kind == Expression::MEMBER)
-			mirFindFieldOffset(*static_cast<MemberExpression*>(bracket.base), field_offset);
-		if (!mirBuildArrayAccess(builder, expression, base, index, element_type, extent)) {
-			if (!bracket.base || bracket.base->resolved_type->kind != ResolvedType::SLICE || bracket.args.size() != 1) return MIR_INVALID_ID;
-			SliceResolvedType* slice = static_cast<SliceResolvedType*>(bracket.base->resolved_type);
-			base = mirBuildExpression(builder, bracket.base);
-			index = mirBuildExpression(builder, bracket.args[0]);
-			element_type = slice->element_type;
-			MirInstruction* load = mirAppend(builder, MIR_OP_LOAD, expression->resolved_type, 2);
-			load->operands[0] = base;
-			load->operands[1] = index;
-			load->immediate = 3;
-			load->local = element_type ? typeByteSize(*element_type) : 0;
-			return load->result;
-		}
-			MirInstruction* load = mirAppend(builder, MIR_OP_LOAD, expression->resolved_type, 2);
-			load->operands[0] = base;
-			load->operands[1] = index;
-			load->immediate = 1;
-			load->local = element_type ? typeByteSize(*element_type) : 0;
-			load->offset = field_offset;
-			load->function = extent;
+			MirValueId base = MIR_INVALID_ID;
+			MirValueId index = MIR_INVALID_ID;
+			ResolvedType* element_type = nullptr;
+			u32 extent = 0;
+			u32 field_offset = 0;
+			if (bracket.base && bracket.base->kind == Expression::MEMBER) mirFindFieldOffset(*static_cast<MemberExpression*>(bracket.base), field_offset);
+			if (!mirBuildArrayAccess(builder, expression, base, index, element_type, extent)) {
+				if (!bracket.base || bracket.base->resolved_type->kind != ResolvedType::SLICE || bracket.args.size() != 1) return MIR_INVALID_ID;
+				SliceResolvedType* slice = static_cast<SliceResolvedType*>(bracket.base->resolved_type);
+				base = mirBuildExpression(builder, bracket.base);
+				index = mirBuildExpression(builder, bracket.args[0]);
+				element_type = slice->element_type;
+				auto* load = mirAppend<MirLoadInstruction>(builder, expression->resolved_type);
+				load->address = base;
+				load->index = index;
+				load->access = MIR_ACCESS_SLICE_ELEMENT;
+				load->element_size = element_type ? typeByteSize(*element_type) : 0;
+				return load->result;
+			}
+			auto* load = mirAppend<MirLoadInstruction>(builder, expression->resolved_type);
+			load->address = base;
+			load->index = index;
+			load->access = MIR_ACCESS_INDEXED;
+			load->element_size = element_type ? typeByteSize(*element_type) : 0;
+			load->field_offset = field_offset;
+			load->extent = extent;
 			return load->result;
 		}
 		case Expression::SLICE: {
@@ -480,28 +472,26 @@ static MirValueId mirBuildExpression(MirBuilder& builder, Expression* expression
 				ArrayResolvedType* array = static_cast<ArrayResolvedType*>(slice.base->resolved_type);
 				element_type = array->element_type;
 				length = (u32)array->size;
-				MirInstruction* full = mirAppend(builder, MIR_OP_MAKE_SLICE, expression->resolved_type, 1);
-				full->operands[0] = mirBuildAddress(builder, slice.base);
-				full->local = element_type ? typeByteSize(*element_type) : 0;
-				full->function = length;
+				auto* full = mirAppend<MirSliceInstruction>(builder, expression->resolved_type);
+				full->base = mirBuildAddress(builder, slice.base);
+				full->element_size = element_type ? typeByteSize(*element_type) : 0;
+				full->length = length;
 				base_slice = full->result;
-			}
-			else if (slice.base->resolved_type->kind == ResolvedType::SLICE) {
+			} else if (slice.base->resolved_type->kind == ResolvedType::SLICE) {
 				SliceResolvedType* source = static_cast<SliceResolvedType*>(slice.base->resolved_type);
 				element_type = source->element_type;
 				base_slice = mirBuildExpression(builder, slice.base);
-			}
-			else {
+			} else {
 				if (slice.base->kind == Expression::BRACKET) {
 					BracketExpression& bracket = *static_cast<BracketExpression*>(slice.base);
 					if (bracket.base && bracket.base->resolved_type && bracket.base->resolved_type->kind == ResolvedType::ARRAY && bracket.args.size() == 1) {
 						ArrayResolvedType* array = static_cast<ArrayResolvedType*>(bracket.base->resolved_type);
 						element_type = array->element_type;
 						length = (u32)array->size;
-						MirInstruction* full = mirAppend(builder, MIR_OP_MAKE_SLICE, expression->resolved_type, 1);
-						full->operands[0] = mirBuildAddress(builder, bracket.base);
-						full->local = typeByteSize(*element_type);
-						full->function = length;
+						auto* full = mirAppend<MirSliceInstruction>(builder, expression->resolved_type);
+						full->base = mirBuildAddress(builder, bracket.base);
+						full->element_size = typeByteSize(*element_type);
+						full->length = length;
 						base_slice = full->result;
 						array_element_view = true;
 					}
@@ -509,68 +499,72 @@ static MirValueId mirBuildExpression(MirBuilder& builder, Expression* expression
 				if (array_element_view) {
 					// The scalar array element is represented as a one-element slice view.
 				} else {
-				element_type = slice.base->resolved_type;
-				length = 1;
-				MirInstruction* full = mirAppend(builder, MIR_OP_MAKE_SLICE, expression->resolved_type, 1);
-				full->operands[0] = mirBuildAddress(builder, slice.base);
-				full->local = typeByteSize(*element_type);
-				full->function = 1;
-				base_slice = full->result;
+					element_type = slice.base->resolved_type;
+					length = 1;
+					auto* full = mirAppend<MirSliceInstruction>(builder, expression->resolved_type);
+					full->base = mirBuildAddress(builder, slice.base);
+					full->element_size = typeByteSize(*element_type);
+					full->length = 1;
+					base_slice = full->result;
 				}
 			}
 			MirValueId begin = MIR_INVALID_ID;
 			MirValueId end = MIR_INVALID_ID;
 			ResolvedType* range_type = slice.begin && slice.begin->resolved_type ? slice.begin->resolved_type : element_type;
-			if (array_element_view) begin = mirBuildExpression(builder, static_cast<BracketExpression*>(slice.base)->args[0]);
-			else if (slice.begin) begin = mirBuildExpression(builder, slice.begin);
+			if (array_element_view)
+				begin = mirBuildExpression(builder, static_cast<BracketExpression*>(slice.base)->args[0]);
+			else if (slice.begin)
+				begin = mirBuildExpression(builder, slice.begin);
 			else {
-				MirInstruction* zero = mirAppend(builder, MIR_OP_CONST, range_type, 0);
+				auto* zero = mirAppend<MirConstInstruction>(builder, range_type);
 				zero->integer = 0;
 				begin = zero->result;
 			}
 			if (array_element_view) {
-				MirInstruction* one = mirAppend(builder, MIR_OP_CONST, range_type, 0);
+				auto* one = mirAppend<MirConstInstruction>(builder, range_type);
 				one->integer = 1;
-				end = mirAppend(builder, MIR_OP_ADD, range_type, 2)->result;
-				MirInstruction& add = builder.block->instructions.back();
-				add.operands[0] = begin; add.operands[1] = one->result;
-			}
-			else if (slice.end) end = mirBuildExpression(builder, slice.end);
+				end = mirAppend<MirBinaryInstruction>(builder, range_type, MIR_OP_ADD)->result;
+				auto& add = static_cast<MirBinaryInstruction&>(*builder.block->instructions.back());
+				add.lhs = begin;
+				add.rhs = one->result;
+			} else if (slice.end)
+				end = mirBuildExpression(builder, slice.end);
 			else {
 				if (slice.base->resolved_type->kind == ResolvedType::SLICE) {
-					MirInstruction* limit = mirAppend(builder, MIR_OP_SLICE_LENGTH, range_type, 1);
-					limit->operands[0] = base_slice;
+					auto* limit = mirAppend<MirUnaryInstruction>(builder, range_type, MIR_OP_SLICE_LENGTH);
+					limit->operand = base_slice;
 					end = limit->result;
-				}
-				else {
-					MirInstruction* limit = mirAppend(builder, MIR_OP_CONST, range_type, 0);
+				} else {
+					auto* limit = mirAppend<MirConstInstruction>(builder, range_type);
 					limit->integer = length;
 					end = limit->result;
 				}
 			}
 			if (!slice.begin && !slice.end && !array_element_view) return base_slice;
-			MirInstruction* sub = mirAppend(builder, MIR_OP_MAKE_SLICE, expression->resolved_type, 3);
-			sub->operands[0] = base_slice;
-			sub->operands[1] = begin;
-			sub->operands[2] = end;
-			sub->immediate = 1;
-			sub->local = element_type ? typeByteSize(*element_type) : 0;
+			auto* sub = mirAppend<MirSliceInstruction>(builder, expression->resolved_type);
+			sub->base = base_slice;
+			sub->begin = begin;
+			sub->end = end;
+			sub->mode = MIR_SLICE_PARTIAL;
+			sub->element_size = element_type ? typeByteSize(*element_type) : 0;
 			return sub->result;
 		}
 		case Expression::MEMBER: {
 			MemberExpression& member = *static_cast<MemberExpression*>(expression);
 			if (equalStrings(member.name, makeStringView("length")) && member.expression && member.expression->resolved_type && member.expression->resolved_type->kind == ResolvedType::ARRAY) {
 				ArrayResolvedType* array = static_cast<ArrayResolvedType*>(member.expression->resolved_type);
-				MirInstruction* length = mirAppend(builder, MIR_OP_CONST, expression->resolved_type, 0);
+				auto* length = mirAppend<MirConstInstruction>(builder, expression->resolved_type);
 				length->integer = array->size;
 				return length->result;
 			}
+
 			if (equalStrings(member.name, makeStringView("length")) && member.expression && member.expression->resolved_type && member.expression->resolved_type->kind == ResolvedType::SLICE) {
 				MirValueId slice = mirBuildExpression(builder, member.expression);
-				MirInstruction* length = mirAppend(builder, MIR_OP_SLICE_LENGTH, expression->resolved_type, 1);
-				length->operands[0] = slice;
+				auto* length = mirAppend<MirUnaryInstruction>(builder, expression->resolved_type, MIR_OP_SLICE_LENGTH);
+				length->operand = slice;
 				return length->result;
 			}
+
 			MemberExpression* field = &member;
 			u32 field_offset = 0;
 			if (field->expression && field->expression->kind == Expression::BRACKET && field->expression->resolved_type && field->expression->resolved_type->kind == ResolvedType::STRUCT) {
@@ -578,75 +572,72 @@ static MirValueId mirBuildExpression(MirBuilder& builder, Expression* expression
 				if (bracket.base && bracket.base->resolved_type && bracket.base->resolved_type->kind == ResolvedType::SLICE && bracket.args.size() == 1 && mirFindFieldOffset(*field, field_offset)) {
 					MirValueId slice = mirBuildExpression(builder, bracket.base);
 					MirValueId index = mirBuildExpression(builder, bracket.args[0]);
-					MirInstruction* load = mirAppend(builder, MIR_OP_LOAD, expression->resolved_type, 2);
-					load->operands[0] = slice; load->operands[1] = index; load->immediate = 4;
-					load->local = typeByteSize(*field->expression->resolved_type); load->offset = field_offset; load->function = typeByteSize(*expression->resolved_type);
+					auto* load = mirAppend<MirLoadInstruction>(builder, expression->resolved_type);
+					load->address = slice;
+					load->index = index;
+					load->access = MIR_ACCESS_SLICE_FIELD;
+					load->element_size = typeByteSize(*field->expression->resolved_type);
+					load->field_offset = field_offset;
+					load->extent = typeByteSize(*expression->resolved_type);
 					return load->result;
 				}
 			}
+			
 			MirValueId base = mirBuildAddress(builder, field->expression);
 			if (base == MIR_INVALID_ID || !mirFindFieldOffset(*field, field_offset)) return MIR_INVALID_ID;
 			MirInstruction* index = mirAppendI32Zero(builder, mirIndexType(expression->resolved_type));
-			MirInstruction* load = mirAppend(builder, MIR_OP_LOAD, expression->resolved_type, 2);
-			load->operands[0] = base;
-			load->operands[1] = index->result;
-			load->immediate = 1;
-			load->local = typeByteSize(*expression->resolved_type);
-			load->offset = field_offset;
-			load->function = 1;
+			auto* load = mirAppend<MirLoadInstruction>(builder, expression->resolved_type);
+			load->address = base;
+			load->index = index->result;
+			load->access = MIR_ACCESS_INDEXED;
+			load->element_size = typeByteSize(*expression->resolved_type);
+			load->field_offset = field_offset;
+			load->extent = 1;
 			return load->result;
 		}
 		case Expression::CAST: {
 			CastExpression& cast = *static_cast<CastExpression*>(expression);
 			MirValueId value = mirBuildExpression(builder, cast.expression);
-			MirInstruction* instruction = mirAppend(builder, MIR_OP_CAST, expression->resolved_type, 1);
+			auto* instruction = mirAppend<MirCastInstruction>(builder, expression->resolved_type);
 			instruction->operand_type = cast.expression ? cast.expression->resolved_type : nullptr;
-			instruction->operands[0] = value;
+			instruction->operand = value;
 			return instruction->result;
 		}
 		case Expression::UNARY: {
 			UnaryExpression& unary = *static_cast<UnaryExpression*>(expression);
 			MirValueId value = mirBuildExpression(builder, unary.expression);
 			MirOpcode opcode = unary.op == Token::NOT ? MIR_OP_NOT : MIR_OP_NEG;
-			MirInstruction* instruction = mirAppend(builder, opcode, expression->resolved_type, 1);
-			instruction->operands[0] = value;
+			auto* instruction = mirAppend<MirUnaryInstruction>(builder, expression->resolved_type, opcode);
+			instruction->operand = value;
 			return instruction->result;
 		}
 		case Expression::BINARY: {
 			BinaryExpression& binary = *static_cast<BinaryExpression*>(expression);
 			if (binary.op == Token::AND || binary.op == Token::OR) return mirBuildLogical(builder, binary);
-			if ((binary.op == Token::EQUAL_EQUAL || binary.op == Token::BANG_EQUAL) && binary.lhs && binary.lhs->kind == Expression::IDENTIFIER && binary.rhs && binary.rhs->kind == Expression::NULL_LITERAL) {
+			if ((binary.op == Token::EQUAL_EQUAL || binary.op == Token::BANG_EQUAL) && binary.lhs && binary.lhs->kind == Expression::IDENTIFIER && binary.rhs &&
+				binary.rhs->kind == Expression::NULL_LITERAL) {
 				IdentifierExpression& identifier = *static_cast<IdentifierExpression*>(binary.lhs);
 				if (!identifier.slot || identifier.slot->storage == StorageSlot::GLOBAL) return MIR_INVALID_ID;
 				MirLocalId local = mirFindSlot(builder, identifier.slot);
 				ResolvedType* nullable_type = local != MIR_INVALID_ID ? builder.function.locals[local].type : identifier.slot->type;
-				MirInstruction* address = mirAppend(builder, MIR_OP_LOCAL_ADDRESS, nullable_type, 0);
+				auto* address = mirAppend<MirAddressInstruction>(builder, nullable_type, MIR_OP_LOCAL_ADDRESS);
 				address->local = local;
 				NullableResolvedType* nullable = static_cast<NullableResolvedType*>(nullable_type);
 				MirInstruction* index = mirAppendI32Zero(builder, nullable->inner);
-				MirInstruction* value = mirAppend(builder, MIR_OP_NULLABLE_HAS_VALUE, binary.resolved_type, 2);
-				value->operands[0] = address->result;
-				value->operands[1] = index->result;
+				auto* value = mirAppend<MirNullableInstruction>(builder, binary.resolved_type);
+				value->address = address->result;
+				value->index = index->result;
 				if (binary.op == Token::BANG_EQUAL) return value->result;
-				MirInstruction* result = mirAppend(builder, MIR_OP_NOT, binary.resolved_type, 1);
-				result->operands[0] = value->result;
+				auto* result = mirAppend<MirUnaryInstruction>(builder, binary.resolved_type, MIR_OP_NOT);
+				result->operand = value->result;
 				return result->result;
 			}
 			MirValueId lhs = mirBuildExpression(builder, binary.lhs);
 			MirValueId rhs = mirBuildExpression(builder, binary.rhs);
-			MirInstruction* instruction = mirAppend(builder, mirBinaryOpcode(binary.op), expression->resolved_type, 2);
+			auto* instruction = mirAppend<MirBinaryInstruction>(builder, expression->resolved_type, mirBinaryOpcode(binary.op));
 			instruction->operand_type = binary.lhs ? binary.lhs->resolved_type : nullptr;
-			switch (binary.op) {
-				case Token::EQUAL_EQUAL: instruction->immediate = MIR_COMPARE_EQ; break;
-				case Token::BANG_EQUAL: instruction->immediate = MIR_COMPARE_NE; break;
-				case Token::LT: instruction->immediate = MIR_COMPARE_LT; break;
-				case Token::LT_EQUAL: instruction->immediate = MIR_COMPARE_LE; break;
-				case Token::GT: instruction->immediate = MIR_COMPARE_GT; break;
-				case Token::GT_EQUAL: instruction->immediate = MIR_COMPARE_GE; break;
-				default: instruction->immediate = MIR_COMPARE_EQ; break;
-			}
-			instruction->operands[0] = lhs;
-			instruction->operands[1] = rhs;
+			instruction->lhs = lhs;
+			instruction->rhs = rhs;
 			return instruction->result;
 		}
 		case Expression::CALL: {
@@ -656,7 +647,7 @@ static MirValueId mirBuildExpression(MirBuilder& builder, Expression* expression
 				IdentifierExpression* identifier = static_cast<IdentifierExpression*>(call.callee);
 				direct = identifier->resolved_fn;
 				if (!direct && identifier->symbol && identifier->symbol->expression && identifier->symbol->expression->kind == Expression::FUNCTION)
-					 direct = static_cast<FunctionExpression*>(identifier->symbol->expression);
+					direct = static_cast<FunctionExpression*>(identifier->symbol->expression);
 			}
 			if (!direct && call.callee && call.callee->kind == Expression::MEMBER) {
 				MemberExpression* member = static_cast<MemberExpression*>(call.callee);
@@ -666,8 +657,8 @@ static MirValueId mirBuildExpression(MirBuilder& builder, Expression* expression
 			}
 			MirValueId callee = MIR_INVALID_ID;
 			if (!direct) callee = mirBuildExpression(builder, call.callee);
-			FunctionResolvedType* direct_type = direct && direct->resolved_type && direct->resolved_type->kind == ResolvedType::FUNCTION
-				? static_cast<FunctionResolvedType*>(direct->resolved_type) : nullptr;
+			FunctionResolvedType* direct_type =
+				direct && direct->resolved_type && direct->resolved_type->kind == ResolvedType::FUNCTION ? static_cast<FunctionResolvedType*>(direct->resolved_type) : nullptr;
 			const u32 argument_count = (u32)call.args.size();
 			MirValueId* arguments = nullptr;
 			u32* argument_sizes = nullptr;
@@ -680,16 +671,16 @@ static MirValueId mirBuildExpression(MirBuilder& builder, Expression* expression
 					argument_sizes[i] = parameter_type ? typeByteSize(*parameter_type) : (call.args[(i32)i]->resolved_type ? typeByteSize(*call.args[(i32)i]->resolved_type) : 0);
 				}
 			}
-			MirInstruction* instruction = mirAppend(builder, MIR_OP_CALL, expression->resolved_type, 0);
+			auto* instruction = mirAppend<MirCallInstruction>(builder, expression->resolved_type);
 			instruction->arguments.values = arguments;
 			instruction->arguments.sizes = argument_sizes;
 			instruction->arguments.count = argument_count;
-			for (u32 i = 0; i < argument_count; ++i) instruction->immediate += argument_sizes[i];
-			if (direct) instruction->function = direct->bytecode_index;
+			for (u32 i = 0; i < argument_count; ++i) instruction->args_size += argument_sizes[i];
+			if (direct)
+				instruction->function = direct->bytecode_index;
 			else {
 				instruction->call_target = MIR_CALL_INDIRECT;
-				instruction->operand_count = 1;
-				instruction->operands[0] = callee;
+				instruction->callee = callee;
 			}
 			if (call.callee && call.callee->kind == Expression::IDENTIFIER)
 				instruction->call_name = static_cast<IdentifierExpression*>(call.callee)->name;
@@ -711,16 +702,13 @@ static void mirBuildStatement(MirBuilder& builder, Statement* statement) {
 			for (Statement* child : block.statements) mirBuildStatement(builder, child);
 			const u32 mark = builder.defer_marks.back();
 			if (!builder.block->has_terminator) {
-				for (i32 i = (i32)builder.deferreds.size() - 1; i >= (i32)mark; --i)
-					mirBuildStatement(builder, builder.deferreds[(u32)i]);
+				for (i32 i = (i32)builder.deferreds.size() - 1; i >= (i32)mark; --i) mirBuildStatement(builder, builder.deferreds[(u32)i]);
 			}
 			while (builder.deferreds.size() > (i32)mark) builder.deferreds.pop_back();
 			builder.defer_marks.pop_back();
 			break;
 		}
-		case Statement::EXPRESSION:
-			mirBuildExpression(builder, static_cast<ExpressionStatement*>(statement)->expression);
-			break;
+		case Statement::EXPRESSION: mirBuildExpression(builder, static_cast<ExpressionStatement*>(statement)->expression); break;
 		case Statement::RETURN: {
 			ReturnStatement& result = *static_cast<ReturnStatement*>(statement);
 			const MirValueId value = result.expression ? mirBuildExpression(builder, result.expression) : MIR_INVALID_ID;
@@ -737,25 +725,40 @@ static void mirBuildStatement(MirBuilder& builder, Statement* statement) {
 				u32 field_offset = 0;
 				if (member.expression && member.expression->kind == Expression::BRACKET && member.expression->resolved_type && member.expression->resolved_type->kind == ResolvedType::STRUCT) {
 					BracketExpression& bracket = *static_cast<BracketExpression*>(member.expression);
-					if (bracket.base && bracket.base->resolved_type && bracket.base->resolved_type->kind == ResolvedType::SLICE && bracket.args.size() == 1 && mirFindFieldOffset(member, field_offset)) {
+					if (bracket.base && bracket.base->resolved_type && bracket.base->resolved_type->kind == ResolvedType::SLICE && bracket.args.size() == 1 &&
+						mirFindFieldOffset(member, field_offset)) {
 						MirValueId slice = mirBuildExpression(builder, bracket.base);
 						MirValueId index_value = mirBuildExpression(builder, bracket.args[0]);
 						MirValueId old_value = MIR_INVALID_ID;
 						if (assignment.op != Token::EQUAL) {
-							MirInstruction* load = mirAppend(builder, MIR_OP_LOAD, assignment.lhs->resolved_type, 2);
-							load->operands[0] = slice; load->operands[1] = index_value; load->immediate = 4;
-							load->local = typeByteSize(*member.expression->resolved_type); load->offset = field_offset; load->function = typeByteSize(*assignment.lhs->resolved_type);
+							auto* load = mirAppend<MirLoadInstruction>(builder, assignment.lhs->resolved_type);
+							load->address = slice;
+							load->index = index_value;
+							load->access = MIR_ACCESS_SLICE_FIELD;
+							load->element_size = typeByteSize(*member.expression->resolved_type);
+							load->field_offset = field_offset;
+							load->extent = typeByteSize(*assignment.lhs->resolved_type);
 							old_value = load->result;
 						}
 						MirValueId value = mirBuildExpression(builder, assignment.rhs);
 						if (assignment.op != Token::EQUAL) {
-							Token::Type op = assignment.op == Token::PLUS_EQUAL ? Token::PLUS : assignment.op == Token::MINUS_EQUAL ? Token::MINUS : assignment.op == Token::STAR_EQUAL ? Token::STAR : Token::SLASH;
-							MirInstruction* operation = mirAppend(builder, mirBinaryOpcode(op), assignment.lhs->resolved_type, 2);
-							operation->operands[0] = old_value; operation->operands[1] = value; value = operation->result;
+							Token::Type op = assignment.op == Token::PLUS_EQUAL	   ? Token::PLUS
+											 : assignment.op == Token::MINUS_EQUAL ? Token::MINUS
+											 : assignment.op == Token::STAR_EQUAL  ? Token::STAR
+																				   : Token::SLASH;
+							auto* operation = mirAppend<MirBinaryInstruction>(builder, assignment.lhs->resolved_type, mirBinaryOpcode(op));
+							operation->lhs = old_value;
+							operation->rhs = value;
+							value = operation->result;
 						}
-						MirInstruction* store = mirAppend(builder, MIR_OP_STORE, assignment.lhs->resolved_type, 3);
-						store->operands[0] = slice; store->operands[1] = index_value; store->operands[2] = value; store->immediate = 4;
-						store->local = typeByteSize(*member.expression->resolved_type); store->offset = field_offset; store->function = typeByteSize(*assignment.lhs->resolved_type);
+						auto* store = mirAppend<MirStoreInstruction>(builder, assignment.lhs->resolved_type);
+						store->address = slice;
+						store->index = index_value;
+						store->value = value;
+						store->access = MIR_ACCESS_SLICE_FIELD;
+						store->element_size = typeByteSize(*member.expression->resolved_type);
+						store->field_offset = field_offset;
+						store->extent = typeByteSize(*assignment.lhs->resolved_type);
 						break;
 					}
 				}
@@ -764,33 +767,34 @@ static void mirBuildStatement(MirBuilder& builder, Statement* statement) {
 				MirInstruction* index = mirAppendI32Zero(builder, mirIndexType(assignment.lhs->resolved_type));
 				MirValueId old_value = MIR_INVALID_ID;
 				if (assignment.op != Token::EQUAL) {
-					MirInstruction* load = mirAppend(builder, MIR_OP_LOAD, assignment.lhs->resolved_type, 2);
-					load->operands[0] = base;
-					load->operands[1] = index->result;
-					load->immediate = 1;
-					load->local = typeByteSize(*assignment.lhs->resolved_type);
-					load->offset = field_offset;
-					load->function = 1;
+					auto* load = mirAppend<MirLoadInstruction>(builder, assignment.lhs->resolved_type);
+					load->address = base;
+					load->index = index->result;
+					load->access = MIR_ACCESS_INDEXED;
+					load->element_size = typeByteSize(*assignment.lhs->resolved_type);
+					load->field_offset = field_offset;
+					load->extent = 1;
 					old_value = load->result;
 				}
 				MirValueId value = mirBuildExpressionAsType(builder, assignment.rhs, assignment.lhs->resolved_type);
 				if (assignment.op != Token::EQUAL) {
-					Token::Type op = assignment.op == Token::PLUS_EQUAL ? Token::PLUS
-						: assignment.op == Token::MINUS_EQUAL ? Token::MINUS
-						: assignment.op == Token::STAR_EQUAL ? Token::STAR : Token::SLASH;
-					MirInstruction* operation = mirAppend(builder, mirBinaryOpcode(op), assignment.lhs->resolved_type, 2);
-					operation->operands[0] = old_value;
-					operation->operands[1] = value;
+					Token::Type op = assignment.op == Token::PLUS_EQUAL	   ? Token::PLUS
+									 : assignment.op == Token::MINUS_EQUAL ? Token::MINUS
+									 : assignment.op == Token::STAR_EQUAL  ? Token::STAR
+																		   : Token::SLASH;
+					auto* operation = mirAppend<MirBinaryInstruction>(builder, assignment.lhs->resolved_type, mirBinaryOpcode(op));
+					operation->lhs = old_value;
+					operation->rhs = value;
 					value = operation->result;
 				}
-				MirInstruction* store = mirAppend(builder, MIR_OP_STORE, assignment.lhs->resolved_type, 3);
-				store->operands[0] = base;
-				store->operands[1] = index->result;
-				store->operands[2] = value;
-				store->immediate = 1;
-				store->local = typeByteSize(*assignment.lhs->resolved_type);
-				store->offset = field_offset;
-				store->function = 1;
+				auto* store = mirAppend<MirStoreInstruction>(builder, assignment.lhs->resolved_type);
+				store->address = base;
+				store->index = index->result;
+				store->value = value;
+				store->access = MIR_ACCESS_INDEXED;
+				store->element_size = typeByteSize(*assignment.lhs->resolved_type);
+				store->field_offset = field_offset;
+				store->extent = 1;
 				break;
 			}
 			if (assignment.lhs && assignment.lhs->kind == Expression::BRACKET) {
@@ -806,62 +810,81 @@ static void mirBuildStatement(MirBuilder& builder, Statement* statement) {
 					index = mirBuildExpression(builder, bracket.args[0]);
 					MirValueId value = mirBuildExpressionAsType(builder, assignment.rhs, assignment.lhs->resolved_type);
 					if (assignment.op != Token::EQUAL) {
-						MirInstruction* load = mirAppend(builder, MIR_OP_LOAD, assignment.lhs->resolved_type, 2);
-						load->operands[0] = base; load->operands[1] = index; load->immediate = 3;
-						load->local = slice->element_type ? typeByteSize(*slice->element_type) : 0;
-						MirInstruction* operation = mirAppend(builder, mirBinaryOpcode(assignment.op == Token::PLUS_EQUAL ? Token::PLUS : assignment.op == Token::MINUS_EQUAL ? Token::MINUS : assignment.op == Token::STAR_EQUAL ? Token::STAR : Token::SLASH), assignment.lhs->resolved_type, 2);
-						operation->operands[0] = load->result; operation->operands[1] = value; value = operation->result;
+						auto* load = mirAppend<MirLoadInstruction>(builder, assignment.lhs->resolved_type);
+						load->address = base;
+						load->index = index;
+						load->access = MIR_ACCESS_SLICE_ELEMENT;
+						load->element_size = slice->element_type ? typeByteSize(*slice->element_type) : 0;
+						auto* operation = mirAppend<MirBinaryInstruction>(builder,
+							assignment.lhs->resolved_type,
+							mirBinaryOpcode(assignment.op == Token::PLUS_EQUAL	  ? Token::PLUS
+											: assignment.op == Token::MINUS_EQUAL ? Token::MINUS
+											: assignment.op == Token::STAR_EQUAL  ? Token::STAR
+																				  : Token::SLASH)
+							);
+						operation->lhs = load->result;
+						operation->rhs = value;
+						value = operation->result;
 					}
-					MirInstruction* store = mirAppend(builder, MIR_OP_STORE, assignment.lhs->resolved_type, 3);
-					store->operands[0] = base;
-					store->operands[1] = index;
-					store->operands[2] = value;
-					store->immediate = 3;
-					store->local = slice->element_type ? typeByteSize(*slice->element_type) : 0;
+					auto* store = mirAppend<MirStoreInstruction>(builder, assignment.lhs->resolved_type);
+					store->address = base;
+					store->index = index;
+					store->value = value;
+					store->access = MIR_ACCESS_SLICE_ELEMENT;
+					store->element_size = slice->element_type ? typeByteSize(*slice->element_type) : 0;
 					break;
 				}
 				MirValueId value = mirBuildExpression(builder, assignment.rhs);
 				if (assignment.op != Token::EQUAL) {
-					MirInstruction* load = mirAppend(builder, MIR_OP_LOAD, assignment.lhs->resolved_type, 2);
-					load->operands[0] = base;
-					load->operands[1] = index;
-					load->immediate = 1;
-					load->local = element_type ? typeByteSize(*element_type) : 0;
-					load->function = extent;
-					MirInstruction* operation = mirAppend(builder, mirBinaryOpcode(assignment.op == Token::PLUS_EQUAL ? Token::PLUS
-						: assignment.op == Token::MINUS_EQUAL ? Token::MINUS : assignment.op == Token::STAR_EQUAL ? Token::STAR : Token::SLASH), assignment.lhs->resolved_type, 2);
-					operation->operands[0] = load->result;
-					operation->operands[1] = value;
+					auto* load = mirAppend<MirLoadInstruction>(builder, assignment.lhs->resolved_type);
+					load->address = base;
+					load->index = index;
+					load->access = MIR_ACCESS_INDEXED;
+					load->element_size = element_type ? typeByteSize(*element_type) : 0;
+					load->extent = extent;
+					auto* operation = mirAppend<MirBinaryInstruction>(builder,
+						assignment.lhs->resolved_type,
+						mirBinaryOpcode(assignment.op == Token::PLUS_EQUAL	  ? Token::PLUS
+										: assignment.op == Token::MINUS_EQUAL ? Token::MINUS
+										: assignment.op == Token::STAR_EQUAL  ? Token::STAR
+																			  : Token::SLASH)
+						);
+					operation->lhs = load->result;
+					operation->rhs = value;
 					value = operation->result;
 				}
-				MirInstruction* store = mirAppend(builder, MIR_OP_STORE, assignment.lhs->resolved_type, 3);
-				store->operands[0] = base;
-				store->operands[1] = index;
-				store->operands[2] = value;
-				store->immediate = 1;
-				store->local = element_type ? typeByteSize(*element_type) : 0;
-				store->function = extent;
+				auto* store = mirAppend<MirStoreInstruction>(builder, assignment.lhs->resolved_type);
+				store->address = base;
+				store->index = index;
+				store->value = value;
+				store->access = MIR_ACCESS_INDEXED;
+				store->element_size = element_type ? typeByteSize(*element_type) : 0;
+				store->extent = extent;
 				break;
 			}
 			MirValueId address = mirBuildAddress(builder, assignment.lhs);
 			MirValueId old_value = MIR_INVALID_ID;
 			if (assignment.op != Token::EQUAL) {
-				MirInstruction* load = mirAppend(builder, MIR_OP_LOAD, assignment.lhs ? assignment.lhs->resolved_type : nullptr, 1);
-				load->operands[0] = address;
+				auto* load = mirAppend<MirLoadInstruction>(builder, assignment.lhs ? assignment.lhs->resolved_type : nullptr);
+				load->address = address;
 				old_value = load->result;
 			}
 			MirValueId value = mirBuildExpressionAsType(builder, assignment.rhs, assignment.lhs ? assignment.lhs->resolved_type : nullptr);
 			if (assignment.op != Token::EQUAL) {
-				MirInstruction* operation = mirAppend(builder, mirBinaryOpcode(assignment.op == Token::PLUS_EQUAL ? Token::PLUS
-					: assignment.op == Token::MINUS_EQUAL ? Token::MINUS
-					: assignment.op == Token::STAR_EQUAL ? Token::STAR : Token::SLASH), assignment.lhs->resolved_type, 2);
-				operation->operands[0] = old_value;
-				operation->operands[1] = value;
+				auto* operation = mirAppend<MirBinaryInstruction>(builder,
+					assignment.lhs->resolved_type,
+					mirBinaryOpcode(assignment.op == Token::PLUS_EQUAL	  ? Token::PLUS
+									: assignment.op == Token::MINUS_EQUAL ? Token::MINUS
+									: assignment.op == Token::STAR_EQUAL  ? Token::STAR
+																		  : Token::SLASH)
+					);
+				operation->lhs = old_value;
+				operation->rhs = value;
 				value = operation->result;
 			}
-			MirInstruction* store = mirAppend(builder, MIR_OP_STORE, assignment.lhs ? assignment.lhs->resolved_type : nullptr, 2);
-			store->operands[0] = address;
-			store->operands[1] = value;
+			auto* store = mirAppend<MirStoreInstruction>(builder, assignment.lhs ? assignment.lhs->resolved_type : nullptr);
+			store->address = address;
+			store->value = value;
 			break;
 		}
 		case Statement::IF: {
@@ -932,7 +955,10 @@ static void mirBuildStatement(MirBuilder& builder, Statement* statement) {
 				BreakStatement& break_statement = *static_cast<BreakStatement*>(statement);
 				MirLoopBinding* loop = nullptr;
 				for (i32 i = (i32)builder.loops.size() - 1; i >= 0; --i) {
-					if (break_statement.label.begin == break_statement.label.end || equalStrings(builder.loops[(u32)i].label, break_statement.label)) { loop = &builder.loops[(u32)i]; break; }
+					if (break_statement.label.begin == break_statement.label.end || equalStrings(builder.loops[(u32)i].label, break_statement.label)) {
+						loop = &builder.loops[(u32)i];
+						break;
+					}
 				}
 				if (!loop) return;
 				builder.block->terminator.kind = MIR_TERM_JUMP;
@@ -947,7 +973,10 @@ static void mirBuildStatement(MirBuilder& builder, Statement* statement) {
 				ContinueStatement& continue_statement = *static_cast<ContinueStatement*>(statement);
 				MirLoopBinding* loop = nullptr;
 				for (i32 i = (i32)builder.loops.size() - 1; i >= 0; --i) {
-					if (continue_statement.label.begin == continue_statement.label.end || equalStrings(builder.loops[(u32)i].label, continue_statement.label)) { loop = &builder.loops[(u32)i]; break; }
+					if (continue_statement.label.begin == continue_statement.label.end || equalStrings(builder.loops[(u32)i].label, continue_statement.label)) {
+						loop = &builder.loops[(u32)i];
+						break;
+					}
 				}
 				if (!loop) return;
 				builder.block->terminator.kind = MIR_TERM_JUMP;
@@ -974,16 +1003,16 @@ static void mirBuildStatement(MirBuilder& builder, Statement* statement) {
 			MirLocalId end_local = mirFunctionAddLocal(builder.function, type, {}, false, true);
 			MirValueId begin = mirBuildExpression(builder, loop.begin);
 			MirValueId end = mirBuildExpression(builder, loop.end);
-			MirInstruction* index_address = mirAppend(builder, MIR_OP_LOCAL_ADDRESS, type, 0);
+			auto* index_address = mirAppend<MirAddressInstruction>(builder, type, MIR_OP_LOCAL_ADDRESS);
 			index_address->local = index_local;
-			MirInstruction* index_store = mirAppend(builder, MIR_OP_STORE, type, 2);
-			index_store->operands[0] = index_address->result;
-			index_store->operands[1] = begin;
-			MirInstruction* end_address = mirAppend(builder, MIR_OP_LOCAL_ADDRESS, type, 0);
+			auto* index_store = mirAppend<MirStoreInstruction>(builder, type);
+			index_store->address = index_address->result;
+			index_store->value = begin;
+			auto* end_address = mirAppend<MirAddressInstruction>(builder, type, MIR_OP_LOCAL_ADDRESS);
 			end_address->local = end_local;
-			MirInstruction* end_store = mirAppend(builder, MIR_OP_STORE, type, 2);
-			end_store->operands[0] = end_address->result;
-			end_store->operands[1] = end;
+			auto* end_store = mirAppend<MirStoreInstruction>(builder, type);
+			end_store->address = end_address->result;
+			end_store->value = end;
 			MirBlock* header = mirFunctionCreateBlock(builder.function);
 			MirBlock* body = mirFunctionCreateBlock(builder.function);
 			MirBlock* increment = mirFunctionCreateBlock(builder.function);
@@ -992,19 +1021,18 @@ static void mirBuildStatement(MirBuilder& builder, Statement* statement) {
 			builder.block->terminator.targets[0] = header->id;
 			builder.block->has_terminator = true;
 			builder.block = header;
-			MirInstruction* index_load_address = mirAppend(builder, MIR_OP_LOCAL_ADDRESS, type, 0);
+			auto* index_load_address = mirAppend<MirAddressInstruction>(builder, type, MIR_OP_LOCAL_ADDRESS);
 			index_load_address->local = index_local;
-			MirInstruction* index_load = mirAppend(builder, MIR_OP_LOAD, type, 1);
-			index_load->operands[0] = index_load_address->result;
-			MirInstruction* end_load_address = mirAppend(builder, MIR_OP_LOCAL_ADDRESS, type, 0);
+			auto* index_load = mirAppend<MirLoadInstruction>(builder, type);
+			index_load->address = index_load_address->result;
+			auto* end_load_address = mirAppend<MirAddressInstruction>(builder, type, MIR_OP_LOCAL_ADDRESS);
 			end_load_address->local = end_local;
-			MirInstruction* end_load = mirAppend(builder, MIR_OP_LOAD, type, 1);
-			end_load->operands[0] = end_load_address->result;
-			MirInstruction* condition = mirAppend(builder, MIR_OP_COMPARE, builder.function.return_type, 2);
+			auto* end_load = mirAppend<MirLoadInstruction>(builder, type);
+			end_load->address = end_load_address->result;
+			auto* condition = mirAppend<MirBinaryInstruction>(builder, builder.function.return_type, MIR_OP_LT);
 			condition->operand_type = type;
-			condition->immediate = MIR_COMPARE_LT;
-			condition->operands[0] = index_load->result;
-			condition->operands[1] = end_load->result;
+			condition->lhs = index_load->result;
+			condition->rhs = end_load->result;
 			builder.block->terminator.kind = MIR_TERM_BRANCH;
 			builder.block->terminator.value = condition->result;
 			builder.block->terminator.targets[0] = body->id;
@@ -1024,25 +1052,23 @@ static void mirBuildStatement(MirBuilder& builder, Statement* statement) {
 				builder.block->has_terminator = true;
 			}
 			builder.block = increment;
-			MirInstruction* one = mirAppend(builder, MIR_OP_CONST, type, 0);
+			auto* one = mirAppend<MirConstInstruction>(builder, type);
 			one->integer = 1;
-			MirInstruction* next = mirAppend(builder, MIR_OP_ADD, type, 2);
-			next->operands[0] = index_load->result;
-			next->operands[1] = one->result;
-			MirInstruction* next_address = mirAppend(builder, MIR_OP_LOCAL_ADDRESS, type, 0);
+			auto* next = mirAppend<MirBinaryInstruction>(builder, type, MIR_OP_ADD);
+			next->lhs = index_load->result;
+			next->rhs = one->result;
+			auto* next_address = mirAppend<MirAddressInstruction>(builder, type, MIR_OP_LOCAL_ADDRESS);
 			next_address->local = index_local;
-			MirInstruction* next_store = mirAppend(builder, MIR_OP_STORE, type, 2);
-			next_store->operands[0] = next_address->result;
-			next_store->operands[1] = next->result;
+			auto* next_store = mirAppend<MirStoreInstruction>(builder, type);
+			next_store->address = next_address->result;
+			next_store->value = next->result;
 			builder.block->terminator.kind = MIR_TERM_JUMP;
 			builder.block->terminator.targets[0] = header->id;
 			builder.block->has_terminator = true;
 			builder.block = exit;
 			break;
 		}
-		case Statement::DEFER:
-			builder.deferreds.push(static_cast<DeferStatement*>(statement)->statement);
-			break;
+		case Statement::DEFER: builder.deferreds.push(static_cast<DeferStatement*>(statement)->statement); break;
 		case Statement::VAR_DECL: {
 			VarDeclStatement& declaration = *static_cast<VarDeclStatement*>(statement);
 			ResolvedType* local_type = declaration.slot.type ? declaration.slot.type : declaration.resolved_type;
@@ -1050,54 +1076,52 @@ static void mirBuildStatement(MirBuilder& builder, Statement* statement) {
 			MirSlotBinding& binding = builder.slots.emplace_back();
 			binding.slot = &declaration.slot;
 			binding.local = local;
-			MirInstruction* address = mirAppend(builder, MIR_OP_LOCAL_ADDRESS, local_type, 0);
+			auto* address = mirAppend<MirAddressInstruction>(builder, local_type, MIR_OP_LOCAL_ADDRESS);
 			address->local = local;
 			if (declaration.expression && local_type && local_type->kind == ResolvedType::NULLABLE) {
 				NullableResolvedType* nullable = static_cast<NullableResolvedType*>(local_type);
-				MirInstruction* tag = mirAppend(builder, MIR_OP_CONST, nullable->inner, 0);
+				auto* tag = mirAppend<MirConstInstruction>(builder, nullable->inner);
 				tag->integer = declaration.expression->kind == Expression::NULL_LITERAL ? 0 : 1;
 				MirInstruction* tag_index = mirAppendI32Zero(builder, nullable->inner);
-				MirInstruction* tag_store = mirAppend(builder, MIR_OP_STORE, nullable->inner, 3);
-				tag_store->operands[0] = address->result;
-				tag_store->operands[1] = tag_index->result;
-				tag_store->operands[2] = tag->result;
-				tag_store->immediate = 2;
-				tag_store->offset = 0;
-				tag_store->local = 1;
-				tag_store->function = 1;
+				auto* tag_store = mirAppend<MirStoreInstruction>(builder, nullable->inner);
+				tag_store->address = address->result;
+				tag_store->index = tag_index->result;
+				tag_store->value = tag->result;
+				tag_store->access = MIR_ACCESS_NULLABLE_TAG;
+				tag_store->element_size = 1;
+				tag_store->field_offset = 0;
+				tag_store->extent = 1;
 				if (declaration.expression->kind != Expression::NULL_LITERAL) {
 					MirValueId value = mirBuildExpressionAsType(builder, declaration.expression, nullable->inner);
-					MirInstruction* payload = mirAppend(builder, MIR_OP_STORE, nullable->inner, 3);
-					payload->operands[0] = address->result;
-					payload->operands[1] = tag_index->result;
-					payload->operands[2] = value;
-					payload->immediate = 1;
-					payload->offset = 1;
-					payload->local = 1;
-					payload->function = 1;
+					auto* payload = mirAppend<MirStoreInstruction>(builder, nullable->inner);
+					payload->address = address->result;
+					payload->index = tag_index->result;
+					payload->value = value;
+					payload->access = MIR_ACCESS_INDEXED;
+					payload->element_size = 1;
+					payload->field_offset = 1;
+					payload->extent = 1;
 				}
-			}
-			else if (declaration.expression && declaration.expression->kind == Expression::ARRAY_LITERAL && local_type && local_type->kind == ResolvedType::ARRAY) {
+			} else if (declaration.expression && declaration.expression->kind == Expression::ARRAY_LITERAL && local_type && local_type->kind == ResolvedType::ARRAY) {
 				ArrayResolvedType* array = static_cast<ArrayResolvedType*>(local_type);
 				ArrayLiteralExpression& literal = *static_cast<ArrayLiteralExpression*>(declaration.expression);
 				for (u32 i = 0; i < (u32)literal.values.size(); ++i) {
-					MirInstruction* index = mirAppendI32Zero(builder, array->element_type);
+					auto* index = mirAppendI32Zero(builder, array->element_type);
 					index->integer = i;
 					MirValueId value = mirBuildExpressionAsType(builder, literal.values[(i32)i], array->element_type);
-					MirInstruction* store = mirAppend(builder, MIR_OP_STORE, array->element_type, 3);
-					store->operands[0] = address->result;
-					store->operands[1] = index->result;
-					store->operands[2] = value;
-					store->immediate = 1;
-					store->local = array->element_type ? typeByteSize(*array->element_type) : 0;
-					store->function = (u32)array->size;
+					auto* store = mirAppend<MirStoreInstruction>(builder, array->element_type);
+					store->address = address->result;
+					store->index = index->result;
+					store->value = value;
+					store->access = MIR_ACCESS_INDEXED;
+					store->element_size = array->element_type ? typeByteSize(*array->element_type) : 0;
+					store->extent = (u32)array->size;
 				}
-			}
-			else if (declaration.expression && declaration.expression->kind != Expression::UNDEFINED) {
+			} else if (declaration.expression && declaration.expression->kind != Expression::UNDEFINED) {
 				MirValueId value = mirBuildExpressionAsType(builder, declaration.expression, local_type);
-				MirInstruction* store = mirAppend(builder, MIR_OP_STORE, local_type, 2);
-				store->operands[0] = address->result;
-				store->operands[1] = value;
+				auto* store = mirAppend<MirStoreInstruction>(builder, local_type);
+				store->address = address->result;
+				store->value = value;
 			}
 			break;
 		}
@@ -1111,8 +1135,7 @@ MirFunction* mirBuildFunction(ls_arena& arena, FunctionExpression* source, ls_st
 	if (!function) return nullptr;
 	::new (NewPlaceholder{}, (void*)function) MirFunction(arena);
 	function->name = name;
-	FunctionResolvedType* function_type = source->resolved_type && source->resolved_type->kind == ResolvedType::FUNCTION
-		? static_cast<FunctionResolvedType*>(source->resolved_type) : nullptr;
+	FunctionResolvedType* function_type = source->resolved_type && source->resolved_type->kind == ResolvedType::FUNCTION ? static_cast<FunctionResolvedType*>(source->resolved_type) : nullptr;
 	function->return_type = function_type ? function_type->return_type : nullptr;
 	MirBuilder builder(arena, *function);
 	for (FunctionParam& parameter : source->params) {
@@ -1140,13 +1163,13 @@ MirFunction* mirBuildGlobalInit(ls_arena& arena, ls_module* module) {
 		for (Symbol& symbol : unit.symbols) {
 			if (!symbolHasGlobalStorage(symbol) || !symbol.expression || symbol.expression->kind == Expression::UNDEFINED) continue;
 			if (!symbol.resolved_type) return nullptr;
-			MirInstruction* address = mirAppend(builder, MIR_OP_GLOBAL_ADDRESS, symbol.resolved_type, 0);
-			address->immediate = symbol.slot.offset;
+			auto* address = mirAppend<MirAddressInstruction>(builder, symbol.resolved_type, MIR_OP_GLOBAL_ADDRESS);
+			address->global_offset = symbol.slot.offset;
 			MirValueId value = mirBuildExpression(builder, symbol.expression);
 			if (value == MIR_INVALID_ID) return nullptr;
-			MirInstruction* store = mirAppend(builder, MIR_OP_STORE, symbol.resolved_type, 2);
-			store->operands[0] = address->result;
-			store->operands[1] = value;
+			auto* store = mirAppend<MirStoreInstruction>(builder, symbol.resolved_type);
+			store->address = address->result;
+			store->value = value;
 		}
 	}
 	builder.block->terminator.kind = MIR_TERM_RETURN;
@@ -1186,28 +1209,28 @@ MirModule* mirBuildModule(ls_arena& arena, ls_module* module) {
 		}
 	}
 	for (u32 pass = 0; pass < 2; ++pass) {
-	for (Unit& unit : module->units) {
-		for (Symbol& symbol : unit.symbols) {
-			if (!symbol.expression || symbol.expression->kind != Expression::FUNCTION) continue;
-			FunctionExpression* function = static_cast<FunctionExpression*>(symbol.expression);
-			if (function->is_template) continue;
-			if ((pass == 0) != function->is_extern) continue;
-			if (function->is_extern) {
-				if (!function->resolved_type || function->resolved_type->kind != ResolvedType::FUNCTION) return nullptr;
+		for (Unit& unit : module->units) {
+			for (Symbol& symbol : unit.symbols) {
+				if (!symbol.expression || symbol.expression->kind != Expression::FUNCTION) continue;
+				FunctionExpression* function = static_cast<FunctionExpression*>(symbol.expression);
+				if (function->is_template) continue;
+				if ((pass == 0) != function->is_extern) continue;
+				if (function->is_extern) {
+					if (!function->resolved_type || function->resolved_type->kind != ResolvedType::FUNCTION) return nullptr;
+					MirModuleFunction& entry = result->functions.emplace_back();
+					entry.is_native = true;
+					entry.function = nullptr;
+					entry.native.name = symbol.name;
+					entry.native.type = static_cast<FunctionResolvedType*>(function->resolved_type);
+					continue;
+				}
+				MirFunction* mir = mirBuildFunction(arena, function, symbol.name);
+				if (!mir) return nullptr;
 				MirModuleFunction& entry = result->functions.emplace_back();
-				entry.is_native = true;
-				entry.function = nullptr;
-				entry.native.name = symbol.name;
-				entry.native.type = static_cast<FunctionResolvedType*>(function->resolved_type);
-				continue;
+				entry.is_native = false;
+				entry.function = mir;
 			}
-			MirFunction* mir = mirBuildFunction(arena, function, symbol.name);
-			if (!mir) return nullptr;
-			MirModuleFunction& entry = result->functions.emplace_back();
-			entry.is_native = false;
-			entry.function = mir;
 		}
-	}
 	}
 	result->global_init = mirBuildGlobalInit(arena, module);
 	return result->global_init ? result : nullptr;

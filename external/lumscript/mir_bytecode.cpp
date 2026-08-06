@@ -1,5 +1,5 @@
-#include "mir.h"
 #include "bytecode.h"
+#include "mir.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -10,7 +10,11 @@ struct MirCode {
 	u32 size;
 	u32 capacity;
 
-	MirCode(ls_arena& arena) : arena(arena), data(nullptr), size(0), capacity(0) {}
+	MirCode(ls_arena& arena)
+		: arena(arena)
+		, data(nullptr)
+		, size(0)
+		, capacity(0) {}
 };
 
 struct MirJumpPatch {
@@ -33,10 +37,18 @@ static bool mirCodeBytes(MirCode& code, const void* data, u32 size) {
 	return true;
 }
 
-static bool mirCodeU8(MirCode& code, u8 value) { return mirCodeBytes(code, &value, sizeof(value)); }
-static bool mirCodeU16(MirCode& code, u16 value) { return mirCodeBytes(code, &value, sizeof(value)); }
-static bool mirCodeU32(MirCode& code, u32 value) { return mirCodeBytes(code, &value, sizeof(value)); }
-static bool mirCodeU64(MirCode& code, u64 value) { return mirCodeBytes(code, &value, sizeof(value)); }
+static bool mirCodeU8(MirCode& code, u8 value) {
+	return mirCodeBytes(code, &value, sizeof(value));
+}
+static bool mirCodeU16(MirCode& code, u16 value) {
+	return mirCodeBytes(code, &value, sizeof(value));
+}
+static bool mirCodeU32(MirCode& code, u32 value) {
+	return mirCodeBytes(code, &value, sizeof(value));
+}
+static bool mirCodeU64(MirCode& code, u64 value) {
+	return mirCodeBytes(code, &value, sizeof(value));
+}
 
 static u32 mirNumericIndex(ls_type_kind kind) {
 	switch (kind) {
@@ -54,22 +66,25 @@ static u32 mirNumericIndex(ls_type_kind kind) {
 	}
 }
 
-static bool mirIsGlobalSlot(u32 slot) { return (slot & MIR_GLOBAL_SLOT) != 0; }
-static u32 mirGlobalOffset(u32 slot) { return slot & ~MIR_GLOBAL_SLOT; }
-
-static bool mirEmitBinaryI32(MirCode& code, ls_op op, MirInstruction& instruction, u32* slots) {
-	return mirCodeU8(code, (u8)op) && mirCodeU32(code, slots[instruction.result])
-		&& mirCodeU32(code, slots[instruction.operands[0]]) && mirCodeU32(code, slots[instruction.operands[1]]);
+static bool mirIsGlobalSlot(u32 slot) {
+	return (slot & MIR_GLOBAL_SLOT) != 0;
+}
+static u32 mirGlobalOffset(u32 slot) {
+	return slot & ~MIR_GLOBAL_SLOT;
 }
 
-static ls_op mirCompareOpcode(u32 op) {
+static bool mirEmitBinaryI32(MirCode& code, ls_op op, MirBinaryInstruction& instruction, u32* slots) {
+	return mirCodeU8(code, (u8)op) && mirCodeU32(code, slots[instruction.result]) && mirCodeU32(code, slots[instruction.lhs]) && mirCodeU32(code, slots[instruction.rhs]);
+}
+
+static ls_op mirCompareOpcode(MirOpcode op) {
 	switch (op) {
-		case MIR_COMPARE_EQ: return LS_OP_EQ;
-		case MIR_COMPARE_NE: return LS_OP_NE;
-		case MIR_COMPARE_LT: return LS_OP_LT;
-		case MIR_COMPARE_LE: return LS_OP_LE;
-		case MIR_COMPARE_GT: return LS_OP_LT;
-		case MIR_COMPARE_GE: return LS_OP_LE;
+		case MIR_OP_EQ: return LS_OP_EQ;
+		case MIR_OP_NE: return LS_OP_NE;
+		case MIR_OP_LT: return LS_OP_LT;
+		case MIR_OP_LE: return LS_OP_LE;
+		case MIR_OP_GT: return LS_OP_GT;
+		case MIR_OP_GE: return LS_OP_GE;
 		default: return LS_OP_EQ;
 	}
 }
@@ -122,87 +137,103 @@ static bool mirEmitInstruction(ls_bytecode& bytecode, MirCode& code, MirInstruct
 	const u32 result = instruction.result == MIR_INVALID_ID ? 0 : slots[instruction.result];
 	switch (instruction.opcode) {
 		case MIR_OP_CONST: {
-			if (instruction.immediate == MIR_CONST_I32)
-				return mirCodeU8(code, LS_OP_LOAD_CONST_4) && mirCodeU32(code, result) && mirCodeU32(code, (u32)instruction.integer);
-			const u32 size = typeByteSize(*instruction.type);
-			if (size == 16 && instruction.type->kind == ResolvedType::SLICE) {
-				if (!instruction.string.begin) return mirCodeU8(code, LS_OP_LOAD_CONST_8) && mirCodeU32(code, result) && mirCodeU64(code, 0)
-					&& mirCodeU8(code, LS_OP_LOAD_CONST_8) && mirCodeU32(code, result + 8) && mirCodeU64(code, 0);
-				u32 string_index = 0;
-				if (!mirAppendStringLiteral(bytecode, instruction.string, string_index)) return false;
-				const ls_string_view value = bytecode.strings[string_index];
-				return mirCodeU8(code, LS_OP_LOAD_CONST_8) && mirCodeU32(code, result) && mirCodeU64(code, (u64)(uintptr)value.begin)
-					&& mirCodeU8(code, LS_OP_LOAD_CONST_8) && mirCodeU32(code, result + 8) && mirCodeU64(code, (u64)(value.end - value.begin));
-			}
-			if (size == 1) {
-				return mirCodeU8(code, LS_OP_LOAD_CONST_1) && mirCodeU32(code, result) && mirCodeU8(code, (u8)instruction.integer);
-			}
-			if (size == 2) {
-				return mirCodeU8(code, LS_OP_LOAD_CONST_2) && mirCodeU32(code, result) && mirCodeU16(code, (u16)instruction.integer);
-			}
-			if (size == 4) {
-				u32 bits = (u32)instruction.integer;
-				if (instruction.type->kind == ResolvedType::F32) {
-					f32 value = (f32)instruction.floating;
-					memcpy(&bits, &value, sizeof(bits));
+			MirConstInstruction& mci = static_cast<MirConstInstruction&>(instruction);
+			if (mci.kind == MIR_CONST_I32) return mirCodeU8(code, LS_OP_LOAD_CONST_4) && mirCodeU32(code, result) && mirCodeU32(code, (u32)mci.integer);
+			const u32 size = typeByteSize(*mci.type);
+			switch (size) {
+				case 16: {
+					if (mci.type->kind != ResolvedType::SLICE) return false;
+					if (!mci.string.begin)
+						return mirCodeU8(code, LS_OP_LOAD_CONST_8) && mirCodeU32(code, result) && mirCodeU64(code, 0) && mirCodeU8(code, LS_OP_LOAD_CONST_8) && mirCodeU32(code, result + 8) &&
+							   mirCodeU64(code, 0);
+					u32 string_index = 0;
+					if (!mirAppendStringLiteral(bytecode, mci.string, string_index)) return false;
+					const ls_string_view value = bytecode.strings[string_index];
+					return mirCodeU8(code, LS_OP_LOAD_CONST_8) && mirCodeU32(code, result) && mirCodeU64(code, (u64)(uintptr)value.begin) && mirCodeU8(code, LS_OP_LOAD_CONST_8) &&
+						   mirCodeU32(code, result + 8) && mirCodeU64(code, (u64)(value.end - value.begin));
 				}
-				return mirCodeU8(code, LS_OP_LOAD_CONST_4) && mirCodeU32(code, result) && mirCodeU32(code, bits);
+				case 1: return mirCodeU8(code, LS_OP_LOAD_CONST_1) && mirCodeU32(code, result) && mirCodeU8(code, (u8)mci.integer);
+				case 2: return mirCodeU8(code, LS_OP_LOAD_CONST_2) && mirCodeU32(code, result) && mirCodeU16(code, (u16)mci.integer);
+				case 4: {
+					u32 bits = (u32)mci.integer;
+					if (mci.type->kind == ResolvedType::F32) {
+						f32 value = (f32)mci.floating;
+						memcpy(&bits, &value, sizeof(bits));
+					}
+					return mirCodeU8(code, LS_OP_LOAD_CONST_4) && mirCodeU32(code, result) && mirCodeU32(code, bits);
+				}
+				case 8: {
+					u64 bits = mci.integer;
+					if (mci.type->kind == ResolvedType::F64) memcpy(&bits, &mci.floating, sizeof(bits));
+					return mirCodeU8(code, LS_OP_LOAD_CONST_8) && mirCodeU32(code, result) && mirCodeU64(code, bits);
+				}
+				default: return false;
 			}
-			if (size == 8) {
-				u64 bits = instruction.integer;
-				if (instruction.type->kind == ResolvedType::F64) memcpy(&bits, &instruction.floating, sizeof(bits));
-				return mirCodeU8(code, LS_OP_LOAD_CONST_8) && mirCodeU32(code, result) && mirCodeU64(code, bits);
-			}
-			return false;
 		}
 		case MIR_OP_UNDEFINED:
-			if (typeByteSize(*instruction.type) == 1)
-				return mirCodeU8(code, LS_OP_LOAD_CONST_1) && mirCodeU32(code, result) && mirCodeU8(code, 0);
-			if (typeByteSize(*instruction.type) == 2)
-				return mirCodeU8(code, LS_OP_LOAD_CONST_2) && mirCodeU32(code, result) && mirCodeU16(code, 0);
-			if (typeByteSize(*instruction.type) == 4)
-				return mirCodeU8(code, LS_OP_LOAD_CONST_4) && mirCodeU32(code, result) && mirCodeU32(code, 0);
-			if (typeByteSize(*instruction.type) == 8)
-				return mirCodeU8(code, LS_OP_LOAD_CONST_8) && mirCodeU32(code, result) && mirCodeU64(code, 0);
-			return false;
+			switch (typeByteSize(*instruction.type)) {
+				case 1: return mirCodeU8(code, LS_OP_LOAD_CONST_1) && mirCodeU32(code, result) && mirCodeU8(code, 0);
+				case 2: return mirCodeU8(code, LS_OP_LOAD_CONST_2) && mirCodeU32(code, result) && mirCodeU16(code, 0);
+				case 4: return mirCodeU8(code, LS_OP_LOAD_CONST_4) && mirCodeU32(code, result) && mirCodeU32(code, 0);
+				case 8: return mirCodeU8(code, LS_OP_LOAD_CONST_8) && mirCodeU32(code, result) && mirCodeU64(code, 0);
+				default: return false;
+			}
 		case MIR_OP_LOCAL_ADDRESS:
-		case MIR_OP_GLOBAL_ADDRESS:
-			return true;
-		case MIR_OP_MAKE_SLICE:
+		case MIR_OP_GLOBAL_ADDRESS: return true;
+		case MIR_OP_MAKE_SLICE: {
+			auto& slice = static_cast<MirSliceInstruction&>(instruction);
 			if (typeByteSize(*instruction.type) != 16) return false;
-			if (instruction.immediate == 1)
-				return mirCodeU8(code, LS_OP_COPY) && mirCodeU32(code, result) && mirCodeU32(code, slots[instruction.operands[0]]) && mirCodeU32(code, 16)
-					&& mirCodeU8(code, LS_OP_SLICE) && mirCodeU32(code, result) && mirCodeU32(code, slots[instruction.operands[1]]) && mirCodeU32(code, slots[instruction.operands[2]]) && mirCodeU32(code, instruction.local);
-			return mirCodeU8(code, LS_OP_LOCAL_REF) && mirCodeU32(code, result) && mirCodeU32(code, slots[instruction.operands[0]])
-				&& mirCodeU8(code, LS_OP_LOAD_CONST_8) && mirCodeU32(code, result + 8) && mirCodeU64(code, instruction.function);
-		case MIR_OP_SLICE_LENGTH:
-			return mirCodeU8(code, LS_OP_SLICE_LENGTH) && mirCodeU32(code, result) && mirCodeU32(code, slots[instruction.operands[0]]);
-		case MIR_OP_LOAD:
-			if (instruction.immediate == 1)
-				return mirCodeU8(code, LS_OP_LOAD_INDEXED_LOCAL_I32) && mirCodeU32(code, result) && mirCodeU32(code, slots[instruction.operands[0]]) && mirCodeU32(code, slots[instruction.operands[1]]) && mirCodeU32(code, instruction.local) && mirCodeU32(code, instruction.offset) && mirCodeU32(code, instruction.function) && mirCodeU32(code, typeByteSize(*instruction.type));
-			if (instruction.immediate == 3)
-				return mirCodeU8(code, LS_OP_SLICE_LOAD_LOCAL_I32) && mirCodeU32(code, result) && mirCodeU32(code, slots[instruction.operands[0]]) && mirCodeU32(code, slots[instruction.operands[1]]) && mirCodeU32(code, instruction.local);
-			if (instruction.immediate == 4)
-				return mirCodeU8(code, LS_OP_SLICE_LOAD_AT_LOCAL_I32) && mirCodeU32(code, result) && mirCodeU32(code, slots[instruction.operands[0]]) && mirCodeU32(code, slots[instruction.operands[1]]) && mirCodeU32(code, instruction.local) && mirCodeU32(code, instruction.offset) && mirCodeU32(code, instruction.function);
-			if (mirIsGlobalSlot(slots[instruction.operands[0]]))
-				return mirCodeU8(code, LS_OP_GLOBAL_LOAD) && mirCodeU32(code, result) && mirCodeU32(code, mirGlobalOffset(slots[instruction.operands[0]])) && mirCodeU32(code, typeByteSize(*instruction.type));
-			return mirCodeU8(code, LS_OP_COPY) && mirCodeU32(code, result)
-				&& mirCodeU32(code, slots[instruction.operands[0]])
-				&& mirCodeU32(code, typeByteSize(*instruction.type));
-		case MIR_OP_STORE:
-			if (instruction.immediate == 3)
-				return mirCodeU8(code, LS_OP_SLICE_STORE_LOCAL_I32) && mirCodeU32(code, slots[instruction.operands[0]]) && mirCodeU32(code, slots[instruction.operands[1]]) && mirCodeU32(code, slots[instruction.operands[2]]) && mirCodeU32(code, instruction.local);
-			if (instruction.immediate == 4)
-				return mirCodeU8(code, LS_OP_SLICE_STORE_AT_LOCAL_I32) && mirCodeU32(code, slots[instruction.operands[0]]) && mirCodeU32(code, slots[instruction.operands[1]]) && mirCodeU32(code, slots[instruction.operands[2]]) && mirCodeU32(code, instruction.local) && mirCodeU32(code, instruction.offset) && mirCodeU32(code, instruction.function);
-			if (instruction.immediate == 2)
-				return mirCodeU8(code, LS_OP_STORE_INDEXED_LOCAL_I32) && mirCodeU32(code, slots[instruction.operands[0]]) && mirCodeU32(code, slots[instruction.operands[1]]) && mirCodeU32(code, slots[instruction.operands[2]]) && mirCodeU32(code, 1) && mirCodeU32(code, 0) && mirCodeU32(code, 1) && mirCodeU32(code, 1);
-			if (instruction.immediate == 1)
-				return mirCodeU8(code, LS_OP_STORE_INDEXED_LOCAL_I32) && mirCodeU32(code, slots[instruction.operands[0]]) && mirCodeU32(code, slots[instruction.operands[1]]) && mirCodeU32(code, slots[instruction.operands[2]]) && mirCodeU32(code, instruction.local) && mirCodeU32(code, instruction.offset) && mirCodeU32(code, instruction.function) && mirCodeU32(code, typeByteSize(*instruction.type));
-			if (mirIsGlobalSlot(slots[instruction.operands[0]]))
-				return mirCodeU8(code, LS_OP_GLOBAL_STORE) && mirCodeU32(code, mirGlobalOffset(slots[instruction.operands[0]])) && mirCodeU32(code, slots[instruction.operands[1]]) && mirCodeU32(code, typeByteSize(*instruction.type));
-			return mirCodeU8(code, LS_OP_COPY) && mirCodeU32(code, slots[instruction.operands[0]])
-				&& mirCodeU32(code, slots[instruction.operands[1]])
-				&& mirCodeU32(code, typeByteSize(*instruction.type));
+			if (slice.mode == MIR_SLICE_PARTIAL)
+				return mirCodeU8(code, LS_OP_COPY) && mirCodeU32(code, result) && mirCodeU32(code, slots[slice.base]) && mirCodeU32(code, 16) && mirCodeU8(code, LS_OP_SLICE) &&
+					   mirCodeU32(code, result) && mirCodeU32(code, slots[slice.begin]) && mirCodeU32(code, slots[slice.end]) && mirCodeU32(code, slice.element_size);
+			return mirCodeU8(code, LS_OP_LOCAL_REF) && mirCodeU32(code, result) && mirCodeU32(code, slots[slice.base]) && mirCodeU8(code, LS_OP_LOAD_CONST_8) && mirCodeU32(code, result + 8) &&
+				   mirCodeU64(code, slice.length);
+		}
+		case MIR_OP_SLICE_LENGTH: {
+			auto& unary = static_cast<MirUnaryInstruction&>(instruction);
+			return mirCodeU8(code, LS_OP_SLICE_LENGTH) && mirCodeU32(code, result) && mirCodeU32(code, slots[unary.operand]);
+		}
+		case MIR_OP_LOAD: {
+			auto& load = static_cast<MirLoadInstruction&>(instruction);
+			switch (load.access) {
+				case MIR_ACCESS_INDEXED:
+					return mirCodeU8(code, LS_OP_LOAD_INDEXED_LOCAL_I32) && mirCodeU32(code, result) && mirCodeU32(code, slots[load.address]) && mirCodeU32(code, slots[load.index]) &&
+						   mirCodeU32(code, load.element_size) && mirCodeU32(code, load.field_offset) && mirCodeU32(code, load.extent) && mirCodeU32(code, typeByteSize(*instruction.type));
+				case MIR_ACCESS_SLICE_ELEMENT:
+					return mirCodeU8(code, LS_OP_SLICE_LOAD_LOCAL_I32) && mirCodeU32(code, result) && mirCodeU32(code, slots[load.address]) && mirCodeU32(code, slots[load.index]) &&
+						   mirCodeU32(code, load.element_size);
+				case MIR_ACCESS_SLICE_FIELD:
+					return mirCodeU8(code, LS_OP_SLICE_LOAD_AT_LOCAL_I32) && mirCodeU32(code, result) && mirCodeU32(code, slots[load.address]) && mirCodeU32(code, slots[load.index]) &&
+						   mirCodeU32(code, load.element_size) && mirCodeU32(code, load.field_offset) && mirCodeU32(code, load.extent);
+				default:
+					if (mirIsGlobalSlot(slots[load.address]))
+						return mirCodeU8(code, LS_OP_GLOBAL_LOAD) && mirCodeU32(code, result) && mirCodeU32(code, mirGlobalOffset(slots[load.address])) &&
+							   mirCodeU32(code, typeByteSize(*instruction.type));
+					return mirCodeU8(code, LS_OP_COPY) && mirCodeU32(code, result) && mirCodeU32(code, slots[load.address]) && mirCodeU32(code, typeByteSize(*instruction.type));
+			}
+		}
+		case MIR_OP_STORE: {
+			auto& store = static_cast<MirStoreInstruction&>(instruction);
+			switch (store.access) {
+				case MIR_ACCESS_SLICE_ELEMENT:
+					return mirCodeU8(code, LS_OP_SLICE_STORE_LOCAL_I32) && mirCodeU32(code, slots[store.address]) && mirCodeU32(code, slots[store.index]) && mirCodeU32(code, slots[store.value]) &&
+						   mirCodeU32(code, store.element_size);
+				case MIR_ACCESS_SLICE_FIELD:
+					return mirCodeU8(code, LS_OP_SLICE_STORE_AT_LOCAL_I32) && mirCodeU32(code, slots[store.address]) && mirCodeU32(code, slots[store.index]) && mirCodeU32(code, slots[store.value]) &&
+						   mirCodeU32(code, store.element_size) && mirCodeU32(code, store.field_offset) && mirCodeU32(code, store.extent);
+				case MIR_ACCESS_NULLABLE_TAG:
+					return mirCodeU8(code, LS_OP_STORE_INDEXED_LOCAL_I32) && mirCodeU32(code, slots[store.address]) && mirCodeU32(code, slots[store.index]) && mirCodeU32(code, slots[store.value]) &&
+						   mirCodeU32(code, store.element_size) && mirCodeU32(code, store.field_offset) && mirCodeU32(code, store.extent) && mirCodeU32(code, 1);
+				case MIR_ACCESS_INDEXED:
+					return mirCodeU8(code, LS_OP_STORE_INDEXED_LOCAL_I32) && mirCodeU32(code, slots[store.address]) && mirCodeU32(code, slots[store.index]) && mirCodeU32(code, slots[store.value]) &&
+						   mirCodeU32(code, store.element_size) && mirCodeU32(code, store.field_offset) && mirCodeU32(code, store.extent) && mirCodeU32(code, typeByteSize(*instruction.type));
+				default:
+					if (mirIsGlobalSlot(slots[store.address]))
+						return mirCodeU8(code, LS_OP_GLOBAL_STORE) && mirCodeU32(code, mirGlobalOffset(slots[store.address])) && mirCodeU32(code, slots[store.value]) &&
+							   mirCodeU32(code, typeByteSize(*instruction.type));
+					return mirCodeU8(code, LS_OP_COPY) && mirCodeU32(code, slots[store.address]) && mirCodeU32(code, slots[store.value]) && mirCodeU32(code, typeByteSize(*instruction.type));
+			}
+		}
 		case MIR_OP_ADD:
 		case MIR_OP_SUB:
 		case MIR_OP_MUL:
@@ -211,73 +242,90 @@ static bool mirEmitInstruction(ls_bytecode& bytecode, MirCode& code, MirInstruct
 			const ls_type_kind kind = mirTypeKind(instruction.type);
 			const u32 index = mirNumericIndex(kind);
 			if (index == MIR_INVALID_ID) return false;
-			return mirEmitBinaryI32(code,
-				(ls_op)((instruction.opcode == MIR_OP_ADD ? LS_OP_ADD_I8
-				: instruction.opcode == MIR_OP_SUB ? LS_OP_SUB_I8
-				: instruction.opcode == MIR_OP_MUL ? LS_OP_MUL_I8
-				: instruction.opcode == MIR_OP_DIV ? LS_OP_DIV_I8 : LS_OP_MOD_I8) + index),
-				instruction, slots);
+			ls_op base = LS_OP_MOD_I8;
+			switch (instruction.opcode) {
+				case MIR_OP_ADD: base = LS_OP_ADD_I8; break;
+				case MIR_OP_SUB: base = LS_OP_SUB_I8; break;
+				case MIR_OP_MUL: base = LS_OP_MUL_I8; break;
+				case MIR_OP_DIV: base = LS_OP_DIV_I8; break;
+				case MIR_OP_MOD: base = LS_OP_MOD_I8; break;
+			}
+			return mirEmitBinaryI32(code, (ls_op)(base + index), static_cast<MirBinaryInstruction&>(instruction), slots);
 		}
-		case MIR_OP_COMPARE:
-			if (instruction.operand_type && instruction.operand_type->kind == ResolvedType::SLICE) {
-				SliceResolvedType* slice = static_cast<SliceResolvedType*>(instruction.operand_type);
+		case MIR_OP_NE:
+		case MIR_OP_EQ:
+		case MIR_OP_LT:
+		case MIR_OP_LE:
+		case MIR_OP_GT:
+		case MIR_OP_GE: {
+			auto& binary = static_cast<MirBinaryInstruction&>(instruction);
+			if (binary.operand_type && binary.operand_type->kind == ResolvedType::SLICE) {
+				SliceResolvedType* slice = static_cast<SliceResolvedType*>(binary.operand_type);
 				ls_type_kind element_kind = mirTypeKind(slice->element_type);
 				if (element_kind == LS_TYPE_INVALID) return false;
-				if (!mirCodeU8(code, LS_OP_SLICE_EQ) || !mirCodeU32(code, result) || !mirCodeU32(code, slots[instruction.operands[0]]) || !mirCodeU32(code, slots[instruction.operands[1]]) || !mirCodeU32(code, slice->element_type ? typeByteSize(*slice->element_type) : 0) || !mirCodeU8(code, (u8)element_kind)) return false;
-				if (instruction.immediate == MIR_COMPARE_NE) return mirCodeU8(code, LS_OP_NOT) && mirCodeU32(code, result);
+				if (!mirCodeU8(code, LS_OP_SLICE_EQ) || !mirCodeU32(code, result) || !mirCodeU32(code, slots[binary.lhs]) || !mirCodeU32(code, slots[binary.rhs]) ||
+					!mirCodeU32(code, slice->element_type ? typeByteSize(*slice->element_type) : 0) || !mirCodeU8(code, (u8)element_kind))
+					return false;
+				if (binary.opcode == MIR_OP_NE) return mirCodeU8(code, LS_OP_NOT) && mirCodeU32(code, result);
 				return true;
 			}
-			if (mirNumericIndex(mirTypeKind(instruction.operand_type)) == MIR_INVALID_ID) return false;
+			if (mirNumericIndex(mirTypeKind(binary.operand_type)) == MIR_INVALID_ID) return false;
 			{
-				const bool swap = instruction.immediate == MIR_COMPARE_GT || instruction.immediate == MIR_COMPARE_GE;
-				const MirValueId lhs = swap ? instruction.operands[1] : instruction.operands[0];
-				const MirValueId rhs = swap ? instruction.operands[0] : instruction.operands[1];
-				return mirCodeU8(code, (u8)mirCompareOpcode(instruction.immediate))
-					&& mirCodeU32(code, result)
-					&& mirCodeU32(code, slots[lhs])
-					&& mirCodeU32(code, slots[rhs])
-					&& mirCodeU8(code, (u8)mirTypeKind(instruction.operand_type));
+				const bool swap = binary.opcode == MIR_OP_GT || binary.opcode == MIR_OP_GE;
+				const MirValueId lhs = swap ? binary.rhs : binary.lhs;
+				const MirValueId rhs = swap ? binary.lhs : binary.rhs;
+				return mirCodeU8(code, (u8)mirCompareOpcode(binary.opcode)) && mirCodeU32(code, result) && mirCodeU32(code, slots[lhs]) && mirCodeU32(code, slots[rhs]) &&
+					   mirCodeU8(code, (u8)mirTypeKind(binary.operand_type));
 			}
-		case MIR_OP_NULLABLE_HAS_VALUE:
-			return mirCodeU8(code, LS_OP_LOAD_INDEXED_LOCAL_I32) && mirCodeU32(code, result) && mirCodeU32(code, slots[instruction.operands[0]]) && mirCodeU32(code, slots[instruction.operands[1]]) && mirCodeU32(code, 1) && mirCodeU32(code, 0) && mirCodeU32(code, 1) && mirCodeU32(code, 1);
-		case MIR_OP_NEG:
-			{
-				const ls_type_kind kind = mirTypeKind(instruction.type);
-				const u32 index = mirNumericIndex(kind);
-				const u32 size = typeByteSize(*instruction.type);
-				if (index == MIR_INVALID_ID) return false;
-				if (!mirCodeU8(code, LS_OP_COPY) || !mirCodeU32(code, result) || !mirCodeU32(code, slots[instruction.operands[0]]) || !mirCodeU32(code, size)) return false;
-				return mirCodeU8(code, (u8)(LS_OP_NEG_I8 + index)) && mirCodeU32(code, result);
-			}
-		case MIR_OP_NOT:
-			if (mirTypeKind(instruction.type) != LS_TYPE_BOOL) return false;
-			if (!mirCodeU8(code, LS_OP_COPY) || !mirCodeU32(code, result) || !mirCodeU32(code, slots[instruction.operands[0]]) || !mirCodeU32(code, 1)) return false;
+		}
+		case MIR_OP_NULLABLE_HAS_VALUE: {
+			auto& nullable = static_cast<MirNullableInstruction&>(instruction);
+			return mirCodeU8(code, LS_OP_LOAD_INDEXED_LOCAL_I32) && mirCodeU32(code, result) && mirCodeU32(code, slots[nullable.address]) && mirCodeU32(code, slots[nullable.index]) &&
+				   mirCodeU32(code, 1) && mirCodeU32(code, 0) && mirCodeU32(code, 1) && mirCodeU32(code, 1);
+		}
+		case MIR_OP_NEG: {
+			auto& unary = static_cast<MirUnaryInstruction&>(instruction);
+			const ls_type_kind kind = mirTypeKind(unary.type);
+			const u32 index = mirNumericIndex(kind);
+			const u32 size = typeByteSize(*unary.type);
+			if (index == MIR_INVALID_ID) return false;
+			if (!mirCodeU8(code, LS_OP_COPY) || !mirCodeU32(code, result) || !mirCodeU32(code, slots[unary.operand]) || !mirCodeU32(code, size)) return false;
+			return mirCodeU8(code, (u8)(LS_OP_NEG_I8 + index)) && mirCodeU32(code, result);
+		}
+		case MIR_OP_NOT: {
+			auto& unary = static_cast<MirUnaryInstruction&>(instruction);
+			if (mirTypeKind(unary.type) != LS_TYPE_BOOL) return false;
+			if (!mirCodeU8(code, LS_OP_COPY) || !mirCodeU32(code, result) || !mirCodeU32(code, slots[unary.operand]) || !mirCodeU32(code, 1)) return false;
 			return mirCodeU8(code, LS_OP_NOT) && mirCodeU32(code, result);
-		case MIR_OP_CAST:
-			if (mirTypeKind(instruction.operand_type) == LS_TYPE_INVALID || mirTypeKind(instruction.type) == LS_TYPE_INVALID) return false;
-			return mirCodeU8(code, LS_OP_CAST) && mirCodeU32(code, result)
-				&& mirCodeU32(code, slots[instruction.operands[0]])
-				&& mirCodeU8(code, (u8)mirTypeKind(instruction.operand_type))
-				&& mirCodeU8(code, (u8)mirTypeKind(instruction.type));
-		case MIR_OP_CALL:
-			if (instruction.call_target == MIR_CALL_INDIRECT) {
-				if (instruction.operand_count == 0 || instruction.operands[0] == MIR_INVALID_ID) return false;
+		}
+		case MIR_OP_CAST: {
+			auto& cast = static_cast<MirCastInstruction&>(instruction);
+			if (mirTypeKind(cast.operand_type) == LS_TYPE_INVALID || mirTypeKind(cast.type) == LS_TYPE_INVALID) return false;
+			if (cast.operand == MIR_INVALID_ID) return false;
+			return mirCodeU8(code, LS_OP_CAST) && mirCodeU32(code, result) && mirCodeU32(code, slots[cast.operand]) && mirCodeU8(code, (u8)mirTypeKind(cast.operand_type)) &&
+				   mirCodeU8(code, (u8)mirTypeKind(cast.type));
+		}
+		case MIR_OP_CALL: {
+			auto& call = static_cast<MirCallInstruction&>(instruction);
+			if (call.call_target == MIR_CALL_INDIRECT) {
+				if (call.callee == MIR_INVALID_ID) return false;
 				const u32 arg_base = result + 4;
-				if (!mirCodeU8(code, LS_OP_COPY) || !mirCodeU32(code, result) || !mirCodeU32(code, slots[instruction.operands[0]]) || !mirCodeU32(code, 4)) return false;
-				for (u32 i = 0, offset = 0; i < instruction.arguments.count; ++i) {
-					const u32 size = instruction.arguments.sizes[i];
-					if (!mirCodeU8(code, LS_OP_COPY) || !mirCodeU32(code, arg_base + offset) || !mirCodeU32(code, slots[instruction.arguments.values[i]]) || !mirCodeU32(code, size)) return false;
+				if (!mirCodeU8(code, LS_OP_COPY) || !mirCodeU32(code, result) || !mirCodeU32(code, slots[call.callee]) || !mirCodeU32(code, 4)) return false;
+				for (u32 i = 0, offset = 0; i < call.arguments.count; ++i) {
+					const u32 size = call.arguments.sizes[i];
+					if (!mirCodeU8(code, LS_OP_COPY) || !mirCodeU32(code, arg_base + offset) || !mirCodeU32(code, slots[call.arguments.values[i]]) || !mirCodeU32(code, size)) return false;
 					offset += size;
 				}
-				return mirCodeU8(code, LS_OP_CALL_INDIRECT) && mirCodeU32(code, result) && mirCodeU32(code, instruction.immediate) && mirCodeU32(code, typeByteSize(*instruction.type));
+				return mirCodeU8(code, LS_OP_CALL_INDIRECT) && mirCodeU32(code, result) && mirCodeU32(code, call.args_size) && mirCodeU32(code, typeByteSize(*call.type));
 			}
-			if (instruction.function == MIR_INVALID_ID) return false;
-			for (u32 i = 0, offset = 0; i < instruction.arguments.count; ++i) {
-				const u32 size = instruction.arguments.sizes[i];
-				if (!mirCodeU8(code, LS_OP_COPY) || !mirCodeU32(code, result + offset) || !mirCodeU32(code, slots[instruction.arguments.values[i]]) || !mirCodeU32(code, size)) return false;
+			if (call.function == MIR_INVALID_ID) return false;
+			for (u32 i = 0, offset = 0; i < call.arguments.count; ++i) {
+				const u32 size = call.arguments.sizes[i];
+				if (!mirCodeU8(code, LS_OP_COPY) || !mirCodeU32(code, result + offset) || !mirCodeU32(code, slots[call.arguments.values[i]]) || !mirCodeU32(code, size)) return false;
 				offset += size;
 			}
-			return mirCodeU8(code, LS_OP_CALL_DIRECT) && mirCodeU32(code, instruction.function) && mirCodeU32(code, result);
+			return mirCodeU8(code, LS_OP_CALL_DIRECT) && mirCodeU32(code, call.function) && mirCodeU32(code, result);
+		}
 		default: return false;
 	}
 }
@@ -303,8 +351,7 @@ static bool mirEmitTerminator(MirCode& code, MirTerminator& terminator, u32* slo
 			false_patch.target = terminator.targets[1];
 			return mirCodeBytes(code, "\0\0", 2);
 		}
-		case MIR_TERM_RETURN:
-			return mirCodeU8(code, LS_OP_RETURN_BASE);
+		case MIR_TERM_RETURN: return mirCodeU8(code, LS_OP_RETURN_BASE);
 		case MIR_TERM_RETURN_VALUE: {
 			const u32 source = slots[terminator.value];
 			if (source == 0) return mirCodeU8(code, LS_OP_RETURN_BASE);
@@ -345,24 +392,27 @@ static bool mirCompileFunction(ls_bytecode& bytecode, MirFunction* mir) {
 	}
 	function->param_size = mir->param_size;
 	for (MirBlock& b : mir->blocks) {
-		for (MirInstruction& instruction : b.instructions) {
-				if (instruction.result != MIR_INVALID_ID && !instruction.type) return false;
-			if (instruction.result == MIR_INVALID_ID || slots[instruction.result] != MIR_INVALID_ID) continue;
-			if (instruction.opcode == MIR_OP_LOCAL_ADDRESS) {
-				slots[instruction.result] = mir->locals[instruction.local].offset + instruction.offset;
+		for (MirInstruction* instruction : b.instructions) {
+			if (instruction->result != MIR_INVALID_ID && !instruction->type) return false;
+			if (instruction->result == MIR_INVALID_ID || slots[instruction->result] != MIR_INVALID_ID) continue;
+			if (instruction->opcode == MIR_OP_LOCAL_ADDRESS) {
+				auto& address = static_cast<MirAddressInstruction&>(*instruction);
+				slots[instruction->result] = mir->locals[address.local].offset + address.byte_offset;
 				continue;
 			}
-			if (instruction.opcode == MIR_OP_GLOBAL_ADDRESS) {
-				slots[instruction.result] = MIR_GLOBAL_SLOT | instruction.immediate;
+			if (instruction->opcode == MIR_OP_GLOBAL_ADDRESS) {
+				auto& address = static_cast<MirAddressInstruction&>(*instruction);
+				slots[instruction->result] = MIR_GLOBAL_SLOT | address.global_offset;
 				continue;
 			}
-			slots[instruction.result] = frame_size;
-			u32 value_size = instruction.opcode == MIR_OP_CONST && instruction.immediate == MIR_CONST_I32 ? 4u : typeByteSize(*instruction.type);
-			if (instruction.opcode == MIR_OP_SLICE_LENGTH && value_size < 8) value_size = 8;
+			slots[instruction->result] = frame_size;
+			u32 value_size = instruction->opcode == MIR_OP_CONST && static_cast<MirConstInstruction*>(instruction)->kind == MIR_CONST_I32 ? 4u : typeByteSize(*instruction->type);
+			if (instruction->opcode == MIR_OP_SLICE_LENGTH && value_size < 8) value_size = 8;
 			frame_size += value_size;
-			if (instruction.opcode == MIR_OP_CALL) {
-				const u32 call_extra = instruction.call_target == MIR_CALL_INDIRECT ? 4 : 0;
-				if (call_extra + instruction.immediate > typeByteSize(*instruction.type)) frame_size += call_extra + instruction.immediate - typeByteSize(*instruction.type);
+			if (instruction->opcode == MIR_OP_CALL) {
+				auto& call = static_cast<MirCallInstruction&>(*instruction);
+				const u32 call_extra = call.call_target == MIR_CALL_INDIRECT ? 4 : 0;
+				if (call_extra + call.args_size > typeByteSize(*call.type)) frame_size += call_extra + call.args_size - typeByteSize(*call.type);
 			}
 			if (frame_size == 0) frame_size = 1;
 		}
@@ -373,23 +423,81 @@ static bool mirCompileFunction(ls_bytecode& bytecode, MirFunction* mir) {
 	ExpArray<MirJumpPatch> patches(*bytecode.arena);
 	for (MirBlock& block : mir->blocks) {
 		block_offsets.push_back(code.size);
-		for (MirInstruction& instruction : block.instructions) {
-			if (instruction.opcode == MIR_OP_CALL && instruction.call_target == MIR_CALL_DIRECT && instruction.function == MIR_INVALID_ID && instruction.call_name.begin) {
-				for (u32 i = 0; i < bytecode.function_count; ++i) {
-					const ls_string_view name = bytecode.functions[i].name;
-					const size_t length = (size_t)(instruction.call_name.end - instruction.call_name.begin);
-					if ((size_t)(name.end - name.begin) == length && memcmp(name.begin, instruction.call_name.begin, length) == 0) {
-						instruction.function = i;
-						break;
+		for (MirInstruction* instruction : block.instructions) {
+			if (instruction->opcode == MIR_OP_CALL) {
+				auto& call = static_cast<MirCallInstruction&>(*instruction);
+				if (call.call_target == MIR_CALL_DIRECT && call.function == MIR_INVALID_ID && call.call_name.begin) {
+					for (u32 i = 0; i < bytecode.function_count; ++i) {
+						const ls_string_view name = bytecode.functions[i].name;
+						const size_t length = (size_t)(call.call_name.end - call.call_name.begin);
+						if ((size_t)(name.end - name.begin) == length && memcmp(name.begin, call.call_name.begin, length) == 0) {
+							call.function = i;
+							break;
+						}
 					}
 				}
+				for (u32 i = 0; i < call.arguments.count; ++i)
+					if (!call.arguments.values || !call.arguments.sizes || call.arguments.values[i] == MIR_INVALID_ID || call.arguments.values[i] >= mir->next_value) return false;
 			}
-			for (u32 i = 0; i < instruction.operand_count; ++i)
-					if (instruction.operands[i] == MIR_INVALID_ID || instruction.operands[i] >= mir->next_value) return false;
-			if (instruction.opcode == MIR_OP_LOCAL_ADDRESS && instruction.local >= (u32)mir->locals.size()) return false;
-			for (u32 i = 0; i < instruction.arguments.count; ++i)
-				if (!instruction.arguments.values || !instruction.arguments.sizes || instruction.arguments.values[i] == MIR_INVALID_ID || instruction.arguments.values[i] >= mir->next_value) return false;
-			if (!mirEmitInstruction(bytecode, code, instruction, slots)) return false;
+
+			switch (instruction->opcode) {
+				case MIR_OP_MAKE_SLICE: {
+					auto* slice = static_cast<MirSliceInstruction*>(instruction);
+					if (slice->base == MIR_INVALID_ID || slice->base >= mir->next_value) return false;
+					if (slice->mode == MIR_SLICE_PARTIAL && (slice->begin == MIR_INVALID_ID || slice->begin >= mir->next_value || slice->end == MIR_INVALID_ID || slice->end >= mir->next_value))
+						return false;
+					break;
+				}
+				case MIR_OP_STORE: {
+					auto* store = static_cast<MirStoreInstruction*>(instruction);
+					if (store->address == MIR_INVALID_ID || store->address >= mir->next_value) return false;
+					if (store->access != MIR_ACCESS_PLAIN && (store->index == MIR_INVALID_ID || store->index >= mir->next_value)) return false;
+					if (store->value == MIR_INVALID_ID || store->value >= mir->next_value) return false;
+					break;
+				}
+				case MIR_OP_LOAD: {
+					auto* load = static_cast<MirLoadInstruction*>(instruction);
+					if (load->address == MIR_INVALID_ID || load->address >= mir->next_value) return false;
+					if (load->access != MIR_ACCESS_PLAIN && (load->index == MIR_INVALID_ID || load->index >= mir->next_value)) return false;
+					break;
+				}
+				case MIR_OP_CAST: {
+					auto* cast = static_cast<MirCastInstruction*>(instruction);
+					if (cast->operand == MIR_INVALID_ID || cast->operand >= mir->next_value) return false;
+					break;
+				}
+				case MIR_OP_SLICE_LENGTH: {
+					auto* unary = static_cast<MirUnaryInstruction*>(instruction);
+					if (unary->operand == MIR_INVALID_ID || unary->operand >= mir->next_value) return false;
+					break;
+				}
+				case MIR_OP_NULLABLE_HAS_VALUE: {
+					auto* nullable = static_cast<MirNullableInstruction*>(instruction);
+					if (nullable->address == MIR_INVALID_ID || nullable->address >= mir->next_value) return false;
+					if (nullable->index == MIR_INVALID_ID || nullable->index >= mir->next_value) return false;
+					break;
+				}
+				case MIR_OP_EQ:
+				case MIR_OP_NE:
+				case MIR_OP_LT:
+				case MIR_OP_LE:
+				case MIR_OP_GT:
+				case MIR_OP_GE:
+				case MIR_OP_DIV:
+				case MIR_OP_MOD:
+				case MIR_OP_ADD:
+				case MIR_OP_MUL: {
+					auto* binary = static_cast<MirBinaryInstruction*>(instruction);
+					if (binary->lhs == MIR_INVALID_ID || binary->lhs >= mir->next_value) return false;
+					if (binary->rhs == MIR_INVALID_ID || binary->rhs >= mir->next_value) return false;
+					break;
+				}
+			}
+			if (instruction->opcode == MIR_OP_LOCAL_ADDRESS) {
+				auto& address = static_cast<MirAddressInstruction&>(*instruction);
+				if (address.local >= (u32)mir->locals.size()) return false;
+			}
+			if (!mirEmitInstruction(bytecode, code, *instruction, slots)) return false;
 		}
 		if (block.terminator.kind == MIR_TERM_BRANCH && (block.terminator.value == MIR_INVALID_ID || block.terminator.value >= mir->next_value)) return false;
 		if (block.terminator.kind == MIR_TERM_RETURN_VALUE && (block.terminator.value == MIR_INVALID_ID || block.terminator.value >= mir->next_value)) return false;
@@ -442,13 +550,13 @@ ls_bytecode* mirCompileModuleBytecode(MirModule* mir_module, ls_host* host) {
 	for (const MirModuleFunction& entry : mir_module->functions) {
 		if (entry.is_native) {
 			if (!mirAppendNativeFunction(*bytecode, entry.native)) {
-					ls_bytecode_destroy(bytecode);
-					return nullptr;
-				}
-		} else if (!mirCompileFunction(*bytecode, entry.function)) {
 				ls_bytecode_destroy(bytecode);
 				return nullptr;
 			}
+		} else if (!mirCompileFunction(*bytecode, entry.function)) {
+			ls_bytecode_destroy(bytecode);
+			return nullptr;
+		}
 	}
 	MirFunction* global_init = mir_module->global_init;
 	if (!global_init) {

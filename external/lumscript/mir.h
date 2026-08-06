@@ -23,7 +23,12 @@ enum MirOpcode {
 	MIR_OP_MUL,
 	MIR_OP_DIV,
 	MIR_OP_MOD,
-	MIR_OP_COMPARE,
+	MIR_OP_EQ,
+	MIR_OP_NE,
+	MIR_OP_LT,
+	MIR_OP_LE,
+	MIR_OP_GT,
+	MIR_OP_GE,
 	MIR_OP_LOCAL_ADDRESS,
 	MIR_OP_GLOBAL_ADDRESS,
 	MIR_OP_CONSTANT_ADDRESS,
@@ -68,13 +73,17 @@ enum MirConstKind {
 	MIR_CONST_I32
 };
 
-enum MirCompareKind {
-	MIR_COMPARE_EQ,
-	MIR_COMPARE_NE,
-	MIR_COMPARE_LT,
-	MIR_COMPARE_LE,
-	MIR_COMPARE_GT,
-	MIR_COMPARE_GE
+enum MirSliceMode {
+	MIR_SLICE_FULL = 0,
+	MIR_SLICE_PARTIAL = 1
+};
+
+enum MirAccessMode {
+	MIR_ACCESS_PLAIN = 0,
+	MIR_ACCESS_INDEXED = 1,
+	MIR_ACCESS_NULLABLE_TAG = 2,
+	MIR_ACCESS_SLICE_ELEMENT = 3,
+	MIR_ACCESS_SLICE_FIELD = 4
 };
 
 struct MirSourceLocation {
@@ -102,21 +111,102 @@ struct MirLocal {
 struct MirInstruction {
 	MirOpcode opcode;
 	ResolvedType* type;
-	ResolvedType* operand_type;
 	MirValueId result;
 	MirSourceLocationId source_location;
-	MirValueId operands[3];
-	u32 operand_count;
-	u32 immediate;
-	u32 offset;
-	i64 integer;
+};
+
+struct MirBinaryInstruction : MirInstruction {
+	MirBinaryInstruction(MirOpcode oc) { opcode = oc; }
+
+	MirValueId lhs;
+	MirValueId rhs;
+	ResolvedType* operand_type = nullptr;
+};
+
+struct MirUnaryInstruction : MirInstruction {
+	MirUnaryInstruction(MirOpcode oc) { opcode = oc; }
+
+	MirValueId operand;
+};
+
+struct MirCastInstruction : MirInstruction {
+	MirCastInstruction() { opcode = MIR_OP_CAST; }
+
+	MirValueId operand = MIR_INVALID_ID;
+	ResolvedType* operand_type = nullptr;
+};
+
+struct MirLoadInstruction : MirInstruction {
+	MirLoadInstruction() { opcode = MIR_OP_LOAD; }
+
+	MirValueId address = MIR_INVALID_ID;
+	MirValueId index = MIR_INVALID_ID;
+	MirAccessMode access = MIR_ACCESS_PLAIN;
+	u32 element_size = 0;
+	u32 field_offset = 0;
+	u32 extent = 0;
+};
+
+struct MirStoreInstruction : MirInstruction {
+	MirStoreInstruction() { opcode = MIR_OP_STORE; }
+
+	MirValueId address = MIR_INVALID_ID;
+	MirValueId index = MIR_INVALID_ID;
+	MirValueId value = MIR_INVALID_ID;
+	MirAccessMode access = MIR_ACCESS_PLAIN;
+	u32 element_size = 0;
+	u32 field_offset = 0;
+	u32 extent = 0;
+};
+
+struct MirSliceInstruction : MirInstruction {
+	MirSliceInstruction() { opcode = MIR_OP_MAKE_SLICE; }
+
+	MirValueId base = MIR_INVALID_ID;
+	MirValueId begin = MIR_INVALID_ID;
+	MirValueId end = MIR_INVALID_ID;
+	MirSliceMode mode = MIR_SLICE_FULL;
+	u32 element_size = 0;
+	u32 length = 0;
+};
+
+struct MirAddressInstruction : MirInstruction {
+	MirAddressInstruction(MirOpcode oc) { opcode = oc; }
+
+	MirLocalId local = MIR_INVALID_ID;
+	u32 byte_offset = 0;
+	u32 global_offset = 0;
+};
+
+struct MirCallInstruction : MirInstruction {
+	MirCallInstruction() { opcode = MIR_OP_CALL; }
+
+	MirFunctionId function = MIR_INVALID_ID;
+	MirCallTargetKind call_target = MIR_CALL_DIRECT;
+	MirValueId callee = MIR_INVALID_ID;
+	u32 args_size = 0;
+	ls_string_view call_name = {};
+	MirValueRange arguments = {};
+};
+
+struct MirConstInstruction : MirInstruction {
+	MirConstInstruction() { opcode = MIR_OP_CONST; }
+
+	MirConstKind kind = MIR_CONST_DEFAULT;
 	f64 floating;
-	MirLocalId local;
-	MirFunctionId function;
-	MirCallTargetKind call_target;
-	ls_string_view call_name;
+	i64 integer;
 	ls_string_view string;
-	MirValueRange arguments;
+};
+
+struct MirUndefinedInstruction : MirInstruction {
+	MirUndefinedInstruction() { opcode = MIR_OP_UNDEFINED; }
+};
+
+struct MirNullableInstruction : MirInstruction {
+	MirNullableInstruction() { opcode = MIR_OP_NULLABLE_HAS_VALUE; }
+
+	MirValueId address;
+	MirValueId index;
 };
 
 struct MirPhiIncoming {
@@ -148,7 +238,7 @@ struct MirTerminator {
 
 struct MirBlock {
 	MirBlockId id;
-	ExpArray<MirInstruction> instructions;
+	ExpArray<MirInstruction*> instructions;
 	ExpArray<MirPhi> phis;
 	MirTerminator terminator;
 	bool has_terminator;

@@ -267,12 +267,12 @@ TEST(MIRBuildScalarReturn) {
 	EXPECT_TRUE(mir->blocks.size() == 1);
 	MirBlock& block = mir->blocks[0];
 	EXPECT_TRUE(block.instructions.size() == 3);
-	EXPECT_TRUE(block.instructions[0].opcode == MIR_OP_CONST);
-	EXPECT_TRUE(block.instructions[1].opcode == MIR_OP_CONST);
-	EXPECT_TRUE(block.instructions[2].opcode == MIR_OP_ADD);
+	EXPECT_TRUE(block.instructions[0]->opcode == MIR_OP_CONST);
+	EXPECT_TRUE(block.instructions[1]->opcode == MIR_OP_CONST);
+	EXPECT_TRUE(block.instructions[2]->opcode == MIR_OP_ADD);
 	EXPECT_TRUE(block.has_terminator);
 	EXPECT_TRUE(block.terminator.kind == MIR_TERM_RETURN_VALUE);
-	EXPECT_TRUE(block.terminator.value == block.instructions[2].result);
+	EXPECT_TRUE(block.terminator.value == block.instructions[2]->result);
 
 	ls_module_destroy(module);
 	return true;
