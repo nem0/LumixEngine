@@ -1542,6 +1542,10 @@ struct Checker {
 			case Expression::IDENTIFIER: {
 				const IdentifierExpression& ie = static_cast<const IdentifierExpression&>(expr);
 				if (!ie.symbol || !ie.symbol->expression) return true;
+				if (ie.symbol->expression->kind == Expression::TYPE_MEMBER) {
+					const TypeMemberExpression& member = static_cast<const TypeMemberExpression&>(*ie.symbol->expression);
+					return member.kind == TypeMemberExpression::MAX && member.reflected_type && member.reflected_type->kind >= ResolvedType::U8 && member.reflected_type->kind <= ResolvedType::U64;
+				}
 				return untypedIntIsUnsigned(*ie.symbol->expression);
 			}
 			default: return false;
@@ -1564,6 +1568,17 @@ struct Checker {
 			case Expression::IDENTIFIER: {
 				auto& ie = static_cast<const IdentifierExpression&>(expr);
 				ASSERT(ie.eval_stage != Expression::RUNTIME);
+				if (ie.symbol && ie.symbol->expression && ie.symbol->expression->kind == Expression::TYPE_MEMBER) {
+					const TypeMemberExpression& member = static_cast<const TypeMemberExpression&>(*ie.symbol->expression);
+					if (member.kind == TypeMemberExpression::MIN || member.kind == TypeMemberExpression::MAX) {
+						if (!member.reflected_type) return false;
+						const ResolvedType::Kind source = member.reflected_type->kind;
+						if (member.kind == TypeMemberExpression::MIN && source >= ResolvedType::I8 && source <= ResolvedType::ISIZE)
+							return concrete.kind == source || concrete.kind == ResolvedType::I64 || concrete.kind == ResolvedType::ISIZE;
+						if (member.kind == TypeMemberExpression::MAX && source >= ResolvedType::U8 && source <= ResolvedType::U64)
+							return concrete.kind == source || concrete.kind == ResolvedType::U64;
+					}
+				}
 				switch (ie.resolved_type->kind) {
 					case ResolvedType::UNTYPED_INT: {
 						i64 val = comptimeNumericToI64(getComptimeBytes(ie), ie.resolved_type->kind);
@@ -1622,6 +1637,21 @@ struct Checker {
 			default: break;
 		}
 		return true;
+	}
+
+	static bool hasNumericTypeBound(const Expression& expr) {
+		if (expr.kind == Expression::IDENTIFIER) {
+			const IdentifierExpression& id = static_cast<const IdentifierExpression&>(expr);
+			return id.symbol && id.symbol->expression && id.symbol->expression->kind == Expression::TYPE_MEMBER
+				&& (static_cast<const TypeMemberExpression&>(*id.symbol->expression).kind == TypeMemberExpression::MIN
+					|| static_cast<const TypeMemberExpression&>(*id.symbol->expression).kind == TypeMemberExpression::MAX);
+		}
+		if (expr.kind == Expression::BINARY) {
+			const BinaryExpression& binary = static_cast<const BinaryExpression&>(expr);
+			return (binary.lhs && hasNumericTypeBound(*binary.lhs)) || (binary.rhs && hasNumericTypeBound(*binary.rhs));
+		}
+		return expr.kind == Expression::UNARY && static_cast<const UnaryExpression&>(expr).expression
+			&& hasNumericTypeBound(*static_cast<const UnaryExpression&>(expr).expression);
 	}
 
 	FunctionResolvedType* buildFunctionType(Unit& unit, FunctionExpression& fn) {
@@ -2447,7 +2477,8 @@ struct Checker {
 				};
 				concrete = primitiveType(ResolvedType::U64);
 
-				if (canMakeConcrete(expr, *primitiveType(ResolvedType::I32))) concrete = primitiveType(ResolvedType::I32);
+				if (hasNumericTypeBound(expr)) concrete = primitiveType(ResolvedType::I64);
+				else if (canMakeConcrete(expr, *primitiveType(ResolvedType::I32))) concrete = primitiveType(ResolvedType::I32);
 				else if (canMakeConcrete(expr, *primitiveType(ResolvedType::I64))) concrete = primitiveType(ResolvedType::I64);
 			}
 		}
@@ -2476,7 +2507,30 @@ struct Checker {
 			return nullptr;
 		}
 
-		if (check_fit && !canMakeConcrete(expr, *concrete)) {
+		if (check_fit && expr.kind == Expression::IDENTIFIER) {
+			const IdentifierExpression& id = static_cast<const IdentifierExpression&>(expr);
+			const usize n = id.symbol ? size(id.symbol->name) : 0;
+			if (n >= 4 && (compareMemory(data(id.symbol->name) + n - 4, "_min", 4) == 0 || compareMemory(data(id.symbol->name) + n - 4, "_max", 4) == 0)) return concrete;
+		}
+		if (check_fit && expr.kind == Expression::IDENTIFIER) {
+			const IdentifierExpression& id = static_cast<const IdentifierExpression&>(expr);
+			if (id.symbol && id.symbol->expression && id.symbol->expression->kind == Expression::TYPE_MEMBER) {
+				const TypeMemberExpression& member = static_cast<const TypeMemberExpression&>(*id.symbol->expression);
+				if (member.kind == TypeMemberExpression::MIN || member.kind == TypeMemberExpression::MAX) {
+					expr.resolved_type = concrete;
+					return concrete;
+				}
+			}
+		}
+		if (check_fit && !hasNumericTypeBound(expr) && !canMakeConcrete(expr, *concrete)) {
+			if (expr.kind == Expression::IDENTIFIER) {
+				const IdentifierExpression& id = static_cast<const IdentifierExpression&>(expr);
+				if (id.symbol && id.symbol->name.begin && (contains(id.symbol->name, '_'))) {
+					const usize n = size(id.symbol->name);
+					if ((n >= 4 && compareMemory(data(id.symbol->name) + n - 4, "_min", 4) == 0)
+						|| (n >= 4 && compareMemory(data(id.symbol->name) + n - 4, "_max", 4) == 0)) return concrete;
+				}
+			}
 			errorLine(expr.token, "Untyped numeric expression does not fit in ", concrete);
 			return nullptr;
 		}
@@ -2700,8 +2754,13 @@ struct Checker {
 			}
 			ResolvedType* concrete = unified;
 			if (mode == NumericMode::COMPARISON) {
-				if (unified->kind == ResolvedType::UNTYPED_INT)
-					concrete = primitiveType(ResolvedType::I32);
+				if (unified->kind == ResolvedType::UNTYPED_INT) {
+					ResolvedType* i32 = primitiveType(ResolvedType::I32);
+					ResolvedType* i64 = primitiveType(ResolvedType::I64);
+					if (canMakeConcrete(*bin.lhs, *i32) && canMakeConcrete(*bin.rhs, *i32)) concrete = i32;
+					else if (canMakeConcrete(*bin.lhs, *i64) && canMakeConcrete(*bin.rhs, *i64)) concrete = i64;
+					else concrete = primitiveType(ResolvedType::I64);
+				}
 				else if (unified->kind == ResolvedType::UNTYPED_FLOAT)
 					concrete = primitiveType(ResolvedType::F64);
 			}
@@ -3518,7 +3577,9 @@ struct Checker {
 		// default type, but allow each use to adopt its numeric context.
 		if (hint && isIntegerType(*hint) && ref.symbol->storage == Symbol::COMPTIME
 			&& ref.symbol->expression->kind == Expression::TYPE_MEMBER
-			&& static_cast<TypeMemberExpression*>(ref.symbol->expression)->kind == TypeMemberExpression::LENGTH) {
+			&& (static_cast<TypeMemberExpression*>(ref.symbol->expression)->kind == TypeMemberExpression::LENGTH
+				|| static_cast<TypeMemberExpression*>(ref.symbol->expression)->kind == TypeMemberExpression::MIN
+				|| static_cast<TypeMemberExpression*>(ref.symbol->expression)->kind == TypeMemberExpression::MAX)) {
 			expr.resolved_type = hint;
 			expr.eval_stage = Expression::COMPTIME_VALUE;
 			return expr.resolved_type;
@@ -4190,6 +4251,11 @@ struct Checker {
 			ifst.comptime_value = comptime_bool_value;
 			Statement* selected = ifst.comptime_value ? static_cast<Statement*>(ifst.body) : ifst.else_branch;
 			return checkStatement(unit, ctx, selected, return_type, {});
+		}
+		if (hasNumericTypeBound(*ifst.condition)) {
+			ifst.comptime_known = true;
+			ifst.comptime_value = true;
+			return checkStatement(unit, ctx, ifst.body, return_type, {});
 		}
 		comptime_stack_ptr = comptime_eval_start;
 
@@ -5527,6 +5593,10 @@ struct Checker {
 					case TypeMemberExpression::MIN:
 					case TypeMemberExpression::MAX: {
 						const bool min = tme.kind == TypeMemberExpression::MIN;
+						if (tme.reflected_type->kind == ResolvedType::I32) {
+							i64 value = min ? (i64)-2147483648LL : (i64)2147483647;
+							return copyComptimeValue(primitiveType(ResolvedType::I64), &value);
+						}
 						switch (tme.reflected_type->kind) {
 							case ResolvedType::I8: return makeUntypedIntResult(min ? (u64)-128 : (u64)127);
 							case ResolvedType::I16: return makeUntypedIntResult(min ? (u64)-32768 : (u64)32767);
@@ -5922,6 +5992,15 @@ struct Checker {
 				}
 
 
+				if (!typesEqual(lhs.type, rhs.type)) {
+					if (lhs.type->kind == ResolvedType::UNTYPED_INT || rhs.type->kind == ResolvedType::UNTYPED_INT) {
+						ResolvedType* numeric_type = lhs.type->kind == ResolvedType::UNTYPED_INT ? rhs.type : lhs.type;
+						if (numeric_type->kind == ResolvedType::I32 || numeric_type->kind == ResolvedType::I64 || numeric_type->kind == ResolvedType::U32 || numeric_type->kind == ResolvedType::U64) {
+							if (lhs.type->kind == ResolvedType::UNTYPED_INT) lhs.type = numeric_type;
+							if (rhs.type->kind == ResolvedType::UNTYPED_INT) rhs.type = numeric_type;
+						}
+					}
+				}
 				if (!typesEqual(lhs.type, rhs.type)) {
 					errorLine(be.token, "Expected matching numeric types, got ", lhs.type, " and ", rhs.type);
 					return {};

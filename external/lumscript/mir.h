@@ -2,6 +2,8 @@
 
 #include "resolved_types.h"
 
+struct ls_bytecode_global_debug_entry;
+
 typedef u32 MirValueId;
 typedef u32 MirBlockId;
 typedef u32 MirLocalId;
@@ -31,6 +33,7 @@ enum MirOpcode {
 	MIR_OP_GE,
 	MIR_OP_LOCAL_ADDRESS,
 	MIR_OP_GLOBAL_ADDRESS,
+	MIR_OP_REFERENCE,
 	MIR_OP_CONSTANT_ADDRESS,
 	MIR_OP_FIELD_ADDRESS,
 	MIR_OP_INDEX_ADDRESS,
@@ -70,7 +73,8 @@ enum MirCallTargetKind {
 
 enum MirConstKind {
 	MIR_CONST_DEFAULT,
-	MIR_CONST_I32
+	MIR_CONST_I32,
+	MIR_CONST_BYTES
 };
 
 enum MirSliceMode {
@@ -83,7 +87,8 @@ enum MirAccessMode {
 	MIR_ACCESS_INDEXED = 1,
 	MIR_ACCESS_NULLABLE_TAG = 2,
 	MIR_ACCESS_SLICE_ELEMENT = 3,
-	MIR_ACCESS_SLICE_FIELD = 4
+	MIR_ACCESS_SLICE_FIELD = 4,
+	MIR_ACCESS_POINTER = 5
 };
 
 struct MirSourceLocation {
@@ -168,6 +173,7 @@ struct MirSliceInstruction : MirInstruction {
 	MirSliceMode mode = MIR_SLICE_FULL;
 	u32 element_size = 0;
 	u32 length = 0;
+	bool base_is_pointer = false;
 };
 
 struct MirAddressInstruction : MirInstruction {
@@ -196,6 +202,8 @@ struct MirConstInstruction : MirInstruction {
 	f64 floating;
 	i64 integer;
 	ls_string_view string;
+	const u8* bytes = nullptr;
+	u32 byte_size = 0;
 };
 
 struct MirUndefinedInstruction : MirInstruction {
@@ -277,6 +285,7 @@ struct MirFunction {
 struct MirNativeFunction {
 	ls_string_view name;
 	FunctionResolvedType* type;
+	bool is_builtin;
 };
 
 struct MirModuleFunction {
@@ -290,9 +299,12 @@ struct MirModule {
 	ExpArray<MirModuleFunction> functions;
 	MirFunction* global_init;
 	u32 global_size;
+	ls_bytecode_global_debug_entry* global_debug;
+	ResolvedType** global_debug_types;
+	u32 global_debug_count;
 
-	explicit MirModule(ls_arena& arena)
-		: arena(arena), functions(arena), global_init(nullptr), global_size(0) {}
+		explicit MirModule(ls_arena& arena)
+		: arena(arena), functions(arena), global_init(nullptr), global_size(0), global_debug(nullptr), global_debug_types(nullptr), global_debug_count(0) {}
 };
 
 static inline MirBlock* mirFunctionCreateBlock(MirFunction& function) {

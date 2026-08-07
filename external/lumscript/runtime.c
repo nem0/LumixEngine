@@ -674,8 +674,10 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				u8* out = runtime->frame + dst;
 				memcpy(&index, index_ptr, 8u);
 				memcpy(&base_ptr, base_value, sizeof(base_ptr));
+				if (!base_ptr) goto runtime_execute_function_fail;
 				u8* base = (u8*)base_ptr;
 				u8* addr = base + index * (i64)scale + (i64)offset;
+				if (base < runtime->stack || base >= runtime->stack_end || addr < runtime->stack || addr + size > runtime->stack_end) goto runtime_execute_function_fail;
 				memmove(out, addr, size);
 				break;
 			}
@@ -693,8 +695,10 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				u8* value = runtime->frame + value_reg;
 				memcpy(&index, index_ptr, 8u);
 				memcpy(&base_ptr, base_value, sizeof(base_ptr));
+				if (!base_ptr) goto runtime_execute_function_fail;
 				u8* base = (u8*)base_ptr;
 				u8* addr = base + index * (i64)scale + (i64)offset;
+				if (base < runtime->stack || base >= runtime->stack_end || addr < runtime->stack || addr + size > runtime->stack_end) goto runtime_execute_function_fail;
 				memmove(addr, value, size);
 				break;
 			}
