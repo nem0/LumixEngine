@@ -98,11 +98,6 @@ static u32 runtime_type_size(ls_type_kind kind) {
 	}
 }
 
-static const ls_function_bc* runtime_find_function(const ls_bytecode* bytecode, u32 function_index) {
-	if (function_index >= bytecode->function_count) return NULL;
-	return &bytecode->functions[function_index];
-}
-
 static const ls_function_bc* runtime_find_function_by_name(const ls_bytecode* bytecode, ls_string_view name, i32* out_index) {
 	if (!bytecode) return NULL;
 	for (u32 i = 0; i < bytecode->function_count; ++i) {
@@ -349,7 +344,8 @@ static bool runtime_enter_script_call(
 	u8* callee_stack_top = callee_frame + callee->frame_size;
 	if (callee_stack_top > runtime->stack_end) return false;
 
-	runtime->call_stack[runtime->call_depth++] = (runtime_call_frame){ *function, *ip, runtime->frame, caller_stack_top };
+	runtime->call_stack[runtime->call_depth] = (runtime_call_frame){ *function, *ip, runtime->frame, caller_stack_top };
+	runtime->call_depth++;
 	*function = callee;
 	*ip = callee->code;
 	runtime->frame = callee_frame;
@@ -1030,38 +1026,39 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				else {
 					runtime->stack_top = runtime->frame;
 				}
-			if (runtime->call_depth == initial->call_depth) {
-				runtime_clear_step_traps(runtime);
-				runtime->step_action = LS_DEBUG_CONTINUE;
-					runtime->result_size = size;
-					runtime->frame = initial->frame;
-					--runtime->call_start_depth;
-					return 1;
+				if (runtime->call_depth == initial->call_depth) {
+					runtime_clear_step_traps(runtime);
+					runtime->step_action = LS_DEBUG_CONTINUE;
+						runtime->result_size = size;
+						runtime->frame = initial->frame;
+						--runtime->call_start_depth;
+						return 1;
 				}
-				{
-					const runtime_call_frame caller = runtime->call_stack[--runtime->call_depth];
-					fn = caller.function;
-					ip = caller.ip;
-					runtime->frame = caller.frame;
-					runtime->stack_top = caller.stack_top;
-				}
+				const runtime_call_frame caller = runtime->call_stack[--runtime->call_depth];
+				fn = caller.function;
+				ip = caller.ip;
+				runtime->frame = caller.frame;
+				runtime->stack_top = caller.stack_top;
 				break;
 			}
 			case LS_OP_CALL_DIRECT: {
 				const u32 callee_index = runtime_read_u32(&ip);
 				const u32 arg_base = runtime_read_u32(&ip);
 				u8* caller_top = runtime->stack_top;
-				const ls_function_bc* callee = runtime_find_function(runtime->bytecode, callee_index);
-				if (!callee) goto runtime_execute_function_fail;
+				const ls_function_bc* callee = &runtime->bytecode->functions[callee_index];
 				if (runtime->frame + arg_base > caller_top) goto runtime_execute_function_fail;
-				
-				if (callee->kind == LS_FUNCTION_NATIVE) {
-					if (!runtime_invoke_native(runtime, callee_index, callee, runtime->frame + arg_base, NULL)) goto runtime_execute_function_fail;
-					runtime->stack_top = caller_top;
-					break;
-				}
 
 				if (!runtime_enter_script_call(runtime, &fn, &ip, callee, runtime->frame + arg_base, caller_top)) goto runtime_execute_function_fail;
+				break;
+			}
+			case LS_OP_CALL_NATIVE: {
+				const u32 callee_index = runtime_read_u32(&ip);
+				const u32 arg_base = runtime_read_u32(&ip);
+				u8* caller_top = runtime->stack_top;
+				const ls_function_bc* callee = &runtime->bytecode->functions[callee_index];
+				if (runtime->frame + arg_base > caller_top) goto runtime_execute_function_fail;
+				if (!runtime_invoke_native(runtime, callee_index, callee, runtime->frame + arg_base, NULL)) goto runtime_execute_function_fail;
+				runtime->stack_top = caller_top;
 				break;
 			}
 			case LS_OP_CALL_INDIRECT: {
@@ -1074,8 +1071,8 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				u32 callee_index = 0;
 				memcpy(&callee_index, callee_ptr, sizeof(callee_index));
 				u8* caller_top = runtime->stack_top;
-				const ls_function_bc* callee = runtime_find_function(runtime->bytecode, callee_index);
-				if (!callee) goto runtime_execute_function_fail;
+				if (callee_index >= runtime->bytecode->function_count) goto runtime_execute_function_fail;
+				const ls_function_bc* callee = &runtime->bytecode->functions[callee_index];
 
 				// The function-value slot at dst is no longer needed once
 				// callee_index is read out of it above; shift the argument
@@ -1323,10 +1320,8 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				break;
 			}
 			case LS_OP_RETURN_BASE: {
-				const u32 size = fn->return_size;
-				if (runtime->frame + size > runtime->stack_end) goto runtime_execute_function_fail;
-
 				if (runtime->call_depth == initial->call_depth) {
+					const u32 size = fn->return_size;
 					runtime_clear_step_traps(runtime);
 					runtime->step_action = LS_DEBUG_CONTINUE;
 					runtime->stack_top = runtime->frame + size;
@@ -1336,7 +1331,8 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 					return 1;
 				}
 
-				const runtime_call_frame caller = runtime->call_stack[--runtime->call_depth];
+				runtime->call_depth--;
+				const runtime_call_frame caller = runtime->call_stack[runtime->call_depth];
 				fn = caller.function;
 				ip = caller.ip;
 				runtime->frame = caller.frame;
@@ -1487,6 +1483,16 @@ runtime_execute_function_suspend:
 	runtime_clear_step_traps(runtime);
 	runtime->step_action = LS_DEBUG_CONTINUE;
 	runtime->suspended_frame = (runtime_call_frame){ fn, ip, runtime->frame, runtime->stack_top };
+	// Reify the complete chain while the interpreter still owns the active
+	// frames. Debug queries can then use one stable representation for both
+	// runtime errors and explicit debugger pauses.
+	runtime->fail_frame_count = 0u;
+	if (runtime->fail_frame_count < (u32)(sizeof(runtime->fail_frames) / sizeof(runtime->fail_frames[0]))) {
+		runtime->fail_frames[runtime->fail_frame_count++] = runtime->suspended_frame;
+	}
+	for (u32 i = runtime->call_depth; i > 0u && runtime->fail_frame_count < (u32)(sizeof(runtime->fail_frames) / sizeof(runtime->fail_frames[0])); --i) {
+		runtime->fail_frames[runtime->fail_frame_count++] = runtime->call_stack[i - 1u];
+	}
 	runtime->is_suspended = true;
 	if (!runtime_debug_frame_location(fn, (u32)(ip - fn->code), &runtime->pause_event.location)) {
 		runtime->pause_event.location = (ls_debug_location){ {NULL, NULL}, 0u, 0u };
@@ -1628,8 +1634,8 @@ ls_result ls_call(ls_runtime* runtime, ls_string_view function_name) {
 ls_result ls_call_index(ls_runtime* runtime, i32 function_index) {
 	if (runtime->is_suspended) return LS_RESULT_FAILURE;
 	if (function_index < 0) return LS_RESULT_FAILURE;
-	const ls_function_bc* function = runtime_find_function(runtime->bytecode, (u32)function_index);
-	if (!function) return LS_RESULT_FAILURE;
+	if ((u32)function_index >= runtime->bytecode->function_count) return LS_RESULT_FAILURE;
+	const ls_function_bc* function = &runtime->bytecode->functions[(u32)function_index];
 	runtime->fail_frame_count = 0u;
 	return runtime_exec_result_to_ls_result(runtime_execute_function(runtime, function, NULL));
 }

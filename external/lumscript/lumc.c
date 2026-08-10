@@ -20,8 +20,6 @@
 #include "bytecode.h"
 #include "capi.h"
 
-ls_bytecode* ls_bytecode_compile_mir(ls_module* module, ls_host* host);
-
 typedef struct lumc_context {
 	ls_host host;
 	char* source;
@@ -531,6 +529,12 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 				printf(" function=%u, arg_base=%u", callee, arg_base);
 				break;
 			}
+			case LS_OP_CALL_NATIVE: {
+				const u32 callee = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 arg_base = lumc_read_u32(fn->code, fn->code_size, &pc);
+				printf(" function=%u, arg_base=%u", callee, arg_base);
+				break;
+			}
 			case LS_OP_CALL_INDIRECT: {
 				const u32 dst = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 arg_size = lumc_read_u32(fn->code, fn->code_size, &pc);
@@ -578,9 +582,8 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 
 int main(int argc, char** argv) {
 	if (argc < 2) {
-		fputs("Usage: lumc [--dump-bytecode|--mir] <script.lum> [function_name] [args...]\n"
+		fputs("Usage: lumc [--dump-bytecode] <script.lum> [function_name] [args...]\n"
 			"  --dump-bytecode  Compile and print human-readable bytecode\n"
-			"  --mir            Compile using the MIR backend\n"
 			"  script.lum     - Path to LumScript source file\n"
 			"  function_name  - Function to call (default: main)\n"
 			"  args           - Arguments passed to the function\n", stderr);
@@ -595,8 +598,7 @@ int main(int argc, char** argv) {
 	ctx.host.print = &lumc_diagnostics_print;
 
 	const int dump_bytecode = strcmp(argv[1], "--dump-bytecode") == 0;
-	const int use_mir = strcmp(argv[1], "--mir") == 0;
-	const int script_arg = (dump_bytecode || use_mir) ? 2 : 1;
+	const int script_arg = dump_bytecode ? 2 : 1;
 	if (argc <= script_arg) {
 		fputs("Error: Missing script path\n", stderr);
 		return 1;
@@ -646,7 +648,7 @@ int main(int argc, char** argv) {
 		goto cleanup;
 	}
 
-	ctx.bytecode = use_mir ? ls_bytecode_compile_mir(ctx.module, &ctx.host) : ls_bytecode_compile(ctx.module, &ctx.host);
+	ctx.bytecode = ls_bytecode_compile(ctx.module, &ctx.host);
 	if (!ctx.bytecode) {
 		fprintf(stderr, "Error: Failed to compile bytecode\n");
 		goto cleanup;

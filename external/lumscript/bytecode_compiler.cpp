@@ -283,11 +283,26 @@ template <typename T> static T* appendArenaArray(ls_arena& arena, T*& data, u32&
 	return &data[count++];
 }
 
+struct LoopConstant {
+	Expression* source = nullptr;
+	u32 offset = 0u;
+	ls_type_kind kind = LS_TYPE_INVALID;
+	u64 bits = 0u;
+	double fval = 0.0;
+};
+
 struct LoopBinding {
 	ls_string_view label = {};
 	u32 defer_mark = 0;
 	ExpArray<u32>* break_jumps = nullptr;
 	ExpArray<u32>* continue_jumps = nullptr;
+	ExpArray<LoopConstant>* constants = nullptr;
+};
+
+struct InlineBinding {
+	StorageSlot* slot = nullptr;
+	u32 source_offset = 0u;
+	u32 offset = 0u;
 };
 
 struct FunctionCompiler;
@@ -453,7 +468,7 @@ static void emitDeferredStatements(FunctionCompiler& ctx, u32 defer_mark, ls_typ
 static void compileExpressionAsType(FunctionCompiler& ctx, Expression& expr, ResolvedType& expected_type);
 static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, ls_type_kind hint);
 static bool tryEmitReference(FunctionCompiler& ctx, Expression& expr);
-static void emitCallDirect(FunctionCompiler& ctx, u32 callee_index, u32 arg_size, u32 return_size);
+static void emitCallDirect(FunctionCompiler& ctx, u32 callee_index, u32 arg_size, u32 return_size, bool is_native);
 static ls_type_kind compileMember(FunctionCompiler& ctx, MemberExpression& expr);
 static bool patchJumpRelative(FunctionCompiler& ctx, u32 operand_pos, u32 target_pos);
 static u32 emitJumpPlaceholder(FunctionCompiler& ctx, ls_op op);
@@ -466,6 +481,7 @@ struct FunctionCompiler {
 		, deferreds(*bytecode->arena)
 		, defer_marks(*bytecode->arena)
 		, loops(*bytecode->arena)
+		, inline_bindings(*bytecode->arena)
 		, locals_debug(*bytecode->arena) {
 		diagnostics.host = bytecode->host;
 	}
@@ -478,6 +494,7 @@ struct FunctionCompiler {
 	ExpArray<Statement*> deferreds;
 	ExpArray<i32> defer_marks;
 	ExpArray<LoopBinding> loops;
+	ExpArray<InlineBinding> inline_bindings;
 	ExpArray<ls_bytecode_local_debug_entry> locals_debug;
 	OutputFormatter diagnostics;
 	bool failed = false;
@@ -553,6 +570,11 @@ struct FunctionCompiler {
 		ASSERT(false);
 		return nullptr;
 	}
+
+	void initLoop(LoopBinding& loop) {
+		void* storage = bytecode->arena->allocate(bytecode->arena->user_data, sizeof(ExpArray<LoopConstant>), alignof(ExpArray<LoopConstant>));
+		loop.constants = ::new (NewPlaceholder{}, storage) ExpArray<LoopConstant>(*bytecode->arena);
+	}
 };
 
 // A `: type` function runs only during compilation, so it gets no bytecode. Every
@@ -610,6 +632,107 @@ static bool paramIsComptime(const FunctionResolvedType& fn_type, u32 param_index
 	return param_index < (u32)fn_type.params.size() && fn_type.params[param_index].is_comptime;
 }
 
+static bool isInlineScalarType(const ResolvedType& type) {
+	switch (type.kind) {
+		case ResolvedType::BOOL:
+		case ResolvedType::I8:
+		case ResolvedType::I16:
+		case ResolvedType::I32:
+		case ResolvedType::I64:
+		case ResolvedType::U8:
+		case ResolvedType::U16:
+		case ResolvedType::U32:
+		case ResolvedType::U64:
+		case ResolvedType::ISIZE:
+		case ResolvedType::F32:
+		case ResolvedType::F64:
+		case ResolvedType::CSTR:
+		case ResolvedType::CPTR:
+		case ResolvedType::BYTE:
+		case ResolvedType::POINTER:
+		case ResolvedType::ENUM:
+			return true;
+		default:
+			return false;
+	}
+}
+
+static bool canInlineSingleReturn(const FunctionExpression& fn, const FunctionExpression* active, u32 depth);
+
+static FunctionExpression* inlineCallTarget(const CallExpression& call) {
+	if (call.resolved_fn) return call.resolved_fn;
+	if (!call.callee) return nullptr;
+	if (call.callee->kind == Expression::IDENTIFIER) {
+		const IdentifierExpression& id = static_cast<const IdentifierExpression&>(*call.callee);
+		if (id.symbol) return static_cast<FunctionExpression*>(id.symbol->expression);
+	}
+	if (call.callee->kind == Expression::MEMBER) {
+		const MemberExpression& member = static_cast<const MemberExpression&>(*call.callee);
+		if (member.resolved_fn) return member.resolved_fn;
+	}
+	if (call.callee->kind == Expression::BRACKET && call.callee->resolved_type
+		&& call.callee->resolved_type->kind == ResolvedType::FUNCTION) {
+		const FunctionResolvedType& fn_type = *static_cast<const FunctionResolvedType*>(call.callee->resolved_type);
+		return fn_type.decl;
+	}
+	return nullptr;
+}
+
+static bool inlineExpressionIsSafe(const Expression& expr, const FunctionExpression* active, u32 depth) {
+	switch (expr.kind) {
+		case Expression::INT_LITERAL:
+		case Expression::FLOAT_LITERAL:
+		case Expression::BOOL_LITERAL:
+		case Expression::IDENTIFIER:
+			return true;
+		case Expression::UNARY:
+			{
+				const UnaryExpression& unary = static_cast<const UnaryExpression&>(expr);
+				return !unary.resolved_fn && inlineExpressionIsSafe(*unary.expression, active, depth);
+			}
+		case Expression::BINARY: {
+			const BinaryExpression& binary = static_cast<const BinaryExpression&>(expr);
+			return !binary.resolved_fn
+				&& inlineExpressionIsSafe(*binary.lhs, active, depth)
+				&& inlineExpressionIsSafe(*binary.rhs, active, depth);
+		}
+		case Expression::CALL: {
+			const CallExpression& call = static_cast<const CallExpression&>(expr);
+			FunctionExpression* target = inlineCallTarget(call);
+			if (!target || !call.callee) return false;
+			for (Expression* arg : call.args) {
+				if (!inlineExpressionIsSafe(*arg, active, depth)) return false;
+			}
+			if (target->is_extern) return true;
+			if (call.callee->kind != Expression::IDENTIFIER || target == active || depth >= 16u) return false;
+			return canInlineSingleReturn(*target, active, depth + 1u);
+		}
+		default:
+			return false;
+	}
+}
+
+static bool canInlineSingleReturn(const FunctionExpression& fn, const FunctionExpression* active = nullptr, u32 depth = 0u) {
+	if (fn.is_extern || fn.is_template || isTypeFactory(fn) || !fn.body) return false;
+	if (fn.body->kind != Statement::BLOCK) return false;
+	const FunctionResolvedType& fn_type = *static_cast<const FunctionResolvedType*>(fn.resolved_type);
+	if (!isInlineScalarType(*fn_type.return_type)) return false;
+	for (i32 i = 0; i < fn.params.size(); ++i) {
+		if (fn.params[i].is_comptime || fn.params[i].is_ref || !isInlineScalarType(*fn_type.params[i].type)) return false;
+	}
+	BlockStatement& body = *static_cast<BlockStatement*>(fn.body);
+	if (body.statements.size() != 1 || body.statements[0]->kind != Statement::RETURN) return false;
+	ReturnStatement& ret = *static_cast<ReturnStatement*>(body.statements[0]);
+	return ret.expression && inlineExpressionIsSafe(*ret.expression, active ? active : &fn, depth);
+}
+
+static u32 inlineBindingOffset(const FunctionCompiler& ctx, const StorageSlot& slot) {
+	for (i32 i = ctx.inline_bindings.size() - 1; i >= 0; --i) {
+		if (ctx.inline_bindings[i].slot == &slot) return ctx.inline_bindings[i].offset;
+	}
+	return slot.offset;
+}
+
 static void compileCallArgs(FunctionCompiler& ctx, CallExpression& expr, const FunctionResolvedType& fn_type, u32 arg_offset) {
 	for (i32 i = 0; i < expr.args.size(); ++i) {
 		const u32 param_index = arg_offset + i;
@@ -617,6 +740,47 @@ static void compileCallArgs(FunctionCompiler& ctx, CallExpression& expr, const F
 		if (paramIsComptime(fn_type, param_index)) continue;
 		compileExpressionAsType(ctx, *expr.args[i], *param_type);
 	}
+}
+
+static ls_type_kind emitInlineSingleReturn(FunctionCompiler& ctx, CallExpression& expr, FunctionExpression& fn, ls_type_kind hint) {
+	FunctionResolvedType& fn_type = *static_cast<FunctionResolvedType*>(fn.resolved_type);
+	const u32 result_base = ctx.temp_top;
+	const i32 binding_base = ctx.inline_bindings.size();
+	for (i32 i = 0; i < expr.args.size(); ++i) {
+		const u32 param_index = (u32)i;
+		compileExpressionAsType(ctx, *expr.args[i], *fn_type.params[param_index].type);
+		const u32 size = typeByteSize(*fn_type.params[param_index].type);
+		fn.params[param_index].slot.byte_size = size;
+		fn.params[param_index].slot.kind = valueKindForType(*fn_type.params[param_index].type);
+		fn.params[param_index].slot.type = fn_type.params[param_index].type;
+		fn.params[param_index].slot.storage = StorageSlot::LOCAL;
+		InlineBinding binding;
+		binding.slot = &fn.params[param_index].slot;
+		binding.source_offset = fn.params[param_index].slot.offset;
+		binding.offset = ctx.temp_top - size;
+		ctx.inline_bindings.push_back(binding);
+	}
+	for (i32 i = 0; i < fn.params.size(); ++i) {
+		fn.params[i].slot.offset = ctx.inline_bindings[binding_base + i].offset;
+	}
+
+	ReturnStatement& ret = *static_cast<ReturnStatement*>(static_cast<BlockStatement*>(fn.body)->statements[0]);
+	SourceScope source_scope(ctx.code, ret.token);
+	const ls_type_kind result_kind = compileExpression(ctx, *ret.expression, hint);
+	const u32 result_size = typeByteSize(*fn_type.return_type);
+	const u32 result_offset = ctx.temp_top - result_size;
+	for (i32 i = 0; i < fn.params.size(); ++i) {
+		fn.params[i].slot.offset = ctx.inline_bindings[binding_base + i].source_offset;
+	}
+	if (result_offset != result_base) {
+		emitOp(ctx.code, LS_OP_COPY);
+		emitU32(ctx.code, result_base);
+		emitU32(ctx.code, result_offset);
+		emitU32(ctx.code, result_size);
+	}
+	ctx.temp_top = result_base + result_size;
+	while (ctx.inline_bindings.size() > binding_base) ctx.inline_bindings.pop_back();
+	return result_kind;
 }
 
 
@@ -634,12 +798,14 @@ static u32 callArgWindowSize(const FunctionResolvedType& fn_type) {
 
 static ls_type_kind emitDirectCall(FunctionCompiler& ctx, CallExpression& expr, FunctionExpression& fn, Expression* receiver, u32 arg_offset, ls_type_kind hint) {
 	FunctionResolvedType& fn_type = *static_cast<FunctionResolvedType*>(fn.resolved_type);
+	if (!receiver && arg_offset == 0u && canInlineSingleReturn(fn))
+		return emitInlineSingleReturn(ctx, expr, fn, hint);
 	if (receiver) {
 		const ls_type_kind receiver_kind = !fn_type.params.empty() ? valueKindForType(*fn_type.params[0].type) : LS_TYPE_INVALID;
 		compileExpression(ctx, *receiver, receiver_kind);
 	}
 	compileCallArgs(ctx, expr, fn_type, arg_offset);
-	emitCallDirect(ctx, fn.bytecode_index, callArgWindowSize(fn_type), typeByteSize(*fn_type.return_type));
+	emitCallDirect(ctx, fn.bytecode_index, callArgWindowSize(fn_type), typeByteSize(*fn_type.return_type), fn.is_extern);
 	return valueKindForType(*fn_type.return_type);
 }
 
@@ -786,6 +952,26 @@ static void emitConstBytes(FunctionCompiler& ctx, const u8* data, u32 size) {
 	}
 }
 
+static void emitConstBytesAt(FunctionCompiler& ctx, u32 dst, const u8* data, u32 size) {
+	u32 offset = 0u;
+	while (size - offset >= 8u) {
+		u64 value; memcpy(&value, data + offset, sizeof(value));
+		emitConst8At(ctx, dst + offset, value);
+		offset += 8u;
+	}
+	if (size - offset >= 4u) {
+		u32 value; memcpy(&value, data + offset, sizeof(value));
+		emitConst4At(ctx, dst + offset, value);
+		offset += 4u;
+	}
+	if (size - offset >= 2u) {
+		u16 value; memcpy(&value, data + offset, sizeof(value));
+		emitConst2At(ctx, dst + offset, value);
+		offset += 2u;
+	}
+	if (size - offset == 1u) emitConst1At(ctx, dst + offset, data[offset]);
+}
+
 static bool isUntypedNumeric(const ResolvedType* type) {
 	return type && (type->kind == ResolvedType::UNTYPED_INT || type->kind == ResolvedType::UNTYPED_FLOAT);
 }
@@ -921,6 +1107,58 @@ static Value makeConstIntValue(u64 bits, ls_type_kind type) {
 
 static bool isConstValue(const Value& v) {
 	return v.kind == Value::CONST_INT || v.kind == Value::CONST_FLOAT;
+}
+
+static Value deferredGlobalConst(const Expression& expr, const Symbol& symbol, ls_type_kind hint) {
+	ls_type_kind kind = expr.resolved_type ? toTypeKind(*expr.resolved_type) : LS_TYPE_INVALID;
+	if (kind == LS_TYPE_INVALID) kind = isNumericKind(hint) ? hint : (symbol.resolved_type->kind == ResolvedType::UNTYPED_FLOAT ? LS_TYPE_F64 : LS_TYPE_I32);
+	Value result;
+	result.type = kind;
+	if (isFloatKind(kind)) {
+		double value = 0.0;
+		if (isFloatKind(toTypeKind(*symbol.resolved_type))) {
+			if (symbol.resolved_type->kind == ResolvedType::F32) {
+				float f; memcpy(&f, symbol.comptime_bytes, sizeof(f)); value = f;
+			} else memcpy(&value, symbol.comptime_bytes, sizeof(value));
+		} else {
+			i64 integer; memcpy(&integer, symbol.comptime_bytes, sizeof(integer)); value = (double)integer;
+		}
+		result.kind = Value::CONST_FLOAT;
+		result.fval = value;
+	} else {
+		result.kind = Value::CONST_INT;
+		memcpy(&result.bits, symbol.comptime_bytes, sizeof(result.bits));
+	}
+	return result;
+}
+
+static bool foldNumericBinary(Token::Type op, ls_type_kind kind, const Value& lhs, const Value& rhs, Value& result) {
+	if (isFloatKind(kind)) {
+		const double a = lhs.kind == Value::CONST_FLOAT ? lhs.fval : (double)(i64)lhs.bits;
+		const double b = rhs.kind == Value::CONST_FLOAT ? rhs.fval : (double)(i64)rhs.bits;
+		result.kind = Value::CONST_FLOAT;
+		result.type = kind;
+		switch (op) {
+			case Token::PLUS: result.fval = a + b; return true;
+			case Token::MINUS: result.fval = a - b; return true;
+			case Token::STAR: result.fval = a * b; return true;
+			case Token::SLASH: result.fval = a / b; return true;
+			default: return false;
+		}
+	}
+	if (!isIntegerKind(kind)) return false;
+	const u64 a = lhs.bits;
+	const u64 b = rhs.bits;
+	result.kind = Value::CONST_INT;
+	result.type = kind;
+	switch (op) {
+		case Token::PLUS: result.bits = a + b; return true;
+		case Token::MINUS: result.bits = a - b; return true;
+		case Token::STAR: result.bits = a * b; return true;
+		case Token::SLASH: if (b) { result.bits = a / b; return true; } return false;
+		case Token::PERCENT: if (b) { result.bits = a % b; return true; } return false;
+		default: return false;
+	}
 }
 
 // Emit a conditional branch taken when `lhs cmp rhs` == `jump_if_true`;
@@ -1225,9 +1463,10 @@ static void emitSliceLengthToLocal(FunctionCompiler& ctx, u32 dst, u32 slice_off
 	emitFixedReg(ctx, slice_offset);
 }
 
-static void emitCallDirect(FunctionCompiler& ctx, u32 callee_index, u32 arg_size, u32 return_size) {
+static void emitCallDirect(FunctionCompiler& ctx, u32 callee_index, u32 arg_size, u32 return_size, bool is_native) {
 	const u32 arg = ctx.temp_top - arg_size;
-	emitOp(ctx.code, LS_OP_CALL_DIRECT);
+	const ls_op op = is_native ? LS_OP_CALL_NATIVE : LS_OP_CALL_DIRECT;
+	emitOp(ctx.code, op);
 	emitU32(ctx.code, callee_index);
 	emitTempReg(ctx, arg);
 	setTempTop(ctx, arg + return_size);
@@ -1656,12 +1895,29 @@ static void emitNumericStoreOp(FunctionCompiler& ctx, ls_type_kind kind, Token::
 	}
 }
 
+static LoopConstant* findHoistedLiteral(FunctionCompiler& ctx, Expression& expr) {
+	const ls_type_kind kind = expr.resolved_type && expr.resolved_type->kind != ResolvedType::UNTYPED_INT && expr.resolved_type->kind != ResolvedType::UNTYPED_FLOAT
+		? toTypeKind(*expr.resolved_type)
+		: defaultLiteralKind(expr, LS_TYPE_INVALID);
+	for (i32 i = (i32)ctx.loops.size() - 1; i >= 0; --i) {
+		LoopBinding& loop = ctx.loops[(u32)i];
+		if (!loop.constants) continue;
+		for (LoopConstant& constant : *loop.constants) {
+			if (constant.source == &expr || (constant.kind == kind && (expr.kind == Expression::FLOAT_LITERAL ? constant.fval == static_cast<FloatLiteralExpression&>(expr).value : constant.bits == static_cast<IntLiteralExpression&>(expr).value)))
+				return &constant;
+		}
+	}
+	return nullptr;
+}
+
 // Compile an expression into a Value descriptor. Local identifiers and
 // numeric/bool literals stay deferred; everything else materializes at the
 // current temp top.
 static Value compileValue(FunctionCompiler& ctx, Expression& expr, ls_type_kind hint) {
 	switch (expr.kind) {
 		case Expression::INT_LITERAL: {
+			if (LoopConstant* constant = findHoistedLiteral(ctx, expr))
+				return makeRegValue(constant->offset, constant->kind, false);
 			Value v;
 			const ls_type_kind kind = expr.resolved_type && expr.resolved_type->kind != ResolvedType::UNTYPED_INT
 				? toTypeKind(*expr.resolved_type)
@@ -1678,6 +1934,8 @@ static Value compileValue(FunctionCompiler& ctx, Expression& expr, ls_type_kind 
 			return v;
 		}
 		case Expression::FLOAT_LITERAL: {
+			if (LoopConstant* constant = findHoistedLiteral(ctx, expr))
+				return makeRegValue(constant->offset, constant->kind, false);
 			Value v;
 			v.kind = Value::CONST_FLOAT;
 			v.type = defaultLiteralKind(expr, hint);
@@ -1705,6 +1963,9 @@ static Value compileValue(FunctionCompiler& ctx, Expression& expr, ls_type_kind 
 		}
 		case Expression::IDENTIFIER: {
 			IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
+			if (id.symbol && id.symbol->storage == Symbol::CONST && id.symbol->comptime_bytes) {
+				return deferredGlobalConst(expr, *id.symbol, hint);
+			}
 			StorageSlot* slot = id.slot;
 			const bool union_payload = slot && slot->type && slot->type->kind == ResolvedType::UNION && expr.resolved_type && expr.resolved_type->kind != ResolvedType::UNION;
 			if (slot && slot->storage == StorageSlot::LOCAL && !union_payload) {
@@ -2191,7 +2452,7 @@ static void emitCompoundValue(FunctionCompiler& ctx, Expression& rhs, ls_type_ki
 	if (op_fn) {
 		const FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(op_fn->resolved_type);
 		compileExpressionAsType(ctx, rhs, *fn_type->params[1].type);
-		emitCallDirect(ctx, op_fn->bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type));
+		emitCallDirect(ctx, op_fn->bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type), op_fn->is_extern);
 		return;
 	}
 	if (rhs.kind == Expression::INT_LITERAL && static_cast<IntLiteralExpression&>(rhs).value == 1u && (op == Token::PLUS_EQUAL || op == Token::MINUS_EQUAL)) {
@@ -2657,7 +2918,7 @@ static ls_type_kind compileBinary(FunctionCompiler& ctx, BinaryExpression& expr,
 		FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(fn.resolved_type);
 		compileExpressionAsType(ctx, *expr.lhs, *fn_type->params[0].type);
 		compileExpressionAsType(ctx, *expr.rhs, *fn_type->params[1].type);
-		emitCallDirect(ctx, fn.bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type));
+		emitCallDirect(ctx, fn.bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type), fn.is_extern);
 		return valueKindForType(*fn_type->return_type);
 	}
 	if (expr.op == Token::IS) {
@@ -2725,6 +2986,15 @@ static ls_type_kind compileBinary(FunctionCompiler& ctx, BinaryExpression& expr,
 		operand_kind = rv.type;
 	else if (isConstValue(lv) && isConstValue(rv) && isFloatKind(rv.type) && !isFloatKind(lv.type))
 		operand_kind = rv.type;
+	if (isConstValue(lv) && isConstValue(rv)) {
+		Value folded;
+		const ls_type_kind kind = numericKindForOp(operand_kind, rv.type);
+		if (foldNumericBinary(expr.op, kind, lv, rv, folded)) {
+			emitConstValueAt(ctx, folded, kind, ctx.temp_top);
+			setTempTop(ctx, ctx.temp_top + typeKindByteSize(kind));
+			return kind;
+		}
+	}
 
 	switch (expr.op) {
 		case Token::PLUS:
@@ -3081,6 +3351,13 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 		}
 		case Expression::IDENTIFIER: {
 			IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
+			if (id.symbol && id.symbol->storage == Symbol::CONST && id.symbol->comptime_bytes) {
+				if (emitUntypedComptimeNumeric(ctx, id.symbol->comptime_bytes, *id.symbol->resolved_type, *expr.resolved_type, hint))
+					return isNumericKind(hint) ? hint : (isFloatKind(toTypeKind(*id.symbol->resolved_type)) ? LS_TYPE_F64 : LS_TYPE_I32);
+				if (isConstU8Slice(id.symbol->resolved_type)) emitConstU8SliceValue(ctx, id.symbol->comptime_bytes);
+				else emitConstBytes(ctx, id.symbol->comptime_bytes, id.symbol->comptime_byte_size);
+				return valueKindForType(*expr.resolved_type);
+			}
 			if (StorageSlot* slot = id.slot) {
 				if (slot->type && slot->type->kind == ResolvedType::UNION && expr.resolved_type->kind != ResolvedType::UNION) {
 					const u32 payload_size = typeByteSize(*expr.resolved_type);
@@ -3099,7 +3376,13 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 					tryEmitReferenceLoad(ctx, expr, typeByteSize(*slot->type));
 					return valueKindForType(*slot->type);
 				}
-				emitLoadSlot(ctx, *slot);
+				if (slot->storage == StorageSlot::LOCAL) {
+					StorageSlot mapped = *slot;
+					mapped.offset = inlineBindingOffset(ctx, *slot);
+					emitLoadSlot(ctx, mapped);
+				} else {
+					emitLoadSlot(ctx, *slot);
+				}
 				return slot->kind != LS_TYPE_INVALID ? slot->kind : LS_TYPE_I32;
 			}
 			if (id.comptime_bytes) {
@@ -3110,7 +3393,6 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 				else emitConstBytes(ctx, id.comptime_bytes, typeByteSize(*id.resolved_type));
 				return valueKindForType(*expr.resolved_type);
 			}
-
 			// Comptime value symbol: no runtime slot exists, so materialize the
 			// value inline. Prefer the folded constant bytes; otherwise fall back to
 			// compiling the initializer expression at this use site.
@@ -3191,7 +3473,7 @@ static ls_type_kind compileExpression(FunctionCompiler& ctx, Expression& expr, l
 				FunctionExpression& fn = *un.resolved_fn;
 				FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(fn.resolved_type);
 				compileExpressionAsType(ctx, *un.expression, *fn_type->params[0].type);
-				emitCallDirect(ctx, fn.bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type));
+				emitCallDirect(ctx, fn.bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type), fn.is_extern);
 				return valueKindForType(*fn_type->return_type);
 			}
 			if (un.op == Token::MINUS && (un.expression->kind == Expression::INT_LITERAL || un.expression->kind == Expression::FLOAT_LITERAL)) {
@@ -3581,7 +3863,7 @@ static void compileAssign(FunctionCompiler& ctx, AssignStatement& assign) {
 				emitConst8(ctx, 0u);
 				emitLoadAt(ctx, 1u, 0, value_size);
 				compileExpressionAsType(ctx, *assign.rhs, *fn_type->params[1].type);
-				emitCallDirect(ctx, assign.resolved_op_fn->bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type));
+				emitCallDirect(ctx, assign.resolved_op_fn->bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type), assign.resolved_op_fn->is_extern);
 				emitStoreAt(ctx, 1u, 0, value_size);
 				return;
 			}
@@ -3608,6 +3890,10 @@ static void compileAssign(FunctionCompiler& ctx, AssignStatement& assign) {
 		if (slot && slot->storage == StorageSlot::LOCAL && !assign.resolved_op_fn && isNumericKind(value_kind)) {
 			const ls_op group = numericOpGroupForAssign(assign.op);
 			if (group != (ls_op)0) {
+				// Keep the INC/DEC fast path even when loop hoisting made the literal a register value.
+				if (assign.rhs->kind == Expression::INT_LITERAL && static_cast<IntLiteralExpression&>(*assign.rhs).value == 1u &&
+					(assign.op == Token::PLUS_EQUAL || assign.op == Token::MINUS_EQUAL) &&
+					emitIncrementLocal(ctx, slot->offset, value_kind, assign.op == Token::MINUS_EQUAL)) return;
 				Value rv = compileValue(ctx, *assign.rhs, value_kind);
 				if (isIncrementCandidate(rv, assign.op) && emitIncrementLocal(ctx, slot->offset, value_kind, assign.op == Token::MINUS_EQUAL)) return;
 				emitBinaryOpValues(ctx, group, value_kind, makeRegValue(slot->offset, value_kind, false), rv, slot->offset);
@@ -3620,7 +3906,7 @@ static void compileAssign(FunctionCompiler& ctx, AssignStatement& assign) {
 		if (assign.resolved_op_fn) {
 			const FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(assign.resolved_op_fn->resolved_type);
 				compileExpressionAsType(ctx, *assign.rhs, *fn_type->params[1].type);
-			emitCallDirect(ctx, assign.resolved_op_fn->bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type));
+				emitCallDirect(ctx, assign.resolved_op_fn->bytecode_index, callArgWindowSize(*fn_type), typeByteSize(*fn_type->return_type), assign.resolved_op_fn->is_extern);
 		} else {
 			compileExpression(ctx, *assign.rhs, value_kind);
 			emitNumericStoreOp(ctx, value_kind, assign.op);
@@ -3698,6 +3984,90 @@ static void compileAssign(FunctionCompiler& ctx, AssignStatement& assign) {
 	ASSERT(false);
 }
 
+static void collectLoopConstants(Expression& expr, ExpArray<Expression*>& out, bool arithmetic_context = false) {
+	if (expr.kind == Expression::INT_LITERAL || expr.kind == Expression::FLOAT_LITERAL) {
+		if (arithmetic_context) out.push_back(&expr);
+		return;
+	}
+	auto visit = [&](Expression* child, bool child_arithmetic = false) { if (child) collectLoopConstants(*child, out, child_arithmetic); };
+	switch (expr.kind) {
+		case Expression::CALL: {
+			CallExpression& call = static_cast<CallExpression&>(expr);
+			visit(call.callee); for (Expression* arg : call.args) visit(arg); break;
+		}
+		case Expression::UNARY: visit(static_cast<UnaryExpression&>(expr).expression, arithmetic_context); break;
+		case Expression::BINARY: { BinaryExpression& e = static_cast<BinaryExpression&>(expr); const bool arithmetic = e.op == Token::PLUS || e.op == Token::MINUS || e.op == Token::STAR || e.op == Token::SLASH || e.op == Token::PERCENT; visit(e.lhs, arithmetic); visit(e.rhs, arithmetic); break; }
+		case Expression::CAST: { CastExpression& e = static_cast<CastExpression&>(expr); visit(e.expression); visit(e.type_expr); break; }
+		case Expression::MEMBER: visit(static_cast<MemberExpression&>(expr).expression); break;
+		case Expression::TYPE_MEMBER: visit(static_cast<TypeMemberExpression&>(expr).expression); break;
+		case Expression::BRACKET: { BracketExpression& e = static_cast<BracketExpression&>(expr); visit(e.base); for (Expression* arg : e.args) visit(arg); break; }
+		case Expression::SLICE: { SliceExpression& e = static_cast<SliceExpression&>(expr); visit(e.base); visit(e.begin); visit(e.end); break; }
+		case Expression::STRUCT_LITERAL: { StructLiteralExpression& e = static_cast<StructLiteralExpression&>(expr); visit(e.type); for (Expression* value : e.values) visit(value); break; }
+		case Expression::ARRAY_LITERAL: for (Expression* value : static_cast<ArrayLiteralExpression&>(expr).values) visit(value); break;
+		case Expression::TERNARY: { TernaryExpression& e = static_cast<TernaryExpression&>(expr); visit(e.condition); visit(e.true_expr); visit(e.false_expr); break; }
+		case Expression::DEREFERENCE: visit(static_cast<DereferenceExpression&>(expr).subject); break;
+		case Expression::ADDRESSOF: visit(static_cast<AddressOfExpression&>(expr).subject); break;
+		case Expression::TYPEOF: visit(static_cast<TypeofExpression&>(expr).operand); break;
+		default: break;
+	}
+}
+
+static void collectLoopConstants(Statement& statement, ExpArray<Expression*>& out) {
+	auto visit = [&](Expression* expr) { if (expr) collectLoopConstants(*expr, out); };
+	auto visitStatement = [&](Statement* child) { if (child) collectLoopConstants(*child, out); };
+	switch (statement.kind) {
+		case Statement::BLOCK: for (Statement* child : static_cast<BlockStatement&>(statement).statements) visitStatement(child); break;
+		case Statement::EXPRESSION: visit(static_cast<ExpressionStatement&>(statement).expression); break;
+		case Statement::RETURN: visit(static_cast<ReturnStatement&>(statement).expression); break;
+		case Statement::VAR_DECL: visit(static_cast<VarDeclStatement&>(statement).expression); break;
+		case Statement::ASSIGN: { AssignStatement& e = static_cast<AssignStatement&>(statement); visit(e.lhs); visit(e.rhs); break; }
+		case Statement::IF: { IfStatement& e = static_cast<IfStatement&>(statement); visit(e.condition); visitStatement(e.body); visitStatement(e.else_branch); break; }
+		case Statement::MATCH: { MatchStatement& e = static_cast<MatchStatement&>(statement); visit(e.subject); for (MatchArm& arm : e.arms) { for (MatchPattern& pattern : arm.patterns) { visit(pattern.begin); visit(pattern.end); } visitStatement(arm.body); } break; }
+		case Statement::WHILE: { WhileStatement& e = static_cast<WhileStatement&>(statement); visit(e.condition); visitStatement(e.body); break; }
+		case Statement::FOR: { ForStatement& e = static_cast<ForStatement&>(statement); visit(e.begin); visit(e.end); visitStatement(e.body); if (e.unroll_elements) visit(e.unroll_elements); break; }
+		case Statement::DEFER: visitStatement(static_cast<DeferStatement&>(statement).statement); break;
+		case Statement::LABEL: visitStatement(static_cast<LabelStatement&>(statement).statement); break;
+		default: break;
+	}
+}
+
+static void hoistLoopConstants(FunctionCompiler& ctx, LoopBinding& loop, Statement& body) {
+	ExpArray<Expression*> literals(*ctx.bytecode->arena);
+	collectLoopConstants(body, literals);
+	for (Expression* literal : literals) {
+		if (literal->kind != Expression::INT_LITERAL && literal->kind != Expression::FLOAT_LITERAL) continue;
+		const ls_type_kind kind = literal->resolved_type && literal->resolved_type->kind != ResolvedType::UNTYPED_INT && literal->resolved_type->kind != ResolvedType::UNTYPED_FLOAT
+			? toTypeKind(*literal->resolved_type)
+			: defaultLiteralKind(*literal, LS_TYPE_INVALID);
+		bool duplicate = false;
+		for (i32 i = (i32)ctx.loops.size() - 1; i >= 0; --i) {
+			for (LoopConstant& existing : *ctx.loops[(u32)i].constants) {
+				if (existing.kind == kind && (literal->kind == Expression::FLOAT_LITERAL ? existing.fval == static_cast<FloatLiteralExpression&>(*literal).value : existing.bits == static_cast<IntLiteralExpression&>(*literal).value)) {
+					duplicate = true;
+					break;
+				}
+			}
+			if (duplicate) break;
+		}
+		if (duplicate) continue;
+		LoopConstant& constant = loop.constants->emplace_back();
+		constant.source = literal;
+		constant.kind = kind;
+		if (literal->kind == Expression::FLOAT_LITERAL) {
+			constant.fval = static_cast<FloatLiteralExpression&>(*literal).value;
+			constant.offset = ctx.addLocal(nullptr, kind, true);
+			Value value; value.kind = Value::CONST_FLOAT; value.type = kind; value.fval = constant.fval;
+			emitConstValueAt(ctx, value, kind, constant.offset);
+		} else {
+			constant.bits = static_cast<IntLiteralExpression&>(*literal).value;
+			constant.offset = ctx.addLocal(nullptr, kind, true);
+			Value value = makeConstIntValue(constant.bits, kind);
+			emitConstValueAt(ctx, value, kind, constant.offset);
+		}
+	}
+	ctx.temp_top = ctx.next_local_offset;
+}
+
 static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind return_kind, ls_string_view current_label) {
 	SourceScope source_scope(ctx.code, st.token);
 	switch (st.kind) {
@@ -3739,7 +4109,12 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 				ctx.debugLocal(var.name, var.slot);
 				return;
 			}
-			if (var.expression->kind != Expression::UNDEFINED) compileExpressionIntoLocal(ctx, *var.expression, offset, *value_type);
+			if (var.expression->comptime_value.kind == ComptimeValue::VALUE) {
+				emitConstBytesAt(ctx, offset, var.expression->comptime_value.value, typeByteSize(*value_type));
+			}
+			else if (var.expression->kind != Expression::UNDEFINED) {
+				compileExpressionIntoLocal(ctx, *var.expression, offset, *value_type);
+			}
 			ctx.debugLocal(var.name, var.slot);
 			return;
 		}
@@ -3779,12 +4154,14 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			const u32 body_pos = (u32)ctx.code.size();
 
 			LoopBinding& loop = ctx.loops.emplace_back();
+			ctx.initLoop(loop);
 			loop.label = current_label;
 			loop.defer_mark = (u32)ctx.deferreds.size();
 			void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
 			loop.break_jumps = ::new (NewPlaceholder{}, break_storage) ExpArray<u32>(*ctx.bytecode->arena);
 			void* continue_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
 			loop.continue_jumps = ::new (NewPlaceholder{}, continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
+			hoistLoopConstants(ctx, loop, *ws.body);
 
 			compileStatement(ctx, *ws.body, return_kind, {});
 
@@ -3819,12 +4196,14 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			if (fs.is_expanded) {
 				ctx.pushScope();
 				LoopBinding& loop = ctx.loops.emplace_back();
+				ctx.initLoop(loop);
 				loop.label = current_label;
 				loop.defer_mark = (u32)ctx.deferreds.size();
 				void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
 				loop.break_jumps = ::new (NewPlaceholder{}, break_storage) ExpArray<u32>(*ctx.bytecode->arena);
 				void* continue_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
 				loop.continue_jumps = ::new (NewPlaceholder{}, continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
+				hoistLoopConstants(ctx, loop, *fs.body);
 				for (Statement* body : fs.body->statements) {
 					const u32 continue_start = (u32)loop.continue_jumps->size();
 					compileStatement(ctx, *body, return_kind, {});
@@ -3857,6 +4236,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 				ctx.temp_top = ctx.next_local_offset;
 
 				LoopBinding& loop = ctx.loops.emplace_back();
+				ctx.initLoop(loop);
 				loop.label = current_label;
 				loop.defer_mark = (u32)ctx.deferreds.size();
 				void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
@@ -3876,6 +4256,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 						compileExpressionIntoLocal(ctx, element_expr, loop_offset, *element_type);
 					}
 					const u32 continue_start = (u32)loop.continue_jumps->size();
+					hoistLoopConstants(ctx, loop, *fs.body);
 					compileStatement(ctx, *fs.body, return_kind, {});
 					const u32 continue_target = (u32)ctx.code.size();
 					for (i32 j = continue_start; j < loop.continue_jumps->size(); ++j) {
@@ -3931,6 +4312,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 					const u32 condition_pos = (u32)ctx.code.size();
 					const u32 jump_false_pos = emitCompareJumpAt(ctx, LS_TYPE_I64, index_offset, length_offset);
 					LoopBinding& loop = ctx.loops.emplace_back();
+					ctx.initLoop(loop);
 					loop.label = current_label;
 					loop.defer_mark = (u32)ctx.deferreds.size();
 					void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
@@ -3947,6 +4329,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 					emitI32(ctx.code, 0);
 					emitU32(ctx.code, element_size);
 
+					hoistLoopConstants(ctx, loop, *fs.body);
 					compileStatement(ctx, *fs.body, return_kind, {});
 					const u32 increment_pos = (u32)ctx.code.size();
 					emitIncrementOrAddOne(ctx, index_offset, LS_TYPE_I64);
@@ -3989,6 +4372,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 				const u32 condition_pos = (u32)ctx.code.size();
 				const u32 jump_false_pos = emitCompareJumpAt(ctx, LS_TYPE_I64, index_offset, length_offset);
 				LoopBinding& loop = ctx.loops.emplace_back();
+				ctx.initLoop(loop);
 				loop.label = current_label;
 				loop.defer_mark = (u32)ctx.deferreds.size();
 				void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
@@ -4002,6 +4386,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 				emitFixedReg(ctx, index_offset);
 				emitU32(ctx.code, element_size);
 
+				hoistLoopConstants(ctx, loop, *fs.body);
 				compileStatement(ctx, *fs.body, return_kind, {});
 				const u32 increment_pos = (u32)ctx.code.size();
 				emitIncrementOrAddOne(ctx, index_offset, LS_TYPE_I64);
@@ -4026,6 +4411,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 				ctx.debugLocal(fs.value_var, fs.slot);
 				ctx.temp_top = ctx.next_local_offset;
 				LoopBinding& loop = ctx.loops.emplace_back();
+				ctx.initLoop(loop);
 				loop.label = current_label;
 				loop.defer_mark = (u32)ctx.deferreds.size();
 				void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
@@ -4038,6 +4424,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 					iteration.value = (u64)value;
 					emitLocalLiteralInitializer(ctx, loop_offset, iteration, value_kind);
 					const u32 continue_start = (u32)loop.continue_jumps->size();
+					hoistLoopConstants(ctx, loop, *fs.body);
 					compileStatement(ctx, *fs.body, return_kind, {});
 					const u32 next_iteration = (u32)ctx.code.size();
 					if (value + 1 < end) emitIncrementOrAddOne(ctx, loop_offset, value_kind);
@@ -4092,13 +4479,15 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 				const u32 jump_false_pos = known_nonempty ? 0u : emitCompareJumpAt(ctx, value_kind, loop_offset, end_offset);
 				const u32 body_pos = (u32)ctx.code.size();
 				LoopBinding& loop = ctx.loops.emplace_back();
+				ctx.initLoop(loop);
 				loop.label = current_label;
 				loop.defer_mark = (u32)ctx.deferreds.size();
 				void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
 				loop.break_jumps = ::new (NewPlaceholder{}, break_storage) ExpArray<u32>(*ctx.bytecode->arena);
 				void* continue_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
 				loop.continue_jumps = ::new (NewPlaceholder{}, continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
-				compileStatement(ctx, *fs.body, return_kind, {});
+					hoistLoopConstants(ctx, loop, *fs.body);
+					compileStatement(ctx, *fs.body, return_kind, {});
 				const u32 increment_pos = (u32)ctx.code.size();
 				emitIncrementOrAddOne(ctx, loop_offset, value_kind);
 				if (post_test) {
@@ -4138,6 +4527,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			const u32 body_pos = (u32)ctx.code.size();
 
 			LoopBinding& loop = ctx.loops.emplace_back();
+			ctx.initLoop(loop);
 			loop.label = current_label;
 			loop.defer_mark = (u32)ctx.deferreds.size();
 			void* break_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
@@ -4145,6 +4535,7 @@ static void compileStatement(FunctionCompiler& ctx, Statement& st, ls_type_kind 
 			void* continue_storage = ctx.bytecode->arena->allocate(ctx.bytecode->arena->user_data, sizeof(ExpArray<u32>), alignof(ExpArray<u32>));
 			loop.continue_jumps = ::new (NewPlaceholder{}, continue_storage) ExpArray<u32>(*ctx.bytecode->arena);
 
+			hoistLoopConstants(ctx, loop, *fs.body);
 			compileStatement(ctx, *fs.body, return_kind, {});
 
 			const u32 increment_pos = (u32)ctx.code.size();
@@ -4560,7 +4951,8 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host) {
 			for (Symbol& sym : unit.symbols) {
 				if (sym.slot.storage != StorageSlot::GLOBAL) continue;
 				if (sym.expression->kind == Expression::UNDEFINED) continue;
-				compileExpressionAsType(ctx, *sym.expression, *sym.resolved_type);
+				if (sym.comptime_bytes) emitConstBytes(ctx, sym.comptime_bytes, sym.comptime_byte_size);
+				else compileExpressionAsType(ctx, *sym.expression, *sym.resolved_type);
 				emitStoreGlobalBytes(ctx, sym.slot.offset, sym.slot.byte_size);
 			}
 		}

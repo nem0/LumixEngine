@@ -166,13 +166,3 @@ struct ls_module {
 	EnumExpression type_kind_decl;
 	EnumResolvedType type_kind;
 };
-
-// Internal test entry point. The public compiler remains the reference backend
-// until MIR coverage is complete.
-#ifdef __cplusplus
-extern "C" {
-#endif
-ls_bytecode* ls_bytecode_compile_mir(ls_module* module, ls_host* host);
-#ifdef __cplusplus
-}
-#endif

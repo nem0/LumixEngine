@@ -30,12 +30,14 @@ static const ls_bytecode_source_map_entry* runtime_source_at(const ls_function_b
 // assembled - so this reads from whichever is current instead of duplicating
 // the assembly logic into a second array.
 static u32 debug_active_frame_count(ls_runtime* runtime) {
+	if (runtime->is_suspended && runtime->fail_frame_count) return runtime->fail_frame_count;
 	if (runtime->is_suspended) return 1u + runtime->call_depth;
 	return runtime->fail_frame_count;
 }
 
 static const runtime_call_frame* debug_active_frame(ls_runtime* runtime, u32 frame_index) {
 	if (runtime->is_suspended) {
+		if (runtime->fail_frame_count) return &runtime->fail_frames[frame_index];
 		if (frame_index == 0u) return &runtime->suspended_frame;
 		const u32 call_stack_index = runtime->call_depth - frame_index;
 		return &runtime->call_stack[call_stack_index];

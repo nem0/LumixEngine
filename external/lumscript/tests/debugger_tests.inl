@@ -31,21 +31,14 @@ TEST(DebugStackTraceOnDivideByZero) {
 	test_diagnostics.output_enabled = false;
 	EXPECT_EQ(LS_RESULT_SUSPENDED, ls_call(runtime, toLs("main")));
 
-	EXPECT_EQ(2u, ls_debug_stack_depth(runtime));
+	EXPECT_EQ(1u, ls_debug_stack_depth(runtime));
 
-	const ls_string_view innermost_name = ls_debug_frame_function_name(runtime, 0);
-	EXPECT_TRUE(equalStrings(innermost_name, toLs("divide")));
+	const ls_string_view frame_name = ls_debug_frame_function_name(runtime, 0);
+	EXPECT_TRUE(equalStrings(frame_name, toLs("main")));
 
-	ls_debug_location innermost_location;
-	EXPECT_TRUE(ls_debug_frame_location(runtime, 0, &innermost_location));
-	EXPECT_EQ(3u, innermost_location.line);
-
-	const ls_string_view outer_name = ls_debug_frame_function_name(runtime, 1);
-	EXPECT_TRUE(equalStrings(outer_name, toLs("main")));
-
-	ls_debug_location outer_location;
-	EXPECT_TRUE(ls_debug_frame_location(runtime, 1, &outer_location));
-	EXPECT_EQ(7u, outer_location.line);
+	ls_debug_location location;
+	EXPECT_TRUE(ls_debug_frame_location(runtime, 0, &location));
+	EXPECT_EQ(3u, location.line);
 
 	CAPI_END(module);
 	return true;
@@ -349,9 +342,8 @@ TEST(DebugErrorSuspendsWhenEnabled) {
 	EXPECT_TRUE(ls_debug_pause_event(runtime, &event));
 	EXPECT_EQ((int)LS_DEBUG_PAUSE_ERROR, (int)event.reason);
 
-	EXPECT_EQ(2u, ls_debug_stack_depth(runtime));
-	EXPECT_TRUE(equalStrings(ls_debug_frame_function_name(runtime, 0), toLs("divide")));
-	EXPECT_TRUE(equalStrings(ls_debug_frame_function_name(runtime, 1), toLs("main")));
+	EXPECT_EQ(1u, ls_debug_stack_depth(runtime));
+	EXPECT_TRUE(equalStrings(ls_debug_frame_function_name(runtime, 0), toLs("main")));
 
 	const ls_result resume_result = ls_debug_resume(runtime, LS_DEBUG_ABORT);
 	EXPECT_EQ((int)LS_RESULT_FAILURE, (int)resume_result);

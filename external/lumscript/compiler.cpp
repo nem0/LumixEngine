@@ -2243,6 +2243,20 @@ struct Checker {
 		}
 	}
 
+	ComptimeValue foldRuntimeConstant(Unit& unit, Expression& expr, FunctionCheckContext* ctx, ResolvedType* hint = nullptr) {
+		++suppress_errors;
+		const bool previous_runtime_const_mode = allow_runtime_const;
+		allow_runtime_const = true;
+		ComptimeValue value = evalComptime(unit, expr, ctx, nullptr, nullptr, hint);
+		allow_runtime_const = previous_runtime_const_mode;
+		--suppress_errors;
+		if (value && value.kind == ComptimeValue::VALUE) {
+			value = makePersistentValue(unit, value.type, value.value, comptimeSize(*value.type));
+			expr.comptime_value = value;
+		}
+		return value;
+	}
+
 	ls_result checkRuntimeSymbol(Unit& unit, Symbol& sym) {
 		ResolvedType* annotation = nullptr;
 		if (sym.type_expr) {
@@ -2283,6 +2297,15 @@ struct Checker {
 		}
 
 		sym.resolved_type = annotation ? annotation : expr_type;
+		const bool runtime_comptime = sym.storage == Symbol::CONST && isRuntimeMaterializable(*sym.resolved_type);
+		if (runtime_comptime) {
+			ComptimeValue value = foldRuntimeConstant(unit, expr, nullptr, annotation);
+			if (value && value.kind == ComptimeValue::VALUE) {
+				sym.comptime_byte_size = comptimeSize(*value.type);
+				sym.comptime_bytes = value.value;
+				sym.comptime_value = {ComptimeValue::VALUE, value.type, sym.comptime_bytes};
+			}
+		}
 		return LS_RESULT_OK;
 	}
 
@@ -4134,6 +4157,18 @@ struct Checker {
 		binding.type = final_type;
 		binding.is_immutable = var.is_immutable;
 		binding.slot = &var.slot;
+		const bool scalar_comptime = final_type->kind == ResolvedType::BOOL
+			|| final_type->kind == ResolvedType::ENUM
+			|| isNumericOrUntyped(*final_type);
+		if (var.is_immutable && scalar_comptime) {
+			// Immutable runtime locals can still be materialized at each use when
+			// their initializer depends only on compile-time values.
+			ComptimeValue value = foldRuntimeConstant(unit, *var.expression, &ctx);
+			if (value && value.kind == ComptimeValue::VALUE) {
+				binding.is_comptime = true;
+				binding.comptime_value = value;
+			}
+		}
 		return true;
 	}
 
@@ -6086,11 +6121,11 @@ struct Checker {
 				if (!rhs) return {};
 
 				const u32 src_size = typeByteSize(*lhs.type);
-				comptime_stack_ptr -= src_size;
-				const u8* src_bytes = comptime_stack_ptr;
+				u8* src_bytes = comptime_stack_ptr;
+				copyMemory(src_bytes, lhs.value, src_size);
 
-				const u32 dst_size = writeComptimeNumeric(comptime_stack_ptr, src_bytes, lhs.type->kind, rhs->kind);
-				u8* value = comptime_stack_ptr;
+				const u32 dst_size = writeComptimeNumeric(src_bytes, src_bytes, lhs.type->kind, rhs->kind);
+			u8* value = src_bytes;
 				comptime_stack_ptr += dst_size;
 
 				return {ComptimeValue::VALUE, rhs, value};
@@ -6220,6 +6255,9 @@ struct Checker {
 					return {};
 				}
 
+				if (allow_runtime_const && ref.symbol->storage == Symbol::CONST && ref.symbol->comptime_bytes) {
+					return copyComptimeValue(ref.symbol->resolved_type, ref.symbol->comptime_bytes, ref.symbol->comptime_byte_size);
+				}
 				if (ref.symbol->storage != Symbol::COMPTIME) {
 					errorLine(id.token, "Symbol '", id.name, "' is not a compile-time value");
 					return {};
@@ -6350,8 +6388,9 @@ struct Checker {
 	StructResolvedType* param_descriptor_type;
 	SliceResolvedType* slice_of_fields;
 	SliceResolvedType* slice_of_params;
-	u8* comptime_stack = nullptr;
-	u8* comptime_stack_ptr = nullptr;
+		u8* comptime_stack = nullptr;
+		u8* comptime_stack_ptr = nullptr;
+		bool allow_runtime_const = false;
 
 }; // struct Checker
 
