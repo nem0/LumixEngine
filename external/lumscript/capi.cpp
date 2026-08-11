@@ -1,6 +1,7 @@
 #include "capi.h"
 #include "compiler.h"
 #include "bytecode.h"
+#include "ir.h"
 
 ls_module* ls_module_create(ls_host* host) {
 	if (!host || !host->arena.allocate) return nullptr;
@@ -61,4 +62,9 @@ int ls_module_get_global_count(ls_module* module) {
 		}
 	}
 	return count;
+}
+
+ls_bytecode* ls_bytecode_compile_ir(ls_module* module, ls_host* host) {
+	LsIrModuleData* ir = lsIrBuildModule(host->arena, module);
+	return ir ? lsIrCompileModule(ir, host) : nullptr;
 }

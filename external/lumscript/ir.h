@@ -24,6 +24,8 @@ enum LsIrOpKind {
 	LS_IR_OP_INVALID,
 	LS_IR_OP_LOAD_CONST,
 	LS_IR_OP_COPY,
+	LS_IR_OP_AGGREGATE_INIT,
+	LS_IR_OP_FIELD_STORE,
 	LS_IR_OP_GLOBAL_LOAD,
 	LS_IR_OP_GLOBAL_STORE,
 	LS_IR_OP_LOCAL_REF,
@@ -87,6 +89,8 @@ struct LsOpLoadConst : LsIrOp {
 	ResolvedType* type = nullptr;
 	LsIrValue result = LS_IR_INVALID_VALUE;
 	u64 value = 0;
+	u64 second_value = 0;
+	bool has_second_value = false;
 };
 
 // LS_OP_COPY
@@ -96,6 +100,27 @@ struct LsOpCopy : LsIrOp {
 	ResolvedType* type = nullptr;
 	LsIrValue result = LS_IR_INVALID_VALUE;
 	LsIrValue source = LS_IR_INVALID_VALUE;
+	u32 source_offset = 0;
+};
+
+struct LsOpAggregateInit : LsIrOp {
+	LsOpAggregateInit()
+		: LsIrOp(LS_IR_OP_AGGREGATE_INIT) {}
+	ResolvedType* type = nullptr;
+	LsIrValue result = LS_IR_INVALID_VALUE;
+	LsIrValue* values = nullptr;
+	u32* offsets = nullptr;
+	u32* sizes = nullptr;
+	u32 value_count = 0;
+};
+
+struct LsOpFieldStore : LsIrOp {
+	LsOpFieldStore()
+		: LsIrOp(LS_IR_OP_FIELD_STORE) {}
+	ResolvedType* type = nullptr;
+	LsIrValue aggregate = LS_IR_INVALID_VALUE;
+	LsIrValue source = LS_IR_INVALID_VALUE;
+	u32 offset = 0;
 };
 
 // LS_OP_GLOBAL_LOAD
@@ -164,6 +189,7 @@ struct LsOpLoadIndexed : LsIrOp {
 	u32 scale = 0;
 	u32 offset = 0;
 	u32 length = 0;
+	bool base_is_value = false;
 };
 
 // LS_OP_STORE_INDEXED
@@ -178,6 +204,7 @@ struct LsOpStoreIndexed : LsIrOp {
 	u32 scale = 0;
 	u32 offset = 0;
 	u32 length = 0;
+	bool base_is_value = false;
 };
 
 // LS_OP_LOAD_INDEXED_LOCAL_I32
@@ -240,6 +267,7 @@ struct LsOpMakeSlice : LsIrOp {
 		: LsIrOp(LS_IR_OP_MAKE_SLICE) {}
 	ResolvedType* type = nullptr;
 	LsIrValue result = LS_IR_INVALID_VALUE;
+	LsIrValue base = LS_IR_INVALID_VALUE;
 	u32 base_offset = 0;
 	u64 length = 0;
 };
@@ -299,6 +327,7 @@ struct LsOpSliceLoadAt : LsIrOp {
 	LsIrValue index = LS_IR_INVALID_VALUE;
 	u32 element_offset = 0;
 	u32 element_size = 0;
+	bool index_is_i32 = false;
 };
 
 // LS_OP_SLICE_STORE_AT_LOCAL, LS_OP_SLICE_STORE_AT_LOCAL_I32
@@ -311,6 +340,7 @@ struct LsOpSliceStoreAt : LsIrOp {
 	LsIrValue source = LS_IR_INVALID_VALUE;
 	u32 element_offset = 0;
 	u32 element_size = 0;
+	bool index_is_i32 = false;
 };
 
 // LS_OP_SLICE_LOAD_AT_LOCAL
@@ -351,6 +381,7 @@ struct LsOpSliceLength : LsIrOp {
 	LsIrValue result = LS_IR_INVALID_VALUE;
 	LsIrValue slice = LS_IR_INVALID_VALUE;
 	u32 slice_offset = LS_IR_INVALID_VALUE;
+	bool slice_is_value = false;
 };
 
 // LS_OP_SLICE_EQ
@@ -489,7 +520,9 @@ struct LsOpCallIndirect : LsIrOp {
 	ResolvedType* type = nullptr;
 	LsIrValue result = LS_IR_INVALID_VALUE;
 	LsIrValue function = LS_IR_INVALID_VALUE;
-	LsIrValue arguments = LS_IR_INVALID_VALUE;
+	LsIrValue* arguments = nullptr;
+	u32* argument_sizes = nullptr;
+	u32 argument_count = 0;
 	u32 argument_size = 0;
 	u32 result_size = 0;
 };
@@ -524,10 +557,13 @@ struct LsIrBlockData {
 struct LsIrFunctionData {
 	ls_arena& arena;
 	ls_string_view name = {};
+	FunctionExpression* source = nullptr;
 	ResolvedType* return_type = nullptr;
 	ExpArray<LsIrBlockData> blocks;
 	LsIrBlock entry = LS_IR_INVALID_BLOCK;
 	LsIrValue next_value = 0;
+	u32 param_size = 0;
+	u32 local_size = 0;
 
 	LsIrFunctionData(ls_arena& arena)
 		: arena(arena), blocks(arena) {}
@@ -538,10 +574,12 @@ struct LsIrModuleEntry {
 	FunctionExpression* source = nullptr;
 	ls_string_view name = {};
 	bool native = false;
+	bool builtin_native = false;
 };
 
 struct LsIrModuleData {
 	ls_arena& arena;
+	ls_module* source = nullptr;
 	ExpArray<LsIrModuleEntry> functions;
 	u32 global_size = 0;
 

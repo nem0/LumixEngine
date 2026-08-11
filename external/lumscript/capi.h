@@ -216,6 +216,11 @@ ls_bytecode* ls_bytecode_compile(
 	ls_module* module,
 	ls_host* host
 );
+// Compile the checked module through the experimental ir.cpp pipeline.
+ls_bytecode* ls_bytecode_compile_ir(
+	ls_module* module,
+	ls_host* host
+);
 void ls_bytecode_destroy(ls_bytecode* bytecode);
 
 // Bytecode runtime lifetime.

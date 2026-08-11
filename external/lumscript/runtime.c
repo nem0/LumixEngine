@@ -402,8 +402,8 @@ static double runtime_numeric_to_double(const u8* value, ls_type_kind kind) {
 		case LS_TYPE_U8:   { u8 v = 0; memcpy(&v, value, 1); return (double)v; }
 		case LS_TYPE_I16:  { i16 v = 0; memcpy(&v, value, 2); return (double)v; }
 		case LS_TYPE_U16:  { u16 v = 0; memcpy(&v, value, 2); return (double)v; }
-		case LS_TYPE_I32:
-		case LS_TYPE_ENUM: { i32 v = 0; memcpy(&v, value, 4); return (double)v; }
+		case LS_TYPE_I32: { i32 v = 0; memcpy(&v, value, 4); return (double)v; }
+		case LS_TYPE_ENUM: { u32 v = 0; memcpy(&v, value, 4); return (double)v; }
 		case LS_TYPE_U32:  { u32 v = 0; memcpy(&v, value, 4); return (double)v; }
 		case LS_TYPE_I64:  { i64 v = 0; memcpy(&v, value, 8); return (double)v; }
 		case LS_TYPE_U64:  { u64 v = 0; memcpy(&v, value, 8); return (double)v; }
@@ -420,8 +420,8 @@ static i64 runtime_numeric_to_i64(const u8* value, ls_type_kind kind) {
 		case LS_TYPE_U8:   { u8 v = 0; memcpy(&v, value, 1); return (i64)v; }
 		case LS_TYPE_I16:  { i16 v = 0; memcpy(&v, value, 2); return (i64)v; }
 		case LS_TYPE_U16:  { u16 v = 0; memcpy(&v, value, 2); return (i64)v; }
-		case LS_TYPE_I32:
-		case LS_TYPE_ENUM: { i32 v = 0; memcpy(&v, value, 4); return (i64)v; }
+		case LS_TYPE_I32: { i32 v = 0; memcpy(&v, value, 4); return (i64)v; }
+		case LS_TYPE_ENUM: { u32 v = 0; memcpy(&v, value, 4); return (i64)v; }
 		case LS_TYPE_U32:  { u32 v = 0; memcpy(&v, value, 4); return (i64)v; }
 		case LS_TYPE_I64:  { i64 v = 0; memcpy(&v, value, 8); return v; }
 		case LS_TYPE_U64:  { u64 v = 0; memcpy(&v, value, 8); return (i64)v; }
@@ -438,8 +438,8 @@ static u64 runtime_numeric_to_u64(const u8* value, ls_type_kind kind) {
 		case LS_TYPE_U8:   { u8 v = 0; memcpy(&v, value, 1); return (u64)v; }
 		case LS_TYPE_I16:  { i16 v = 0; memcpy(&v, value, 2); return (u64)v; }
 		case LS_TYPE_U16:  { u16 v = 0; memcpy(&v, value, 2); return (u64)v; }
-		case LS_TYPE_I32:
-		case LS_TYPE_ENUM: { i32 v = 0; memcpy(&v, value, 4); return (u64)v; }
+		case LS_TYPE_I32: { i32 v = 0; memcpy(&v, value, 4); return (u64)v; }
+		case LS_TYPE_ENUM: { u32 v = 0; memcpy(&v, value, 4); return (u64)v; }
 		case LS_TYPE_U32:  { u32 v = 0; memcpy(&v, value, 4); return (u64)v; }
 		case LS_TYPE_I64:  { i64 v = 0; memcpy(&v, value, 8); return (u64)v; }
 		case LS_TYPE_U64:  { u64 v = 0; memcpy(&v, value, 8); return v; }
@@ -1218,6 +1218,8 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 			case LS_OP_NE: LS_REG_CMP_NUMERIC(!=); break;
 			case LS_OP_LT: LS_REG_CMP_NUMERIC(<); break;
 			case LS_OP_LE: LS_REG_CMP_NUMERIC(<=); break;
+			case LS_OP_GT: LS_REG_CMP_NUMERIC(>); break;
+			case LS_OP_GE: LS_REG_CMP_NUMERIC(>=); break;
 			case LS_OP_JE_I8: LS_REG_CMP_JUMP(i8, !=); break;
 			case LS_OP_JGE_I8: LS_REG_CMP_JUMP(i8, <); break;
 			case LS_OP_JGT_I8: LS_REG_CMP_JUMP(i8, <=); break;

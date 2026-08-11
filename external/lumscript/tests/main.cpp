@@ -46,7 +46,7 @@ void print(int val) { printf("%d", val); }
 		ls_module* module = ls_module_create(&context.host); \
 		EXPECT_TRUE(module != nullptr); \
 		bool compiled = ls_module_compile(module, toLs(src), makeStringView(__func__), nullptr, nullptr); \
-		ls_bytecode* bytecode = compiled ? ls_bytecode_compile(module, &context.host) : nullptr; \
+		ls_bytecode* bytecode = compiled ? ls_bytecode_compile_ir(module, &context.host) : nullptr; \
 		if (bytecode) ls_bytecode_destroy(bytecode); \
 		ls_module_destroy(module); \
 		EXPECT_TRUE(compiled); \
@@ -69,7 +69,7 @@ void print(int val) { printf("%d", val); }
 		ls_module* module = ls_module_create(&context.host); \
 		EXPECT_TRUE(module != nullptr); \
 		bool compiled = ls_module_compile(module, toLs(src), makeStringView(__func__), &resolveLumScriptImportC, &(files)); \
-		ls_bytecode* bytecode = compiled ? ls_bytecode_compile(module, &context.host) : nullptr; \
+		ls_bytecode* bytecode = compiled ? ls_bytecode_compile_ir(module, &context.host) : nullptr; \
 		if (bytecode) ls_bytecode_destroy(bytecode); \
 		ls_module_destroy(module); \
 		EXPECT_TRUE(compiled); \
@@ -408,6 +408,27 @@ TEST(ir_to_bytecode_array_access) {
 	return true;
 }
 
+TEST(ir_to_bytecode_undefined_array_and_greater_than) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(ls_module_compile(module, makeStringView(
+		"fn main() : i32 { var values : [3]i32 = undefined; for i in 0..3 { values[i] = i; } if values[2] > 1 { return values[2]; } return 0; }"
+	), makeStringView("ir_undefined_array_test"), nullptr, nullptr));
+	LsIrModuleData* ir = lsIrBuildModule(context.host.arena, module);
+	EXPECT_TRUE(ir != nullptr);
+	ls_bytecode* bytecode = lsIrCompileModule(ir, &context.host);
+	EXPECT_TRUE(bytecode != nullptr);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_EQ(ls_call(runtime, makeStringView("main")), LS_RESULT_OK);
+	EXPECT_EQ(ls_to_i32(runtime, -1), 2);
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return true;
+}
+
 TEST(ir_to_bytecode_array_for) {
 	TestContext context;
 	ls_module* module = ls_module_create(&context.host);
@@ -449,7 +470,7 @@ struct RuntimeGuard {
 	// The tests run through the bytecode runtime, so this guard owns both the
 	// compiled bytecode and the runtime bound to it.
 	explicit RuntimeGuard(ls_module* module, ls_host* host)
-		: bytecode(ls_bytecode_compile(module, host))
+		: bytecode(ls_bytecode_compile_ir(module, host))
 		, runtime(bytecode ? ls_runtime_create(bytecode, nullptr) : nullptr)
 	{}
 

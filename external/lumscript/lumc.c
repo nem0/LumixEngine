@@ -1,6 +1,6 @@
 /*
  * lumc.c - Standalone LumScript runner/compiler
- * Usage: lumc [--dump-bytecode] <script.lum> [function_name] [args...]
+ * Usage: lumc [--dump-bytecode|--ir.cpp] <script.lum> [function_name] [args...]
  *
  * Compiles and runs a LumScript file. If function_name is provided,
  * calls that function with the remaining arguments. Otherwise, calls main().
@@ -229,6 +229,7 @@ static const char* lumc_opcode_name(ls_op op) {
 		case LS_OP_JLEZ_I32: return "JLEZ_I32";
 		case LS_OP_JLEZ_I64: return "JLEZ_I64";
 		case LS_OP_CALL_DIRECT: return "CALL_DIRECT";
+		case LS_OP_CALL_NATIVE: return "CALL_NATIVE";
 		case LS_OP_CALL_INDIRECT: return "CALL_INDIRECT";
 		case LS_OP_CAST: return "CAST";
 		case LS_OP_RETURN: return "RETURN";
@@ -582,8 +583,9 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 
 int main(int argc, char** argv) {
 	if (argc < 2) {
-		fputs("Usage: lumc [--dump-bytecode] <script.lum> [function_name] [args...]\n"
+		fputs("Usage: lumc [--dump-bytecode|--ir.cpp] <script.lum> [function_name] [args...]\n"
 			"  --dump-bytecode  Compile and print human-readable bytecode\n"
+			"  --ir.cpp         Compile through the experimental ir.cpp pipeline\n"
 			"  script.lum     - Path to LumScript source file\n"
 			"  function_name  - Function to call (default: main)\n"
 			"  args           - Arguments passed to the function\n", stderr);
@@ -597,8 +599,20 @@ int main(int argc, char** argv) {
 	ctx.host.diagnostics_userdata = &ctx.host;
 	ctx.host.print = &lumc_diagnostics_print;
 
-	const int dump_bytecode = strcmp(argv[1], "--dump-bytecode") == 0;
-	const int script_arg = dump_bytecode ? 2 : 1;
+	int dump_bytecode = 0;
+	int ir_cpp = 0;
+	int script_arg = 1;
+	while (script_arg < argc) {
+		if (strcmp(argv[script_arg], "--dump-bytecode") == 0) {
+			dump_bytecode = 1;
+			++script_arg;
+		} else if (strcmp(argv[script_arg], "--ir.cpp") == 0) {
+			ir_cpp = 1;
+			++script_arg;
+		} else {
+			break;
+		}
+	}
 	if (argc <= script_arg) {
 		fputs("Error: Missing script path\n", stderr);
 		return 1;
@@ -648,9 +662,11 @@ int main(int argc, char** argv) {
 		goto cleanup;
 	}
 
-	ctx.bytecode = ls_bytecode_compile(ctx.module, &ctx.host);
+	ctx.bytecode = ir_cpp
+		? ls_bytecode_compile_ir(ctx.module, &ctx.host)
+		: ls_bytecode_compile(ctx.module, &ctx.host);
 	if (!ctx.bytecode) {
-		fprintf(stderr, "Error: Failed to compile bytecode\n");
+		fprintf(stderr, "Error: Failed to compile %s\n", ir_cpp ? "ir.cpp bytecode" : "bytecode");
 		goto cleanup;
 	}
 	if (dump_bytecode) {

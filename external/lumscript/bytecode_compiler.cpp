@@ -2559,6 +2559,7 @@ static void emitSlice(FunctionCompiler& ctx, SliceExpression& br) {
 		// A scalar slice view uses the scalar's address and has exactly one element.
 		if (!tryEmitReference(ctx, *br.base)) return;
 		emitConst8(ctx, 1u);
+		return;
 	}
 
 	// Bounds may contain nested expressions, so reserve the source pair until both
