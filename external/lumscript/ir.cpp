@@ -54,14 +54,22 @@ struct IRBuilder {
 			}
 			case Expression::MEMBER: {
 				auto& me = static_cast<MemberExpression&>(expr);
-				if (!me.expression) {
-					ASSERT(expr.resolved_type && expr.resolved_type->kind == ResolvedType::ENUM);
-					auto& enum_type = static_cast<EnumResolvedType&>(*expr.resolved_type);
-					for (i32 i = 0; i < enum_type.decl->members.size(); ++i) {
-						if (!equalStrings(me.name, enum_type.decl->members[i].name)) continue;
+				EnumResolvedType* enum_type = nullptr;
+				if (!me.expression) enum_type = static_cast<EnumResolvedType*>(expr.resolved_type);
+				else if (me.expression->resolved_type->kind == ResolvedType::META) {
+					ResolvedType* type = static_cast<MetaType*>(me.expression->resolved_type)->inner;
+					if (type->kind == ResolvedType::ENUM) enum_type = static_cast<EnumResolvedType*>(type);
+				}
+				if (enum_type) {
+					for (i32 i = 0; i < enum_type->decl->members.size(); ++i) {
+						if (!equalStrings(me.name, enum_type->decl->members[i].name)) continue;
 						auto& op = alloc<LsOpLoadConst>();
 						op.type = expr.resolved_type;
-						const i32 value = i;
+						u32 value = i;
+						if (enum_type->decl->members[i].value) {
+							auto& literal = static_cast<IntLiteralExpression&>(*enum_type->decl->members[i].value);
+							value = (u32)literal.value;
+						}
 						memcpy(op.value, &value, sizeof(value));
 						return op;
 					}
@@ -265,6 +273,25 @@ struct IRBuilder {
 				memcpy(&op.value, &value, sizeof(value));
 				return op;
 			}
+			case Expression::STRING_LITERAL: {
+				auto& literal = static_cast<StringLiteralExpression&>(expr);
+				auto& pointer = alloc<LsOpLoadConst>();
+				static ResolvedType pointer_type(ResolvedType::CPTR);
+				pointer.type = &pointer_type;
+				memcpy(pointer.value, &literal.value.begin, sizeof(literal.value.begin));
+				auto& length = alloc<LsOpLoadConst>();
+				static ResolvedType length_type(ResolvedType::I64);
+				length.type = &length_type;
+				const i64 value_length = literal.value.end - literal.value.begin;
+				memcpy(length.value, &value_length, sizeof(value_length));
+				auto& slice = alloc<LsOpAggregateInit>();
+				slice.type = literal.resolved_type;
+				slice.value_count = 2;
+				slice.values = static_cast<LsIrOp**>(host.arena.allocate(host.arena.user_data, sizeof(LsIrOp*) * slice.value_count, alignof(LsIrOp*)));
+				slice.values[0] = &pointer;
+				slice.values[1] = &length;
+				return slice;
+			}
 			case Expression::INT_LITERAL: {
 				auto& ile = static_cast<IntLiteralExpression&>(expr);
 				auto& op = alloc<LsOpLoadConst>();
@@ -362,6 +389,11 @@ struct IRBuilder {
 
 	void buildStatementIR(Statement& st, LsIrBlockData& parent) {
 		switch (st.kind) {
+			case Statement::EXPRESSION: {
+				auto& ex = static_cast<ExpressionStatement&>(st);
+				parent.ops.push(&buildExpressionIR(*ex.expression, true));
+				break;
+			}
 			case Statement::LABEL: {
 				auto& label = static_cast<LabelStatement&>(st);
 				const ls_string_view previous_label = pending_loop_label;
@@ -414,6 +446,11 @@ struct IRBuilder {
 			}
 			case Statement::IF: {
 				auto& ifs = static_cast<IfStatement&>(st);
+				if (ifs.comptime_known) {
+					Statement* branch = ifs.comptime_value ? static_cast<Statement*>(ifs.body) : ifs.else_branch;
+					if (branch) buildStatementIR(*branch, parent);
+					break;
+				}
 				auto& if_ir = alloc<LsOpConditionalJump>();
 				if_ir.condition = &buildExpressionIR(*ifs.condition, true);
 				if_ir.true_block = &alloc<LsIrBlockData>(host.arena);
@@ -631,6 +668,23 @@ struct BytecodeCompiler {
 	}
 
 	u32 emitCompare(const LsOpBinary& cmp) {
+		if (cmp.operand_type->kind == ResolvedType::SLICE) {
+			const u32 lhs = emit(*cmp.lhs);
+			const u32 rhs = emit(*cmp.rhs);
+			const u32 result = stack_top++;
+			const auto& slice = static_cast<const SliceResolvedType&>(*cmp.operand_type);
+			emitOp(LS_OP_SLICE_EQ);
+			emit(result);
+			emit(lhs);
+			emit(rhs);
+			emit(typeByteSize(*slice.element_type));
+			emit((u8)toTypeKind(*slice.element_type));
+			if (cmp.kind == LS_IR_OP_NE) {
+				emitOp(LS_OP_NOT);
+				emit(result);
+			}
+			return result;
+		}
 		u32 byte_size = typeByteSize(*cmp.operand_type);
 		u32 lhs_offset = emit(*cmp.lhs);
 		u32 rhs_offset = emit(*cmp.rhs);
