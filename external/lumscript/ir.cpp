@@ -54,6 +54,18 @@ struct IRBuilder {
 			}
 			case Expression::MEMBER: {
 				auto& me = static_cast<MemberExpression&>(expr);
+				if (!me.expression) {
+					ASSERT(expr.resolved_type && expr.resolved_type->kind == ResolvedType::ENUM);
+					auto& enum_type = static_cast<EnumResolvedType&>(*expr.resolved_type);
+					for (i32 i = 0; i < enum_type.decl->members.size(); ++i) {
+						if (!equalStrings(me.name, enum_type.decl->members[i].name)) continue;
+						auto& op = alloc<LsOpLoadConst>();
+						op.type = expr.resolved_type;
+						const i32 value = i;
+						memcpy(op.value, &value, sizeof(value));
+						return op;
+					}
+				}
 				auto* struct_type = static_cast<StructResolvedType*>(me.expression->resolved_type);
 				auto& fields = struct_type->decl->fields;
 				u32 offset = 0;
