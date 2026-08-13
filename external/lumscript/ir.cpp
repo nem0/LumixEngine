@@ -7,7 +7,10 @@ namespace {
 
 // AST to IR
 struct IRBuilder {
-	IRBuilder(ls_host& host) : host(host), locals(host.arena) {}
+	IRBuilder(ls_host& host)
+		: host(host)
+		, locals(host.arena)
+		, defers(host.arena) {}
 
 	template <typename T, typename... Args>
 	T& alloc(Args&&... args) {
@@ -279,6 +282,23 @@ struct IRBuilder {
 				}
 				return op;
 			}
+			case Expression::UNARY: {
+				auto& unary = static_cast<UnaryExpression&>(expr);
+				LsIrOp& operand = buildExpressionIR(*unary.expression, true);
+				if (unary.op == Token::MINUS) {
+					auto& op = alloc<LsOpNeg>();
+					op.operand_type = unary.resolved_type;
+					op.operand = &operand;
+					return op;
+				}
+				if (unary.op == Token::NOT) {
+					auto& op = alloc<LsOpNot>();
+					op.operand_type = unary.resolved_type;
+					op.operand = &operand;
+					return op;
+				}
+				break;
+			}
 			case Expression::BINARY: {
 				auto& be = static_cast<BinaryExpression&>(expr);
 				LsIrOp& lhs = buildExpressionIR(*be.lhs, true);
@@ -296,6 +316,8 @@ struct IRBuilder {
 					case Token::LT_EQUAL: op = &alloc<LsOpLe>(); break;
 					case Token::EQUAL_EQUAL: op = &alloc<LsOpEq>(); break;
 					case Token::BANG_EQUAL: op = &alloc<LsOpNe>(); break;
+					case Token::AND: op = &alloc<LsOpAnd>(); break;
+					case Token::OR: op = &alloc<LsOpOr>(); break;
 					default: ASSERT(false); break;
 				}
 				op->operand_type = be.lhs->resolved_type;
@@ -309,20 +331,35 @@ struct IRBuilder {
 		return dummy;
 	}
 
+	void emitDefers(LsIrBlockData& parent, u32 mark) {
+		for (i32 i = defers.size() - 1; i >= (i32)mark; --i) {
+			buildStatementIR(*defers[i], parent);
+		}
+	}
+
 	void buildStatementIR(Statement& st, LsIrBlockData& parent) {
 		switch (st.kind) {
+			case Statement::WHILE: {
+				auto& while_statement = static_cast<WhileStatement&>(st);
+				auto& loop = alloc<LsOpConditionalJump>();
+				loop.condition = &buildExpressionIR(*while_statement.condition, true);
+				loop.true_block = &alloc<LsIrBlockData>(host.arena);
+				buildStatementIR(*while_statement.body, *loop.true_block);
+				auto& back_edge = alloc<LsOpJump>();
+				back_edge.target = &loop;
+				loop.true_block->ops.push(&back_edge);
+				parent.ops.push(&loop);
+				break;
+			}
 			case Statement::IF: {
 				auto& ifs = static_cast<IfStatement&>(st);
 				auto& if_ir = alloc<LsOpConditionalJump>();
 				if_ir.condition = &buildExpressionIR(*ifs.condition, true);
 				if_ir.true_block = &alloc<LsIrBlockData>(host.arena);
-				u32 local_watermark = locals.size();
-				for (Statement* child : ifs.body->statements) buildStatementIR(*child, *if_ir.true_block);
-				locals.resize(local_watermark);
+				buildStatementIR(*ifs.body, *if_ir.true_block);
 				if (ifs.else_branch) {
 					if_ir.false_block = &alloc<LsIrBlockData>(host.arena);
 					buildStatementIR(*ifs.else_branch, *if_ir.false_block);
-					locals.resize(local_watermark);
 				}
 				parent.ops.push(&if_ir);
 				break;
@@ -381,21 +418,45 @@ struct IRBuilder {
 			}
 			case Statement::BLOCK: {
 				u32 local_watermark = locals.size();
+				u32 defer_watermark = defers.size();
 				auto& bl = static_cast<BlockStatement&>(st);
 				for (Statement* s : bl.statements) {
 					buildStatementIR(*s, parent);
 				}
+				emitDefers(parent, defer_watermark);
+				defers.resize(defer_watermark);
 				locals.resize(local_watermark);
 				break;
 			}
 			case Statement::RETURN: {
 				auto& ret = static_cast<ReturnStatement&>(st);
 				auto& ir_ret = alloc<LsOpReturn>();
-				parent.ops.push(&ir_ret);
 				if (ret.expression) {
 					ir_ret.size = typeByteSize(*ret.expression->resolved_type);
-					ir_ret.expression = &buildExpressionIR(*ret.expression, true);
+					LsIrOp& expression = buildExpressionIR(*ret.expression, true);
+					if (defers.empty()) {
+						ir_ret.expression = &expression;
+					}
+					else {
+						auto& value = alloc<LsOpAlloca>();
+						value.type = ret.expression->resolved_type;
+						value.value = &expression;
+						parent.ops.push(&value);
+						auto& addr = alloc<LsOpPushLocalAddr>();
+						addr.alloca = &value;
+						auto& load = alloc<LsOpLocalLoad>();
+						load.addr = &addr;
+						load.size = ir_ret.size;
+						ir_ret.expression = &load;
+					}
 				}
+				emitDefers(parent, 0);
+				parent.ops.push(&ir_ret);
+				break;
+			}
+			case Statement::DEFER: {
+				auto& defer = static_cast<DeferStatement&>(st);
+				if (defer.statement) defers.push(defer.statement);
 				break;
 			}
 			default: ASSERT(false); break;
@@ -418,9 +479,7 @@ struct IRBuilder {
 			param.slot.type = param.resolved_type;
 			param_offset += param.slot.byte_size;
 		}
-		for (Statement* s : static_cast<BlockStatement*>(expr.body)->statements) {
-			buildStatementIR(*s, root);
-		}
+		buildStatementIR(*expr.body, root);
 		locals.clear();
 		return root;
 	}
@@ -432,6 +491,7 @@ struct IRBuilder {
 
 	ls_host& host;
 	ExpArray<Local> locals;
+	ExpArray<Statement*> defers;
 };
 
 struct ByteArray {
@@ -522,6 +582,14 @@ struct BytecodeCompiler {
 		return result;
 	}
 
+	u32 emitUnary(const LsOpUnary& op) {
+		const u32 operand = emit(*op.operand);
+		if (op.kind == LS_IR_OP_NEG) emitOp(ls_op(LS_OP_NEG_I8 + numericKindIndex(*op.operand_type)));
+		else emitOp(LS_OP_NOT);
+		emit(operand);
+		return operand;
+	}
+
 	void patchI16(u32 position, u32 target) {
 		const i64 relative = (i64)target - (i64)(position + sizeof(i16));
 		ASSERT(relative >= -32768 && relative <= 32767);
@@ -555,6 +623,58 @@ struct BytecodeCompiler {
 		patchI16(end_jump, code.size());
 		stack_top = high_water;
 		return entry_stack_top;
+	}
+
+	u32 emitJump(LsOpJump& jump) {
+		ASSERT(jump.target);
+		emitOp(LS_OP_JUMP);
+		jump.bytecode_patch_offset = code.size();
+		emit((i16)0);
+		return stack_top;
+	}
+
+	u32 emitShortCircuit(const LsOpBinary& op) {
+		const u32 lhs = emit(*op.lhs);
+		emitOp(op.kind == LS_IR_OP_AND ? LS_OP_JZ_U8 : LS_OP_JNZ_U8);
+		emit(lhs);
+		const u32 short_jump = code.size();
+		emit((i16)0);
+
+		const u32 rhs = emit(*op.rhs);
+		const u32 result = stack_top;
+		stack_top++;
+		emitOp(LS_OP_COPY);
+		emit(result);
+		emit(rhs);
+		emit((u32)1);
+		emitOp(LS_OP_JUMP);
+		const u32 end_jump = code.size();
+		emit((i16)0);
+
+		patchI16(short_jump, code.size());
+		emitOp(LS_OP_COPY);
+		emit(result);
+		emit(lhs);
+		emit((u32)1);
+		patchI16(end_jump, code.size());
+		return result;
+	}
+
+	void patchJumps(LsIrBlockData& block) {
+		for (LsIrOp* op : block.ops) {
+			if (op->kind == LS_IR_OP_JUMP) {
+				auto& jump = static_cast<LsOpJump&>(*op);
+				ASSERT(jump.target);
+				ASSERT(jump.target->bytecode_offset != 0xffffffffu);
+				ASSERT(jump.bytecode_patch_offset != 0xffffffffu);
+				patchI16(jump.bytecode_patch_offset, jump.target->bytecode_offset);
+			}
+			else if (op->kind == LS_IR_OP_CONDITIONAL_JUMP) {
+				auto& conditional = static_cast<LsOpConditionalJump&>(*op);
+				if (conditional.true_block) patchJumps(*conditional.true_block);
+				if (conditional.false_block) patchJumps(*conditional.false_block);
+			}
+		}
 	}
 
 	u32 emitBinary(ls_op base_op, const LsOpBinary& ir_op) {
@@ -818,9 +938,15 @@ struct BytecodeCompiler {
 	}
 
 	u32 emit(LsIrOp& op) {
+		op.bytecode_offset = code.size();
 		switch (op.kind) {
+			case LS_IR_OP_NEG:
+			case LS_IR_OP_NOT: return emitUnary(static_cast<LsOpUnary&>(op));
+			case LS_IR_OP_AND:
+			case LS_IR_OP_OR: return emitShortCircuit(static_cast<LsOpBinary&>(op));
 			case LS_IR_OP_NULL: return emitNull(static_cast<LsOpNull&>(op));
 			case LS_IR_OP_NOP: return 0xffFFffFF;
+			case LS_IR_OP_JUMP: return emitJump(static_cast<LsOpJump&>(op));
 			case LS_IR_OP_CONDITIONAL_JUMP: return emitConditionalJump(*static_cast<LsOpConditionalJump*>(&op));
 			case LS_IR_OP_CALL_DIRECT: return emitCallDirect(*static_cast<LsOpCallDirect*>(&op));
 			case LS_IR_OP_CALL_INDIRECT: return emitCallIndirect(*static_cast<LsOpCallIndirect*>(&op));
@@ -972,6 +1098,7 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host) {
 				if (fn_expr.body) {
 					LsIrBlockData& body = builder.buildFunctionIR(fn_expr);
 					bc_compiler.emit(body);
+					bc_compiler.patchJumps(body);
 				}
 				bc_compiler.endFunction();
 				++fn_index;

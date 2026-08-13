@@ -1314,6 +1314,26 @@ TEST(BytecodeFunctionCallWorks) {
 	return true;
 }
 
+TEST(BytecodeWhile) {
+	const char* source = R"(
+		fn main() : i32 {
+			var value : i32 = 0;
+			while value < 6 {
+				value += 1;
+			}
+			return value;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(6, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(BytecodeWhileBreakContinue) {
 	const char* source = R"(
 		fn main() : i32 {
