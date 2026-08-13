@@ -10,7 +10,8 @@ struct IRBuilder {
 	IRBuilder(ls_host& host)
 		: host(host)
 		, locals(host.arena)
-		, defers(host.arena) {}
+		, defers(host.arena)
+		, loops(host.arena) {}
 
 	template <typename T, typename... Args>
 	T& alloc(Args&&... args) {
@@ -349,16 +350,54 @@ struct IRBuilder {
 
 	void buildStatementIR(Statement& st, LsIrBlockData& parent) {
 		switch (st.kind) {
+			case Statement::LABEL: {
+				auto& label = static_cast<LabelStatement&>(st);
+				const ls_string_view previous_label = pending_loop_label;
+				pending_loop_label = label.name;
+				buildStatementIR(*label.statement, parent);
+				pending_loop_label = previous_label;
+				break;
+			}
 			case Statement::WHILE: {
 				auto& while_statement = static_cast<WhileStatement&>(st);
 				auto& loop = alloc<LsOpConditionalJump>();
+				auto& exit = alloc<LsOpNop>();
 				loop.condition = &buildExpressionIR(*while_statement.condition, true);
 				loop.true_block = &alloc<LsIrBlockData>(host.arena);
+				loops.push({pending_loop_label, &loop, &exit, (u32)defers.size()});
+				pending_loop_label = {};
 				buildStatementIR(*while_statement.body, *loop.true_block);
+				loops.pop_back();
 				auto& back_edge = alloc<LsOpJump>();
 				back_edge.target = &loop;
 				loop.true_block->ops.push(&back_edge);
 				parent.ops.push(&loop);
+				parent.ops.push(&exit);
+				break;
+			}
+			case Statement::BREAK:
+			case Statement::CONTINUE: {
+				const bool is_break = st.kind == Statement::BREAK;
+				const ls_string_view label = is_break
+					? static_cast<BreakStatement&>(st).label
+					: static_cast<ContinueStatement&>(st).label;
+				Loop* target = nullptr;
+				if (size(label) == 0) {
+					target = &loops.back();
+				}
+				else {
+					for (i32 i = loops.size() - 1; i >= 0; --i) {
+						if (equalStrings(label, loops[i].label)) {
+							target = &loops[i];
+							break;
+						}
+					}
+				}
+				ASSERT(target);
+				emitDefers(parent, target->defer_watermark);
+				auto& jump = alloc<LsOpJump>();
+				jump.target = is_break ? target->break_target : target->continue_target;
+				parent.ops.push(&jump);
 				break;
 			}
 			case Statement::IF: {
@@ -498,10 +537,18 @@ struct IRBuilder {
 		ls_string_view name;
 		LsOpAlloca* alloca = nullptr;
 	};
+	struct Loop {
+		ls_string_view label = {};
+		LsIrOp* continue_target = nullptr;
+		LsIrOp* break_target = nullptr;
+		u32 defer_watermark = 0;
+	};
 
 	ls_host& host;
 	ExpArray<Local> locals;
 	ExpArray<Statement*> defers;
+	ExpArray<Loop> loops;
+	ls_string_view pending_loop_label = {};
 };
 
 struct ByteArray {
