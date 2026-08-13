@@ -600,6 +600,14 @@ struct IRBuilder {
 	ls_string_view pending_loop_label = {};
 };
 
+bool isTypeFactory(const FunctionExpression& function) {
+	if (!function.return_type) return false;
+	if (function.return_type->kind == Expression::TYPE_LITERAL) {
+		return static_cast<const TypeLiteralExpression*>(function.return_type)->type == ResolvedType::META;
+	}
+	return function.return_type->resolved_type && function.return_type->resolved_type->kind == ResolvedType::META;
+}
+
 struct ByteArray {
 	explicit ByteArray(ls_arena& arena)
 		: arena(arena)
@@ -1195,6 +1203,8 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host) {
 			if (s.expression->kind != Expression::FUNCTION) continue;
 			
 			auto& fn_expr = static_cast<FunctionExpression&>(*s.expression);
+			if (isTypeFactory(fn_expr)) continue;
+			if (fn_expr.is_template) continue;
 			fn_expr.bytecode_index = bc->function_count++;
 		}
 	}
@@ -1214,6 +1224,8 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host) {
 
 			if (s.expression->kind == Expression::FUNCTION) {
 				auto& fn_expr = static_cast<FunctionExpression&>(*s.expression);
+				if (isTypeFactory(fn_expr)) continue;
+				if (fn_expr.is_template) continue;
 				ls_function_bc& fn_bc = bc->functions[fn_index];
 				fn_bc.name = s.name;
 
