@@ -228,12 +228,20 @@ TEST(EnumMethodCallOnReturnValue) {
 
         fn foo() : State { return State.Idle; }
 
-		fn main() : bool {
-            var b = foo().bar();
-            return b;
-		}
+		fn main() : i32 {
+			var result : i32 = 0;
+			var state = foo();
+			if state.bar() { result += 1; }
+			if foo().bar() { result += 2; }
+			return result;
+        }
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(3, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 

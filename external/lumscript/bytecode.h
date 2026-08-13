@@ -66,7 +66,8 @@
 // - frame copies: COPY (`dst`, `src`, `byte size`)
 // - global access: GLOBAL_LOAD/GLOBAL_STORE carry destination/source register,
 //   global byte offset, and byte size
-// - refs: LOCAL_REF/GLOBAL_REF (`dst`, byte offset)
+// - refs: LOCAL_REF/GLOBAL_REF (`dst`, byte offset); LOAD/STORE_*_REF use the
+//   referenced offset stored in a frame register
 // - arithmetic/logical/comparison ops carry explicit destination and source
 //   register operands; comparisons also carry a type byte
 // - comparison branches carry lhs/rhs registers, a type byte, and a signed
@@ -94,7 +95,11 @@ typedef enum ls_op {
 	LS_OP_GLOBAL_STORE,
 	LS_OP_LOCAL_REF,
 	LS_OP_GLOBAL_REF,
+	LS_OP_LOAD_GLOBAL_REF,
+	LS_OP_STORE_GLOBAL_REF,
 
+	LS_OP_LOAD_LOCAL_REF,	
+	LS_OP_STORE_LOCAL_REF,
 	LS_OP_LOAD_INDEXED,
 	LS_OP_STORE_INDEXED,
 	LS_OP_LOAD_INDEXED_LOCAL_I32,
@@ -293,7 +298,7 @@ typedef struct ls_type {
 
 // Debug-only description of one parameter or local's storage, used by
 // `ls_debug_frame_local_*`. Frame offsets are never reused within a
-// function (see FunctionCompiler::next_local_offset in bytecode_compiler.cpp),
+// function's local allocation state,
 // so a local's live range is approximated as [scope_begin_offset, end of
 // function) rather than tracking true block-scope exit: it may be reported
 // as "in scope" past the end of the if/while/for block that actually

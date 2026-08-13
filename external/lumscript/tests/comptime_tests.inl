@@ -597,6 +597,22 @@ TEST(ComptimeArray3) {
 	return true;
 }
 
+TEST(ComptimeArrayIndexMaterializesElementOnly) {
+	const char* source = R"(
+		comptime values = [10, 20, 30];
+		fn main() : i32 {
+			return values[1];
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(20, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 
 TEST(ComptimeArrayUnrollFor) {
 	const char* source = R"(

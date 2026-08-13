@@ -47,7 +47,7 @@ struct Symbol {
 	Expression* expression = nullptr; // expression used to initialize the symbol
 	// Storage location in the global data segment. The checker points identifier
 	// expressions at this slot (see symbolHasGlobalStorage); its values are filled
-	// in by ls_bytecode_compile's global layout pass before function bodies compile.
+	// in by the IR compiler's global layout pass before function bodies compile.
 	StorageSlot slot;
 	// Folded compile-time value for COMPTIME value symbols, laid out exactly as the
 	// runtime memory representation of `resolved_type` (see typeByteSize / struct
@@ -62,7 +62,7 @@ struct Symbol {
 
 // True when the symbol occupies runtime storage in the global data segment.
 // The checker uses this to decide whether an identifier gets a slot pointer;
-// ls_bytecode_compile's global layout pass must lay out exactly these symbols.
+// The IR compiler's global layout pass must lay out exactly these symbols.
 //
 // Comptime symbols are excluded: they are compile-time constants and are
 // materialized inline at each use site (folded to a value), so they never

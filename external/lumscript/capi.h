@@ -208,16 +208,8 @@ ls_result ls_module_compile(
 int ls_module_get_function_count(ls_module* module);
 int ls_module_get_global_count(ls_module* module);
 
-// Compile the prepared module into bytecode.
-//
-// Returns a bytecode handle on success, or null on failure. Destroy the
-// returned bytecode after all runtimes using it have been destroyed.
+// Compile the checked module into bytecode through the IR pipeline.
 ls_bytecode* ls_bytecode_compile(
-	ls_module* module,
-	ls_host* host
-);
-// Compile the checked module through the experimental ir.cpp pipeline.
-ls_bytecode* ls_bytecode_compile_ir(
 	ls_module* module,
 	ls_host* host
 );

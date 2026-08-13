@@ -18,9 +18,8 @@ static u32 mainFrameSize(const char* source, const char* test_name) {
 }
 
 TEST(SliceExpressionsDoNotGrowFrame) {
-	// Each `arr[:]` stashes its source in an addLocal whose next_local_offset
-	// bump is never undone (bytecode_compiler.cpp, compileBoundedRange), so the
-	// scratch is promoted to a function-lifetime local. Frame size should not
+	// Each `arr[:]` stashes its source in a temporary whose allocation is not
+	// reused. Frame size should not
 	// scale with how many slice expressions a function contains.
 	const char* one = R"(
 		fn take(s : []i32) : i32 { return s[0]; }
@@ -58,6 +57,48 @@ TEST(SliceExpressionsDoNotGrowFrame) {
 	return true;
 }
 
+TEST(RegisterAllocatorReusesSequentialValues) {
+	const char* one = R"(
+		fn main() : i32 {
+			var total : i32 = 0;
+			total += 1 + 2;
+			return total;
+		}
+	)";
+	const char* many = R"(
+		fn main() : i32 {
+			var total : i32 = 0;
+			total += 1 + 2;
+			total += 3 + 4;
+			total += 5 + 6;
+			total += 7 + 8;
+			return total;
+		}
+	)";
+	const u32 one_frame = mainFrameSize(one, __func__);
+	const u32 many_frame = mainFrameSize(many, __func__);
+	EXPECT_TRUE(one_frame != 0);
+	EXPECT_EQ(one_frame, many_frame);
+	return true;
+}
+
+TEST(RegisterAllocatorPreservesValuesAcrossCalls) {
+	const char* source = R"(
+		fn add_one(value : i32) : i32 { return value + 1; }
+		fn main() : i32 {
+			var lhs = 20 + 1;
+			return lhs + add_one(20);
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(ls_call(runtime, toLs("main")), LS_RESULT_OK);
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(SliceBoundsCanContainSliceExpressions) {
 	const char* source = R"(
 		fn main() : i32 {
@@ -84,6 +125,27 @@ TEST(SliceTypeSyntax) {
 		}
 	)";
 	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(BytecodeSliceStructFieldElementStore) {
+	const char* source = R"(
+		struct Point { x : i32; }
+		struct Points { values : []Point; }
+
+		fn main() : i32 {
+			var storage : [1]Point = [Point { 1 }];
+			var points : Points = Points { storage[:] };
+			points.values[0].x = 42;
+			return storage[0].x;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 

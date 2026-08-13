@@ -18,6 +18,33 @@ TEST(UnionBasicConstruction) {
 	return true;
 }
 
+TEST(BytecodeUnionMemberStore) {
+	const char* source = R"(
+		struct A { x : i32; }
+		struct B { y : i32; }
+		comptime Value = A | B;
+
+		fn main() : i32 {
+			var value : Value = A { 1 };
+			match value {
+				case A:
+					value.x = 42;
+					return value.x;
+				case B:
+					return -1;
+			}
+			return -2;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(UnionMemberToUnion) {
 	const char* source = R"(
 		struct ButtonEvent {

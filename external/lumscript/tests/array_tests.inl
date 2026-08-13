@@ -570,6 +570,28 @@ TEST(ThreeDimensionalStaticArray) {
 	return true;
 }
 
+TEST(BytecodeFourDimensionalStaticArrayIndexing) {
+	const char* source = R"(
+		fn main() : i32 {
+			var values : [2][2][2][2]i32 = undefined;
+			var a : i32 = 1;
+			var b : i32 = 0;
+			var c : i32 = 1;
+			var d : i32 = 0;
+			values[a][b][c][d] = 42;
+			return values[a][b][c][d];
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(MultiDimensionalArrayOutOfBoundsInnerDimensionFails) {
 	const char* source = R"(
 		fn main() : void {

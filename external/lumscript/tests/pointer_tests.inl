@@ -172,6 +172,25 @@ TEST(PointerParameterAllowsNestedMutableField) {
 	return true;
 }
 
+TEST(PointerParameterAllowsRuntimeIndexedNestedField) {
+	const char* source = R"(
+		struct Stats { hp : i32; }
+		struct Player { stats : Stats; }
+
+		fn bump(v : *i32) : void {
+			v.* += 1;
+		}
+
+		fn main() : void {
+			var players : [2]Player = undefined;
+			var i : i32 = 1;
+			bump(&players[i].stats.hp);
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(BytecodePointerParameterCall) {
 	const char* source = R"(
 		fn increment(v : *i32) : void {

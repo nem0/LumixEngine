@@ -279,7 +279,8 @@ struct UnaryExpression : Expression {
 
 	Expression* expression = nullptr;
 	Token::Type op = Token::ERROR;
-	FunctionExpression* resolved_fn = nullptr;
+	// Set when this unary operator resolves to an overloaded operator function.
+	FunctionExpression* operator_fn = nullptr;
 };
 
 struct BinaryExpression : Expression {
@@ -288,7 +289,8 @@ struct BinaryExpression : Expression {
 	Expression* lhs = nullptr;
 	Expression* rhs = nullptr;
 	Token::Type op = Token::ERROR;
-	FunctionExpression* resolved_fn = nullptr;
+	// Set when this binary operator resolves to an overloaded operator function.
+	FunctionExpression* operator_fn = nullptr;
 };
 
 struct CastExpression : Expression {

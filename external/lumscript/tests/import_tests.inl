@@ -13,7 +13,12 @@ TEST(ImportConst) {
 		{ toLs("a"), toLs(a_source) },
 	};
 	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
-	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), makeStringView(__func__), &resolveLumScriptImportC, &files));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(ls_call(runtime, toLs("main")), LS_RESULT_OK);
+	EXPECT_EQ(ls_to_i32(runtime, -1), 42);
+	CAPI_END(module);
 	return true;
 }
 

@@ -1,6 +1,6 @@
 /*
  * lumc.c - Standalone LumScript runner/compiler
- * Usage: lumc [--dump-bytecode|--ir.cpp] <script.lum> [function_name] [args...]
+ * Usage: lumc [--dump-bytecode] <script.lum> [function_name] [args...]
  *
  * Compiles and runs a LumScript file. If function_name is provided,
  * calls that function with the remaining arguments. Otherwise, calls main().
@@ -167,6 +167,10 @@ static const char* lumc_opcode_name(ls_op op) {
 		case LS_OP_GLOBAL_STORE: return "GLOBAL_STORE";
 		case LS_OP_LOCAL_REF: return "LOCAL_REF";
 		case LS_OP_GLOBAL_REF: return "GLOBAL_REF";
+		case LS_OP_LOAD_GLOBAL_REF: return "LOAD_GLOBAL_REF";
+		case LS_OP_STORE_GLOBAL_REF: return "STORE_GLOBAL_REF";
+		case LS_OP_LOAD_LOCAL_REF: return "LOAD_LOCAL_REF";
+		case LS_OP_STORE_LOCAL_REF: return "STORE_LOCAL_REF";
 		case LS_OP_LOAD_INDEXED: return "LOAD_INDEXED";
 		case LS_OP_STORE_INDEXED: return "STORE_INDEXED";
 		case LS_OP_LOAD_INDEXED_LOCAL_I32: return "LOAD_INDEXED_LOCAL_I32";
@@ -347,6 +351,17 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 				const u32 dst = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 offset = lumc_read_u32(fn->code, fn->code_size, &pc);
 				printf(" dst=%u, offset=%u", dst, offset);
+				break;
+			}
+			case LS_OP_LOAD_GLOBAL_REF:
+			case LS_OP_STORE_GLOBAL_REF:
+			case LS_OP_LOAD_LOCAL_REF:
+			case LS_OP_STORE_LOCAL_REF: {
+				const u32 addr = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 src = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 size = lumc_read_u32(fn->code, fn->code_size, &pc);
+				if (op == LS_OP_LOAD_GLOBAL_REF || op == LS_OP_LOAD_LOCAL_REF) printf(" dst=%u, addr=%u, size=%u", addr, src, size);
+				else printf(" addr=%u, src=%u, size=%u", addr, src, size);
 				break;
 			}
 			case LS_OP_LOAD_INDEXED:
@@ -583,9 +598,8 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 
 int main(int argc, char** argv) {
 	if (argc < 2) {
-		fputs("Usage: lumc [--dump-bytecode|--ir.cpp] <script.lum> [function_name] [args...]\n"
+		fputs("Usage: lumc [--dump-bytecode] <script.lum> [function_name] [args...]\n"
 			"  --dump-bytecode  Compile and print human-readable bytecode\n"
-			"  --ir.cpp         Compile through the experimental ir.cpp pipeline\n"
 			"  script.lum     - Path to LumScript source file\n"
 			"  function_name  - Function to call (default: main)\n"
 			"  args           - Arguments passed to the function\n", stderr);
@@ -600,14 +614,10 @@ int main(int argc, char** argv) {
 	ctx.host.print = &lumc_diagnostics_print;
 
 	int dump_bytecode = 0;
-	int ir_cpp = 0;
 	int script_arg = 1;
 	while (script_arg < argc) {
 		if (strcmp(argv[script_arg], "--dump-bytecode") == 0) {
 			dump_bytecode = 1;
-			++script_arg;
-		} else if (strcmp(argv[script_arg], "--ir.cpp") == 0) {
-			ir_cpp = 1;
 			++script_arg;
 		} else {
 			break;
@@ -662,11 +672,9 @@ int main(int argc, char** argv) {
 		goto cleanup;
 	}
 
-	ctx.bytecode = ir_cpp
-		? ls_bytecode_compile_ir(ctx.module, &ctx.host)
-		: ls_bytecode_compile(ctx.module, &ctx.host);
+	ctx.bytecode = ls_bytecode_compile(ctx.module, &ctx.host);
 	if (!ctx.bytecode) {
-		fprintf(stderr, "Error: Failed to compile %s\n", ir_cpp ? "ir.cpp bytecode" : "bytecode");
+		fputs("Error: Failed to compile IR bytecode\n", stderr);
 		goto cleanup;
 	}
 	if (dump_bytecode) {

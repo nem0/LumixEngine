@@ -2797,12 +2797,6 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 
 * https://verdagon.dev/grimoire/grimoire#the-list
 * should we make string literal to cstr cast explicit?
-* slice expressions leak frame space - each `arr[:]` in an expression permanently claims ~32 bytes that are never reclaimed, so a function's frame grows with the number of slice expressions it contains
-	- measured: two inline `arr[:]` uses give `frame_size` 124, six give 252; six scalar temp expressions give 24, so it is specific to slice materialization
-	- `temp_top` rewinds correctly between statements; what grows is `next_local_offset`
-	- cause is `addLocal` in bytecode_compiler.cpp: allocating while temps are live places the allocation at `temp_top` and raises the permanent locals floor past it, promoting mid-expression scratch into a function-lifetime local
-	- not a correctness bug (the frame is sized to fit), but it inflates every call and brings recursion closer to the runtime's stack cap
-	- fixing it means teaching `addLocal` to distinguish scratch from real locals, which touches every expression form; wants a regression test asserting `frame_size` does not scale with the number of slice expressions
 * hex - 0x1234ABCD
 * FourCC? `ABCD`
 * bit set / flags / something else?

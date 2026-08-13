@@ -2614,7 +2614,7 @@ struct Checker {
 			StructExpression* host = static_cast<StructResolvedType*>(inner)->decl;
 			OverloadResult unary_result = resolveOperatorOverload(unit, ctx, un.op, 1, &un.expression, &inner, *host, overload_result, overload_fn);
 			switch (unary_result) {
-				case OverloadResult::FOUND: un.resolved_fn = overload_fn; expr.resolved_type = overload_result; expr.eval_stage = Expression::RUNTIME; return overload_result;
+				case OverloadResult::FOUND: un.operator_fn = overload_fn; expr.resolved_type = overload_result; expr.eval_stage = Expression::RUNTIME; return overload_result;
 				case OverloadResult::AMBIGUOUS: errorLine(expr.token, "Ambiguous operator ", operatorSymbolName(un.op), " overload"); return nullptr;
 				case OverloadResult::FAILED: return nullptr;
 				case OverloadResult::NOT_FOUND: errorLine(expr.token, "No matching operator ", operatorSymbolName(un.op), " overload"); return nullptr;
@@ -2744,7 +2744,7 @@ struct Checker {
 				? Expression::COMPTIME_ONLY
 				: Expression::RUNTIME;
 			switch (bin_overload) {
-				case OverloadResult::FOUND: bin.resolved_fn = overload_fn; expr.resolved_type = overload_result; expr.eval_stage = overload_stage; return overload_result;
+				case OverloadResult::FOUND: bin.operator_fn = overload_fn; expr.resolved_type = overload_result; expr.eval_stage = overload_stage; return overload_result;
 				case OverloadResult::AMBIGUOUS: errorLine(expr.token, "Ambiguous operator ", operatorSymbolName(bin.op), " overload"); return nullptr;
 				case OverloadResult::FAILED: return nullptr;
 				case OverloadResult::NOT_FOUND: errorLine(expr.token, "No matching operator ", operatorSymbolName(bin.op), " overload"); return nullptr;

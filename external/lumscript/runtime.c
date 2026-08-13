@@ -652,8 +652,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 dst = runtime_read_u32(&ip);
 				const u32 offset = runtime_read_u32(&ip);
 				u8* out = runtime->frame + dst;
-				void* ptr = runtime->stack + offset;
-				memcpy(out, &ptr, sizeof(ptr));
+				memcpy(out, &offset, sizeof(offset));
 				break;
 			}
 			case LS_OP_LOAD_INDEXED: {
@@ -747,6 +746,49 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				u8* dst = runtime->frame + dst_base_offset + dst_index * scale;
 				if (src + size > runtime->stack_end || dst + size > runtime->stack_end) goto runtime_execute_function_fail;
 				memmove(dst, src, size);
+				break;
+			}
+			case LS_OP_LOAD_GLOBAL_REF: {
+				const u32 dst = runtime_read_u32(&ip);
+				const u32 addr = runtime_read_u32(&ip);
+				const u32 size = runtime_read_u32(&ip);
+				u8* out = runtime->frame + dst;
+				u32 offset;
+				memcpy(&offset, runtime->frame + addr, sizeof(offset));
+				if (offset > runtime->bytecode->global_size || size > runtime->bytecode->global_size - offset) goto runtime_execute_function_fail;
+				memmove(out, runtime->stack + offset, size);
+				break;
+			}
+			case LS_OP_STORE_GLOBAL_REF: {
+				const u32 addr = runtime_read_u32(&ip);
+				const u32 src = runtime_read_u32(&ip);
+				const u32 size = runtime_read_u32(&ip);
+				u32 offset;
+				memcpy(&offset, runtime->frame + addr, sizeof(offset));
+				if (offset > runtime->bytecode->global_size || size > runtime->bytecode->global_size - offset) goto runtime_execute_function_fail;
+				memmove(runtime->stack + offset, runtime->frame + src, size);
+				break;
+			}
+			case LS_OP_LOAD_LOCAL_REF: {
+				const u32 dst = runtime_read_u32(&ip);
+				const u32 addr = runtime_read_u32(&ip);
+				const u32 size = runtime_read_u32(&ip);
+				u8* out = runtime->frame + dst;
+				u8* src = runtime->frame + addr;
+				u32 tmp;
+				memcpy(&tmp, src, sizeof(tmp));
+				if (tmp + size > runtime->stack_end - runtime->frame) goto runtime_execute_function_fail;
+				memmove(out, runtime->frame + tmp, size);
+				break;
+			}
+			case LS_OP_STORE_LOCAL_REF: {
+				const u32 addr = runtime_read_u32(&ip);
+				const u32 src_offset = runtime_read_u32(&ip);
+				const u32 size = runtime_read_u32(&ip);
+				u32 offset;
+				memcpy(&offset, runtime->frame + addr, sizeof(offset));
+				if (offset + size > runtime->stack_end - runtime->frame) goto runtime_execute_function_fail;
+				memmove(runtime->frame + offset, runtime->frame + src_offset, size);
 				break;
 			}
 			case LS_OP_REF_INDEXED: {
