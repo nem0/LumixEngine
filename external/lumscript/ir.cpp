@@ -303,6 +303,16 @@ struct IRBuilder {
 				auto& be = static_cast<BinaryExpression&>(expr);
 				LsIrOp& lhs = buildExpressionIR(*be.lhs, true);
 				LsIrOp& rhs = buildExpressionIR(*be.rhs, true);
+				if (be.operator_fn) {
+					auto& op = alloc<LsOpCallDirect>();
+					op.function = be.operator_fn;
+					op.arg_count = 2;
+					op.return_size = typeByteSize(*be.resolved_type);
+					op.args = static_cast<LsIrOp**>(host.arena.allocate(host.arena.user_data, sizeof(LsIrOp*) * op.arg_count, alignof(LsIrOp*)));
+					op.args[0] = &lhs;
+					op.args[1] = &rhs;
+					return op;
+				}
 				LsOpBinary* op = nullptr;
 				switch (be.op) {
 					case Token::PLUS: op = &alloc<LsOpAdd>(); break;
