@@ -42,21 +42,15 @@
 //   stack helpers
 //
 // Addressing contract:
-// - `LOAD_INDEXED` and `STORE_INDEXED` copy an explicit byte width
-// - they read explicit base reference, index, and value/result registers
-// - they compute `base + index * scale + offset`, then load/store bytes
-// - `scale` and `offset` are encoded as immediates
-// - this is intended to cover nested field access and array indexing through
-//   one generic form
-// - `BOUNDS_CHECK` validates an explicit index register against a static length
+// - pointer arithmetic uses the ordinary arithmetic instructions
+// - `BOUNDS_CHECK` validates a typed integer index register against a static length
 //
 // Slice contract:
 // - a slice occupies `base, length` in stack memory
 // - `base` is an absolute runtime memory address, so slices can alias caller locals
 //   while passed to and returned from nested calls
 // - `SLICE` reads `base, length, begin, end` registers and writes a subslice
-// - `SLICE_*_LOCAL` reads/writes slice, index, and value/result frame registers
-// - `SLICE_*_AT_LOCAL` additionally carries element and field byte ranges
+// - `SLICE_LOAD` and `SLICE_REF` bounds-check an i64 index
 // - `SLICE_EQ` reads two slice registers plus the element size and kind, and
 //   writes a bool; `!=` is `SLICE_EQ` followed by `NOT`
 // - all slice bounds are checked by the runtime
@@ -64,10 +58,8 @@
 // Opcode layout summary:
 // - constants: LOAD_CONST_N (`dst`, inline payload)
 // - frame copies: COPY (`dst`, `src`, `byte size`)
-// - global access: GLOBAL_LOAD/GLOBAL_STORE carry destination/source register,
-//   global byte offset, and byte size
-// - refs: LOCAL_REF/GLOBAL_REF (`dst`, byte offset); LOAD/STORE_*_REF use the
-//   referenced offset stored in a frame register
+// - pointers: FRAME_PTR and GLOBAL_PTR materialize pointers from immediate byte
+//   offsets; LOAD_PTR and STORE_PTR handle all indirect value access
 // - arithmetic/logical/comparison ops carry explicit destination and source
 //   register operands; comparisons also carry a type byte
 // - comparison branches carry lhs/rhs registers, a type byte, and a signed
@@ -91,31 +83,13 @@ typedef enum ls_op {
 	LS_OP_LOAD_CONST_4,
 	LS_OP_LOAD_CONST_8,
 	LS_OP_COPY,
-	LS_OP_GLOBAL_LOAD,
-	LS_OP_GLOBAL_STORE,
-	LS_OP_LOCAL_REF,
-	LS_OP_GLOBAL_REF,
-	LS_OP_LOAD_GLOBAL_REF,
-	LS_OP_STORE_GLOBAL_REF,
-
-	LS_OP_LOAD_LOCAL_REF,	
-	LS_OP_STORE_LOCAL_REF,
-	LS_OP_LOAD_INDEXED,
-	LS_OP_STORE_INDEXED,
-	LS_OP_LOAD_INDEXED_LOCAL_I32,
-	LS_OP_STORE_INDEXED_LOCAL_I32,
-	LS_OP_COPY_AT_LOCAL_I32,
-	LS_OP_REF_INDEXED,
+	LS_OP_FRAME_PTR,
+	LS_OP_GLOBAL_PTR,
+	LS_OP_LOAD_PTR,
+	LS_OP_STORE_PTR,
 	LS_OP_BOUNDS_CHECK,
 	LS_OP_SLICE,
-	LS_OP_SLICE_LOAD_LOCAL,
-	LS_OP_SLICE_STORE_LOCAL,
-	LS_OP_SLICE_LOAD_LOCAL_I32,
-	LS_OP_SLICE_STORE_LOCAL_I32,
-	LS_OP_SLICE_LOAD_AT_LOCAL,
-	LS_OP_SLICE_STORE_AT_LOCAL,
-	LS_OP_SLICE_LOAD_AT_LOCAL_I32,
-	LS_OP_SLICE_STORE_AT_LOCAL_I32,
+	LS_OP_SLICE_LOAD,
 	LS_OP_SLICE_REF,
 	LS_OP_SLICE_LENGTH,
 	LS_OP_SLICE_EQ,

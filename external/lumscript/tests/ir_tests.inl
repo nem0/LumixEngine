@@ -93,6 +93,22 @@ TEST(ir_to_bytecode_array_access) {
 	return true;
 }
 
+TEST(ir_to_bytecode_array_bounds_check) {
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(R"(
+		fn valid() : i32 { var values : [3]i32 = undefined; var index : i64 = 1; values[index] = 8; return values[index]; }
+		fn negative() : i32 { var values : [3]i32 = undefined; var index : i64 = -1; return values[index]; }
+		fn past_end() : i32 { var values : [3]i32 = undefined; var index : u64 = 3; values[index] = 8; return 0; }
+	)"), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(ls_call(runtime, toLs("valid")), LS_RESULT_OK);
+	EXPECT_EQ(ls_to_i32(runtime, -1), 8);
+	EXPECT_EQ(ls_call(runtime, toLs("negative")), LS_RESULT_FAILURE);
+	EXPECT_EQ(ls_call(runtime, toLs("past_end")), LS_RESULT_FAILURE);
+	CAPI_END(module);
+	return true;
+}
+
 TEST(ir_to_bytecode_undefined_array_and_greater_than) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs("fn main() : i32 { var values : [3]i32 = undefined; for i in 0..3 { values[i] = i; } if values[2] > 1 { return values[2]; } return 0; }"), makeStringView(__func__), nullptr, nullptr));

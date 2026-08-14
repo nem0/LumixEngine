@@ -163,30 +163,13 @@ static const char* lumc_opcode_name(ls_op op) {
 		case LS_OP_LOAD_CONST_4: return "LOAD_CONST_4";
 		case LS_OP_LOAD_CONST_8: return "LOAD_CONST_8";
 		case LS_OP_COPY: return "COPY";
-		case LS_OP_GLOBAL_LOAD: return "GLOBAL_LOAD";
-		case LS_OP_GLOBAL_STORE: return "GLOBAL_STORE";
-		case LS_OP_LOCAL_REF: return "LOCAL_REF";
-		case LS_OP_GLOBAL_REF: return "GLOBAL_REF";
-		case LS_OP_LOAD_GLOBAL_REF: return "LOAD_GLOBAL_REF";
-		case LS_OP_STORE_GLOBAL_REF: return "STORE_GLOBAL_REF";
-		case LS_OP_LOAD_LOCAL_REF: return "LOAD_LOCAL_REF";
-		case LS_OP_STORE_LOCAL_REF: return "STORE_LOCAL_REF";
-		case LS_OP_LOAD_INDEXED: return "LOAD_INDEXED";
-		case LS_OP_STORE_INDEXED: return "STORE_INDEXED";
-		case LS_OP_LOAD_INDEXED_LOCAL_I32: return "LOAD_INDEXED_LOCAL_I32";
-		case LS_OP_STORE_INDEXED_LOCAL_I32: return "STORE_INDEXED_LOCAL_I32";
-		case LS_OP_COPY_AT_LOCAL_I32: return "COPY_AT_LOCAL_I32";
-		case LS_OP_REF_INDEXED: return "REF_INDEXED";
+		case LS_OP_FRAME_PTR: return "FRAME_PTR";
+		case LS_OP_GLOBAL_PTR: return "GLOBAL_PTR";
+		case LS_OP_LOAD_PTR: return "LOAD_PTR";
+		case LS_OP_STORE_PTR: return "STORE_PTR";
 		case LS_OP_BOUNDS_CHECK: return "BOUNDS_CHECK";
 		case LS_OP_SLICE: return "SLICE";
-		case LS_OP_SLICE_LOAD_LOCAL: return "SLICE_LOAD_LOCAL";
-		case LS_OP_SLICE_STORE_LOCAL: return "SLICE_STORE_LOCAL";
-		case LS_OP_SLICE_LOAD_LOCAL_I32: return "SLICE_LOAD_LOCAL_I32";
-		case LS_OP_SLICE_STORE_LOCAL_I32: return "SLICE_STORE_LOCAL_I32";
-		case LS_OP_SLICE_LOAD_AT_LOCAL: return "SLICE_LOAD_AT_LOCAL";
-		case LS_OP_SLICE_STORE_AT_LOCAL: return "SLICE_STORE_AT_LOCAL";
-		case LS_OP_SLICE_LOAD_AT_LOCAL_I32: return "SLICE_LOAD_AT_LOCAL_I32";
-		case LS_OP_SLICE_STORE_AT_LOCAL_I32: return "SLICE_STORE_AT_LOCAL_I32";
+		case LS_OP_SLICE_LOAD: return "SLICE_LOAD";
 		case LS_OP_SLICE_REF: return "SLICE_REF";
 		case LS_OP_SLICE_LENGTH: return "SLICE_LENGTH";
 		case LS_OP_INC_I32: return "INC_I32";
@@ -335,125 +318,54 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 				pc += width;
 				break;
 			}
-			case LS_OP_COPY:
-			case LS_OP_GLOBAL_LOAD:
-			case LS_OP_GLOBAL_STORE: {
+			case LS_OP_COPY: {
 				const u32 a = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 b = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 c = lumc_read_u32(fn->code, fn->code_size, &pc);
-				if (op == LS_OP_COPY) printf(" dst=%u, src=%u, size=%u", a, b, c);
-				else if (op == LS_OP_GLOBAL_LOAD) printf(" dst=%u, offset=%u, size=%u", a, b, c);
-				else printf(" offset=%u, src=%u, size=%u", a, b, c);
+				printf(" dst=%u, src=%u, size=%u", a, b, c);
 				break;
 			}
-			case LS_OP_LOCAL_REF:
-			case LS_OP_GLOBAL_REF: {
+			case LS_OP_FRAME_PTR:
+			case LS_OP_GLOBAL_PTR: {
 				const u32 dst = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 offset = lumc_read_u32(fn->code, fn->code_size, &pc);
 				printf(" dst=%u, offset=%u", dst, offset);
 				break;
 			}
-			case LS_OP_LOAD_GLOBAL_REF:
-			case LS_OP_STORE_GLOBAL_REF:
-			case LS_OP_LOAD_LOCAL_REF:
-			case LS_OP_STORE_LOCAL_REF: {
+			case LS_OP_LOAD_PTR:
+			case LS_OP_STORE_PTR: {
 				const u32 addr = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 src = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 size = lumc_read_u32(fn->code, fn->code_size, &pc);
-				if (op == LS_OP_LOAD_GLOBAL_REF || op == LS_OP_LOAD_LOCAL_REF) printf(" dst=%u, addr=%u, size=%u", addr, src, size);
+				if (op == LS_OP_LOAD_PTR) printf(" dst=%u, addr=%u, size=%u", addr, src, size);
 				else printf(" addr=%u, src=%u, size=%u", addr, src, size);
-				break;
-			}
-			case LS_OP_LOAD_INDEXED:
-			case LS_OP_STORE_INDEXED:
-			case LS_OP_REF_INDEXED: {
-				const u32 a = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 b = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 c = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 scale = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const i32 offset = lumc_read_i32(fn->code, fn->code_size, &pc);
-				const u32 value_size = op == LS_OP_REF_INDEXED ? 0u : lumc_read_u32(fn->code, fn->code_size, &pc);
-				if (op == LS_OP_LOAD_INDEXED) printf(" dst=%u, base=%u, index=%u, scale=%u, offset=%d, size=%u", a, b, c, scale, offset, value_size);
-				else if (op == LS_OP_STORE_INDEXED) printf(" base=%u, index=%u, src=%u, scale=%u, offset=%d, size=%u", a, b, c, scale, offset, value_size);
-				else printf(" dst=%u, base=%u, index=%u, scale=%u, offset=%d", a, b, c, scale, offset);
 				break;
 			}
 			case LS_OP_BOUNDS_CHECK: {
 				const u32 index = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u8 index_kind = fn->code[pc++];
 				const u64 length = lumc_read_u64(fn->code, fn->code_size, &pc);
-				printf(" index=%u, length=%llu", index, (unsigned long long)length);
+				printf(" index=%u, type=%u, length=%llu", index, index_kind, (unsigned long long)length);
 				break;
 			}
 			case LS_OP_SLICE:
-			case LS_OP_SLICE_LOAD_LOCAL:
-			case LS_OP_SLICE_STORE_LOCAL:
-			case LS_OP_SLICE_LOAD_LOCAL_I32:
-			case LS_OP_SLICE_STORE_LOCAL_I32:
-			case LS_OP_SLICE_LOAD_AT_LOCAL:
-			case LS_OP_SLICE_STORE_AT_LOCAL:
-			case LS_OP_SLICE_LOAD_AT_LOCAL_I32:
-			case LS_OP_SLICE_STORE_AT_LOCAL_I32:
+			case LS_OP_SLICE_LOAD:
 			case LS_OP_SLICE_REF:
 			case LS_OP_SLICE_LENGTH: {
-				if (op == LS_OP_SLICE_LOAD_LOCAL || op == LS_OP_SLICE_STORE_LOCAL || op == LS_OP_SLICE_LOAD_LOCAL_I32 || op == LS_OP_SLICE_STORE_LOCAL_I32) {
+				if (op == LS_OP_SLICE_LOAD) {
 					const u32 a = lumc_read_u32(fn->code, fn->code_size, &pc);
 					const u32 b = lumc_read_u32(fn->code, fn->code_size, &pc);
 					const u32 c = lumc_read_u32(fn->code, fn->code_size, &pc);
 					const u32 size = lumc_read_u32(fn->code, fn->code_size, &pc);
-					if (op == LS_OP_SLICE_LOAD_LOCAL || op == LS_OP_SLICE_LOAD_LOCAL_I32) printf(" dst=%u, slice=%u, index=%u, size=%u", a, b, c, size);
-					else printf(" slice=%u, index=%u, src=%u, size=%u", a, b, c, size);
-					break;
-				}
-				if (op == LS_OP_SLICE_LOAD_AT_LOCAL || op == LS_OP_SLICE_STORE_AT_LOCAL || op == LS_OP_SLICE_LOAD_AT_LOCAL_I32 || op == LS_OP_SLICE_STORE_AT_LOCAL_I32) {
-					const u32 a = lumc_read_u32(fn->code, fn->code_size, &pc);
-					const u32 b = lumc_read_u32(fn->code, fn->code_size, &pc);
-					const u32 c = lumc_read_u32(fn->code, fn->code_size, &pc);
-					const u32 element_size = lumc_read_u32(fn->code, fn->code_size, &pc);
-					const i32 field_offset = lumc_read_i32(fn->code, fn->code_size, &pc);
-					const u32 field_size = lumc_read_u32(fn->code, fn->code_size, &pc);
-					if (op == LS_OP_SLICE_LOAD_AT_LOCAL || op == LS_OP_SLICE_LOAD_AT_LOCAL_I32) printf(" dst=%u, slice=%u, index=%u, element_size=%u, field_offset=%d, field_size=%u", a, b, c, element_size, field_offset, field_size);
-					else printf(" slice=%u, index=%u, src=%u, element_size=%u, field_offset=%d, field_size=%u", a, b, c, element_size, field_offset, field_size);
+					printf(" dst=%u, slice=%u, index=%u, size=%u", a, b, c, size);
 					break;
 				}
 				if (op == LS_OP_SLICE_LENGTH) {
 					printf(" dst=%u, slice=%u", lumc_read_u32(fn->code, fn->code_size, &pc), lumc_read_u32(fn->code, fn->code_size, &pc));
 					break;
 				}
-				const u32 count = op == LS_OP_SLICE ? 4u : op == LS_OP_SLICE_LOAD_LOCAL || op == LS_OP_SLICE_STORE_LOCAL || op == LS_OP_SLICE_LOAD_LOCAL_I32 || op == LS_OP_SLICE_STORE_LOCAL_I32 ? 4u : op == LS_OP_SLICE_LOAD_AT_LOCAL || op == LS_OP_SLICE_STORE_AT_LOCAL || op == LS_OP_SLICE_LOAD_AT_LOCAL_I32 || op == LS_OP_SLICE_STORE_AT_LOCAL_I32 ? 6u : op == LS_OP_SLICE_REF ? 3u : 1u;
+				const u32 count = op == LS_OP_SLICE ? 4u : op == LS_OP_SLICE_REF ? 3u : 1u;
 				for (u32 i = 0; i < count; ++i) printf(" arg%u=%u", i, lumc_read_u32(fn->code, fn->code_size, &pc));
-				break;
-			}
-			case LS_OP_LOAD_INDEXED_LOCAL_I32: {
-				const u32 dst = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 base = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 index = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 scale = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const i32 offset = lumc_read_i32(fn->code, fn->code_size, &pc);
-				const u32 length = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 size = lumc_read_u32(fn->code, fn->code_size, &pc);
-				printf(" dst=%u, base=%u, index=%u, scale=%u, offset=%d, length=%u, size=%u", dst, base, index, scale, offset, length, size);
-				break;
-			}
-			case LS_OP_STORE_INDEXED_LOCAL_I32: {
-				const u32 base = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 index = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 src = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 scale = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const i32 offset = lumc_read_i32(fn->code, fn->code_size, &pc);
-				const u32 length = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 size = lumc_read_u32(fn->code, fn->code_size, &pc);
-				printf(" base=%u, index=%u, src=%u, scale=%u, offset=%d, length=%u, size=%u", base, index, src, scale, offset, length, size);
-				break;
-			}
-			case LS_OP_COPY_AT_LOCAL_I32: {
-				const u32 src_base = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 src_index = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 dst_base = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 dst_index = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 scale = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 length = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 size = lumc_read_u32(fn->code, fn->code_size, &pc);
-				printf(" src_base=%u, src_index=%u, dst_base=%u, dst_index=%u, scale=%u, length=%u, size=%u", src_base, src_index, dst_base, dst_index, scale, length, size);
 				break;
 			}
 			case LS_OP_ADD_I8: case LS_OP_ADD_U8: case LS_OP_ADD_I16: case LS_OP_ADD_U16: case LS_OP_ADD_I32: case LS_OP_ADD_U32: case LS_OP_ADD_I64: case LS_OP_ADD_U64: case LS_OP_ADD_F32: case LS_OP_ADD_F64:

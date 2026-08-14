@@ -25,6 +25,7 @@ enum LsIrOpKind {
 	LS_IR_OP_MUL,
 	LS_IR_OP_DIV,
 	LS_IR_OP_MOD,
+	LS_IR_OP_BOUNDS_CHECK,
 	LS_IR_OP_CAST,
 	LS_IR_OP_RETURN,
 	LS_IR_OP_ALLOCA,
@@ -42,21 +43,22 @@ enum LsIrOpKind {
 	LS_IR_OP_NOP,
 	LS_IR_OP_PUSH_LOCAL_ADDR,
 	LS_IR_OP_PUSH_GLOBAL_ADDR,
-	LS_IR_OP_LOCAL_LOAD,
-	LS_IR_OP_GLOBAL_LOAD,
+	LS_IR_OP_LOAD,
 	LS_IR_OP_EXTRACT_VALUE,
 	LS_IR_OP_CALL_DIRECT,
 	LS_IR_OP_CALL_INDIRECT,
 	LS_IR_OP_CONDITIONAL_JUMP,
 	LS_IR_OP_JUMP,
 	LS_IR_OP_NULL,
+	LS_IR_OP_SLICE,
+	LS_IR_OP_SLICE_LOAD,
+	LS_IR_OP_SLICE_REF,
 };
 
 struct LsIrOp {
 	virtual ~LsIrOp() = default; // TODO just for debugger, remove later
 	enum OutputStorage {
-		LOCAL_REF,
-		GLOBAL_REF,
+		POINTER_REF,
 		VALUE
 	} output_storage = VALUE;
 	LsIrOpKind kind = LS_IR_OP_INVALID;
@@ -68,12 +70,12 @@ struct LsIrOp {
 };
 
 struct LsOpPushLocalAddr : LsIrOp {
-	LsOpPushLocalAddr() : LsIrOp(LS_IR_OP_PUSH_LOCAL_ADDR) { output_storage = LOCAL_REF; }
+	LsOpPushLocalAddr() : LsIrOp(LS_IR_OP_PUSH_LOCAL_ADDR) { output_storage = POINTER_REF; }
 	struct LsOpAlloca* alloca = nullptr;
 };
 
 struct LsOpPushGlobalAddr : LsIrOp {
-	LsOpPushGlobalAddr() : LsIrOp(LS_IR_OP_PUSH_GLOBAL_ADDR) { output_storage = GLOBAL_REF; }
+	LsOpPushGlobalAddr() : LsIrOp(LS_IR_OP_PUSH_GLOBAL_ADDR) { output_storage = POINTER_REF; }
 	struct Symbol* symbol = nullptr;
 };
 
@@ -82,14 +84,8 @@ struct LsOpNull : LsIrOp {
 	u32 size;
 };
 
-struct LsOpLocalLoad : LsIrOp {
-	LsOpLocalLoad() : LsIrOp(LS_IR_OP_LOCAL_LOAD) { output_storage = VALUE; }
-	LsIrOp* addr = nullptr;
-	u32 size = 0;
-};
-
-struct LsOpGlobalLoad : LsIrOp {
-	LsOpGlobalLoad() : LsIrOp(LS_IR_OP_GLOBAL_LOAD) { output_storage = VALUE; }
+struct LsOpLoad : LsIrOp {
+	LsOpLoad() : LsIrOp(LS_IR_OP_LOAD) { output_storage = VALUE; }
 	LsIrOp* addr = nullptr;
 	u32 size = 0;
 };
@@ -163,6 +159,38 @@ struct LsOpBinary : LsIrOp {
 	ResolvedType* operand_type = nullptr;
 	LsIrOp* lhs = nullptr;
 	LsIrOp* rhs = nullptr;
+};
+
+struct LsOpBoundsCheck : LsIrOp {
+	LsOpBoundsCheck() : LsIrOp(LS_IR_OP_BOUNDS_CHECK) {}
+	ResolvedType* index_type = nullptr;
+	LsIrOp* index = nullptr;
+	u64 length = 0;
+};
+
+struct LsOpSlice : LsIrOp {
+	LsOpSlice() : LsIrOp(LS_IR_OP_SLICE) {}
+	LsIrOp* source = nullptr;
+	LsIrOp* begin = nullptr;
+	LsIrOp* end = nullptr;
+	u32 element_size = 0;
+	i64 source_length = 0;
+	bool source_is_array = false;
+	bool source_is_scalar = false;
+};
+
+struct LsOpSliceLoad : LsIrOp {
+	LsOpSliceLoad() : LsIrOp(LS_IR_OP_SLICE_LOAD) {}
+	LsIrOp* slice = nullptr;
+	LsIrOp* index = nullptr;
+	u32 element_size = 0;
+};
+
+struct LsOpSliceRef : LsIrOp {
+	LsOpSliceRef() : LsIrOp(LS_IR_OP_SLICE_REF) { output_storage = POINTER_REF; }
+	LsIrOp* slice = nullptr;
+	LsIrOp* index = nullptr;
+	u32 element_size = 0;
 };
 
 struct LsOpUnary : LsIrOp {
