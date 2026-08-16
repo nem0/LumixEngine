@@ -156,6 +156,15 @@ struct IRBuilder {
 				}
 				ASSERT(be.base->resolved_type->kind == ResolvedType::ARRAY);
 				LsIrOp& base = buildExpressionIR(*be.base, false);
+				// A temporary array (for example, a function call returning an array)
+				// is a value, not an address. Materialize its frame address before
+				// applying the element offset.
+				LsIrOp* base_address = &base;
+				if (base.result_mode == LsIrOp::VALUE) {
+					auto& address = alloc<LsOpMaterializeAddr>();
+					address.value = &base;
+					base_address = &address;
+				}
 				ASSERT(be.args.size() == 1);
 				LsIrOp& index = buildExpressionIR(*be.args[0], true);
 				auto& bounds_check = alloc<LsOpBoundsCheck>();
@@ -183,7 +192,7 @@ struct IRBuilder {
 
 				mul.lhs = checked_index;
 				mul.rhs = &size;
-				add.lhs = &base;
+				add.lhs = base_address;
 				add.rhs = &mul;
 				add.result_mode = LsIrOp::ADDRESS;
 				if (!as_rvalue) return add;
@@ -1733,10 +1742,19 @@ struct BytecodeCompiler {
 			auto& source = static_cast<SliceResolvedType&>(*cast.target_type);
 			auto& target = static_cast<SliceResolvedType&>(*cast.type);
 			static ResolvedType i64_type(ResolvedType::I64);
-			u32 length_sp = stack_top;
-			emitOp(LS_OP_SLICE_LENGTH);
-			emit(length_sp);
+			// Materialize the destination before calculating the rescaled length. This
+			// keeps the reinterpretation independent of temporary lifetime/overlap.
+			const u32 result = stack_top;
+			stack_top += typeByteSize(*cast.type);
+			emitOp(LS_OP_COPY);
+			emit(result);
 			emit(value_sp);
+			emit(sizeof(void*));
+			u32 length_sp = stack_top;
+			emitOp(LS_OP_COPY);
+			emit(length_sp);
+			emit(value_sp + sizeof(void*));
+			emit(sizeof(i64));
 			stack_top += sizeof(i64);
 			const u32 source_size = typeByteSize(*source.element_type);
 			const u32 target_size = typeByteSize(*target.element_type);
@@ -1755,12 +1773,6 @@ struct BytecodeCompiler {
 				stack_top += sizeof(i64);
 				length_sp = scaled_sp;
 			}
-			const u32 result = stack_top;
-			stack_top += typeByteSize(*cast.type);
-			emitOp(LS_OP_COPY);
-			emit(result);
-			emit(value_sp);
-			emit(sizeof(void*));
 			emitOp(LS_OP_COPY);
 			emit(result + sizeof(void*));
 			emit(length_sp);

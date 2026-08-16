@@ -645,7 +645,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				void* ptr = NULL;
 				memcpy(&ptr, runtime->frame + addr, sizeof(ptr));
 				u8* value = (u8*)ptr;
-				if (!value || value < runtime->stack || value + size > runtime->stack_end) goto runtime_execute_function_fail;
+				if (!value) goto runtime_execute_function_fail;
 				memmove(runtime->frame + dst, value, size);
 				break;
 			}
@@ -656,7 +656,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				void* ptr = NULL;
 				memcpy(&ptr, runtime->frame + addr, sizeof(ptr));
 				u8* value = (u8*)ptr;
-				if (!value || value < runtime->stack || value + size > runtime->stack_end) goto runtime_execute_function_fail;
+				if (!value) goto runtime_execute_function_fail;
 				memmove(value, runtime->frame + src, size);
 				break;
 			}
