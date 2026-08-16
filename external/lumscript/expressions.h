@@ -289,6 +289,8 @@ struct BinaryExpression : Expression {
 	Expression* lhs = nullptr;
 	Expression* rhs = nullptr;
 	Token::Type op = Token::ERROR;
+	// Set during semantic checking for union membership tests.
+	i32 union_member_index = -1;
 	// Set when this binary operator resolves to an overloaded operator function.
 	FunctionExpression* operator_fn = nullptr;
 };
@@ -307,6 +309,9 @@ struct MemberExpression : Expression {
 	ls_string_view name = {};
 	FunctionExpression* resolved_fn = nullptr;
 	struct Symbol* resolved_symbol = nullptr;
+	// Set during semantic checking for enum member expressions.
+	i32 enum_member_index = -1;
+	i64 enum_member_value = 0;
 };
 
 struct TypeMemberExpression : Expression {

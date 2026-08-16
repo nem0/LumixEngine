@@ -1216,6 +1216,7 @@ struct Checker {
 				BinaryExpression* s = static_cast<BinaryExpression*>(src);
 				BinaryExpression* bin = makeType<BinaryExpression>(unit.arena);
 				bin->op = s->op;
+				bin->union_member_index = s->union_member_index;
 				bin->lhs = cloneExpression(unit, s->lhs, bindings);
 				bin->rhs = cloneExpression(unit, s->rhs, bindings);
 				out = bin;
@@ -1254,6 +1255,8 @@ struct Checker {
 					mem->expression = cloneExpression(unit, s->expression, bindings);
 				}
 				mem->name = s->name;
+				mem->enum_member_index = s->enum_member_index;
+				mem->enum_member_value = s->enum_member_value;
 				out = mem;
 				break;
 			}
@@ -1388,8 +1391,9 @@ struct Checker {
 					dst_arm.is_fallback = src_arm.is_fallback;
 					for (MatchPattern& src_pattern : src_arm.patterns) {
 						MatchPattern& dst_pattern = dst_arm.patterns.emplace_back();
-						dst_pattern.begin = cloneExpression(unit, src_pattern.begin, bindings);
+						 dst_pattern.begin = cloneExpression(unit, src_pattern.begin, bindings);
 						dst_pattern.end = cloneExpression(unit, src_pattern.end, bindings);
+						dst_pattern.union_member_index = src_pattern.union_member_index;
 					}
 					dst_arm.body = static_cast<BlockStatement*>(cloneStatement(unit, src_arm.body, bindings));
 				}
@@ -2681,8 +2685,10 @@ struct Checker {
 				return nullptr;
 			}
 			ResolvedType* member = unwrapMeta(rhs);
-			for (ResolvedType* candidate : static_cast<UnionResolvedType*>(lhs)->members) {
+			for (i32 i = 0; i < static_cast<UnionResolvedType*>(lhs)->members.size(); ++i) {
+				ResolvedType* candidate = static_cast<UnionResolvedType*>(lhs)->members[i];
 				if (typesEqual(candidate, member)) {
+					bin.union_member_index = i;
 					expr.resolved_type = primitiveType(ResolvedType::BOOL);
 					expr.eval_stage = bin.lhs->eval_stage == Expression::COMPTIME_VALUE
 						? Expression::COMPTIME_VALUE
@@ -3116,7 +3122,15 @@ struct Checker {
 			}
 
 			EnumResolvedType* en = static_cast<EnumResolvedType*>(hint);
-			if (hasEnumMember(*en, member.name)) {
+			for (i32 i = 0; i < en->decl->members.size(); ++i) {
+				if (!equalStrings(en->decl->members[i].name, member.name)) continue;
+				member.enum_member_index = i;
+				member.enum_member_value = i;
+				if (en->decl->members[i].value) {
+					ComptimeValue value = evalComptime(unit, *en->decl->members[i].value, ctx);
+					if (!value) return nullptr;
+					member.enum_member_value = comptimeNumericToI64(value.value, value.type->kind);
+				}
 				expr.resolved_type = en;
 				expr.eval_stage = hint == &module.type_kind ? Expression::COMPTIME_ONLY : Expression::COMPTIME_VALUE;
 				return en;
@@ -3200,7 +3214,15 @@ struct Checker {
 				ResolvedType* inner = static_cast<MetaType*>(base_type)->inner;
 				if (inner->kind == ResolvedType::ENUM) {
 					EnumResolvedType* en = static_cast<EnumResolvedType*>(inner);
-					if (hasEnumMember(*en, member.name)) {
+					for (i32 i = 0; i < en->decl->members.size(); ++i) {
+						if (!equalStrings(en->decl->members[i].name, member.name)) continue;
+						member.enum_member_index = i;
+						member.enum_member_value = i;
+						if (en->decl->members[i].value) {
+							ComptimeValue value = evalComptime(unit, *en->decl->members[i].value, ctx);
+							if (!value) return nullptr;
+							member.enum_member_value = comptimeNumericToI64(value.value, value.type->kind);
+						}
 						expr.resolved_type = inner;
 						expr.eval_stage = Expression::COMPTIME_VALUE;
 						return inner;
@@ -4759,6 +4781,7 @@ struct Checker {
 					}
 					covered_union_members[member_index] = true;
 					++covered_union_count;
+					pattern.union_member_index = member_index;
 					MetaType* meta = makeType<MetaType>(unit.arena);
 					meta->inner = member;
 					pattern.begin->resolved_type = meta;
@@ -4786,6 +4809,13 @@ struct Checker {
 						}
 						covered_enum_members[i] = true;
 						++covered_enum_count;
+						mem->enum_member_index = i;
+						mem->enum_member_value = i;
+						if (subject_enum->decl->members[i].value) {
+							ComptimeValue value = evalComptime(unit, *subject_enum->decl->members[i].value, &ctx);
+							if (!value) return false;
+							mem->enum_member_value = comptimeNumericToI64(value.value, value.type->kind);
+						}
 						break;
 					}
 				}

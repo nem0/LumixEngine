@@ -86,6 +86,8 @@ struct IfStatement : Statement {
 struct MatchPattern {
 	Expression* begin = nullptr;
 	Expression* end = nullptr;
+	// Set during semantic checking for union type patterns.
+	i32 union_member_index = -1;
 };
 
 struct MatchArm {

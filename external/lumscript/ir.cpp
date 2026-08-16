@@ -13,25 +13,30 @@ struct IRBuilder {
 		, defers(host.arena)
 		, loops(host.arena) {}
 
-	template <typename T, typename... Args>
-	T& alloc(Args&&... args) {
+	template <typename T, typename... Args> T& alloc(Args&&... args) {
 		T* v = (T*)host.arena.allocate(host.arena.user_data, sizeof(T), alignof(T));
 		new (NewPlaceholder(), v) T(static_cast<Args&&>(args)...);
 		return *v;
-	} 
+	}
 
 	LsIrOp& buildImplicitConversionIR(Expression& expression, ResolvedType& target_type) {
+		if (expression.kind == Expression::UNDEFINED) {
+			// TODO should undefined do nothing?
+			auto& storage = alloc<LsOpAlloca>();
+			storage.type = &target_type;
+			storage.value = &alloc<LsOpNop>();
+			return storage;
+		}
 		if (target_type.kind != ResolvedType::SLICE || expression.resolved_type->kind != ResolvedType::ARRAY) {
 			return buildExpressionIR(expression, true);
 		}
 		auto& array = static_cast<ArrayResolvedType&>(*expression.resolved_type);
 		auto& slice = alloc<LsOpSlice>();
 		LsIrOp* source = &buildExpressionIR(expression, false);
-		if (source->output_storage == LsIrOp::VALUE) {
-			auto& temporary = alloc<LsOpAlloca>();
-			temporary.type = expression.resolved_type;
-			temporary.value = source;
-			source = &temporary;
+		if (source->result_mode == LsIrOp::VALUE) {
+			auto& address = alloc<LsOpMaterializeAddr>();
+			address.value = source;
+			source = &address;
 		}
 		slice.source = source;
 		slice.source_is_array = true;
@@ -41,13 +46,17 @@ struct IRBuilder {
 	}
 
 	LsIrOp& buildExpressionIR(Expression& expr, bool as_rvalue) {
-		if (as_rvalue && expr.comptime_value.kind == ComptimeValue::VALUE
-			&& expr.comptime_value.value && expr.resolved_type
-			&& typeByteSize(*expr.resolved_type) <= sizeof(LsOpLoadConst::value))
-		{
+		if (as_rvalue && expr.comptime_value.kind == ComptimeValue::VALUE && expr.comptime_value.value && expr.resolved_type && typeByteSize(*expr.resolved_type) <= sizeof(LsOpLoadConst::value)) {
 			auto& constant = alloc<LsOpLoadConst>();
 			constant.type = expr.resolved_type;
 			memcpy(constant.value, expr.comptime_value.value, typeByteSize(*expr.resolved_type));
+			return constant;
+		}
+		if (as_rvalue && expr.comptime_value.kind == ComptimeValue::VALUE && expr.comptime_value.value && expr.resolved_type) {
+			auto& constant = alloc<LsOpLoadBytes>();
+			constant.type = expr.resolved_type;
+			constant.value = expr.comptime_value.value;
+			constant.size = typeByteSize(*expr.resolved_type);
 			return constant;
 		}
 		switch (expr.kind) {
@@ -59,7 +68,7 @@ struct IRBuilder {
 			case Expression::DEREFERENCE: {
 				auto& dereference = static_cast<DereferenceExpression&>(expr);
 				LsIrOp& address = buildExpressionIR(*dereference.subject, true);
-				address.output_storage = LsIrOp::POINTER_REF;
+				address.result_mode = LsIrOp::ADDRESS;
 				if (!as_rvalue) return address;
 				auto& load = alloc<LsOpLoad>();
 				load.addr = &address;
@@ -77,12 +86,10 @@ struct IRBuilder {
 					auto& array = static_cast<ArrayResolvedType&>(*slice.base->resolved_type);
 					element_type = array.element_type;
 					op.source_length = array.size;
-				}
-				else if (op.source_is_scalar) {
+				} else if (op.source_is_scalar) {
 					element_type = slice.base->resolved_type;
 					op.source_length = 1;
-				}
-				else {
+				} else {
 					element_type = static_cast<SliceResolvedType*>(slice.base->resolved_type)->element_type;
 				}
 				op.element_size = typeByteSize(*element_type);
@@ -92,6 +99,37 @@ struct IRBuilder {
 			}
 			case Expression::BRACKET: {
 				auto& be = static_cast<BracketExpression&>(expr);
+				if (be.struct_field_name.begin) {
+					auto& struct_type = static_cast<StructResolvedType&>(*be.base->resolved_type);
+					u32 offset = 0;
+					for (u32 i = 0; i < struct_type.decl->fields.size(); ++i) {
+						if (!equalStrings(struct_type.decl->fields[i].name, be.struct_field_name)) {
+							offset += typeByteSize(*struct_type.field_types[i]);
+							continue;
+						}
+						if (as_rvalue) {
+							auto& extract = alloc<LsOpExtractValue>();
+							extract.value = &buildExpressionIR(*be.base, true);
+							extract.offset = offset;
+							extract.size = typeByteSize(*be.resolved_type);
+							return extract;
+						}
+						auto& add = alloc<LsOpAdd>();
+						auto& base = buildExpressionIR(*be.base, false);
+						add.lhs = &base;
+						auto& rhs = alloc<LsOpLoadConst>();
+						static ResolvedType offset_type(ResolvedType::U64);
+						rhs.type = &offset_type;
+						const u64 field_offset = offset;
+						memcpy(rhs.value, &field_offset, sizeof(field_offset));
+						add.rhs = &rhs;
+						add.operand_type = &offset_type;
+						add.result_mode = LsIrOp::ADDRESS;
+						return add;
+					}
+					ASSERT(false);
+					return alloc<LsOpNop>();
+				}
 				if (be.base->resolved_type->kind == ResolvedType::SLICE) {
 					ASSERT(be.args.size() == 1);
 					LsIrOp* index = &buildExpressionIR(*be.args[0], true);
@@ -123,7 +161,7 @@ struct IRBuilder {
 				auto& bounds_check = alloc<LsOpBoundsCheck>();
 				bounds_check.index_type = be.args[0]->resolved_type;
 				bounds_check.index = &index;
-				bounds_check.length = (u64)static_cast<ArrayResolvedType*>(be.base->resolved_type)->size;
+				bounds_check.length = (u64) static_cast<ArrayResolvedType*>(be.base->resolved_type)->size;
 				LsIrOp* checked_index = &bounds_check;
 				static ResolvedType R(ResolvedType::U64);
 				if (be.args[0]->resolved_type->kind != ResolvedType::U64) {
@@ -147,7 +185,7 @@ struct IRBuilder {
 				mul.rhs = &size;
 				add.lhs = &base;
 				add.rhs = &mul;
-				add.output_storage = LsIrOp::POINTER_REF;
+				add.result_mode = LsIrOp::ADDRESS;
 				if (!as_rvalue) return add;
 
 				auto& load = alloc<LsOpLoad>();
@@ -157,8 +195,31 @@ struct IRBuilder {
 			}
 			case Expression::MEMBER: {
 				auto& me = static_cast<MemberExpression&>(expr);
-				if (me.expression && me.expression->resolved_type->kind == ResolvedType::SLICE
-					&& equalStrings(me.name, makeStringView("length"))) {
+				if (me.resolved_fn && as_rvalue) {
+					auto& value = alloc<LsOpLoadConst>();
+					value.type = expr.resolved_type;
+					memcpy(value.value, &me.resolved_fn->bytecode_index, sizeof(me.resolved_fn->bytecode_index));
+					return value;
+				}
+				if (as_rvalue && me.resolved_symbol && me.resolved_symbol->storage == Symbol::COMPTIME && me.resolved_symbol->comptime_value.kind == ComptimeValue::VALUE &&
+					me.resolved_symbol->comptime_value.value && expr.resolved_type && typeByteSize(*expr.resolved_type) <= sizeof(LsOpLoadConst::value)) {
+					auto& value = alloc<LsOpLoadConst>();
+					value.type = expr.resolved_type;
+					memcpy(value.value, me.resolved_symbol->comptime_value.value, typeByteSize(*expr.resolved_type));
+					return value;
+				}
+				// A qualified imported value is a namespace member, not a struct field.
+				// Use its global slot directly so indexed access can take its address.
+				if (me.resolved_symbol && symbolHasGlobalStorage(*me.resolved_symbol) && me.resolved_symbol->slot.storage == StorageSlot::GLOBAL) {
+					auto& address = alloc<LsOpPushGlobalAddr>();
+					address.offset = me.resolved_symbol->slot.offset;
+					if (!as_rvalue) return address;
+					auto& load = alloc<LsOpLoad>();
+					load.addr = &address;
+					load.size = typeByteSize(*expr.resolved_type);
+					return load;
+				}
+				if (me.expression && me.expression->resolved_type && me.expression->resolved_type->kind == ResolvedType::SLICE && equalStrings(me.name, makeStringView("length"))) {
 					auto& length = alloc<LsOpExtractValue>();
 					length.value = &buildExpressionIR(*me.expression, true);
 					length.offset = sizeof(void*);
@@ -166,26 +227,24 @@ struct IRBuilder {
 					return length;
 				}
 				EnumResolvedType* enum_type = nullptr;
-				if (!me.expression) enum_type = static_cast<EnumResolvedType*>(expr.resolved_type);
-				else if (me.expression->resolved_type->kind == ResolvedType::META) {
+				if (!me.expression)
+					enum_type = static_cast<EnumResolvedType*>(expr.resolved_type);
+				else if (me.expression && me.expression->resolved_type && me.expression->resolved_type->kind == ResolvedType::META) {
 					ResolvedType* type = static_cast<MetaType*>(me.expression->resolved_type)->inner;
 					if (type->kind == ResolvedType::ENUM) enum_type = static_cast<EnumResolvedType*>(type);
 				}
 				if (enum_type) {
-					for (i32 i = 0; i < enum_type->decl->members.size(); ++i) {
-						if (!equalStrings(me.name, enum_type->decl->members[i].name)) continue;
-						auto& op = alloc<LsOpLoadConst>();
-						op.type = expr.resolved_type;
-						u32 value = i;
-						if (enum_type->decl->members[i].value) {
-							auto& literal = static_cast<IntLiteralExpression&>(*enum_type->decl->members[i].value);
-							value = (u32)literal.value;
-						}
-						memcpy(op.value, &value, sizeof(value));
-						return op;
-					}
+					ASSERT(me.enum_member_index >= 0);
+					auto& op = alloc<LsOpLoadConst>();
+					op.type = expr.resolved_type;
+					const u32 value = (u32)me.enum_member_value;
+					memcpy(op.value, &value, sizeof(value));
+					return op;
 				}
-				auto* struct_type = static_cast<StructResolvedType*>(me.expression->resolved_type);
+				ResolvedType* base_type = me.expression->resolved_type;
+				const bool pointer_base = base_type->kind == ResolvedType::POINTER;
+				if (pointer_base) base_type = static_cast<PointerResolvedType*>(base_type)->inner;
+				auto* struct_type = static_cast<StructResolvedType*>(base_type);
 				auto& fields = struct_type->decl->fields;
 				u32 offset = 0;
 				for (u32 i = 0; i < fields.size(); ++i) {
@@ -195,9 +254,10 @@ struct IRBuilder {
 					}
 
 					if (as_rvalue) {
-						auto& base = buildExpressionIR(*me.expression, false);
-						switch (base.output_storage) {
-							case LsIrOp::POINTER_REF: {
+						auto& base = buildExpressionIR(*me.expression, pointer_base);
+						if (pointer_base) base.result_mode = LsIrOp::ADDRESS;
+						switch (base.result_mode) {
+							case LsIrOp::ADDRESS: {
 								auto& add = alloc<LsOpAdd>();
 								add.lhs = &base;
 								auto& rhs = alloc<LsOpLoadConst>();
@@ -207,7 +267,7 @@ struct IRBuilder {
 								rhs.type = &R;
 								add.rhs = &rhs;
 								add.operand_type = &R;
-								add.output_storage = LsIrOp::POINTER_REF;
+								add.result_mode = LsIrOp::ADDRESS;
 
 								auto& load = alloc<LsOpLoad>();
 								load.addr = &add;
@@ -223,10 +283,10 @@ struct IRBuilder {
 							}
 						}
 						ASSERT(false);
-					} 				
-					else {
+					} else {
 						auto& add = alloc<LsOpAdd>();
-						auto& base = buildExpressionIR(*me.expression, false);
+						auto& base = buildExpressionIR(*me.expression, pointer_base);
+						if (pointer_base) base.result_mode = LsIrOp::ADDRESS;
 						add.lhs = &base;
 						auto& rhs = alloc<LsOpLoadConst>();
 						static ResolvedType U64(ResolvedType::U64);
@@ -235,8 +295,8 @@ struct IRBuilder {
 						rhs.type = &U64;
 						add.rhs = &rhs;
 						add.operand_type = &U64;
-						add.output_storage = LsIrOp::POINTER_REF;
-						
+						add.result_mode = LsIrOp::ADDRESS;
+
 						return add;
 					}
 				}
@@ -254,38 +314,89 @@ struct IRBuilder {
 					memcpy(op.value, &value_function->bytecode_index, sizeof(value_function->bytecode_index));
 					return op;
 				}
-				if (ie.symbol) {
+				if (ie.symbol && ie.symbol->storage == Symbol::COMPTIME && ie.symbol->comptime_bytes) {
+					auto& value = alloc<LsOpLoadBytes>();
+					value.type = ie.symbol->resolved_type;
+					value.value = ie.symbol->comptime_bytes;
+					value.size = ie.symbol->comptime_byte_size;
+					if (!as_rvalue) {
+						auto& address = alloc<LsOpMaterializeAddr>();
+						address.value = &value;
+						return address;
+					}
+					if (value.type == ie.resolved_type) return value;
+					auto& cast = alloc<LsOpCast>();
+					cast.type = ie.resolved_type;
+					cast.target_type = value.type;
+					cast.value = &value;
+					return cast;
+				}
+				StorageSlot* global_slot = ie.symbol ? &ie.symbol->slot : ie.slot;
+				if (global_slot && global_slot->storage == StorageSlot::GLOBAL) {
+					u32 offset = global_slot->offset;
+					if (global_slot->type && global_slot->type->kind == ResolvedType::NULLABLE && ie.resolved_type->kind != ResolvedType::NULLABLE) ++offset;
 					if (as_rvalue) {
 						auto& addr = alloc<LsOpPushGlobalAddr>();
-						addr.symbol = ie.symbol;
+						addr.offset = offset;
 						auto& load = alloc<LsOpLoad>();
 						load.addr = &addr;
 						load.size = typeByteSize(*ie.resolved_type);
 						return load;
-					}
-					else {
+					} else {
 						auto& op = alloc<LsOpPushGlobalAddr>();
-						op.symbol = ie.symbol;
+						op.offset = offset;
 						return op;
 					}
 				}
 
 				for (i32 i = locals.size() - 1; i >= 0; --i) {
 					if (!equalStrings(locals[i].name, ie.name)) continue;
+					auto& addr = alloc<LsOpPushLocalAddr>();
+					addr.alloca = locals[i].alloca;
+					LsIrOp* value_addr = &addr;
+					if (locals[i].alloca->type->kind == ResolvedType::NULLABLE && ie.resolved_type->kind != ResolvedType::NULLABLE) {
+						auto& add = alloc<LsOpAdd>();
+						auto& offset = alloc<LsOpLoadConst>();
+						static ResolvedType pointer_type(ResolvedType::U64);
+						const u64 payload_offset = 1;
+						memcpy(offset.value, &payload_offset, sizeof(payload_offset));
+						offset.type = &pointer_type;
+						add.lhs = &addr;
+						add.rhs = &offset;
+						add.operand_type = &pointer_type;
+						add.result_mode = LsIrOp::ADDRESS;
+						value_addr = &add;
+					} else if (locals[i].alloca->type->kind == ResolvedType::UNION && ie.resolved_type->kind != ResolvedType::UNION) {
+						if (as_rvalue) {
+							auto& union_value = alloc<LsOpLoad>();
+							union_value.addr = &addr;
+							union_value.size = typeByteSize(*locals[i].alloca->type);
+							auto& payload = alloc<LsOpExtractValue>();
+							payload.value = &union_value;
+							payload.offset = sizeof(i32);
+							payload.size = typeByteSize(*ie.resolved_type);
+							return payload;
+						}
+						auto& add = alloc<LsOpAdd>();
+						auto& offset = alloc<LsOpLoadConst>();
+						static ResolvedType pointer_type(ResolvedType::U64);
+						const u64 payload_offset = sizeof(i32);
+						memcpy(offset.value, &payload_offset, sizeof(payload_offset));
+						offset.type = &pointer_type;
+						add.lhs = &addr;
+						add.rhs = &offset;
+						add.operand_type = &pointer_type;
+						add.result_mode = LsIrOp::ADDRESS;
+						value_addr = &add;
+					}
 
 					if (as_rvalue) {
-						auto& addr = alloc<LsOpPushLocalAddr>();
-						addr.alloca = locals[i].alloca;
 						auto& load = alloc<LsOpLoad>();
-						load.addr = &addr;
+						load.addr = value_addr;
 						load.size = typeByteSize(*ie.resolved_type);
 						return load;
 					}
-					else {
-						auto& op = alloc<LsOpPushLocalAddr>();
-						op.alloca = locals[i].alloca;
-						return op;
-					}
+					return *value_addr;
 				}
 				break;
 			}
@@ -298,17 +409,33 @@ struct IRBuilder {
 						function = static_cast<FunctionExpression*>(callee.symbol->expression);
 					}
 				}
+				if (!function && call.callee->kind == Expression::MEMBER) {
+					function = static_cast<MemberExpression&>(*call.callee).resolved_fn;
+				}
 				if (function && function->bytecode_index != ~0u) {
+					MemberExpression* member_callee = call.callee->kind == Expression::MEMBER ? static_cast<MemberExpression*>(call.callee) : nullptr;
+					ResolvedType* receiver_type = member_callee && member_callee->expression ? member_callee->expression->resolved_type : nullptr;
+					const bool is_ufcs = receiver_type && (receiver_type->kind == ResolvedType::STRUCT || receiver_type->kind == ResolvedType::ENUM || receiver_type->kind == ResolvedType::POINTER);
 					auto& op = alloc<LsOpCallDirect>();
 					op.function = function;
-					op.arg_count = call.args.size();
+					op.arg_count = (is_ufcs ? 1u : 0u);
+					for (u32 i = 0, param_index = is_ufcs ? 1u : 0u; i < call.args.size(); ++i, ++param_index) {
+						if (!function->params[param_index].is_comptime) ++op.arg_count;
+					}
 					op.return_size = typeByteSize(*call.resolved_type);
 					op.args = static_cast<LsIrOp**>(host.arena.allocate(host.arena.user_data, sizeof(LsIrOp*) * op.arg_count, alignof(LsIrOp*)));
 					u32 param_index = 0;
-					for (u32 i = 0; i < op.arg_count; ++i) {
+					u32 arg_index = 0;
+					if (is_ufcs) {
 						while (function->params[param_index].is_comptime) ++param_index;
 						ResolvedType& target_type = *function->params[param_index++].resolved_type;
-						op.args[i] = &buildImplicitConversionIR(*call.args[i], target_type);
+						op.args[arg_index++] = &buildImplicitConversionIR(*member_callee->expression, target_type);
+					}
+					for (u32 i = 0; i < call.args.size(); ++i) {
+						FunctionParam& param = function->params[param_index++];
+						if (param.is_comptime) continue;
+						ResolvedType& target_type = *param.resolved_type;
+						op.args[arg_index++] = &buildImplicitConversionIR(*call.args[i], target_type);
 					}
 					return op;
 				}
@@ -322,7 +449,7 @@ struct IRBuilder {
 				op.args = static_cast<LsIrOp**>(host.arena.allocate(host.arena.user_data, sizeof(LsIrOp*) * op.arg_count, alignof(LsIrOp*)));
 				op.arg_sizes = static_cast<u32*>(host.arena.allocate(host.arena.user_data, sizeof(u32) * op.arg_count, alignof(u32)));
 				for (u32 i = 0; i < op.arg_count; ++i) {
-						ResolvedType& target_type = *fn_type.params[i].type;
+					ResolvedType& target_type = *fn_type.params[i].type;
 					op.args[i] = &buildImplicitConversionIR(*call.args[i], target_type);
 					op.arg_sizes[i] = typeByteSize(target_type);
 				}
@@ -372,6 +499,14 @@ struct IRBuilder {
 				op.size = typeByteSize(*expr.resolved_type);
 				return op;
 			}
+			case Expression::SIZEOF: {
+				auto& sz = static_cast<SizeofExpression&>(expr);
+				auto& op = alloc<LsOpLoadConst>();
+				static ResolvedType default_type(ResolvedType::I32);
+				op.type = expr.resolved_type->kind == ResolvedType::UNTYPED_INT ? &default_type : expr.resolved_type;
+				memcpy(op.value, &sz.value, sizeof(sz.value));
+				return op;
+			}
 			case Expression::BOOL_LITERAL: {
 				auto& ble = static_cast<BoolLiteralExpression&>(expr);
 				auto& op = alloc<LsOpLoadConst>();
@@ -399,6 +534,91 @@ struct IRBuilder {
 				slice.values[1] = &length;
 				return slice;
 			}
+			case Expression::TYPE_MEMBER: {
+				auto& member = static_cast<TypeMemberExpression&>(expr);
+				if (member.kind == TypeMemberExpression::NAME) {
+					auto& pointer = alloc<LsOpLoadConst>();
+					static ResolvedType pointer_type(ResolvedType::CPTR);
+					pointer.type = &pointer_type;
+					memcpy(pointer.value, &member.comptime_string.begin, sizeof(member.comptime_string.begin));
+					auto& length = alloc<LsOpLoadConst>();
+					static ResolvedType length_type(ResolvedType::I64);
+					length.type = &length_type;
+					const i64 value_length = member.comptime_string.end - member.comptime_string.begin;
+					memcpy(length.value, &value_length, sizeof(value_length));
+					auto& slice = alloc<LsOpAggregateInit>();
+					slice.type = expr.resolved_type;
+					slice.value_count = 2;
+					slice.values = static_cast<LsIrOp**>(host.arena.allocate(host.arena.user_data, sizeof(LsIrOp*) * slice.value_count, alignof(LsIrOp*)));
+					slice.values[0] = &pointer;
+					slice.values[1] = &length;
+					return slice;
+				}
+				if (member.kind == TypeMemberExpression::MIN || member.kind == TypeMemberExpression::MAX) {
+					ASSERT(member.reflected_type && expr.resolved_type);
+					const bool is_min = member.kind == TypeMemberExpression::MIN;
+					auto& value = alloc<LsOpLoadConst>();
+					value.type = expr.resolved_type;
+					switch (member.reflected_type->kind) {
+						case ResolvedType::I8: {
+							const i8 v = is_min ? -128 : 127;
+							memcpy(value.value, &v, sizeof(v));
+							break;
+						}
+						case ResolvedType::I16: {
+							const i16 v = is_min ? -32768 : 32767;
+							memcpy(value.value, &v, sizeof(v));
+							break;
+						}
+						case ResolvedType::I32: {
+							const i32 v = is_min ? (i32)-2147483647 - 1 : (i32)2147483647;
+							memcpy(value.value, &v, sizeof(v));
+							break;
+						}
+						case ResolvedType::I64:
+						case ResolvedType::ISIZE: {
+							const i64 v = is_min ? (i64)-9223372036854775807LL - 1 : (i64)9223372036854775807LL;
+							memcpy(value.value, &v, sizeof(v));
+							break;
+						}
+						case ResolvedType::U8:
+						case ResolvedType::BYTE: {
+							const u8 v = is_min ? 0 : 255;
+							memcpy(value.value, &v, sizeof(v));
+							break;
+						}
+						case ResolvedType::U16: {
+							const u16 v = is_min ? 0 : 65535;
+							memcpy(value.value, &v, sizeof(v));
+							break;
+						}
+						case ResolvedType::U32: {
+							const u32 v = is_min ? 0 : (u32)4294967295u;
+							memcpy(value.value, &v, sizeof(v));
+							break;
+						}
+						case ResolvedType::U64: {
+							const u64 v = is_min ? 0 : (u64)18446744073709551615ULL;
+							memcpy(value.value, &v, sizeof(v));
+							break;
+						}
+						case ResolvedType::F32: {
+							const float v = is_min ? -3.402823466e+38f : 3.402823466e+38f;
+							memcpy(value.value, &v, sizeof(v));
+							break;
+						}
+						case ResolvedType::F64: {
+							const double v = is_min ? -1.7976931348623157e+308 : 1.7976931348623157e+308;
+							memcpy(value.value, &v, sizeof(v));
+							break;
+						}
+						default: ASSERT(false); break;
+					}
+					return value;
+				}
+				ASSERT(false);
+				return alloc<LsOpNop>();
+			}
 			case Expression::INT_LITERAL: {
 				auto& ile = static_cast<IntLiteralExpression&>(expr);
 				auto& op = alloc<LsOpLoadConst>();
@@ -406,12 +626,10 @@ struct IRBuilder {
 				if (ile.resolved_type->kind == ResolvedType::F32) {
 					const float value = (float)ile.value;
 					memcpy(&op.value, &value, sizeof(value));
-				}
-				else if (ile.resolved_type->kind == ResolvedType::F64) {
+				} else if (ile.resolved_type->kind == ResolvedType::F64) {
 					const double value = (double)ile.value;
 					memcpy(&op.value, &value, sizeof(value));
-				}
-				else {
+				} else {
 					memcpy(&op.value, &ile.value, sizeof(ile.value));
 				}
 				return op;
@@ -423,8 +641,7 @@ struct IRBuilder {
 				if (fle.resolved_type->kind == ResolvedType::F32) {
 					float value = (float)fle.value;
 					memcpy(&op.value, &value, sizeof(value));
-				}
-				else {
+				} else {
 					memcpy(&op.value, &fle.value, sizeof(fle.value));
 				}
 				return op;
@@ -432,6 +649,15 @@ struct IRBuilder {
 			case Expression::UNARY: {
 				auto& unary = static_cast<UnaryExpression&>(expr);
 				LsIrOp& operand = buildExpressionIR(*unary.expression, true);
+				if (unary.operator_fn) {
+					auto& call = alloc<LsOpCallDirect>();
+					call.function = unary.operator_fn;
+					call.arg_count = 1;
+					call.return_size = typeByteSize(*unary.resolved_type);
+					call.args = static_cast<LsIrOp**>(host.arena.allocate(host.arena.user_data, sizeof(LsIrOp*), alignof(LsIrOp*)));
+					call.args[0] = &operand;
+					return call;
+				}
 				if (unary.op == Token::MINUS) {
 					auto& op = alloc<LsOpNeg>();
 					op.operand_type = unary.resolved_type;
@@ -449,6 +675,25 @@ struct IRBuilder {
 			case Expression::BINARY: {
 				auto& be = static_cast<BinaryExpression&>(expr);
 				LsIrOp& lhs = buildExpressionIR(*be.lhs, true);
+				if (be.op == Token::IS) {
+					ASSERT(be.lhs->resolved_type->kind == ResolvedType::UNION);
+					ASSERT(be.rhs->resolved_type->kind == ResolvedType::META);
+					auto& tag = alloc<LsOpExtractValue>();
+					tag.value = &lhs;
+					tag.offset = 0;
+					tag.size = sizeof(i32);
+					i32 member_index = be.union_member_index;
+					ASSERT(member_index >= 0);
+					static ResolvedType tag_type(ResolvedType::I32);
+					auto& expected = alloc<LsOpLoadConst>();
+					expected.type = &tag_type;
+					memcpy(expected.value, &member_index, sizeof(member_index));
+					auto& condition = alloc<LsOpEq>();
+					condition.operand_type = &tag_type;
+					condition.lhs = &tag;
+					condition.rhs = &expected;
+					return condition;
+				}
 				LsIrOp& rhs = buildExpressionIR(*be.rhs, true);
 				if (be.operator_fn) {
 					auto& op = alloc<LsOpCallDirect>();
@@ -481,6 +726,15 @@ struct IRBuilder {
 				op->lhs = &lhs;
 				op->rhs = &rhs;
 				return *op;
+			}
+			case Expression::TERNARY: {
+				auto& ternary = static_cast<TernaryExpression&>(expr);
+				auto& op = alloc<LsOpTernary>();
+				op.type = expr.resolved_type;
+				op.condition = &buildExpressionIR(*ternary.condition, true);
+				op.true_value = &buildImplicitConversionIR(*ternary.true_expr, *expr.resolved_type);
+				op.false_value = &buildImplicitConversionIR(*ternary.false_expr, *expr.resolved_type);
+				return op;
 			}
 		}
 		ASSERT(false);
@@ -526,17 +780,363 @@ struct IRBuilder {
 				parent.ops.push(&exit);
 				break;
 			}
+			case Statement::FOR: {
+				auto& for_statement = static_cast<ForStatement&>(st);
+				if (for_statement.end) {
+					ResolvedType* value_type = for_statement.begin->resolved_type;
+					auto& value = alloc<LsOpAlloca>();
+					value.type = value_type;
+					value.value = &buildExpressionIR(*for_statement.begin, true);
+					parent.ops.push(&value);
+					auto& end = alloc<LsOpAlloca>();
+					end.type = value_type;
+					end.value = &buildExpressionIR(*for_statement.end, true);
+					parent.ops.push(&end);
+
+					const u32 local_watermark = locals.size();
+					locals.push({for_statement.value_var, &value});
+					auto& value_addr = alloc<LsOpPushLocalAddr>();
+					value_addr.alloca = &value;
+					auto& value_load = alloc<LsOpLoad>();
+					value_load.addr = &value_addr;
+					value_load.size = typeByteSize(*value_type);
+					auto& end_addr = alloc<LsOpPushLocalAddr>();
+					end_addr.alloca = &end;
+					auto& end_load = alloc<LsOpLoad>();
+					end_load.addr = &end_addr;
+					end_load.size = typeByteSize(*value_type);
+					auto& condition = alloc<LsOpLt>();
+					condition.operand_type = value_type;
+					condition.lhs = &value_load;
+					condition.rhs = &end_load;
+
+					auto& loop = alloc<LsOpConditionalJump>();
+					auto& increment_target = alloc<LsOpNop>();
+					auto& exit = alloc<LsOpNop>();
+					loop.condition = &condition;
+					loop.true_block = &alloc<LsIrBlockData>(host.arena);
+					loops.push({pending_loop_label, &increment_target, &exit, (u32)defers.size()});
+					pending_loop_label = {};
+					buildStatementIR(*for_statement.body, *loop.true_block);
+					loop.true_block->ops.push(&increment_target);
+
+					auto& increment_addr = alloc<LsOpPushLocalAddr>();
+					increment_addr.alloca = &value;
+					auto& increment_value = alloc<LsOpLoad>();
+					increment_value.addr = &increment_addr;
+					increment_value.size = typeByteSize(*value_type);
+					auto& one = alloc<LsOpLoadConst>();
+					one.type = value_type;
+					const u64 one_value = 1;
+					memcpy(one.value, &one_value, typeByteSize(*value_type));
+					auto& increment = alloc<LsOpAdd>();
+					increment.operand_type = value_type;
+					increment.lhs = &increment_value;
+					increment.rhs = &one;
+					auto& store_addr = alloc<LsOpPushLocalAddr>();
+					store_addr.alloca = &value;
+					auto& store = alloc<LsOpCopy>();
+					store.type = value_type;
+					store.src = &increment;
+					store.dst = &store_addr;
+					loop.true_block->ops.push(&store);
+					loops.pop_back();
+					locals.resize(local_watermark);
+					auto& back_edge = alloc<LsOpJump>();
+					back_edge.target = &loop;
+					loop.true_block->ops.push(&back_edge);
+					parent.ops.push(&loop);
+					parent.ops.push(&exit);
+					break;
+				}
+				if (for_statement.begin->resolved_type->kind == ResolvedType::SLICE) {
+					auto& slice_type = static_cast<SliceResolvedType&>(*for_statement.begin->resolved_type);
+					auto& slice = alloc<LsOpAlloca>();
+					slice.type = &slice_type;
+					slice.value = &buildExpressionIR(*for_statement.begin, true);
+					parent.ops.push(&slice);
+
+					static ResolvedType index_type(ResolvedType::ISIZE);
+					auto& index_value = alloc<LsOpLoadConst>();
+					index_value.type = &index_type;
+					auto& index = alloc<LsOpAlloca>();
+					index.type = &index_type;
+					index.value = &index_value;
+					parent.ops.push(&index);
+
+					auto& value = alloc<LsOpAlloca>();
+					value.type = slice_type.element_type;
+					value.value = &alloc<LsOpNop>();
+					parent.ops.push(&value);
+					const u32 local_watermark = locals.size();
+					if (for_statement.is_key_value) locals.push({for_statement.key_var, &index});
+					locals.push({for_statement.value_var, &value});
+
+					auto& index_addr = alloc<LsOpPushLocalAddr>();
+					index_addr.alloca = &index;
+					auto& index_load = alloc<LsOpLoad>();
+					index_load.addr = &index_addr;
+					index_load.size = typeByteSize(index_type);
+					auto& slice_addr = alloc<LsOpPushLocalAddr>();
+					slice_addr.alloca = &slice;
+					auto& slice_load = alloc<LsOpLoad>();
+					slice_load.addr = &slice_addr;
+					slice_load.size = typeByteSize(slice_type);
+					auto& length = alloc<LsOpExtractValue>();
+					length.value = &slice_load;
+					length.offset = sizeof(void*);
+					length.size = sizeof(i64);
+					auto& condition = alloc<LsOpLt>();
+					condition.operand_type = &index_type;
+					condition.lhs = &index_load;
+					condition.rhs = &length;
+
+					auto& loop = alloc<LsOpConditionalJump>();
+					auto& exit = alloc<LsOpNop>();
+					loop.condition = &condition;
+					loop.true_block = &alloc<LsIrBlockData>(host.arena);
+					loops.push({pending_loop_label, &loop, &exit, (u32)defers.size()});
+					pending_loop_label = {};
+
+					auto& element = alloc<LsOpSliceLoad>();
+					element.slice = &slice_load;
+					element.index = &index_load;
+					element.element_size = typeByteSize(*slice_type.element_type);
+					auto& value_addr = alloc<LsOpPushLocalAddr>();
+					value_addr.alloca = &value;
+					auto& assign_value = alloc<LsOpCopy>();
+					assign_value.type = slice_type.element_type;
+					assign_value.src = &element;
+					assign_value.dst = &value_addr;
+					loop.true_block->ops.push(&assign_value);
+					buildStatementIR(*for_statement.body, *loop.true_block);
+
+					auto& increment_addr = alloc<LsOpPushLocalAddr>();
+					increment_addr.alloca = &index;
+					auto& increment_value = alloc<LsOpLoad>();
+					increment_value.addr = &increment_addr;
+					increment_value.size = typeByteSize(index_type);
+					auto& one = alloc<LsOpLoadConst>();
+					one.type = &index_type;
+					const i64 one_value = 1;
+					memcpy(one.value, &one_value, sizeof(one_value));
+					auto& increment = alloc<LsOpAdd>();
+					increment.operand_type = &index_type;
+					increment.lhs = &increment_value;
+					increment.rhs = &one;
+					auto& store_addr = alloc<LsOpPushLocalAddr>();
+					store_addr.alloca = &index;
+					auto& store = alloc<LsOpCopy>();
+					store.type = &index_type;
+					store.src = &increment;
+					store.dst = &store_addr;
+					loop.true_block->ops.push(&store);
+					loops.pop_back();
+					locals.resize(local_watermark);
+					auto& back_edge = alloc<LsOpJump>();
+					back_edge.target = &loop;
+					loop.true_block->ops.push(&back_edge);
+					parent.ops.push(&loop);
+					parent.ops.push(&exit);
+					break;
+				}
+				ASSERT(!for_statement.end);
+				ASSERT(for_statement.begin->resolved_type->kind == ResolvedType::ARRAY);
+				auto& array = static_cast<ArrayResolvedType&>(*for_statement.begin->resolved_type);
+
+				static ResolvedType index_type(ResolvedType::I32);
+				auto& index_value = alloc<LsOpLoadConst>();
+				index_value.type = &index_type;
+				auto& index = alloc<LsOpAlloca>();
+				index.type = &index_type;
+				index.value = &index_value;
+				parent.ops.push(&index);
+
+				auto& value = alloc<LsOpAlloca>();
+				value.type = array.element_type;
+				value.value = &alloc<LsOpNop>();
+				parent.ops.push(&value);
+				const u32 local_watermark = locals.size();
+				if (for_statement.is_key_value) locals.push({for_statement.key_var, &index});
+				locals.push({for_statement.value_var, &value});
+
+				auto& condition_index_addr = alloc<LsOpPushLocalAddr>();
+				condition_index_addr.alloca = &index;
+				auto& condition_index = alloc<LsOpLoad>();
+				condition_index.addr = &condition_index_addr;
+				condition_index.size = typeByteSize(index_type);
+				auto& length = alloc<LsOpLoadConst>();
+				length.type = &index_type;
+				const i32 array_length = (i32)array.size;
+				memcpy(length.value, &array_length, sizeof(array_length));
+				auto& condition = alloc<LsOpLt>();
+				condition.operand_type = &index_type;
+				condition.lhs = &condition_index;
+				condition.rhs = &length;
+
+				auto& loop = alloc<LsOpConditionalJump>();
+				auto& exit = alloc<LsOpNop>();
+				loop.condition = &condition;
+				loop.true_block = &alloc<LsIrBlockData>(host.arena);
+				loops.push({pending_loop_label, &loop, &exit, (u32)defers.size()});
+				pending_loop_label = {};
+
+				auto& base = buildExpressionIR(*for_statement.begin, false);
+				auto& element_index_addr = alloc<LsOpPushLocalAddr>();
+				element_index_addr.alloca = &index;
+				auto& element_index = alloc<LsOpLoad>();
+				element_index.addr = &element_index_addr;
+				element_index.size = typeByteSize(index_type);
+				auto& element_size = alloc<LsOpLoadConst>();
+				static ResolvedType offset_type(ResolvedType::U64);
+				element_size.type = &offset_type;
+				const u32 byte_size = typeByteSize(*array.element_type);
+				const u64 pointer_scale = byte_size;
+				memcpy(element_size.value, &pointer_scale, sizeof(pointer_scale));
+				auto& pointer_index = alloc<LsOpCast>();
+				pointer_index.type = &offset_type;
+				pointer_index.target_type = &index_type;
+				pointer_index.value = &element_index;
+				auto& offset = alloc<LsOpMul>();
+				offset.operand_type = &offset_type;
+				offset.lhs = &pointer_index;
+				offset.rhs = &element_size;
+				auto& address = alloc<LsOpAdd>();
+				address.operand_type = &offset_type;
+				address.lhs = &base;
+				address.rhs = &offset;
+				address.result_mode = LsIrOp::ADDRESS;
+				auto& element = alloc<LsOpLoad>();
+				element.addr = &address;
+				element.size = byte_size;
+				auto& value_addr = alloc<LsOpPushLocalAddr>();
+				value_addr.alloca = &value;
+				auto& assign_value = alloc<LsOpCopy>();
+				assign_value.type = array.element_type;
+				assign_value.src = &element;
+				assign_value.dst = &value_addr;
+				loop.true_block->ops.push(&assign_value);
+				buildStatementIR(*for_statement.body, *loop.true_block);
+
+				auto& increment_addr = alloc<LsOpPushLocalAddr>();
+				increment_addr.alloca = &index;
+				auto& increment_value = alloc<LsOpLoad>();
+				increment_value.addr = &increment_addr;
+				increment_value.size = typeByteSize(index_type);
+				auto& one = alloc<LsOpLoadConst>();
+				one.type = &index_type;
+				const i32 one_value = 1;
+				memcpy(one.value, &one_value, sizeof(one_value));
+				auto& increment = alloc<LsOpAdd>();
+				increment.operand_type = &index_type;
+				increment.lhs = &increment_value;
+				increment.rhs = &one;
+				auto& store_index_addr = alloc<LsOpPushLocalAddr>();
+				store_index_addr.alloca = &index;
+				auto& store_index = alloc<LsOpCopy>();
+				store_index.type = &index_type;
+				store_index.src = &increment;
+				store_index.dst = &store_index_addr;
+				loop.true_block->ops.push(&store_index);
+				loops.pop_back();
+				locals.resize(local_watermark);
+				auto& back_edge = alloc<LsOpJump>();
+				back_edge.target = &loop;
+				loop.true_block->ops.push(&back_edge);
+				parent.ops.push(&loop);
+				parent.ops.push(&exit);
+				break;
+			}
+			case Statement::MATCH: {
+				auto& match = static_cast<MatchStatement&>(st);
+				if (match.comptime_known) {
+					ASSERT(match.comptime_arm >= 0 && match.comptime_arm < match.arms.size());
+					buildStatementIR(*match.arms[match.comptime_arm].body, parent);
+					break;
+				}
+				auto& subject = alloc<LsOpAlloca>();
+				subject.type = match.subject->resolved_type;
+				subject.value = &buildExpressionIR(*match.subject, true);
+				parent.ops.push(&subject);
+
+				LsIrBlockData* current = &parent;
+				for (MatchArm& arm : match.arms) {
+					if (arm.is_fallback) {
+						buildStatementIR(*arm.body, *current);
+						break;
+					}
+					LsIrBlockData* arm_body = &alloc<LsIrBlockData>(host.arena);
+					for (u32 pattern_index = 0; pattern_index < arm.patterns.size(); ++pattern_index) {
+						MatchPattern& pattern = arm.patterns[pattern_index];
+						auto& subject_addr = alloc<LsOpPushLocalAddr>();
+						subject_addr.alloca = &subject;
+						auto& subject_value = alloc<LsOpLoad>();
+						subject_value.addr = &subject_addr;
+						subject_value.size = typeByteSize(*subject.type);
+
+						LsIrOp* condition = nullptr;
+						if (pattern.end) {
+							auto& lower = alloc<LsOpGe>();
+							lower.operand_type = subject.type;
+							lower.lhs = &subject_value;
+							lower.rhs = &buildExpressionIR(*pattern.begin, true);
+							auto& upper_subject_addr = alloc<LsOpPushLocalAddr>();
+							upper_subject_addr.alloca = &subject;
+							auto& upper_subject = alloc<LsOpLoad>();
+							upper_subject.addr = &upper_subject_addr;
+							upper_subject.size = typeByteSize(*subject.type);
+							auto& upper = alloc<LsOpLe>();
+							upper.operand_type = subject.type;
+							upper.lhs = &upper_subject;
+							upper.rhs = &buildExpressionIR(*pattern.end, true);
+							auto& range = alloc<LsOpAnd>();
+							range.operand_type = subject.type;
+							range.lhs = &lower;
+							range.rhs = &upper;
+							condition = &range;
+						} else if (subject.type->kind == ResolvedType::UNION) {
+							i32 member_index = pattern.union_member_index;
+							ASSERT(member_index >= 0);
+							auto& tag = alloc<LsOpExtractValue>();
+							tag.value = &subject_value;
+							tag.offset = 0;
+							tag.size = sizeof(i32);
+							static ResolvedType tag_type(ResolvedType::I32);
+							auto& expected = alloc<LsOpLoadConst>();
+							expected.type = &tag_type;
+							memcpy(expected.value, &member_index, sizeof(member_index));
+							auto& equality = alloc<LsOpEq>();
+							equality.operand_type = &tag_type;
+							equality.lhs = &tag;
+							equality.rhs = &expected;
+							condition = &equality;
+						} else {
+							auto& equality = alloc<LsOpEq>();
+							equality.operand_type = subject.type;
+							equality.lhs = &subject_value;
+							equality.rhs = &buildExpressionIR(*pattern.begin, true);
+							condition = &equality;
+						}
+
+						auto& branch = alloc<LsOpConditionalJump>();
+						branch.condition = condition;
+						branch.true_block = arm_body;
+						branch.false_block = &alloc<LsIrBlockData>(host.arena);
+						current->ops.push(&branch);
+						current = branch.false_block;
+					}
+					buildStatementIR(*arm.body, *arm_body);
+				}
+				break;
+			}
 			case Statement::BREAK:
 			case Statement::CONTINUE: {
 				const bool is_break = st.kind == Statement::BREAK;
-				const ls_string_view label = is_break
-					? static_cast<BreakStatement&>(st).label
-					: static_cast<ContinueStatement&>(st).label;
+				const ls_string_view label = is_break ? static_cast<BreakStatement&>(st).label : static_cast<ContinueStatement&>(st).label;
 				Loop* target = nullptr;
 				if (size(label) == 0) {
 					target = &loops.back();
-				}
-				else {
+				} else {
 					for (i32 i = loops.size() - 1; i >= 0; --i) {
 						if (equalStrings(label, loops[i].label)) {
 							target = &loops[i];
@@ -582,9 +1182,24 @@ struct IRBuilder {
 					return;
 				}
 				auto& load = alloc<LsOpLoad>();
-					load.addr = &lhs;
-					load.size = typeByteSize(*as.lhs->resolved_type);
+				load.addr = &lhs;
+				load.size = typeByteSize(*as.lhs->resolved_type);
 				LsIrOp* lhs_value = &load;
+				if (as.resolved_op_fn) {
+					auto& call = alloc<LsOpCallDirect>();
+					call.function = as.resolved_op_fn;
+					call.arg_count = 2;
+					call.return_size = typeByteSize(*as.lhs->resolved_type);
+					call.args = static_cast<LsIrOp**>(host.arena.allocate(host.arena.user_data, sizeof(LsIrOp*) * call.arg_count, alignof(LsIrOp*)));
+					call.args[0] = lhs_value;
+					call.args[1] = &rhs;
+					auto& cpy = alloc<LsOpCopy>();
+					cpy.src = &call;
+					cpy.dst = &lhs;
+					cpy.type = as.lhs->resolved_type;
+					parent.ops.push(&cpy);
+					break;
+				}
 				LsOpBinary* op = nullptr;
 				switch (as.op) {
 					case Token::STAR_EQUAL: op = &alloc<LsOpMul>(); break;
@@ -605,6 +1220,7 @@ struct IRBuilder {
 			}
 			case Statement::VAR_DECL: {
 				auto& vd = static_cast<VarDeclStatement&>(st);
+				if (vd.is_comptime) break;
 				auto& alloca = alloc<LsOpAlloca>();
 				alloca.type = vd.resolved_type;
 				alloca.value = &buildImplicitConversionIR(*vd.expression, *vd.resolved_type);
@@ -633,8 +1249,7 @@ struct IRBuilder {
 					LsIrOp& expression = buildImplicitConversionIR(*ret.expression, *return_type);
 					if (defers.empty()) {
 						ir_ret.expression = &expression;
-					}
-					else {
+					} else {
 						auto& value = alloc<LsOpAlloca>();
 						value.type = return_type;
 						value.value = &expression;
@@ -749,18 +1364,19 @@ struct ByteArray {
 struct BytecodeCompiler {
 	BytecodeCompiler(ls_host& host)
 		: host(host)
-		, code(host.arena)
-	{}
+		, code(host.arena) {}
 
-	template <typename T, typename... Args>
-	T& alloc(Args&&... args) {
+	template <typename T, typename... Args> T& alloc(Args&&... args) {
 		T* v = (T*)host.arena.allocate(host.arena.user_data, sizeof(T), alignof(T));
 		new (NewPlaceholder(), v) T(static_cast<Args&&>(args)...);
 		return *v;
-	} 
-	
-	void emitOp(ls_op op) { u8 tmp = (u8)op; emit(&tmp, sizeof(tmp)); }
-	
+	}
+
+	void emitOp(ls_op op) {
+		u8 tmp = (u8)op;
+		emit(&tmp, sizeof(tmp));
+	}
+
 	template <typename T> void emit(T value) { emit(&value, sizeof(value)); }
 
 	static u32 numericKindIndex(const ResolvedType& type) {
@@ -798,7 +1414,6 @@ struct BytecodeCompiler {
 			}
 			return result;
 		}
-		u32 byte_size = typeByteSize(*cmp.operand_type);
 		u32 lhs_offset = emit(*cmp.lhs);
 		u32 rhs_offset = emit(*cmp.rhs);
 		switch (cmp.kind) {
@@ -814,14 +1429,16 @@ struct BytecodeCompiler {
 		u32 result = stack_top++;
 		emit(lhs_offset);
 		emit(rhs_offset);
-		emit((u8)toTypeKind(*cmp.operand_type));
+		emit((u8)(cmp.operand_type->kind == ResolvedType::NULLABLE ? LS_TYPE_U8 : toTypeKind(*cmp.operand_type)));
 		return result;
 	}
 
 	u32 emitUnary(const LsOpUnary& op) {
 		const u32 operand = emit(*op.operand);
-		if (op.kind == LS_IR_OP_NEG) emitOp(ls_op(LS_OP_NEG_I8 + numericKindIndex(*op.operand_type)));
-		else emitOp(LS_OP_NOT);
+		if (op.kind == LS_IR_OP_NEG)
+			emitOp(ls_op(LS_OP_NEG_I8 + numericKindIndex(*op.operand_type)));
+		else
+			emitOp(LS_OP_NOT);
 		emit(operand);
 		return operand;
 	}
@@ -859,6 +1476,40 @@ struct BytecodeCompiler {
 		patchI16(end_jump, code.size());
 		stack_top = high_water;
 		return entry_stack_top;
+	}
+
+	u32 emitTernary(const LsOpTernary& ternary) {
+		const u32 condition = emit(*ternary.condition);
+		const u32 size = typeByteSize(*ternary.type);
+		const u32 result = stack_top;
+		stack_top += size;
+
+		emitOp(LS_OP_JZ_U8);
+		emit(condition);
+		const u32 false_jump = code.size();
+		emit((i16)0);
+
+		const u32 true_value = emit(*ternary.true_value);
+		emitOp(LS_OP_COPY);
+		emit(result);
+		emit(true_value);
+		emit(size);
+		u32 high_water = stack_top;
+		emitOp(LS_OP_JUMP);
+		const u32 end_jump = code.size();
+		emit((i16)0);
+
+		patchI16(false_jump, code.size());
+		stack_top = result + size;
+		const u32 false_value = emit(*ternary.false_value);
+		emitOp(LS_OP_COPY);
+		emit(result);
+		emit(false_value);
+		emit(size);
+		if (stack_top > high_water) high_water = stack_top;
+		patchI16(end_jump, code.size());
+		stack_top = high_water;
+		return result;
 	}
 
 	u32 emitJump(LsOpJump& jump) {
@@ -904,8 +1555,7 @@ struct BytecodeCompiler {
 				ASSERT(jump.target->bytecode_offset != 0xffffffffu);
 				ASSERT(jump.bytecode_patch_offset != 0xffffffffu);
 				patchI16(jump.bytecode_patch_offset, jump.target->bytecode_offset);
-			}
-			else if (op->kind == LS_IR_OP_CONDITIONAL_JUMP) {
+			} else if (op->kind == LS_IR_OP_CONDITIONAL_JUMP) {
 				auto& conditional = static_cast<LsOpConditionalJump&>(*op);
 				if (conditional.true_block) patchJumps(*conditional.true_block);
 				if (conditional.false_block) patchJumps(*conditional.false_block);
@@ -957,6 +1607,21 @@ struct BytecodeCompiler {
 		return 0xffFFffFF;
 	}
 
+	u32 emitLoadBytes(const LsOpLoadBytes& load) {
+		const u32 result = stack_top;
+		u32 offset = 0;
+		while (offset < load.size) {
+			const u32 remaining = load.size - offset;
+			const u32 size = remaining >= 8 ? 8u : remaining >= 4 ? 4u : remaining >= 2 ? 2u : 1u;
+			emitOp(size == 8 ? LS_OP_LOAD_CONST_8 : size == 4 ? LS_OP_LOAD_CONST_4 : size == 2 ? LS_OP_LOAD_CONST_2 : LS_OP_LOAD_CONST_1);
+			emit(stack_top);
+			emit(load.value + offset, size);
+			stack_top += size;
+			offset += size;
+		}
+		return result;
+	}
+
 	u32 emitAlloca(LsOpAlloca& alloca) {
 		if (alloca.value->kind != LS_IR_OP_NOP) {
 			u32 ret = emit(*alloca.value);
@@ -971,8 +1636,8 @@ struct BytecodeCompiler {
 	u32 emitCopy(const LsOpCopy& copy) {
 		u32 src = emit(*copy.src);
 		u32 dst = emit(*copy.dst);
-		switch (copy.dst->output_storage) {
-			case LsIrOp::POINTER_REF: {
+		switch (copy.dst->result_mode) {
+			case LsIrOp::ADDRESS: {
 				emitOp(LS_OP_STORE_PTR);
 				emit(dst);
 				emit(src);
@@ -1009,11 +1674,9 @@ struct BytecodeCompiler {
 		u32 offset = 0;
 		for (u32 i = 0; i < aggregate.value_count; ++i) {
 			const u32 value = emit(*aggregate.values[i]);
-			const u32 size = aggregate.sizes
-				? aggregate.sizes[i]
-				: aggregate.type->kind == ResolvedType::ARRAY
-					? typeByteSize(*static_cast<ArrayResolvedType*>(aggregate.type)->element_type)
-					: (u32)sizeof(u64);
+			const u32 size = aggregate.sizes							   ? aggregate.sizes[i]
+							 : aggregate.type->kind == ResolvedType::ARRAY ? typeByteSize(*static_cast<ArrayResolvedType*>(aggregate.type)->element_type)
+																		   : (u32)sizeof(u64);
 			emitOp(LS_OP_COPY);
 			emit(result + (aggregate.offsets ? aggregate.offsets[i] : offset));
 			emit(value);
@@ -1032,6 +1695,7 @@ struct BytecodeCompiler {
 			case ResolvedType::I32: return LS_TYPE_I32;
 			case ResolvedType::I64: return LS_TYPE_I64;
 			case ResolvedType::UNTYPED_INT: return LS_TYPE_I64;
+			case ResolvedType::UNTYPED_FLOAT: return LS_TYPE_F64;
 			case ResolvedType::U8: return LS_TYPE_U8;
 			case ResolvedType::U16: return LS_TYPE_U16;
 			case ResolvedType::U32: return LS_TYPE_U32;
@@ -1065,6 +1729,44 @@ struct BytecodeCompiler {
 
 	u32 emitCast(const LsOpCast& cast) {
 		u32 value_sp = emit(*cast.value);
+		if (cast.target_type->kind == ResolvedType::SLICE && cast.type->kind == ResolvedType::SLICE) {
+			auto& source = static_cast<SliceResolvedType&>(*cast.target_type);
+			auto& target = static_cast<SliceResolvedType&>(*cast.type);
+			static ResolvedType i64_type(ResolvedType::I64);
+			u32 length_sp = stack_top;
+			emitOp(LS_OP_SLICE_LENGTH);
+			emit(length_sp);
+			emit(value_sp);
+			stack_top += sizeof(i64);
+			const u32 source_size = typeByteSize(*source.element_type);
+			const u32 target_size = typeByteSize(*target.element_type);
+			if (source_size != target_size) {
+				auto& ratio = alloc<LsOpLoadConst>();
+				ratio.type = &i64_type;
+				const bool shrink = target_size >= source_size;
+				const i64 factor = shrink ? (source_size ? (i64)target_size / source_size : 1) : (target_size ? (i64)source_size / target_size : 1);
+				memcpy(ratio.value, &factor, sizeof(factor));
+				const u32 ratio_sp = emit(static_cast<LsIrOp&>(ratio));
+				const u32 scaled_sp = stack_top;
+				emitOp(shrink ? LS_OP_DIV_I64 : LS_OP_MUL_I64);
+				emit(scaled_sp);
+				emit(length_sp);
+				emit(ratio_sp);
+				stack_top += sizeof(i64);
+				length_sp = scaled_sp;
+			}
+			const u32 result = stack_top;
+			stack_top += typeByteSize(*cast.type);
+			emitOp(LS_OP_COPY);
+			emit(result);
+			emit(value_sp);
+			emit(sizeof(void*));
+			emitOp(LS_OP_COPY);
+			emit(result + sizeof(void*));
+			emit(length_sp);
+			emit(sizeof(i64));
+			return result;
+		}
 		emitOp(LS_OP_CAST);
 		emit(stack_top);
 		emit(value_sp);
@@ -1077,9 +1779,19 @@ struct BytecodeCompiler {
 	}
 
 	u32 emitPushLocalAddr(const LsOpPushLocalAddr& op) {
+		ASSERT(op.alloca->stack_sp != 0xffFFffFF);
 		emitOp(LS_OP_FRAME_PTR);
 		emit(stack_top);
 		emit(op.alloca->stack_sp);
+		stack_top += sizeof(void*);
+		return stack_top - sizeof(void*);
+	}
+
+	u32 emitMaterializeAddr(const LsOpMaterializeAddr& op) {
+		const u32 value_sp = emit(*op.value);
+		emitOp(LS_OP_FRAME_PTR);
+		emit(stack_top);
+		emit(value_sp);
 		stack_top += sizeof(void*);
 		return stack_top - sizeof(void*);
 	}
@@ -1096,11 +1808,10 @@ struct BytecodeCompiler {
 	}
 
 	u32 emitPushGlobalAddr(const LsOpPushGlobalAddr& op) {
-		ASSERT(op.symbol);
 		emitOp(LS_OP_GLOBAL_PTR);
 		u32 ret = stack_top;
 		emit(ret);
-		emit(op.symbol->slot.offset);
+		emit(op.offset);
 		stack_top += sizeof(void*);
 		return ret;
 	}
@@ -1161,8 +1872,8 @@ struct BytecodeCompiler {
 			remaining -= 8;
 		}
 		while (remaining > 0) {
-		emitOp(LS_OP_LOAD_CONST_1);
-		emit(stack_top);
+			emitOp(LS_OP_LOAD_CONST_1);
+			emit(stack_top);
 			emit((u8)0);
 			++stack_top;
 			--remaining;
@@ -1175,36 +1886,23 @@ struct BytecodeCompiler {
 		if (op.source_is_scalar) {
 			const u32 source = emit(*op.source);
 			result = stack_top;
-				emitOp(LS_OP_COPY);
-				emit(result);
-				emit(source);
-				emit((u32)sizeof(void*));
+			emitOp(LS_OP_COPY);
+			emit(result);
+			emit(source);
+			emit((u32)sizeof(void*));
 			stack_top += sizeof(void*);
 			emitOp(LS_OP_LOAD_CONST_8);
 			emit(stack_top);
 			emit(op.source_length);
 			stack_top += sizeof(i64);
-		}
-		else if (op.source_is_array) {
-			if (op.source->output_storage == LsIrOp::POINTER_REF) {
-				result = emit(*op.source);
-			}
-			else {
-				ASSERT(op.source->kind == LS_IR_OP_ALLOCA);
-				auto* source = &static_cast<LsOpAlloca&>(*op.source);
-				emit(static_cast<LsIrOp&>(*source));
-			result = stack_top;
-			emitOp(LS_OP_FRAME_PTR);
-			emit(stack_top);
-			emit(source->stack_sp);
-			stack_top += sizeof(void*);
-			}
+		} else if (op.source_is_array) {
+			ASSERT(op.source->result_mode == LsIrOp::ADDRESS);
+			result = emit(*op.source);
 			emitOp(LS_OP_LOAD_CONST_8);
 			emit(stack_top);
 			emit(op.source_length);
 			stack_top += sizeof(i64);
-		}
-		else {
+		} else {
 			result = emit(*op.source);
 		}
 
@@ -1222,11 +1920,9 @@ struct BytecodeCompiler {
 		u32 end;
 		if (op.end) {
 			end = emit(*op.end);
-		}
-		else if (op.source_is_array) {
+		} else if (op.source_is_array) {
 			end = emitBound(nullptr, op.source_length);
-		}
-		else {
+		} else {
 			end = stack_top;
 			emitOp(LS_OP_SLICE_LENGTH);
 			emit(stack_top);
@@ -1269,7 +1965,7 @@ struct BytecodeCompiler {
 		switch (op.kind) {
 			case LS_IR_OP_SLICE_REF: return emitSliceRef(static_cast<LsOpSliceRef&>(op));
 			case LS_IR_OP_SLICE_LOAD: return emitSliceLoad(static_cast<LsOpSliceLoad&>(op));
-case LS_IR_OP_SLICE: return emitSlice(static_cast<LsOpSlice&>(op));
+			case LS_IR_OP_SLICE: return emitSlice(static_cast<LsOpSlice&>(op));
 			case LS_IR_OP_NEG:
 			case LS_IR_OP_NOT: return emitUnary(static_cast<LsOpUnary&>(op));
 			case LS_IR_OP_AND:
@@ -1283,6 +1979,7 @@ case LS_IR_OP_SLICE: return emitSlice(static_cast<LsOpSlice&>(op));
 			case LS_IR_OP_EXTRACT_VALUE: return emitExtractValue(*static_cast<LsOpExtractValue*>(&op));
 			case LS_IR_OP_LOAD: return emitLoad(*static_cast<LsOpLoad*>(&op));
 			case LS_IR_OP_PUSH_LOCAL_ADDR: return emitPushLocalAddr(*static_cast<LsOpPushLocalAddr*>(&op));
+			case LS_IR_OP_MATERIALIZE_ADDR: return emitMaterializeAddr(*static_cast<LsOpMaterializeAddr*>(&op));
 			case LS_IR_OP_PUSH_GLOBAL_ADDR: return emitPushGlobalAddr(*static_cast<LsOpPushGlobalAddr*>(&op));
 			case LS_IR_OP_EQ:
 			case LS_IR_OP_NE:
@@ -1292,6 +1989,7 @@ case LS_IR_OP_SLICE: return emitSlice(static_cast<LsOpSlice&>(op));
 			case LS_IR_OP_GE: return emitCompare(static_cast<LsOpBinary&>(op));
 			case LS_IR_OP_COPY: return emitCopy(*static_cast<LsOpCopy*>(&op));
 			case LS_IR_OP_CAST: return emitCast(static_cast<LsOpCast&>(op));
+			case LS_IR_OP_TERNARY: return emitTernary(static_cast<LsOpTernary&>(op));
 			case LS_IR_OP_BOUNDS_CHECK: return emitBoundsCheck(static_cast<LsOpBoundsCheck&>(op));
 			case LS_IR_OP_ALLOCA: return emitAlloca(*static_cast<LsOpAlloca*>(&op));
 			case LS_IR_OP_MUL: return emitBinary(LS_OP_MUL_I8, static_cast<LsOpBinary&>(op));
@@ -1300,6 +1998,7 @@ case LS_IR_OP_SLICE: return emitSlice(static_cast<LsOpSlice&>(op));
 			case LS_IR_OP_DIV: return emitBinary(LS_OP_DIV_I8, static_cast<LsOpBinary&>(op));
 			case LS_IR_OP_MOD: return emitBinary(LS_OP_MOD_I8, static_cast<LsOpBinary&>(op));
 			case LS_IR_OP_LOAD_CONST: return emitLoadConst(static_cast<LsOpLoadConst&>(op));
+			case LS_IR_OP_LOAD_BYTES: return emitLoadBytes(static_cast<LsOpLoadBytes&>(op));
 			case LS_IR_OP_AGGREGATE_INIT: return emitAggregateInit(static_cast<LsOpAggregateInit&>(op));
 			case LS_IR_OP_RETURN: return emitReturn(static_cast<LsOpReturn&>(op));
 			default: ASSERT(false); break;
@@ -1335,21 +2034,21 @@ case LS_IR_OP_SLICE: return emitSlice(static_cast<LsOpSlice&>(op));
 
 		fn_bc->code = (u8*)(u64)code.size(); // store offset since code.data may be reallocated
 		fn_bc->kind = fn_expr.is_extern ? LS_FUNCTION_NATIVE : LS_FUNCTION_SCRIPT;
-		fn_bc->is_builtin_native = false; //is_builtin_native; // TODO
+		fn_bc->is_builtin_native = false; // is_builtin_native; // TODO
 		fn_bc->param_size = 0;
 		for (const FunctionParam& param : fn_expr.params) {
 			if (!param.is_comptime) fn_bc->param_size += typeByteSize(*param.resolved_type);
 		}
 		stack_top = fn_bc->param_size;
 		stack_high_water = stack_top;
-		//fn_bc->return_kind = toTypeKind(*return_type); // TODO
+		// fn_bc->return_kind = toTypeKind(*return_type); // TODO
 		fn_bc->return_size = typeByteSize(*return_type);
 		fn_bc->frame_size = 0;
 		fn_bc->code_size = 0u;
 		fn_bc->source_map = nullptr;
 		fn_bc->source_map_count = 0u;
 		fn_bc->locals = nullptr;
-		fn_bc->local_count = 0u;			
+		fn_bc->local_count = 0u;
 	}
 
 	void endFunction() {
@@ -1369,10 +2068,10 @@ case LS_IR_OP_SLICE: return emitSlice(static_cast<LsOpSlice&>(op));
 	ls_function_bc* fn_bc = nullptr;
 	ByteArray code;
 	u32 stack_top = 0;
-u32 stack_high_water = 0;
+	u32 stack_high_water = 0;
 };
 
-}
+} // namespace
 
 ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host) {
 	if (!module || !host) return nullptr;
@@ -1403,7 +2102,7 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host) {
 		for (Symbol& s : u.symbols) {
 			if (!s.expression) continue; // alias
 			if (s.expression->kind != Expression::FUNCTION) continue;
-			
+
 			auto& fn_expr = static_cast<FunctionExpression&>(*s.expression);
 			if (isTypeFactory(fn_expr)) continue;
 			if (fn_expr.is_template) continue;
@@ -1428,7 +2127,7 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host) {
 				auto& fn_expr = static_cast<FunctionExpression&>(*s.expression);
 				if (isTypeFactory(fn_expr)) continue;
 				if (fn_expr.is_template) continue;
-				ls_function_bc& fn_bc = bc->functions[fn_index];
+				ls_function_bc& fn_bc = bc->functions[fn_expr.bytecode_index];
 				fn_bc.name = s.name;
 
 				bc_compiler.beginFunction(&fn_bc, fn_expr);
