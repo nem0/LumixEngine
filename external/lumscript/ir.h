@@ -56,6 +56,7 @@ enum LsIrOpKind {
 	LS_IR_OP_SLICE,
 	LS_IR_OP_SLICE_LOAD,
 	LS_IR_OP_SLICE_REF,
+	LS_IR_OP_STRING_LITERAL
 };
 
 struct LsIrOp {
@@ -138,6 +139,12 @@ struct LsOpJump : LsIrOp {
 };
 
 struct LsOpNop : LsIrOp { LsOpNop() : LsIrOp(LS_IR_OP_NOP) {} };
+
+struct LsOpStringLiteral : LsIrOp {
+	LsOpStringLiteral() : LsIrOp(LS_IR_OP_STRING_LITERAL) {}
+	u32 index;
+	u32 length;
+};
 
 struct LsOpLoadConst : LsIrOp {
 	LsOpLoadConst() : LsIrOp(LS_IR_OP_LOAD_CONST) {}

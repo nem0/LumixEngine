@@ -82,6 +82,7 @@ typedef enum ls_op {
 	LS_OP_LOAD_CONST_2,
 	LS_OP_LOAD_CONST_4,
 	LS_OP_LOAD_CONST_8,
+	LS_OP_STRING_SLICE,
 	LS_OP_COPY,
 	LS_OP_FRAME_PTR,
 	LS_OP_GLOBAL_PTR,
@@ -350,7 +351,6 @@ typedef struct ls_bytecode {
 
 	ls_string_view* strings;
 	u32 string_count;
-	u32 string_capacity;
 
 	// One entry per named global in declaration order. Compiler temporaries
 	// and the synthetic global-initializer function are not globals and have

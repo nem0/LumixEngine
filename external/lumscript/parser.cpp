@@ -734,27 +734,27 @@ struct Parser {
 		return expr;
 	}
 
-	static ResolvedType::Kind primitiveKindFromToken(Token::Type type) {
+	static ResolvedTypeKind primitiveKindFromToken(Token::Type type) {
 		switch (type) {
-			case Token::VOID: return ResolvedType::VOID;
-			case Token::BOOL: return ResolvedType::BOOL;
-			case Token::I8: return ResolvedType::I8;
-			case Token::I16: return ResolvedType::I16;
-			case Token::I32: return ResolvedType::I32;
-			case Token::I64: return ResolvedType::I64;
-			case Token::U8: return ResolvedType::U8;
-			case Token::U16: return ResolvedType::U16;
-			case Token::U32: return ResolvedType::U32;
-			case Token::U64: return ResolvedType::U64;
-			case Token::ISIZE: return ResolvedType::ISIZE;
-			case Token::F32: return ResolvedType::F32;
-			case Token::F64: return ResolvedType::F64;
-			case Token::CPTR: return ResolvedType::CPTR;
-			case Token::CSTR: return ResolvedType::CSTR;
-			case Token::BYTE: return ResolvedType::BYTE;
+			case Token::VOID: return ResolvedTypeKind::VOID;
+			case Token::BOOL: return ResolvedTypeKind::BOOL;
+			case Token::I8: return ResolvedTypeKind::I8;
+			case Token::I16: return ResolvedTypeKind::I16;
+			case Token::I32: return ResolvedTypeKind::I32;
+			case Token::I64: return ResolvedTypeKind::I64;
+			case Token::U8: return ResolvedTypeKind::U8;
+			case Token::U16: return ResolvedTypeKind::U16;
+			case Token::U32: return ResolvedTypeKind::U32;
+			case Token::U64: return ResolvedTypeKind::U64;
+			case Token::ISIZE: return ResolvedTypeKind::ISIZE;
+			case Token::F32: return ResolvedTypeKind::F32;
+			case Token::F64: return ResolvedTypeKind::F64;
+			case Token::CPTR: return ResolvedTypeKind::CPTR;
+			case Token::CSTR: return ResolvedTypeKind::CSTR;
+			case Token::BYTE: return ResolvedTypeKind::BYTE;
 			// META stands for the `type` keyword.
-			case Token::TYPE_KW: return ResolvedType::META;
-			default: return ResolvedType::INVALID;
+			case Token::TYPE_KW: return ResolvedTypeKind::META;
+			default: return ResolvedTypeKind::INVALID;
 		}
 	}
 
@@ -809,7 +809,7 @@ struct Parser {
 			// specializes the function just like an explicitly comptime one.
 			param.is_comptime = type_param.is_comptime
 				|| (type_param.type_expr->kind == Expression::TYPE_LITERAL
-					&& static_cast<TypeLiteralExpression*>(type_param.type_expr)->type == ResolvedType::META);
+					&& static_cast<TypeLiteralExpression*>(type_param.type_expr)->type == ResolvedTypeKind::META);
 			param.type_expr = type_param.type_expr;
 			for (i32 i = 0; i < fn.params.size() - 1; ++i) {
 				if (!equalStrings(fn.params[i].name, param.name)) continue;
@@ -915,8 +915,8 @@ struct Parser {
 				break;
 			}
 			default: {
-				const ResolvedType::Kind kind = primitiveKindFromToken(token.type);
-				if (kind != ResolvedType::INVALID) res = makeExpr<TypeLiteralExpression>(token, kind);
+				const ResolvedTypeKind kind = primitiveKindFromToken(token.type);
+				if (kind != ResolvedTypeKind::INVALID) res = makeExpr<TypeLiteralExpression>(token, kind);
 				break;
 			}
 		}

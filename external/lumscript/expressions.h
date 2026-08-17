@@ -188,9 +188,9 @@ struct UndefinedExpression : Expression {
 
 struct TypeLiteralExpression : Expression {
 	// VOID..BYTE name a primitive type; META is the `type` keyword.
-	TypeLiteralExpression(ResolvedType::Kind kind) : Expression(TYPE_LITERAL), type(kind) {}
+	TypeLiteralExpression(ResolvedTypeKind kind) : Expression(TYPE_LITERAL), type(kind) {}
 
-	ResolvedType::Kind type = ResolvedType::INVALID;
+	ResolvedTypeKind type = ResolvedTypeKind::INVALID;
 };
 
 struct ArrayTypeExpression : Expression {
@@ -312,6 +312,7 @@ struct MemberExpression : Expression {
 	// Set during semantic checking for enum member expressions.
 	i32 enum_member_index = -1;
 	i64 enum_member_value = 0;
+	i32 struct_field_index = -1;
 };
 
 struct TypeMemberExpression : Expression {

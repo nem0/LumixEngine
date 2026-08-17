@@ -7,59 +7,59 @@ struct StructExpression;
 struct FunctionExpression;
 struct Expression;
 
-struct ResolvedType {
-	enum Kind {
-		INVALID,
-		VOID,
-		BOOL,
-		I8,
-		I16,
-		I32,
-		I64,
-		U8,
-		U16,
-		U32,
-		U64,
-		ISIZE,
-		F32,
-		F64,
-		CSTR,
-		CPTR,
-		BYTE,
-		UNTYPED_INT,
-		UNTYPED_FLOAT,
-		META, // the type of a type: resolved_type of enum/struct/fn declarations
-		ENUM,
-		STRUCT,
-		FUNCTION,
-		ARRAY,
-		SLICE,
-		NULLABLE,
-		UNION,
-		POINTER
-	};
+enum class ResolvedTypeKind {
+	INVALID,
+	VOID,
+	BOOL,
+	I8,
+	I16,
+	I32,
+	I64,
+	U8,
+	U16,
+	U32,
+	U64,
+	ISIZE,
+	F32,
+	F64,
+	CSTR,
+	CPTR,
+	BYTE,
+	UNTYPED_INT,
+	UNTYPED_FLOAT,
+	META, // the type of a type: resolved_type of enum/struct/fn declarations
+	ENUM,
+	STRUCT,
+	FUNCTION,
+	ARRAY,
+	SLICE,
+	NULLABLE,
+	UNION,
+	POINTER
+};
 
-	explicit ResolvedType(Kind kind) : kind(kind) {}
+struct ResolvedType {
+	explicit ResolvedType(ResolvedTypeKind kind) : kind(kind) {}
 	ResolvedType() = default;
 	virtual ~ResolvedType() = default;
 
-	Kind kind = INVALID;
+	ResolvedTypeKind kind = ResolvedTypeKind::INVALID;
 };
 
 struct MetaType : ResolvedType {
-	MetaType() : ResolvedType(META) {}
+	MetaType() : ResolvedType(ResolvedTypeKind::META) {}
 	ResolvedType* inner = nullptr; // the actual type (EnumResolvedType*, StructResolvedType*, etc.)
 };
 
 struct EnumResolvedType : ResolvedType {
-	EnumResolvedType() : ResolvedType(ENUM) {}
+	EnumResolvedType() : ResolvedType(ResolvedTypeKind::ENUM) {}
 
 	EnumExpression* decl = nullptr;
 };
 
 struct StructResolvedType : ResolvedType {
 	StructResolvedType(ls_arena& arena)
-		: ResolvedType(STRUCT)
+		: ResolvedType(ResolvedTypeKind::STRUCT)
 		, field_types(arena) {}
 
 	StructExpression* decl = nullptr;
@@ -74,7 +74,7 @@ struct FunctionResolvedParam {
 };
 
 struct FunctionResolvedType : ResolvedType {
-	FunctionResolvedType(ls_arena& arena) : ResolvedType(FUNCTION), params(arena) {}
+	FunctionResolvedType(ls_arena& arena) : ResolvedType(ResolvedTypeKind::FUNCTION), params(arena) {}
 
 	ExpArray<FunctionResolvedParam> params;
 	ResolvedType* return_type = nullptr;
@@ -82,34 +82,34 @@ struct FunctionResolvedType : ResolvedType {
 };
 
 struct PointerResolvedType : ResolvedType {
-	PointerResolvedType() : ResolvedType(POINTER) {}
+	PointerResolvedType() : ResolvedType(ResolvedTypeKind::POINTER) {}
 
 	ResolvedType* inner = nullptr;
 	bool is_const = false;
 };
 
 struct ArrayResolvedType : ResolvedType {
-	ArrayResolvedType() : ResolvedType(ARRAY) {}
+	ArrayResolvedType() : ResolvedType(ResolvedTypeKind::ARRAY) {}
 
 	ResolvedType* element_type = nullptr;
 	i64 size = 0;
 };
 
 struct SliceResolvedType : ResolvedType {
-	SliceResolvedType() : ResolvedType(SLICE) {}
+	SliceResolvedType() : ResolvedType(ResolvedTypeKind::SLICE) {}
 
 	ResolvedType* element_type = nullptr;
 	bool is_const = false;
 };
 
 struct NullableResolvedType : ResolvedType {
-	NullableResolvedType() : ResolvedType(NULLABLE) {}
+	NullableResolvedType() : ResolvedType(ResolvedTypeKind::NULLABLE) {}
 
 	ResolvedType* inner = nullptr;
 };
 
 struct UnionResolvedType : ResolvedType {
-	UnionResolvedType(ls_arena& arena) : ResolvedType(UNION), members(arena) {}
+	UnionResolvedType(ls_arena& arena) : ResolvedType(ResolvedTypeKind::UNION), members(arena) {}
 
 	ExpArray<ResolvedType*> members;
 };

@@ -70,7 +70,7 @@ struct Symbol {
 inline bool symbolHasGlobalStorage(const Symbol& sym) {
 	return sym.expression
 		&& sym.storage != Symbol::COMPTIME
-		&& (!sym.resolved_type || sym.resolved_type->kind != ResolvedType::META)
+		&& (!sym.resolved_type || sym.resolved_type->kind != ResolvedTypeKind::META)
 		&& sym.expression->kind != Expression::FUNCTION
 		&& sym.expression->kind != Expression::STRUCT
 		&& sym.expression->kind != Expression::ENUM;
@@ -160,9 +160,9 @@ struct ls_module {
 	ls_arena& arena;
 	ExpArray<Unit> units;
 	ExpArray<UnionResolvedType*> union_types;
-	// One canonical instance per primitive kind, indexed by ResolvedType::Kind.
+	// One canonical instance per primitive kind, indexed by ResolvedTypeKind::Kind.
 	// Pointer equality suffices for primitives; use typesEqual() for compound types.
-	ResolvedType primitives[ResolvedType::META];
+	ResolvedType primitives[(i32)ResolvedTypeKind::META];
 	EnumExpression type_kind_decl;
 	EnumResolvedType type_kind;
 };

@@ -1069,6 +1069,29 @@ TEST(IntrospectionNamesSelectUnrolledBranchWithSliceEquality) {
 	return true;
 }
 
+TEST(IntrospectionUnrollSliceContinueSkipsField) {
+	const char* source = R"(
+		struct S { a : i32; b : i32; c : i32; d : i32; }
+		fn main() : i32 {
+			var v : S = S { 10, 20, 30, 40 };
+			var total : i32 = 0;
+			unroll for f in S::fields {
+				if f.name == "b" { continue; }
+				if f.name == "d" { break; }
+				total += v[f.name];
+			}
+			return total;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(40, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(IntrospectionTypeNamesCoverAllPrimitiveTypes) {
 	const char* source = R"(
 		fn main() : void {
