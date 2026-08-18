@@ -101,6 +101,7 @@ TEST(ir_to_bytecode_array_bounds_check) {
 		fn past_end() : i32 { var values : [3]i32 = undefined; var index : u64 = 3; values[index] = 8; return 0; }
 	)"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
+	test_diagnostics.output_enabled = false;
 	EXPECT_EQ(ls_call(runtime, toLs("valid")), LS_RESULT_OK);
 	EXPECT_EQ(ls_to_i32(runtime, -1), 8);
 
