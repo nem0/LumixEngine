@@ -182,6 +182,26 @@ struct IRBuilder {
 		return value;
 	}
 
+	// Runtime slice indexing and slice bounds are always read back as a fixed
+	// 8-byte i64 (SLICE_LOAD / SLICE_REF / SLICE in runtime.c). Widen narrower
+	// integer indices so the upper four bytes are not stale stack data.
+	LsIrOp& widenToI64(LsIrOp& value, ResolvedType& source_type) {
+		switch (source_type.kind) {
+			case ResolvedTypeKind::I64:
+			case ResolvedTypeKind::U64:
+			case ResolvedTypeKind::ISIZE:
+			case ResolvedTypeKind::UNTYPED_INT:
+				return value;
+			default: break;
+		}
+		auto& cast = alloc<LsOpCast>();
+		static ResolvedType i64_type(ResolvedTypeKind::I64);
+		cast.type = &i64_type;
+		cast.target_type = &source_type;
+		cast.value = &value;
+		return cast;
+	}
+
 	LsIrOp& loadAllocaValue(LsOpAlloca& storage) {
 		auto& addr = alloc<LsOpPushLocalAddr>();
 		addr.alloca = &storage;
@@ -300,8 +320,8 @@ struct IRBuilder {
 					element_type = static_cast<SliceResolvedType*>(slice.base->resolved_type)->element_type;
 				}
 				op.element_size = typeByteSize(*element_type);
-				if (slice.begin) op.begin = &buildExpressionIR(*slice.begin, true);
-				if (slice.end) op.end = &buildExpressionIR(*slice.end, true);
+				if (slice.begin) op.begin = &widenToI64(buildExpressionIR(*slice.begin, true), *slice.begin->resolved_type);
+				if (slice.end) op.end = &widenToI64(buildExpressionIR(*slice.end, true), *slice.end->resolved_type);
 				return op;
 			}
 			case Expression::BRACKET: {
@@ -342,17 +362,17 @@ struct IRBuilder {
 				// slice[index]
 				if (be.base->resolved_type->kind == ResolvedTypeKind::SLICE) {
 					ASSERT(be.args.size() == 1);
-					LsIrOp* index = &buildExpressionIR(*be.args[0], true);
+					LsIrOp& index = widenToI64(buildExpressionIR(*be.args[0], true), *be.args[0]->resolved_type);
 					if (as_rvalue) {
 					auto& load = alloc<LsOpSliceLoad>();
 						load.slice = &buildExpressionIR(*be.base, true);
-						load.index = index;
+						load.index = &index;
 						load.element_size = typeByteSize(*be.resolved_type);
 						return load;
 					}
 					auto& ref = alloc<LsOpSliceRef>();
 					ref.slice = &buildExpressionIR(*be.base, true);
-					ref.index = index;
+					ref.index = &index;
 					ref.element_size = typeByteSize(*be.resolved_type);
 					return ref;
 				}

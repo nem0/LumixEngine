@@ -1012,6 +1012,29 @@ TEST(SliceElementWriteThroughParameterRuntime) {
 	return true;
 }
 
+TEST(SliceI32IndexWriteThroughParameterRuntime) {
+	const char* source = R"(
+		fn main() : i32 {
+			var values : [3]i32 = undefined;
+			var slice : []i32 = values[:];
+			var i : i32 = 0;
+			while i < 3 {
+				slice[i] = i;
+				i += 1;
+			}
+			return values[0] + values[1] + values[2];
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(3, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(SliceStructFieldReadRuntime) {
 	const char* source = R"(
 		struct Body {
