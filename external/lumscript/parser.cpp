@@ -8,10 +8,13 @@ enum class ExprMode {
 };
 
 struct Parser {
-	Parser(Unit& unit, const ls_host* host)
+	Parser(Unit& unit, const ls_host* host, SourceLocTable& src_locs)
 		: m_unit(unit)
+		, m_src_locs(src_locs)
+		, m_tokenizer(src_locs)
 	{
 		m_output.host = host;
+		m_output.src_locs = &src_locs;
 	}
 
 	// Counter for synthesizing unique hidden index names for `for v in arr` (no
@@ -1735,6 +1738,7 @@ struct Parser {
 	}
 
 	Unit& m_unit;
+	SourceLocTable& m_src_locs;
 	Tokenizer m_tokenizer;
 	OutputFormatter m_output;
 };
@@ -1742,7 +1746,7 @@ struct Parser {
 // Parse a module, e.g. `ls_module_parse(module, source, name)`.
 ls_result ls_module_parse(ls_module* module, ls_string_view source, ls_string_view source_name) {
 	Unit& unit = module->units.emplace_back(source_name, module->arena);
-	Parser parser(unit, module->host);
+	Parser parser(unit, module->host, module->src_locs);
 	if (parser.parse(source, source_name) == LS_RESULT_FAILURE) return LS_RESULT_FAILURE;
 
 	return LS_RESULT_OK;

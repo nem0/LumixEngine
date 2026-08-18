@@ -158,6 +158,7 @@ struct ls_module {
 
 	ls_host* host;
 	ls_arena& arena;
+	SourceLocTable src_locs;
 	ExpArray<Unit> units;
 	ExpArray<UnionResolvedType*> union_types;
 	// One canonical instance per primitive kind, indexed by ResolvedTypeKind::Kind.
@@ -166,3 +167,9 @@ struct ls_module {
 	EnumExpression type_kind_decl;
 	EnumResolvedType type_kind;
 };
+
+// Returns the integer discriminant of enum member `index`, matching runtime
+// semantics: implicit members use their index, explicit members their evaluated
+// constant. Values are cached on the enum expression by the checker after
+// typechecking; falls back to `index` when the cache is unavailable.
+i64 enumMemberValue(const EnumResolvedType& en, i32 index);

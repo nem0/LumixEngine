@@ -103,8 +103,23 @@ TEST(ir_to_bytecode_array_bounds_check) {
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_EQ(ls_call(runtime, toLs("valid")), LS_RESULT_OK);
 	EXPECT_EQ(ls_to_i32(runtime, -1), 8);
-	EXPECT_EQ(ls_call(runtime, toLs("negative")), LS_RESULT_FAILURE);
-	EXPECT_EQ(ls_call(runtime, toLs("past_end")), LS_RESULT_FAILURE);
+
+	// Runtime errors suspend with LS_DEBUG_PAUSE_ERROR instead of failing the
+	// call (see DebugErrorSuspendsWhenEnabled); the host aborts to unwind.
+	ls_debug_event event;
+	EXPECT_EQ(ls_call(runtime, toLs("negative")), LS_RESULT_SUSPENDED);
+	EXPECT_TRUE(ls_debug_is_suspended(runtime));
+	EXPECT_TRUE(ls_debug_pause_event(runtime, &event));
+	EXPECT_EQ((int)LS_DEBUG_PAUSE_ERROR, (int)event.reason);
+	EXPECT_EQ((int)LS_RESULT_FAILURE, (int)ls_debug_resume(runtime, LS_DEBUG_ABORT));
+	EXPECT_TRUE(!ls_debug_is_suspended(runtime));
+
+	EXPECT_EQ(ls_call(runtime, toLs("past_end")), LS_RESULT_SUSPENDED);
+	EXPECT_TRUE(ls_debug_is_suspended(runtime));
+	EXPECT_TRUE(ls_debug_pause_event(runtime, &event));
+	EXPECT_EQ((int)LS_DEBUG_PAUSE_ERROR, (int)event.reason);
+	EXPECT_EQ((int)LS_RESULT_FAILURE, (int)ls_debug_resume(runtime, LS_DEBUG_ABORT));
+	EXPECT_TRUE(!ls_debug_is_suspended(runtime));
 	CAPI_END(module);
 	return true;
 }

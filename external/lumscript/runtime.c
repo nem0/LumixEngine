@@ -216,7 +216,7 @@ static void runtime_bind_builtin_callbacks(ls_runtime* runtime) {
 // debugger.c's runtime_source_at, which serves the same lookup for
 // ls_debug_frame_location; kept separate since the two files are independent
 // translation units and this is a handful of lines.
-static bool runtime_debug_frame_location(const ls_function_bc* fn, u32 code_offset, ls_debug_location* out_location) {
+static bool runtime_debug_frame_location(const ls_bytecode* bytecode, const ls_function_bc* fn, u32 code_offset, ls_debug_location* out_location) {
 	if (!fn) return false;
 	const ls_bytecode_source_map_entry* result = NULL;
 	for (u32 i = 0; i < fn->source_map_count; ++i) {
@@ -224,10 +224,11 @@ static bool runtime_debug_frame_location(const ls_function_bc* fn, u32 code_offs
 		if (entry->code_offset > code_offset) break;
 		result = entry;
 	}
-	if (!result) return false;
-	out_location->source_name = result->source_name;
-	out_location->line = result->line;
-	out_location->column = result->column;
+	if (!result || !bytecode || result->location_index >= bytecode->location_count) return false;
+	const ls_bytecode_location* loc = &bytecode->locations[result->location_index];
+	out_location->source_name = loc->source_name;
+	out_location->line = loc->line;
+	out_location->column = loc->column;
 	return true;
 }
 
@@ -248,7 +249,7 @@ static ls_string_view runtime_error_message(ls_op op) {
 static void runtime_report_error(const ls_runtime* runtime, const ls_function_bc* function, const u8* ip, ls_string_view message) {
 	if (!runtime->host->print) return;
 	ls_debug_location location;
-	if (runtime_debug_frame_location(function, (u32)(ip - function->code), &location) && location.source_name.begin) {
+	if (runtime_debug_frame_location(runtime->bytecode, function, (u32)(ip - function->code), &location) && location.source_name.begin) {
 		static const char separator[] = ": ";
 		char line_buffer[10];
 		char* line = line_buffer + sizeof(line_buffer);
@@ -295,7 +296,7 @@ static void runtime_clear_step_traps(ls_runtime* runtime) {
 
 static bool runtime_should_pause_for_step(const ls_runtime* runtime, const ls_function_bc* function, u32 code_offset) {
 	ls_debug_location location;
-	if (!runtime_debug_frame_location(function, code_offset, &location)) return false;
+	if (!runtime_debug_frame_location(runtime->bytecode, function, code_offset, &location)) return false;
 	if (location.line == runtime->step_start_line && runtime->call_depth == runtime->step_start_call_depth) return false;
 	if (runtime->step_action == LS_DEBUG_STEP_INTO) return true;
 	if (runtime->step_action == LS_DEBUG_STEP_OVER) return runtime->call_depth <= runtime->step_start_call_depth;
@@ -1242,6 +1243,18 @@ runtime_execute_function_fail:
 
 runtime_execute_function_suspend:
 	runtime_clear_step_traps(runtime);
+	// A completed STEP_OUT reports the call site the stepped-out frame
+	// returned into rather than the first statement boundary reached after the
+	// return (the trap this pause fires on). The caller's frame on
+	// call_stack[call_depth] was saved with ip as the return address just past
+	// its CALL_DIRECT (the same convention debugger.c's
+	// debug_frame_lookup_offset relies on), so ip - 1 resolves back to the
+	// call statement. The suspension itself stays parked at the real resume
+	// point (the boundary trap) so a CONTINUE re-executes correctly.
+	const int step_out_completed =
+		runtime->step_action == LS_DEBUG_STEP_OUT &&
+		runtime->pause_event.reason == LS_DEBUG_PAUSE_STEP &&
+		runtime->call_depth < runtime->step_start_call_depth;
 	runtime->step_action = LS_DEBUG_CONTINUE;
 	runtime->suspended_frame = (runtime_call_frame){ fn, ip, runtime->frame, runtime->stack_top };
 	// Reify the complete chain while the interpreter still owns the active
@@ -1255,7 +1268,16 @@ runtime_execute_function_suspend:
 		runtime->fail_frames[runtime->fail_frame_count++] = runtime->call_stack[i - 1u];
 	}
 	runtime->is_suspended = true;
-	if (!runtime_debug_frame_location(fn, (u32)(ip - fn->code), &runtime->pause_event.location)) {
+	if (step_out_completed && runtime->call_depth < LS_MAX_CALL_DEPTH) {
+		const runtime_call_frame* caller = &runtime->call_stack[runtime->call_depth];
+		if (caller->function && caller->ip > caller->function->code) {
+			const u32 caller_offset = (u32)(caller->ip - 1u - caller->function->code);
+			if (runtime_debug_frame_location(runtime->bytecode, caller->function, caller_offset, &runtime->pause_event.location)) {
+				return EXEC_SUSPENDED;
+			}
+		}
+	}
+	if (!runtime_debug_frame_location(runtime->bytecode, fn, (u32)(ip - fn->code), &runtime->pause_event.location)) {
 		runtime->pause_event.location = (ls_debug_location){ {NULL, NULL}, 0u, 0u };
 	}
 	return EXEC_SUSPENDED;

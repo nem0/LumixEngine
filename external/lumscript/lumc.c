@@ -498,7 +498,9 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 			if (source) {
 				const size_t source_column = 120;
 				while (line_size < source_column && line_size + 1 < sizeof(line)) line[line_size++] = ' ';
-				lumc_append_source_line(line, &line_size, sizeof(line), source_text, source->line);
+				if (source->location_index < bytecode->location_count) {
+					lumc_append_source_line(line, &line_size, sizeof(line), source_text, bytecode->locations[source->location_index].line);
+				}
 			}
 			fputs(line, stdout);
 			putchar('\n');

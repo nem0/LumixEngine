@@ -2,6 +2,7 @@
 
 #include "capi.h"
 #include "exparray.h"
+#include "token.h"
 
 struct ResolvedType;
 struct FunctionExpression;
@@ -9,10 +10,11 @@ struct ls_module;
 struct ls_host;
 struct ls_bytecode;
 
-// compacted by later passes.
+// Index into the per-compile SourceLocTable (token.h). INVALID when the
+// op is not tied to a source location.
 using LsIrSourceLoc = u32;
 
-static constexpr LsIrSourceLoc LS_IR_INVALID_SOURCE_LOC = 0xffffffffu;
+static constexpr LsIrSourceLoc LS_IR_INVALID_SOURCE_LOC = LS_INVALID_SOURCE_LOC;
 
 enum LsIrOpKind {
 	LS_IR_OP_INVALID,
@@ -20,6 +22,7 @@ enum LsIrOpKind {
 	LS_IR_OP_LOAD_BYTES,
 	LS_IR_OP_COPY,
 	LS_IR_OP_AGGREGATE_INIT,
+	LS_IR_OP_UNION_CONVERT,
 	LS_IR_OP_COMPARE,
 	LS_IR_OP_ADD,
 	LS_IR_OP_SUB,
@@ -169,6 +172,15 @@ struct LsOpAggregateInit : LsIrOp {
 	u32 value_count = 0;
 };
 
+// Widen a tagged union to a superset. The payload is copied; the tag is remapped
+// because interned member order (and therefore tag values) can differ.
+struct LsOpUnionConvert : LsIrOp {
+	LsOpUnionConvert() : LsIrOp(LS_IR_OP_UNION_CONVERT) {}
+	ResolvedType* source_type = nullptr;
+	ResolvedType* target_type = nullptr;
+	LsIrOp* value = nullptr;
+};
+
 struct LsOpBinary : LsIrOp {
 	LsOpBinary(LsIrOpKind op) : LsIrOp(op) {}
 	ResolvedType* operand_type = nullptr;
@@ -262,6 +274,7 @@ struct LsOpAlloca : LsIrOp {
 	ResolvedType* type = nullptr;
 	LsIrOp* value = nullptr;
 	u32 stack_sp = 0xffFFffFF;
+	ls_string_view name = {}; // debug entry name; empty for compiler temporaries
 };
 
 struct LsOpReturn : LsIrOp {

@@ -24,8 +24,8 @@ TEST(BytecodeCompileAndRunMain) {
 
 	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
 	EXPECT_TRUE(bytecode != nullptr);
-	//EXPECT_TRUE(bytecode->functions[0].source_map_count > 0u);
-	//EXPECT_EQ(0u, bytecode->functions[0].source_map[0].code_offset);
+	EXPECT_TRUE(bytecode->functions[0].source_map_count > 0u);
+	EXPECT_EQ(0u, bytecode->functions[0].source_map[0].code_offset);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);

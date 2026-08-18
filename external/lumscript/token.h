@@ -1,6 +1,38 @@
 #pragma once
 
 #include "capi.h"
+#include "exparray.h"
+
+// Sentinel for "no source location". Used by Token::src_loc, LsIrSourceLoc
+// and ls_bytecode_source_map_entry::location_index (the bytecode location
+// table is 0-based, so this never collides with a real entry).
+static constexpr u32 LS_INVALID_SOURCE_LOC = 0xffffffffu;
+
+// Append-only per-compile table of token source locations. Every token gets a
+// unique index into `entries` (no dedup): two tokens can never share a slot.
+// The bytecode location table (see ls_bytecode_compile) is a verbatim copy of
+// `entries`, so token indices are reused as bytecode location indices. Owned by
+// ls_module so the tokenizer, parser diagnostics, checker and IR compiler all
+// resolve through it.
+struct SourceLocTable {
+	struct Entry {
+		ls_string_view source_name;
+		u32 line = 0;
+		u32 column = 0;
+	};
+	explicit SourceLocTable(ls_arena& arena) : entries(arena) {}
+
+	u32 add(ls_string_view source_name, u32 line, u32 column) {
+		Entry entry;
+		entry.source_name = source_name;
+		entry.line = line;
+		entry.column = column;
+		entries.push(entry);
+		return (u32)(entries.size() - 1);
+	}
+
+	ExpArray<Entry> entries;
+};
 
 struct Token {
 	enum Type {
@@ -102,10 +134,9 @@ struct Token {
 
 	Type type = END_OF_FILE;
 	ls_string_view value;
-	
-	// TODO remove
-	ls_string_view source_name = {};
-	i32 line = 1;
-	i32 column = 1;
+
+	// Index into the per-compile SourceLocTable (token.h). LS_INVALID_SOURCE_LOC
+	// when the token has no usable source position (EOF or a synthesized token).
+	u32 src_loc = LS_INVALID_SOURCE_LOC;
 };
 

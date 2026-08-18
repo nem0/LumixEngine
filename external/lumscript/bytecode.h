@@ -223,13 +223,21 @@ typedef enum ls_function_kind {
 	LS_FUNCTION_NATIVE,
 } ls_function_kind;
 
-typedef struct ls_bytecode_source_map_entry {
-	// Byte offset of the first instruction associated with this source location.
-	u32 code_offset;
-	// Non-owning source identifier copied from the AST token.
+// One source position in the bytecode's location table (the PDB "file table"
+// model). source_name is copied into the bytecode arena, so the bytecode is
+// self-contained after compilation.
+typedef struct ls_bytecode_location {
 	ls_string_view source_name;
 	u32 line;
 	u32 column;
+} ls_bytecode_location;
+
+typedef struct ls_bytecode_source_map_entry {
+	// Byte offset of the first instruction associated with this source location.
+	u32 code_offset;
+	// Index into ls_bytecode::locations[] (0-based; never LS_INVALID_SOURCE_LOC
+	// since recordSourceMap skips locations tied to no source position).
+	u32 location_index;
 } ls_bytecode_source_map_entry;
 
 // Index into ls_bytecode::type_info, or this sentinel when no type metadata
@@ -351,6 +359,11 @@ typedef struct ls_bytecode {
 
 	ls_string_view* strings;
 	u32 string_count;
+
+	// Deduplicated source locations referenced by the functions' source maps.
+	// `ls_bytecode_source_map_entry::location_index` indexes here.
+	ls_bytecode_location* locations;
+	u32 location_count;
 
 	// One entry per named global in declaration order. Compiler temporaries
 	// and the synthetic global-initializer function are not globals and have

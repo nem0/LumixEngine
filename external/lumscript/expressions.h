@@ -413,12 +413,17 @@ struct EnumMember {
 };
 
 struct EnumExpression : Expression {
-	EnumExpression(ls_arena& arena) : Expression(ENUM), members(arena) {}
+	EnumExpression(ls_arena& arena) : Expression(ENUM), members(arena), cached_values(arena) {}
 
 	ExpArray<EnumMember> members;
 	// Cached by symbol checking: name and owner unit for fast type printing.
 	ls_string_view cached_name = {};
 	struct Unit* cached_owner = nullptr;
+	// Integer discriminant of each member in declaration order, filled by the
+	// checker after typechecking. Implicit members use their index (matching
+	// runtime member-access semantics); explicit members use their evaluated
+	// constant. Consumed by bytecode type metadata.
+	ExpArray<i64> cached_values;
 };
 
 struct TernaryExpression : Expression {

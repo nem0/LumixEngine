@@ -40,6 +40,7 @@ static constexpr TypeKindInfo TYPE_KIND_INFOS[] = {
 ls_module::ls_module(ls_host* host)
 	: host(host)
 	, arena(host->arena)
+	, src_locs(arena)
 	, units(arena)
 	, union_types(arena)
 	, type_kind_decl(arena)
@@ -379,6 +380,7 @@ struct Checker {
 		: module(module)
 	{
 		error_stream.host = module.host;
+		error_stream.src_locs = &module.src_locs;
 		meta_value_type = makeType<MetaType>(module.arena);
 		const_u8_slice = makeType<SliceResolvedType>(module.arena);
 		const_u8_slice->element_type = primitiveType(ResolvedTypeKind::U8);
@@ -864,13 +866,17 @@ struct Checker {
 
 	template <typename... Args> void errorLine(Token token, Args&&... args) {
 		if (suppress_errors != 0) return;
-		if (!empty(token.source_name)) {
-			error_stream.print(token.source_name);
+		const SourceLocTable::Entry* loc = nullptr;
+		if (token.src_loc != LS_INVALID_SOURCE_LOC && token.src_loc < (u32)module.src_locs.entries.size()) {
+			loc = &module.src_locs.entries[(i32)token.src_loc];
+		}
+		if (loc && !empty(loc->source_name)) {
+			error_stream.print(loc->source_name);
 			error_stream.print(": ");
 		}
-		if (token.line > 0) {
+		if (loc && loc->line > 0) {
 			error_stream.print("line ");
-			error_stream.print(token.line);
+			error_stream.print(loc->line);
 			error_stream.print(": ");
 		}
 		int dummy[] = {(error(static_cast<Args&&>(args)), 0)...};
@@ -6475,12 +6481,48 @@ struct Checker {
 		u8* comptime_stack_ptr = nullptr;
 		bool allow_runtime_const = false;
 
+	// Evaluates and caches every enum member's integer discriminant on its
+	// EnumExpression (`cached_values`), matching runtime member-access
+	// semantics: implicit members take their index, explicit members take
+	// their evaluated constant. Called after typechecking so referenced
+	// comptime symbols are already folded; un-evaluable members fall back to
+	// their index. The bytecode's type metadata reads these through
+	// `enumMemberValue`.
+	void cacheEnumValues(Unit& unit) {
+		for (Symbol& sym : unit.symbols) {
+			if (!sym.expression || sym.expression->kind != Expression::ENUM) continue;
+			EnumExpression& en = static_cast<EnumExpression&>(*sym.expression);
+			en.cached_values.clear();
+			++suppress_errors;
+			for (i32 i = 0; i < en.members.size(); ++i) {
+				i64 value = i;
+				if (en.members[i].value) {
+					ComptimeValue resolved = evalComptime(unit, *en.members[i].value, nullptr, nullptr, nullptr);
+					if (resolved && resolved.kind == ComptimeValue::VALUE && resolved.type) {
+						value = comptimeNumericToI64(resolved.value, resolved.type->kind);
+					}
+				}
+				en.cached_values.emplace_back(value);
+			}
+			--suppress_errors;
+		}
+	}
+
 }; // struct Checker
+
+i64 enumMemberValue(const EnumResolvedType& en, i32 index) {
+	if (en.decl && index >= 0 && index < en.decl->cached_values.size()) {
+		return en.decl->cached_values[index];
+	}
+	return index;
+}
 
 ls_result ls_module_typecheck(ls_module* module) {
 	if (!module) return LS_RESULT_FAILURE;
-	if (Checker(*module).typecheck() == LS_RESULT_FAILURE) return LS_RESULT_FAILURE;
+	Checker checker(*module);
+	if (checker.typecheck() == LS_RESULT_FAILURE) return LS_RESULT_FAILURE;
 	for (Unit& unit : module->units) {
+		checker.cacheEnumValues(unit);
 		unit.native_symbols.clear();
 		for (Symbol& sym : unit.symbols) {
 			if (!sym.expression || sym.expression->kind != Expression::FUNCTION) continue;

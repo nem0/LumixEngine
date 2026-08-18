@@ -83,9 +83,11 @@ ls_result ls_debug_frame_location(ls_runtime* runtime, u32 frame_index, ls_debug
 	const u32 lookup_offset = debug_frame_lookup_offset(runtime, frame_index, frame);
 	const ls_bytecode_source_map_entry* entry = runtime_source_at(frame->function, lookup_offset);
 	if (!entry) return LS_RESULT_FAILURE;
-	out_location->source_name = entry->source_name;
-	out_location->line = entry->line;
-	out_location->column = entry->column;
+	if (!runtime->bytecode || entry->location_index >= runtime->bytecode->location_count) return LS_RESULT_FAILURE;
+	const ls_bytecode_location* loc = &runtime->bytecode->locations[entry->location_index];
+	out_location->source_name = loc->source_name;
+	out_location->line = loc->line;
+	out_location->column = loc->column;
 	return LS_RESULT_OK;
 }
 
@@ -102,11 +104,13 @@ static int debug_find_breakpoint_target(const ls_bytecode* bytecode, ls_string_v
 		const ls_function_bc* fn = &bytecode->functions[function_index];
 		for (u32 i = 0; i < fn->source_map_count; ++i) {
 			const ls_bytecode_source_map_entry* entry = &fn->source_map[i];
-			if (entry->line < line) continue;
-			if (!debug_string_equals(entry->source_name, source_name)) continue;
-			if (!found || entry->line < best_line || (entry->line == best_line && entry->code_offset < best_code_offset)) {
+			if (entry->location_index >= bytecode->location_count) continue;
+			const ls_bytecode_location* loc = &bytecode->locations[entry->location_index];
+			if (loc->line < line) continue;
+			if (!debug_string_equals(loc->source_name, source_name)) continue;
+			if (!found || loc->line < best_line || (loc->line == best_line && entry->code_offset < best_code_offset)) {
 				found = 1;
-				best_line = entry->line;
+				best_line = loc->line;
 				best_function_index = function_index;
 				best_code_offset = entry->code_offset;
 			}

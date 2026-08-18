@@ -788,6 +788,35 @@ TEST(UnionMatchDispatchRuntime) {
 	return true;
 }
 
+TEST(UnionSubsetWideningRemapsTag) {
+	const char* source = R"(
+		struct A { x : i32; }
+		struct B { y : i32; }
+		struct C { z : i32; }
+		comptime AB = A | B;
+		comptime BAC = B | A | C;
+
+		fn widen(value : AB) : BAC {
+			return value;
+		}
+
+		fn main() : i32 {
+			var value : AB = A { 9 };
+			var wide : BAC = widen(value);
+			if wide is A { return 100 + wide.x; }
+			if wide is B { return 200 + wide.y; }
+			return -1;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(109, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(UnionWideningAcrossCallRuntime) {
 	const char* source = R"(
 		struct A {
