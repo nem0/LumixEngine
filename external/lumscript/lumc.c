@@ -586,7 +586,8 @@ int main(int argc, char** argv) {
 		goto cleanup;
 	}
 
-	ctx.bytecode = ls_bytecode_compile(ctx.module, &ctx.host);
+	ls_bytecode_compile_options opts = {.optimize = true};
+	ctx.bytecode = ls_bytecode_compile(ctx.module, &ctx.host, &opts);
 	if (!ctx.bytecode) {
 		fputs("Error: Failed to compile IR bytecode\n", stderr);
 		goto cleanup;

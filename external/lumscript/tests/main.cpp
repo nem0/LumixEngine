@@ -45,7 +45,7 @@ void print(int val) { printf("%d", val); }
 		ls_module* module = ls_module_create(&context.host); \
 		EXPECT_TRUE(module != nullptr); \
 		bool compiled = ls_module_compile(module, toLs(src), makeStringView(__func__), nullptr, nullptr); \
-		ls_bytecode* bytecode = compiled ? ls_bytecode_compile(module, &context.host) : nullptr; \
+		ls_bytecode* bytecode = compiled ? ls_bytecode_compile(module, &context.host, nullptr) : nullptr; \
 		if (bytecode) ls_bytecode_destroy(bytecode); \
 		ls_module_destroy(module); \
 		EXPECT_TRUE(compiled); \
@@ -68,7 +68,7 @@ void print(int val) { printf("%d", val); }
 		ls_module* module = ls_module_create(&context.host); \
 		EXPECT_TRUE(module != nullptr); \
 		bool compiled = ls_module_compile(module, toLs(src), makeStringView(__func__), &resolveLumScriptImportC, &(files)); \
-		ls_bytecode* bytecode = compiled ? ls_bytecode_compile(module, &context.host) : nullptr; \
+		ls_bytecode* bytecode = compiled ? ls_bytecode_compile(module, &context.host, nullptr) : nullptr; \
 		if (bytecode) ls_bytecode_destroy(bytecode); \
 		ls_module_destroy(module); \
 		EXPECT_TRUE(compiled); \
@@ -153,7 +153,7 @@ struct TestContext {
 
 struct RuntimeGuard {
 	explicit RuntimeGuard(ls_module* module, ls_host* host)
-		: bytecode(ls_bytecode_compile(module, host))
+		: bytecode(ls_bytecode_compile(module, host, nullptr))
 		, runtime(bytecode ? ls_runtime_create(bytecode, nullptr) : nullptr) {}
 
 	~RuntimeGuard() {

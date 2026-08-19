@@ -263,7 +263,7 @@ TEST(BytecodeEnumMatch) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);

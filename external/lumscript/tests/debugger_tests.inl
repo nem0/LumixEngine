@@ -107,7 +107,7 @@ TEST(DebugSetBreakpointPatchesCode) {
 
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	u32 resolved_line = 0;
@@ -139,7 +139,7 @@ TEST(DebugSetBreakpointOnUnknownLineFails) {
 
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	u32 resolved_line = 0;
@@ -162,7 +162,7 @@ TEST(DebugRemoveBreakpointRestoresOriginalByte) {
 
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	const ls_function_bc& fn = bytecode->functions[0];
@@ -198,7 +198,7 @@ TEST(DebugRemoveAllBreakpointsRestoresEverything) {
 
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	const ls_function_bc& fn = bytecode->functions[0];

@@ -59,7 +59,8 @@ enum LsIrOpKind {
 	LS_IR_OP_SLICE,
 	LS_IR_OP_SLICE_LOAD,
 	LS_IR_OP_SLICE_REF,
-	LS_IR_OP_STRING_LITERAL
+	LS_IR_OP_STRING_LITERAL,
+	LS_IR_OP_FRAME_PTR
 };
 
 struct LsIrOp {
@@ -142,6 +143,12 @@ struct LsOpJump : LsIrOp {
 };
 
 struct LsOpNop : LsIrOp { LsOpNop() : LsIrOp(LS_IR_OP_NOP) {} };
+
+struct LsOpFramePtr : LsIrOp {
+	LsOpFramePtr() : LsIrOp(LS_IR_OP_FRAME_PTR) {}
+	// Resolved to the slot at emit time, once emitAlloca has assigned stack_sp.
+	struct LsOpAlloca* alloca = nullptr;
+};
 
 struct LsOpStringLiteral : LsIrOp {
 	LsOpStringLiteral() : LsIrOp(LS_IR_OP_STRING_LITERAL) {}

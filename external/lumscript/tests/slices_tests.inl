@@ -4,7 +4,7 @@ static u32 mainFrameSize(const char* source, const char* test_name) {
 	ls_module* module = ls_module_create(&context.host);
 	if (!module) return 0;
 	if (!ls_module_compile(module, toLs(source), makeStringView(test_name), nullptr, nullptr)) return 0;
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &context.host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &context.host, nullptr);
 	if (!bytecode) return 0;
 	u32 frame_size = 0;
 	for (u32 i = 0; i < bytecode->function_count; ++i) {
@@ -599,7 +599,7 @@ TEST(SliceImplicitConversionFromTemporaryArray) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);

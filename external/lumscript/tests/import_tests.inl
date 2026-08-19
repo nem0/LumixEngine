@@ -846,7 +846,7 @@ TEST(ExternImport) {
 	EXPECT_TRUE(module != nullptr);
 	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), makeStringView(__func__), &resolveLumScriptImportC, &files));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &diagnostics.host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &diagnostics.host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	auto sumfn = [](ls_runtime* runtime, ls_call_frame frame) -> void {
@@ -1072,7 +1072,7 @@ TEST(ExternFnSecondImportCorrectIndex) {
 	EXPECT_TRUE(module != nullptr);
 	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), makeStringView(__func__), &resolveLumScriptImportC, &files));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &diagnostics.host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &diagnostics.host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);

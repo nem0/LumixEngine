@@ -208,10 +208,15 @@ ls_result ls_module_compile(
 int ls_module_get_function_count(ls_module* module);
 int ls_module_get_global_count(ls_module* module);
 
+typedef struct ls_bytecode_compile_options {
+	bool optimize;
+} ls_bytecode_compile_options;
+
 // Compile the checked module into bytecode through the IR pipeline.
 ls_bytecode* ls_bytecode_compile(
 	ls_module* module,
-	ls_host* host
+	ls_host* host,
+	ls_bytecode_compile_options* options
 );
 void ls_bytecode_destroy(ls_bytecode* bytecode);
 

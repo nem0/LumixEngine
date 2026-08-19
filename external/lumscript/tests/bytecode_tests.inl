@@ -22,7 +22,7 @@ TEST(BytecodeCompileAndRunMain) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 	EXPECT_TRUE(bytecode->functions[0].source_map_count > 0u);
 	EXPECT_EQ(0u, bytecode->functions[0].source_map[0].code_offset);
@@ -83,7 +83,7 @@ TEST(BytecodeThreeByteStructUndefinedLocalCanBeFullyAssigned) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -245,7 +245,7 @@ TEST(BytecodeStringLiteralArgumentShouldCompile) {
 
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_bytecode_destroy(bytecode);
@@ -349,7 +349,7 @@ TEST(BytecodeAddTwoConstants) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -373,7 +373,7 @@ TEST(BytecodeFloatArithmetic) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -399,7 +399,7 @@ TEST(BytecodeConstPropagationThroughCastAndArithmetic) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -423,7 +423,7 @@ TEST(BytecodeF64Arithmetic) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -447,7 +447,7 @@ TEST(BytecodeMultiplyExpression) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -471,7 +471,7 @@ TEST(BytecodeDivideExpression) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -495,7 +495,7 @@ TEST(BytecodeModuloExpression) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -521,7 +521,7 @@ TEST(BytecodeMultiplyAssignment) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -547,7 +547,7 @@ TEST(BytecodeDivideAssignment) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -574,7 +574,7 @@ TEST(BytecodeDeferRunsOnReturn) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -609,7 +609,7 @@ TEST(BytecodeDeferLifoAcrossScopes) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -716,7 +716,7 @@ TEST(BytecodeFunctionTypedLocalCanBeCalled) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -741,7 +741,7 @@ TEST(BytecodeRunFunctionWithF64ParameterFromStack) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -775,7 +775,7 @@ TEST(BytecodeF64Comparisons) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -823,7 +823,7 @@ TEST(ADLResolvesViaFirstParameterNamespace) {
 	EXPECT_TRUE(module != nullptr);
 	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), makeStringView(__func__), &resolveLumScriptImportC, &files));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &diagnostics.host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &diagnostics.host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -896,7 +896,7 @@ TEST(BytecodeStructsBasic) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -930,7 +930,7 @@ TEST(BytecodeNestedStructs) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -964,7 +964,7 @@ TEST(BytecodeStructParameterPassing) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -999,7 +999,7 @@ TEST(BytecodeChainedFieldAccess) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1035,7 +1035,7 @@ TEST(BytecodeChainedFieldAssignment) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1066,7 +1066,7 @@ TEST(BytecodeStructFieldAssignment) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1097,7 +1097,7 @@ TEST(BytecodeStructFieldCompoundAssignment) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1129,7 +1129,7 @@ TEST(BytecodeStructFieldAssignmentGlobal) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1165,7 +1165,7 @@ TEST(BytecodeStructFieldAssignmentParameterLocalCopy) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1198,7 +1198,7 @@ TEST(BytecodeEnumBasicUsage) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1237,7 +1237,7 @@ TEST(BytecodeIntegerOverflowWraps) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1266,7 +1266,7 @@ TEST(BytecodeRunFunctionWithParameterFromStack) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1298,7 +1298,7 @@ TEST(BytecodeFunctionCallWorks) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1358,7 +1358,7 @@ TEST(BytecodeWhileBreakContinue) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1403,7 +1403,7 @@ TEST(BytecodeNamedLabelBreakContinue) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1429,7 +1429,7 @@ TEST(BytecodeLocalVariable) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1458,7 +1458,7 @@ TEST(BytecodeGlobalVariable) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1628,7 +1628,7 @@ TEST(BytecodeGlobalInitializationOrder) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1668,7 +1668,7 @@ TEST(BytecodeShortCircuitingWithGlobals) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1715,7 +1715,7 @@ TEST(BytecodeNestedShortCircuitingWithGlobals) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1749,7 +1749,7 @@ TEST(BytecodeAssignLocalVariable) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1777,7 +1777,7 @@ TEST(BytecodeCompoundAssignLocalPlusEqual) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1805,7 +1805,7 @@ TEST(BytecodeCompoundAssignLocalMinusEqual) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1851,7 +1851,7 @@ TEST(BytecodeExtendedIntegerReturnWidths) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1890,7 +1890,7 @@ TEST(BytecodeIfElse) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1926,7 +1926,7 @@ TEST(BytecodeIfElseIf) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
@@ -1976,7 +1976,7 @@ TEST(DivisionAndModuloSemanticsRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host);
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
 	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
