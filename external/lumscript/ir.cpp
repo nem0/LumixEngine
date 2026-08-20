@@ -2419,27 +2419,96 @@ struct BytecodeCompiler {
 		return ret;
 	}
 
+	static bool canForward(const LsIrOp& op) {
+		switch (op.kind) {
+			case LS_IR_OP_LOAD_CONST:
+			case LS_IR_OP_LOAD_BYTES:
+			case LS_IR_OP_FRAME_PTR:
+				return true;
+			case LS_IR_OP_LOAD: {
+				const auto& load = static_cast<const LsOpLoad&>(op);
+				return load.addr->kind == LS_IR_OP_FRAME_PTR || load.addr->kind == LS_IR_OP_PUSH_LOCAL_ADDR || load.addr->kind == LS_IR_OP_PUSH_GLOBAL_ADDR;
+			}
+			case LS_IR_OP_NEG:
+			case LS_IR_OP_NOT:
+				return canForward(*static_cast<const LsOpUnary&>(op).operand);
+			case LS_IR_OP_CAST:
+				return canForward(*static_cast<const LsOpCast&>(op).value);
+			case LS_IR_OP_BOUNDS_CHECK:
+				return canForward(*static_cast<const LsOpBoundsCheck&>(op).index);
+			case LS_IR_OP_ADD:
+			case LS_IR_OP_SUB:
+			case LS_IR_OP_MUL:
+			case LS_IR_OP_DIV:
+			case LS_IR_OP_MOD:
+			case LS_IR_OP_EQ:
+			case LS_IR_OP_NE:
+			case LS_IR_OP_LT:
+			case LS_IR_OP_LE:
+			case LS_IR_OP_GT:
+			case LS_IR_OP_GE: {
+				const auto& binary = static_cast<const LsOpBinary&>(op);
+				return canForward(*binary.lhs) && canForward(*binary.rhs);
+			}
+			default:
+				return false;
+		}
+	}
+
+	static bool canForward(const LsOpCallDirect& call) {
+		for (u32 i = 0; i < call.arg_count; ++i) {
+			if (!canForward(*call.args[i])) {
+				return false;
+			}
+		}
+		return true;
+	}
+
 	u32 emitCallDirect(const LsOpCallDirect& call) {
 		u32* args = static_cast<u32*>(host.arena.allocate(host.arena.user_data, sizeof(u32) * call.arg_count, alignof(u32)));
-		for (u32 i = 0; i < call.arg_count; ++i) args[i] = emit(*call.args[i], nullptr);
+		u32 args_base = stack_top;
+		if (do_optimize && canForward(call)) {
+			u32 total_arg_size = 0;
+			for (u32 i = 0; i < call.arg_count; ++i) {
+				FunctionParam& param = call.function->params[i];
+				if (param.is_comptime) continue;
+				
+				total_arg_size += typeByteSize(*param.resolved_type);
+			}
+			stack_top += total_arg_size;
 
-		const u32 arg_base = stack_top;
-		u32 param_index = 0;
-		for (u32 i = 0; i < call.arg_count; ++i) {
-			while (call.function->params[param_index].is_comptime) ++param_index;
-			const u32 size = typeByteSize(*call.function->params[param_index++].resolved_type);
-			emitOp(LS_OP_COPY);
-			emit(stack_top);
-			emit(args[i]);
-			emit(size);
-			stack_top += size;
+			u32 arg_sp = args_base;
+			u32 param_index = 0;
+			for (u32 i = 0; i < call.arg_count; ++i) {
+				while (call.function->params[param_index].is_comptime) ++param_index;
+				EmitDst dst = { arg_sp, typeByteSize(*call.function->params[param_index].resolved_type) };
+				arg_sp += dst.size;
+				++param_index;
+				args[i] = emit(*call.args[i], &dst);
+			}
 		}
+		else {
+			for (u32 i = 0; i < call.arg_count; ++i) args[i] = emit(*call.args[i], nullptr);
+			args_base = stack_top;
+			u32 param_index = 0;
+			for (u32 i = 0; i < call.arg_count; ++i) {
+				while (call.function->params[param_index].is_comptime) ++param_index;
+				const u32 size = typeByteSize(*call.function->params[param_index].resolved_type);
+				++param_index;
+				emitOp(LS_OP_COPY);
+				emit(stack_top);
+				emit(args[i]);
+				emit(size);
+				stack_top += size;
+			}
+		}
+
 		if (stack_top > stack_high_water) stack_high_water = stack_top;
 		emitOp(call.function->is_extern ? LS_OP_CALL_NATIVE : LS_OP_CALL_DIRECT);
 		emit(call.function->bytecode_index);
-		emit(arg_base);
-		stack_top = arg_base + call.return_size;
-		return arg_base;
+		emit(args_base);
+		stack_top = args_base + call.return_size;
+		return args_base;
 	}
 
 	u32 emitCallIndirect(const LsOpCallIndirect& call) {
