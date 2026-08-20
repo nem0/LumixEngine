@@ -1827,8 +1827,11 @@ struct BytecodeCompiler {
 			emit(typeByteSize(*slice.element_type));
 			emit((u8)toTypeKind(*slice.element_type));
 			if (cmp.kind == LS_IR_OP_NE) {
+				const u32 neq = stack_top++;
 				emitOp(LS_OP_NOT);
+				emit(neq);
 				emit(result);
+				return neq;
 			}
 			return result;
 		}
@@ -1851,14 +1854,17 @@ struct BytecodeCompiler {
 		return result;
 	}
 
-	u32 emitUnary(const LsOpUnary& op) {
+	u32 emitUnary(const LsOpUnary& op, EmitDst* dst) {
 		const u32 operand = emit(*op.operand, nullptr);
 		if (op.kind == LS_IR_OP_NEG)
 			emitOp(ls_op(LS_OP_NEG_I8 + numericKindIndex(*op.operand_type)));
 		else
 			emitOp(LS_OP_NOT);
+		const u32 result = dst ? dst->dst : stack_top;
+		emit(result);
 		emit(operand);
-		return operand;
+		if (!dst) stack_top += typeByteSize(*op.operand_type);
+		return result;
 	}
 
 	void patchI16(u32 position, u32 target) {
@@ -2583,7 +2589,7 @@ struct BytecodeCompiler {
 			case LS_IR_OP_SLICE_LOAD: result = emitSliceLoad(static_cast<LsOpSliceLoad&>(op)); break;
 			case LS_IR_OP_SLICE: result = emitSlice(static_cast<LsOpSlice&>(op)); break;
 			case LS_IR_OP_NEG:
-			case LS_IR_OP_NOT: result = emitUnary(static_cast<LsOpUnary&>(op)); break;
+			case LS_IR_OP_NOT: result = emitUnary(static_cast<LsOpUnary&>(op), dst); break;
 			case LS_IR_OP_AND:
 			case LS_IR_OP_OR: result = emitShortCircuit(static_cast<LsOpBinary&>(op)); break;
 			case LS_IR_OP_NULL: result = emitNull(static_cast<LsOpNull&>(op)); break;
@@ -2670,12 +2676,6 @@ struct BytecodeCompiler {
 			case LS_IR_OP_NOT:
 			case LS_IR_OP_NEG: {
 				auto& v = *static_cast<LsOpUnary*>(op);
-				#error 
-				// this can negate locals in place, which is not correct. 
-				// see norm2 in mandel.ls bytecode
-				// a = -b;
-				// vs 
-				// a = -foo();
 				optimize(v.operand);
 				break;
 			}

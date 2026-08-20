@@ -489,7 +489,9 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 			}
 			case LS_OP_NOT:
 			case LS_OP_NEG_I8: case LS_OP_NEG_U8: case LS_OP_NEG_I16: case LS_OP_NEG_U16: case LS_OP_NEG_I32: case LS_OP_NEG_U32: case LS_OP_NEG_I64: case LS_OP_NEG_U64: case LS_OP_NEG_F32: case LS_OP_NEG_F64: {
-				printf(" dst=%u", lumc_read_u32(fn->code, fn->code_size, &pc));
+				const u32 dst = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 src = lumc_read_u32(fn->code, fn->code_size, &pc);
+				printf(" dst=%u, src=%u", dst, src);
 				break;
 			}
 			default:

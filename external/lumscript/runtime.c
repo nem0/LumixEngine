@@ -483,12 +483,15 @@ static u64 runtime_numeric_to_u64(const u8* value, ls_type_kind kind) {
 
 #define LS_REG_NEGOP(TYPE) \
 	do { \
-		const u32 offset__ = runtime_read_u32(&ip); \
+		const u32 dst__ = runtime_read_u32(&ip); \
+		const u32 src__ = runtime_read_u32(&ip); \
 		TYPE value__ = 0; \
-		u8* ptr__ = runtime->frame + offset__; \
-		memcpy(&value__, ptr__, sizeof(TYPE)); \
-		value__ = (TYPE)(0 - value__); \
-		memcpy(ptr__, &value__, sizeof(TYPE)); \
+		TYPE result__ = 0; \
+		u8* src_ptr__ = runtime->frame + src__; \
+		u8* out__ = runtime->frame + dst__; \
+		memcpy(&value__, src_ptr__, sizeof(TYPE)); \
+		result__ = (TYPE)(0 - value__); \
+		memcpy(out__, &result__, sizeof(TYPE)); \
 	} while (0)
 
 #define LS_REG_CMP_NUMERIC(OP) \
@@ -889,9 +892,11 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 			case LS_OP_NEG_F32: LS_REG_NEGOP(f32); break;
 			case LS_OP_NEG_F64: LS_REG_NEGOP(f64); break;
 			case LS_OP_NOT: {
-				const u32 offset = runtime_read_u32(&ip);
-				u8* ptr = runtime->frame + offset;
-				*ptr = *ptr ? 0u : 1u;
+				const u32 dst = runtime_read_u32(&ip);
+				const u32 src = runtime_read_u32(&ip);
+				u8* src_ptr = runtime->frame + src;
+				u8* out = runtime->frame + dst;
+				*out = *src_ptr ? 0u : 1u;
 				break;
 			}
 			case LS_OP_ADD_I8: LS_REG_BINOP(i8, a + b); break;
