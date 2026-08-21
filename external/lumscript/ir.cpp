@@ -2585,15 +2585,6 @@ struct BytecodeCompiler {
 		return (u32)offset;
 	}
 
-	void emitIndexedOperands(const IndexedAddress& address) {
-		ASSERT(!address.index_immediate);
-		emit(address.base_slot);
-		emit(address.index_slot);
-		emit((u8)address.index_kind);
-		emit(address.length);
-		emit(address.element_size);
-	}
-
 	u32 emitCopy(const LsOpCopy& copy) {
 		if (do_optimize && copy.dst->kind == LS_IR_OP_PUSH_LOCAL_ADDR) {
 			auto& local_addr = static_cast<LsOpPushLocalAddr&>(*copy.dst);
@@ -2612,7 +2603,12 @@ struct BytecodeCompiler {
 				emit(indexed.element_size);
 			} else {
 				emitOp(LS_OP_STORE_INDEXED);
-				emitIndexedOperands(indexed);
+				ASSERT(!indexed.index_immediate);
+				emit(indexed.base_slot);
+				emit(indexed.index_slot);
+				emit((u8)indexed.index_kind);
+				emit(indexed.length);
+				emit(indexed.element_size);
 				emit(src);
 			}
 			return indexed.base_slot;
@@ -2875,7 +2871,12 @@ struct BytecodeCompiler {
 			} else {
 				emitOp(LS_OP_LOAD_INDEXED);
 				emit(ret);
-				emitIndexedOperands(indexed);
+				ASSERT(!indexed.index_immediate);
+				emit(indexed.base_slot);
+				emit(indexed.index_slot);
+				emit((u8)indexed.index_kind);
+				emit(indexed.length);
+				emit(indexed.element_size);
 			}
 			if (!dst) stack_top += op.size;
 			return ret;
