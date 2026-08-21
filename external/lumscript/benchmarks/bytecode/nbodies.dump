@@ -12,9 +12,9 @@ function 0 combinations (script, params=20, frame=76, returns=0)
   0118: COPY                 dst=44, src=52, size=4                                                                      // 			pairs[count] = BodyPair { i, j };
   0131: COPY                 dst=56, src=4, size=16                                                                      // 			pairs[count] = BodyPair { i, j };
   0144: COPY                 dst=72, src=20, size=4                                                                      // 			pairs[count] = BodyPair { i, j };
-  0157: SLICE_REF            slice=56, index=72, index_type=0, element_size=14346                                        // 			pairs[count] = BodyPair { i, j };
-  0175: UNKNOWN                                                                                                          // 			pairs[count] = BodyPair { i, j };
-  0176: MUL_16               dst=134217728, lhs=1660944384, rhs=20                                                       // 			pairs[count] = BodyPair { i, j };
+  0157: SLICE_REF            slice=56, index=72, index_type=7, element_size=8                                            // 			pairs[count] = BodyPair { i, j };
+  0171: STORE_PTR            addr=56, src=40, size=8                                                                     // 			pairs[count] = BodyPair { i, j };
+  0184: INC_I32              dst=20                                                                                      // 			count += 1;
   0189: INC_I32              dst=32                                                                                      // 		for j in i + 1..n {
   0194: JLT_I32              lhs=32, rhs=36, offset=-126, target=79                                                      // 		for j in i + 1..n {
   0205: INC_I32              dst=24                                                                                      // 	for i in 0..n - 1 {
@@ -38,14 +38,12 @@ function 1 make_system (script, params=16, frame=272, returns=0)
   0178: COPY                 dst=64, src=128, size=8                                                                     // 	bodies[0] = Body {
   0191: COPY                 dst=136, src=0, size=16                                                                     // 	bodies[0] = Body {
   0204: LOAD_CONST_8         dst=152, value= 00 00 00 00 00 00 00 00                                                     // 	bodies[0] = Body {
-  0217: SLICE_REF            slice=136, index=152, index_type=0, element_size=34826                                      // 	bodies[0] = Body {
-  0235: UNKNOWN                                                                                                          // 	bodies[0] = Body {
-  0236: STORE_INDEXED_16     base=939524096, index=67108864, length=3764122171576680520, size=1075010976, src=4102       // 	bodies[0] = Body {
-  0261: UNKNOWN                                                                                                          // 	bodies[1] = Body {
-  0262: SUB_64_IMM           dst=134217728, lhs=67108864, imm=0x500000007cdb1fc0                                         // 	bodies[1] = Body {
-  0279: JLT_F32              lhs=1883239056, rhs=88, offset=80, target=370                                               // 		4.84143144246472090, -1.16032004402742839, -0.103622044471123109,
-  0290: UNKNOWN                                                                                                          // 		4.84143144246472090, -1.16032004402742839, -0.103622044471123109,
-  0291: UNKNOWN                                                                                                          // 		4.84143144246472090, -1.16032004402742839, -0.103622044471123109,
+  0217: SLICE_REF            slice=136, index=152, index_type=9, element_size=56                                         // 	bodies[0] = Body {
+  0231: STORE_PTR            addr=136, src=16, size=56                                                                   // 	bodies[0] = Body {
+  0244: LOAD_CONST_8         dst=72, value= 2c d9 3c 34 a0 5d 13 40                                                      // 		4.84143144246472090, -1.16032004402742839, -0.103622044471123109,
+  0257: COPY                 dst=16, src=72, size=8                                                                      // 	bodies[1] = Body {
+  0270: LOAD_CONST_8         dst=80, value= 7c db 1f c0 ab 90 f2 3f                                                      // 		4.84143144246472090, -1.16032004402742839, -0.103622044471123109,
+  0283: NEG_F64              dst=88, src=80                                                                              // 		4.84143144246472090, -1.16032004402742839, -0.103622044471123109,
   0292: COPY                 dst=24, src=88, size=8                                                                      // 	bodies[1] = Body {
   0305: LOAD_CONST_8         dst=96, value= f1 eb 25 6c f9 86 ba 3f                                                      // 		4.84143144246472090, -1.16032004402742839, -0.103622044471123109,
   0318: NEG_F64              dst=104, src=96                                                                             // 		4.84143144246472090, -1.16032004402742839, -0.103622044471123109,
@@ -73,19 +71,15 @@ function 1 make_system (script, params=16, frame=272, returns=0)
   0580: COPY                 dst=64, src=240, size=8                                                                     // 	bodies[1] = Body {
   0593: COPY                 dst=248, src=0, size=16                                                                     // 	bodies[1] = Body {
   0606: LOAD_CONST_8         dst=264, value= 01 00 00 00 00 00 00 00                                                     // 	bodies[1] = Body {
-  0619: SLICE_REF            slice=248, index=264, index_type=0, element_size=63498                                      // 	bodies[1] = Body {
-  0637: UNKNOWN                                                                                                          // 	bodies[1] = Body {
-  0638: STORE_INDEXED_16     base=939524096, index=67108864, length=14065527129961922632, size=1075883981, src=4102      // 	bodies[1] = Body {
-  0663: UNKNOWN                                                                                                          // 	bodies[2] = Body {
-  0664: SUB_64_IMM           dst=134217728, lhs=67108864, imm=0x50000000b001de31                                         // 	bodies[2] = Body {
-  0681: UNKNOWN                                                                                                          // 		8.34336671824457987, 4.12479856412430479, -0.403523417114321381,
-  0682: JGE_U8               lhs=403062800, rhs=1342177280, offset=0, target=693                                         // 		8.34336671824457987, 4.12479856412430479, -0.403523417114321381,
-  0693: UNKNOWN                                                                                                          // 	bodies[2] = Body {
-  0694: GLOBAL_PTR           dst=67108864, offset=88                                                                     // 	bodies[2] = Body {
-  0703: JLT_I8               lhs=1407314758, rhs=1883232723, offset=96, target=810                                       // 		8.34336671824457987, 4.12479856412430479, -0.403523417114321381,
-  0714: UNKNOWN                                                                                                          // 		8.34336671824457987, 4.12479856412430479, -0.403523417114321381,
-  0715: UNKNOWN                                                                                                          // 		8.34336671824457987, 4.12479856412430479, -0.403523417114321381,
-  0716: DIV_U64_IMM          dst=100663296, lhs=32, imm=0x6000000008000000                                               // 		8.34336671824457987, 4.12479856412430479, -0.403523417114321381,
+  0619: SLICE_REF            slice=248, index=264, index_type=9, element_size=56                                         // 	bodies[1] = Body {
+  0633: STORE_PTR            addr=248, src=16, size=56                                                                   // 	bodies[1] = Body {
+  0646: LOAD_CONST_8         dst=72, value= 67 ca 32 c3 cd af 20 40                                                      // 		8.34336671824457987, 4.12479856412430479, -0.403523417114321381,
+  0659: COPY                 dst=16, src=72, size=8                                                                      // 	bodies[2] = Body {
+  0672: LOAD_CONST_8         dst=80, value= b0 01 de 31 cb 7f 10 40                                                      // 		8.34336671824457987, 4.12479856412430479, -0.403523417114321381,
+  0685: COPY                 dst=24, src=80, size=8                                                                      // 	bodies[2] = Body {
+  0698: LOAD_CONST_8         dst=88, value= 7b 46 eb e1 53 d3 d9 3f                                                      // 		8.34336671824457987, 4.12479856412430479, -0.403523417114321381,
+  0711: NEG_F64              dst=96, src=88                                                                              // 		8.34336671824457987, 4.12479856412430479, -0.403523417114321381,
+  0720: COPY                 dst=32, src=96, size=8                                                                      // 	bodies[2] = Body {
   0733: LOAD_CONST_8         dst=104, value= 76 1d 8e 0a b6 ab 66 3f                                                     // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
   0746: NEG_F64              dst=112, src=104                                                                            // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
   0755: GLOBAL_PTR           dst=120, offset=16                                                                          // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
@@ -109,20 +103,19 @@ function 1 make_system (script, params=16, frame=272, returns=0)
   0973: COPY                 dst=64, src=232, size=8                                                                     // 	bodies[2] = Body {
   0986: COPY                 dst=240, src=0, size=16                                                                     // 	bodies[2] = Body {
   0999: LOAD_CONST_8         dst=256, value= 02 00 00 00 00 00 00 00                                                     // 	bodies[2] = Body {
-  1012: SLICE_REF            slice=240, index=256, index_type=0, element_size=61450                                      // 	bodies[2] = Body {
-  1030: UNKNOWN                                                                                                          // 	bodies[2] = Body {
-  1031: STORE_INDEXED_16     base=939524096, index=67108864, length=14891110176005292104, size=1076480490, src=4102      // 	bodies[2] = Body {
-  1056: UNKNOWN                                                                                                          // 	bodies[3] = Body {
-  1057: SUB_64_IMM           dst=134217728, lhs=67108864, imm=0x500000007e6626d6                                         // 	bodies[3] = Body {
-  1074: UNKNOWN                                                                                                          // 		12.8943695621391310, -15.1111514016986312, -0.223307578892655734,
-  1075: MOD_U8               dst=1483751470, lhs=1342177280, rhs=100663296                                               // 		12.8943695621391310, -15.1111514016986312, -0.223307578892655734,
-  1088: SLICE_FIELD_STORE    slice=1476395008, index=134217728, index_type=0, element_size=1610874880, field_offset=2667577344, field_size=1472079229, src=1883229333 // 	bodies[3] = Body {
-  1114: NEG_U8               dst=1610612736, src=100663296                                                               // 		12.8943695621391310, -15.1111514016986312, -0.223307578892655734,
-  1123: ADD_F64              dst=1744830464, lhs=134217728, rhs=67108864                                                 // 	bodies[3] = Body {
-  1136: NEG_F64              dst=1409286144, src=943622105                                                               // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
-  1145: SUB_F32_IMM          dst=2013806440, lhs=268435456, imm=0x00000009                                               // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
-  1158: JGT_U8               lhs=2013265920, rhs=134217728, offset=0, target=1169                                        // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
-  1169: UNKNOWN                                                                                                          // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
+  1012: SLICE_REF            slice=240, index=256, index_type=9, element_size=56                                         // 	bodies[2] = Body {
+  1026: STORE_PTR            addr=240, src=16, size=56                                                                   // 	bodies[2] = Body {
+  1039: LOAD_CONST_8         dst=72, value= cf d9 a7 ce ea c9 29 40                                                      // 		12.8943695621391310, -15.1111514016986312, -0.223307578892655734,
+  1052: COPY                 dst=16, src=72, size=8                                                                      // 	bodies[3] = Body {
+  1065: LOAD_CONST_8         dst=80, value= 7e 66 26 d6 e8 38 2e 40                                                      // 		12.8943695621391310, -15.1111514016986312, -0.223307578892655734,
+  1078: NEG_F64              dst=88, src=80                                                                              // 		12.8943695621391310, -15.1111514016986312, -0.223307578892655734,
+  1087: COPY                 dst=24, src=88, size=8                                                                      // 	bodies[3] = Body {
+  1100: LOAD_CONST_8         dst=96, value= 9f 7d 25 be 57 95 cc 3f                                                      // 		12.8943695621391310, -15.1111514016986312, -0.223307578892655734,
+  1113: NEG_F64              dst=104, src=96                                                                             // 		12.8943695621391310, -15.1111514016986312, -0.223307578892655734,
+  1122: COPY                 dst=32, src=104, size=8                                                                     // 	bodies[3] = Body {
+  1135: LOAD_CONST_8         dst=112, value= 54 d9 87 3e 38 49 68 3f                                                     // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
+  1148: GLOBAL_PTR           dst=120, offset=16                                                                          // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
+  1157: LOAD_PTR             dst=128, addr=120, size=8                                                                   // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
   1170: MUL_F64              dst=136, lhs=112, rhs=128                                                                   // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
   1183: COPY                 dst=40, src=136, size=8                                                                     // 	bodies[3] = Body {
   1196: LOAD_CONST_8         dst=144, value= e0 ac c0 4a 04 7c 63 3f                                                     // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
@@ -143,35 +136,27 @@ function 1 make_system (script, params=16, frame=272, returns=0)
   1375: COPY                 dst=64, src=240, size=8                                                                     // 	bodies[3] = Body {
   1388: COPY                 dst=248, src=0, size=16                                                                     // 	bodies[3] = Body {
   1401: LOAD_CONST_8         dst=264, value= 03 00 00 00 00 00 00 00                                                     // 	bodies[3] = Body {
-  1414: SLICE_REF            slice=248, index=264, index_type=0, element_size=63498                                      // 	bodies[3] = Body {
-  1432: UNKNOWN                                                                                                          // 	bodies[3] = Body {
-  1433: STORE_INDEXED_16     base=939524096, index=67108864, length=12179236605193617480, size=1076806247, src=4102      // 	bodies[3] = Body {
-  1458: UNKNOWN                                                                                                          // 	bodies[4] = Body {
-  1459: SUB_64_IMM           dst=134217728, lhs=67108864, imm=0x5000000020a2c833                                         // 	bodies[4] = Body {
-  1476: DIV_U64_IMM          dst=1883257323, lhs=88, imm=0x5000000006180000                                              // 		15.3796971148509165, -25.9193146099879641, 0.179258772950371181,
-  1493: UNKNOWN                                                                                                          // 	bodies[4] = Body {
-  1494: DIV_U64_IMM          dst=134217728, lhs=67108864, imm=0x6000000040e5ab93                                         // 	bodies[4] = Body {
-  1511: UNKNOWN                                                                                                          // 		15.3796971148509165, -25.9193146099879641, 0.179258772950371181,
-  1512: UNKNOWN                                                                                                          // 		15.3796971148509165, -25.9193146099879641, 0.179258772950371181,
-  1513: CAST                 dst=2098751, src=6291456, invalid -> invalid                                                // 		15.3796971148509165, -25.9193146099879641, 0.179258772950371181,
-  1524: GLOBAL_PTR           dst=67108864, offset=104                                                                    // 	bodies[4] = Body {
-  1533: ADD_F32              dst=3387235139, lhs=138372597, rhs=112                                                      // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1546: STORE_INDEXED_16     base=150994944, index=120, length=34359738480, size=32812, src=26624                        // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1571: UNKNOWN                                                                                                          // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1572: JE_I8                lhs=100663296, rhs=40, offset=128, target=1711                                              // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1583: UNKNOWN                                                                                                          // 	bodies[4] = Body {
-  1584: UNKNOWN                                                                                                          // 	bodies[4] = Body {
-  1585: GLOBAL_PTR           dst=67108864, offset=136                                                                    // 	bodies[4] = Body {
-  1594: JLT_I16              lhs=1463196061, rhs=138369709, offset=144, target=1749                                      // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1605: UNKNOWN                                                                                                          // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1606: UNKNOWN                                                                                                          // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1607: STORE_INDEXED_16     base=150994944, index=152, length=34359738512, size=41004, src=34816                        // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1632: UNKNOWN                                                                                                          // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1633: JGT_U32              lhs=100663296, rhs=48, offset=160, target=1804                                              // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1644: UNKNOWN                                                                                                          // 	bodies[4] = Body {
-  1645: UNKNOWN                                                                                                          // 	bodies[4] = Body {
-  1646: GLOBAL_PTR           dst=67108864, offset=168                                                                    // 	bodies[4] = Body {
-  1655: MUL_F64_IMM          dst=118194071, lhs=1883183346, imm=0xb0000000a8000000                                       // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1414: SLICE_REF            slice=248, index=264, index_type=9, element_size=56                                         // 	bodies[3] = Body {
+  1428: STORE_PTR            addr=248, src=16, size=56                                                                   // 	bodies[3] = Body {
+  1441: LOAD_CONST_8         dst=72, value= 2a 57 05 a9 67 c2 2e 40                                                      // 		15.3796971148509165, -25.9193146099879641, 0.179258772950371181,
+  1454: COPY                 dst=16, src=72, size=8                                                                      // 	bodies[4] = Body {
+  1467: LOAD_CONST_8         dst=80, value= 20 a2 c8 33 58 eb 39 40                                                      // 		15.3796971148509165, -25.9193146099879641, 0.179258772950371181,
+  1480: NEG_F64              dst=88, src=80                                                                              // 		15.3796971148509165, -25.9193146099879641, 0.179258772950371181,
+  1489: COPY                 dst=24, src=88, size=8                                                                      // 	bodies[4] = Body {
+  1502: LOAD_CONST_8         dst=96, value= 40 e5 ab 93 f3 f1 c6 3f                                                      // 		15.3796971148509165, -25.9193146099879641, 0.179258772950371181,
+  1515: COPY                 dst=32, src=96, size=8                                                                      // 	bodies[4] = Body {
+  1528: LOAD_CONST_8         dst=104, value= 1f 43 1b e5 c9 f5 65 3f                                                     // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1541: GLOBAL_PTR           dst=112, offset=16                                                                          // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1550: LOAD_PTR             dst=120, addr=112, size=8                                                                   // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1563: MUL_F64              dst=128, lhs=104, rhs=120                                                                   // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1576: COPY                 dst=40, src=128, size=8                                                                     // 	bodies[4] = Body {
+  1589: LOAD_CONST_8         dst=136, value= 87 9d 99 36 57 ad 5a 3f                                                     // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1602: GLOBAL_PTR           dst=144, offset=16                                                                          // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1611: LOAD_PTR             dst=152, addr=144, size=8                                                                   // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1624: MUL_F64              dst=160, lhs=136, rhs=152                                                                   // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1637: COPY                 dst=48, src=160, size=8                                                                     // 	bodies[4] = Body {
+  1650: LOAD_CONST_8         dst=168, value= 50 97 7f 0b 07 f2 18 3f                                                     // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1663: NEG_F64              dst=176, src=168                                                                            // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
   1672: GLOBAL_PTR           dst=184, offset=16                                                                          // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
   1681: LOAD_PTR             dst=192, addr=184, size=8                                                                   // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
   1694: MUL_F64              dst=200, lhs=176, rhs=192                                                                   // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
@@ -183,9 +168,9 @@ function 1 make_system (script, params=16, frame=272, returns=0)
   1768: COPY                 dst=64, src=232, size=8                                                                     // 	bodies[4] = Body {
   1781: COPY                 dst=240, src=0, size=16                                                                     // 	bodies[4] = Body {
   1794: LOAD_CONST_8         dst=256, value= 04 00 00 00 00 00 00 00                                                     // 	bodies[4] = Body {
-  1807: SLICE_REF            slice=240, index=256, index_type=0, element_size=61450                                      // 	bodies[4] = Body {
-  1825: UNKNOWN                                                                                                          // 	bodies[4] = Body {
-  1826: STORE_INDEXED_16     base=939524096, index=3355443200, length=0, size=0, src=0                                   // 	bodies[4] = Body {
+  1807: SLICE_REF            slice=240, index=256, index_type=9, element_size=56                                         // 	bodies[4] = Body {
+  1821: STORE_PTR            addr=240, src=16, size=56                                                                   // 	bodies[4] = Body {
+  1834: RETURN_BASE                                                                                                      // fn make_system(bodies : []Body) : void {
 function 2 offset_momentum (script, params=16, frame=88, returns=0)
   0000: LOAD_CONST_8         dst=16, value= 00 00 00 00 00 00 00 00                                                      // 	var px = 0.0;
   0013: LOAD_CONST_8         dst=24, value= 00 00 00 00 00 00 00 00                                                      // 	var py = 0.0;

@@ -462,7 +462,6 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 				if (op == LS_OP_SLICE_REF) {
 					const u32 a = lumc_read_u32(fn->code, fn->code_size, &pc);
 					const u32 b = lumc_read_u32(fn->code, fn->code_size, &pc);
-					const u32 c = lumc_read_u32(fn->code, fn->code_size, &pc);
 					const u8 index_type = fn->code[pc++];
 					const u32 size = lumc_read_u32(fn->code, fn->code_size, &pc);
 					printf(" slice=%u, index=%u, index_type=%u, element_size=%u", a, b, index_type, size);
