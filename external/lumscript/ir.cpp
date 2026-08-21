@@ -1814,6 +1814,20 @@ struct BytecodeCompiler {
 		}
 	}
 
+	static ls_op immediateArithmeticOp(LsIrOpKind kind, const ResolvedType& type) {
+		const u32 index = numericKindIndex(type);
+		switch (kind) {
+			case LS_IR_OP_ADD: return ls_op(LS_OP_ADD_I8_IMM + index);
+			case LS_IR_OP_SUB: return ls_op(LS_OP_SUB_I8_IMM + index);
+			case LS_IR_OP_MUL: return ls_op(LS_OP_MUL_I8_IMM + index);
+			case LS_IR_OP_DIV: return ls_op(LS_OP_DIV_I8_IMM + index);
+			case LS_IR_OP_MOD:
+				ASSERT(index < 8);
+				return ls_op(LS_OP_MOD_I8_IMM + index);
+			default: ASSERT(false); return LS_OP_ADD_I8_IMM;
+		}
+	}
+
 	u32 emitCompare(const LsOpBinary& cmp) {
 		if (cmp.operand_type->kind == ResolvedTypeKind::SLICE) {
 			const u32 lhs = emit(*cmp.lhs, nullptr);
@@ -2061,6 +2075,25 @@ struct BytecodeCompiler {
 
 	u32 emitBinary(ls_op base_op, const LsOpBinary& ir_op, EmitDst* dst) {
 		u32 lhs = emit(*ir_op.lhs, nullptr);
+		const u8* immediate = nullptr;
+		if (ir_op.rhs->kind == LS_IR_OP_LOAD_CONST) immediate = static_cast<const LsOpLoadConst&>(*ir_op.rhs).value;
+		if (ir_op.rhs->kind == LS_IR_OP_LOAD_BYTES) immediate = static_cast<const LsOpLoadBytes&>(*ir_op.rhs).value;
+		if (immediate) {
+			const ResolvedType* rhs_type = nullptr;
+			if (ir_op.rhs->kind == LS_IR_OP_LOAD_CONST) rhs_type = static_cast<const LsOpLoadConst&>(*ir_op.rhs).type;
+			else rhs_type = static_cast<const LsOpLoadBytes&>(*ir_op.rhs).type;
+
+			const u32 size = typeByteSize(*ir_op.operand_type);
+			if (rhs_type && rhs_type->kind == ir_op.operand_type->kind && typeByteSize(*rhs_type) == size) {
+				emitOp(immediateArithmeticOp(ir_op.kind, *ir_op.operand_type));
+				const u32 ret = dst ? dst->dst : stack_top;
+				emit(ret);
+				emit(lhs);
+				emit(immediate, size);
+				if (!dst) stack_top += size;
+				return ret;
+			}
+		}
 		u32 rhs = emit(*ir_op.rhs, nullptr);
 		emitOp(ls_op(base_op + numericKindIndex(*ir_op.operand_type)));
 		u32 ret = dst ? dst->dst : stack_top;
@@ -2389,7 +2422,7 @@ struct BytecodeCompiler {
 	}
 
 	u32 emitLoad(const LsOpLoad& op) {
-		/*if (op.addr->kind == LS_IR_OP_PUSH_LOCAL_ADDR) {
+		if (op.addr->kind == LS_IR_OP_PUSH_LOCAL_ADDR) {
 			u32 ret = stack_top;
 			LsOpAlloca* alloca = static_cast<LsOpPushLocalAddr&>(*op.addr).alloca;
 			u32 size = typeByteSize(*alloca->type);
@@ -2399,7 +2432,7 @@ struct BytecodeCompiler {
 			emit(alloca->stack_sp);
 			emit(size);
 			return ret;
-		}*/
+		}
 		u32 addr_sp = emit(*op.addr, nullptr);
 		emitOp(LS_OP_LOAD_PTR);
 		u32 ret = stack_top;

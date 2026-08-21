@@ -151,12 +151,22 @@ static const char* lumc_opcode_name(ls_op op) {
 	static const char* const mul[] = {"MUL_I8", "MUL_U8", "MUL_I16", "MUL_U16", "MUL_I32", "MUL_U32", "MUL_I64", "MUL_U64", "MUL_F32", "MUL_F64"};
 	static const char* const div[] = {"DIV_I8", "DIV_U8", "DIV_I16", "DIV_U16", "DIV_I32", "DIV_U32", "DIV_I64", "DIV_U64", "DIV_F32", "DIV_F64"};
 	static const char* const mod[] = {"MOD_I8", "MOD_U8", "MOD_I16", "MOD_U16", "MOD_I32", "MOD_U32", "MOD_I64", "MOD_U64"};
+	static const char* const add_imm[] = {"ADD_I8_IMM", "ADD_U8_IMM", "ADD_I16_IMM", "ADD_U16_IMM", "ADD_I32_IMM", "ADD_U32_IMM", "ADD_I64_IMM", "ADD_U64_IMM", "ADD_F32_IMM", "ADD_F64_IMM"};
+	static const char* const sub_imm[] = {"SUB_I8_IMM", "SUB_U8_IMM", "SUB_I16_IMM", "SUB_U16_IMM", "SUB_I32_IMM", "SUB_U32_IMM", "SUB_I64_IMM", "SUB_U64_IMM", "SUB_F32_IMM", "SUB_F64_IMM"};
+	static const char* const mul_imm[] = {"MUL_I8_IMM", "MUL_U8_IMM", "MUL_I16_IMM", "MUL_U16_IMM", "MUL_I32_IMM", "MUL_U32_IMM", "MUL_I64_IMM", "MUL_U64_IMM", "MUL_F32_IMM", "MUL_F64_IMM"};
+	static const char* const div_imm[] = {"DIV_I8_IMM", "DIV_U8_IMM", "DIV_I16_IMM", "DIV_U16_IMM", "DIV_I32_IMM", "DIV_U32_IMM", "DIV_I64_IMM", "DIV_U64_IMM", "DIV_F32_IMM", "DIV_F64_IMM"};
+	static const char* const mod_imm[] = {"MOD_I8_IMM", "MOD_U8_IMM", "MOD_I16_IMM", "MOD_U16_IMM", "MOD_I32_IMM", "MOD_U32_IMM", "MOD_I64_IMM", "MOD_U64_IMM"};
 	if (op >= LS_OP_NEG_I8 && op <= LS_OP_NEG_F64) return unary[(u32)op - (u32)LS_OP_NEG_I8];
 	if (op >= LS_OP_ADD_I8 && op <= LS_OP_ADD_F64) return add[(u32)op - (u32)LS_OP_ADD_I8];
 	if (op >= LS_OP_SUB_I8 && op <= LS_OP_SUB_F64) return sub[(u32)op - (u32)LS_OP_SUB_I8];
 	if (op >= LS_OP_MUL_I8 && op <= LS_OP_MUL_F64) return mul[(u32)op - (u32)LS_OP_MUL_I8];
 	if (op >= LS_OP_DIV_I8 && op <= LS_OP_DIV_F64) return div[(u32)op - (u32)LS_OP_DIV_I8];
 	if (op >= LS_OP_MOD_I8 && op <= LS_OP_MOD_U64) return mod[(u32)op - (u32)LS_OP_MOD_I8];
+	if (op >= LS_OP_ADD_I8_IMM && op <= LS_OP_ADD_F64_IMM) return add_imm[(u32)op - (u32)LS_OP_ADD_I8_IMM];
+	if (op >= LS_OP_SUB_I8_IMM && op <= LS_OP_SUB_F64_IMM) return sub_imm[(u32)op - (u32)LS_OP_SUB_I8_IMM];
+	if (op >= LS_OP_MUL_I8_IMM && op <= LS_OP_MUL_F64_IMM) return mul_imm[(u32)op - (u32)LS_OP_MUL_I8_IMM];
+	if (op >= LS_OP_DIV_I8_IMM && op <= LS_OP_DIV_F64_IMM) return div_imm[(u32)op - (u32)LS_OP_DIV_I8_IMM];
+	if (op >= LS_OP_MOD_I8_IMM && op <= LS_OP_MOD_U64_IMM) return mod_imm[(u32)op - (u32)LS_OP_MOD_I8_IMM];
 	switch (op) {
 		case LS_OP_LOAD_CONST_1: return "LOAD_CONST_1";
 		case LS_OP_LOAD_CONST_2: return "LOAD_CONST_2";
@@ -223,6 +233,21 @@ static const char* lumc_opcode_name(ls_op op) {
 		case LS_OP_RETURN_BASE: return "RETURN_BASE";
 		default: return "UNKNOWN";
 	}
+}
+
+static u32 lumc_immediate_size(ls_op op) {
+	if ((op >= LS_OP_ADD_I8_IMM && op <= LS_OP_ADD_F64_IMM)
+		|| (op >= LS_OP_SUB_I8_IMM && op <= LS_OP_SUB_F64_IMM)
+		|| (op >= LS_OP_MUL_I8_IMM && op <= LS_OP_MUL_F64_IMM)
+		|| (op >= LS_OP_DIV_I8_IMM && op <= LS_OP_DIV_F64_IMM)) {
+		const u32 index = (u32)(op - LS_OP_ADD_I8_IMM) % 10u;
+		return index < 2 ? 1u : index < 4 ? 2u : index < 6 ? 4u : index < 8 ? 8u : index == 8 ? 4u : 8u;
+	}
+	if (op >= LS_OP_MOD_I8_IMM && op <= LS_OP_MOD_U64_IMM) {
+		const u32 index = (u32)(op - LS_OP_MOD_I8_IMM);
+		return index < 2 ? 1u : index < 4 ? 2u : index < 6 ? 4u : 8u;
+	}
+	return 0;
 }
 
 static u32 lumc_read_u32(const u8* code, u32 size, u32* pc) {
@@ -379,6 +404,24 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 				printf(" dst=%u, lhs=%u, rhs=%u", dst, lhs, rhs);
 				break;
 			}
+			#define LS_ARITH_IMM_DISASM_CASES(OP) \
+				case LS_OP_##OP##_I8_IMM: case LS_OP_##OP##_U8_IMM: case LS_OP_##OP##_I16_IMM: case LS_OP_##OP##_U16_IMM: \
+				case LS_OP_##OP##_I32_IMM: case LS_OP_##OP##_U32_IMM: case LS_OP_##OP##_I64_IMM: case LS_OP_##OP##_U64_IMM: \
+				case LS_OP_##OP##_F32_IMM: case LS_OP_##OP##_F64_IMM:
+			LS_ARITH_IMM_DISASM_CASES(ADD)
+			LS_ARITH_IMM_DISASM_CASES(SUB)
+			LS_ARITH_IMM_DISASM_CASES(MUL)
+			LS_ARITH_IMM_DISASM_CASES(DIV)
+			case LS_OP_MOD_I8_IMM: case LS_OP_MOD_U8_IMM: case LS_OP_MOD_I16_IMM: case LS_OP_MOD_U16_IMM:
+			case LS_OP_MOD_I32_IMM: case LS_OP_MOD_U32_IMM: case LS_OP_MOD_I64_IMM: case LS_OP_MOD_U64_IMM: {
+				const u32 dst = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 lhs = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 size = lumc_immediate_size(op);
+				printf(" dst=%u, lhs=%u, imm=0x", dst, lhs);
+				for (u32 i = 0; i < size; ++i) printf("%02x", fn->code[pc++]);
+				break;
+			}
+			#undef LS_ARITH_IMM_DISASM_CASES
 			case LS_OP_INC_I32:
 			case LS_OP_INC_I64:
 			case LS_OP_DEC_I32:

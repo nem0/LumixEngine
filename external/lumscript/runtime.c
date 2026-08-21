@@ -239,8 +239,12 @@ static ls_string_view runtime_error_message(ls_op op) {
 	static const char index_out_of_bounds[] = "index out of bounds";
 	static const char invalid_function[] = "invalid function call";
 
-	if (op >= LS_OP_DIV_I8 && op <= LS_OP_DIV_F64) return (ls_string_view){division_by_zero, division_by_zero + sizeof(division_by_zero) - 1u};
-	if (op >= LS_OP_MOD_I8 && op <= LS_OP_MOD_U64) return (ls_string_view){modulo_by_zero, modulo_by_zero + sizeof(modulo_by_zero) - 1u};
+	if ((op >= LS_OP_DIV_I8 && op <= LS_OP_DIV_F64) || (op >= LS_OP_DIV_I8_IMM && op <= LS_OP_DIV_F64_IMM)) {
+		return (ls_string_view){division_by_zero, division_by_zero + sizeof(division_by_zero) - 1u};
+	}
+	if ((op >= LS_OP_MOD_I8 && op <= LS_OP_MOD_U64) || (op >= LS_OP_MOD_I8_IMM && op <= LS_OP_MOD_U64_IMM)) {
+		return (ls_string_view){modulo_by_zero, modulo_by_zero + sizeof(modulo_by_zero) - 1u};
+	}
 	if (op >= LS_OP_BOUNDS_CHECK && op <= LS_OP_SLICE_REF) return (ls_string_view){index_out_of_bounds, index_out_of_bounds + sizeof(index_out_of_bounds) - 1u};
 	if (op == LS_OP_CALL_DIRECT || op == LS_OP_CALL_INDIRECT) return (ls_string_view){invalid_function, invalid_function + sizeof(invalid_function) - 1u};
 	return (ls_string_view){generic, generic + sizeof(generic) - 1u};
@@ -465,6 +469,21 @@ static u64 runtime_numeric_to_u64(const u8* value, ls_type_kind kind) {
 		memcpy(out__, &result__, sizeof(TYPE)); \
 	} while (0)
 
+#define LS_REG_BINOP_IMM(TYPE, EXPR) \
+	do { \
+		const u32 dst__ = runtime_read_u32(&ip); \
+		const u32 lhs_offset__ = runtime_read_u32(&ip); \
+		TYPE b = 0; \
+		memcpy(&b, ip, sizeof(TYPE)); \
+		ip += sizeof(TYPE); \
+		TYPE a = 0; \
+		u8* lhs__ = runtime->frame + lhs_offset__; \
+		u8* out__ = runtime->frame + dst__; \
+		memcpy(&a, lhs__, sizeof(TYPE)); \
+		TYPE result__ = (TYPE)(EXPR); \
+		memcpy(out__, &result__, sizeof(TYPE)); \
+	} while (0)
+
 #define LS_REG_DIVOP(TYPE, EXPR) \
 	do { \
 		const u32 dst__ = runtime_read_u32(&ip); \
@@ -476,6 +495,22 @@ static u64 runtime_numeric_to_u64(const u8* value, ls_type_kind kind) {
 		u8* out__ = runtime->frame + dst__; \
 		memcpy(&a, lhs__, sizeof(TYPE)); \
 		memcpy(&b, rhs__, sizeof(TYPE)); \
+		if (!b) goto runtime_execute_function_fail; \
+		TYPE result__ = (TYPE)(EXPR); \
+		memcpy(out__, &result__, sizeof(TYPE)); \
+	} while (0)
+
+#define LS_REG_DIVOP_IMM(TYPE, EXPR) \
+	do { \
+		const u32 dst__ = runtime_read_u32(&ip); \
+		const u32 lhs_offset__ = runtime_read_u32(&ip); \
+		TYPE b = 0; \
+		memcpy(&b, ip, sizeof(TYPE)); \
+		ip += sizeof(TYPE); \
+		TYPE a = 0; \
+		u8* lhs__ = runtime->frame + lhs_offset__; \
+		u8* out__ = runtime->frame + dst__; \
+		memcpy(&a, lhs__, sizeof(TYPE)); \
 		if (!b) goto runtime_execute_function_fail; \
 		TYPE result__ = (TYPE)(EXPR); \
 		memcpy(out__, &result__, sizeof(TYPE)); \
@@ -899,54 +934,65 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				*out = *src_ptr ? 0u : 1u;
 				break;
 			}
-			case LS_OP_ADD_I8: LS_REG_BINOP(i8, a + b); break;
-			case LS_OP_ADD_U8: LS_REG_BINOP(u8, a + b); break;
-			case LS_OP_ADD_I16: LS_REG_BINOP(i16, a + b); break;
-			case LS_OP_ADD_U16: LS_REG_BINOP(u16, a + b); break;
-			case LS_OP_ADD_I32: LS_REG_BINOP(i32, a + b); break;
-			case LS_OP_ADD_U32: LS_REG_BINOP(u32, a + b); break;
-			case LS_OP_ADD_I64: LS_REG_BINOP(i64, a + b); break;
-			case LS_OP_ADD_U64: LS_REG_BINOP(u64, a + b); break;
-			case LS_OP_SUB_I8: LS_REG_BINOP(i8, a - b); break;
-			case LS_OP_SUB_U8: LS_REG_BINOP(u8, a - b); break;
-			case LS_OP_SUB_I16: LS_REG_BINOP(i16, a - b); break;
-			case LS_OP_SUB_U16: LS_REG_BINOP(u16, a - b); break;
-			case LS_OP_SUB_I32: LS_REG_BINOP(i32, a - b); break;
-			case LS_OP_SUB_U32: LS_REG_BINOP(u32, a - b); break;
-			case LS_OP_SUB_I64: LS_REG_BINOP(i64, a - b); break;
-			case LS_OP_SUB_U64: LS_REG_BINOP(u64, a - b); break;
-			case LS_OP_MUL_I8: LS_REG_BINOP(i8, a * b); break;
-			case LS_OP_MUL_U8: LS_REG_BINOP(u8, a * b); break;
-			case LS_OP_MUL_I16: LS_REG_BINOP(i16, a * b); break;
-			case LS_OP_MUL_U16: LS_REG_BINOP(u16, a * b); break;
-			case LS_OP_MUL_I32: LS_REG_BINOP(i32, a * b); break;
-			case LS_OP_MUL_U32: LS_REG_BINOP(u32, a * b); break;
-			case LS_OP_MUL_I64: LS_REG_BINOP(i64, a * b); break;
-			case LS_OP_MUL_U64: LS_REG_BINOP(u64, a * b); break;
-			case LS_OP_DIV_I8: LS_REG_DIVOP(i8, a / b); break;
-			case LS_OP_DIV_U8: LS_REG_DIVOP(u8, a / b); break;
-			case LS_OP_DIV_I16: LS_REG_DIVOP(i16, a / b); break;
-			case LS_OP_DIV_U16: LS_REG_DIVOP(u16, a / b); break;
-			case LS_OP_DIV_I32: LS_REG_DIVOP(i32, a / b); break;
-			case LS_OP_DIV_U32: LS_REG_DIVOP(u32, a / b); break;
-			case LS_OP_DIV_I64: LS_REG_DIVOP(i64, a / b); break;
-			case LS_OP_DIV_U64: LS_REG_DIVOP(u64, a / b); break;
-			case LS_OP_ADD_F32: LS_REG_BINOP(f32, a + b); break;
-			case LS_OP_SUB_F32: LS_REG_BINOP(f32, a - b); break;
-			case LS_OP_MUL_F32: LS_REG_BINOP(f32, a * b); break;
-			case LS_OP_DIV_F32: LS_REG_DIVOP(f32, a / b); break;
-			case LS_OP_ADD_F64: LS_REG_BINOP(f64, a + b); break;
-			case LS_OP_SUB_F64: LS_REG_BINOP(f64, a - b); break;
-			case LS_OP_MUL_F64: LS_REG_BINOP(f64, a * b); break;
-			case LS_OP_DIV_F64: LS_REG_DIVOP(f64, a / b); break;
-			case LS_OP_MOD_I8: LS_REG_DIVOP(i8, a % b); break;
-			case LS_OP_MOD_U8: LS_REG_DIVOP(u8, a % b); break;
-			case LS_OP_MOD_I16: LS_REG_DIVOP(i16, a % b); break;
-			case LS_OP_MOD_U16: LS_REG_DIVOP(u16, a % b); break;
-			case LS_OP_MOD_I32: LS_REG_DIVOP(i32, a % b); break;
-			case LS_OP_MOD_U32: LS_REG_DIVOP(u32, a % b); break;
-			case LS_OP_MOD_I64: LS_REG_DIVOP(i64, a % b); break;
-			case LS_OP_MOD_U64: LS_REG_DIVOP(u64, a % b); break;
+			#define LS_ARITH_BIN_CASES(OP, EXPR) \
+				case LS_OP_##OP##_I8: LS_REG_BINOP(i8, a EXPR b); break; \
+				case LS_OP_##OP##_U8: LS_REG_BINOP(u8, a EXPR b); break; \
+				case LS_OP_##OP##_I16: LS_REG_BINOP(i16, a EXPR b); break; \
+				case LS_OP_##OP##_U16: LS_REG_BINOP(u16, a EXPR b); break; \
+				case LS_OP_##OP##_I32: LS_REG_BINOP(i32, a EXPR b); break; \
+				case LS_OP_##OP##_U32: LS_REG_BINOP(u32, a EXPR b); break; \
+				case LS_OP_##OP##_I64: LS_REG_BINOP(i64, a EXPR b); break; \
+				case LS_OP_##OP##_U64: LS_REG_BINOP(u64, a EXPR b); break; \
+				case LS_OP_##OP##_F32: LS_REG_BINOP(f32, a EXPR b); break; \
+				case LS_OP_##OP##_F64: LS_REG_BINOP(f64, a EXPR b); break; \
+				case LS_OP_##OP##_I8_IMM: LS_REG_BINOP_IMM(i8, a EXPR b); break; \
+				case LS_OP_##OP##_U8_IMM: LS_REG_BINOP_IMM(u8, a EXPR b); break; \
+				case LS_OP_##OP##_I16_IMM: LS_REG_BINOP_IMM(i16, a EXPR b); break; \
+				case LS_OP_##OP##_U16_IMM: LS_REG_BINOP_IMM(u16, a EXPR b); break; \
+				case LS_OP_##OP##_I32_IMM: LS_REG_BINOP_IMM(i32, a EXPR b); break; \
+				case LS_OP_##OP##_U32_IMM: LS_REG_BINOP_IMM(u32, a EXPR b); break; \
+				case LS_OP_##OP##_I64_IMM: LS_REG_BINOP_IMM(i64, a EXPR b); break; \
+				case LS_OP_##OP##_U64_IMM: LS_REG_BINOP_IMM(u64, a EXPR b); break; \
+				case LS_OP_##OP##_F32_IMM: LS_REG_BINOP_IMM(f32, a EXPR b); break; \
+				case LS_OP_##OP##_F64_IMM: LS_REG_BINOP_IMM(f64, a EXPR b); break;
+			#define LS_ARITH_DIV_CASES(OP, EXPR) \
+				case LS_OP_##OP##_I8: LS_REG_DIVOP(i8, a EXPR b); break; \
+				case LS_OP_##OP##_U8: LS_REG_DIVOP(u8, a EXPR b); break; \
+				case LS_OP_##OP##_I16: LS_REG_DIVOP(i16, a EXPR b); break; \
+				case LS_OP_##OP##_U16: LS_REG_DIVOP(u16, a EXPR b); break; \
+				case LS_OP_##OP##_I32: LS_REG_DIVOP(i32, a EXPR b); break; \
+				case LS_OP_##OP##_U32: LS_REG_DIVOP(u32, a EXPR b); break; \
+				case LS_OP_##OP##_I64: LS_REG_DIVOP(i64, a EXPR b); break; \
+				case LS_OP_##OP##_U64: LS_REG_DIVOP(u64, a EXPR b); break; \
+				case LS_OP_##OP##_F32: LS_REG_DIVOP(f32, a EXPR b); break; \
+				case LS_OP_##OP##_F64: LS_REG_DIVOP(f64, a EXPR b); break; \
+				case LS_OP_##OP##_I8_IMM: LS_REG_DIVOP_IMM(i8, a EXPR b); break; \
+				case LS_OP_##OP##_U8_IMM: LS_REG_DIVOP_IMM(u8, a EXPR b); break; \
+				case LS_OP_##OP##_I16_IMM: LS_REG_DIVOP_IMM(i16, a EXPR b); break; \
+				case LS_OP_##OP##_U16_IMM: LS_REG_DIVOP_IMM(u16, a EXPR b); break; \
+				case LS_OP_##OP##_I32_IMM: LS_REG_DIVOP_IMM(i32, a EXPR b); break; \
+				case LS_OP_##OP##_U32_IMM: LS_REG_DIVOP_IMM(u32, a EXPR b); break; \
+				case LS_OP_##OP##_I64_IMM: LS_REG_DIVOP_IMM(i64, a EXPR b); break; \
+				case LS_OP_##OP##_U64_IMM: LS_REG_DIVOP_IMM(u64, a EXPR b); break; \
+				case LS_OP_##OP##_F32_IMM: LS_REG_DIVOP_IMM(f32, a EXPR b); break; \
+				case LS_OP_##OP##_F64_IMM: LS_REG_DIVOP_IMM(f64, a EXPR b); break;
+			#define LS_MOD_CASES \
+				case LS_OP_MOD_I8: LS_REG_DIVOP(i8, a % b); break; case LS_OP_MOD_I8_IMM: LS_REG_DIVOP_IMM(i8, a % b); break; \
+				case LS_OP_MOD_U8: LS_REG_DIVOP(u8, a % b); break; case LS_OP_MOD_U8_IMM: LS_REG_DIVOP_IMM(u8, a % b); break; \
+				case LS_OP_MOD_I16: LS_REG_DIVOP(i16, a % b); break; case LS_OP_MOD_I16_IMM: LS_REG_DIVOP_IMM(i16, a % b); break; \
+				case LS_OP_MOD_U16: LS_REG_DIVOP(u16, a % b); break; case LS_OP_MOD_U16_IMM: LS_REG_DIVOP_IMM(u16, a % b); break; \
+				case LS_OP_MOD_I32: LS_REG_DIVOP(i32, a % b); break; case LS_OP_MOD_I32_IMM: LS_REG_DIVOP_IMM(i32, a % b); break; \
+				case LS_OP_MOD_U32: LS_REG_DIVOP(u32, a % b); break; case LS_OP_MOD_U32_IMM: LS_REG_DIVOP_IMM(u32, a % b); break; \
+				case LS_OP_MOD_I64: LS_REG_DIVOP(i64, a % b); break; case LS_OP_MOD_I64_IMM: LS_REG_DIVOP_IMM(i64, a % b); break; \
+				case LS_OP_MOD_U64: LS_REG_DIVOP(u64, a % b); break; case LS_OP_MOD_U64_IMM: LS_REG_DIVOP_IMM(u64, a % b); break;
+			LS_ARITH_BIN_CASES(ADD, +)
+			LS_ARITH_BIN_CASES(SUB, -)
+			LS_ARITH_BIN_CASES(MUL, *)
+			LS_ARITH_DIV_CASES(DIV, /)
+			LS_MOD_CASES
+			#undef LS_MOD_CASES
+			#undef LS_ARITH_DIV_CASES
+			#undef LS_ARITH_BIN_CASES
 			case LS_OP_INC_I32: {
 				const u32 dst = runtime_read_u32(&ip);
 				i32 value = 0;
