@@ -180,8 +180,6 @@ static const char* lumc_opcode_name(ls_op op) {
 		case LS_OP_STORE_PTR: return "STORE_PTR";
 		case LS_OP_LOAD_INDEXED: return "LOAD_INDEXED";
 		case LS_OP_STORE_INDEXED: return "STORE_INDEXED";
-		case LS_OP_LOAD_INDEXED_IMM: return "LOAD_INDEXED_IMM";
-		case LS_OP_STORE_INDEXED_IMM: return "STORE_INDEXED_IMM";
 		case LS_OP_BOUNDS_CHECK: return "BOUNDS_CHECK";
 		case LS_OP_SLICE: return "SLICE";
 		case LS_OP_SLICE_LOAD: return "SLICE_LOAD";
@@ -380,19 +378,18 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 				break;
 			}
 			case LS_OP_LOAD_INDEXED:
-			case LS_OP_STORE_INDEXED:
-			case LS_OP_LOAD_INDEXED_IMM:
-			case LS_OP_STORE_INDEXED_IMM: {
+			case LS_OP_STORE_INDEXED: {
 				const u32 a = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 b = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const bool immediate = op == LS_OP_LOAD_INDEXED_IMM || op == LS_OP_STORE_INDEXED_IMM;
-				const u64 index = immediate ? lumc_read_u64(fn->code, fn->code_size, &pc) : (op == LS_OP_LOAD_INDEXED ? lumc_read_u32(fn->code, fn->code_size, &pc) : b);
+				const u64 index = op == LS_OP_LOAD_INDEXED ? lumc_read_u32(fn->code, fn->code_size, &pc) : b;
 				const u8 kind = fn->code[pc++];
 				const u64 length = lumc_read_u64(fn->code, fn->code_size, &pc);
 				const u32 size = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 src = op == LS_OP_STORE_INDEXED || op == LS_OP_STORE_INDEXED_IMM ? lumc_read_u32(fn->code, fn->code_size, &pc) : 0;
-				if (op == LS_OP_LOAD_INDEXED || op == LS_OP_LOAD_INDEXED_IMM) printf(" dst=%u, base=%u, index=%llu, type=%u, length=%llu, size=%u", a, b, (unsigned long long)index, kind, (unsigned long long)length, size);
-				else printf(" base=%u, index=%u, type=%u, length=%llu, size=%u, src=%u", a, b, kind, (unsigned long long)length, size, src);
+				if (op == LS_OP_LOAD_INDEXED) printf(" dst=%u, base=%u, index=%u, type=%u, length=%llu, size=%u", a, b, (unsigned)index, kind, (unsigned long long)length, size);
+				else {
+					const u32 src = lumc_read_u32(fn->code, fn->code_size, &pc);
+					printf(" base=%u, index=%u, type=%u, length=%llu, size=%u, src=%u", a, b, kind, (unsigned long long)length, size, src);
+				}
 				break;
 			}
 			case LS_OP_BOUNDS_CHECK: {

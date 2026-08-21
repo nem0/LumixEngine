@@ -720,38 +720,32 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				memmove(value, runtime->frame + src, size);
 				break;
 			}
-			case LS_OP_LOAD_INDEXED:
-			case LS_OP_LOAD_INDEXED_IMM: {
+			case LS_OP_LOAD_INDEXED: {
 				const u32 dst = runtime_read_u32(&ip);
 				const u32 base_offset = runtime_read_u32(&ip);
-				const bool immediate = op == LS_OP_LOAD_INDEXED_IMM;
-				const u64 immediate_index = immediate ? runtime_read_u64(&ip) : 0u;
-				const u32 index_reg = immediate ? 0u : runtime_read_u32(&ip);
+				const u32 index_reg = runtime_read_u32(&ip);
 				const ls_type_kind index_kind = (ls_type_kind)*ip++;
 				const u64 length = runtime_read_u64(&ip);
 				const u32 element_size = runtime_read_u32(&ip);
-				const i64 signed_index = immediate ? runtime_immediate_to_i64(immediate_index, index_kind) : runtime_numeric_to_i64(runtime->frame + index_reg, index_kind);
+				const i64 signed_index = runtime_numeric_to_i64(runtime->frame + index_reg, index_kind);
 				const u64 index = (index_kind == LS_TYPE_I8 || index_kind == LS_TYPE_I16 || index_kind == LS_TYPE_I32 || index_kind == LS_TYPE_I64 || index_kind == LS_TYPE_ENUM)
 					? (signed_index < 0 ? length : (u64)signed_index)
-					: (immediate ? runtime_immediate_to_u64(immediate_index, index_kind) : runtime_numeric_to_u64(runtime->frame + index_reg, index_kind));
+					: runtime_numeric_to_u64(runtime->frame + index_reg, index_kind);
 				if (index >= length || (element_size != 0u && index > ((u64)-1 / element_size))) goto runtime_execute_function_fail;
 				memmove(runtime->frame + dst, runtime->frame + base_offset + index * element_size, element_size);
 				break;
 			}
-			case LS_OP_STORE_INDEXED:
-			case LS_OP_STORE_INDEXED_IMM: {
+			case LS_OP_STORE_INDEXED: {
 				const u32 base_offset = runtime_read_u32(&ip);
-				const bool immediate = op == LS_OP_STORE_INDEXED_IMM;
-				const u64 immediate_index = immediate ? runtime_read_u64(&ip) : 0u;
-				const u32 index_reg = immediate ? 0u : runtime_read_u32(&ip);
+				const u32 index_reg = runtime_read_u32(&ip);
 				const ls_type_kind index_kind = (ls_type_kind)*ip++;
 				const u64 length = runtime_read_u64(&ip);
 				const u32 element_size = runtime_read_u32(&ip);
 				const u32 src = runtime_read_u32(&ip);
-				const i64 signed_index = immediate ? runtime_immediate_to_i64(immediate_index, index_kind) : runtime_numeric_to_i64(runtime->frame + index_reg, index_kind);
+				const i64 signed_index = runtime_numeric_to_i64(runtime->frame + index_reg, index_kind);
 				const u64 index = (index_kind == LS_TYPE_I8 || index_kind == LS_TYPE_I16 || index_kind == LS_TYPE_I32 || index_kind == LS_TYPE_I64 || index_kind == LS_TYPE_ENUM)
 					? (signed_index < 0 ? length : (u64)signed_index)
-					: (immediate ? runtime_immediate_to_u64(immediate_index, index_kind) : runtime_numeric_to_u64(runtime->frame + index_reg, index_kind));
+					: runtime_numeric_to_u64(runtime->frame + index_reg, index_kind);
 				if (index >= length || (element_size != 0u && index > ((u64)-1 / element_size))) goto runtime_execute_function_fail;
 				memmove(runtime->frame + base_offset + index * element_size, runtime->frame + src, element_size);
 				break;

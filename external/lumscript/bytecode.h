@@ -62,7 +62,10 @@
 //   offsets; LOAD_PTR and STORE_PTR handle indirect value access
 // - indexed access: LOAD_INDEXED and STORE_INDEXED combine bounds checking,
 //   element scaling, address formation, and the memory access; their base
-//   operand is a frame offset, not a pointer register
+//   operand is a frame offset, not a pointer register. Their _IMM variants
+//   take a constant index that the compiler has already validated against the
+//   static array length, so they carry no index kind and no length and do no
+//   runtime bounds checking
 // - arithmetic/logical/comparison ops carry explicit destination and source
 //   register operands; comparisons also carry a type byte
 // - comparison branches carry lhs/rhs registers, a type byte, and a signed
@@ -93,8 +96,6 @@ typedef enum ls_op {
 	LS_OP_STORE_PTR,
 	LS_OP_LOAD_INDEXED,
 	LS_OP_STORE_INDEXED,
-	LS_OP_LOAD_INDEXED_IMM,
-	LS_OP_STORE_INDEXED_IMM,
 	LS_OP_BOUNDS_CHECK,
 	LS_OP_SLICE,
 	LS_OP_SLICE_LOAD,

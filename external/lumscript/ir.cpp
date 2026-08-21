@@ -2576,10 +2576,19 @@ struct BytecodeCompiler {
 		return address.index_slot;
 	}
 
+	u32 indexedImmediateOffset(const IndexedAddress& address) {
+		// The checker validates constant indices against the static array
+		// length (compiler.cpp checkBracketExpr), so base, index and element
+		// size fold into a single frame offset with no bounds checking.
+		const u64 offset = address.base_slot + address.immediate_index * address.element_size;
+		ASSERT(offset <= 0xffFFffFFu);
+		return (u32)offset;
+	}
+
 	void emitIndexedOperands(const IndexedAddress& address) {
+		ASSERT(!address.index_immediate);
 		emit(address.base_slot);
-		if (address.index_immediate) emit(address.immediate_index);
-		else emit(address.index_slot);
+		emit(address.index_slot);
 		emit((u8)address.index_kind);
 		emit(address.length);
 		emit(address.element_size);
@@ -2596,9 +2605,16 @@ struct BytecodeCompiler {
 		if (copy.dst->result_mode == LsIrOp::ADDRESS && tryGetIndexedAddress(*copy.dst, indexed)) {
 			u32 src = emit(*copy.src, nullptr);
 			emitIndexedAddress(indexed);
-			emitOp(indexed.index_immediate ? LS_OP_STORE_INDEXED_IMM : LS_OP_STORE_INDEXED);
-			emitIndexedOperands(indexed);
-			emit(src);
+			if (indexed.index_immediate) {
+				emitOp(LS_OP_COPY);
+				emit(indexedImmediateOffset(indexed));
+				emit(indexed.element_size);
+				emit(src);
+			} else {
+				emitOp(LS_OP_STORE_INDEXED);
+				emitIndexedOperands(indexed);
+				emit(src);
+			}
 			return indexed.base_slot;
 		}
 		u32 src = emit(*copy.src, nullptr);
@@ -2851,9 +2867,16 @@ struct BytecodeCompiler {
 		if (tryGetIndexedAddress(*op.addr, indexed)) {
 			const u32 ret = dst ? dst->dst : stack_top;
 			emitIndexedAddress(indexed);
-			emitOp(indexed.index_immediate ? LS_OP_LOAD_INDEXED_IMM : LS_OP_LOAD_INDEXED);
-			emit(ret);
-			emitIndexedOperands(indexed);
+			if (indexed.index_immediate) {
+				emitOp(LS_OP_COPY);
+				emit(ret);
+				emit(indexedImmediateOffset(indexed));
+				emit(indexed.element_size);
+			} else {
+				emitOp(LS_OP_LOAD_INDEXED);
+				emit(ret);
+				emitIndexedOperands(indexed);
+			}
 			if (!dst) stack_top += op.size;
 			return ret;
 		}
