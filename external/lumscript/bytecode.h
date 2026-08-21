@@ -61,7 +61,7 @@
 // - frame copies: COPY (`dst`, `src`, `byte size`)
 // - pointers: FRAME_PTR and GLOBAL_PTR materialize pointers from immediate byte
 //   offsets; LOAD_PTR and STORE_PTR handle indirect value access
-// - indexed access: LOAD_INDEXED and STORE_INDEXED combine bounds checking,
+// - indexed access: LOAD_INDEXED_{8,16,32,64} and STORE_INDEXED_{8,16,32,64} combine bounds checking,
 //   element scaling, address formation, and the memory access; their base
 //   operand is a frame offset, not a pointer register. Their _IMM variants
 //   take a constant index that the compiler has already validated against the
@@ -95,8 +95,14 @@ typedef enum ls_op {
 	LS_OP_GLOBAL_PTR,
 	LS_OP_LOAD_PTR,
 	LS_OP_STORE_PTR,
-	LS_OP_LOAD_INDEXED,
-	LS_OP_STORE_INDEXED,
+	LS_OP_LOAD_INDEXED_8,
+	LS_OP_LOAD_INDEXED_16,
+	LS_OP_LOAD_INDEXED_32,
+	LS_OP_LOAD_INDEXED_64,
+	LS_OP_STORE_INDEXED_8,
+	LS_OP_STORE_INDEXED_16,
+	LS_OP_STORE_INDEXED_32,
+	LS_OP_STORE_INDEXED_64,
 	LS_OP_BOUNDS_CHECK,
 	LS_OP_SLICE,
 	LS_OP_SLICE_LOAD,

@@ -2431,6 +2431,17 @@ struct BytecodeCompiler {
 
 			const u32 size = typeByteSize(*ir_op.operand_type);
 			if (rhs_type && rhs_type->kind == ir_op.operand_type->kind && typeByteSize(*rhs_type) == size) {
+				u64 immediate_value = 0;
+				memcpy(&immediate_value, immediate, size);
+				const bool increment = ir_op.kind == LS_IR_OP_ADD && immediate_value == 1u;
+				const bool decrement = ir_op.kind == LS_IR_OP_SUB && immediate_value == 1u;
+				if (dst && dst->dst == lhs && (increment || decrement) &&
+					((size == 4 && (ir_op.operand_type->kind == ResolvedTypeKind::I32 || ir_op.operand_type->kind == ResolvedTypeKind::U32)) ||
+					 (size == 8 && (ir_op.operand_type->kind == ResolvedTypeKind::I64 || ir_op.operand_type->kind == ResolvedTypeKind::U64 || ir_op.operand_type->kind == ResolvedTypeKind::ISIZE)))) {
+					emitOp(size == 4 ? (increment ? LS_OP_INC_I32 : LS_OP_DEC_I32) : (increment ? LS_OP_INC_I64 : LS_OP_DEC_I64));
+					emit(lhs);
+					return lhs;
+				}
 				emitOp(immediateArithmeticOp(ir_op.kind, *ir_op.operand_type));
 				const u32 ret = dst ? dst->dst : stack_top;
 				emit(ret);
@@ -2541,6 +2552,26 @@ struct BytecodeCompiler {
 		entry.kind = debugTypeKind(type);
 		entry.type_index = type_info.internType(type);
 		entry.scope_begin_offset = scope_begin_offset;
+	}
+
+	static ls_op indexedLoadOp(ls_type_kind kind) {
+		switch (kind) {
+			case LS_TYPE_I8:
+			case LS_TYPE_U8:
+			case LS_TYPE_BOOL: return LS_OP_LOAD_INDEXED_8;
+			case LS_TYPE_I16:
+			case LS_TYPE_U16: return LS_OP_LOAD_INDEXED_16;
+			case LS_TYPE_I32:
+			case LS_TYPE_U32:
+			case LS_TYPE_ENUM: return LS_OP_LOAD_INDEXED_32;
+			case LS_TYPE_I64:
+			case LS_TYPE_U64: return LS_OP_LOAD_INDEXED_64;
+			default: ASSERT(false); return LS_OP_LOAD_INDEXED_8;
+		}
+	}
+
+	static ls_op indexedStoreOp(ls_type_kind kind) {
+		return (ls_op)((u32)LS_OP_STORE_INDEXED_8 + ((u32)indexedLoadOp(kind) - (u32)LS_OP_LOAD_INDEXED_8));
 	}
 
 	struct IndexedAddress {
@@ -2702,7 +2733,7 @@ struct BytecodeCompiler {
 				emit(src);
 				emit(indexed.element_size);
 			} else {
-				emitOp(LS_OP_STORE_INDEXED);
+				emitOp(indexedStoreOp(indexed.index_kind));
 				ASSERT(!indexed.index_immediate);
 				// The runtime scales the bounds-checked index by element_size
 				// without an overflow check, so the whole array's scaled extent
@@ -2710,7 +2741,6 @@ struct BytecodeCompiler {
 				ASSERT((u64)indexed.length * indexed.element_size + indexed.base_slot <= 0xffFFffFFu);
 				emit(indexed.base_slot);
 				emit(indexed.index_slot);
-				emit((u8)indexed.index_kind);
 				emit(indexed.length);
 				emit(indexed.element_size);
 				emit(src);
@@ -3001,14 +3031,13 @@ struct BytecodeCompiler {
 				emit(indexedImmediateOffset(indexed));
 				emit(indexed.element_size);
 			} else {
-				emitOp(LS_OP_LOAD_INDEXED);
+				emitOp(indexedLoadOp(indexed.index_kind));
 				emit(ret);
 				ASSERT(!indexed.index_immediate);
 				// Same invariant as the STORE_INDEXED site in emitCopy.
 				ASSERT((u64)indexed.length * indexed.element_size + indexed.base_slot <= 0xffFFffFFu);
 				emit(indexed.base_slot);
 				emit(indexed.index_slot);
-				emit((u8)indexed.index_kind);
 				emit(indexed.length);
 				emit(indexed.element_size);
 			}

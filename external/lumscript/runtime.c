@@ -245,7 +245,7 @@ static ls_string_view runtime_error_message(ls_op op) {
 	if ((op >= LS_OP_MOD_I8 && op <= LS_OP_MOD_U64) || (op >= LS_OP_MOD_I8_IMM && op <= LS_OP_MOD_U64_IMM)) {
 		return (ls_string_view){modulo_by_zero, modulo_by_zero + sizeof(modulo_by_zero) - 1u};
 	}
-	if (op >= LS_OP_LOAD_INDEXED && op <= LS_OP_SLICE_FIELD_STORE) return (ls_string_view){index_out_of_bounds, index_out_of_bounds + sizeof(index_out_of_bounds) - 1u};
+	if (op >= LS_OP_LOAD_INDEXED_8 && op <= LS_OP_SLICE_FIELD_STORE) return (ls_string_view){index_out_of_bounds, index_out_of_bounds + sizeof(index_out_of_bounds) - 1u};
 	if (op == LS_OP_CALL_DIRECT || op == LS_OP_CALL_INDIRECT) return (ls_string_view){invalid_function, invalid_function + sizeof(invalid_function) - 1u};
 	return (ls_string_view){generic, generic + sizeof(generic) - 1u};
 }
@@ -579,6 +579,32 @@ static u64 runtime_immediate_to_u64(u64 value, ls_type_kind kind) {
 		if (!(lhs__ OP rhs__)) ip += jump_offset__; \
 	} while (0)
 
+#define LS_INDEXED_OP(OP, TYPE)                                                                               \
+	case LS_OP_LOAD_INDEXED_##OP: {                                                                           \
+		const u32 dst = runtime_read_u32(&ip);                                                                \
+		const u32 base_offset = runtime_read_u32(&ip);                                                        \
+		const u32 index_reg = runtime_read_u32(&ip);                                                          \
+		const u64 length = runtime_read_u64(&ip);                                                             \
+		const u32 element_size = runtime_read_u32(&ip);                                                       \
+		TYPE index = 0;                                                                                       \
+		memcpy(&index, runtime->frame + index_reg, sizeof(index));                                            \
+		if (index >= length) goto runtime_execute_function_fail;                                              \
+		memcpy(runtime->frame + dst, runtime->frame + base_offset + (u64)index * element_size, element_size); \
+		break;                                                                                                \
+	}                                                                                                         \
+	case LS_OP_STORE_INDEXED_##OP: {                                                                          \
+		const u32 base_offset = runtime_read_u32(&ip);                                                        \
+		const u32 index_reg = runtime_read_u32(&ip);                                                          \
+		const u64 length = runtime_read_u64(&ip);                                                             \
+		const u32 element_size = runtime_read_u32(&ip);                                                       \
+		const u32 src = runtime_read_u32(&ip);                                                                \
+		TYPE index = 0;                                                                                       \
+		memcpy(&index, runtime->frame + index_reg, sizeof(index));                                            \
+		if (index >= length) goto runtime_execute_function_fail;                                              \
+		memcpy(runtime->frame + base_offset + (u64)index * element_size, runtime->frame + src, element_size); \
+		break;                                                                                                \
+	}
+
 // Runs either a fresh call to `function` or a previously suspended
 // frame. The runtime stack is already parked at the correct state when
 // `resume_frame` is non-NULL, so fresh-call setup is skipped in that case.
@@ -762,33 +788,10 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				memmove((u8*)base_ptr + element_offset + field_offset, runtime->frame + src, field_size);
 				break;
 			}
-			case LS_OP_LOAD_INDEXED: {
-				const u32 dst = runtime_read_u32(&ip);
-				const u32 base_offset = runtime_read_u32(&ip);
-				const u32 index_reg = runtime_read_u32(&ip);
-				const ls_type_kind index_kind = (ls_type_kind)*ip++;
-				const u64 length = runtime_read_u64(&ip);
-				const u32 element_size = runtime_read_u32(&ip);
-				// A negative signed index sign-extends through i64 into a value
-				// far above any emitter-legal length, so this one comparison
-				// rejects it exactly like an explicit negative check.
-				const u64 index = runtime_numeric_to_u64(runtime->frame + index_reg, index_kind);
-				if (index >= length) goto runtime_execute_function_fail;
-				memcpy(runtime->frame + dst, runtime->frame + base_offset + index * element_size, element_size);
-				break;
-			}
-			case LS_OP_STORE_INDEXED: {
-				const u32 base_offset = runtime_read_u32(&ip);
-				const u32 index_reg = runtime_read_u32(&ip);
-				const ls_type_kind index_kind = (ls_type_kind)*ip++;
-				const u64 length = runtime_read_u64(&ip);
-				const u32 element_size = runtime_read_u32(&ip);
-				const u32 src = runtime_read_u32(&ip);
-				const u64 index = runtime_numeric_to_u64(runtime->frame + index_reg, index_kind);
-				if (index >= length) goto runtime_execute_function_fail;
-				memcpy(runtime->frame + base_offset + index * element_size, runtime->frame + src, element_size);
-				break;
-			}
+			LS_INDEXED_OP(8, u8)
+			LS_INDEXED_OP(16, u16)
+			LS_INDEXED_OP(32, u32)
+			LS_INDEXED_OP(64, u64)
 			case LS_OP_BOUNDS_CHECK: {
 				const u32 index_reg = runtime_read_u32(&ip);
 				const ls_type_kind index_kind = (ls_type_kind)*ip++;
