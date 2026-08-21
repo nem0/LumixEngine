@@ -1078,6 +1078,13 @@ struct IRBuilder {
 		switch (node->kind) {
 			case LS_IR_OP_LOAD_CONST: {
 				auto& c = *static_cast<LsOpLoadConst*>(node);
+				bool is_zero = true;
+				for (u32 i = 0, num = typeByteSize(*c.type); i < num; ++i)
+					if (c.value[i] != 0) is_zero = false;
+				// Zero has dedicated conditional branches. Keep it as a literal
+				// so emission can use those branches without a frame temporary.
+				if (is_zero) break;
+
 				auto& alloca = allocAlloca(c.type, {}, &c);
 				parent.ops.push(&alloca);
 				auto& ref = alloc<LsOpFramePtr>();
@@ -2123,6 +2130,25 @@ struct BytecodeCompiler {
 		memcpy(code.data + position, &offset, sizeof(offset));
 	}
 
+	// Return a zero-test branch for a comparison whose right-hand side is
+	// known to be zero. The branch condition is the comparison result itself,
+	// rather than the inverted condition used by fusedCompareJumpOp.
+	bool zeroCompareJumpOp(LsIrOpKind condition_kind, const ResolvedType& operand_type, ls_op& out_op) {
+		const bool is_i32 = operand_type.kind == ResolvedTypeKind::I32;
+		const bool is_i64 = operand_type.kind == ResolvedTypeKind::I64 || operand_type.kind == ResolvedTypeKind::ISIZE;
+		if (!is_i32 && !is_i64) return false;
+		switch (condition_kind) {
+			case LS_IR_OP_EQ: out_op = is_i32 ? LS_OP_JZ_I32 : LS_OP_JZ_I64; break;
+			case LS_IR_OP_NE: out_op = is_i32 ? LS_OP_JNZ_I32 : LS_OP_JNZ_I64; break;
+			case LS_IR_OP_GT: out_op = is_i32 ? LS_OP_JGZ_I32 : LS_OP_JGZ_I64; break;
+			case LS_IR_OP_GE: out_op = is_i32 ? LS_OP_JGEZ_I32 : LS_OP_JGEZ_I64; break;
+			case LS_IR_OP_LT: out_op = is_i32 ? LS_OP_JLTZ_I32 : LS_OP_JLTZ_I64; break;
+			case LS_IR_OP_LE: out_op = is_i32 ? LS_OP_JLEZ_I32 : LS_OP_JLEZ_I64; break;
+			default: return false;
+		}
+		return true;
+	}
+
 	// Fuse a numeric compare and the branch that follows it into a single
 	// compare-and-branch opcode (e.g. `n <= 1` + `JZ_U8` -> `JGT_I32`, which
 	// jumps past the body when `n > 1`). Returns false when the condition is
@@ -2171,9 +2197,8 @@ struct BytecodeCompiler {
 			constant = static_cast<const LsOpLoadConst*>(condition);
 		} else if (condition->kind == LS_IR_OP_FRAME_PTR) {
 			auto& ref = static_cast<const LsOpFramePtr&>(*condition);
-			if (ref.alloca->value->kind == LS_IR_OP_LOAD_CONST) {
+			if (ref.alloca->value->kind == LS_IR_OP_LOAD_CONST)
 				constant = static_cast<const LsOpLoadConst*>(ref.alloca->value);
-			}
 		}
 		bool is_constant = constant != nullptr;
 		bool constant_value = false;
@@ -2203,7 +2228,21 @@ struct BytecodeCompiler {
 				compare = static_cast<const LsOpBinary*>(condition);
 			}
 			ls_op fused_opcode;
-			if (compare && fusedCompareJumpOp(compare->kind, *compare->operand_type, true, fused_opcode)) {
+			const LsOpLoadConst* rhs_constant = compare && compare->rhs->kind == LS_IR_OP_LOAD_CONST
+				? static_cast<const LsOpLoadConst*>(compare->rhs) : nullptr;
+			bool rhs_is_zero = rhs_constant != nullptr;
+			if (rhs_is_zero) {
+				for (u32 i = 0; i < typeByteSize(*rhs_constant->type); ++i)
+					if (rhs_constant->value[i] != 0) rhs_is_zero = false;
+			}
+			if (compare && rhs_is_zero && zeroCompareJumpOp(compare->kind, *compare->operand_type, fused_opcode)) {
+				const u32 lhs_slot = emit(*compare->lhs, nullptr);
+				emitOp(fused_opcode);
+				emit(lhs_slot);
+				const u32 patch_pos = code.size();
+				emit((i16)0);
+				patchI16(patch_pos, conditional.body_start->bytecode_offset);
+			} else if (compare && fusedCompareJumpOp(compare->kind, *compare->operand_type, true, fused_opcode)) {
 				const u32 lhs_slot = emit(*compare->lhs, nullptr);
 				const u32 rhs_slot = emit(*compare->rhs, nullptr);
 				emitOp(fused_opcode);
@@ -2239,7 +2278,21 @@ struct BytecodeCompiler {
 		} else if (condition->kind >= LS_IR_OP_EQ && condition->kind <= LS_IR_OP_GE) {
 			const LsOpBinary& compare = static_cast<const LsOpBinary&>(*condition);
 			ls_op fused_opcode;
-			if (fusedCompareJumpOp(compare.kind, *compare.operand_type, false, fused_opcode)) {
+			const LsOpLoadConst* rhs_constant = compare.rhs->kind == LS_IR_OP_LOAD_CONST
+				? static_cast<const LsOpLoadConst*>(compare.rhs) : nullptr;
+			bool rhs_is_zero = rhs_constant != nullptr;
+			if (rhs_is_zero) {
+				for (u32 i = 0; i < typeByteSize(*rhs_constant->type); ++i)
+					if (rhs_constant->value[i] != 0) rhs_is_zero = false;
+			}
+			if (rhs_is_zero && zeroCompareJumpOp(invertCompare(compare.kind), *compare.operand_type, fused_opcode)) {
+				const u32 lhs_slot = emit(*compare.lhs, nullptr);
+				emitOp(fused_opcode);
+				emit(lhs_slot);
+				false_jump = code.size();
+				emit((i16)0);
+				have_jump = true;
+			} else if (fusedCompareJumpOp(compare.kind, *compare.operand_type, false, fused_opcode)) {
 				const u32 lhs_slot = emit(*compare.lhs, nullptr);
 				const u32 rhs_slot = emit(*compare.rhs, nullptr);
 				emitOp(fused_opcode);
@@ -2604,6 +2657,10 @@ struct BytecodeCompiler {
 			} else {
 				emitOp(LS_OP_STORE_INDEXED);
 				ASSERT(!indexed.index_immediate);
+				// The runtime scales the bounds-checked index by element_size
+				// without an overflow check, so the whole array's scaled extent
+				// must stay within the u32 frame-offset space.
+				ASSERT((u64)indexed.length * indexed.element_size + indexed.base_slot <= 0xffFFffFFu);
 				emit(indexed.base_slot);
 				emit(indexed.index_slot);
 				emit((u8)indexed.index_kind);
@@ -2872,6 +2929,8 @@ struct BytecodeCompiler {
 				emitOp(LS_OP_LOAD_INDEXED);
 				emit(ret);
 				ASSERT(!indexed.index_immediate);
+				// Same invariant as the STORE_INDEXED site in emitCopy.
+				ASSERT((u64)indexed.length * indexed.element_size + indexed.base_slot <= 0xffFFffFFu);
 				emit(indexed.base_slot);
 				emit(indexed.index_slot);
 				emit((u8)indexed.index_kind);

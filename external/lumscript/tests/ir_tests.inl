@@ -125,6 +125,65 @@ TEST(ir_to_bytecode_array_bounds_check) {
 	return true;
 }
 
+// Exercises every index width through LOAD_INDEXED/STORE_INDEXED: unsigned
+// kinds on the success path (previously only ever seen failing), and narrow
+// signed kinds wrapping through i64 to u64 when rejected.
+TEST(ir_to_bytecode_array_index_kinds) {
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(R"(
+		fn load_u8() : i32 { var values : [3]i32 = [ 4, 5, 6 ]; var index : u8 = 2; return values[index]; }
+		fn load_u16() : i32 { var values : [3]i32 = [ 4, 5, 6 ]; var index : u16 = 1; return values[index]; }
+		fn load_u32() : i32 { var values : [3]i32 = [ 4, 5, 6 ]; var index : u32 = 2; return values[index]; }
+		fn store_u8() : i32 { var values : [3]i32 = undefined; var index : u8 = 2; values[index] = 7; return values[index]; }
+		fn negative_i8() : i32 { var values : [3]i32 = undefined; var index : i8 = -1; return values[index]; }
+		fn negative_i16() : i32 { var values : [3]i32 = undefined; var index : i16 = -1; return values[index]; }
+		fn negative_i32() : i32 { var values : [3]i32 = undefined; var index : i32 = -1; return values[index]; }
+		fn past_end_u8() : i32 { var values : [3]i32 = undefined; var index : u8 = 3; return values[index]; }
+	)"), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_EQ(ls_call(runtime, toLs("load_u8")), LS_RESULT_OK);
+	EXPECT_EQ(ls_to_i32(runtime, -1), 6);
+	EXPECT_EQ(ls_call(runtime, toLs("load_u16")), LS_RESULT_OK);
+	EXPECT_EQ(ls_to_i32(runtime, -1), 5);
+	EXPECT_EQ(ls_call(runtime, toLs("load_u32")), LS_RESULT_OK);
+	EXPECT_EQ(ls_to_i32(runtime, -1), 6);
+	EXPECT_EQ(ls_call(runtime, toLs("store_u8")), LS_RESULT_OK);
+	EXPECT_EQ(ls_to_i32(runtime, -1), 7);
+
+	test_diagnostics.output_enabled = false;
+	ls_debug_event event;
+	EXPECT_EQ(ls_call(runtime, toLs("negative_i8")), LS_RESULT_SUSPENDED);
+	EXPECT_TRUE(ls_debug_is_suspended(runtime));
+	EXPECT_TRUE(ls_debug_pause_event(runtime, &event));
+	EXPECT_EQ((int)LS_DEBUG_PAUSE_ERROR, (int)event.reason);
+	EXPECT_EQ((int)LS_RESULT_FAILURE, (int)ls_debug_resume(runtime, LS_DEBUG_ABORT));
+	EXPECT_TRUE(!ls_debug_is_suspended(runtime));
+
+	EXPECT_EQ(ls_call(runtime, toLs("negative_i16")), LS_RESULT_SUSPENDED);
+	EXPECT_TRUE(ls_debug_is_suspended(runtime));
+	EXPECT_TRUE(ls_debug_pause_event(runtime, &event));
+	EXPECT_EQ((int)LS_DEBUG_PAUSE_ERROR, (int)event.reason);
+	EXPECT_EQ((int)LS_RESULT_FAILURE, (int)ls_debug_resume(runtime, LS_DEBUG_ABORT));
+	EXPECT_TRUE(!ls_debug_is_suspended(runtime));
+
+	EXPECT_EQ(ls_call(runtime, toLs("negative_i32")), LS_RESULT_SUSPENDED);
+	EXPECT_TRUE(ls_debug_is_suspended(runtime));
+	EXPECT_TRUE(ls_debug_pause_event(runtime, &event));
+	EXPECT_EQ((int)LS_DEBUG_PAUSE_ERROR, (int)event.reason);
+	EXPECT_EQ((int)LS_RESULT_FAILURE, (int)ls_debug_resume(runtime, LS_DEBUG_ABORT));
+	EXPECT_TRUE(!ls_debug_is_suspended(runtime));
+
+	EXPECT_EQ(ls_call(runtime, toLs("past_end_u8")), LS_RESULT_SUSPENDED);
+	EXPECT_TRUE(ls_debug_is_suspended(runtime));
+	EXPECT_TRUE(ls_debug_pause_event(runtime, &event));
+	EXPECT_EQ((int)LS_DEBUG_PAUSE_ERROR, (int)event.reason);
+	EXPECT_EQ((int)LS_RESULT_FAILURE, (int)ls_debug_resume(runtime, LS_DEBUG_ABORT));
+	EXPECT_TRUE(!ls_debug_is_suspended(runtime));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(ir_to_bytecode_undefined_array_and_greater_than) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ls_module_compile(module, toLs("fn main() : i32 { var values : [3]i32 = undefined; for i in 0..3 { values[i] = i; } if values[2] > 1 { return values[2]; } return 0; }"), makeStringView(__func__), nullptr, nullptr));

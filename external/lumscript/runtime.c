@@ -727,12 +727,12 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const ls_type_kind index_kind = (ls_type_kind)*ip++;
 				const u64 length = runtime_read_u64(&ip);
 				const u32 element_size = runtime_read_u32(&ip);
-				const i64 signed_index = runtime_numeric_to_i64(runtime->frame + index_reg, index_kind);
-				const u64 index = (index_kind == LS_TYPE_I8 || index_kind == LS_TYPE_I16 || index_kind == LS_TYPE_I32 || index_kind == LS_TYPE_I64 || index_kind == LS_TYPE_ENUM)
-					? (signed_index < 0 ? length : (u64)signed_index)
-					: runtime_numeric_to_u64(runtime->frame + index_reg, index_kind);
-				if (index >= length || (element_size != 0u && index > ((u64)-1 / element_size))) goto runtime_execute_function_fail;
-				memmove(runtime->frame + dst, runtime->frame + base_offset + index * element_size, element_size);
+				// A negative signed index sign-extends through i64 into a value
+				// far above any emitter-legal length, so this one comparison
+				// rejects it exactly like an explicit negative check.
+				const u64 index = runtime_numeric_to_u64(runtime->frame + index_reg, index_kind);
+				if (index >= length) goto runtime_execute_function_fail;
+				memcpy(runtime->frame + dst, runtime->frame + base_offset + index * element_size, element_size);
 				break;
 			}
 			case LS_OP_STORE_INDEXED: {
@@ -742,24 +742,18 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u64 length = runtime_read_u64(&ip);
 				const u32 element_size = runtime_read_u32(&ip);
 				const u32 src = runtime_read_u32(&ip);
-				const i64 signed_index = runtime_numeric_to_i64(runtime->frame + index_reg, index_kind);
-				const u64 index = (index_kind == LS_TYPE_I8 || index_kind == LS_TYPE_I16 || index_kind == LS_TYPE_I32 || index_kind == LS_TYPE_I64 || index_kind == LS_TYPE_ENUM)
-					? (signed_index < 0 ? length : (u64)signed_index)
-					: runtime_numeric_to_u64(runtime->frame + index_reg, index_kind);
-				if (index >= length || (element_size != 0u && index > ((u64)-1 / element_size))) goto runtime_execute_function_fail;
-				memmove(runtime->frame + base_offset + index * element_size, runtime->frame + src, element_size);
+				const u64 index = runtime_numeric_to_u64(runtime->frame + index_reg, index_kind);
+				if (index >= length) goto runtime_execute_function_fail;
+				memcpy(runtime->frame + base_offset + index * element_size, runtime->frame + src, element_size);
 				break;
 			}
 			case LS_OP_BOUNDS_CHECK: {
 				const u32 index_reg = runtime_read_u32(&ip);
 				const ls_type_kind index_kind = (ls_type_kind)*ip++;
 				const u64 length = runtime_read_u64(&ip);
+				// Same negative-index wraparound as LOAD_INDEXED.
 				u8* index_ptr = runtime->frame + index_reg;
-				if (index_kind == LS_TYPE_I8 || index_kind == LS_TYPE_I16 || index_kind == LS_TYPE_I32 || index_kind == LS_TYPE_I64 || index_kind == LS_TYPE_ENUM) {
-					const i64 index = runtime_numeric_to_i64(index_ptr, index_kind);
-					if (index < 0 || (u64)index >= length) goto runtime_execute_function_fail;
-				}
-				else if (runtime_numeric_to_u64(index_ptr, index_kind) >= length) goto runtime_execute_function_fail;
+				if (runtime_numeric_to_u64(index_ptr, index_kind) >= length) goto runtime_execute_function_fail;
 				break;
 			}
 			case LS_OP_STRING_SLICE:
