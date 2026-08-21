@@ -66,6 +66,18 @@ u64 payloadOffset(const ResolvedType* storage, const ResolvedType* requested) {
 	return 0;
 }
 
+LsIrOpKind invertCompare(LsIrOpKind kind) {
+	switch (kind) {
+		case LS_IR_OP_EQ: return LS_IR_OP_NE;
+		case LS_IR_OP_NE: return LS_IR_OP_EQ;
+		case LS_IR_OP_LT: return LS_IR_OP_GE;
+		case LS_IR_OP_LE: return LS_IR_OP_GT;
+		case LS_IR_OP_GT: return LS_IR_OP_LE;
+		case LS_IR_OP_GE: return LS_IR_OP_LT;
+		default: return LS_IR_OP_INVALID;
+	}
+}
+
 // Source locations for LsIrSourceLoc. IR ops store a u32 index into the
 // module's SourceLocTable (token.h); the BytecodeCompiler records it as-is and
 // ls_bytecode_compile copies the table verbatim into the bytecode.
@@ -278,6 +290,116 @@ struct IRBuilder {
 		tmp[len] = 0;
 		strings.push({tmp, tmp + len});
 		return strings.size() - 1;
+	}
+
+	bool hasInliningBlocker(const Expression& expression, u32 depth = 0) {
+		if (depth > 8) return true;
+		switch (expression.kind) {
+			case Expression::ADDRESSOF:
+				return true;
+			case Expression::CALL: {
+				const auto& call = static_cast<const CallExpression&>(expression);
+				FunctionExpression* function = call.resolved_fn;
+				if (!function && call.callee->kind == Expression::IDENTIFIER) {
+					const auto& callee = static_cast<const IdentifierExpression&>(*call.callee);
+					function = callee.resolved_fn;
+					if (!function && callee.symbol && callee.symbol->expression && callee.symbol->expression->kind == Expression::FUNCTION) {
+						function = static_cast<FunctionExpression*>(callee.symbol->expression);
+					}
+				}
+				if (!function && call.callee->kind == Expression::MEMBER) {
+					function = static_cast<const MemberExpression&>(*call.callee).resolved_fn;
+				}
+				if (!function) return true;
+				if (!function->is_extern) {
+					if (!function->body || function->body->kind != Statement::BLOCK) return true;
+					const auto& body = static_cast<const BlockStatement&>(*function->body);
+					if (body.statements.size() != 1 || body.statements[0]->kind != Statement::RETURN) return true;
+					const auto& ret = static_cast<const ReturnStatement&>(*body.statements[0]);
+					if (!ret.expression || hasInliningBlocker(*ret.expression, depth + 1)) return true;
+				}
+				for (Expression* arg : call.args) if (hasInliningBlocker(*arg, depth + 1)) return true;
+				return false;
+			}
+			case Expression::UNARY: {
+				const auto& unary = static_cast<const UnaryExpression&>(expression);
+				return (unary.operator_fn && !unary.operator_fn->is_extern) || hasInliningBlocker(*unary.expression, depth + 1);
+			}
+			case Expression::BINARY: {
+				const auto& binary = static_cast<const BinaryExpression&>(expression);
+				return (binary.operator_fn && !binary.operator_fn->is_extern) || hasInliningBlocker(*binary.lhs, depth + 1) || hasInliningBlocker(*binary.rhs, depth + 1);
+			}
+			case Expression::CAST:
+				return hasInliningBlocker(*static_cast<const CastExpression&>(expression).expression, depth + 1);
+			case Expression::MEMBER:
+				return hasInliningBlocker(*static_cast<const MemberExpression&>(expression).expression, depth + 1);
+			case Expression::BRACKET: {
+				const auto& bracket = static_cast<const BracketExpression&>(expression);
+				if (hasInliningBlocker(*bracket.base, depth + 1)) return true;
+				for (Expression* arg : bracket.args) if (hasInliningBlocker(*arg, depth + 1)) return true;
+				return false;
+			}
+			case Expression::SLICE: {
+				const auto& slice = static_cast<const SliceExpression&>(expression);
+				return hasInliningBlocker(*slice.base, depth + 1) ||
+					(slice.begin && hasInliningBlocker(*slice.begin, depth + 1)) ||
+					(slice.end && hasInliningBlocker(*slice.end, depth + 1));
+			}
+			case Expression::STRUCT_LITERAL: {
+				const auto& literal = static_cast<const StructLiteralExpression&>(expression);
+				for (Expression* value : literal.values) if (hasInliningBlocker(*value, depth + 1)) return true;
+				return false;
+			}
+			case Expression::ARRAY_LITERAL: {
+				const auto& literal = static_cast<const ArrayLiteralExpression&>(expression);
+				for (Expression* value : literal.values) if (hasInliningBlocker(*value, depth + 1)) return true;
+				return false;
+			}
+			case Expression::TERNARY: {
+				const auto& ternary = static_cast<const TernaryExpression&>(expression);
+				return hasInliningBlocker(*ternary.condition, depth + 1) ||
+					hasInliningBlocker(*ternary.true_expr, depth + 1) || hasInliningBlocker(*ternary.false_expr, depth + 1);
+			}
+			case Expression::DEREFERENCE:
+				return hasInliningBlocker(*static_cast<const DereferenceExpression&>(expression).subject, depth + 1);
+			default:
+				return false;
+		}
+	}
+
+	LsIrOp* buildInlineCall(FunctionExpression& function, CallExpression& call) {
+		if (function.is_extern || function.is_template) return nullptr;
+		const auto& body = static_cast<const BlockStatement&>(*function.body);
+		if (body.statements.size() != 1 || body.statements[0]->kind != Statement::RETURN) return nullptr;
+		const auto& ret = static_cast<const ReturnStatement&>(*body.statements[0]);
+		if (!ret.expression || hasInliningBlocker(*ret.expression)) return nullptr;
+
+		u32 runtime_param_count = 0;
+		for (const FunctionParam& param : function.params) {
+			if (!param.is_comptime) ++runtime_param_count;
+		}
+		if (runtime_param_count != call.args.size()) return nullptr;
+		for (Expression* arg : call.args) {
+			if (hasInliningBlocker(*arg)) return nullptr;
+		}
+
+		LsIrOp** args = static_cast<LsIrOp**>(host.arena.allocate(
+			host.arena.user_data, sizeof(LsIrOp*) * call.args.size(), alignof(LsIrOp*)));
+		for (u32 i = 0, param_index = 0; i < call.args.size(); ++i) {
+			while (function.params[param_index].is_comptime) ++param_index;
+			args[i] = &buildImplicitConversionIR(*call.args[i], *function.params[param_index].resolved_type);
+			++param_index;
+		}
+
+		const i32 local_watermark = locals.size();
+		u32 arg_index = 0;
+		for (const FunctionParam& param : function.params) {
+			if (param.is_comptime) continue;
+			locals.push({param.name, nullptr, args[arg_index++]});
+		}
+		LsIrOp& result = buildImplicitConversionIR(*ret.expression, *static_cast<FunctionResolvedType*>(function.resolved_type)->return_type);
+		locals.resize(local_watermark);
+		return &result;
 	}
 
 	LsIrOp& buildExpressionIR(Expression& expr, bool as_rvalue) {
@@ -582,6 +704,7 @@ struct IRBuilder {
 
 				for (i32 i = locals.size() - 1; i >= 0; --i) {
 					if (!equalStrings(locals[i].name, ie.name)) continue;
+					if (as_rvalue && locals[i].inline_value) return *locals[i].inline_value;
 
 					auto& addr = alloc<LsOpPushLocalAddr>();
 					addr.alloca = locals[i].alloca;
@@ -609,6 +732,9 @@ struct IRBuilder {
 					function = static_cast<MemberExpression&>(*call.callee).resolved_fn;
 				}
 				if (function && function->bytecode_index != ~0u) {
+					if (do_inline && call.callee->kind != Expression::MEMBER) {
+						if (LsIrOp* inlined = buildInlineCall(*function, call)) return *inlined;
+					}
 					MemberExpression* member_callee = call.callee->kind == Expression::MEMBER ? static_cast<MemberExpression*>(call.callee) : nullptr;
 					ResolvedType* receiver_type = member_callee && member_callee->expression ? member_callee->expression->resolved_type : nullptr;
 					const bool is_ufcs = receiver_type && (receiver_type->kind == ResolvedTypeKind::STRUCT || receiver_type->kind == ResolvedTypeKind::ENUM || receiver_type->kind == ResolvedTypeKind::POINTER);
@@ -852,6 +978,14 @@ struct IRBuilder {
 					return op;
 				}
 				if (unary.op == Token::NOT) {
+					if (operand.kind >= LS_IR_OP_EQ && operand.kind <= LS_IR_OP_GE) {
+						auto& cmp = static_cast<LsOpBinary&>(operand);
+						auto& op = alloc<LsOpBinary>(invertCompare(operand.kind));
+						op.operand_type = cmp.operand_type;
+						op.lhs = cmp.lhs;
+						op.rhs = cmp.rhs;
+						return op;
+					}
 					auto& op = alloc<LsOpNot>();
 					op.operand_type = unary.resolved_type;
 					op.operand = &operand;
@@ -935,6 +1069,56 @@ struct IRBuilder {
 		}
 	}
 
+	// Replaces constant leaves in a loop condition with allocas initialized
+	// once before the loop, so per-iteration entry/back-edge checks read
+	// dedicated frame slots instead of re-materializing constants into shared
+	// scratch temps on every evaluation.
+	void hoistConditionConstants(LsIrOp*& node, LsIrBlockData& parent) {
+		if (!node) return;
+		switch (node->kind) {
+			case LS_IR_OP_LOAD_CONST: {
+				auto& c = *static_cast<LsOpLoadConst*>(node);
+				auto& alloca = allocAlloca(c.type, {}, &c);
+				parent.ops.push(&alloca);
+				auto& ref = alloc<LsOpFramePtr>();
+				ref.alloca = &alloca;
+				node = &ref;
+				break;
+			}
+			case LS_IR_OP_EQ:
+			case LS_IR_OP_NE:
+			case LS_IR_OP_LT:
+			case LS_IR_OP_LE:
+			case LS_IR_OP_GT:
+			case LS_IR_OP_GE:
+			case LS_IR_OP_COMPARE:
+			case LS_IR_OP_ADD:
+			case LS_IR_OP_SUB:
+			case LS_IR_OP_MUL:
+			case LS_IR_OP_DIV:
+			case LS_IR_OP_MOD:
+			case LS_IR_OP_AND:
+			case LS_IR_OP_OR: {
+				auto& bin = *static_cast<LsOpBinary*>(node);
+				hoistConditionConstants(bin.lhs, parent);
+				hoistConditionConstants(bin.rhs, parent);
+				break;
+			}
+			case LS_IR_OP_NOT:
+			case LS_IR_OP_NEG: {
+				auto& unary = *static_cast<LsOpUnary*>(node);
+				hoistConditionConstants(unary.operand, parent);
+				break;
+			}
+			case LS_IR_OP_CAST: {
+				auto& cast = *static_cast<LsOpCast*>(node);
+				hoistConditionConstants(cast.value, parent);
+				break;
+			}
+			default: break;
+		}
+	}
+
 	void buildStatementIR(Statement& st, LsIrBlockData& parent) {
 		SourceScope scope(*this, st.token);
 		switch (st.kind) {
@@ -953,17 +1137,33 @@ struct IRBuilder {
 			}
 			case Statement::WHILE: {
 				auto& while_statement = static_cast<WhileStatement&>(st);
-				auto& loop = alloc<LsOpConditionalJump>();
 				auto& exit = alloc<LsOpNop>();
-				loop.condition = &buildExpressionIR(*while_statement.condition, true);
+				LsIrOp* condition = &buildExpressionIR(*while_statement.condition, true);
+				hoistConditionConstants(condition, parent);
+
+				auto& loop = alloc<LsOpConditionalJump>();
+				loop.condition = condition;
 				loop.true_block = &alloc<LsIrBlockData>(host.arena);
-				loops.push({pending_loop_label, &loop, &exit, (u32)defers.size()});
+
+				auto& body_start = alloc<LsOpNop>();
+				loop.body_start = &body_start;
+				loop.true_block->ops.push(&body_start);
+
+				// Bottom check: the per-iteration back edge. Shares the condition
+				// tree with the entry check above; only one of the two runs per
+				// pass through its position, so the condition is still evaluated
+				// exactly once per iteration.
+				auto& bottom = alloc<LsOpConditionalJump>();
+				bottom.condition = loop.condition;
+				bottom.bottom_tested = true;
+				bottom.body_start = &body_start;
+
+				loops.push({pending_loop_label, &bottom, &exit, (u32)defers.size()});
 				pending_loop_label = {};
 				buildStatementIR(*while_statement.body, *loop.true_block);
 				loops.pop_back();
-				auto& back_edge = alloc<LsOpJump>();
-				back_edge.target = &loop;
-				loop.true_block->ops.push(&back_edge);
+
+				loop.true_block->ops.push(&bottom);
 				parent.ops.push(&loop);
 				parent.ops.push(&exit);
 				break;
@@ -994,8 +1194,9 @@ struct IRBuilder {
 					break;
 				}
 
-				const auto finishLoopIteration = [&](LsIrBlockData* block, LsOpConditionalJump& loop, LsOpNop& increment_target, LsOpNop& exit, LsOpAlloca* counter, ResolvedType* counter_type) {
-					block->ops.push(&increment_target);
+				const auto finishLoopIteration = [&](LsOpConditionalJump& loop, LsOpNop& increment_target, LsOpConditionalJump& bottom, LsOpNop& exit, LsOpAlloca* counter, ResolvedType* counter_type) {
+					auto& block = *loop.true_block;
+					block.ops.push(&increment_target);
 					auto& addr = alloc<LsOpPushLocalAddr>();
 					addr.alloca = counter;
 					auto& load = alloc<LsOpLoad>();
@@ -1015,12 +1216,10 @@ struct IRBuilder {
 					store.type = counter_type;
 					store.src = &increment;
 					store.dst = &dst;
-					block->ops.push(&store);
+					block.ops.push(&store);
 					loops.pop_back();
 					locals.resize(local_watermark);
-					auto& back_edge = alloc<LsOpJump>();
-					back_edge.target = &loop;
-					block->ops.push(&back_edge);
+					block.ops.push(&bottom);
 					parent.ops.push(&loop);
 					parent.ops.push(&exit);
 				};
@@ -1043,20 +1242,32 @@ struct IRBuilder {
 					auto& end_load = alloc<LsOpLoad>();
 					end_load.addr = &end_addr;
 					end_load.size = typeByteSize(*value_type);
-					auto& condition = alloc<LsOpLt>();
-					condition.operand_type = value_type;
-					condition.lhs = &value_load;
-					condition.rhs = &end_load;
+				auto& condition = alloc<LsOpLt>();
+				condition.operand_type = value_type;
+				condition.lhs = &value_load;
+				condition.rhs = &end_load;
+				LsIrOp* condition_op = &condition;
+				hoistConditionConstants(condition_op, parent);
 
-					auto& loop = alloc<LsOpConditionalJump>();
-					auto& increment_target = alloc<LsOpNop>();
-					auto& exit = alloc<LsOpNop>();
-					loop.condition = &condition;
+				auto& loop = alloc<LsOpConditionalJump>();
+				auto& increment_target = alloc<LsOpNop>();
+				auto& exit = alloc<LsOpNop>();
+				loop.condition = condition_op;
 					loop.true_block = &alloc<LsIrBlockData>(host.arena);
+
+					auto& body_start = alloc<LsOpNop>();
+					loop.body_start = &body_start;
+					loop.true_block->ops.push(&body_start);
+
+					auto& bottom = alloc<LsOpConditionalJump>();
+					bottom.condition = &condition;
+					bottom.bottom_tested = true;
+					bottom.body_start = &body_start;
+
 					loops.push({pending_loop_label, &increment_target, &exit, (u32)defers.size()});
 					pending_loop_label = {};
 					buildStatementIR(*for_statement.body, *loop.true_block);
-					finishLoopIteration(loop.true_block, loop, increment_target, exit, &value, value_type);
+					finishLoopIteration(loop, increment_target, bottom, exit, &value, value_type);
 					return;
 				}
 
@@ -1119,12 +1330,24 @@ struct IRBuilder {
 				condition.operand_type = index_type;
 				condition.lhs = &counter_load;
 				condition.rhs = boundary;
+				LsIrOp* condition_op = &condition;
+				hoistConditionConstants(condition_op, parent);
 
 				auto& loop = alloc<LsOpConditionalJump>();
 				auto& increment_target = alloc<LsOpNop>();
 				auto& exit = alloc<LsOpNop>();
-				loop.condition = &condition;
+				loop.condition = condition_op;
 				loop.true_block = &alloc<LsIrBlockData>(host.arena);
+
+				auto& body_start = alloc<LsOpNop>();
+				loop.body_start = &body_start;
+				loop.true_block->ops.push(&body_start);
+
+				auto& bottom = alloc<LsOpConditionalJump>();
+				bottom.condition = condition_op;
+				bottom.bottom_tested = true;
+				bottom.body_start = &body_start;
+
 				loops.push({pending_loop_label, &increment_target, &exit, (u32)defers.size()});
 				pending_loop_label = {};
 
@@ -1170,7 +1393,7 @@ struct IRBuilder {
 				assign_value.dst = &value_addr;
 				loop.true_block->ops.push(&assign_value);
 				buildStatementIR(*for_statement.body, *loop.true_block);
-				finishLoopIteration(loop.true_block, loop, increment_target, exit, &counter, index_type);
+				finishLoopIteration(loop, increment_target, bottom, exit, &counter, index_type);
 				return;
 			}
 			case Statement::MATCH: {
@@ -1472,6 +1695,7 @@ struct IRBuilder {
 	struct Local {
 		ls_string_view name;
 		LsOpAlloca* alloca = nullptr;
+		LsIrOp* inline_value = nullptr;
 	};
 	struct Loop {
 		ls_string_view label = {};
@@ -1490,6 +1714,7 @@ struct IRBuilder {
 	LsIrSourceLoc current_src_loc = LS_IR_INVALID_SOURCE_LOC;
 	u32 stack_cursor = 0;
 	u32 alloca_region_size = 0;
+	bool do_inline = false;
 
 	struct SourceScope {
 		SourceScope(IRBuilder& builder, const Token& token)
@@ -1815,16 +2040,26 @@ struct BytecodeCompiler {
 	}
 
 	static ls_op immediateArithmeticOp(LsIrOpKind kind, const ResolvedType& type) {
-		const u32 index = numericKindIndex(type);
+		const u32 index = kind == LS_IR_OP_ADD || kind == LS_IR_OP_SUB || kind == LS_IR_OP_MUL ? arithmeticKindIndex(type) : numericKindIndex(type);
 		switch (kind) {
-			case LS_IR_OP_ADD: return ls_op(LS_OP_ADD_I8_IMM + index);
-			case LS_IR_OP_SUB: return ls_op(LS_OP_SUB_I8_IMM + index);
-			case LS_IR_OP_MUL: return ls_op(LS_OP_MUL_I8_IMM + index);
+			case LS_IR_OP_ADD: return ls_op(LS_OP_ADD_8_IMM + index);
+			case LS_IR_OP_SUB: return ls_op(LS_OP_SUB_8_IMM + index);
+			case LS_IR_OP_MUL: return ls_op(LS_OP_MUL_8_IMM + index);
 			case LS_IR_OP_DIV: return ls_op(LS_OP_DIV_I8_IMM + index);
 			case LS_IR_OP_MOD:
 				ASSERT(index < 8);
 				return ls_op(LS_OP_MOD_I8_IMM + index);
-			default: ASSERT(false); return LS_OP_ADD_I8_IMM;
+			default: ASSERT(false); return LS_OP_ADD_8_IMM;
+		}
+	}
+
+	static ls_op arithmeticOp(LsIrOpKind kind, const ResolvedType& type) {
+		const u32 index = arithmeticKindIndex(type);
+		switch (kind) {
+			case LS_IR_OP_ADD: return ls_op(LS_OP_ADD_8 + index);
+			case LS_IR_OP_SUB: return ls_op(LS_OP_SUB_8 + index);
+			case LS_IR_OP_MUL: return ls_op(LS_OP_MUL_8 + index);
+			default: ASSERT(false); return LS_OP_ADD_8;
 		}
 	}
 
@@ -1893,16 +2128,7 @@ struct BytecodeCompiler {
 	// jumps past the body when `n > 1`). Returns false when the condition is
 	// not a fusable comparison.
 	bool fusedCompareJumpOp(LsIrOpKind condition_kind, const ResolvedType& operand_type, bool negate, ls_op& out_op) {
-		LsIrOpKind skip;
-		switch (condition_kind) {
-			case LS_IR_OP_EQ: if (!negate) return false; skip = LS_IR_OP_EQ; break;
-			case LS_IR_OP_NE: if (negate) return false; skip = LS_IR_OP_EQ; break;
-			case LS_IR_OP_LT: skip = negate ? LS_IR_OP_LT : LS_IR_OP_GE; break;
-			case LS_IR_OP_LE: skip = negate ? LS_IR_OP_LE : LS_IR_OP_GT; break;
-			case LS_IR_OP_GT: skip = negate ? LS_IR_OP_GT : LS_IR_OP_LE; break;
-			case LS_IR_OP_GE: skip = negate ? LS_IR_OP_GE : LS_IR_OP_LT; break;
-			default: return false;
-		}
+		const LsIrOpKind skip = negate ? condition_kind : invertCompare(condition_kind);
 		switch (operand_type.kind) {
 			case ResolvedTypeKind::I8:
 			case ResolvedTypeKind::U8:
@@ -1925,9 +2151,10 @@ struct BytecodeCompiler {
 			case LS_IR_OP_GT: variant = 2; break; // JGT
 			case LS_IR_OP_LT: variant = 3; break; // JLT
 			case LS_IR_OP_LE: variant = 4; break; // JLE
+			case LS_IR_OP_NE: variant = 5; break; // JNE
 			default: return false;
 		}
-		out_op = ls_op(LS_OP_JE_I8 + numericKindIndex(operand_type) * 5u + variant);
+		out_op = ls_op(LS_OP_JE_I8 + numericKindIndex(operand_type) * 6u + variant);
 		return true;
 	}
 
@@ -1936,18 +2163,83 @@ struct BytecodeCompiler {
 
 		// Peek through a leading NOT so `if (!(a < b))` can fuse too.
 		const LsIrOp* condition = conditional.condition;
-		bool negate = false;
-		if (condition->kind == LS_IR_OP_NOT) {
-			condition = static_cast<const LsOpUnary&>(*condition).operand;
-			negate = true;
+
+		// Fold compile-time-constant conditions: either a literal or a hoisted
+		// alloca initialized from one.
+		const LsOpLoadConst* constant = nullptr;
+		if (condition->kind == LS_IR_OP_LOAD_CONST) {
+			constant = static_cast<const LsOpLoadConst*>(condition);
+		} else if (condition->kind == LS_IR_OP_FRAME_PTR) {
+			auto& ref = static_cast<const LsOpFramePtr&>(*condition);
+			if (ref.alloca->value->kind == LS_IR_OP_LOAD_CONST) {
+				constant = static_cast<const LsOpLoadConst*>(ref.alloca->value);
+			}
+		}
+		bool is_constant = constant != nullptr;
+		bool constant_value = false;
+		if (is_constant) {
+			bool truthy = false;
+			for (u32 i = 0; i < typeByteSize(*constant->type); ++i) truthy |= constant->value[i] != 0;
+			constant_value = truthy;
+		}
+
+		if (conditional.bottom_tested) {
+			ASSERT(conditional.body_start);
+			if (is_constant) {
+				if (constant_value) {
+					// Always taken: the back edge is an unconditional jump.
+					emitOp(LS_OP_JUMP);
+					const u32 patch_pos = code.size();
+					emit((i16)0);
+					patchI16(patch_pos, conditional.body_start->bytecode_offset);
+				}
+				// Never taken: fall through to the loop exit.
+				return entry_stack_top;
+			}
+			// Jump back into the body while the condition holds; fall through to
+			// whatever follows (the loop exit) once it fails.
+			const LsOpBinary* compare = nullptr;
+			if (condition->kind >= LS_IR_OP_EQ && condition->kind <= LS_IR_OP_GE) {
+				compare = static_cast<const LsOpBinary*>(condition);
+			}
+			ls_op fused_opcode;
+			if (compare && fusedCompareJumpOp(compare->kind, *compare->operand_type, true, fused_opcode)) {
+				const u32 lhs_slot = emit(*compare->lhs, nullptr);
+				const u32 rhs_slot = emit(*compare->rhs, nullptr);
+				emitOp(fused_opcode);
+				emit(lhs_slot);
+				emit(rhs_slot);
+				const u32 patch_pos = code.size();
+				emit((i16)0);
+				patchI16(patch_pos, conditional.body_start->bytecode_offset);
+			} else {
+				const u32 condition_slot = emit(*conditional.condition, nullptr);
+				emitOp(LS_OP_JNZ_U8);
+				emit(condition_slot);
+				const u32 patch_pos = code.size();
+				emit((i16)0);
+				patchI16(patch_pos, conditional.body_start->bytecode_offset);
+			}
+			// Leave stack_top at its post-condition value so emitBlock records
+			// the temporary slots used by the condition evaluation.
+			return entry_stack_top;
 		}
 
 		u32 false_jump = 0;
 		bool have_jump = false;
-		if (condition->kind >= LS_IR_OP_EQ && condition->kind <= LS_IR_OP_GE) {
+		if (is_constant) {
+			if (!constant_value) {
+				// Always false: jump straight past the block.
+				emitOp(LS_OP_JUMP);
+				false_jump = code.size();
+				emit((i16)0);
+				have_jump = true;
+			}
+			// Always true: no branch - fall into the block.
+		} else if (condition->kind >= LS_IR_OP_EQ && condition->kind <= LS_IR_OP_GE) {
 			const LsOpBinary& compare = static_cast<const LsOpBinary&>(*condition);
 			ls_op fused_opcode;
-			if (fusedCompareJumpOp(compare.kind, *compare.operand_type, negate, fused_opcode)) {
+			if (fusedCompareJumpOp(compare.kind, *compare.operand_type, false, fused_opcode)) {
 				const u32 lhs_slot = emit(*compare.lhs, nullptr);
 				const u32 rhs_slot = emit(*compare.rhs, nullptr);
 				emitOp(fused_opcode);
@@ -1958,12 +2250,13 @@ struct BytecodeCompiler {
 				have_jump = true;
 			}
 		}
-		if (!have_jump) {
+		if (!have_jump && !is_constant) {
 			const u32 condition_slot = emit(*conditional.condition, nullptr);
 			emitOp(LS_OP_JZ_U8);
 			emit(condition_slot);
 			false_jump = code.size();
 			emit((i16)0);
+			have_jump = true;
 		}
 		const u32 condition_peak = stack_top;
 
@@ -1971,7 +2264,7 @@ struct BytecodeCompiler {
 		u32 peak = stack_top;
 		if (peak < condition_peak) peak = condition_peak;
 		if (!conditional.false_block) {
-			patchI16(false_jump, code.size());
+			if (have_jump) patchI16(false_jump, code.size());
 			stack_top = peak;
 			return entry_stack_top;
 		}
@@ -1979,7 +2272,7 @@ struct BytecodeCompiler {
 		emitOp(LS_OP_JUMP);
 		const u32 end_jump = code.size();
 		emit((i16)0);
-		patchI16(false_jump, code.size());
+		if (have_jump) patchI16(false_jump, code.size());
 		stack_top = entry_stack_top;
 		emitBlock(*conditional.false_block);
 		if (stack_top > peak) peak = stack_top;
@@ -2095,7 +2388,9 @@ struct BytecodeCompiler {
 			}
 		}
 		u32 rhs = emit(*ir_op.rhs, nullptr);
-		emitOp(ls_op(base_op + numericKindIndex(*ir_op.operand_type)));
+		emitOp(base_op == LS_OP_ADD_8 || base_op == LS_OP_SUB_8 || base_op == LS_OP_MUL_8
+			? arithmeticOp(ir_op.kind, *ir_op.operand_type)
+			: ls_op(base_op + numericKindIndex(*ir_op.operand_type)));
 		u32 ret = dst ? dst->dst : stack_top;
 		emit(ret);
 		emit(lhs);
@@ -2195,12 +2490,116 @@ struct BytecodeCompiler {
 		entry.scope_begin_offset = scope_begin_offset;
 	}
 
+	struct IndexedAddress {
+		LsIrOp* base = nullptr;
+		LsIrOp* index = nullptr;
+		ls_type_kind index_kind = LS_TYPE_INVALID;
+		u64 length = 0;
+		u32 element_size = 0;
+		u32 base_slot = 0;
+		u32 index_slot = 0;
+		bool index_immediate = false;
+		u64 immediate_index = 0;
+	};
+
+	bool tryGetIndexedImmediate(const LsIrOp& index, ls_type_kind kind, u64& result) {
+		if (index.kind != LS_IR_OP_LOAD_CONST) return false;
+		const auto& constant = static_cast<const LsOpLoadConst&>(index);
+		switch (kind) {
+			case LS_TYPE_I8: { i8 value; memcpy(&value, constant.value, sizeof(value)); if (value < 0) return false; result = (u64)value; return true; }
+			case LS_TYPE_I16: { i16 value; memcpy(&value, constant.value, sizeof(value)); if (value < 0) return false; result = (u64)value; return true; }
+			case LS_TYPE_I32: { i32 value; memcpy(&value, constant.value, sizeof(value)); if (value < 0) return false; result = (u64)value; return true; }
+			case LS_TYPE_I64: { i64 value; memcpy(&value, constant.value, sizeof(value)); if (value < 0) return false; result = (u64)value; return true; }
+			case LS_TYPE_ENUM:
+			case LS_TYPE_U8:
+			case LS_TYPE_U16:
+			case LS_TYPE_U32:
+			case LS_TYPE_U64:
+			case LS_TYPE_BOOL:
+				memcpy(&result, constant.value, sizeof(result));
+				return true;
+			default: return false;
+		}
+	}
+
+	static u32 arithmeticKindIndex(const ResolvedType& type) {
+		switch (type.kind) {
+			case ResolvedTypeKind::I8:
+			case ResolvedTypeKind::U8: return 0;
+			case ResolvedTypeKind::I16:
+			case ResolvedTypeKind::U16: return 1;
+			case ResolvedTypeKind::I32:
+			case ResolvedTypeKind::U32: return 2;
+			case ResolvedTypeKind::I64:
+			case ResolvedTypeKind::ISIZE:
+			case ResolvedTypeKind::U64: return 3;
+			case ResolvedTypeKind::F32: return 4;
+			case ResolvedTypeKind::F64: return 5;
+			default: ASSERT(false); return -1;
+		}
+	}
+
+	bool tryGetIndexedAddress(LsIrOp& address, IndexedAddress& result) {
+		if (address.kind != LS_IR_OP_ADD) return false;
+		auto& add = static_cast<LsOpBinary&>(address);
+		if (!add.rhs || add.rhs->kind != LS_IR_OP_MUL) return false;
+		auto& mul = static_cast<LsOpBinary&>(*add.rhs);
+		if (!mul.rhs || mul.rhs->kind != LS_IR_OP_LOAD_CONST) return false;
+		auto& size = static_cast<LsOpLoadConst&>(*mul.rhs);
+		if (!size.type || size.type->kind != ResolvedTypeKind::U64) return false;
+		u64 element_size = 0;
+		memcpy(&element_size, size.value, sizeof(element_size));
+		if (element_size > 0xffffffffu) return false;
+
+		LsIrOp* checked = mul.lhs;
+		if (!checked) return false;
+		if (checked->kind == LS_IR_OP_CAST) checked = static_cast<LsOpCast&>(*checked).value;
+		if (!checked || checked->kind != LS_IR_OP_BOUNDS_CHECK) return false;
+		auto& bounds = static_cast<LsOpBoundsCheck&>(*checked);
+		result.base = add.lhs;
+		if (result.base->kind != LS_IR_OP_PUSH_LOCAL_ADDR && result.base->kind != LS_IR_OP_FRAME_PTR) return false;
+		result.index = bounds.index;
+		result.index_kind = toTypeKind(*bounds.index_type);
+		result.index_immediate = tryGetIndexedImmediate(*result.index, result.index_kind, result.immediate_index);
+		result.length = bounds.length;
+		result.element_size = (u32)element_size;
+		return true;
+	}
+
+	u32 emitIndexedAddress(IndexedAddress& address) {
+		if (address.base->kind == LS_IR_OP_PUSH_LOCAL_ADDR) {
+			address.base_slot = static_cast<LsOpPushLocalAddr&>(*address.base).alloca->stack_sp;
+		} else {
+			address.base_slot = static_cast<LsOpFramePtr&>(*address.base).alloca->stack_sp;
+		}
+		if (!address.index_immediate) address.index_slot = emit(*address.index, nullptr);
+		return address.index_slot;
+	}
+
+	void emitIndexedOperands(const IndexedAddress& address) {
+		emit(address.base_slot);
+		if (address.index_immediate) emit(address.immediate_index);
+		else emit(address.index_slot);
+		emit((u8)address.index_kind);
+		emit(address.length);
+		emit(address.element_size);
+	}
+
 	u32 emitCopy(const LsOpCopy& copy) {
 		if (do_optimize && copy.dst->kind == LS_IR_OP_PUSH_LOCAL_ADDR) {
 			auto& local_addr = static_cast<LsOpPushLocalAddr&>(*copy.dst);
 			EmitDst dst = { local_addr.alloca->stack_sp, typeByteSize(*copy.type) };
 			emit(*copy.src, &dst);
 			return dst.dst;
+		}
+		IndexedAddress indexed;
+		if (copy.dst->result_mode == LsIrOp::ADDRESS && tryGetIndexedAddress(*copy.dst, indexed)) {
+			u32 src = emit(*copy.src, nullptr);
+			emitIndexedAddress(indexed);
+			emitOp(indexed.index_immediate ? LS_OP_STORE_INDEXED_IMM : LS_OP_STORE_INDEXED);
+			emitIndexedOperands(indexed);
+			emit(src);
+			return indexed.base_slot;
 		}
 		u32 src = emit(*copy.src, nullptr);
 		u32 dst = emit(*copy.dst, nullptr);
@@ -2394,7 +2793,7 @@ struct BytecodeCompiler {
 				memcpy(ratio.value, &factor, sizeof(factor));
 				const u32 ratio_sp = emit(static_cast<LsIrOp&>(ratio), nullptr);
 				const u32 scaled_sp = stack_top;
-				emitOp(shrink ? LS_OP_DIV_I64 : LS_OP_MUL_I64);
+				emitOp(shrink ? LS_OP_DIV_I64 : LS_OP_MUL_64);
 				emit(scaled_sp);
 				emit(length_sp);
 				emit(ratio_sp);
@@ -2446,6 +2845,16 @@ struct BytecodeCompiler {
 			emit(alloca->stack_sp);
 			emit(size);
 			if (!dst) stack_top += size;
+			return ret;
+		}
+		IndexedAddress indexed;
+		if (tryGetIndexedAddress(*op.addr, indexed)) {
+			const u32 ret = dst ? dst->dst : stack_top;
+			emitIndexedAddress(indexed);
+			emitOp(indexed.index_immediate ? LS_OP_LOAD_INDEXED_IMM : LS_OP_LOAD_INDEXED);
+			emit(ret);
+			emitIndexedOperands(indexed);
+			if (!dst) stack_top += op.size;
 			return ret;
 		}
 		u32 addr_sp = emit(*op.addr, nullptr);
@@ -2731,9 +3140,9 @@ struct BytecodeCompiler {
 			case LS_IR_OP_TERNARY: result = emitTernary(static_cast<LsOpTernary&>(op)); break;
 			case LS_IR_OP_BOUNDS_CHECK: result = emitBoundsCheck(static_cast<LsOpBoundsCheck&>(op)); break;
 			case LS_IR_OP_ALLOCA: result = emitAlloca(*static_cast<LsOpAlloca*>(&op)); break;
-			case LS_IR_OP_MUL: result = emitBinary(LS_OP_MUL_I8, static_cast<LsOpBinary&>(op), dst); break;
-			case LS_IR_OP_ADD: result = emitBinary(LS_OP_ADD_I8, static_cast<LsOpBinary&>(op), dst); break;
-			case LS_IR_OP_SUB: result = emitBinary(LS_OP_SUB_I8, static_cast<LsOpBinary&>(op), dst); break;
+			case LS_IR_OP_MUL: result = emitBinary(LS_OP_MUL_8, static_cast<LsOpBinary&>(op), dst); break;
+			case LS_IR_OP_ADD: result = emitBinary(LS_OP_ADD_8, static_cast<LsOpBinary&>(op), dst); break;
+			case LS_IR_OP_SUB: result = emitBinary(LS_OP_SUB_8, static_cast<LsOpBinary&>(op), dst); break;
 			case LS_IR_OP_DIV: result = emitBinary(LS_OP_DIV_I8, static_cast<LsOpBinary&>(op), dst); break;
 			case LS_IR_OP_MOD: result = emitBinary(LS_OP_MOD_I8, static_cast<LsOpBinary&>(op), dst); break;
 			case LS_IR_OP_LOAD_CONST: result = emitLoadConst(static_cast<LsOpLoadConst&>(op), dst); break;
@@ -2799,6 +3208,12 @@ struct BytecodeCompiler {
 			case LS_IR_OP_SUB:
 			case LS_IR_OP_MUL:
 			case LS_IR_OP_DIV:
+			case LS_IR_OP_MOD:
+			case LS_IR_OP_COMPARE:
+			case LS_IR_OP_EQ:
+			case LS_IR_OP_NE:
+			case LS_IR_OP_AND:
+			case LS_IR_OP_OR:
 			case LS_IR_OP_LE:
 			case LS_IR_OP_LT:
 			case LS_IR_OP_GE:
@@ -2812,7 +3227,7 @@ struct BytecodeCompiler {
 			case LS_IR_OP_CONDITIONAL_JUMP: {
 				auto& jmp = *static_cast<LsOpConditionalJump*>(op);
 				optimize(jmp.condition);
-				optimize(*jmp.true_block);
+				if (jmp.true_block) optimize(*jmp.true_block);
 				if (jmp.false_block) optimize(*jmp.false_block);
 				break;
 			}
@@ -2823,12 +3238,28 @@ struct BytecodeCompiler {
 			}
 			case LS_IR_OP_LOAD: {
 				auto* load = static_cast<LsOpLoad*>(op);
+				optimize(load->addr);
 				if (load->addr->kind == LS_IR_OP_PUSH_LOCAL_ADDR) {
 					auto& addr = *static_cast<LsOpPushLocalAddr*>(load->addr);
 					auto& ref = alloc<LsOpFramePtr>();
 					ref.alloca = addr.alloca;
 					op = &ref;
 				}
+				break;
+			}
+			case LS_IR_OP_BOUNDS_CHECK: {
+				auto& bounds = *static_cast<LsOpBoundsCheck*>(op);
+				optimize(bounds.index);
+				break;
+			}
+			case LS_IR_OP_CAST: {
+				auto& cast = *static_cast<LsOpCast*>(op);
+				optimize(cast.value);
+				break;
+			}
+			case LS_IR_OP_MATERIALIZE_ADDR: {
+				auto& address = *static_cast<LsOpMaterializeAddr*>(op);
+				optimize(address.value);
 				break;
 			}
 		}
@@ -2933,6 +3364,7 @@ struct BytecodeCompiler {
 	ls_function_bc* fn_bc = nullptr;
 	ByteArray code;
 	bool do_optimize = false;
+	bool do_inline = false;
 	// Debug entries for the current function's named params and locals, in
 	// declaration order (params first). Copied into the arena in endFunction
 	// and cleared per function.
@@ -3035,6 +3467,8 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host, ls_bytecode_c
 
 	BytecodeCompiler bc_compiler(*host, *bc, type_info);
 	if (options) bc_compiler.do_optimize = options->optimize;
+	bc_compiler.do_inline = bc_compiler.do_optimize;
+	builder.do_inline = bc_compiler.do_optimize;
 	u32 fn_index = 0;
 	for (Unit& u : module->units) {
 		for (Symbol& s : u.symbols) {

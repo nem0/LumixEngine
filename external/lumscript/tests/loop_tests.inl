@@ -544,6 +544,29 @@ TEST(ForInEmptySliceDoesNotExecuteRuntime) {
 	return true;
 }
 
+TEST(ForRangeZeroIterationsDoesNotExecuteBody) {
+	const char* source = R"(
+		fn main(end : i32) : i32 {
+			var hits : i32 = 0;
+			for i in end + 5..end {
+				hits += 1;
+			}
+			for i in 0..end {
+				hits += 10;
+			}
+			return hits;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	ls_push_i32(runtime, 0);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(NestedForInRuntime) {
 	const char* source = R"(
 		fn main() : i32 {

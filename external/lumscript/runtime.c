@@ -245,7 +245,7 @@ static ls_string_view runtime_error_message(ls_op op) {
 	if ((op >= LS_OP_MOD_I8 && op <= LS_OP_MOD_U64) || (op >= LS_OP_MOD_I8_IMM && op <= LS_OP_MOD_U64_IMM)) {
 		return (ls_string_view){modulo_by_zero, modulo_by_zero + sizeof(modulo_by_zero) - 1u};
 	}
-	if (op >= LS_OP_BOUNDS_CHECK && op <= LS_OP_SLICE_REF) return (ls_string_view){index_out_of_bounds, index_out_of_bounds + sizeof(index_out_of_bounds) - 1u};
+	if (op >= LS_OP_LOAD_INDEXED && op <= LS_OP_SLICE_REF) return (ls_string_view){index_out_of_bounds, index_out_of_bounds + sizeof(index_out_of_bounds) - 1u};
 	if (op == LS_OP_CALL_DIRECT || op == LS_OP_CALL_INDIRECT) return (ls_string_view){invalid_function, invalid_function + sizeof(invalid_function) - 1u};
 	return (ls_string_view){generic, generic + sizeof(generic) - 1u};
 }
@@ -451,6 +451,27 @@ static u64 runtime_numeric_to_u64(const u8* value, ls_type_kind kind) {
 		case LS_TYPE_F32:  { f32 v = 0; memcpy(&v, value, 4); return (u64)v; }
 		case LS_TYPE_F64:  { f64 v = 0; memcpy(&v, value, 8); return (u64)v; }
 		default:           return 0u;
+	}
+}
+
+static i64 runtime_immediate_to_i64(u64 value, ls_type_kind kind) {
+	switch (kind) {
+		case LS_TYPE_I8: return (i8)value;
+		case LS_TYPE_I16: return (i16)value;
+		case LS_TYPE_I32: return (i32)value;
+		case LS_TYPE_I64: return (i64)value;
+		case LS_TYPE_ENUM: return (u32)value;
+		default: return (i64)value;
+	}
+}
+
+static u64 runtime_immediate_to_u64(u64 value, ls_type_kind kind) {
+	switch (kind) {
+		case LS_TYPE_U8: return (u8)value;
+		case LS_TYPE_U16: return (u16)value;
+		case LS_TYPE_U32: return (u32)value;
+		case LS_TYPE_BOOL: return value != 0u;
+		default: return value;
 	}
 }
 
@@ -697,6 +718,42 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				u8* value = (u8*)ptr;
 				if (!value) goto runtime_execute_function_fail;
 				memmove(value, runtime->frame + src, size);
+				break;
+			}
+			case LS_OP_LOAD_INDEXED:
+			case LS_OP_LOAD_INDEXED_IMM: {
+				const u32 dst = runtime_read_u32(&ip);
+				const u32 base_offset = runtime_read_u32(&ip);
+				const bool immediate = op == LS_OP_LOAD_INDEXED_IMM;
+				const u64 immediate_index = immediate ? runtime_read_u64(&ip) : 0u;
+				const u32 index_reg = immediate ? 0u : runtime_read_u32(&ip);
+				const ls_type_kind index_kind = (ls_type_kind)*ip++;
+				const u64 length = runtime_read_u64(&ip);
+				const u32 element_size = runtime_read_u32(&ip);
+				const i64 signed_index = immediate ? runtime_immediate_to_i64(immediate_index, index_kind) : runtime_numeric_to_i64(runtime->frame + index_reg, index_kind);
+				const u64 index = (index_kind == LS_TYPE_I8 || index_kind == LS_TYPE_I16 || index_kind == LS_TYPE_I32 || index_kind == LS_TYPE_I64 || index_kind == LS_TYPE_ENUM)
+					? (signed_index < 0 ? length : (u64)signed_index)
+					: (immediate ? runtime_immediate_to_u64(immediate_index, index_kind) : runtime_numeric_to_u64(runtime->frame + index_reg, index_kind));
+				if (index >= length || (element_size != 0u && index > ((u64)-1 / element_size))) goto runtime_execute_function_fail;
+				memmove(runtime->frame + dst, runtime->frame + base_offset + index * element_size, element_size);
+				break;
+			}
+			case LS_OP_STORE_INDEXED:
+			case LS_OP_STORE_INDEXED_IMM: {
+				const u32 base_offset = runtime_read_u32(&ip);
+				const bool immediate = op == LS_OP_STORE_INDEXED_IMM;
+				const u64 immediate_index = immediate ? runtime_read_u64(&ip) : 0u;
+				const u32 index_reg = immediate ? 0u : runtime_read_u32(&ip);
+				const ls_type_kind index_kind = (ls_type_kind)*ip++;
+				const u64 length = runtime_read_u64(&ip);
+				const u32 element_size = runtime_read_u32(&ip);
+				const u32 src = runtime_read_u32(&ip);
+				const i64 signed_index = immediate ? runtime_immediate_to_i64(immediate_index, index_kind) : runtime_numeric_to_i64(runtime->frame + index_reg, index_kind);
+				const u64 index = (index_kind == LS_TYPE_I8 || index_kind == LS_TYPE_I16 || index_kind == LS_TYPE_I32 || index_kind == LS_TYPE_I64 || index_kind == LS_TYPE_ENUM)
+					? (signed_index < 0 ? length : (u64)signed_index)
+					: (immediate ? runtime_immediate_to_u64(immediate_index, index_kind) : runtime_numeric_to_u64(runtime->frame + index_reg, index_kind));
+				if (index >= length || (element_size != 0u && index > ((u64)-1 / element_size))) goto runtime_execute_function_fail;
+				memmove(runtime->frame + base_offset + index * element_size, runtime->frame + src, element_size);
 				break;
 			}
 			case LS_OP_BOUNDS_CHECK: {
@@ -955,6 +1012,19 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				case LS_OP_##OP##_U64_IMM: LS_REG_BINOP_IMM(u64, a EXPR b); break; \
 				case LS_OP_##OP##_F32_IMM: LS_REG_BINOP_IMM(f32, a EXPR b); break; \
 				case LS_OP_##OP##_F64_IMM: LS_REG_BINOP_IMM(f64, a EXPR b); break;
+			#define LS_ARITH_INT_CASES(OP, EXPR) \
+				case LS_OP_##OP##_8: LS_REG_BINOP(u8, a EXPR b); break; \
+				case LS_OP_##OP##_16: LS_REG_BINOP(u16, a EXPR b); break; \
+				case LS_OP_##OP##_32: LS_REG_BINOP(u32, a EXPR b); break; \
+				case LS_OP_##OP##_64: LS_REG_BINOP(u64, a EXPR b); break; \
+				case LS_OP_##OP##_8_IMM: LS_REG_BINOP_IMM(u8, a EXPR b); break; \
+				case LS_OP_##OP##_16_IMM: LS_REG_BINOP_IMM(u16, a EXPR b); break; \
+				case LS_OP_##OP##_32_IMM: LS_REG_BINOP_IMM(u32, a EXPR b); break; \
+				case LS_OP_##OP##_64_IMM: LS_REG_BINOP_IMM(u64, a EXPR b); break; \
+				case LS_OP_##OP##_F32: LS_REG_BINOP(f32, a EXPR b); break; \
+				case LS_OP_##OP##_F64: LS_REG_BINOP(f64, a EXPR b); break; \
+				case LS_OP_##OP##_F32_IMM: LS_REG_BINOP_IMM(f32, a EXPR b); break; \
+				case LS_OP_##OP##_F64_IMM: LS_REG_BINOP_IMM(f64, a EXPR b); break;
 			#define LS_ARITH_DIV_CASES(OP, EXPR) \
 				case LS_OP_##OP##_I8: LS_REG_DIVOP(i8, a EXPR b); break; \
 				case LS_OP_##OP##_U8: LS_REG_DIVOP(u8, a EXPR b); break; \
@@ -985,13 +1055,14 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				case LS_OP_MOD_U32: LS_REG_DIVOP(u32, a % b); break; case LS_OP_MOD_U32_IMM: LS_REG_DIVOP_IMM(u32, a % b); break; \
 				case LS_OP_MOD_I64: LS_REG_DIVOP(i64, a % b); break; case LS_OP_MOD_I64_IMM: LS_REG_DIVOP_IMM(i64, a % b); break; \
 				case LS_OP_MOD_U64: LS_REG_DIVOP(u64, a % b); break; case LS_OP_MOD_U64_IMM: LS_REG_DIVOP_IMM(u64, a % b); break;
-			LS_ARITH_BIN_CASES(ADD, +)
-			LS_ARITH_BIN_CASES(SUB, -)
-			LS_ARITH_BIN_CASES(MUL, *)
+			LS_ARITH_INT_CASES(ADD, +)
+			LS_ARITH_INT_CASES(SUB, -)
+			LS_ARITH_INT_CASES(MUL, *)
 			LS_ARITH_DIV_CASES(DIV, /)
 			LS_MOD_CASES
 			#undef LS_MOD_CASES
 			#undef LS_ARITH_DIV_CASES
+			#undef LS_ARITH_INT_CASES
 			#undef LS_ARITH_BIN_CASES
 			case LS_OP_INC_I32: {
 				const u32 dst = runtime_read_u32(&ip);
@@ -1081,6 +1152,16 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 			case LS_OP_JGT_F64: LS_REG_CMP_JUMP(f64, <=); break;
 			case LS_OP_JLT_F64: LS_REG_CMP_JUMP(f64, >=); break;
 			case LS_OP_JLE_F64: LS_REG_CMP_JUMP(f64, >); break;
+			case LS_OP_JNE_I8: LS_REG_CMP_JUMP(i8, ==); break;
+			case LS_OP_JNE_U8: LS_REG_CMP_JUMP(u8, ==); break;
+			case LS_OP_JNE_I16: LS_REG_CMP_JUMP(i16, ==); break;
+			case LS_OP_JNE_U16: LS_REG_CMP_JUMP(u16, ==); break;
+			case LS_OP_JNE_I32: LS_REG_CMP_JUMP(i32, ==); break;
+			case LS_OP_JNE_U32: LS_REG_CMP_JUMP(u32, ==); break;
+			case LS_OP_JNE_I64: LS_REG_CMP_JUMP(i64, ==); break;
+			case LS_OP_JNE_U64: LS_REG_CMP_JUMP(u64, ==); break;
+			case LS_OP_JNE_F32: LS_REG_CMP_JUMP(f32, ==); break;
+			case LS_OP_JNE_F64: LS_REG_CMP_JUMP(f64, ==); break;
 			case LS_OP_JUMP: {
 				const i32 offset = runtime_read_i16(&ip);
 				ip += offset;

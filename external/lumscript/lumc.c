@@ -146,25 +146,25 @@ static const char* lumc_opcode_name(ls_op op) {
 		"NEG_I8", "NEG_U8", "NEG_I16", "NEG_U16", "NEG_I32", "NEG_U32",
 		"NEG_I64", "NEG_U64", "NEG_F32", "NEG_F64"
 	};
-	static const char* const add[] = {"ADD_I8", "ADD_U8", "ADD_I16", "ADD_U16", "ADD_I32", "ADD_U32", "ADD_I64", "ADD_U64", "ADD_F32", "ADD_F64"};
-	static const char* const sub[] = {"SUB_I8", "SUB_U8", "SUB_I16", "SUB_U16", "SUB_I32", "SUB_U32", "SUB_I64", "SUB_U64", "SUB_F32", "SUB_F64"};
-	static const char* const mul[] = {"MUL_I8", "MUL_U8", "MUL_I16", "MUL_U16", "MUL_I32", "MUL_U32", "MUL_I64", "MUL_U64", "MUL_F32", "MUL_F64"};
+	static const char* const add[] = {"ADD_8", "ADD_16", "ADD_32", "ADD_64", "ADD_F32", "ADD_F64"};
+	static const char* const sub[] = {"SUB_8", "SUB_16", "SUB_32", "SUB_64", "SUB_F32", "SUB_F64"};
+	static const char* const mul[] = {"MUL_8", "MUL_16", "MUL_32", "MUL_64", "MUL_F32", "MUL_F64"};
 	static const char* const div[] = {"DIV_I8", "DIV_U8", "DIV_I16", "DIV_U16", "DIV_I32", "DIV_U32", "DIV_I64", "DIV_U64", "DIV_F32", "DIV_F64"};
 	static const char* const mod[] = {"MOD_I8", "MOD_U8", "MOD_I16", "MOD_U16", "MOD_I32", "MOD_U32", "MOD_I64", "MOD_U64"};
-	static const char* const add_imm[] = {"ADD_I8_IMM", "ADD_U8_IMM", "ADD_I16_IMM", "ADD_U16_IMM", "ADD_I32_IMM", "ADD_U32_IMM", "ADD_I64_IMM", "ADD_U64_IMM", "ADD_F32_IMM", "ADD_F64_IMM"};
-	static const char* const sub_imm[] = {"SUB_I8_IMM", "SUB_U8_IMM", "SUB_I16_IMM", "SUB_U16_IMM", "SUB_I32_IMM", "SUB_U32_IMM", "SUB_I64_IMM", "SUB_U64_IMM", "SUB_F32_IMM", "SUB_F64_IMM"};
-	static const char* const mul_imm[] = {"MUL_I8_IMM", "MUL_U8_IMM", "MUL_I16_IMM", "MUL_U16_IMM", "MUL_I32_IMM", "MUL_U32_IMM", "MUL_I64_IMM", "MUL_U64_IMM", "MUL_F32_IMM", "MUL_F64_IMM"};
+	static const char* const add_imm[] = {"ADD_8_IMM", "ADD_16_IMM", "ADD_32_IMM", "ADD_64_IMM", "ADD_F32_IMM", "ADD_F64_IMM"};
+	static const char* const sub_imm[] = {"SUB_8_IMM", "SUB_16_IMM", "SUB_32_IMM", "SUB_64_IMM", "SUB_F32_IMM", "SUB_F64_IMM"};
+	static const char* const mul_imm[] = {"MUL_8_IMM", "MUL_16_IMM", "MUL_32_IMM", "MUL_64_IMM", "MUL_F32_IMM", "MUL_F64_IMM"};
 	static const char* const div_imm[] = {"DIV_I8_IMM", "DIV_U8_IMM", "DIV_I16_IMM", "DIV_U16_IMM", "DIV_I32_IMM", "DIV_U32_IMM", "DIV_I64_IMM", "DIV_U64_IMM", "DIV_F32_IMM", "DIV_F64_IMM"};
 	static const char* const mod_imm[] = {"MOD_I8_IMM", "MOD_U8_IMM", "MOD_I16_IMM", "MOD_U16_IMM", "MOD_I32_IMM", "MOD_U32_IMM", "MOD_I64_IMM", "MOD_U64_IMM"};
 	if (op >= LS_OP_NEG_I8 && op <= LS_OP_NEG_F64) return unary[(u32)op - (u32)LS_OP_NEG_I8];
-	if (op >= LS_OP_ADD_I8 && op <= LS_OP_ADD_F64) return add[(u32)op - (u32)LS_OP_ADD_I8];
-	if (op >= LS_OP_SUB_I8 && op <= LS_OP_SUB_F64) return sub[(u32)op - (u32)LS_OP_SUB_I8];
-	if (op >= LS_OP_MUL_I8 && op <= LS_OP_MUL_F64) return mul[(u32)op - (u32)LS_OP_MUL_I8];
+	if (op >= LS_OP_ADD_8 && op <= LS_OP_ADD_F64) return add[(u32)op - (u32)LS_OP_ADD_8];
+	if (op >= LS_OP_SUB_8 && op <= LS_OP_SUB_F64) return sub[(u32)op - (u32)LS_OP_SUB_8];
+	if (op >= LS_OP_MUL_8 && op <= LS_OP_MUL_F64) return mul[(u32)op - (u32)LS_OP_MUL_8];
 	if (op >= LS_OP_DIV_I8 && op <= LS_OP_DIV_F64) return div[(u32)op - (u32)LS_OP_DIV_I8];
 	if (op >= LS_OP_MOD_I8 && op <= LS_OP_MOD_U64) return mod[(u32)op - (u32)LS_OP_MOD_I8];
-	if (op >= LS_OP_ADD_I8_IMM && op <= LS_OP_ADD_F64_IMM) return add_imm[(u32)op - (u32)LS_OP_ADD_I8_IMM];
-	if (op >= LS_OP_SUB_I8_IMM && op <= LS_OP_SUB_F64_IMM) return sub_imm[(u32)op - (u32)LS_OP_SUB_I8_IMM];
-	if (op >= LS_OP_MUL_I8_IMM && op <= LS_OP_MUL_F64_IMM) return mul_imm[(u32)op - (u32)LS_OP_MUL_I8_IMM];
+	if (op >= LS_OP_ADD_8_IMM && op <= LS_OP_ADD_F64_IMM) return add_imm[(u32)op - (u32)LS_OP_ADD_8_IMM];
+	if (op >= LS_OP_SUB_8_IMM && op <= LS_OP_SUB_F64_IMM) return sub_imm[(u32)op - (u32)LS_OP_SUB_8_IMM];
+	if (op >= LS_OP_MUL_8_IMM && op <= LS_OP_MUL_F64_IMM) return mul_imm[(u32)op - (u32)LS_OP_MUL_8_IMM];
 	if (op >= LS_OP_DIV_I8_IMM && op <= LS_OP_DIV_F64_IMM) return div_imm[(u32)op - (u32)LS_OP_DIV_I8_IMM];
 	if (op >= LS_OP_MOD_I8_IMM && op <= LS_OP_MOD_U64_IMM) return mod_imm[(u32)op - (u32)LS_OP_MOD_I8_IMM];
 	switch (op) {
@@ -172,16 +172,22 @@ static const char* lumc_opcode_name(ls_op op) {
 		case LS_OP_LOAD_CONST_2: return "LOAD_CONST_2";
 		case LS_OP_LOAD_CONST_4: return "LOAD_CONST_4";
 		case LS_OP_LOAD_CONST_8: return "LOAD_CONST_8";
+		case LS_OP_STRING_SLICE: return "STRING_SLICE";
 		case LS_OP_COPY: return "COPY";
 		case LS_OP_FRAME_PTR: return "FRAME_PTR";
 		case LS_OP_GLOBAL_PTR: return "GLOBAL_PTR";
 		case LS_OP_LOAD_PTR: return "LOAD_PTR";
 		case LS_OP_STORE_PTR: return "STORE_PTR";
+		case LS_OP_LOAD_INDEXED: return "LOAD_INDEXED";
+		case LS_OP_STORE_INDEXED: return "STORE_INDEXED";
+		case LS_OP_LOAD_INDEXED_IMM: return "LOAD_INDEXED_IMM";
+		case LS_OP_STORE_INDEXED_IMM: return "STORE_INDEXED_IMM";
 		case LS_OP_BOUNDS_CHECK: return "BOUNDS_CHECK";
 		case LS_OP_SLICE: return "SLICE";
 		case LS_OP_SLICE_LOAD: return "SLICE_LOAD";
 		case LS_OP_SLICE_REF: return "SLICE_REF";
 		case LS_OP_SLICE_LENGTH: return "SLICE_LENGTH";
+		case LS_OP_SLICE_EQ: return "SLICE_EQ";
 		case LS_OP_INC_I32: return "INC_I32";
 		case LS_OP_INC_I64: return "INC_I64";
 		case LS_OP_DEC_I32: return "DEC_I32";
@@ -198,7 +204,8 @@ static const char* lumc_opcode_name(ls_op op) {
 			case LS_OP_JGE_##TYPE: return "JGE_" #TYPE; \
 			case LS_OP_JGT_##TYPE: return "JGT_" #TYPE; \
 			case LS_OP_JLT_##TYPE: return "JLT_" #TYPE; \
-			case LS_OP_JLE_##TYPE: return "JLE_" #TYPE;
+			case LS_OP_JLE_##TYPE: return "JLE_" #TYPE; \
+			case LS_OP_JNE_##TYPE: return "JNE_" #TYPE;
 		LS_COMPARE_JUMP_NAME(I8)
 		LS_COMPARE_JUMP_NAME(U8)
 		LS_COMPARE_JUMP_NAME(I16)
@@ -236,12 +243,12 @@ static const char* lumc_opcode_name(ls_op op) {
 }
 
 static u32 lumc_immediate_size(ls_op op) {
-	if ((op >= LS_OP_ADD_I8_IMM && op <= LS_OP_ADD_F64_IMM)
-		|| (op >= LS_OP_SUB_I8_IMM && op <= LS_OP_SUB_F64_IMM)
-		|| (op >= LS_OP_MUL_I8_IMM && op <= LS_OP_MUL_F64_IMM)
+	if ((op >= LS_OP_ADD_8_IMM && op <= LS_OP_ADD_F64_IMM)
+		|| (op >= LS_OP_SUB_8_IMM && op <= LS_OP_SUB_F64_IMM)
+		|| (op >= LS_OP_MUL_8_IMM && op <= LS_OP_MUL_F64_IMM)
 		|| (op >= LS_OP_DIV_I8_IMM && op <= LS_OP_DIV_F64_IMM)) {
-		const u32 index = (u32)(op - LS_OP_ADD_I8_IMM) % 10u;
-		return index < 2 ? 1u : index < 4 ? 2u : index < 6 ? 4u : index < 8 ? 8u : index == 8 ? 4u : 8u;
+		const u32 index = op >= LS_OP_DIV_I8_IMM ? (u32)(op - LS_OP_DIV_I8_IMM) % 10u : (op >= LS_OP_MUL_8_IMM ? (u32)(op - LS_OP_MUL_8_IMM) % 6u : op >= LS_OP_SUB_8_IMM ? (u32)(op - LS_OP_SUB_8_IMM) % 6u : (u32)(op - LS_OP_ADD_8_IMM));
+		return index < 1 ? 1u : index < 2 ? 2u : index < 3 ? 4u : index < 4 ? 8u : index == 4 ? 4u : 8u;
 	}
 	if (op >= LS_OP_MOD_I8_IMM && op <= LS_OP_MOD_U64_IMM) {
 		const u32 index = (u32)(op - LS_OP_MOD_I8_IMM);
@@ -366,11 +373,42 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 				else printf(" addr=%u, src=%u, size=%u", addr, src, size);
 				break;
 			}
+			case LS_OP_STRING_SLICE: {
+				const u32 dst = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 string = lumc_read_u32(fn->code, fn->code_size, &pc);
+				printf(" dst=%u, string=%u", dst, string);
+				break;
+			}
+			case LS_OP_LOAD_INDEXED:
+			case LS_OP_STORE_INDEXED:
+			case LS_OP_LOAD_INDEXED_IMM:
+			case LS_OP_STORE_INDEXED_IMM: {
+				const u32 a = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 b = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const bool immediate = op == LS_OP_LOAD_INDEXED_IMM || op == LS_OP_STORE_INDEXED_IMM;
+				const u64 index = immediate ? lumc_read_u64(fn->code, fn->code_size, &pc) : (op == LS_OP_LOAD_INDEXED ? lumc_read_u32(fn->code, fn->code_size, &pc) : b);
+				const u8 kind = fn->code[pc++];
+				const u64 length = lumc_read_u64(fn->code, fn->code_size, &pc);
+				const u32 size = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 src = op == LS_OP_STORE_INDEXED || op == LS_OP_STORE_INDEXED_IMM ? lumc_read_u32(fn->code, fn->code_size, &pc) : 0;
+				if (op == LS_OP_LOAD_INDEXED || op == LS_OP_LOAD_INDEXED_IMM) printf(" dst=%u, base=%u, index=%llu, type=%u, length=%llu, size=%u", a, b, (unsigned long long)index, kind, (unsigned long long)length, size);
+				else printf(" base=%u, index=%u, type=%u, length=%llu, size=%u, src=%u", a, b, kind, (unsigned long long)length, size, src);
+				break;
+			}
 			case LS_OP_BOUNDS_CHECK: {
 				const u32 index = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u8 index_kind = fn->code[pc++];
 				const u64 length = lumc_read_u64(fn->code, fn->code_size, &pc);
 				printf(" index=%u, type=%u, length=%llu", index, index_kind, (unsigned long long)length);
+				break;
+			}
+			case LS_OP_SLICE_EQ: {
+				const u32 result = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 lhs = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 rhs = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 size = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u8 kind = fn->code[pc++];
+				printf(" dst=%u, lhs=%u, rhs=%u, size=%u, type=%u", result, lhs, rhs, size, kind);
 				break;
 			}
 			case LS_OP_SLICE:
@@ -393,9 +431,9 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 				for (u32 i = 0; i < count; ++i) printf(" arg%u=%u", i, lumc_read_u32(fn->code, fn->code_size, &pc));
 				break;
 			}
-			case LS_OP_ADD_I8: case LS_OP_ADD_U8: case LS_OP_ADD_I16: case LS_OP_ADD_U16: case LS_OP_ADD_I32: case LS_OP_ADD_U32: case LS_OP_ADD_I64: case LS_OP_ADD_U64: case LS_OP_ADD_F32: case LS_OP_ADD_F64:
-			case LS_OP_SUB_I8: case LS_OP_SUB_U8: case LS_OP_SUB_I16: case LS_OP_SUB_U16: case LS_OP_SUB_I32: case LS_OP_SUB_U32: case LS_OP_SUB_I64: case LS_OP_SUB_U64: case LS_OP_SUB_F32: case LS_OP_SUB_F64:
-			case LS_OP_MUL_I8: case LS_OP_MUL_U8: case LS_OP_MUL_I16: case LS_OP_MUL_U16: case LS_OP_MUL_I32: case LS_OP_MUL_U32: case LS_OP_MUL_I64: case LS_OP_MUL_U64: case LS_OP_MUL_F32: case LS_OP_MUL_F64:
+			case LS_OP_ADD_8: case LS_OP_ADD_16: case LS_OP_ADD_32: case LS_OP_ADD_64: case LS_OP_ADD_F32: case LS_OP_ADD_F64:
+			case LS_OP_SUB_8: case LS_OP_SUB_16: case LS_OP_SUB_32: case LS_OP_SUB_64: case LS_OP_SUB_F32: case LS_OP_SUB_F64:
+			case LS_OP_MUL_8: case LS_OP_MUL_16: case LS_OP_MUL_32: case LS_OP_MUL_64: case LS_OP_MUL_F32: case LS_OP_MUL_F64:
 			case LS_OP_DIV_I8: case LS_OP_DIV_U8: case LS_OP_DIV_I16: case LS_OP_DIV_U16: case LS_OP_DIV_I32: case LS_OP_DIV_U32: case LS_OP_DIV_I64: case LS_OP_DIV_U64: case LS_OP_DIV_F32: case LS_OP_DIV_F64:
 			case LS_OP_MOD_I8: case LS_OP_MOD_U8: case LS_OP_MOD_I16: case LS_OP_MOD_U16: case LS_OP_MOD_I32: case LS_OP_MOD_U32: case LS_OP_MOD_I64: case LS_OP_MOD_U64: {
 				const u32 dst = lumc_read_u32(fn->code, fn->code_size, &pc);
@@ -404,13 +442,16 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 				printf(" dst=%u, lhs=%u, rhs=%u", dst, lhs, rhs);
 				break;
 			}
+			#define LS_ARITH_INT_IMM_DISASM_CASES(OP) \
+				case LS_OP_##OP##_8_IMM: case LS_OP_##OP##_16_IMM: case LS_OP_##OP##_32_IMM: case LS_OP_##OP##_64_IMM: \
+				case LS_OP_##OP##_F32_IMM: case LS_OP_##OP##_F64_IMM:
 			#define LS_ARITH_IMM_DISASM_CASES(OP) \
 				case LS_OP_##OP##_I8_IMM: case LS_OP_##OP##_U8_IMM: case LS_OP_##OP##_I16_IMM: case LS_OP_##OP##_U16_IMM: \
 				case LS_OP_##OP##_I32_IMM: case LS_OP_##OP##_U32_IMM: case LS_OP_##OP##_I64_IMM: case LS_OP_##OP##_U64_IMM: \
 				case LS_OP_##OP##_F32_IMM: case LS_OP_##OP##_F64_IMM:
-			LS_ARITH_IMM_DISASM_CASES(ADD)
-			LS_ARITH_IMM_DISASM_CASES(SUB)
-			LS_ARITH_IMM_DISASM_CASES(MUL)
+			LS_ARITH_INT_IMM_DISASM_CASES(ADD)
+			LS_ARITH_INT_IMM_DISASM_CASES(SUB)
+			LS_ARITH_INT_IMM_DISASM_CASES(MUL)
 			LS_ARITH_IMM_DISASM_CASES(DIV)
 			case LS_OP_MOD_I8_IMM: case LS_OP_MOD_U8_IMM: case LS_OP_MOD_I16_IMM: case LS_OP_MOD_U16_IMM:
 			case LS_OP_MOD_I32_IMM: case LS_OP_MOD_U32_IMM: case LS_OP_MOD_I64_IMM: case LS_OP_MOD_U64_IMM: {
@@ -422,6 +463,7 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 				break;
 			}
 			#undef LS_ARITH_IMM_DISASM_CASES
+			#undef LS_ARITH_INT_IMM_DISASM_CASES
 			case LS_OP_INC_I32:
 			case LS_OP_INC_I64:
 			case LS_OP_DEC_I32:
@@ -446,7 +488,8 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 				case LS_OP_JGE_##TYPE: \
 				case LS_OP_JGT_##TYPE: \
 				case LS_OP_JLT_##TYPE: \
-				case LS_OP_JLE_##TYPE:
+				case LS_OP_JLE_##TYPE: \
+				case LS_OP_JNE_##TYPE:
 			LS_COMPARE_JUMP_CASES(I8)
 			LS_COMPARE_JUMP_CASES(U8)
 			LS_COMPARE_JUMP_CASES(I16)

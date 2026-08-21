@@ -59,7 +59,10 @@
 // - constants: LOAD_CONST_N (`dst`, inline payload)
 // - frame copies: COPY (`dst`, `src`, `byte size`)
 // - pointers: FRAME_PTR and GLOBAL_PTR materialize pointers from immediate byte
-//   offsets; LOAD_PTR and STORE_PTR handle all indirect value access
+//   offsets; LOAD_PTR and STORE_PTR handle indirect value access
+// - indexed access: LOAD_INDEXED and STORE_INDEXED combine bounds checking,
+//   element scaling, address formation, and the memory access; their base
+//   operand is a frame offset, not a pointer register
 // - arithmetic/logical/comparison ops carry explicit destination and source
 //   register operands; comparisons also carry a type byte
 // - comparison branches carry lhs/rhs registers, a type byte, and a signed
@@ -88,6 +91,10 @@ typedef enum ls_op {
 	LS_OP_GLOBAL_PTR,
 	LS_OP_LOAD_PTR,
 	LS_OP_STORE_PTR,
+	LS_OP_LOAD_INDEXED,
+	LS_OP_STORE_INDEXED,
+	LS_OP_LOAD_INDEXED_IMM,
+	LS_OP_STORE_INDEXED_IMM,
 	LS_OP_BOUNDS_CHECK,
 	LS_OP_SLICE,
 	LS_OP_SLICE_LOAD,
@@ -95,36 +102,24 @@ typedef enum ls_op {
 	LS_OP_SLICE_LENGTH,
 	LS_OP_SLICE_EQ,
 
-	LS_OP_ADD_I8,
-	LS_OP_ADD_U8,
-	LS_OP_ADD_I16,
-	LS_OP_ADD_U16,
-	LS_OP_ADD_I32,
-	LS_OP_ADD_U32,
-	LS_OP_ADD_I64,
-	LS_OP_ADD_U64,
+	LS_OP_ADD_8,
+	LS_OP_ADD_16,
+	LS_OP_ADD_32,
+	LS_OP_ADD_64,
 	LS_OP_ADD_F32,
 	LS_OP_ADD_F64,
 
-	LS_OP_SUB_I8,
-	LS_OP_SUB_U8,
-	LS_OP_SUB_I16,
-	LS_OP_SUB_U16,
-	LS_OP_SUB_I32,
-	LS_OP_SUB_U32,
-	LS_OP_SUB_I64,
-	LS_OP_SUB_U64,
+	LS_OP_SUB_8,
+	LS_OP_SUB_16,
+	LS_OP_SUB_32,
+	LS_OP_SUB_64,
 	LS_OP_SUB_F32,
 	LS_OP_SUB_F64,
 
-	LS_OP_MUL_I8,
-	LS_OP_MUL_U8,
-	LS_OP_MUL_I16,
-	LS_OP_MUL_U16,
-	LS_OP_MUL_I32,
-	LS_OP_MUL_U32,
-	LS_OP_MUL_I64,
-	LS_OP_MUL_U64,
+	LS_OP_MUL_8,
+	LS_OP_MUL_16,
+	LS_OP_MUL_32,
+	LS_OP_MUL_64,
 	LS_OP_MUL_F32,
 	LS_OP_MUL_F64,
 
@@ -149,36 +144,24 @@ typedef enum ls_op {
 	LS_OP_MOD_U64,
 
 	
-	LS_OP_ADD_I8_IMM,
-	LS_OP_ADD_U8_IMM,
-	LS_OP_ADD_I16_IMM,
-	LS_OP_ADD_U16_IMM,
-	LS_OP_ADD_I32_IMM,
-	LS_OP_ADD_U32_IMM,
-	LS_OP_ADD_I64_IMM,
-	LS_OP_ADD_U64_IMM,
+	LS_OP_ADD_8_IMM,
+	LS_OP_ADD_16_IMM,
+	LS_OP_ADD_32_IMM,
+	LS_OP_ADD_64_IMM,
 	LS_OP_ADD_F32_IMM,
 	LS_OP_ADD_F64_IMM,
 
-	LS_OP_SUB_I8_IMM,
-	LS_OP_SUB_U8_IMM,
-	LS_OP_SUB_I16_IMM,
-	LS_OP_SUB_U16_IMM,
-	LS_OP_SUB_I32_IMM,
-	LS_OP_SUB_U32_IMM,
-	LS_OP_SUB_I64_IMM,
-	LS_OP_SUB_U64_IMM,
+	LS_OP_SUB_8_IMM,
+	LS_OP_SUB_16_IMM,
+	LS_OP_SUB_32_IMM,
+	LS_OP_SUB_64_IMM,
 	LS_OP_SUB_F32_IMM,
 	LS_OP_SUB_F64_IMM,
 
-	LS_OP_MUL_I8_IMM,
-	LS_OP_MUL_U8_IMM,
-	LS_OP_MUL_I16_IMM,
-	LS_OP_MUL_U16_IMM,
-	LS_OP_MUL_I32_IMM,
-	LS_OP_MUL_U32_IMM,
-	LS_OP_MUL_I64_IMM,
-	LS_OP_MUL_U64_IMM,
+	LS_OP_MUL_8_IMM,
+	LS_OP_MUL_16_IMM,
+	LS_OP_MUL_32_IMM,
+	LS_OP_MUL_64_IMM,
 	LS_OP_MUL_F32_IMM,
 	LS_OP_MUL_F64_IMM,
 
@@ -231,7 +214,8 @@ typedef enum ls_op {
 		LS_OP_JGE_##TYPE, \
 		LS_OP_JGT_##TYPE, \
 		LS_OP_JLT_##TYPE, \
-		LS_OP_JLE_##TYPE,
+		LS_OP_JLE_##TYPE, \
+		LS_OP_JNE_##TYPE,
 	LS_COMPARE_JUMP_OPS(I8)
 	LS_COMPARE_JUMP_OPS(U8)
 	LS_COMPARE_JUMP_OPS(I16)

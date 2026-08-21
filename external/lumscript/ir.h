@@ -133,6 +133,14 @@ struct LsOpConditionalJump : LsIrOp {
     LsIrOp* condition = nullptr;
     struct LsIrBlockData* true_block = nullptr;
     LsIrBlockData* false_block = nullptr;
+
+    // Loop layout: the condition tree is shared by two conditional jumps - an
+    // entry check (normal if-style lowering, skips the body when initially
+    // false) and a bottom check emitted after the body in the parent block,
+    // which branches straight into `body_start` while the condition holds.
+    // One conditional branch per iteration, no unconditional back edge.
+    bool bottom_tested = false;
+    LsIrOp* body_start = nullptr;
 };
 
 struct LsOpJump : LsIrOp {
