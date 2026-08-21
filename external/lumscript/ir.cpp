@@ -2196,6 +2196,12 @@ struct BytecodeCompiler {
 	}
 
 	u32 emitCopy(const LsOpCopy& copy) {
+		if (do_optimize && copy.dst->kind == LS_IR_OP_PUSH_LOCAL_ADDR) {
+			auto& local_addr = static_cast<LsOpPushLocalAddr&>(*copy.dst);
+			EmitDst dst = { local_addr.alloca->stack_sp, typeByteSize(*copy.type) };
+			emit(*copy.src, &dst);
+			return dst.dst;
+		}
 		u32 src = emit(*copy.src, nullptr);
 		u32 dst = emit(*copy.dst, nullptr);
 		switch (copy.dst->result_mode) {
@@ -2349,8 +2355,17 @@ struct BytecodeCompiler {
 		return index;
 	}
 
-	u32 emitCast(const LsOpCast& cast) {
-		u32 value_sp = emit(*cast.value, nullptr);
+	bool tryGetDirectFrameValue(const LsIrOp& value, u32& offset) {
+		if (value.kind != LS_IR_OP_LOAD) return false;
+		const auto& load = static_cast<const LsOpLoad&>(value);
+		if (load.addr->kind != LS_IR_OP_PUSH_LOCAL_ADDR) return false;
+		offset = static_cast<const LsOpPushLocalAddr&>(*load.addr).alloca->stack_sp;
+		return true;
+	}
+
+	u32 emitCast(const LsOpCast& cast, EmitDst* dst) {
+		u32 value_sp = 0;
+		if (!tryGetDirectFrameValue(*cast.value, value_sp)) value_sp = emit(*cast.value, nullptr);
 		if (cast.target_type->kind == ResolvedTypeKind::SLICE && cast.type->kind == ResolvedTypeKind::SLICE) {
 			auto& source = static_cast<SliceResolvedType&>(*cast.target_type);
 			auto& target = static_cast<SliceResolvedType&>(*cast.type);
@@ -2392,15 +2407,15 @@ struct BytecodeCompiler {
 			emit((u32)sizeof(i64));
 			return result;
 		}
+		const u32 result = dst ? dst->dst : stack_top;
 		emitOp(LS_OP_CAST);
-		emit(stack_top);
+		emit(result);
 		emit(value_sp);
 		emit((u8)toTypeKind(*cast.target_type));
 		emit((u8)toTypeKind(*cast.type));
 
-		u32 ret = stack_top;
-		stack_top += typeByteSize(*cast.type);
-		return ret;
+		if (!dst) stack_top += typeByteSize(*cast.type);
+		return result;
 	}
 
 	u32 emitPushLocalAddr(const LsOpPushLocalAddr& op) {
@@ -2421,25 +2436,25 @@ struct BytecodeCompiler {
 		return stack_top - sizeof(void*);
 	}
 
-	u32 emitLoad(const LsOpLoad& op) {
+	u32 emitLoad(const LsOpLoad& op, EmitDst* dst) {
 		if (op.addr->kind == LS_IR_OP_PUSH_LOCAL_ADDR) {
-			u32 ret = stack_top;
+			u32 ret = dst ? dst->dst : stack_top;
 			LsOpAlloca* alloca = static_cast<LsOpPushLocalAddr&>(*op.addr).alloca;
 			u32 size = typeByteSize(*alloca->type);
-			stack_top += size;
 			emitOp(LS_OP_COPY);
 			emit(ret);
 			emit(alloca->stack_sp);
 			emit(size);
+			if (!dst) stack_top += size;
 			return ret;
 		}
 		u32 addr_sp = emit(*op.addr, nullptr);
 		emitOp(LS_OP_LOAD_PTR);
-		u32 ret = stack_top;
-		emit(stack_top);
+		u32 ret = dst ? dst->dst : stack_top;
+		emit(ret);
 		emit(addr_sp);
 		emit(op.size);
-		stack_top += op.size;
+		if (!dst) stack_top += op.size;
 		return ret;
 	}
 
@@ -2701,7 +2716,7 @@ struct BytecodeCompiler {
 			case LS_IR_OP_CALL_DIRECT: result = emitCallDirect(*static_cast<LsOpCallDirect*>(&op)); break;
 			case LS_IR_OP_CALL_INDIRECT: result = emitCallIndirect(*static_cast<LsOpCallIndirect*>(&op)); break;
 			case LS_IR_OP_EXTRACT_VALUE: result = emitExtractValue(*static_cast<LsOpExtractValue*>(&op)); break;
-			case LS_IR_OP_LOAD: result = emitLoad(*static_cast<LsOpLoad*>(&op)); break;
+			case LS_IR_OP_LOAD: result = emitLoad(*static_cast<LsOpLoad*>(&op), dst); break;
 			case LS_IR_OP_PUSH_LOCAL_ADDR: result = emitPushLocalAddr(*static_cast<LsOpPushLocalAddr*>(&op)); break;
 			case LS_IR_OP_MATERIALIZE_ADDR: result = emitMaterializeAddr(*static_cast<LsOpMaterializeAddr*>(&op)); break;
 			case LS_IR_OP_PUSH_GLOBAL_ADDR: result = emitPushGlobalAddr(*static_cast<LsOpPushGlobalAddr*>(&op)); break;
@@ -2712,7 +2727,7 @@ struct BytecodeCompiler {
 			case LS_IR_OP_GT:
 			case LS_IR_OP_GE: result = emitCompare(static_cast<LsOpBinary&>(op)); break;
 			case LS_IR_OP_COPY: result = emitCopy(*static_cast<LsOpCopy*>(&op)); break;
-			case LS_IR_OP_CAST: result = emitCast(static_cast<LsOpCast&>(op)); break;
+			case LS_IR_OP_CAST: result = emitCast(static_cast<LsOpCast&>(op), dst); break;
 			case LS_IR_OP_TERNARY: result = emitTernary(static_cast<LsOpTernary&>(op)); break;
 			case LS_IR_OP_BOUNDS_CHECK: result = emitBoundsCheck(static_cast<LsOpBoundsCheck&>(op)); break;
 			case LS_IR_OP_ALLOCA: result = emitAlloca(*static_cast<LsOpAlloca*>(&op)); break;
