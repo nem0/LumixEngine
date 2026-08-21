@@ -50,7 +50,8 @@
 // - `base` is an absolute runtime memory address, so slices can alias caller locals
 //   while passed to and returned from nested calls
 // - `SLICE` reads `base, length, begin, end` registers and writes a subslice
-// - `SLICE_LOAD` and `SLICE_REF` bounds-check an i64 index
+// - `SLICE_LOAD` and `SLICE_REF` bounds-check a typed integer index; the type
+//   kind byte of the index register follows the index register operand
 // - `SLICE_EQ` reads two slice registers plus the element size and kind, and
 //   writes a bool; `!=` is `SLICE_EQ` followed by `NOT`
 // - all slice bounds are checked by the runtime
@@ -100,6 +101,8 @@ typedef enum ls_op {
 	LS_OP_SLICE,
 	LS_OP_SLICE_LOAD,
 	LS_OP_SLICE_REF,
+	LS_OP_SLICE_FIELD_LOAD,
+	LS_OP_SLICE_FIELD_STORE,
 	LS_OP_SLICE_LENGTH,
 	LS_OP_SLICE_EQ,
 

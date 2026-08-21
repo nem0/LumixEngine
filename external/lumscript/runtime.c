@@ -245,7 +245,7 @@ static ls_string_view runtime_error_message(ls_op op) {
 	if ((op >= LS_OP_MOD_I8 && op <= LS_OP_MOD_U64) || (op >= LS_OP_MOD_I8_IMM && op <= LS_OP_MOD_U64_IMM)) {
 		return (ls_string_view){modulo_by_zero, modulo_by_zero + sizeof(modulo_by_zero) - 1u};
 	}
-	if (op >= LS_OP_LOAD_INDEXED && op <= LS_OP_SLICE_REF) return (ls_string_view){index_out_of_bounds, index_out_of_bounds + sizeof(index_out_of_bounds) - 1u};
+	if (op >= LS_OP_LOAD_INDEXED && op <= LS_OP_SLICE_FIELD_STORE) return (ls_string_view){index_out_of_bounds, index_out_of_bounds + sizeof(index_out_of_bounds) - 1u};
 	if (op == LS_OP_CALL_DIRECT || op == LS_OP_CALL_INDIRECT) return (ls_string_view){invalid_function, invalid_function + sizeof(invalid_function) - 1u};
 	return (ls_string_view){generic, generic + sizeof(generic) - 1u};
 }
@@ -720,6 +720,48 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				memmove(value, runtime->frame + src, size);
 				break;
 			}
+			case LS_OP_SLICE_FIELD_LOAD: {
+				const u32 dst = runtime_read_u32(&ip);
+				const u32 slice_reg = runtime_read_u32(&ip);
+				const u32 index_reg = runtime_read_u32(&ip);
+				const ls_type_kind index_kind = (ls_type_kind)*ip++;
+				const u32 element_size = runtime_read_u32(&ip);
+				const u32 field_offset = runtime_read_u32(&ip);
+				const u32 field_size = runtime_read_u32(&ip);
+				u64 length = 0;
+				void* base_ptr = NULL;
+				u8* slice = runtime->frame + slice_reg;
+				memcpy(&base_ptr, slice, sizeof(base_ptr));
+				memcpy(&length, slice + sizeof(void*), sizeof(length));
+				const u64 index = runtime_numeric_to_u64(runtime->frame + index_reg, index_kind);
+				if (index >= length) goto runtime_execute_function_fail;
+
+				const u64 element_offset = index * element_size;
+				ASSERT(element_size != 0);
+				memmove(runtime->frame + dst, (u8*)base_ptr + element_offset + field_offset, field_size);
+				break;
+			}
+			case LS_OP_SLICE_FIELD_STORE: {
+				const u32 slice_reg = runtime_read_u32(&ip);
+				const u32 index_reg = runtime_read_u32(&ip);
+				const ls_type_kind index_kind = (ls_type_kind)*ip++;
+				const u32 element_size = runtime_read_u32(&ip);
+				const u32 field_offset = runtime_read_u32(&ip);
+				const u32 field_size = runtime_read_u32(&ip);
+				const u32 src = runtime_read_u32(&ip);
+				u64 length = 0;
+				void* base_ptr = NULL;
+				u8* slice = runtime->frame + slice_reg;
+				memcpy(&base_ptr, slice, sizeof(base_ptr));
+				memcpy(&length, slice + sizeof(void*), sizeof(length));
+				const u64 index = runtime_numeric_to_u64(runtime->frame + index_reg, index_kind);
+				if (index >= length) goto runtime_execute_function_fail;
+
+				const u64 element_offset = index * element_size;
+				ASSERT(element_size != 0);
+				memmove((u8*)base_ptr + element_offset + field_offset, runtime->frame + src, field_size);
+				break;
+			}
 			case LS_OP_LOAD_INDEXED: {
 				const u32 dst = runtime_read_u32(&ip);
 				const u32 base_offset = runtime_read_u32(&ip);
@@ -784,7 +826,6 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				u8* base = (u8*)base_ptr;
 				if (begin < 0 || end < begin || (u64)end > (u64)length) goto runtime_execute_function_fail;
 				const u64 offset = (u64)begin * element_size;
-				if (element_size != 0u && offset / element_size != (u64)begin) goto runtime_execute_function_fail;
 				void* new_base = base ? base + offset : NULL;
 				const i64 new_length = end - begin;
 				memcpy(out, &new_base, sizeof(new_base));
@@ -795,19 +836,17 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 dst = runtime_read_u32(&ip);
 				const u32 slice_offset = runtime_read_u32(&ip);
 				const u32 index_reg = runtime_read_u32(&ip);
+				const ls_type_kind index_kind = (ls_type_kind)*ip++;
 				const u32 element_size = runtime_read_u32(&ip);
-				i64 index = 0;
 				i64 length = 0;
 				void* base_ptr = NULL;
 				u8* slice = runtime->frame + slice_offset;
-				u8* index_ptr = runtime->frame + index_reg;
 				u8* out = runtime->frame + dst;
 				memcpy(&base_ptr, slice, sizeof(base_ptr));
 				memcpy(&length, slice + sizeof(void*), 8u);
-				memcpy(&index, index_ptr, 8u);
-				if (!base_ptr || index < 0 || (u64)index >= (u64)length) goto runtime_execute_function_fail;
-				const u64 offset = (u64)index * element_size;
-				if (element_size != 0u && offset / element_size != (u64)index) goto runtime_execute_function_fail;
+				const u64 index = runtime_numeric_to_u64(runtime->frame + index_reg, index_kind);
+				if (!base_ptr || index >= (u64)length) goto runtime_execute_function_fail;
+				const u64 offset = index * element_size;
 				memmove(out, (u8*)base_ptr + offset, element_size);
 				break;
 			}
@@ -815,20 +854,18 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				/* The resulting pointer overwrites the slice value in place. */
 				const u32 slice_reg = runtime_read_u32(&ip);
 				const u32 index_reg = runtime_read_u32(&ip);
+				const ls_type_kind index_kind = (ls_type_kind)*ip++;
 				const u32 element_size = runtime_read_u32(&ip);
-				i64 index = 0;
 				i64 length = 0;
 				void* base_ptr = NULL;
 				u8* slice = runtime->frame + slice_reg;
-				u8* index_ptr = runtime->frame + index_reg;
 				u8* out = slice;
 				memcpy(&base_ptr, slice, sizeof(base_ptr));
 				memcpy(&length, slice + sizeof(void*), 8u);
-				memcpy(&index, index_ptr, 8u);
+				const u64 index = runtime_numeric_to_u64(runtime->frame + index_reg, index_kind);
 				u8* base = (u8*)base_ptr;
-				if (!base || index < 0 || (u64)index >= (u64)length) goto runtime_execute_function_fail;
-				const u64 offset = (u64)index * element_size;
-				if (element_size != 0u && offset / element_size != (u64)index) goto runtime_execute_function_fail;
+				if (!base || index >= (u64)length) goto runtime_execute_function_fail;
+				const u64 offset = index * element_size;
 				void* ref = base + offset;
 				memcpy(out, &ref, sizeof(ref));
 				break;

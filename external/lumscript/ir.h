@@ -59,6 +59,8 @@ enum LsIrOpKind {
 	LS_IR_OP_SLICE,
 	LS_IR_OP_SLICE_LOAD,
 	LS_IR_OP_SLICE_REF,
+	LS_IR_OP_SLICE_FIELD_LOAD,
+	LS_IR_OP_SLICE_FIELD_STORE,
 	LS_IR_OP_STRING_LITERAL,
 	LS_IR_OP_FRAME_PTR
 };
@@ -240,6 +242,7 @@ struct LsOpSliceLoad : LsIrOp {
 	LsOpSliceLoad() : LsIrOp(LS_IR_OP_SLICE_LOAD) {}
 	LsIrOp* slice = nullptr;
 	LsIrOp* index = nullptr;
+	ResolvedType* index_type = nullptr;
 	u32 element_size = 0;
 };
 
@@ -248,6 +251,25 @@ struct LsOpSliceRef : LsIrOp {
 	LsIrOp* slice = nullptr;
 	LsIrOp* index = nullptr;
 	u32 element_size = 0;
+	ResolvedType* index_type = nullptr;
+};
+
+struct LsOpSliceField : LsIrOp {
+	LsOpSliceField(LsIrOpKind kind) : LsIrOp(kind) {}
+	LsIrOp* slice = nullptr;
+	LsIrOp* index = nullptr;
+	u32 element_size = 0;
+	ResolvedType* index_type = nullptr;
+	u32 field_offset = 0;
+	u32 field_size = 0;
+};
+
+struct LsOpSliceFieldLoad : LsOpSliceField {
+	LsOpSliceFieldLoad() : LsOpSliceField(LS_IR_OP_SLICE_FIELD_LOAD) {}
+};
+
+struct LsOpSliceFieldStore : LsOpSliceField {
+	LsOpSliceFieldStore() : LsOpSliceField(LS_IR_OP_SLICE_FIELD_STORE) { result_mode = ADDRESS; }
 };
 
 struct LsOpUnary : LsIrOp {

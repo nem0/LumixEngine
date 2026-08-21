@@ -1035,6 +1035,81 @@ TEST(SliceI32IndexWriteThroughParameterRuntime) {
 	return true;
 }
 
+TEST(SliceU8IndexReadWriteRuntime) {
+	const char* source = R"(
+		fn fetch(values : []i32, i : u8) : i32 {
+			return values[i];
+		}
+
+		fn main() : i32 {
+			var values : [4]i32 = undefined;
+			values[0] = 10;
+			values[1] = 20;
+			values[2] = 30;
+			values[3] = 40;
+			var slice : []i32 = values[:];
+			var i : u8 = 2;
+			slice[i] = 99;
+			return fetch(values, 0) + slice[i] + slice[i + 1];
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(149, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(SliceU32IndexOutOfBoundsFails) {
+	const char* source = R"(
+		fn main(i : u32) : i32 {
+			var values : [3]i32 = undefined;
+			values[0] = 7;
+			const slice : []i32 = values[:];
+			return slice[i];
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	test_diagnostics.output_enabled = false;
+	ls_push_u32(runtime, 3);
+	EXPECT_EQ(LS_RESULT_SUSPENDED, ls_call(runtime, toLs("main")));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(SliceCastIndexFieldReadRuntime) {
+	const char* source = R"(
+		struct P {
+			x : i32;
+			y : i32;
+		}
+
+		fn main() : i32 {
+			var ps : [3]P = undefined;
+			ps[0] = P { 1, 2 };
+			ps[1] = P { 3, 4 };
+			ps[2] = P { 5, 6 };
+			var s : []P = ps[:];
+			var i : i32 = 2;
+			return s[i as i64].y + s[i].x;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(11, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(SliceStructFieldReadRuntime) {
 	const char* source = R"(
 		struct Body {

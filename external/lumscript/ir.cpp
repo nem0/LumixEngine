@@ -207,9 +207,6 @@ struct IRBuilder {
 		return value;
 	}
 
-	// Runtime slice indexing and slice bounds are always read back as a fixed
-	// 8-byte i64 (SLICE_LOAD / SLICE_REF / SLICE in runtime.c). Widen narrower
-	// integer indices so the upper four bytes are not stale stack data.
 	LsIrOp& widenToI64(LsIrOp& value, ResolvedType& source_type) {
 		switch (source_type.kind) {
 			case ResolvedTypeKind::I64:
@@ -495,17 +492,19 @@ struct IRBuilder {
 				// slice[index]
 				if (be.base->resolved_type->kind == ResolvedTypeKind::SLICE) {
 					ASSERT(be.args.size() == 1);
-					LsIrOp& index = widenToI64(buildExpressionIR(*be.args[0], true), *be.args[0]->resolved_type);
+					LsIrOp& index = buildExpressionIR(*be.args[0], true);
 					if (as_rvalue) {
-					auto& load = alloc<LsOpSliceLoad>();
+						auto& load = alloc<LsOpSliceLoad>();
 						load.slice = &buildExpressionIR(*be.base, true);
 						load.index = &index;
+						load.index_type = be.args[0]->resolved_type;
 						load.element_size = typeByteSize(*be.resolved_type);
 						return load;
 					}
 					auto& ref = alloc<LsOpSliceRef>();
 					ref.slice = &buildExpressionIR(*be.base, true);
 					ref.index = &index;
+					ref.index_type = be.args[0]->resolved_type;
 					ref.element_size = typeByteSize(*be.resolved_type);
 					return ref;
 				}
@@ -631,7 +630,7 @@ struct IRBuilder {
 				}
 
 				auto& base = buildExpressionIR(*me.expression, pointer_base);
-				
+
 				if (as_rvalue && base.result_mode == LsIrOp::VALUE) {
 					auto& extract = alloc<LsOpExtractValue>();
 					extract.value = &base;
@@ -1363,6 +1362,7 @@ struct IRBuilder {
 					auto& load = alloc<LsOpSliceLoad>();
 					load.slice = &container_load;
 					load.index = &counter_load;
+					load.index_type = index_type;
 					load.element_size = typeByteSize(*element_type);
 					element = &load;
 				}
@@ -2639,6 +2639,53 @@ struct BytecodeCompiler {
 	}
 
 	u32 emitCopy(const LsOpCopy& copy) {
+		// Fuse stores whose address was formed as slice element reference plus
+		// a constant struct-field offset.
+		if (copy.dst->kind == LS_IR_OP_ADD) {
+			auto& add = static_cast<const LsOpAdd&>(*copy.dst);
+			if (add.lhs->kind == LS_IR_OP_SLICE_REF && add.rhs->kind == LS_IR_OP_LOAD_CONST) {
+				auto& ref = static_cast<const LsOpSliceRef&>(*add.lhs);
+				auto& offset = static_cast<const LsOpLoadConst&>(*add.rhs);
+				u64 field_offset = 0;
+				memcpy(&field_offset, offset.value, sizeof(field_offset));
+				if (field_offset <= 0xffFFffFFu) {
+					const u32 src = emit(*copy.src, nullptr);
+					const u32 slice = emitSliceFieldValue(ref.slice);
+					const u32 index = emitSliceFieldValue(ref.index);
+					emitOp(LS_OP_SLICE_FIELD_STORE);
+					emit(slice);
+					emit(index);
+					emit((u8)toTypeKind(*ref.index_type));
+					emit(ref.element_size);
+					emit((u32)field_offset);
+					emit(typeByteSize(*copy.type));
+					emit(src);
+					return slice;
+				}
+			}
+		}
+		if (copy.dst->kind == LS_IR_OP_SLICE_FIELD_STORE) {
+			auto& field = static_cast<LsOpSliceFieldStore&>(*copy.dst);
+			const u32 src = emit(*copy.src, nullptr);
+			const u32 slice = emitSliceFieldValue(field.slice);
+			const u32 index = emit(*field.index, nullptr);
+			emitOp(LS_OP_SLICE_REF);
+			emit(slice);
+			emit(index);
+			emit((u8)toTypeKind(*field.index_type));
+			emit(field.element_size);
+			const u32 address = stack_top;
+			emitOp(LS_OP_ADD_64_IMM);
+			emit(address);
+			emit(slice);
+			emit((u64)field.field_offset);
+			emitOp(LS_OP_STORE_PTR);
+			emit(address);
+			emit(src);
+			emit(field.field_size);
+			stack_top += sizeof(void*);
+			return address;
+		}
 		if (do_optimize && copy.dst->kind == LS_IR_OP_PUSH_LOCAL_ADDR) {
 			auto& local_addr = static_cast<LsOpPushLocalAddr&>(*copy.dst);
 			EmitDst dst = { local_addr.alloca->stack_sp, typeByteSize(*copy.type) };
@@ -2916,6 +2963,34 @@ struct BytecodeCompiler {
 			if (!dst) stack_top += size;
 			return ret;
 		}
+		// Fuse a field load formed from a slice element reference and a
+		// constant struct-field offset. This is also the read side of compound
+		// assignments, whose address is otherwise lowered to SLICE_REF + ADD +
+		// LOAD_PTR before bytecode emission.
+		if (op.addr->kind == LS_IR_OP_ADD) {
+			auto& add = static_cast<const LsOpAdd&>(*op.addr);
+			if (add.lhs->kind == LS_IR_OP_SLICE_REF && add.rhs->kind == LS_IR_OP_LOAD_CONST) {
+				auto& ref = static_cast<const LsOpSliceRef&>(*add.lhs);
+				auto& offset = static_cast<const LsOpLoadConst&>(*add.rhs);
+				u64 field_offset = 0;
+				memcpy(&field_offset, offset.value, sizeof(field_offset));
+				if (field_offset <= 0xffFFffFFu) {
+					const u32 slice = emitSliceFieldValue(ref.slice);
+					const u32 index = emitSliceFieldValue(ref.index);
+					const u32 ret = dst ? dst->dst : stack_top;
+					emitOp(LS_OP_SLICE_FIELD_LOAD);
+					emit(ret);
+					emit(slice);
+					emit(index);
+					emit((u8)toTypeKind(*ref.index_type));
+					emit(ref.element_size);
+					emit((u32)field_offset);
+					emit(op.size);
+					if (!dst) stack_top += op.size;
+					return ret;
+				}
+			}
+		}
 		IndexedAddress indexed;
 		if (tryGetIndexedAddress(*op.addr, indexed)) {
 			const u32 ret = dst ? dst->dst : stack_top;
@@ -3157,6 +3232,7 @@ struct BytecodeCompiler {
 		emit(result);
 		emit(slice);
 		emit(index);
+		emit((u8)toTypeKind(*op.index_type));
 		emit(op.element_size);
 		stack_top += op.element_size;
 		return result;
@@ -3172,14 +3248,48 @@ struct BytecodeCompiler {
 		return result;
 	}
 
+	u32 emitSliceFieldValue(LsIrOp* value) {
+		u32 frame_offset = 0;
+		if (tryGetDirectFrameValue(*value, frame_offset)) return frame_offset;
+		return emit(*value, nullptr);
+	}
+
 	u32 emitSliceRef(const LsOpSliceRef& op) {
 		const u32 slice = emit(*op.slice, nullptr);
 		const u32 index = emit(*op.index, nullptr);
 		emitOp(LS_OP_SLICE_REF);
 		emit(slice);
 		emit(index);
+		emit((u8)toTypeKind(*op.index_type));
 		emit(op.element_size);
 		return slice;
+	}
+
+	u32 emitSliceFieldStoreAddress(const LsOpSliceFieldStore& op) {
+		const u32 slice = emitSliceFieldValue(op.slice);
+		const u32 index = emitSliceFieldValue(op.index);
+		emitOp(LS_OP_SLICE_REF);
+		emit(slice);
+		emit(index);
+		emit((u8)toTypeKind(*op.index_type));
+		emit(op.element_size);
+		return slice;
+	}
+
+	u32 emitSliceFieldLoad(const LsOpSliceFieldLoad& op) {
+		const u32 slice = emitSliceFieldValue(op.slice);
+		const u32 index = emitSliceFieldValue(op.index);
+		const u32 result = stack_top;
+		emitOp(LS_OP_SLICE_FIELD_LOAD);
+		emit(result);
+		emit(slice);
+		emit(index);
+		emit((u8)toTypeKind(*op.index_type));
+		emit(op.element_size);
+		emit(op.field_offset);
+		emit(op.field_size);
+		stack_top += op.field_size;
+		return result;
 	}
 
 	u32 emitFramePtr(LsOpFramePtr& frame) {
@@ -3195,6 +3305,8 @@ struct BytecodeCompiler {
 			case LS_IR_OP_FRAME_PTR: result = emitFramePtr(static_cast<LsOpFramePtr&>(op)); break;
 			case LS_IR_OP_STRING_LITERAL: result = emitStringLiteral(static_cast<LsOpStringLiteral&>(op)); break;
 			case LS_IR_OP_SLICE_REF: result = emitSliceRef(static_cast<LsOpSliceRef&>(op)); break;
+			case LS_IR_OP_SLICE_FIELD_LOAD: result = emitSliceFieldLoad(static_cast<LsOpSliceFieldLoad&>(op)); break;
+			case LS_IR_OP_SLICE_FIELD_STORE: result = emitSliceFieldStoreAddress(static_cast<LsOpSliceFieldStore&>(op)); break;
 			case LS_IR_OP_SLICE_LOAD: result = emitSliceLoad(static_cast<LsOpSliceLoad&>(op)); break;
 			case LS_IR_OP_SLICE: result = emitSlice(static_cast<LsOpSlice&>(op)); break;
 			case LS_IR_OP_NEG:
