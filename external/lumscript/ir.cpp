@@ -3438,6 +3438,7 @@ struct BytecodeCompiler {
 					auto& addr = *static_cast<LsOpPushLocalAddr*>(load->addr);
 					auto& ref = alloc<LsOpFramePtr>();
 					ref.alloca = addr.alloca;
+					ref.src_loc = load->src_loc;
 					op = &ref;
 				}
 				break;
