@@ -2608,8 +2608,8 @@ struct BytecodeCompiler {
 			if (indexed.index_immediate) {
 				emitOp(LS_OP_COPY);
 				emit(indexedImmediateOffset(indexed));
-				emit(indexed.element_size);
 				emit(src);
+				emit(indexed.element_size);
 			} else {
 				emitOp(LS_OP_STORE_INDEXED);
 				emitIndexedOperands(indexed);
