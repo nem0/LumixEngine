@@ -5,6 +5,12 @@
 
 using i32 = int;
 
+#if defined(_MSC_VER)
+	#define bitScanReverse(value) ([](unsigned long v) { unsigned long result; _BitScanReverse(&result, v); return result; }(value))
+#else
+	#define bitScanReverse(value) (8 * sizeof(unsigned long) - 1 - __builtin_clzl(value))
+#endif
+
 struct NewPlaceholder {};
 inline void* operator new(size_t, NewPlaceholder, void* where) { return where; }
 inline void operator delete(void*, NewPlaceholder,  void*) { } 
@@ -36,8 +42,7 @@ struct ExpArray {
 	T& emplace(Args&&... args) {
 		if (capacity == size) grow();
 		unsigned long m = (size + 4) >> 2;
-		unsigned long chunk = 0;
-		_BitScanReverse(&chunk, (unsigned long)m);
+		unsigned long chunk = bitScanReverse((unsigned long)m);
 		i32 chunk_elems = (i32(4) << chunk);
 		i32 start_idx = chunk_elems - 4;
 		i32 offset = size - start_idx;
@@ -48,8 +53,7 @@ struct ExpArray {
 
 	T& operator[](i32 idx) {
 		unsigned long m = (idx + 4) >> 2;              // Normalize so first 4 indices fall into chunk 0; divides by 4 with bias.
-		unsigned long chunk = 0;
-		_BitScanReverse(&chunk, (unsigned long)m);     // Find position of highest set bit => selects chunk (log2).
+		unsigned long chunk = bitScanReverse((unsigned long)m);     // Find position of highest set bit => selects chunk (log2).
 		i32 chunk_elems = (i32(4) << chunk);           // Chunk size = 4 * 2^chunk (sequence: 4,8,16,32,...).
 		i32 start_idx = chunk_elems - 4;               // First global index served by this chunk.
 		i32 offset = idx - start_idx;                  // In-chunk offset of requested element.
@@ -58,8 +62,7 @@ struct ExpArray {
 
 	const T& operator[](i32 idx) const {
 		unsigned long m = (idx + 4) >> 2;
-		unsigned long chunk = 0;
-		_BitScanReverse(&chunk, (unsigned long)m);
+		unsigned long chunk = bitScanReverse((unsigned long)m);
 		i32 chunk_elems = (i32(4) << chunk);
 		i32 start_idx = chunk_elems - 4;
 		i32 offset = idx - start_idx;
