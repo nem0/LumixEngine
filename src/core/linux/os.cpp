@@ -604,6 +604,8 @@ next:
 }
 
 
+void* getNativeDisplay() { return G.display; }
+
 void destroyWindow(WindowHandle window) {
 	XUnmapWindow(G.display, (Window)window);
 	XDestroyWindow(G.display, (Window)window);

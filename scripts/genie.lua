@@ -12,6 +12,7 @@ local simple_options = {
 	{ "no-lumscript", "Do not build lumscript plugin." },
 	{ "no-ui", "Do not build UI plugin." },
 	{ "with-app", "Do build app." },
+	{ "with-vulkan", "Use the minimal Vulkan clear/present backend." },
 	{ "with-basis-universal", "Use basis universal compression." },
 	{ "with-game", "Build game plugin." },
 	{ "working-dir", "Working directory." },
@@ -44,6 +45,7 @@ newoption {
 -- process _OPTIONS
 build_studio = not _OPTIONS["no-studio"]
 build_app = _OPTIONS["with-app"] or false
+build_vulkan = _OPTIONS["with-vulkan"] or false
 build_tests = _OPTIONS["with-tests"] or false
 local embed_resources = _OPTIONS["embed-resources"]
 local working_dir = _OPTIONS["working-dir"]
@@ -478,11 +480,26 @@ if plugin "renderer" then
 
 	configuration { "linux" }
 		links { "GL", "X11", "Xi" }
+		if build_vulkan then links { "vulkan" } end
 		-- TODO pipeline
 		removefiles { "../src/renderer/gpu/gpu_dx12.cpp", "../src/renderer/pipeline.cpp", "../src/renderer/pose.cpp", "../src/renderer/render_module.cpp" }
+		if not build_vulkan then removefiles { "../src/renderer/gpu/gpu_vulkan.cpp" } end
 	
 	configuration { "windows" }
 		links { "psapi", "dxguid" }
+		if build_vulkan then
+			local vulkan_sdk = os.getenv("VULKAN_SDK")
+			if vulkan_sdk then
+				includedirs { vulkan_sdk .. "/Include" }
+				libdirs { vulkan_sdk .. "/Lib" }
+			else
+				printf("VULKAN_SDK is not set; install the Vulkan SDK before building with --with-vulkan")
+			end
+			links { "vulkan-1" }
+			removefiles { "../src/renderer/gpu/gpu_dx12.cpp" }
+		else
+			removefiles { "../src/renderer/gpu/gpu_vulkan.cpp" }
+		end
 end
 		
 if plugin "animation" then
@@ -666,6 +683,14 @@ if build_app then
 		configuration {"vs*"}
 			links { "winmm", "imm32", "version" }
 		configuration {}
+
+		if build_vulkan then
+			configuration { "windows" }
+				local vulkan_sdk = os.getenv("VULKAN_SDK")
+				if vulkan_sdk then libdirs { vulkan_sdk .. "/Lib" } end
+				links { "vulkan-1" }
+			configuration {}
+		end
 
 		for _, callback in ipairs(build_app_callbacks) do
 			callback()

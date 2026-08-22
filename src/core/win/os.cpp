@@ -888,6 +888,8 @@ struct WindowData {
 	bool is_shown = false;
 };
 
+void* getNativeDisplay() { return nullptr; }
+
 void destroyWindow(WindowHandle window) {
 	WindowData* data = (WindowData*)GetWindowLongPtrW((HWND)window, GWLP_USERDATA);
 	if (data) LUMIX_DELETE(getGlobalAllocator(), data);
