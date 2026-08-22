@@ -62,7 +62,7 @@ private:
 		struct {
 			pthread_mutex_t mutex;
 			pthread_cond_t cond;
-			volatile i32 count;
+			i32 count;
 		} m_id;
 	#endif
 };
