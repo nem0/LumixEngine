@@ -7,6 +7,8 @@ TEST_BIN="$BUILD_DIR/bin/Debug/tests"
 
 cd "$SCRIPT_DIR"
 
+"$SCRIPT_DIR/run_meta.sh"
+
 if [[ ! -x ./genie ]]; then
   echo "error: Linux genie is missing or not executable: $SCRIPT_DIR/genie" >&2
   echo "       run: chmod +x \"$SCRIPT_DIR/genie\"" >&2

@@ -607,6 +607,10 @@ struct Parser {
 		res.return_type = consumeType(str);
 		res.name = consumeIdentifier(str);
 		res.args = consumeArgs(str);
+		StringView suffix = skipWhitespaces(str);
+		res.is_const = suffix.size() >= 5
+			&& suffix.begin[0] == 'c' && suffix.begin[1] == 'o' && suffix.begin[2] == 'n'
+			&& suffix.begin[3] == 's' && suffix.begin[4] == 't';
 		StringView def = find(str, "//@");
 		if (def.size() > 2) {
 			def.begin += 3;
@@ -2452,7 +2456,7 @@ void serializeReflection(OutputStream& out, Module& m) {
 	for (Function& fn : m.functions) {
 		StringView name = fn.name;
 		if (fn.attributes.alias.size() > 0) name = fn.attributes.alias;
-		L("\t.function<(", fn.return_type, " (", m.name, "::*)(", fn.args, "))&", m.name, "::", fn.name ,">(\"", name, "\")");
+		L("\t.function<static_cast<", fn.return_type, " (", m.name, "::*)(", fn.args, ")", fn.is_const ? " const" : "", ">(&", m.name, "::", fn.name ,")>(\"", name, "\")");
 	}
 
 	for (Component& cmp : m.components) {
@@ -2522,7 +2526,7 @@ void serializeReflection(OutputStream& out, Module& m) {
 
 		for (Function& fn : cmp.functions) {
 			StringView name = fn.attributes.alias.size() > 0 ? fn.attributes.alias : fn.name;
-			L("\t\t.function<(", fn.return_type, " (", m.name, "::*)(", fn.args, "))&", m.name, "::", fn.name, ">(\"", name, "\")");
+			L("\t\t.function<static_cast<", fn.return_type, " (", m.name, "::*)(", fn.args, ")", fn.is_const ? " const" : "", ">(&", m.name, "::", fn.name, ")>(\"", name, "\")");
 		}
 
 		for (Property& prop : cmp.properties) {

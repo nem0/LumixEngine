@@ -163,6 +163,7 @@ struct Function {
 	StringView name;
 	StringView args;
 	Attributes attributes;
+	bool is_const = false;
 };
 
 struct StructVar {

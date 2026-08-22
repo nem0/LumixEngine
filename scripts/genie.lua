@@ -479,7 +479,7 @@ if plugin "renderer" then
 	configuration { "linux" }
 		links { "GL", "X11", "Xi" }
 		-- TODO pipeline
-		removefiles { "../src/renderer/gpu/gpu_dx12.cpp", "../src/renderer/pipeline.cpp", "../src/renderer/pose.cpp" }
+		removefiles { "../src/renderer/gpu/gpu_dx12.cpp", "../src/renderer/pipeline.cpp", "../src/renderer/pose.cpp", "../src/renderer/render_module.cpp" }
 	
 	configuration { "windows" }
 		links { "psapi", "dxguid" }
