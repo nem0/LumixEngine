@@ -24,3 +24,16 @@ jobs:
         run: |
           echo Running headless tests because related files changed
           scripts\run_tests.bat
+
+  run-tests-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++ libfreetype6-dev libgl1-mesa-dev libx11-dev libxi-dev
+
+      - name: Run headless tests
+        run: ./scripts/run_tests.sh
