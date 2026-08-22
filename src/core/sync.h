@@ -19,6 +19,8 @@ struct alignas(8) LUMIX_CORE_API SRWLock {
 	
 	#ifdef _WIN32
 		u8 data[8];
+	#elif defined __linux__
+		pthread_rwlock_t rwlock;
 	#else
 		#error "Not implemented"
 	#endif

@@ -1,379 +1,339 @@
 #include "core/debug.h"
 #include "core/default_allocator.h"
-#include "core/atomic.h"
+#include "core/stack_tree.h"
 #include "core/string.h"
+#include "core/tag_allocator.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <execinfo.h>
 
-static bool g_is_crash_reporting_enabled = false;
+namespace Lumix::debug {
 
+static constexpr u32 UNINITIALIZED_MEMORY_PATTERN = 0xCD;
+static constexpr u32 FREED_MEMORY_PATTERN = 0xDD;
+static constexpr u32 ALLOCATION_GUARD = 0xFDFDFDFD;
 
-namespace Lumix {
-
-
-namespace debug {
-
-
-static Lumix::DefaultAllocator stack_node_allocator;
-
-
-void debugOutput(const char* message) {
-	printf("%s", message);
-}
-
-
-void debugBreak() {
-	abort();
-}
-
+struct StackNode {
+	void* instruction = nullptr;
+	StackNode* next = nullptr;
+	StackNode* first_child = nullptr;
+	StackNode* parent = nullptr;
+};
 
 AtomicI32 StackTree::s_instances = 0;
 
+StackTree::StackTree(IAllocator& allocator)
+	: m_allocator(256 * 1024 * 1024, allocator, "Stack tree") {
+#ifdef LUMIX_DEBUG
+	m_allocator.getAllocationInfo().flags = AllocationInfo::IS_MISC;
+#endif
+}
 
-struct StackNode {
-	~StackNode() {
-		delete m_next;
-		delete m_first_child;
-	}
-
-	void* m_instruction;
-	StackNode* m_next;
-	StackNode* m_first_child;
-	StackNode* m_parent;
-};
-
-
-StackTree::StackTree()
-	: m_root(nullptr)
-{}
-
-StackTree::~StackTree() {}
+StackTree::~StackTree() {
+	m_allocator.reset();
+}
 
 void StackTree::refreshModuleList() {}
 
-
 int StackTree::getPath(StackNode* node, Span<StackNode*> output) {
-	u32 i = 0;
-	while (i < output.length() && node) {
-		output[i] = node;
-		i++;
-		node = node->m_parent;
+	u32 count = 0;
+	while (count < output.length() && node) {
+		output[count++] = node;
+		node = node->parent;
 	}
-	return i;
+	return count;
 }
-
 
 StackNode* StackTree::getParent(StackNode* node) {
-	return node ? node->m_parent : nullptr;
+	return node ? node->parent : nullptr;
 }
 
-
-bool StackTree::getFunction(StackNode* node, Span<char> out, int& line) {
-	if (!node) return false;
-	char** str = backtrace_symbols(&node->m_instruction, 1);
-	if (!str) return false;
-
-	copyString(out, *str);
-	free(str);
+bool StackTree::getFunction(StackNode* node, Span<char> output, int& line) {
 	line = -1;
+	if (!node) return false;
+	char** symbols = backtrace_symbols(&node->instruction, 1);
+	if (!symbols) return false;
+	copyString(output, symbols[0]);
+	std::free(symbols);
 	return true;
 }
 
-
 void StackTree::printCallstack(StackNode* node) {
-	char** str = backtrace_symbols(&node->m_instruction, 1);
-	if (str) {
-		printf("%s", *str);
-		free(str);
+	while (node) {
+		char** symbols = backtrace_symbols(&node->instruction, 1);
+		if (symbols) {
+			std::fprintf(stderr, "\\t%s\\n", symbols[0]);
+			std::free(symbols);
+		}
+		node = node->parent;
 	}
 }
 
-
-StackNode* StackTree::insertChildren(StackNode* root_node, void** instruction, void** stack) {
-	StackNode* node = root_node;
+StackNode* StackTree::insertChildren(StackNode* root, void** instruction, void** stack) {
+	StackNode* node = root;
 	while (instruction >= stack) {
-		StackNode* new_node = LUMIX_NEW(stack_node_allocator, StackNode)();
-		node->m_first_child = new_node;
-		new_node->m_parent = node;
-		new_node->m_next = nullptr;
-		new_node->m_first_child = nullptr;
-		new_node->m_instruction = *instruction;
-		node = new_node;
+		StackNode* child = LUMIX_NEW(m_allocator, StackNode)();
+		child->parent = node;
+		child->instruction = *instruction;
+		node->first_child = child;
+		node = child;
 		--instruction;
 	}
 	return node;
 }
 
-StackNode* StackTree::record() {
-	static const int frames_to_capture = 256;
-	void* stack[frames_to_capture];
-	const int captured_frames_count = backtrace(stack, frames_to_capture);
+StackNode* StackTree::find(void** stack, u32 count) {
+	if (!count) return nullptr;
+	m_srw_lock.enterShared();
+	StackNode* node = m_root;
+	void** instruction = stack + count - 1;
+	while (node) {
+		if (node->instruction != *instruction) {
+			node = node->next;
+			continue;
+		}
+		if (instruction == stack) {
+			m_srw_lock.exitShared();
+			return node;
+		}
+		--instruction;
+		node = node->first_child;
+	}
+	m_srw_lock.exitShared();
+	return nullptr;
+}
 
-	void** ptr = stack + captured_frames_count - 1;
+StackNode* StackTree::record() {
+	thread_local bool recording = false;
+	if (recording) return nullptr;
+	recording = true;
+	struct RecordingGuard {
+		bool& value;
+		~RecordingGuard() { value = false; }
+	} guard{recording};
+
+	void* stack[256];
+	const int count = backtrace(stack, lengthOf(stack));
+	if (count <= 0) return nullptr;
+
+	m_srw_lock.enterExclusive();
+	void** instruction = stack + count - 1;
 	if (!m_root) {
-		m_root = LUMIX_NEW(stack_node_allocator, StackNode)();
-		m_root->m_instruction = *ptr;
-		m_root->m_first_child = nullptr;
-		m_root->m_next = nullptr;
-		m_root->m_parent = nullptr;
-		--ptr;
-		return insertChildren(m_root, ptr, stack);
+		m_root = LUMIX_NEW(m_allocator, StackNode)();
+		m_root->instruction = *instruction;
+		--instruction;
+		StackNode* result = insertChildren(m_root, instruction, stack);
+		m_srw_lock.exitExclusive();
+		return result;
 	}
 
 	StackNode* node = m_root;
-	while (ptr >= stack) {
-		while (node->m_instruction != *ptr && node->m_next) {
-			node = node->m_next;
+	while (instruction >= stack) {
+		while (node->instruction != *instruction && node->next) node = node->next;
+		if (node->instruction != *instruction) {
+			node->next = LUMIX_NEW(m_allocator, StackNode)();
+			node->next->parent = node->parent;
+			node->next->instruction = *instruction;
+			StackNode* result = insertChildren(node->next, instruction - 1, stack);
+			m_srw_lock.exitExclusive();
+			return result;
 		}
-		if (node->m_instruction != *ptr) {
-			node->m_next = LUMIX_NEW(stack_node_allocator, StackNode);
-			node->m_next->m_parent = node->m_parent;
-			node->m_next->m_instruction = *ptr;
-			node->m_next->m_next = nullptr;
-			node->m_next->m_first_child = nullptr;
-			--ptr;
-			return insertChildren(node->m_next, ptr, stack);
-		}
-
-		if (node->m_first_child) {
-			--ptr;
-			node = node->m_first_child;
-		} else if (ptr != stack) {
-			--ptr;
-			return insertChildren(node, ptr, stack);
+		if (node->first_child) {
+			--instruction;
+			node = node->first_child;
+		} else if (instruction != stack) {
+			StackNode* result = insertChildren(node, instruction - 1, stack);
+			m_srw_lock.exitExclusive();
+			return result;
 		} else {
+			m_srw_lock.exitExclusive();
 			return node;
 		}
 	}
-
+	m_srw_lock.exitExclusive();
 	return node;
 }
 
-static const u32 UNINITIALIZED_MEMORY_PATTERN = 0xCD;
-static const u32 FREED_MEMORY_PATTERN = 0xDD;
-static const u32 ALLOCATION_GUARD = 0xFDFDFDFD;
+struct AllocationDebugSystem {
+	AllocationInfo* root = nullptr;
+	Mutex mutex;
+	AtomicI64 total_size = 0;
+} static s_allocations;
 
+static Local<StackTree> s_stack_tree;
 
-Allocator::Allocator(IAllocator& source)
-	: m_source(source)
-	, m_root(nullptr)
-	, m_total_size(0)
-	, m_is_fill_enabled(true)
-	, m_are_guards_enabled(true) {
-	m_sentinels[0].next = &m_sentinels[1];
-	m_sentinels[0].previous = nullptr;
-	m_sentinels[0].stack_leaf = nullptr;
-	m_sentinels[0].size = 0;
-	m_sentinels[0].align = 0;
+void debugOutput(const char* message) {
+	std::fputs(message, stdout);
+}
+void debugBreak() {
+	std::abort();
+}
+void enableFloatingPointTraps(bool) {}
 
-	m_sentinels[1].next = nullptr;
-	m_sentinels[1].previous = &m_sentinels[0];
-	m_sentinels[1].stack_leaf = nullptr;
-	m_sentinels[1].size = 0;
-	m_sentinels[1].align = 0;
-
-	m_root = &m_sentinels[1];
+void init(IAllocator& allocator) {
+	s_stack_tree.create(allocator);
 }
 
-
-Allocator::~Allocator() {
-	AllocationInfo* last_sentinel = &m_sentinels[1];
-	if (m_root != last_sentinel) {
-		debugOutput("Memory leaks detected!\n");
-		AllocationInfo* info = m_root;
-		while (info != last_sentinel) {
-			char tmp[2048];
-			sprintf(tmp, "\nAllocation size : %zu, memory %p\n", info->size, info + sizeof(info)); //-V568
-			debugOutput(tmp);
-			m_stack_tree.printCallstack(info->stack_leaf);
-			info = info->next;
-		}
-		ASSERT(false);
-	}
+void shutdown() {
+	s_stack_tree.destroy();
 }
 
-
-void Allocator::lock() {
-	m_mutex.enter();
-}
-
-
-void Allocator::unlock() {
-	m_mutex.exit();
-}
-
-
-void Allocator::checkGuards() {
-	if (m_are_guards_enabled) return;
-
-	MutexGuard lock(m_mutex);
-	auto* info = m_root;
-	while (info) {
-		auto user_ptr = getUserPtrFromAllocationInfo(info);
-		void* system_ptr = getSystemFromUser(user_ptr);
-		ASSERT(*(u32*)system_ptr == ALLOCATION_GUARD);
-		ASSERT(*(u32*)((u8*)user_ptr + info->size) == ALLOCATION_GUARD);
-
-		info = info->next;
-	}
-}
-
-
-size_t Allocator::getAllocationOffset() {
-	return sizeof(AllocationInfo) + (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) : 0);
-}
-
-
-size_t Allocator::getNeededMemory(size_t size) {
-	return size + sizeof(AllocationInfo) + (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) << 1 : 0);
-}
-
-
-size_t Allocator::getNeededMemory(size_t size, size_t align) {
-	return size + sizeof(AllocationInfo) + (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) << 1 : 0) + align;
-}
-
-
-void* Allocator::getUserPtrFromAllocationInfo(AllocationInfo* info) {
-	return ((u8*)info + sizeof(AllocationInfo));
-}
-
-
-Allocator::AllocationInfo* Allocator::getAllocationInfoFromUser(void* user_ptr) {
+static AllocationInfo* getInfo(void* user_ptr) {
 	return (AllocationInfo*)((u8*)user_ptr - sizeof(AllocationInfo));
 }
 
-
-u8* Allocator::getUserFromSystem(void* system_ptr, size_t align) {
-	size_t diff = (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) : 0) + sizeof(AllocationInfo);
-
-	if (align) diff += (align - diff % align) % align;
-	return (u8*)system_ptr + diff;
+static size_t getOffset() {
+	return sizeof(ALLOCATION_GUARD) + sizeof(AllocationInfo);
 }
 
-
-u8* Allocator::getSystemFromUser(void* user_ptr) {
-	AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
-	size_t diff = (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) : 0) + sizeof(AllocationInfo);
-	if (info->align) diff += (info->align - diff % info->align) % info->align;
-	return (u8*)user_ptr - diff;
+static size_t getNeededMemory(size_t size, size_t align) {
+	return size + sizeof(AllocationInfo) + sizeof(ALLOCATION_GUARD) * 2 + align;
 }
 
+static u8* getUser(void* system_ptr, size_t align) {
+	size_t offset = getOffset();
+	if (align) offset += (align - offset % align) % align;
+	return (u8*)system_ptr + offset;
+}
+
+static u8* getSystem(void* user_ptr) {
+	AllocationInfo* info = getInfo(user_ptr);
+	size_t offset = sizeof(ALLOCATION_GUARD) + sizeof(AllocationInfo);
+	if (info->align) offset += (info->align - offset % info->align) % info->align;
+	return (u8*)user_ptr - offset;
+}
+
+void registerAlloc(AllocationInfo& info) {
+	info.stack_leaf = s_stack_tree.get() ? s_stack_tree->record() : nullptr;
+	MutexGuard guard(s_allocations.mutex);
+	info.previous = nullptr;
+	info.next = s_allocations.root;
+	if (s_allocations.root) s_allocations.root->previous = &info;
+	s_allocations.root = &info;
+	if (!info.is(AllocationInfo::IS_VRAM)) s_allocations.total_size.add(info.size);
+}
+
+void unregisterAlloc(const AllocationInfo& info) {
+	MutexGuard guard(s_allocations.mutex);
+	if (&info == s_allocations.root) s_allocations.root = info.next;
+	if (info.previous) info.previous->next = info.next;
+	if (info.next) info.next->previous = info.previous;
+	if (!info.is(AllocationInfo::IS_VRAM)) s_allocations.total_size.subtract(info.size);
+}
+
+void resizeAlloc(AllocationInfo& info, u64 new_size) {
+	MutexGuard guard(s_allocations.mutex);
+	if (!info.is(AllocationInfo::IS_VRAM)) {
+		s_allocations.total_size.subtract(info.size);
+		s_allocations.total_size.add(new_size);
+	}
+	info.size = new_size;
+}
+
+u64 getRegisteredAllocsSize() {
+	return s_allocations.total_size;
+}
+
+const AllocationInfo* lockAllocationInfos() {
+	s_allocations.mutex.enter();
+	return s_allocations.root;
+}
+
+void unlockAllocationInfos() {
+	s_allocations.mutex.exit();
+}
+
+void checkGuards() {
+	MutexGuard guard(s_allocations.mutex);
+	for (AllocationInfo* info = s_allocations.root; info; info = info->next) {
+		if (info->is(AllocationInfo::IS_VRAM) || info->is(AllocationInfo::IS_PAGED) || info->is(AllocationInfo::IS_ARENA) || info->is(AllocationInfo::IS_MISC)) continue;
+		void* system = getSystem((u8*)info + sizeof(AllocationInfo));
+		ASSERT(*(u32*)system == ALLOCATION_GUARD);
+		ASSERT(*(u32*)((u8*)info + sizeof(AllocationInfo) + info->size) == ALLOCATION_GUARD);
+	}
+}
+
+void checkLeaks() {
+#ifdef LUMIX_DEBUG
+	const AllocationInfo* info = lockAllocationInfos();
+	bool leaked = false;
+	for (; info; info = info->next) {
+		if (!info->is(AllocationInfo::IS_MISC)) {
+			leaked = true;
+			std::fprintf(stderr, "Memory leak: %zu bytes\n", info->size);
+		}
+	}
+	unlockAllocationInfos();
+	if (leaked) debugOutput("Memory leaks detected!\n");
+#endif
+}
+
+Allocator::Allocator(IAllocator& source)
+	: m_source(source)
+	, m_is_fill_enabled(true) {}
 
 void* Allocator::allocate(size_t size, size_t align) {
 #ifndef LUMIX_DEBUG
 	return m_source.allocate(size, align);
 #else
-	void* system_ptr;
-	AllocationInfo* info;
-	u8* user_ptr;
-
-	size_t system_size = getNeededMemory(size, align);
-	{
-		MutexGuard lock(m_mutex);
-		system_ptr = m_source.allocate(system_size, align);
-		user_ptr = getUserFromSystem(system_ptr, align);
-		info = new (NewPlaceholder(), getAllocationInfoFromUser(user_ptr)) AllocationInfo();
-
-		info->previous = m_root->previous;
-		m_root->previous->next = info;
-
-		info->next = m_root;
-		m_root->previous = info;
-
-		m_root = info;
-
-		m_total_size += size;
-	} // because of the MutexGuard
-
-	info->align = u16(align);
-	info->stack_leaf = m_stack_tree.record();
+	const size_t system_size = getNeededMemory(size, align);
+	void* system = m_source.allocate(system_size, align);
+	if (!system) return nullptr;
+	u8* user = getUser(system, align);
+	auto* info = new (NewPlaceholder(), getInfo(user)) AllocationInfo();
+	info->tag = TagAllocator::getActiveAllocator();
 	info->size = size;
-	if (m_is_fill_enabled) {
-		memset(user_ptr, UNINITIALIZED_MEMORY_PATTERN, size);
-	}
-
-	if (m_are_guards_enabled) {
-		*(u32*)system_ptr = ALLOCATION_GUARD;
-		*(u32*)((u8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) = ALLOCATION_GUARD;
-	}
-
-	return user_ptr;
+	info->align = (u16)align;
+	registerAlloc(*info);
+	m_total_size.add(size);
+	if (m_is_fill_enabled) std::memset(user, UNINITIALIZED_MEMORY_PATTERN, size);
+	*(u32*)system = ALLOCATION_GUARD;
+	*(u32*)(user + size) = ALLOCATION_GUARD;
+	return user;
 #endif
 }
 
-
-void Allocator::deallocate(void* user_ptr) {
+void Allocator::deallocate(void* user) {
 #ifndef LUMIX_DEBUG
-	m_source.deallocate(user_ptr);
+	m_source.deallocate(user);
 #else
-	if (user_ptr) {
-		AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
-		void* system_ptr = getSystemFromUser(user_ptr);
-		if (m_is_fill_enabled) {
-			memset(user_ptr, FREED_MEMORY_PATTERN, info->size);
-		}
+	if (!user) return;
+	AllocationInfo* info = getInfo(user);
+	void* system = getSystem(user);
+	ASSERT(*(u32*)system == ALLOCATION_GUARD);
+	ASSERT(*(u32*)((u8*)user + info->size) == ALLOCATION_GUARD);
+	if (m_is_fill_enabled) std::memset(user, FREED_MEMORY_PATTERN, info->size);
+	m_total_size.subtract(info->size);
+	unregisterAlloc(*info);
+	info->~AllocationInfo();
+	m_source.deallocate(system);
+#endif
+}
 
-		if (m_are_guards_enabled) {
-			ASSERT(*(u32*)system_ptr == ALLOCATION_GUARD);
-			size_t system_size = getNeededMemory(info->size, info->align);
-			ASSERT(*(u32*)((u8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) == ALLOCATION_GUARD);
-		}
-
-		{
-			MutexGuard lock(m_mutex);
-			if (info == m_root) {
-				m_root = info->next;
-			}
-			info->previous->next = info->next;
-			info->next->previous = info->previous;
-
-			m_total_size -= info->size;
-		} // because of the MutexGuard
-
-		info->~AllocationInfo();
-
-		m_source.deallocate((void*)system_ptr);
+void* Allocator::reallocate(void* user, size_t new_size, size_t old_size, size_t align) {
+	if (!user) return allocate(new_size, align);
+	if (!new_size) {
+		deallocate(user);
+		return nullptr;
 	}
-#endif
+	void* result = allocate(new_size, align);
+	if (!result) return nullptr;
+	AllocationInfo* info = getInfo(user);
+	std::memcpy(result, user, info->size < new_size ? info->size : new_size);
+	deallocate(user);
+	return result;
 }
 
+} // namespace Lumix::debug
 
-void* Allocator::reallocate(void* user_ptr, size_t new_size, size_t old_size, size_t align) {
-#ifndef LUMIX_DEBUG
-	return m_source.reallocate(user_ptr, new_size, old_size, align);
-#else
-	if (user_ptr == nullptr) return allocate(new_size, align);
-	if (new_size == 0) return nullptr;
-
-	void* new_data = allocate(new_size, align);
-	if (!new_data) return nullptr;
-
-	AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
-	memcpy(new_data, user_ptr, info->size < new_size ? info->size : new_size);
-
-	deallocate(user_ptr);
-
-	return new_data;
-#endif
-}
-
-
-} // namespace debug
-
-
-void enableCrashReporting(bool enable) {
-	g_is_crash_reporting_enabled = false;
-}
-
-
-void configureCrashReport(CrashReportFlags flags) {}
+namespace Lumix {
+void configureCrashReport(CrashReportFlags) {}
 void installUnhandledExceptionHandler() {}
-
-
-void clearHardwareBreakpoint(u32 breakpoint_idx) { ASSERT(false); /* not implemented */ }
-void setHardwareBreakpoint(u32 breakpoint_idx, const void* mem, u32 size) { ASSERT(false); /* not implemented */ }
-
+void clearHardwareBreakpoint(u32) {
+	ASSERT(false);
+}
+void setHardwareBreakpoint(u32, const void*, u32) {
+	ASSERT(false);
+}
 } // namespace Lumix

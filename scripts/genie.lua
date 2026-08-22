@@ -370,8 +370,11 @@ lib_project "core"
 	libType()
 	defaultConfigurations()
 	defines { "BUILDING_CORE" }
-	-- Run meta tool before any compilation to generate reflection headers and Lua bindings
-	prebuildcommands { "msbuild $(SolutionDir)meta.vcxproj /p:Configuration=$(Configuration) /p:Platform=$(Platform) /verbosity:minimal", "cd $(ProjectDir)../../../ && $(SolutionDir)bin\\$(Configuration)\\meta.exe" }
+	-- Run the meta tool before compilation on Windows. Linux currently uses the
+	-- checked-in generated headers until the meta tool is made portable.
+	configuration { "not linux" }
+		prebuildcommands { "msbuild $(SolutionDir)meta.vcxproj /p:Configuration=$(Configuration) /p:Platform=$(Platform) /verbosity:minimal", "cd $(ProjectDir)../../../ && $(SolutionDir)bin\\$(Configuration)\\meta.exe" }
+	configuration {}
 
 	files { "../src/core/**.h",
 			"../src/core/**.c",
@@ -475,6 +478,8 @@ if plugin "renderer" then
 
 	configuration { "linux" }
 		links { "GL", "X11", "Xi" }
+		-- TODO pipeline
+		removefiles { "../src/renderer/gpu/gpu_dx12.cpp", "../src/renderer/pipeline.cpp", "../src/renderer/pose.cpp" }
 	
 	configuration { "windows" }
 		links { "psapi", "dxguid" }
