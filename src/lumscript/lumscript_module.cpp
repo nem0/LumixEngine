@@ -262,7 +262,7 @@ private:
 		}
 
 		// Create runtime
-		m_script.bytecode = ls_bytecode_compile(m_script.module, &m_host);
+		m_script.bytecode = ls_bytecode_compile(m_script.module, &m_host, nullptr);
 		if (!m_script.bytecode) {
 			m_host.diagnostics_userdata = nullptr;
 			m_host.print = nullptr;

@@ -2456,7 +2456,7 @@ void serializeReflection(OutputStream& out, Module& m) {
 	for (Function& fn : m.functions) {
 		StringView name = fn.name;
 		if (fn.attributes.alias.size() > 0) name = fn.attributes.alias;
-		L("\t.function<static_cast<", fn.return_type, " (", m.name, "::*)(", fn.args, ")", fn.is_const ? " const" : "", ">(&", m.name, "::", fn.name ,")>(\"", name, "\")");
+		L("\t.function<(", fn.return_type, " (", m.name, "::*)(", fn.args, ")", fn.is_const ? " const" : "", ")&", m.name, "::", fn.name ,">(\"", name, "\")");
 	}
 
 	for (Component& cmp : m.components) {
@@ -2526,7 +2526,7 @@ void serializeReflection(OutputStream& out, Module& m) {
 
 		for (Function& fn : cmp.functions) {
 			StringView name = fn.attributes.alias.size() > 0 ? fn.attributes.alias : fn.name;
-			L("\t\t.function<static_cast<", fn.return_type, " (", m.name, "::*)(", fn.args, ")", fn.is_const ? " const" : "", ">(&", m.name, "::", fn.name, ")>(\"", name, "\")");
+			L("\t\t.function<(", fn.return_type, " (", m.name, "::*)(", fn.args, ")", fn.is_const ? " const" : "", ")&", m.name, "::", fn.name, ">(\"", name, "\")");
 		}
 
 		for (Property& prop : cmp.properties) {

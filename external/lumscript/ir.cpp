@@ -380,9 +380,8 @@ struct IRBuilder {
 			if (hasInliningBlocker(*arg)) return nullptr;
 		}
 
-		LsIrOp** args = static_cast<LsIrOp**>(host.arena.allocate(
-			host.arena.user_data, sizeof(LsIrOp*) * call.args.size(), alignof(LsIrOp*)));
-		for (u32 i = 0, param_index = 0; i < call.args.size(); ++i) {
+		LsIrOp** args = static_cast<LsIrOp**>(host.arena.allocate(host.arena.user_data, sizeof(LsIrOp*) * call.args.size(), alignof(LsIrOp*)));
+		for (i32 i = 0, param_index = 0; i < call.args.size(); ++i) {
 			while (function.params[param_index].is_comptime) ++param_index;
 			args[i] = &buildImplicitConversionIR(*call.args[i], *function.params[param_index].resolved_type);
 			++param_index;
@@ -460,7 +459,7 @@ struct IRBuilder {
 				if (be.struct_field_name.begin) {
 					auto& struct_type = static_cast<StructResolvedType&>(*be.base->resolved_type);
 					u32 offset = 0;
-					for (u32 i = 0; i < struct_type.decl->fields.size(); ++i) {
+					for (i32 i = 0; i < struct_type.decl->fields.size(); ++i) {
 						if (!equalStrings(struct_type.decl->fields[i].name, be.struct_field_name)) {
 							offset += typeByteSize(*struct_type.field_types[i]);
 							continue;
@@ -625,7 +624,7 @@ struct IRBuilder {
 				auto* struct_type = static_cast<StructResolvedType*>(base_type);
 				auto& fields = struct_type->decl->fields;
 				u32 offset = 0;
-				for (u32 i = 0; i < me.struct_field_index; ++i) {
+				for (i32 i = 0; i < me.struct_field_index; ++i) {
 					offset += typeByteSize(*struct_type->field_types[i]);
 				}
 
@@ -740,7 +739,7 @@ struct IRBuilder {
 					auto& op = alloc<LsOpCallDirect>();
 					op.function = function;
 					op.arg_count = (is_ufcs ? 1u : 0u);
-					for (u32 i = 0, param_index = is_ufcs ? 1u : 0u; i < call.args.size(); ++i, ++param_index) {
+					for (i32 i = 0, param_index = is_ufcs ? 1u : 0u; i < call.args.size(); ++i, ++param_index) {
 						if (!function->params[param_index].is_comptime) ++op.arg_count;
 					}
 					op.return_size = typeByteSize(*call.resolved_type);
@@ -752,7 +751,7 @@ struct IRBuilder {
 						ResolvedType& target_type = *function->params[param_index++].resolved_type;
 						op.args[arg_index++] = &buildImplicitConversionIR(*member_callee->expression, target_type);
 					}
-					for (u32 i = 0; i < call.args.size(); ++i) {
+					for (i32 i = 0; i < call.args.size(); ++i) {
 						FunctionParam& param = function->params[param_index++];
 						if (param.is_comptime) continue;
 						ResolvedType& target_type = *param.resolved_type;
@@ -1187,7 +1186,7 @@ struct IRBuilder {
 				if (for_statement.is_expanded) {
 					auto& expanded = static_cast<BlockStatement&>(*for_statement.body);
 					LsOpNop& exit = alloc<LsOpNop>();
-					for (u32 i = 0; i < expanded.statements.size(); ++i) {
+					for (i32 i = 0; i < expanded.statements.size(); ++i) {
 						LsOpNop& next = alloc<LsOpNop>();
 						const bool is_last = i + 1 == expanded.statements.size();
 						loops.push({pending_loop_label, is_last ? static_cast<LsIrOp*>(&exit) : static_cast<LsIrOp*>(&next), &exit, (u32)defers.size()});
@@ -1421,7 +1420,7 @@ struct IRBuilder {
 						continue;
 					}
 					LsIrBlockData* arm_body = &alloc<LsIrBlockData>(host.arena);
-					for (u32 pattern_index = 0; pattern_index < arm.patterns.size(); ++pattern_index) {
+					for (i32 pattern_index = 0; pattern_index < arm.patterns.size(); ++pattern_index) {
 						MatchPattern& pattern = arm.patterns[pattern_index];
 						auto& subject_addr = alloc<LsOpPushLocalAddr>();
 						subject_addr.alloca = &subject;
@@ -3539,7 +3538,7 @@ struct BytecodeCompiler {
 
 	void endFunction() {
 		ASSERT(fn_bc);
-		fn_bc->code_size = code.size() - (u64)fn_bc->code;
+		fn_bc->code_size = u32(code.size() - (u64)fn_bc->code);
 		fn_bc->frame_size = stack_top > stack_high_water ? stack_top : stack_high_water;
 
 		const u32 function_start = (u32)(u64)fn_bc->code;
