@@ -12,10 +12,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
-#include <windows.h>
-
-#include <malloc.h>
-
 #include "arena.h"
 #include "bytecode.h"
 #include "capi.h"
@@ -27,18 +23,6 @@ typedef struct lumc_context {
 	ls_bytecode* bytecode;
 	ls_runtime* runtime;
 } lumc_context;
-
-static double lumc_now_ms(void) {
-	static LARGE_INTEGER frequency;
-	static int initialized = 0;
-	LARGE_INTEGER counter;
-	if (!initialized) {
-		QueryPerformanceFrequency(&frequency);
-		initialized = 1;
-	}
-	QueryPerformanceCounter(&counter);
-	return (double)counter.QuadPart * 1000.0 / (double)frequency.QuadPart;
-}
 
 static const ls_host g_host_template = {
 	{NULL, NULL, NULL},
@@ -768,12 +752,12 @@ int main(int argc, char** argv) {
 		}
 
 		// Bytecode compilation and runtime setup are intentionally outside the benchmark.
-		double start = lumc_now_ms();
+		double start = ls_platform_now_ms();
 		if (!ls_call(ctx.runtime, ls_from_cstr(function_name))) {
 			fprintf(stderr, "Runtime error\n");
 			goto cleanup;
 		}
-		double elapsed_ms = lumc_now_ms() - start;
+		double elapsed_ms = ls_platform_now_ms() - start;
 
 		{
 			ls_type_kind result_kind = ls_bytecode_runtime_result_kind(ctx.runtime, ls_from_cstr(function_name));

@@ -10,7 +10,7 @@
 #include "../capi.h"
 #include "../ir.h"
 
-void print(const char* val) { printf(val); }
+void print(const char* val) { printf("%s", val); }
 void print(int val) { printf("%d", val); }
 
 #define EXPECT_EQ(expected, actual) \

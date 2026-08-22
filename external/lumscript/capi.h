@@ -18,6 +18,7 @@
 
 #include <assert.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 #ifndef ASSERT
 	#ifdef LS_TESTS

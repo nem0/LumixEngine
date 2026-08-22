@@ -3,14 +3,7 @@
  */
 
 #include <stdio.h>
-#include <windows.h>
-
-static double now_ms(void) {
-	LARGE_INTEGER freq, counter;
-	QueryPerformanceFrequency(&freq);
-	QueryPerformanceCounter(&counter);
-	return (double)counter.QuadPart * 1000.0 / (double)freq.QuadPart;
-}
+#include "../platform.h"
 
 static int fannkuch(int n, int* perm1, int* perm, int* count) {
 	for (int i = 0; i < n; i++) {
@@ -88,9 +81,9 @@ int main(void) {
 	int perm[9];
 	int count[9];
 
-	const double start = now_ms();
+	const double start = ls_platform_now_ms();
 	const int result = fannkuch(9, perm1, perm, count);
-	const double elapsed = now_ms() - start;
+	const double elapsed = ls_platform_now_ms() - start;
 	fprintf(stderr, "Time: %.2f ms\n", elapsed);
 	printf("%d\n", result);
 	return 0;

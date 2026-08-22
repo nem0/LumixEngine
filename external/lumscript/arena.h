@@ -3,10 +3,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-
-#include <windows.h>
+#include "platform.h"
 
 #ifdef ERROR
 	#undef ERROR
@@ -62,7 +59,7 @@ static inline void* ls_default_arena_allocate(void* userdata, size_t size, size_
 	if (committed_end > arena->committed_size) {
 		void* commit_base = (char*)arena->base + arena->committed_size;
 		size_t commit_size = committed_end - arena->committed_size;
-		void* committed = VirtualAlloc(commit_base, commit_size, MEM_COMMIT, PAGE_READWRITE);
+		void* committed = ls_platform_commit(commit_base, commit_size) ? commit_base : NULL;
 		if (!committed) {
 			ASSERT(false);
 			return NULL;
@@ -88,15 +85,13 @@ static inline void ls_default_arena_restore(void* userdata, void* ptr) {
 	arena->cursor = new_cursor;
 }
 
-inline void ls_default_arena_create(ls_arena* out) {
+static inline void ls_default_arena_create(ls_arena* out) {
 	ls_default_arena* arena = (ls_default_arena*)malloc(sizeof(ls_default_arena));
-	SYSTEM_INFO info;
-	GetSystemInfo(&info);
-	arena->page_size = info.dwPageSize ? (size_t)info.dwPageSize : 4096;
+	arena->page_size = ls_platform_page_size();
 	arena->reserve_size = 256ull * 1024ull * 1024ull;
 	arena->committed_size = 0;
 	arena->cursor = 0;
-	arena->base = VirtualAlloc(NULL, arena->reserve_size, MEM_RESERVE, PAGE_NOACCESS);
+	arena->base = ls_platform_reserve(arena->reserve_size);
 	arena->arena.allocate = &ls_default_arena_allocate;
 	arena->arena.restore = &ls_default_arena_restore;
 	arena->arena.user_data = arena;
@@ -107,7 +102,7 @@ static inline void ls_default_arena_destroy(ls_arena* arena) {
 	if (!arena) return;
 	ls_default_arena* impl = (ls_default_arena*)arena->user_data;
 	if (impl) {
-		if (impl->base) VirtualFree(impl->base, 0, MEM_RELEASE);
+		if (impl->base) ls_platform_release(impl->base, impl->reserve_size);
 		free(impl);
 	}
 }

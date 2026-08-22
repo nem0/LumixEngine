@@ -4,14 +4,7 @@
 
 #include <math.h>
 #include <stdio.h>
-#include <windows.h>
-
-static double now_ms(void) {
-	LARGE_INTEGER freq, counter;
-	QueryPerformanceFrequency(&freq);
-	QueryPerformanceCounter(&counter);
-	return (double)counter.QuadPart * 1000.0 / (double)freq.QuadPart;
-}
+#include "../platform.h"
 
 static const double pi = 3.14159265358979323846;
 static const double days_per_year = 365.24;
@@ -161,9 +154,9 @@ static double sim_system(int iters) {
 }
 
 int main(void) {
-	const double start = now_ms();
+	const double start = ls_platform_now_ms();
 	const double result = sim_system(500000);
-	const double elapsed = now_ms() - start;
+	const double elapsed = ls_platform_now_ms() - start;
 	fprintf(stderr, "Time: %.2f ms\n", elapsed);
 	printf("%.6f\n", result);
 	return 0;

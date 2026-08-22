@@ -4,14 +4,7 @@
 
 #include <math.h>
 #include <stdio.h>
-#include <windows.h>
-
-static double now_ms(void) {
-	LARGE_INTEGER freq, counter;
-	QueryPerformanceFrequency(&freq);
-	QueryPerformanceCounter(&counter);
-	return (double)counter.QuadPart * 1000.0 / (double)freq.QuadPart;
-}
+#include "../platform.h"
 
 static double norm2(double re, double im) {
 	return re * re - im * (-im);
@@ -61,9 +54,9 @@ static int run(void) {
 }
 
 int main(void) {
-	const double start = now_ms();
+	const double start = ls_platform_now_ms();
 	const int result = run();
-	const double elapsed = now_ms() - start;
+	const double elapsed = ls_platform_now_ms() - start;
 	fprintf(stderr, "Time: %.2f ms\n", elapsed);
 	printf("%d\n", result);
 	return 0;

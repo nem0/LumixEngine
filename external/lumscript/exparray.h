@@ -1,6 +1,10 @@
 #pragma once
 
 #include "capi.h"
+#include <stddef.h>
+#ifdef _WIN32
+#include <intrin.h>
+#endif
 
 struct NewPlaceholder {};
 
@@ -200,18 +204,30 @@ struct ExpArray {
 	}
 
 private:
+	static i32 mostSignificantBit(u32 value) {
+#ifdef _WIN32
+		unsigned long result = 0;
+		return _BitScanReverse(&result, (unsigned long)value) ? (i32)result : -1;
+#else
+		i32 result = -1;
+		while (value) {
+			value >>= 1;
+			++result;
+		}
+		return result;
+#endif
+	}
+
 	static i32 binIndex(i32 index) {
 		ASSERT(index >= 0);
-		unsigned long msb = 0;
-		const unsigned char found = _BitScanReverse(&msb, (unsigned long)index + 4);
-		ASSERT(found);
-		return (i32)msb - 2;
+		const i32 msb = mostSignificantBit((u32)index + 4u);
+		ASSERT(msb >= 0);
+		return msb - 2;
 	}
 
 	static i32 innerIndex(i32 index) {
-		unsigned long msb = 0;
-		const unsigned char found = _BitScanReverse(&msb, (unsigned long)index + 4);
-		ASSERT(found);
+		const i32 msb = mostSignificantBit((u32)index + 4u);
+		ASSERT(msb >= 0);
 		return index + 4 - (1 << msb);
 	}
 

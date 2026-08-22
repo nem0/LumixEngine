@@ -5218,17 +5218,6 @@ struct Checker {
 	}
 
 	template <typename T> ResolvedType* getPrimitiveType();
-	template <> ResolvedType* getPrimitiveType<i8>() { return primitiveType(ResolvedTypeKind::I8); }
-	template <> ResolvedType* getPrimitiveType<i16>() { return primitiveType(ResolvedTypeKind::I16); }
-	template <> ResolvedType* getPrimitiveType<i32>() { return primitiveType(ResolvedTypeKind::I32); }
-	template <> ResolvedType* getPrimitiveType<i64>() { return primitiveType(ResolvedTypeKind::I64); }
-	template <> ResolvedType* getPrimitiveType<u8>() { return primitiveType(ResolvedTypeKind::U8); }
-	template <> ResolvedType* getPrimitiveType<u16>() { return primitiveType(ResolvedTypeKind::U16); }
-	template <> ResolvedType* getPrimitiveType<u32>() { return primitiveType(ResolvedTypeKind::U32); }
-	template <> ResolvedType* getPrimitiveType<u64>() { return primitiveType(ResolvedTypeKind::U64); }
-	template <> ResolvedType* getPrimitiveType<f32>() { return primitiveType(ResolvedTypeKind::F32); }
-	template <> ResolvedType* getPrimitiveType<f64>() { return primitiveType(ResolvedTypeKind::F64); }
-	template <> ResolvedType* getPrimitiveType<bool>() { return primitiveType(ResolvedTypeKind::BOOL); }
 
 	template <typename T>
 	ComptimeValue makeComptimeResult(T value, u8* address) {
@@ -5549,15 +5538,6 @@ struct Checker {
 		T result = lhs % rhs;
 		if (result < 0) result += rhs;
 		return result;
-	}
-
-	template <> float modulo(float lhs, float rhs) {
-		errorLine({}, "Modulo operator is not defined for floating point types");
-		return 0;
-	}
-	template <> double modulo(double lhs, double rhs) {
-		errorLine({}, "Modulo operator is not defined for floating point types");
-		return 0;
 	}
 
 	template <typename T>
@@ -6509,6 +6489,28 @@ struct Checker {
 	}
 
 }; // struct Checker
+
+template <> inline ResolvedType* Checker::getPrimitiveType<i8>() { return primitiveType(ResolvedTypeKind::I8); }
+template <> inline ResolvedType* Checker::getPrimitiveType<i16>() { return primitiveType(ResolvedTypeKind::I16); }
+template <> inline ResolvedType* Checker::getPrimitiveType<i32>() { return primitiveType(ResolvedTypeKind::I32); }
+template <> inline ResolvedType* Checker::getPrimitiveType<i64>() { return primitiveType(ResolvedTypeKind::I64); }
+template <> inline ResolvedType* Checker::getPrimitiveType<u8>() { return primitiveType(ResolvedTypeKind::U8); }
+template <> inline ResolvedType* Checker::getPrimitiveType<u16>() { return primitiveType(ResolvedTypeKind::U16); }
+template <> inline ResolvedType* Checker::getPrimitiveType<u32>() { return primitiveType(ResolvedTypeKind::U32); }
+template <> inline ResolvedType* Checker::getPrimitiveType<u64>() { return primitiveType(ResolvedTypeKind::U64); }
+template <> inline ResolvedType* Checker::getPrimitiveType<f32>() { return primitiveType(ResolvedTypeKind::F32); }
+template <> inline ResolvedType* Checker::getPrimitiveType<f64>() { return primitiveType(ResolvedTypeKind::F64); }
+template <> inline ResolvedType* Checker::getPrimitiveType<bool>() { return primitiveType(ResolvedTypeKind::BOOL); }
+template <> inline float Checker::modulo(float lhs, float rhs) {
+	(void)lhs; (void)rhs;
+	errorLine({}, "Modulo operator is not defined for floating point types");
+	return 0;
+}
+template <> inline double Checker::modulo(double lhs, double rhs) {
+	(void)lhs; (void)rhs;
+	errorLine({}, "Modulo operator is not defined for floating point types");
+	return 0;
+}
 
 i64 enumMemberValue(const EnumResolvedType& en, i32 index) {
 	if (en.decl && index >= 0 && index < en.decl->cached_values.size()) {
