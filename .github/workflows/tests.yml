@@ -33,7 +33,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++ libfreetype6-dev libgl1-mesa-dev libx11-dev libxi-dev
+          sudo apt-get install -y g++ libfreetype6-dev libgl1-mesa-dev libx11-dev libxi-dev libgtk-3-dev
 
       - name: Run headless tests
         run: ./scripts/run_tests.sh
