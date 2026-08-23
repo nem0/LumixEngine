@@ -21,7 +21,9 @@
 #include <stddef.h>
 
 #ifndef ASSERT
-	#ifdef LS_TESTS
+	#ifdef NDEBUG
+		#define ASSERT(X)
+	#elif defined LS_TESTS
 		#include <stdio.h>
 		#include <stdlib.h>
 		#define ASSERT(x) do { \

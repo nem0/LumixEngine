@@ -11,8 +11,8 @@ CXX=${CXX:-c++}
 CFLAGS=(-std=c11 -D_GNU_SOURCE -I"$ROOT" -I"$ROOT/../../src")
 CXXFLAGS=(-std=c++20 -I"$ROOT" -I"$ROOT/../../src")
 if [[ "$MODE" == release ]]; then
-    CFLAGS+=(-O2)
-    CXXFLAGS+=(-O2)
+    CFLAGS+=(-O2 -DNDEBUG)
+    CXXFLAGS+=(-O2 -DNDEBUG)
 else
     CFLAGS+=(-O0 -g)
     CXXFLAGS+=(-O0 -g)

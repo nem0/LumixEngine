@@ -72,8 +72,8 @@ if /I "%TARGET%"=="tests" (
     set CXXFLAGS=%CXXFLAGS% /Od /MDd /DLS_TESTS
 ) else (
     if /I "%CONFIG%"=="release" (
-        set CFLAGS=%CFLAGS% /O2 /MD
-        set CXXFLAGS=%CXXFLAGS% /O2 /MD
+        set CFLAGS=%CFLAGS% /O2 /MD /DNDEBUG
+        set CXXFLAGS=%CXXFLAGS% /O2 /MD /DNDEBUG
     ) else (
         set CFLAGS=%CFLAGS% /Od /MDd
         set CXXFLAGS=%CXXFLAGS% /Od /MDd
