@@ -2682,10 +2682,11 @@ struct BytecodeCompiler {
 					const u32 src = emit(*copy.src, nullptr);
 					const u32 slice = emitSliceFieldValue(ref.slice);
 					const u32 index = emitSliceFieldValue(ref.index);
-					emitOp(LS_OP_SLICE_FIELD_STORE);
+					const ls_type_kind kind = toTypeKind(*ref.index_type);
+					const ls_op op = sliceFieldStoreOp(kind);
+					emitOp(op);
 					emit(slice);
 					emit(index);
-					emit((u8)toTypeKind(*ref.index_type));
 					emit(ref.element_size);
 					emit((u32)field_offset);
 					emit(typeByteSize(*copy.type));
@@ -2890,6 +2891,26 @@ struct BytecodeCompiler {
 		}
 	}
 
+	static ls_op sliceFieldLoadOp(ls_type_kind kind) {
+		switch (kind) {
+			case LS_TYPE_I8: case LS_TYPE_U8: case LS_TYPE_BOOL: return LS_OP_SLICE_FIELD_LOAD_8;
+			case LS_TYPE_I16: case LS_TYPE_U16: return LS_OP_SLICE_FIELD_LOAD_16;
+			case LS_TYPE_I32: case LS_TYPE_U32: case LS_TYPE_F32: case LS_TYPE_ENUM: return LS_OP_SLICE_FIELD_LOAD_32;
+			case LS_TYPE_I64: case LS_TYPE_U64: case LS_TYPE_F64: return LS_OP_SLICE_FIELD_LOAD_64;
+			default: ASSERT(false); return LS_OP_SLICE_FIELD_LOAD_32;
+		}
+	}
+
+	static ls_op sliceFieldStoreOp(ls_type_kind kind) {
+		switch (kind) {
+			case LS_TYPE_I8: case LS_TYPE_U8: case LS_TYPE_BOOL: return LS_OP_SLICE_FIELD_STORE_8;
+			case LS_TYPE_I16: case LS_TYPE_U16: return LS_OP_SLICE_FIELD_STORE_16;
+			case LS_TYPE_I32: case LS_TYPE_U32: case LS_TYPE_F32: case LS_TYPE_ENUM: return LS_OP_SLICE_FIELD_STORE_32;
+			case LS_TYPE_I64: case LS_TYPE_U64: case LS_TYPE_F64: return LS_OP_SLICE_FIELD_STORE_64;
+			default: ASSERT(false); return LS_OP_SLICE_FIELD_STORE_32;
+		}
+	}
+
 	u32 emitBoundsCheck(const LsOpBoundsCheck& op) {
 		const u32 index = emit(*op.index, nullptr);
 		emitOp(LS_OP_BOUNDS_CHECK);
@@ -3007,11 +3028,12 @@ struct BytecodeCompiler {
 					const u32 slice = emitSliceFieldValue(ref.slice);
 					const u32 index = emitSliceFieldValue(ref.index);
 					const u32 ret = dst ? dst->dst : stack_top;
-					emitOp(LS_OP_SLICE_FIELD_LOAD);
+					const ls_type_kind kind = toTypeKind(*ref.index_type);
+					const ls_op op_code = sliceFieldLoadOp(kind);
+					emitOp(op_code);
 					emit(ret);
 					emit(slice);
 					emit(index);
-					emit((u8)toTypeKind(*ref.index_type));
 					emit(ref.element_size);
 					emit((u32)field_offset);
 					emit(op.size);
@@ -3308,11 +3330,12 @@ struct BytecodeCompiler {
 		const u32 slice = emitSliceFieldValue(op.slice);
 		const u32 index = emitSliceFieldValue(op.index);
 		const u32 result = stack_top;
-		emitOp(LS_OP_SLICE_FIELD_LOAD);
+		const ls_type_kind kind = toTypeKind(*op.index_type);
+		const ls_op op_code = sliceFieldLoadOp(kind);
+		emitOp(op_code);
 		emit(result);
 		emit(slice);
 		emit(index);
-		emit((u8)toTypeKind(*op.index_type));
 		emit(op.element_size);
 		emit(op.field_offset);
 		emit(op.field_size);

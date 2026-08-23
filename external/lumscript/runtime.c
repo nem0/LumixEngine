@@ -245,7 +245,7 @@ static ls_string_view runtime_error_message(ls_op op) {
 	if ((op >= LS_OP_MOD_I8 && op <= LS_OP_MOD_U64) || (op >= LS_OP_MOD_I8_IMM && op <= LS_OP_MOD_U64_IMM)) {
 		return (ls_string_view){modulo_by_zero, modulo_by_zero + sizeof(modulo_by_zero) - 1u};
 	}
-	if (op >= LS_OP_LOAD_INDEXED_8 && op <= LS_OP_SLICE_FIELD_STORE) return (ls_string_view){index_out_of_bounds, index_out_of_bounds + sizeof(index_out_of_bounds) - 1u};
+	if (op >= LS_OP_LOAD_INDEXED_8 && op <= LS_OP_SLICE_FIELD_STORE_64) return (ls_string_view){index_out_of_bounds, index_out_of_bounds + sizeof(index_out_of_bounds) - 1u};
 	if (op == LS_OP_CALL_DIRECT || op == LS_OP_CALL_INDIRECT) return (ls_string_view){invalid_function, invalid_function + sizeof(invalid_function) - 1u};
 	return (ls_string_view){generic, generic + sizeof(generic) - 1u};
 }
@@ -372,33 +372,11 @@ static bool runtime_invoke_native(ls_runtime* runtime, u32 function_index, const
 	return true;
 }
 
-static u64 runtime_read_u64(const u8** ip) {
-	u64 value = 0;
-	memcpy(&value, *ip, sizeof(value));
-	*ip += sizeof(value);
-	return value;
-}
-
-static u32 runtime_read_u32(const u8** ip) {
-	u32 value = 0;
-	memcpy(&value, *ip, sizeof(value));
-	*ip += sizeof(value);
-	return value;
-}
-
-static i32 runtime_read_i32(const u8** ip) {
-	i32 value = 0;
-	memcpy(&value, *ip, sizeof(value));
-	*ip += sizeof(value);
-	return value;
-}
-
-static i32 runtime_read_i16(const u8** ip) {
-	i16 value = 0;
-	memcpy(&value, *ip, sizeof(value));
-	*ip += sizeof(value);
-	return (i32)value;
-}
+// TODO memcpy? but see codegen/benchmarks
+#define runtime_read_u64(ip) ( (*(ip) += sizeof(u64)), *(const u64*)((*(ip)) - sizeof(u64)) )
+#define runtime_read_u32(ip) ( (*(ip) += sizeof(u32)), *(const u32*)((*(ip)) - sizeof(u32)) )
+#define runtime_read_i32(ip) ( (*(ip) += sizeof(i32)), *(const i32*)((*(ip)) - sizeof(i32)) )
+#define runtime_read_i16(ip) ( (*(ip) += sizeof(i16)), (i32)*(const i16*)((*(ip)) - sizeof(i16)) )
 
 static double runtime_numeric_to_double(const u8* value, ls_type_kind kind) {
 	switch (kind) {
@@ -475,108 +453,111 @@ static u64 runtime_immediate_to_u64(u64 value, ls_type_kind kind) {
 	}
 }
 
-#define LS_REG_BINOP(TYPE, EXPR) \
-	do { \
-		const u32 dst__ = runtime_read_u32(&ip); \
+#define LS_REG_BINOP(TYPE, EXPR)                        \
+	do {                                                \
+		const u32 dst__ = runtime_read_u32(&ip);        \
 		const u32 lhs_offset__ = runtime_read_u32(&ip); \
 		const u32 rhs_offset__ = runtime_read_u32(&ip); \
-		TYPE a = 0; TYPE b = 0; \
-		u8* lhs__ = runtime->frame + lhs_offset__; \
-		u8* rhs__ = runtime->frame + rhs_offset__; \
-		u8* out__ = runtime->frame + dst__; \
-		memcpy(&a, lhs__, sizeof(TYPE)); \
-		memcpy(&b, rhs__, sizeof(TYPE)); \
-		TYPE result__ = (TYPE)(EXPR); \
-		memcpy(out__, &result__, sizeof(TYPE)); \
+		TYPE a = 0;                                     \
+		TYPE b = 0;                                     \
+		u8* lhs__ = runtime->frame + lhs_offset__;      \
+		u8* rhs__ = runtime->frame + rhs_offset__;      \
+		u8* out__ = runtime->frame + dst__;             \
+		memcpy(&a, lhs__, sizeof(TYPE));                \
+		memcpy(&b, rhs__, sizeof(TYPE));                \
+		TYPE result__ = (TYPE)(EXPR);                   \
+		memcpy(out__, &result__, sizeof(TYPE));         \
 	} while (0)
 
-#define LS_REG_BINOP_IMM(TYPE, EXPR) \
-	do { \
-		const u32 dst__ = runtime_read_u32(&ip); \
+#define LS_REG_BINOP_IMM(TYPE, EXPR)                    \
+	do {                                                \
+		const u32 dst__ = runtime_read_u32(&ip);        \
 		const u32 lhs_offset__ = runtime_read_u32(&ip); \
-		TYPE b = 0; \
-		memcpy(&b, ip, sizeof(TYPE)); \
-		ip += sizeof(TYPE); \
-		TYPE a = 0; \
-		u8* lhs__ = runtime->frame + lhs_offset__; \
-		u8* out__ = runtime->frame + dst__; \
-		memcpy(&a, lhs__, sizeof(TYPE)); \
-		TYPE result__ = (TYPE)(EXPR); \
-		memcpy(out__, &result__, sizeof(TYPE)); \
+		TYPE b = 0;                                     \
+		memcpy(&b, ip, sizeof(TYPE));                   \
+		ip += sizeof(TYPE);                             \
+		TYPE a = 0;                                     \
+		u8* lhs__ = runtime->frame + lhs_offset__;      \
+		u8* out__ = runtime->frame + dst__;             \
+		memcpy(&a, lhs__, sizeof(TYPE));                \
+		TYPE result__ = (TYPE)(EXPR);                   \
+		memcpy(out__, &result__, sizeof(TYPE));         \
 	} while (0)
 
-#define LS_REG_DIVOP(TYPE, EXPR) \
-	do { \
-		const u32 dst__ = runtime_read_u32(&ip); \
+#define LS_REG_DIVOP(TYPE, EXPR)                        \
+	do {                                                \
+		const u32 dst__ = runtime_read_u32(&ip);        \
 		const u32 lhs_offset__ = runtime_read_u32(&ip); \
 		const u32 rhs_offset__ = runtime_read_u32(&ip); \
-		TYPE a = 0; TYPE b = 0; \
-		u8* lhs__ = runtime->frame + lhs_offset__; \
-		u8* rhs__ = runtime->frame + rhs_offset__; \
-		u8* out__ = runtime->frame + dst__; \
-		memcpy(&a, lhs__, sizeof(TYPE)); \
-		memcpy(&b, rhs__, sizeof(TYPE)); \
-		if (!b) goto runtime_execute_function_fail; \
-		TYPE result__ = (TYPE)(EXPR); \
-		memcpy(out__, &result__, sizeof(TYPE)); \
+		TYPE a = 0;                                     \
+		TYPE b = 0;                                     \
+		u8* lhs__ = runtime->frame + lhs_offset__;      \
+		u8* rhs__ = runtime->frame + rhs_offset__;      \
+		u8* out__ = runtime->frame + dst__;             \
+		memcpy(&a, lhs__, sizeof(TYPE));                \
+		memcpy(&b, rhs__, sizeof(TYPE));                \
+		if (!b) goto runtime_execute_function_fail;     \
+		TYPE result__ = (TYPE)(EXPR);                   \
+		memcpy(out__, &result__, sizeof(TYPE));         \
 	} while (0)
 
-#define LS_REG_DIVOP_IMM(TYPE, EXPR) \
-	do { \
-		const u32 dst__ = runtime_read_u32(&ip); \
+#define LS_REG_DIVOP_IMM(TYPE, EXPR)                    \
+	do {                                                \
+		const u32 dst__ = runtime_read_u32(&ip);        \
 		const u32 lhs_offset__ = runtime_read_u32(&ip); \
-		TYPE b = 0; \
-		memcpy(&b, ip, sizeof(TYPE)); \
-		ip += sizeof(TYPE); \
-		TYPE a = 0; \
-		u8* lhs__ = runtime->frame + lhs_offset__; \
-		u8* out__ = runtime->frame + dst__; \
-		memcpy(&a, lhs__, sizeof(TYPE)); \
-		if (!b) goto runtime_execute_function_fail; \
-		TYPE result__ = (TYPE)(EXPR); \
-		memcpy(out__, &result__, sizeof(TYPE)); \
+		TYPE b = 0;                                     \
+		memcpy(&b, ip, sizeof(TYPE));                   \
+		ip += sizeof(TYPE);                             \
+		TYPE a = 0;                                     \
+		u8* lhs__ = runtime->frame + lhs_offset__;      \
+		u8* out__ = runtime->frame + dst__;             \
+		memcpy(&a, lhs__, sizeof(TYPE));                \
+		if (!b) goto runtime_execute_function_fail;     \
+		TYPE result__ = (TYPE)(EXPR);                   \
+		memcpy(out__, &result__, sizeof(TYPE));         \
 	} while (0)
 
-#define LS_REG_NEGOP(TYPE) \
-	do { \
-		const u32 dst__ = runtime_read_u32(&ip); \
-		const u32 src__ = runtime_read_u32(&ip); \
-		TYPE value__ = 0; \
-		TYPE result__ = 0; \
-		u8* src_ptr__ = runtime->frame + src__; \
-		u8* out__ = runtime->frame + dst__; \
+#define LS_REG_NEGOP(TYPE)                         \
+	do {                                           \
+		const u32 dst__ = runtime_read_u32(&ip);   \
+		const u32 src__ = runtime_read_u32(&ip);   \
+		TYPE value__ = 0;                          \
+		TYPE result__ = 0;                         \
+		u8* src_ptr__ = runtime->frame + src__;    \
+		u8* out__ = runtime->frame + dst__;        \
 		memcpy(&value__, src_ptr__, sizeof(TYPE)); \
-		result__ = (TYPE)(0 - value__); \
-		memcpy(out__, &result__, sizeof(TYPE)); \
+		result__ = (TYPE)(0 - value__);            \
+		memcpy(out__, &result__, sizeof(TYPE));    \
 	} while (0)
 
-#define LS_REG_CMP_NUMERIC(OP) \
-	do { \
-		const u32 dst__ = runtime_read_u32(&ip); \
-		const u32 lhs_offset__ = runtime_read_u32(&ip); \
-		const u32 rhs_offset__ = runtime_read_u32(&ip); \
-		const ls_type_kind kind__ = (ls_type_kind)*ip++; \
-		u8* lhs_ptr__ = runtime->frame + lhs_offset__; \
-		u8* rhs_ptr__ = runtime->frame + rhs_offset__; \
-		u8* out__ = runtime->frame + dst__; \
-		int result__ = 0; \
-		if (kind__ == LS_TYPE_F32 || kind__ == LS_TYPE_F64) { \
+#define LS_REG_CMP_NUMERIC(OP)                                                                                       \
+	do {                                                                                                             \
+		const u32 dst__ = runtime_read_u32(&ip);                                                                     \
+		const u32 lhs_offset__ = runtime_read_u32(&ip);                                                              \
+		const u32 rhs_offset__ = runtime_read_u32(&ip);                                                              \
+		const ls_type_kind kind__ = (ls_type_kind) * ip++;                                                           \
+		u8* lhs_ptr__ = runtime->frame + lhs_offset__;                                                               \
+		u8* rhs_ptr__ = runtime->frame + rhs_offset__;                                                               \
+		u8* out__ = runtime->frame + dst__;                                                                          \
+		int result__ = 0;                                                                                            \
+		if (kind__ == LS_TYPE_F32 || kind__ == LS_TYPE_F64) {                                                        \
 			result__ = runtime_numeric_to_double(lhs_ptr__, kind__) OP runtime_numeric_to_double(rhs_ptr__, kind__); \
-		} else { \
-			result__ = runtime_numeric_to_i64(lhs_ptr__, kind__) OP runtime_numeric_to_i64(rhs_ptr__, kind__); \
-		} \
-		*out__ = result__ ? 1u : 0u; \
+		} else {                                                                                                     \
+			result__ = runtime_numeric_to_i64(lhs_ptr__, kind__) OP runtime_numeric_to_i64(rhs_ptr__, kind__);       \
+		}                                                                                                            \
+		*out__ = result__ ? 1u : 0u;                                                                                 \
 	} while (0)
 
-#define LS_REG_CMP_JUMP(TYPE, OP) \
-	do { \
-		const u32 lhs_offset__ = runtime_read_u32(&ip); \
-		const u32 rhs_offset__ = runtime_read_u32(&ip); \
-		const i32 jump_offset__ = runtime_read_i16(&ip); \
-		TYPE lhs__; TYPE rhs__; \
+#define LS_REG_CMP_JUMP(TYPE, OP)                                     \
+	do {                                                              \
+		const u32 lhs_offset__ = runtime_read_u32(&ip);               \
+		const u32 rhs_offset__ = runtime_read_u32(&ip);               \
+		const i32 jump_offset__ = runtime_read_i16(&ip);              \
+		TYPE lhs__;                                                   \
+		TYPE rhs__;                                                   \
 		memcpy(&lhs__, runtime->frame + lhs_offset__, sizeof(lhs__)); \
 		memcpy(&rhs__, runtime->frame + rhs_offset__, sizeof(rhs__)); \
-		if (!(lhs__ OP rhs__)) ip += jump_offset__; \
+		if (!(lhs__ OP rhs__)) ip += jump_offset__;                   \
 	} while (0)
 
 #define LS_INDEXED_OP(OP, TYPE)                                                                               \
@@ -603,6 +584,48 @@ static u64 runtime_immediate_to_u64(u64 value, ls_type_kind kind) {
 		if (index >= length) goto runtime_execute_function_fail;                                              \
 		memcpy(runtime->frame + base_offset + (u64)index * element_size, runtime->frame + src, element_size); \
 		break;                                                                                                \
+	}
+
+#define LS_SLICE_FIELD_OP(OP, TYPE)                                               \
+	case LS_OP_SLICE_FIELD_LOAD_##OP: {                                           \
+		const u32 dst = runtime_read_u32(&ip);                                    \
+		const u32 slice_reg = runtime_read_u32(&ip);                              \
+		const u32 index_reg = runtime_read_u32(&ip);                              \
+		const u32 element_size = runtime_read_u32(&ip);                           \
+		const u32 field_offset = runtime_read_u32(&ip);                           \
+		const u32 field_size = runtime_read_u32(&ip);                             \
+		void* base_ptr = NULL;                                                    \
+		u64 length = 0;                                                           \
+		u8* slice = runtime->frame + slice_reg;                                   \
+		memcpy(&base_ptr, slice, sizeof(base_ptr));                               \
+		memcpy(&length, slice + sizeof(void*), sizeof(length));                   \
+		TYPE index = 0;                                                           \
+		memcpy(&index, runtime->frame + index_reg, sizeof(index));                \
+		if ((u64)index >= length) goto runtime_execute_function_fail;             \
+		ASSERT(element_size != 0);                                                \
+		u8* field_ptr = (u8*)base_ptr + (u64)index * element_size + field_offset; \
+		memmove(runtime->frame + dst, field_ptr, field_size);                     \
+		break;                                                                    \
+	}                                                                             \
+	case LS_OP_SLICE_FIELD_STORE_##OP: {                                          \
+		const u32 slice_reg = runtime_read_u32(&ip);                              \
+		const u32 index_reg = runtime_read_u32(&ip);                              \
+		const u32 element_size = runtime_read_u32(&ip);                           \
+		const u32 field_offset = runtime_read_u32(&ip);                           \
+		const u32 field_size = runtime_read_u32(&ip);                             \
+		const u32 src = runtime_read_u32(&ip);                                    \
+		void* base_ptr = NULL;                                                    \
+		u64 length = 0;                                                           \
+		u8* slice = runtime->frame + slice_reg;                                   \
+		memcpy(&base_ptr, slice, sizeof(base_ptr));                               \
+		memcpy(&length, slice + sizeof(void*), sizeof(length));                   \
+		TYPE index = 0;                                                           \
+		memcpy(&index, runtime->frame + index_reg, sizeof(index));                \
+		if ((u64)index >= length) goto runtime_execute_function_fail;             \
+		ASSERT(element_size != 0);                                                \
+		u8* field_ptr = (u8*)base_ptr + (u64)index * element_size + field_offset; \
+		memmove(field_ptr, runtime->frame + src, field_size);                     \
+		break;                                                                    \
 	}
 
 // Runs either a fresh call to `function` or a previously suspended
@@ -746,48 +769,10 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				memmove(value, runtime->frame + src, size);
 				break;
 			}
-			case LS_OP_SLICE_FIELD_LOAD: {
-				const u32 dst = runtime_read_u32(&ip);
-				const u32 slice_reg = runtime_read_u32(&ip);
-				const u32 index_reg = runtime_read_u32(&ip);
-				const ls_type_kind index_kind = (ls_type_kind)*ip++;
-				const u32 element_size = runtime_read_u32(&ip);
-				const u32 field_offset = runtime_read_u32(&ip);
-				const u32 field_size = runtime_read_u32(&ip);
-				u64 length = 0;
-				void* base_ptr = NULL;
-				u8* slice = runtime->frame + slice_reg;
-				memcpy(&base_ptr, slice, sizeof(base_ptr));
-				memcpy(&length, slice + sizeof(void*), sizeof(length));
-				const u64 index = runtime_numeric_to_u64(runtime->frame + index_reg, index_kind);
-				if (index >= length) goto runtime_execute_function_fail;
-
-				const u64 element_offset = index * element_size;
-				ASSERT(element_size != 0);
-				memmove(runtime->frame + dst, (u8*)base_ptr + element_offset + field_offset, field_size);
-				break;
-			}
-			case LS_OP_SLICE_FIELD_STORE: {
-				const u32 slice_reg = runtime_read_u32(&ip);
-				const u32 index_reg = runtime_read_u32(&ip);
-				const ls_type_kind index_kind = (ls_type_kind)*ip++;
-				const u32 element_size = runtime_read_u32(&ip);
-				const u32 field_offset = runtime_read_u32(&ip);
-				const u32 field_size = runtime_read_u32(&ip);
-				const u32 src = runtime_read_u32(&ip);
-				u64 length = 0;
-				void* base_ptr = NULL;
-				u8* slice = runtime->frame + slice_reg;
-				memcpy(&base_ptr, slice, sizeof(base_ptr));
-				memcpy(&length, slice + sizeof(void*), sizeof(length));
-				const u64 index = runtime_numeric_to_u64(runtime->frame + index_reg, index_kind);
-				if (index >= length) goto runtime_execute_function_fail;
-
-				const u64 element_offset = index * element_size;
-				ASSERT(element_size != 0);
-				memmove((u8*)base_ptr + element_offset + field_offset, runtime->frame + src, field_size);
-				break;
-			}
+			LS_SLICE_FIELD_OP(8, u8)
+			LS_SLICE_FIELD_OP(16, u16)
+			LS_SLICE_FIELD_OP(32, u32)
+			LS_SLICE_FIELD_OP(64, u64)
 			LS_INDEXED_OP(8, u8)
 			LS_INDEXED_OP(16, u16)
 			LS_INDEXED_OP(32, u32)
