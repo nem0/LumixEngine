@@ -786,7 +786,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				if (runtime_numeric_to_u64(index_ptr, index_kind) >= length) goto runtime_execute_function_fail;
 				break;
 			}
-			case LS_OP_STRING_SLICE:
+			case LS_OP_STRING_SLICE: {
 				const u32 slice_reg = runtime_read_u32(&ip);
 				const u32 index = runtime_read_u32(&ip);
 				ls_string_view str = runtime->bytecode->strings[index];
@@ -795,6 +795,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				u64 len = str.end - str.begin;
 				memcpy(slice + sizeof(void*), &len, 8u);
 				break;
+			}
 			case LS_OP_SLICE: {
 				/* The resulting slice overwrites the source slice value in place. */
 				const u32 slice_reg = runtime_read_u32(&ip);

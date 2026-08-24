@@ -6,7 +6,9 @@
  * calls that function with the remaining arguments. Otherwise, calls main().
  */
 
+#ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -93,11 +95,14 @@ static void lumc_write_result(FILE* out, ls_runtime* runtime, ls_type_kind kind)
 }
 
 static void lumc_diagnostics_print(void* userdata, ls_string_view msg) {
+	(void)userdata;
 	ls_host* host = (ls_host*)userdata;
+	(void)host;
 	lumc_print_string(stderr, msg);
 }
 
 static void lumc_native_print(ls_runtime* runtime, ls_call_frame frame) {
+	(void)runtime;
 	LS_STRING_ARG(frame, val);
 	lumc_print_string(stdout, val);
 	putchar('\n');
@@ -356,8 +361,8 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 			case LS_OP_FRAME_PTR:
 			case LS_OP_GLOBAL_PTR: {
 				const u32 dst = lumc_read_u32(fn->code, fn->code_size, &pc);
-				const u32 offset = lumc_read_u32(fn->code, fn->code_size, &pc);
-				printf(" dst=%u, offset=%u", dst, offset);
+				const u32 off = lumc_read_u32(fn->code, fn->code_size, &pc);
+				printf(" dst=%u, offset=%u", dst, off);
 				break;
 			}
 			case LS_OP_LOAD_PTR:
