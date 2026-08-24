@@ -337,7 +337,7 @@ static bool runtime_arm_step_traps(ls_runtime* runtime) {
 	return true;
 }
 
-static bool runtime_enter_script_call(
+static __forceinline bool runtime_enter_script_call(
 	ls_runtime* runtime,
 	const ls_function_bc** function,
 	const u8** ip,
@@ -358,10 +358,10 @@ static bool runtime_enter_script_call(
 	return true;
 }
 
-static bool runtime_invoke_native(ls_runtime* runtime, u32 function_index, const ls_function_bc* function, u8* args, u8** result_stack_top) {
-	if (function_index >= runtime->native_callback_count) return false;
+static __forceinline bool runtime_invoke_native(ls_runtime* runtime, u32 function_index, const ls_function_bc* function, u8* args, u8** result_stack_top) {
+	if (function_index >= runtime->native_callback_count) return false; // TODO can this even happen?
 	const ls_native_fn callback = runtime->native_callbacks[function_index];
-	if (!callback) return false;
+	if (!callback) return false; // TODO should we even allow script to execute if some natives are missing?
 
 	u8* stack_top = args + function->return_size;
 	if (stack_top > runtime->stack_end) return false;
