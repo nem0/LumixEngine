@@ -460,9 +460,9 @@ static u64 runtime_immediate_to_u64(u64 value, ls_type_kind kind) {
 		const u32 rhs_offset__ = runtime_read_u32(&ip); \
 		TYPE a = 0;                                     \
 		TYPE b = 0;                                     \
-		u8* lhs__ = runtime->frame + lhs_offset__;      \
-		u8* rhs__ = runtime->frame + rhs_offset__;      \
-		u8* out__ = runtime->frame + dst__;             \
+		u8* lhs__ = frame + lhs_offset__;               \
+		u8* rhs__ = frame + rhs_offset__;               \
+		u8* out__ = frame + dst__;                      \
 		memcpy(&a, lhs__, sizeof(TYPE));                \
 		memcpy(&b, rhs__, sizeof(TYPE));                \
 		TYPE result__ = (TYPE)(EXPR);                   \
@@ -477,8 +477,8 @@ static u64 runtime_immediate_to_u64(u64 value, ls_type_kind kind) {
 		memcpy(&b, ip, sizeof(TYPE));                   \
 		ip += sizeof(TYPE);                             \
 		TYPE a = 0;                                     \
-		u8* lhs__ = runtime->frame + lhs_offset__;      \
-		u8* out__ = runtime->frame + dst__;             \
+		u8* lhs__ = frame + lhs_offset__;               \
+		u8* out__ = frame + dst__;                      \
 		memcpy(&a, lhs__, sizeof(TYPE));                \
 		TYPE result__ = (TYPE)(EXPR);                   \
 		memcpy(out__, &result__, sizeof(TYPE));         \
@@ -491,9 +491,9 @@ static u64 runtime_immediate_to_u64(u64 value, ls_type_kind kind) {
 		const u32 rhs_offset__ = runtime_read_u32(&ip); \
 		TYPE a = 0;                                     \
 		TYPE b = 0;                                     \
-		u8* lhs__ = runtime->frame + lhs_offset__;      \
-		u8* rhs__ = runtime->frame + rhs_offset__;      \
-		u8* out__ = runtime->frame + dst__;             \
+		u8* lhs__ = frame + lhs_offset__;               \
+		u8* rhs__ = frame + rhs_offset__;               \
+		u8* out__ = frame + dst__;                      \
 		memcpy(&a, lhs__, sizeof(TYPE));                \
 		memcpy(&b, rhs__, sizeof(TYPE));                \
 		if (!b) goto runtime_execute_function_fail;     \
@@ -509,8 +509,8 @@ static u64 runtime_immediate_to_u64(u64 value, ls_type_kind kind) {
 		memcpy(&b, ip, sizeof(TYPE));                   \
 		ip += sizeof(TYPE);                             \
 		TYPE a = 0;                                     \
-		u8* lhs__ = runtime->frame + lhs_offset__;      \
-		u8* out__ = runtime->frame + dst__;             \
+		u8* lhs__ = frame + lhs_offset__;               \
+		u8* out__ = frame + dst__;                      \
 		memcpy(&a, lhs__, sizeof(TYPE));                \
 		if (!b) goto runtime_execute_function_fail;     \
 		TYPE result__ = (TYPE)(EXPR);                   \
@@ -523,8 +523,8 @@ static u64 runtime_immediate_to_u64(u64 value, ls_type_kind kind) {
 		const u32 src__ = runtime_read_u32(&ip);   \
 		TYPE value__ = 0;                          \
 		TYPE result__ = 0;                         \
-		u8* src_ptr__ = runtime->frame + src__;    \
-		u8* out__ = runtime->frame + dst__;        \
+		u8* src_ptr__ = frame + src__;             \
+		u8* out__ = frame + dst__;                 \
 		memcpy(&value__, src_ptr__, sizeof(TYPE)); \
 		result__ = (TYPE)(0 - value__);            \
 		memcpy(out__, &result__, sizeof(TYPE));    \
@@ -536,9 +536,9 @@ static u64 runtime_immediate_to_u64(u64 value, ls_type_kind kind) {
 		const u32 lhs_offset__ = runtime_read_u32(&ip);                                                              \
 		const u32 rhs_offset__ = runtime_read_u32(&ip);                                                              \
 		const ls_type_kind kind__ = (ls_type_kind) * ip++;                                                           \
-		u8* lhs_ptr__ = runtime->frame + lhs_offset__;                                                               \
-		u8* rhs_ptr__ = runtime->frame + rhs_offset__;                                                               \
-		u8* out__ = runtime->frame + dst__;                                                                          \
+		u8* lhs_ptr__ = frame + lhs_offset__;                                                                        \
+		u8* rhs_ptr__ = frame + rhs_offset__;                                                                        \
+		u8* out__ = frame + dst__;                                                                                   \
 		int result__ = 0;                                                                                            \
 		if (kind__ == LS_TYPE_F32 || kind__ == LS_TYPE_F64) {                                                        \
 			result__ = runtime_numeric_to_double(lhs_ptr__, kind__) OP runtime_numeric_to_double(rhs_ptr__, kind__); \
@@ -548,42 +548,42 @@ static u64 runtime_immediate_to_u64(u64 value, ls_type_kind kind) {
 		*out__ = result__ ? 1u : 0u;                                                                                 \
 	} while (0)
 
-#define LS_REG_CMP_JUMP(TYPE, OP)                                     \
-	do {                                                              \
-		const u32 lhs_offset__ = runtime_read_u32(&ip);               \
-		const u32 rhs_offset__ = runtime_read_u32(&ip);               \
-		const i32 jump_offset__ = runtime_read_i16(&ip);              \
-		TYPE lhs__;                                                   \
-		TYPE rhs__;                                                   \
-		memcpy(&lhs__, runtime->frame + lhs_offset__, sizeof(lhs__)); \
-		memcpy(&rhs__, runtime->frame + rhs_offset__, sizeof(rhs__)); \
-		if (!(lhs__ OP rhs__)) ip += jump_offset__;                   \
+#define LS_REG_CMP_JUMP(TYPE, OP)                            \
+	do {                                                     \
+		const u32 lhs_offset__ = runtime_read_u32(&ip);      \
+		const u32 rhs_offset__ = runtime_read_u32(&ip);      \
+		const i32 jump_offset__ = runtime_read_i16(&ip);     \
+		TYPE lhs__;                                          \
+		TYPE rhs__;                                          \
+		memcpy(&lhs__, frame + lhs_offset__, sizeof(lhs__)); \
+		memcpy(&rhs__, frame + rhs_offset__, sizeof(rhs__)); \
+		if (!(lhs__ OP rhs__)) ip += jump_offset__;          \
 	} while (0)
 
-#define LS_INDEXED_OP(OP, TYPE)                                                                               \
-	case LS_OP_LOAD_INDEXED_##OP: {                                                                           \
-		const u32 dst = runtime_read_u32(&ip);                                                                \
-		const u32 base_offset = runtime_read_u32(&ip);                                                        \
-		const u32 index_reg = runtime_read_u32(&ip);                                                          \
-		const u64 length = runtime_read_u64(&ip);                                                             \
-		const u32 element_size = runtime_read_u32(&ip);                                                       \
-		TYPE index = 0;                                                                                       \
-		memcpy(&index, runtime->frame + index_reg, sizeof(index));                                            \
-		if (index >= length) goto runtime_execute_function_fail;                                              \
-		memcpy(runtime->frame + dst, runtime->frame + base_offset + (u64)index * element_size, element_size); \
-		break;                                                                                                \
-	}                                                                                                         \
-	case LS_OP_STORE_INDEXED_##OP: {                                                                          \
-		const u32 base_offset = runtime_read_u32(&ip);                                                        \
-		const u32 index_reg = runtime_read_u32(&ip);                                                          \
-		const u64 length = runtime_read_u64(&ip);                                                             \
-		const u32 element_size = runtime_read_u32(&ip);                                                       \
-		const u32 src = runtime_read_u32(&ip);                                                                \
-		TYPE index = 0;                                                                                       \
-		memcpy(&index, runtime->frame + index_reg, sizeof(index));                                            \
-		if (index >= length) goto runtime_execute_function_fail;                                              \
-		memcpy(runtime->frame + base_offset + (u64)index * element_size, runtime->frame + src, element_size); \
-		break;                                                                                                \
+#define LS_INDEXED_OP(OP, TYPE)                                                             \
+	case LS_OP_LOAD_INDEXED_##OP: {                                                         \
+		const u32 dst = runtime_read_u32(&ip);                                              \
+		const u32 base_offset = runtime_read_u32(&ip);                                      \
+		const u32 index_reg = runtime_read_u32(&ip);                                        \
+		const u64 length = runtime_read_u64(&ip);                                           \
+		const u32 element_size = runtime_read_u32(&ip);                                     \
+		TYPE index = 0;                                                                     \
+		memcpy(&index, frame + index_reg, sizeof(index));                                   \
+		if (index >= length) goto runtime_execute_function_fail;                            \
+		memcpy(frame + dst, frame + base_offset + (u64)index * element_size, element_size); \
+		break;                                                                              \
+	}                                                                                       \
+	case LS_OP_STORE_INDEXED_##OP: {                                                        \
+		const u32 base_offset = runtime_read_u32(&ip);                                      \
+		const u32 index_reg = runtime_read_u32(&ip);                                        \
+		const u64 length = runtime_read_u64(&ip);                                           \
+		const u32 element_size = runtime_read_u32(&ip);                                     \
+		const u32 src = runtime_read_u32(&ip);                                              \
+		TYPE index = 0;                                                                     \
+		memcpy(&index, frame + index_reg, sizeof(index));                                   \
+		if (index >= length) goto runtime_execute_function_fail;                            \
+		memcpy(frame + base_offset + (u64)index * element_size, frame + src, element_size); \
+		break;                                                                              \
 	}
 
 #define LS_SLICE_FIELD_OP(OP, TYPE)                                               \
@@ -596,15 +596,15 @@ static u64 runtime_immediate_to_u64(u64 value, ls_type_kind kind) {
 		const u32 field_size = runtime_read_u32(&ip);                             \
 		void* base_ptr = NULL;                                                    \
 		u64 length = 0;                                                           \
-		u8* slice = runtime->frame + slice_reg;                                   \
+		u8* slice = frame + slice_reg;                                            \
 		memcpy(&base_ptr, slice, sizeof(base_ptr));                               \
 		memcpy(&length, slice + sizeof(void*), sizeof(length));                   \
 		TYPE index = 0;                                                           \
-		memcpy(&index, runtime->frame + index_reg, sizeof(index));                \
+		memcpy(&index, frame + index_reg, sizeof(index));                         \
 		if ((u64)index >= length) goto runtime_execute_function_fail;             \
 		ASSERT(element_size != 0);                                                \
 		u8* field_ptr = (u8*)base_ptr + (u64)index * element_size + field_offset; \
-		memmove(runtime->frame + dst, field_ptr, field_size);                     \
+		memmove(frame + dst, field_ptr, field_size);                              \
 		break;                                                                    \
 	}                                                                             \
 	case LS_OP_SLICE_FIELD_STORE_##OP: {                                          \
@@ -616,15 +616,15 @@ static u64 runtime_immediate_to_u64(u64 value, ls_type_kind kind) {
 		const u32 src = runtime_read_u32(&ip);                                    \
 		void* base_ptr = NULL;                                                    \
 		u64 length = 0;                                                           \
-		u8* slice = runtime->frame + slice_reg;                                   \
+		u8* slice = frame + slice_reg;                                            \
 		memcpy(&base_ptr, slice, sizeof(base_ptr));                               \
 		memcpy(&length, slice + sizeof(void*), sizeof(length));                   \
 		TYPE index = 0;                                                           \
-		memcpy(&index, runtime->frame + index_reg, sizeof(index));                \
+		memcpy(&index, frame + index_reg, sizeof(index));                         \
 		if ((u64)index >= length) goto runtime_execute_function_fail;             \
 		ASSERT(element_size != 0);                                                \
 		u8* field_ptr = (u8*)base_ptr + (u64)index * element_size + field_offset; \
-		memmove(field_ptr, runtime->frame + src, field_size);                     \
+		memmove(field_ptr, frame + src, field_size);                              \
 		break;                                                                    \
 	}
 
@@ -687,6 +687,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 		runtime->stack_top = frame_stack_top;
 	}
 
+	u8* frame = runtime->frame;
 	for (;;) {
 		op = (ls_op)*ip;
 		ip++;
@@ -697,27 +698,27 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 			case LS_OP_LOAD_CONST_1: {
 				const u32 dst = runtime_read_u32(&ip);
 				u8 value = *ip++;
-				u8* out = runtime->frame + dst;
+				u8* out = frame + dst;
 				*out = value;
 				break;
 			}
 			case LS_OP_LOAD_CONST_2: {
 				const u32 dst = runtime_read_u32(&ip);
-				u8* out = runtime->frame + dst;
+				u8* out = frame + dst;
 				memcpy(out, ip, 2u);
 				ip += 2u;
 				break;
 			}
 			case LS_OP_LOAD_CONST_4: {
 				const u32 dst = runtime_read_u32(&ip);
-				u8* out = runtime->frame + dst;
+				u8* out = frame + dst;
 				memcpy(out, ip, 4u);
 				ip += 4u;
 				break;
 			}
 			case LS_OP_LOAD_CONST_8: {
 				const u32 dst = runtime_read_u32(&ip);
-				u8* out = runtime->frame + dst;
+				u8* out = frame + dst;
 				memcpy(out, ip, 8u);
 				ip += 8u;
 				break;
@@ -726,16 +727,16 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 dst = runtime_read_u32(&ip);
 				const u32 src_offset = runtime_read_u32(&ip);
 				const u32 size = runtime_read_u32(&ip);
-				u8* out = runtime->frame + dst;
-				u8* src = runtime->frame + src_offset;
+				u8* out = frame + dst;
+				u8* src = frame + src_offset;
 				memmove(out, src, size);
 				break;
 			}
 			case LS_OP_FRAME_PTR: {
 				const u32 dst = runtime_read_u32(&ip);
 				const u32 offset = runtime_read_u32(&ip);
-				u8* out = runtime->frame + dst;
-				void* ptr = runtime->frame + offset;
+				u8* out = frame + dst;
+				void* ptr = frame + offset;
 				memcpy(out, &ptr, sizeof(ptr));
 				break;
 			}
@@ -744,7 +745,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 offset = runtime_read_u32(&ip);
 				if (offset >= runtime->bytecode->global_size) goto runtime_execute_function_fail;
 				void* ptr = runtime->stack + offset;
-				memcpy(runtime->frame + dst, &ptr, sizeof(ptr));
+				memcpy(frame + dst, &ptr, sizeof(ptr));
 				break;
 			}
 			case LS_OP_LOAD_PTR: {
@@ -752,10 +753,10 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 addr = runtime_read_u32(&ip);
 				const u32 size = runtime_read_u32(&ip);
 				void* ptr = NULL;
-				memcpy(&ptr, runtime->frame + addr, sizeof(ptr));
+				memcpy(&ptr, frame + addr, sizeof(ptr));
 				u8* value = (u8*)ptr;
 				if (!value) goto runtime_execute_function_fail;
-				memmove(runtime->frame + dst, value, size);
+				memmove(frame + dst, value, size);
 				break;
 			}
 			case LS_OP_STORE_PTR: {
@@ -763,10 +764,10 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 src = runtime_read_u32(&ip);
 				const u32 size = runtime_read_u32(&ip);
 				void* ptr = NULL;
-				memcpy(&ptr, runtime->frame + addr, sizeof(ptr));
+				memcpy(&ptr, frame + addr, sizeof(ptr));
 				u8* value = (u8*)ptr;
 				if (!value) goto runtime_execute_function_fail;
-				memmove(value, runtime->frame + src, size);
+				memmove(value, frame + src, size);
 				break;
 			}
 			LS_SLICE_FIELD_OP(8, u8)
@@ -782,7 +783,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const ls_type_kind index_kind = (ls_type_kind)*ip++;
 				const u64 length = runtime_read_u64(&ip);
 				// Same negative-index wraparound as LOAD_INDEXED.
-				u8* index_ptr = runtime->frame + index_reg;
+				u8* index_ptr = frame + index_reg;
 				if (runtime_numeric_to_u64(index_ptr, index_kind) >= length) goto runtime_execute_function_fail;
 				break;
 			}
@@ -790,7 +791,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 slice_reg = runtime_read_u32(&ip);
 				const u32 index = runtime_read_u32(&ip);
 				ls_string_view str = runtime->bytecode->strings[index];
-				u8* slice = runtime->frame + slice_reg;
+				u8* slice = frame + slice_reg;
 				memcpy(slice, &str.begin, sizeof(str.begin));
 				u64 len = str.end - str.begin;
 				memcpy(slice + sizeof(void*), &len, 8u);
@@ -804,9 +805,9 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 element_size = runtime_read_u32(&ip);
 				i64 end = 0, begin = 0, length = 0;
 				void* base_ptr = NULL;
-				u8* slice = runtime->frame + slice_reg;
-				u8* begin_ptr = runtime->frame + begin_reg;
-				u8* end_ptr = runtime->frame + end_reg;
+				u8* slice = frame + slice_reg;
+				u8* begin_ptr = frame + begin_reg;
+				u8* end_ptr = frame + end_reg;
 				u8* out = slice;
 				memcpy(&base_ptr, slice, sizeof(base_ptr));
 				memcpy(&length, slice + sizeof(void*), 8u);
@@ -829,11 +830,11 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 element_size = runtime_read_u32(&ip);
 				i64 length = 0;
 				void* base_ptr = NULL;
-				u8* slice = runtime->frame + slice_offset;
-				u8* out = runtime->frame + dst;
+				u8* slice = frame + slice_offset;
+				u8* out = frame + dst;
 				memcpy(&base_ptr, slice, sizeof(base_ptr));
 				memcpy(&length, slice + sizeof(void*), 8u);
-				const u64 index = runtime_numeric_to_u64(runtime->frame + index_reg, index_kind);
+				const u64 index = runtime_numeric_to_u64(frame + index_reg, index_kind);
 				if (!base_ptr || index >= (u64)length) goto runtime_execute_function_fail;
 				const u64 offset = index * element_size;
 				memmove(out, (u8*)base_ptr + offset, element_size);
@@ -847,11 +848,11 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 element_size = runtime_read_u32(&ip);
 				i64 length = 0;
 				void* base_ptr = NULL;
-				u8* slice = runtime->frame + slice_reg;
+				u8* slice = frame + slice_reg;
 				u8* out = slice;
 				memcpy(&base_ptr, slice, sizeof(base_ptr));
 				memcpy(&length, slice + sizeof(void*), 8u);
-				const u64 index = runtime_numeric_to_u64(runtime->frame + index_reg, index_kind);
+				const u64 index = runtime_numeric_to_u64(frame + index_reg, index_kind);
 				u8* base = (u8*)base_ptr;
 				if (!base || index >= (u64)length) goto runtime_execute_function_fail;
 				const u64 offset = index * element_size;
@@ -863,8 +864,8 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 dst = runtime_read_u32(&ip);
 				const u32 slice_reg = runtime_read_u32(&ip);
 				i64 length = 0;
-				u8* slice = runtime->frame + slice_reg;
-				u8* out = runtime->frame + dst;
+				u8* slice = frame + slice_reg;
+				u8* out = frame + dst;
 				memcpy(&length, slice + sizeof(void*), 8u);
 				memcpy(out, &length, 8u);
 				break;
@@ -877,9 +878,9 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const ls_type_kind element_kind = (ls_type_kind)*ip++;
 				ls_runtime_slice lhs = {NULL, 0};
 				ls_runtime_slice rhs = {NULL, 0};
-				u8* out = runtime->frame + dst;
-				memcpy(&lhs, runtime->frame + lhs_reg, sizeof(lhs));
-				memcpy(&rhs, runtime->frame + rhs_reg, sizeof(rhs));
+				u8* out = frame + dst;
+				memcpy(&lhs, frame + lhs_reg, sizeof(lhs));
+				memcpy(&rhs, frame + rhs_reg, sizeof(rhs));
 				*out = (u8)(runtime_slice_equal(lhs, rhs, element_size, element_kind) ? 1u : 0u);
 				break;
 			}
@@ -887,13 +888,13 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 src = runtime_read_u32(&ip);
 				const u32 size = runtime_read_u32(&ip);
 				if (size > 0u) {
-					u8* src_ptr = runtime->frame + src;
-					if (runtime->frame + size > runtime->stack_end) goto runtime_execute_function_fail;
-					memmove(runtime->frame, src_ptr, size);
-					runtime->stack_top = runtime->frame + size;
+					u8* src_ptr = frame + src;
+					if (frame + size > runtime->stack_end) goto runtime_execute_function_fail;
+					memmove(frame, src_ptr, size);
+					runtime->stack_top = frame + size;
 				}
 				else {
-					runtime->stack_top = runtime->frame;
+					runtime->stack_top = frame;
 				}
 				if (runtime->call_depth == initial->call_depth) {
 					runtime_clear_step_traps(runtime);
@@ -907,6 +908,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				fn = caller.function;
 				ip = caller.ip;
 				runtime->frame = caller.frame;
+				frame = caller.frame;
 				runtime->stack_top = caller.stack_top;
 				break;
 			}
@@ -915,9 +917,10 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 arg_base = runtime_read_u32(&ip);
 				u8* caller_top = runtime->stack_top;
 				const ls_function_bc* callee = &runtime->bytecode->functions[callee_index];
-				if (runtime->frame + arg_base > caller_top) goto runtime_execute_function_fail;
+				if (frame + arg_base > caller_top) goto runtime_execute_function_fail;
 
-				if (!runtime_enter_script_call(runtime, &fn, &ip, callee, runtime->frame + arg_base, caller_top)) goto runtime_execute_function_fail;
+				if (!runtime_enter_script_call(runtime, &fn, &ip, callee, frame + arg_base, caller_top)) goto runtime_execute_function_fail;
+				frame = runtime->frame;
 				break;
 			}
 			case LS_OP_CALL_NATIVE: {
@@ -925,8 +928,10 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 arg_base = runtime_read_u32(&ip);
 				u8* caller_top = runtime->stack_top;
 				const ls_function_bc* callee = &runtime->bytecode->functions[callee_index];
-				if (runtime->frame + arg_base > caller_top) goto runtime_execute_function_fail;
-				if (!runtime_invoke_native(runtime, callee_index, callee, runtime->frame + arg_base, NULL)) goto runtime_execute_function_fail;
+				if (frame + arg_base > caller_top) goto runtime_execute_function_fail;
+				runtime->frame = frame;
+				if (!runtime_invoke_native(runtime, callee_index, callee, frame + arg_base, NULL)) goto runtime_execute_function_fail;
+				frame = runtime->frame;
 				runtime->stack_top = caller_top;
 				break;
 			}
@@ -936,7 +941,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 return_size = runtime_read_u32(&ip);
 				(void)return_size;
 				const u32 arg = dst + 4u;
-				u8* callee_ptr = runtime->frame + dst;
+				u8* callee_ptr = frame + dst;
 				u32 callee_index = 0;
 				memcpy(&callee_index, callee_ptr, sizeof(callee_index));
 				u8* caller_top = runtime->stack_top;
@@ -952,15 +957,18 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				// below, with zero special-casing needed in LS_OP_RETURN: the
 				// callee's own RETURN deposits its result at its frame
 				// (== dst), which is exactly where the caller expects it.
-				if (arg_size > 0u) memmove(runtime->frame + dst, runtime->frame + arg, arg_size);
+				if (arg_size > 0u) memmove(frame + dst, frame + arg, arg_size);
 
 				if (callee->kind == LS_FUNCTION_NATIVE) {
-					if (!runtime_invoke_native(runtime, callee_index, callee, runtime->frame + dst, NULL)) goto runtime_execute_function_fail;
+					runtime->frame = frame;
+					if (!runtime_invoke_native(runtime, callee_index, callee, frame + dst, NULL)) goto runtime_execute_function_fail;
+					frame = runtime->frame;
 					runtime->stack_top = caller_top;
 					break;
 				}
 
-				if (!runtime_enter_script_call(runtime, &fn, &ip, callee, runtime->frame + dst, caller_top)) goto runtime_execute_function_fail;
+				if (!runtime_enter_script_call(runtime, &fn, &ip, callee, frame + dst, caller_top)) goto runtime_execute_function_fail;
+				frame = runtime->frame;
 				break;
 			}
 			case LS_OP_CAST: {
@@ -968,8 +976,8 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 src = runtime_read_u32(&ip);
 				const ls_type_kind src_kind = (ls_type_kind)*ip++;
 				const ls_type_kind dst_kind = (ls_type_kind)*ip++;
-				u8* src_ptr = runtime->frame + src;
-				u8* out = runtime->frame + dst;
+				u8* src_ptr = frame + src;
+				u8* out = frame + dst;
 				switch (dst_kind) {
 					case LS_TYPE_BOOL: { u8 v = runtime_numeric_to_u64(src_ptr, src_kind) != 0u ? 1u : 0u; memcpy(out, &v, 1u); break; }
 					case LS_TYPE_I8:  { i8 v = (i8)runtime_numeric_to_i64(src_ptr, src_kind); memcpy(out, &v, 1u); break; }
@@ -1000,8 +1008,8 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 			case LS_OP_NOT: {
 				const u32 dst = runtime_read_u32(&ip);
 				const u32 src = runtime_read_u32(&ip);
-				u8* src_ptr = runtime->frame + src;
-				u8* out = runtime->frame + dst;
+				u8* src_ptr = frame + src;
+				u8* out = frame + dst;
 				*out = *src_ptr ? 0u : 1u;
 				break;
 			}
@@ -1081,33 +1089,33 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 			case LS_OP_INC_I32: {
 				const u32 dst = runtime_read_u32(&ip);
 				i32 value = 0;
-				memcpy(&value, runtime->frame + dst, 4u);
+				memcpy(&value, frame + dst, 4u);
 				value = (i32)((u32)value + 1u);
-				memcpy(runtime->frame + dst, &value, 4u);
+				memcpy(frame + dst, &value, 4u);
 				break;
 			}
 			case LS_OP_INC_I64: {
 				const u32 dst = runtime_read_u32(&ip);
 				i64 value = 0;
-				memcpy(&value, runtime->frame + dst, 8u);
+				memcpy(&value, frame + dst, 8u);
 				value = (i64)((u64)value + 1u);
-				memcpy(runtime->frame + dst, &value, 8u);
+				memcpy(frame + dst, &value, 8u);
 				break;
 			}
 			case LS_OP_DEC_I32: {
 				const u32 dst = runtime_read_u32(&ip);
 				i32 value = 0;
-				memcpy(&value, runtime->frame + dst, 4u);
+				memcpy(&value, frame + dst, 4u);
 				value = (i32)((u32)value - 1u);
-				memcpy(runtime->frame + dst, &value, 4u);
+				memcpy(frame + dst, &value, 4u);
 				break;
 			}
 			case LS_OP_DEC_I64: {
 				const u32 dst = runtime_read_u32(&ip);
 				i64 value = 0;
-				memcpy(&value, runtime->frame + dst, 8u);
+				memcpy(&value, frame + dst, 8u);
 				value = (i64)((u64)value - 1u);
-				memcpy(runtime->frame + dst, &value, 8u);
+				memcpy(frame + dst, &value, 8u);
 				break;
 			}
 			case LS_OP_EQ: LS_REG_CMP_NUMERIC(==); break;
@@ -1184,14 +1192,14 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 			case LS_OP_JZ_U8: {
 				const u32 cond = runtime_read_u32(&ip);
 				const i32 offset = runtime_read_i16(&ip);
-				u8* ptr = runtime->frame + cond;
+				u8* ptr = frame + cond;
 				if (*ptr == 0u) ip += offset;
 				break;
 			}
 			case LS_OP_JNZ_U8: {
 				const u32 cond = runtime_read_u32(&ip);
 				const i32 offset = runtime_read_i16(&ip);
-				u8* ptr = runtime->frame + cond;
+				u8* ptr = frame + cond;
 				if (*ptr != 0u) ip += offset;
 				break;
 			}
@@ -1199,7 +1207,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 reg = runtime_read_u32(&ip);
 				const i32 offset = runtime_read_i16(&ip);
 				i32 value = 0;
-				memcpy(&value, runtime->frame + reg, 4u);
+				memcpy(&value, frame + reg, 4u);
 				if (value == 0) ip += offset;
 				break;
 			}
@@ -1207,7 +1215,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 reg = runtime_read_u32(&ip);
 				const i32 offset = runtime_read_i16(&ip);
 				i64 value = 0;
-				memcpy(&value, runtime->frame + reg, 8u);
+				memcpy(&value, frame + reg, 8u);
 				if (value == 0) ip += offset;
 				break;
 			}
@@ -1215,7 +1223,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 reg = runtime_read_u32(&ip);
 				const i32 offset = runtime_read_i16(&ip);
 				i32 value = 0;
-				memcpy(&value, runtime->frame + reg, 4u);
+				memcpy(&value, frame + reg, 4u);
 				if (value > 0) ip += offset;
 				break;
 			}
@@ -1223,7 +1231,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 reg = runtime_read_u32(&ip);
 				const i32 offset = runtime_read_i16(&ip);
 				i64 value = 0;
-				memcpy(&value, runtime->frame + reg, 8u);
+				memcpy(&value, frame + reg, 8u);
 				if (value > 0) ip += offset;
 				break;
 			}
@@ -1232,7 +1240,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 					const u32 size = fn->return_size;
 					runtime_clear_step_traps(runtime);
 					runtime->step_action = LS_DEBUG_CONTINUE;
-					runtime->stack_top = runtime->frame + size;
+					runtime->stack_top = frame + size;
 					runtime->result_size = size;
 					runtime->frame = initial->frame;
 					--runtime->call_start_depth;
@@ -1244,6 +1252,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				fn = caller.function;
 				ip = caller.ip;
 				runtime->frame = caller.frame;
+				frame = caller.frame;
 				runtime->stack_top = caller.stack_top;
 				break;
 			}
@@ -1251,7 +1260,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 reg = runtime_read_u32(&ip);
 				const i32 offset = runtime_read_i16(&ip);
 				i32 value = 0;
-				memcpy(&value, runtime->frame + reg, 4u);
+				memcpy(&value, frame + reg, 4u);
 				if (value >= 0) ip += offset;
 				break;
 			}
@@ -1259,7 +1268,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 reg = runtime_read_u32(&ip);
 				const i32 offset = runtime_read_i16(&ip);
 				i64 value = 0;
-				memcpy(&value, runtime->frame + reg, 8u);
+				memcpy(&value, frame + reg, 8u);
 				if (value >= 0) ip += offset;
 				break;
 			}
@@ -1267,7 +1276,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 reg = runtime_read_u32(&ip);
 				const i32 offset = runtime_read_i16(&ip);
 				i32 value = 0;
-				memcpy(&value, runtime->frame + reg, 4u);
+				memcpy(&value, frame + reg, 4u);
 				if (value < 0) ip += offset;
 				break;
 			}
@@ -1275,7 +1284,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 reg = runtime_read_u32(&ip);
 				const i32 offset = runtime_read_i16(&ip);
 				i64 value = 0;
-				memcpy(&value, runtime->frame + reg, 8u);
+				memcpy(&value, frame + reg, 8u);
 				if (value < 0) ip += offset;
 				break;
 			}
@@ -1283,7 +1292,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 reg = runtime_read_u32(&ip);
 				const i32 offset = runtime_read_i16(&ip);
 				i32 value = 0;
-				memcpy(&value, runtime->frame + reg, 4u);
+				memcpy(&value, frame + reg, 4u);
 				if (value <= 0) ip += offset;
 				break;
 			}
@@ -1291,7 +1300,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 reg = runtime_read_u32(&ip);
 				const i32 offset = runtime_read_i16(&ip);
 				i64 value = 0;
-				memcpy(&value, runtime->frame + reg, 8u);
+				memcpy(&value, frame + reg, 8u);
 				if (value <= 0) ip += offset;
 				break;
 			}
@@ -1299,7 +1308,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 reg = runtime_read_u32(&ip);
 				const i32 offset = runtime_read_i16(&ip);
 				i32 value = 0;
-				memcpy(&value, runtime->frame + reg, 4u);
+				memcpy(&value, frame + reg, 4u);
 				if (value != 0) ip += offset;
 				break;
 			}
@@ -1307,7 +1316,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 reg = runtime_read_u32(&ip);
 				const i32 offset = runtime_read_i16(&ip);
 				i64 value = 0;
-				memcpy(&value, runtime->frame + reg, 8u);
+				memcpy(&value, frame + reg, 8u);
 				if (value != 0) ip += offset;
 				break;
 			}

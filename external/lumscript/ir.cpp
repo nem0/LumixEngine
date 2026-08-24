@@ -3549,7 +3549,7 @@ struct BytecodeCompiler {
 			recordLocal(param.name, param_offset, *param.resolved_type, 0u);
 			param_offset += size;
 		}
-		// fn_bc->return_kind = toTypeKind(*return_type); // TODO
+		fn_bc->return_kind = toTypeKind(*return_type);
 		fn_bc->return_size = typeByteSize(*return_type);
 		fn_bc->frame_size = 0;
 		fn_bc->code_size = 0u;
