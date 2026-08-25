@@ -767,23 +767,25 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 			case LS_OP_LOAD_PTR: {
 				const u32 dst = runtime_read_u32();
 				const u32 addr = runtime_read_u32();
+				const u32 offset = runtime_read_u32();
 				const u32 size = runtime_read_u32();
 				void* ptr = NULL;
 				memcpy(&ptr, frame + addr, sizeof(ptr));
 				u8* value = (u8*)ptr;
 				if (!value) goto runtime_execute_function_fail;
-				memmove(frame + dst, value, size);
+				memmove(frame + dst, value + offset, size);
 				break;
 			}
 			case LS_OP_STORE_PTR: {
 				const u32 addr = runtime_read_u32();
+				const u32 offset = runtime_read_u32();
 				const u32 src = runtime_read_u32();
 				const u32 size = runtime_read_u32();
 				void* ptr = NULL;
 				memcpy(&ptr, frame + addr, sizeof(ptr));
 				u8* value = (u8*)ptr;
 				if (!value) goto runtime_execute_function_fail;
-				memmove(value, frame + src, size);
+				memmove(value + offset, frame + src, size);
 				break;
 			}
 			LS_SLICE_FIELD_OP(8, u8)
@@ -814,19 +816,19 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				break;
 			}
 			case LS_OP_SLICE: {
-				/* The resulting slice overwrites the source slice value in place. */
-				const u32 slice_reg = runtime_read_u32();
+				const u32 dst_reg = runtime_read_u32();
+				const u32 source_reg = runtime_read_u32();
 				const u32 begin_reg = runtime_read_u32();
 				const u32 end_reg = runtime_read_u32();
 				const u32 element_size = runtime_read_u32();
 				i64 end = 0, begin = 0, length = 0;
 				void* base_ptr = NULL;
-				u8* slice = frame + slice_reg;
+				u8* source = frame + source_reg;
 				u8* begin_ptr = frame + begin_reg;
 				u8* end_ptr = frame + end_reg;
-				u8* out = slice;
-				memcpy(&base_ptr, slice, sizeof(base_ptr));
-				memcpy(&length, slice + sizeof(void*), 8u);
+				u8* out = frame + dst_reg;
+				memcpy(&base_ptr, source, sizeof(base_ptr));
+				memcpy(&length, source + sizeof(void*), 8u);
 				memcpy(&begin, begin_ptr, 8u);
 				memcpy(&end, end_ptr, 8u);
 				u8* base = (u8*)base_ptr;
@@ -839,7 +841,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				break;
 			}
 			case LS_OP_SLICE_REF: {
-				/* The resulting pointer overwrites the slice value in place. */
+				const u32 dst = runtime_read_u32();
 				const u32 slice_reg = runtime_read_u32();
 				const u32 index_reg = runtime_read_u32();
 				const ls_type_kind index_kind = (ls_type_kind)*ip++;
@@ -847,7 +849,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				i64 length = 0;
 				void* base_ptr = NULL;
 				u8* slice = frame + slice_reg;
-				u8* out = slice;
+				u8* out = frame + dst;
 				memcpy(&base_ptr, slice, sizeof(base_ptr));
 				memcpy(&length, slice + sizeof(void*), 8u);
 				const u64 index = runtime_numeric_to_u64(frame + index_reg, index_kind);

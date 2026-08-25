@@ -1,26 +1,24 @@
-function 0 combinations (script, params=20, frame=76, returns=0)
+function 0 combinations (script, params=20, frame=64, returns=0)
   0000: LOAD_CONST_4         dst=20, value= 00 00 00 00                                                                  // 	var count : i32 = 0;
   0009: LOAD_CONST_4         dst=24, value= 00 00 00 00                                                                  // 	for i in 0..n - 1 {
   0018: SUB_32_IMM           dst=28, lhs=0, imm=0x01000000                                                               // 	for i in 0..n - 1 {
-  0031: JGE_I32              lhs=24, rhs=28, offset=179, target=221                                                      // 	for i in 0..n - 1 {
+  0031: JGE_I32              lhs=24, rhs=28, offset=161, target=203                                                      // 	for i in 0..n - 1 {
   0042: ADD_32_IMM           dst=32, lhs=24, imm=0x01000000                                                              // 		for j in i + 1..n {
   0055: COPY                 dst=36, src=0, size=4                                                                       // 		for j in i + 1..n {
-  0068: JGE_I32              lhs=32, rhs=36, offset=126, target=205                                                      // 		for j in i + 1..n {
+  0068: JGE_I32              lhs=32, rhs=36, offset=108, target=187                                                      // 		for j in i + 1..n {
   0079: COPY                 dst=48, src=24, size=4                                                                      // 			pairs[count] = BodyPair { i, j };
   0092: COPY                 dst=40, src=48, size=4                                                                      // 			pairs[count] = BodyPair { i, j };
   0105: COPY                 dst=52, src=32, size=4                                                                      // 			pairs[count] = BodyPair { i, j };
   0118: COPY                 dst=44, src=52, size=4                                                                      // 			pairs[count] = BodyPair { i, j };
-  0131: COPY                 dst=56, src=4, size=16                                                                      // 			pairs[count] = BodyPair { i, j };
-  0144: COPY                 dst=72, src=20, size=4                                                                      // 			pairs[count] = BodyPair { i, j };
-  0157: SLICE_REF            slice=56, index=72, index_type=7, element_size=8                                            // 			pairs[count] = BodyPair { i, j };
-  0171: STORE_PTR            addr=56, src=40, size=8                                                                     // 			pairs[count] = BodyPair { i, j };
-  0184: INC_I32              dst=20                                                                                      // 			count += 1;
-  0189: INC_I32              dst=32                                                                                      // 		for j in i + 1..n {
-  0194: JLT_I32              lhs=32, rhs=36, offset=-126, target=79                                                      // 		for j in i + 1..n {
-  0205: INC_I32              dst=24                                                                                      // 	for i in 0..n - 1 {
-  0210: JLT_I32              lhs=24, rhs=28, offset=-179, target=42                                                      // 	for i in 0..n - 1 {
-  0221: RETURN_BASE                                                                                                      // fn combinations(n : i32, pairs : []BodyPair) : void {
-function 1 make_system (script, params=16, frame=272, returns=0)
+  0131: SLICE_REF            dst=56, slice=4, index=20, index_type=7, element_size=8                                     // 			pairs[count] = BodyPair { i, j };
+  0149: STORE_PTR            addr=56, offset=0, src=40, size=8                                                           // 			pairs[count] = BodyPair { i, j };
+  0166: INC_I32              dst=20                                                                                      // 			count += 1;
+  0171: INC_I32              dst=32                                                                                      // 		for j in i + 1..n {
+  0176: JLT_I32              lhs=32, rhs=36, offset=-108, target=79                                                      // 		for j in i + 1..n {
+  0187: INC_I32              dst=24                                                                                      // 	for i in 0..n - 1 {
+  0192: JLT_I32              lhs=24, rhs=28, offset=-161, target=42                                                      // 	for i in 0..n - 1 {
+  0203: RETURN_BASE                                                                                                      // fn combinations(n : i32, pairs : []BodyPair) : void {
+function 1 make_system (script, params=16, frame=264, returns=0)
   0000: LOAD_CONST_8         dst=72, value= 00 00 00 00 00 00 00 00                                                      // 		0.0, 0.0, 0.0,
   0013: COPY                 dst=16, src=72, size=8                                                                      // 	bodies[0] = Body {
   0026: LOAD_CONST_8         dst=80, value= 00 00 00 00 00 00 00 00                                                      // 		0.0, 0.0, 0.0,
@@ -34,351 +32,287 @@ function 1 make_system (script, params=16, frame=272, returns=0)
   0130: LOAD_CONST_8         dst=112, value= 00 00 00 00 00 00 00 00                                                     // 		0.0, 0.0, 0.0,
   0143: COPY                 dst=56, src=112, size=8                                                                     // 	bodies[0] = Body {
   0156: GLOBAL_PTR           dst=120, offset=8                                                                           // 		solar_mass
-  0165: LOAD_PTR             dst=128, addr=120, size=8                                                                   // 		solar_mass
-  0178: COPY                 dst=64, src=128, size=8                                                                     // 	bodies[0] = Body {
-  0191: COPY                 dst=136, src=0, size=16                                                                     // 	bodies[0] = Body {
-  0204: LOAD_CONST_8         dst=152, value= 00 00 00 00 00 00 00 00                                                     // 	bodies[0] = Body {
-  0217: SLICE_REF            slice=136, index=152, index_type=9, element_size=56                                         // 	bodies[0] = Body {
-  0231: STORE_PTR            addr=136, src=16, size=56                                                                   // 	bodies[0] = Body {
-  0244: LOAD_CONST_8         dst=72, value= 2c d9 3c 34 a0 5d 13 40                                                      // 		4.84143144246472090, -1.16032004402742839, -0.103622044471123109,
-  0257: COPY                 dst=16, src=72, size=8                                                                      // 	bodies[1] = Body {
-  0270: LOAD_CONST_8         dst=80, value= 7c db 1f c0 ab 90 f2 3f                                                      // 		4.84143144246472090, -1.16032004402742839, -0.103622044471123109,
-  0283: NEG_F64              dst=88, src=80                                                                              // 		4.84143144246472090, -1.16032004402742839, -0.103622044471123109,
-  0292: COPY                 dst=24, src=88, size=8                                                                      // 	bodies[1] = Body {
-  0305: LOAD_CONST_8         dst=96, value= f1 eb 25 6c f9 86 ba 3f                                                      // 		4.84143144246472090, -1.16032004402742839, -0.103622044471123109,
-  0318: NEG_F64              dst=104, src=96                                                                             // 		4.84143144246472090, -1.16032004402742839, -0.103622044471123109,
-  0327: COPY                 dst=32, src=104, size=8                                                                     // 	bodies[1] = Body {
-  0340: LOAD_CONST_8         dst=112, value= 08 92 ec b8 dd 32 5b 3f                                                     // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
-  0353: GLOBAL_PTR           dst=120, offset=16                                                                          // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
-  0362: LOAD_PTR             dst=128, addr=120, size=8                                                                   // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
-  0375: MUL_F64              dst=136, lhs=112, rhs=128                                                                   // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
-  0388: COPY                 dst=40, src=136, size=8                                                                     // 	bodies[1] = Body {
-  0401: LOAD_CONST_8         dst=144, value= b6 70 f6 93 ff 88 7f 3f                                                     // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
-  0414: GLOBAL_PTR           dst=152, offset=16                                                                          // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
-  0423: LOAD_PTR             dst=160, addr=152, size=8                                                                   // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
-  0436: MUL_F64              dst=168, lhs=144, rhs=160                                                                   // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
-  0449: COPY                 dst=48, src=168, size=8                                                                     // 	bodies[1] = Body {
-  0462: LOAD_CONST_8         dst=176, value= 80 bd de 46 99 19 12 3f                                                     // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
-  0475: NEG_F64              dst=184, src=176                                                                            // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
-  0484: GLOBAL_PTR           dst=192, offset=16                                                                          // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
-  0493: LOAD_PTR             dst=200, addr=192, size=8                                                                   // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
-  0506: MUL_F64              dst=208, lhs=184, rhs=200                                                                   // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
-  0519: COPY                 dst=56, src=208, size=8                                                                     // 	bodies[1] = Body {
-  0532: LOAD_CONST_8         dst=216, value= 34 c1 33 13 60 49 4f 3f                                                     // 		0.000954791938424326609 * solar_mass
-  0545: GLOBAL_PTR           dst=224, offset=8                                                                           // 		0.000954791938424326609 * solar_mass
-  0554: LOAD_PTR             dst=232, addr=224, size=8                                                                   // 		0.000954791938424326609 * solar_mass
-  0567: MUL_F64              dst=240, lhs=216, rhs=232                                                                   // 		0.000954791938424326609 * solar_mass
-  0580: COPY                 dst=64, src=240, size=8                                                                     // 	bodies[1] = Body {
-  0593: COPY                 dst=248, src=0, size=16                                                                     // 	bodies[1] = Body {
-  0606: LOAD_CONST_8         dst=264, value= 01 00 00 00 00 00 00 00                                                     // 	bodies[1] = Body {
-  0619: SLICE_REF            slice=248, index=264, index_type=9, element_size=56                                         // 	bodies[1] = Body {
-  0633: STORE_PTR            addr=248, src=16, size=56                                                                   // 	bodies[1] = Body {
-  0646: LOAD_CONST_8         dst=72, value= 67 ca 32 c3 cd af 20 40                                                      // 		8.34336671824457987, 4.12479856412430479, -0.403523417114321381,
-  0659: COPY                 dst=16, src=72, size=8                                                                      // 	bodies[2] = Body {
-  0672: LOAD_CONST_8         dst=80, value= b0 01 de 31 cb 7f 10 40                                                      // 		8.34336671824457987, 4.12479856412430479, -0.403523417114321381,
-  0685: COPY                 dst=24, src=80, size=8                                                                      // 	bodies[2] = Body {
-  0698: LOAD_CONST_8         dst=88, value= 7b 46 eb e1 53 d3 d9 3f                                                      // 		8.34336671824457987, 4.12479856412430479, -0.403523417114321381,
-  0711: NEG_F64              dst=96, src=88                                                                              // 		8.34336671824457987, 4.12479856412430479, -0.403523417114321381,
-  0720: COPY                 dst=32, src=96, size=8                                                                      // 	bodies[2] = Body {
-  0733: LOAD_CONST_8         dst=104, value= 76 1d 8e 0a b6 ab 66 3f                                                     // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
-  0746: NEG_F64              dst=112, src=104                                                                            // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
-  0755: GLOBAL_PTR           dst=120, offset=16                                                                          // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
-  0764: LOAD_PTR             dst=128, addr=120, size=8                                                                   // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
-  0777: MUL_F64              dst=136, lhs=112, rhs=128                                                                   // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
-  0790: COPY                 dst=40, src=136, size=8                                                                     // 	bodies[2] = Body {
-  0803: LOAD_CONST_8         dst=144, value= b7 78 75 25 56 79 74 3f                                                     // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
-  0816: GLOBAL_PTR           dst=152, offset=16                                                                          // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
-  0825: LOAD_PTR             dst=160, addr=152, size=8                                                                   // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
-  0838: MUL_F64              dst=168, lhs=144, rhs=160                                                                   // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
-  0851: COPY                 dst=48, src=168, size=8                                                                     // 	bodies[2] = Body {
-  0864: LOAD_CONST_8         dst=176, value= bf 4a ad 9c 37 29 f8 3e                                                     // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
-  0877: GLOBAL_PTR           dst=184, offset=16                                                                          // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
-  0886: LOAD_PTR             dst=192, addr=184, size=8                                                                   // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
-  0899: MUL_F64              dst=200, lhs=176, rhs=192                                                                   // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
-  0912: COPY                 dst=56, src=200, size=8                                                                     // 	bodies[2] = Body {
-  0925: LOAD_CONST_8         dst=208, value= f8 e6 f5 ef 5e bc 32 3f                                                     // 		0.000285885980666130812 * solar_mass
-  0938: GLOBAL_PTR           dst=216, offset=8                                                                           // 		0.000285885980666130812 * solar_mass
-  0947: LOAD_PTR             dst=224, addr=216, size=8                                                                   // 		0.000285885980666130812 * solar_mass
-  0960: MUL_F64              dst=232, lhs=208, rhs=224                                                                   // 		0.000285885980666130812 * solar_mass
-  0973: COPY                 dst=64, src=232, size=8                                                                     // 	bodies[2] = Body {
-  0986: COPY                 dst=240, src=0, size=16                                                                     // 	bodies[2] = Body {
-  0999: LOAD_CONST_8         dst=256, value= 02 00 00 00 00 00 00 00                                                     // 	bodies[2] = Body {
-  1012: SLICE_REF            slice=240, index=256, index_type=9, element_size=56                                         // 	bodies[2] = Body {
-  1026: STORE_PTR            addr=240, src=16, size=56                                                                   // 	bodies[2] = Body {
-  1039: LOAD_CONST_8         dst=72, value= cf d9 a7 ce ea c9 29 40                                                      // 		12.8943695621391310, -15.1111514016986312, -0.223307578892655734,
-  1052: COPY                 dst=16, src=72, size=8                                                                      // 	bodies[3] = Body {
-  1065: LOAD_CONST_8         dst=80, value= 7e 66 26 d6 e8 38 2e 40                                                      // 		12.8943695621391310, -15.1111514016986312, -0.223307578892655734,
-  1078: NEG_F64              dst=88, src=80                                                                              // 		12.8943695621391310, -15.1111514016986312, -0.223307578892655734,
-  1087: COPY                 dst=24, src=88, size=8                                                                      // 	bodies[3] = Body {
-  1100: LOAD_CONST_8         dst=96, value= 9f 7d 25 be 57 95 cc 3f                                                      // 		12.8943695621391310, -15.1111514016986312, -0.223307578892655734,
-  1113: NEG_F64              dst=104, src=96                                                                             // 		12.8943695621391310, -15.1111514016986312, -0.223307578892655734,
-  1122: COPY                 dst=32, src=104, size=8                                                                     // 	bodies[3] = Body {
-  1135: LOAD_CONST_8         dst=112, value= 54 d9 87 3e 38 49 68 3f                                                     // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
-  1148: GLOBAL_PTR           dst=120, offset=16                                                                          // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
-  1157: LOAD_PTR             dst=128, addr=120, size=8                                                                   // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
-  1170: MUL_F64              dst=136, lhs=112, rhs=128                                                                   // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
-  1183: COPY                 dst=40, src=136, size=8                                                                     // 	bodies[3] = Body {
-  1196: LOAD_CONST_8         dst=144, value= e0 ac c0 4a 04 7c 63 3f                                                     // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
-  1209: GLOBAL_PTR           dst=152, offset=16                                                                          // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
-  1218: LOAD_PTR             dst=160, addr=152, size=8                                                                   // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
-  1231: MUL_F64              dst=168, lhs=144, rhs=160                                                                   // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
-  1244: COPY                 dst=48, src=168, size=8                                                                     // 	bodies[3] = Body {
-  1257: LOAD_CONST_8         dst=176, value= a0 fa db fe 83 19 ff 3e                                                     // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
-  1270: NEG_F64              dst=184, src=176                                                                            // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
-  1279: GLOBAL_PTR           dst=192, offset=16                                                                          // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
-  1288: LOAD_PTR             dst=200, addr=192, size=8                                                                   // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
-  1301: MUL_F64              dst=208, lhs=184, rhs=200                                                                   // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
-  1314: COPY                 dst=56, src=208, size=8                                                                     // 	bodies[3] = Body {
-  1327: LOAD_CONST_8         dst=216, value= d5 3b a1 07 46 e4 06 3f                                                     // 		0.0000436624404335156298 * solar_mass
-  1340: GLOBAL_PTR           dst=224, offset=8                                                                           // 		0.0000436624404335156298 * solar_mass
-  1349: LOAD_PTR             dst=232, addr=224, size=8                                                                   // 		0.0000436624404335156298 * solar_mass
-  1362: MUL_F64              dst=240, lhs=216, rhs=232                                                                   // 		0.0000436624404335156298 * solar_mass
-  1375: COPY                 dst=64, src=240, size=8                                                                     // 	bodies[3] = Body {
-  1388: COPY                 dst=248, src=0, size=16                                                                     // 	bodies[3] = Body {
-  1401: LOAD_CONST_8         dst=264, value= 03 00 00 00 00 00 00 00                                                     // 	bodies[3] = Body {
-  1414: SLICE_REF            slice=248, index=264, index_type=9, element_size=56                                         // 	bodies[3] = Body {
-  1428: STORE_PTR            addr=248, src=16, size=56                                                                   // 	bodies[3] = Body {
-  1441: LOAD_CONST_8         dst=72, value= 2a 57 05 a9 67 c2 2e 40                                                      // 		15.3796971148509165, -25.9193146099879641, 0.179258772950371181,
-  1454: COPY                 dst=16, src=72, size=8                                                                      // 	bodies[4] = Body {
-  1467: LOAD_CONST_8         dst=80, value= 20 a2 c8 33 58 eb 39 40                                                      // 		15.3796971148509165, -25.9193146099879641, 0.179258772950371181,
-  1480: NEG_F64              dst=88, src=80                                                                              // 		15.3796971148509165, -25.9193146099879641, 0.179258772950371181,
-  1489: COPY                 dst=24, src=88, size=8                                                                      // 	bodies[4] = Body {
-  1502: LOAD_CONST_8         dst=96, value= 40 e5 ab 93 f3 f1 c6 3f                                                      // 		15.3796971148509165, -25.9193146099879641, 0.179258772950371181,
-  1515: COPY                 dst=32, src=96, size=8                                                                      // 	bodies[4] = Body {
-  1528: LOAD_CONST_8         dst=104, value= 1f 43 1b e5 c9 f5 65 3f                                                     // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1541: GLOBAL_PTR           dst=112, offset=16                                                                          // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1550: LOAD_PTR             dst=120, addr=112, size=8                                                                   // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1563: MUL_F64              dst=128, lhs=104, rhs=120                                                                   // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1576: COPY                 dst=40, src=128, size=8                                                                     // 	bodies[4] = Body {
-  1589: LOAD_CONST_8         dst=136, value= 87 9d 99 36 57 ad 5a 3f                                                     // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1602: GLOBAL_PTR           dst=144, offset=16                                                                          // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1611: LOAD_PTR             dst=152, addr=144, size=8                                                                   // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1624: MUL_F64              dst=160, lhs=136, rhs=152                                                                   // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1637: COPY                 dst=48, src=160, size=8                                                                     // 	bodies[4] = Body {
-  1650: LOAD_CONST_8         dst=168, value= 50 97 7f 0b 07 f2 18 3f                                                     // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1663: NEG_F64              dst=176, src=168                                                                            // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1672: GLOBAL_PTR           dst=184, offset=16                                                                          // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1681: LOAD_PTR             dst=192, addr=184, size=8                                                                   // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1694: MUL_F64              dst=200, lhs=176, rhs=192                                                                   // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
-  1707: COPY                 dst=56, src=200, size=8                                                                     // 	bodies[4] = Body {
-  1720: LOAD_CONST_8         dst=208, value= ec 0e 2d ca 13 02 0b 3f                                                     // 		0.0000515138902046611451 * solar_mass
-  1733: GLOBAL_PTR           dst=216, offset=8                                                                           // 		0.0000515138902046611451 * solar_mass
-  1742: LOAD_PTR             dst=224, addr=216, size=8                                                                   // 		0.0000515138902046611451 * solar_mass
-  1755: MUL_F64              dst=232, lhs=208, rhs=224                                                                   // 		0.0000515138902046611451 * solar_mass
-  1768: COPY                 dst=64, src=232, size=8                                                                     // 	bodies[4] = Body {
-  1781: COPY                 dst=240, src=0, size=16                                                                     // 	bodies[4] = Body {
-  1794: LOAD_CONST_8         dst=256, value= 04 00 00 00 00 00 00 00                                                     // 	bodies[4] = Body {
-  1807: SLICE_REF            slice=240, index=256, index_type=9, element_size=56                                         // 	bodies[4] = Body {
-  1821: STORE_PTR            addr=240, src=16, size=56                                                                   // 	bodies[4] = Body {
-  1834: RETURN_BASE                                                                                                      // fn make_system(bodies : []Body) : void {
+  0165: LOAD_PTR             dst=128, addr=120, offset=0, size=8                                                         // 		solar_mass
+  0182: COPY                 dst=64, src=128, size=8                                                                     // 	bodies[0] = Body {
+  0195: LOAD_CONST_8         dst=136, value= 00 00 00 00 00 00 00 00                                                     // 	bodies[0] = Body {
+  0208: SLICE_REF            dst=144, slice=0, index=136, index_type=9, element_size=56                                  // 	bodies[0] = Body {
+  0226: STORE_PTR            addr=144, offset=0, src=16, size=56                                                         // 	bodies[0] = Body {
+  0243: LOAD_CONST_8         dst=72, value= 2c d9 3c 34 a0 5d 13 40                                                      // 		4.84143144246472090, -1.16032004402742839, -0.103622044471123109,
+  0256: COPY                 dst=16, src=72, size=8                                                                      // 	bodies[1] = Body {
+  0269: LOAD_CONST_8         dst=80, value= 7c db 1f c0 ab 90 f2 3f                                                      // 		4.84143144246472090, -1.16032004402742839, -0.103622044471123109,
+  0282: NEG_F64              dst=88, src=80                                                                              // 		4.84143144246472090, -1.16032004402742839, -0.103622044471123109,
+  0291: COPY                 dst=24, src=88, size=8                                                                      // 	bodies[1] = Body {
+  0304: LOAD_CONST_8         dst=96, value= f1 eb 25 6c f9 86 ba 3f                                                      // 		4.84143144246472090, -1.16032004402742839, -0.103622044471123109,
+  0317: NEG_F64              dst=104, src=96                                                                             // 		4.84143144246472090, -1.16032004402742839, -0.103622044471123109,
+  0326: COPY                 dst=32, src=104, size=8                                                                     // 	bodies[1] = Body {
+  0339: LOAD_CONST_8         dst=112, value= 08 92 ec b8 dd 32 5b 3f                                                     // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
+  0352: GLOBAL_PTR           dst=120, offset=16                                                                          // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
+  0361: LOAD_PTR             dst=128, addr=120, offset=0, size=8                                                         // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
+  0378: MUL_F64              dst=136, lhs=112, rhs=128                                                                   // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
+  0391: COPY                 dst=40, src=136, size=8                                                                     // 	bodies[1] = Body {
+  0404: LOAD_CONST_8         dst=144, value= b6 70 f6 93 ff 88 7f 3f                                                     // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
+  0417: GLOBAL_PTR           dst=152, offset=16                                                                          // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
+  0426: LOAD_PTR             dst=160, addr=152, offset=0, size=8                                                         // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
+  0443: MUL_F64              dst=168, lhs=144, rhs=160                                                                   // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
+  0456: COPY                 dst=48, src=168, size=8                                                                     // 	bodies[1] = Body {
+  0469: LOAD_CONST_8         dst=176, value= 80 bd de 46 99 19 12 3f                                                     // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
+  0482: NEG_F64              dst=184, src=176                                                                            // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
+  0491: GLOBAL_PTR           dst=192, offset=16                                                                          // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
+  0500: LOAD_PTR             dst=200, addr=192, offset=0, size=8                                                         // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
+  0517: MUL_F64              dst=208, lhs=184, rhs=200                                                                   // 		0.00166007664274403694 * days_per_year, 0.00769901118419740425 * days_per_year, -0.0000690460016972063023 * days_per_year,
+  0530: COPY                 dst=56, src=208, size=8                                                                     // 	bodies[1] = Body {
+  0543: LOAD_CONST_8         dst=216, value= 34 c1 33 13 60 49 4f 3f                                                     // 		0.000954791938424326609 * solar_mass
+  0556: GLOBAL_PTR           dst=224, offset=8                                                                           // 		0.000954791938424326609 * solar_mass
+  0565: LOAD_PTR             dst=232, addr=224, offset=0, size=8                                                         // 		0.000954791938424326609 * solar_mass
+  0582: MUL_F64              dst=240, lhs=216, rhs=232                                                                   // 		0.000954791938424326609 * solar_mass
+  0595: COPY                 dst=64, src=240, size=8                                                                     // 	bodies[1] = Body {
+  0608: LOAD_CONST_8         dst=248, value= 01 00 00 00 00 00 00 00                                                     // 	bodies[1] = Body {
+  0621: SLICE_REF            dst=256, slice=0, index=248, index_type=9, element_size=56                                  // 	bodies[1] = Body {
+  0639: STORE_PTR            addr=256, offset=0, src=16, size=56                                                         // 	bodies[1] = Body {
+  0656: LOAD_CONST_8         dst=72, value= 67 ca 32 c3 cd af 20 40                                                      // 		8.34336671824457987, 4.12479856412430479, -0.403523417114321381,
+  0669: COPY                 dst=16, src=72, size=8                                                                      // 	bodies[2] = Body {
+  0682: LOAD_CONST_8         dst=80, value= b0 01 de 31 cb 7f 10 40                                                      // 		8.34336671824457987, 4.12479856412430479, -0.403523417114321381,
+  0695: COPY                 dst=24, src=80, size=8                                                                      // 	bodies[2] = Body {
+  0708: LOAD_CONST_8         dst=88, value= 7b 46 eb e1 53 d3 d9 3f                                                      // 		8.34336671824457987, 4.12479856412430479, -0.403523417114321381,
+  0721: NEG_F64              dst=96, src=88                                                                              // 		8.34336671824457987, 4.12479856412430479, -0.403523417114321381,
+  0730: COPY                 dst=32, src=96, size=8                                                                      // 	bodies[2] = Body {
+  0743: LOAD_CONST_8         dst=104, value= 76 1d 8e 0a b6 ab 66 3f                                                     // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
+  0756: NEG_F64              dst=112, src=104                                                                            // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
+  0765: GLOBAL_PTR           dst=120, offset=16                                                                          // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
+  0774: LOAD_PTR             dst=128, addr=120, offset=0, size=8                                                         // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
+  0791: MUL_F64              dst=136, lhs=112, rhs=128                                                                   // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
+  0804: COPY                 dst=40, src=136, size=8                                                                     // 	bodies[2] = Body {
+  0817: LOAD_CONST_8         dst=144, value= b7 78 75 25 56 79 74 3f                                                     // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
+  0830: GLOBAL_PTR           dst=152, offset=16                                                                          // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
+  0839: LOAD_PTR             dst=160, addr=152, offset=0, size=8                                                         // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
+  0856: MUL_F64              dst=168, lhs=144, rhs=160                                                                   // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
+  0869: COPY                 dst=48, src=168, size=8                                                                     // 	bodies[2] = Body {
+  0882: LOAD_CONST_8         dst=176, value= bf 4a ad 9c 37 29 f8 3e                                                     // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
+  0895: GLOBAL_PTR           dst=184, offset=16                                                                          // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
+  0904: LOAD_PTR             dst=192, addr=184, offset=0, size=8                                                         // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
+  0921: MUL_F64              dst=200, lhs=176, rhs=192                                                                   // 		-0.00276742510726862411 * days_per_year, 0.00499852801234917238 * days_per_year, 0.0000230417297573763929 * days_per_year,
+  0934: COPY                 dst=56, src=200, size=8                                                                     // 	bodies[2] = Body {
+  0947: LOAD_CONST_8         dst=208, value= f8 e6 f5 ef 5e bc 32 3f                                                     // 		0.000285885980666130812 * solar_mass
+  0960: GLOBAL_PTR           dst=216, offset=8                                                                           // 		0.000285885980666130812 * solar_mass
+  0969: LOAD_PTR             dst=224, addr=216, offset=0, size=8                                                         // 		0.000285885980666130812 * solar_mass
+  0986: MUL_F64              dst=232, lhs=208, rhs=224                                                                   // 		0.000285885980666130812 * solar_mass
+  0999: COPY                 dst=64, src=232, size=8                                                                     // 	bodies[2] = Body {
+  1012: LOAD_CONST_8         dst=240, value= 02 00 00 00 00 00 00 00                                                     // 	bodies[2] = Body {
+  1025: SLICE_REF            dst=248, slice=0, index=240, index_type=9, element_size=56                                  // 	bodies[2] = Body {
+  1043: STORE_PTR            addr=248, offset=0, src=16, size=56                                                         // 	bodies[2] = Body {
+  1060: LOAD_CONST_8         dst=72, value= cf d9 a7 ce ea c9 29 40                                                      // 		12.8943695621391310, -15.1111514016986312, -0.223307578892655734,
+  1073: COPY                 dst=16, src=72, size=8                                                                      // 	bodies[3] = Body {
+  1086: LOAD_CONST_8         dst=80, value= 7e 66 26 d6 e8 38 2e 40                                                      // 		12.8943695621391310, -15.1111514016986312, -0.223307578892655734,
+  1099: NEG_F64              dst=88, src=80                                                                              // 		12.8943695621391310, -15.1111514016986312, -0.223307578892655734,
+  1108: COPY                 dst=24, src=88, size=8                                                                      // 	bodies[3] = Body {
+  1121: LOAD_CONST_8         dst=96, value= 9f 7d 25 be 57 95 cc 3f                                                      // 		12.8943695621391310, -15.1111514016986312, -0.223307578892655734,
+  1134: NEG_F64              dst=104, src=96                                                                             // 		12.8943695621391310, -15.1111514016986312, -0.223307578892655734,
+  1143: COPY                 dst=32, src=104, size=8                                                                     // 	bodies[3] = Body {
+  1156: LOAD_CONST_8         dst=112, value= 54 d9 87 3e 38 49 68 3f                                                     // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
+  1169: GLOBAL_PTR           dst=120, offset=16                                                                          // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
+  1178: LOAD_PTR             dst=128, addr=120, offset=0, size=8                                                         // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
+  1195: MUL_F64              dst=136, lhs=112, rhs=128                                                                   // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
+  1208: COPY                 dst=40, src=136, size=8                                                                     // 	bodies[3] = Body {
+  1221: LOAD_CONST_8         dst=144, value= e0 ac c0 4a 04 7c 63 3f                                                     // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
+  1234: GLOBAL_PTR           dst=152, offset=16                                                                          // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
+  1243: LOAD_PTR             dst=160, addr=152, offset=0, size=8                                                         // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
+  1260: MUL_F64              dst=168, lhs=144, rhs=160                                                                   // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
+  1273: COPY                 dst=48, src=168, size=8                                                                     // 	bodies[3] = Body {
+  1286: LOAD_CONST_8         dst=176, value= a0 fa db fe 83 19 ff 3e                                                     // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
+  1299: NEG_F64              dst=184, src=176                                                                            // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
+  1308: GLOBAL_PTR           dst=192, offset=16                                                                          // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
+  1317: LOAD_PTR             dst=200, addr=192, offset=0, size=8                                                         // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
+  1334: MUL_F64              dst=208, lhs=184, rhs=200                                                                   // 		0.00296460137564761618 * days_per_year, 0.00237847173959480950 * days_per_year, -0.0000296589568540237556 * days_per_year,
+  1347: COPY                 dst=56, src=208, size=8                                                                     // 	bodies[3] = Body {
+  1360: LOAD_CONST_8         dst=216, value= d5 3b a1 07 46 e4 06 3f                                                     // 		0.0000436624404335156298 * solar_mass
+  1373: GLOBAL_PTR           dst=224, offset=8                                                                           // 		0.0000436624404335156298 * solar_mass
+  1382: LOAD_PTR             dst=232, addr=224, offset=0, size=8                                                         // 		0.0000436624404335156298 * solar_mass
+  1399: MUL_F64              dst=240, lhs=216, rhs=232                                                                   // 		0.0000436624404335156298 * solar_mass
+  1412: COPY                 dst=64, src=240, size=8                                                                     // 	bodies[3] = Body {
+  1425: LOAD_CONST_8         dst=248, value= 03 00 00 00 00 00 00 00                                                     // 	bodies[3] = Body {
+  1438: SLICE_REF            dst=256, slice=0, index=248, index_type=9, element_size=56                                  // 	bodies[3] = Body {
+  1456: STORE_PTR            addr=256, offset=0, src=16, size=56                                                         // 	bodies[3] = Body {
+  1473: LOAD_CONST_8         dst=72, value= 2a 57 05 a9 67 c2 2e 40                                                      // 		15.3796971148509165, -25.9193146099879641, 0.179258772950371181,
+  1486: COPY                 dst=16, src=72, size=8                                                                      // 	bodies[4] = Body {
+  1499: LOAD_CONST_8         dst=80, value= 20 a2 c8 33 58 eb 39 40                                                      // 		15.3796971148509165, -25.9193146099879641, 0.179258772950371181,
+  1512: NEG_F64              dst=88, src=80                                                                              // 		15.3796971148509165, -25.9193146099879641, 0.179258772950371181,
+  1521: COPY                 dst=24, src=88, size=8                                                                      // 	bodies[4] = Body {
+  1534: LOAD_CONST_8         dst=96, value= 40 e5 ab 93 f3 f1 c6 3f                                                      // 		15.3796971148509165, -25.9193146099879641, 0.179258772950371181,
+  1547: COPY                 dst=32, src=96, size=8                                                                      // 	bodies[4] = Body {
+  1560: LOAD_CONST_8         dst=104, value= 1f 43 1b e5 c9 f5 65 3f                                                     // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1573: GLOBAL_PTR           dst=112, offset=16                                                                          // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1582: LOAD_PTR             dst=120, addr=112, offset=0, size=8                                                         // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1599: MUL_F64              dst=128, lhs=104, rhs=120                                                                   // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1612: COPY                 dst=40, src=128, size=8                                                                     // 	bodies[4] = Body {
+  1625: LOAD_CONST_8         dst=136, value= 87 9d 99 36 57 ad 5a 3f                                                     // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1638: GLOBAL_PTR           dst=144, offset=16                                                                          // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1647: LOAD_PTR             dst=152, addr=144, offset=0, size=8                                                         // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1664: MUL_F64              dst=160, lhs=136, rhs=152                                                                   // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1677: COPY                 dst=48, src=160, size=8                                                                     // 	bodies[4] = Body {
+  1690: LOAD_CONST_8         dst=168, value= 50 97 7f 0b 07 f2 18 3f                                                     // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1703: NEG_F64              dst=176, src=168                                                                            // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1712: GLOBAL_PTR           dst=184, offset=16                                                                          // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1721: LOAD_PTR             dst=192, addr=184, offset=0, size=8                                                         // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1738: MUL_F64              dst=200, lhs=176, rhs=192                                                                   // 		0.00268067772490389322 * days_per_year, 0.00162824170038242295 * days_per_year, -0.0000951592254519715870 * days_per_year,
+  1751: COPY                 dst=56, src=200, size=8                                                                     // 	bodies[4] = Body {
+  1764: LOAD_CONST_8         dst=208, value= ec 0e 2d ca 13 02 0b 3f                                                     // 		0.0000515138902046611451 * solar_mass
+  1777: GLOBAL_PTR           dst=216, offset=8                                                                           // 		0.0000515138902046611451 * solar_mass
+  1786: LOAD_PTR             dst=224, addr=216, offset=0, size=8                                                         // 		0.0000515138902046611451 * solar_mass
+  1803: MUL_F64              dst=232, lhs=208, rhs=224                                                                   // 		0.0000515138902046611451 * solar_mass
+  1816: COPY                 dst=64, src=232, size=8                                                                     // 	bodies[4] = Body {
+  1829: LOAD_CONST_8         dst=240, value= 04 00 00 00 00 00 00 00                                                     // 	bodies[4] = Body {
+  1842: SLICE_REF            dst=248, slice=0, index=240, index_type=9, element_size=56                                  // 	bodies[4] = Body {
+  1860: STORE_PTR            addr=248, offset=0, src=16, size=56                                                         // 	bodies[4] = Body {
+  1877: RETURN_BASE                                                                                                      // fn make_system(bodies : []Body) : void {
 function 2 offset_momentum (script, params=16, frame=88, returns=0)
   0000: LOAD_CONST_8         dst=16, value= 00 00 00 00 00 00 00 00                                                      // 	var px = 0.0;
   0013: LOAD_CONST_8         dst=24, value= 00 00 00 00 00 00 00 00                                                      // 	var py = 0.0;
   0026: LOAD_CONST_8         dst=32, value= 00 00 00 00 00 00 00 00                                                      // 	var pz = 0.0;
   0039: LOAD_CONST_8         dst=40, value= 00 00 00 00 00 00 00 00                                                      // 	for bi in 0..bodies.length {
-  0052: COPY                 dst=56, src=0, size=16                                                                      // 	for bi in 0..bodies.length {
-  0065: COPY                 dst=72, src=64, size=8                                                                      // 	for bi in 0..bodies.length {
-  0078: COPY                 dst=48, src=72, size=8                                                                      // 	for bi in 0..bodies.length {
-  0091: JGE_I64              lhs=40, rhs=48, offset=244, target=346                                                      // 	for bi in 0..bodies.length {
-  0102: SLICE_LOAD_64        dst=56, slice=0, index=40, element_size=56, load_offset=24, load_size=8                     // 		px -= bodies[bi].vx * bodies[bi].mass;
-  0127: SLICE_LOAD_64        dst=64, slice=0, index=40, element_size=56, load_offset=48, load_size=8                     // 		px -= bodies[bi].vx * bodies[bi].mass;
-  0152: MUL_F64              dst=72, lhs=56, rhs=64                                                                      // 		px -= bodies[bi].vx * bodies[bi].mass;
-  0165: SUB_F64              dst=16, lhs=16, rhs=72                                                                      // 		px -= bodies[bi].vx * bodies[bi].mass;
-  0178: SLICE_LOAD_64        dst=56, slice=0, index=40, element_size=56, load_offset=32, load_size=8                     // 		py -= bodies[bi].vy * bodies[bi].mass;
-  0203: SLICE_LOAD_64        dst=64, slice=0, index=40, element_size=56, load_offset=48, load_size=8                     // 		py -= bodies[bi].vy * bodies[bi].mass;
-  0228: MUL_F64              dst=72, lhs=56, rhs=64                                                                      // 		py -= bodies[bi].vy * bodies[bi].mass;
-  0241: SUB_F64              dst=24, lhs=24, rhs=72                                                                      // 		py -= bodies[bi].vy * bodies[bi].mass;
-  0254: SLICE_LOAD_64        dst=56, slice=0, index=40, element_size=56, load_offset=40, load_size=8                     // 		pz -= bodies[bi].vz * bodies[bi].mass;
-  0279: SLICE_LOAD_64        dst=64, slice=0, index=40, element_size=56, load_offset=48, load_size=8                     // 		pz -= bodies[bi].vz * bodies[bi].mass;
-  0304: MUL_F64              dst=72, lhs=56, rhs=64                                                                      // 		pz -= bodies[bi].vz * bodies[bi].mass;
-  0317: SUB_F64              dst=32, lhs=32, rhs=72                                                                      // 		pz -= bodies[bi].vz * bodies[bi].mass;
-  0330: INC_I64              dst=40                                                                                      // 	for bi in 0..bodies.length {
-  0335: JLT_I64              lhs=40, rhs=48, offset=-244, target=102                                                     // 	for bi in 0..bodies.length {
-  0346: LOAD_CONST_8         dst=56, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vx = px / bodies[0].mass;
-  0359: SLICE_LOAD_64        dst=64, slice=0, index=56, element_size=56, load_offset=48, load_size=8                     // 	bodies[0].vx = px / bodies[0].mass;
-  0384: DIV_F64              dst=72, lhs=16, rhs=64                                                                      // 	bodies[0].vx = px / bodies[0].mass;
-  0397: LOAD_CONST_8         dst=80, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vx = px / bodies[0].mass;
-  0410: SLICE_STORE_64       slice=0, index=80, element_size=56, store_offset=24, store_size=8, src=72                   // 	bodies[0].vx = px / bodies[0].mass;
-  0435: LOAD_CONST_8         dst=56, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vy = py / bodies[0].mass;
-  0448: SLICE_LOAD_64        dst=64, slice=0, index=56, element_size=56, load_offset=48, load_size=8                     // 	bodies[0].vy = py / bodies[0].mass;
-  0473: DIV_F64              dst=72, lhs=24, rhs=64                                                                      // 	bodies[0].vy = py / bodies[0].mass;
-  0486: LOAD_CONST_8         dst=80, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vy = py / bodies[0].mass;
-  0499: SLICE_STORE_64       slice=0, index=80, element_size=56, store_offset=32, store_size=8, src=72                   // 	bodies[0].vy = py / bodies[0].mass;
-  0524: LOAD_CONST_8         dst=56, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vz = pz / bodies[0].mass;
-  0537: SLICE_LOAD_64        dst=64, slice=0, index=56, element_size=56, load_offset=48, load_size=8                     // 	bodies[0].vz = pz / bodies[0].mass;
-  0562: DIV_F64              dst=72, lhs=32, rhs=64                                                                      // 	bodies[0].vz = pz / bodies[0].mass;
-  0575: LOAD_CONST_8         dst=80, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vz = pz / bodies[0].mass;
-  0588: SLICE_STORE_64       slice=0, index=80, element_size=56, store_offset=40, store_size=8, src=72                   // 	bodies[0].vz = pz / bodies[0].mass;
-  0613: RETURN_BASE                                                                                                      // fn offset_momentum(bodies : []Body) : void {
-function 3 sum_energy (script, params=32, frame=464, returns=8)
+  0052: COPY                 dst=48, src=8, size=8                                                                       // 	for bi in 0..bodies.length {
+  0065: JGE_I64              lhs=40, rhs=48, offset=244, target=320                                                      // 	for bi in 0..bodies.length {
+  0076: SLICE_LOAD_64        dst=56, slice=0, index=40, element_size=56, load_offset=24, load_size=8                     // 		px -= bodies[bi].vx * bodies[bi].mass;
+  0101: SLICE_LOAD_64        dst=64, slice=0, index=40, element_size=56, load_offset=48, load_size=8                     // 		px -= bodies[bi].vx * bodies[bi].mass;
+  0126: MUL_F64              dst=72, lhs=56, rhs=64                                                                      // 		px -= bodies[bi].vx * bodies[bi].mass;
+  0139: SUB_F64              dst=16, lhs=16, rhs=72                                                                      // 		px -= bodies[bi].vx * bodies[bi].mass;
+  0152: SLICE_LOAD_64        dst=56, slice=0, index=40, element_size=56, load_offset=32, load_size=8                     // 		py -= bodies[bi].vy * bodies[bi].mass;
+  0177: SLICE_LOAD_64        dst=64, slice=0, index=40, element_size=56, load_offset=48, load_size=8                     // 		py -= bodies[bi].vy * bodies[bi].mass;
+  0202: MUL_F64              dst=72, lhs=56, rhs=64                                                                      // 		py -= bodies[bi].vy * bodies[bi].mass;
+  0215: SUB_F64              dst=24, lhs=24, rhs=72                                                                      // 		py -= bodies[bi].vy * bodies[bi].mass;
+  0228: SLICE_LOAD_64        dst=56, slice=0, index=40, element_size=56, load_offset=40, load_size=8                     // 		pz -= bodies[bi].vz * bodies[bi].mass;
+  0253: SLICE_LOAD_64        dst=64, slice=0, index=40, element_size=56, load_offset=48, load_size=8                     // 		pz -= bodies[bi].vz * bodies[bi].mass;
+  0278: MUL_F64              dst=72, lhs=56, rhs=64                                                                      // 		pz -= bodies[bi].vz * bodies[bi].mass;
+  0291: SUB_F64              dst=32, lhs=32, rhs=72                                                                      // 		pz -= bodies[bi].vz * bodies[bi].mass;
+  0304: INC_I64              dst=40                                                                                      // 	for bi in 0..bodies.length {
+  0309: JLT_I64              lhs=40, rhs=48, offset=-244, target=76                                                      // 	for bi in 0..bodies.length {
+  0320: LOAD_CONST_8         dst=56, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vx = px / bodies[0].mass;
+  0333: SLICE_LOAD_64        dst=64, slice=0, index=56, element_size=56, load_offset=48, load_size=8                     // 	bodies[0].vx = px / bodies[0].mass;
+  0358: DIV_F64              dst=72, lhs=16, rhs=64                                                                      // 	bodies[0].vx = px / bodies[0].mass;
+  0371: LOAD_CONST_8         dst=80, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vx = px / bodies[0].mass;
+  0384: SLICE_STORE_64       slice=0, index=80, element_size=56, store_offset=24, store_size=8, src=72                   // 	bodies[0].vx = px / bodies[0].mass;
+  0409: LOAD_CONST_8         dst=56, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vy = py / bodies[0].mass;
+  0422: SLICE_LOAD_64        dst=64, slice=0, index=56, element_size=56, load_offset=48, load_size=8                     // 	bodies[0].vy = py / bodies[0].mass;
+  0447: DIV_F64              dst=72, lhs=24, rhs=64                                                                      // 	bodies[0].vy = py / bodies[0].mass;
+  0460: LOAD_CONST_8         dst=80, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vy = py / bodies[0].mass;
+  0473: SLICE_STORE_64       slice=0, index=80, element_size=56, store_offset=32, store_size=8, src=72                   // 	bodies[0].vy = py / bodies[0].mass;
+  0498: LOAD_CONST_8         dst=56, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vz = pz / bodies[0].mass;
+  0511: SLICE_LOAD_64        dst=64, slice=0, index=56, element_size=56, load_offset=48, load_size=8                     // 	bodies[0].vz = pz / bodies[0].mass;
+  0536: DIV_F64              dst=72, lhs=32, rhs=64                                                                      // 	bodies[0].vz = pz / bodies[0].mass;
+  0549: LOAD_CONST_8         dst=80, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vz = pz / bodies[0].mass;
+  0562: SLICE_STORE_64       slice=0, index=80, element_size=56, store_offset=40, store_size=8, src=72                   // 	bodies[0].vz = pz / bodies[0].mass;
+  0587: RETURN_BASE                                                                                                      // fn offset_momentum(bodies : []Body) : void {
+function 3 sum_energy (script, params=32, frame=324, returns=8)
   0000: LOAD_CONST_8         dst=32, value= 00 00 00 00 00 00 00 00                                                      // 	var e = 0.0;
   0013: LOAD_CONST_8         dst=40, value= 00 00 00 00 00 00 00 00                                                      // 	for pi_ in 0..pairs.length {
-  0026: COPY                 dst=264, src=16, size=16                                                                    // 	for pi_ in 0..pairs.length {
-  0039: COPY                 dst=280, src=272, size=8                                                                    // 	for pi_ in 0..pairs.length {
-  0052: COPY                 dst=48, src=280, size=8                                                                     // 	for pi_ in 0..pairs.length {
-  0065: JGE_I64              lhs=40, rhs=48, offset=614, target=690                                                      // 	for pi_ in 0..pairs.length {
-  0076: COPY                 dst=264, src=0, size=16                                                                     // 		const b1 = bodies[pairs[pi_].first];
-  0089: SLICE_LOAD_64        dst=280, slice=16, index=40, element_size=8, load_offset=0, load_size=4                     // 		const b1 = bodies[pairs[pi_].first];
-  0114: SLICE_LOAD_32        dst=284, slice=264, index=280, element_size=56, load_offset=0, load_size=56                 // 		const b1 = bodies[pairs[pi_].first];
-  0139: COPY                 dst=56, src=284, size=56                                                                    // 		const b1 = bodies[pairs[pi_].first];
-  0152: COPY                 dst=264, src=0, size=16                                                                     // 		const b2 = bodies[pairs[pi_].second];
-  0165: SLICE_LOAD_64        dst=280, slice=16, index=40, element_size=8, load_offset=4, load_size=4                     // 		const b2 = bodies[pairs[pi_].second];
-  0190: SLICE_LOAD_32        dst=284, slice=264, index=280, element_size=56, load_offset=0, load_size=56                 // 		const b2 = bodies[pairs[pi_].second];
-  0215: COPY                 dst=112, src=284, size=56                                                                   // 		const b2 = bodies[pairs[pi_].second];
-  0228: FRAME_PTR            dst=264, offset=56                                                                          // 		const dx = b1.px - b2.px;
-  0237: ADD_64_IMM           dst=272, lhs=264, imm=0x0000000000000000                                                    // 		const dx = b1.px - b2.px;
-  0254: LOAD_PTR             dst=280, addr=272, size=8                                                                   // 		const dx = b1.px - b2.px;
-  0267: FRAME_PTR            dst=288, offset=112                                                                         // 		const dx = b1.px - b2.px;
-  0276: ADD_64_IMM           dst=296, lhs=288, imm=0x0000000000000000                                                    // 		const dx = b1.px - b2.px;
-  0293: LOAD_PTR             dst=304, addr=296, size=8                                                                   // 		const dx = b1.px - b2.px;
-  0306: SUB_F64              dst=168, lhs=280, rhs=304                                                                   // 		const dx = b1.px - b2.px;
-  0319: FRAME_PTR            dst=264, offset=56                                                                          // 		const dy = b1.py - b2.py;
-  0328: ADD_64_IMM           dst=272, lhs=264, imm=0x0800000000000000                                                    // 		const dy = b1.py - b2.py;
-  0345: LOAD_PTR             dst=280, addr=272, size=8                                                                   // 		const dy = b1.py - b2.py;
-  0358: FRAME_PTR            dst=288, offset=112                                                                         // 		const dy = b1.py - b2.py;
-  0367: ADD_64_IMM           dst=296, lhs=288, imm=0x0800000000000000                                                    // 		const dy = b1.py - b2.py;
-  0384: LOAD_PTR             dst=304, addr=296, size=8                                                                   // 		const dy = b1.py - b2.py;
-  0397: SUB_F64              dst=176, lhs=280, rhs=304                                                                   // 		const dy = b1.py - b2.py;
-  0410: FRAME_PTR            dst=264, offset=56                                                                          // 		const dz = b1.pz - b2.pz;
-  0419: ADD_64_IMM           dst=272, lhs=264, imm=0x1000000000000000                                                    // 		const dz = b1.pz - b2.pz;
-  0436: LOAD_PTR             dst=280, addr=272, size=8                                                                   // 		const dz = b1.pz - b2.pz;
-  0449: FRAME_PTR            dst=288, offset=112                                                                         // 		const dz = b1.pz - b2.pz;
-  0458: ADD_64_IMM           dst=296, lhs=288, imm=0x1000000000000000                                                    // 		const dz = b1.pz - b2.pz;
-  0475: LOAD_PTR             dst=304, addr=296, size=8                                                                   // 		const dz = b1.pz - b2.pz;
-  0488: SUB_F64              dst=184, lhs=280, rhs=304                                                                   // 		const dz = b1.pz - b2.pz;
-  0501: FRAME_PTR            dst=264, offset=56                                                                          // 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
-  0510: ADD_64_IMM           dst=272, lhs=264, imm=0x3000000000000000                                                    // 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
-  0527: LOAD_PTR             dst=280, addr=272, size=8                                                                   // 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
-  0540: FRAME_PTR            dst=288, offset=112                                                                         // 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
-  0549: ADD_64_IMM           dst=296, lhs=288, imm=0x3000000000000000                                                    // 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
-  0566: LOAD_PTR             dst=304, addr=296, size=8                                                                   // 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
-  0579: MUL_F64              dst=312, lhs=280, rhs=304                                                                   // 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
-  0592: MUL_F64              dst=328, lhs=176, rhs=176                                                                   // 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
-  0605: MADD_F64             dst=336, lhs=168, rhs=168, addend=328                                                       // 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
-  0622: MADD_F64             dst=320, lhs=184, rhs=184, addend=336                                                       // 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
-  0639: CALL_NATIVE          function=12, arg_base=320                                                                   // 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
-  0648: DIV_F64              dst=328, lhs=312, rhs=320                                                                   // 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
-  0661: SUB_F64              dst=32, lhs=32, rhs=328                                                                     // 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
-  0674: INC_I64              dst=40                                                                                      // 	for pi_ in 0..pairs.length {
-  0679: JLT_I64              lhs=40, rhs=48, offset=-614, target=76                                                      // 	for pi_ in 0..pairs.length {
-  0690: LOAD_CONST_8         dst=192, value= 00 00 00 00 00 00 00 00                                                     // 	for bi in 0..bodies.length {
-  0703: COPY                 dst=264, src=0, size=16                                                                     // 	for bi in 0..bodies.length {
-  0716: COPY                 dst=280, src=272, size=8                                                                    // 	for bi in 0..bodies.length {
-  0729: COPY                 dst=200, src=280, size=8                                                                    // 	for bi in 0..bodies.length {
-  0742: JGE_I64              lhs=192, rhs=200, offset=434, target=1187                                                   // 	for bi in 0..bodies.length {
-  0753: COPY                 dst=264, src=0, size=16                                                                     // 		const body = bodies[bi];
-  0766: COPY                 dst=280, src=192, size=8                                                                    // 		const body = bodies[bi];
-  0779: SLICE_LOAD_64        dst=288, slice=264, index=280, element_size=56, load_offset=0, load_size=56                 // 		const body = bodies[bi];
-  0804: COPY                 dst=208, src=288, size=56                                                                   // 		const body = bodies[bi];
-  0817: FRAME_PTR            dst=264, offset=208                                                                         // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  0826: ADD_64_IMM           dst=272, lhs=264, imm=0x3000000000000000                                                    // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  0843: LOAD_PTR             dst=280, addr=272, size=8                                                                   // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  0856: FRAME_PTR            dst=288, offset=208                                                                         // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  0865: ADD_64_IMM           dst=296, lhs=288, imm=0x1800000000000000                                                    // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  0882: LOAD_PTR             dst=304, addr=296, size=8                                                                   // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  0895: FRAME_PTR            dst=312, offset=208                                                                         // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  0904: ADD_64_IMM           dst=320, lhs=312, imm=0x1800000000000000                                                    // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  0921: LOAD_PTR             dst=328, addr=320, size=8                                                                   // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  0934: FRAME_PTR            dst=336, offset=208                                                                         // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  0943: ADD_64_IMM           dst=344, lhs=336, imm=0x2000000000000000                                                    // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  0960: LOAD_PTR             dst=352, addr=344, size=8                                                                   // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  0973: FRAME_PTR            dst=360, offset=208                                                                         // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  0982: ADD_64_IMM           dst=368, lhs=360, imm=0x2000000000000000                                                    // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  0999: LOAD_PTR             dst=376, addr=368, size=8                                                                   // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  1012: MUL_F64              dst=384, lhs=352, rhs=376                                                                   // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  1025: MADD_F64             dst=392, lhs=304, rhs=328, addend=384                                                       // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  1042: FRAME_PTR            dst=400, offset=208                                                                         // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  1051: ADD_64_IMM           dst=408, lhs=400, imm=0x2800000000000000                                                    // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  1068: LOAD_PTR             dst=416, addr=408, size=8                                                                   // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  1081: FRAME_PTR            dst=424, offset=208                                                                         // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  1090: ADD_64_IMM           dst=432, lhs=424, imm=0x2800000000000000                                                    // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  1107: LOAD_PTR             dst=440, addr=432, size=8                                                                   // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  1120: MADD_F64             dst=448, lhs=416, rhs=440, addend=392                                                       // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  1137: DIV_F64_IMM          dst=456, lhs=448, imm=0x0000000000000040                                                    // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  1154: MADD_F64             dst=32, lhs=280, rhs=456, addend=32                                                         // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
-  1171: INC_I64              dst=192                                                                                     // 	for bi in 0..bodies.length {
-  1176: JLT_I64              lhs=192, rhs=200, offset=-434, target=753                                                   // 	for bi in 0..bodies.length {
-  1187: COPY                 dst=0, src=32, size=8                                                                       // 	return e;
-  1200: RETURN_BASE                                                                                                      // 	return e;
-  1201: RETURN_BASE                                                                                                      // fn sum_energy(bodies : []Body, pairs : []BodyPair) : f64 {
+  0026: COPY                 dst=48, src=24, size=8                                                                      // 	for pi_ in 0..pairs.length {
+  0039: JGE_I64              lhs=40, rhs=48, offset=276, target=326                                                      // 	for pi_ in 0..pairs.length {
+  0050: SLICE_LOAD_64        dst=264, slice=16, index=40, element_size=8, load_offset=0, load_size=4                     // 		const b1 = bodies[pairs[pi_].first];
+  0075: SLICE_LOAD_32        dst=268, slice=0, index=264, element_size=56, load_offset=0, load_size=56                   // 		const b1 = bodies[pairs[pi_].first];
+  0100: COPY                 dst=56, src=268, size=56                                                                    // 		const b1 = bodies[pairs[pi_].first];
+  0113: SLICE_LOAD_64        dst=264, slice=16, index=40, element_size=8, load_offset=4, load_size=4                     // 		const b2 = bodies[pairs[pi_].second];
+  0138: SLICE_LOAD_32        dst=268, slice=0, index=264, element_size=56, load_offset=0, load_size=56                   // 		const b2 = bodies[pairs[pi_].second];
+  0163: COPY                 dst=112, src=268, size=56                                                                   // 		const b2 = bodies[pairs[pi_].second];
+  0176: SUB_F64              dst=168, lhs=56, rhs=112                                                                    // 		const dx = b1.px - b2.px;
+  0189: SUB_F64              dst=176, lhs=64, rhs=120                                                                    // 		const dy = b1.py - b2.py;
+  0202: SUB_F64              dst=184, lhs=72, rhs=128                                                                    // 		const dz = b1.pz - b2.pz;
+  0215: MUL_F64              dst=264, lhs=104, rhs=160                                                                   // 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
+  0228: MUL_F64              dst=280, lhs=176, rhs=176                                                                   // 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
+  0241: MADD_F64             dst=288, lhs=168, rhs=168, addend=280                                                       // 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
+  0258: MADD_F64             dst=272, lhs=184, rhs=184, addend=288                                                       // 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
+  0275: CALL_NATIVE          function=12, arg_base=272                                                                   // 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
+  0284: DIV_F64              dst=280, lhs=264, rhs=272                                                                   // 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
+  0297: SUB_F64              dst=32, lhs=32, rhs=280                                                                     // 		e -= (b1.mass * b2.mass) / math.sqrt_f64(dx * dx + dy * dy + dz * dz);
+  0310: INC_I64              dst=40                                                                                      // 	for pi_ in 0..pairs.length {
+  0315: JLT_I64              lhs=40, rhs=48, offset=-276, target=50                                                      // 	for pi_ in 0..pairs.length {
+  0326: LOAD_CONST_8         dst=192, value= 00 00 00 00 00 00 00 00                                                     // 	for bi in 0..bodies.length {
+  0339: COPY                 dst=200, src=8, size=8                                                                      // 	for bi in 0..bodies.length {
+  0352: JGE_I64              lhs=192, rhs=200, offset=135, target=498                                                    // 	for bi in 0..bodies.length {
+  0363: SLICE_LOAD_64        dst=264, slice=0, index=192, element_size=56, load_offset=0, load_size=56                   // 		const body = bodies[bi];
+  0388: COPY                 dst=208, src=264, size=56                                                                   // 		const body = bodies[bi];
+  0401: MUL_F64              dst=264, lhs=240, rhs=240                                                                   // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
+  0414: MADD_F64             dst=272, lhs=232, rhs=232, addend=264                                                       // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
+  0431: MADD_F64             dst=280, lhs=248, rhs=248, addend=272                                                       // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
+  0448: DIV_F64_IMM          dst=288, lhs=280, imm=0x0000000000000040                                                    // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
+  0465: MADD_F64             dst=32, lhs=256, rhs=288, addend=32                                                         // 		e += body.mass * ((body.vx * body.vx + body.vy * body.vy + body.vz * body.vz) / 2.0);
+  0482: INC_I64              dst=192                                                                                     // 	for bi in 0..bodies.length {
+  0487: JLT_I64              lhs=192, rhs=200, offset=-135, target=363                                                   // 	for bi in 0..bodies.length {
+  0498: COPY                 dst=0, src=32, size=8                                                                       // 	return e;
+  0511: RETURN_BASE                                                                                                      // 	return e;
+  0512: RETURN_BASE                                                                                                      // fn sum_energy(bodies : []Body, pairs : []BodyPair) : f64 {
 function 4 advance (script, params=44, frame=188, returns=0)
-  0000: COPY                 dst=164, src=28, size=16                                                                    // 	const n_pairs = pairs.length;
-  0013: COPY                 dst=180, src=172, size=8                                                                    // 	const n_pairs = pairs.length;
-  0026: COPY                 dst=44, src=180, size=8                                                                     // 	const n_pairs = pairs.length;
-  0039: COPY                 dst=164, src=12, size=16                                                                    // 	const n_bodies = bodies.length;
-  0052: COPY                 dst=180, src=172, size=8                                                                    // 	const n_bodies = bodies.length;
-  0065: COPY                 dst=52, src=180, size=8                                                                     // 	const n_bodies = bodies.length;
-  0078: LOAD_CONST_4         dst=60, value= 00 00 00 00                                                                  // 	for i in 0..iters {
-  0087: COPY                 dst=64, src=8, size=4                                                                       // 	for i in 0..iters {
-  0100: JGE_I32              lhs=60, rhs=64, offset=1237, target=1348                                                    // 	for i in 0..iters {
-  0111: LOAD_CONST_8         dst=68, value= 00 00 00 00 00 00 00 00                                                      // 		for pi_ in 0..n_pairs {
-  0124: COPY                 dst=76, src=44, size=8                                                                      // 		for pi_ in 0..n_pairs {
-  0137: JGE_I64              lhs=68, rhs=76, offset=855, target=1003                                                     // 		for pi_ in 0..n_pairs {
-  0148: SLICE_LOAD_64        dst=84, slice=28, index=68, element_size=8, load_offset=0, load_size=4                      // 			const first = pairs[pi_].first;
-  0173: SLICE_LOAD_64        dst=88, slice=28, index=68, element_size=8, load_offset=4, load_size=4                      // 			const second = pairs[pi_].second;
-  0198: SLICE_LOAD_32        dst=164, slice=12, index=84, element_size=56, load_offset=0, load_size=8                    // 			const dx = bodies[first].px - bodies[second].px;
-  0223: SLICE_LOAD_32        dst=172, slice=12, index=88, element_size=56, load_offset=0, load_size=8                    // 			const dx = bodies[first].px - bodies[second].px;
-  0248: SUB_F64              dst=92, lhs=164, rhs=172                                                                    // 			const dx = bodies[first].px - bodies[second].px;
-  0261: SLICE_LOAD_32        dst=164, slice=12, index=84, element_size=56, load_offset=8, load_size=8                    // 			const dy = bodies[first].py - bodies[second].py;
-  0286: SLICE_LOAD_32        dst=172, slice=12, index=88, element_size=56, load_offset=8, load_size=8                    // 			const dy = bodies[first].py - bodies[second].py;
-  0311: SUB_F64              dst=100, lhs=164, rhs=172                                                                   // 			const dy = bodies[first].py - bodies[second].py;
-  0324: SLICE_LOAD_32        dst=164, slice=12, index=84, element_size=56, load_offset=16, load_size=8                   // 			const dz = bodies[first].pz - bodies[second].pz;
-  0349: SLICE_LOAD_32        dst=172, slice=12, index=88, element_size=56, load_offset=16, load_size=8                   // 			const dz = bodies[first].pz - bodies[second].pz;
-  0374: SUB_F64              dst=108, lhs=164, rhs=172                                                                   // 			const dz = bodies[first].pz - bodies[second].pz;
-  0387: MUL_F64              dst=164, lhs=100, rhs=100                                                                   // 			const d = dx * dx + dy * dy + dz * dz;
-  0400: MADD_F64             dst=172, lhs=92, rhs=92, addend=164                                                         // 			const d = dx * dx + dy * dy + dz * dz;
-  0417: MADD_F64             dst=116, lhs=108, rhs=108, addend=172                                                       // 			const d = dx * dx + dy * dy + dz * dz;
-  0434: COPY                 dst=164, src=116, size=8                                                                    // 			const mag = time / (d * math.sqrt_f64(d));
-  0447: CALL_NATIVE          function=12, arg_base=164                                                                   // 			const mag = time / (d * math.sqrt_f64(d));
-  0456: MUL_F64              dst=172, lhs=116, rhs=164                                                                   // 			const mag = time / (d * math.sqrt_f64(d));
-  0469: DIV_F64              dst=124, lhs=0, rhs=172                                                                     // 			const mag = time / (d * math.sqrt_f64(d));
-  0482: SLICE_LOAD_32        dst=164, slice=12, index=84, element_size=56, load_offset=48, load_size=8                   // 			const b1m = bodies[first].mass * mag;
-  0507: MUL_F64              dst=132, lhs=164, rhs=124                                                                   // 			const b1m = bodies[first].mass * mag;
-  0520: SLICE_LOAD_32        dst=164, slice=12, index=88, element_size=56, load_offset=48, load_size=8                   // 			const b2m = bodies[second].mass * mag;
-  0545: MUL_F64              dst=140, lhs=164, rhs=124                                                                   // 			const b2m = bodies[second].mass * mag;
-  0558: SLICE_LOAD_32        dst=164, slice=12, index=84, element_size=56, load_offset=24, load_size=8                   // 			bodies[first].vx -= dx * b2m;
-  0583: MUL_F64              dst=172, lhs=92, rhs=140                                                                    // 			bodies[first].vx -= dx * b2m;
-  0596: SUB_F64              dst=180, lhs=164, rhs=172                                                                   // 			bodies[first].vx -= dx * b2m;
-  0609: SLICE_STORE_32       slice=12, index=84, element_size=56, store_offset=24, store_size=8, src=180                 // 			bodies[first].vx -= dx * b2m;
-  0634: SLICE_LOAD_32        dst=164, slice=12, index=84, element_size=56, load_offset=32, load_size=8                   // 			bodies[first].vy -= dy * b2m;
-  0659: MUL_F64              dst=172, lhs=100, rhs=140                                                                   // 			bodies[first].vy -= dy * b2m;
-  0672: SUB_F64              dst=180, lhs=164, rhs=172                                                                   // 			bodies[first].vy -= dy * b2m;
-  0685: SLICE_STORE_32       slice=12, index=84, element_size=56, store_offset=32, store_size=8, src=180                 // 			bodies[first].vy -= dy * b2m;
-  0710: SLICE_LOAD_32        dst=164, slice=12, index=84, element_size=56, load_offset=40, load_size=8                   // 			bodies[first].vz -= dz * b2m;
-  0735: MUL_F64              dst=172, lhs=108, rhs=140                                                                   // 			bodies[first].vz -= dz * b2m;
-  0748: SUB_F64              dst=180, lhs=164, rhs=172                                                                   // 			bodies[first].vz -= dz * b2m;
-  0761: SLICE_STORE_32       slice=12, index=84, element_size=56, store_offset=40, store_size=8, src=180                 // 			bodies[first].vz -= dz * b2m;
-  0786: SLICE_LOAD_32        dst=164, slice=12, index=88, element_size=56, load_offset=24, load_size=8                   // 			bodies[second].vx += dx * b1m;
-  0811: MADD_F64             dst=172, lhs=92, rhs=132, addend=164                                                        // 			bodies[second].vx += dx * b1m;
-  0828: SLICE_STORE_32       slice=12, index=88, element_size=56, store_offset=24, store_size=8, src=172                 // 			bodies[second].vx += dx * b1m;
-  0853: SLICE_LOAD_32        dst=164, slice=12, index=88, element_size=56, load_offset=32, load_size=8                   // 			bodies[second].vy += dy * b1m;
-  0878: MADD_F64             dst=172, lhs=100, rhs=132, addend=164                                                       // 			bodies[second].vy += dy * b1m;
-  0895: SLICE_STORE_32       slice=12, index=88, element_size=56, store_offset=32, store_size=8, src=172                 // 			bodies[second].vy += dy * b1m;
-  0920: SLICE_LOAD_32        dst=164, slice=12, index=88, element_size=56, load_offset=40, load_size=8                   // 			bodies[second].vz += dz * b1m;
-  0945: MADD_F64             dst=172, lhs=108, rhs=132, addend=164                                                       // 			bodies[second].vz += dz * b1m;
-  0962: SLICE_STORE_32       slice=12, index=88, element_size=56, store_offset=40, store_size=8, src=172                 // 			bodies[second].vz += dz * b1m;
-  0987: INC_I64              dst=68                                                                                      // 		for pi_ in 0..n_pairs {
-  0992: JLT_I64              lhs=68, rhs=76, offset=-855, target=148                                                     // 		for pi_ in 0..n_pairs {
-  1003: LOAD_CONST_8         dst=148, value= 00 00 00 00 00 00 00 00                                                     // 		for bi in 0..n_bodies {
-  1016: COPY                 dst=156, src=52, size=8                                                                     // 		for bi in 0..n_bodies {
-  1029: JGE_I64              lhs=148, rhs=156, offset=292, target=1332                                                   // 		for bi in 0..n_bodies {
-  1040: SLICE_LOAD_64        dst=164, slice=12, index=148, element_size=56, load_offset=0, load_size=8                   // 			bodies[bi].px += time * bodies[bi].vx;
-  1065: SLICE_LOAD_64        dst=172, slice=12, index=148, element_size=56, load_offset=24, load_size=8                  // 			bodies[bi].px += time * bodies[bi].vx;
-  1090: MADD_F64             dst=180, lhs=0, rhs=172, addend=164                                                         // 			bodies[bi].px += time * bodies[bi].vx;
-  1107: SLICE_STORE_64       slice=12, index=148, element_size=56, store_offset=0, store_size=8, src=180                 // 			bodies[bi].px += time * bodies[bi].vx;
-  1132: SLICE_LOAD_64        dst=164, slice=12, index=148, element_size=56, load_offset=8, load_size=8                   // 			bodies[bi].py += time * bodies[bi].vy;
-  1157: SLICE_LOAD_64        dst=172, slice=12, index=148, element_size=56, load_offset=32, load_size=8                  // 			bodies[bi].py += time * bodies[bi].vy;
-  1182: MADD_F64             dst=180, lhs=0, rhs=172, addend=164                                                         // 			bodies[bi].py += time * bodies[bi].vy;
-  1199: SLICE_STORE_64       slice=12, index=148, element_size=56, store_offset=8, store_size=8, src=180                 // 			bodies[bi].py += time * bodies[bi].vy;
-  1224: SLICE_LOAD_64        dst=164, slice=12, index=148, element_size=56, load_offset=16, load_size=8                  // 			bodies[bi].pz += time * bodies[bi].vz;
-  1249: SLICE_LOAD_64        dst=172, slice=12, index=148, element_size=56, load_offset=40, load_size=8                  // 			bodies[bi].pz += time * bodies[bi].vz;
-  1274: MADD_F64             dst=180, lhs=0, rhs=172, addend=164                                                         // 			bodies[bi].pz += time * bodies[bi].vz;
-  1291: SLICE_STORE_64       slice=12, index=148, element_size=56, store_offset=16, store_size=8, src=180                // 			bodies[bi].pz += time * bodies[bi].vz;
-  1316: INC_I64              dst=148                                                                                     // 		for bi in 0..n_bodies {
-  1321: JLT_I64              lhs=148, rhs=156, offset=-292, target=1040                                                  // 		for bi in 0..n_bodies {
-  1332: INC_I32              dst=60                                                                                      // 	for i in 0..iters {
-  1337: JLT_I32              lhs=60, rhs=64, offset=-1237, target=111                                                    // 	for i in 0..iters {
-  1348: RETURN_BASE                                                                                                      // fn advance(time : f64, iters : i32, bodies : []Body, pairs : []BodyPair) : void {
+  0000: COPY                 dst=44, src=36, size=8                                                                      // 	const n_pairs = pairs.length;
+  0013: COPY                 dst=52, src=20, size=8                                                                      // 	const n_bodies = bodies.length;
+  0026: LOAD_CONST_4         dst=60, value= 00 00 00 00                                                                  // 	for i in 0..iters {
+  0035: COPY                 dst=64, src=8, size=4                                                                       // 	for i in 0..iters {
+  0048: JGE_I32              lhs=60, rhs=64, offset=1237, target=1296                                                    // 	for i in 0..iters {
+  0059: LOAD_CONST_8         dst=68, value= 00 00 00 00 00 00 00 00                                                      // 		for pi_ in 0..n_pairs {
+  0072: COPY                 dst=76, src=44, size=8                                                                      // 		for pi_ in 0..n_pairs {
+  0085: JGE_I64              lhs=68, rhs=76, offset=855, target=951                                                      // 		for pi_ in 0..n_pairs {
+  0096: SLICE_LOAD_64        dst=84, slice=28, index=68, element_size=8, load_offset=0, load_size=4                      // 			const first = pairs[pi_].first;
+  0121: SLICE_LOAD_64        dst=88, slice=28, index=68, element_size=8, load_offset=4, load_size=4                      // 			const second = pairs[pi_].second;
+  0146: SLICE_LOAD_32        dst=164, slice=12, index=84, element_size=56, load_offset=0, load_size=8                    // 			const dx = bodies[first].px - bodies[second].px;
+  0171: SLICE_LOAD_32        dst=172, slice=12, index=88, element_size=56, load_offset=0, load_size=8                    // 			const dx = bodies[first].px - bodies[second].px;
+  0196: SUB_F64              dst=92, lhs=164, rhs=172                                                                    // 			const dx = bodies[first].px - bodies[second].px;
+  0209: SLICE_LOAD_32        dst=164, slice=12, index=84, element_size=56, load_offset=8, load_size=8                    // 			const dy = bodies[first].py - bodies[second].py;
+  0234: SLICE_LOAD_32        dst=172, slice=12, index=88, element_size=56, load_offset=8, load_size=8                    // 			const dy = bodies[first].py - bodies[second].py;
+  0259: SUB_F64              dst=100, lhs=164, rhs=172                                                                   // 			const dy = bodies[first].py - bodies[second].py;
+  0272: SLICE_LOAD_32        dst=164, slice=12, index=84, element_size=56, load_offset=16, load_size=8                   // 			const dz = bodies[first].pz - bodies[second].pz;
+  0297: SLICE_LOAD_32        dst=172, slice=12, index=88, element_size=56, load_offset=16, load_size=8                   // 			const dz = bodies[first].pz - bodies[second].pz;
+  0322: SUB_F64              dst=108, lhs=164, rhs=172                                                                   // 			const dz = bodies[first].pz - bodies[second].pz;
+  0335: MUL_F64              dst=164, lhs=100, rhs=100                                                                   // 			const d = dx * dx + dy * dy + dz * dz;
+  0348: MADD_F64             dst=172, lhs=92, rhs=92, addend=164                                                         // 			const d = dx * dx + dy * dy + dz * dz;
+  0365: MADD_F64             dst=116, lhs=108, rhs=108, addend=172                                                       // 			const d = dx * dx + dy * dy + dz * dz;
+  0382: COPY                 dst=164, src=116, size=8                                                                    // 			const mag = time / (d * math.sqrt_f64(d));
+  0395: CALL_NATIVE          function=12, arg_base=164                                                                   // 			const mag = time / (d * math.sqrt_f64(d));
+  0404: MUL_F64              dst=172, lhs=116, rhs=164                                                                   // 			const mag = time / (d * math.sqrt_f64(d));
+  0417: DIV_F64              dst=124, lhs=0, rhs=172                                                                     // 			const mag = time / (d * math.sqrt_f64(d));
+  0430: SLICE_LOAD_32        dst=164, slice=12, index=84, element_size=56, load_offset=48, load_size=8                   // 			const b1m = bodies[first].mass * mag;
+  0455: MUL_F64              dst=132, lhs=164, rhs=124                                                                   // 			const b1m = bodies[first].mass * mag;
+  0468: SLICE_LOAD_32        dst=164, slice=12, index=88, element_size=56, load_offset=48, load_size=8                   // 			const b2m = bodies[second].mass * mag;
+  0493: MUL_F64              dst=140, lhs=164, rhs=124                                                                   // 			const b2m = bodies[second].mass * mag;
+  0506: SLICE_LOAD_32        dst=164, slice=12, index=84, element_size=56, load_offset=24, load_size=8                   // 			bodies[first].vx -= dx * b2m;
+  0531: MUL_F64              dst=172, lhs=92, rhs=140                                                                    // 			bodies[first].vx -= dx * b2m;
+  0544: SUB_F64              dst=180, lhs=164, rhs=172                                                                   // 			bodies[first].vx -= dx * b2m;
+  0557: SLICE_STORE_32       slice=12, index=84, element_size=56, store_offset=24, store_size=8, src=180                 // 			bodies[first].vx -= dx * b2m;
+  0582: SLICE_LOAD_32        dst=164, slice=12, index=84, element_size=56, load_offset=32, load_size=8                   // 			bodies[first].vy -= dy * b2m;
+  0607: MUL_F64              dst=172, lhs=100, rhs=140                                                                   // 			bodies[first].vy -= dy * b2m;
+  0620: SUB_F64              dst=180, lhs=164, rhs=172                                                                   // 			bodies[first].vy -= dy * b2m;
+  0633: SLICE_STORE_32       slice=12, index=84, element_size=56, store_offset=32, store_size=8, src=180                 // 			bodies[first].vy -= dy * b2m;
+  0658: SLICE_LOAD_32        dst=164, slice=12, index=84, element_size=56, load_offset=40, load_size=8                   // 			bodies[first].vz -= dz * b2m;
+  0683: MUL_F64              dst=172, lhs=108, rhs=140                                                                   // 			bodies[first].vz -= dz * b2m;
+  0696: SUB_F64              dst=180, lhs=164, rhs=172                                                                   // 			bodies[first].vz -= dz * b2m;
+  0709: SLICE_STORE_32       slice=12, index=84, element_size=56, store_offset=40, store_size=8, src=180                 // 			bodies[first].vz -= dz * b2m;
+  0734: SLICE_LOAD_32        dst=164, slice=12, index=88, element_size=56, load_offset=24, load_size=8                   // 			bodies[second].vx += dx * b1m;
+  0759: MADD_F64             dst=172, lhs=92, rhs=132, addend=164                                                        // 			bodies[second].vx += dx * b1m;
+  0776: SLICE_STORE_32       slice=12, index=88, element_size=56, store_offset=24, store_size=8, src=172                 // 			bodies[second].vx += dx * b1m;
+  0801: SLICE_LOAD_32        dst=164, slice=12, index=88, element_size=56, load_offset=32, load_size=8                   // 			bodies[second].vy += dy * b1m;
+  0826: MADD_F64             dst=172, lhs=100, rhs=132, addend=164                                                       // 			bodies[second].vy += dy * b1m;
+  0843: SLICE_STORE_32       slice=12, index=88, element_size=56, store_offset=32, store_size=8, src=172                 // 			bodies[second].vy += dy * b1m;
+  0868: SLICE_LOAD_32        dst=164, slice=12, index=88, element_size=56, load_offset=40, load_size=8                   // 			bodies[second].vz += dz * b1m;
+  0893: MADD_F64             dst=172, lhs=108, rhs=132, addend=164                                                       // 			bodies[second].vz += dz * b1m;
+  0910: SLICE_STORE_32       slice=12, index=88, element_size=56, store_offset=40, store_size=8, src=172                 // 			bodies[second].vz += dz * b1m;
+  0935: INC_I64              dst=68                                                                                      // 		for pi_ in 0..n_pairs {
+  0940: JLT_I64              lhs=68, rhs=76, offset=-855, target=96                                                      // 		for pi_ in 0..n_pairs {
+  0951: LOAD_CONST_8         dst=148, value= 00 00 00 00 00 00 00 00                                                     // 		for bi in 0..n_bodies {
+  0964: COPY                 dst=156, src=52, size=8                                                                     // 		for bi in 0..n_bodies {
+  0977: JGE_I64              lhs=148, rhs=156, offset=292, target=1280                                                   // 		for bi in 0..n_bodies {
+  0988: SLICE_LOAD_64        dst=164, slice=12, index=148, element_size=56, load_offset=0, load_size=8                   // 			bodies[bi].px += time * bodies[bi].vx;
+  1013: SLICE_LOAD_64        dst=172, slice=12, index=148, element_size=56, load_offset=24, load_size=8                  // 			bodies[bi].px += time * bodies[bi].vx;
+  1038: MADD_F64             dst=180, lhs=0, rhs=172, addend=164                                                         // 			bodies[bi].px += time * bodies[bi].vx;
+  1055: SLICE_STORE_64       slice=12, index=148, element_size=56, store_offset=0, store_size=8, src=180                 // 			bodies[bi].px += time * bodies[bi].vx;
+  1080: SLICE_LOAD_64        dst=164, slice=12, index=148, element_size=56, load_offset=8, load_size=8                   // 			bodies[bi].py += time * bodies[bi].vy;
+  1105: SLICE_LOAD_64        dst=172, slice=12, index=148, element_size=56, load_offset=32, load_size=8                  // 			bodies[bi].py += time * bodies[bi].vy;
+  1130: MADD_F64             dst=180, lhs=0, rhs=172, addend=164                                                         // 			bodies[bi].py += time * bodies[bi].vy;
+  1147: SLICE_STORE_64       slice=12, index=148, element_size=56, store_offset=8, store_size=8, src=180                 // 			bodies[bi].py += time * bodies[bi].vy;
+  1172: SLICE_LOAD_64        dst=164, slice=12, index=148, element_size=56, load_offset=16, load_size=8                  // 			bodies[bi].pz += time * bodies[bi].vz;
+  1197: SLICE_LOAD_64        dst=172, slice=12, index=148, element_size=56, load_offset=40, load_size=8                  // 			bodies[bi].pz += time * bodies[bi].vz;
+  1222: MADD_F64             dst=180, lhs=0, rhs=172, addend=164                                                         // 			bodies[bi].pz += time * bodies[bi].vz;
+  1239: SLICE_STORE_64       slice=12, index=148, element_size=56, store_offset=16, store_size=8, src=180                // 			bodies[bi].pz += time * bodies[bi].vz;
+  1264: INC_I64              dst=148                                                                                     // 		for bi in 0..n_bodies {
+  1269: JLT_I64              lhs=148, rhs=156, offset=-292, target=988                                                   // 		for bi in 0..n_bodies {
+  1280: INC_I32              dst=60                                                                                      // 	for i in 0..iters {
+  1285: JLT_I32              lhs=60, rhs=64, offset=-1237, target=59                                                     // 	for i in 0..iters {
+  1296: RETURN_BASE                                                                                                      // fn advance(time : f64, iters : i32, bodies : []Body, pairs : []BodyPair) : void {
 function 5 sim_system (script, params=4, frame=808, returns=8)
   0000: COPY                 dst=284, src=4, size=280                                                                    // 	var bodies : [5]Body = undefined;
   0013: COPY                 dst=644, src=564, size=80                                                                   // 	var pairs : [10]BodyPair = undefined;
@@ -439,11 +373,11 @@ function 14 pow_f64 (native, params=16, frame=0, returns=8)
 function 15  (script, params=0, frame=48, returns=0)
   0000: LOAD_CONST_8         dst=0, value= 18 2d 44 54 fb 21 09 40                                                       // const pi = 3.14159265358979323846;
   0013: GLOBAL_PTR           dst=8, offset=0                                                                             // const pi = 3.14159265358979323846;
-  0022: STORE_PTR            addr=8, src=0, size=8                                                                       // const pi = 3.14159265358979323846;
-  0035: LOAD_CONST_8         dst=16, value= de 45 be c9 3c bd 43 40                                                      // const solar_mass = 4.0 * pi * pi;
-  0048: GLOBAL_PTR           dst=24, offset=8                                                                            // const solar_mass = 4.0 * pi * pi;
-  0057: STORE_PTR            addr=24, src=16, size=8                                                                     // const solar_mass = 4.0 * pi * pi;
-  0070: LOAD_CONST_8         dst=32, value= a4 70 3d 0a d7 d3 76 40                                                      // const days_per_year = 365.24;
-  0083: GLOBAL_PTR           dst=40, offset=16                                                                           // const days_per_year = 365.24;
-  0092: STORE_PTR            addr=40, src=32, size=8                                                                     // const days_per_year = 365.24;
-  0105: RETURN_BASE                                                                                                      // const days_per_year = 365.24;
+  0022: STORE_PTR            addr=8, offset=0, src=0, size=8                                                             // const pi = 3.14159265358979323846;
+  0039: LOAD_CONST_8         dst=16, value= de 45 be c9 3c bd 43 40                                                      // const solar_mass = 4.0 * pi * pi;
+  0052: GLOBAL_PTR           dst=24, offset=8                                                                            // const solar_mass = 4.0 * pi * pi;
+  0061: STORE_PTR            addr=24, offset=0, src=16, size=8                                                           // const solar_mass = 4.0 * pi * pi;
+  0078: LOAD_CONST_8         dst=32, value= a4 70 3d 0a d7 d3 76 40                                                      // const days_per_year = 365.24;
+  0091: GLOBAL_PTR           dst=40, offset=16                                                                           // const days_per_year = 365.24;
+  0100: STORE_PTR            addr=40, offset=0, src=32, size=8                                                           // const days_per_year = 365.24;
+  0117: RETURN_BASE                                                                                                      // const days_per_year = 365.24;

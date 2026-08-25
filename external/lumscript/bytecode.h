@@ -49,8 +49,10 @@
 // - a slice occupies `base, length` in stack memory
 // - `base` is an absolute runtime memory address, so slices can alias caller locals
 //   while passed to and returned from nested calls
-// - `SLICE` reads `base, length, begin, end` registers and writes a subslice
-// - `SLICE_REF` bounds-checks a typed integer index; the type
+// - `SLICE` reads `dst, source, begin, end` registers and writes a subslice
+//   without modifying the source; element size follows the operands
+// - `SLICE_REF` bounds-checks a typed integer index and writes the element
+//   address to `dst` (the slice operand is read only); the type
 //   kind byte of the index register follows the index register operand
 // - `SLICE_EQ` reads two slice registers plus the element size and kind, and
 //   writes a bool; `!=` is `SLICE_EQ` followed by `NOT`
@@ -60,7 +62,8 @@
 // - constants: LOAD_CONST_N (`dst`, inline payload)
 // - frame copies: COPY (`dst`, `src`, `byte size`)
 // - pointers: FRAME_PTR and GLOBAL_PTR materialize pointers from immediate byte
-//   offsets; LOAD_PTR and STORE_PTR handle indirect value access
+//   offsets; LOAD_PTR and STORE_PTR handle indirect value access through a
+//   pointer register plus an immediate byte offset
 // - indexed access: LOAD_INDEXED_{8,16,32,64} and STORE_INDEXED_{8,16,32,64} combine bounds checking,
 //   element scaling, address formation, and the memory access; their base
 //   operand is a frame offset, not a pointer register. Their _IMM variants

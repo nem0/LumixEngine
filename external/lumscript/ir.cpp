@@ -630,7 +630,7 @@ struct IRBuilder {
 
 				auto& base = buildExpressionIR(*me.expression, pointer_base);
 
-				if (as_rvalue && base.result_mode == LsIrOp::VALUE) {
+				if (!pointer_base && as_rvalue && base.result_mode == LsIrOp::VALUE) {
 					auto& extract = alloc<LsOpExtractValue>();
 					extract.value = &base;
 					extract.offset = offset;
@@ -2090,8 +2090,8 @@ struct BytecodeCompiler {
 			}
 			return result;
 		}
-		u32 lhs_offset = emit(*cmp.lhs, nullptr);
-		u32 rhs_offset = emit(*cmp.rhs, nullptr);
+		u32 lhs_offset = emitOperand(*cmp.lhs);
+		u32 rhs_offset = emitOperand(*cmp.rhs);
 		switch (cmp.kind) {
 			case LS_IR_OP_EQ: emitOp(LS_OP_EQ); break;
 			case LS_IR_OP_NE: emitOp(LS_OP_NE); break;
@@ -2110,7 +2110,7 @@ struct BytecodeCompiler {
 	}
 
 	u32 emitUnary(const LsOpUnary& op, EmitDst* dst) {
-		const u32 operand = emit(*op.operand, nullptr);
+		const u32 operand = emitOperand(*op.operand);
 		if (op.kind == LS_IR_OP_NEG)
 			emitOp(ls_op(LS_OP_NEG_I8 + numericKindIndex(*op.operand_type)));
 		else
@@ -2171,12 +2171,12 @@ struct BytecodeCompiler {
 		}
 		u32 variant;
 		switch (skip) {
-			case LS_IR_OP_EQ: variant = 0; break; // JE
-			case LS_IR_OP_GE: variant = 1; break; // JGE
-			case LS_IR_OP_GT: variant = 2; break; // JGT
-			case LS_IR_OP_LT: variant = 3; break; // JLT
-			case LS_IR_OP_LE: variant = 4; break; // JLE
-			case LS_IR_OP_NE: variant = 5; break; // JNE
+			case LS_IR_OP_EQ: variant = 0; break;
+			case LS_IR_OP_GE: variant = 1; break;
+			case LS_IR_OP_GT: variant = 2; break;
+			case LS_IR_OP_LT: variant = 3; break;
+			case LS_IR_OP_LE: variant = 4; break;
+			case LS_IR_OP_NE: variant = 5; break;
 			default: return false;
 		}
 		out_op = ls_op(LS_OP_JE_I8 + numericKindIndex(operand_type) * 6u + variant);
@@ -2186,7 +2186,6 @@ struct BytecodeCompiler {
 	u32 emitConditionalJump(const LsOpConditionalJump& conditional) {
 		const u32 entry_stack_top = stack_top;
 
-		// Peek through a leading NOT so `if (!(a < b))` can fuse too.
 		const LsIrOp* condition = conditional.condition;
 
 		// Fold compile-time-constant conditions: either a literal or a hoisted
@@ -2235,15 +2234,15 @@ struct BytecodeCompiler {
 					if (rhs_constant->value[i] != 0) rhs_is_zero = false;
 			}
 			if (compare && rhs_is_zero && zeroCompareJumpOp(compare->kind, *compare->operand_type, fused_opcode)) {
-				const u32 lhs_slot = emit(*compare->lhs, nullptr);
+				const u32 lhs_slot = emitOperand(*compare->lhs);
 				emitOp(fused_opcode);
 				emit(lhs_slot);
 				const u32 patch_pos = code.size();
 				emit((i16)0);
 				patchI16(patch_pos, conditional.body_start->bytecode_offset);
 			} else if (compare && fusedCompareJumpOp(compare->kind, *compare->operand_type, true, fused_opcode)) {
-				const u32 lhs_slot = emit(*compare->lhs, nullptr);
-				const u32 rhs_slot = emit(*compare->rhs, nullptr);
+				const u32 lhs_slot = emitOperand(*compare->lhs);
+				const u32 rhs_slot = emitOperand(*compare->rhs);
 				emitOp(fused_opcode);
 				emit(lhs_slot);
 				emit(rhs_slot);
@@ -2285,15 +2284,15 @@ struct BytecodeCompiler {
 					if (rhs_constant->value[i] != 0) rhs_is_zero = false;
 			}
 			if (rhs_is_zero && zeroCompareJumpOp(invertCompare(compare.kind), *compare.operand_type, fused_opcode)) {
-				const u32 lhs_slot = emit(*compare.lhs, nullptr);
+				const u32 lhs_slot = emitOperand(*compare.lhs);
 				emitOp(fused_opcode);
 				emit(lhs_slot);
 				false_jump = code.size();
 				emit((i16)0);
 				have_jump = true;
 			} else if (fusedCompareJumpOp(compare.kind, *compare.operand_type, false, fused_opcode)) {
-				const u32 lhs_slot = emit(*compare.lhs, nullptr);
-				const u32 rhs_slot = emit(*compare.rhs, nullptr);
+				const u32 lhs_slot = emitOperand(*compare.lhs);
+				const u32 rhs_slot = emitOperand(*compare.rhs);
 				emitOp(fused_opcode);
 				emit(lhs_slot);
 				emit(rhs_slot);
@@ -2425,10 +2424,10 @@ struct BytecodeCompiler {
 		LsIrOp* addend_op = multiply_is_lhs ? add.rhs : add.lhs;
 		const auto& multiply = static_cast<const LsOpBinary&>(*multiply_op);
 		// Keep source evaluation order even when the multiply is on the RHS.
-		const u32 addend = multiply_is_lhs ? 0 : emit(*addend_op, nullptr);
-		const u32 lhs = emit(*multiply.lhs, nullptr);
-		const u32 rhs = emit(*multiply.rhs, nullptr);
-		const u32 ordered_addend = multiply_is_lhs ? emit(*addend_op, nullptr) : addend;
+		const u32 addend = multiply_is_lhs ? 0 : emitOperand(*addend_op);
+		const u32 lhs = emitOperand(*multiply.lhs);
+		const u32 rhs = emitOperand(*multiply.rhs);
+		const u32 ordered_addend = multiply_is_lhs ? emitOperand(*addend_op) : addend;
 		const u32 size = typeByteSize(*add.operand_type);
 		const u32 result = dst ? dst->dst : stack_top;
 		emitOp(add.operand_type->kind == ResolvedTypeKind::F32 ? LS_OP_MADD_F32 : LS_OP_MADD_F64);
@@ -2446,7 +2445,7 @@ struct BytecodeCompiler {
 			(ir_op.operand_type->kind == ResolvedTypeKind::F32 || ir_op.operand_type->kind == ResolvedTypeKind::F64)) {
 			return emitMadd(ir_op, dst);
 		}
-		u32 lhs = emit(*ir_op.lhs, nullptr);
+		u32 lhs = emitOperand(*ir_op.lhs);
 		const u8* immediate = nullptr;
 		if (ir_op.rhs->kind == LS_IR_OP_LOAD_CONST) immediate = static_cast<const LsOpLoadConst&>(*ir_op.rhs).value;
 		if (ir_op.rhs->kind == LS_IR_OP_LOAD_BYTES) immediate = static_cast<const LsOpLoadBytes&>(*ir_op.rhs).value;
@@ -2459,6 +2458,11 @@ struct BytecodeCompiler {
 			if (rhs_type && rhs_type->kind == ir_op.operand_type->kind && typeByteSize(*rhs_type) == size) {
 				u64 immediate_value = 0;
 				memcpy(&immediate_value, immediate, size);
+				// A zero-offset address addition is a no-op: address registers
+				// are read-only, so the base operand already holds the address.
+				if (ir_op.result_mode == LsIrOp::ADDRESS && ir_op.kind == LS_IR_OP_ADD && immediate_value == 0u) {
+					return lhs;
+				}
 				const bool increment = ir_op.kind == LS_IR_OP_ADD && immediate_value == 1u;
 				const bool decrement = ir_op.kind == LS_IR_OP_SUB && immediate_value == 1u;
 				if (dst && dst->dst == lhs && (increment || decrement) &&
@@ -2477,7 +2481,7 @@ struct BytecodeCompiler {
 				return ret;
 			}
 		}
-		u32 rhs = emit(*ir_op.rhs, nullptr);
+		u32 rhs = emitOperand(*ir_op.rhs);
 		emitOp(base_op == LS_OP_ADD_8 || base_op == LS_OP_SUB_8 || base_op == LS_OP_MUL_8
 			? arithmeticOp(ir_op.kind, *ir_op.operand_type)
 			: ls_op(base_op + numericKindIndex(*ir_op.operand_type)));
@@ -2649,6 +2653,37 @@ struct BytecodeCompiler {
 		}
 	}
 
+	// Matches an address formed as base + constant byte offset (the shape
+	// produced by struct field access through pointers). The constant folds
+	// into LOAD_PTR/STORE_PTR's immediate offset operand.
+	bool tryGetOffsetAddress(const LsIrOp& address, LsIrOp*& base, u32& offset) {
+		if (address.kind != LS_IR_OP_ADD) return false;
+		const auto& add = static_cast<const LsOpBinary&>(address);
+		if (!add.rhs || add.rhs->kind != LS_IR_OP_LOAD_CONST) return false;
+		const auto& constant = static_cast<const LsOpLoadConst&>(*add.rhs);
+		if (!constant.type || constant.type->kind != ResolvedTypeKind::U64) return false;
+		u64 value = 0;
+		memcpy(&value, constant.value, sizeof(value));
+		if (value > 0xffffffffu) return false;
+		base = add.lhs;
+		offset = (u32)value;
+		return true;
+	}
+
+	bool tryGetDirectFrameAddress(const LsIrOp& address, u32& offset) {
+		if (address.kind == LS_IR_OP_PUSH_LOCAL_ADDR) {
+			offset = static_cast<const LsOpPushLocalAddr&>(address).alloca->stack_sp;
+			return true;
+		}
+		LsIrOp* base = nullptr;
+		u32 field_offset = 0;
+		if (tryGetOffsetAddress(address, base, field_offset) && base->kind == LS_IR_OP_PUSH_LOCAL_ADDR) {
+			offset = static_cast<LsOpPushLocalAddr*>(base)->alloca->stack_sp + field_offset;
+			return true;
+		}
+		return false;
+	}
+
 	bool tryGetIndexedAddress(LsIrOp& address, IndexedAddress& result) {
 		if (address.kind != LS_IR_OP_ADD) return false;
 		auto& add = static_cast<LsOpBinary&>(address);
@@ -2695,58 +2730,33 @@ struct BytecodeCompiler {
 		return (u32)offset;
 	}
 
+	u32 emitSliceFieldCopy(const LsOpCopy& copy, LsIrOp& slice_op, LsIrOp& index_op, const ResolvedType& index_type,
+		u32 element_size, u32 field_offset, u32 field_size)
+	{
+		const u32 src = emit(*copy.src, nullptr);
+		const u32 slice = emitOperand(slice_op);
+		const u32 index = emitOperand(index_op);
+		emitOp(sliceFieldStoreOp(toTypeKind(index_type)));
+		emit(slice);
+		emit(index);
+		emit(element_size);
+		emit(field_offset);
+		emit(field_size);
+		emit(src);
+		return slice;
+	}
+
 	u32 emitCopy(const LsOpCopy& copy) {
-		// Fuse stores whose address was formed as slice element reference plus
-		// a constant struct-field offset.
-		if (copy.dst->kind == LS_IR_OP_ADD) {
-			auto& add = static_cast<const LsOpAdd&>(*copy.dst);
-			if (add.lhs->kind == LS_IR_OP_SLICE_REF && add.rhs->kind == LS_IR_OP_LOAD_CONST) {
-				auto& ref = static_cast<const LsOpSliceRef&>(*add.lhs);
-				auto& offset = static_cast<const LsOpLoadConst&>(*add.rhs);
-				u64 field_offset = 0;
-				memcpy(&field_offset, offset.value, sizeof(field_offset));
-				if (field_offset <= 0xffFFffFFu) {
-					const u32 src = emit(*copy.src, nullptr);
-					const u32 slice = emitSliceFieldValue(ref.slice);
-					const u32 index = emitSliceFieldValue(ref.index);
-					const ls_type_kind kind = toTypeKind(*ref.index_type);
-					const ls_op op = sliceFieldStoreOp(kind);
-					emitOp(op);
-					emit(slice);
-					emit(index);
-					emit(ref.element_size);
-					emit((u32)field_offset);
-					emit(typeByteSize(*copy.type));
-					emit(src);
-					return slice;
-				}
-			}
-		}
 		if (copy.dst->kind == LS_IR_OP_SLICE_FIELD_STORE) {
 			auto& field = static_cast<LsOpSliceFieldStore&>(*copy.dst);
-			const u32 src = emit(*copy.src, nullptr);
-			const u32 slice = emitSliceFieldValue(field.slice);
-			const u32 index = emit(*field.index, nullptr);
-			emitOp(LS_OP_SLICE_REF);
-			emit(slice);
-			emit(index);
-			emit((u8)toTypeKind(*field.index_type));
-			emit(field.element_size);
-			const u32 address = stack_top;
-			emitOp(LS_OP_ADD_64_IMM);
-			emit(address);
-			emit(slice);
-			emit((u64)field.field_offset);
-			emitOp(LS_OP_STORE_PTR);
-			emit(address);
-			emit(src);
-			emit(field.field_size);
-			stack_top += sizeof(void*);
-			return address;
+			return emitSliceFieldCopy(copy, *field.slice, *field.index, *field.index_type,
+				field.element_size, field.field_offset, field.field_size);
 		}
-		if (do_optimize && copy.dst->kind == LS_IR_OP_PUSH_LOCAL_ADDR) {
-			auto& local_addr = static_cast<LsOpPushLocalAddr&>(*copy.dst);
-			EmitDst dst = { local_addr.alloca->stack_sp, typeByteSize(*copy.type) };
+
+		u32 frame_offset = 0;
+		const bool direct_frame = copy.dst->result_mode == LsIrOp::ADDRESS && tryGetDirectFrameAddress(*copy.dst, frame_offset);
+		if (do_optimize && direct_frame) {
+			EmitDst dst = { frame_offset, typeByteSize(*copy.type) };
 			emit(*copy.src, &dst);
 			return dst.dst;
 		}
@@ -2775,11 +2785,19 @@ struct BytecodeCompiler {
 			return indexed.base_slot;
 		}
 		u32 src = emit(*copy.src, nullptr);
+		if (direct_frame) {
+			emitOp(LS_OP_COPY);
+			emit(frame_offset);
+			emit(src);
+			emit(typeByteSize(*copy.type));
+			return frame_offset;
+		}
 		u32 dst = emit(*copy.dst, nullptr);
 		switch (copy.dst->result_mode) {
 			case LsIrOp::ADDRESS: {
 				emitOp(LS_OP_STORE_PTR);
 				emit(dst);
+				emit(u32(0));
 				emit(src);
 				emit(typeByteSize(*copy.type));
 				return dst;
@@ -2797,14 +2815,14 @@ struct BytecodeCompiler {
 		return 0xffFFffFF;
 	}
 
-	u32 emitExtractValue(const LsOpExtractValue& op) {
-		const u32 value = emit(*op.value, nullptr);
-		const u32 ret = stack_top;
+	u32 emitExtractValue(const LsOpExtractValue& op, EmitDst* dst) {
+		const u32 value = emitOperand(*op.value);
+		const u32 ret = dst ? dst->dst : stack_top;
 		emitOp(LS_OP_COPY);
 		emit(ret);
 		emit(value + op.offset);
 		emit(op.size);
-		stack_top += op.size;
+		if (!dst) stack_top += op.size;
 		return ret;
 	}
 
@@ -2812,7 +2830,7 @@ struct BytecodeCompiler {
 		const UnionResolvedType& source = static_cast<const UnionResolvedType&>(*op.source_type);
 		const UnionResolvedType& dest = static_cast<const UnionResolvedType&>(*op.target_type);
 		// Evaluate the source once: tag remap and payload copy both need it.
-		const u32 src = emit(*op.value, nullptr);
+		const u32 src = emitOperand(*op.value);
 		const u32 dest_size = typeByteSize(*op.target_type);
 		const u32 src_size = typeByteSize(*op.source_type);
 		const u32 result = stack_top;
@@ -2939,7 +2957,7 @@ struct BytecodeCompiler {
 	}
 
 	u32 emitBoundsCheck(const LsOpBoundsCheck& op) {
-		const u32 index = emit(*op.index, nullptr);
+		const u32 index = emitOperand(*op.index);
 		emitOp(LS_OP_BOUNDS_CHECK);
 		emit(index);
 		emit((u8)toTypeKind(*op.index_type));
@@ -2948,11 +2966,25 @@ struct BytecodeCompiler {
 	}
 
 	bool tryGetDirectFrameValue(const LsIrOp& value, u32& offset) {
+		// A local/parameter value whose bytes live at a static frame offset:
+		// a plain load, its constant-offset struct field, or the folded
+		// frame-slot reference optimize() rewrites plain loads into.
+		if (value.kind == LS_IR_OP_FRAME_PTR) {
+			offset = static_cast<const LsOpFramePtr&>(value).alloca->stack_sp;
+			return true;
+		}
 		if (value.kind != LS_IR_OP_LOAD) return false;
 		const auto& load = static_cast<const LsOpLoad&>(value);
-		if (load.addr->kind != LS_IR_OP_PUSH_LOCAL_ADDR) return false;
-		offset = static_cast<const LsOpPushLocalAddr&>(*load.addr).alloca->stack_sp;
-		return true;
+		return tryGetDirectFrameAddress(*load.addr, offset);
+	}
+
+	// Slot an operand's value already lives in when nothing needs to be
+	// emitted for it; reads straight from locals'/parameters' frame bytes,
+	// including their struct fields. Falls back to a full emission.
+	u32 emitOperand(LsIrOp& op) {
+		u32 slot = 0;
+		if (tryGetDirectFrameValue(op, slot)) return slot;
+		return emit(op, nullptr);
 	}
 
 	u32 emitCast(const LsOpCast& cast, EmitDst* dst) {
@@ -3029,46 +3061,6 @@ struct BytecodeCompiler {
 	}
 
 	u32 emitLoad(const LsOpLoad& op, EmitDst* dst) {
-		if (op.addr->kind == LS_IR_OP_PUSH_LOCAL_ADDR) {
-			u32 ret = dst ? dst->dst : stack_top;
-			LsOpAlloca* alloca = static_cast<LsOpPushLocalAddr&>(*op.addr).alloca;
-			u32 size = typeByteSize(*alloca->type);
-			emitOp(LS_OP_COPY);
-			emit(ret);
-			emit(alloca->stack_sp);
-			emit(size);
-			if (!dst) stack_top += size;
-			return ret;
-		}
-		// Fuse a field load formed from a slice element reference and a
-		// constant struct-field offset. This is also the read side of compound
-		// assignments, whose address is otherwise lowered to SLICE_REF + ADD +
-		// LOAD_PTR before bytecode emission.
-		if (op.addr->kind == LS_IR_OP_ADD) {
-			auto& add = static_cast<const LsOpAdd&>(*op.addr);
-			if (add.lhs->kind == LS_IR_OP_SLICE_REF && add.rhs->kind == LS_IR_OP_LOAD_CONST) {
-				auto& ref = static_cast<const LsOpSliceRef&>(*add.lhs);
-				auto& offset = static_cast<const LsOpLoadConst&>(*add.rhs);
-				u64 field_offset = 0;
-				memcpy(&field_offset, offset.value, sizeof(field_offset));
-				if (field_offset <= 0xffFFffFFu) {
-					const u32 slice = emitSliceFieldValue(ref.slice);
-					const u32 index = emitSliceFieldValue(ref.index);
-					const u32 ret = dst ? dst->dst : stack_top;
-					const ls_type_kind kind = toTypeKind(*ref.index_type);
-					const ls_op op_code = sliceFieldLoadOp(kind);
-					emitOp(op_code);
-					emit(ret);
-					emit(slice);
-					emit(index);
-					emit(ref.element_size);
-					emit((u32)field_offset);
-					emit(op.size);
-					if (!dst) stack_top += op.size;
-					return ret;
-				}
-			}
-		}
 		IndexedAddress indexed;
 		if (tryGetIndexedAddress(*op.addr, indexed)) {
 			const u32 ret = dst ? dst->dst : stack_top;
@@ -3092,11 +3084,26 @@ struct BytecodeCompiler {
 			if (!dst) stack_top += op.size;
 			return ret;
 		}
-		u32 addr_sp = emit(*op.addr, nullptr);
+		LsIrOp* address_base = op.addr;
+		u32 address_offset = 0;
+		tryGetOffsetAddress(*op.addr, address_base, address_offset);
+		u32 frame_offset = 0;
+		if (tryGetDirectFrameAddress(*op.addr, frame_offset)) {
+			const u32 ret = dst ? dst->dst : stack_top;
+			emitOp(LS_OP_COPY);
+			emit(ret);
+			emit(frame_offset);
+			emit(op.size);
+			if (!dst) stack_top += op.size;
+			return ret;
+		}
+		u32 addr_sp = 0;
+		if (!tryGetDirectFrameValue(*address_base, addr_sp)) addr_sp = emit(*address_base, nullptr);
 		emitOp(LS_OP_LOAD_PTR);
 		u32 ret = dst ? dst->dst : stack_top;
 		emit(ret);
 		emit(addr_sp);
+		emit(address_offset);
 		emit(op.size);
 		if (!dst) stack_top += op.size;
 		return ret;
@@ -3248,7 +3255,7 @@ struct BytecodeCompiler {
 	u32 emitSlice(const LsOpSlice& op) {
 		u32 result;
 		if (op.source_is_scalar) {
-			const u32 source = emit(*op.source, nullptr);
+			const u32 source = emitOperand(*op.source);
 			result = stack_top;
 			emitOp(LS_OP_COPY);
 			emit(result);
@@ -3267,14 +3274,14 @@ struct BytecodeCompiler {
 			emit(op.source_length);
 			stack_top += sizeof(i64);
 		} else {
-			result = emit(*op.source, nullptr);
+			result = emitOperand(*op.source);
 		}
 
 		if (!op.begin && !op.end) return result;
 
 		static ResolvedType index_type(ResolvedTypeKind::I64);
 		auto emitBound = [&](LsIrOp* bound, i64 fallback) {
-			if (bound) return emit(*bound, nullptr);
+			if (bound) return emitOperand(*bound);
 			auto& constant = alloc<LsOpLoadConst>();
 			constant.type = &index_type;
 			memcpy(constant.value, &fallback, sizeof(fallback));
@@ -3283,7 +3290,7 @@ struct BytecodeCompiler {
 		const u32 begin = emitBound(op.begin, 0);
 		u32 end;
 		if (op.end) {
-			end = emit(*op.end, nullptr);
+			end = emitOperand(*op.end);
 		} else if (op.source_is_array) {
 			end = emitBound(nullptr, op.source_length);
 		} else {
@@ -3293,17 +3300,20 @@ struct BytecodeCompiler {
 			emit(result);
 			stack_top += sizeof(i64);
 		}
+		const u32 destination = stack_top;
 		emitOp(LS_OP_SLICE);
+		emit(destination);
 		emit(result);
 		emit(begin);
 		emit(end);
 		emit(op.element_size);
-		return result;
+		stack_top += sizeof(void*) + sizeof(i64);
+		return destination;
 	}
 
 	u32 emitSliceLoad(const LsOpSliceLoad& op) {
-		const u32 slice = emit(*op.slice, nullptr);
-		const u32 index = emit(*op.index, nullptr);
+		const u32 slice = emitOperand(*op.slice);
+		const u32 index = emitOperand(*op.index);
 		const u32 result = stack_top;
 		const ls_op load_op = sliceFieldLoadOp(toTypeKind(*op.index_type));
 		emitOp(load_op);
@@ -3327,38 +3337,38 @@ struct BytecodeCompiler {
 		return result;
 	}
 
-	u32 emitSliceFieldValue(LsIrOp* value) {
-		u32 frame_offset = 0;
-		if (tryGetDirectFrameValue(*value, frame_offset)) return frame_offset;
-		return emit(*value, nullptr);
-	}
-
-	u32 emitSliceRef(const LsOpSliceRef& op) {
-		const u32 slice = emit(*op.slice, nullptr);
-		const u32 index = emit(*op.index, nullptr);
+	u32 emitSliceRef(const LsOpSliceRef& op, EmitDst* dst) {
+		const u32 slice = emitOperand(*op.slice);
+		const u32 index = emitOperand(*op.index);
+		const u32 ret = dst ? dst->dst : stack_top;
+		if (!dst) stack_top += sizeof(void*);
 		emitOp(LS_OP_SLICE_REF);
+		emit(ret);
 		emit(slice);
 		emit(index);
 		emit((u8)toTypeKind(*op.index_type));
 		emit(op.element_size);
-		return slice;
+		return ret;
 	}
 
 	u32 emitSliceFieldStoreAddress(const LsOpSliceFieldStore& op) {
-		const u32 slice = emitSliceFieldValue(op.slice);
-		const u32 index = emitSliceFieldValue(op.index);
+		const u32 slice = emitOperand(*op.slice);
+		const u32 index = emitOperand(*op.index);
+		const u32 address = stack_top;
+		stack_top += sizeof(void*);
 		emitOp(LS_OP_SLICE_REF);
+		emit(address);
 		emit(slice);
 		emit(index);
 		emit((u8)toTypeKind(*op.index_type));
 		emit(op.element_size);
-		return slice;
+		return address;
 	}
 
-	u32 emitSliceFieldLoad(const LsOpSliceFieldLoad& op) {
-		const u32 slice = emitSliceFieldValue(op.slice);
-		const u32 index = emitSliceFieldValue(op.index);
-		const u32 result = stack_top;
+	u32 emitSliceFieldLoad(const LsOpSliceFieldLoad& op, EmitDst* dst) {
+		const u32 slice = emitOperand(*op.slice);
+		const u32 index = emitOperand(*op.index);
+		const u32 result = dst ? dst->dst : stack_top;
 		const ls_type_kind kind = toTypeKind(*op.index_type);
 		const ls_op op_code = sliceFieldLoadOp(kind);
 		emitOp(op_code);
@@ -3368,7 +3378,7 @@ struct BytecodeCompiler {
 		emit(op.element_size);
 		emit(op.field_offset);
 		emit(op.field_size);
-		stack_top += op.field_size;
+		if (!dst) stack_top += op.field_size;
 		return result;
 	}
 
@@ -3384,8 +3394,8 @@ struct BytecodeCompiler {
 		switch (op.kind) {
 			case LS_IR_OP_FRAME_PTR: result = emitFramePtr(static_cast<LsOpFramePtr&>(op)); break;
 			case LS_IR_OP_STRING_LITERAL: result = emitStringLiteral(static_cast<LsOpStringLiteral&>(op)); break;
-			case LS_IR_OP_SLICE_REF: result = emitSliceRef(static_cast<LsOpSliceRef&>(op)); break;
-			case LS_IR_OP_SLICE_FIELD_LOAD: result = emitSliceFieldLoad(static_cast<LsOpSliceFieldLoad&>(op)); break;
+			case LS_IR_OP_SLICE_REF: result = emitSliceRef(static_cast<LsOpSliceRef&>(op), dst); break;
+			case LS_IR_OP_SLICE_FIELD_LOAD: result = emitSliceFieldLoad(static_cast<LsOpSliceFieldLoad&>(op), dst); break;
 			case LS_IR_OP_SLICE_FIELD_STORE: result = emitSliceFieldStoreAddress(static_cast<LsOpSliceFieldStore&>(op)); break;
 			case LS_IR_OP_SLICE_LOAD: result = emitSliceLoad(static_cast<LsOpSliceLoad&>(op)); break;
 			case LS_IR_OP_SLICE: result = emitSlice(static_cast<LsOpSlice&>(op)); break;
@@ -3399,7 +3409,7 @@ struct BytecodeCompiler {
 			case LS_IR_OP_CONDITIONAL_JUMP: result = emitConditionalJump(*static_cast<LsOpConditionalJump*>(&op)); break;
 			case LS_IR_OP_CALL_DIRECT: result = emitCallDirect(*static_cast<LsOpCallDirect*>(&op)); break;
 			case LS_IR_OP_CALL_INDIRECT: result = emitCallIndirect(*static_cast<LsOpCallIndirect*>(&op)); break;
-			case LS_IR_OP_EXTRACT_VALUE: result = emitExtractValue(*static_cast<LsOpExtractValue*>(&op)); break;
+			case LS_IR_OP_EXTRACT_VALUE: result = emitExtractValue(*static_cast<LsOpExtractValue*>(&op), dst); break;
 			case LS_IR_OP_LOAD: result = emitLoad(*static_cast<LsOpLoad*>(&op), dst); break;
 			case LS_IR_OP_PUSH_LOCAL_ADDR: result = emitPushLocalAddr(*static_cast<LsOpPushLocalAddr*>(&op)); break;
 			case LS_IR_OP_MATERIALIZE_ADDR: result = emitMaterializeAddr(*static_cast<LsOpMaterializeAddr*>(&op)); break;
@@ -3472,6 +3482,26 @@ struct BytecodeCompiler {
 				auto& copy = *static_cast<LsOpCopy*>(op);
 				optimize(copy.src);
 				optimize(copy.dst);
+
+				// Fold a slice-element address plus a constant field offset into
+				// the dedicated slice-field store operation. The emitter keeps the
+				// old address-shaped fallback for builds without optimization.
+				LsIrOp* address_base = copy.dst;
+				u32 field_offset = 0;
+				if (copy.dst->result_mode == LsIrOp::ADDRESS
+					&& tryGetOffsetAddress(*copy.dst, address_base, field_offset)
+					&& address_base->kind == LS_IR_OP_SLICE_REF) {
+					auto& ref = *static_cast<LsOpSliceRef*>(address_base);
+					auto& field = alloc<LsOpSliceFieldStore>();
+					field.slice = ref.slice;
+					field.index = ref.index;
+					field.element_size = ref.element_size;
+					field.index_type = ref.index_type;
+					field.field_offset = field_offset;
+					field.field_size = typeByteSize(*copy.type);
+					field.src_loc = copy.dst->src_loc;
+					copy.dst = &field;
+				}
 				break;
 			}
 			case LS_IR_OP_NOT:
@@ -3514,13 +3544,46 @@ struct BytecodeCompiler {
 			case LS_IR_OP_LOAD: {
 				auto* load = static_cast<LsOpLoad*>(op);
 				optimize(load->addr);
-				if (load->addr->kind == LS_IR_OP_PUSH_LOCAL_ADDR) {
+				LsIrOp* address_base = load->addr;
+				u32 field_offset = 0;
+				if (tryGetOffsetAddress(*load->addr, address_base, field_offset) && address_base->kind == LS_IR_OP_SLICE_REF) {
+					auto& ref = *static_cast<LsOpSliceRef*>(address_base);
+					auto& field = alloc<LsOpSliceFieldLoad>();
+					field.slice = ref.slice;
+					field.index = ref.index;
+					field.element_size = ref.element_size;
+					field.index_type = ref.index_type;
+					field.field_offset = field_offset;
+					field.field_size = load->size;
+					field.src_loc = load->src_loc;
+					op = &field;
+				}
+				else if (load->addr->kind == LS_IR_OP_PUSH_LOCAL_ADDR) {
 					auto& addr = *static_cast<LsOpPushLocalAddr*>(load->addr);
 					auto& ref = alloc<LsOpFramePtr>();
 					ref.alloca = addr.alloca;
 					ref.src_loc = load->src_loc;
 					op = &ref;
 				}
+				break;
+			}
+			case LS_IR_OP_SLICE_REF: {
+				auto& ref = *static_cast<LsOpSliceRef*>(op);
+				optimize(ref.slice);
+				optimize(ref.index);
+				break;
+			}
+			case LS_IR_OP_SLICE_LOAD: {
+				auto& load = *static_cast<LsOpSliceLoad*>(op);
+				optimize(load.slice);
+				optimize(load.index);
+				break;
+			}
+			case LS_IR_OP_SLICE_FIELD_LOAD:
+			case LS_IR_OP_SLICE_FIELD_STORE: {
+				auto& field = *static_cast<LsOpSliceField*>(op);
+				optimize(field.slice);
+				optimize(field.index);
 				break;
 			}
 			case LS_IR_OP_BOUNDS_CHECK: {
@@ -3809,6 +3872,7 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host, ls_bytecode_c
 				bc_compiler.stack_top += sizeof(void*);
 				bc_compiler.emitOp(LS_OP_STORE_PTR);
 				bc_compiler.emit(dst);
+				bc_compiler.emit(0u);
 				bc_compiler.emit(src);
 				bc_compiler.emit(s.slot.byte_size);
 			}
