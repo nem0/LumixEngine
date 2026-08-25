@@ -50,7 +50,7 @@
 // - `base` is an absolute runtime memory address, so slices can alias caller locals
 //   while passed to and returned from nested calls
 // - `SLICE` reads `base, length, begin, end` registers and writes a subslice
-// - `SLICE_LOAD` and `SLICE_REF` bounds-check a typed integer index; the type
+// - `SLICE_REF` bounds-checks a typed integer index; the type
 //   kind byte of the index register follows the index register operand
 // - `SLICE_EQ` reads two slice registers plus the element size and kind, and
 //   writes a bool; `!=` is `SLICE_EQ` followed by `NOT`
@@ -105,16 +105,15 @@ typedef enum ls_op {
 	LS_OP_STORE_INDEXED_64,
 	LS_OP_BOUNDS_CHECK,
 	LS_OP_SLICE,
-	LS_OP_SLICE_LOAD,
 	LS_OP_SLICE_REF,
-	LS_OP_SLICE_FIELD_LOAD_8,
-	LS_OP_SLICE_FIELD_LOAD_16,
-	LS_OP_SLICE_FIELD_LOAD_32,
-	LS_OP_SLICE_FIELD_LOAD_64,
-	LS_OP_SLICE_FIELD_STORE_8,
-	LS_OP_SLICE_FIELD_STORE_16,
-	LS_OP_SLICE_FIELD_STORE_32,
-	LS_OP_SLICE_FIELD_STORE_64,
+	LS_OP_SLICE_LOAD_8,
+	LS_OP_SLICE_LOAD_16,
+	LS_OP_SLICE_LOAD_32,
+	LS_OP_SLICE_LOAD_64,
+	LS_OP_SLICE_STORE_8,
+	LS_OP_SLICE_STORE_16,
+	LS_OP_SLICE_STORE_32,
+	LS_OP_SLICE_STORE_64,
 	LS_OP_SLICE_LENGTH,
 	LS_OP_SLICE_EQ,
 
@@ -138,6 +137,10 @@ typedef enum ls_op {
 	LS_OP_MUL_64,
 	LS_OP_MUL_F32,
 	LS_OP_MUL_F64,
+	// Fused multiply-add: dst = lhs * rhs + addend.
+	// Operands are four u32 frame offsets: dst, lhs, rhs, addend.
+	LS_OP_MADD_F32,
+	LS_OP_MADD_F64,
 
 	LS_OP_DIV_I8,
 	LS_OP_DIV_U8,

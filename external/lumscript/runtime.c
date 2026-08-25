@@ -245,7 +245,7 @@ static ls_string_view runtime_error_message(ls_op op) {
 	if ((op >= LS_OP_MOD_I8 && op <= LS_OP_MOD_U64) || (op >= LS_OP_MOD_I8_IMM && op <= LS_OP_MOD_U64_IMM)) {
 		return (ls_string_view){modulo_by_zero, modulo_by_zero + sizeof(modulo_by_zero) - 1u};
 	}
-	if (op >= LS_OP_LOAD_INDEXED_8 && op <= LS_OP_SLICE_FIELD_STORE_64) return (ls_string_view){index_out_of_bounds, index_out_of_bounds + sizeof(index_out_of_bounds) - 1u};
+	if (op >= LS_OP_LOAD_INDEXED_8 && op <= LS_OP_SLICE_STORE_64) return (ls_string_view){index_out_of_bounds, index_out_of_bounds + sizeof(index_out_of_bounds) - 1u};
 	if (op == LS_OP_CALL_DIRECT || op == LS_OP_CALL_INDIRECT) return (ls_string_view){invalid_function, invalid_function + sizeof(invalid_function) - 1u};
 	return (ls_string_view){generic, generic + sizeof(generic) - 1u};
 }
@@ -484,6 +484,22 @@ static u64 runtime_immediate_to_u64(u64 value, ls_type_kind kind) {
 		memcpy(out__, &result__, sizeof(TYPE));      \
 	} while (0)
 
+#define LS_REG_MADD(TYPE, EXPR)                    \
+	do {                                             \
+		const u32 dst__ = runtime_read_u32();        \
+		const u32 lhs_offset__ = runtime_read_u32(); \
+		const u32 rhs_offset__ = runtime_read_u32(); \
+		const u32 add_offset__ = runtime_read_u32(); \
+		TYPE a = 0;                                  \
+		TYPE b = 0;                                  \
+		TYPE c = 0;                                  \
+		memcpy(&a, frame + lhs_offset__, sizeof(TYPE)); \
+		memcpy(&b, frame + rhs_offset__, sizeof(TYPE)); \
+		memcpy(&c, frame + add_offset__, sizeof(TYPE)); \
+		TYPE result__ = (EXPR);                      \
+		memcpy(frame + dst__, &result__, sizeof(TYPE)); \
+	} while (0)
+
 #define LS_REG_DIVOP(TYPE, EXPR)                     \
 	do {                                             \
 		const u32 dst__ = runtime_read_u32();        \
@@ -587,7 +603,7 @@ static u64 runtime_immediate_to_u64(u64 value, ls_type_kind kind) {
 	}
 
 #define LS_SLICE_FIELD_OP(OP, TYPE)                                               \
-	case LS_OP_SLICE_FIELD_LOAD_##OP: {                                           \
+	case LS_OP_SLICE_LOAD_##OP: {                                           \
 		const u32 dst = runtime_read_u32();                                       \
 		const u32 slice_reg = runtime_read_u32();                                 \
 		const u32 index_reg = runtime_read_u32();                                 \
@@ -607,7 +623,7 @@ static u64 runtime_immediate_to_u64(u64 value, ls_type_kind kind) {
 		memmove(frame + dst, field_ptr, field_size);                              \
 		break;                                                                    \
 	}                                                                             \
-	case LS_OP_SLICE_FIELD_STORE_##OP: {                                          \
+	case LS_OP_SLICE_STORE_##OP: {                                          \
 		const u32 slice_reg = runtime_read_u32();                                 \
 		const u32 index_reg = runtime_read_u32();                                 \
 		const u32 element_size = runtime_read_u32();                              \
@@ -820,24 +836,6 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const i64 new_length = end - begin;
 				memcpy(out, &new_base, sizeof(new_base));
 				memcpy(out + sizeof(void*), &new_length, 8u);
-				break;
-			}
-			case LS_OP_SLICE_LOAD: {
-				const u32 dst = runtime_read_u32();
-				const u32 slice_offset = runtime_read_u32();
-				const u32 index_reg = runtime_read_u32();
-				const ls_type_kind index_kind = (ls_type_kind)*ip++;
-				const u32 element_size = runtime_read_u32();
-				i64 length = 0;
-				void* base_ptr = NULL;
-				u8* slice = frame + slice_offset;
-				u8* out = frame + dst;
-				memcpy(&base_ptr, slice, sizeof(base_ptr));
-				memcpy(&length, slice + sizeof(void*), 8u);
-				const u64 index = runtime_numeric_to_u64(frame + index_reg, index_kind);
-				if (!base_ptr || index >= (u64)length) goto runtime_execute_function_fail;
-				const u64 offset = index * element_size;
-				memmove(out, (u8*)base_ptr + offset, element_size);
 				break;
 			}
 			case LS_OP_SLICE_REF: {
@@ -1082,6 +1080,8 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 			LS_ARITH_INT_CASES(MUL, *)
 			LS_ARITH_DIV_CASES(DIV, /)
 			LS_MOD_CASES
+			case LS_OP_MADD_F32: LS_REG_MADD(f32, fmaf(a, b, c)); break;
+			case LS_OP_MADD_F64: LS_REG_MADD(f64, fma(a, b, c)); break;
 			#undef LS_MOD_CASES
 			#undef LS_ARITH_DIV_CASES
 			#undef LS_ARITH_INT_CASES

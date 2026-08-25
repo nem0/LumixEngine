@@ -2418,7 +2418,34 @@ struct BytecodeCompiler {
 		}
 	}
 
+	u32 emitMadd(const LsOpBinary& add, EmitDst* dst) {
+		ASSERT(add.kind == LS_IR_OP_ADD);
+		const bool multiply_is_lhs = add.lhs->kind == LS_IR_OP_MUL;
+		LsIrOp* multiply_op = multiply_is_lhs ? add.lhs : add.rhs;
+		LsIrOp* addend_op = multiply_is_lhs ? add.rhs : add.lhs;
+		const auto& multiply = static_cast<const LsOpBinary&>(*multiply_op);
+		// Keep source evaluation order even when the multiply is on the RHS.
+		const u32 addend = multiply_is_lhs ? 0 : emit(*addend_op, nullptr);
+		const u32 lhs = emit(*multiply.lhs, nullptr);
+		const u32 rhs = emit(*multiply.rhs, nullptr);
+		const u32 ordered_addend = multiply_is_lhs ? emit(*addend_op, nullptr) : addend;
+		const u32 size = typeByteSize(*add.operand_type);
+		const u32 result = dst ? dst->dst : stack_top;
+		emitOp(add.operand_type->kind == ResolvedTypeKind::F32 ? LS_OP_MADD_F32 : LS_OP_MADD_F64);
+		emit(result);
+		emit(lhs);
+		emit(rhs);
+		emit(ordered_addend);
+		if (!dst) stack_top += size;
+		return result;
+	}
+
 	u32 emitBinary(ls_op base_op, const LsOpBinary& ir_op, EmitDst* dst) {
+		if (do_optimize && ir_op.kind == LS_IR_OP_ADD &&
+			(ir_op.lhs->kind == LS_IR_OP_MUL || ir_op.rhs->kind == LS_IR_OP_MUL) &&
+			(ir_op.operand_type->kind == ResolvedTypeKind::F32 || ir_op.operand_type->kind == ResolvedTypeKind::F64)) {
+			return emitMadd(ir_op, dst);
+		}
 		u32 lhs = emit(*ir_op.lhs, nullptr);
 		const u8* immediate = nullptr;
 		if (ir_op.rhs->kind == LS_IR_OP_LOAD_CONST) immediate = static_cast<const LsOpLoadConst&>(*ir_op.rhs).value;
@@ -2893,21 +2920,21 @@ struct BytecodeCompiler {
 
 	static ls_op sliceFieldLoadOp(ls_type_kind kind) {
 		switch (kind) {
-			case LS_TYPE_I8: case LS_TYPE_U8: case LS_TYPE_BOOL: return LS_OP_SLICE_FIELD_LOAD_8;
-			case LS_TYPE_I16: case LS_TYPE_U16: return LS_OP_SLICE_FIELD_LOAD_16;
-			case LS_TYPE_I32: case LS_TYPE_U32: case LS_TYPE_F32: case LS_TYPE_ENUM: return LS_OP_SLICE_FIELD_LOAD_32;
-			case LS_TYPE_I64: case LS_TYPE_U64: case LS_TYPE_F64: return LS_OP_SLICE_FIELD_LOAD_64;
-			default: ASSERT(false); return LS_OP_SLICE_FIELD_LOAD_32;
+			case LS_TYPE_I8: case LS_TYPE_U8: case LS_TYPE_BOOL: return LS_OP_SLICE_LOAD_8;
+			case LS_TYPE_I16: case LS_TYPE_U16: return LS_OP_SLICE_LOAD_16;
+			case LS_TYPE_I32: case LS_TYPE_U32: case LS_TYPE_F32: case LS_TYPE_ENUM: return LS_OP_SLICE_LOAD_32;
+			case LS_TYPE_I64: case LS_TYPE_U64: case LS_TYPE_F64: return LS_OP_SLICE_LOAD_64;
+			default: ASSERT(false); return LS_OP_SLICE_LOAD_32;
 		}
 	}
 
 	static ls_op sliceFieldStoreOp(ls_type_kind kind) {
 		switch (kind) {
-			case LS_TYPE_I8: case LS_TYPE_U8: case LS_TYPE_BOOL: return LS_OP_SLICE_FIELD_STORE_8;
-			case LS_TYPE_I16: case LS_TYPE_U16: return LS_OP_SLICE_FIELD_STORE_16;
-			case LS_TYPE_I32: case LS_TYPE_U32: case LS_TYPE_F32: case LS_TYPE_ENUM: return LS_OP_SLICE_FIELD_STORE_32;
-			case LS_TYPE_I64: case LS_TYPE_U64: case LS_TYPE_F64: return LS_OP_SLICE_FIELD_STORE_64;
-			default: ASSERT(false); return LS_OP_SLICE_FIELD_STORE_32;
+			case LS_TYPE_I8: case LS_TYPE_U8: case LS_TYPE_BOOL: return LS_OP_SLICE_STORE_8;
+			case LS_TYPE_I16: case LS_TYPE_U16: return LS_OP_SLICE_STORE_16;
+			case LS_TYPE_I32: case LS_TYPE_U32: case LS_TYPE_F32: case LS_TYPE_ENUM: return LS_OP_SLICE_STORE_32;
+			case LS_TYPE_I64: case LS_TYPE_U64: case LS_TYPE_F64: return LS_OP_SLICE_STORE_64;
+			default: ASSERT(false); return LS_OP_SLICE_STORE_32;
 		}
 	}
 
@@ -3278,11 +3305,13 @@ struct BytecodeCompiler {
 		const u32 slice = emit(*op.slice, nullptr);
 		const u32 index = emit(*op.index, nullptr);
 		const u32 result = stack_top;
-		emitOp(LS_OP_SLICE_LOAD);
+		const ls_op load_op = sliceFieldLoadOp(toTypeKind(*op.index_type));
+		emitOp(load_op);
 		emit(result);
 		emit(slice);
 		emit(index);
-		emit((u8)toTypeKind(*op.index_type));
+		emit(op.element_size);
+		emit((u32)0);
 		emit(op.element_size);
 		stack_top += op.element_size;
 		return result;
