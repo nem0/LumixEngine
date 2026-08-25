@@ -22,19 +22,19 @@ Measured 2026-08-24. Times are the minimum of 5 runs.
 
 | Benchmark | Workload | Result | lumc | lua 5.4 | node --jitless | node | C /O2 |
 |---|---|---|---:|---:|---:|---:|---:|
-| recursion | fib(30) | 832040 | 22.97 ms | 31 ms | 43.40 ms | 5.06 ms | 2.63 ms |
-| mandel | 256x256, 255 iters | 1694719 | 36.13 ms | 96 ms | 129.08 ms | 6.24 ms | 3.82 ms |
-| fannkuch | n=9 | 30 | 164.39 ms | 179 ms | 257.76 ms | 17.41 ms | 17.48 ms |
-| nbodies | 500k steps | -0.169097 | 617.98 ms | 916 ms | 1237.79 ms | 33.02 ms | 19.58 ms |
+| recursion | fib(30) | 832040 | 24.92 ms | 31 ms | 43.40 ms | 5.06 ms | 2.63 ms |
+| mandel | 256x256, 255 iters | 1694719 | 36.92 ms | 96 ms | 129.08 ms | 6.24 ms | 3.82 ms |
+| fannkuch | n=9 | 30 | 161.90 ms | 179 ms | 257.76 ms | 17.41 ms | 17.48 ms |
+| nbodies | 500k steps | -0.169097 | 550.55 ms | 916 ms | 1237.79 ms | 33.02 ms | 19.58 ms |
 
 Relative to lumc (higher = faster than lumc):
 
 | Benchmark | lua 5.4 | node --jitless | node | C /O2 |
 |---|---:|---:|---:|---:|
-| recursion | 0.7x | 0.5x | 4.5x | 8.7x |
-| mandel | 0.4x | 0.3x | 5.8x | 9.5x |
-| fannkuch | 0.9x | 0.6x | 9.4x | 9.4x |
-| nbodies | 0.7x | 0.5x | 18.7x | 31.6x |
+| recursion | 0.8x | 0.6x | 4.9x | 9.5x |
+| mandel | 0.4x | 0.3x | 5.9x | 9.7x |
+| fannkuch | 0.9x | 0.6x | 9.3x | 9.3x |
+| nbodies | 0.6x | 0.4x | 16.7x | 28.1x |
 
 ## Bytecode instruction counts
 
@@ -63,7 +63,7 @@ xychart-beta
     title "recursion: fib(30)"
     x-axis [lumc, lua, jitless, node, C]
     y-axis "milliseconds" 0 --> 50
-    bar [23, 31, 43, 5.1, 2.6]
+    bar [25, 31, 43, 5.1, 2.6]
 ```
 
 ```mermaid
@@ -71,7 +71,7 @@ xychart-beta
     title "mandel"
     x-axis [lumc, lua, jitless, node, C]
     y-axis "milliseconds" 0 --> 160
-    bar [36, 96, 129, 6.2, 3.8]
+    bar [37, 96, 129, 6.2, 3.8]
 ```
 
 ```mermaid
@@ -79,7 +79,7 @@ xychart-beta
     title "fannkuch"
     x-axis [lumc, lua, jitless, node, C]
     y-axis "milliseconds" 0 --> 300
-    bar [164, 179, 258, 17.4, 17.5]
+    bar [162, 179, 258, 17.4, 17.5]
 ```
 
 ```mermaid
@@ -87,7 +87,7 @@ xychart-beta
     title "nbodies"
     x-axis [lumc, lua, jitless, node, C]
     y-axis "milliseconds" 0 --> 1300
-    bar [618, 916, 1238, 33.0, 19.6]
+    bar [551, 916, 1238, 33.0, 19.6]
 ```
 
 ## Reproducing
