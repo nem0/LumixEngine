@@ -6,7 +6,7 @@
 
 namespace {
 
-enum class LumScriptType { UNKNOWN, VOID_T, BOOL_T, I32_T, F32_T, VEC2_T, VEC3_T, DVEC3_T, VEC4_T, COLOR_T, QUAT_T, ENTITY_T, ENUM_T, STRUCT_T, PATH_T };
+enum class LumScriptType { UNKNOWN, VOID_T, BOOL_T, I32_T, F32_T, VEC2_T, VEC3_T, DVEC3_T, VEC4_T, COLOR_T, QUAT_T, ENTITY_T, ENUM_T, STRUCT_T, OBJECT_T, PATH_T };
 
 template <int CAPACITY> struct StaticString {
 	template <typename... Args> StaticString(Args&&... args) {
@@ -78,6 +78,24 @@ const Struct* findStructByTypeName(StringView type) {
 	return nullptr;
 }
 
+StringView objectBaseType(StringView type) {
+	while (type.size() > 0 && (type[type.size() - 1] == '*' || type[type.size() - 1] == '&')) --type.end;
+	return type;
+}
+
+const Object* findObjectByTypeName(StringView type) {
+	if (!g_meta_data) return nullptr;
+	type = objectBaseType(type);
+	for (Object& o : g_meta_data->objects) {
+		if (equal(type, o.name) || equal(type, o.full)) return &o;
+	}
+	return nullptr;
+}
+
+bool isObjectPointerType(StringView type) {
+	return type.size() > 0 && type[type.size() - 1] == '*';
+}
+
 LumScriptType getLumScriptType(StringView type) {
 	if (equal(type, "void")) return LumScriptType::VOID_T;
 	if (equal(type, "bool")) return LumScriptType::BOOL_T;
@@ -93,6 +111,7 @@ LumScriptType getLumScriptType(StringView type) {
 	if (equal(type, "Path")) return LumScriptType::PATH_T;
 	if (findEnumByTypeName(type)) return LumScriptType::ENUM_T;
 	if (findStructByTypeName(type)) return LumScriptType::STRUCT_T;
+	if (findObjectByTypeName(type)) return LumScriptType::OBJECT_T;
 	return LumScriptType::UNKNOWN;
 }
 
@@ -104,7 +123,7 @@ bool isSupportedLumScriptType(StringView type, LumScriptType t) {
 	for (const StructVar& v : s->vars) {
 		const LumScriptType field_type = getLumScriptType(v.type);
 		if (field_type == LumScriptType::UNKNOWN) return false;
-		if (field_type == LumScriptType::PATH_T) return false;
+		if (field_type == LumScriptType::PATH_T || field_type == LumScriptType::OBJECT_T) return false;
 		if (field_type == LumScriptType::STRUCT_T && !isSupportedLumScriptType(v.type, field_type)) return false;
 	}
 	return true;
@@ -129,9 +148,10 @@ bool isLumScriptEntityType(StringView type) {
 bool isSupportedLumScriptFunctionArg(const Arg& arg) {
 	if (isLumScriptStringArg(arg)) return true;
 	if (isLumScriptPathArg(arg)) return true;
+	const LumScriptType type = getLumScriptType(arg.type);
+	if (type == LumScriptType::OBJECT_T) return arg.is_ptr || arg.is_ref;
 	if (arg.is_ptr) return false;
 	if (arg.is_ref && !arg.is_const) return false;
-	const LumScriptType type = getLumScriptType(arg.type);
 	return type != LumScriptType::UNKNOWN && type != LumScriptType::ENUM_T && type != LumScriptType::PATH_T;
 }
 
@@ -202,6 +222,11 @@ void emitFrameValueRead(OutputStream& out, StringView type, StringView name) {
 			}
 			break;
 		}
+		case LumScriptType::OBJECT_T: {
+			const Object* o = findObjectByTypeName(type);
+			out.add("LS_ARG(frame, ", o ? o->full : objectBaseType(type), "*, ", name, ");" OUT_ENDL);
+			break;
+		}
 		default:
 			out.add("LS_ARG(frame, ", type, ", ", name, ");" OUT_ENDL);
 			break;
@@ -221,6 +246,7 @@ void emitArgRead(OutputStream& out, const Arg& arg) {
 void appendArgExpression(OutputStream& out, const Arg& arg) {
 	if (isLumScriptStringArg(arg)) out.add("lumscript_string_arg_", arg.name);
 	else if (isLumScriptPathArg(arg)) out.add("Path(StringView{", arg.name, ".begin, ", arg.name, ".end})");
+	else if (getLumScriptType(arg.type) == LumScriptType::OBJECT_T && arg.is_ref) out.add("*", arg.name);
 	else appendValueExpression(out, arg.type, arg.name);
 }
 
@@ -274,12 +300,24 @@ void appendReturnValue(OutputStream& out, StringView type, const char* value, co
 			}
 			break;
 		}
+		case LumScriptType::OBJECT_T:
+			if (isObjectPointerType(type)) {
+				StaticString<256> present("u8(", value, " != nullptr)");
+				emitResult(out, present);
+				emitResult(out, value);
+			}
+			else {
+				StaticString<256> ptr("&", value);
+				emitResult(out, ptr);
+			}
+			break;
 	}
 }
 
 bool isSupportedLumScriptFunction(Function& f) {
 	const LumScriptType ret_type = getLumScriptType(f.return_type);
 	if (!isSupportedLumScriptType(f.return_type, ret_type)) return false;
+	if (ret_type == LumScriptType::OBJECT_T && !isObjectPointerType(f.return_type)) return false;
 	bool supported = true;
 	forEachArg(f.args, [&](const Arg& arg, bool) {
 		if (!isSupportedLumScriptFunctionArg(arg)) supported = false;
@@ -290,6 +328,7 @@ bool isSupportedLumScriptFunction(Function& f) {
 bool isSupportedLumScriptPropertyArg(const Arg& arg) {
 	if (isLumScriptPathArg(arg)) return true;
 	if (isLumScriptStringArg(arg)) return true;
+	if (getLumScriptType(arg.type) == LumScriptType::OBJECT_T) return arg.is_ptr || arg.is_ref;
 	if (arg.is_ptr) return false;
 	if (arg.is_ref && !arg.is_const) return false;
 	return isSupportedLumScriptType(arg.type);
@@ -423,6 +462,27 @@ void appendModuleWrapperName(OutputStream& out, Module& m, Function& f, i32 idx)
 	out.add("lumscript_", m.id, "_", functionScriptName(f), "_", idx);
 }
 
+void appendObjectWrapperName(OutputStream& out, Object& o, Function& f, i32 idx) {
+	out.add("lumscript_object_", o.name, "_", functionScriptName(f), "_", idx);
+}
+
+void serializeLumScriptObjectWrapper(OutputStream& out, Object& o, Function& f, i32 idx) {
+	out.add("static void ");
+	appendObjectWrapperName(out, o, f, idx);
+	L("(ls_runtime* runtime, ls_call_frame frame) {");
+	L("LS_ARG(frame, ", o.full, "*, object);");
+	forEachArg(f.args, [&](const Arg& arg, bool) { emitArgRead(out, arg); });
+	if (!equal(f.return_type, "void")) out.add("auto ret = ");
+	out.add("object->", f.name, "(");
+	forEachArg(f.args, [&](const Arg& arg, bool is_first) {
+		if (!is_first) out.add(", ");
+		appendArgExpression(out, arg);
+	});
+	L(");");
+	appendReturnValue(out, f.return_type, "ret");
+	L("}" OUT_ENDL);
+}
+
 void serializeLumScriptModuleWrapper(OutputStream& out, Module& m, Function& f, i32 idx) {
 	out.add("static void ");
 	appendModuleWrapperName(out, m, f, idx);
@@ -517,16 +577,25 @@ void emitGeneratedHeader(OutputStream& out, MetaData& data) {
 	out.add("#define LS_COMPONENT_ARG(frame, type, name, context) \\" OUT_ENDL);
 	out.add("\tLS_ARG(frame, i32, name##_index); \\" OUT_ENDL);
 	out.add("\tLS_ARG(frame, type, context)" OUT_ENDL OUT_ENDL);
-	for (Module& m : data.modules) {
-		StringView include_path = makeStringView(m.filename);
+	StringView included_paths[512];
+	i32 included_path_count = 0;
+	auto emitInclude = [&](const char* filename) {
+		StringView include_path = makeStringView(filename);
+		for (i32 i = 0; i < included_path_count; ++i) {
+			if (equal(included_paths[i], include_path)) return;
+		}
+		included_paths[included_path_count++] = include_path;
 		// Generated header lives under src/lumscript, so plugin includes need one extra "..".
 		if (startsWith(include_path, "plugins/")) {
 			out.add("#include \"../", include_path, "\"" OUT_ENDL);
-		} else {
+		}
+		else {
 			if (startsWith(include_path, "src/")) include_path = withoutPrefix(include_path, 4);
 			out.add("#include \"", include_path, "\"" OUT_ENDL);
 		}
-	}
+	};
+	for (Module& m : data.modules) emitInclude(m.filename);
+	for (Object& o : data.objects) emitInclude(o.filename);
 	out.add(OUT_ENDL);
 }
 
@@ -605,6 +674,16 @@ void emitGeneratedModuleWrappers(OutputStream& out, MetaData& data, i32* wrapper
 		for (Function& f : m.functions) {
 			if (!isSupportedLumScriptFunction(f)) continue;
 			serializeLumScriptModuleWrapper(out, m, f, *wrapper_idx);
+			++*wrapper_idx;
+		}
+	}
+}
+
+void emitGeneratedObjectWrappers(OutputStream& out, MetaData& data, i32* wrapper_idx) {
+	for (Object& o : data.objects) {
+		for (Function& f : o.functions) {
+			if (!isSupportedLumScriptFunction(f)) continue;
+			serializeLumScriptObjectWrapper(out, o, f, *wrapper_idx);
 			++*wrapper_idx;
 		}
 	}
@@ -730,6 +809,20 @@ void emitGeneratedComponentImportRegistrations(OutputStream& out, MetaData& data
 	}
 }
 
+void emitGeneratedObjectImportRegistrations(OutputStream& out, MetaData& data, i32* wrapper_idx) {
+	for (Object& o : data.objects) {
+		StaticString<256> unit("core:");
+		appendLowercase(unit, o.name);
+		for (Function& f : o.functions) {
+			if (!isSupportedLumScriptFunction(f)) continue;
+			out.add("functions.insert({StringView(\"", unit.buffer, "\"), StringView(\"", functionScriptName(f), "\")}, &");
+			appendObjectWrapperName(out, o, f, *wrapper_idx);
+			L(");");
+			++*wrapper_idx;
+		}
+	}
+}
+
 void appendLumScriptDeclType(OutputStream& out, StringView type) {
 	switch (getLumScriptType(type)) {
 		case LumScriptType::VOID_T: out.add("void"); break;
@@ -751,6 +844,12 @@ void appendLumScriptDeclType(OutputStream& out, StringView type) {
 		case LumScriptType::STRUCT_T: {
 			const Struct* s = findStructByTypeName(type);
 			out.add(s ? s->name : type);
+			break;
+		}
+		case LumScriptType::OBJECT_T: {
+			const Object* o = findObjectByTypeName(type);
+			if (isObjectPointerType(type)) out.add("?");
+			out.add(o ? o->name : objectBaseType(type));
 			break;
 		}
 		case LumScriptType::PATH_T: out.add("[]const u8"); break;
@@ -787,6 +886,13 @@ void appendLumScriptImportType(OutputStream& out, StringView type) {
 		case LumScriptType::STRUCT_T: {
 			const Struct* s = findStructByTypeName(type);
 			out.add(s ? s->name : type);
+			break;
+		}
+		case LumScriptType::OBJECT_T: {
+			const Object* o = findObjectByTypeName(type);
+			StaticString<256> name("");
+			if (o) appendLowercase(name, o->name);
+			out.add(name.buffer);
 			break;
 		}
 		default: out.add(type); break;
@@ -925,6 +1031,68 @@ void serializeCoreImports(MetaData& data) {
 
 	for (Struct& s : data.structs) output_struct(s);
 
+	for (Object& o : data.objects) {
+		bool has_supported_function = false;
+		for (Function& f : o.functions) {
+			if (isSupportedLumScriptFunction(f)) {
+				has_supported_function = true;
+				break;
+			}
+		}
+		if (!has_supported_function) continue;
+
+		out.length = 0;
+		L("// Generated by meta.cpp");
+		StaticString<256> object_unit("");
+		appendLowercase(object_unit, o.name);
+		out.add("// import core:", object_unit.buffer, " as ", o.name, OUT_ENDL OUT_ENDL);
+
+		StringView imported_types[32];
+		i32 imported_types_count = 0;
+		auto emitImportForType = [&](StringView type) {
+			const LumScriptType import_type = getLumScriptType(type);
+			if (import_type != LumScriptType::VEC2_T && import_type != LumScriptType::VEC3_T && import_type != LumScriptType::DVEC3_T && import_type != LumScriptType::VEC4_T &&
+				import_type != LumScriptType::COLOR_T && import_type != LumScriptType::QUAT_T && import_type != LumScriptType::ENTITY_T && import_type != LumScriptType::ENUM_T &&
+				import_type != LumScriptType::STRUCT_T && import_type != LumScriptType::OBJECT_T) return;
+			const Object* imported_object = findObjectByTypeName(type);
+			if (imported_object == &o) return;
+			StringView base_type = objectBaseType(type);
+			for (i32 i = 0; i < imported_types_count; ++i) {
+				if (equal(imported_types[i], base_type)) return;
+			}
+			imported_types[imported_types_count++] = base_type;
+			out.add("import \"core:");
+			appendLumScriptImportType(out, type);
+			out.add("\"" OUT_ENDL);
+		};
+		for (Function& f : o.functions) {
+			if (!isSupportedLumScriptFunction(f)) continue;
+			emitImportForType(f.return_type);
+			forEachArg(f.args, [&](const Arg& arg, bool) { emitImportForType(arg.type); });
+		}
+
+		L("struct ", o.name, " { ptr : cptr; }" OUT_ENDL);
+		for (Function& f : o.functions) {
+			if (!isSupportedLumScriptFunction(f)) continue;
+			out.add("extern fn ", functionScriptName(f), "(object : ", o.name);
+			i32 arg_idx = 0;
+			forEachArg(f.args, [&](const Arg& arg, bool) {
+				out.add(", ");
+				appendLumScriptDeclArgName(out, arg.name, arg_idx++);
+				out.add(" : ");
+				appendLumScriptDeclArgType(out, arg);
+			});
+			out.add(") : ");
+			appendLumScriptDeclType(out, f.return_type);
+			out.add(";" OUT_ENDL);
+		}
+		out.add(OUT_ENDL);
+		StaticString<256> path("data/scripts/core/");
+		appendLowercase(path, o.name);
+		path.append(".lum");
+		writeFile(path, out);
+	}
+
 	for (Module& m : data.modules) {
 		bool has_supported_function = false;
 		for (Function& f : m.functions) {
@@ -948,7 +1116,7 @@ void serializeCoreImports(MetaData& data) {
 			const LumScriptType import_type = getLumScriptType(type);
 			if (import_type != LumScriptType::VEC2_T && import_type != LumScriptType::VEC3_T && import_type != LumScriptType::DVEC3_T && import_type != LumScriptType::VEC4_T &&
 				import_type != LumScriptType::COLOR_T && import_type != LumScriptType::QUAT_T && import_type != LumScriptType::ENTITY_T && import_type != LumScriptType::ENUM_T &&
-				import_type != LumScriptType::STRUCT_T && !equal(type, "World")) {
+				import_type != LumScriptType::STRUCT_T && import_type != LumScriptType::OBJECT_T && !equal(type, "World")) {
 				return;
 			}
 			if (equal(type, m.name)) return;
@@ -1025,7 +1193,7 @@ void serializeCoreImports(MetaData& data) {
 				const LumScriptType import_type = getLumScriptType(type);
 				if (import_type != LumScriptType::VEC2_T && import_type != LumScriptType::VEC3_T && import_type != LumScriptType::DVEC3_T && import_type != LumScriptType::VEC4_T &&
 					import_type != LumScriptType::COLOR_T && import_type != LumScriptType::QUAT_T && import_type != LumScriptType::ENTITY_T && import_type != LumScriptType::ENUM_T &&
-					import_type != LumScriptType::STRUCT_T)
+					import_type != LumScriptType::STRUCT_T && import_type != LumScriptType::OBJECT_T)
 					return;
 				if (equal(type, c.name)) return;
 				for (i32 i = 0; i < imported_types_count; ++i) {
@@ -1120,6 +1288,13 @@ void serializeCoreImports(MetaData& data) {
 
 void serializeLumScriptMeta(MetaData& data) {
 	g_meta_data = &data;
+	for (Object& o : data.objects) {
+		for (Function& f : o.functions) {
+			if (hasUnsupportedLumScriptFunctionArg(f)) {
+				logUnsupportedLumScriptFunctionArgs("object function", o.name, f);
+			}
+		}
+	}
 	for (Module& m : data.modules) {
 		for (Function& f : m.functions) {
 			if (hasUnsupportedLumScriptFunctionArg(f)) {
@@ -1145,6 +1320,7 @@ void serializeLumScriptMeta(MetaData& data) {
 	i32 wrapper_idx = 0;
 	emitGeneratedModuleWrappers(out, data, &wrapper_idx);
 	emitGeneratedComponentWrappers(out, data, &wrapper_idx);
+	emitGeneratedObjectWrappers(out, data, &wrapper_idx);
 
 	L("static void registerGeneratedEngineImport(HashMap<NativeFunctionKey, ls_native_fn, NativeFunctionKeyHash>& functions) {");
 	for (Module& m : data.modules) {
@@ -1171,6 +1347,7 @@ void serializeLumScriptMeta(MetaData& data) {
 		}
 	}
 	emitGeneratedComponentImportRegistrations(out, data, &wrapper_idx);
+	emitGeneratedObjectImportRegistrations(out, data, &wrapper_idx);
 
 	L("}" OUT_ENDL);
 	L("} // namespace Lumix::LumScript::generated");

@@ -2,7 +2,7 @@ player = Lumix.Entity.NULL
 
 function start()
 	this.world.ui:getSystem():enableCursor(true)
-	player.lua_script[1].handle_input = false
+	--player.lua_script[1].handle_input = false
 end
 
 function update(time_delta)
