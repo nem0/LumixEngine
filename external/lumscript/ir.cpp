@@ -68,13 +68,13 @@ u64 payloadOffset(const ResolvedType* storage, const ResolvedType* requested) {
 
 LsIrOpKind invertCompare(LsIrOpKind kind) {
 	switch (kind) {
-		case LS_IR_OP_EQ: return LS_IR_OP_NE;
-		case LS_IR_OP_NE: return LS_IR_OP_EQ;
-		case LS_IR_OP_LT: return LS_IR_OP_GE;
-		case LS_IR_OP_LE: return LS_IR_OP_GT;
-		case LS_IR_OP_GT: return LS_IR_OP_LE;
-		case LS_IR_OP_GE: return LS_IR_OP_LT;
-		default: return LS_IR_OP_INVALID;
+		case LsIrOpKind::EQ: return LsIrOpKind::NE;
+		case LsIrOpKind::NE: return LsIrOpKind::EQ;
+		case LsIrOpKind::LT: return LsIrOpKind::GE;
+		case LsIrOpKind::LE: return LsIrOpKind::GT;
+		case LsIrOpKind::GT: return LsIrOpKind::LE;
+		case LsIrOpKind::GE: return LsIrOpKind::LT;
+		default: return LsIrOpKind::INVALID;
 	}
 }
 
@@ -668,6 +668,23 @@ struct IRBuilder {
 					return op;
 				}
 				
+				for (i32 i = locals.size() - 1; i >= 0; --i) {
+					if (!equalStrings(locals[i].name, ie.name)) continue;
+					if (as_rvalue && locals[i].inline_value) return *locals[i].inline_value;
+					if (!locals[i].alloca) continue;
+
+					auto& addr = alloc<LsOpPushLocalAddr>();
+					addr.alloca = locals[i].alloca;
+					LsIrOp& value_addr = offsetAddress(addr, payloadOffset(locals[i].alloca->type, ie.resolved_type));
+					if (as_rvalue) {
+						auto& load = alloc<LsOpLoad>();
+						load.addr = &value_addr;
+						load.size = typeByteSize(*ie.resolved_type);
+						return load;
+					}
+					return value_addr;
+				}
+
 				if (ie.symbol && ie.symbol->storage == Symbol::COMPTIME && ie.symbol->comptime_bytes) {
 					auto& value = alloc<LsOpLoadBytes>();
 					value.type = ie.symbol->resolved_type;
@@ -700,21 +717,6 @@ struct IRBuilder {
 					return load;
 				}
 
-				for (i32 i = locals.size() - 1; i >= 0; --i) {
-					if (!equalStrings(locals[i].name, ie.name)) continue;
-					if (as_rvalue && locals[i].inline_value) return *locals[i].inline_value;
-
-					auto& addr = alloc<LsOpPushLocalAddr>();
-					addr.alloca = locals[i].alloca;
-					LsIrOp& value_addr = offsetAddress(addr, payloadOffset(locals[i].alloca->type, ie.resolved_type));
-					if (as_rvalue) {
-						auto& load = alloc<LsOpLoad>();
-						load.addr = &value_addr;
-						load.size = typeByteSize(*ie.resolved_type);
-						return load;
-					}
-					return value_addr;
-				}
 				break;
 			}
 			case Expression::CALL: {
@@ -976,7 +978,7 @@ struct IRBuilder {
 					return op;
 				}
 				if (unary.op == Token::NOT) {
-					if (operand.kind >= LS_IR_OP_EQ && operand.kind <= LS_IR_OP_GE) {
+					if (operand.kind >= LsIrOpKind::EQ && operand.kind <= LsIrOpKind::GE) {
 						auto& cmp = static_cast<LsOpBinary&>(operand);
 						auto& op = alloc<LsOpBinary>(invertCompare(operand.kind));
 						op.operand_type = cmp.operand_type;
@@ -1057,7 +1059,7 @@ struct IRBuilder {
 			}
 		}
 		ASSERT(false);
-		static LsIrOp dummy(LS_IR_OP_RETURN);
+		static LsIrOp dummy(LsIrOpKind::RETURN);
 		return dummy;
 	}
 
@@ -1074,7 +1076,7 @@ struct IRBuilder {
 	void hoistConditionConstants(LsIrOp*& node, LsIrBlockData& parent) {
 		if (!node) return;
 		switch (node->kind) {
-			case LS_IR_OP_LOAD_CONST: {
+			case LsIrOpKind::LOAD_CONST: {
 				auto& c = *static_cast<LsOpLoadConst*>(node);
 				bool is_zero = true;
 				for (u32 i = 0, num = typeByteSize(*c.type); i < num; ++i)
@@ -1090,32 +1092,32 @@ struct IRBuilder {
 				node = &ref;
 				break;
 			}
-			case LS_IR_OP_EQ:
-			case LS_IR_OP_NE:
-			case LS_IR_OP_LT:
-			case LS_IR_OP_LE:
-			case LS_IR_OP_GT:
-			case LS_IR_OP_GE:
-			case LS_IR_OP_COMPARE:
-			case LS_IR_OP_ADD:
-			case LS_IR_OP_SUB:
-			case LS_IR_OP_MUL:
-			case LS_IR_OP_DIV:
-			case LS_IR_OP_MOD:
-			case LS_IR_OP_AND:
-			case LS_IR_OP_OR: {
+			case LsIrOpKind::EQ:
+			case LsIrOpKind::NE:
+			case LsIrOpKind::LT:
+			case LsIrOpKind::LE:
+			case LsIrOpKind::GT:
+			case LsIrOpKind::GE:
+			case LsIrOpKind::COMPARE:
+			case LsIrOpKind::ADD:
+			case LsIrOpKind::SUB:
+			case LsIrOpKind::MUL:
+			case LsIrOpKind::DIV:
+			case LsIrOpKind::MOD:
+			case LsIrOpKind::AND:
+			case LsIrOpKind::OR: {
 				auto& bin = *static_cast<LsOpBinary*>(node);
 				hoistConditionConstants(bin.lhs, parent);
 				hoistConditionConstants(bin.rhs, parent);
 				break;
 			}
-			case LS_IR_OP_NOT:
-			case LS_IR_OP_NEG: {
+			case LsIrOpKind::NOT:
+			case LsIrOpKind::NEG: {
 				auto& unary = *static_cast<LsOpUnary*>(node);
 				hoistConditionConstants(unary.operand, parent);
 				break;
 			}
-			case LS_IR_OP_CAST: {
+			case LsIrOpKind::CAST: {
 				auto& cast = *static_cast<LsOpCast*>(node);
 				hoistConditionConstants(cast.value, parent);
 				break;
@@ -1746,9 +1748,10 @@ bool isTypeFactory(const FunctionExpression& function) {
 static ls_string_view copyStringViewToArena(ls_arena& arena, ls_string_view src) {
 	if (empty(src)) return src;
 	const usize len = size(src);
-	char* mem = (char*)arena.allocate(arena.user_data, len, 1);
+	char* mem = (char*)arena.allocate(arena.user_data, len + 1, 1);
 	if (!mem) return src;
 	memcpy(mem, src.begin, len);
+	mem[len] = '\0';
 	return { mem, mem + len };
 }
 
@@ -2046,13 +2049,13 @@ struct BytecodeCompiler {
 	}
 
 	static ls_op immediateArithmeticOp(LsIrOpKind kind, const ResolvedType& type) {
-		const u32 index = kind == LS_IR_OP_ADD || kind == LS_IR_OP_SUB || kind == LS_IR_OP_MUL ? arithmeticKindIndex(type) : numericKindIndex(type);
+		const u32 index = kind == LsIrOpKind::ADD || kind == LsIrOpKind::SUB || kind == LsIrOpKind::MUL ? arithmeticKindIndex(type) : numericKindIndex(type);
 		switch (kind) {
-			case LS_IR_OP_ADD: return ls_op(LS_OP_ADD_8_IMM + index);
-			case LS_IR_OP_SUB: return ls_op(LS_OP_SUB_8_IMM + index);
-			case LS_IR_OP_MUL: return ls_op(LS_OP_MUL_8_IMM + index);
-			case LS_IR_OP_DIV: return ls_op(LS_OP_DIV_I8_IMM + index);
-			case LS_IR_OP_MOD:
+			case LsIrOpKind::ADD: return ls_op(LS_OP_ADD_8_IMM + index);
+			case LsIrOpKind::SUB: return ls_op(LS_OP_SUB_8_IMM + index);
+			case LsIrOpKind::MUL: return ls_op(LS_OP_MUL_8_IMM + index);
+			case LsIrOpKind::DIV: return ls_op(LS_OP_DIV_I8_IMM + index);
+			case LsIrOpKind::MOD:
 				ASSERT(index < 8);
 				return ls_op(LS_OP_MOD_I8_IMM + index);
 			default: ASSERT(false); return LS_OP_ADD_8_IMM;
@@ -2062,9 +2065,9 @@ struct BytecodeCompiler {
 	static ls_op arithmeticOp(LsIrOpKind kind, const ResolvedType& type) {
 		const u32 index = arithmeticKindIndex(type);
 		switch (kind) {
-			case LS_IR_OP_ADD: return ls_op(LS_OP_ADD_8 + index);
-			case LS_IR_OP_SUB: return ls_op(LS_OP_SUB_8 + index);
-			case LS_IR_OP_MUL: return ls_op(LS_OP_MUL_8 + index);
+			case LsIrOpKind::ADD: return ls_op(LS_OP_ADD_8 + index);
+			case LsIrOpKind::SUB: return ls_op(LS_OP_SUB_8 + index);
+			case LsIrOpKind::MUL: return ls_op(LS_OP_MUL_8 + index);
 			default: ASSERT(false); return LS_OP_ADD_8;
 		}
 	}
@@ -2081,7 +2084,7 @@ struct BytecodeCompiler {
 			emit(rhs);
 			emit(typeByteSize(*slice.element_type));
 			emit((u8)toTypeKind(*slice.element_type));
-			if (cmp.kind == LS_IR_OP_NE) {
+			if (cmp.kind == LsIrOpKind::NE) {
 				const u32 neq = stack_top++;
 				emitOp(LS_OP_NOT);
 				emit(neq);
@@ -2093,12 +2096,12 @@ struct BytecodeCompiler {
 		u32 lhs_offset = emitOperand(*cmp.lhs);
 		u32 rhs_offset = emitOperand(*cmp.rhs);
 		switch (cmp.kind) {
-			case LS_IR_OP_EQ: emitOp(LS_OP_EQ); break;
-			case LS_IR_OP_NE: emitOp(LS_OP_NE); break;
-			case LS_IR_OP_LT: emitOp(LS_OP_LT); break;
-			case LS_IR_OP_LE: emitOp(LS_OP_LE); break;
-			case LS_IR_OP_GT: emitOp(LS_OP_GT); break;
-			case LS_IR_OP_GE: emitOp(LS_OP_GE); break;
+			case LsIrOpKind::EQ: emitOp(LS_OP_EQ); break;
+			case LsIrOpKind::NE: emitOp(LS_OP_NE); break;
+			case LsIrOpKind::LT: emitOp(LS_OP_LT); break;
+			case LsIrOpKind::LE: emitOp(LS_OP_LE); break;
+			case LsIrOpKind::GT: emitOp(LS_OP_GT); break;
+			case LsIrOpKind::GE: emitOp(LS_OP_GE); break;
 			default: ASSERT(false); break;
 		}
 		emit(stack_top);
@@ -2111,7 +2114,7 @@ struct BytecodeCompiler {
 
 	u32 emitUnary(const LsOpUnary& op, EmitDst* dst) {
 		const u32 operand = emitOperand(*op.operand);
-		if (op.kind == LS_IR_OP_NEG)
+		if (op.kind == LsIrOpKind::NEG)
 			emitOp(ls_op(LS_OP_NEG_I8 + numericKindIndex(*op.operand_type)));
 		else
 			emitOp(LS_OP_NOT);
@@ -2137,12 +2140,12 @@ struct BytecodeCompiler {
 		const bool is_i64 = operand_type.kind == ResolvedTypeKind::I64 || operand_type.kind == ResolvedTypeKind::ISIZE;
 		if (!is_i32 && !is_i64) return false;
 		switch (condition_kind) {
-			case LS_IR_OP_EQ: out_op = is_i32 ? LS_OP_JZ_I32 : LS_OP_JZ_I64; break;
-			case LS_IR_OP_NE: out_op = is_i32 ? LS_OP_JNZ_I32 : LS_OP_JNZ_I64; break;
-			case LS_IR_OP_GT: out_op = is_i32 ? LS_OP_JGZ_I32 : LS_OP_JGZ_I64; break;
-			case LS_IR_OP_GE: out_op = is_i32 ? LS_OP_JGEZ_I32 : LS_OP_JGEZ_I64; break;
-			case LS_IR_OP_LT: out_op = is_i32 ? LS_OP_JLTZ_I32 : LS_OP_JLTZ_I64; break;
-			case LS_IR_OP_LE: out_op = is_i32 ? LS_OP_JLEZ_I32 : LS_OP_JLEZ_I64; break;
+			case LsIrOpKind::EQ: out_op = is_i32 ? LS_OP_JZ_I32 : LS_OP_JZ_I64; break;
+			case LsIrOpKind::NE: out_op = is_i32 ? LS_OP_JNZ_I32 : LS_OP_JNZ_I64; break;
+			case LsIrOpKind::GT: out_op = is_i32 ? LS_OP_JGZ_I32 : LS_OP_JGZ_I64; break;
+			case LsIrOpKind::GE: out_op = is_i32 ? LS_OP_JGEZ_I32 : LS_OP_JGEZ_I64; break;
+			case LsIrOpKind::LT: out_op = is_i32 ? LS_OP_JLTZ_I32 : LS_OP_JLTZ_I64; break;
+			case LsIrOpKind::LE: out_op = is_i32 ? LS_OP_JLEZ_I32 : LS_OP_JLEZ_I64; break;
 			default: return false;
 		}
 		return true;
@@ -2171,12 +2174,12 @@ struct BytecodeCompiler {
 		}
 		u32 variant;
 		switch (skip) {
-			case LS_IR_OP_EQ: variant = 0; break;
-			case LS_IR_OP_GE: variant = 1; break;
-			case LS_IR_OP_GT: variant = 2; break;
-			case LS_IR_OP_LT: variant = 3; break;
-			case LS_IR_OP_LE: variant = 4; break;
-			case LS_IR_OP_NE: variant = 5; break;
+			case LsIrOpKind::EQ: variant = 0; break;
+			case LsIrOpKind::GE: variant = 1; break;
+			case LsIrOpKind::GT: variant = 2; break;
+			case LsIrOpKind::LT: variant = 3; break;
+			case LsIrOpKind::LE: variant = 4; break;
+			case LsIrOpKind::NE: variant = 5; break;
 			default: return false;
 		}
 		out_op = ls_op(LS_OP_JE_I8 + numericKindIndex(operand_type) * 6u + variant);
@@ -2191,11 +2194,11 @@ struct BytecodeCompiler {
 		// Fold compile-time-constant conditions: either a literal or a hoisted
 		// alloca initialized from one.
 		const LsOpLoadConst* constant = nullptr;
-		if (condition->kind == LS_IR_OP_LOAD_CONST) {
+		if (condition->kind == LsIrOpKind::LOAD_CONST) {
 			constant = static_cast<const LsOpLoadConst*>(condition);
-		} else if (condition->kind == LS_IR_OP_FRAME_PTR) {
+		} else if (condition->kind == LsIrOpKind::FRAME_PTR) {
 			auto& ref = static_cast<const LsOpFramePtr&>(*condition);
-			if (ref.alloca->value->kind == LS_IR_OP_LOAD_CONST)
+			if (ref.alloca->value->kind == LsIrOpKind::LOAD_CONST)
 				constant = static_cast<const LsOpLoadConst*>(ref.alloca->value);
 		}
 		bool is_constant = constant != nullptr;
@@ -2222,11 +2225,11 @@ struct BytecodeCompiler {
 			// Jump back into the body while the condition holds; fall through to
 			// whatever follows (the loop exit) once it fails.
 			const LsOpBinary* compare = nullptr;
-			if (condition->kind >= LS_IR_OP_EQ && condition->kind <= LS_IR_OP_GE) {
+			if (condition->kind >= LsIrOpKind::EQ && condition->kind <= LsIrOpKind::GE) {
 				compare = static_cast<const LsOpBinary*>(condition);
 			}
 			ls_op fused_opcode;
-			const LsOpLoadConst* rhs_constant = compare && compare->rhs->kind == LS_IR_OP_LOAD_CONST
+			const LsOpLoadConst* rhs_constant = compare && compare->rhs->kind == LsIrOpKind::LOAD_CONST
 				? static_cast<const LsOpLoadConst*>(compare->rhs) : nullptr;
 			bool rhs_is_zero = rhs_constant != nullptr;
 			if (rhs_is_zero) {
@@ -2273,10 +2276,10 @@ struct BytecodeCompiler {
 				have_jump = true;
 			}
 			// Always true: no branch - fall into the block.
-		} else if (condition->kind >= LS_IR_OP_EQ && condition->kind <= LS_IR_OP_GE) {
+		} else if (condition->kind >= LsIrOpKind::EQ && condition->kind <= LsIrOpKind::GE) {
 			const LsOpBinary& compare = static_cast<const LsOpBinary&>(*condition);
 			ls_op fused_opcode;
-			const LsOpLoadConst* rhs_constant = compare.rhs->kind == LS_IR_OP_LOAD_CONST
+			const LsOpLoadConst* rhs_constant = compare.rhs->kind == LsIrOpKind::LOAD_CONST
 				? static_cast<const LsOpLoadConst*>(compare.rhs) : nullptr;
 			bool rhs_is_zero = rhs_constant != nullptr;
 			if (rhs_is_zero) {
@@ -2376,7 +2379,7 @@ struct BytecodeCompiler {
 
 	u32 emitShortCircuit(const LsOpBinary& op) {
 		const u32 lhs = emit(*op.lhs, nullptr);
-		emitOp(op.kind == LS_IR_OP_AND ? LS_OP_JZ_U8 : LS_OP_JNZ_U8);
+		emitOp(op.kind == LsIrOpKind::AND ? LS_OP_JZ_U8 : LS_OP_JNZ_U8);
 		emit(lhs);
 		const u32 short_jump = code.size();
 		emit((i16)0);
@@ -2403,13 +2406,13 @@ struct BytecodeCompiler {
 
 	void patchJumps(LsIrBlockData& block) {
 		for (LsIrOp* op : block.ops) {
-			if (op->kind == LS_IR_OP_JUMP) {
+			if (op->kind == LsIrOpKind::JUMP) {
 				auto& jump = static_cast<LsOpJump&>(*op);
 				ASSERT(jump.target);
 				ASSERT(jump.target->bytecode_offset != 0xffffffffu);
 				ASSERT(jump.bytecode_patch_offset != 0xffffffffu);
 				patchI16(jump.bytecode_patch_offset, jump.target->bytecode_offset);
-			} else if (op->kind == LS_IR_OP_CONDITIONAL_JUMP) {
+			} else if (op->kind == LsIrOpKind::CONDITIONAL_JUMP) {
 				auto& conditional = static_cast<LsOpConditionalJump&>(*op);
 				if (conditional.true_block) patchJumps(*conditional.true_block);
 				if (conditional.false_block) patchJumps(*conditional.false_block);
@@ -2417,20 +2420,37 @@ struct BytecodeCompiler {
 		}
 	}
 
-	u32 emitMadd(const LsOpBinary& add, EmitDst* dst) {
-		ASSERT(add.kind == LS_IR_OP_ADD);
-		const bool multiply_is_lhs = add.lhs->kind == LS_IR_OP_MUL;
-		LsIrOp* multiply_op = multiply_is_lhs ? add.lhs : add.rhs;
-		LsIrOp* addend_op = multiply_is_lhs ? add.rhs : add.lhs;
-		const auto& multiply = static_cast<const LsOpBinary&>(*multiply_op);
+	struct FusedMultiplyMatch {
+		LsIrOp* multiply_op = nullptr;
+		LsIrOp* addend_op = nullptr;
+		bool mul_is_lhs = false;
+		ls_op op_f32 = LS_OP_MADD_F32;
+	};
+
+	static bool unwrapMultiply(LsIrOp& op, LsIrOp*& multiply, bool& negated) {
+		negated = false;
+		if (op.kind == LsIrOpKind::MUL) {
+			multiply = &op;
+			return true;
+		}
+		if (op.kind == LsIrOpKind::NEG && static_cast<LsOpNeg&>(op).operand->kind == LsIrOpKind::MUL) {
+			multiply = static_cast<LsOpNeg&>(op).operand;
+			negated = true;
+			return true;
+		}
+		return false;
+	}
+
+	u32 emitFusedMultiply(const LsOpBinary& outer, const FusedMultiplyMatch& match, EmitDst* dst) {
+		const auto& multiply = static_cast<const LsOpBinary&>(*match.multiply_op);
 		// Keep source evaluation order even when the multiply is on the RHS.
-		const u32 addend = multiply_is_lhs ? 0 : emitOperand(*addend_op);
+		const u32 addend = match.mul_is_lhs ? 0 : emitOperand(*match.addend_op);
 		const u32 lhs = emitOperand(*multiply.lhs);
 		const u32 rhs = emitOperand(*multiply.rhs);
-		const u32 ordered_addend = multiply_is_lhs ? emitOperand(*addend_op) : addend;
-		const u32 size = typeByteSize(*add.operand_type);
+		const u32 ordered_addend = match.mul_is_lhs ? emitOperand(*match.addend_op) : addend;
+		const u32 size = typeByteSize(*outer.operand_type);
 		const u32 result = dst ? dst->dst : stack_top;
-		emitOp(add.operand_type->kind == ResolvedTypeKind::F32 ? LS_OP_MADD_F32 : LS_OP_MADD_F64);
+		emitOp((ls_op)((u32)match.op_f32 + (outer.operand_type->kind == ResolvedTypeKind::F64 ? 1u : 0u)));
 		emit(result);
 		emit(lhs);
 		emit(rhs);
@@ -2440,18 +2460,40 @@ struct BytecodeCompiler {
 	}
 
 	u32 emitBinary(ls_op base_op, const LsOpBinary& ir_op, EmitDst* dst) {
-		if (do_optimize && ir_op.kind == LS_IR_OP_ADD &&
-			(ir_op.lhs->kind == LS_IR_OP_MUL || ir_op.rhs->kind == LS_IR_OP_MUL) &&
-			(ir_op.operand_type->kind == ResolvedTypeKind::F32 || ir_op.operand_type->kind == ResolvedTypeKind::F64)) {
-			return emitMadd(ir_op, dst);
+		FusedMultiplyMatch fused;
+		if (do_optimize && (ir_op.kind == LsIrOpKind::ADD || ir_op.kind == LsIrOpKind::SUB) 
+			&& (ir_op.operand_type->kind == ResolvedTypeKind::F32 || ir_op.operand_type->kind == ResolvedTypeKind::F64))
+		{
+			LsIrOp* multiply_lhs = nullptr;
+			bool negated_lhs = false;
+			LsIrOp* multiply_rhs = nullptr;
+			bool negated_rhs = false;
+			const bool has_lhs_mul = unwrapMultiply(*ir_op.lhs, multiply_lhs, negated_lhs);
+			const bool has_rhs_mul = unwrapMultiply(*ir_op.rhs, multiply_rhs, negated_rhs);
+			if (has_lhs_mul || has_rhs_mul) {
+				fused.mul_is_lhs = has_lhs_mul;
+				fused.multiply_op = has_lhs_mul ? multiply_lhs : multiply_rhs;
+				const bool sub = ir_op.kind == LsIrOpKind::SUB;
+				const bool product_negated = has_lhs_mul ? negated_lhs : negated_rhs;
+				const bool product_positive = (fused.mul_is_lhs || !sub) != product_negated;
+				const bool addend_negated = has_lhs_mul ? negated_rhs : negated_lhs;
+				const bool addend_positive = (!fused.mul_is_lhs || !sub) != addend_negated;
+				fused.addend_op = has_lhs_mul
+					? (has_rhs_mul ? multiply_rhs : ir_op.rhs)
+					: ir_op.lhs;
+				fused.op_f32 = product_positive
+					? (addend_positive ? LS_OP_MADD_F32 : LS_OP_MSUB_F32)
+					: (addend_positive ? LS_OP_NMADD_F32 : LS_OP_NMSUB_F32);
+				return emitFusedMultiply(ir_op, fused, dst);
+			}
 		}
 		u32 lhs = emitOperand(*ir_op.lhs);
 		const u8* immediate = nullptr;
-		if (ir_op.rhs->kind == LS_IR_OP_LOAD_CONST) immediate = static_cast<const LsOpLoadConst&>(*ir_op.rhs).value;
-		if (ir_op.rhs->kind == LS_IR_OP_LOAD_BYTES) immediate = static_cast<const LsOpLoadBytes&>(*ir_op.rhs).value;
+		if (ir_op.rhs->kind == LsIrOpKind::LOAD_CONST) immediate = static_cast<const LsOpLoadConst&>(*ir_op.rhs).value;
+		if (ir_op.rhs->kind == LsIrOpKind::LOAD_BYTES) immediate = static_cast<const LsOpLoadBytes&>(*ir_op.rhs).value;
 		if (immediate) {
 			const ResolvedType* rhs_type = nullptr;
-			if (ir_op.rhs->kind == LS_IR_OP_LOAD_CONST) rhs_type = static_cast<const LsOpLoadConst&>(*ir_op.rhs).type;
+			if (ir_op.rhs->kind == LsIrOpKind::LOAD_CONST) rhs_type = static_cast<const LsOpLoadConst&>(*ir_op.rhs).type;
 			else rhs_type = static_cast<const LsOpLoadBytes&>(*ir_op.rhs).type;
 
 			const u32 size = typeByteSize(*ir_op.operand_type);
@@ -2460,11 +2502,11 @@ struct BytecodeCompiler {
 				memcpy(&immediate_value, immediate, size);
 				// A zero-offset address addition is a no-op: address registers
 				// are read-only, so the base operand already holds the address.
-				if (ir_op.result_mode == LsIrOp::ADDRESS && ir_op.kind == LS_IR_OP_ADD && immediate_value == 0u) {
+				if (ir_op.result_mode == LsIrOp::ADDRESS && ir_op.kind == LsIrOpKind::ADD && immediate_value == 0u) {
 					return lhs;
 				}
-				const bool increment = ir_op.kind == LS_IR_OP_ADD && immediate_value == 1u;
-				const bool decrement = ir_op.kind == LS_IR_OP_SUB && immediate_value == 1u;
+				const bool increment = ir_op.kind == LsIrOpKind::ADD && immediate_value == 1u;
+				const bool decrement = ir_op.kind == LsIrOpKind::SUB && immediate_value == 1u;
 				if (dst && dst->dst == lhs && (increment || decrement) &&
 					((size == 4 && (ir_op.operand_type->kind == ResolvedTypeKind::I32 || ir_op.operand_type->kind == ResolvedTypeKind::U32)) ||
 					 (size == 8 && (ir_op.operand_type->kind == ResolvedTypeKind::I64 || ir_op.operand_type->kind == ResolvedTypeKind::U64 || ir_op.operand_type->kind == ResolvedTypeKind::ISIZE)))) {
@@ -2495,10 +2537,10 @@ struct BytecodeCompiler {
 
 	u32 emitLoadConst(const LsOpLoadConst& load, EmitDst* dst) {
 		u32 size = typeByteSize(*load.type);
+		u32 res = dst ? dst->dst : stack_top;
 		switch (size) {
 			case 1: {
 				emitOp(LS_OP_LOAD_CONST_1);
-				u32 res = dst ? dst->dst : stack_top;
 				emit(res);
 				if (!dst) stack_top += 1;
 				emit(&load.value, 1);
@@ -2506,7 +2548,6 @@ struct BytecodeCompiler {
 			}
 			case 2: {
 				emitOp(LS_OP_LOAD_CONST_2);
-				u32 res = dst ? dst->dst : stack_top;
 				emit(res);
 				if (!dst) stack_top += 2;
 				emit(&load.value, 2);
@@ -2514,7 +2555,6 @@ struct BytecodeCompiler {
 			}
 			case 4: {
 				emitOp(LS_OP_LOAD_CONST_4);
-				u32 res = dst ? dst->dst : stack_top;
 				emit(res);
 				if (!dst) stack_top += 4;
 				emit(&load.value, 4);
@@ -2522,7 +2562,6 @@ struct BytecodeCompiler {
 			}
 			case 8: {
 				emitOp(LS_OP_LOAD_CONST_8);
-				u32 res = dst ? dst->dst : stack_top;
 				emit(res);
 				if (!dst) stack_top += 8;
 				emit(&load.value, 8);
@@ -2552,7 +2591,7 @@ struct BytecodeCompiler {
 
 	u32 emitAlloca(LsOpAlloca& alloca) {
 		ASSERT(alloca.stack_sp != 0xffFFffFF);
-		if (alloca.value->kind != LS_IR_OP_NOP) {
+		if (alloca.value->kind != LsIrOpKind::NOP) {
 			if (do_optimize) {
 				EmitDst dst = { .dst = alloca.stack_sp, .size = typeByteSize(*alloca.type) };
 				const u32 value_slot = emit(*alloca.value, &dst);
@@ -2617,7 +2656,7 @@ struct BytecodeCompiler {
 	};
 
 	bool tryGetIndexedImmediate(const LsIrOp& index, ls_type_kind kind, u64& result) {
-		if (index.kind != LS_IR_OP_LOAD_CONST) return false;
+		if (index.kind != LsIrOpKind::LOAD_CONST) return false;
 		const auto& constant = static_cast<const LsOpLoadConst&>(index);
 		switch (kind) {
 			case LS_TYPE_I8: { i8 value; memcpy(&value, constant.value, sizeof(value)); if (value < 0) return false; result = (u64)value; return true; }
@@ -2657,9 +2696,9 @@ struct BytecodeCompiler {
 	// produced by struct field access through pointers). The constant folds
 	// into LOAD_PTR/STORE_PTR's immediate offset operand.
 	bool tryGetOffsetAddress(const LsIrOp& address, LsIrOp*& base, u32& offset) {
-		if (address.kind != LS_IR_OP_ADD) return false;
+		if (address.kind != LsIrOpKind::ADD) return false;
 		const auto& add = static_cast<const LsOpBinary&>(address);
-		if (!add.rhs || add.rhs->kind != LS_IR_OP_LOAD_CONST) return false;
+		if (!add.rhs || add.rhs->kind != LsIrOpKind::LOAD_CONST) return false;
 		const auto& constant = static_cast<const LsOpLoadConst&>(*add.rhs);
 		if (!constant.type || constant.type->kind != ResolvedTypeKind::U64) return false;
 		u64 value = 0;
@@ -2671,13 +2710,13 @@ struct BytecodeCompiler {
 	}
 
 	bool tryGetDirectFrameAddress(const LsIrOp& address, u32& offset) {
-		if (address.kind == LS_IR_OP_PUSH_LOCAL_ADDR) {
+		if (address.kind == LsIrOpKind::PUSH_LOCAL_ADDR) {
 			offset = static_cast<const LsOpPushLocalAddr&>(address).alloca->stack_sp;
 			return true;
 		}
 		LsIrOp* base = nullptr;
 		u32 field_offset = 0;
-		if (tryGetOffsetAddress(address, base, field_offset) && base->kind == LS_IR_OP_PUSH_LOCAL_ADDR) {
+		if (tryGetOffsetAddress(address, base, field_offset) && base->kind == LsIrOpKind::PUSH_LOCAL_ADDR) {
 			offset = static_cast<LsOpPushLocalAddr*>(base)->alloca->stack_sp + field_offset;
 			return true;
 		}
@@ -2685,11 +2724,11 @@ struct BytecodeCompiler {
 	}
 
 	bool tryGetIndexedAddress(LsIrOp& address, IndexedAddress& result) {
-		if (address.kind != LS_IR_OP_ADD) return false;
+		if (address.kind != LsIrOpKind::ADD) return false;
 		auto& add = static_cast<LsOpBinary&>(address);
-		if (!add.rhs || add.rhs->kind != LS_IR_OP_MUL) return false;
+		if (!add.rhs || add.rhs->kind != LsIrOpKind::MUL) return false;
 		auto& mul = static_cast<LsOpBinary&>(*add.rhs);
-		if (!mul.rhs || mul.rhs->kind != LS_IR_OP_LOAD_CONST) return false;
+		if (!mul.rhs || mul.rhs->kind != LsIrOpKind::LOAD_CONST) return false;
 		auto& size = static_cast<LsOpLoadConst&>(*mul.rhs);
 		if (!size.type || size.type->kind != ResolvedTypeKind::U64) return false;
 		u64 element_size = 0;
@@ -2698,11 +2737,11 @@ struct BytecodeCompiler {
 
 		LsIrOp* checked = mul.lhs;
 		if (!checked) return false;
-		if (checked->kind == LS_IR_OP_CAST) checked = static_cast<LsOpCast&>(*checked).value;
-		if (!checked || checked->kind != LS_IR_OP_BOUNDS_CHECK) return false;
+		if (checked->kind == LsIrOpKind::CAST) checked = static_cast<LsOpCast&>(*checked).value;
+		if (!checked || checked->kind != LsIrOpKind::BOUNDS_CHECK) return false;
 		auto& bounds = static_cast<LsOpBoundsCheck&>(*checked);
 		result.base = add.lhs;
-		if (result.base->kind != LS_IR_OP_PUSH_LOCAL_ADDR && result.base->kind != LS_IR_OP_FRAME_PTR) return false;
+		if (result.base->kind != LsIrOpKind::PUSH_LOCAL_ADDR && result.base->kind != LsIrOpKind::FRAME_PTR) return false;
 		result.index = bounds.index;
 		result.index_kind = toTypeKind(*bounds.index_type);
 		result.index_immediate = tryGetIndexedImmediate(*result.index, result.index_kind, result.immediate_index);
@@ -2712,7 +2751,7 @@ struct BytecodeCompiler {
 	}
 
 	u32 emitIndexedAddress(IndexedAddress& address) {
-		if (address.base->kind == LS_IR_OP_PUSH_LOCAL_ADDR) {
+		if (address.base->kind == LsIrOpKind::PUSH_LOCAL_ADDR) {
 			address.base_slot = static_cast<LsOpPushLocalAddr&>(*address.base).alloca->stack_sp;
 		} else {
 			address.base_slot = static_cast<LsOpFramePtr&>(*address.base).alloca->stack_sp;
@@ -2747,7 +2786,7 @@ struct BytecodeCompiler {
 	}
 
 	u32 emitCopy(const LsOpCopy& copy) {
-		if (copy.dst->kind == LS_IR_OP_SLICE_FIELD_STORE) {
+		if (copy.dst->kind == LsIrOpKind::SLICE_FIELD_STORE) {
 			auto& field = static_cast<LsOpSliceFieldStore&>(*copy.dst);
 			return emitSliceFieldCopy(copy, *field.slice, *field.index, *field.index_type,
 				field.element_size, field.field_offset, field.field_size);
@@ -2969,11 +3008,11 @@ struct BytecodeCompiler {
 		// A local/parameter value whose bytes live at a static frame offset:
 		// a plain load, its constant-offset struct field, or the folded
 		// frame-slot reference optimize() rewrites plain loads into.
-		if (value.kind == LS_IR_OP_FRAME_PTR) {
+		if (value.kind == LsIrOpKind::FRAME_PTR) {
 			offset = static_cast<const LsOpFramePtr&>(value).alloca->stack_sp;
 			return true;
 		}
-		if (value.kind != LS_IR_OP_LOAD) return false;
+		if (value.kind != LsIrOpKind::LOAD) return false;
 		const auto& load = static_cast<const LsOpLoad&>(value);
 		return tryGetDirectFrameAddress(*load.addr, offset);
 	}
@@ -3120,32 +3159,32 @@ struct BytecodeCompiler {
 
 	static bool canForward(const LsIrOp& op) {
 		switch (op.kind) {
-			case LS_IR_OP_LOAD_CONST:
-			case LS_IR_OP_LOAD_BYTES:
-			case LS_IR_OP_FRAME_PTR:
+			case LsIrOpKind::LOAD_CONST:
+			case LsIrOpKind::LOAD_BYTES:
+			case LsIrOpKind::FRAME_PTR:
 				return true;
-			case LS_IR_OP_LOAD: {
+			case LsIrOpKind::LOAD: {
 				const auto& load = static_cast<const LsOpLoad&>(op);
-				return load.addr->kind == LS_IR_OP_FRAME_PTR || load.addr->kind == LS_IR_OP_PUSH_LOCAL_ADDR || load.addr->kind == LS_IR_OP_PUSH_GLOBAL_ADDR;
+				return load.addr->kind == LsIrOpKind::FRAME_PTR || load.addr->kind == LsIrOpKind::PUSH_LOCAL_ADDR || load.addr->kind == LsIrOpKind::PUSH_GLOBAL_ADDR;
 			}
-			case LS_IR_OP_NEG:
-			case LS_IR_OP_NOT:
+			case LsIrOpKind::NEG:
+			case LsIrOpKind::NOT:
 				return canForward(*static_cast<const LsOpUnary&>(op).operand);
-			case LS_IR_OP_CAST:
+			case LsIrOpKind::CAST:
 				return canForward(*static_cast<const LsOpCast&>(op).value);
-			case LS_IR_OP_BOUNDS_CHECK:
+			case LsIrOpKind::BOUNDS_CHECK:
 				return canForward(*static_cast<const LsOpBoundsCheck&>(op).index);
-			case LS_IR_OP_ADD:
-			case LS_IR_OP_SUB:
-			case LS_IR_OP_MUL:
-			case LS_IR_OP_DIV:
-			case LS_IR_OP_MOD:
-			case LS_IR_OP_EQ:
-			case LS_IR_OP_NE:
-			case LS_IR_OP_LT:
-			case LS_IR_OP_LE:
-			case LS_IR_OP_GT:
-			case LS_IR_OP_GE: {
+			case LsIrOpKind::ADD:
+			case LsIrOpKind::SUB:
+			case LsIrOpKind::MUL:
+			case LsIrOpKind::DIV:
+			case LsIrOpKind::MOD:
+			case LsIrOpKind::EQ:
+			case LsIrOpKind::NE:
+			case LsIrOpKind::LT:
+			case LsIrOpKind::LE:
+			case LsIrOpKind::GT:
+			case LsIrOpKind::GE: {
 				const auto& binary = static_cast<const LsOpBinary&>(op);
 				return canForward(*binary.lhs) && canForward(*binary.rhs);
 			}
@@ -3392,49 +3431,49 @@ struct BytecodeCompiler {
 		SourceScope scope(*this, op.src_loc);
 		u32 result = -1;
 		switch (op.kind) {
-			case LS_IR_OP_FRAME_PTR: result = emitFramePtr(static_cast<LsOpFramePtr&>(op)); break;
-			case LS_IR_OP_STRING_LITERAL: result = emitStringLiteral(static_cast<LsOpStringLiteral&>(op)); break;
-			case LS_IR_OP_SLICE_REF: result = emitSliceRef(static_cast<LsOpSliceRef&>(op), dst); break;
-			case LS_IR_OP_SLICE_FIELD_LOAD: result = emitSliceFieldLoad(static_cast<LsOpSliceFieldLoad&>(op), dst); break;
-			case LS_IR_OP_SLICE_FIELD_STORE: result = emitSliceFieldStoreAddress(static_cast<LsOpSliceFieldStore&>(op)); break;
-			case LS_IR_OP_SLICE_LOAD: result = emitSliceLoad(static_cast<LsOpSliceLoad&>(op)); break;
-			case LS_IR_OP_SLICE: result = emitSlice(static_cast<LsOpSlice&>(op)); break;
-			case LS_IR_OP_NEG:
-			case LS_IR_OP_NOT: result = emitUnary(static_cast<LsOpUnary&>(op), dst); break;
-			case LS_IR_OP_AND:
-			case LS_IR_OP_OR: result = emitShortCircuit(static_cast<LsOpBinary&>(op)); break;
-			case LS_IR_OP_NULL: result = emitNull(static_cast<LsOpNull&>(op)); break;
-			case LS_IR_OP_NOP: result = 0xffFFffFF; break;
-			case LS_IR_OP_JUMP: result = emitJump(static_cast<LsOpJump&>(op)); break;
-			case LS_IR_OP_CONDITIONAL_JUMP: result = emitConditionalJump(*static_cast<LsOpConditionalJump*>(&op)); break;
-			case LS_IR_OP_CALL_DIRECT: result = emitCallDirect(*static_cast<LsOpCallDirect*>(&op)); break;
-			case LS_IR_OP_CALL_INDIRECT: result = emitCallIndirect(*static_cast<LsOpCallIndirect*>(&op)); break;
-			case LS_IR_OP_EXTRACT_VALUE: result = emitExtractValue(*static_cast<LsOpExtractValue*>(&op), dst); break;
-			case LS_IR_OP_LOAD: result = emitLoad(*static_cast<LsOpLoad*>(&op), dst); break;
-			case LS_IR_OP_PUSH_LOCAL_ADDR: result = emitPushLocalAddr(*static_cast<LsOpPushLocalAddr*>(&op)); break;
-			case LS_IR_OP_MATERIALIZE_ADDR: result = emitMaterializeAddr(*static_cast<LsOpMaterializeAddr*>(&op)); break;
-			case LS_IR_OP_PUSH_GLOBAL_ADDR: result = emitPushGlobalAddr(*static_cast<LsOpPushGlobalAddr*>(&op)); break;
-			case LS_IR_OP_EQ:
-			case LS_IR_OP_NE:
-			case LS_IR_OP_LT:
-			case LS_IR_OP_LE:
-			case LS_IR_OP_GT:
-			case LS_IR_OP_GE: result = emitCompare(static_cast<LsOpBinary&>(op)); break;
-			case LS_IR_OP_COPY: result = emitCopy(*static_cast<LsOpCopy*>(&op)); break;
-			case LS_IR_OP_CAST: result = emitCast(static_cast<LsOpCast&>(op), dst); break;
-			case LS_IR_OP_TERNARY: result = emitTernary(static_cast<LsOpTernary&>(op)); break;
-			case LS_IR_OP_BOUNDS_CHECK: result = emitBoundsCheck(static_cast<LsOpBoundsCheck&>(op)); break;
-			case LS_IR_OP_ALLOCA: result = emitAlloca(*static_cast<LsOpAlloca*>(&op)); break;
-			case LS_IR_OP_MUL: result = emitBinary(LS_OP_MUL_8, static_cast<LsOpBinary&>(op), dst); break;
-			case LS_IR_OP_ADD: result = emitBinary(LS_OP_ADD_8, static_cast<LsOpBinary&>(op), dst); break;
-			case LS_IR_OP_SUB: result = emitBinary(LS_OP_SUB_8, static_cast<LsOpBinary&>(op), dst); break;
-			case LS_IR_OP_DIV: result = emitBinary(LS_OP_DIV_I8, static_cast<LsOpBinary&>(op), dst); break;
-			case LS_IR_OP_MOD: result = emitBinary(LS_OP_MOD_I8, static_cast<LsOpBinary&>(op), dst); break;
-			case LS_IR_OP_LOAD_CONST: result = emitLoadConst(static_cast<LsOpLoadConst&>(op), dst); break;
-			case LS_IR_OP_LOAD_BYTES: result = emitLoadBytes(static_cast<LsOpLoadBytes&>(op), dst); break;
-			case LS_IR_OP_UNION_CONVERT: result = emitUnionConvert(static_cast<LsOpUnionConvert&>(op)); break;
-			case LS_IR_OP_AGGREGATE_INIT: result = emitAggregateInit(static_cast<LsOpAggregateInit&>(op)); break;
-			case LS_IR_OP_RETURN: result = emitReturn(static_cast<LsOpReturn&>(op)); break;
+			case LsIrOpKind::FRAME_PTR: result = emitFramePtr(static_cast<LsOpFramePtr&>(op)); break;
+			case LsIrOpKind::STRING_LITERAL: result = emitStringLiteral(static_cast<LsOpStringLiteral&>(op)); break;
+			case LsIrOpKind::SLICE_REF: result = emitSliceRef(static_cast<LsOpSliceRef&>(op), dst); break;
+			case LsIrOpKind::SLICE_FIELD_LOAD: result = emitSliceFieldLoad(static_cast<LsOpSliceFieldLoad&>(op), dst); break;
+			case LsIrOpKind::SLICE_FIELD_STORE: result = emitSliceFieldStoreAddress(static_cast<LsOpSliceFieldStore&>(op)); break;
+			case LsIrOpKind::SLICE_LOAD: result = emitSliceLoad(static_cast<LsOpSliceLoad&>(op)); break;
+			case LsIrOpKind::SLICE: result = emitSlice(static_cast<LsOpSlice&>(op)); break;
+			case LsIrOpKind::NEG:
+			case LsIrOpKind::NOT: result = emitUnary(static_cast<LsOpUnary&>(op), dst); break;
+			case LsIrOpKind::AND:
+			case LsIrOpKind::OR: result = emitShortCircuit(static_cast<LsOpBinary&>(op)); break;
+			case LsIrOpKind::NULL_VALUE: result = emitNull(static_cast<LsOpNull&>(op)); break;
+			case LsIrOpKind::NOP: result = 0xffFFffFF; break;
+			case LsIrOpKind::JUMP: result = emitJump(static_cast<LsOpJump&>(op)); break;
+			case LsIrOpKind::CONDITIONAL_JUMP: result = emitConditionalJump(*static_cast<LsOpConditionalJump*>(&op)); break;
+			case LsIrOpKind::CALL_DIRECT: result = emitCallDirect(*static_cast<LsOpCallDirect*>(&op)); break;
+			case LsIrOpKind::CALL_INDIRECT: result = emitCallIndirect(*static_cast<LsOpCallIndirect*>(&op)); break;
+			case LsIrOpKind::EXTRACT_VALUE: result = emitExtractValue(*static_cast<LsOpExtractValue*>(&op), dst); break;
+			case LsIrOpKind::LOAD: result = emitLoad(*static_cast<LsOpLoad*>(&op), dst); break;
+			case LsIrOpKind::PUSH_LOCAL_ADDR: result = emitPushLocalAddr(*static_cast<LsOpPushLocalAddr*>(&op)); break;
+			case LsIrOpKind::MATERIALIZE_ADDR: result = emitMaterializeAddr(*static_cast<LsOpMaterializeAddr*>(&op)); break;
+			case LsIrOpKind::PUSH_GLOBAL_ADDR: result = emitPushGlobalAddr(*static_cast<LsOpPushGlobalAddr*>(&op)); break;
+			case LsIrOpKind::EQ:
+			case LsIrOpKind::NE:
+			case LsIrOpKind::LT:
+			case LsIrOpKind::LE:
+			case LsIrOpKind::GT:
+			case LsIrOpKind::GE: result = emitCompare(static_cast<LsOpBinary&>(op)); break;
+			case LsIrOpKind::COPY: result = emitCopy(*static_cast<LsOpCopy*>(&op)); break;
+			case LsIrOpKind::CAST: result = emitCast(static_cast<LsOpCast&>(op), dst); break;
+			case LsIrOpKind::TERNARY: result = emitTernary(static_cast<LsOpTernary&>(op)); break;
+			case LsIrOpKind::BOUNDS_CHECK: result = emitBoundsCheck(static_cast<LsOpBoundsCheck&>(op)); break;
+			case LsIrOpKind::ALLOCA: result = emitAlloca(*static_cast<LsOpAlloca*>(&op)); break;
+			case LsIrOpKind::MUL: result = emitBinary(LS_OP_MUL_8, static_cast<LsOpBinary&>(op), dst); break;
+			case LsIrOpKind::ADD: result = emitBinary(LS_OP_ADD_8, static_cast<LsOpBinary&>(op), dst); break;
+			case LsIrOpKind::SUB: result = emitBinary(LS_OP_SUB_8, static_cast<LsOpBinary&>(op), dst); break;
+			case LsIrOpKind::DIV: result = emitBinary(LS_OP_DIV_I8, static_cast<LsOpBinary&>(op), dst); break;
+			case LsIrOpKind::MOD: result = emitBinary(LS_OP_MOD_I8, static_cast<LsOpBinary&>(op), dst); break;
+			case LsIrOpKind::LOAD_CONST: result = emitLoadConst(static_cast<LsOpLoadConst&>(op), dst); break;
+			case LsIrOpKind::LOAD_BYTES: result = emitLoadBytes(static_cast<LsOpLoadBytes&>(op), dst); break;
+			case LsIrOpKind::UNION_CONVERT: result = emitUnionConvert(static_cast<LsOpUnionConvert&>(op)); break;
+			case LsIrOpKind::AGGREGATE_INIT: result = emitAggregateInit(static_cast<LsOpAggregateInit&>(op)); break;
+			case LsIrOpKind::RETURN: result = emitReturn(static_cast<LsOpReturn&>(op)); break;
 			default: ASSERT(false); break;
 		}
 		if (dst && dst->dst != result) {
@@ -3466,19 +3505,19 @@ struct BytecodeCompiler {
 
 	void optimize(LsIrOp*& op) {
 		switch (op->kind) {
-			case LS_IR_OP_ALLOCA: {
+			case LsIrOpKind::ALLOCA: {
 				auto& alloca = *static_cast<LsOpAlloca*>(op);
 				if (alloca.value) optimize(alloca.value);
 				break;
 			}
-			case LS_IR_OP_CALL_DIRECT: {
+			case LsIrOpKind::CALL_DIRECT: {
 				auto& call = *static_cast<LsOpCallDirect*>(op);
 				for (u32 i = 0; i < call.arg_count; ++i) {
 					optimize(call.args[i]);
 				}
 				break;
 			}
-			case LS_IR_OP_COPY: {
+			case LsIrOpKind::COPY: {
 				auto& copy = *static_cast<LsOpCopy*>(op);
 				optimize(copy.src);
 				optimize(copy.dst);
@@ -3490,7 +3529,7 @@ struct BytecodeCompiler {
 				u32 field_offset = 0;
 				if (copy.dst->result_mode == LsIrOp::ADDRESS
 					&& tryGetOffsetAddress(*copy.dst, address_base, field_offset)
-					&& address_base->kind == LS_IR_OP_SLICE_REF) {
+					&& address_base->kind == LsIrOpKind::SLICE_REF) {
 					auto& ref = *static_cast<LsOpSliceRef*>(address_base);
 					auto& field = alloc<LsOpSliceFieldStore>();
 					field.slice = ref.slice;
@@ -3504,49 +3543,101 @@ struct BytecodeCompiler {
 				}
 				break;
 			}
-			case LS_IR_OP_NOT:
-			case LS_IR_OP_NEG: {
+			case LsIrOpKind::NOT:
+			case LsIrOpKind::NEG: {
 				auto& v = *static_cast<LsOpUnary*>(op);
 				optimize(v.operand);
 				break;
 			}
-			case LS_IR_OP_SUB:
-			case LS_IR_OP_MUL:
-			case LS_IR_OP_DIV:
-			case LS_IR_OP_MOD:
-			case LS_IR_OP_COMPARE:
-			case LS_IR_OP_EQ:
-			case LS_IR_OP_NE:
-			case LS_IR_OP_AND:
-			case LS_IR_OP_OR:
-			case LS_IR_OP_LE:
-			case LS_IR_OP_LT:
-			case LS_IR_OP_GE:
-			case LS_IR_OP_GT:
-			case LS_IR_OP_ADD: {
+			case LsIrOpKind::MUL: {
+				auto& mul = *static_cast<LsOpBinary*>(op);
+				optimize(mul.lhs);
+				optimize(mul.rhs);
+				LsIrOp* lhs_negated = nullptr;
+				if (mul.lhs->kind == LsIrOpKind::NEG) lhs_negated = static_cast<LsOpNeg*>(mul.lhs)->operand;
+				LsIrOp* rhs_negated = nullptr;
+				if (mul.rhs->kind == LsIrOpKind::NEG) rhs_negated = static_cast<LsOpNeg*>(mul.rhs)->operand;
+				if (!lhs_negated && !rhs_negated) break;
+
+				auto& inner = alloc<LsOpMul>();
+				inner.lhs = lhs_negated ? lhs_negated : mul.lhs;
+				inner.rhs = rhs_negated ? rhs_negated : mul.rhs;
+				inner.operand_type = mul.operand_type;
+				inner.src_loc = mul.src_loc;
+				if (lhs_negated && rhs_negated) {
+					op = &inner;
+					break;
+				}
+
+				auto& neg = alloc<LsOpNeg>();
+				neg.operand = &inner;
+				neg.operand_type = mul.operand_type;
+				neg.src_loc = mul.src_loc;
+				op = &neg;
+				break;
+			}
+			case LsIrOpKind::ADD:
+			case LsIrOpKind::SUB: {
+				auto& binary = *static_cast<LsOpBinary*>(op);
+				optimize(binary.lhs);
+				optimize(binary.rhs);
+				const bool lhs_negated = binary.lhs->kind == LsIrOpKind::NEG;
+				const bool rhs_negated = binary.rhs->kind == LsIrOpKind::NEG;
+				LsOpBinary* rewritten = nullptr;
+				if (rhs_negated) {
+					rewritten = binary.kind == LsIrOpKind::ADD
+						? static_cast<LsOpBinary*>(&alloc<LsOpSub>())
+						: static_cast<LsOpBinary*>(&alloc<LsOpAdd>());
+					rewritten->lhs = binary.lhs;
+					rewritten->rhs = static_cast<LsOpNeg*>(binary.rhs)->operand;
+				}
+				else if (lhs_negated && binary.kind == LsIrOpKind::ADD) {
+					auto& sub = alloc<LsOpSub>();
+					sub.lhs = binary.rhs;
+					sub.rhs = static_cast<LsOpNeg*>(binary.lhs)->operand;
+					rewritten = &sub;
+				}
+				if (!rewritten) break;
+				
+				rewritten->operand_type = binary.operand_type;
+				rewritten->src_loc = binary.src_loc;
+				op = rewritten;
+				break;
+			}
+			case LsIrOpKind::DIV:
+			case LsIrOpKind::MOD:
+			case LsIrOpKind::COMPARE:
+			case LsIrOpKind::EQ:
+			case LsIrOpKind::NE:
+			case LsIrOpKind::AND:
+			case LsIrOpKind::OR:
+			case LsIrOpKind::LE:
+			case LsIrOpKind::LT:
+			case LsIrOpKind::GE:
+			case LsIrOpKind::GT: {
 				auto& add = *static_cast<LsOpBinary*>(op);
 				optimize(add.lhs);
 				optimize(add.rhs);
 				break;
 			}
-			case LS_IR_OP_CONDITIONAL_JUMP: {
+			case LsIrOpKind::CONDITIONAL_JUMP: {
 				auto& jmp = *static_cast<LsOpConditionalJump*>(op);
 				optimize(jmp.condition);
 				if (jmp.true_block) optimize(*jmp.true_block);
 				if (jmp.false_block) optimize(*jmp.false_block);
 				break;
 			}
-			case LS_IR_OP_RETURN: {
+			case LsIrOpKind::RETURN: {
 				auto& ret = *static_cast<LsOpReturn*>(op);
 				if (ret.expression) optimize(ret.expression);
 				break;
 			}
-			case LS_IR_OP_LOAD: {
+			case LsIrOpKind::LOAD: {
 				auto* load = static_cast<LsOpLoad*>(op);
 				optimize(load->addr);
 				LsIrOp* address_base = load->addr;
 				u32 field_offset = 0;
-				if (tryGetOffsetAddress(*load->addr, address_base, field_offset) && address_base->kind == LS_IR_OP_SLICE_REF) {
+				if (tryGetOffsetAddress(*load->addr, address_base, field_offset) && address_base->kind == LsIrOpKind::SLICE_REF) {
 					auto& ref = *static_cast<LsOpSliceRef*>(address_base);
 					auto& field = alloc<LsOpSliceFieldLoad>();
 					field.slice = ref.slice;
@@ -3558,7 +3649,7 @@ struct BytecodeCompiler {
 					field.src_loc = load->src_loc;
 					op = &field;
 				}
-				else if (load->addr->kind == LS_IR_OP_PUSH_LOCAL_ADDR) {
+				else if (load->addr->kind == LsIrOpKind::PUSH_LOCAL_ADDR) {
 					auto& addr = *static_cast<LsOpPushLocalAddr*>(load->addr);
 					auto& ref = alloc<LsOpFramePtr>();
 					ref.alloca = addr.alloca;
@@ -3567,36 +3658,36 @@ struct BytecodeCompiler {
 				}
 				break;
 			}
-			case LS_IR_OP_SLICE_REF: {
+			case LsIrOpKind::SLICE_REF: {
 				auto& ref = *static_cast<LsOpSliceRef*>(op);
 				optimize(ref.slice);
 				optimize(ref.index);
 				break;
 			}
-			case LS_IR_OP_SLICE_LOAD: {
+			case LsIrOpKind::SLICE_LOAD: {
 				auto& load = *static_cast<LsOpSliceLoad*>(op);
 				optimize(load.slice);
 				optimize(load.index);
 				break;
 			}
-			case LS_IR_OP_SLICE_FIELD_LOAD:
-			case LS_IR_OP_SLICE_FIELD_STORE: {
+			case LsIrOpKind::SLICE_FIELD_LOAD:
+			case LsIrOpKind::SLICE_FIELD_STORE: {
 				auto& field = *static_cast<LsOpSliceField*>(op);
 				optimize(field.slice);
 				optimize(field.index);
 				break;
 			}
-			case LS_IR_OP_BOUNDS_CHECK: {
+			case LsIrOpKind::BOUNDS_CHECK: {
 				auto& bounds = *static_cast<LsOpBoundsCheck*>(op);
 				optimize(bounds.index);
 				break;
 			}
-			case LS_IR_OP_CAST: {
+			case LsIrOpKind::CAST: {
 				auto& cast = *static_cast<LsOpCast*>(op);
 				optimize(cast.value);
 				break;
 			}
-			case LS_IR_OP_MATERIALIZE_ADDR: {
+			case LsIrOpKind::MATERIALIZE_ADDR: {
 				auto& address = *static_cast<LsOpMaterializeAddr*>(op);
 				optimize(address.value);
 				break;
@@ -3684,7 +3775,9 @@ struct BytecodeCompiler {
 				host.arena.user_data,
 				sizeof(ls_bytecode_local_debug_entry) * fn_bc->local_count,
 				alignof(ls_bytecode_local_debug_entry));
-			memcpy(fn_bc->locals, local_debug.data(), sizeof(ls_bytecode_local_debug_entry) * fn_bc->local_count);
+			for (u32 i = 0; i < fn_bc->local_count; ++i) {
+				fn_bc->locals[i] = local_debug[(i32)i];
+			}
 		}
 		local_debug.clear();
 
@@ -3818,7 +3911,7 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host, ls_bytecode_c
 				if (isTypeFactory(fn_expr)) continue;
 				if (fn_expr.is_template) continue;
 				ls_function_bc& fn_bc = bc->functions[fn_expr.bytecode_index];
-				fn_bc.name = s.name;
+				fn_bc.name = copyStringViewToArena(host->arena, s.name);
 
 				if (fn_expr.body) {
 					LsIrBlockData& body = builder.buildFunctionIR(fn_expr);

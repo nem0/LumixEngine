@@ -138,7 +138,7 @@ static const char* lumc_opcode_name(ls_op op) {
 	static const char* const add[] = {"ADD_8", "ADD_16", "ADD_32", "ADD_64", "ADD_F32", "ADD_F64"};
 	static const char* const sub[] = {"SUB_8", "SUB_16", "SUB_32", "SUB_64", "SUB_F32", "SUB_F64"};
 	static const char* const mul[] = {"MUL_8", "MUL_16", "MUL_32", "MUL_64", "MUL_F32", "MUL_F64"};
-	static const char* const madd[] = {"MADD_F32", "MADD_F64"};
+	static const char* const madd[] = {"MADD_F32", "MADD_F64", "MSUB_F32", "MSUB_F64", "NMADD_F32", "NMADD_F64", "NMSUB_F32", "NMSUB_F64"};
 	static const char* const div[] = {"DIV_I8", "DIV_U8", "DIV_I16", "DIV_U16", "DIV_I32", "DIV_U32", "DIV_I64", "DIV_U64", "DIV_F32", "DIV_F64"};
 	static const char* const mod[] = {"MOD_I8", "MOD_U8", "MOD_I16", "MOD_U16", "MOD_I32", "MOD_U32", "MOD_I64", "MOD_U64"};
 	static const char* const add_imm[] = {"ADD_8_IMM", "ADD_16_IMM", "ADD_32_IMM", "ADD_64_IMM", "ADD_F32_IMM", "ADD_F64_IMM"};
@@ -150,7 +150,7 @@ static const char* lumc_opcode_name(ls_op op) {
 	if (op >= LS_OP_ADD_8 && op <= LS_OP_ADD_F64) return add[(u32)op - (u32)LS_OP_ADD_8];
 	if (op >= LS_OP_SUB_8 && op <= LS_OP_SUB_F64) return sub[(u32)op - (u32)LS_OP_SUB_8];
 	if (op >= LS_OP_MUL_8 && op <= LS_OP_MUL_F64) return mul[(u32)op - (u32)LS_OP_MUL_8];
-	if (op >= LS_OP_MADD_F32 && op <= LS_OP_MADD_F64) return madd[(u32)op - (u32)LS_OP_MADD_F32];
+	if (op >= LS_OP_MADD_F32 && op <= LS_OP_NMSUB_F64) return madd[(u32)op - (u32)LS_OP_MADD_F32];
 	if (op >= LS_OP_DIV_I8 && op <= LS_OP_DIV_F64) return div[(u32)op - (u32)LS_OP_DIV_I8];
 	if (op >= LS_OP_MOD_I8 && op <= LS_OP_MOD_U64) return mod[(u32)op - (u32)LS_OP_MOD_I8];
 	if (op >= LS_OP_ADD_8_IMM && op <= LS_OP_ADD_F64_IMM) return add_imm[(u32)op - (u32)LS_OP_ADD_8_IMM];
@@ -434,41 +434,36 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 				printf(" dst=%u, slice=%u, index=%u, index_type=%u, element_size=%u", a, b, c, index_type, size);
 				break;
 			}
-			case LS_OP_SLICE:
 			case LS_OP_SLICE_LOAD_8:
 			case LS_OP_SLICE_LOAD_16:
 			case LS_OP_SLICE_LOAD_32:
-			case LS_OP_SLICE_LOAD_64:
+			case LS_OP_SLICE_LOAD_64: {
+				const u32 dst = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 slice = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 index = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 element_size = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 load_offset = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 load_size = lumc_read_u32(fn->code, fn->code_size, &pc);
+				printf(" dst=%u, slice=%u, index=%u, element_size=%u, load_offset=%u, load_size=%u", dst, slice, index, element_size, load_offset, load_size);
+				break;
+			}
+			case LS_OP_SLICE_LENGTH:
+				printf(" dst=%u, slice=%u", lumc_read_u32(fn->code, fn->code_size, &pc), lumc_read_u32(fn->code, fn->code_size, &pc));
+				break;
 			case LS_OP_SLICE_STORE_8:
 			case LS_OP_SLICE_STORE_16:
 			case LS_OP_SLICE_STORE_32:
-			case LS_OP_SLICE_STORE_64:
-			case LS_OP_SLICE_LENGTH: {
-				if (op == LS_OP_SLICE_LOAD_8 || op == LS_OP_SLICE_LOAD_16 || op == LS_OP_SLICE_LOAD_32 || op == LS_OP_SLICE_LOAD_64) {
-					const u32 dst = lumc_read_u32(fn->code, fn->code_size, &pc);
-					const u32 slice = lumc_read_u32(fn->code, fn->code_size, &pc);
-					const u32 index = lumc_read_u32(fn->code, fn->code_size, &pc);
-					const u32 element_size = lumc_read_u32(fn->code, fn->code_size, &pc);
-					const u32 load_offset = lumc_read_u32(fn->code, fn->code_size, &pc);
-					const u32 load_size = lumc_read_u32(fn->code, fn->code_size, &pc);
-					printf(" dst=%u, slice=%u, index=%u, element_size=%u, load_offset=%u, load_size=%u", dst, slice, index, element_size, load_offset, load_size);
-					break;
-				}
-				if (op == LS_OP_SLICE_STORE_8 || op == LS_OP_SLICE_STORE_16 || op == LS_OP_SLICE_STORE_32 || op == LS_OP_SLICE_STORE_64) {
-					const u32 slice = lumc_read_u32(fn->code, fn->code_size, &pc);
-					const u32 index = lumc_read_u32(fn->code, fn->code_size, &pc);
-					const u32 element_size = lumc_read_u32(fn->code, fn->code_size, &pc);
-					const u32 store_offset = lumc_read_u32(fn->code, fn->code_size, &pc);
-					const u32 store_size = lumc_read_u32(fn->code, fn->code_size, &pc);
-					const u32 src = lumc_read_u32(fn->code, fn->code_size, &pc);
-					printf(" slice=%u, index=%u, element_size=%u, store_offset=%u, store_size=%u, src=%u", slice, index, element_size, store_offset, store_size, src);
-					break;
-				}
-				
-				if (op == LS_OP_SLICE_LENGTH) {
-					printf(" dst=%u, slice=%u", lumc_read_u32(fn->code, fn->code_size, &pc), lumc_read_u32(fn->code, fn->code_size, &pc));
-					break;
-				}
+			case LS_OP_SLICE_STORE_64: {
+				const u32 slice = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 index = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 element_size = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 store_offset = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 store_size = lumc_read_u32(fn->code, fn->code_size, &pc);
+				const u32 src = lumc_read_u32(fn->code, fn->code_size, &pc);
+				printf(" slice=%u, index=%u, element_size=%u, store_offset=%u, store_size=%u, src=%u", slice, index, element_size, store_offset, store_size, src);
+				break;
+			}
+			case LS_OP_SLICE: {
 				const u32 dst = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 source = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 begin = lumc_read_u32(fn->code, fn->code_size, &pc);
@@ -489,7 +484,13 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 				break;
 			}
 			case LS_OP_MADD_F32:
-			case LS_OP_MADD_F64: {
+			case LS_OP_MADD_F64:
+			case LS_OP_MSUB_F32:
+			case LS_OP_MSUB_F64:
+			case LS_OP_NMADD_F32:
+			case LS_OP_NMADD_F64:
+			case LS_OP_NMSUB_F32:
+			case LS_OP_NMSUB_F64: {
 				const u32 dst = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 lhs = lumc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 rhs = lumc_read_u32(fn->code, fn->code_size, &pc);

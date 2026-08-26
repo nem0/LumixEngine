@@ -170,37 +170,34 @@ function 2 offset_momentum (script, params=16, frame=88, returns=0)
   0026: LOAD_CONST_8         dst=32, value= 00 00 00 00 00 00 00 00                                                      // 	var pz = 0.0;
   0039: LOAD_CONST_8         dst=40, value= 00 00 00 00 00 00 00 00                                                      // 	for bi in 0..bodies.length {
   0052: COPY                 dst=48, src=8, size=8                                                                       // 	for bi in 0..bodies.length {
-  0065: JGE_I64              lhs=40, rhs=48, offset=244, target=320                                                      // 	for bi in 0..bodies.length {
+  0065: JGE_I64              lhs=40, rhs=48, offset=217, target=293                                                      // 	for bi in 0..bodies.length {
   0076: SLICE_LOAD_64        dst=56, slice=0, index=40, element_size=56, load_offset=24, load_size=8                     // 		px -= bodies[bi].vx * bodies[bi].mass;
   0101: SLICE_LOAD_64        dst=64, slice=0, index=40, element_size=56, load_offset=48, load_size=8                     // 		px -= bodies[bi].vx * bodies[bi].mass;
-  0126: MUL_F64              dst=72, lhs=56, rhs=64                                                                      // 		px -= bodies[bi].vx * bodies[bi].mass;
-  0139: SUB_F64              dst=16, lhs=16, rhs=72                                                                      // 		px -= bodies[bi].vx * bodies[bi].mass;
-  0152: SLICE_LOAD_64        dst=56, slice=0, index=40, element_size=56, load_offset=32, load_size=8                     // 		py -= bodies[bi].vy * bodies[bi].mass;
-  0177: SLICE_LOAD_64        dst=64, slice=0, index=40, element_size=56, load_offset=48, load_size=8                     // 		py -= bodies[bi].vy * bodies[bi].mass;
-  0202: MUL_F64              dst=72, lhs=56, rhs=64                                                                      // 		py -= bodies[bi].vy * bodies[bi].mass;
-  0215: SUB_F64              dst=24, lhs=24, rhs=72                                                                      // 		py -= bodies[bi].vy * bodies[bi].mass;
-  0228: SLICE_LOAD_64        dst=56, slice=0, index=40, element_size=56, load_offset=40, load_size=8                     // 		pz -= bodies[bi].vz * bodies[bi].mass;
-  0253: SLICE_LOAD_64        dst=64, slice=0, index=40, element_size=56, load_offset=48, load_size=8                     // 		pz -= bodies[bi].vz * bodies[bi].mass;
-  0278: MUL_F64              dst=72, lhs=56, rhs=64                                                                      // 		pz -= bodies[bi].vz * bodies[bi].mass;
-  0291: SUB_F64              dst=32, lhs=32, rhs=72                                                                      // 		pz -= bodies[bi].vz * bodies[bi].mass;
-  0304: INC_I64              dst=40                                                                                      // 	for bi in 0..bodies.length {
-  0309: JLT_I64              lhs=40, rhs=48, offset=-244, target=76                                                      // 	for bi in 0..bodies.length {
-  0320: LOAD_CONST_8         dst=56, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vx = px / bodies[0].mass;
-  0333: SLICE_LOAD_64        dst=64, slice=0, index=56, element_size=56, load_offset=48, load_size=8                     // 	bodies[0].vx = px / bodies[0].mass;
-  0358: DIV_F64              dst=72, lhs=16, rhs=64                                                                      // 	bodies[0].vx = px / bodies[0].mass;
-  0371: LOAD_CONST_8         dst=80, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vx = px / bodies[0].mass;
-  0384: SLICE_STORE_64       slice=0, index=80, element_size=56, store_offset=24, store_size=8, src=72                   // 	bodies[0].vx = px / bodies[0].mass;
-  0409: LOAD_CONST_8         dst=56, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vy = py / bodies[0].mass;
-  0422: SLICE_LOAD_64        dst=64, slice=0, index=56, element_size=56, load_offset=48, load_size=8                     // 	bodies[0].vy = py / bodies[0].mass;
-  0447: DIV_F64              dst=72, lhs=24, rhs=64                                                                      // 	bodies[0].vy = py / bodies[0].mass;
-  0460: LOAD_CONST_8         dst=80, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vy = py / bodies[0].mass;
-  0473: SLICE_STORE_64       slice=0, index=80, element_size=56, store_offset=32, store_size=8, src=72                   // 	bodies[0].vy = py / bodies[0].mass;
-  0498: LOAD_CONST_8         dst=56, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vz = pz / bodies[0].mass;
-  0511: SLICE_LOAD_64        dst=64, slice=0, index=56, element_size=56, load_offset=48, load_size=8                     // 	bodies[0].vz = pz / bodies[0].mass;
-  0536: DIV_F64              dst=72, lhs=32, rhs=64                                                                      // 	bodies[0].vz = pz / bodies[0].mass;
-  0549: LOAD_CONST_8         dst=80, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vz = pz / bodies[0].mass;
-  0562: SLICE_STORE_64       slice=0, index=80, element_size=56, store_offset=40, store_size=8, src=72                   // 	bodies[0].vz = pz / bodies[0].mass;
-  0587: RETURN_BASE                                                                                                      // fn offset_momentum(bodies : []Body) : void {
+  0126: NMADD_F64            dst=16, lhs=56, rhs=64, addend=16                                                           // 		px -= bodies[bi].vx * bodies[bi].mass;
+  0143: SLICE_LOAD_64        dst=56, slice=0, index=40, element_size=56, load_offset=32, load_size=8                     // 		py -= bodies[bi].vy * bodies[bi].mass;
+  0168: SLICE_LOAD_64        dst=64, slice=0, index=40, element_size=56, load_offset=48, load_size=8                     // 		py -= bodies[bi].vy * bodies[bi].mass;
+  0193: NMADD_F64            dst=24, lhs=56, rhs=64, addend=24                                                           // 		py -= bodies[bi].vy * bodies[bi].mass;
+  0210: SLICE_LOAD_64        dst=56, slice=0, index=40, element_size=56, load_offset=40, load_size=8                     // 		pz -= bodies[bi].vz * bodies[bi].mass;
+  0235: SLICE_LOAD_64        dst=64, slice=0, index=40, element_size=56, load_offset=48, load_size=8                     // 		pz -= bodies[bi].vz * bodies[bi].mass;
+  0260: NMADD_F64            dst=32, lhs=56, rhs=64, addend=32                                                           // 		pz -= bodies[bi].vz * bodies[bi].mass;
+  0277: INC_I64              dst=40                                                                                      // 	for bi in 0..bodies.length {
+  0282: JLT_I64              lhs=40, rhs=48, offset=-217, target=76                                                      // 	for bi in 0..bodies.length {
+  0293: LOAD_CONST_8         dst=56, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vx = px / bodies[0].mass;
+  0306: SLICE_LOAD_64        dst=64, slice=0, index=56, element_size=56, load_offset=48, load_size=8                     // 	bodies[0].vx = px / bodies[0].mass;
+  0331: DIV_F64              dst=72, lhs=16, rhs=64                                                                      // 	bodies[0].vx = px / bodies[0].mass;
+  0344: LOAD_CONST_8         dst=80, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vx = px / bodies[0].mass;
+  0357: SLICE_STORE_64       slice=0, index=80, element_size=56, store_offset=24, store_size=8, src=72                   // 	bodies[0].vx = px / bodies[0].mass;
+  0382: LOAD_CONST_8         dst=56, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vy = py / bodies[0].mass;
+  0395: SLICE_LOAD_64        dst=64, slice=0, index=56, element_size=56, load_offset=48, load_size=8                     // 	bodies[0].vy = py / bodies[0].mass;
+  0420: DIV_F64              dst=72, lhs=24, rhs=64                                                                      // 	bodies[0].vy = py / bodies[0].mass;
+  0433: LOAD_CONST_8         dst=80, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vy = py / bodies[0].mass;
+  0446: SLICE_STORE_64       slice=0, index=80, element_size=56, store_offset=32, store_size=8, src=72                   // 	bodies[0].vy = py / bodies[0].mass;
+  0471: LOAD_CONST_8         dst=56, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vz = pz / bodies[0].mass;
+  0484: SLICE_LOAD_64        dst=64, slice=0, index=56, element_size=56, load_offset=48, load_size=8                     // 	bodies[0].vz = pz / bodies[0].mass;
+  0509: DIV_F64              dst=72, lhs=32, rhs=64                                                                      // 	bodies[0].vz = pz / bodies[0].mass;
+  0522: LOAD_CONST_8         dst=80, value= 00 00 00 00 00 00 00 00                                                      // 	bodies[0].vz = pz / bodies[0].mass;
+  0535: SLICE_STORE_64       slice=0, index=80, element_size=56, store_offset=40, store_size=8, src=72                   // 	bodies[0].vz = pz / bodies[0].mass;
+  0560: RETURN_BASE                                                                                                      // fn offset_momentum(bodies : []Body) : void {
 function 3 sum_energy (script, params=32, frame=324, returns=8)
   0000: LOAD_CONST_8         dst=32, value= 00 00 00 00 00 00 00 00                                                      // 	var e = 0.0;
   0013: LOAD_CONST_8         dst=40, value= 00 00 00 00 00 00 00 00                                                      // 	for pi_ in 0..pairs.length {
@@ -244,10 +241,10 @@ function 4 advance (script, params=44, frame=188, returns=0)
   0013: COPY                 dst=52, src=20, size=8                                                                      // 	const n_bodies = bodies.length;
   0026: LOAD_CONST_4         dst=60, value= 00 00 00 00                                                                  // 	for i in 0..iters {
   0035: COPY                 dst=64, src=8, size=4                                                                       // 	for i in 0..iters {
-  0048: JGE_I32              lhs=60, rhs=64, offset=1237, target=1296                                                    // 	for i in 0..iters {
+  0048: JGE_I32              lhs=60, rhs=64, offset=1210, target=1269                                                    // 	for i in 0..iters {
   0059: LOAD_CONST_8         dst=68, value= 00 00 00 00 00 00 00 00                                                      // 		for pi_ in 0..n_pairs {
   0072: COPY                 dst=76, src=44, size=8                                                                      // 		for pi_ in 0..n_pairs {
-  0085: JGE_I64              lhs=68, rhs=76, offset=855, target=951                                                      // 		for pi_ in 0..n_pairs {
+  0085: JGE_I64              lhs=68, rhs=76, offset=828, target=924                                                      // 		for pi_ in 0..n_pairs {
   0096: SLICE_LOAD_64        dst=84, slice=28, index=68, element_size=8, load_offset=0, load_size=4                      // 			const first = pairs[pi_].first;
   0121: SLICE_LOAD_64        dst=88, slice=28, index=68, element_size=8, load_offset=4, load_size=4                      // 			const second = pairs[pi_].second;
   0146: SLICE_LOAD_32        dst=164, slice=12, index=84, element_size=56, load_offset=0, load_size=8                    // 			const dx = bodies[first].px - bodies[second].px;
@@ -271,48 +268,45 @@ function 4 advance (script, params=44, frame=188, returns=0)
   0468: SLICE_LOAD_32        dst=164, slice=12, index=88, element_size=56, load_offset=48, load_size=8                   // 			const b2m = bodies[second].mass * mag;
   0493: MUL_F64              dst=140, lhs=164, rhs=124                                                                   // 			const b2m = bodies[second].mass * mag;
   0506: SLICE_LOAD_32        dst=164, slice=12, index=84, element_size=56, load_offset=24, load_size=8                   // 			bodies[first].vx -= dx * b2m;
-  0531: MUL_F64              dst=172, lhs=92, rhs=140                                                                    // 			bodies[first].vx -= dx * b2m;
-  0544: SUB_F64              dst=180, lhs=164, rhs=172                                                                   // 			bodies[first].vx -= dx * b2m;
-  0557: SLICE_STORE_32       slice=12, index=84, element_size=56, store_offset=24, store_size=8, src=180                 // 			bodies[first].vx -= dx * b2m;
-  0582: SLICE_LOAD_32        dst=164, slice=12, index=84, element_size=56, load_offset=32, load_size=8                   // 			bodies[first].vy -= dy * b2m;
-  0607: MUL_F64              dst=172, lhs=100, rhs=140                                                                   // 			bodies[first].vy -= dy * b2m;
-  0620: SUB_F64              dst=180, lhs=164, rhs=172                                                                   // 			bodies[first].vy -= dy * b2m;
-  0633: SLICE_STORE_32       slice=12, index=84, element_size=56, store_offset=32, store_size=8, src=180                 // 			bodies[first].vy -= dy * b2m;
-  0658: SLICE_LOAD_32        dst=164, slice=12, index=84, element_size=56, load_offset=40, load_size=8                   // 			bodies[first].vz -= dz * b2m;
-  0683: MUL_F64              dst=172, lhs=108, rhs=140                                                                   // 			bodies[first].vz -= dz * b2m;
-  0696: SUB_F64              dst=180, lhs=164, rhs=172                                                                   // 			bodies[first].vz -= dz * b2m;
-  0709: SLICE_STORE_32       slice=12, index=84, element_size=56, store_offset=40, store_size=8, src=180                 // 			bodies[first].vz -= dz * b2m;
-  0734: SLICE_LOAD_32        dst=164, slice=12, index=88, element_size=56, load_offset=24, load_size=8                   // 			bodies[second].vx += dx * b1m;
-  0759: MADD_F64             dst=172, lhs=92, rhs=132, addend=164                                                        // 			bodies[second].vx += dx * b1m;
-  0776: SLICE_STORE_32       slice=12, index=88, element_size=56, store_offset=24, store_size=8, src=172                 // 			bodies[second].vx += dx * b1m;
-  0801: SLICE_LOAD_32        dst=164, slice=12, index=88, element_size=56, load_offset=32, load_size=8                   // 			bodies[second].vy += dy * b1m;
-  0826: MADD_F64             dst=172, lhs=100, rhs=132, addend=164                                                       // 			bodies[second].vy += dy * b1m;
-  0843: SLICE_STORE_32       slice=12, index=88, element_size=56, store_offset=32, store_size=8, src=172                 // 			bodies[second].vy += dy * b1m;
-  0868: SLICE_LOAD_32        dst=164, slice=12, index=88, element_size=56, load_offset=40, load_size=8                   // 			bodies[second].vz += dz * b1m;
-  0893: MADD_F64             dst=172, lhs=108, rhs=132, addend=164                                                       // 			bodies[second].vz += dz * b1m;
-  0910: SLICE_STORE_32       slice=12, index=88, element_size=56, store_offset=40, store_size=8, src=172                 // 			bodies[second].vz += dz * b1m;
-  0935: INC_I64              dst=68                                                                                      // 		for pi_ in 0..n_pairs {
-  0940: JLT_I64              lhs=68, rhs=76, offset=-855, target=96                                                      // 		for pi_ in 0..n_pairs {
-  0951: LOAD_CONST_8         dst=148, value= 00 00 00 00 00 00 00 00                                                     // 		for bi in 0..n_bodies {
-  0964: COPY                 dst=156, src=52, size=8                                                                     // 		for bi in 0..n_bodies {
-  0977: JGE_I64              lhs=148, rhs=156, offset=292, target=1280                                                   // 		for bi in 0..n_bodies {
-  0988: SLICE_LOAD_64        dst=164, slice=12, index=148, element_size=56, load_offset=0, load_size=8                   // 			bodies[bi].px += time * bodies[bi].vx;
-  1013: SLICE_LOAD_64        dst=172, slice=12, index=148, element_size=56, load_offset=24, load_size=8                  // 			bodies[bi].px += time * bodies[bi].vx;
-  1038: MADD_F64             dst=180, lhs=0, rhs=172, addend=164                                                         // 			bodies[bi].px += time * bodies[bi].vx;
-  1055: SLICE_STORE_64       slice=12, index=148, element_size=56, store_offset=0, store_size=8, src=180                 // 			bodies[bi].px += time * bodies[bi].vx;
-  1080: SLICE_LOAD_64        dst=164, slice=12, index=148, element_size=56, load_offset=8, load_size=8                   // 			bodies[bi].py += time * bodies[bi].vy;
-  1105: SLICE_LOAD_64        dst=172, slice=12, index=148, element_size=56, load_offset=32, load_size=8                  // 			bodies[bi].py += time * bodies[bi].vy;
-  1130: MADD_F64             dst=180, lhs=0, rhs=172, addend=164                                                         // 			bodies[bi].py += time * bodies[bi].vy;
-  1147: SLICE_STORE_64       slice=12, index=148, element_size=56, store_offset=8, store_size=8, src=180                 // 			bodies[bi].py += time * bodies[bi].vy;
-  1172: SLICE_LOAD_64        dst=164, slice=12, index=148, element_size=56, load_offset=16, load_size=8                  // 			bodies[bi].pz += time * bodies[bi].vz;
-  1197: SLICE_LOAD_64        dst=172, slice=12, index=148, element_size=56, load_offset=40, load_size=8                  // 			bodies[bi].pz += time * bodies[bi].vz;
-  1222: MADD_F64             dst=180, lhs=0, rhs=172, addend=164                                                         // 			bodies[bi].pz += time * bodies[bi].vz;
-  1239: SLICE_STORE_64       slice=12, index=148, element_size=56, store_offset=16, store_size=8, src=180                // 			bodies[bi].pz += time * bodies[bi].vz;
-  1264: INC_I64              dst=148                                                                                     // 		for bi in 0..n_bodies {
-  1269: JLT_I64              lhs=148, rhs=156, offset=-292, target=988                                                   // 		for bi in 0..n_bodies {
-  1280: INC_I32              dst=60                                                                                      // 	for i in 0..iters {
-  1285: JLT_I32              lhs=60, rhs=64, offset=-1237, target=59                                                     // 	for i in 0..iters {
-  1296: RETURN_BASE                                                                                                      // fn advance(time : f64, iters : i32, bodies : []Body, pairs : []BodyPair) : void {
+  0531: NMADD_F64            dst=172, lhs=92, rhs=140, addend=164                                                        // 			bodies[first].vx -= dx * b2m;
+  0548: SLICE_STORE_32       slice=12, index=84, element_size=56, store_offset=24, store_size=8, src=172                 // 			bodies[first].vx -= dx * b2m;
+  0573: SLICE_LOAD_32        dst=164, slice=12, index=84, element_size=56, load_offset=32, load_size=8                   // 			bodies[first].vy -= dy * b2m;
+  0598: NMADD_F64            dst=172, lhs=100, rhs=140, addend=164                                                       // 			bodies[first].vy -= dy * b2m;
+  0615: SLICE_STORE_32       slice=12, index=84, element_size=56, store_offset=32, store_size=8, src=172                 // 			bodies[first].vy -= dy * b2m;
+  0640: SLICE_LOAD_32        dst=164, slice=12, index=84, element_size=56, load_offset=40, load_size=8                   // 			bodies[first].vz -= dz * b2m;
+  0665: NMADD_F64            dst=172, lhs=108, rhs=140, addend=164                                                       // 			bodies[first].vz -= dz * b2m;
+  0682: SLICE_STORE_32       slice=12, index=84, element_size=56, store_offset=40, store_size=8, src=172                 // 			bodies[first].vz -= dz * b2m;
+  0707: SLICE_LOAD_32        dst=164, slice=12, index=88, element_size=56, load_offset=24, load_size=8                   // 			bodies[second].vx += dx * b1m;
+  0732: MADD_F64             dst=172, lhs=92, rhs=132, addend=164                                                        // 			bodies[second].vx += dx * b1m;
+  0749: SLICE_STORE_32       slice=12, index=88, element_size=56, store_offset=24, store_size=8, src=172                 // 			bodies[second].vx += dx * b1m;
+  0774: SLICE_LOAD_32        dst=164, slice=12, index=88, element_size=56, load_offset=32, load_size=8                   // 			bodies[second].vy += dy * b1m;
+  0799: MADD_F64             dst=172, lhs=100, rhs=132, addend=164                                                       // 			bodies[second].vy += dy * b1m;
+  0816: SLICE_STORE_32       slice=12, index=88, element_size=56, store_offset=32, store_size=8, src=172                 // 			bodies[second].vy += dy * b1m;
+  0841: SLICE_LOAD_32        dst=164, slice=12, index=88, element_size=56, load_offset=40, load_size=8                   // 			bodies[second].vz += dz * b1m;
+  0866: MADD_F64             dst=172, lhs=108, rhs=132, addend=164                                                       // 			bodies[second].vz += dz * b1m;
+  0883: SLICE_STORE_32       slice=12, index=88, element_size=56, store_offset=40, store_size=8, src=172                 // 			bodies[second].vz += dz * b1m;
+  0908: INC_I64              dst=68                                                                                      // 		for pi_ in 0..n_pairs {
+  0913: JLT_I64              lhs=68, rhs=76, offset=-828, target=96                                                      // 		for pi_ in 0..n_pairs {
+  0924: LOAD_CONST_8         dst=148, value= 00 00 00 00 00 00 00 00                                                     // 		for bi in 0..n_bodies {
+  0937: COPY                 dst=156, src=52, size=8                                                                     // 		for bi in 0..n_bodies {
+  0950: JGE_I64              lhs=148, rhs=156, offset=292, target=1253                                                   // 		for bi in 0..n_bodies {
+  0961: SLICE_LOAD_64        dst=164, slice=12, index=148, element_size=56, load_offset=0, load_size=8                   // 			bodies[bi].px += time * bodies[bi].vx;
+  0986: SLICE_LOAD_64        dst=172, slice=12, index=148, element_size=56, load_offset=24, load_size=8                  // 			bodies[bi].px += time * bodies[bi].vx;
+  1011: MADD_F64             dst=180, lhs=0, rhs=172, addend=164                                                         // 			bodies[bi].px += time * bodies[bi].vx;
+  1028: SLICE_STORE_64       slice=12, index=148, element_size=56, store_offset=0, store_size=8, src=180                 // 			bodies[bi].px += time * bodies[bi].vx;
+  1053: SLICE_LOAD_64        dst=164, slice=12, index=148, element_size=56, load_offset=8, load_size=8                   // 			bodies[bi].py += time * bodies[bi].vy;
+  1078: SLICE_LOAD_64        dst=172, slice=12, index=148, element_size=56, load_offset=32, load_size=8                  // 			bodies[bi].py += time * bodies[bi].vy;
+  1103: MADD_F64             dst=180, lhs=0, rhs=172, addend=164                                                         // 			bodies[bi].py += time * bodies[bi].vy;
+  1120: SLICE_STORE_64       slice=12, index=148, element_size=56, store_offset=8, store_size=8, src=180                 // 			bodies[bi].py += time * bodies[bi].vy;
+  1145: SLICE_LOAD_64        dst=164, slice=12, index=148, element_size=56, load_offset=16, load_size=8                  // 			bodies[bi].pz += time * bodies[bi].vz;
+  1170: SLICE_LOAD_64        dst=172, slice=12, index=148, element_size=56, load_offset=40, load_size=8                  // 			bodies[bi].pz += time * bodies[bi].vz;
+  1195: MADD_F64             dst=180, lhs=0, rhs=172, addend=164                                                         // 			bodies[bi].pz += time * bodies[bi].vz;
+  1212: SLICE_STORE_64       slice=12, index=148, element_size=56, store_offset=16, store_size=8, src=180                // 			bodies[bi].pz += time * bodies[bi].vz;
+  1237: INC_I64              dst=148                                                                                     // 		for bi in 0..n_bodies {
+  1242: JLT_I64              lhs=148, rhs=156, offset=-292, target=961                                                   // 		for bi in 0..n_bodies {
+  1253: INC_I32              dst=60                                                                                      // 	for i in 0..iters {
+  1258: JLT_I32              lhs=60, rhs=64, offset=-1210, target=59                                                     // 	for i in 0..iters {
+  1269: RETURN_BASE                                                                                                      // fn advance(time : f64, iters : i32, bodies : []Body, pairs : []BodyPair) : void {
 function 5 sim_system (script, params=4, frame=808, returns=8)
   0000: COPY                 dst=284, src=4, size=280                                                                    // 	var bodies : [5]Body = undefined;
   0013: COPY                 dst=644, src=564, size=80                                                                   // 	var pairs : [10]BodyPair = undefined;

@@ -171,6 +171,13 @@ typedef struct ls_unit ls_unit;
 typedef struct ls_bytecode ls_bytecode;
 typedef struct ls_type ls_type;
 
+// A typed attribute value. `value` points to the packed bytes of `type` and is
+// owned by the module/bytecode that owns the inspected type.
+typedef struct ls_attribute {
+	const ls_type* type;
+	const void* value;
+} ls_attribute;
+
 // Module lifetime.
 //
 // Create one module per script bundle or compilation unit. Destroy it when the
@@ -327,6 +334,29 @@ const ls_type* ls_type_struct_field_type(const ls_type* type, u32 field_index);
 // Byte offset of the field from the start of the struct value. The host
 // uses this to read the field: `(u8*)struct_value + offset`.
 u32 ls_type_struct_field_offset(const ls_type* type, u32 field_index);
+
+// Attributes.
+
+// Number of attributes attached to a type.
+u32 ls_type_attribute_count(const ls_type* type);
+
+// Attribute value at `attribute_index`. The attribute's declaration type is
+// returned in `.type`; its struct value is returned in `.value`. Use
+// ls_type_get_size(result.type) for the value size. Returns { NULL, NULL } for
+// an invalid index.
+ls_attribute ls_type_attribute_value(const ls_type* type, u32 attribute_index);
+
+// Number of attributes attached to the struct field at `field_index`.
+// Returns 0 when `type` is not a struct or the field index is invalid.
+u32 ls_type_struct_field_attribute_count(const ls_type* type, u32 field_index);
+
+// Attribute value attached to a struct field. Returns { NULL, NULL } for an
+// invalid index. Use ls_type_get_size(result.type) for the value size.
+ls_attribute ls_type_struct_field_attribute_value(
+	const ls_type* type,
+	u32 field_index,
+	u32 attribute_index
+);
 
 // Introspect a tagged union type (valid when kind == LS_TYPE_TAGGED_UNION).
 // A tagged union value is stored as: [tag : i32] [payload : N bytes].

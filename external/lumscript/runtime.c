@@ -484,7 +484,7 @@ static u64 runtime_immediate_to_u64(u64 value, ls_type_kind kind) {
 		memcpy(out__, &result__, sizeof(TYPE));      \
 	} while (0)
 
-#define LS_REG_MADD(TYPE, EXPR)                    \
+#define LS_REG_FMA(TYPE, EXPR)                     \
 	do {                                             \
 		const u32 dst__ = runtime_read_u32();        \
 		const u32 lhs_offset__ = runtime_read_u32(); \
@@ -759,7 +759,6 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 			case LS_OP_GLOBAL_PTR: {
 				const u32 dst = runtime_read_u32();
 				const u32 offset = runtime_read_u32();
-				if (offset >= runtime->bytecode->global_size) goto runtime_execute_function_fail;
 				void* ptr = runtime->stack + offset;
 				memcpy(frame + dst, &ptr, sizeof(ptr));
 				break;
@@ -889,7 +888,6 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 size = runtime_read_u32();
 				if (size > 0u) {
 					u8* src_ptr = frame + src;
-					if (frame + size > runtime->stack_end) goto runtime_execute_function_fail;
 					memmove(frame, src_ptr, size);
 					runtime->stack_top = frame + size;
 				}
@@ -917,7 +915,6 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 arg_base = runtime_read_u32();
 				u8* caller_top = runtime->stack_top;
 				const ls_function_bc* callee = &runtime->bytecode->functions[callee_index];
-				if (frame + arg_base > caller_top) goto runtime_execute_function_fail;
 
 				if (!runtime_enter_script_call(runtime, &fn, &ip, callee, frame + arg_base, caller_top)) goto runtime_execute_function_fail;
 				frame = runtime->frame;
@@ -928,7 +925,6 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				const u32 arg_base = runtime_read_u32();
 				u8* caller_top = runtime->stack_top;
 				const ls_function_bc* callee = &runtime->bytecode->functions[callee_index];
-				if (frame + arg_base > caller_top) goto runtime_execute_function_fail;
 				runtime->frame = frame;
 				if (!runtime_invoke_native(runtime, callee_index, callee, frame + arg_base, NULL)) goto runtime_execute_function_fail;
 				frame = runtime->frame;
@@ -1082,8 +1078,14 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 			LS_ARITH_INT_CASES(MUL, *)
 			LS_ARITH_DIV_CASES(DIV, /)
 			LS_MOD_CASES
-			case LS_OP_MADD_F32: LS_REG_MADD(f32, fmaf(a, b, c)); break;
-			case LS_OP_MADD_F64: LS_REG_MADD(f64, fma(a, b, c)); break;
+			case LS_OP_MADD_F32: LS_REG_FMA(f32, fmaf(a, b, c)); break;
+			case LS_OP_MADD_F64: LS_REG_FMA(f64, fma(a, b, c)); break;
+			case LS_OP_MSUB_F32: LS_REG_FMA(f32, fmaf(a, b, -c)); break;
+			case LS_OP_MSUB_F64: LS_REG_FMA(f64, fma(a, b, -c)); break;
+			case LS_OP_NMADD_F32: LS_REG_FMA(f32, fmaf(-a, b, c)); break;
+			case LS_OP_NMADD_F64: LS_REG_FMA(f64, fma(-a, b, c)); break;
+			case LS_OP_NMSUB_F32: LS_REG_FMA(f32, fmaf(-a, b, -c)); break;
+			case LS_OP_NMSUB_F64: LS_REG_FMA(f64, fma(-a, b, -c)); break;
 			#undef LS_MOD_CASES
 			#undef LS_ARITH_DIV_CASES
 			#undef LS_ARITH_INT_CASES

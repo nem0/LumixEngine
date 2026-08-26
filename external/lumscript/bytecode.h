@@ -33,7 +33,7 @@
 // - consequently everything at or above the argument window must be dead in
 //   the caller; the callee clobbers it with its locals and temps. Codegen
 //   guarantees this by always staging args at the top of the live temp
-//   stack. Hand-written bytecode must uphold the same invariant.
+//   stack.
 // - RETURN deposits the result at the callee frame base, which is already
 //   the caller's result location for direct calls; indirect calls relocate
 //   the result down into the consumed function-value slot
@@ -140,10 +140,20 @@ typedef enum ls_op {
 	LS_OP_MUL_64,
 	LS_OP_MUL_F32,
 	LS_OP_MUL_F64,
-	// Fused multiply-add: dst = lhs * rhs + addend.
+	// Fused multiply-add family: a single-rounding ternary float op per pair.
 	// Operands are four u32 frame offsets: dst, lhs, rhs, addend.
+	// - MADD:  dst =  lhs * rhs + addend
+	// - MSUB:  dst =  lhs * rhs - addend
+	// - NMADD: dst = -lhs * rhs + addend
+	// - NMSUB: dst = -lhs * rhs - addend
 	LS_OP_MADD_F32,
 	LS_OP_MADD_F64,
+	LS_OP_MSUB_F32,
+	LS_OP_MSUB_F64,
+	LS_OP_NMADD_F32,
+	LS_OP_NMADD_F64,
+	LS_OP_NMSUB_F32,
+	LS_OP_NMSUB_F64,
 
 	LS_OP_DIV_I8,
 	LS_OP_DIV_U8,

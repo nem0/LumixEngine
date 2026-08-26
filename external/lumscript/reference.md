@@ -16,6 +16,7 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 - [Declarations](#declarations)
 	- [Imports](#imports)
 	- [Structs](#structs)
+		- [Attributes](#attributes)
 	- [Enums](#enums)
 	- [Functions](#functions)
 	- [Comptime](#comptime)
@@ -271,6 +272,47 @@ Structs have no built-in equality or ordering. Operators for a struct must be
 provided with `operator` declarations, subject to the rules in [Operators](#operators).
 Struct fields themselves retain their declared types; there is no automatic
 conversion of a whole struct.
+
+#### Attributes
+
+Attributes are typed metadata attached to declarations. They can be attached
+to a type:
+
+```cpp
+#[some_tag]
+struct Foo {}
+```
+
+or to a field:
+
+```cpp
+struct range_attr {
+	min : f32;
+	max : f32;
+}
+
+struct label_attr {
+	value : []const u8;
+}
+
+struct Settings {
+	#[label_attr {"Radius"}, range_attr {0, 100}]
+	radius : f32;
+}
+```
+
+An attribute is declared as an ordinary struct. Its arguments are a positional
+struct value, so the attribute name and its payload are checked by the
+compiler. Attributes may therefore carry different, user-defined payload types
+and multiple attributes may be attached to the same declaration.
+
+Attributes are compile-time metadata. They can be inspected by compile-time
+code and are intended for uses such as serialization, GUI descriptions (labels,
+ranges, and similar information), and tagging. 
+
+LumScript does not provide runtime reflection over attributes yet. Runtime
+script code cannot enumerate attributes or read their values; native C++ code
+is the current runtime consumer.
 
 ### Enums
 
@@ -2778,6 +2820,18 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 
 		this is accepted deliberately: without pruning, generic code could not branch on type at all. Branches over configuration flags should be exercised by building every configuration
 	- alternative considered was an explicit `comptime if` / `comptime match` opt-in, which makes the unchecked region auditable at the cost of a second form of every branch
+
+- attributes use typed struct declarations
+	- attributes are inspectable at compile time and are intended for serialization, GUI metadata (labels, ranges, and similar properties), tagging, and native integration; runtime reflection is not provided yet
+	- the attribute metadata is also exposed to C++ so native code can consume it
+	- a string payload such as `#"min = 32, max = 52"` was rejected because typos and malformed values are unchecked
+	- an array of primitive key/value pairs was rejected because names remain unchecked and user-defined structured values such as `#[range {0, 10}]` do not fit naturally
+	- function attributes were rejected because a function such as `fn min_attr(i : i32) : void {}` has no meaningful execution semantics in an attribute position
+	- Rust-style macros were rejected as a new, complex macro system with the disadvantages of the other approaches
+	- C#-style attributes were rejected because they require a base class, while LumScript has no inheritance
+	- sidecar declarations were rejected because they require more code and make associating metadata with the intended type error-prone
+	- representing attributes as one generated struct was rejected because access through its fields is cumbersome; a heterogeneous attribute sequence is more direct even though iteration requires compile-time type checks
+	- Java-style typed lookup was rejected because iteration would remain heterogeneous and it would introduce a new `::function()` call concept
 
 - reflection members use `::`
 	- `T::kind`, `T::fields`, `T::values` and the rest live in a namespace disjoint from `.`, so they never compete with user-declared names

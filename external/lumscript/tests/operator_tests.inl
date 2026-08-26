@@ -1470,3 +1470,191 @@ TEST(NullableEqualityAgainstNullLiteralRuntime) {
 	CAPI_END(module);
 	return true;
 }
+
+// Compiles `source` with the optimizer enabled and reports whether any
+// function's bytecode stream contains `op`. Probe modules hold one tiny
+// straight-line function with runtime-typed parameters (so nothing folds at
+// compile time), which keeps a raw byte scan free of meaningful collisions
+// with immediate payloads.
+static bool anyFunctionContainsOpcode(const char* source, ls_op op, const char* test_name) {
+	TestContext context;
+	ls_module* module = ls_module_create(&context.host);
+	if (!module) return false;
+	if (!ls_module_compile(module, toLs(source), makeStringView(test_name), nullptr, nullptr)) return false;
+	ls_bytecode_compile_options options = {};
+	options.optimize = true;
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &context.host, &options);
+	if (!bytecode) return false;
+	bool found = false;
+	for (u32 i = 0; i < bytecode->function_count && !found; ++i) {
+		const ls_function_bc& fn = bytecode->functions[i];
+		for (u32 j = 0; j < fn.code_size; ++j) {
+			if (fn.code[j] == (u8)op) {
+				found = true;
+				break;
+			}
+		}
+	}
+	ls_bytecode_destroy(bytecode);
+	ls_module_destroy(module);
+	return found;
+}
+
+TEST(FusedMsubEmitted) {
+	EXPECT_TRUE(anyFunctionContainsOpcode(R"(
+		fn probe(x : f64) : f64 { return x * 2.0 - 1.5; }
+	)", LS_OP_MSUB_F64, __func__));
+	EXPECT_TRUE(anyFunctionContainsOpcode(R"(
+		fn probe(x : f32) : f32 { return x * 2.0 - 1.5; }
+	)", LS_OP_MSUB_F32, __func__));
+	return true;
+}
+
+TEST(FusedNmaddEmitted) {
+	// c - a*b and -(a*b) + c share the NMADD opcode.
+	EXPECT_TRUE(anyFunctionContainsOpcode(R"(
+		fn probe(x : f64) : f64 { return 1.5 - x * 2.0; }
+	)", LS_OP_NMADD_F64, __func__));
+	EXPECT_TRUE(anyFunctionContainsOpcode(R"(
+		fn probe(x : f64) : f64 { return -(x * 2.0) + 1.5; }
+	)", LS_OP_NMADD_F64, __func__));
+	EXPECT_TRUE(anyFunctionContainsOpcode(R"(
+		fn probe(x : f32) : f32 { return 1.5 - x * 2.0; }
+	)", LS_OP_NMADD_F32, __func__));
+	return true;
+}
+
+TEST(FusedNmsubEmitted) {
+	EXPECT_TRUE(anyFunctionContainsOpcode(R"(
+		fn probe(x : f64) : f64 { return -(x * 2.0) - 1.5; }
+	)", LS_OP_NMSUB_F64, __func__));
+	EXPECT_TRUE(anyFunctionContainsOpcode(R"(
+		fn probe(x : f32) : f32 { return -(x * 2.0) - 1.5; }
+	)", LS_OP_NMSUB_F32, __func__));
+	return true;
+}
+
+TEST(FusedNegatedSubtractCollapsesToMadd) {
+	// c - -(a*b) is a*b + c: no NEG instruction needed.
+	EXPECT_TRUE(anyFunctionContainsOpcode(R"(
+		fn probe(x : f64) : f64 { return 1.5 - -(x * 2.0); }
+	)", LS_OP_MADD_F64, __func__));
+	return true;
+}
+
+TEST(FusedMandelShapeEmitted) {
+	// x*x - y*(-y) folds both multiplies into one ternary with no NEG left.
+	EXPECT_TRUE(anyFunctionContainsOpcode(R"(
+		fn probe(x : f64, y : f64) : f64 { return x * x - y * (-y); }
+	)", LS_OP_MADD_F64, __func__));
+	return true;
+}
+
+TEST(NegationPushThroughAddSubRuntime) {
+	const char* source = R"(
+		fn add_neg_rhs(x : f64) : f64 { return 10.0 + -x; }
+		fn add_neg_lhs(x : f64) : f64 { return -x + 10.0; }
+		fn sub_neg_rhs(x : f64) : f64 { return 10.0 - -x; }
+		fn sub_negated_mul(x : f64) : f64 { return -(x * 4.0) - 2.0; }
+		fn mandel_check(x : f64, y : f64) : f64 { return x * x - y * (-y); }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	ls_bytecode_compile_options options = {};
+	options.optimize = true;
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, &options);
+	EXPECT_TRUE(bytecode != nullptr);
+	if (bytecode) {
+		ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+		EXPECT_TRUE(runtime != nullptr);
+		if (runtime) {
+			struct Case {
+				const char* name;
+				double arg;
+				double expected;
+			};
+			const Case cases[] = {
+				{"add_neg_rhs", 3.0, 7.0},
+				{"add_neg_lhs", 3.0, 7.0},
+				{"sub_neg_rhs", 3.0, 13.0},
+				{"sub_negated_mul", 3.0, -14.0},
+			};
+			for (const Case& c : cases) {
+				ls_push_f64(runtime, c.arg);
+				EXPECT_TRUE(ls_call(runtime, toLs(c.name)));
+				EXPECT_FLOAT_EQ(c.expected, ls_to_f64(runtime, -1));
+			}
+			ls_push_f64(runtime, 3.0);
+			ls_push_f64(runtime, 4.0);
+			EXPECT_TRUE(ls_call(runtime, toLs("mandel_check")));
+			EXPECT_FLOAT_EQ(25.0, ls_to_f64(runtime, -1));
+		}
+		ls_bytecode_destroy(bytecode);
+	}
+	CAPI_END(module);
+	return true;
+}
+
+TEST(FusedMultiplyOpsRuntime) {
+	const char* source = R"(
+		fn msub_f64(x : f64) : f64 { return x * 4.0 - 2.0; }
+		fn nmadd_sub_form(x : f64) : f64 { return 2.0 - x * 4.0; }
+		fn nmadd_neg_form(x : f64) : f64 { return -(x * 4.0) + 2.0; }
+		fn nmsub_f64(x : f64) : f64 { return -(x * 4.0) - 2.0; }
+		fn negated_collapse(x : f64) : f64 { return 2.0 - -(x * 4.0); }
+		fn plain_madd(x : f64) : f64 { return x * 4.0 + 2.0; }
+		fn both_sides_mul(x : f64) : f64 { return x * 4.0 - x * 2.0; }
+		fn msub_f32(x : f32) : f32 { return x * 4.0 - 2.0; }
+		fn nmadd_f32(x : f32) : f32 { return 2.0 - x * 4.0; }
+		fn nmsub_f32(x : f32) : f32 { return -(x * 4.0) - 2.0; }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	ls_bytecode_compile_options options = {};
+	options.optimize = true;
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, &options);
+	EXPECT_TRUE(bytecode != nullptr);
+	if (bytecode) {
+		ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+		EXPECT_TRUE(runtime != nullptr);
+		if (runtime) {
+			struct F64Case {
+				const char* name;
+				double arg;
+				double expected;
+			};
+			const F64Case f64_cases[] = {
+				{"msub_f64", 3.0, 10.0},
+				{"nmadd_sub_form", 3.0, -10.0},
+				{"nmadd_neg_form", 3.0, -10.0},
+				{"nmsub_f64", 3.0, -14.0},
+				{"negated_collapse", 3.0, 14.0},
+				{"plain_madd", 3.0, 14.0},
+				{"both_sides_mul", 3.0, 6.0},
+			};
+			for (const F64Case& c : f64_cases) {
+				ls_push_f64(runtime, c.arg);
+				EXPECT_TRUE(ls_call(runtime, toLs(c.name)));
+				EXPECT_FLOAT_EQ(c.expected, ls_to_f64(runtime, -1));
+			}
+			struct F32Case {
+				const char* name;
+				float arg;
+				float expected;
+			};
+			const F32Case f32_cases[] = {
+				{"msub_f32", 3.0f, 10.0f},
+				{"nmadd_f32", 3.0f, -10.0f},
+				{"nmsub_f32", 3.0f, -14.0f},
+			};
+			for (const F32Case& c : f32_cases) {
+				ls_push_f32(runtime, c.arg);
+				EXPECT_TRUE(ls_call(runtime, toLs(c.name)));
+				EXPECT_FLOAT_EQ(c.expected, ls_to_f32(runtime, -1));
+			}
+		}
+		ls_bytecode_destroy(bytecode);
+	}
+	CAPI_END(module);
+	return true;
+}

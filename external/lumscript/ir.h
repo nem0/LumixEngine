@@ -16,53 +16,53 @@ using LsIrSourceLoc = u32;
 
 static constexpr LsIrSourceLoc LS_IR_INVALID_SOURCE_LOC = LS_INVALID_SOURCE_LOC;
 
-enum LsIrOpKind {
-	LS_IR_OP_INVALID,
-	LS_IR_OP_LOAD_CONST,
-	LS_IR_OP_LOAD_BYTES,
-	LS_IR_OP_COPY,
-	LS_IR_OP_AGGREGATE_INIT,
-	LS_IR_OP_UNION_CONVERT,
-	LS_IR_OP_COMPARE,
-	LS_IR_OP_ADD,
-	LS_IR_OP_SUB,
-	LS_IR_OP_MUL,
-	LS_IR_OP_DIV,
-	LS_IR_OP_MOD,
-	LS_IR_OP_BOUNDS_CHECK,
-	LS_IR_OP_CAST,
-	LS_IR_OP_TERNARY,
-	LS_IR_OP_RETURN,
-	LS_IR_OP_ALLOCA,
-	LS_IR_OP_EQ,
-	LS_IR_OP_NE,
-	LS_IR_OP_LT,
-	LS_IR_OP_LE,
-	LS_IR_OP_GT,
-	LS_IR_OP_GE,
-	LS_IR_OP_AND,
-	LS_IR_OP_OR,
-	LS_IR_OP_NEG,
-	LS_IR_OP_NOT,
+enum class LsIrOpKind {
+	INVALID,
+	LOAD_CONST,
+	LOAD_BYTES,
+	COPY,
+	AGGREGATE_INIT,
+	UNION_CONVERT,
+	COMPARE,
+	ADD,
+	SUB,
+	MUL,
+	DIV,
+	MOD,
+	BOUNDS_CHECK,
+	CAST,
+	TERNARY,
+	RETURN,
+	ALLOCA,
+	EQ,
+	NE,
+	LT,
+	LE,
+	GT,
+	GE,
+	AND,
+	OR,
+	NEG,
+	NOT,
 
-	LS_IR_OP_NOP,
-	LS_IR_OP_PUSH_LOCAL_ADDR,
-	LS_IR_OP_MATERIALIZE_ADDR,
-	LS_IR_OP_PUSH_GLOBAL_ADDR,
-	LS_IR_OP_LOAD,
-	LS_IR_OP_EXTRACT_VALUE,
-	LS_IR_OP_CALL_DIRECT,
-	LS_IR_OP_CALL_INDIRECT,
-	LS_IR_OP_CONDITIONAL_JUMP,
-	LS_IR_OP_JUMP,
-	LS_IR_OP_NULL,
-	LS_IR_OP_SLICE,
-	LS_IR_OP_SLICE_LOAD,
-	LS_IR_OP_SLICE_REF,
-	LS_IR_OP_SLICE_FIELD_LOAD,
-	LS_IR_OP_SLICE_FIELD_STORE,
-	LS_IR_OP_STRING_LITERAL,
-	LS_IR_OP_FRAME_PTR
+	NOP,
+	PUSH_LOCAL_ADDR,
+	MATERIALIZE_ADDR,
+	PUSH_GLOBAL_ADDR,
+	LOAD,
+	EXTRACT_VALUE,
+	CALL_DIRECT,
+	CALL_INDIRECT,
+	CONDITIONAL_JUMP,
+	JUMP,
+	NULL_VALUE,
+	SLICE,
+	SLICE_LOAD,
+	SLICE_REF,
+	SLICE_FIELD_LOAD,
+	SLICE_FIELD_STORE,
+	STRING_LITERAL,
+	FRAME_PTR
 };
 
 struct LsIrOp {
@@ -71,7 +71,7 @@ struct LsIrOp {
 		ADDRESS,
 		VALUE
 	} result_mode = VALUE;
-	LsIrOpKind kind = LS_IR_OP_INVALID;
+	LsIrOpKind kind = LsIrOpKind::INVALID;
 	LsIrSourceLoc src_loc = LS_IR_INVALID_SOURCE_LOC;
 	u32 bytecode_offset = 0xffffffffu;
 	bool is_ref = false;
@@ -80,33 +80,33 @@ struct LsIrOp {
 };
 
 struct LsOpPushLocalAddr : LsIrOp {
-	LsOpPushLocalAddr() : LsIrOp(LS_IR_OP_PUSH_LOCAL_ADDR) { result_mode = ADDRESS; }
+	LsOpPushLocalAddr() : LsIrOp(LsIrOpKind::PUSH_LOCAL_ADDR) { result_mode = ADDRESS; }
 	struct LsOpAlloca* alloca = nullptr;
 };
 
 struct LsOpMaterializeAddr : LsIrOp {
-	LsOpMaterializeAddr() : LsIrOp(LS_IR_OP_MATERIALIZE_ADDR) { result_mode = ADDRESS; }
+	LsOpMaterializeAddr() : LsIrOp(LsIrOpKind::MATERIALIZE_ADDR) { result_mode = ADDRESS; }
 	LsIrOp* value = nullptr;
 };
 
 struct LsOpPushGlobalAddr : LsIrOp {
-	LsOpPushGlobalAddr() : LsIrOp(LS_IR_OP_PUSH_GLOBAL_ADDR) { result_mode = ADDRESS; }
+	LsOpPushGlobalAddr() : LsIrOp(LsIrOpKind::PUSH_GLOBAL_ADDR) { result_mode = ADDRESS; }
 	u32 offset = 0;
 };
 
 struct LsOpNull : LsIrOp {
-	LsOpNull() : LsIrOp(LS_IR_OP_NULL) { result_mode = VALUE; }
+	LsOpNull() : LsIrOp(LsIrOpKind::NULL_VALUE) { result_mode = VALUE; }
 	u32 size;
 };
 
 struct LsOpLoad : LsIrOp {
-	LsOpLoad() : LsIrOp(LS_IR_OP_LOAD) { result_mode = VALUE; }
+	LsOpLoad() : LsIrOp(LsIrOpKind::LOAD) { result_mode = VALUE; }
 	LsIrOp* addr = nullptr;
 	u32 size = 0;
 };
 
 struct LsOpCallDirect : LsIrOp {
-	LsOpCallDirect() : LsIrOp(LS_IR_OP_CALL_DIRECT) {}
+	LsOpCallDirect() : LsIrOp(LsIrOpKind::CALL_DIRECT) {}
 	FunctionExpression* function = nullptr;
 	LsIrOp** args = nullptr;
 	u32 arg_count = 0;
@@ -114,14 +114,14 @@ struct LsOpCallDirect : LsIrOp {
 };
 
 struct LsOpExtractValue : LsIrOp {
-	LsOpExtractValue() : LsIrOp(LS_IR_OP_EXTRACT_VALUE) {}
+	LsOpExtractValue() : LsIrOp(LsIrOpKind::EXTRACT_VALUE) {}
 	LsIrOp* value = nullptr;
 	u32 offset = 0;
 	u32 size = 0;
 };
 
 struct LsOpCallIndirect : LsIrOp {
-	LsOpCallIndirect() : LsIrOp(LS_IR_OP_CALL_INDIRECT) {}
+	LsOpCallIndirect() : LsIrOp(LsIrOpKind::CALL_INDIRECT) {}
 	LsIrOp* callee = nullptr;
 	LsIrOp** args = nullptr;
 	u32* arg_sizes = nullptr;
@@ -130,7 +130,7 @@ struct LsOpCallIndirect : LsIrOp {
 };
 
 struct LsOpConditionalJump : LsIrOp {
-    LsOpConditionalJump() : LsIrOp(LS_IR_OP_CONDITIONAL_JUMP) {}
+    LsOpConditionalJump() : LsIrOp(LsIrOpKind::CONDITIONAL_JUMP) {}
 
     LsIrOp* condition = nullptr;
     struct LsIrBlockData* true_block = nullptr;
@@ -146,34 +146,34 @@ struct LsOpConditionalJump : LsIrOp {
 };
 
 struct LsOpJump : LsIrOp {
-	LsOpJump() : LsIrOp(LS_IR_OP_JUMP) {}
+	LsOpJump() : LsIrOp(LsIrOpKind::JUMP) {}
 
 	LsIrOp* target = nullptr;
 	u32 bytecode_patch_offset = 0xffffffffu;
 };
 
-struct LsOpNop : LsIrOp { LsOpNop() : LsIrOp(LS_IR_OP_NOP) {} };
+struct LsOpNop : LsIrOp { LsOpNop() : LsIrOp(LsIrOpKind::NOP) {} };
 
 struct LsOpFramePtr : LsIrOp {
-	LsOpFramePtr() : LsIrOp(LS_IR_OP_FRAME_PTR) {}
+	LsOpFramePtr() : LsIrOp(LsIrOpKind::FRAME_PTR) {}
 	// Resolved to the slot at emit time, once emitAlloca has assigned stack_sp.
 	struct LsOpAlloca* alloca = nullptr;
 };
 
 struct LsOpStringLiteral : LsIrOp {
-	LsOpStringLiteral() : LsIrOp(LS_IR_OP_STRING_LITERAL) {}
+	LsOpStringLiteral() : LsIrOp(LsIrOpKind::STRING_LITERAL) {}
 	u32 index;
 	u32 length;
 };
 
 struct LsOpLoadConst : LsIrOp {
-	LsOpLoadConst() : LsIrOp(LS_IR_OP_LOAD_CONST) {}
+	LsOpLoadConst() : LsIrOp(LsIrOpKind::LOAD_CONST) {}
 	ResolvedType* type = nullptr;
 	u8 value[8] = {};
 };
 
 struct LsOpCopy : LsIrOp {
-	LsOpCopy() : LsIrOp(LS_IR_OP_COPY) {}
+	LsOpCopy() : LsIrOp(LsIrOpKind::COPY) {}
 	ResolvedType* type = nullptr;
 	LsIrOp* src;
 	LsIrOp* dst;
@@ -181,7 +181,7 @@ struct LsOpCopy : LsIrOp {
 
 struct LsOpAggregateInit : LsIrOp {
 	LsOpAggregateInit()
-		: LsIrOp(LS_IR_OP_AGGREGATE_INIT) {}
+		: LsIrOp(LsIrOpKind::AGGREGATE_INIT) {}
 	ResolvedType* type = nullptr;
 	LsIrOp** values = nullptr;
 	u32* offsets = nullptr;
@@ -192,7 +192,7 @@ struct LsOpAggregateInit : LsIrOp {
 // Widen a tagged union to a superset. The payload is copied; the tag is remapped
 // because interned member order (and therefore tag values) can differ.
 struct LsOpUnionConvert : LsIrOp {
-	LsOpUnionConvert() : LsIrOp(LS_IR_OP_UNION_CONVERT) {}
+	LsOpUnionConvert() : LsIrOp(LsIrOpKind::UNION_CONVERT) {}
 	ResolvedType* source_type = nullptr;
 	ResolvedType* target_type = nullptr;
 	LsIrOp* value = nullptr;
@@ -206,14 +206,14 @@ struct LsOpBinary : LsIrOp {
 };
 
 struct LsOpLoadBytes : LsIrOp {
-	LsOpLoadBytes() : LsIrOp(LS_IR_OP_LOAD_BYTES) {}
+	LsOpLoadBytes() : LsIrOp(LsIrOpKind::LOAD_BYTES) {}
 	ResolvedType* type = nullptr;
 	const u8* value = nullptr;
 	u32 size = 0;
 };
 
 struct LsOpTernary : LsIrOp {
-	LsOpTernary() : LsIrOp(LS_IR_OP_TERNARY) {}
+	LsOpTernary() : LsIrOp(LsIrOpKind::TERNARY) {}
 	ResolvedType* type = nullptr;
 	LsIrOp* condition = nullptr;
 	LsIrOp* true_value = nullptr;
@@ -221,14 +221,14 @@ struct LsOpTernary : LsIrOp {
 };
 
 struct LsOpBoundsCheck : LsIrOp {
-	LsOpBoundsCheck() : LsIrOp(LS_IR_OP_BOUNDS_CHECK) {}
+	LsOpBoundsCheck() : LsIrOp(LsIrOpKind::BOUNDS_CHECK) {}
 	ResolvedType* index_type = nullptr;
 	LsIrOp* index = nullptr;
 	u64 length = 0;
 };
 
 struct LsOpSlice : LsIrOp {
-	LsOpSlice() : LsIrOp(LS_IR_OP_SLICE) {}
+	LsOpSlice() : LsIrOp(LsIrOpKind::SLICE) {}
 	LsIrOp* source = nullptr;
 	LsIrOp* begin = nullptr;
 	LsIrOp* end = nullptr;
@@ -239,7 +239,7 @@ struct LsOpSlice : LsIrOp {
 };
 
 struct LsOpSliceLoad : LsIrOp {
-	LsOpSliceLoad() : LsIrOp(LS_IR_OP_SLICE_LOAD) {}
+	LsOpSliceLoad() : LsIrOp(LsIrOpKind::SLICE_LOAD) {}
 	LsIrOp* slice = nullptr;
 	LsIrOp* index = nullptr;
 	ResolvedType* index_type = nullptr;
@@ -247,7 +247,7 @@ struct LsOpSliceLoad : LsIrOp {
 };
 
 struct LsOpSliceRef : LsIrOp {
-	LsOpSliceRef() : LsIrOp(LS_IR_OP_SLICE_REF) { result_mode = ADDRESS; }
+	LsOpSliceRef() : LsIrOp(LsIrOpKind::SLICE_REF) { result_mode = ADDRESS; }
 	LsIrOp* slice = nullptr;
 	LsIrOp* index = nullptr;
 	u32 element_size = 0;
@@ -265,11 +265,11 @@ struct LsOpSliceField : LsIrOp {
 };
 
 struct LsOpSliceFieldLoad : LsOpSliceField {
-	LsOpSliceFieldLoad() : LsOpSliceField(LS_IR_OP_SLICE_FIELD_LOAD) {}
+	LsOpSliceFieldLoad() : LsOpSliceField(LsIrOpKind::SLICE_FIELD_LOAD) {}
 };
 
 struct LsOpSliceFieldStore : LsOpSliceField {
-	LsOpSliceFieldStore() : LsOpSliceField(LS_IR_OP_SLICE_FIELD_STORE) { result_mode = ADDRESS; }
+	LsOpSliceFieldStore() : LsOpSliceField(LsIrOpKind::SLICE_FIELD_STORE) { result_mode = ADDRESS; }
 };
 
 struct LsOpUnary : LsIrOp {
@@ -278,28 +278,28 @@ struct LsOpUnary : LsIrOp {
 	LsIrOp* operand = nullptr;
 };
 
-struct LsOpNeg : LsOpUnary { LsOpNeg() : LsOpUnary(LS_IR_OP_NEG) {} };
-struct LsOpNot : LsOpUnary { LsOpNot() : LsOpUnary(LS_IR_OP_NOT) {} };
+struct LsOpNeg : LsOpUnary { LsOpNeg() : LsOpUnary(LsIrOpKind::NEG) {} };
+struct LsOpNot : LsOpUnary { LsOpNot() : LsOpUnary(LsIrOpKind::NOT) {} };
 
-struct LsOpAdd : LsOpBinary { LsOpAdd() : LsOpBinary(LS_IR_OP_ADD) {} };
-struct LsOpSub : LsOpBinary { LsOpSub() : LsOpBinary(LS_IR_OP_SUB) {} };
-struct LsOpMul : LsOpBinary { LsOpMul() : LsOpBinary(LS_IR_OP_MUL) {} };
-struct LsOpDiv : LsOpBinary { LsOpDiv() : LsOpBinary(LS_IR_OP_DIV) {} };
-struct LsOpMod : LsOpBinary { LsOpMod() : LsOpBinary(LS_IR_OP_MOD) {} };
+struct LsOpAdd : LsOpBinary { LsOpAdd() : LsOpBinary(LsIrOpKind::ADD) {} };
+struct LsOpSub : LsOpBinary { LsOpSub() : LsOpBinary(LsIrOpKind::SUB) {} };
+struct LsOpMul : LsOpBinary { LsOpMul() : LsOpBinary(LsIrOpKind::MUL) {} };
+struct LsOpDiv : LsOpBinary { LsOpDiv() : LsOpBinary(LsIrOpKind::DIV) {} };
+struct LsOpMod : LsOpBinary { LsOpMod() : LsOpBinary(LsIrOpKind::MOD) {} };
 
-struct LsOpAnd : LsOpBinary { LsOpAnd() : LsOpBinary(LS_IR_OP_AND) {} };
-struct LsOpOr : LsOpBinary { LsOpOr() : LsOpBinary(LS_IR_OP_OR) {} };
+struct LsOpAnd : LsOpBinary { LsOpAnd() : LsOpBinary(LsIrOpKind::AND) {} };
+struct LsOpOr : LsOpBinary { LsOpOr() : LsOpBinary(LsIrOpKind::OR) {} };
 
-struct LsOpEq : LsOpBinary { LsOpEq() : LsOpBinary(LS_IR_OP_EQ) {} };
-struct LsOpNe : LsOpBinary { LsOpNe() : LsOpBinary(LS_IR_OP_NE) {} };
-struct LsOpLt : LsOpBinary { LsOpLt() : LsOpBinary(LS_IR_OP_LT) {} };
-struct LsOpLe : LsOpBinary { LsOpLe() : LsOpBinary(LS_IR_OP_LE) {} };
-struct LsOpGt : LsOpBinary { LsOpGt() : LsOpBinary(LS_IR_OP_GT) {} };
-struct LsOpGe : LsOpBinary { LsOpGe() : LsOpBinary(LS_IR_OP_GE) {} };
+struct LsOpEq : LsOpBinary { LsOpEq() : LsOpBinary(LsIrOpKind::EQ) {} };
+struct LsOpNe : LsOpBinary { LsOpNe() : LsOpBinary(LsIrOpKind::NE) {} };
+struct LsOpLt : LsOpBinary { LsOpLt() : LsOpBinary(LsIrOpKind::LT) {} };
+struct LsOpLe : LsOpBinary { LsOpLe() : LsOpBinary(LsIrOpKind::LE) {} };
+struct LsOpGt : LsOpBinary { LsOpGt() : LsOpBinary(LsIrOpKind::GT) {} };
+struct LsOpGe : LsOpBinary { LsOpGe() : LsOpBinary(LsIrOpKind::GE) {} };
 
 struct LsOpCast : LsIrOp {
 	LsOpCast()
-		: LsIrOp(LS_IR_OP_CAST) {}
+		: LsIrOp(LsIrOpKind::CAST) {}
 	ResolvedType* type = nullptr;
 	ResolvedType* target_type = nullptr;
 	LsIrOp* value = nullptr;
@@ -307,7 +307,7 @@ struct LsOpCast : LsIrOp {
 
 struct LsOpAlloca : LsIrOp {
 	LsOpAlloca()
-		: LsIrOp(LS_IR_OP_ALLOCA) {}
+		: LsIrOp(LsIrOpKind::ALLOCA) {}
 	ResolvedType* type = nullptr;
 	LsIrOp* value = nullptr;
 	u32 stack_sp = 0xffFFffFF;
@@ -315,7 +315,7 @@ struct LsOpAlloca : LsIrOp {
 };
 
 struct LsOpReturn : LsIrOp {
-	LsOpReturn() : LsIrOp(LS_IR_OP_RETURN) {}
+	LsOpReturn() : LsIrOp(LsIrOpKind::RETURN) {}
 	LsIrOp* expression = nullptr;
 	u32 size = 0; 
 };

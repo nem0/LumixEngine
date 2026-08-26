@@ -1,46 +1,39 @@
-function 0 norm2 (script, params=16, frame=40, returns=8)
-  0000: MUL_F64              dst=16, lhs=0, rhs=0                                                                        // 	return re * re - im * (-im);
-  0013: NEG_F64              dst=24, src=8                                                                               // 	return re * re - im * (-im);
-  0022: MUL_F64              dst=32, lhs=8, rhs=24                                                                       // 	return re * re - im * (-im);
-  0035: SUB_F64              dst=0, lhs=16, rhs=32                                                                       // 	return re * re - im * (-im);
-  0048: RETURN_BASE                                                                                                      // 	return re * re - im * (-im);
-  0049: RETURN_BASE                                                                                                      // fn norm2(re : f64, im : f64) : f64 {
-function 1 cabs (script, params=16, frame=48, returns=8)
-  0000: MUL_F64              dst=24, lhs=0, rhs=0                                                                        // 	return re * re - im * (-im);
-  0013: NEG_F64              dst=32, src=8                                                                               // 	return re * re - im * (-im);
-  0022: MUL_F64              dst=40, lhs=8, rhs=32                                                                       // 	return re * re - im * (-im);
-  0035: SUB_F64              dst=16, lhs=24, rhs=40                                                                      // 	return re * re - im * (-im);
-  0048: CALL_NATIVE          function=9, arg_base=16                                                                     // 	return math.sqrt_f64(norm2(re, im));
-  0057: COPY                 dst=0, src=16, size=8                                                                       // 	return math.sqrt_f64(norm2(re, im));
-  0070: RETURN_BASE                                                                                                      // 	return math.sqrt_f64(norm2(re, im));
-  0071: RETURN_BASE                                                                                                      // fn cabs(re : f64, im : f64) : f64 {
-function 2 level (script, params=16, frame=88, returns=4)
+function 0 norm2 (script, params=16, frame=24, returns=8)
+  0000: MUL_F64              dst=16, lhs=8, rhs=8                                                                        // 	return re * re - im * (-im);
+  0013: MADD_F64             dst=0, lhs=0, rhs=0, addend=16                                                              // 	return re * re - im * (-im);
+  0030: RETURN_BASE                                                                                                      // 	return re * re - im * (-im);
+  0031: RETURN_BASE                                                                                                      // fn norm2(re : f64, im : f64) : f64 {
+function 1 cabs (script, params=16, frame=32, returns=8)
+  0000: MUL_F64              dst=24, lhs=8, rhs=8                                                                        // 	return re * re - im * (-im);
+  0013: MADD_F64             dst=16, lhs=0, rhs=0, addend=24                                                             // 	return re * re - im * (-im);
+  0030: CALL_NATIVE          function=9, arg_base=16                                                                     // 	return math.sqrt_f64(norm2(re, im));
+  0039: COPY                 dst=0, src=16, size=8                                                                       // 	return math.sqrt_f64(norm2(re, im));
+  0052: RETURN_BASE                                                                                                      // 	return math.sqrt_f64(norm2(re, im));
+  0053: RETURN_BASE                                                                                                      // fn cabs(re : f64, im : f64) : f64 {
+function 2 level (script, params=16, frame=72, returns=4)
   0000: COPY                 dst=16, src=0, size=8                                                                       // 	var zre = x;
   0013: COPY                 dst=24, src=8, size=8                                                                       // 	var zim = y;
   0026: LOAD_CONST_4         dst=32, value= 00 00 00 00                                                                  // 	for l in 0..255 {
   0035: LOAD_CONST_4         dst=36, value= ff 00 00 00                                                                  // 	for l in 0..255 {
-  0044: JGE_I32              lhs=32, rhs=36, offset=206, target=261                                                      // 	for l in 0..255 {
-  0055: MUL_F64              dst=56, lhs=16, rhs=16                                                                      // 		const tre = zre * zre - zim * zim;
-  0068: MUL_F64              dst=64, lhs=24, rhs=24                                                                      // 		const tre = zre * zre - zim * zim;
-  0081: SUB_F64              dst=40, lhs=56, rhs=64                                                                      // 		const tre = zre * zre - zim * zim;
-  0094: MUL_F64              dst=56, lhs=24, rhs=16                                                                      // 		const tim = zre * zim + zim * zre;
-  0107: MADD_F64             dst=48, lhs=16, rhs=24, addend=56                                                           // 		const tim = zre * zim + zim * zre;
-  0124: ADD_F64              dst=16, lhs=40, rhs=0                                                                       // 		zre = tre + x;
-  0137: ADD_F64              dst=24, lhs=48, rhs=8                                                                       // 		zim = tim + y;
-  0150: MUL_F64              dst=64, lhs=16, rhs=16                                                                      // 	return re * re - im * (-im);
-  0163: NEG_F64              dst=72, src=24                                                                              // 	return re * re - im * (-im);
-  0172: MUL_F64              dst=80, lhs=24, rhs=72                                                                      // 	return re * re - im * (-im);
-  0185: SUB_F64              dst=56, lhs=64, rhs=80                                                                      // 	return re * re - im * (-im);
-  0198: CALL_NATIVE          function=9, arg_base=56                                                                     // 	return math.sqrt_f64(norm2(re, im));
-  0207: LOAD_CONST_8         dst=64, value= 00 00 00 00 00 00 00 40                                                      // 		if cabs(zre, zim) > 2.0 {
-  0220: JLE_F64              lhs=56, rhs=64, offset=14, target=245                                                       // 		if cabs(zre, zim) > 2.0 {
-  0231: COPY                 dst=0, src=32, size=4                                                                       // 			return l;
-  0244: RETURN_BASE                                                                                                      // 			return l;
-  0245: INC_I32              dst=32                                                                                      // 	for l in 0..255 {
-  0250: JLT_I32              lhs=32, rhs=36, offset=-206, target=55                                                      // 	for l in 0..255 {
-  0261: LOAD_CONST_4         dst=0, value= ff 00 00 00                                                                   // 	return 255;
-  0270: RETURN_BASE                                                                                                      // 	return 255;
-  0271: RETURN_BASE                                                                                                      // fn level(x : f64, y : f64) : i32 {
+  0044: JGE_I32              lhs=32, rhs=36, offset=179, target=234                                                      // 	for l in 0..255 {
+  0055: MUL_F64              dst=56, lhs=24, rhs=24                                                                      // 		const tre = zre * zre - zim * zim;
+  0068: MSUB_F64             dst=40, lhs=16, rhs=16, addend=56                                                           // 		const tre = zre * zre - zim * zim;
+  0085: MUL_F64              dst=56, lhs=24, rhs=16                                                                      // 		const tim = zre * zim + zim * zre;
+  0098: MADD_F64             dst=48, lhs=16, rhs=24, addend=56                                                           // 		const tim = zre * zim + zim * zre;
+  0115: ADD_F64              dst=16, lhs=40, rhs=0                                                                       // 		zre = tre + x;
+  0128: ADD_F64              dst=24, lhs=48, rhs=8                                                                       // 		zim = tim + y;
+  0141: MUL_F64              dst=64, lhs=24, rhs=24                                                                      // 	return re * re - im * (-im);
+  0154: MADD_F64             dst=56, lhs=16, rhs=16, addend=64                                                           // 	return re * re - im * (-im);
+  0171: CALL_NATIVE          function=9, arg_base=56                                                                     // 	return math.sqrt_f64(norm2(re, im));
+  0180: LOAD_CONST_8         dst=64, value= 00 00 00 00 00 00 00 40                                                      // 		if cabs(zre, zim) > 2.0 {
+  0193: JLE_F64              lhs=56, rhs=64, offset=14, target=218                                                       // 		if cabs(zre, zim) > 2.0 {
+  0204: COPY                 dst=0, src=32, size=4                                                                       // 			return l;
+  0217: RETURN_BASE                                                                                                      // 			return l;
+  0218: INC_I32              dst=32                                                                                      // 	for l in 0..255 {
+  0223: JLT_I32              lhs=32, rhs=36, offset=-179, target=55                                                      // 	for l in 0..255 {
+  0234: LOAD_CONST_4         dst=0, value= ff 00 00 00                                                                   // 	return 255;
+  0243: RETURN_BASE                                                                                                      // 	return 255;
+  0244: RETURN_BASE                                                                                                      // fn level(x : f64, y : f64) : i32 {
 function 3 main (script, params=0, frame=96, returns=4)
   0000: LOAD_CONST_8         dst=0, value= 00 00 00 00 00 00 00 c0                                                       // 	const xmin = -2.0;
   0013: LOAD_CONST_8         dst=8, value= 00 00 00 00 00 00 00 c0                                                       // 	const ymin = -2.0;
