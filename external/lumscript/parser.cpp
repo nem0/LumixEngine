@@ -559,7 +559,7 @@ struct Parser {
 						m_output.errorAt(name, "Expected identifier");
 						return nullptr;
 					}
-					
+
 					TypeMemberExpression* member = makeExpr<TypeMemberExpression>(colon);
 					member->expression = expr;
 					if (equalStrings(name.value, "kind")) member->kind = TypeMemberExpression::KIND;
@@ -573,6 +573,7 @@ struct Parser {
 					else if (equalStrings(name.value, "max")) member->kind = TypeMemberExpression::MAX;
 					else if (equalStrings(name.value, "child")) member->kind = TypeMemberExpression::CHILD;
 					else if (equalStrings(name.value, "length")) member->kind = TypeMemberExpression::LENGTH;
+					else if (equalStrings(name.value, "attribute")) member->kind = TypeMemberExpression::ATTRIBUTE;
 					else {
 						m_output.errorAt(name, "Unsupported type member");
 						return nullptr;

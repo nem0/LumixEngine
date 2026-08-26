@@ -17,6 +17,49 @@ TEST(NullablePromotionTypechecks) {
 	return true;
 }
 
+TEST(ComptimeNullableNarrowing) {
+	const char* source = R"(
+		fn read(v : ?i32) : i32 {
+			if v != null { return v; }
+			return 0;
+		}
+		comptime value : ?i32 = 42;
+		comptime result = read(value);
+		fn main() : void {}
+
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeNullableStructFieldNarrowing) {
+	const char* source = R"(
+		struct Value { number : i32; }
+		fn read(v : ?Value) : i32 {
+			if v != null { return v.number; }
+			return 0;
+		}
+		comptime value : ?Value = Value { 42 };
+		comptime result = read(value);
+		fn main() : void {}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ComptimeNullableStructFieldRequiresNullCheck) {
+	const char* source = R"(
+		struct Value { number : i32; }
+		fn read(v : ?Value) : i32 {
+			return v.number;
+		}
+		comptime value : ?Value = Value { 42 };
+		comptime result = read(value);
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(NullableNarrowingPreservesConst) {
 	const char* source = R"(
 		fn main() : void {

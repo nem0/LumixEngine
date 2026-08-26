@@ -332,7 +332,8 @@ struct TypeMemberExpression : Expression {
 		MIN,
 		MAX,
 		CHILD,
-		LENGTH
+		LENGTH,
+		ATTRIBUTE
 	};
 
 	TypeMemberExpression() : Expression(TYPE_MEMBER) {}

@@ -2233,6 +2233,7 @@ A `type` value exposes its structure through members accessed with `::`. A value
 | `t::types` | sequence of member types | `.Union` |
 | `t::params` | slice of parameter descriptors | `.Fn` |
 | `t::ret` | `type` | `.Fn` |
+| `t::attribute(attr_type)` | `?attr_type` | every type |
 
 ```cpp
 comptime k = i32::kind;       // .I32
@@ -2244,6 +2245,7 @@ comptime e = []i32::child;  // i32
 comptime m = [4]i32::length; // 4
 comptime ps = (fn(i32, f32) : bool)::params; // [{ name = "", type = i32 }, { name = "", type = f32 }]
 comptime r = (fn(i32, f32) : bool)::ret;     // bool
+comptime tag = Settings::attribute(tag);      // ?tag
 
 var v : Vec3 = undefined;
 comptime value_name = v::name;                       // same as typeof(v)::name
@@ -2257,6 +2259,7 @@ comptime value_fields = v::fields;                   // same as typeof(v)::field
 - `t::length` is the element count `N` of a `[N]T`, an untyped compile-time integer - the same value `v.length` yields on an instance (see [Static-sized arrays](#static-sized-arrays)), but reachable from the type without one, so `unroll for i in 0..t::length` works on a type alone. It is not defined for `.Slice`, whose length is a runtime property
 - `t::fields`, `t::values`, and `t::types` are [reflection sequences](#reflection-sequences)
 - `t::params` is the [reflection sequence](#reflection-sequences) of a `.Fn` type's parameter descriptors, in declaration order; `t::ret` is its return type, named `ret` rather than `return` to avoid the keyword. Each descriptor is an ordinary compile-time struct with `.name` and `.type` members; `.name` is a compile-time `[]const u8` and is `""` for unnamed parameters.
+- `t::attribute(attr_type)` looks up the first attribute on `t` whose declaration type is `attr_type`, returning its value as `?attr_type`. It returns `null` when no matching attribute is attached. The argument must be a compile-time type value and the result is compile-time only.
 
 All type members are compile-time only. A concrete type receiver is checked immediately. A generic receiver such as an uninstantiated `$T` defers the access as a compile-time constraint until the template is instantiated. A value receiver uses its statically known type, including any flow typing in effect at the access site. Type members are not operators or functions - like any member access they cannot be taken as a value on their own, only applied to a type or value receiver.
 

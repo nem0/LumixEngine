@@ -2419,6 +2419,35 @@ struct Checker {
 	Expression* checkCallExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr) {
 		CallExpression& call = static_cast<CallExpression&>(expr);
 
+		// `t::attribute(T)` is a compiler intrinsic rather than a function call.
+		if (call.callee->kind == Expression::TYPE_MEMBER
+			&& static_cast<TypeMemberExpression*>(call.callee)->kind == TypeMemberExpression::ATTRIBUTE) {
+			TypeMemberExpression& member = static_cast<TypeMemberExpression&>(*call.callee);
+			if (!checkTypeMemberExpr(unit, ctx, member)) return nullptr;
+
+			if (call.args.size() != 1) {
+				errorLine(call.token, "::attribute expects exactly one type argument");
+				return nullptr;
+			}
+
+			Expression* argument = call.args[0];
+			if (!checkExpr(unit, ctx, *argument, nullptr)) return nullptr;
+
+			ComptimeValue argument_value = evalComptime(unit, *argument, ctx);
+			ResolvedType* attribute_type = argument_value.kind == ComptimeValue::TYPE
+				? argument_value.type : nullptr;
+			if (!attribute_type) {
+				errorLine(argument->token, "::attribute argument must be a compile-time type");
+				return nullptr;
+			}
+			
+			NullableResolvedType* result_type = makeType<NullableResolvedType>(unit.arena);
+			result_type->inner = attribute_type;
+			call.resolved_type = result_type;
+			call.eval_stage = Expression::COMPTIME_ONLY;
+			return &call;
+		}
+
 		// Suppress errors while probing normal lookup because a failed member lookup can
 		// fall back to UFCS, and the first argument can be checked again during the call.
 		++suppress_errors;
@@ -3146,6 +3175,11 @@ struct Checker {
 				}
 				expr.resolved_type = primitiveType(isFloatType(*t) ? ResolvedTypeKind::UNTYPED_FLOAT : ResolvedTypeKind::UNTYPED_INT);
 				expr.eval_stage = Expression::COMPTIME_VALUE;
+				return &expr;
+			}
+			case TypeMemberExpression::ATTRIBUTE: {
+				// The call checker validates the single attribute type argument and
+				// supplies the nullable result type.
 				return &expr;
 			}
 			case TypeMemberExpression::RET: {
@@ -4377,6 +4411,8 @@ struct Checker {
 		// A condition made entirely from compile-time values selects one branch.
 		// Suppress resolver diagnostics here because a runtime condition is valid;
 		// it simply falls through to ordinary two-arm checking below.
+		bool comptime_branch_known = false;
+		bool comptime_branch_value = false;
 		++suppress_errors;
 		u8* comptime_eval_start = comptime_stack_ptr;
 		ComptimeValue cmptime_t = evalComptime(unit, *ifst.condition, &ctx);
@@ -4389,13 +4425,14 @@ struct Checker {
 
 			ifst.comptime_known = true;
 			ifst.comptime_value = comptime_bool_value;
-			Statement* selected = ifst.comptime_value ? static_cast<Statement*>(ifst.body) : ifst.else_branch;
-			return checkStatement(unit, ctx, selected, return_type, {});
+			comptime_branch_known = true;
+			comptime_branch_value = comptime_bool_value;
 		}
 		if (hasNumericTypeBound(*ifst.condition)) {
 			ifst.comptime_known = true;
 			ifst.comptime_value = true;
-			return checkStatement(unit, ctx, ifst.body, return_type, {});
+			comptime_branch_known = true;
+			comptime_branch_value = true;
 		}
 		comptime_stack_ptr = comptime_eval_start;
 
@@ -4515,6 +4552,11 @@ struct Checker {
 
 		ResolvedType* true_branch_type = narrow_in_true ? narrowed_type : residual_type;
 		ResolvedType* false_branch_type = narrow_in_true ? residual_type : narrowed_type;
+		if (comptime_branch_known) {
+			Statement* selected = comptime_branch_value ? static_cast<Statement*>(ifst.body) : ifst.else_branch;
+			ResolvedType* selected_type = comptime_branch_value ? true_branch_type : false_branch_type;
+			return checkBranchWithNarrowing(selected, selected_type);
+		}
 		if (!checkBranchWithNarrowing(ifst.body, true_branch_type)) return false;
 		if (!checkBranchWithNarrowing(ifst.else_branch, false_branch_type)) return false;
 
@@ -5748,6 +5790,35 @@ struct Checker {
 			}
 			case Expression::CALL: {
 				auto& call = static_cast<CallExpression&>(expr);
+				// T::attribute()
+				if (call.callee->kind == Expression::TYPE_MEMBER && static_cast<TypeMemberExpression*>(call.callee)->kind == TypeMemberExpression::ATTRIBUTE) {
+					TypeMemberExpression& member = static_cast<TypeMemberExpression&>(*call.callee);
+					ComptimeValue requested = evalComptime(unit, *call.args[0], ctx, bindings, frame);
+					
+					// TODO can this even happen?
+					if (requested.kind != ComptimeValue::TYPE) return {};
+
+					ResolvedType* result_inner = requested.type;
+					NullableResolvedType* result_type = static_cast<NullableResolvedType*>(call.resolved_type);
+					u8* bytes = comptime_stack_ptr;
+					const u32 payload_size = typeByteSize(*result_inner);
+					memset(bytes, 0, 1 + payload_size);
+
+					if (member.reflected_type->kind == ResolvedTypeKind::STRUCT) {
+						StructExpression* declaration = static_cast<StructResolvedType*>(member.reflected_type)->decl;
+						if (declaration->attributes) {
+							for (Attribute& attribute : *declaration->attributes) {
+								if (!typesEqual(attribute.resolved_type, result_inner)) continue;
+
+								bytes[0] = 1;
+								copyMemory(bytes + 1, attribute.comptime_bytes, attribute.comptime_byte_size);
+								break;
+							}
+						}
+					}
+					comptime_stack_ptr += 1 + payload_size;
+					return {ComptimeValue::VALUE, result_type, bytes};
+				}
 				SymbolRef ref = resolveSymbol(unit, *call.callee);
 				if (ref && checkSymbol(*ref.owner, *ref.symbol) == LS_RESULT_FAILURE) return {};
 				if (!ref) {
@@ -5864,13 +5935,22 @@ struct Checker {
 				}
 
 				// struct.field
-				if (member.expression && member.expression->resolved_type && member.expression->resolved_type->kind == ResolvedTypeKind::STRUCT) {
+				if (member.expression && member.expression->resolved_type
+					&& (member.expression->resolved_type->kind == ResolvedTypeKind::STRUCT
+						|| member.expression->resolved_type->kind == ResolvedTypeKind::NULLABLE)) {
 					++suppress_errors;
 					ComptimeValue base_value = evalComptime(unit, *member.expression, ctx, bindings, frame);
 					--suppress_errors;
 					if (base_value.kind == ComptimeValue::VALUE) {
-						StructResolvedType& st = *static_cast<StructResolvedType*>(member.expression->resolved_type);
+						ResolvedType* base_type = base_value.type ? base_value.type : member.expression->resolved_type;
 						u32 offset = 0;
+						if (base_type->kind == ResolvedTypeKind::NULLABLE) {
+							if (!base_value.value || base_value.value[0] == 0) return {};
+							offset = 1;
+							base_type = static_cast<NullableResolvedType*>(base_type)->inner;
+						}
+						if (base_type->kind != ResolvedTypeKind::STRUCT) return {};
+						StructResolvedType& st = *static_cast<StructResolvedType*>(base_type);
 						for (i32 i = 0; i < st.decl->fields.size(); ++i) {
 							ResolvedType* field_type = structFieldType(st, i);
 							if (equalStrings(st.decl->fields[i].name, member.name)) {
