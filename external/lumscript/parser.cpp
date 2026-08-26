@@ -102,6 +102,7 @@ struct Parser {
 			case Token::RANGE_INCLUSIVE: return "..=";
 			case Token::QUESTION: return "?";
 			case Token::DOLLAR: return "$";
+			case Token::HASH: return "#";
 			case Token::PIPE: return "|";
 			case Token::PLUS: return "+";
 			case Token::MINUS: return "-";
@@ -1552,6 +1553,34 @@ struct Parser {
 		return fn;
 	}
 
+	inline ExpArray<Attribute>* parseAttributeList() {
+		if (!consume(Token::LEFT_BRACKET)) return nullptr;
+		if (peekToken().type == Token::RIGHT_BRACKET) {
+			m_output.errorAt(peekToken(), "Expected attribute");
+			return nullptr;
+		}
+		ExpArray<Attribute>* attributes = make<ExpArray<Attribute>>(m_unit.arena);
+		for (;;) {
+			Token name = consumeToken();
+			if (name.type != Token::IDENTIFIER) {
+				m_output.errorAt(name, "Expected attribute type");
+				return nullptr;
+			}
+			IdentifierExpression* type_expr = makeExpr<IdentifierExpression>(name);
+			type_expr->name = name.value;
+			Attribute& attribute = attributes->emplace_back();
+			attribute.type = type_expr;
+			attribute.token = name;
+			attribute.value = structLiteral(type_expr);
+			if (!attribute.value) return nullptr;
+			if (peekToken().type != Token::COMMA) break;
+			consumeToken();
+		}
+		if (!consume(Token::RIGHT_BRACKET)) return nullptr;
+		return attributes;
+	}
+
+
 	StructExpression* structExpression() {
 		StructExpression* st = make<StructExpression>(m_unit.arena);
 		if (!consume(Token::LEFT_BRACE)) return nullptr;
@@ -1562,6 +1591,11 @@ struct Parser {
 			}
 
 			NamedDecl& field = st->fields.emplace_back();
+			if (peekToken().type == Token::HASH) {
+				consumeToken();
+				field.attributes = parseAttributeList();
+				if (!field.attributes) return nullptr;
+			}
 			if (!consume(Token::IDENTIFIER, field.name, "Expected field name")) return nullptr;
 			for (i32 i = 0; i < st->fields.size() - 1; ++i) {
 				if (!equalStrings(st->fields[i].name, field.name)) continue;
@@ -1614,11 +1648,12 @@ struct Parser {
 		return namedComptimeDecl(name_token, en);
 	}
 
-	bool structDecl() {
+	bool structDecl(ExpArray<Attribute>* attributes = nullptr) {
 		Token name_token = consumeToken();
 		if (name_token.type != Token::IDENTIFIER) { m_output.errorAt(name_token, "Expected struct name"); return false; }
 		StructExpression* st = structExpression();
 		if (!st) return false;
+		st->attributes = attributes;
 		return namedComptimeDecl(name_token, st);
 	}
 
@@ -1725,6 +1760,17 @@ struct Parser {
 				case Token::COMPTIME: if (!symbolDecl(Symbol::COMPTIME)) return LS_RESULT_FAILURE; break;
 				case Token::FN: if (!functionDecl()) return LS_RESULT_FAILURE; break;
 				case Token::STRUCT: if (!structDecl()) return LS_RESULT_FAILURE; break;
+				case Token::HASH: {
+					ExpArray<Attribute>* attributes = parseAttributeList();
+					if (!attributes) return LS_RESULT_FAILURE;
+					Token declaration = consumeToken();
+					if (declaration.type != Token::STRUCT) {
+						m_output.errorAt(declaration, "Attributes can only be attached to structs");
+						return LS_RESULT_FAILURE;
+					}
+					if (!structDecl(attributes)) return LS_RESULT_FAILURE;
+					break;
+				}
 				case Token::ENUM: if (!enumDecl()) return LS_RESULT_FAILURE; break;
 				case Token::IMPORT: if (!importDecl()) return LS_RESULT_FAILURE; break;
 				case Token::EXTERN: if (!externDecl()) return LS_RESULT_FAILURE; break;

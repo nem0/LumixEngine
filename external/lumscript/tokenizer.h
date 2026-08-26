@@ -311,6 +311,7 @@ struct Tokenizer {
 			case '&': return makeToken(Token::AMPERSAND);
 			case '?': return makeToken(Token::QUESTION);
 			case '$': return makeToken(Token::DOLLAR);
+			case '#': return makeToken(Token::HASH);
 			case '|': return makeToken(Token::PIPE);
 			case '+': {
 				if (match('=')) return makeToken(Token::PLUS_EQUAL);

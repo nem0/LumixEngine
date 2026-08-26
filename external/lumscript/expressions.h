@@ -10,8 +10,13 @@ struct Symbol;
 struct FunctionExpression;
 struct Expression;
 
+struct Attribute;
+
 struct NamedDecl {
 	ls_string_view name;
+	// Attributes are parsed metadata; semantic validation and materialization are
+	// performed by the checker.
+	ExpArray<Attribute>* attributes = nullptr;
 	// Shared by compile-time template parameters and runtime function parameters;
 	// the owning expression determines which phase the parameter belongs to.
 	// Type annotations are ordinary expressions resolved in a comptime context.
@@ -363,6 +368,16 @@ struct StructLiteralExpression : Expression {
 	ExpArray<Expression*> values;
 };
 
+// A typed attribute such as `tag { 42 }` in `#[tag { 42 }]`.
+struct Attribute {
+	Expression* type = nullptr;
+	StructLiteralExpression* value = nullptr;
+	Token token = {};
+	ResolvedType* resolved_type = nullptr;
+	u8* comptime_bytes = nullptr;
+	u32 comptime_byte_size = 0;
+};
+
 struct TypeofExpression : Expression {
 	TypeofExpression() : Expression(TYPEOF) {}
 
@@ -399,6 +414,7 @@ struct StructExpression : Expression {
 	StructExpression(ls_arena& arena) : Expression(STRUCT), fields(arena), operators(arena) {}
 
 	ExpArray<NamedDecl> fields;
+	ExpArray<Attribute>* attributes = nullptr;
 	// Operator overloads hosted on this type (first struct operand).
 	// Populated during symbol checking; used for O(1)-ish operator lookup.
 	ExpArray<StructOperator> operators;

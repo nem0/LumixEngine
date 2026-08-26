@@ -321,7 +321,14 @@ typedef struct ls_type_field_info {
 	ls_string_view name;
 	u32 type_index;   // index into the owning bytecode's type_info[]
 	u32 offset;       // byte offset from the start of the struct value
+	u32 first_attribute_index;
+	u32 attribute_count;
 } ls_type_field_info;
+
+typedef struct ls_type_attribute_info {
+	u32 type_index;
+	const void* value;
+} ls_type_attribute_info;
 
 // Describes one value of an enum type. Used at debug time to enumerate
 // enum value names and their integer values.
@@ -340,6 +347,8 @@ typedef struct ls_type {
 	u32 byte_size;               // same as typeByteSize for this type
 	u32 field_count;             // 0 when kind != LS_TYPE_STRUCT
 	u32 first_field_index;       // index into bytecode->type_fields[]; unused when field_count == 0
+	u32 attribute_count;
+	u32 first_attribute_index;
 	u32 member_count;            // 0 when kind != LS_TYPE_TAGGED_UNION
 	u32 first_member_index;      // index into bytecode->type_member_indices[]; unused when member_count == 0
 	u32 value_count;             // 0 when kind != LS_TYPE_ENUM
@@ -454,6 +463,9 @@ typedef struct ls_bytecode {
 	ls_type_field_info* type_fields;
 	u32 type_field_count;
 	u32 type_field_capacity;
+	ls_type_attribute_info* type_attributes;
+	u32 type_attribute_count;
+	u32 type_attribute_capacity;
 
 	// Flat array of type indices for tagged union members, indexed by
 	// `ls_type::first_member_index` + member offset.

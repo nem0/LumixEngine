@@ -1948,6 +1948,33 @@ struct Checker {
 			if (!field_type) return false;
 
 			st_type.field_types.push(field_type);
+			if (field.attributes) {
+				for (Attribute& attribute : *field.attributes) {
+					attribute.resolved_type = asType(evalComptime(unit, *attribute.type), attribute.type->token);
+					if (!attribute.resolved_type || attribute.resolved_type->kind != ResolvedTypeKind::STRUCT) return false;
+					if (!checkExprForTarget(unit, nullptr, *attribute.value, attribute.resolved_type)) return false;
+
+					ComptimeValue payload = evalComptime(unit, *attribute.value, nullptr, nullptr, nullptr, attribute.resolved_type);
+					if (!payload || payload.kind != ComptimeValue::VALUE) return false;
+
+					attribute.comptime_bytes = payload.value;
+					attribute.comptime_byte_size = typeByteSize(*attribute.resolved_type);
+				}
+			}
+		}
+
+		if (st.attributes) {
+			for (Attribute& attribute : *st.attributes) {
+				attribute.resolved_type = asType(evalComptime(unit, *attribute.type), attribute.type->token);
+				if (!attribute.resolved_type || attribute.resolved_type->kind != ResolvedTypeKind::STRUCT) return false;
+				if (!checkExprForTarget(unit, nullptr, *attribute.value, attribute.resolved_type)) return false;
+
+				ComptimeValue payload = evalComptime(unit, *attribute.value, nullptr, nullptr, nullptr, attribute.resolved_type);
+				if (!payload || payload.kind != ComptimeValue::VALUE) return false;
+
+				attribute.comptime_bytes = payload.value;
+				attribute.comptime_byte_size = typeByteSize(*attribute.resolved_type);
+			}
 		}
 
 		ExpArray<ResolvedType*> visited(unit.arena);

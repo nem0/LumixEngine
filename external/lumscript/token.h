@@ -58,6 +58,7 @@ struct Token {
 		RANGE_INCLUSIVE,
 		QUESTION,
 		DOLLAR,
+		HASH,
 		PIPE,
 
 		PLUS,

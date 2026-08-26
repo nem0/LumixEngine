@@ -1810,6 +1810,7 @@ struct TypeInfoBuilder {
 		, sources(host.arena)
 		, types(host.arena)
 		, fields(host.arena)
+		, attributes(host.arena)
 		, member_indices(host.arena)
 		, enum_values(host.arena) {}
 
@@ -1819,6 +1820,7 @@ struct TypeInfoBuilder {
 		}
 
 		const u32 first_field = (u32)fields.size();
+		const u32 first_attribute = (u32)attributes.size();
 		const u32 first_member = (u32)member_indices.size();
 		const u32 first_value = (u32)enum_values.size();
 		const u32 self = (u32)types.size();
@@ -1828,6 +1830,9 @@ struct TypeInfoBuilder {
 		entry.kind = debugTypeKind(type);
 		entry.byte_size = typeByteSize(type);
 		entry.first_field_index = first_field;
+		entry.first_attribute_index = first_attribute;
+		entry.attribute_count = 0;
+		entry.member_count = 0;
 		entry.first_member_index = first_member;
 		entry.first_value_index = first_value;
 		entry.element_type_index = LS_TYPE_INDEX_NONE;
@@ -1838,16 +1843,45 @@ struct TypeInfoBuilder {
 				const StructResolvedType& st = static_cast<const StructResolvedType&>(type);
 				if (st.decl) {
 					entry.name = copyStringViewToArena(host.arena, st.decl->cached_name);
+					if (st.decl->attributes) {
+						for (const Attribute& attr : *st.decl->attributes) {
+							if (!attr.resolved_type || !attr.comptime_bytes) continue;
+							u32 type_index = internType(*attr.resolved_type);
+							ls_type_attribute_info& info = attributes.emplace_back();
+							info.type_index = type_index;
+							u32 size = typeByteSize(*attr.resolved_type);
+							void* value = host.arena.allocate(host.arena.user_data, size, 1);
+							copyMemory(value, attr.comptime_bytes, size);
+							info.value = value;
+						}
+						entry.attribute_count = (u32)attributes.size() - first_attribute;
+					}
 					u32 offset = 0;
 					// Append this type's own field entries first (recursion
 					// below must not interleave child fields into this range).
 					for (i32 i = 0; i < st.decl->fields.size(); ++i) {
 						ResolvedType* field_type = structFieldTypeAt(st, i);
 						if (!field_type) continue;
+						u32 field_index = (u32)fields.size();
 						ls_type_field_info& field = fields.emplace_back();
 						field.name = copyStringViewToArena(host.arena, st.decl->fields[i].name);
 						field.type_index = LS_TYPE_INDEX_NONE;
 						field.offset = offset;
+						field.first_attribute_index = (u32)attributes.size();
+						field.attribute_count = 0;
+						if (st.decl->fields[i].attributes) {
+							for (const Attribute& attr : *st.decl->fields[i].attributes) {
+								if (!attr.resolved_type || !attr.comptime_bytes) continue;
+								u32 type_index = internType(*attr.resolved_type);
+								ls_type_attribute_info& info = attributes.emplace_back();
+								info.type_index = type_index;
+								u32 size = typeByteSize(*attr.resolved_type);
+								void* value = host.arena.allocate(host.arena.user_data, size, 1);
+								copyMemory(value, attr.comptime_bytes, size);
+								info.value = value;
+							}
+							fields[field_index].attribute_count = (u32)attributes.size() - fields[field_index].first_attribute_index;
+						}
 						offset += typeByteSize(*field_type);
 					}
 					entry.field_count = (u32)fields.size() - first_field;
@@ -1923,6 +1957,12 @@ struct TypeInfoBuilder {
 			bytecode.type_info_count = (u32)types.size();
 			bytecode.type_info_capacity = (u32)types.size();
 		}
+		if (attributes.size() > 0) {
+			bytecode.type_attributes = (ls_type_attribute_info*)host.arena.allocate(host.arena.user_data, sizeof(ls_type_attribute_info) * (u32)attributes.size(), alignof(ls_type_attribute_info));
+			for (i32 i = 0; i < attributes.size(); ++i) bytecode.type_attributes[i] = attributes[i];
+			bytecode.type_attribute_count = (u32)attributes.size();
+			bytecode.type_attribute_capacity = (u32)attributes.size();
+		}
 		if (fields.size() > 0) {
 			bytecode.type_fields = (ls_type_field_info*)host.arena.allocate(host.arena.user_data, sizeof(ls_type_field_info) * (u32)fields.size(), alignof(ls_type_field_info));
 			for (i32 i = 0; i < fields.size(); ++i) bytecode.type_fields[i] = fields[i];
@@ -1948,6 +1988,7 @@ struct TypeInfoBuilder {
 	ExpArray<const ResolvedType*> sources;
 	ExpArray<ls_type> types;
 	ExpArray<ls_type_field_info> fields;
+	ExpArray<ls_type_attribute_info> attributes;
 	ExpArray<u32> member_indices;
 	ExpArray<ls_type_enum_value_info> enum_values;
 };

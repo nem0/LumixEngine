@@ -69,3 +69,38 @@ int ls_module_get_global_count(ls_module* module) {
 void ls_bytecode_destroy(ls_bytecode* bytecode) {
 	// TODO
 }
+
+u32 ls_type_attribute_count(const ls_type* type) {
+	return type ? type->attribute_count : 0u;
+}
+
+ls_attribute ls_type_attribute_value(const ls_type* type, u32 attribute_index) {
+	if (!type || !type->bytecode || attribute_index >= type->attribute_count) return {nullptr, nullptr};
+
+	const ls_type_attribute_info& info = type->bytecode->type_attributes[type->first_attribute_index + attribute_index];
+	if (info.type_index >= type->bytecode->type_info_count) return {nullptr, nullptr};
+
+	return {(const ls_type*)&type->bytecode->type_info[info.type_index], info.value};
+}
+
+u32 ls_type_struct_field_attribute_count(const ls_type* type, u32 field_index) {
+	if (!type || type->kind != LS_TYPE_STRUCT || !type->bytecode || field_index >= type->field_count) return 0u;
+
+	return type->bytecode->type_fields[type->first_field_index + field_index].attribute_count;
+}
+
+ls_attribute ls_type_struct_field_attribute_value(
+	const ls_type* type,
+	u32 field_index,
+	u32 attribute_index
+) {
+	if (!type || type->kind != LS_TYPE_STRUCT || !type->bytecode || field_index >= type->field_count) return {nullptr, nullptr};
+
+	const ls_type_field_info& field = type->bytecode->type_fields[type->first_field_index + field_index];
+	if (attribute_index >= field.attribute_count) return {nullptr, nullptr};
+
+	const ls_type_attribute_info& info = type->bytecode->type_attributes[field.first_attribute_index + attribute_index];
+	if (info.type_index >= type->bytecode->type_info_count) return {nullptr, nullptr};
+
+	return {(const ls_type*)&type->bytecode->type_info[info.type_index], info.value};
+}
