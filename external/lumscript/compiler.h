@@ -8,8 +8,12 @@
 
 struct Unit;
 
+u32 typeByteSize(const ResolvedType& type);
+u32 typeAlignment(const ResolvedType& type);
+u32 structFieldOffset(const StructResolvedType& type, i32 field_index);
+
 struct Symbol {
-	enum Storage {
+	enum Kind {
 		// Runtime storage. The initializer expression is evaluated at runtime unless
 		// later analysis proves it can be folded.
 		VARIABLE,
@@ -31,7 +35,7 @@ struct Symbol {
 		CHECKED,
 	};
 
-	Storage storage;
+	Kind kind;
 	CheckState check_state = UNCHECKED;
 	ls_string_view name; // as written in unit
 	Token token = {};
@@ -69,7 +73,7 @@ struct Symbol {
 // occupy a runtime global slot nor need a global-init store.
 inline bool symbolHasGlobalStorage(const Symbol& sym) {
 	return sym.expression
-		&& sym.storage != Symbol::COMPTIME
+		&& sym.kind != Symbol::COMPTIME
 		&& (!sym.resolved_type || sym.resolved_type->kind != ResolvedTypeKind::META)
 		&& sym.expression->kind != Expression::FUNCTION
 		&& sym.expression->kind != Expression::STRUCT

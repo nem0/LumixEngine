@@ -70,6 +70,15 @@ void ls_bytecode_destroy(ls_bytecode* bytecode) {
 	// TODO
 }
 
+u32 ls_bytecode_type_count(const ls_bytecode* bytecode) {
+	return bytecode ? bytecode->type_info_count : 0;
+}
+
+const ls_type* ls_bytecode_type(const ls_bytecode* bytecode, u32 index) {
+	if (!bytecode || index >= bytecode->type_info_count) return nullptr;
+	return &bytecode->type_info[index];
+}
+
 u32 ls_type_attribute_count(const ls_type* type) {
 	return type ? type->attribute_count : 0u;
 }

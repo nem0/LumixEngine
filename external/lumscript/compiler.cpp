@@ -56,11 +56,74 @@ ls_module::ls_module(ls_host* host)
 	type_kind.decl = &type_kind_decl;
 }
 
-static ResolvedType* structFieldType(const StructResolvedType& st, i32 index) {
-	ASSERT(st.decl);
-	if (index < st.field_types.size()) return st.field_types[(u32)index];
-	ASSERT(false);
-	return nullptr;
+static u32 alignTo(u32 offset, u32 alignment) {
+	ASSERT(alignment > 0);
+	return (offset + alignment - 1) & ~(alignment - 1);
+}
+
+u32 typeAlignment(const ResolvedType& t) {
+	switch (t.kind) {
+		case ResolvedTypeKind::VOID: return 1;
+		case ResolvedTypeKind::BOOL:
+		case ResolvedTypeKind::I8:
+		case ResolvedTypeKind::U8:
+		case ResolvedTypeKind::BYTE: return 1;
+		case ResolvedTypeKind::I16:
+		case ResolvedTypeKind::U16: return 2;
+		case ResolvedTypeKind::I32:
+		case ResolvedTypeKind::U32:
+		case ResolvedTypeKind::F32:
+		case ResolvedTypeKind::ENUM:
+		case ResolvedTypeKind::FUNCTION: return 4;
+		case ResolvedTypeKind::I64:
+		case ResolvedTypeKind::U64:
+		case ResolvedTypeKind::ISIZE:
+		case ResolvedTypeKind::F64:
+		case ResolvedTypeKind::CSTR:
+		case ResolvedTypeKind::CPTR:
+		case ResolvedTypeKind::SLICE:
+		case ResolvedTypeKind::POINTER: return 8;
+		case ResolvedTypeKind::NULLABLE: return typeAlignment(*static_cast<const NullableResolvedType&>(t).inner);
+		case ResolvedTypeKind::UNION: {
+			const UnionResolvedType& un = static_cast<const UnionResolvedType&>(t);
+			u32 alignment = 4;
+			for (ResolvedType* member : un.members) {
+				const u32 member_alignment = typeAlignment(*member);
+				if (member_alignment > alignment) alignment = member_alignment;
+			}
+			return alignment;
+		}
+		case ResolvedTypeKind::ARRAY: return typeAlignment(*static_cast<const ArrayResolvedType&>(t).element_type);
+		case ResolvedTypeKind::STRUCT: return static_cast<const StructResolvedType&>(t).alignment;
+		case ResolvedTypeKind::UNTYPED_FLOAT:
+		case ResolvedTypeKind::UNTYPED_INT: return 8;
+		case ResolvedTypeKind::META: return alignof(ResolvedType*);
+		default: ASSERT(false); return 1;
+	}
+}
+
+u32 structFieldOffset(const StructResolvedType& st, i32 field_index) {
+	ASSERT(field_index >= 0 && (u32)field_index < st.fields.size());
+	return st.fields[(u32)field_index].offset;
+}
+
+void cacheStructFieldOffsets(StructResolvedType& st) {
+	for (ResolvedStructField& field : st.fields) field.offset = 0;
+	st.alignment = 1;
+	u32 size = 0;
+	for (i32 field_index = 0; field_index < st.fields.size(); ++field_index) {
+		ResolvedType* field = st.fields[field_index].type;
+		if (!field) {
+			st.fields[field_index].offset = size;
+			continue;
+		}
+		const u32 field_alignment = typeAlignment(*field);
+		if (field_alignment > st.alignment) st.alignment = field_alignment;
+		size = alignTo(size, field_alignment);
+		st.fields[field_index].offset = size;
+		size += typeByteSize(*field);
+	}
+	st.byte_size = size ? alignTo(size, st.alignment) : 1;
 }
 
 u32 typeByteSize(const ResolvedType& t) {
@@ -101,22 +164,13 @@ u32 typeByteSize(const ResolvedType& t) {
 			ASSERT(arr.size < 0xffFFffFF); // TODO
 			return (u32)arr.size * typeByteSize(*arr.element_type);
 		}
-		case ResolvedTypeKind::STRUCT: {
-			const StructResolvedType& st = static_cast<const StructResolvedType&>(t);
-			u32 count = 0;
-			if (st.decl) {
-				for (i32 i = 0; i < st.decl->fields.size(); ++i) {
-					ResolvedType* field_type = structFieldType(st, i);
-					if (field_type) count += typeByteSize(*field_type);
-				}
-			}
-			return count ? count : 1;
-		}
+		case ResolvedTypeKind::STRUCT:
+			return static_cast<const StructResolvedType&>(t).byte_size;
 		case ResolvedTypeKind::UNTYPED_FLOAT:
 		case ResolvedTypeKind::UNTYPED_INT:
 			return 8;
 		case ResolvedTypeKind::META:
-			return 0;
+			return sizeof(ResolvedType*);
 		case ResolvedTypeKind::POINTER: return 8;
 		default:
 			ASSERT(false);
@@ -434,13 +488,12 @@ struct Checker {
 		StructExpression* decl = makeType<StructExpression>(arena, arena);
 		StructResolvedType* type = makeType<StructResolvedType>(arena, arena);
 		type->decl = decl;
-		type->is_compiler_only = true;
 		for (u32 i = 0; i < count; ++i) {
-			NamedDecl& field = decl->fields.emplace_back();
+			StructFieldDecl& field = decl->fields.emplace_back();
 			field.name = makeStringView(names[i]);
-			field.resolved_type = types[i];
-			type->field_types.push(types[i]);
+			type->fields.push(types[i]);
 		}
+		cacheStructFieldOffsets(*type);
 		return type;
 	}
 
@@ -455,34 +508,13 @@ struct Checker {
 		return makePersistentValue(unit, const_u8_slice, &slice, sizeof(slice));
 	}
 
-	u32 comptimeSize(const ResolvedType& type) const {
-		switch (type.kind) {
-			case ResolvedTypeKind::META: return sizeof(ResolvedType*);
-			case ResolvedTypeKind::STRUCT: {
-				const StructResolvedType& st = static_cast<const StructResolvedType&>(type);
-				u32 size = 0;
-				for (ResolvedType* field : st.field_types) size += comptimeSize(*field);
-				return size;
-			}
-			case ResolvedTypeKind::ARRAY: return (u32)static_cast<const ArrayResolvedType&>(type).size * comptimeSize(*static_cast<const ArrayResolvedType&>(type).element_type);
-			case ResolvedTypeKind::SLICE: return sizeof(ComptimeSliceValue);
-			default: return typeByteSize(type);
-		}
-	}
-
-	u32 comptimeFieldOffset(const StructResolvedType& type, u32 index) const {
-		u32 offset = 0;
-		for (u32 i = 0; i < index; ++i) offset += comptimeSize(*structFieldType(type, i));
-		return offset;
-	}
-
 	void writeComptimeValue(u8* destination, const ResolvedType& type, const ComptimeValue& value) const {
 		if (value.kind == ComptimeValue::TYPE) {
 			copyMemory(destination, &value.type, sizeof(value.type));
 			return;
 		}
 		if (value.kind == ComptimeValue::VALUE) {
-			copyMemory(destination, value.value, comptimeSize(type));
+			copyMemory(destination, value.value, typeByteSize(type));
 			return;
 		}
 	}
@@ -627,7 +659,7 @@ struct Checker {
 			}
 			return true;
 		}
-		return compareMemory(lhs, rhs, (usize)count * comptimeSize(element)) == 0;
+		return compareMemory(lhs, rhs, (usize)count * typeByteSize(element)) == 0;
 	}
 
 	bool comptimeValuesEqual(const ComptimeValue& a, const ComptimeValue& b) {
@@ -653,7 +685,7 @@ struct Checker {
 			return comptimeSlicePayloadEqual(lhs.data, rhs.data, *slice.element_type, lhs.count);
 		}
 
-		u32 size = comptimeSize(*a.type);
+		u32 size = typeByteSize(*a.type);
 		return memcmp(a.value, b.value, size) == 0;
 	}
 
@@ -767,7 +799,7 @@ struct Checker {
 			case ResolvedTypeKind::SLICE: return isRuntimeMaterializable(*static_cast<const SliceResolvedType&>(type).element_type);
 			case ResolvedTypeKind::STRUCT: {
 				const StructResolvedType& st = static_cast<const StructResolvedType&>(type);
-				for (i32 i = 0; i < st.field_types.size(); ++i) if (!isRuntimeMaterializable(*st.field_types[i])) return false;
+				for (i32 i = 0; i < st.fields.size(); ++i) if (!isRuntimeMaterializable(*st.fields[i].type)) return false;
 				return true;
 			}
 			case ResolvedTypeKind::NULLABLE: return isRuntimeMaterializable(*static_cast<const NullableResolvedType&>(type).inner);
@@ -908,15 +940,7 @@ struct Checker {
 		sz.type_expr->resolved_type = measured;
 
 		const i64 size = typeByteSize(*measured);
-		i64 align = size >= 8 ? 8 : size >= 4 ? 4 : size >= 2 ? 2 : 1;
-		if (measured->kind == ResolvedTypeKind::UNION) {
-			align = 4;
-			for (ResolvedType* member : static_cast<UnionResolvedType*>(measured)->members) {
-				const i64 member_size = typeByteSize(*member);
-				const i64 member_align = member_size >= 8 ? 8 : member_size >= 4 ? 4 : member_size >= 2 ? 2 : 1;
-				if (member_align > align) align = member_align;
-			}
-		}
+		const i64 align = typeAlignment(*measured);
 		sz.value = (u64)sz.is_align ? align : size;
 		return true;
 	}
@@ -1316,8 +1340,9 @@ struct Checker {
 			case Expression::STRUCT: {
 				StructExpression* s = static_cast<StructExpression*>(src);
 				StructExpression* st = makeType<StructExpression>(unit.arena, unit.arena);
-				for (NamedDecl& field : s->fields) {
-					NamedDecl& clone = st->fields.emplace_back();
+				st->is_extern = s->is_extern;
+				for (StructFieldDecl& field : s->fields) {
+					StructFieldDecl& clone = st->fields.emplace_back();
 					clone.name = field.name;
 					clone.type_expr = cloneExpression(unit, field.type_expr, bindings);
 				}
@@ -1677,12 +1702,6 @@ struct Checker {
 		for (FunctionParam& param : fn.params) {
 			param.resolved_type = asType(evalComptime(unit, *param.type_expr), param.type_expr->token);
 			if (!param.resolved_type) return nullptr;
-
-			if (param.is_ref && param.resolved_type->kind == ResolvedTypeKind::NULLABLE) {
-				// not supported by the language
-				errorLine(fn.token, "Function parameter ", param.name, " cannot be a nullable reference");
-				return nullptr;
-			}
 			FunctionResolvedParam& resolved_param = fn_type->params.emplace_back();
 			resolved_param.name = param.name;
 			resolved_param.type = param.resolved_type;
@@ -1707,7 +1726,7 @@ struct Checker {
 	}
 
 	static const char* symbolKind(const Symbol& symbol) {
-		switch (symbol.storage) {
+		switch (symbol.kind) {
 			case Symbol::VARIABLE: return "variable";
 			case Symbol::CONST: return "constant";
 			case Symbol::IMPORT: return "namespace";
@@ -1875,8 +1894,8 @@ struct Checker {
 				if (!typesEqual(value.type, target)) return {};
 				if (!value.value[0]) {
 					u8* bytes = comptime_stack_ptr;
-					memset(bytes, 0, comptimeSize(*target));
-					comptime_stack_ptr += comptimeSize(*target);
+					memset(bytes, 0, typeByteSize(*target));
+					comptime_stack_ptr += typeByteSize(*target);
 					return {ComptimeValue::VALUE, target, bytes};
 				}
 				NullableResolvedType* source_type = static_cast<NullableResolvedType*>(value.type);
@@ -1891,8 +1910,8 @@ struct Checker {
 			u8* bytes = comptime_stack_ptr;
 			*comptime_stack_ptr = 1;
 			comptime_stack_ptr++;
-			copyMemory(comptime_stack_ptr, converted.value, comptimeSize(*inner));
-			comptime_stack_ptr += comptimeSize(*inner);
+			copyMemory(comptime_stack_ptr, converted.value, typeByteSize(*inner));
+			comptime_stack_ptr += typeByteSize(*inner);
 			return {ComptimeValue::VALUE, target, bytes};
 		}
 
@@ -1922,13 +1941,14 @@ struct Checker {
 
 			ResolvedType* member = un->members[matched_index];
 			ComptimeValue converted = coerceComptimeValue(source, member);
-				if (!converted) return {};
-				u8* bytes = comptime_stack_ptr;
-				memset(bytes, 0, comptimeSize(*target));
+			if (!converted) return {};
+
+			u8* bytes = comptime_stack_ptr;
+			memset(bytes, 0, typeByteSize(*target));
 			copyMemory(bytes, &matched_index, sizeof(matched_index));
-			copyMemory(bytes + sizeof(matched_index), converted.value, comptimeSize(*member));
-				comptime_stack_ptr += comptimeSize(*target);
-				return {ComptimeValue::VALUE, target, bytes};
+			copyMemory(bytes + sizeof(matched_index), converted.value, typeByteSize(*member));
+			comptime_stack_ptr += typeByteSize(*target);
+			return {ComptimeValue::VALUE, target, bytes};
 		}
 
 		if (typesEqual(value.type, target)) return {ComptimeValue::VALUE, target, value.value};
@@ -1942,12 +1962,47 @@ struct Checker {
 		return {};
 	}
 
+	bool isCAbiCompatibleFieldType(const ResolvedType& type) {
+		switch (type.kind) {
+			case ResolvedTypeKind::BOOL:
+			case ResolvedTypeKind::I8:
+			case ResolvedTypeKind::I16:
+			case ResolvedTypeKind::I32:
+			case ResolvedTypeKind::I64:
+			case ResolvedTypeKind::U8:
+			case ResolvedTypeKind::U16:
+			case ResolvedTypeKind::U32:
+			case ResolvedTypeKind::U64:
+			case ResolvedTypeKind::ISIZE:
+			case ResolvedTypeKind::F32:
+			case ResolvedTypeKind::F64:
+			case ResolvedTypeKind::CSTR:
+			case ResolvedTypeKind::CPTR:
+			case ResolvedTypeKind::BYTE:
+			case ResolvedTypeKind::POINTER:
+			case ResolvedTypeKind::ENUM:
+				return true;
+			case ResolvedTypeKind::ARRAY:
+				return isCAbiCompatibleFieldType(*static_cast<const ArrayResolvedType&>(type).element_type);
+			case ResolvedTypeKind::STRUCT: {
+				const StructResolvedType& st = static_cast<const StructResolvedType&>(type);
+				return st.decl && st.decl->is_extern;
+			}
+			default:
+				return false;
+		}
+	}
+
 	bool resolveStructFields(Unit& unit, const Symbol* sym, StructExpression& st, StructResolvedType& st_type) {
-		for (NamedDecl& field : st.fields) {
+		for (StructFieldDecl& field : st.fields) {
 			ResolvedType* field_type = asType(evalComptime(unit, *field.type_expr), field.type_expr->token);
 			if (!field_type) return false;
+			if (st.is_extern && !isCAbiCompatibleFieldType(*field_type)) {
+				errorLine(field.type_expr->token, "Extern struct field ", field.name, " is not C ABI compatible");
+				return false;
+			}
 
-			st_type.field_types.push(field_type);
+			st_type.fields.push(field_type);
 			if (field.attributes) {
 				for (Attribute& attribute : *field.attributes) {
 					attribute.resolved_type = asType(evalComptime(unit, *attribute.type), attribute.type->token);
@@ -1978,13 +2033,14 @@ struct Checker {
 		}
 
 		ExpArray<ResolvedType*> visited(unit.arena);
-		for (ResolvedType* field_type : st_type.field_types) {
-			if (containsStructByValue(*field_type, st_type, visited)) {
+		for (const ResolvedStructField& field : st_type.fields) {
+			if (containsStructByValue(*field.type, st_type, visited)) {
 				if (sym) errorLine(sym->token, "Recursive by-value field in struct ", sym->name);
 				else errorLine(st.token, "Recursive by-value field in struct");
 				return false;
 			}
 		}
+		cacheStructFieldOffsets(st_type);
 		return true;
 	}
 
@@ -2095,9 +2151,7 @@ struct Checker {
 		for (FunctionParam& src_param : fn.params) {
 			FunctionParam& dst_param = clone->params.emplace_back();
 			dst_param.name = src_param.name;
-			dst_param.is_ref = src_param.is_ref;
-			dst_param.is_comptime = src_param.is_comptime;
-			dst_param.is_generic = false;
+				dst_param.is_comptime = src_param.is_comptime;
 			 dst_param.type_expr = cloneExpression(unit, src_param.type_expr, &bindings);
 		}
 		clone->return_type = cloneExpression(unit, fn.return_type, &bindings);
@@ -2197,8 +2251,8 @@ struct Checker {
 		}
 		visited.push(&type);
 		StructResolvedType& st = static_cast<StructResolvedType&>(type);
-		for (ResolvedType* field_type : st.field_types) {
-			if (containsStructByValue(*field_type, target, visited)) return true;
+		for (const ResolvedStructField& field : st.fields) {
+			if (containsStructByValue(*field.type, target, visited)) return true;
 		}
 		return false;
 	}
@@ -2259,7 +2313,7 @@ struct Checker {
 		sym.comptime_value = t;
 
 		if (t.kind == ComptimeValue::VALUE) {
-			sym.comptime_byte_size = comptimeSize(*t.type);
+			sym.comptime_byte_size = typeByteSize(*t.type);
 			u8* bytes = static_cast<u8*>(unit.arena.allocate(unit.arena.user_data, sym.comptime_byte_size, 1));
 			copyMemory(bytes, t.value, sym.comptime_byte_size);
 			sym.comptime_bytes = bytes;
@@ -2292,7 +2346,7 @@ struct Checker {
 		allow_runtime_const = previous_runtime_const_mode;
 		--suppress_errors;
 		if (value && value.kind == ComptimeValue::VALUE) {
-			value = makePersistentValue(unit, value.type, value.value, comptimeSize(*value.type));
+			value = makePersistentValue(unit, value.type, value.value, typeByteSize(*value.type));
 			expr.comptime_value = value;
 		}
 		return value;
@@ -2313,7 +2367,7 @@ struct Checker {
 				errorLine(sym.token, "'undefined' initializer requires an explicit type annotation: ", sym.name);
 				return LS_RESULT_FAILURE;
 			}
-			if (sym.storage == Symbol::CONST) {
+			if (sym.kind == Symbol::CONST) {
 				// const a : i32 = undefined; - not useful
 				errorLine(sym.token, "const cannot be initialized with 'undefined': ", sym.name);
 				return LS_RESULT_FAILURE;
@@ -2338,11 +2392,11 @@ struct Checker {
 		}
 
 		sym.resolved_type = annotation ? annotation : expr_type;
-		const bool runtime_comptime = sym.storage == Symbol::CONST && isRuntimeMaterializable(*sym.resolved_type);
+		const bool runtime_comptime = sym.kind == Symbol::CONST && isRuntimeMaterializable(*sym.resolved_type);
 		if (runtime_comptime) {
 			ComptimeValue value = foldRuntimeConstant(unit, expr, nullptr, annotation);
 			if (value && value.kind == ComptimeValue::VALUE) {
-				sym.comptime_byte_size = comptimeSize(*value.type);
+				sym.comptime_byte_size = typeByteSize(*value.type);
 				sym.comptime_bytes = value.value;
 				sym.comptime_value = {ComptimeValue::VALUE, value.type, sym.comptime_bytes};
 			}
@@ -3251,7 +3305,7 @@ struct Checker {
 				if (sym.check_failed) return nullptr;
 
 				expr.resolved_type = sym.symbol->resolved_type;
-				expr.eval_stage = sym.symbol->storage == Symbol::COMPTIME ? comptimeStageForType(expr.resolved_type) : Expression::RUNTIME;
+				expr.eval_stage = sym.symbol->kind == Symbol::COMPTIME ? comptimeStageForType(expr.resolved_type) : Expression::RUNTIME;
 				member.resolved_symbol = sym.symbol;
 				if (sym.symbol->expression && sym.symbol->expression->kind == Expression::FUNCTION) {
 					member.resolved_fn = static_cast<FunctionExpression*>(sym.symbol->expression);
@@ -3290,11 +3344,11 @@ struct Checker {
 				// struct.field
 				StructResolvedType* st = static_cast<StructResolvedType*>(base_type);
 				for (i32 i = 0; i < st->decl->fields.size(); ++i) {
-					const NamedDecl& field = st->decl->fields[i];
+					const StructFieldDecl& field = st->decl->fields[i];
 					if (!equalStrings(field.name, member.name)) continue;
 
 					member.struct_field_index = i;
-					ResolvedType* field_type = structFieldType(*st, i);
+					ResolvedType* field_type = st->fields[i].type;
 					expr.resolved_type = field_type;
 					if (member.expression->eval_stage != Expression::RUNTIME) {
 						++suppress_errors;
@@ -3417,7 +3471,7 @@ struct Checker {
 			for (i32 i = 0; i < st->decl->fields.size(); ++i) {
 				if (equalStrings(st->decl->fields[i].name, field_name)) {
 					br.struct_field_name = st->decl->fields[i].name;
-					expr.resolved_type = structFieldType(*st, i);
+					expr.resolved_type = st->fields[i].type;
 					return &expr;
 				}
 			}
@@ -3586,7 +3640,7 @@ struct Checker {
 			return nullptr;
 		}
 		for (i32 i = 0; i < lit.values.size(); ++i) {
-			ResolvedType* field_type = structFieldType(*st, i);
+			ResolvedType* field_type = st->fields[i].type;
 			ASSERT(field_type);
 			ResolvedType* value_type = checkExprForTarget(unit, ctx, *lit.values[i], field_type);
 			if (!value_type) return nullptr;
@@ -3643,7 +3697,7 @@ struct Checker {
 	}
 
 	Expression* checkIdentifierExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint, ResolvedType* first_arg_type = nullptr) {
-	IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
+		IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
 		if (id.slot && id.slot->type) {
 			expr.resolved_type = id.slot->type;
 			expr.eval_stage = Expression::RUNTIME;
@@ -3657,7 +3711,7 @@ struct Checker {
 				if (local->is_comptime) {
 					expr.comptime_value = local->comptime_value;
 					if (local->comptime_value.kind == ComptimeValue::VALUE) {
-						u32 size = comptimeSize(*local->type);
+						u32 size = typeByteSize(*local->type);
 						id.comptime_bytes = (u8*)unit.arena.allocate(unit.arena.user_data, size, 1);
 						memcpy(id.comptime_bytes, local->comptime_value.value, size);
 					}
@@ -3725,7 +3779,7 @@ struct Checker {
 		if (symbolHasGlobalStorage(*ref.symbol)) id.slot = &ref.symbol->slot;
 		// Reflection lengths are untyped compile-time integers. Keep the symbol's
 		// default type, but allow each use to adopt its numeric context.
-		if (hint && isIntegerType(*hint) && ref.symbol->storage == Symbol::COMPTIME
+		if (hint && isIntegerType(*hint) && ref.symbol->kind == Symbol::COMPTIME
 			&& ref.symbol->expression->kind == Expression::TYPE_MEMBER
 			&& (static_cast<TypeMemberExpression*>(ref.symbol->expression)->kind == TypeMemberExpression::LENGTH
 				|| static_cast<TypeMemberExpression*>(ref.symbol->expression)->kind == TypeMemberExpression::MIN
@@ -3735,7 +3789,7 @@ struct Checker {
 			return &expr;
 		}
 		expr.resolved_type = ref.symbol->resolved_type;
-		expr.eval_stage = ref.symbol->storage == Symbol::COMPTIME
+		expr.eval_stage = ref.symbol->kind == Symbol::COMPTIME
 			? comptimeStageForType(expr.resolved_type)
 			: Expression::RUNTIME;
 		return &expr;
@@ -3936,7 +3990,7 @@ struct Checker {
 				id.symbol = ref.symbol;
 				// TODO why is this here?
 				if (symbolHasGlobalStorage(*ref.symbol)) id.slot = &ref.symbol->slot;
-				is_writable = ref.symbol->storage == Symbol::VARIABLE;
+				is_writable = ref.symbol->kind == Symbol::VARIABLE;
 				expr.resolved_type = unwrapMeta(ref.symbol->resolved_type);
 				return &expr;
 			}
@@ -3955,7 +4009,7 @@ struct Checker {
 					ref = resolveSymbol(unit, static_cast<IdentifierExpression&>(*member.expression).name, member.name, LookupPolicy::Checked);
 				}
 				if (ref) {
-					is_writable = ref.symbol->storage == Symbol::VARIABLE;
+					is_writable = ref.symbol->kind == Symbol::VARIABLE;
 					expr.resolved_type = unwrapMeta(ref.symbol->resolved_type);
 					return &expr;
 				}
@@ -4133,7 +4187,7 @@ struct Checker {
 			SemanticLocalBinding& binding = ctx.locals.emplace_back();
 			binding.name = param.name;
 			binding.type = param.resolved_type;
-			binding.is_immutable = !param.is_ref;
+			binding.is_immutable = true;
 			binding.slot = &param.slot;
 		}
 
@@ -4470,7 +4524,7 @@ struct Checker {
 							narrowed_is_immutable = local->is_immutable;
 							narrowed_slot = local->slot;
 						} else if (id->symbol) {
-							narrowed_is_immutable = id->symbol->storage != Symbol::VARIABLE;
+							narrowed_is_immutable = id->symbol->kind != Symbol::VARIABLE;
 							narrowed_slot = id->slot;
 						}
 						narrow_in_true = (bin->op == Token::BANG_EQUAL);
@@ -4501,7 +4555,7 @@ struct Checker {
 						narrowed_is_immutable = local->is_immutable;
 						narrowed_slot = local->slot;
 					} else if (id->symbol) {
-						narrowed_is_immutable = id->symbol->storage != Symbol::VARIABLE;
+						narrowed_is_immutable = id->symbol->kind != Symbol::VARIABLE;
 						narrowed_slot = id->slot;
 					}
 					narrow_in_true = true;
@@ -4586,7 +4640,7 @@ struct Checker {
 		if (expr.kind == Expression::ARRAY_LITERAL) return static_cast<ArrayLiteralExpression*>(&expr);
 		if (expr.kind != Expression::IDENTIFIER) return nullptr;
 		IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
-		if (!id.symbol || id.symbol->storage != Symbol::COMPTIME || !id.symbol->expression) return nullptr;
+		if (!id.symbol || id.symbol->kind != Symbol::COMPTIME || !id.symbol->expression) return nullptr;
 		return resolveUnrollElements(*id.symbol->expression);
 	}
 
@@ -4658,7 +4712,7 @@ struct Checker {
 					ComptimeValue binding_value;
 					ResolvedType* binding_type = nullptr;
 					binding_type = static_cast<SliceResolvedType*>(elements.type)->element_type;
-					u8* element_data = slice.data + comptimeSize(*binding_type) * i;
+					u8* element_data = slice.data + typeByteSize(*binding_type) * i;
 					if (binding_type->kind == ResolvedTypeKind::META) {
 						ResolvedType* reflected_type;
 						copyMemory(&reflected_type, element_data, sizeof(reflected_type));
@@ -4970,7 +5024,7 @@ struct Checker {
 					narrowed.is_immutable = local->is_immutable;
 					narrowed.slot = local->slot;
 				} else {
-					narrowed.is_immutable = id->symbol && id->symbol->storage != Symbol::VARIABLE;
+					narrowed.is_immutable = id->symbol && id->symbol->kind != Symbol::VARIABLE;
 					narrowed.slot = id->slot;
 				}
 				const bool ok = checkStatement(unit, ctx, arm.body, return_type, {});
@@ -5204,7 +5258,7 @@ struct Checker {
 				if (!fn.is_template) continue;
 				for (TemplateFunctionInstance& instance : fn.template_function_instances) {
 					Symbol& new_sym = unit.symbols.emplace_back();
-					new_sym.storage = Symbol::COMPTIME;
+					new_sym.kind = Symbol::COMPTIME;
 					new_sym.check_state = Symbol::CHECKED;
 					new_sym.expression = instance.instance;
 					new_sym.resolved_type = instance.type;
@@ -5218,12 +5272,12 @@ struct Checker {
 		if (sym.check_state == Symbol::CHECKED) return LS_RESULT_OK;
 		if (sym.check_state == Symbol::FAILED) return LS_RESULT_FAILURE;
 
-		if (sym.storage == Symbol::IMPORT) {
+		if (sym.kind == Symbol::IMPORT) {
 			sym.check_state = Symbol::CHECKED;
 			return LS_RESULT_OK;
 		}
 
-		if (sym.storage == Symbol::COMPTIME && isPrimitiveShadowName(sym.name)) {
+		if (sym.kind == Symbol::COMPTIME && isPrimitiveShadowName(sym.name)) {
 			errorLine(sym.token, "Can not shadow primitive type: ", sym.name);
 			sym.check_state = Symbol::FAILED;
 			return LS_RESULT_FAILURE;
@@ -5253,7 +5307,7 @@ struct Checker {
 			FunctionExpression& fn = static_cast<FunctionExpression&>(*sym.expression);
 			if (!fn.is_template) {
 				// TODO what's going on on the next line?
-				ResolvedType* annotation = sym.storage == Symbol::COMPTIME ? nullptr : (sym.type_expr ? asType(evalComptime(unit, *sym.type_expr), sym.type_expr->token) : nullptr);
+				ResolvedType* annotation = sym.kind == Symbol::COMPTIME ? nullptr : (sym.type_expr ? asType(evalComptime(unit, *sym.type_expr), sym.type_expr->token) : nullptr);
 				FunctionResolvedType* fn_type = buildFunctionType(unit, fn);
 				if (!fn_type) {
 					sym.check_state = Symbol::FAILED;
@@ -5263,7 +5317,7 @@ struct Checker {
 			}
 		}
 
-		if (sym.storage == Symbol::COMPTIME) {
+		if (sym.kind == Symbol::COMPTIME) {
 			if (checkComptimeSymbol(unit, sym) == LS_RESULT_FAILURE) {
 				sym.check_state = Symbol::FAILED;
 				return LS_RESULT_FAILURE;
@@ -5303,7 +5357,7 @@ struct Checker {
 	}
 
 	ComptimeValue copyComptimeValue(ResolvedType* type, const void* bytes) {
-		return copyComptimeValue(type, bytes, comptimeSize(*type));
+		return copyComptimeValue(type, bytes, typeByteSize(*type));
 	}
 
 	ComptimeValue makeUntypedIntResult(u64 value) {
@@ -5545,14 +5599,6 @@ struct Checker {
 		return {};
 	}
 
-	static u32 fieldOffset(const StructResolvedType& st, i32 field_index) {
-		u32 offset = 0;
-		for (i32 i = 0; i < field_index; ++i) {
-			ResolvedType* ft = structFieldType(st, i);
-			if (ft) offset += typeByteSize(*ft);
-		}
-		return offset;
-	}
 
 	bool resolveComptimeLValue(Unit& unit, Expression& expr, ComptimeFrame& frame, u8*& out_ptr, ResolvedType*& out_type) {
 		switch (expr.kind) {
@@ -5574,9 +5620,9 @@ struct Checker {
 				if (!st.decl) return false;
 				for (i32 i = 0; i < st.decl->fields.size(); ++i) {
 					if (!equalStrings(st.decl->fields[i].name, member.name)) continue;
-					ResolvedType* field_type = structFieldType(st, i);
+					ResolvedType* field_type = st.fields[i].type;
 					if (!field_type) return false;
-					out_ptr = base_ptr + fieldOffset(st, i);
+					out_ptr = base_ptr + st.fields[i].offset;
 					out_type = field_type;
 					return true;
 				}
@@ -5585,15 +5631,19 @@ struct Checker {
 			case Expression::BRACKET: {
 				BracketExpression& br = static_cast<BracketExpression&>(expr);
 				if (!br.base || br.args.size() != 1) return false;
+
 				u8* base_ptr = nullptr;
 				ResolvedType* base_type = nullptr;
 				if (!resolveComptimeLValue(unit, *br.base, frame, base_ptr, base_type)) return false;
 				if (base_type->kind != ResolvedTypeKind::ARRAY) return false;
+
 				ArrayResolvedType& arr = static_cast<ArrayResolvedType&>(*base_type);
 				ComptimeValue index = evalComptime(unit, *br.args[0], nullptr, nullptr, &frame);
 				if (!index || index.kind != ComptimeValue::VALUE || !isIntegerOrUntyped(*index.type)) return false;
+
 				const i64 i = comptimeNumericToI64(index.value, index.type->kind);
 				if (i < 0 || i >= arr.size) return false;
+
 				out_ptr = base_ptr + (u32)i * typeByteSize(*arr.element_type);
 				out_type = arr.element_type;
 				return true;
@@ -5671,16 +5721,16 @@ struct Checker {
 						ComptimeSliceValue slice;
 						slice.count = st.decl->fields.size();
 						slice.data = comptime_stack_ptr;
-						comptime_stack_ptr += st.decl->fields.size() * comptimeSize(*descriptor_type);
+						comptime_stack_ptr += st.decl->fields.size() * typeByteSize(*descriptor_type);
 						expr.comptime_value = copyComptimeValue(slice_type, &slice, sizeof(slice));
 
-						const u32 type_offset = comptimeFieldOffset(*static_cast<StructResolvedType*>(descriptor_type), 1);
-						const u32 descriptor_size = comptimeSize(*descriptor_type);
+						const u32 type_offset = structFieldOffset(*static_cast<StructResolvedType*>(descriptor_type), 1);
+						const u32 descriptor_size = typeByteSize(*descriptor_type);
 						for (i32 i = 0; i < st.decl->fields.size(); ++i) {
 							u8* descriptor = slice.data + descriptor_size * i;
 							const ls_string_view name = st.decl->fields[i].name;
 							ComptimeSliceValue name_slice{(u8*)name.begin, (i64)(name.end - name.begin)};
-							ResolvedType* type = structFieldType(st, i);
+							ResolvedType* type = st.fields[i].type;
 							copyMemory(descriptor, &name_slice, sizeof(name_slice));
 							copyMemory(descriptor + type_offset, &type, sizeof(type));
 						}
@@ -5693,10 +5743,10 @@ struct Checker {
 						ComptimeSliceValue slice;
 						slice.count = en.decl->members.size();
 						slice.data = (u8*)comptime_stack_ptr;
-						comptime_stack_ptr += en.decl->members.size() * comptimeSize(*descriptor_type);
+						comptime_stack_ptr += en.decl->members.size() * typeByteSize(*descriptor_type);
 						expr.comptime_value = copyComptimeValue(slice_type, &slice, sizeof(slice));
 
-						const u32 descriptor_size = comptimeSize(*descriptor_type);
+						const u32 descriptor_size = typeByteSize(*descriptor_type);
 						for (i32 i = 0; i < en.decl->members.size(); ++i) {
 							i32 enum_value = i;
 							if (en.decl->members[i].value) {
@@ -5708,7 +5758,7 @@ struct Checker {
 							const ls_string_view name = en.decl->members[i].name;
 							ComptimeSliceValue name_slice{(u8*)name.begin, (i64)(name.end - name.begin)};
 							copyMemory(descriptor, &name_slice, sizeof(name_slice));
-							copyMemory(descriptor + comptimeFieldOffset(*static_cast<StructResolvedType*>(descriptor_type), 1), &enum_value, sizeof(enum_value));
+							copyMemory(descriptor + structFieldOffset(*static_cast<StructResolvedType*>(descriptor_type), 1), &enum_value, sizeof(enum_value));
 						}
 						return expr.comptime_value;
 					}
@@ -5719,11 +5769,11 @@ struct Checker {
 						ComptimeSliceValue slice;
 						slice.count = fn.params.size();
 						slice.data = comptime_stack_ptr;
-						comptime_stack_ptr += fn.params.size() * comptimeSize(*descriptor_type);
+						comptime_stack_ptr += fn.params.size() * typeByteSize(*descriptor_type);
 						expr.comptime_value = copyComptimeValue(slice_type, &slice, sizeof(slice));
 
-						const u32 type_offset = comptimeFieldOffset(*static_cast<StructResolvedType*>(descriptor_type), 1);
-						const u32 descriptor_size = comptimeSize(*descriptor_type);
+						const u32 type_offset = structFieldOffset(*static_cast<StructResolvedType*>(descriptor_type), 1);
+						const u32 descriptor_size = typeByteSize(*descriptor_type);
 						for (i32 i = 0; i < fn.params.size(); ++i) {
 							u8* descriptor = slice.data + descriptor_size * i;
 							const ls_string_view name = fn.params[i].name;
@@ -5952,16 +6002,15 @@ struct Checker {
 						if (base_type->kind != ResolvedTypeKind::STRUCT) return {};
 						StructResolvedType& st = *static_cast<StructResolvedType*>(base_type);
 						for (i32 i = 0; i < st.decl->fields.size(); ++i) {
-							ResolvedType* field_type = structFieldType(st, i);
-							if (equalStrings(st.decl->fields[i].name, member.name)) {
-								if (field_type->kind == ResolvedTypeKind::META) {
-									ResolvedType* inner = nullptr;
-									copyMemory(&inner, base_value.value + offset, sizeof(inner));
-									return {ComptimeValue::TYPE, inner};
-								}
-								return {ComptimeValue::VALUE, field_type, base_value.value + offset};
+							ResolvedType* field_type = st.fields[i].type;
+							if (!equalStrings(st.decl->fields[i].name, member.name)) continue;
+							u8* field_value = base_value.value + offset + st.fields[i].offset;
+							if (field_type->kind == ResolvedTypeKind::META) {
+								ResolvedType* inner = nullptr;
+								copyMemory(&inner, field_value, sizeof(inner));
+								return {ComptimeValue::TYPE, inner};
 							}
-							offset += st.is_compiler_only ? comptimeSize(*field_type) : typeByteSize(*field_type);
+							return {ComptimeValue::VALUE, field_type, field_value};
 						}
 					}
 				}
@@ -6024,7 +6073,7 @@ struct Checker {
 					return {};
 				}
 
-				if (ref.symbol->storage != Symbol::COMPTIME) {
+				if (ref.symbol->kind != Symbol::COMPTIME) {
 					errorLine(expr.token, "Symbol ", qualifier, ".", member.name, " is not a compile-time value");
 					return {};
 				}
@@ -6052,18 +6101,17 @@ struct Checker {
 						// struct_value["field"]
 						if (!empty(be.struct_field_name) && base_value.type->kind == ResolvedTypeKind::STRUCT) {
 							StructResolvedType* st = static_cast<StructResolvedType*>(base_value.type);
-							u32 offset = 0;
 							for (i32 field_index = 0; field_index < st->decl->fields.size(); ++field_index) {
-								ResolvedType* field_type = structFieldType(*st, field_index);
-								if (equalStrings(st->decl->fields[field_index].name, be.struct_field_name)) {
-									if (field_type->kind == ResolvedTypeKind::META) {
-										ResolvedType* inner = nullptr;
-										copyMemory(&inner, base_value.value + offset, sizeof(inner));
-										return {ComptimeValue::TYPE, inner};
-									}
-									return {ComptimeValue::VALUE, field_type, base_value.value + offset};
+								ResolvedType* field_type = st->fields[field_index].type;
+								if (!equalStrings(st->decl->fields[field_index].name, be.struct_field_name)) continue;
+								
+								u8* field_value = base_value.value + st->fields[field_index].offset;
+								if (field_type->kind == ResolvedTypeKind::META) {
+									ResolvedType* inner = nullptr;
+									copyMemory(&inner, field_value, sizeof(inner));
+									return {ComptimeValue::TYPE, inner};
 								}
-								offset += comptimeSize(*field_type);
+								return {ComptimeValue::VALUE, field_type, field_value};
 							}
 							return {};
 						}
@@ -6092,10 +6140,10 @@ struct Checker {
 							ResolvedType* element_type = static_cast<SliceResolvedType*>(base_value.type)->element_type;
 							if (element_type->kind == ResolvedTypeKind::META) {
 								ResolvedType* inner = nullptr;
-								copyMemory(&inner, slice.data + comptimeSize(*element_type) * i, sizeof(inner));
+								copyMemory(&inner, slice.data + typeByteSize(*element_type) * i, sizeof(inner));
 								return {ComptimeValue::TYPE, inner};
 							}
-							return {ComptimeValue::VALUE, element_type, slice.data + comptimeSize(*element_type) * i};
+							return {ComptimeValue::VALUE, element_type, slice.data + typeByteSize(*element_type) * i};
 						}
 
 						// array_value[index]
@@ -6116,7 +6164,7 @@ struct Checker {
 								return {};
 							}
 							ResolvedType* element_type = array_type->element_type;
-							u8* element = base_value.value + comptimeSize(*element_type) * i;
+							u8* element = base_value.value + typeByteSize(*element_type) * i;
 							if (element_type->kind == ResolvedTypeKind::META) {
 								ResolvedType* inner = nullptr;
 								copyMemory(&inner, element, sizeof(inner));
@@ -6249,12 +6297,12 @@ struct Checker {
 			case Expression::ARRAY_LITERAL: {
 				auto& al = static_cast<ArrayLiteralExpression&>(expr);
 				if (expr.resolved_type && !isRuntimeMaterializable(*expr.resolved_type)) {
-					u8* data = static_cast<u8*>(unit.arena.allocate(unit.arena.user_data, comptimeSize(*expr.resolved_type), 1));
+					u8* data = static_cast<u8*>(unit.arena.allocate(unit.arena.user_data, typeByteSize(*expr.resolved_type), 1));
 					ResolvedType* element_type = static_cast<ArrayResolvedType*>(expr.resolved_type)->element_type;
 					for (i32 i = 0; i < al.values.size(); ++i) {
 						ComptimeValue element = evalComptime(unit, *al.values[i], ctx, bindings, frame);
 						if (!element) return {};
-						writeComptimeValue(data + comptimeSize(*element_type) * i, *element_type, element);
+						writeComptimeValue(data + typeByteSize(*element_type) * i, *element_type, element);
 					}
 					return {ComptimeValue::VALUE, expr.resolved_type, data};
 				}
@@ -6267,13 +6315,15 @@ struct Checker {
 			}
 			case Expression::STRUCT_LITERAL: {
 				auto& sl = static_cast<StructLiteralExpression&>(expr);
-				if (expr.resolved_type && !isRuntimeMaterializable(*expr.resolved_type)) {
-					StructResolvedType* st = static_cast<StructResolvedType*>(expr.resolved_type);
-					u8* data = static_cast<u8*>(unit.arena.allocate(unit.arena.user_data, comptimeSize(*st), 1));
+				StructResolvedType* resolved_struct = expr.resolved_type && expr.resolved_type->kind == ResolvedTypeKind::STRUCT ? static_cast<StructResolvedType*>(expr.resolved_type) : nullptr;
+				if (resolved_struct && (resolved_struct->decl->is_extern || !isRuntimeMaterializable(*expr.resolved_type))) {
+					StructResolvedType* st = resolved_struct;
+					u8* data = static_cast<u8*>(unit.arena.allocate(unit.arena.user_data, typeByteSize(*st), 1));
+					memset(data, 0, typeByteSize(*st));
 					for (i32 i = 0; i < sl.values.size(); ++i) {
 						ComptimeValue field = evalComptime(unit, *sl.values[i], ctx, bindings, frame);
 						if (!field) return {};
-						writeComptimeValue(data + comptimeFieldOffset(*st, i), *structFieldType(*st, i), field);
+						writeComptimeValue(data + st->fields[i].offset, *st->fields[i].type, field);
 					}
 					return {ComptimeValue::VALUE, expr.resolved_type, data};
 				}
@@ -6431,10 +6481,10 @@ struct Checker {
 					return {};
 				}
 
-				if (allow_runtime_const && ref.symbol->storage == Symbol::CONST && ref.symbol->comptime_bytes) {
+				if (allow_runtime_const && ref.symbol->kind == Symbol::CONST && ref.symbol->comptime_bytes) {
 					return copyComptimeValue(ref.symbol->resolved_type, ref.symbol->comptime_bytes, ref.symbol->comptime_byte_size);
 				}
-				if (ref.symbol->storage != Symbol::COMPTIME) {
+				if (ref.symbol->kind != Symbol::COMPTIME) {
 					errorLine(id.token, "Symbol '", id.name, "' is not a compile-time value");
 					return {};
 				}

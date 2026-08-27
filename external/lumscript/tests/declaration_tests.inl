@@ -3,6 +3,59 @@ TEST(BasicFunction) {
 	return true;
 }
 
+TEST(ExternStructDeclarationCompiles) {
+	const char* source = R"(
+		extern struct Vec2 {
+			x : f32;
+			y : f32;
+		}
+
+		fn main() : f32 {
+			var v : Vec2 = Vec2 { 1, 2 };
+			return v.x + v.y;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ExternStructRejectsNonCAbiFields) {
+	EXPECT_COMPILE_FAIL(R"(
+		extern struct Bad {
+			items : []i32;
+		}
+	)");
+
+	EXPECT_COMPILE_FAIL(R"(
+		struct ScriptOnly { value : i32; }
+		extern struct Bad {
+			value : ScriptOnly;
+		}
+	)");
+
+	EXPECT_COMPILE_FAIL(R"(
+		struct A { value : i32; }
+		struct B { value : i32; }
+		comptime U = A | B;
+		extern struct Bad {
+			value : U;
+		}
+	)");
+
+	EXPECT_COMPILE_FAIL(R"(
+		extern struct Bad {
+			callback : fn() : void;
+		}
+	)");
+
+	EXPECT_COMPILE_FAIL(R"(
+		extern struct Bad {
+			value : ?i32;
+		}
+	)");
+	return true;
+}
+
 TEST(BasicLocalVar) {
 	EXPECT_COMPILE("fn main() : void { var i : i32 = 42; }");
 	return true;

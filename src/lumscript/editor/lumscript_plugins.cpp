@@ -9,6 +9,7 @@
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/editor_asset.h"
+#include "editor/property_grid.h"
 #include "editor/utils.h"
 #include "engine/engine.h"
 #include "engine/component_uid.h"
@@ -225,76 +226,52 @@ static void drawPrimitiveValue(ls_type_kind kind, const void* value, const ls_ty
 	}
 }
 
-static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* type, void* value, u32 size) {
+static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* type, void* value, u32 size, bool editable = false) {
 	if (type && ls_type_get_kind(type) != LS_TYPE_INVALID) {
 		kind = ls_type_get_kind(type);
 		size = ls_type_get_size(type);
 	}
 
-	if (!value || size == 0) {
-		ImGui::TableNextRow();
-		ImGui::TableNextColumn();
-		ImGui::Text("%.*s", int(name.end - name.begin), name.begin);
-		ImGui::TableNextColumn();
-		ImGui::TextDisabled("<unavailable>");
-		ImGui::TableNextColumn();
-		drawTypeColumn(kind, type);
-		return;
+	if (!value || size == 0) {ImGuiEx::Label(StaticString<128>(StringView(name.begin, name.end))); ImGui::TextDisabled("<unavailable>"); return;
 	}
 
-	if (kind == LS_TYPE_STRUCT && type) {
-		ImGui::TableNextRow();
-		ImGui::TableNextColumn();
-		const bool open = ImGui::TreeNodeEx(name.begin
+	if (kind == LS_TYPE_STRUCT && type) {const bool open = ImGui::TreeNodeEx(name.begin
 			, ImGuiTreeNodeFlags_SpanFullWidth
 			, "%.*s"
 			, int(name.end - name.begin)
-			, name.begin);
-		ImGui::TableNextColumn();
-		ImGui::Text("(%u B)", ls_type_get_size(type));
-		ImGui::TableNextColumn();
-		drawTypeColumn(kind, type);
-		if (open) {
+			, name.begin);ImGui::Text("(%u B)", ls_type_get_size(type));if (open) {
 			for (u32 i = 0, c = ls_type_struct_field_count(type); i < c; ++i) {
 				const ls_string_view fname = ls_type_struct_field_name(type, i);
 				const u32 offset = ls_type_struct_field_offset(type, i);
 				const ls_type* ftype = ls_type_struct_field_type(type, i);
 				void* fv = (u8*)value + offset;
 				const u32 fsize = ftype ? ls_type_get_size(ftype) : 0u;
-				drawVariable(fname, ftype ? ls_type_get_kind(ftype) : LS_TYPE_INVALID, ftype, fv, fsize);
+				drawVariable(fname, ftype ? ls_type_get_kind(ftype) : LS_TYPE_INVALID, ftype, fv, fsize, editable);
 			}
 			ImGui::TreePop();
 		}
 		return;
 	}
 
-	if (kind == LS_TYPE_TAGGED_UNION && type) {
-		ImGui::TableNextRow();
-		ImGui::TableNextColumn();
-		const i32 tag = ls_type_union_tag(type, value);
+	if (kind == LS_TYPE_TAGGED_UNION && type) {const i32 tag = ls_type_union_tag(type, value);
 		const bool open = ImGui::TreeNodeEx(name.begin
 			, ImGuiTreeNodeFlags_SpanFullWidth
 			, "%.*s"
 			, int(name.end - name.begin)
-			, name.begin);
-		ImGui::TableNextColumn();
-		{
+			, name.begin);{
 			const u32 member_count = ls_type_union_member_count(type);
 			if (tag >= 0 && (u32)tag < member_count) {
 				const ls_type* member_type = ls_type_union_member_type(type, tag);
 				ImGui::Text("tag=%d: ", tag);
 				ImGui::SameLine();
-				if (member_type) drawTypeColumn(ls_type_get_kind(member_type), member_type);
+				if (member_type) ImGui::TextUnformatted("<value>");
 				else ImGui::TextUnformatted("?");
 				ImGui::SameLine();
 				ImGui::Text("(%u members)", member_count);
 			} else {
 				ImGui::Text("tag=%d (invalid) (%u members)", tag, member_count);
 			}
-		}
-		ImGui::TableNextColumn();
-		drawTypeColumn(kind, type);
-		if (open) {
+		}if (open) {
 			const u32 member_count = ls_type_union_member_count(type);
 			if (tag >= 0 && (u32)tag < member_count) {
 				const ls_type* member_type = ls_type_union_member_type(type, tag);
@@ -306,43 +283,29 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 						const ls_type* ftype = ls_type_struct_field_type(member_type, i);
 						void* fv = (u8*)payload + offset;
 						const u32 fsize = ftype ? ls_type_get_size(ftype) : 0u;
-						drawVariable(fname, ftype ? ls_type_get_kind(ftype) : LS_TYPE_INVALID, ftype, fv, fsize);
+						drawVariable(fname, ftype ? ls_type_get_kind(ftype) : LS_TYPE_INVALID, ftype, fv, fsize, editable);
 					}
 				} else {
 					const ls_type_kind member_kind = member_type ? ls_type_get_kind(member_type) : LS_TYPE_INVALID;
 					const u32 member_size = member_type ? ls_type_get_size(member_type) : 0u;
 					const char* value_str = "value";
-					drawVariable(ls_string_view{value_str, value_str + 5}, member_kind, member_type, payload, member_size);
+					drawVariable(ls_string_view{value_str, value_str + 5}, member_kind, member_type, payload, member_size, editable);
 				}
-			} else {
-				ImGui::TableNextRow();
-				ImGui::TableNextColumn();
-				ImGui::TextDisabled("<invalid tag>");
+			} else {ImGui::TextDisabled("<invalid tag>");
 			}
 			ImGui::TreePop();
 		}
 		return;
 	}
 
-	if (kind == LS_TYPE_ARRAY && type) {
-		ImGui::TableNextRow();
-		ImGui::TableNextColumn();
-		const bool open = ImGui::TreeNodeEx(name.begin
+	if (kind == LS_TYPE_ARRAY && type) {const bool open = ImGui::TreeNodeEx(name.begin
 			, ImGuiTreeNodeFlags_SpanFullWidth
 			, "%.*s"
 			, int(name.end - name.begin)
-			, name.begin);
-		ImGui::TableNextColumn();
-		ImGui::TextUnformatted("");
-		ImGui::TableNextColumn();
-		{
+			, name.begin);ImGui::TextUnformatted("");{
 			const u32 len = ls_type_array_length(type);
 			const ls_type* elem = ls_type_array_element_type(type);
 			ImGui::Text("[%u]", len);
-			if (elem) {
-				ImGui::SameLine();
-				drawTypeColumn(ls_type_get_kind(elem), elem);
-			}
 		}
 		if (open) {
 			const u32 len = ls_type_array_length(type);
@@ -357,7 +320,7 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 				*(end + 1) = '\0';
 				const ls_string_view idx_name = { idx_buf, end + 1 };
 				void* ev = (u8*)value + i * elem_size;
-				drawVariable(idx_name, elem ? ls_type_get_kind(elem) : LS_TYPE_INVALID, elem, ev, elem_size);
+				drawVariable(idx_name, elem ? ls_type_get_kind(elem) : LS_TYPE_INVALID, elem, ev, elem_size, editable);
 			}
 			ImGui::TreePop();
 		}
@@ -370,37 +333,22 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 		const ls_type* elem = ls_type_array_element_type(type);
 		const u32 elem_size = elem ? ls_type_get_size(elem) : 1u;
 		if (isStringSlice(type)) {
-			ImGui::Indent();
-			ImGui::TableNextRow();
-			ImGui::TableNextColumn();
-			ImGui::Text("%.*s", int(name.end - name.begin), name.begin);
-			ImGui::TableNextColumn();
-			if (!ptr) {
+			ImGui::Indent();ImGui::Text("%.*s", int(name.end - name.begin), name.begin);if (!ptr) {
 				ImGui::TextUnformatted("null");
 			} else {
 				const u64 display_len = len > 0x7fffffffu ? 0x7fffffffu : len;
 				ImGui::Text("\"%.*s\"", (int)display_len, (const char*)ptr);
-			}
-			ImGui::TableNextColumn();
-			ImGui::TextUnformatted("string");
+			}ImGui::TextUnformatted("string");
 			ImGui::Unindent();
 			return;
-		}
-
-		ImGui::TableNextRow();
-		ImGui::TableNextColumn();
-		const bool open = ImGui::TreeNodeEx(name.begin
+		}const bool open = ImGui::TreeNodeEx(name.begin
 			, ImGuiTreeNodeFlags_SpanFullWidth
 			, "%.*s"
 			, int(name.end - name.begin)
-			, name.begin);
-		ImGui::TableNextColumn();
-		ImGui::TextUnformatted("");
-		ImGui::TableNextColumn();
-		ImGui::Text("(%llu)", len);
+			, name.begin);ImGui::TextUnformatted("");ImGui::Text("(%llu)", len);
 		if (elem) {
 			ImGui::SameLine();
-			drawTypeColumn(ls_type_get_kind(elem), elem);
+			ImGui::TextUnformatted("<element>");
 		}
 		if (open) {
 			if (ptr && len > 0) {
@@ -413,7 +361,7 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 					*(end + 1) = '\0';
 					const ls_string_view idx_name = { idx_buf, end + 1 };
 					void* ev = (u8*)ptr + i * elem_size;
-					drawVariable(idx_name, elem ? ls_type_get_kind(elem) : LS_TYPE_INVALID, elem, ev, elem_size);
+					drawVariable(idx_name, elem ? ls_type_get_kind(elem) : LS_TYPE_INVALID, elem, ev, elem_size, editable);
 				}
 			}
 			ImGui::TreePop();
@@ -421,24 +369,17 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 		return;
 	}
 
-	if (kind == LS_TYPE_NULLABLE && type) {
-		ImGui::TableNextRow();
-		ImGui::TableNextColumn();
-		const bool open = ImGui::TreeNodeEx(name.begin
+	if (kind == LS_TYPE_NULLABLE && type) {const bool open = ImGui::TreeNodeEx(name.begin
 			, ImGuiTreeNodeFlags_SpanFullWidth
 			, "%.*s"
 			, int(name.end - name.begin)
-			, name.begin);
-		ImGui::TableNextColumn();
-		if (ls_type_nullable_is_null(type, value)) {
+			, name.begin);if (ls_type_nullable_is_null(type, value)) {
 			ImGui::TextDisabled("null");
 		} else {
 			const ls_type* inner = ls_type_nullable_inner_type(type);
-			if (inner) drawTypeColumn(ls_type_get_kind(inner), inner);
+			if (inner) ImGui::TextUnformatted("<value>");
 			else ImGui::TextUnformatted("?");
-		}
-		ImGui::TableNextColumn();
-		ImGui::TextUnformatted("?");
+		}ImGui::TextUnformatted("?");
 		if (open) {
 			if (!ls_type_nullable_is_null(type, value)) {
 				const ls_type* inner = ls_type_nullable_inner_type(type);
@@ -452,12 +393,12 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 						const ls_type* ftype = ls_type_struct_field_type(inner, i);
 						void* fv = (u8*)inner_value + offset;
 						const u32 fsize = ftype ? ls_type_get_size(ftype) : 0u;
-						drawVariable(fname, ftype ? ls_type_get_kind(ftype) : LS_TYPE_INVALID, ftype, fv, fsize);
+						drawVariable(fname, ftype ? ls_type_get_kind(ftype) : LS_TYPE_INVALID, ftype, fv, fsize, editable);
 					}
 				} else {
 					const char* value_str = "value";
 					const ls_string_view value_name = { value_str, value_str + 5 };
-					drawVariable(value_name, inner_kind, inner, (void*)inner_value, inner_size);
+					drawVariable(value_name, inner_kind, inner, (void*)inner_value, inner_size, editable);
 				}
 			}
 			ImGui::TreePop();
@@ -467,14 +408,29 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 
 	// Primitive
 	ImGui::Indent();
-	ImGui::TableNextRow();
-	ImGui::TableNextColumn();
-	ImGui::Text("%.*s", int(name.end - name.begin), name.begin);
-	ImGui::TableNextColumn();
-	drawPrimitiveValue(kind, value, type);
-	ImGui::TableNextColumn();
-	drawTypeColumn(kind, type);
-	ImGui::Unindent();
+	ImGuiEx::Label(StaticString<128>(StringView(name.begin, name.end)));
+	ImGui::PushID(value);
+	if (editable) {
+		switch (kind) {
+			case LS_TYPE_BOOL: ImGui::Checkbox("##value", (bool*)value); break;
+			case LS_TYPE_I8: ImGui::InputScalar("##value", ImGuiDataType_S8, value); break;
+			case LS_TYPE_U8: ImGui::InputScalar("##value", ImGuiDataType_U8, value); break;
+			case LS_TYPE_I16: ImGui::InputScalar("##value", ImGuiDataType_S16, value); break;
+			case LS_TYPE_U16: ImGui::InputScalar("##value", ImGuiDataType_U16, value); break;
+			case LS_TYPE_I32: ImGui::InputInt("##value", (i32*)value); break;
+			case LS_TYPE_U32: ImGui::InputScalar("##value", ImGuiDataType_U32, value); break;
+			case LS_TYPE_I64: ImGui::InputScalar("##value", ImGuiDataType_S64, value); break;
+			case LS_TYPE_U64: ImGui::InputScalar("##value", ImGuiDataType_U64, value); break;
+			case LS_TYPE_F32: ImGui::InputFloat("##value", (f32*)value); break;
+			case LS_TYPE_F64: ImGui::InputDouble("##value", (f64*)value); break;
+			case LS_TYPE_ENUM: ImGui::InputInt("##value", (i32*)value); break;
+			default: drawPrimitiveValue(kind, value, type); break;
+		}
+	}
+	else {
+		drawPrimitiveValue(kind, value, type);
+	}
+	ImGui::PopID();ImGui::Unindent();
 }
 
 struct LumScriptDebuggerWindow;
@@ -542,19 +498,22 @@ struct LumScriptEditorWindow final : AssetEditorWindow {
 			ImportResolverContext* ctx = (ImportResolverContext*)userdata;
 			if (!ctx || !ctx->module || !ctx->import_ctx) return 0;
 			StringView path_view(path.begin, path.end);
+			Path file_path;
 			if (startsWith(path_view, "core:")) {
 				StringView name = path_view.withoutLeft(5);
 				const bool has_lum_extension = endsWith(name, ".lum");
-				Path file_path = has_lum_extension ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".lum");
-				OutputMemoryStream& import_blob = ctx->import_ctx->sources.emplace(*ctx->import_ctx->allocator);
-				if (!ctx->import_ctx->filesystem->getContentSync(file_path, import_blob)) {
-					ctx->import_ctx->sources.pop();
-					return 0;
-				}
-				*source = ls_string_view{(const char*)import_blob.data(), (const char*)import_blob.data() + import_blob.size()};
-				return 1;
+				file_path = has_lum_extension ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".lum");
 			}
-			return 0;
+			else {
+				file_path = endsWith(path_view, ".lum") ? Path(path_view) : Path(path_view, ".lum");
+			}
+			OutputMemoryStream& import_blob = ctx->import_ctx->sources.emplace(*ctx->import_ctx->allocator);
+			if (!ctx->import_ctx->filesystem->getContentSync(file_path, import_blob)) {
+				ctx->import_ctx->sources.pop();
+				return 0;
+			}
+			*source = ls_string_view{(const char*)import_blob.data(), (const char*)import_blob.data() + import_blob.size()};
+			return 1;
 		};
 		ImportContext import_ctx(m_app.getEngine().getFileSystem(), m_app.getAllocator());
 		ImportResolverContext resolver_ctx = {};
@@ -1060,6 +1019,104 @@ static bool toggleLumScriptBreakpoint(StudioApp& app, const Path& source, u32 li
 
 static Action g_toggle_variables_window{"LumScript", "Variables window", "Show/hide variables window", "lumscript_toggle_variables", ICON_FA_CUBE, Action::Type::TOOL};
 
+struct LumScriptDataCommand final : IEditorCommand {
+	LumScriptDataCommand(WorldEditor& editor, EntityRef entity, const ls_type* type, bool add)
+		: m_editor(editor)
+		, m_entity(entity)
+		, m_type(type)
+		, m_add(add)
+	{}
+
+	bool execute() override { return apply(m_add); }
+	void undo() override { apply(!m_add); }
+	const char* getType() override { return m_add ? "add_lumscript_data" : "remove_lumscript_data"; }
+	bool merge(IEditorCommand&) override { return false; }
+
+	bool apply(bool add) {
+		World* world = m_editor.getWorld();
+		if (!world || !world->hasEntity(m_entity)) return false;
+		LumScriptModule* module = static_cast<LumScriptModule*>(world->getModule("lumscript"));
+		if (!module) return false;
+		return add ? module->addLumScriptData(m_entity, m_type) : module->removeLumScriptData(m_entity, m_type);
+	}
+
+	WorldEditor& m_editor;
+	EntityRef m_entity;
+	const ls_type* m_type;
+	bool m_add;
+};
+
+struct LumScriptPropertyGridPlugin final : PropertyGrid::IPlugin {
+	void onGUI(PropertyGrid&, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
+		if (entities.length() != 1) return;
+		World* world = editor.getWorld();
+		IModule* base_module = world ? world->getModule(cmp_type) : nullptr;
+		if (!base_module || !equalStrings(base_module->getName(), "lumscript")) return;
+
+		LumScriptModule& module = static_cast<LumScriptModule&>(*base_module);
+		const EntityRef entity = entities[0];
+		for (u32 i = 0, count = module.getLumScriptDataCount(entity); i < count; ++i) {
+			const ls_type* type = module.getLumScriptDataType(entity, i);
+			if (!type) continue;
+			const ls_string_view ls_name = ls_type_get_name(type);
+			const StringView name(ls_name.begin, ls_name.end);
+			if (filter.isActive() && !filter.pass(name)) continue;
+
+			ImGui::PushID(type);
+			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Remove data")) {
+				UniquePtr<IEditorCommand> command = UniquePtr<LumScriptDataCommand>::create(
+					editor.getAllocator(), editor, entity, type, false);
+				editor.executeCommand(command.move());
+				ImGui::PopID();
+				break;
+			}
+			ImGui::SameLine();
+			const bool open = ImGui::TreeNodeEx("##data", ImGuiTreeNodeFlags_SpanFullWidth, "%.*s", int(name.end - name.begin), name.begin);
+			if (open) {
+				{
+					const void* value = module.getLumScriptData(entity, type);
+					const ls_type_kind kind = ls_type_get_kind(type);
+					if (kind == LS_TYPE_STRUCT) {
+						for (u32 j = 0, n = ls_type_struct_field_count(type); j < n; ++j) {
+							const ls_string_view field_name = ls_type_struct_field_name(type, j);
+							const ls_type* field_type = ls_type_struct_field_type(type, j);
+							const u32 offset = ls_type_struct_field_offset(type, j);
+							drawVariable(field_name
+								, field_type ? ls_type_get_kind(field_type) : LS_TYPE_INVALID
+								, field_type
+								, value ? (void*)((const u8*)value + offset) : nullptr
+								, field_type ? ls_type_get_size(field_type) : 0
+								, true);
+						}
+					}
+					else {
+						static const char value_name[] = "value";
+						drawVariable({value_name, value_name + lengthOf(value_name) - 1 }, kind, type, (void*)value, ls_type_get_size(type), true);
+					}
+				}
+				ImGui::TreePop();
+			}
+			ImGui::PopID();
+		}
+
+		if (ImGui::Button(ICON_FA_PLUS " Add data")) ImGui::OpenPopup("lumscript_add_data");
+		if (ImGui::BeginPopup("lumscript_add_data")) {
+			for (const ls_type* type : module.getLumScriptDataTypes()) {
+				if (module.hasLumScriptData(entity, type)) continue;
+				const ls_string_view ls_name = ls_type_get_name(type);
+				const StringView name(ls_name.begin, ls_name.end);
+				if (ImGui::MenuItem(StaticString<128>(name))) {
+					UniquePtr<IEditorCommand> command = UniquePtr<LumScriptDataCommand>::create(
+						editor.getAllocator(), editor, entity, type, true);
+					editor.executeCommand(command.move());
+				}
+			}
+			ImGui::EndPopup();
+		}
+	}
+
+};
+
 struct LumScriptPlugin : StudioApp::IPlugin {
 	explicit LumScriptPlugin(StudioApp& app)
 		: m_app(app)
@@ -1080,6 +1137,7 @@ struct LumScriptPlugin : StudioApp::IPlugin {
 		g_debugger_step_out.shortcut = os::Keycode::SHIFT | os::Keycode::F11;
 		m_app.getAssetBrowser().addPlugin(m_asset_plugin, Span(lum_exts));
 		m_app.getAssetCompiler().addPlugin(m_asset_plugin, Span(lum_exts));
+		m_app.getPropertyGrid().addPlugin(m_property_grid_plugin);
 		m_app.addPlugin(m_debugger);
 		m_app.addPlugin(m_variables_window);
 	}
@@ -1112,6 +1170,7 @@ struct LumScriptPlugin : StudioApp::IPlugin {
 	}
 
 	~LumScriptPlugin() {
+		m_app.getPropertyGrid().removePlugin(m_property_grid_plugin);
 		m_app.removePlugin(m_variables_window);
 		m_app.removePlugin(m_debugger);
 		m_app.getAssetBrowser().removePlugin(m_asset_plugin);
@@ -1123,6 +1182,7 @@ private:
 	LumScriptAssetPlugin m_asset_plugin;
 	LumScriptDebuggerWindow m_debugger;
 	LumScriptVariablesWindow m_variables_window;
+	LumScriptPropertyGridPlugin m_property_grid_plugin;
 	Action m_debugger_action{"LumScript", "Debugger", "LumScript Debugger", "lumscript_debugger", ICON_FA_BUG, Action::Type::TOOL};
 };
 

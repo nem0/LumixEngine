@@ -3,6 +3,9 @@
 
 struct Element { ptr : cptr; }
 
+extern fn getID(object : Element) : []const u8;
 extern fn setVisible(object : Element, show : bool) : void;
+extern fn setText(object : Element, value : []const u8) : void;
+extern fn setWidth(object : Element, value : []const u8) : void;
 extern fn setBGImage(object : Element, path : []const u8) : void;
 

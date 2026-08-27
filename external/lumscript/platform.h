@@ -1,67 +1,18 @@
 #pragma once
 
-#include <stddef.h>
 #include <stdbool.h>
+#include <stddef.h>
 
-#ifdef _WIN32
-#include <windows.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-static inline size_t ls_platform_page_size(void) {
-	SYSTEM_INFO info;
-	GetSystemInfo(&info);
-	return info.dwPageSize ? (size_t)info.dwPageSize : 4096u;
-}
+size_t ls_platform_page_size(void);
+void* ls_platform_reserve(size_t size);
+bool ls_platform_commit(void* address, size_t size);
+void ls_platform_release(void* address, size_t size);
+double ls_platform_now_ms(void);
 
-static inline void* ls_platform_reserve(size_t size) {
-	return VirtualAlloc(NULL, size, MEM_RESERVE, PAGE_NOACCESS);
-}
-
-static inline bool ls_platform_commit(void* address, size_t size) {
-	return VirtualAlloc(address, size, MEM_COMMIT, PAGE_READWRITE) != NULL;
-}
-
-static inline void ls_platform_release(void* address, size_t size) {
-	(void)size;
-	if (address) VirtualFree(address, 0, MEM_RELEASE);
-}
-
-static inline double ls_platform_now_ms(void) {
-	static LARGE_INTEGER frequency;
-	static int initialized;
-	LARGE_INTEGER counter;
-	if (!initialized) {
-		QueryPerformanceFrequency(&frequency);
-		initialized = 1;
-	}
-	QueryPerformanceCounter(&counter);
-	return (double)counter.QuadPart * 1000.0 / (double)frequency.QuadPart;
-}
-#else
-#include <sys/mman.h>
-#include <unistd.h>
-#include <time.h>
-
-static inline size_t ls_platform_page_size(void) {
-	long value = sysconf(_SC_PAGESIZE);
-	return value > 0 ? (size_t)value : 4096u;
-}
-
-static inline void* ls_platform_reserve(size_t size) {
-	void* address = mmap(NULL, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	return address == MAP_FAILED ? NULL : address;
-}
-
-static inline bool ls_platform_commit(void* address, size_t size) {
-	return mprotect(address, size, PROT_READ | PROT_WRITE) == 0;
-}
-
-static inline void ls_platform_release(void* address, size_t size) {
-	if (address) munmap(address, size);
-}
-
-static inline double ls_platform_now_ms(void) {
-	struct timespec value;
-	clock_gettime(CLOCK_MONOTONIC, &value);
-	return (double)value.tv_sec * 1000.0 + (double)value.tv_nsec / 1000000.0;
+#ifdef __cplusplus
 }
 #endif

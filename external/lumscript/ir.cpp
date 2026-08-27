@@ -460,10 +460,8 @@ struct IRBuilder {
 					auto& struct_type = static_cast<StructResolvedType&>(*be.base->resolved_type);
 					u32 offset = 0;
 					for (i32 i = 0; i < struct_type.decl->fields.size(); ++i) {
-						if (!equalStrings(struct_type.decl->fields[i].name, be.struct_field_name)) {
-							offset += typeByteSize(*struct_type.field_types[i]);
-							continue;
-						}
+						if (!equalStrings(struct_type.decl->fields[i].name, be.struct_field_name)) continue;
+						offset = structFieldOffset(struct_type, i);
 						if (as_rvalue) {
 							auto& extract = alloc<LsOpExtractValue>();
 							extract.value = &buildExpressionIR(*be.base, true);
@@ -568,7 +566,7 @@ struct IRBuilder {
 				}
 
 				// namespace.comptime
-				if (me.resolved_symbol && me.resolved_symbol->storage == Symbol::COMPTIME) {
+				if (me.resolved_symbol && me.resolved_symbol->kind == Symbol::COMPTIME) {
 					ASSERT(as_rvalue);
 					auto& value = alloc<LsOpLoadBytes>();
 					value.type = expr.resolved_type;
@@ -623,10 +621,7 @@ struct IRBuilder {
 				ASSERT(base_type->kind == ResolvedTypeKind::STRUCT);
 				auto* struct_type = static_cast<StructResolvedType*>(base_type);
 				auto& fields = struct_type->decl->fields;
-				u32 offset = 0;
-				for (i32 i = 0; i < me.struct_field_index; ++i) {
-					offset += typeByteSize(*struct_type->field_types[i]);
-				}
+				u32 offset = structFieldOffset(*struct_type, me.struct_field_index);
 
 				auto& base = buildExpressionIR(*me.expression, pointer_base);
 
@@ -685,7 +680,7 @@ struct IRBuilder {
 					return value_addr;
 				}
 
-				if (ie.symbol && ie.symbol->storage == Symbol::COMPTIME && ie.symbol->comptime_bytes) {
+				if (ie.symbol && ie.symbol->kind == Symbol::COMPTIME && ie.symbol->comptime_bytes) {
 					auto& value = alloc<LsOpLoadBytes>();
 					value.type = ie.symbol->resolved_type;
 					value.value = ie.symbol->comptime_bytes;
@@ -796,12 +791,10 @@ struct IRBuilder {
 					StructResolvedType* st = static_cast<StructResolvedType*>(op.type);
 					op.offsets = static_cast<u32*>(host.arena.allocate(host.arena.user_data, sizeof(u32) * op.value_count, alignof(u32)));
 					op.sizes = static_cast<u32*>(host.arena.allocate(host.arena.user_data, sizeof(u32) * op.value_count, alignof(u32)));
-					u32 offset = 0;
 					for (u32 i = 0; i < op.value_count; ++i) {
-						ResolvedType* field_type = st->field_types[i];
-						op.offsets[i] = offset;
+						ResolvedType* field_type = st->fields[i].type;
+						op.offsets[i] = structFieldOffset(*st, (i32)i);
 						op.sizes[i] = typeByteSize(*field_type);
-						offset += op.sizes[i];
 					}
 				}
 				for (u32 i = 0; i < op.value_count; ++i) op.values[i] = &buildExpressionIR(*sle.values[i], true);
@@ -1686,9 +1679,8 @@ struct IRBuilder {
 			locals.push({param.name, &alloca});
 			param.slot.storage = StorageSlot::LOCAL;
 			param.slot.offset = param_offset;
-			param.slot.byte_size = typeByteSize(*param.resolved_type);
 			param.slot.type = param.resolved_type;
-			param_offset += param.slot.byte_size;
+			param_offset += typeByteSize(*param.resolved_type);
 		}
 		stack_cursor = param_offset;
 		buildStatementIR(*expr.body, root);
@@ -1791,7 +1783,7 @@ static ls_type_kind debugTypeKind(const ResolvedType& type) {
 }
 
 static ResolvedType* structFieldTypeAt(const StructResolvedType& st, i32 index) {
-	if (index < st.field_types.size()) return st.field_types[index];
+	if (index < st.fields.size()) return st.fields[index].type;
 	return nullptr;
 }
 
@@ -1829,6 +1821,7 @@ struct TypeInfoBuilder {
 		entry.bytecode = &bytecode;
 		entry.kind = debugTypeKind(type);
 		entry.byte_size = typeByteSize(type);
+		entry.alignment = typeAlignment(type);
 		entry.first_field_index = first_field;
 		entry.first_attribute_index = first_attribute;
 		entry.attribute_count = 0;
@@ -1856,7 +1849,6 @@ struct TypeInfoBuilder {
 						}
 						entry.attribute_count = (u32)attributes.size() - first_attribute;
 					}
-					u32 offset = 0;
 					// Append this type's own field entries first (recursion
 					// below must not interleave child fields into this range).
 					for (i32 i = 0; i < st.decl->fields.size(); ++i) {
@@ -1866,7 +1858,7 @@ struct TypeInfoBuilder {
 						ls_type_field_info& field = fields.emplace_back();
 						field.name = copyStringViewToArena(host.arena, st.decl->fields[i].name);
 						field.type_index = LS_TYPE_INDEX_NONE;
-						field.offset = offset;
+						field.offset = structFieldOffset(st, i);
 						field.first_attribute_index = (u32)attributes.size();
 						field.attribute_count = 0;
 						if (st.decl->fields[i].attributes) {
@@ -1882,7 +1874,6 @@ struct TypeInfoBuilder {
 							}
 							fields[field_index].attribute_count = (u32)attributes.size() - fields[field_index].first_attribute_index;
 						}
-						offset += typeByteSize(*field_type);
 					}
 					entry.field_count = (u32)fields.size() - first_field;
 					// Then intern child types (which may append their own
@@ -3905,20 +3896,29 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host, ls_bytecode_c
 			if (!symbolHasGlobalStorage(s)) continue;
 			s.slot.storage = StorageSlot::GLOBAL;
 			s.slot.offset = bc->global_size;
-			s.slot.byte_size = typeByteSize(*s.resolved_type);
-			if (s.slot.byte_size == 0) s.slot.byte_size = 1;
 			s.slot.type = s.resolved_type;
-			s.slot.kind = BytecodeCompiler::toTypeKind(*s.resolved_type);
-			bc->global_size += s.slot.byte_size;
+			const u32 byte_size = typeByteSize(*s.resolved_type);
+			bc->global_size += byte_size;
 
 			ls_bytecode_global_debug_entry& entry = bc->global_debug[global_debug_index++];
 			entry.name = copyStringViewToArena(host->arena, s.name);
 			entry.offset = s.slot.offset;
-			entry.byte_size = s.slot.byte_size;
+			entry.byte_size = byte_size;
 			entry.kind = debugTypeKind(*s.resolved_type);
 			entry.type_index = type_info.internType(*s.resolved_type);
 		}
 	}
+	// Keep named struct declarations available to hosts even when they are not
+	// referenced by runtime code (for example, editor-only component data).
+	for (Unit& u : module->units) {
+		for (Symbol& s : u.symbols) {
+			if (!s.expression || s.expression->kind != Expression::STRUCT) continue;
+			if (!s.resolved_type || s.resolved_type->kind != ResolvedTypeKind::META) continue;
+			ResolvedType* type = static_cast<MetaType*>(s.resolved_type)->inner;
+			if (type) type_info.internType(*type);
+		}
+	}
+
 	for (Unit& u : module->units) {
 		for (Symbol& s : u.symbols) {
 			if (!s.expression) continue; // alias
@@ -4008,7 +4008,7 @@ ls_bytecode* ls_bytecode_compile(ls_module* module, ls_host* host, ls_bytecode_c
 				bc_compiler.emit(dst);
 				bc_compiler.emit(0u);
 				bc_compiler.emit(src);
-				bc_compiler.emit(s.slot.byte_size);
+				bc_compiler.emit(typeByteSize(*s.resolved_type));
 			}
 		}
 		bc_compiler.emitOp(LS_OP_RETURN_BASE);

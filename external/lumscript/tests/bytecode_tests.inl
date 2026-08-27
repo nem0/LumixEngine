@@ -100,6 +100,11 @@ TEST(BytecodeThreeByteStructUndefinedLocalCanBeFullyAssigned) {
 
 
 TEST(StructExtern) {
+	struct NativeEntity {
+		i32 index;
+		void* world;
+	};
+
 	const char* source = R"(
 		struct Entity {
 			index : i32;
@@ -119,23 +124,21 @@ TEST(StructExtern) {
 	static int ptr;
 
 	auto create_fn = [](ls_runtime* runtime, ls_call_frame frame) -> void {
-		i32 idx = 42; void* world = &ptr;
-		memcpy(frame.result, &idx, sizeof(idx));
-		memcpy(frame.result + sizeof(idx), &world, sizeof(world));
+		NativeEntity value = {42, &ptr};
+		memcpy(frame.result, &value, sizeof(value));
 	};
 
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("create"), create_fn) == LS_RESULT_OK);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
-	// Struct fields are packed in declaration order: index at 0, world at 4.
 	u32 result_size = 0;
 	const u8* result = (const u8*)ls_call_result(runtime, &result_size);
 	EXPECT_TRUE(result != nullptr);
-	EXPECT_EQ(12u, result_size);
+	EXPECT_EQ((u32)sizeof(NativeEntity), result_size);
 	i32 index_value = 0;
 	void* world_value = nullptr;
-	memcpy(&index_value, result, sizeof(index_value));
-	memcpy(&world_value, result + 4, sizeof(world_value));
+	memcpy(&index_value, result + offsetof(NativeEntity, index), sizeof(index_value));
+	memcpy(&world_value, result + offsetof(NativeEntity, world), sizeof(world_value));
 	EXPECT_EQ(42, index_value);
 	EXPECT_TRUE(&ptr == world_value);
 	CAPI_END(module);
@@ -143,7 +146,273 @@ TEST(StructExtern) {
 	return true;
 }
 
+TEST(NormalStructCAbiLayout) {
+	struct NativeEntity {
+		i32 index;
+		void* world;
+	};
+
+	const char* source = R"(
+		struct Entity {
+			index : i32;
+			world : cptr;
+		}
+
+		var g : Entity = undefined;
+
+		fn main() : void {
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_EQ(1u, ls_debug_global_count(runtime));
+	EXPECT_EQ((int)LS_TYPE_STRUCT, (int)ls_debug_global_kind(runtime, 0));
+	const ls_type* type = ls_debug_global_type(runtime, 0);
+	EXPECT_TRUE(type != nullptr);
+	EXPECT_EQ((u32)sizeof(NativeEntity), ls_type_get_size(type));
+	EXPECT_EQ((u32)offsetof(NativeEntity, index), ls_type_struct_field_offset(type, 0));
+	EXPECT_EQ((u32)offsetof(NativeEntity, world), ls_type_struct_field_offset(type, 1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ExternStructCAbiLayout) {
+	struct NativeEntity {
+		i32 index;
+		void* world;
+	};
+
+	const char* source = R"(
+		extern struct Entity {
+			index : i32;
+			world : cptr;
+		}
+
+		var g : Entity = undefined;
+
+		fn main() : void {
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_EQ(1u, ls_debug_global_count(runtime));
+	EXPECT_EQ((int)LS_TYPE_STRUCT, (int)ls_debug_global_kind(runtime, 0));
+	const ls_type* type = ls_debug_global_type(runtime, 0);
+	EXPECT_TRUE(type != nullptr);
+	EXPECT_EQ((int)LS_TYPE_STRUCT, (int)ls_type_get_kind(type));
+	EXPECT_EQ((u32)sizeof(NativeEntity), ls_type_get_size(type));
+	EXPECT_EQ(2u, ls_type_struct_field_count(type));
+	EXPECT_TRUE(equalStrings(ls_type_struct_field_name(type, 0), toLs("index")));
+	EXPECT_EQ((u32)offsetof(NativeEntity, index), ls_type_struct_field_offset(type, 0));
+	EXPECT_TRUE(equalStrings(ls_type_struct_field_name(type, 1), toLs("world")));
+	EXPECT_EQ((u32)offsetof(NativeEntity, world), ls_type_struct_field_offset(type, 1));
+
+	u32 value_size = 0;
+	const void* value = ls_debug_global_value(runtime, 0, &value_size);
+	EXPECT_TRUE(value != nullptr);
+	EXPECT_EQ((u32)sizeof(NativeEntity), value_size);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ExternStructPaddedFieldAccessAndAssignment) {
+	struct NativePadded {
+		i8 a;
+		i64 b;
+	};
+
+	const char* source = R"(
+		extern struct Padded {
+			a : i8;
+			b : i64;
+		}
+
+		extern fn read_native(v : Padded) : i64;
+
+		fn make() : Padded {
+			var v = Padded { 1, 42 };
+			v.b = v.b + 10;
+			return v;
+		}
+
+		fn main() : i64 {
+			return read_native(make());
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	auto read_native = [](ls_runtime*, ls_call_frame frame) -> void {
+		LS_ARG(frame, NativePadded, v);
+		LS_RESULT(frame, v.b);
+	};
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("read_native"), read_native) == LS_RESULT_OK);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("make")));
+	u32 result_size = 0;
+	const u8* result = (const u8*)ls_call_result(runtime, &result_size);
+	EXPECT_TRUE(result != nullptr);
+	EXPECT_EQ((u32)sizeof(NativePadded), result_size);
+
+	i8 a = 0;
+	i64 b = 0;
+	memcpy(&a, result + offsetof(NativePadded, a), sizeof(a));
+	memcpy(&b, result + offsetof(NativePadded, b), sizeof(b));
+	EXPECT_EQ(1, a);
+	EXPECT_EQ(52, b);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(52, ls_to_i64(runtime, -1));
+
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ExternStructSizeofAndAlignofUseCAbiLayout) {
+	const char* source = R"(
+		extern struct Padded {
+			a : i8;
+			b : i64;
+		}
+
+		fn size_of() : i32 { return sizeof(Padded) as i32; }
+		fn align_of() : i32 { return alignof(Padded) as i32; }
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("size_of")));
+	EXPECT_EQ(16, ls_to_i32(runtime, -1));
+	EXPECT_TRUE(ls_call(runtime, toLs("align_of")));
+	EXPECT_EQ(8, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ExternStructNestedAndArrayLayout) {
+	struct NativeInner {
+		i8 a;
+		i32 b;
+	};
+	struct NativeOuter {
+		i8 tag;
+		NativeInner inner;
+		i16 values[3];
+	};
+
+	const char* source = R"(
+		extern struct Inner {
+			a : i8;
+			b : i32;
+		}
+
+		extern struct Outer {
+			tag : i8;
+			inner : Inner;
+			values : [3]i16;
+		}
+
+		var g : Outer = Outer { 1, Inner { 2, 300 }, [4, 5, 6] };
+
+		fn main() : i32 {
+			return g.inner.b + g.values[1] as i32;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(305, ls_to_i32(runtime, -1));
+
+	EXPECT_EQ(1u, ls_debug_global_count(runtime));
+	const ls_type* type = ls_debug_global_type(runtime, 0);
+	EXPECT_TRUE(type != nullptr);
+	EXPECT_EQ((u32)sizeof(NativeOuter), ls_type_get_size(type));
+	EXPECT_EQ((u32)offsetof(NativeOuter, tag), ls_type_struct_field_offset(type, 0));
+	EXPECT_EQ((u32)offsetof(NativeOuter, inner), ls_type_struct_field_offset(type, 1));
+	EXPECT_EQ((u32)offsetof(NativeOuter, values), ls_type_struct_field_offset(type, 2));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(NativeStructAbiVec3DVec3Quat) {
+	struct NativeVec3 { float x, y, z; };
+	struct NativeDVec3 { double x, y, z; };
+	struct NativeQuat { float x, y, z, w; };
+
+	const char* source = R"(
+		struct Vec3 { x : f32; y : f32; z : f32; }
+		struct DVec3 { x : f64; y : f64; z : f64; }
+		struct Quat { x : f32; y : f32; z : f32; w : f32; }
+
+		extern fn native_vec3(v : Vec3) : Vec3;
+		extern fn native_dvec3(v : DVec3) : DVec3;
+		extern fn native_quat(v : Quat) : Quat;
+
+		fn vec3() : Vec3 { return native_vec3(Vec3 { 1.0, 2.0, 3.0 }); }
+		fn dvec3() : DVec3 { return native_dvec3(DVec3 { 4.0, 5.0, 6.0 }); }
+		fn quat() : Quat { return native_quat(Quat { 7.0, 8.0, 9.0, 10.0 }); }
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	auto native_vec3 = [](ls_runtime*, ls_call_frame frame) {
+		LS_ARG(frame, NativeVec3, value);
+		LS_RESULT(frame, value);
+	};
+	auto native_dvec3 = [](ls_runtime*, ls_call_frame frame) {
+		LS_ARG(frame, NativeDVec3, value);
+		LS_RESULT(frame, value);
+	};
+	auto native_quat = [](ls_runtime*, ls_call_frame frame) {
+		LS_ARG(frame, NativeQuat, value);
+		LS_RESULT(frame, value);
+	};
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("native_vec3"), native_vec3) == LS_RESULT_OK);
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("native_dvec3"), native_dvec3) == LS_RESULT_OK);
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("native_quat"), native_quat) == LS_RESULT_OK);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("vec3")));
+	NativeVec3 vec3_result{};
+	u32 size = 0;
+	memcpy(&vec3_result, ls_call_result(runtime, &size), sizeof(vec3_result));
+	EXPECT_EQ((u32)sizeof(vec3_result), size);
+	EXPECT_EQ(1.0f, vec3_result.x); EXPECT_EQ(2.0f, vec3_result.y); EXPECT_EQ(3.0f, vec3_result.z);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("dvec3")));
+	NativeDVec3 dvec3_result{};
+	memcpy(&dvec3_result, ls_call_result(runtime, &size), sizeof(dvec3_result));
+	EXPECT_EQ((u32)sizeof(dvec3_result), size);
+	EXPECT_EQ(4.0, dvec3_result.x); EXPECT_EQ(5.0, dvec3_result.y); EXPECT_EQ(6.0, dvec3_result.z);
+
+	EXPECT_TRUE(ls_call(runtime, toLs("quat")));
+	NativeQuat quat_result{};
+	memcpy(&quat_result, ls_call_result(runtime, &size), sizeof(quat_result));
+	EXPECT_EQ((u32)sizeof(quat_result), size);
+	EXPECT_EQ(7.0f, quat_result.x); EXPECT_EQ(8.0f, quat_result.y);
+	EXPECT_EQ(9.0f, quat_result.z); EXPECT_EQ(10.0f, quat_result.w);
+
+	CAPI_END(module);
+	return true;
+}
+
 TEST(RawResultAccess) {
+	struct NativeEntity {
+		i32 index;
+		void* world;
+	};
+
 	const char* source = R"(
 		struct Entity {
 			index : i32;
@@ -166,24 +435,22 @@ TEST(RawResultAccess) {
 	static int ptr;
 
 	auto create_fn = [](ls_runtime* runtime, ls_call_frame frame) -> void {
-		i32 idx = 42; void* world = &ptr;
-		memcpy(frame.result, &idx, sizeof(idx));
-		memcpy(frame.result + sizeof(idx), &world, sizeof(world));
+		NativeEntity value = {42, &ptr};
+		memcpy(frame.result, &value, sizeof(value));
 	};
 
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("create"), create_fn) == LS_RESULT_OK);
 	EXPECT_TRUE(ls_call(runtime, toLs("main")));
 
-	// Struct fields are packed in declaration order: index at 0, world at 4.
 	u32 size = 0;
 	const u8* result = (const u8*)ls_call_result(runtime, &size);
 	EXPECT_TRUE(result != nullptr);
-	EXPECT_EQ(12u, size);
+	EXPECT_EQ((u32)sizeof(NativeEntity), size);
 	i32 index_value = 0;
 	void* world_value = nullptr;
-	memcpy(&index_value, result, sizeof(index_value));
-	memcpy(&world_value, result + 4, sizeof(world_value));
+	memcpy(&index_value, result + offsetof(NativeEntity, index), sizeof(index_value));
+	memcpy(&world_value, result + offsetof(NativeEntity, world), sizeof(world_value));
 	EXPECT_EQ(42, index_value);
 	EXPECT_TRUE(&ptr == world_value);
 

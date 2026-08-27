@@ -34,15 +34,16 @@ compile_cpp "$ROOT/parser.cpp" "$OUT/parser.o"
 compile_cpp "$ROOT/compiler.cpp" "$OUT/compiler.o"
 compile_cpp "$ROOT/ir.cpp" "$OUT/ir.o"
 compile_cpp "$ROOT/capi.cpp" "$OUT/capi.o"
+compile_cpp "$ROOT/platform.cpp" "$OUT/platform.o"
 
 if [[ "$MODE" == tests ]]; then
     compile_cpp "$ROOT/tests/main.cpp" "$OUT/tests_main.o"
     "$CXX" "$OUT/tests_main.o" "$OUT/parser.o" "$OUT/compiler.o" "$OUT/ir.o" \
-        "$OUT/capi.o" "$OUT/runtime.o" "$OUT/debugger.o" -lm -o "$OUT/tests"
+        "$OUT/capi.o" "$OUT/platform.o" "$OUT/runtime.o" "$OUT/debugger.o" -lm -o "$OUT/tests"
 else
     compile_c "$ROOT/lumc.c" "$OUT/lumc.o"
     "$CXX" "$OUT/lumc.o" "$OUT/parser.o" "$OUT/compiler.o" "$OUT/ir.o" \
-        "$OUT/capi.o" "$OUT/runtime.o" "$OUT/debugger.o" -lm -o "$OUT/lumc"
+        "$OUT/capi.o" "$OUT/platform.o" "$OUT/runtime.o" "$OUT/debugger.o" -lm -o "$OUT/lumc"
 fi
 
 if [[ "$MODE" == tests ]]; then

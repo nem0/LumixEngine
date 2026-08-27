@@ -345,6 +345,7 @@ typedef struct ls_type {
 	const struct ls_bytecode* bytecode;  // owning bytecode (for field/type lookups)
 	ls_type_kind kind;
 	u32 byte_size;               // same as typeByteSize for this type
+	u32 alignment;               // required alignment of values of this type
 	u32 field_count;             // 0 when kind != LS_TYPE_STRUCT
 	u32 first_field_index;       // index into bytecode->type_fields[]; unused when field_count == 0
 	u32 attribute_count;

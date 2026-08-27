@@ -6,7 +6,7 @@ struct Event {
 	type : EventType;
 	position : Vec2;
 	element_index : i32;
-	action : void;
+	action : []const u8;
 	key_code : i32;
 	text_utf8 : i32;
 	wheel_y : f32;

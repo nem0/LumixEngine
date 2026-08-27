@@ -7,8 +7,6 @@
 
 namespace Lumix::LumScript {
 
-struct LumScriptEntity;
-
 template <typename T> struct IsPointer { static constexpr bool Value = false; };
 template <typename T> struct IsPointer<T*> { static constexpr bool Value = true; };
 
@@ -37,7 +35,7 @@ template <typename T> void writeResult(ls_runtime*, ls_call_frame& frame, const 
 
 template <typename T> void writeResult(ls_runtime*, ls_call_frame& frame, const T& value) { LS_RESULT(frame, value); }
 inline void writeResult(ls_runtime* runtime, ls_call_frame& frame, ls_string_view value) { ls_result_string(runtime, &frame, value); }
-void writeResult(ls_runtime* runtime, ls_call_frame& frame, const LumScriptEntity& value);
+void writeResult(ls_runtime* runtime, ls_call_frame& frame, const LsEntity& value);
 
 template <typename R, typename... Args>
 static void callImpl(ls_runtime* runtime, ls_call_frame& frame, R (*f)(Args...)) {

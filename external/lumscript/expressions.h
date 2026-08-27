@@ -12,16 +12,10 @@ struct Expression;
 
 struct Attribute;
 
-struct NamedDecl {
+struct StructFieldDecl {
 	ls_string_view name;
-	// Attributes are parsed metadata; semantic validation and materialization are
-	// performed by the checker.
 	ExpArray<Attribute>* attributes = nullptr;
-	// Shared by compile-time template parameters and runtime function parameters;
-	// the owning expression determines which phase the parameter belongs to.
-	// Type annotations are ordinary expressions resolved in a comptime context.
 	Expression* type_expr = nullptr;
-	ResolvedType* resolved_type = nullptr;
 };
 
 // Storage location assigned by the bytecode compiler to runtime declarations
@@ -32,25 +26,18 @@ struct NamedDecl {
 // the entire compilation.
 struct StorageSlot {
 	enum Storage : u8 {
-		LOCAL,      // Frame-local storage (typical locals and loop variables).
-		LOCAL_REF,  // Frame-local storage passed by reference (function parameters only).
-		GLOBAL,     // Global data segment storage.
+		LOCAL,
+		GLOBAL,
 	};
 
 	u32 offset = 0;
-	u32 byte_size = 0;
-	ls_type_kind kind = LS_TYPE_INVALID;
 	ResolvedType* type = nullptr;
 	Storage storage = LOCAL;
 };
 
 struct FunctionParam {
 	ls_string_view name;
-	// Runtime parameters can be passed by reference with `ref`.
-	bool is_ref = false;
-	// Compile-time value parameters require constant arguments.
 	bool is_comptime = false;
-	bool is_generic = false;
 	Expression* type_expr = nullptr;
 	ResolvedType* resolved_type = nullptr;
 	StorageSlot slot;
@@ -145,8 +132,6 @@ struct IdentifierExpression : Expression {
 	ls_string_view name = {};
 	Symbol* symbol = nullptr;
 	FunctionExpression* resolved_fn = nullptr;
-	// Set by the checker when this identifier resolves to runtime storage (local,
-	// parameter, or global); null for compile-time symbols (functions, types, etc.).
 	StorageSlot* slot = nullptr;
 
 	// for comptime locals, we need to store folded value for bytecode compiler to use
@@ -414,8 +399,9 @@ struct StructOperator {
 struct StructExpression : Expression {
 	StructExpression(ls_arena& arena) : Expression(STRUCT), fields(arena), operators(arena) {}
 
-	ExpArray<NamedDecl> fields;
+	ExpArray<StructFieldDecl> fields;
 	ExpArray<Attribute>* attributes = nullptr;
+	bool is_extern = false;
 	// Operator overloads hosted on this type (first struct operand).
 	// Populated during symbol checking; used for O(1)-ish operator lookup.
 	ExpArray<StructOperator> operators;

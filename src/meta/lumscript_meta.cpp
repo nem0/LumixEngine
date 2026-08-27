@@ -6,7 +6,7 @@
 
 namespace {
 
-enum class LumScriptType { UNKNOWN, VOID_T, BOOL_T, I32_T, F32_T, VEC2_T, VEC3_T, DVEC3_T, VEC4_T, COLOR_T, QUAT_T, ENTITY_T, ENUM_T, STRUCT_T, OBJECT_T, PATH_T };
+enum class LumScriptType { UNKNOWN, VOID_T, BOOL_T, I32_T, F32_T, VEC2_T, VEC3_T, DVEC3_T, VEC4_T, COLOR_T, QUAT_T, ENTITY_T, ENUM_T, STRUCT_T, OBJECT_T, PATH_T, STRING_T };
 
 template <int CAPACITY> struct StaticString {
 	template <typename... Args> StaticString(Args&&... args) {
@@ -109,6 +109,7 @@ LumScriptType getLumScriptType(StringView type) {
 	if (equal(type, "Quat")) return LumScriptType::QUAT_T;
 	if (equal(type, "EntityRef") || equal(type, "EntityPtr")) return LumScriptType::ENTITY_T;
 	if (equal(type, "Path")) return LumScriptType::PATH_T;
+	if (equal(type, "StringView")) return LumScriptType::STRING_T;
 	if (findEnumByTypeName(type)) return LumScriptType::ENUM_T;
 	if (findStructByTypeName(type)) return LumScriptType::STRUCT_T;
 	if (findObjectByTypeName(type)) return LumScriptType::OBJECT_T;
@@ -178,7 +179,7 @@ void logUnsupportedLumScriptFunctionArgs(const char* scope, StringView owner, Fu
 void appendValueExpression(OutputStream& out, StringView type, StringView name) {
 	switch (getLumScriptType(type)) {
 		case LumScriptType::ENTITY_T:
-			out.add(equal(type, "EntityRef") ? "EntityRef(" : "EntityPtr(", name, "_index)");
+			out.add(equal(type, "EntityRef") ? "EntityRef(" : "EntityPtr(", name, ".index)");
 			break;
 		case LumScriptType::COLOR_T:
 			out.add("Color(u8(", name, "_r), u8(", name, "_g), u8(", name, "_b), u8(", name, "_a))");
@@ -188,6 +189,9 @@ void appendValueExpression(OutputStream& out, StringView type, StringView name) 
 			out.add("(", e ? e->full : type, ")", name, "_value");
 			break;
 		}
+		case LumScriptType::STRING_T:
+			out.add("StringView{", name, ".begin, ", name, ".end}");
+			break;
 		default: out.add(name); break;
 	}
 }
@@ -195,7 +199,7 @@ void appendValueExpression(OutputStream& out, StringView type, StringView name) 
 void emitFrameValueRead(OutputStream& out, StringView type, StringView name) {
 	switch (getLumScriptType(type)) {
 		case LumScriptType::ENTITY_T:
-			L("LS_ENTITY_ARG(frame, ", name, ", ", name, "_world);");
+			L("LS_ARG(frame, LsEntity, ", name, ");");
 			break;
 		case LumScriptType::COLOR_T:
 			L("LS_ARG(frame, i32, ", name, "_r);");
@@ -227,6 +231,9 @@ void emitFrameValueRead(OutputStream& out, StringView type, StringView name) {
 			out.add("LS_ARG(frame, ", o ? o->full : objectBaseType(type), "*, ", name, ");" OUT_ENDL);
 			break;
 		}
+		case LumScriptType::STRING_T:
+			L("LS_STRING_ARG(frame, ", name, ");");
+			break;
 		default:
 			out.add("LS_ARG(frame, ", type, ", ", name, ");" OUT_ENDL);
 			break;
@@ -240,12 +247,14 @@ void emitArgRead(OutputStream& out, const Arg& arg) {
 		L("copyString(Span(lumscript_string_arg_", arg.name, "), StringView{", arg.name, ".begin, ", arg.name, ".end});");
 	}
 	else if (isLumScriptPathArg(arg)) L("LS_STRING_ARG(frame, ", arg.name, ");");
+	else if (getLumScriptType(arg.type) == LumScriptType::STRING_T) L("LS_STRING_ARG(frame, ", arg.name, ");");
 	else emitFrameValueRead(out, arg.type, arg.name);
 }
 
 void appendArgExpression(OutputStream& out, const Arg& arg) {
 	if (isLumScriptStringArg(arg)) out.add("lumscript_string_arg_", arg.name);
 	else if (isLumScriptPathArg(arg)) out.add("Path(StringView{", arg.name, ".begin, ", arg.name, ".end})");
+	else if (getLumScriptType(arg.type) == LumScriptType::STRING_T) out.add("StringView{", arg.name, ".begin, ", arg.name, ".end}");
 	else if (getLumScriptType(arg.type) == LumScriptType::OBJECT_T && arg.is_ref) out.add("*", arg.name);
 	else appendValueExpression(out, arg.type, arg.name);
 }
@@ -278,8 +287,8 @@ void appendReturnValue(OutputStream& out, StringView type, const char* value, co
 		}
 		case LumScriptType::QUAT_T: emitResult(out, value); break;
 		case LumScriptType::ENTITY_T: {
-			StaticString<256> index(value, ".index"); emitResult(out, index);
-			emitResult(out, world_expr ? world_expr : "nullptr");
+			StaticString<256> index(value, ".index");
+			L("LS_RESULT(frame, LsEntity(", index.buffer, ", ", world_expr ? world_expr : "nullptr", "));");
 			break;
 		}
 		case LumScriptType::ENUM_T: {
@@ -289,6 +298,9 @@ void appendReturnValue(OutputStream& out, StringView type, const char* value, co
 		}
 		case LumScriptType::PATH_T:
 			L("ls_result_string(runtime, &frame, ls_string_view{", value, ".c_str(), ", value, ".c_str() + ", value, ".length()});");
+			break;
+		case LumScriptType::STRING_T:
+			L("ls_result_string(runtime, &frame, ls_string_view{", value, ".begin, ", value, ".end});");
 			break;
 		case LumScriptType::STRUCT_T: {
 			const Struct* s = findStructByTypeName(type);
@@ -405,7 +417,8 @@ void serializeLumScriptWrapper(OutputStream& out, Module& m, Component& c, Funct
 	L("(ls_runtime* runtime, ls_call_frame frame) {");
 	forEachArg(f.args, [&](const Arg& arg, bool is_first) {
 		if (is_first) {
-			L("LS_COMPONENT_ARG(frame, ", m.name, "*, ", arg.name, ", module);");
+			L("LS_ARG(frame, LsComponent, ", arg.name, ");");
+			L(m.name, "* module = static_cast<", m.name, "*>(", arg.name, ".module);");
 		}
 		else {
 			emitArgRead(out, arg);
@@ -429,7 +442,8 @@ void serializeLumScriptPropertyWrapper(OutputStream& out, Module& m, Component& 
 	L("(ls_runtime* runtime, ls_call_frame frame) {");
 	forEachArg(accessor_args, [&](const Arg& arg, bool is_first) {
 		if (is_first) {
-			L("LS_COMPONENT_ARG(frame, ", m.name, "*, ", arg.name, ", module);");
+			L("LS_ARG(frame, LsComponent, ", arg.name, ");");
+			L(m.name, "* module = static_cast<", m.name, "*>(", arg.name, ".module);");
 		}
 		else {
 			emitArgRead(out, arg);
@@ -505,8 +519,9 @@ void serializeLumScriptArrayCountWrapper(OutputStream& out, Module& m, Component
 	out.add("static void ");
 	appendArrayCountWrapperName(out, c, a, idx);
 	L("(ls_runtime* runtime, ls_call_frame frame) {");
-	L("LS_COMPONENT_ARG(frame, ", m.name, "*, entity, module);");
-	L("const i32 count = module->get", a.name, "Count(EntityRef(entity_index));");
+	L("LS_ARG(frame, LsComponent, component);");
+	L(m.name, "* module = static_cast<", m.name, "*>(component.module);");
+	L("const i32 count = module->get", a.name, "Count(EntityRef(component.index));");
 	L("LS_RESULT(frame, count);");
 	L("}" OUT_ENDL);
 }
@@ -515,9 +530,10 @@ void serializeLumScriptArrayItemWrapper(OutputStream& out, Module& m, Component&
 	out.add("static void ");
 	appendArrayItemWrapperName(out, c, a, idx);
 	L("(ls_runtime* runtime, ls_call_frame frame) {");
-	L("LS_COMPONENT_ARG(frame, ", m.name, "*, entity, module);");
+	L("LS_ARG(frame, LsComponent, component);");
+	L(m.name, "* module = static_cast<", m.name, "*>(component.module);");
 	L("LS_ARG(frame, i32, item_idx);");
-	L("const i32 count = module->get", a.name, "Count(EntityRef(entity_index));");
+	L("const i32 count = module->get", a.name, "Count(EntityRef(component.index));");
 	L("if (item_idx < 0 || item_idx >= count) {");
 	L("LS_RESULT(frame, u8(0));");
 	L("LS_RESULT(frame, i32(0));");
@@ -526,7 +542,7 @@ void serializeLumScriptArrayItemWrapper(OutputStream& out, Module& m, Component&
 	L("return;");
 	L("}");
 	L("LS_RESULT(frame, u8(1));");
-	emitResult(out, "entity_index");
+	emitResult(out, "component.index");
 	emitResult(out, "item_idx");
 	emitResult(out, "module");
 	L("}" OUT_ENDL);
@@ -571,12 +587,14 @@ void emitGeneratedHeader(OutputStream& out, MetaData& data) {
 	out.add("#include \"engine/reflection.h\"" OUT_ENDL);
 	out.add("#include \"engine/world.h\"" OUT_ENDL);
 	out.add(OUT_ENDL);
-	out.add("#define LS_ENTITY_ARG(frame, name, world) \\" OUT_ENDL);
-	out.add("\tLS_ARG(frame, i32, name##_index); \\" OUT_ENDL);
-	out.add("\tLS_ARG(frame, World*, world)" OUT_ENDL);
-	out.add("#define LS_COMPONENT_ARG(frame, type, name, context) \\" OUT_ENDL);
-	out.add("\tLS_ARG(frame, i32, name##_index); \\" OUT_ENDL);
-	out.add("\tLS_ARG(frame, type, context)" OUT_ENDL OUT_ENDL);
+
+	out.add("struct LsEntity { i32 index; u32 padding; Lumix::World* world; LsEntity() = default; explicit LsEntity(i32 index, Lumix::World* world) : index(index), padding(0), world(world) {} };" OUT_ENDL);
+	out.add("struct LsComponent { i32 index; u32 padding; void* module; LsComponent() = default; explicit LsComponent(i32 index, void* module) : index(index), padding(0), module(module) {} };" OUT_ENDL);
+	out.add("static_assert(offsetof(LsEntity, world) == 8);" OUT_ENDL);
+	out.add("static_assert(offsetof(LsComponent, module) == 8);" OUT_ENDL);
+	out.add("static_assert(sizeof(LsEntity) == 16);" OUT_ENDL);
+	out.add("static_assert(sizeof(LsComponent) == 16);" OUT_ENDL OUT_ENDL);
+
 	StringView included_paths[512];
 	i32 included_path_count = 0;
 	auto emitInclude = [&](const char* filename) {
@@ -622,18 +640,17 @@ void emitGeneratedComponentEntityAccessors(OutputStream& out, MetaData& data) {
 	for (Module& m : data.modules) {
 		for (Component& c : m.components) {
 			L("static void lumscript_entity_", c.id, "(ls_runtime* runtime, ls_call_frame frame) {");
-			L("LS_ENTITY_ARG(frame, entity, world);");
+			L("LS_ARG(frame, LsEntity, entity);");
+			L("World* world = entity.world;");
 			L("const ComponentType component_type = reflection::getComponentType(\"", c.id, "\");");
-			L("IModule* module = world->getModule(component_type);");
-			L("if (!module || !world->hasComponent(EntityRef(entity_index), component_type)) {");
+			L("IModule* module = world ? world->getModule(component_type) : nullptr;");
+			L("if (!world || entity.index < 0 || !world->hasEntity(EntityRef(entity.index)) || !module || !world->hasComponent(EntityRef(entity.index), component_type)) {");
 			L("LS_RESULT(frame, u8(0));");
-			L("LS_RESULT(frame, i32(0));");
-			L("LS_RESULT(frame, (void*)nullptr);");
+			L("LS_RESULT(frame, LsComponent(i32(0), (void*)nullptr));");
 			L("return;");
 			L("}");
 			L("LS_RESULT(frame, u8(1));");
-			emitResult(out, "entity_index");
-			emitResult(out, "module");
+			L("LS_RESULT(frame, LsComponent(entity.index, module));");
 			L("}" OUT_ENDL);
 		}
 	}
@@ -643,27 +660,25 @@ void emitGeneratedComponentCreators(OutputStream& out, MetaData& data) {
 	for (Module& m : data.modules) {
 		for (Component& c : m.components) {
 			L("static void lumscript_entity_create", c.name, "(ls_runtime* runtime, ls_call_frame frame) {");
-			L("LS_ENTITY_ARG(frame, entity, world);");
+			L("LS_ARG(frame, LsEntity, entity);");
+			L("World* world = entity.world;");
 			L("const ComponentType component_type = reflection::getComponentType(\"", c.id, "\");");
-			L("IModule* module = world->getModule(component_type);");
-			L("if (!module || !world->hasEntity(EntityRef(entity_index))) {");
+			L("IModule* module = world ? world->getModule(component_type) : nullptr;");
+			L("if (!world || entity.index < 0 || !world->hasEntity(EntityRef(entity.index)) || !module) {");
 			L("LS_RESULT(frame, u8(0));");
-			L("LS_RESULT(frame, i32(0));");
-			L("LS_RESULT(frame, (void*)nullptr);");
+			L("LS_RESULT(frame, LsComponent(i32(0), (void*)nullptr));");
 			L("return;");
 			L("}");
-			L("if (!world->hasComponent(EntityRef(entity_index), component_type)) {");
-			L("world->createComponent(component_type, EntityRef(entity_index));");
+			L("if (!world->hasComponent(EntityRef(entity.index), component_type)) {");
+			L("world->createComponent(component_type, EntityRef(entity.index));");
 			L("}");
-			L("if (!world->hasComponent(EntityRef(entity_index), component_type)) {");
+			L("if (!world->hasComponent(EntityRef(entity.index), component_type)) {");
 			L("LS_RESULT(frame, u8(0));");
-			L("LS_RESULT(frame, i32(0));");
-			L("LS_RESULT(frame, (void*)nullptr);");
+			L("LS_RESULT(frame, LsComponent(i32(0), (void*)nullptr));");
 			L("return;");
 			L("}");
 			L("LS_RESULT(frame, u8(1));");
-			emitResult(out, "entity_index");
-			emitResult(out, "module");
+			L("LS_RESULT(frame, LsComponent(entity.index, module));");
 			L("}" OUT_ENDL);
 		}
 	}
@@ -853,6 +868,7 @@ void appendLumScriptDeclType(OutputStream& out, StringView type) {
 			break;
 		}
 		case LumScriptType::PATH_T: out.add("[]const u8"); break;
+		case LumScriptType::STRING_T: out.add("[]const u8"); break;
 		default: out.add("void"); break;
 	}
 }
@@ -1351,8 +1367,6 @@ void serializeLumScriptMeta(MetaData& data) {
 
 	L("}" OUT_ENDL);
 	L("} // namespace Lumix::LumScript::generated");
-	L("#undef LS_ENTITY_ARG");
-	L("#undef LS_COMPONENT_ARG");
 	formatCPP(out);
 	writeFile("src/lumscript/lumscript_capi.gen.h", out);
 

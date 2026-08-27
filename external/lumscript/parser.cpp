@@ -201,7 +201,7 @@ struct Parser {
 	// Push a top-level symbol. Operator overloads may share a name with other
 	// overloads of the same operator; all other symbols reject redeclarations.
 	bool addSymbol(const Symbol& sym) {
-		ASSERT(sym.expression || sym.storage == Symbol::IMPORT);
+		ASSERT(sym.expression || sym.kind == Symbol::IMPORT);
 		if (!isOperatorSymbol(sym.name)) {
 			for (const Symbol& other : m_unit.symbols) {
 				if (!equalStrings(other.name, sym.name)) continue;
@@ -261,9 +261,9 @@ struct Parser {
 		return expr;
 	}
 
-	bool symbolDecl(Symbol::Storage storage) {
+	bool symbolDecl(Symbol::Kind kind) {
 		Symbol sym;
-		sym.storage = storage;
+		sym.kind = kind;
 
 		Token name_token = consumeToken();
 		if (name_token.type != Token::IDENTIFIER) {
@@ -293,7 +293,7 @@ struct Parser {
 		sym.name = name_token.value;
 		sym.token = name_token;
 		sym.expression = expression;
-		sym.storage = Symbol::COMPTIME;
+		sym.kind = Symbol::COMPTIME;
 		return addSymbol(sym);
 	}
 
@@ -1205,7 +1205,6 @@ struct Parser {
 		ExpArray<ls_string_view> generic_names(m_unit.arena);
 		for (FunctionParam& param : fn->params) {
 			if (param.is_comptime || isGeneric(*param.type_expr)) {
-				param.is_generic = true;
 				fn->is_template = true;
 			}
 			if (!collectGenericParams(*param.type_expr, generic_names)) return nullptr;
@@ -1543,7 +1542,6 @@ struct Parser {
 		ExpArray<ls_string_view> generic_names(m_unit.arena);
 		for (FunctionParam& param : fn->params) {
 			if (param.is_comptime || isGeneric(*param.type_expr)) {
-				param.is_generic = true;
 				fn->is_template = true;
 			}
 			if (!collectGenericParams(*param.type_expr, generic_names)) return nullptr;
@@ -1591,7 +1589,7 @@ struct Parser {
 				return nullptr;
 			}
 
-			NamedDecl& field = st->fields.emplace_back();
+			StructFieldDecl& field = st->fields.emplace_back();
 			if (peekToken().type == Token::HASH) {
 				consumeToken();
 				field.attributes = parseAttributeList();
@@ -1649,12 +1647,13 @@ struct Parser {
 		return namedComptimeDecl(name_token, en);
 	}
 
-	bool structDecl(ExpArray<Attribute>* attributes = nullptr) {
+	bool structDecl(ExpArray<Attribute>* attributes, bool is_extern) {
 		Token name_token = consumeToken();
 		if (name_token.type != Token::IDENTIFIER) { m_output.errorAt(name_token, "Expected struct name"); return false; }
 		StructExpression* st = structExpression();
 		if (!st) return false;
 		st->attributes = attributes;
+		st->is_extern = is_extern;
 		return namedComptimeDecl(name_token, st);
 	}
 
@@ -1678,7 +1677,7 @@ struct Parser {
 
 		if (!empty(import.alias)) {
 			Symbol sym;
-			sym.storage = Symbol::IMPORT;
+			sym.kind = Symbol::IMPORT;
 			sym.name = import.alias;
 			sym.token = alias_token;
 			if (!addSymbol(sym)) return false;
@@ -1689,9 +1688,15 @@ struct Parser {
 		return true;
 	}
 
-	// Parse an extern function declaration, e.g. `extern fn foo(a : i32) : i32;`.
+	// Parse an extern declaration, e.g. `extern fn foo(a : i32) : i32;` or `extern struct Foo { ... }`.
 	bool externDecl() {
-		if (!consume(Token::FN)) return false;
+		Token declaration = consumeToken();
+		if (declaration.type == Token::STRUCT) return structDecl(nullptr, true);
+		if (declaration.type != Token::FN) {
+			m_output.errorAt(declaration, "Expected extern fn or extern struct declaration");
+			return false;
+		}
+
 		Token name_token = consumeToken();
 		if (name_token.type != Token::IDENTIFIER) { m_output.errorAt(name_token, "Expected function name"); return false; }
 
@@ -1706,7 +1711,7 @@ struct Parser {
 		s.name = name_token.value;
 		s.token = name_token;
 		s.expression = fn;
-		s.storage = Symbol::VARIABLE;
+		s.kind = Symbol::VARIABLE;
 		return addSymbol(s);
 	}
 
@@ -1733,7 +1738,7 @@ struct Parser {
 		sym.name = makeStringView(sym_name);
 		sym.token = op;
 		sym.expression = fn;
-		sym.storage = Symbol::COMPTIME;
+		sym.kind = Symbol::COMPTIME;
 		return addSymbol(sym);
 	}
 
@@ -1760,17 +1765,26 @@ struct Parser {
 				case Token::VAR: if (!symbolDecl(Symbol::VARIABLE)) return LS_RESULT_FAILURE; break;
 				case Token::COMPTIME: if (!symbolDecl(Symbol::COMPTIME)) return LS_RESULT_FAILURE; break;
 				case Token::FN: if (!functionDecl()) return LS_RESULT_FAILURE; break;
-				case Token::STRUCT: if (!structDecl()) return LS_RESULT_FAILURE; break;
+				case Token::STRUCT: if (!structDecl(nullptr, false)) return LS_RESULT_FAILURE; break;
 				case Token::HASH: {
 					ExpArray<Attribute>* attributes = parseAttributeList();
 					if (!attributes) return LS_RESULT_FAILURE;
 					Token declaration = consumeToken();
-					if (declaration.type != Token::STRUCT) {
-						m_output.errorAt(declaration, "Attributes can only be attached to structs");
-						return LS_RESULT_FAILURE;
+					if (declaration.type == Token::STRUCT) {
+						if (!structDecl(attributes, false)) return LS_RESULT_FAILURE;
+						break;
 					}
-					if (!structDecl(attributes)) return LS_RESULT_FAILURE;
-					break;
+					if (declaration.type == Token::EXTERN) {
+						Token extern_declaration = consumeToken();
+						if (extern_declaration.type != Token::STRUCT) {
+							m_output.errorAt(extern_declaration, "Attributes can only be attached to structs");
+							return LS_RESULT_FAILURE;
+						}
+						if (!structDecl(attributes, true)) return LS_RESULT_FAILURE;
+						break;
+					}
+					m_output.errorAt(declaration, "Attributes can only be attached to structs");
+					return LS_RESULT_FAILURE;
 				}
 				case Token::ENUM: if (!enumDecl()) return LS_RESULT_FAILURE; break;
 				case Token::IMPORT: if (!importDecl()) return LS_RESULT_FAILURE; break;

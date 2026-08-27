@@ -57,14 +57,23 @@ struct EnumResolvedType : ResolvedType {
 	EnumExpression* decl = nullptr;
 };
 
+struct ResolvedStructField {
+	ResolvedStructField() = default;
+	ResolvedStructField(ResolvedType* type) : type(type) {}
+
+	ResolvedType* type = nullptr;
+	u32 offset = 0;
+};
+
 struct StructResolvedType : ResolvedType {
 	StructResolvedType(ls_arena& arena)
 		: ResolvedType(ResolvedTypeKind::STRUCT)
-		, field_types(arena) {}
+		, fields(arena) {}
 
 	StructExpression* decl = nullptr;
-	ExpArray<ResolvedType*> field_types;
-	bool is_compiler_only = false;
+	ExpArray<ResolvedStructField> fields;
+	u32 byte_size = 1;
+	u32 alignment = 1;
 };
 
 struct FunctionResolvedParam {

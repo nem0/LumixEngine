@@ -16,6 +16,7 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 - [Declarations](#declarations)
 	- [Imports](#imports)
 	- [Structs](#structs)
+		- [Extern structs](#extern-structs)
 		- [Attributes](#attributes)
 	- [Enums](#enums)
 	- [Functions](#functions)
@@ -111,7 +112,7 @@ fn main() : void {
 }
 ```
 
-- A unit contains top-level `import`, `comptime`, `struct`, `enum`, `fn`, and variable declarations.
+- A unit contains top-level `import`, `comptime`, `struct`, `extern struct`, `enum`, `fn`, `extern fn`, and variable declarations.
 - Whitespace is not significant.
 - Line comments start with `//`.
 
@@ -206,6 +207,8 @@ expression; see [Comptime](#comptime).
 - field names must be unique within the struct
 - fields are ordered; that order is used by positional literals, reflection,
   and the runtime representation
+- non-`extern` struct layout is implementation-defined; do not rely on its
+  size, alignment, padding, or field offsets for native ABI interop
 - a field type may be any valid concrete type, including a primitive, enum,
   function type, array, slice, nullable, union, or another struct
 - a struct type must be available when it is used as a field type; declarations
@@ -219,6 +222,41 @@ expression; see [Comptime](#comptime).
 Two separate struct declarations are different nominal types even when their
 fields have identical names and types. Structs do not receive implicit casts to
 or from other structs.
+
+#### Extern structs
+
+`extern struct` declares a nominal struct whose runtime layout matches an
+existing native C struct using the target C ABI. It keeps the ABI boundary
+explicit and restricts fields to C-ABI-compatible types. Use it for native
+interop when script code needs to read or write fields of a C struct directly:
+
+```cpp
+extern struct Vec2 {
+	x : f32;
+	y : f32;
+}
+
+extern fn length(v : *const Vec2) : f32;
+```
+
+Rules:
+
+- syntax is the same as `struct`, prefixed by `extern`
+- field order is declaration order and follows the target C ABI for size,
+  alignment, padding, and field offsets
+- field types must be C-ABI-compatible LumScript types, such as primitives,
+  pointers, `cptr`, `cstr`, other `extern struct` types, or static arrays of
+  compatible element types
+- slices, tagged unions, function values, ordinary script-only structs, and
+  nullable value types are not C-ABI-compatible fields
+- recursive containment by value is not allowed; use a pointer field for C
+  self-referential structs
+- `sizeof`, `alignof`, field access, pointers, and passing by value or pointer
+  use the extern C ABI layout
+- `extern struct` is still a distinct nominal LumScript type; it does not
+  implicitly convert to another struct with the same fields
+- no C header is imported automatically; the declaration must exactly match the
+  native definition used by the host application
 
 #### Values
 
@@ -1261,6 +1299,39 @@ Slice operations:
 - immutable backing storage may be exposed as `[]const T`, but never as a
   writable `[]T` view
 
+#### Slice ABI representation
+
+At runtime, every slice value—including `[]const T` and string values—is a
+non-owning pair laid out in declaration order:
+
+```cpp
+struct LumScriptSlice {
+	const void* data; // address of element 0
+	isize length;     // number of elements, not bytes
+};
+```
+
+The representation is exactly a pointer followed by a signed 64-bit length;
+`sizeof([]T)` is therefore 16 bytes on the supported targets. The element type
+is not stored in the value. `data` is an absolute address, and an empty slice
+has length zero (its pointer may be null). Slicing and assignment copy only
+this pair; they do not copy or take ownership of the backing storage.
+
+This is also the representation used for slice parameters and return values of
+`extern fn`. A native callback can read or write one with the C API's
+`ls_slice` type and `LS_ARG`/`LS_RESULT`; it must use the declared element type
+and `sizeof(T)` when interpreting the pointed-to bytes. The host must keep the
+backing storage alive and stable for as long as script code can use the slice.
+The `const` qualifier is a script-level access restriction and is not encoded
+in the pair.
+
+```cpp
+static void native_sum(ls_runtime* runtime, ls_call_frame frame) {
+	LS_ARG(frame, ls_slice, values);
+	// Interpret values.data as the declared element type and use values.length.
+}
+```
+
 ```cpp
 fn sum(values : []i32) : i32 {
 	var total : i32 = 0;
@@ -1831,7 +1902,7 @@ Rules:
 - the operand is a type, not a value
 - the operand must be a concrete type. Untyped integer and float values have no size or alignment, and `sizeof`/`alignof` do not default them; use a concrete type such as `sizeof(i32)`, or cast or annotate the value before obtaining its type
 - both produce an untyped integer constant, usable wherever a compile-time integer is required (array sizes, type-factory value arguments, `comptime` parameters, other comptime expressions)
-- `sizeof(T)` is the size of `T` measured in `byte` units: `byte`, `bool`, `i8`, and `u8` are 1 byte; `i16`/`u16` are 2; `i32`/`u32`/`f32`/enums/function values are 4; `i64`/`u64`/`isize`/`f64`/pointers are 8; a slice is a pointer plus an `i64` length; an array is `size * sizeof(element)`; a struct is the sum of its field sizes; and a tagged union is `sizeof(i32)` for the tag plus the size of its largest member
+- `sizeof(T)` is the size of `T` measured in `byte` units: `byte`, `bool`, `i8`, and `u8` are 1 byte; `i16`/`u16` are 2; `i32`/`u32`/`f32`/enums/function values are 4; `i64`/`u64`/`isize`/`f64`/pointers are 8; a slice is a pointer followed by an `i64` element length (16 bytes on supported targets); an array is `size * sizeof(element)`; a struct is the sum of its field sizes; and a tagged union is `sizeof(i32)` for the tag plus the size of its largest member
 - `alignof(T)` is derived from the byte size and capped at pointer alignment
 - they are most commonly used with the raw-memory allocator and slice reinterpret casts, for example `alloc(n * sizeof(i32), alignof(i32))`
 
@@ -2352,7 +2423,7 @@ A type comparison is always compile-time known, so an `if` on one is always a [c
 | `t::types` | a `type` |
 | `t::params` | a parameter descriptor struct: `.name`, `.type` |
 
-As comptime slices they are first-class: they can be bound, measured with `.length`, indexed, and iterated with `unroll for`, all at compile time. Their element types contain compile-time-only information, so they cannot be materialized or traversed by a runtime `for`.
+As comptime slices they are first-class: they can be bound, measured with `.length`, indexed, and iterated with `unroll for`, all at compile time. Their element types contain compile-time-only information, so they cannot be materialized or traversed by a runtime `for`. Compiler-provided descriptor structs nevertheless use the same field alignment, padding, and size rules as runtime structs for the representations of their fields.
 
 ```cpp
 comptime fs    = t::fields;    // element type inferred; see below
@@ -2892,10 +2963,4 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 * iterators/yield 
 	fn each(a : arr) : yield i32 { ...
 	for x in each(a) { ... }
-* extern struct or explicit field offset (so we can access C struct directly)
-	struct S {
-		x : f32 @ 4; // 4bytes offset 
-	}
-	or 
-	extern struct S { // automatically matches c abi
 

@@ -1,0 +1,26 @@
+import "core:input"
+import "core:log"
+import "core:ui"
+import "core:world"
+
+import "maps/demo/demo" as demo
+
+var g_input : InputSystem = undefined;
+var g_world : World = undefined;
+
+fn update(td : f32) : void {
+    demo.update(td);
+	
+	// UI
+	var ui = g_world.ui();
+	//var events = doc.getEvents();
+}
+
+fn init(input : InputSystem) : void {
+	g_input = input;
+}
+
+fn addWorld(world : World) : void {
+	g_world = world;
+	demo.init(world, g_input);
+}

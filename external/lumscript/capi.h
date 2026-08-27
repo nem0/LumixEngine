@@ -62,6 +62,18 @@ typedef struct ls_string_view {
 	const char* end;
 } ls_string_view;
 
+// Runtime representation of every script slice, including []const T and
+// strings: an absolute pointer to the first element followed by an element
+// count. The pointer is non-owning and the length is a signed 64-bit value.
+// An empty slice may have a null data pointer. The element type is supplied by
+// the script function signature/type metadata; it is not stored in this value.
+// For writable []T slices, data points at writable storage even though this C
+// view uses const void* so it can represent both slice qualifiers.
+typedef struct ls_slice {
+	const void* data;
+	i64 length;
+} ls_slice;
+
 // Type categories mirrored from the internal LumScript type system.
 typedef enum ls_type_kind {
 	LS_TYPE_INVALID = 0,
@@ -142,6 +154,10 @@ void ls_result_string(ls_runtime* runtime, ls_call_frame* frame, ls_string_view 
 } while(0)
 
 // Native function callback used by `ls_runtime_set_native_function_callback`.
+// Slice arguments and results in `frame` use the `ls_slice` representation
+// above and occupy sizeof(ls_slice) bytes. Use LS_ARG/LS_RESULT with ls_slice
+// to read or write them; the element type and element size come from the
+// declared script signature.
 typedef void (*ls_native_fn)(ls_runtime* runtime, ls_call_frame frame);
 
 typedef struct ls_arena {
@@ -171,8 +187,8 @@ typedef struct ls_unit ls_unit;
 typedef struct ls_bytecode ls_bytecode;
 typedef struct ls_type ls_type;
 
-// A typed attribute value. `value` points to the packed bytes of `type` and is
-// owned by the module/bytecode that owns the inspected type.
+// A typed attribute value. `value` points to the runtime-layout bytes of `type`
+// and is owned by the module/bytecode that owns the inspected type.
 typedef struct ls_attribute {
 	const ls_type* type;
 	const void* value;
@@ -230,6 +246,11 @@ ls_bytecode* ls_bytecode_compile(
 );
 void ls_bytecode_destroy(ls_bytecode* bytecode);
 
+// Enumerate all types emitted into the bytecode. Returned type handles are
+// stable until the bytecode is destroyed.
+u32 ls_bytecode_type_count(const ls_bytecode* bytecode);
+const ls_type* ls_bytecode_type(const ls_bytecode* bytecode, u32 index);
+
 // Bytecode runtime lifetime.
 //
 // Bind a runtime to compiled bytecode to call script functions repeatedly.
@@ -260,10 +281,14 @@ void ls_push_ptr(ls_runtime* runtime, void* value);
 //
 // Returns a pointer to the raw bytes of the value returned by the last
 // executed function and writes their count to `*size`, or returns null (and
-// writes 0) when there is no result. Struct fields are packed with no padding,
-// in declaration order, so hosts can read components at explicit offsets
-// instead of relying on the positional `ls_to_*` helpers. The pointer is
-// invalidated by the next push or call.
+// writes 0) when there is no result. A slice value in these bytes is laid out
+// as `ls_slice`: pointer first, then signed i64 element count. It is a
+// non-owning view; the host must keep its backing storage alive. Non-extern
+// struct layout is implementation-defined; extern struct fields use target C
+// ABI layout. Hosts can read components at introspected offsets instead of
+// relying on the positional `ls_to_*` helpers. The pointer is invalidated by
+// the next push or
+// call.
 const void* ls_call_result(ls_runtime* runtime, u32* size);
 
 i32 ls_to_bool(ls_runtime* runtime, i32 index);
@@ -317,9 +342,12 @@ ls_string_view ls_type_get_name(const ls_type* type);
 // reported by ls_debug_local_value / ls_debug_global_value.
 u32 ls_type_get_size(const ls_type* type);
 
+// Returns the required byte alignment of values of this type.
+u32 ls_type_get_alignment(const ls_type* type);
+
 // Introspect a struct type (valid when kind == LS_TYPE_STRUCT).
-// Fields are enumerated in declaration order with packed layout
-// (no alignment padding between fields).
+// Fields are enumerated in declaration order. Non-extern struct layout is
+// implementation-defined; extern structs use target C ABI layout.
 
 // Number of fields in the struct.
 u32 ls_type_struct_field_count(const ls_type* type);
@@ -485,7 +513,7 @@ ls_result ls_debug_frame_location(ls_runtime* runtime, u32 frame_index, ls_debug
 
 // Variable inspection. Locals enumerate the parameters and locals in scope at
 // the frame's current statement. Values point at the raw bytes in live
-// frame/global storage (packed layout, see `ls_call_result`); writing through
+// frame/global storage (runtime layout, see `ls_call_result`); writing through
 // them mutates the running script.
 u32 ls_debug_frame_local_count(ls_runtime* runtime, u32 frame_index);
 ls_string_view ls_debug_local_name(ls_runtime* runtime, u32 frame_index, u32 local_index);

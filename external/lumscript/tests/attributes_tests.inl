@@ -14,6 +14,22 @@ TEST(AttributesCanBeAttachedToStructsAndFields) {
 	return true;
 }
 
+TEST(AttributesCanBeAttachedToExternStructsAndFields) {
+	const char* source = R"(
+		struct tag {
+			value : i32;
+		}
+
+		#[tag { 42 }]
+		extern struct NativeSettings {
+			#[tag { 7 }]
+			radius : f32;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(MultipleAttributesPreserveDeclarationOrder) {
 	const char* source = R"(
 		struct tag { value : i32; }
@@ -26,6 +42,75 @@ TEST(MultipleAttributesPreserveDeclarationOrder) {
 		}
 	)";
 	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(UnusedAnnotatedStructIsAvailableThroughBytecodeTypeEnumeration) {
+	const char* source = R"(
+		struct component {}
+
+		#[component {}]
+		struct Inventory {
+			capacity : i32;
+		}
+
+		fn main() : void {}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	const ls_type* inventory = nullptr;
+	for (u32 i = 0, count = ls_bytecode_type_count(runtime.bytecode); i < count; ++i) {
+		const ls_type* type = ls_bytecode_type(runtime.bytecode, i);
+		if (ls_type_get_kind(type) == LS_TYPE_STRUCT && equalStrings(ls_type_get_name(type), toLs("Inventory"))) {
+			inventory = type;
+			break;
+		}
+	}
+	EXPECT_TRUE(inventory != nullptr);
+	EXPECT_EQ(1u, ls_type_attribute_count(inventory));
+	const ls_attribute attribute = ls_type_attribute_value(inventory, 0);
+	EXPECT_TRUE(attribute.type != nullptr);
+	EXPECT_TRUE(equalStrings(ls_type_get_name(attribute.type), toLs("component")));
+	EXPECT_EQ(0u, ls_bytecode_type_count(nullptr));
+	EXPECT_TRUE(ls_bytecode_type(runtime.bytecode, ls_bytecode_type_count(runtime.bytecode)) == nullptr);
+	EXPECT_TRUE(ls_bytecode_type(nullptr, 0) == nullptr);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeTypeMetadataExposesSizeAndAlignment) {
+	const char* source = R"(
+		struct component {}
+
+		#[component {}]
+		struct AlignedData {
+			flag : i8;
+			value : i64;
+		}
+
+		fn main() : void {}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	const ls_type* data = nullptr;
+	for (u32 i = 0, count = ls_bytecode_type_count(runtime.bytecode); i < count; ++i) {
+		const ls_type* type = ls_bytecode_type(runtime.bytecode, i);
+		if (ls_type_get_kind(type) == LS_TYPE_STRUCT && equalStrings(ls_type_get_name(type), toLs("AlignedData"))) {
+			data = type;
+			break;
+		}
+	}
+	EXPECT_TRUE(data != nullptr);
+	EXPECT_EQ(16u, ls_type_get_size(data));
+	EXPECT_EQ(8u, ls_type_get_alignment(data));
+	EXPECT_EQ(0u, ls_type_get_alignment(nullptr));
+	CAPI_END(module);
 	return true;
 }
 
@@ -71,10 +156,14 @@ TEST(AttributeMetadataIsAvailableThroughCAPI) {
 	EXPECT_EQ(1, min);
 	EXPECT_EQ(9, max);
 
-	EXPECT_EQ(0u, ls_type_struct_field_attribute_count(settings_type, 0));
+	EXPECT_EQ(1u, ls_type_struct_field_attribute_count(settings_type, 0));
 	ls_attribute field_attribute = ls_type_struct_field_attribute_value(settings_type, 0, 0);
-	EXPECT_TRUE(field_attribute.type == nullptr);
-	EXPECT_TRUE(field_attribute.value == nullptr);
+	EXPECT_TRUE(field_attribute.type != nullptr);
+	EXPECT_TRUE(equalStrings(ls_type_get_name(field_attribute.type), toLs("range")));
+	memcpy(&min, (const u8*)field_attribute.value + ls_type_struct_field_offset(field_attribute.type, 0), sizeof(min));
+	memcpy(&max, (const u8*)field_attribute.value + ls_type_struct_field_offset(field_attribute.type, 1), sizeof(max));
+	EXPECT_EQ(2, min);
+	EXPECT_EQ(3, max);
 
 	// Invalid handles and indices must be rejected without dereferencing them.
 	EXPECT_EQ(0u, ls_type_attribute_count(nullptr));

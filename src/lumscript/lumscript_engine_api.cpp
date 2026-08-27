@@ -11,20 +11,15 @@
 
 namespace Lumix::LumScript {
 
-struct LumScriptEntity {
-	World* world;
-	EntityRef entity;
-};
-
-template <> inline LumScriptEntity readArg<LumScriptEntity>(ls_call_frame& frame) {
+template <> inline LsEntity readArg<LsEntity>(ls_call_frame& frame) {
 	LS_ARG(frame, i32, entity_index);
+	LS_ARG(frame, u32, entity_padding);
 	LS_ARG(frame, World*, world);
-	return {world, EntityRef(entity_index)};
+	return LsEntity{entity_index, world};
 }
 
-void writeResult(ls_runtime*, ls_call_frame& frame, const LumScriptEntity& value) {
-	LS_RESULT(frame, value.entity.index);
-	LS_RESULT(frame, value.world);
+void writeResult(ls_runtime*, ls_call_frame& frame, const LsEntity& value) {
+	LS_RESULT(frame, value);
 }
 
 namespace {
@@ -94,16 +89,16 @@ static bool imguiButton(ls_string_view sv) {
 	return ImGui::Button(label);
 }
 
-static LumScriptEntity lumscript_world_createEntity(World* world) {
-	return {world, world->createEntity({0, 0, 0}, Quat::IDENTITY)};
+static LsEntity lumscript_world_createEntity(World* world) {
+	return LsEntity(world->createEntity({0, 0, 0}, Quat::IDENTITY).index, world);
 }
 
-static void lumscript_world_destroyEntity(LumScriptEntity entity) {
-	entity.world->destroyEntity(entity.entity);
+static void lumscript_world_destroyEntity(LsEntity entity) {
+	entity.world->destroyEntity(EntityRef{entity.index});
 }
 
-static bool lumscript_world_hasEntity(LumScriptEntity entity) {
-	return entity.entity.index >= 0 && entity.world->hasEntity(entity.entity);
+static bool lumscript_world_hasEntity(LsEntity entity) {
+	return entity.index >= 0 && entity.world->hasEntity(EntityRef{entity.index});
 }
 
 static void lumscript_world_findByName(ls_runtime*, ls_call_frame frame) {
@@ -113,8 +108,7 @@ static void lumscript_world_findByName(ls_runtime*, ls_call_frame frame) {
 	const i32 name_len = (i32)(name_sv.end - name_sv.begin);
 	if (name_len >= (i32)sizeof(name)) {
 		LS_RESULT(frame, u8(0));
-		LS_RESULT(frame, i32(0));
-		LS_RESULT(frame, (void*)nullptr);
+		LS_RESULT(frame, LsEntity(i32(0), nullptr));
 		return;
 	}
 	if (name_len > 0) memcpy(name, name_sv.begin, (size_t)name_len);
@@ -122,70 +116,65 @@ static void lumscript_world_findByName(ls_runtime*, ls_call_frame frame) {
 	const EntityPtr entity = world->findByName(INVALID_ENTITY, name);
 	if (!entity.isValid()) {
 		LS_RESULT(frame, u8(0));
-		LS_RESULT(frame, i32(0));
-		LS_RESULT(frame, (void*)nullptr);
+		LS_RESULT(frame, LsEntity(i32(0), nullptr));
 		return;
 	}
 	LS_RESULT(frame, u8(1));
-	LS_RESULT(frame, entity.index);
-	LS_RESULT(frame, world);
+	LS_RESULT(frame, LsEntity(entity.index, world));
 }
 
 static void lumscript_entity_findChildByName(ls_runtime*, ls_call_frame frame) {
-	const LumScriptEntity parent = readArg<LumScriptEntity>(frame);
+	const LsEntity parent = readArg<LsEntity>(frame);
 	char name[128];
 	LS_STRING_ARG(frame, name_sv);
 	const i32 name_len = (i32)(name_sv.end - name_sv.begin);
 	if (name_len >= (i32)sizeof(name)) {
 		LS_RESULT(frame, u8(0));
-		LS_RESULT(frame, i32(0));
-		LS_RESULT(frame, (void*)nullptr);
+		LS_RESULT(frame, LsEntity(i32(0), nullptr));
 		return;
 	}
 	if (name_len > 0) memcpy(name, name_sv.begin, (size_t)name_len);
 	name[name_len] = '\0';
-	const EntityPtr entity = parent.world->findByName(parent.entity, name);
+	const EntityPtr entity = parent.world->findByName(EntityPtr{parent.index}, name);
 	if (!entity.isValid()) {
 		LS_RESULT(frame, u8(0));
-		LS_RESULT(frame, i32(0));
-		LS_RESULT(frame, (void*)nullptr);
+		LS_RESULT(frame, LsEntity(i32(0), nullptr));
 		return;
 	}
 	LS_RESULT(frame, u8(1));
-	LS_RESULT(frame, entity.index);
-	LS_RESULT(frame, parent.world);
+	LS_RESULT(frame, LsEntity(entity.index, parent.world));
 }
 
-static void lumscript_entity_destroy(LumScriptEntity entity) {
-	entity.world->destroyEntity(entity.entity);
+static void lumscript_entity_destroy(LsEntity entity) {
+	entity.world->destroyEntity(EntityRef{entity.index});
 }
 
-static bool lumscript_entity_isValid(LumScriptEntity entity) {
-	return entity.world && entity.entity.index >= 0 && entity.world->hasEntity(entity.entity);
+static bool lumscript_entity_isValid(LsEntity entity) {
+	return entity.world && entity.index >= 0 && entity.world->hasEntity(EntityRef{entity.index});
 }
 
-static void lumscript_entity_setPosition(LumScriptEntity entity, double x, double y, double z) {
-	entity.world->setPosition(entity.entity, DVec3(x, y, z));
+static void lumscript_entity_setPosition(LsEntity entity, double x, double y, double z) {
+	entity.world->setPosition(EntityRef{entity.index}, DVec3(x, y, z));
 }
 
-static DVec3 lumscript_entity_getPosition(LumScriptEntity entity) {
-	return entity.world->getPosition(entity.entity);
+static DVec3 lumscript_entity_getPosition(LsEntity entity) {
+	return entity.world->getPosition(EntityRef{entity.index});
 }
 
-static void lumscript_entity_setRotation(LumScriptEntity entity, float x, float y, float z, float w) {
-	entity.world->setRotation(entity.entity, Quat(x, y, z, w));
+static void lumscript_entity_setRotation(LsEntity entity, float x, float y, float z, float w) {
+	entity.world->setRotation(EntityRef{entity.index}, Quat(x, y, z, w));
 }
 
-static Quat lumscript_entity_getRotation(LumScriptEntity entity) {
-	return entity.world->getRotation(entity.entity);
+static Quat lumscript_entity_getRotation(LsEntity entity) {
+	return entity.world->getRotation(EntityRef{entity.index});
 }
 
-static void lumscript_entity_setScale(LumScriptEntity entity, float x, float y, float z) {
-	entity.world->setScale(entity.entity, Vec3(x, y, z));
+static void lumscript_entity_setScale(LsEntity entity, float x, float y, float z) {
+	entity.world->setScale(EntityRef{entity.index}, Vec3(x, y, z));
 }
 
-static Vec3 lumscript_entity_getScale(LumScriptEntity entity) {
-	return entity.world->getScale(entity.entity);
+static Vec3 lumscript_entity_getScale(LsEntity entity) {
+	return entity.world->getScale(EntityRef{entity.index});
 }
 
 void registerImguiModule(NativeFunctionMap& functions) {

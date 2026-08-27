@@ -354,6 +354,10 @@ u32 ls_type_get_size(const ls_type* type) {
 	return type ? type->byte_size : 0u;
 }
 
+u32 ls_type_get_alignment(const ls_type* type) {
+	return type ? type->alignment : 0u;
+}
+
 u32 ls_type_struct_field_count(const ls_type* type) {
 	return (type && type->kind == LS_TYPE_STRUCT) ? type->field_count : 0u;
 }

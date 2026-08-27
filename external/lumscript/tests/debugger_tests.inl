@@ -1078,7 +1078,7 @@ TEST(DebugStructSliceField) {
 	const ls_type* type = ls_debug_local_type(runtime, 0, 0);
 	EXPECT_TRUE(type != nullptr);
 	EXPECT_EQ((int)LS_TYPE_STRUCT, (int)ls_type_get_kind(type));
-	EXPECT_EQ(20u, ls_type_get_size(type));
+	EXPECT_EQ(24u, ls_type_get_size(type));
 	EXPECT_EQ(2u, ls_type_struct_field_count(type));
 
 	// Iterate fields

@@ -22,6 +22,34 @@ TEST(ImportConst) {
 	return true;
 }
 
+TEST(ExternStructCanBeImported) {
+	const char* main_source = R"(
+		import "native" as native
+
+		fn main() : i64 {
+			var v = native.Padded { 1, 42 };
+			return v.b;
+		}
+	)";
+	const char* native_source = R"(
+		extern struct Padded {
+			a : i8;
+			b : i64;
+		}
+	)";
+	LumScriptImportFile files_storage[] = {
+		{ toLs("native"), toLs(native_source) },
+	};
+	LumScriptImportFiles files = { files_storage, lengthOf(files_storage) };
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(main_source), makeStringView(__func__), &resolveLumScriptImportC, &files));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(ls_call(runtime, toLs("main")), LS_RESULT_OK);
+	EXPECT_EQ(ls_to_i64(runtime, -1), 42);
+	CAPI_END(module);
+	return true;
+}
+
 TEST(QualifiedNonFunctionCallFails) {
 	const char* main_source = R"(
 		import "a" as a
