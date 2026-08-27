@@ -2,7 +2,7 @@
 
 import "core:dvec3"
 import "core:vec3"
-struct Ray {
+extern struct Ray {
 	origin : DVec3;
 	dir : Vec3;
 }

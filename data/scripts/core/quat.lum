@@ -1,6 +1,6 @@
 import "std:math" as math
 
-struct Quat {
+extern struct Quat {
 	x : f32;
 	y : f32;
 	z : f32;

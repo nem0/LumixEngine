@@ -1,4 +1,4 @@
-struct Vec4 {
+extern struct Vec4 {
 	x : f32;
 	y : f32;
 	z : f32;

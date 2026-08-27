@@ -134,6 +134,20 @@ bool isSupportedLumScriptType(StringView type) {
 	return isSupportedLumScriptType(type, getLumScriptType(type));
 }
 
+bool isExternCompatibleLumScriptType(StringView type) {
+	const LumScriptType lumscript_type = getLumScriptType(type);
+	if (lumscript_type == LumScriptType::ENTITY_T || lumscript_type == LumScriptType::PATH_T || lumscript_type == LumScriptType::STRING_T || lumscript_type == LumScriptType::OBJECT_T || lumscript_type == LumScriptType::UNKNOWN) {
+		return false;
+	}
+	if (lumscript_type != LumScriptType::STRUCT_T) return true;
+	const Struct* s = findStructByTypeName(type);
+	if (!s) return false;
+	for (const StructVar& v : s->vars) {
+		if (!isExternCompatibleLumScriptType(v.type)) return false;
+	}
+	return true;
+}
+
 bool isLumScriptStringArg(const Arg& arg) {
 	return arg.is_const && arg.is_ptr && equal(arg.type, "char");
 }
@@ -1032,7 +1046,7 @@ void serializeCoreImports(MetaData& data) {
 			appendLumScriptImportType(out, v.type);
 			out.add("\"" OUT_ENDL);
 		}
-		L("struct ", s.name, " {");
+		L(isExternCompatibleLumScriptType(s.name) ? "extern struct " : "struct ", s.name, " {");
 		for (StructVar& v : s.vars) {
 			out.add("\t", v.name, " : ");
 			appendLumScriptDeclType(out, v.type);

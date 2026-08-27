@@ -3,7 +3,7 @@
 import "core:dvec3"
 import "core:quat"
 import "core:vec2"
-struct Viewport {
+extern struct Viewport {
 	is_ortho : bool;
 	fov : f32;
 	ortho_size : f32;
