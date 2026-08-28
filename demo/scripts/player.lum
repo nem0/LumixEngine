@@ -12,7 +12,7 @@ import "std:math"
 
 var player : ?Entity = null;
 var camera_pivot : ?Entity = null;
-var handle_input = true;
+var handle_input = false;
 var forward = false;
 var backward = false;
 var left = false;

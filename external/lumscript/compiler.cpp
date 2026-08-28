@@ -4011,7 +4011,15 @@ struct Checker {
 					ref = resolveSymbol(unit, static_cast<IdentifierExpression&>(*member.expression).name, member.name, LookupPolicy::Checked);
 				}
 				if (ref) {
+					if (ref.check_failed) {
+						is_writable = false;
+						return nullptr;
+					}
 					is_writable = ref.symbol->kind == Symbol::VARIABLE;
+					member.resolved_symbol = ref.symbol;
+					if (ref.symbol->expression && ref.symbol->expression->kind == Expression::FUNCTION) {
+						member.resolved_fn = static_cast<FunctionExpression*>(ref.symbol->expression);
+					}
 					expr.resolved_type = unwrapMeta(ref.symbol->resolved_type);
 					return &expr;
 				}
@@ -5207,7 +5215,7 @@ struct Checker {
 						return false;
 					}
 					if (!import_resolver(import_resolver_userdata, import.path, import.alias, &source)) {
-						errorLine({}, "Import not found: ", import.path);
+						errorLine({}, "Import not found: ", import.path, " (while importing from ", unit.path, ")");
 						return false;
 					}
 				}

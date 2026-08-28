@@ -4,13 +4,13 @@ import "core:ui"
 import "core:document"
 import "core:world"
 
-import "maps/demo/demo" as demo
+import "scripts/player" as player
 
 var g_input : InputSystem = undefined;
 var g_world : World = undefined;
 
 fn update(td : f32) : void {
-    demo.update(td);
+    player.update(td);
 	
 	// UI
 	var ui = g_world.ui();
@@ -21,7 +21,7 @@ fn update(td : f32) : void {
 			var events = doc.getEvents();
 			for event in events {
 				if event.action == "start" {
-					logError("START");
+					player.handle_input = true;
 				}
 			}	
 		}
@@ -34,5 +34,5 @@ fn init(input : InputSystem) : void {
 
 fn addWorld(world : World) : void {
 	g_world = world;
-	demo.init(world, g_input);
+	player.init(world, g_input);
 }
