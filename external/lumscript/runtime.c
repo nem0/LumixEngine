@@ -650,6 +650,7 @@ static u64 runtime_immediate_to_u64(u64 value, ls_type_kind kind) {
 static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* function, const runtime_call_frame* resume_frame) {
 	const ls_function_bc* fn = function;
 	const u8* ip;
+	u8* frame = NULL;
 	ls_op op = (ls_op)0;
 	// Restore point for the whole host call, retained across suspend/resume.
 	runtime_restore_point* initial;
@@ -659,6 +660,13 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 		ip = resume_frame->ip;
 		if (runtime->call_start_depth == 0u) return EXEC_FAIL;
 		initial = &runtime->call_starts[runtime->call_start_depth - 1];
+		// The interpreter's locals (`frame` and `stack_top`) no longer exist
+		// after a suspension.  Do not rely on the cached runtime values here:
+		// native/debugger code may have changed them while the runtime was
+		// parked.  The suspended frame is the authoritative resume state.
+		runtime->frame = resume_frame->frame;
+		runtime->stack_top = resume_frame->stack_top;
+		frame = resume_frame->frame;
 		runtime->is_suspended = false;
 
 		const ls_bytecode_breakpoint* breakpoint = runtime_find_breakpoint(runtime->bytecode, ip);
@@ -703,7 +711,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 		runtime->stack_top = frame_stack_top;
 	}
 
-	u8* frame = runtime->frame;
+	frame = runtime->frame;
 	for (;;) {
 		op = (ls_op)*ip;
 		ip++;
