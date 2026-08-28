@@ -9,12 +9,12 @@ Tokenizer::Tokenizer(StringView content, const char* filename)
 	: content(content)
 	, filename(filename)
 {
-	cursor = content.begin;
+	cursor = content.data;
 }
 
 u32 Tokenizer::getLine() const {
 	u32 line = 1;
-	for (const char* c = content.begin; c < cursor; ++c) {
+	for (const char* c = content.data; c < cursor; ++c) {
 		if (*c == '\n') ++line;
 	}
 	return line;
@@ -41,32 +41,33 @@ Tokenizer::Token Tokenizer::tryNextToken(Token::Type type) {
 	if (!token) return token;
 	if (token.type != type) {
 		logError(filename, "(", getLine(), "): unexpected token ", token.value);
-		logErrorPosition(token.value.begin);
+		logErrorPosition(token.value.data);
 		return Token::ERROR;
 	}
 	return token;
 }
 
 Tokenizer::Token Tokenizer::tryNextToken() {
+	const char* content_end = content.end();
 	// skip whitespaces
-	while (cursor < content.end && isSpace(*cursor)) {
+	while (cursor < content_end && isSpace(*cursor)) {
 		++cursor;
 	}
-	if (cursor >= content.end) return Token::EOF;
+	if (cursor >= content_end) return Token::EOF;
 
 	if (*cursor == '`') {
 		// string
 		Token token(Token::STRING);
 		++cursor;
-		token.value.begin = cursor;
-		while (cursor < content.end && *cursor != '`') {
+		token.value.data = cursor;
+		while (cursor < content_end && *cursor != '`') {
 			++cursor;
 		}
-		if (cursor >= content.end) {
+		if (cursor >= content_end) {
 			logError(filename, "(", getLine(), "): unexpected end of file.");
 			return Token::ERROR;
 		}
-		token.value.end = cursor;
+		token.value.length = cursor - token.value.data;
 		++cursor;
 		return token;
 	}
@@ -75,15 +76,15 @@ Tokenizer::Token Tokenizer::tryNextToken() {
 		// string
 		Token token(Token::STRING);
 		++cursor;
-		token.value.begin = cursor;
-		while (cursor < content.end && *cursor != '"') {
+		token.value.data = cursor;
+		while (cursor < content_end && *cursor != '"') {
 			++cursor;
 		}
-		if (cursor >= content.end) {
+		if (cursor >= content_end) {
 			logError(filename, "(", getLine(), "): unexpected end of file.");
 			return Token::ERROR;
 		}
-		token.value.end = cursor;
+		token.value.length = cursor - token.value.data;
 		++cursor;
 		return token;
 	}
@@ -92,10 +93,10 @@ Tokenizer::Token Tokenizer::tryNextToken() {
 	bool is_negative_num = false;
 	if (*cursor == '-') {
 		++cursor;
-		if (cursor >= content.end || !isNumeric(*cursor)) {
+		if (cursor >= content_end || !isNumeric(*cursor)) {
 			Token token(Token::SYMBOL);
-			token.value.begin = cursor - 1;
-			token.value.end = cursor;
+			token.value.data = cursor - 1;
+			token.value.length = cursor - token.value.data;
 			return token;
 		}
 		is_negative_num = true;
@@ -104,57 +105,60 @@ Tokenizer::Token Tokenizer::tryNextToken() {
 	if (isNumeric(*cursor)) {
 		// number
 		Token token(Token::NUMBER);
-		token.value.begin = is_negative_num ? cursor - 1 : cursor;
-		while (cursor < content.end && isNumeric(*cursor)) {
+		token.value.data = is_negative_num ? cursor - 1 : cursor;
+		while (cursor < content_end && isNumeric(*cursor)) {
 			++cursor;
 		}
-		if (cursor < content.end) {
+		if (cursor < content_end) {
 			// decimal
 			if (*cursor == '.') {
 				++cursor;
-				while (cursor < content.end && isNumeric(*cursor)) {
+				while (cursor < content_end && isNumeric(*cursor)) {
 					++cursor;
 				}
 			}
-			if (cursor < content.end && isIdentifierChar(*cursor)) {
+			if (cursor < content_end && isIdentifierChar(*cursor)) {
 				logError(filename, "(", getLine(), "): unexpected character ", *cursor);
 				logErrorPosition(cursor);
 				return Token::ERROR;
 			}
 		}
-		token.value.end = cursor;
+		token.value.length = cursor - token.value.data;
 		return token;
 	}
 
 	if (!isIdentifierChar(*cursor)) {
 		// symbol
 		Token token(Token::SYMBOL);
-		token.value.begin = cursor;
+		token.value.data = cursor;
 		++cursor;
-		token.value.end = cursor;
+		token.value.length = 1;
 		return token;
 	}
 
 	// identifier
 	Token token(Token::IDENTIFIER);
-	token.value.begin = cursor;
-	while (cursor < content.end && isIdentifierChar(*cursor)) {
+	token.value.data = cursor;
+	while (cursor < content_end && isIdentifierChar(*cursor)) {
 		++cursor;
 	}
-	token.value.end = cursor;
+	token.value.length = cursor - token.value.data;
 	return token;
 }
 
-void Tokenizer::logErrorPosition(const char* pos ) {
-	ASSERT(pos >= content.begin && pos <= content.end);
+void Tokenizer::logErrorPosition(const char* pos) {
+	ASSERT(pos >= content.data && pos <= content.end());
 	StringView line;
-	line.begin = pos;
-	line.end = pos;
-	while (line.begin > content.begin && line.begin[-1] != '\n') --line.begin;
-	while (line.end < content.end && *line.end != '\n') ++line.end;
+	line.data = pos;
+	line.length = 0;
+	while (line.data > content.data && line.data[-1] != '\n') --line.data;
+	const char* content_end = content.end();
+	const char* line_end = line.data;
+	while (line_end < content_end && *line_end != '\n') ++line_end;
+	line.length = line_end - line.data;
 	logError(line);
 	char tmp[1024];
-	const u32 offset = u32(pos - line.begin);
+	const u32 offset = u32(pos - line.data);
 	if (offset + 1 < lengthOf(tmp)) {
 		for (u32 i = 0; i < offset; ++i) tmp[i] = ' ';
 		tmp[offset] = '^';
@@ -187,7 +191,7 @@ bool Tokenizer::consume(bool& out) {
 	}
 	
 	logError(filename, "(", getLine(), "): boolean expected.");
-	logErrorPosition(token.value.begin);
+	logErrorPosition(token.value.data);
 	return false;
 }
 
@@ -214,7 +218,7 @@ bool Tokenizer::consume(i32& out) {
 	}
 
 	logError(filename, "(", getLine(), "): number expected.");
-	logErrorPosition(token.value.begin);
+	logErrorPosition(token.value.data);
 	return false;
 }
 
@@ -228,7 +232,7 @@ bool Tokenizer::consume(u32& out) {
 	}
 
 	logError(filename, "(", getLine(), "): number expected.");
-	logErrorPosition(token.value.begin);
+	logErrorPosition(token.value.data);
 	return false;
 }
 
@@ -244,7 +248,7 @@ bool Tokenizer::consume(float& out) {
 	}
 
 	logError(filename, "(", getLine(), "): number expected.");
-	logErrorPosition(token.value.begin);
+	logErrorPosition(token.value.data);
 	return false;
 }
 
@@ -274,7 +278,7 @@ Tokenizer::Variant Tokenizer::consumeVariant() {
 		}
 		else if (iter != ",") {
 			logError(filename, "(", getLine(), "): expected ',' or '}', got ", iter.value);
-			logErrorPosition(iter.value.begin);
+			logErrorPosition(iter.value.data);
 			return {};
 		}
 		if (!consume(v.vector[2])) return {};
@@ -286,7 +290,7 @@ Tokenizer::Variant Tokenizer::consumeVariant() {
 		}
 		else if (iter != ",") {
 			logError(filename, "(", getLine(), "): expected ',' or '}', got ", iter.value);
-			logErrorPosition(iter.value.begin);
+			logErrorPosition(iter.value.data);
 			return {};
 		}
 		if (!consume(v.vector[3], "}")) return {};
@@ -295,7 +299,7 @@ Tokenizer::Variant Tokenizer::consumeVariant() {
 	}
 
 	logError(filename, "(", getLine(), "): unexpected token ", token.value);
-	logErrorPosition(token.value.begin);
+	logErrorPosition(token.value.data);
 	return v;
 }
 
@@ -306,7 +310,7 @@ bool Tokenizer::consume(const char* literal) {
 	if (equalStrings(token.value, literal)) return true;
 
 	logError(filename, "(", getLine(), "): ", literal, " expected.");
-	logErrorPosition(token.value.begin);
+	logErrorPosition(token.value.data);
 	return false;
 }
 
@@ -319,12 +323,12 @@ bool Tokenizer::consumeVector(float* out_vec, u32& out_size) {
 			if (value.value[0] == '}') break;
 			if (i == 4) {
 				logError(filename, "(", getLine(), "): expected '}'");
-				logErrorPosition(value.value.begin);
+				logErrorPosition(value.value.data);
 				return false;
 			}
 			if (value.value[0] != ',') {
 				logError(filename, "(", getLine(), "): expected ','");
-				logErrorPosition(value.value.begin);
+				logErrorPosition(value.value.data);
 				return false;
 			}
 			value = nextToken();
@@ -332,13 +336,13 @@ bool Tokenizer::consumeVector(float* out_vec, u32& out_size) {
 		}
 		else if (value.value[0] == '}') { 
 			logError(filename, "(", getLine(), "): expected number");
-			logErrorPosition(value.value.begin);
+			logErrorPosition(value.value.data);
 			return false;
 		}
 
 		if (value.type != Tokenizer::Token::NUMBER) {
 			logError(filename, "(", getLine(), "): expected number");
-			logErrorPosition(value.value.begin);
+			logErrorPosition(value.value.data);
 			return false;
 		}
 		char tmp[64];
@@ -354,7 +358,7 @@ bool Tokenizer::consume(StringView& out) {
 	if (!token) return false;
 	if (token.type != Token::STRING && token.type != Token::IDENTIFIER) {
 		logError(filename, "(", getLine(), "): string expected.");
-		logErrorPosition(token.value.begin);
+		logErrorPosition(token.value.data);
 		return false;
 	}
 	out = token.value;
@@ -393,7 +397,7 @@ bool parse(StringView content, const char* path, Span<const ParseItemDesc> descs
 						if (!next) return false;
 						if (next.value[0] != '[') {
 							logError(t.filename, "(", t.getLine(), "): '[' expected, got ", next.value);
-							t.logErrorPosition(next.value.begin);
+							t.logErrorPosition(next.value.data);
 							return false;
 						}
 						*desc.string_value = next.value;
@@ -405,7 +409,7 @@ bool parse(StringView content, const char* path, Span<const ParseItemDesc> descs
 							else if (next.value[0] == ']') {
 								--depth;
 								if (depth == 0) {
-									desc.string_value->end = next.value.end;
+									desc.string_value->length = next.value.end() - desc.string_value->data;
 									break;
 								}
 							}
@@ -417,7 +421,7 @@ bool parse(StringView content, const char* path, Span<const ParseItemDesc> descs
 		}
 		if (!found_any) {
 			logError(t.filename, "(", t.getLine(), "): Unknown token ", token.value);
-			t.logErrorPosition(token.value.begin);
+			t.logErrorPosition(token.value.data);
 		}
 	}
 }

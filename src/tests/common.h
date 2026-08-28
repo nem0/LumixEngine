@@ -53,9 +53,9 @@ struct MockFontManager final : ui::IFontManager {
 		int font_size = (int)(combined & 0xFFFFFFFF);
 		float width = 0;
 		bool in_whitespace = false;
-		for (const char* c = text.begin; c != text.end; ++c) {
-			if (*c == '\r') continue;
-			if (isWhitespace(*c)) {
+		for (const char c : text) {
+			if (c == '\r') continue;
+			if (isWhitespace(c)) {
 				if (!in_whitespace) {
 					width += font_size * 0.5f;
 					in_whitespace = true;
@@ -82,14 +82,15 @@ struct MockFontManager final : ui::IFontManager {
 
 	SplitWord splitFirstWord(FontHandle font, StringView text) override {
 		// Trim leading whitespace
-		while (text.begin != text.end && isWhitespace(*text.begin)) ++text.begin;
+		const char* text_end = text.end();
+		while (text.data != text_end && isWhitespace(*text.data)) { ++text.data; --text.length; }
 
-		const char* head_start = text.begin;
+		const char* head_start = text.data;
 		const char* head_end = head_start;
-		while (head_end != text.end && !isWhitespace(*head_end)) ++head_end;
+		while (head_end != text_end && !isWhitespace(*head_end)) ++head_end;
 
 		StringView head(head_start, head_end);
-		StringView tail(head_end, text.end);
+		StringView tail(head_end, text_end);
 
 		float head_width = measureTextA(font, head).x;
 

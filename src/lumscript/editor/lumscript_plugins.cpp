@@ -540,11 +540,11 @@ struct LumScriptEditorWindow final : AssetEditorWindow {
 				m_message = diagnostics_message;
 				const StringView diagnostics = diagnostics_message;
 				if (const char* line_marker = find(diagnostics, ": line ")) {
-					const StringView error_path(diagnostics.begin, line_marker);
+					const StringView error_path(diagnostics.data, line_marker);
 					line_marker += stringLength(": line ");
 					i32 line;
 					if (equalStrings(error_path, m_path.c_str())
-						&& fromCString(StringView(line_marker, diagnostics.end), line)
+						&& fromCString(StringView(line_marker, diagnostics.end()), line)
 						&& line > 0)
 					{
 						m_editor->underlineTokens(line - 1, 0, 0xffFFffFF, diagnostics_message.c_str());
@@ -572,24 +572,24 @@ struct LumScriptEditorWindow final : AssetEditorWindow {
 			if (ls_debug_pause_event(runtime, &event) == LS_RESULT_OK) {
 				StringView event_source(event.location.source_name.begin, event.location.source_name.end);
 				StringView editor_path(m_path.c_str(), m_path.c_str() + stringLength(m_path.c_str()));
-				if (event_source.end - event_source.begin > 0) {
+				if (!event_source.empty()) {
 					const char* event_filename = reverseFind(event_source, '/');
 					if (!event_filename) event_filename = reverseFind(event_source, '\\');
-					if (!event_filename) event_filename = event_source.begin;
+					if (!event_filename) event_filename = event_source.data;
 					else ++event_filename;
 
 					const char* editor_filename = reverseFind(editor_path, '/');
 					if (!editor_filename) editor_filename = reverseFind(editor_path, '\\');
-					if (!editor_filename) editor_filename = editor_path.begin;
+					if (!editor_filename) editor_filename = editor_path.data;
 					else ++editor_filename;
 
-					const StringView ed_name(editor_filename, editor_path.end);
+					const StringView ed_name(editor_filename, editor_path.end());
 					if (startsWith(event_source, "core:")) {
 						const StringView core_name = event_source.withoutLeft(5);
 						if (startsWith(ed_name, core_name)) {
 							current_line = event.location.line > 0 ? event.location.line - 1 : 0;
 						}
-					} else if (equalStrings(StringView(event_filename, event_source.end), ed_name)) {
+					} else if (equalStrings(StringView(event_filename, event_source.end()), ed_name)) {
 						current_line = event.location.line > 0 ? event.location.line - 1 : 0;
 					}
 				}
@@ -1071,7 +1071,7 @@ struct LumScriptPropertyGridPlugin final : PropertyGrid::IPlugin {
 				break;
 			}
 			ImGui::SameLine();
-			const bool open = ImGui::TreeNodeEx("##data", ImGuiTreeNodeFlags_SpanFullWidth, "%.*s", int(name.end - name.begin), name.begin);
+			const bool open = ImGui::TreeNodeEx("##data", ImGuiTreeNodeFlags_SpanFullWidth, "%.*s", int(name.length), name.data);
 			if (open) {
 				{
 					const void* value = module.getLumScriptData(entity, type);

@@ -100,7 +100,7 @@ static bool consumeNumberArray(Tokenizer& tokenizer, Array<T>& array) {
 			u32 frame;
 			if (!fromCString(token.value, frame)) {
 				logError(tokenizer.filename, "(", tokenizer.getLine(), "): Expected a number, got ", token.value);
-				tokenizer.logErrorPosition(token.value.begin);
+				tokenizer.logErrorPosition(token.value.data);
 				return false;
 			}
 			value = Time::fromSeconds(frame / 30.f);
@@ -108,7 +108,7 @@ static bool consumeNumberArray(Tokenizer& tokenizer, Array<T>& array) {
 		else {
 			if (!fromCString(token.value, value)) {
 				logError(tokenizer.filename, "(", tokenizer.getLine(), "): Expected a number, got ", token.value);
-				tokenizer.logErrorPosition(token.value.begin);
+				tokenizer.logErrorPosition(token.value.data);
 				return false;
 			}
 		}
@@ -118,7 +118,7 @@ static bool consumeNumberArray(Tokenizer& tokenizer, Array<T>& array) {
 		if (token == "]") return true;
 		if (token != ",") {
 			logError(tokenizer.filename, "(", tokenizer.getLine(), "): Expected ',' or ']', got ", token.value);
-			tokenizer.logErrorPosition(token.value.begin);
+			tokenizer.logErrorPosition(token.value.data);
 			return false;
 		}
 	}
@@ -796,13 +796,13 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				case Tokenizer::Token::SYMBOL:
 					if (token != "{") {
 						logError(tokenizer.filename, "(", tokenizer.getLine(), "): Expected '{', got ", token.value);
-						tokenizer.logErrorPosition(token.value.begin);
+						tokenizer.logErrorPosition(token.value.data);
 						return false;
 					}
 					break;
 				default:
 					logError(tokenizer.filename, "(", tokenizer.getLine(), "): Expected '{', got ", token.value);
-					tokenizer.logErrorPosition(token.value.begin);
+					tokenizer.logErrorPosition(token.value.data);
 					return false;
 			}
 
@@ -823,13 +823,13 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				if (key == "version") {
 					if (!first) {
 						logError(tokenizer.filename, "(", tokenizer.getLine(), "): 'version' must be first");
-						tokenizer.logErrorPosition(key.value.begin);
+						tokenizer.logErrorPosition(key.value.data);
 						return false;
 					}
 					if (!tokenizer.consume(version)) return false;
 					if (version > 1) {
 						logError(tokenizer.filename, "(", tokenizer.getLine(), "): Unsupported version ", version);
-						tokenizer.logErrorPosition(key.value.begin);
+						tokenizer.logErrorPosition(key.value.data);
 						return false;
 					}
 				}
@@ -866,7 +866,7 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				}
 				else {
 					logError(tokenizer.filename, "(", tokenizer.getLine(), "): Unknown identifier ", key.value);
-					tokenizer.logErrorPosition(key.value.begin);
+					tokenizer.logErrorPosition(key.value.data);
 					return false;
 				}
 
@@ -878,7 +878,7 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				}
 				if (next != ",") {
 					logError(tokenizer.filename, "(", tokenizer.getLine(), "): Expected ',' or '}', got ", next.value);
-					tokenizer.logErrorPosition(next.value.begin);
+					tokenizer.logErrorPosition(next.value.data);
 					return false;
 				}
 				first = false;
@@ -890,13 +890,13 @@ struct PropertyAnimationPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				case Tokenizer::Token::SYMBOL:
 					if (!equalStrings(token.value, ",")) {
 						logError(tokenizer.filename, "(", tokenizer.getLine(), "): Expected ',', got ", token.value);
-						tokenizer.logErrorPosition(token.value.begin);
+						tokenizer.logErrorPosition(token.value.data);
 						return false;
 					}
 					break;
 				default:
 					logError(tokenizer.filename, "(", tokenizer.getLine(), "): Expected ',', got ", token.value);
-					tokenizer.logErrorPosition(token.value.begin);
+					tokenizer.logErrorPosition(token.value.data);
 					return false;
 			}
 		}

@@ -68,7 +68,7 @@ OutputMemoryStream::~OutputMemoryStream()
 
 
 IOutputStream& IOutputStream::operator << (StringView str) {
-	write(str.begin, str.size());
+	write(str.data, str.size());
 	return *this;
 }
 
@@ -300,7 +300,7 @@ bool OutputMemoryStream::write(const void* data, u64 size)
 
 void OutputMemoryStream::writeString(StringView string) {
 	const i32 size = string.size() + 1;
-	write(string.begin, size - 1);
+	write(string.data, size - 1);
 	write((char)0);
 }
 

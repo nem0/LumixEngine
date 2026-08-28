@@ -39,7 +39,7 @@ template<>
 struct HashFunc<StringView> {
 	static u32 get(const StringView& key) {
 		if (key.size() == 0) return 0;
-		RuntimeHash32 h(key.begin, key.size());
+		RuntimeHash32 h(key.data, key.size());
 		return h.getHashValue();
 	}
 };

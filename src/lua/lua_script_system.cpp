@@ -727,7 +727,7 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 		lua_State* state = script.m_state;
 		if (!state) return false;
 
-		bool errors = LuaWrapper::luaL_loadbuffer(state, code.begin, code.size(), nullptr) != 0;
+		bool errors = LuaWrapper::luaL_loadbuffer(state, code.data, code.size(), nullptr) != 0;
 		if (errors) {
 			logError(lua_tostring(state, -1));
 			lua_pop(state, 1);
@@ -1979,7 +1979,7 @@ void LuaScriptModuleImpl::ScriptInstance::onScriptLoaded(LuaScriptModuleImpl& mo
 	ASSERT(lua_type(m_state, -1) == LUA_TTABLE);
 
 	bool errors = LuaWrapper::luaL_loadbuffer(m_state,
-		m_script->getSourceCode().begin,
+		m_script->getSourceCode().data,
 		m_script->getSourceCode().size(),
 		m_script->getPath().c_str()) != 0; // [env, func]
 
@@ -2044,7 +2044,7 @@ static int LUA_inherit(lua_State* L) {
 	}
 
 	const StringView src = dep->getSourceCode();
-	bool errors = LuaWrapper::luaL_loadbuffer(L, src.begin, src.size(), name);
+	bool errors = LuaWrapper::luaL_loadbuffer(L, src.data, src.size(), name);
 	if (errors) {
 		lua_error(L);
 		return 0;
@@ -2100,7 +2100,7 @@ static int LUA_require(lua_State* L) {
 
 	// now we can compile & run module on the new thread
 	size_t bytecode_size;
-	char* bytecode = luau_compile((const char*)dep->getSourceCode().begin, dep->getSourceCode().size(), nullptr, &bytecode_size);
+	char* bytecode = luau_compile((const char*)dep->getSourceCode().data, dep->getSourceCode().size(), nullptr, &bytecode_size);
 	if (bytecode_size == 0) {
 		lua_pushstring(L, bytecode);
 		free(bytecode);
@@ -2158,7 +2158,7 @@ static int LUA_dofile(lua_State* L) {
 	luaL_sandboxthread(ML);
 
 	size_t bytecode_size;
-	char* bytecode = luau_compile((const char*)dep->getSourceCode().begin, dep->getSourceCode().size(), nullptr, &bytecode_size);
+	char* bytecode = luau_compile((const char*)dep->getSourceCode().data, dep->getSourceCode().size(), nullptr, &bytecode_size);
 	if (bytecode_size == 0) {
 		lua_pushstring(L, bytecode);
 		free(bytecode);

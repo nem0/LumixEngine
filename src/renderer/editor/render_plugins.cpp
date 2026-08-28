@@ -3226,16 +3226,18 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 	void findHLSLIncludes(StringView content, const Path& path) {
 		const StringView needle = "#include \"";
+		const char* content_end = content.end();
 		for (;;) {
 			const char* inc = find(content, needle);
 			if (!inc) return;
 			
 			StringView dep_path;
-			dep_path.begin = inc + needle.size();
-			dep_path.end = dep_path.begin + 1;
-			while (dep_path.end < content.end && *dep_path.end != '"') ++dep_path.end;
+			dep_path.data = inc + needle.size();
+			const char* dep_path_end = dep_path.data + 1;
+			while (dep_path_end < content_end && *dep_path_end != '"') ++dep_path_end;
+			dep_path.length = dep_path_end - dep_path.data;
 			m_app.getAssetCompiler().registerDependency(path, Path(dep_path));
-			content.begin = dep_path.end;
+			content.removePrefix(dep_path.end() - content.data);
 		}
 	}
 
@@ -3254,16 +3256,18 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 		const StringView needle = "#include \"";
 		StringView view((const char*)content.data(), (u32)content.size());
+		const char* view_end = view.end();
 		for (;;) {
 			const char* inc = find(view, needle);
 			if (!inc) return;
 			
 			StringView dep_path;
-			dep_path.begin = inc + needle.size();
-			dep_path.end = dep_path.begin + 1;
-			while (dep_path.end < view.end && *dep_path.end != '"') ++dep_path.end;
+			dep_path.data = inc + needle.size();
+			const char* dep_path_end = dep_path.data + 1;
+			while (dep_path_end < view_end && *dep_path_end != '"') ++dep_path_end;
+			dep_path.length = dep_path_end - dep_path.data;
 			m_app.getAssetCompiler().registerDependency(path, Path(dep_path));
-			view.begin = dep_path.end;
+			view.removePrefix(dep_path.end() - view.data);
 		}
 	}
 
@@ -3278,10 +3282,12 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	}
 
 	static StringView getLine(StringView& src) {
-		const char* b = src.begin;
-		while (b < src.end && *b != '\n') ++b;
-		StringView ret(src.begin, b);
-		src.begin = b < src.end ? b + 1 : b;
+		const char* src_end = src.end();
+		const char* b = src.data;
+		while (b < src_end && *b != '\n') ++b;
+		StringView ret(src.data, b);
+		const u64 consumed = u64(b - src.data) + (b < src_end ? 1 : 0);
+		src.removePrefix(consumed);
 		return ret;
 	}
 
@@ -3312,7 +3318,10 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	}
 
 	static void skipWhitespaces(StringView& str) {
-		while (str.begin != str.end && isWhitespace(*str.begin)) ++str.begin;
+		const char* begin = str.data;
+		const char* str_end = str.end();
+		while (begin != str_end && isWhitespace(*begin)) ++begin;
+		str.removePrefix(begin - str.data);
 	}
 
 	bool compile(const Path& src) override {
@@ -3330,6 +3339,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		};
 
 		StringView preprocess((const char*)src_data.data(), (u32)src_data.size());
+		const char* preprocess_end = preprocess.end();
 		bool is_surface = false;
 		Array<Shader::Uniform> uniforms(m_app.getAllocator());
 		Array<String> defines(m_app.getAllocator());
@@ -3340,14 +3350,15 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		for (;;) {
 			++line_idx;
 			StringView line = getLine(preprocess);
-			if (line.begin == preprocess.end) break;
+			if (line.data == preprocess_end) break;
 			
 			skipWhitespaces(line);
 			if (startsWith(line, "#include \"")) {
 				StringView path;
-				path.begin = line.begin + 10;
-				path.end = path.begin + 1;
-				while (path.end < preprocess.end && *path.end != '"') ++path.end;
+				path.data = line.data + 10;
+				const char* path_end = path.data + 1;
+				while (path_end < preprocess_end && *path_end != '"') ++path_end;
+				path.length = path_end - path.data;
 
 				OutputMemoryStream include_content(m_app.getAllocator());
 				if (!fs.getContentSync(Path(path), include_content)) {
@@ -3369,8 +3380,9 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				}
 				else if (startsWith(line, "define \"")) {
 					line.removePrefix(8);
-					line.end = line.begin + 1;
-					while (line.end < preprocess.end && *line.end != '"') ++line.end;
+					const char* define_end = line.data + 1;
+					while (define_end < preprocess_end && *define_end != '"') ++define_end;
+					line.length = define_end - line.data;
 					
 					char tmp[64];
 					copyString(tmp, line);
@@ -3379,7 +3391,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				else if (startsWith(line, "uniform")) {
 					line.removePrefix(7);
 					Tokenizer t(preprocess, src.c_str());
-					t.cursor = line.begin;
+					t.cursor = line.data;
 					StringView name;
 					StringView type;
 					if (!t.consume(name, ",", type, ",")) return false;
@@ -3396,7 +3408,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					else if (equalStrings(type, "float4")) u.type = Shader::Uniform::FLOAT4;
 					else {
 						logError(src, "(", getLine(type), "): Unknown uniform type ", type);
-						t.logErrorPosition(type.begin);
+						t.logErrorPosition(type.data);
 						return false;
 					}
 
@@ -3404,7 +3416,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					if (v.type == Tokenizer::Variant::NONE) return false;
 					if (!assign(u, v)) {
 						logError(src, "(", getLine(type), "): Uniform ", name, " has incompatible type ", type);
-						t.logErrorPosition(type.begin);
+						t.logErrorPosition(type.data);
 						return false;
 					}
 
@@ -3421,8 +3433,8 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				else if (startsWith(line, "texture_slot")) {
 					line.removePrefix(12);
 					Tokenizer t(preprocess, src.c_str());
-					t.content.end = line.end;
-					t.cursor = line.begin;
+					t.content.length = line.end() - t.content.data;
+					t.cursor = line.data;
 					StringView name;
 					StringView default_texture;
 					if (!t.consume(name, ",", default_texture)) return false;

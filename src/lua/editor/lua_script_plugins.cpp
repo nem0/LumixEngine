@@ -500,8 +500,8 @@ struct EditorWindow : AssetEditorWindow {
 		m_file_async_handle = FileSystem::AsyncHandle::invalid();
 		if (success) {
 			StringView v;
-			v.begin = (const char*)data.begin();
-			v.end = (const char*)data.end();
+			v.data = (const char*)data.begin();
+			v.length = data.length();
 			m_code_editor = createLuaCodeEditor(m_app);
 			m_code_editor->setText(v);
 			m_analysis.markDirty(m_path);
@@ -1392,8 +1392,8 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 			if (!fs.getContentSync(path, blob)) continue;
 
 			StringView content;
-			content.begin = (const char*)blob.data();
-			content.end = content.begin + blob.size();
+			content.data = (const char*)blob.data();
+			content.length = blob.size();
 			StudioLuaPlugin* plugin = StudioLuaPlugin::create(m_app, content, path);
 			if (plugin) m_plugins.push(plugin);
 		}

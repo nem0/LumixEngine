@@ -274,7 +274,7 @@ struct AssetBrowserImpl : AssetBrowser {
 
 		StaticString<MAX_PATH> filename;
 		StringView subres = ResourcePath::getSubresource(path);
-		if (*subres.end) {
+		if (*subres.end()) {
 			filename.append(subres, ":", Path::getBasename(path));
 		}
 		else {
@@ -289,8 +289,8 @@ struct AssetBrowserImpl : AssetBrowser {
 		tile.clamped_filename = filename;
 		StringView ext = Path::getExtension(subres);
 		tile.extension = 0;
-		ASSERT(ext.size() <= sizeof(tile.extension));
-		memcpy(&tile.extension, ext.begin, ext.size());
+		ASSERT(ext.length <= sizeof(tile.extension));
+		memcpy(&tile.extension, ext.data, ext.length);
 
 		m_file_infos.push(tile);
 	}
@@ -420,7 +420,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		const Path path(".lumix/asset_tiles/", file_path_hash, ".lbc");
 		if (!fs.fileExists(info.filepath)) {
 			StringView master = ResourcePath::getResource(info.filepath);
-			if (master.begin == info.filepath.c_str()) {
+			if (master.data == info.filepath.c_str()) {
 				return TileState::DELETED;
 			}
 		}
@@ -559,7 +559,7 @@ struct AssetBrowserImpl : AssetBrowser {
 						if (moved && idx == m_selected_file) ImGuiEx::ScrollToItem();
 						ImGui::PopID();
 						ImGui::TableNextColumn();
-						ImGui::TextUnformatted(locator.dir.begin, locator.dir.end);
+						ImGui::TextUnformatted(locator.dir.data, locator.dir.end());
 						if (clicked) {
 							openEditor(res.path);
 							ImGui::CloseCurrentPopup();
@@ -579,7 +579,7 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	bool tileDir(StringView name, StaticString<MAX_PATH>& clamped_name, float size) {
 		ImGui::BeginGroup();
-		ImGui::PushID(name.begin, name.end);
+		ImGui::PushID(name.data, name.end());
 		
 		ImVec2 cp = ImGui::GetCursorScreenPos();
 		tileIcon(ICON_FA_FOLDER, size);
@@ -858,7 +858,7 @@ struct AssetBrowserImpl : AssetBrowser {
 				else {
 					ImGuiEx::TextUnformatted(Path::getBasename(m_selected_resources[0]));
 					ImGui::Separator();
-					if (*ResourcePath::getSubresource(m_selected_resources[0]).end == 0 && ImGui::MenuItem(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) {
+					if (!contains(m_selected_resources[0], ':') && ImGui::MenuItem(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) {
 						openInExternalEditor(m_selected_resources[0]);
 					}
 					if (ImGui::MenuItem("Rename")) {
@@ -1233,7 +1233,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			res.append(rl.subresource, (rl.subresource.empty() ? "" : ":"), rl.basename, ".", rl.ext);
 		}
 		if (hash_id) {
-			res.append("##h", RuntimeHash(rl.full.begin, rl.full.size()).getHashValue());
+			res.append("##h", RuntimeHash(rl.full.data, rl.full.size()).getHashValue());
 		}
 		return res;
 	}
@@ -1343,7 +1343,7 @@ struct AssetBrowserImpl : AssetBrowser {
 
 			StaticString<MAX_PATH> filename;
 			StringView subres = ResourcePath::getSubresource(path);
-			if (*subres.end) {
+			if (*subres.end()) {
 				filename.append(subres, ":", Path::getBasename(path));
 			}
 			else {
@@ -1355,7 +1355,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			StringView ext = Path::getExtension(filename);
 			fi.extension = 0;
 			ASSERT(ext.size() <= sizeof(fi.extension));
-			memcpy(&fi.extension, ext.begin, ext.size());
+			memcpy(&fi.extension, ext.data, ext.length);
 
 			idx = m_immediate_tiles.size() - 1;
 		}

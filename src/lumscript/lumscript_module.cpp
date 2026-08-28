@@ -34,7 +34,7 @@ static void printLumScriptMessage(void* userdata, ls_string_view msg) {
 }
 
 static ls_string_view toLs(StringView value) {
-	return {value.begin, value.end};
+	return {value.data, value.end()};
 }
 
 static ls_string_view toLs(const char* value) {

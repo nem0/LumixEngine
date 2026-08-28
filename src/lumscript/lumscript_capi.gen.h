@@ -4166,7 +4166,7 @@ namespace Lumix::LumScript::generated {
 	static void lumscript_object_Element_getID_352(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, ui::Element*, object);
 		auto ret = object->getID();
-		ls_result_string(runtime, &frame, ls_string_view{ret.begin, ret.end});
+		ls_result_string(runtime, &frame, ls_string_view{ret.data, ret.end()});
 	}
 	
 	static void lumscript_object_Element_setVisible_353(ls_runtime* runtime, ls_call_frame frame) {

@@ -17,8 +17,8 @@ struct NativeFunctionKey {
 
 struct NativeFunctionKeyHash {
 	static u32 get(const NativeFunctionKey& key) {
-		const u32 unit_hash = RuntimeHash32(key.unit_path.begin, key.unit_path.size()).getHashValue();
-		const u32 name_hash = RuntimeHash32(key.name.begin, key.name.size()).getHashValue();
+		const u32 unit_hash = RuntimeHash32(key.unit_path.data, key.unit_path.size()).getHashValue();
+		const u32 name_hash = RuntimeHash32(key.name.data, key.name.size()).getHashValue();
 		return unit_hash ^ (name_hash + 0x9e3779b9 + (unit_hash << 6) + (unit_hash >> 2));
 	}
 };

@@ -217,8 +217,8 @@ struct ModelMeta {
 
 		clips.clear();	
 		if (!tmp_clips.empty()) {
-			Tokenizer t(StringView(content.begin, tmp_clips.end), path.c_str());
-			t.cursor = tmp_clips.begin;
+			Tokenizer t(StringView(content.data, tmp_clips.end()), path.c_str());
+			t.cursor = tmp_clips.data;
 			Tokenizer::Token token = t.nextToken();
 			ASSERT(token && token.value[0] == '[');
 			for (;;) {
@@ -227,7 +227,7 @@ struct ModelMeta {
 				if (token == "]") break;
 				if (token != "{") {
 					logError(t.filename, "(", t.getLine(), "): expected ']' or '{', got ", token.value);
-					t.logErrorPosition(token.value.begin);
+					t.logErrorPosition(token.value.data);
 					return;
 				}
 
@@ -250,7 +250,7 @@ struct ModelMeta {
 					}
 					else {
 						logError(t.filename, "(", t.getLine(), "): unknown token ", token.value);
-						t.logErrorPosition(token.value.begin);
+						t.logErrorPosition(token.value.data);
 						return;
 					}
 					token = t.nextToken();
@@ -258,7 +258,7 @@ struct ModelMeta {
 					if (token == "}") break;
 					if (token != ",") {
 						logError(t.filename, "(", t.getLine(), "): expected '}' or ',', got ", token.value);
-						t.logErrorPosition(token.value.begin);
+						t.logErrorPosition(token.value.data);
 						return;
 					}
 				}
@@ -268,7 +268,7 @@ struct ModelMeta {
 				if (token == "]") break;
 				if (token != ",") {
 					logError(t.filename, "(", t.getLine(), "): expected ']' or ',', got ", token.value);
-					t.logErrorPosition(token.value.begin);
+					t.logErrorPosition(token.value.data);
 					return;
 				}
 			}

@@ -314,7 +314,7 @@ void appendReturnValue(OutputStream& out, StringView type, const char* value, co
 			L("ls_result_string(runtime, &frame, ls_string_view{", value, ".c_str(), ", value, ".c_str() + ", value, ".length()});");
 			break;
 		case LumScriptType::STRING_T:
-			L("ls_result_string(runtime, &frame, ls_string_view{", value, ".begin, ", value, ".end});");
+			L("ls_result_string(runtime, &frame, ls_string_view{", value, ".data, ", value, ".end()});");
 			break;
 		case LumScriptType::STRUCT_T: {
 			const Struct* s = findStructByTypeName(type);

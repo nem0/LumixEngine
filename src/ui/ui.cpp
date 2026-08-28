@@ -45,7 +45,7 @@ static bool isInlineTag(Tag tag) {
 Tag parseTag(StringView str) {
 	const u32 len = (u32)str.size();
 	if (len == 0) return Tag::INVALID;
-	const char* s = str.begin;
+	const char* s = str.data;
 
 	switch (len) {
 		case 3: if (memcmp(s, "box", 3) == 0) return Tag::BOX; break;
@@ -58,7 +58,7 @@ Tag parseTag(StringView str) {
 AttributeName parseAttributeName(StringView str) {
 	const u32 len = (u32)str.size();
 	if (len == 0) return AttributeName::INVALID;
-	const char* s = str.begin;
+	const char* s = str.data;
 
 	switch (s[0]) {
 		case 'a':
@@ -165,10 +165,10 @@ static bool parseColor(StringView str, Color& out) {
 		}
 		return res;
 	};
-	int r = hexToInt(str.begin + 1, 2);
-	int g = hexToInt(str.begin + 3, 2);
-	int b = hexToInt(str.begin + 5, 2);
-	int a = str.size() == 9 ? hexToInt(str.begin + 7, 2) : 255;
+	int r = hexToInt(str.data + 1, 2);
+	int g = hexToInt(str.data + 3, 2);
+	int b = hexToInt(str.data + 5, 2);
+	int a = str.size() == 9 ? hexToInt(str.data + 7, 2) : 255;
 	if (r < 0 || g < 0 || b < 0 || a < 0) return false;
 	out = Color(u8(r), u8(g), u8(b), u8(a));
 	return true;
@@ -179,10 +179,10 @@ static bool parseOpacity(StringView value, float& out) {
 	const char* end = fromCString(value, opacity);
 	if (!end) return false;
 
-	if (end == value.end - 1 && *end == '%') {
+	if (end == value.end() - 1 && *end == '%') {
 		opacity *= 0.01f;
 	}
-	else if (end != value.end) {
+	else if (end != value.end()) {
 		return false;
 	}
 
@@ -253,17 +253,17 @@ static bool parseUnit(StringView str, ParsedUnit& out) {
 	if (len > 0 && str.back() == '%') {
 		if (len == 1) return false;
 		unit = Unit::PERCENT;
-		number = StringView(str.begin, str.end - 1);
-	} else if (len >= 2 && *(str.end - 2) == 'e' && str.back() == 'm') {
+		number = StringView(str.data, str.end() - 1);
+	} else if (len >= 2 && *(str.end() - 2) == 'e' && str.back() == 'm') {
 		if (len == 2) return false;
 		unit = Unit::EM;
-		number = StringView(str.begin, str.end - 2);
+		number = StringView(str.data, str.end() - 2);
 	}
 
 	if (number.empty()) return false;
 
 	const char* end = fromCString(number, out.value);
-	if (!end || end != number.end) return false;
+	if (!end || end != number.end()) return false;
 
 	out.unit = unit;
 	return true;
@@ -274,7 +274,7 @@ static bool parseTypedAttributeValue(Document& doc, AttributeName name, StringVi
 		case AttributeName::ALIGN: {
 			const u32 len = (u32)value.size();
 			if (len == 0) return false;
-			const char* s = value.begin;
+			const char* s = value.data;
 			switch (len) {
 				case 4: if (memcmp(s, "left", 4) == 0) { out.align = Align::LEFT; return true; } break;
 				case 5: if (memcmp(s, "right", 5) == 0) { out.align = Align::RIGHT; return true; } break;
@@ -284,7 +284,7 @@ static bool parseTypedAttributeValue(Document& doc, AttributeName name, StringVi
 		}
 		case AttributeName::ALIGN_ITEMS: {
 			const u32 len = (u32)value.size();
-			const char* s = value.begin;
+			const char* s = value.data;
 			switch (len) {
 				case 3: if (memcmp(s, "end", 3) == 0) { out.align_items = AlignItems::END; return true; } break;
 				case 5: if (memcmp(s, "start", 5) == 0) { out.align_items = AlignItems::START; return true; } break;
@@ -295,7 +295,7 @@ static bool parseTypedAttributeValue(Document& doc, AttributeName name, StringVi
 		}
 		case AttributeName::DIRECTION: {
 			const u32 len = (u32)value.size();
-			const char* s = value.begin;
+			const char* s = value.data;
 			switch (len) {
 				case 3: if (memcmp(s, "row", 3) == 0) { out.direction = Direction::ROW; return true; } break;
 				case 6: if (memcmp(s, "column", 6) == 0) {  out.direction = Direction::COLUMN; return true; } break;
@@ -305,7 +305,7 @@ static bool parseTypedAttributeValue(Document& doc, AttributeName name, StringVi
 		case AttributeName::JUSTIFY_CONTENT: {
 			const u32 len = (u32)value.size();
 			if (len == 0) return false;
-			const char* s = value.begin;
+			const char* s = value.data;
 			switch (value[0]) {
 				case 's':
 					if (len == 5 && memcmp(s, "start", 5) == 0) { out.justify = JustifyContent::START; return true; }
@@ -326,7 +326,7 @@ static bool parseTypedAttributeValue(Document& doc, AttributeName name, StringVi
 		case AttributeName::FONT_SIZE: {
 			float font_size = 12.0f;
 			const char* end = fromCString(value, font_size);
-			if (!end || end != value.end || font_size < 0 || font_size != font_size) return false;
+			if (!end || end != value.end() || font_size < 0 || font_size != font_size) return false;
 			out.font_size = font_size;
 			return true;
 		}
@@ -550,7 +550,7 @@ bool Document::parseStyleBlock() {
 		
 		StyleRule& rule = m_stylesheet.m_rules.emplace(m_allocator);
 
-		const char* selector_start = token.value.begin;
+		const char* selector_start = token.value.data;
 		while(token.type != Token::LBRACE) {
 			switch (token.type) {
 				case Token::DOLLAR:
@@ -561,7 +561,7 @@ bool Document::parseStyleBlock() {
 				case Token::DOT: {
 					Token id_token;
 					if (!consume(Token::IDENTIFIER, &id_token)) return false;
-					rule.classes.push(m_intern_table.intern(StringView(token.value.begin, id_token.value.end)));
+					rule.classes.push(m_intern_table.intern(StringView(token.value.data, id_token.value.end())));
 					break;
 				}
 				default:
@@ -636,7 +636,7 @@ bool Document::parseElements(u32 parent_index) {
 					Token next = m_tokenizer.peekToken();
 					switch (next.type) {
 						case Token::TEXT:
-							elem.text.end = next.value.end;
+							elem.text.length = next.value.end() - elem.text.data;
 							m_tokenizer.consumeToken();
 							break;
 						case Token::LBRACKET: is_break = true; break;
@@ -652,9 +652,9 @@ bool Document::parseElements(u32 parent_index) {
 							error(token.value, m_tokenizer, "unexpected EOF");
 							return false;
 						default:
-							elem.text.end = next.value.end;
+							elem.text.length = next.value.end() - elem.text.data;
 							if (next.type == Token::STRING) {
-								elem.text.end += 1;
+								elem.text.length += 1;
 							}
 							m_tokenizer.consumeToken();
 							break;
@@ -709,10 +709,10 @@ bool Document::parseElements(u32 parent_index) {
 
 					// class
 					if (peeked.type == Token::DOT) {
-						const char* dot = m_tokenizer.peekToken().value.begin;
+						const char* dot = m_tokenizer.peekToken().value.data;
 						if (!consume(Token::DOT)) return false;
 						if (!consume(Token::IDENTIFIER, &name_token)) return false;	
-						InternString class_id = m_intern_table.intern({dot, name_token.value.end});
+						InternString class_id = m_intern_table.intern({dot, name_token.value.end()});
 						if (!hasClassId(elem.classes, class_id)) {
 							elem.classes.push(class_id);
 						}
@@ -760,7 +760,7 @@ bool Document::parseElements(u32 parent_index) {
 					m_root.children.push(elem_idx);
 				}
 				if (token.type == Token::STRING) {
-					elem.text = StringView{token.value.begin - 1, token.value.end + 1};
+					elem.text = StringView{token.value.data - 1, token.value.end() + 1};
 				} else {
 					elem.text = token.value;
 				}
@@ -785,13 +785,13 @@ bool Document::parseElements(u32 parent_index) {
 							return true; // end of the parent container
 						case Token::TEXT:
 							// Include TEXT tokens in the element value
-							elem.text.end = next.value.end;
+							elem.text.length = next.value.end() - elem.text.data;
 							m_tokenizer.consumeToken();
 							break;
 						default: 
-							elem.text.end = next.value.end;
+							elem.text.length = next.value.end() - elem.text.data;
 							if (next.type == Token::STRING) {
-								elem.text.end += 1;
+								elem.text.length += 1;
 							}
 							m_tokenizer.consumeToken();
 							break;
@@ -1699,7 +1699,7 @@ static void wrapInlineRun(Document& doc, Element& parent, i32 start_span_idx, i3
 		if (wrap_enabled) {
 			SpanLine* line = nullptr;
 			while (!text.empty()) {
-				is_prev_space = is_prev_space || isWhitespace(*text.begin);
+				is_prev_space = is_prev_space || isWhitespace(*text.data);
 				SplitWord split = doc.m_font_manager->splitFirstWord(span.getFontHandle(), text);
 				if (split.head.empty()) {
 					// this should only be possible if text ends with whitespaces
@@ -1725,12 +1725,12 @@ static void wrapInlineRun(Document& doc, Element& parent, i32 start_span_idx, i3
 					}
 					if (!line) {
 						line = &span.lines.emplace();
-						line->text.begin = split.head.begin;
+						line->text.data = split.head.data;
 						line->width = 0;
 						line->pos.x = x;
 					}
 					
-					line->text.end = split.head.end;
+					line->text.length = split.head.end() - line->text.data;
 					line->width += split.head_width;
 					x += split.head_width;
 				}

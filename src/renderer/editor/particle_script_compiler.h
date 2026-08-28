@@ -67,13 +67,14 @@ struct ParticleScriptTokenizer {
 	Token m_current_token;
 
 	void skipWhitespaces() {
-		while (m_current != m_document.end && isWhitespace(*m_current)) ++m_current;
-		if (m_current < m_document.end - 1
+		const char* document_end = m_document.end();
+		while (m_current != document_end && isWhitespace(*m_current)) ++m_current;
+		if (m_current < document_end - 1
 			&& m_current[0] == '/'
 			&& m_current[1] == '/') 
 		{
 			m_current += 2;
-			while (m_current != m_document.end && *m_current != '\n') {
+			while (m_current != document_end && *m_current != '\n') {
 				++m_current;
 			}
 			skipWhitespaces();
@@ -83,17 +84,17 @@ struct ParticleScriptTokenizer {
 	Token makeToken(Token::Type type) {
 		Token res;
 		res.type = type;
-		res.value.begin = m_start_token;
-		res.value.end = m_current;
+		res.value.data = m_start_token;
+		res.value.length = m_current - res.value.data;
 		if (type == Token::STRING) {
-			++res.value.begin;
-			--res.value.end;
+			++res.value.data;
+			res.value.length -= 2;
 		}
 		return res;
 	}
 
 	char advance() {
-		ASSERT(m_current < m_document.end);
+		ASSERT(m_current < m_document.end());
 		char c = m_current[0];
 		++m_current;
 		return c;
@@ -102,12 +103,12 @@ struct ParticleScriptTokenizer {
 	static bool isDigit(char c) { return c >= '0' && c <= '9'; }
 
 	char peekChar() {
-		if (m_current == m_document.end) return 0;
+		if (m_current == m_document.end()) return 0;
 		return m_current[0];
 	}
 
 	char peekNextChar() {
-		if (m_current + 1 >= m_document.end) return 0;
+		if (m_current + 1 >= m_document.end()) return 0;
 		return m_current[1];
 	}
 
@@ -123,10 +124,11 @@ struct ParticleScriptTokenizer {
 	}
 
 	Token stringToken() {
-		while (m_current != m_document.end && m_current[0] != '"') {
+		const char* document_end = m_document.end();
+		while (m_current != document_end && m_current[0] != '"') {
 			++m_current;
 		}
-		if (m_current == m_document.end) return makeToken(Token::ERROR);
+		if (m_current == document_end) return makeToken(Token::ERROR);
 		advance();
 		return makeToken(Token::STRING);
 	}
@@ -184,7 +186,7 @@ struct ParticleScriptTokenizer {
 		skipWhitespaces();
 		Token res;
 		m_start_token = m_current;
-		if (m_current == m_document.end) return makeToken(Token::EOF);
+		if (m_current == m_document.end()) return makeToken(Token::EOF);
 
 		char c = advance();
 		if (isDigit(c)) return numberToken();
@@ -594,10 +596,10 @@ struct ParticleScriptCompiler {
     }
 
 	i32 getLine(StringView location) {
-        ASSERT(location.begin <= m_tokenizer.m_document.end);
-        const char* c = m_tokenizer.m_document.begin;
+        ASSERT(location.data <= m_tokenizer.m_document.end());
+        const char* c = m_tokenizer.m_document.data;
         i32 line = 1;
-        while(c < location.begin) {
+        while(c < location.data) {
             if (*c == '\n') ++line;
             ++c;
         }
@@ -1032,7 +1034,7 @@ struct ParticleScriptCompiler {
 	
 	static bool tokenMatchRemaining(StringView name, const char* remaining, i32 start, i32 len) {
 		if (name.size() != start + len) return false;
-		if (memcmp(name.begin + start, remaining, len) == 0) return true;
+		if (memcmp(name.data + start, remaining, len) == 0) return true;
 		return false;
 	}
 
@@ -1062,7 +1064,7 @@ struct ParticleScriptCompiler {
 	SysCall checkBuiltinFunction(StringView name, const char* remaining, i32 start, i32 len, SysCall if_matching) {
 		if (name.size() != start + len) return {InstructionType::END};
 		name.removePrefix(start);
-		if (memcmp(name.begin, remaining, len) == 0) return if_matching;
+		if (memcmp(name.data, remaining, len) == 0) return if_matching;
 		return {InstructionType::END};
 	}
 
@@ -3127,7 +3129,7 @@ struct ParticleScriptCompiler {
 		}
 		u32 res;
 		const char* end = fromCString(t.value, res);
-		if (end != t.value.end) {
+		if (end != t.value.end()) {
 			error(t.value, "Expected u32.");
 			return res;
 		}
@@ -3207,7 +3209,7 @@ struct ParticleScriptCompiler {
 
 	bool compile(const Path& path, StringView code, OutputMemoryStream& output) {
 		m_path = path;
-		m_tokenizer.m_current = code.begin;
+		m_tokenizer.m_current = code.data;
 		m_tokenizer.m_document = code;
 		m_tokenizer.m_current_token = m_tokenizer.nextToken();
 
@@ -3297,8 +3299,8 @@ struct ParticleScriptCompiler {
 
 		ParticleScriptTokenizer tokenizer;
 		tokenizer.m_document = doc;
-		tokenizer.m_current = doc.begin;
-		tokenizer.m_start_token = doc.begin;
+		tokenizer.m_current = doc.data;
+		tokenizer.m_start_token = doc.data;
 
 		Array<i32> scope_stack(allocator);
 		i32 next_scope_id = 0;
@@ -3318,10 +3320,10 @@ struct ParticleScriptCompiler {
 			const ParticleScriptToken tok = tokenizer.nextToken();
 			if (tok.type == ParticleScriptToken::EOF) break;
 			
-			const char* tok_begin = tok.value.begin ? tok.value.begin : tokenizer.m_current;
-			const char* tok_end = tok.value.end ? tok.value.end : tokenizer.m_current;
-			int tok_start_off = int(tok_begin - doc.begin);
-			int tok_end_off = int(tok_end - doc.begin);
+			const char* tok_begin = tok.value.data ? tok.value.data : tokenizer.m_current;
+			const char* tok_end = tok.value.end() ? tok.value.end() : tokenizer.m_current;
+			int tok_start_off = int(tok_begin - doc.data);
+			int tok_end_off = int(tok_end - doc.data);
 
 			if (opts.stop_at_cursor_only && tok_start_off > cursor_offset) break;
 
@@ -3353,10 +3355,10 @@ struct ParticleScriptCompiler {
 					ParticleScriptToken name_tok = tokenizer.nextToken();
 					if (name_tok.type == ParticleScriptToken::IDENTIFIER) {
 						Symbol s;
-						s.name = StringView(name_tok.value.begin, name_tok.value.end);
+						s.name = name_tok.value;
 						s.kind = SymbolKind::EmitterField;
-						s.start_offset = int(name_tok.value.begin - doc.begin);
-						s.end_offset = int(name_tok.value.end - doc.begin);
+						s.start_offset = int(name_tok.value.data - doc.data);
+						s.end_offset = i32(s.start_offset + name_tok.value.length);
 						s.scope_id = scope_stack.empty() ? 0 : scope_stack.back();
 						res.symbols.push(s);
 						// mark next scope as emitter when brace comes
@@ -3375,7 +3377,7 @@ struct ParticleScriptCompiler {
 					ParticleScriptToken name_tok = tokenizer.nextToken();
 					if (name_tok.type == ParticleScriptToken::IDENTIFIER) {
 						Symbol s;
-						s.name = StringView(name_tok.value.begin, name_tok.value.end);
+						s.name = name_tok.value;
 						switch (tok.type) {
 							case ParticleScriptToken::FN:
 								pending_scope_kind = ScopeKind::Function;
@@ -3405,8 +3407,8 @@ struct ParticleScriptCompiler {
 								break;
 							default: break;
 						}
-						s.start_offset = int(name_tok.value.begin - doc.begin);
-						s.end_offset = int(name_tok.value.end - doc.begin);
+						s.start_offset = int(name_tok.value.data - doc.data);
+						s.end_offset = i32(s.start_offset + name_tok.value.length);
 						s.scope_id = scope_stack.empty() ? 0 : scope_stack.back();
 						res.symbols.push(s);
 						if (res.symbols.size() >= opts.max_symbols) { res.truncated = true; break; }
