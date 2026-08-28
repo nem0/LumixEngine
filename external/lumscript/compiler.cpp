@@ -410,10 +410,6 @@ static void appendReflectedTypeName(char*& out, char* end, const ResolvedType& t
 	}
 
 struct Checker {
-	struct ComptimeSliceValue {
-		u8* data;
-		i64 count;
-	};
 	struct ComptimeFrame {
 		struct Local {
 			ls_string_view name;
@@ -508,7 +504,7 @@ struct Checker {
 	}
 
 	ComptimeValue makeStringValue(Unit& unit, ls_string_view value) {
-		ComptimeSliceValue slice{(u8*)value.begin, value.length};
+		ls_slice slice{(u8*)value.begin, value.length};
 		return makePersistentValue(unit, const_u8_slice, &slice, sizeof(slice));
 	}
 
@@ -679,14 +675,14 @@ struct Checker {
 		if (a.kind != ComptimeValue::VALUE || !a.type) return false;
 
 		if (slices_comparable || typesEqual(a.type, const_u8_slice)) {
-			ComptimeSliceValue lhs;
-			ComptimeSliceValue rhs;
+			ls_slice lhs;
+			ls_slice rhs;
 			memcpy(&lhs, a.value, sizeof(lhs));
 			memcpy(&rhs, b.value, sizeof(rhs));
-			if (lhs.count != rhs.count) return false;
-			if (lhs.count == 0) return true;
+			if (lhs.length != rhs.length) return false;
+			if (lhs.length == 0) return true;
 			const SliceResolvedType& slice = static_cast<const SliceResolvedType&>(*a.type);
-			return comptimeSlicePayloadEqual(lhs.data, rhs.data, *slice.element_type, lhs.count);
+			return comptimeSlicePayloadEqual(lhs.data, rhs.data, *slice.element_type, lhs.length);
 		}
 
 		u32 size = typeByteSize(*a.type);
@@ -1063,9 +1059,9 @@ struct Checker {
 					case ResolvedTypeKind::SLICE: {
 						if (!typesEqual(arg.type, const_u8_slice)) return nullptr;
 						StringLiteralExpression* expr = makeType<StringLiteralExpression>(unit.arena);
-						ComptimeSliceValue value;
+						ls_slice value;
 						memcpy(&value, arg.value, sizeof(value));
-						expr->value = {(const char*)value.data, value.count};
+						expr->value = {(const char*)value.data, value.length};
 						expr->resolved_type = arg.type;
 						return expr;
 					}
@@ -3465,13 +3461,13 @@ struct Checker {
 			ComptimeValue index = evalComptime(unit, *br.args[0], ctx);
 			if (!index) return nullptr;
 
-			ComptimeSliceValue field_name_value;
+			ls_slice field_name_value;
 			copyMemory(&field_name_value, index.value, sizeof(field_name_value));
 			if (!field_name_value.data) {
 				errorLine(expr.token, "Struct field access expects a valid compile-time []const u8");
 				return nullptr;
 			}
-			const ls_string_view field_name{(const char*)field_name_value.data, field_name_value.count};
+			const ls_string_view field_name{(const char*)field_name_value.data, field_name_value.length};
 			StructResolvedType* st = static_cast<StructResolvedType*>(base_type);
 			for (i32 i = 0; i < st->decl->fields.size(); ++i) {
 				if (equalStrings(st->decl->fields[i].name, field_name)) {
@@ -4704,7 +4700,7 @@ struct Checker {
 			++suppress_errors;
 			ComptimeValue elements = evalComptime(unit, *fs.begin, &ctx);
 			--suppress_errors;
-			ComptimeSliceValue slice = {};
+			ls_slice slice = {};
 			if (!fs.end && elements.kind == ComptimeValue::VALUE && elements.type && elements.type->kind == ResolvedTypeKind::SLICE) copyMemory(&slice, elements.value, sizeof(slice));
 			const bool slice_unroll = !fs.end && (elements.kind == ComptimeValue::VALUE && elements.type && elements.type->kind == ResolvedTypeKind::SLICE);
 			if (slice_unroll) {
@@ -4712,8 +4708,8 @@ struct Checker {
 				BlockStatement* expanded_body = makeType<BlockStatement>(unit.arena, unit.arena);
 				expanded_body->token = source_body->token;
 				ctx.loop_labels.push({});
-				const u32 count = (u32)slice.count;
-				for (u32 i = 0; i < count; ++i) {
+				const i64 count = slice.length;
+				for (i64 i = 0; i < count; ++i) {
 					ComptimeValue binding_value;
 					ResolvedType* binding_type = nullptr;
 					binding_type = static_cast<SliceResolvedType*>(elements.type)->element_type;
@@ -5713,9 +5709,9 @@ struct Checker {
 					case TypeMemberExpression::TYPES: {
 						UnionResolvedType& un = *static_cast<UnionResolvedType*>(tme.reflected_type);
 						SliceResolvedType* slice_type = static_cast<SliceResolvedType*>(expr.resolved_type);
-						ComptimeSliceValue slice;
+						ls_slice slice;
 						slice.data = (u8*)un.members.data();
-						slice.count = un.members.size();
+						slice.length = un.members.size();
 						expr.comptime_value = copyComptimeValue(slice_type, &slice, sizeof(slice));
 						return expr.comptime_value;
 					}
@@ -5723,8 +5719,8 @@ struct Checker {
 						StructResolvedType& st = *static_cast<StructResolvedType*>(tme.reflected_type);
 						SliceResolvedType* slice_type = static_cast<SliceResolvedType*>(expr.resolved_type);
 						ResolvedType* descriptor_type = slice_type->element_type;
-						ComptimeSliceValue slice;
-						slice.count = st.decl->fields.size();
+						ls_slice slice;
+						slice.length = st.decl->fields.size();
 						slice.data = comptime_stack_ptr;
 						comptime_stack_ptr += st.decl->fields.size() * typeByteSize(*descriptor_type);
 						expr.comptime_value = copyComptimeValue(slice_type, &slice, sizeof(slice));
@@ -5734,7 +5730,7 @@ struct Checker {
 						for (i32 i = 0; i < st.decl->fields.size(); ++i) {
 							u8* descriptor = slice.data + descriptor_size * i;
 							const ls_string_view name = st.decl->fields[i].name;
-							ComptimeSliceValue name_slice{(u8*)name.begin, name.length};
+							ls_slice name_slice{(u8*)name.begin, name.length};
 							ResolvedType* type = st.fields[i].type;
 							copyMemory(descriptor, &name_slice, sizeof(name_slice));
 							copyMemory(descriptor + type_offset, &type, sizeof(type));
@@ -5745,8 +5741,8 @@ struct Checker {
 						EnumResolvedType& en = *static_cast<EnumResolvedType*>(tme.reflected_type);
 						SliceResolvedType* slice_type = static_cast<SliceResolvedType*>(expr.resolved_type);
 						ResolvedType* descriptor_type = slice_type->element_type;
-						ComptimeSliceValue slice;
-						slice.count = en.decl->members.size();
+						ls_slice slice;
+						slice.length = en.decl->members.size();
 						slice.data = (u8*)comptime_stack_ptr;
 						comptime_stack_ptr += en.decl->members.size() * typeByteSize(*descriptor_type);
 						expr.comptime_value = copyComptimeValue(slice_type, &slice, sizeof(slice));
@@ -5761,7 +5757,7 @@ struct Checker {
 							}
 							u8* descriptor = slice.data + descriptor_size * i;
 							const ls_string_view name = en.decl->members[i].name;
-							ComptimeSliceValue name_slice{(u8*)name.begin, name.length};
+							ls_slice name_slice{(u8*)name.begin, name.length};
 							copyMemory(descriptor, &name_slice, sizeof(name_slice));
 							copyMemory(descriptor + structFieldOffset(*static_cast<StructResolvedType*>(descriptor_type), 1), &enum_value, sizeof(enum_value));
 						}
@@ -5771,8 +5767,8 @@ struct Checker {
 						FunctionResolvedType& fn = *static_cast<FunctionResolvedType*>(tme.reflected_type);
 						SliceResolvedType* slice_type = static_cast<SliceResolvedType*>(expr.resolved_type);
 						ResolvedType* descriptor_type = slice_type->element_type;
-						ComptimeSliceValue slice;
-						slice.count = fn.params.size();
+						ls_slice slice;
+						slice.length = fn.params.size();
 						slice.data = comptime_stack_ptr;
 						comptime_stack_ptr += fn.params.size() * typeByteSize(*descriptor_type);
 						expr.comptime_value = copyComptimeValue(slice_type, &slice, sizeof(slice));
@@ -5782,7 +5778,7 @@ struct Checker {
 						for (i32 i = 0; i < fn.params.size(); ++i) {
 							u8* descriptor = slice.data + descriptor_size * i;
 							const ls_string_view name = fn.params[i].name;
-							ComptimeSliceValue name_slice{(u8*)name.begin, name.length};
+							ls_slice name_slice{(u8*)name.begin, name.length};
 							copyMemory(descriptor, &name_slice, sizeof(name_slice));
 							copyMemory(descriptor + type_offset, &fn.params[i].type, sizeof(fn.params[i].type));
 						}
@@ -5982,9 +5978,9 @@ struct Checker {
 					if (member.expression->resolved_type->kind == ResolvedTypeKind::SLICE) {
 						ComptimeValue base = evalComptime(unit, *member.expression, ctx, bindings, frame);
 						if (!base || base.kind != ComptimeValue::VALUE) return {};
-						ComptimeSliceValue slice;
+						ls_slice slice;
 						copyMemory(&slice, base.value, sizeof(slice));
-						length = slice.count;
+						length = slice.length;
 					}
 					return copyComptimeValue(primitiveType(ResolvedTypeKind::UNTYPED_INT), &length);
 				}
@@ -6129,11 +6125,11 @@ struct Checker {
 								return {};
 							}
 
-							ComptimeSliceValue slice;
+							ls_slice slice;
 							copyMemory(&slice, base_value.value, sizeof(slice));
 							i64 i = comptimeNumericToI64(index.value, index.type->kind);
-							if (i >= slice.count) {
-								errorLine(be.base->token, "Comptime slice index `", i, "` out of bounds, must be < ", slice.count);
+							if (i >= slice.length) {
+								errorLine(be.base->token, "Comptime slice index `", i, "` out of bounds, must be < ", slice.length);
 								return {};
 							}
 
@@ -6296,7 +6292,7 @@ struct Checker {
 			}
 			case Expression::STRING_LITERAL: {
 				auto& sl = static_cast<StringLiteralExpression&>(expr);
-				ComptimeSliceValue value{(u8*)sl.value.begin, sl.value.length};
+				ls_slice value{(u8*)sl.value.begin, sl.value.length};
 				return copyComptimeValue(const_u8_slice, &value, sizeof(value));
 			}
 			case Expression::ARRAY_LITERAL: {

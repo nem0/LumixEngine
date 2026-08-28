@@ -62,7 +62,7 @@ typedef struct ls_string_view {
 } ls_string_view;
 
 typedef struct ls_slice {
-	const void* data;
+	u8* data;
 	i64 length;
 } ls_slice;
 
