@@ -1352,7 +1352,8 @@ struct CodeEditorImpl final : CodeEditor {
 			}
 			else {
 				m_lines[p.line].value.insert(p.col, line);
-				p.col += line.size();
+				ASSERT(line.size() < 0x7fFFffFF);
+				p.col += (i32)line.size();
 			}
 		}
 		return p;
@@ -1486,7 +1487,8 @@ struct CodeEditorImpl final : CodeEditor {
 					new_cursor.line = line;
 					new_cursor.sel.line = line;
 					new_cursor.sel.col = i32(found - m_lines[line].value.c_str());
-					new_cursor.col = new_cursor.sel.col + sel_view.size();
+					ASSERT(sel_view.size() < 0x7fFFffFF);
+					new_cursor.col = new_cursor.sel.col + (i32)sel_view.size();
 					new_cursor.virtual_x = computeCursorX(new_cursor);
 					ensurePointVisible(new_cursor);
 					return;
@@ -1758,7 +1760,8 @@ struct CodeEditorImpl final : CodeEditor {
 				new_cursor.line = line;
 				new_cursor.sel.line = line;
 				new_cursor.sel.col = i32(found - m_lines[line].value.c_str());
-				new_cursor.col = new_cursor.sel.col + sel_view.size();
+				ASSERT(sel_view.size() < 0x7fFFffFF);
+				new_cursor.col = new_cursor.sel.col + (i32)sel_view.size();
 				ensurePointVisible(new_cursor, true);
 				return;
 			}
@@ -2846,7 +2849,7 @@ bool DirSelector::gui(const char* label, bool* open) {
 				FileSystem& fs = ds->m_app.getEngine().getFileSystem();
 				const Path fullpath = fs.getFullPath(ds->m_current_dir);
 				if (!os::dirExists(fullpath) && !ds->m_subdirs.empty()) {
-					const u32 dir_size = Path::getDir(ds->m_current_dir).size();
+					const u32 dir_size = (u32)Path::getDir(ds->m_current_dir).size();
 					ds->m_current_dir.resize(dir_size);
 					ds->m_current_dir.append(ds->m_subdirs[0], "/");
 					ds->fillSubitems();
@@ -2874,7 +2877,7 @@ bool DirSelector::gui(const char* label, bool* open) {
 						m_current_dir.append("/", subdir.c_str());
 					}
 					else {
-						const u32 dir_size = Path::getDir(m_current_dir).size();
+						const u32 dir_size = (u32)Path::getDir(m_current_dir).size();
 						m_current_dir.resize(dir_size);
 						m_current_dir.append(subdir.c_str());
 					}
@@ -2930,7 +2933,7 @@ bool FileSelector::gui(const char* accepted_extension) {
 					dir_size = selector->m_path.length();
 				}
 				else {
-					dir_size = Path::getDir(selector->m_path).size();
+					dir_size = (u32)Path::getDir(selector->m_path).size();
 				}
 				if (!selector->m_subdirs.empty()) {
 					selector->m_path.resize(dir_size);
@@ -2989,7 +2992,7 @@ bool FileSelector::gui(const char* accepted_extension) {
 					m_path.append("/", subdir.c_str());
 				}
 				else {
-					const u32 dir_size = Path::getDir(m_path).size();
+					const u32 dir_size = (u32)Path::getDir(m_path).size();
 					m_path.resize(dir_size);
 					m_path.append(subdir.c_str());
 				}
@@ -3004,7 +3007,7 @@ bool FileSelector::gui(const char* accepted_extension) {
 					m_path.append("/", subfile.c_str());
 				}
 				else {
-					const u32 dir_size = Path::getDir(m_path).size();
+					const u32 dir_size = (u32)Path::getDir(m_path).size();
 					m_path.resize(dir_size);
 					m_path.append(subfile.c_str());
 				}
@@ -3239,7 +3242,7 @@ void NodeEditor::nodeEditorGUI(Span<NodeEditorNode*> nodes, Array<NodeEditorLink
 u32 TextFilter::passWithScore(StringView text) const {
 	if (count == 0) return 1;
 
-	u32 score = (1 << 31) - text.size();
+	u32 score = (1 << 31) - (u32)text.size();
 	for (u32 i = 0; i < count; ++i) {
 		if (*subfilters[i].data == '-') {
 			if (findInsensitive(text, StringView(subfilters[i].data + 1, subfilters[i].end()))) return 0;
@@ -3247,7 +3250,7 @@ u32 TextFilter::passWithScore(StringView text) const {
 		else {
 			const char* found = findInsensitive(text, subfilters[i]);
 			if (!found) return 0;
-			u32 pattern_size = subfilters[i].size();
+			u32 pattern_size = (u32)subfilters[i].size();
 
 			auto getSeparatorScore = [](char c) {
 				if (c == '.' || c == '/' || c == '\\') return 8;

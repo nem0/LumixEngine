@@ -118,7 +118,8 @@ void String::operator=(StringView rhs) {
 		memcpy(m_big, rhs.data, rhs.size());
 		m_big[rhs.size()] = '\0';
 	}
-	m_size = rhs.size();
+	ASSERT(rhs.size() < 0xffFFffFF);
+	m_size = (u32)rhs.size();
 }
 
 
@@ -164,9 +165,10 @@ void String::resize(u32 size) {
 
 String& String::add(StringView value) {
 	ASSERT(value.data < c_str() || value.data >= c_str() + m_size);
+	ASSERT(value.size() < 0xffFFffFF);
 
 	const int old_s = m_size;
-	resize(m_size + value.size());
+	resize(m_size + (u32)value.size());
 	char* data = getMutableData();
 	memcpy(data + old_s, value.data, value.size());
 	data[old_s + value.size()] = '\0';
@@ -204,8 +206,9 @@ void String::insert(u32 position, StringView value)
 {
 	ASSERT(value.end() <= c_str() || value.data >= c_str() + m_size);
 	
-	const int old_size = m_size;
-	const int len = value.size();
+	const u32 old_size = m_size;
+	ASSERT(value.size() < 0xffFFffFF);
+	const u32 len = (u32)value.size();
 	resize(old_size + len);
 
 	char* tmp = getMutableData();
@@ -282,7 +285,7 @@ bool equalStrings(const char* lhs, const char* rhs) {
 bool equalIStrings(StringView lhs, StringView rhs) {
 	if (lhs.size() != rhs.size()) return false;
 
-	for (u32 i = 0, c = lhs.size(); i < c; ++i) {
+	for (u64 i = 0, c = lhs.size(); i < c; ++i) {
 		if (toLower(lhs[i]) != toLower(rhs[i])) return false;
 	}
 	return true;

@@ -26,7 +26,7 @@ struct LUMIX_CORE_API StringView {
 
 	const char* begin() const { return data; }
 	const char* end() const { return data ? data + length : nullptr; }
-	u32 size() const { return u32(length); }
+	u64 size() const { return length; }
 	char operator[](u64 idx) const { ASSERT(idx < length); return data[idx]; }
 	char back() const { ASSERT(length > 0); return data[length - 1]; }
 	void removeSuffix(u64 count) { ASSERT(count <= length); length -= count; }

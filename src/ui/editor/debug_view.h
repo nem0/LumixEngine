@@ -133,7 +133,7 @@ static void debugElementGUI(const Document& document, u32 element_idx, int depth
 		label.append(tag_name, size_str, "##", element_idx);
 	} else {
 		StaticString<128> value_preview;
-		u32 preview_len = minimum((u32)100, element->text.size());
+		u32 preview_len = minimum((u32)100, (u32)element->text.size());
 		value_preview.append(StringView(element->text.data, preview_len));
 		if (element->text.size() > 100) {
 			value_preview.append("...");

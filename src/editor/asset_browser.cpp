@@ -1233,7 +1233,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			res.append(rl.subresource, (rl.subresource.empty() ? "" : ":"), rl.basename, ".", rl.ext);
 		}
 		if (hash_id) {
-			res.append("##h", RuntimeHash(rl.full.data, rl.full.size()).getHashValue());
+			res.append("##h", RuntimeHash(rl.full.data, rl.full.length).getHashValue());
 		}
 		return res;
 	}

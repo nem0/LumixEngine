@@ -2643,7 +2643,7 @@ struct ParticleScriptCompiler {
 				}
 				ctx.popStack(left);
 				for (u32 i = 0; i < swizzle.size(); ++i) ctx.stack.push(swizzled[i]);
-				return swizzle.size();
+				return (u32)swizzle.size();
 			}
 			case Node::SYSTEM_VALUE: {
 				auto* n = (SystemValueNode*)node;
@@ -3310,7 +3310,8 @@ struct ParticleScriptCompiler {
 		top.id = next_scope_id++;
 		top.parent_id = -1;
 		top.start_offset = 0;
-		top.end_offset = doc.size();
+		ASSERT(doc.size() < 0x7fFFffFF);
+		top.end_offset = (i32)doc.size();
 		top.kind = ScopeKind::TopLevel;
 		res.scopes.push(top);
 		scope_stack.push(top.id);
@@ -3333,7 +3334,8 @@ struct ParticleScriptCompiler {
 					s.id = next_scope_id++;
 					s.parent_id = scope_stack.empty() ? -1 : scope_stack.back();
 					s.start_offset = tok_start_off;
-					s.end_offset = doc.size();
+					ASSERT(doc.size() < 0x7fFFffFF);
+					s.end_offset = (i32)doc.size();
 					s.kind = pending_scope_kind;
 					res.scopes.push(s);
 					scope_stack.push(s.id);

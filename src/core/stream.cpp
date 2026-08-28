@@ -299,8 +299,8 @@ bool OutputMemoryStream::write(const void* data, u64 size)
 
 
 void OutputMemoryStream::writeString(StringView string) {
-	const i32 size = string.size() + 1;
-	write(string.data, size - 1);
+	const u64 size = string.size();
+	write(string.data, size);
 	write((char)0);
 }
 

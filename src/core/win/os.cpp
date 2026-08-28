@@ -539,7 +539,8 @@ static void fromWChar(Span<char> out, Span<const WCHAR> in) {
 }
 
 template <int N> static void toWChar(WCHAR (&out)[N], StringView in) {
-	i32 written = MultiByteToWideChar(CP_UTF8, 0, in.data, in.size(), out, N);
+	ASSERT(in.size() < 0x7fFFffFF);
+	i32 written = MultiByteToWideChar(CP_UTF8, 0, in.data, (int)in.size(), out, N);
 	FATAL_CHECK(written != N);
 	out[written] = 0;
 }
