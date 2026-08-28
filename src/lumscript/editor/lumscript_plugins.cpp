@@ -589,7 +589,9 @@ struct LumScriptEditorWindow final : AssetEditorWindow {
 						if (startsWith(ed_name, core_name)) {
 							current_line = event.location.line > 0 ? event.location.line - 1 : 0;
 						}
-					} else if (equalStrings(StringView(event_filename, event_source.end()), ed_name)) {
+					} else if (equalStrings(StringView(event_filename, event_source.end()), ed_name)
+						|| (endsWith(ed_name, ".lum")
+							&& equalStrings(StringView(event_filename, event_source.end()), StringView(ed_name.data, ed_name.end() - 4)))) {
 						current_line = event.location.line > 0 ? event.location.line - 1 : 0;
 					}
 				}
@@ -805,7 +807,9 @@ struct LumScriptDebuggerWindow final : StudioApp::GUIPlugin {
 					const bool has_lum = endsWith(file_name, ".lum");
 					path = has_lum ? Path("engine/scripts/core/", file_name) : Path("engine/scripts/core/", file_name, ".lum");
 				} else {
-					path = Path(src_name);
+					// Imported units use the import spelling as their source name
+					// (e.g. `import demo` -> `demo`), while the asset is demo.lum.
+					path = endsWith(src_name, ".lum") ? Path(src_name) : Path(src_name, ".lum");
 				}
 				m_app.getAssetBrowser().openEditor(path);
 				AssetEditorWindow* win = m_app.getAssetBrowser().getWindow(path);
