@@ -27,11 +27,11 @@ namespace {
 using NativeFunctionMap = HashMap<NativeFunctionKey, ls_native_fn, NativeFunctionKeyHash>;
 
 static void logLogError(ls_string_view v) {
-	logError(StringView(v.begin, v.end));
+	logError(StringView(v.begin, (u64)v.length));
 }
 
 static void logLogInfo(ls_string_view v) {
-	logInfo(StringView(v.begin, v.end));
+	logInfo(StringView(v.begin, (u64)v.length));
 }
 
 static i32 inputGetEventCount(InputSystem* input) {
@@ -72,7 +72,7 @@ static void inputGetEvent(ls_runtime*, ls_call_frame frame) {
 }
 
 static bool imguiBegin(ls_string_view sv) {
-	StaticString<256> title(StringView{sv.begin, sv.end});
+	StaticString<256> title(StringView{sv.begin, (u64)sv.length});
 	return ImGui::Begin(title);
 }
 
@@ -81,11 +81,11 @@ static void imguiEnd() {
 }
 
 static void imguiTextUnformatted(ls_string_view sv) {
-	ImGui::TextUnformatted(sv.begin, sv.end);
+	ImGui::TextUnformatted(sv.begin, sv.begin + sv.length);
 }
 
 static bool imguiButton(ls_string_view sv) {
-	StaticString<256> label(StringView{sv.begin, sv.end});
+	StaticString<256> label(StringView{sv.begin, (u64)sv.length});
 	return ImGui::Button(label);
 }
 
@@ -105,13 +105,13 @@ static void lumscript_world_findByName(ls_runtime*, ls_call_frame frame) {
 	LS_ARG(frame, World*, world);
 	char name[128];
 	LS_STRING_ARG(frame, name_sv);
-	const i32 name_len = (i32)(name_sv.end - name_sv.begin);
-	if (name_len >= (i32)sizeof(name)) {
+	const i64 name_len = name_sv.length;
+	if (name_len >= sizeof(name)) {
 		LS_RESULT(frame, u8(0));
 		LS_RESULT(frame, LsEntity(i32(0), nullptr));
 		return;
 	}
-	if (name_len > 0) memcpy(name, name_sv.begin, (size_t)name_len);
+	if (name_len > 0) memcpy(name, name_sv.begin, name_len);
 	name[name_len] = '\0';
 	const EntityPtr entity = world->findByName(INVALID_ENTITY, name);
 	if (!entity.isValid()) {
@@ -127,13 +127,13 @@ static void lumscript_entity_findChildByName(ls_runtime*, ls_call_frame frame) {
 	const LsEntity parent = readArg<LsEntity>(frame);
 	char name[128];
 	LS_STRING_ARG(frame, name_sv);
-	const i32 name_len = (i32)(name_sv.end - name_sv.begin);
-	if (name_len >= (i32)sizeof(name)) {
+	const i64 name_len = name_sv.length;
+	if (name_len >= sizeof(name)) {
 		LS_RESULT(frame, u8(0));
 		LS_RESULT(frame, LsEntity(i32(0), nullptr));
 		return;
 	}
-	if (name_len > 0) memcpy(name, name_sv.begin, (size_t)name_len);
+	if (name_len > 0) memcpy(name, name_sv.begin, name_len);
 	name[name_len] = '\0';
 	const EntityPtr entity = parent.world->findByName(EntityPtr{parent.index}, name);
 	if (!entity.isValid()) {

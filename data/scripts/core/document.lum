@@ -2,8 +2,10 @@
 // import core:document as Document
 
 import "core:element"
+import "core:Event"
 struct Document { ptr : cptr; }
 
 extern fn getElement(object : Document, index : i32) : ?Element;
 extern fn getElementByID(object : Document, id : []const u8) : ?Element;
+extern fn getEvents(object : Document) : []const Event;
 

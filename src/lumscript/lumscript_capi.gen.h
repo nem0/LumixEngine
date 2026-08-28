@@ -1707,7 +1707,7 @@ namespace Lumix::LumScript::generated {
 	static void lumscript_ui_load_18(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, UIModule*, module);
 		LS_STRING_ARG(frame, path);
-		module->load(Path(StringView{path.begin, path.end}));
+		module->load(Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_ui_isReady_19(ls_runtime* runtime, ls_call_frame frame) {
@@ -1755,14 +1755,14 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, LsComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		auto ret = module->getPropertyAnimatorAnimation(EntityRef(entity.index));
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_property_animator_setPropertyAnimatorAnimation_26(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		LS_STRING_ARG(frame, path);
-		module->setPropertyAnimatorAnimation(EntityRef(entity.index), Path(StringView{path.begin, path.end}));
+		module->setPropertyAnimatorAnimation(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_animator_applySet_27(ls_runtime* runtime, ls_call_frame frame) {
@@ -1801,7 +1801,7 @@ namespace Lumix::LumScript::generated {
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		LS_STRING_ARG(frame, name);
 		char lumscript_string_arg_name[128];
-		copyString(Span(lumscript_string_arg_name), StringView{name.begin, name.end});
+		copyString(Span(lumscript_string_arg_name), StringView{name.begin, (u64)name.length});
 		auto ret = module->getAnimatorInputIndex(EntityRef(entity.index), lumscript_string_arg_name);
 		LS_RESULT(frame, (i32)ret);
 	}
@@ -1810,14 +1810,14 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, LsComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		auto ret = module->getAnimatorSource(EntityRef(entity.index));
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_animator_setAnimatorSource_33(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		LS_STRING_ARG(frame, path);
-		module->setAnimatorSource(EntityRef(entity.index), Path(StringView{path.begin, path.end}));
+		module->setAnimatorSource(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_animator_getAnimatorUseRootMotion_34(ls_runtime* runtime, ls_call_frame frame) {
@@ -1852,14 +1852,14 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, LsComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		auto ret = module->getAnimableAnimation(EntityRef(entity.index));
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_animable_setAnimableAnimation_39(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		LS_STRING_ARG(frame, path);
-		module->setAnimableAnimation(EntityRef(entity.index), Path(StringView{path.begin, path.end}));
+		module->setAnimableAnimation(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_ambient_sound_pause_40(ls_runtime* runtime, ls_call_frame frame) {
@@ -1878,14 +1878,14 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, LsComponent, entity);
 		AudioModule* module = static_cast<AudioModule*>(entity.module);
 		auto ret = module->getAmbientSoundClip(EntityRef(entity.index));
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_ambient_sound_setAmbientSoundClip_43(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		AudioModule* module = static_cast<AudioModule*>(entity.module);
 		LS_STRING_ARG(frame, clip);
-		module->setAmbientSoundClip(EntityRef(entity.index), Path(StringView{clip.begin, clip.end}));
+		module->setAmbientSoundClip(EntityRef(entity.index), Path(StringView{clip.begin, (u64)clip.length}));
 	}
 	
 	static void lumscript_ambient_sound_isAmbientSound3D_44(ls_runtime* runtime, ls_call_frame frame) {
@@ -1948,7 +1948,7 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, i32, item_idx);
 		LS_ARG(frame, LuaScriptModule*, module);
 		auto ret = module->getScriptPath(EntityRef(entity_idx), item_idx);
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_lua_script_scripts_setScriptPath_51(ls_runtime* runtime, ls_call_frame frame) {
@@ -1956,7 +1956,7 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, i32, item_idx);
 		LS_ARG(frame, LuaScriptModule*, module);
 		LS_STRING_ARG(frame, path);
-		module->setScriptPath(EntityRef(entity_idx), item_idx, Path(StringView{path.begin, path.end}));
+		module->setScriptPath(EntityRef(entity_idx), item_idx, Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_lua_script_inline_setInlineScriptCode_52(ls_runtime* runtime, ls_call_frame frame) {
@@ -1964,7 +1964,7 @@ namespace Lumix::LumScript::generated {
 		LuaScriptModule* module = static_cast<LuaScriptModule*>(entity.module);
 		LS_STRING_ARG(frame, value);
 		char lumscript_string_arg_value[128];
-		copyString(Span(lumscript_string_arg_value), StringView{value.begin, value.end});
+		copyString(Span(lumscript_string_arg_value), StringView{value.begin, (u64)value.length});
 		module->setInlineScriptCode(EntityRef(entity.index), lumscript_string_arg_value);
 	}
 	
@@ -2114,14 +2114,14 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, LsComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getHeightfieldSource(EntityRef(entity.index));
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_physical_heightfield_setHeightfieldSource_74(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		LS_STRING_ARG(frame, path);
-		module->setHeightfieldSource(EntityRef(entity.index), Path(StringView{path.begin, path.end}));
+		module->setHeightfieldSource(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_physical_heightfield_getHeightfieldXZScale_75(ls_runtime* runtime, ls_call_frame frame) {
@@ -2835,28 +2835,28 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, LsComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getActorMesh(EntityRef(entity.index));
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_rigid_actor_setActorMesh_177(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		LS_STRING_ARG(frame, path);
-		module->setActorMesh(EntityRef(entity.index), Path(StringView{path.begin, path.end}));
+		module->setActorMesh(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_rigid_actor_getActorMaterial_178(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getActorMaterial(EntityRef(entity.index));
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_rigid_actor_setActorMaterial_179(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		LS_STRING_ARG(frame, path);
-		module->setActorMaterial(EntityRef(entity.index), Path(StringView{path.begin, path.end}));
+		module->setActorMaterial(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_rigid_actor_getActorCCD_180(ls_runtime* runtime, ls_call_frame frame) {
@@ -3210,14 +3210,14 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, LsComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getVehicleChassis(EntityRef(entity.index));
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_vehicle_setVehicleChassis_226(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		LS_STRING_ARG(frame, path);
-		module->setVehicleChassis(EntityRef(entity.index), Path(StringView{path.begin, path.end}));
+		module->setVehicleChassis(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_vehicle_getVehicleMass_227(ls_runtime* runtime, ls_call_frame frame) {
@@ -3336,14 +3336,14 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, LsComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getInstancedMeshGeomPath(EntityRef(entity.index));
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_physical_instanced_mesh_setInstancedMeshGeomPath_244(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		LS_STRING_ARG(frame, path);
-		module->setInstancedMeshGeomPath(EntityRef(entity.index), Path(StringView{path.begin, path.end}));
+		module->setInstancedMeshGeomPath(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_camera_getRay_245(ls_runtime* runtime, ls_call_frame frame) {
@@ -3373,14 +3373,14 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, LsComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getDecalMaterialPath(EntityRef(entity.index));
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_decal_setDecalMaterialPath_249(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		LS_STRING_ARG(frame, path);
-		module->setDecalMaterialPath(EntityRef(entity.index), Path(StringView{path.begin, path.end}));
+		module->setDecalMaterialPath(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_decal_getDecalHalfExtents_250(ls_runtime* runtime, ls_call_frame frame) {
@@ -3415,14 +3415,14 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, LsComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getEnvironmentSkyTexture(EntityRef(entity.index));
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_environment_setEnvironmentSkyTexture_255(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		LS_STRING_ARG(frame, path);
-		module->setEnvironmentSkyTexture(EntityRef(entity.index), Path(StringView{path.begin, path.end}));
+		module->setEnvironmentSkyTexture(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_environment_getEnvironmentShadowmapCascades_256(ls_runtime* runtime, ls_call_frame frame) {
@@ -3577,7 +3577,7 @@ namespace Lumix::LumScript::generated {
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		LS_STRING_ARG(frame, name);
 		char lumscript_string_arg_name[128];
-		copyString(Span(lumscript_string_arg_name), StringView{name.begin, name.end});
+		copyString(Span(lumscript_string_arg_name), StringView{name.begin, (u64)name.length});
 		auto ret = module->getParticleEmitterGlobalID(EntityRef(entity.index), lumscript_string_arg_name);
 		LS_RESULT(frame, (i32)ret);
 	}
@@ -3626,14 +3626,14 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, LsComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getParticleEmitterPath(EntityRef(entity.index));
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_particle_emitter_setParticleEmitterPath_284(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		LS_STRING_ARG(frame, path);
-		module->setParticleEmitterPath(EntityRef(entity.index), Path(StringView{path.begin, path.end}));
+		module->setParticleEmitterPath(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_particle_emitter_getParticleEmitterAutodestroy_285(ls_runtime* runtime, ls_call_frame frame) {
@@ -3654,14 +3654,14 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, LsComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getInstancedModelPath(EntityRef(entity.index));
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_instanced_model_setInstancedModelPath_288(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		LS_STRING_ARG(frame, path);
-		module->setInstancedModelPath(EntityRef(entity.index), Path(StringView{path.begin, path.end}));
+		module->setInstancedModelPath(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_model_instance_overrideMaterialVec4_289(ls_runtime* runtime, ls_call_frame frame) {
@@ -3670,7 +3670,7 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, u32, mesh_index);
 		LS_STRING_ARG(frame, uniform_name);
 		char lumscript_string_arg_uniform_name[128];
-		copyString(Span(lumscript_string_arg_uniform_name), StringView{uniform_name.begin, uniform_name.end});
+		copyString(Span(lumscript_string_arg_uniform_name), StringView{uniform_name.begin, (u64)uniform_name.length});
 		LS_ARG(frame, Vec4, value);
 		auto ret = module->overrideMaterialVec4(EntityRef(entity.index), mesh_index, lumscript_string_arg_uniform_name, value);
 		LS_RESULT(frame, ret);
@@ -3689,7 +3689,7 @@ namespace Lumix::LumScript::generated {
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		LS_ARG(frame, u32, mesh_idx);
 		LS_STRING_ARG(frame, path);
-		module->setModelInstanceMaterialOverride(EntityRef(entity.index), mesh_idx, Path(StringView{path.begin, path.end}));
+		module->setModelInstanceMaterialOverride(EntityRef(entity.index), mesh_idx, Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_model_instance_getMaterialOverride_292(ls_runtime* runtime, ls_call_frame frame) {
@@ -3697,7 +3697,7 @@ namespace Lumix::LumScript::generated {
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		LS_ARG(frame, u32, mesh_idx);
 		auto ret = module->getModelInstanceMaterialOverride(EntityRef(entity.index), mesh_idx);
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_model_instance_isModelInstanceEnabled_293(ls_runtime* runtime, ls_call_frame frame) {
@@ -3718,28 +3718,28 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, LsComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getModelInstancePath(EntityRef(entity.index));
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_model_instance_setModelInstancePath_296(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		LS_STRING_ARG(frame, path);
-		module->setModelInstancePath(EntityRef(entity.index), Path(StringView{path.begin, path.end}));
+		module->setModelInstancePath(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_curve_decal_getCurveDecalMaterialPath_297(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getCurveDecalMaterialPath(EntityRef(entity.index));
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_curve_decal_setCurveDecalMaterialPath_298(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		LS_STRING_ARG(frame, path);
-		module->setCurveDecalMaterialPath(EntityRef(entity.index), Path(StringView{path.begin, path.end}));
+		module->setCurveDecalMaterialPath(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_curve_decal_getCurveDecalHalfExtents_299(ls_runtime* runtime, ls_call_frame frame) {
@@ -3827,14 +3827,14 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, LsComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getTerrainMaterialPath(EntityRef(entity.index));
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_terrain_setTerrainMaterialPath_311(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		LS_STRING_ARG(frame, path);
-		module->setTerrainMaterialPath(EntityRef(entity.index), Path(StringView{path.begin, path.end}));
+		module->setTerrainMaterialPath(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_terrain_getTerrainXZScale_312(ls_runtime* runtime, ls_call_frame frame) {
@@ -3955,7 +3955,7 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, i32, item_idx);
 		LS_ARG(frame, RenderModule*, module);
 		auto ret = module->getGrassPath(EntityRef(entity_idx), item_idx);
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_terrain_grass_setGrassPath_327(ls_runtime* runtime, ls_call_frame frame) {
@@ -3963,7 +3963,7 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, i32, item_idx);
 		LS_ARG(frame, RenderModule*, module);
 		LS_STRING_ARG(frame, path);
-		module->setGrassPath(EntityRef(entity_idx), item_idx, Path(StringView{path.begin, path.end}));
+		module->setGrassPath(EntityRef(entity_idx), item_idx, Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_terrain_grass_getGrassSpacing_328(ls_runtime* runtime, ls_call_frame frame) {
@@ -3986,28 +3986,28 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, LsComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getProceduralGeometryMaterial(EntityRef(entity.index));
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_procedural_geom_setProceduralGeometryMaterial_331(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		LS_STRING_ARG(frame, path);
-		module->setProceduralGeometryMaterial(EntityRef(entity.index), Path(StringView{path.begin, path.end}));
+		module->setProceduralGeometryMaterial(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_ui_3d_getUI3DPath_332(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		UIModule* module = static_cast<UIModule*>(entity.module);
 		auto ret = module->getUI3DPath(EntityRef(entity.index));
-		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), ret.c_str() + ret.length()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
 	static void lumscript_ui_3d_setUI3DPath_333(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, LsComponent, entity);
 		UIModule* module = static_cast<UIModule*>(entity.module);
 		LS_STRING_ARG(frame, path);
-		module->setUI3DPath(EntityRef(entity.index), Path(StringView{path.begin, path.end}));
+		module->setUI3DPath(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_ui_3d_getUI3DVirtualSize_334(ls_runtime* runtime, ls_call_frame frame) {
@@ -4041,7 +4041,7 @@ namespace Lumix::LumScript::generated {
 	static void lumscript_object_AssetBrowser_openEditor_338(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, AssetBrowser*, object);
 		LS_STRING_ARG(frame, resource);
-		object->openEditor(Path(StringView{resource.begin, resource.end}));
+		object->openEditor(Path(StringView{resource.begin, (u64)resource.length}));
 	}
 	
 	static void lumscript_object_StudioApp_exitWithCode_339(ls_runtime* runtime, ls_call_frame frame) {
@@ -4097,7 +4097,7 @@ namespace Lumix::LumScript::generated {
 	static void lumscript_object_SceneView_makeScreenshot_344(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, SceneView*, object);
 		LS_STRING_ARG(frame, path);
-		object->makeScreenshot(StringView{path.begin, path.end});
+		object->makeScreenshot(StringView{path.begin, (u64)path.length});
 	}
 	
 	static void lumscript_object_Model_getOriginBoundingRadius_345(ls_runtime* runtime, ls_call_frame frame) {
@@ -4166,7 +4166,7 @@ namespace Lumix::LumScript::generated {
 	static void lumscript_object_Element_getID_352(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, ui::Element*, object);
 		auto ret = object->getID();
-		ls_result_string(runtime, &frame, ls_string_view{ret.data, ret.end()});
+		ls_result_string(runtime, &frame, ls_string_view{ret.data, (i64)ret.length});
 	}
 	
 	static void lumscript_object_Element_setVisible_353(ls_runtime* runtime, ls_call_frame frame) {
@@ -4178,19 +4178,19 @@ namespace Lumix::LumScript::generated {
 	static void lumscript_object_Element_setText_354(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, ui::Element*, object);
 		LS_STRING_ARG(frame, value);
-		object->setText(StringView{value.begin, value.end});
+		object->setText(StringView{value.begin, (u64)value.length});
 	}
 	
 	static void lumscript_object_Element_setWidth_355(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, ui::Element*, object);
 		LS_STRING_ARG(frame, value);
-		object->setWidth(StringView{value.begin, value.end});
+		object->setWidth(StringView{value.begin, (u64)value.length});
 	}
 	
 	static void lumscript_object_Element_setBGImage_356(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, ui::Element*, object);
 		LS_STRING_ARG(frame, path);
-		object->setBGImage(Path(StringView{path.begin, path.end}));
+		object->setBGImage(Path(StringView{path.begin, (u64)path.length}));
 	}
 	
 	static void lumscript_object_Document_getElement_357(ls_runtime* runtime, ls_call_frame frame) {
@@ -4205,13 +4205,20 @@ namespace Lumix::LumScript::generated {
 		LS_ARG(frame, ui::Document*, object);
 		LS_STRING_ARG(frame, id);
 		char lumscript_string_arg_id[128];
-		copyString(Span(lumscript_string_arg_id), StringView{id.begin, id.end});
+		copyString(Span(lumscript_string_arg_id), StringView{id.begin, (u64)id.length});
 		auto ret = object->getElementByID(lumscript_string_arg_id);
 		LS_RESULT(frame, u8(ret != nullptr));
 		LS_RESULT(frame, ret);
 	}
 	
-	static void lumscript_object_UISystem_enableCursor_359(ls_runtime* runtime, ls_call_frame frame) {
+	static void lumscript_object_Document_getEvents_359(ls_runtime* runtime, ls_call_frame frame) {
+		LS_ARG(frame, ui::Document*, object);
+		auto ret = object->getEvents();
+		ls_slice result{const_cast<u8*>(reinterpret_cast<const u8*>((ret).begin())), (i64)(ret).size()};
+		LS_RESULT(frame, result);
+	}
+	
+	static void lumscript_object_UISystem_enableCursor_360(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, UISystem*, object);
 		LS_ARG(frame, bool, enable);
 		object->enableCursor(enable);
@@ -4667,7 +4674,8 @@ namespace Lumix::LumScript::generated {
 		functions.insert({StringView("core:element"), StringView("setBGImage")}, &lumscript_object_Element_setBGImage_356);
 		functions.insert({StringView("core:document"), StringView("getElement")}, &lumscript_object_Document_getElement_357);
 		functions.insert({StringView("core:document"), StringView("getElementByID")}, &lumscript_object_Document_getElementByID_358);
-		functions.insert({StringView("core:uisystem"), StringView("enableCursor")}, &lumscript_object_UISystem_enableCursor_359);
+		functions.insert({StringView("core:document"), StringView("getEvents")}, &lumscript_object_Document_getEvents_359);
+		functions.insert({StringView("core:uisystem"), StringView("enableCursor")}, &lumscript_object_UISystem_enableCursor_360);
 	}
 	
 } // namespace Lumix::LumScript::generated

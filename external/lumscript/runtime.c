@@ -147,7 +147,7 @@ static void runtime_push_bytes(ls_runtime* runtime, const void* value, u32 size)
 }
 
 static int runtime_string_equals_cstr(ls_string_view value, const char* cstr) {
-	for (u64 i = 0; i < value.length; ++i) {
+	for (i64 i = 0; i < value.length; ++i) {
 		if (cstr[i] == '\0' || value.begin[i] != cstr[i]) return 0;
 	}
 	return cstr[value.length] == '\0';

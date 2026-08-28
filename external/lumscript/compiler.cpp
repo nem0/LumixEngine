@@ -385,7 +385,7 @@ static void appendReflectedTypeName(char*& out, char* end, const ResolvedType& t
 			while (p != digits + sizeof(digits) && out < end) *out++ = *p++;
 		};
 		const ls_string_view function_name = fn.token.value;
-		for (u64 i = 0; i < function_name.length && out < end; ++i) *out++ = function_name.begin[i];
+		for (i64 i = 0; i < function_name.length && out < end; ++i) *out++ = function_name.begin[i];
 		text("(");
 		for (i32 i = 0; i < args.size(); ++i) {
 			if (i) text(", ");

@@ -6,7 +6,7 @@
 
 namespace {
 
-enum class LumScriptType { UNKNOWN, VOID_T, BOOL_T, I32_T, F32_T, VEC2_T, VEC3_T, DVEC3_T, VEC4_T, COLOR_T, QUAT_T, ENTITY_T, ENUM_T, STRUCT_T, OBJECT_T, PATH_T, STRING_T };
+enum class LumScriptType { UNKNOWN, VOID_T, BOOL_T, U8_T, I32_T, F32_T, VEC2_T, VEC3_T, DVEC3_T, VEC4_T, COLOR_T, QUAT_T, ENTITY_T, ENUM_T, STRUCT_T, OBJECT_T, PATH_T, STRING_T };
 
 template <int CAPACITY> struct StaticString {
 	template <typename... Args> StaticString(Args&&... args) {
@@ -96,9 +96,30 @@ bool isObjectPointerType(StringView type) {
 	return type.size() > 0 && type[type.size() - 1] == '*';
 }
 
+bool isSpanType(StringView type) {
+	return type.size() > 6 && type[0] == 'S' && type[1] == 'p' && type[2] == 'a' && type[3] == 'n' && type[4] == '<' && type[type.size() - 1] == '>';
+}
+
+StringView spanElementType(StringView type) {
+	StringView element{type.begin + 5, type.end - 1};
+	while (element.size() > 0 && (*element.begin == ' ' || *element.begin == '\t')) ++element.begin;
+	while (element.size() > 0 && (element[element.size() - 1] == ' ' || element[element.size() - 1] == '\t')) --element.end;
+	return element;
+}
+
+StringView spanElementBaseType(StringView type) {
+	StringView element = spanElementType(type);
+	if (element.size() > 6 && element[0] == 'c' && element[1] == 'o' && element[2] == 'n' && element[3] == 's' && element[4] == 't' &&
+		(element[5] == ' ' || element[5] == '\t')) {
+		element.begin += 6;
+	}
+	return element;
+}
+
 LumScriptType getLumScriptType(StringView type) {
 	if (equal(type, "void")) return LumScriptType::VOID_T;
 	if (equal(type, "bool")) return LumScriptType::BOOL_T;
+	if (equal(type, "u8")) return LumScriptType::U8_T;
 	if (equal(type, "i32") || equal(type, "int") || equal(type, "u32")) return LumScriptType::I32_T;
 	if (equal(type, "float")) return LumScriptType::F32_T;
 	if (equal(type, "Vec2")) return LumScriptType::VEC2_T;
@@ -116,7 +137,10 @@ LumScriptType getLumScriptType(StringView type) {
 	return LumScriptType::UNKNOWN;
 }
 
+bool isSupportedLumScriptType(StringView type);
+
 bool isSupportedLumScriptType(StringView type, LumScriptType t) {
+	if (isSpanType(type)) return isSupportedLumScriptType(spanElementBaseType(type));
 	if (t == LumScriptType::UNKNOWN) return false;
 	if (t != LumScriptType::STRUCT_T) return true;
 	const Struct* s = findStructByTypeName(type);
@@ -131,12 +155,16 @@ bool isSupportedLumScriptType(StringView type, LumScriptType t) {
 }
 
 bool isSupportedLumScriptType(StringView type) {
+	if (isSpanType(type)) return isSupportedLumScriptType(spanElementBaseType(type));
 	return isSupportedLumScriptType(type, getLumScriptType(type));
 }
 
 bool isExternCompatibleLumScriptType(StringView type) {
+	if (isSpanType(type)) return isExternCompatibleLumScriptType(spanElementBaseType(type));
 	const LumScriptType lumscript_type = getLumScriptType(type);
-	if (lumscript_type == LumScriptType::ENTITY_T || lumscript_type == LumScriptType::PATH_T || lumscript_type == LumScriptType::STRING_T || lumscript_type == LumScriptType::OBJECT_T || lumscript_type == LumScriptType::UNKNOWN) {
+	// StringView is represented as []const u8 in LumScript, so it is ABI-compatible
+	// with fields in an extern struct.
+	if (lumscript_type == LumScriptType::ENTITY_T || lumscript_type == LumScriptType::PATH_T || lumscript_type == LumScriptType::OBJECT_T || lumscript_type == LumScriptType::UNKNOWN) {
 		return false;
 	}
 	if (lumscript_type != LumScriptType::STRUCT_T) return true;
@@ -163,6 +191,7 @@ bool isLumScriptEntityType(StringView type) {
 bool isSupportedLumScriptFunctionArg(const Arg& arg) {
 	if (isLumScriptStringArg(arg)) return true;
 	if (isLumScriptPathArg(arg)) return true;
+	if (isSpanType(arg.type)) return isExternCompatibleLumScriptType(arg.type);
 	const LumScriptType type = getLumScriptType(arg.type);
 	if (type == LumScriptType::OBJECT_T) return arg.is_ptr || arg.is_ref;
 	if (arg.is_ptr) return false;
@@ -204,7 +233,7 @@ void appendValueExpression(OutputStream& out, StringView type, StringView name) 
 			break;
 		}
 		case LumScriptType::STRING_T:
-			out.add("StringView{", name, ".begin, ", name, ".end}");
+			out.add("StringView{", name, ".begin, (u64)", name, ".length}");
 			break;
 		default: out.add(name); break;
 	}
@@ -255,10 +284,14 @@ void emitFrameValueRead(OutputStream& out, StringView type, StringView name) {
 }
 
 void emitArgRead(OutputStream& out, const Arg& arg) {
-	if (isLumScriptStringArg(arg)) {
+	if (isSpanType(arg.type)) {
+		L("LS_ARG(frame, ls_slice, ", arg.name, "_slice);");
+		out.add(arg.type, " ", arg.name, "(reinterpret_cast<", spanElementType(arg.type), "*>(", arg.name, "_slice.data), ", arg.name, "_slice.length);" OUT_ENDL);
+	}
+	else if (isLumScriptStringArg(arg)) {
 		L("LS_STRING_ARG(frame, ", arg.name, ");");
 		L("char lumscript_string_arg_", arg.name, "[128];");
-		L("copyString(Span(lumscript_string_arg_", arg.name, "), StringView{", arg.name, ".begin, ", arg.name, ".end});");
+		L("copyString(Span(lumscript_string_arg_", arg.name, "), StringView{", arg.name, ".begin, (u64)", arg.name, ".length});");
 	}
 	else if (isLumScriptPathArg(arg)) L("LS_STRING_ARG(frame, ", arg.name, ");");
 	else if (getLumScriptType(arg.type) == LumScriptType::STRING_T) L("LS_STRING_ARG(frame, ", arg.name, ");");
@@ -267,8 +300,8 @@ void emitArgRead(OutputStream& out, const Arg& arg) {
 
 void appendArgExpression(OutputStream& out, const Arg& arg) {
 	if (isLumScriptStringArg(arg)) out.add("lumscript_string_arg_", arg.name);
-	else if (isLumScriptPathArg(arg)) out.add("Path(StringView{", arg.name, ".begin, ", arg.name, ".end})");
-	else if (getLumScriptType(arg.type) == LumScriptType::STRING_T) out.add("StringView{", arg.name, ".begin, ", arg.name, ".end}");
+	else if (isLumScriptPathArg(arg)) out.add("Path(StringView{", arg.name, ".begin, (u64)", arg.name, ".length})");
+	else if (getLumScriptType(arg.type) == LumScriptType::STRING_T) out.add("StringView{", arg.name, ".begin, (u64)", arg.name, ".length}");
 	else if (getLumScriptType(arg.type) == LumScriptType::OBJECT_T && arg.is_ref) out.add("*", arg.name);
 	else appendValueExpression(out, arg.type, arg.name);
 }
@@ -278,10 +311,16 @@ void emitResult(OutputStream& out, const char* value) {
 }
 
 void appendReturnValue(OutputStream& out, StringView type, const char* value, const char* world_expr = nullptr) {
+	if (isSpanType(type)) {
+		L("ls_slice result{const_cast<u8*>(reinterpret_cast<const u8*>((", value, ").begin())), (i64)(", value, ").size()};");
+		L("LS_RESULT(frame, result);");
+		return;
+	}
 	const LumScriptType lumscript_type = getLumScriptType(type);
 	if (lumscript_type == LumScriptType::VOID_T) return;
 	switch (lumscript_type) {
 		case LumScriptType::BOOL_T: emitResult(out, value); break;
+		case LumScriptType::U8_T: emitResult(out, value); break;
 		case LumScriptType::I32_T: {
 			StaticString<256> v("(i32)", value);
 			emitResult(out, v);
@@ -311,10 +350,10 @@ void appendReturnValue(OutputStream& out, StringView type, const char* value, co
 			break;
 		}
 		case LumScriptType::PATH_T:
-			L("ls_result_string(runtime, &frame, ls_string_view{", value, ".c_str(), ", value, ".c_str() + ", value, ".length()});");
+			L("ls_result_string(runtime, &frame, ls_string_view{", value, ".c_str(), (i64)", value, ".length()});");
 			break;
 		case LumScriptType::STRING_T:
-			L("ls_result_string(runtime, &frame, ls_string_view{", value, ".data, ", value, ".end()});");
+			L("ls_result_string(runtime, &frame, ls_string_view{", value, ".data, (i64)", value, ".length});");
 			break;
 		case LumScriptType::STRUCT_T: {
 			const Struct* s = findStructByTypeName(type);
@@ -354,6 +393,7 @@ bool isSupportedLumScriptFunction(Function& f) {
 bool isSupportedLumScriptPropertyArg(const Arg& arg) {
 	if (isLumScriptPathArg(arg)) return true;
 	if (isLumScriptStringArg(arg)) return true;
+	if (isSpanType(arg.type)) return isExternCompatibleLumScriptType(arg.type);
 	if (getLumScriptType(arg.type) == LumScriptType::OBJECT_T) return arg.is_ptr || arg.is_ref;
 	if (arg.is_ptr) return false;
 	if (arg.is_ref && !arg.is_const) return false;
@@ -853,9 +893,17 @@ void emitGeneratedObjectImportRegistrations(OutputStream& out, MetaData& data, i
 }
 
 void appendLumScriptDeclType(OutputStream& out, StringView type) {
+	if (isSpanType(type)) {
+		out.add("[]");
+		if (spanElementType(type).size() >= 6 && spanElementType(type)[0] == 'c' && spanElementType(type)[1] == 'o' && spanElementType(type)[2] == 'n' && spanElementType(type)[3] == 's' && spanElementType(type)[4] == 't' &&
+			(spanElementType(type)[5] == ' ' || spanElementType(type)[5] == '\t')) out.add("const ");
+		appendLumScriptDeclType(out, spanElementBaseType(type));
+		return;
+	}
 	switch (getLumScriptType(type)) {
 		case LumScriptType::VOID_T: out.add("void"); break;
 		case LumScriptType::BOOL_T: out.add("bool"); break;
+		case LumScriptType::U8_T: out.add("u8"); break;
 		case LumScriptType::I32_T: out.add("i32"); break;
 		case LumScriptType::F32_T: out.add("f32"); break;
 		case LumScriptType::VEC2_T: out.add("Vec2"); break;
@@ -896,6 +944,7 @@ void appendLumScriptDeclArgType(OutputStream& out, const Arg& arg) {
 }
 
 void appendLumScriptImportType(OutputStream& out, StringView type) {
+	if (isSpanType(type)) type = spanElementBaseType(type);
 	if (equal(type, "World")) {
 		out.add("world");
 		return;
@@ -1080,6 +1129,7 @@ void serializeCoreImports(MetaData& data) {
 		StringView imported_types[32];
 		i32 imported_types_count = 0;
 		auto emitImportForType = [&](StringView type) {
+			if (isSpanType(type)) type = spanElementBaseType(type);
 			const LumScriptType import_type = getLumScriptType(type);
 			if (import_type != LumScriptType::VEC2_T && import_type != LumScriptType::VEC3_T && import_type != LumScriptType::DVEC3_T && import_type != LumScriptType::VEC4_T &&
 				import_type != LumScriptType::COLOR_T && import_type != LumScriptType::QUAT_T && import_type != LumScriptType::ENTITY_T && import_type != LumScriptType::ENUM_T &&
@@ -1143,6 +1193,7 @@ void serializeCoreImports(MetaData& data) {
 		auto emitImportForType = [&](StringView type) {
 			if (type.size() == 0) return;
 			if (type.begin[0] == '?') type = {type.begin + 1, type.end};
+			if (isSpanType(type)) type = spanElementBaseType(type);
 			const LumScriptType import_type = getLumScriptType(type);
 			if (import_type != LumScriptType::VEC2_T && import_type != LumScriptType::VEC3_T && import_type != LumScriptType::DVEC3_T && import_type != LumScriptType::VEC4_T &&
 				import_type != LumScriptType::COLOR_T && import_type != LumScriptType::QUAT_T && import_type != LumScriptType::ENTITY_T && import_type != LumScriptType::ENUM_T &&
@@ -1220,6 +1271,7 @@ void serializeCoreImports(MetaData& data) {
 			auto emitImportForType = [&](StringView type) {
 				if (type.size() == 0) return;
 				if (type.begin[0] == '?') type = {type.begin + 1, type.end};
+				if (isSpanType(type)) type = spanElementBaseType(type);
 				const LumScriptType import_type = getLumScriptType(type);
 				if (import_type != LumScriptType::VEC2_T && import_type != LumScriptType::VEC3_T && import_type != LumScriptType::DVEC3_T && import_type != LumScriptType::VEC4_T &&
 					import_type != LumScriptType::COLOR_T && import_type != LumScriptType::QUAT_T && import_type != LumScriptType::ENTITY_T && import_type != LumScriptType::ENUM_T &&

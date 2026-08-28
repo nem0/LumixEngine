@@ -2,7 +2,7 @@
 
 import "core:EventType"
 import "core:vec2"
-struct Event {
+extern struct Event {
 	type : EventType;
 	position : Vec2;
 	element_index : i32;

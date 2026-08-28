@@ -30,15 +30,15 @@ struct LumScriptDiagnosticsContext {
 
 static void printLumScriptMessage(void* userdata, ls_string_view msg) {
 	LumScriptDiagnosticsContext* ctx = (LumScriptDiagnosticsContext*)userdata;
-	if (ctx->message) ctx->message->append(StringView(msg.begin, msg.end));
+	if (ctx->message) ctx->message->append(StringView(msg.begin, (u64)msg.length));
 }
 
 static ls_string_view toLs(StringView value) {
-	return {value.data, value.end()};
+	return {value.data, (i64)value.length};
 }
 
 static ls_string_view toLs(const char* value) {
-	return {value, value + stringLength(value)};
+	return {value, (i64)stringLength(value)};
 }
 
 static void bindCoreFunctions(ls_module* module, ls_runtime* runtime, IAllocator& allocator) {
@@ -47,11 +47,11 @@ static void bindCoreFunctions(ls_module* module, ls_runtime* runtime, IAllocator
 	for (i32 unit_index = 0, unit_count = ls_module_get_unit_count(module); unit_index < unit_count; ++unit_index) {
 		ls_unit* unit = ls_module_get_unit(module, unit_index);
 		const ls_string_view path = ls_unit_get_path(unit);
-		const StringView unit_path(path.begin, path.end);
+		const StringView unit_path(path.begin, path.length);
 		if (unit_path == "std:math" || unit_path == "std:mem") continue;
 		for (i32 function_index = 0, function_count = ls_unit_get_native_function_count(unit); function_index < function_count; ++function_index) {
 			const ls_string_view name = ls_unit_get_native_function_name(unit, function_index);
-			const NativeFunctionKey key{unit_path, {name.begin, name.end}};
+			const NativeFunctionKey key{unit_path, {name.begin, (u64)name.length}};
 			auto iter = functions.find(key);
 			if (!iter.isValid()) {
 				logError("LumScript : failed to bind native function ", key.unit_path, ".", key.name);
@@ -397,14 +397,14 @@ private:
 			const ls_attribute attribute = ls_type_attribute_value(type, i);
 			if (!attribute.type) continue;
 			const ls_string_view name = ls_type_get_name(attribute.type);
-			if (StringView(name.begin, name.end) == "component") return true;
+			if (StringView(name.begin, name.length) == "component") return true;
 		}
 		return false;
 	}
 
 	static int resolveImport(void* userdata, ls_string_view path, ls_string_view, ls_string_view* source) {
 		ImportContext& ctx = *(ImportContext*)userdata;
-		StringView requested(path.begin, path.end);
+		StringView requested(path.begin, path.length);
 		Path file_path;
 		if (startsWith(requested, "core:")) {
 			StringView name = requested.withoutLeft(5);
@@ -418,7 +418,7 @@ private:
 			ctx.sources.pop();
 			return 0;
 		}
-		*source = {(const char*)blob.data(), (const char*)blob.data() + blob.size()};
+		*source = {(const char*)blob.data(), (i64)blob.size()};
 		return 1;
 	}
 
