@@ -1,6 +1,7 @@
 import "core:input"
 import "core:log"
 import "core:ui"
+import "core:document"
 import "core:world"
 
 import "maps/demo/demo" as demo
@@ -13,7 +14,18 @@ fn update(td : f32) : void {
 	
 	// UI
 	var ui = g_world.ui();
-	//var events = doc.getEvents();
+	//var events = g_world.ui()?.getDocument()?.getEvents();
+	if ui != null {
+		var doc = ui.getDocument();
+		if doc != null {
+			var events = doc.getEvents();
+			for event in events {
+				if event.action == "start" {
+					logError("START");
+				}
+			}	
+		}
+	}
 }
 
 fn init(input : InputSystem) : void {

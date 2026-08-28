@@ -1756,6 +1756,7 @@ struct Checker {
 			ResolvedType* receiver_type = mem.expression->resolved_type;
 			ResolvedType* parameter_type = fn_type.params[0].type;
 			if (!receiver_type || !canImplicitlyConvert(receiver_type, parameter_type)) {
+				errorLine(call.token, "Cannot call member function ", mem.name, " on receiver of type ", receiver_type, "; expected ", parameter_type);
 				return nullptr;
 			}
 		}

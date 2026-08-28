@@ -1595,7 +1595,14 @@ struct Parser {
 				field.attributes = parseAttributeList();
 				if (!field.attributes) return nullptr;
 			}
-			if (!consume(Token::IDENTIFIER, field.name, "Expected field name")) return nullptr;
+			Token field_name = consumeToken();
+			// Native-facing structs may mirror C fields whose names happen to be
+			// LumScript keywords (e.g. ui::Event::type).
+			if (field_name.type != Token::IDENTIFIER && field_name.type != Token::TYPE_KW) {
+				m_output.errorAt(field_name, "Expected field name");
+				return nullptr;
+			}
+			field.name = field_name.value;
 			for (i32 i = 0; i < st->fields.size() - 1; ++i) {
 				if (!equalStrings(st->fields[i].name, field.name)) continue;
 				m_output.error("Duplicate field: ", field.name);
