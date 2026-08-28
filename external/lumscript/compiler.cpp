@@ -864,10 +864,13 @@ struct Checker {
 				error("]");
 				return;
 			}
-			case ResolvedTypeKind::SLICE:
-				error(static_cast<const SliceResolvedType*>(type)->element_type);
-				error("[]");
+			case ResolvedTypeKind::SLICE: {
+				const SliceResolvedType* slice = static_cast<const SliceResolvedType*>(type);
+				if (slice->is_const) error("[]const ");
+				error(slice->element_type);
+				if (!slice->is_const) error("[]");
 				return;
+			}
 			case ResolvedTypeKind::NULLABLE:
 				error("?");
 				error(static_cast<const NullableResolvedType*>(type)->inner);

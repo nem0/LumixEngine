@@ -2928,7 +2928,8 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 * hex - 0x1234ABCD
 * FourCC? `ABCD`
 * bit set / flags / something else?
-* null propagation a?.b?.c;
+* match on strings (and maybe any type)
+* null chaining a?.b?.c;
 * list of keywords and forbid identifier colliding with keywords
 * debugger:
 	- modify variables while paused

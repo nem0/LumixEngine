@@ -22,6 +22,16 @@ fn update(td : f32) : void {
 			for event in events {
 				if event.action == "start" {
 					player.handle_input = true;
+					var root_el = doc.getElement(0);
+					if root_el != null {
+						root_el.setVisible(false);
+					}
+				}
+				else if event.action == "close" {
+					var el = doc.getElementByID("runtime_ui");
+					if el != null {
+						el.setVisible(false);
+					}
 				}
 			}	
 		}
