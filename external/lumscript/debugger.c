@@ -4,8 +4,8 @@
 #include <string.h>
 
 static int debug_string_equals(ls_string_view a, ls_string_view b) {
-	const ptrdiff_t a_size = (ptrdiff_t)(a.end - a.begin);
-	const ptrdiff_t b_size = (ptrdiff_t)(b.end - b.begin);
+	const ptrdiff_t a_size = a.length;
+	const ptrdiff_t b_size = b.length;
 	if (a_size != b_size) return 0;
 	return a_size == 0 || memcmp(a.begin, b.begin, (size_t)a_size) == 0;
 }
@@ -50,7 +50,7 @@ u32 ls_debug_stack_depth(ls_runtime* runtime) {
 }
 
 ls_string_view ls_debug_frame_function_name(ls_runtime* runtime, u32 frame_index) {
-	ls_string_view empty = {NULL, NULL};
+	ls_string_view empty = {NULL, 0};
 	if (frame_index >= debug_active_frame_count(runtime)) return empty;
 	const runtime_call_frame* frame = debug_active_frame(runtime, frame_index);
 	return frame->function ? frame->function->name : empty;
@@ -74,7 +74,7 @@ static u32 debug_frame_lookup_offset(ls_runtime* runtime, u32 frame_index, const
 
 ls_result ls_debug_frame_location(ls_runtime* runtime, u32 frame_index, ls_debug_location* out_location) {
 	if (!out_location) return LS_RESULT_FAILURE;
-	out_location->source_name = (ls_string_view){NULL, NULL};
+	out_location->source_name = (ls_string_view){NULL, 0};
 	out_location->line = 0u;
 	out_location->column = 0u;
 	if (frame_index >= debug_active_frame_count(runtime)) return LS_RESULT_FAILURE;
@@ -283,7 +283,7 @@ u32 ls_debug_frame_local_count(ls_runtime* runtime, u32 frame_index) {
 }
 
 ls_string_view ls_debug_local_name(ls_runtime* runtime, u32 frame_index, u32 local_index) {
-	ls_string_view empty = {NULL, NULL};
+	ls_string_view empty = {NULL, 0};
 	const ls_bytecode_local_debug_entry* entry = debug_local_at(runtime, frame_index, local_index, NULL);
 	return entry ? entry->name : empty;
 }
@@ -309,7 +309,7 @@ u32 ls_debug_global_count(ls_runtime* runtime) {
 }
 
 ls_string_view ls_debug_global_name(ls_runtime* runtime, u32 global_index) {
-	ls_string_view empty = {NULL, NULL};
+	ls_string_view empty = {NULL, 0};
 	if (global_index >= runtime->bytecode->global_debug_count) return empty;
 	return runtime->bytecode->global_debug[global_index].name;
 }
@@ -346,7 +346,7 @@ ls_type_kind ls_type_get_kind(const ls_type* type) {
 }
 
 ls_string_view ls_type_get_name(const ls_type* type) {
-	const ls_string_view empty = {NULL, NULL};
+	const ls_string_view empty = {NULL, 0};
 	return type ? type->name : empty;
 }
 
@@ -363,7 +363,7 @@ u32 ls_type_struct_field_count(const ls_type* type) {
 }
 
 ls_string_view ls_type_struct_field_name(const ls_type* type, u32 field_index) {
-	const ls_string_view empty = {NULL, NULL};
+	const ls_string_view empty = {NULL, 0};
 	if (!type || type->kind != LS_TYPE_STRUCT || !type->bytecode) return empty;
 	if (field_index >= type->field_count) return empty;
 	const u32 fi = type->first_field_index + field_index;
@@ -416,7 +416,7 @@ u32 ls_type_enum_value_count(const ls_type* type) {
 }
 
 ls_string_view ls_type_enum_value_name(const ls_type* type, u32 value_index) {
-	const ls_string_view empty = {NULL, NULL};
+	const ls_string_view empty = {NULL, 0};
 	if (!type || type->kind != LS_TYPE_ENUM || !type->bytecode) return empty;
 	if (value_index >= type->value_count) return empty;
 	const u32 vi = type->first_value_index + value_index;

@@ -1291,7 +1291,7 @@ static PrintCapture g_print_capture;
 
 static void printCaptureBytes(ls_runtime*, ls_call_frame frame) {
 	LS_STRING_ARG(frame, text);
-	g_print_capture.append(text.begin, text.end);
+	g_print_capture.append(text.begin, text.begin + text.length);
 }
 
 static void printCaptureI64(ls_runtime*, ls_call_frame frame) {

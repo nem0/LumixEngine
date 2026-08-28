@@ -12,7 +12,7 @@
 // - `ls_bytecode` and `ls_runtime` are the public execution pipeline.
 // - `ls_host` bundles allocator hooks and diagnostics callbacks into one
 //   object. It is the main bridge between host code and LumScript.
-// - Strings are passed as non-owning `[begin, end)` spans. The caller keeps the
+// - Strings are passed as non-owning byte spans. The caller keeps the
 //   underlying bytes alive for the duration of the call.
 // - The ABI is intentionally plain C: no templates, references, or exceptions.
 
@@ -56,19 +56,11 @@ static_assert(sizeof(uintptr) == sizeof(void*), "fix this");
 extern "C" {
 #endif
 
-// Non-owning string span. `end` points one past the last byte.
 typedef struct ls_string_view {
 	const char* begin;
-	const char* end;
+	i64 length;
 } ls_string_view;
 
-// Runtime representation of every script slice, including []const T and
-// strings: an absolute pointer to the first element followed by an element
-// count. The pointer is non-owning and the length is a signed 64-bit value.
-// An empty slice may have a null data pointer. The element type is supplied by
-// the script function signature/type metadata; it is not stored in this value.
-// For writable []T slices, data points at writable storage even though this C
-// view uses const void* so it can represent both slice qualifiers.
 typedef struct ls_slice {
 	const void* data;
 	i64 length;

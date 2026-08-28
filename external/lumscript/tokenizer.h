@@ -48,7 +48,7 @@ struct Tokenizer {
 	Token makeToken(TokenType type) {
 		Token res;
 		res.type = type;
-		res.value = ls_string_view{m_start_token, m_current};
+		res.value = ls_string_view{m_start_token, m_current - m_start_token};
 		if (type != Token::END_OF_FILE) {
 			res.src_loc = m_src_locs.add(m_source_name, (u32)m_start_line, (u32)m_start_column);
 		}
@@ -114,7 +114,7 @@ struct Tokenizer {
 		const char* value_end = m_current;
 		advance();
 		Token res = makeToken(Token::STRING);
-		res.value = ls_string_view{value_begin, value_end};
+		res.value = ls_string_view{value_begin, value_end - value_begin};
 		return res;
 	}
 
@@ -128,7 +128,7 @@ struct Tokenizer {
 		const char* value_end = m_current;
 		advance();
 		Token res = makeToken(Token::RUNE);
-		res.value = ls_string_view{value_begin, value_end};
+		res.value = ls_string_view{value_begin, value_end - value_begin};
 		return res;
 	}
 
@@ -140,7 +140,7 @@ struct Tokenizer {
 
 	Token identifierOrKeywordToken() {
 		while (isIdentifierChar(peekChar())) advance();
-		const ls_string_view ident{m_start_token, m_current};
+		const ls_string_view ident{m_start_token, m_current - m_start_token};
 		if (equalStrings(ident, "break")) return makeToken(Token::BREAK);
 		if (equalStrings(ident, "continue")) return makeToken(Token::CONTINUE);
 		switch (m_start_token[0]) {

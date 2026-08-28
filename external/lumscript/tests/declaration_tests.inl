@@ -19,10 +19,21 @@ TEST(ExternStructDeclarationCompiles) {
 	return true;
 }
 
+TEST(ExternStructSliceFieldCompiles) {
+	EXPECT_COMPILE(R"(
+		extern struct NativeData {
+		items : []i32;
+		}
+		fn main() : void {}
+	)");
+	return true;
+}
+
 TEST(ExternStructRejectsNonCAbiFields) {
 	EXPECT_COMPILE_FAIL(R"(
+		struct ScriptOnlySlice { items : []i32; }
 		extern struct Bad {
-			items : []i32;
+			items : ScriptOnlySlice;
 		}
 	)");
 

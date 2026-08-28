@@ -33,7 +33,7 @@ static const ls_host g_host_template = {
 };
 
 static ls_string_view ls_from_cstr(const char* str) {
-	return (ls_string_view){str, str ? str + strlen(str) : NULL};
+	return (ls_string_view){str, str ? (i64)strlen(str) : 0};
 }
 
 static ls_unit* lumc_find_native_function(ls_module* module, const char* name, int* out_function_index) {
@@ -42,7 +42,7 @@ static ls_unit* lumc_find_native_function(ls_module* module, const char* name, i
 		ls_unit* unit = ls_module_get_unit(module, unit_index);
 		for (int function_index = 0, function_count = ls_unit_get_native_function_count(unit); function_index < function_count; ++function_index) {
 			const ls_string_view function_name = ls_unit_get_native_function_name(unit, function_index);
-			if ((size_t)(function_name.end - function_name.begin) != name_size) continue;
+			if (function_name.length != name_size) continue;
 			if (memcmp(function_name.begin, name, name_size) == 0) {
 				*out_function_index = function_index;
 				return unit;
@@ -53,8 +53,8 @@ static ls_unit* lumc_find_native_function(ls_module* module, const char* name, i
 }
 
 static void lumc_print_string(FILE* out, ls_string_view value) {
-	if (!value.begin || !value.end || value.end < value.begin) return;
-	fwrite(value.begin, 1, (size_t)(value.end - value.begin), out);
+	if (!value.begin) return;
+	fwrite(value.begin, 1, value.length, out);
 }
 
 static void lumc_write_result(FILE* out, ls_runtime* runtime, ls_type_kind kind) {
@@ -327,7 +327,7 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 		const ls_function_bc* fn = &bytecode->functions[function_index];
 		printf("function %u %.*s (%s, params=%u, frame=%u, returns=%u)\n",
 			function_index,
-			fn->name.begin ? (int)(fn->name.end - fn->name.begin) : 0,
+			fn->name.begin ? (int)(fn->name.length) : 0,
 			fn->name.begin ? fn->name.begin : "<global_init>",
 			fn->kind == LS_FUNCTION_NATIVE ? "native" : "script",
 			fn->param_size, fn->frame_size, fn->return_size);

@@ -2668,7 +2668,7 @@ ls_default_arena_create(&runtime_arena);
 ls_host runtime_host = {runtime_arena};
 ls_runtime* runtime = bytecode ? ls_runtime_create(bytecode, &runtime_host) : nullptr;
 if (runtime) {
-	ls_string_view main_name = { "main", "main" + 4 };
+	ls_string_view main_name = { "main", 4 };
 	ls_call(runtime, main_name);
 	if (ls_bytecode_runtime_result_kind(runtime, main_name) != LS_TYPE_VOID) {
 		i32 result = ls_to_i32(runtime, -1);

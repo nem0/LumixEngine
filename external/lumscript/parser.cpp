@@ -24,16 +24,16 @@ struct Parser {
 	ls_string_view makeForIndexName() {
 		char digits[32];
 		toCString(m_for_index_counter++, digits, sizeof(digits));
-		usize digits_len = 0;
+		i64 digits_len = 0;
 		while (digits[digits_len] != '\0') ++digits_len;
 
 		static const char prefix[] = "$for_index";
-		const usize prefix_len = sizeof(prefix) - 1;
+		const i64 prefix_len = sizeof(prefix) - 1;
 		ls_arena& a = m_unit.arena;
 		char* buffer = static_cast<char*>(a.allocate(a.user_data, prefix_len + digits_len, 1));
 		copyMemory(buffer, prefix, prefix_len);
 		copyMemory(buffer + prefix_len, digits, digits_len);
-		return ls_string_view{buffer, buffer + prefix_len + digits_len};
+		return ls_string_view{buffer, prefix_len + digits_len};
 	}
 
 	template <typename T, typename... Args>

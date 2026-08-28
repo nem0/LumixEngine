@@ -536,7 +536,7 @@ TEST(NativeStringArgument) {
 		(void)runtime;
 		LS_STRING_ARG(frame, text);
 		LS_ARG(frame, i32, value);
-		const bool matches = text.end - text.begin == 6 && memcmp(text.begin, "testor", 6) == 0;
+		const bool matches = text.length == 6 && memcmp(text.begin, "testor", 6) == 0;
 		LS_RESULT(frame, i32(matches && value == 42 ? 1 : 0));
 	};
 
@@ -564,8 +564,8 @@ TEST(NativeTwoStringArguments) {
 		(void)runtime;
 		LS_STRING_ARG(frame, first);
 		LS_STRING_ARG(frame, second);
-		const bool first_matches = first.end - first.begin == 5 && memcmp(first.begin, "first", 5) == 0;
-		const bool second_matches = second.end - second.begin == 6 && memcmp(second.begin, "second", 6) == 0;
+		const bool first_matches = first.length == 5 && memcmp(first.begin, "first", 5) == 0;
+		const bool second_matches = second.length == 6 && memcmp(second.begin, "second", 6) == 0;
 		LS_RESULT(frame, i32(first_matches && second_matches ? 1 : 0));
 	};
 
@@ -594,7 +594,7 @@ TEST(NativeStringResult) {
 
 	auto get_text = [](ls_runtime* runtime, ls_call_frame frame) -> void {
 		char temporary[] = "native result";
-		ls_result_string(runtime, &frame, ls_string_view{temporary, temporary + sizeof(temporary) - 1});
+		ls_result_string(runtime, &frame, ls_string_view{temporary, sizeof(temporary) - 1});
 		memset(temporary, 0, sizeof(temporary));
 	};
 

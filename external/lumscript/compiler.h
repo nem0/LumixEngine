@@ -126,8 +126,9 @@ inline Token::Type tokenFromOperatorName(ls_string_view name) {
 	for (const Entry& e : table) {
 		const char* p = name.begin;
 		const char* q = e.name;
-		while (p != name.end && *q && *p == *q) { ++p; ++q; }
-		if (p == name.end && *q == '\0') return e.token;
+		const char* end = p + name.length;
+		while (p != end && *q && *p == *q) { ++p; ++q; }
+		if (p == end && *q == '\0') return e.token;
 	}
 	return Token::ERROR;
 }

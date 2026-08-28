@@ -305,8 +305,8 @@ struct TemplateBindings {
 };
 
 static void appendReflectedTypeName(char*& out, char* end, const ResolvedType& type) {
-		auto text = [&out, end](const char* value) { while (*value && out < end) *out++ = *value++; };
-		auto view = [&out, end](ls_string_view value) { while (value.begin != value.end && out < end) *out++ = *value.begin++; };
+	auto text = [&out, end](const char* value) { while (*value && out < end) *out++ = *value++; };
+	auto view = [&out, end](ls_string_view value) { while (value.length > 0 && out < end) { *out++ = *value.begin++; --value.length; } };
 	switch (type.kind) {
 		case ResolvedTypeKind::VOID: case ResolvedTypeKind::BOOL: case ResolvedTypeKind::I8: case ResolvedTypeKind::I16:
 		case ResolvedTypeKind::I32: case ResolvedTypeKind::I64: case ResolvedTypeKind::U8: case ResolvedTypeKind::U16:
@@ -361,15 +361,18 @@ static void appendReflectedTypeName(char*& out, char* end, const ResolvedType& t
 	}
 }
 
-// TODO what to do with you
 	static ls_string_view reflectedTypeName(Unit& unit, const ResolvedType& type) {
-	char buffer[4096]; char* out = buffer; char* end = buffer + sizeof(buffer) - 1;
-	appendReflectedTypeName(out, end, type); *out = 0;
-	char* copy = static_cast<char*>(unit.arena.allocate(unit.arena.user_data, (u32)(out - buffer), 1));
-	copyMemory(copy, buffer, (usize)(out - buffer));
-		return {copy, copy + (out - buffer)};
+		char buffer[4096];
+		char* out = buffer;
+		char* end = buffer + sizeof(buffer) - 1;
+		appendReflectedTypeName(out, end, type);
+		*out = 0;
+		char* copy = static_cast<char*>(unit.arena.allocate(unit.arena.user_data, (u32)(out - buffer), 1));
+		copyMemory(copy, buffer, (usize)(out - buffer));
+		return {copy, out - buffer};
 	}
 
+	// TODO what to do with you
 	static ls_string_view factoryTypeName(Unit& unit, const FunctionExpression& fn, const ExpArray<ComptimeValue>& args) {
 		char buffer[4096];
 		char* out = buffer;
@@ -381,7 +384,8 @@ static void appendReflectedTypeName(char*& out, char* end, const ResolvedType& t
 			do { *--p = char('0' + value % 10); value /= 10; } while (value);
 			while (p != digits + sizeof(digits) && out < end) *out++ = *p++;
 		};
-		for (const char* p = fn.token.value.begin; p && p != fn.token.value.end && out < end; ++p) *out++ = *p;
+		const ls_string_view function_name = fn.token.value;
+		for (u64 i = 0; i < function_name.length && out < end; ++i) *out++ = function_name.begin[i];
 		text("(");
 		for (i32 i = 0; i < args.size(); ++i) {
 			if (i) text(", ");
@@ -402,7 +406,7 @@ static void appendReflectedTypeName(char*& out, char* end, const ResolvedType& t
 		text(")");
 		char* copy = static_cast<char*>(unit.arena.allocate(unit.arena.user_data, (u32)(out - buffer), 1));
 		copyMemory(copy, buffer, (usize)(out - buffer));
-		return {copy, copy + (out - buffer)};
+		return {copy, out - buffer};
 	}
 
 struct Checker {
@@ -504,7 +508,7 @@ struct Checker {
 	}
 
 	ComptimeValue makeStringValue(Unit& unit, ls_string_view value) {
-		ComptimeSliceValue slice{(u8*)value.begin, (i64)(value.end - value.begin)};
+		ComptimeSliceValue slice{(u8*)value.begin, value.length};
 		return makePersistentValue(unit, const_u8_slice, &slice, sizeof(slice));
 	}
 
@@ -821,7 +825,7 @@ struct Checker {
 			magnitude /= 10u;
 		} while (magnitude);
 		if (value < 0) *--cursor = '-';
-		error(ls_string_view{cursor, end});
+		error(ls_string_view{cursor, end - cursor});
 	}
 
 	void error(ResolvedType* type) { error(static_cast<const ResolvedType*>(type)); }
@@ -1061,7 +1065,7 @@ struct Checker {
 						StringLiteralExpression* expr = makeType<StringLiteralExpression>(unit.arena);
 						ComptimeSliceValue value;
 						memcpy(&value, arg.value, sizeof(value));
-						expr->value = {(const char*)value.data, (const char*)value.data + value.count};
+						expr->value = {(const char*)value.data, value.count};
 						expr->resolved_type = arg.type;
 						return expr;
 					}
@@ -1980,6 +1984,7 @@ struct Checker {
 			case ResolvedTypeKind::CPTR:
 			case ResolvedTypeKind::BYTE:
 			case ResolvedTypeKind::POINTER:
+			case ResolvedTypeKind::SLICE:
 			case ResolvedTypeKind::ENUM:
 				return true;
 			case ResolvedTypeKind::ARRAY:
@@ -3466,7 +3471,7 @@ struct Checker {
 				errorLine(expr.token, "Struct field access expects a valid compile-time []const u8");
 				return nullptr;
 			}
-			const ls_string_view field_name{(const char*)field_name_value.data, (const char*)field_name_value.data + field_name_value.count};
+			const ls_string_view field_name{(const char*)field_name_value.data, field_name_value.count};
 			StructResolvedType* st = static_cast<StructResolvedType*>(base_type);
 			for (i32 i = 0; i < st->decl->fields.size(); ++i) {
 				if (equalStrings(st->decl->fields[i].name, field_name)) {
@@ -5729,7 +5734,7 @@ struct Checker {
 						for (i32 i = 0; i < st.decl->fields.size(); ++i) {
 							u8* descriptor = slice.data + descriptor_size * i;
 							const ls_string_view name = st.decl->fields[i].name;
-							ComptimeSliceValue name_slice{(u8*)name.begin, (i64)(name.end - name.begin)};
+							ComptimeSliceValue name_slice{(u8*)name.begin, name.length};
 							ResolvedType* type = st.fields[i].type;
 							copyMemory(descriptor, &name_slice, sizeof(name_slice));
 							copyMemory(descriptor + type_offset, &type, sizeof(type));
@@ -5756,7 +5761,7 @@ struct Checker {
 							}
 							u8* descriptor = slice.data + descriptor_size * i;
 							const ls_string_view name = en.decl->members[i].name;
-							ComptimeSliceValue name_slice{(u8*)name.begin, (i64)(name.end - name.begin)};
+							ComptimeSliceValue name_slice{(u8*)name.begin, name.length};
 							copyMemory(descriptor, &name_slice, sizeof(name_slice));
 							copyMemory(descriptor + structFieldOffset(*static_cast<StructResolvedType*>(descriptor_type), 1), &enum_value, sizeof(enum_value));
 						}
@@ -5777,7 +5782,7 @@ struct Checker {
 						for (i32 i = 0; i < fn.params.size(); ++i) {
 							u8* descriptor = slice.data + descriptor_size * i;
 							const ls_string_view name = fn.params[i].name;
-							ComptimeSliceValue name_slice{(u8*)name.begin, (i64)(name.end - name.begin)};
+							ComptimeSliceValue name_slice{(u8*)name.begin, name.length};
 							copyMemory(descriptor, &name_slice, sizeof(name_slice));
 							copyMemory(descriptor + type_offset, &fn.params[i].type, sizeof(fn.params[i].type));
 						}
@@ -6291,7 +6296,7 @@ struct Checker {
 			}
 			case Expression::STRING_LITERAL: {
 				auto& sl = static_cast<StringLiteralExpression&>(expr);
-				ComptimeSliceValue value{(u8*)sl.value.begin, (i64)(sl.value.end - sl.value.begin)};
+				ComptimeSliceValue value{(u8*)sl.value.begin, sl.value.length};
 				return copyComptimeValue(const_u8_slice, &value, sizeof(value));
 			}
 			case Expression::ARRAY_LITERAL: {

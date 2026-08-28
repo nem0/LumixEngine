@@ -26,7 +26,7 @@ ls_string_view ls_arg_read_string(ls_call_frame* frame) {
 	ls_runtime_slice slice = {NULL, 0};
 	memcpy(&slice, frame->args, sizeof(slice));
 	frame->args += sizeof(slice);
-	return (ls_string_view){(const char*)slice.data, (const char*)slice.data + slice.length};
+	return (ls_string_view){(const char*)slice.data, slice.length};
 }
 
 // Content equality for slice values. Floats are compared element-wise because
@@ -60,10 +60,8 @@ static int runtime_slice_equal(ls_runtime_slice a, ls_runtime_slice b, u32 eleme
 }
 
 static int string_equals(ls_string_view a, ls_string_view b) {
-	const ptrdiff_t a_size = (ptrdiff_t)(a.end - a.begin);
-	const ptrdiff_t b_size = (ptrdiff_t)(b.end - b.begin);
-	if (a_size != b_size) return 0;
-	for (ptrdiff_t i = 0; i < a_size; ++i) {
+	if (a.length != b.length) return 0;
+	for (i64 i = 0; i < a.length; ++i) {
 		if (a.begin[i] != b.begin[i]) return 0;
 	}
 	return 1;
@@ -124,25 +122,19 @@ static ls_string_box* runtime_make_string_box(ls_runtime* runtime, ls_string_vie
 
 static ls_string_box* runtime_copy_string_box(ls_runtime* runtime, ls_string_view value) {
 	static const char empty[] = "";
-	const ptrdiff_t size = value.begin && value.end && value.end >= value.begin ? value.end - value.begin : 0;
-	char* copy = NULL;
-	if (runtime && runtime->arena && runtime->arena->allocate) {
-		copy = (char*)runtime->arena->allocate(runtime->arena->user_data, (size_t)size + 1u, 1u);
-	}
-	else {
-		copy = (char*)malloc((size_t)size + 1u);
-	}
+	const i64 size = value.begin ? value.length : 0;
+	char* copy = (char*)runtime->arena->allocate(runtime->arena->user_data, size + 1u, 1u);
 	if (!copy) return NULL;
 	if (size > 0) memcpy(copy, value.begin, (size_t)size);
 	copy[size] = '\0';
-	return runtime_make_string_box(runtime, (ls_string_view){size > 0 ? copy : empty, (size > 0 ? copy : empty) + size});
+	return runtime_make_string_box(runtime, (ls_string_view){size > 0 ? copy : empty, size});
 }
 
 // TODO leak?
 void ls_result_string(ls_runtime* runtime, ls_call_frame* frame, ls_string_view value) {
 	ls_string_box* box = runtime_copy_string_box(runtime, value);
 	if (!box) return;
-	ls_runtime_slice slice = {box->value.begin, (i64)(box->value.end - box->value.begin)};
+	ls_runtime_slice slice = {box->value.begin, (i64)(box->value.length)};
 	memcpy(frame->result, &slice, sizeof(slice));
 	frame->result += sizeof(slice);
 }
@@ -155,12 +147,10 @@ static void runtime_push_bytes(ls_runtime* runtime, const void* value, u32 size)
 }
 
 static int runtime_string_equals_cstr(ls_string_view value, const char* cstr) {
-	const char* a = value.begin;
-	const char* b = cstr;
-	while (a < value.end && *b) {
-		if (*a++ != *b++) return 0;
+	for (u64 i = 0; i < value.length; ++i) {
+		if (cstr[i] == '\0' || value.begin[i] != cstr[i]) return 0;
 	}
-	return a == value.end && *b == '\0';
+	return cstr[value.length] == '\0';
 }
 
 static void runtime_native_sin_f32(ls_runtime* runtime, ls_call_frame frame) { (void)runtime; LS_ARG(frame, f32, value); LS_TYPED_RESULT(frame, f32, sinf(value)); }
@@ -240,14 +230,14 @@ static ls_string_view runtime_error_message(ls_op op) {
 	static const char invalid_function[] = "invalid function call";
 
 	if ((op >= LS_OP_DIV_I8 && op <= LS_OP_DIV_F64) || (op >= LS_OP_DIV_I8_IMM && op <= LS_OP_DIV_F64_IMM)) {
-		return (ls_string_view){division_by_zero, division_by_zero + sizeof(division_by_zero) - 1u};
+		return (ls_string_view){division_by_zero, sizeof(division_by_zero) - 1u};
 	}
 	if ((op >= LS_OP_MOD_I8 && op <= LS_OP_MOD_U64) || (op >= LS_OP_MOD_I8_IMM && op <= LS_OP_MOD_U64_IMM)) {
-		return (ls_string_view){modulo_by_zero, modulo_by_zero + sizeof(modulo_by_zero) - 1u};
+		return (ls_string_view){modulo_by_zero, sizeof(modulo_by_zero) - 1u};
 	}
-	if (op >= LS_OP_LOAD_INDEXED_8 && op <= LS_OP_SLICE_STORE_64) return (ls_string_view){index_out_of_bounds, index_out_of_bounds + sizeof(index_out_of_bounds) - 1u};
-	if (op == LS_OP_CALL_DIRECT || op == LS_OP_CALL_INDIRECT) return (ls_string_view){invalid_function, invalid_function + sizeof(invalid_function) - 1u};
-	return (ls_string_view){generic, generic + sizeof(generic) - 1u};
+	if (op >= LS_OP_LOAD_INDEXED_8 && op <= LS_OP_SLICE_STORE_64) return (ls_string_view){index_out_of_bounds, sizeof(index_out_of_bounds) - 1u};
+	if (op == LS_OP_CALL_DIRECT || op == LS_OP_CALL_INDIRECT) return (ls_string_view){invalid_function, sizeof(invalid_function) - 1u};
+	return (ls_string_view){generic, sizeof(generic) - 1u};
 }
 
 static void runtime_report_error(const ls_runtime* runtime, const ls_function_bc* function, const u8* ip, ls_string_view message) {
@@ -263,13 +253,13 @@ static void runtime_report_error(const ls_runtime* runtime, const ls_function_bc
 			line_number /= 10u;
 		} while (line_number != 0u);
 		runtime->host->print(runtime->host->diagnostics_userdata, location.source_name);
-		runtime->host->print(runtime->host->diagnostics_userdata, (ls_string_view){separator, separator + 1u});
-		runtime->host->print(runtime->host->diagnostics_userdata, (ls_string_view){line, line_buffer + sizeof(line_buffer)});
-		runtime->host->print(runtime->host->diagnostics_userdata, (ls_string_view){separator + 1u, separator + sizeof(separator) - 1u});
+		runtime->host->print(runtime->host->diagnostics_userdata, (ls_string_view){separator, 1u});
+		runtime->host->print(runtime->host->diagnostics_userdata, (ls_string_view){line, line_buffer + sizeof(line_buffer) - line});
+		runtime->host->print(runtime->host->diagnostics_userdata, (ls_string_view){separator + 1u, sizeof(separator) - 2u});
 	}
 	static const char newline[] = "\n";
 	runtime->host->print(runtime->host->diagnostics_userdata, message);
-	runtime->host->print(runtime->host->diagnostics_userdata, (ls_string_view){newline, newline + sizeof(newline) - 1u});
+	runtime->host->print(runtime->host->diagnostics_userdata, (ls_string_view){newline, sizeof(newline) - 1u});
 }
 
 static const ls_bytecode_breakpoint* runtime_find_breakpoint(const ls_bytecode* bytecode, const u8* code) {
@@ -818,7 +808,7 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				ls_string_view str = runtime->bytecode->strings[index];
 				u8* slice = frame + slice_reg;
 				memcpy(slice, &str.begin, sizeof(str.begin));
-				u64 len = str.end - str.begin;
+				i64 len = str.length;
 				memcpy(slice + sizeof(void*), &len, 8u);
 				break;
 			}
@@ -1343,13 +1333,13 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				--ip;
 				if (step_trap && runtime_should_pause_for_step(runtime, fn, code_offset)) {
 					runtime->pause_event.reason = LS_DEBUG_PAUSE_STEP;
-					runtime->pause_event.message = (ls_string_view){NULL, NULL};
+					runtime->pause_event.message = (ls_string_view){NULL, 0};
 					goto runtime_execute_function_suspend;
 				}
 
 				if (bp) {
 					runtime->pause_event.reason = LS_DEBUG_PAUSE_BREAKPOINT;
-					runtime->pause_event.message = (ls_string_view){NULL, NULL};
+					runtime->pause_event.message = (ls_string_view){NULL, 0};
 					goto runtime_execute_function_suspend;
 				}
 
@@ -1445,7 +1435,7 @@ runtime_execute_function_suspend:
 		}
 	}
 	if (!runtime_debug_frame_location(runtime->bytecode, fn, (u32)(ip - fn->code), &runtime->pause_event.location)) {
-		runtime->pause_event.location = (ls_debug_location){ {NULL, NULL}, 0u, 0u };
+		runtime->pause_event.location = (ls_debug_location){ {NULL, 0}, 0u, 0u };
 	}
 	return EXEC_SUSPENDED;
 }
@@ -1518,7 +1508,7 @@ void ls_push_i64(ls_runtime* runtime, i64 value) { runtime_push_bytes(runtime, &
 void ls_push_u64(ls_runtime* runtime, u64 value) { runtime_push_bytes(runtime, &value, 8u); }
 void ls_push_f32(ls_runtime* runtime, float value) { runtime_push_bytes(runtime, &value, 4u); }
 void ls_push_f64(ls_runtime* runtime, double value) { runtime_push_bytes(runtime, &value, 8u); }
-void ls_push_string(ls_runtime* runtime, ls_string_view value) { ls_runtime_slice slice = {value.begin, (i64)(value.end - value.begin)}; runtime_push_bytes(runtime, &slice, (u32)sizeof(slice)); }
+void ls_push_string(ls_runtime* runtime, ls_string_view value) { ls_runtime_slice slice = {value.begin, value.length}; runtime_push_bytes(runtime, &slice, (u32)sizeof(slice)); }
 void ls_push_null(ls_runtime* runtime) { void* p = NULL; runtime_push_bytes(runtime, &p, (u32)sizeof(p)); }
 void ls_push_ptr(ls_runtime* runtime, void* value) { runtime_push_bytes(runtime, &value, (u32)sizeof(value)); }
 
@@ -1556,7 +1546,7 @@ double ls_to_f64(ls_runtime* runtime, i32 index) { double v = 0.0; runtime_read_
 ls_string_view ls_to_string(ls_runtime* runtime, i32 index) {
 	ls_runtime_slice slice = {NULL, 0};
 	runtime_read_value(runtime, index, &slice, (u32)sizeof(slice));
-	return (ls_string_view){(const char*)slice.data, (const char*)slice.data + slice.length};
+	return (ls_string_view){(const char*)slice.data, slice.length};
 }
 
 void* ls_to_ptr(ls_runtime* runtime, i32 index) {

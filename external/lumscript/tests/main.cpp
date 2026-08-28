@@ -192,9 +192,9 @@ struct RuntimeGuard {
 
 static void testPrint(void* userdata, ls_string_view msg) {
 	TestContext* context = (TestContext*)userdata;
-	context->diagnostics.size += (u32)(msg.end - msg.begin);
+	context->diagnostics.size += (u32)(msg.length);
 	if (!context->diagnostics.output_enabled) return;
-	for (const char* c = msg.begin; c != msg.end; ++c) putchar(*c);
+	for (u64 i = 0; i < msg.length; ++i) putchar(msg.begin[i]);
 }
 
 static int resolveLumScriptImportC(void* userdata, ls_string_view path, ls_string_view, ls_string_view* source) {

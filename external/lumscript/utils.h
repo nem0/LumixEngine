@@ -28,11 +28,11 @@ inline const char* data(ls_string_view s) {
 }
 
 inline usize size(ls_string_view s) {
-	return (usize)(s.end - s.begin);
+	return s.length;
 }
 
 inline bool empty(ls_string_view s) {
-	return s.begin == s.end;
+	return s.length == 0;
 }
 
 inline usize stringLength(const char* cstr) {
@@ -58,7 +58,7 @@ inline int compareMemory(const void* lhs, const void* rhs, usize count) {
 }
 
 inline ls_string_view makeStringView(const char* cstr) {
-	return cstr ? ls_string_view{cstr, cstr + stringLength(cstr)} : ls_string_view{};
+	return cstr ? ls_string_view{cstr, (i64)stringLength(cstr)} : ls_string_view{};
 }
 
 struct OutputFormatter {

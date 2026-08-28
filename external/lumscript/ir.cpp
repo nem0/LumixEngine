@@ -281,11 +281,11 @@ struct IRBuilder {
 		for (i32 i = 0, c = strings.size(); i < c; ++i) {
 			if (equalStrings(value, strings[i])) return i;
 		}
-		u32 len = u32(value.end - value.begin);
+		i64 len = value.length;
 		char* tmp = (char*)host.arena.allocate(host.arena.user_data, len + 1, 1);
 		memcpy(tmp, value.begin, len);
 		tmp[len] = 0;
-		strings.push({tmp, tmp + len});
+		strings.push({tmp, len});
 		return strings.size() - 1;
 	}
 
@@ -834,7 +834,7 @@ struct IRBuilder {
 				auto& literal = static_cast<StringLiteralExpression&>(expr);
 				auto& ir_literal = alloc<LsOpStringLiteral>();
 				ir_literal.index = internString(literal.value);
-				ir_literal.length = u32(literal.value.end - literal.value.begin);
+				ir_literal.length = u32(literal.value.length);
 				return ir_literal;
 			}
 			case Expression::TYPE_MEMBER: {
@@ -847,7 +847,7 @@ struct IRBuilder {
 						auto& length = alloc<LsOpLoadConst>();
 						static ResolvedType length_type(ResolvedTypeKind::I64);
 						length.type = &length_type;
-						const i64 value_length = member.comptime_string.end - member.comptime_string.begin;
+						const i64 value_length = member.comptime_string.length;
 						memcpy(length.value, &value_length, sizeof(value_length));
 						auto& slice = alloc<LsOpAggregateInit>();
 						slice.type = expr.resolved_type;
@@ -1739,12 +1739,12 @@ bool isTypeFactory(const FunctionExpression& function) {
 
 static ls_string_view copyStringViewToArena(ls_arena& arena, ls_string_view src) {
 	if (empty(src)) return src;
-	const usize len = size(src);
+	const i64 len = (i64)size(src);
 	char* mem = (char*)arena.allocate(arena.user_data, len + 1, 1);
 	if (!mem) return src;
 	memcpy(mem, src.begin, len);
 	mem[len] = '\0';
-	return { mem, mem + len };
+	return { mem, len };
 }
 
 // Debug-facing type kind: mirrors BytecodeCompiler::toTypeKind but reports
