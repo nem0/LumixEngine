@@ -8,6 +8,7 @@ import "core:world"
 
 import "scripts/player" as player
 
+// TODO move into "core:something"
 struct component {}
 struct inject {}
 

@@ -273,6 +273,7 @@ private:
 				if (!attribute.type) continue;
 
 				const ls_string_view name = ls_type_get_name(attribute.type);
+				// TODO not string based compare
 				if (StringView(name.begin, (u64)name.length) == "inject") {
 					inject = true;
 					break;
