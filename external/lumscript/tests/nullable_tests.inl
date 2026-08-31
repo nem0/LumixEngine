@@ -158,6 +158,121 @@ TEST(NullableElseReturnNarrowing) {
 	return true;
 }
 
+TEST(NullableElseReturnDeclaration) {
+	const char* source = R"(
+		struct Value { number : i32; }
+
+		fn consume(v : ?Value) : void {
+			var value : Value = v else return;
+			const number = value.number;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(NullableElseReturnDeclarationWithNullInitializer) {
+	const char* source = R"(
+		fn main() : void {
+			var value : ?i32 = null;
+			var unwrapped : i32 = value else return;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(NullableElseReturnScalar) {
+	const char* source = R"(
+		fn unwrap(v : ?i32) : void {
+			var value : i32 = v else return;
+			const doubled = value * 2;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(NullableElseReturnPointer) {
+	const char* source = R"(
+		fn write(v : ?*i32) : void {
+			var ptr : *i32 = v else return;
+			ptr.* = 42;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(NullableElseReturnCallExpression) {
+	const char* source = R"(
+		fn find() : ?i32 { return 42; }
+
+		fn consume() : void {
+			var value : i32 = find() else return;
+			const result = value + 1;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(BytecodeNullableElseReturn) {
+	const char* source = R"(
+		var result : i32 = -1;
+		var calls : i32 = 0;
+
+		fn find(present : bool) : ?i32 {
+			calls += 1;
+			if present { return 42; }
+			return null;
+		}
+
+		fn consume(present : bool) : void {
+			var value : i32 = find(present) else return;
+			result = value;
+		}
+
+		fn main() : i32 {
+			consume(true);
+			const successful = result;
+			const successful_calls = calls;
+			consume(false);
+			return successful * 100 + successful_calls * 10 + calls;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(4212, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(NullableElseReturnNonVoidFunctionFails) {
+	const char* source = R"(
+		fn unwrap(v : ?i32) : i32 {
+			var value : i32 = v else return;
+			return value;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(NullableElseReturnInfersTarget) {
+	const char* source = R"(
+		fn consume(v : ?i32) : void {
+			var value = v else return;
+			const doubled = value * 2;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(NullableComparisonRequiresNullCheckFails) {
 	const char* source = R"(
 		fn main() : void {

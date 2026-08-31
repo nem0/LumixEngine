@@ -1699,9 +1699,8 @@ namespace Lumix::LumScript::generated {
 	
 	static void lumscript_ui_getDocument_17(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, UIModule*, module);
-		auto ret = module->getDocument();
-		LS_RESULT(frame, u8(ret != nullptr));
-		LS_RESULT(frame, ret);
+		auto& ret = module->getDocument();
+		LS_RESULT(frame, &ret);
 	}
 	
 	static void lumscript_ui_load_18(ls_runtime* runtime, ls_call_frame frame) {
@@ -1718,9 +1717,8 @@ namespace Lumix::LumScript::generated {
 	
 	static void lumscript_ui_getSystem_20(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, UIModule*, module);
-		auto ret = module->getSystemPtr();
-		LS_RESULT(frame, u8(ret != nullptr));
-		LS_RESULT(frame, ret);
+		auto& ret = module->getSystemPtr();
+		LS_RESULT(frame, &ret);
 	}
 	
 	static void lumscript_property_animator_isPropertyAnimatorEnabled_21(ls_runtime* runtime, ls_call_frame frame) {

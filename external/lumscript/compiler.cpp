@@ -4297,10 +4297,26 @@ struct Checker {
 
 		if (!requireMaterializable(*var.expression, "a runtime variable initializer")) return false;
 		if (var.else_return) {
-			if (!annotation || expr_type->kind != ResolvedTypeKind::UNION) {
-				errorLine(var.token, "else return requires a union initializer and an explicit target type");
+			if (expr_type->kind == ResolvedTypeKind::NULLABLE) {
+				ResolvedType* inner = static_cast<NullableResolvedType*>(expr_type)->inner;
+				if (annotation && !typesEqual(annotation, inner)) {
+					errorLine(var.token, "else return target type must be the non-nullable inner type of initializer");
+					return false;
+				}
+				if (!annotation) annotation = inner;
+				if (return_type->kind != ResolvedTypeKind::VOID) {
+					errorLine(var.token, "else return with a nullable initializer requires a void function");
+					return false;
+				}
+			}
+			else if (!annotation || expr_type->kind != ResolvedTypeKind::UNION) {
+				errorLine(var.token, "else return requires a union or nullable initializer");
 				return false;
 			}
+			if (expr_type->kind != ResolvedTypeKind::UNION) {
+				var.else_return_type = nullptr;
+			}
+			else {
 			UnionResolvedType& source = static_cast<UnionResolvedType&>(*expr_type);
 			u32 target_count = 0;
 			for (ResolvedType* member : source.members) {
@@ -4341,6 +4357,7 @@ struct Checker {
 				errorLine(var.token, "else return residual type ", var.else_return_type,
 					" cannot be returned from function returning ", return_type);
 				return false;
+			}
 			}
 		}
 		if (!var.else_return && annotation && !canImplicitlyConvert(expr_type, annotation)) {
@@ -4847,12 +4864,16 @@ struct Checker {
 		ResolvedType* subject = checkExprForTarget(unit, &ctx, *ms.subject, nullptr);
 		if (!subject) return false;
 
-		// Subject must be a scalar numeric type, enum, or union.
+		// Subject must be a scalar numeric type, enum, string slice, or union.
 		const bool subject_is_numeric = isNumericOrUntyped(*subject);
 		const bool subject_is_enum = subject->kind == ResolvedTypeKind::ENUM;
+		const bool subject_is_string = subject->kind == ResolvedTypeKind::SLICE
+			&& static_cast<SliceResolvedType*>(subject)->is_const
+			&& static_cast<SliceResolvedType*>(subject)->element_type
+			&& static_cast<SliceResolvedType*>(subject)->element_type->kind == ResolvedTypeKind::U8;
 		const bool subject_is_union = subject->kind == ResolvedTypeKind::UNION;
-		if (!subject_is_numeric && !subject_is_enum && !subject_is_union) {
-			errorLine(ms.token, "Match statement subject must be a numeric type, enum, or union, got ", subject);
+		if (!subject_is_numeric && !subject_is_enum && !subject_is_string && !subject_is_union) {
+			errorLine(ms.token, "Match statement subject must be a numeric type, enum, string, or union, got ", subject);
 			return false;
 		}
 		// A compile-time subject selects one arm before checking match bodies, just
@@ -4929,6 +4950,7 @@ struct Checker {
 		ExpArray<bool> covered_union_members(unit.arena);
 		if (subject_union) covered_union_members.resize(subject_union->members.size(), false);
 		u32 covered_union_count = 0;
+		ExpArray<ComptimeValue> covered_string_patterns(unit.arena);
 
 		for (i32 arm_index = 0; arm_index < ms.arms.size(); ++arm_index) {
 			MatchArm& arm = ms.arms[arm_index];
@@ -4994,6 +5016,21 @@ struct Checker {
 					if (!end || !typesEqual(end, subject)) return false;
 				}
 				// Track enum coverage and detect duplicates.
+				if (subject_is_string) {
+					// String patterns are normally literals and therefore compile-time
+					// values. Keep the same duplicate-case diagnostic as enums while
+					// leaving non-constant pattern expressions to the normal matcher.
+					ComptimeValue value = evalComptime(unit, *pattern.begin, &ctx);
+					if (value) {
+						for (const ComptimeValue& previous : covered_string_patterns) {
+							if (comptimeValuesEqual(previous, value)) {
+								errorLine(pattern.begin->token, "Duplicate match arm for string pattern");
+								return false;
+							}
+						}
+						covered_string_patterns.push(value);
+					}
+				}
 				if (subject_enum && pattern.begin && pattern.begin->kind == Expression::MEMBER) {
 					MemberExpression* mem = static_cast<MemberExpression*>(pattern.begin);
 					for (i32 i = 0; i < subject_enum->decl->members.size(); ++i) {

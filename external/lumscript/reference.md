@@ -823,7 +823,28 @@ if e == null { return; }
 use_entity(e); // e is promoted to entity.Entity
 ```
 
-The same promotion applies when the `else` branch returns.
+The same promotion applies when the `else` branch returns:
+
+```cpp
+if e != null {
+	use_entity(e);
+} else {
+	return;
+}
+
+use_entity(e); // e is promoted to entity.Entity
+```
+
+A nullable value can also use the `else return` declaration form. The target
+annotation is optional and defaults to the nullable type's non-null inner type.
+The non-null value initializes the variable; the null case returns immediately:
+
+```cpp
+fn load_entity() : void {
+	var e = find_entity() else return;
+	use_entity(e); // e is non-null here
+}
+```
 
 Using a nullable value without a required null check is a compile-time error.
 
@@ -1478,13 +1499,14 @@ if health <= 0 {
 
 ### Match
 
-`match` is a non-fallthrough multi-way branch for enum and scalar values. Each `case` can contain any number of statements; execution stops at the end of the selected case and does not fall through to the next case.
+`match` is a non-fallthrough multi-way branch for enum, scalar, and string values. Each `case` can contain any number of statements; execution stops at the end of the selected case and does not fall through to the next case.
 An empty `case:` is the fallback arm. `else` is reserved for `if` statements.
 
 Supported patterns:
 
 - enum members
 - scalar literals
+- string literals, when matching a `[]const u8` value
 - ranges (`a..=b`, inclusive on both bounds)
 - member types, when matching a tagged union value (see [Tagged unions](#tagged-unions))
 - comma-separated alternatives
@@ -1530,7 +1552,22 @@ match key {
 }
 ```
 
-Enum matches must be exhaustive unless an empty `case:` fallback is present. Duplicate enum cases and multiple fallback cases are compile-time errors.
+String cases compare the slice contents, not the backing-pointer identity. This makes matching equivalent to a sequence of `==` comparisons and permits comma-separated alternatives:
+
+```cpp
+fn handle_command(command : []const u8) : void {
+	match command {
+		case "start", "run":
+			start();
+		case "stop", "quit":
+			stop();
+		case:
+			log.logError("unknown command");
+	}
+}
+```
+
+Enum matches must be exhaustive unless an empty `case:` fallback is present. String matches cannot generally be exhaustive, so they require an empty `case:` fallback. Duplicate enum or string cases and multiple fallback cases are compile-time errors.
 
 ### Compile-time branches
 
@@ -2929,7 +2966,6 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 * hex - 0x1234ABCD
 * FourCC? `ABCD`
 * bit set / flags / something else?
-* match on strings (and maybe any type)
 * null chaining a?.b?.c;
 * list of keywords and forbid identifier colliding with keywords
 * debugger:

@@ -30,6 +30,23 @@ TEST(MatchTypechecks) {
 	return true;
 }
 
+TEST(MatchStringTypechecks) {
+	const char* source = R"(
+		fn classify(value : []const u8) : i32 {
+			match value {
+				case "start", "run":
+					return 1;
+				case "stop":
+					return 2;
+				case:
+					return 0;
+			}
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(MatchArmAllowsMultipleStatements) {
 	const char* source = R"(
 		fn main(v : i32) : i32 {
@@ -322,6 +339,40 @@ TEST(MatchRuntime) {
 	ls_push_i32(runtime, 42);
 	EXPECT_TRUE(ls_call(runtime, toLs("range_match")));
 	EXPECT_EQ(2, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(MatchStringRuntimeUsesContentEquality) {
+	const char* source = R"(
+		fn classify(value : []const u8) : i32 {
+			match value {
+				case "start", "run":
+					return 1;
+				case "stop":
+					return 2;
+				case:
+					return 0;
+			}
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	ls_push_string(runtime, {"run", 3});
+	EXPECT_TRUE(ls_call(runtime, toLs("classify")));
+	EXPECT_EQ(1, ls_to_i32(runtime, -1));
+
+	// The input is not the pooled literal used by the match arm.
+	const char input[] = {'s', 't', 'o', 'p'};
+	ls_push_string(runtime, {input, 4});
+	EXPECT_TRUE(ls_call(runtime, toLs("classify")));
+	EXPECT_EQ(2, ls_to_i32(runtime, -1));
+
+	ls_push_string(runtime, {"unknown", 7});
+	EXPECT_TRUE(ls_call(runtime, toLs("classify")));
+	EXPECT_EQ(0, ls_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }

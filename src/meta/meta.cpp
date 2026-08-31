@@ -1477,6 +1477,7 @@ static void outputLuaObjectTypename(OutputStream& out, StringView type) {
 }
 
 void wrap(OutputStream& out, Module& m, Function& f) {
+	const bool return_is_reference = f.return_type.size() > 0 && f.return_type[f.return_type.size() - 1] == '&';
 	L("int ",m.name,"_",f.name,"(lua_State* L) {");
 	L("LuaWrapper::checkTableArg(L, 1);");
 	L(m.name,"* module;");
@@ -1497,6 +1498,7 @@ void wrap(OutputStream& out, Module& m, Function& f) {
 
 	bool has_return = !equal(f.return_type, "void");
 	if (has_return) out.add("\tLuaWrapper::push(L, ");
+	if (return_is_reference) out.add("&");
 	out.add("\tmodule->", f.name, "(");
 	forEachArg(args, [&](const Arg& arg, bool is_first) {
 		if (!is_first) out.add(", ");
@@ -2054,10 +2056,12 @@ StringView toLuaType(StringView ctype) {
 	#undef C
 
 	// TODO structs	
-	Struct* s = getStruct(ctype);
+	StringView base_type = ctype;
+	if (base_type.size() > 0 && base_type[base_type.size() - 1] == '&') --base_type.end;
+	Struct* s = getStruct(base_type);
 	if (s) return s->name;
 
-	Object* o = getObject(ctype);
+	Object* o = getObject(base_type);
 	if (o) return o->name;
 
 	return makeStringView("any");

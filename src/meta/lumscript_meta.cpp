@@ -96,6 +96,10 @@ bool isObjectPointerType(StringView type) {
 	return type.size() > 0 && type[type.size() - 1] == '*';
 }
 
+bool isReferenceType(StringView type) {
+	return type.size() > 0 && type[type.size() - 1] == '&';
+}
+
 bool isSpanType(StringView type) {
 	return type.size() > 6 && type[0] == 'S' && type[1] == 'p' && type[2] == 'a' && type[3] == 'n' && type[4] == '<' && type[type.size() - 1] == '>';
 }
@@ -382,7 +386,7 @@ void appendReturnValue(OutputStream& out, StringView type, const char* value, co
 bool isSupportedLumScriptFunction(Function& f) {
 	const LumScriptType ret_type = getLumScriptType(f.return_type);
 	if (!isSupportedLumScriptType(f.return_type, ret_type)) return false;
-	if (ret_type == LumScriptType::OBJECT_T && !isObjectPointerType(f.return_type)) return false;
+	if (ret_type == LumScriptType::OBJECT_T && !isObjectPointerType(f.return_type) && !isReferenceType(f.return_type)) return false;
 	bool supported = true;
 	forEachArg(f.args, [&](const Arg& arg, bool) {
 		if (!isSupportedLumScriptFunctionArg(arg)) supported = false;
@@ -558,7 +562,7 @@ void serializeLumScriptModuleWrapper(OutputStream& out, Module& m, Function& f, 
 	L("LS_ARG(frame, ", m.name, "*, module);");
 	forEachArg(f.args, [&](const Arg& arg, bool) { emitArgRead(out, arg); });
 
-	if (!equal(f.return_type, "void")) out.add("auto ret = ");
+	if (!equal(f.return_type, "void")) out.add(isReferenceType(f.return_type) ? "auto& ret = " : "auto ret = ");
 	out.add("module->", f.name, "(");
 	forEachArg(f.args, [&](const Arg& arg, bool is_first) {
 		if (!is_first) out.add(", ");

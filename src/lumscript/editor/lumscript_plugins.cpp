@@ -4,6 +4,7 @@
 #include "lumscript/lumscript_resource.h"
 #include "core/log.h"
 #include "core/path.h"
+#include "core/debug.h"
 #include "editor/action.h"
 #include "editor/studio_app.h"
 #include "editor/asset_browser.h"
@@ -17,6 +18,7 @@
 #include "engine/world.h"
 #include "editor/world_editor.h"
 #include "lumscript/lumscript_module.h"
+#include "lumscript/lumscript_capi.gen.h"
 #include "core/array.h"
 #include "core/stream.h"
 #include "../../external/lumscript/capi.h"
@@ -205,7 +207,38 @@ static void drawVariableName(ls_string_view name) {
 	ImGui::Unindent(ImGui::GetTreeNodeToLabelSpacing());
 }
 
-static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* type, void* value, u32 size, bool editable = false) {
+static bool isEntityType(const ls_type* type) {
+	if (!type || ls_type_get_kind(type) != LS_TYPE_STRUCT) return false;
+	const ls_string_view type_name = ls_type_get_name(type);
+	return type_name.length == 6 && equalStrings(StringView(type_name.begin, type_name.length), "Entity");
+}
+
+static void drawEntityValue(const LsEntity& entity, WorldEditor* editor) {
+	const bool valid = entity.world && entity.index >= 0 && entity.world->hasEntity(EntityRef(entity.index));
+	StaticString<256> label;
+	if (valid) {
+		const char* entity_name = entity.world->getEntityName(EntityRef(entity.index));
+		if (entity_name && entity_name[0]) label.append(entity_name, " (", entity.index, ")");
+		else label.append("Entity (", entity.index, ")");
+	}
+	else {
+		label.append("<invalid entity>");
+	}
+
+	if (editor && valid && entity.world == editor->getWorld()) {
+		ImGui::Selectable(label, false, ImGuiSelectableFlags_DontClosePopups);
+		if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+		if (ImGui::IsItemClicked()) {
+			const EntityRef ref(entity.index);
+			editor->selectEntities(Span(&ref, 1), false);
+		}
+	}
+	else {
+		ImGui::TextUnformatted(label);
+	}
+}
+
+static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* type, void* value, u32 size, bool editable = false, WorldEditor* editor = nullptr) {
 	if (type && ls_type_get_kind(type) != LS_TYPE_INVALID) {
 		kind = ls_type_get_kind(type);
 		size = ls_type_get_size(type);
@@ -228,13 +261,21 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 				, inner
 				, (void*)ls_type_nullable_value_ptr(type, value)
 				, ls_type_get_size(inner)
-				, editable);
+				, editable
+				, editor);
 			return;
 		}
 	}
 
 	ImGui::TableNextRow();
 	ImGui::TableNextColumn();
+
+	if (isEntityType(type) && size >= sizeof(LsEntity)) {
+		drawVariableName(name);
+		ImGui::TableNextColumn();
+		drawEntityValue(*(const LsEntity*)value, editor);
+		return;
+	}
 
 	if (kind == LS_TYPE_STRUCT && type) {
 		const bool open = ImGui::TreeNodeEx(value, ImGuiTreeNodeFlags_SpanAvailWidth, "%.*s", int(name.length), name.begin);
@@ -248,7 +289,8 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 					, field_type
 					, (u8*)value + ls_type_struct_field_offset(type, i)
 					, field_type ? ls_type_get_size(field_type) : 0
-					, editable);
+					, editable
+					, editor);
 			}
 			ImGui::TreePop();
 		}
@@ -276,7 +318,8 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 							, field_type
 							, (u8*)payload + ls_type_struct_field_offset(member_type, i)
 							, field_type ? ls_type_get_size(field_type) : 0
-							, editable);
+							, editable
+							, editor);
 					}
 				} else {
 					static const char value_name[] = "value";
@@ -285,7 +328,8 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 						, member_type
 						, payload
 						, member_type ? ls_type_get_size(member_type) : 0
-						, editable);
+						, editable
+						, editor);
 				}
 			}
 			ImGui::TreePop();
@@ -324,7 +368,8 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 						, element_type
 						, (u8*)data + i * element_size
 						, element_size
-						, editable);
+						, editable
+						, editor);
 				}
 			}
 			ImGui::TreePop();
@@ -337,6 +382,14 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 	ImGui::PushID(value);
 	if (kind == LS_TYPE_NULLABLE) {
 		ImGui::TextDisabled("null");
+	}
+	else if (isEntityType(type) && size >= sizeof(LsEntity)) {
+		drawEntityValue(*(const LsEntity*)value, editor);
+	}
+	else if (kind == LS_TYPE_CPTR && editor) {
+		drawPrimitiveValue(kind, value, type);
+		ImGui::SameLine();
+		if (ImGuiEx::IconButton(ICON_FA_BUG, "Break into C++ debugger")) debug::debugBreak();
 	}
 	else if (editable) {
 		switch (kind) {
@@ -930,7 +983,7 @@ struct LumScriptVariablesWindow final : StudioApp::GUIPlugin {
 						const ls_type* type = ls_debug_local_type(runtime, 0, i);
 						u32 size = 0;
 						void* value = ls_debug_local_value(runtime, 0, i, &size);
-						drawVariable(name, kind, type, value, size);
+						drawVariable(name, kind, type, value, size, false, &m_app.getWorldEditor());
 					}
 				}
 
@@ -941,7 +994,7 @@ struct LumScriptVariablesWindow final : StudioApp::GUIPlugin {
 					const ls_type* type = ls_debug_global_type(runtime, i);
 					u32 size = 0;
 					void* value = ls_debug_global_value(runtime, i, &size);
-					drawVariable(name, kind, type, value, size);
+					drawVariable(name, kind, type, value, size, false, &m_app.getWorldEditor());
 				}
 				ImGui::EndTable();
 			}

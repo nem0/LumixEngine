@@ -6,36 +6,44 @@ import "core:world"
 
 import "scripts/player" as player
 
+struct component {}
+
+#[component {}]
+struct Foo {
+	i : i32;
+	f : i32;
+}
+
 var g_input : InputSystem = undefined;
 var g_world : World = undefined;
+
+fn enableCursor(ui : UIModule, enable : bool) : void {
+	var sys = ui.getSystem();
+	sys.enableCursor(enable);
+}
 
 fn update(td : f32) : void {
     player.update(td);
 	
 	// UI
-	var ui = g_world.ui();
-	//var events = g_world.ui()?.getDocument()?.getEvents();
-	if ui != null {
-		var doc = ui.getDocument();
-		if doc != null {
-			var events = doc.getEvents();
-			for event in events {
-				if event.action == "start" {
-					player.handle_input = true;
-					var root_el = doc.getElement(0);
-					if root_el != null {
-						root_el.setVisible(false);
-					}
-				}
-				else if event.action == "close" {
-					var el = doc.getElementByID("runtime_ui");
-					if el != null {
-						el.setVisible(false);
-					}
-				}
-			}	
+	var ui = g_world.ui() else return;
+	var doc = ui.getDocument();
+	var events = doc.getEvents();
+
+	for event in events {
+		match event.action {
+			case "start":
+				player.handle_input = true;
+				enableCursor(ui, false);
+				var elem = doc.getElement(0) else return;
+				elem.setVisible(false);
+			case "close":
+				player.handle_input = true;
+				enableCursor(ui, false);
+				var elem = doc.getElementByID("runtime_ui") else return;
+				elem.setVisible(false);
 		}
-	}
+	}	
 }
 
 fn init(input : InputSystem) : void {

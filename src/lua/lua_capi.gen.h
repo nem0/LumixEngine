@@ -2657,7 +2657,7 @@ namespace Lumix {
 		LuaWrapper::checkTableArg(L, 1);
 		UIModule* module;
 		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
-		LuaWrapper::push(L, 	module->getDocument());
+		LuaWrapper::push(L, &	module->getDocument());
 		return 1;
 	}
 	
@@ -2682,7 +2682,7 @@ namespace Lumix {
 		LuaWrapper::checkTableArg(L, 1);
 		UIModule* module;
 		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
-		LuaWrapper::push(L, 	module->getSystemPtr());
+		LuaWrapper::push(L, &	module->getSystemPtr());
 		return 1;
 	}
 	

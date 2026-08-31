@@ -1574,6 +1574,39 @@ struct IRBuilder {
 				auto& vd = static_cast<VarDeclStatement&>(st);
 				if (vd.is_comptime) break;
 				if (vd.else_return) {
+					ASSERT(vd.expression->resolved_type);
+					if (vd.expression->resolved_type->kind == ResolvedTypeKind::NULLABLE) {
+						auto& nullable = static_cast<NullableResolvedType&>(*vd.expression->resolved_type);
+						auto& tmp = allocAlloca(vd.expression->resolved_type, {}, &buildExpressionIR(*vd.expression, true));
+						parent.ops.push(&tmp);
+						static ResolvedType u8_type(ResolvedTypeKind::U8);
+						auto& flag = alloc<LsOpExtractValue>();
+						flag.value = &loadAllocaValue(tmp);
+						flag.offset = 0;
+						flag.size = 1;
+						auto& zero = alloc<LsOpLoadConst>();
+						zero.type = &u8_type;
+						const u8 zero_value = 0;
+						memcpy(zero.value, &zero_value, sizeof(zero_value));
+						auto& is_null = alloc<LsOpEq>();
+						is_null.operand_type = &u8_type;
+						is_null.lhs = &flag;
+						is_null.rhs = &zero;
+						auto& branch = alloc<LsOpConditionalJump>();
+						branch.condition = &is_null;
+						branch.true_block = &alloc<LsIrBlockData>(host.arena);
+						branch.false_block = &alloc<LsIrBlockData>(host.arena);
+						auto& dest = allocAlloca(vd.resolved_type, vd.name, &alloc<LsOpExtractValue>());
+						auto& payload = static_cast<LsOpExtractValue&>(*dest.value);
+						payload.value = &loadAllocaValue(tmp);
+						payload.offset = 1;
+						payload.size = typeByteSize(*nullable.inner);
+						branch.false_block->ops.push(&dest);
+						locals.push({vd.name, &dest});
+						buildReturnIR(*branch.true_block, nullptr);
+						parent.ops.push(&branch);
+						break;
+					}
 					// var v : T = expr else return;
 					// Evaluate expr once. If its tag is in T, bind v (extract or remap).
 					// Otherwise return the residual U-T, converted to the function return type.
