@@ -2923,6 +2923,7 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 
 # TODO
 
+* union tag is always 4 bytes
 * https://verdagon.dev/grimoire/grimoire#the-list
 * should we make string literal to cstr cast explicit?
 * hex - 0x1234ABCD

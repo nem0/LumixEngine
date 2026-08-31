@@ -157,47 +157,6 @@ static Action g_debugger_step_over{"LumScript", "Step over", "Step over next sta
 static Action g_debugger_step_into{"LumScript", "Step into", "Step into function call", "lumscript_step_into", ICON_FA_ARROW_DOWN, Action::Type::NORMAL};
 static Action g_debugger_step_out{"LumScript", "Step out", "Step out of function", "lumscript_step_out", ICON_FA_ARROW_UP, Action::Type::NORMAL};
 
-static const char* typeName(ls_type_kind kind) {
-	switch (kind) {
-		case LS_TYPE_BOOL: return "bool";
-		case LS_TYPE_I8: return "i8";
-		case LS_TYPE_U8: return "u8";
-		case LS_TYPE_I16: return "i16";
-		case LS_TYPE_U16: return "u16";
-		case LS_TYPE_I32: return "i32";
-		case LS_TYPE_U32: return "u32";
-		case LS_TYPE_I64: return "i64";
-		case LS_TYPE_U64: return "u64";
-		case LS_TYPE_F32: return "f32";
-		case LS_TYPE_F64: return "f64";
-		case LS_TYPE_STRUCT: return "struct";
-		case LS_TYPE_ENUM: return "enum";
-		case LS_TYPE_ARRAY: return "array";
-		case LS_TYPE_SLICE: return "slice";
-		case LS_TYPE_CPTR: return "cptr";
-		case LS_TYPE_FUNCTION: return "function";
-		case LS_TYPE_TAGGED_UNION: return "union";
-		case LS_TYPE_NULLABLE: return "?";
-		case LS_TYPE_NULL_VALUE: return "null";
-		default: return "unknown";
-	}
-}
-
-static void drawTypeColumn(ls_type_kind kind, const ls_type* type) {
-	if (type) {
-		const ls_string_view name = ls_type_get_name(type);
-		if (name.begin && name.length != 0) {
-			ImGui::Text("%.*s", int(name.length), name.begin);
-			return;
-		}
-	}
-	if (kind == LS_TYPE_INVALID) {
-		ImGui::TextUnformatted("invalid");
-		return;
-	}
-	ImGui::TextUnformatted(typeName(kind));
-}
-
 static bool isStringSlice(const ls_type* type) {
 	if (!type || ls_type_get_kind(type) != LS_TYPE_SLICE || !ls_type_is_const(type)) return false;
 	const ls_type* elem = ls_type_array_element_type(type);
@@ -240,142 +199,132 @@ static void drawPrimitiveValue(ls_type_kind kind, const void* value, const ls_ty
 	}
 }
 
+static void drawVariableName(ls_string_view name) {
+	ImGui::Indent(ImGui::GetTreeNodeToLabelSpacing());
+	ImGui::TextUnformatted(name.begin, name.begin + name.length);
+	ImGui::Unindent(ImGui::GetTreeNodeToLabelSpacing());
+}
+
 static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* type, void* value, u32 size, bool editable = false) {
 	if (type && ls_type_get_kind(type) != LS_TYPE_INVALID) {
 		kind = ls_type_get_kind(type);
 		size = ls_type_get_size(type);
 	}
 
-	if (!value || size == 0) {ImGuiEx::Label(StaticString<128>(StringView(name.begin, name.length))); ImGui::TextDisabled("<unavailable>"); return;
+	if (!value || size == 0) {
+		ImGui::TableNextRow();
+		ImGui::TableNextColumn();
+		drawVariableName(name);
+		ImGui::TableNextColumn();
+		ImGui::TextDisabled("<unavailable>");
+		return;
 	}
 
-	if (kind == LS_TYPE_STRUCT && type) {const bool open = ImGui::TreeNodeEx(name.begin
-			, ImGuiTreeNodeFlags_SpanFullWidth
-			, "%.*s"
-			, int(name.length)
-			, name.begin);ImGui::Text("(%u B)", ls_type_get_size(type));if (open) {
+	if (kind == LS_TYPE_NULLABLE && type && !ls_type_nullable_is_null(type, value)) {
+		const ls_type* inner = ls_type_nullable_inner_type(type);
+		if (inner) {
+			drawVariable(name
+				, ls_type_get_kind(inner)
+				, inner
+				, (void*)ls_type_nullable_value_ptr(type, value)
+				, ls_type_get_size(inner)
+				, editable);
+			return;
+		}
+	}
+
+	ImGui::TableNextRow();
+	ImGui::TableNextColumn();
+
+	if (kind == LS_TYPE_STRUCT && type) {
+		const bool open = ImGui::TreeNodeEx(value, ImGuiTreeNodeFlags_SpanAvailWidth, "%.*s", int(name.length), name.begin);
+		ImGui::TableNextColumn();
+		if (open) {
 			for (u32 i = 0, c = ls_type_struct_field_count(type); i < c; ++i) {
-				const ls_string_view fname = ls_type_struct_field_name(type, i);
-				const u32 offset = ls_type_struct_field_offset(type, i);
-				const ls_type* ftype = ls_type_struct_field_type(type, i);
-				void* fv = (u8*)value + offset;
-				const u32 fsize = ftype ? ls_type_get_size(ftype) : 0u;
-				drawVariable(fname, ftype ? ls_type_get_kind(ftype) : LS_TYPE_INVALID, ftype, fv, fsize, editable);
+				const ls_string_view field_name = ls_type_struct_field_name(type, i);
+				const ls_type* field_type = ls_type_struct_field_type(type, i);
+				drawVariable(field_name
+					, field_type ? ls_type_get_kind(field_type) : LS_TYPE_INVALID
+					, field_type
+					, (u8*)value + ls_type_struct_field_offset(type, i)
+					, field_type ? ls_type_get_size(field_type) : 0
+					, editable);
 			}
 			ImGui::TreePop();
 		}
 		return;
 	}
 
-	if (kind == LS_TYPE_TAGGED_UNION && type) {const i32 tag = ls_type_union_tag(type, value);
-		const bool open = ImGui::TreeNodeEx(name.begin
-			, ImGuiTreeNodeFlags_SpanFullWidth
-			, "%.*s"
-			, int(name.length)
-			, name.begin);{
-			const u32 member_count = ls_type_union_member_count(type);
-			if (tag >= 0 && (u32)tag < member_count) {
-				const ls_type* member_type = ls_type_union_member_type(type, tag);
-				ImGui::Text("tag=%d: ", tag);
-				ImGui::SameLine();
-				if (member_type) ImGui::TextUnformatted("<value>");
-				else ImGui::TextUnformatted("?");
-				ImGui::SameLine();
-				ImGui::Text("(%u members)", member_count);
-			} else {
-				ImGui::Text("tag=%d (invalid) (%u members)", tag, member_count);
-			}
-		}if (open) {
-			const u32 member_count = ls_type_union_member_count(type);
-			if (tag >= 0 && (u32)tag < member_count) {
+	if (kind == LS_TYPE_TAGGED_UNION && type) {
+		const i32 tag = ls_type_union_tag(type, value);
+		const u32 member_count = ls_type_union_member_count(type);
+		const bool valid_tag = tag >= 0 && (u32)tag < member_count;
+		const bool open = ImGui::TreeNodeEx(value, ImGuiTreeNodeFlags_SpanAvailWidth, "%.*s", int(name.length), name.begin);
+		ImGui::TableNextColumn();
+		if (valid_tag) ImGui::Text("tag %d", tag);
+		else ImGui::TextDisabled("invalid tag %d", tag);
+		if (open) {
+			if (valid_tag) {
 				const ls_type* member_type = ls_type_union_member_type(type, tag);
 				void* payload = (u8*)value + 4;
 				if (member_type && ls_type_get_kind(member_type) == LS_TYPE_STRUCT) {
 					for (u32 i = 0, c = ls_type_struct_field_count(member_type); i < c; ++i) {
-						const ls_string_view fname = ls_type_struct_field_name(member_type, i);
-						const u32 offset = ls_type_struct_field_offset(member_type, i);
-						const ls_type* ftype = ls_type_struct_field_type(member_type, i);
-						void* fv = (u8*)payload + offset;
-						const u32 fsize = ftype ? ls_type_get_size(ftype) : 0u;
-						drawVariable(fname, ftype ? ls_type_get_kind(ftype) : LS_TYPE_INVALID, ftype, fv, fsize, editable);
+						const ls_string_view field_name = ls_type_struct_field_name(member_type, i);
+						const ls_type* field_type = ls_type_struct_field_type(member_type, i);
+						drawVariable(field_name
+							, field_type ? ls_type_get_kind(field_type) : LS_TYPE_INVALID
+							, field_type
+							, (u8*)payload + ls_type_struct_field_offset(member_type, i)
+							, field_type ? ls_type_get_size(field_type) : 0
+							, editable);
 					}
 				} else {
-					const ls_type_kind member_kind = member_type ? ls_type_get_kind(member_type) : LS_TYPE_INVALID;
-					const u32 member_size = member_type ? ls_type_get_size(member_type) : 0u;
-					const char* value_str = "value";
-					drawVariable(ls_string_view{value_str, 5}, member_kind, member_type, payload, member_size, editable);
+					static const char value_name[] = "value";
+					drawVariable({value_name, sizeof(value_name) - 1}
+						, member_type ? ls_type_get_kind(member_type) : LS_TYPE_INVALID
+						, member_type
+						, payload
+						, member_type ? ls_type_get_size(member_type) : 0
+						, editable);
 				}
-			} else {ImGui::TextDisabled("<invalid tag>");
 			}
 			ImGui::TreePop();
 		}
 		return;
 	}
 
-	if (kind == LS_TYPE_ARRAY && type) {const bool open = ImGui::TreeNodeEx(name.begin
-			, ImGuiTreeNodeFlags_SpanFullWidth
-			, "%.*s"
-			, int(name.length)
-			, name.begin);ImGui::TextUnformatted("");{
-			const u32 len = ls_type_array_length(type);
-			const ls_type* elem = ls_type_array_element_type(type);
-			ImGui::Text("[%u]", len);
-		}
-		if (open) {
-			const u32 len = ls_type_array_length(type);
-			const ls_type* elem = ls_type_array_element_type(type);
-			const u32 elem_size = elem ? ls_type_get_size(elem) : 1u;
-			char idx_buf[32];
-			for (u32 i = 0; i < len; ++i) {
-				idx_buf[0] = '[';
-				char* end = toCString(i, Span<char>(idx_buf + 1, sizeof(idx_buf) - 2));
-				if (!end) end = idx_buf + 1;
-				*end = ']';
-				*(end + 1) = '\0';
-				const ls_string_view idx_name = { idx_buf, end - idx_buf + 1 };
-				void* ev = (u8*)value + i * elem_size;
-				drawVariable(idx_name, elem ? ls_type_get_kind(elem) : LS_TYPE_INVALID, elem, ev, elem_size, editable);
-			}
-			ImGui::TreePop();
-		}
-		return;
-	}
-
-	if (kind == LS_TYPE_SLICE && type) {
-		const void* ptr = *(const void* const*)value;
-		const u64 len = *(const u64*)((const u8*)value + 8);
-		const ls_type* elem = ls_type_array_element_type(type);
-		const u32 elem_size = elem ? ls_type_get_size(elem) : 1u;
-		if (isStringSlice(type)) {
-			ImGui::Indent();ImGui::Text("%.*s", int(name.length), name.begin);if (!ptr) {
-				ImGui::TextUnformatted("null");
-			} else {
-				const u64 display_len = len > 0x7fffffffu ? 0x7fffffffu : len;
-				ImGui::Text("\"%.*s\"", (int)display_len, (const char*)ptr);
-			}ImGui::TextUnformatted("string");
-			ImGui::Unindent();
+	if ((kind == LS_TYPE_ARRAY || kind == LS_TYPE_SLICE) && type) {
+		const ls_type* element_type = ls_type_array_element_type(type);
+		const u32 element_size = element_type ? ls_type_get_size(element_type) : 1;
+		const bool slice = kind == LS_TYPE_SLICE;
+		const void* data = slice ? *(const void* const*)value : value;
+		const u64 count = slice ? *(const u64*)((const u8*)value + 8) : ls_type_array_length(type);
+		if (slice && isStringSlice(type)) {
+			drawVariableName(name);
+			ImGui::TableNextColumn();
+			if (data) ImGui::Text("\"%.*s\"", int(count > 0x7fffffffu ? 0x7fffffffu : count), (const char*)data);
+			else ImGui::TextUnformatted("null");
 			return;
-		}const bool open = ImGui::TreeNodeEx(name.begin
-			, ImGuiTreeNodeFlags_SpanFullWidth
-			, "%.*s"
-			, int(name.length)
-			, name.begin);ImGui::TextUnformatted("");ImGui::Text("(%llu)", len);
-		if (elem) {
-			ImGui::SameLine();
-			ImGui::TextUnformatted("<element>");
 		}
+
+		const bool open = ImGui::TreeNodeEx(value, ImGuiTreeNodeFlags_SpanAvailWidth, "%.*s", int(name.length), name.begin);
+		ImGui::TableNextColumn();
+		ImGui::Text("[%llu]", count);
 		if (open) {
-			if (ptr && len > 0) {
-				char idx_buf[32];
-				for (u64 i = 0; i < len; ++i) {
-					idx_buf[0] = '[';
-					char* end = toCString(i, Span<char>(idx_buf + 1, sizeof(idx_buf) - 2));
-					if (!end) end = idx_buf + 1;
+			if (data) {
+				for (u64 i = 0; i < count; ++i) {
+					char index[32];
+					index[0] = '[';
+					char* end = toCString(i, Span<char>(index + 1, sizeof(index) - 2));
+					if (!end) end = index + 1;
 					*end = ']';
 					*(end + 1) = '\0';
-					const ls_string_view idx_name = { idx_buf, end - idx_buf + 1 };
-					void* ev = (u8*)ptr + i * elem_size;
-					drawVariable(idx_name, elem ? ls_type_get_kind(elem) : LS_TYPE_INVALID, elem, ev, elem_size, editable);
+					drawVariable({index, u32(end - index + 1)}
+						, element_type ? ls_type_get_kind(element_type) : LS_TYPE_INVALID
+						, element_type
+						, (u8*)data + i * element_size
+						, element_size
+						, editable);
 				}
 			}
 			ImGui::TreePop();
@@ -383,48 +332,13 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 		return;
 	}
 
-	if (kind == LS_TYPE_NULLABLE && type) {const bool open = ImGui::TreeNodeEx(name.begin
-			, ImGuiTreeNodeFlags_SpanFullWidth
-			, "%.*s"
-			, int(name.length)
-			, name.begin);if (ls_type_nullable_is_null(type, value)) {
-			ImGui::TextDisabled("null");
-		} else {
-			const ls_type* inner = ls_type_nullable_inner_type(type);
-			if (inner) ImGui::TextUnformatted("<value>");
-			else ImGui::TextUnformatted("?");
-		}ImGui::TextUnformatted("?");
-		if (open) {
-			if (!ls_type_nullable_is_null(type, value)) {
-				const ls_type* inner = ls_type_nullable_inner_type(type);
-				const void* inner_value = ls_type_nullable_value_ptr(type, value);
-				const u32 inner_size = inner ? ls_type_get_size(inner) : 0u;
-				const ls_type_kind inner_kind = inner ? ls_type_get_kind(inner) : LS_TYPE_INVALID;
-				if (inner_kind == LS_TYPE_STRUCT) {
-					for (u32 i = 0, c = ls_type_struct_field_count(inner); i < c; ++i) {
-						const ls_string_view fname = ls_type_struct_field_name(inner, i);
-						const u32 offset = ls_type_struct_field_offset(inner, i);
-						const ls_type* ftype = ls_type_struct_field_type(inner, i);
-						void* fv = (u8*)inner_value + offset;
-						const u32 fsize = ftype ? ls_type_get_size(ftype) : 0u;
-						drawVariable(fname, ftype ? ls_type_get_kind(ftype) : LS_TYPE_INVALID, ftype, fv, fsize, editable);
-					}
-				} else {
-					const char* value_str = "value";
-					const ls_string_view value_name = { value_str, 5 };
-					drawVariable(value_name, inner_kind, inner, (void*)inner_value, inner_size, editable);
-				}
-			}
-			ImGui::TreePop();
-		}
-		return;
-	}
-
-	// Primitive
-	ImGui::Indent();
-	ImGuiEx::Label(StaticString<128>(StringView(name.begin, name.length)));
+	drawVariableName(name);
+	ImGui::TableNextColumn();
 	ImGui::PushID(value);
-	if (editable) {
+	if (kind == LS_TYPE_NULLABLE) {
+		ImGui::TextDisabled("null");
+	}
+	else if (editable) {
 		switch (kind) {
 			case LS_TYPE_BOOL: ImGui::Checkbox("##value", (bool*)value); break;
 			case LS_TYPE_I8: ImGui::InputScalar("##value", ImGuiDataType_S8, value); break;
@@ -444,7 +358,7 @@ static void drawVariable(ls_string_view name, ls_type_kind kind, const ls_type* 
 	else {
 		drawPrimitiveValue(kind, value, type);
 	}
-	ImGui::PopID();ImGui::Unindent();
+	ImGui::PopID();
 }
 
 struct LumScriptDebuggerWindow;
@@ -956,7 +870,11 @@ static void applyLumScriptBreakpointMarkers(CodeEditor& editor, const Path& path
 }
 
 struct LumScriptVariablesWindow final : StudioApp::GUIPlugin {
-	explicit LumScriptVariablesWindow(StudioApp& app) : m_app(app), m_is_open(true) { m_filter[0] = '\0'; }
+	explicit LumScriptVariablesWindow(StudioApp& app)
+		: m_app(app)
+		, m_is_open(true) {
+		m_filter[0] = '\0';
+	}
 	const char* getName() const override { return "lumscript_variables"; }
 	bool isOpen() const { return m_is_open; }
 	void setOpen(bool open) { m_is_open = open; }
@@ -966,7 +884,10 @@ struct LumScriptVariablesWindow final : StudioApp::GUIPlugin {
 		for (const char* c = name.begin; c < name.begin + name.length; ++c) {
 			const char* f = filter;
 			const char* n = c;
-			while (*f && n < name.begin + name.length && toLower(*n) == toLower(*f)) { ++n; ++f; }
+			while (*f && n < name.begin + name.length && toLower(*n) == toLower(*f)) {
+				++n;
+				++f;
+			}
 			if (!*f) return true;
 		}
 		return false;
@@ -985,30 +906,34 @@ struct LumScriptVariablesWindow final : StudioApp::GUIPlugin {
 		ls_runtime* runtime = module ? module->getDebugRuntime() : nullptr;
 
 		const bool suspended = runtime && ls_debug_is_suspended(runtime);
-		if (!suspended) {
-			ImGui::TextDisabled(runtime ? "Running" : "Waiting for runtime...");
+		if (!runtime) {
+			ImGui::TextDisabled("Waiting for runtime...");
 		} else {
 			ImGui::InputTextWithHint("##filter", "Filter variables...", m_filter, sizeof(m_filter), ImGuiInputTextFlags_AutoSelectAll);
 			const bool has_filter = m_filter[0] != '\0';
 
-			if (ImGui::BeginTable("lumscript_variables", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY)) {
-				ImGui::TableSetupColumn("Name");
-				ImGui::TableSetupColumn("Value");
-				ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed);
+			const ImGuiTableFlags table_flags = ImGuiTableFlags_BordersInnerV
+				| ImGuiTableFlags_Resizable
+				| ImGuiTableFlags_RowBg
+				| ImGuiTableFlags_ScrollY;
+			if (ImGui::BeginTable("lumscript_variables", 2, table_flags)) {
+				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.5f);
+				ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch, 0.5f);
+				ImGui::TableSetupScrollFreeze(0, 1);
 				ImGui::TableHeadersRow();
 
-				// Locals
-				for (u32 i = 0, n = ls_debug_frame_local_count(runtime, 0); i < n; ++i) {
-					const ls_string_view name = ls_debug_local_name(runtime, 0, i);
-					if (has_filter && !nameMatchesFilter(name, m_filter)) continue;
-					const ls_type_kind kind = ls_debug_local_kind(runtime, 0, i);
-					const ls_type* type = ls_debug_local_type(runtime, 0, i);
-					u32 size = 0;
-					void* value = ls_debug_local_value(runtime, 0, i, &size);
-					drawVariable(name, kind, type, value, size);
+				if (suspended) {
+					for (u32 i = 0, n = ls_debug_frame_local_count(runtime, 0); i < n; ++i) {
+						const ls_string_view name = ls_debug_local_name(runtime, 0, i);
+						if (has_filter && !nameMatchesFilter(name, m_filter)) continue;
+						const ls_type_kind kind = ls_debug_local_kind(runtime, 0, i);
+						const ls_type* type = ls_debug_local_type(runtime, 0, i);
+						u32 size = 0;
+						void* value = ls_debug_local_value(runtime, 0, i, &size);
+						drawVariable(name, kind, type, value, size);
+					}
 				}
 
-				// Globals
 				for (u32 i = 0, n = ls_debug_global_count(runtime); i < n; ++i) {
 					const ls_string_view name = ls_debug_global_name(runtime, i);
 					if (has_filter && !nameMatchesFilter(name, m_filter)) continue;
@@ -1091,7 +1016,9 @@ struct LumScriptPropertyGridPlugin final : PropertyGrid::IPlugin {
 			ImGui::SameLine();
 			const bool open = ImGui::TreeNodeEx("##data", ImGuiTreeNodeFlags_SpanFullWidth, "%.*s", int(name.length), name.data);
 			if (open) {
-				{
+				if (ImGui::BeginTable("##data_table", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable)) {
+					ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.5f);
+					ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch, 0.5f);
 					const void* value = module.getLumScriptData(entity, type);
 					const ls_type_kind kind = ls_type_get_kind(type);
 					if (kind == LS_TYPE_STRUCT) {
@@ -1109,8 +1036,9 @@ struct LumScriptPropertyGridPlugin final : PropertyGrid::IPlugin {
 					}
 					else {
 						static const char value_name[] = "value";
-						drawVariable({value_name, lengthOf(value_name) - 1 }, kind, type, (void*)value, ls_type_get_size(type), true);
+						drawVariable({value_name, lengthOf(value_name) - 1}, kind, type, (void*)value, ls_type_get_size(type), true);
 					}
+					ImGui::EndTable();
 				}
 				ImGui::TreePop();
 			}
