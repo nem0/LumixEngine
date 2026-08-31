@@ -9,10 +9,7 @@ import "scripts/player" as player
 struct component {}
 
 #[component {}]
-struct Foo {
-	i : i32;
-	f : i32;
-}
+struct RandomColorComponent {}
 
 var g_input : InputSystem = undefined;
 var g_world : World = undefined;

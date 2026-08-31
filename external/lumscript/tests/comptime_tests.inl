@@ -855,7 +855,7 @@ TEST(ComptimeStructBindingTypechecks) {
 
 TEST(ComptimeFunctionReturnsStructType) {
 	const char* source = R"(
-		fn pair(T : type) : type {
+		fn pair(T : comptime type) : type {
 			return struct {
 				a : T;
 				b : T;
@@ -880,7 +880,7 @@ TEST(ComptimeFunctionReturnsStructType) {
 
 TEST(ComptimeFunctionReturnedStructTypeIsCanonical) {
 	const char* source = R"(
-		fn pair(T : type) : type {
+		fn pair(T : comptime type) : type {
 			return struct { a : T; b : T; };
 		}
 
@@ -901,7 +901,7 @@ TEST(ComptimeFunctionReturnedStructTypeIsCanonical) {
 
 TEST(TypeFactoryCallInTypeAnnotation) {
 	const char* source = R"(
-		fn vec2(T : type) : type {
+		fn vec2(T : comptime type) : type {
 			return struct { x : T; y : T; };
 		}
 
@@ -919,11 +919,11 @@ TEST(TypeFactoryCallInTypeAnnotation) {
 
 TEST(TypeFactoryCallInGenericTypeAnnotation) {
 	const char* source = R"(
-		fn vec2(T : type) : type {
+		fn vec2(T : comptime type) : type {
 			return struct { x : T; y : T; };
 		}
 
-		fn first(T : type, value : vec2(T)) : T { return value.x; }
+		fn first(T : comptime type, value : vec2(T)) : T { return value.x; }
 		fn main() : i32 { return first(i32, vec2(i32) { 42, 0 }); }
 	)";
 	CAPI_BEGIN(module, diagnostics);
@@ -937,7 +937,7 @@ TEST(TypeFactoryCallInGenericTypeAnnotation) {
 
 TEST(TypeFactoryCallInfersGenericTypeAnnotation) {
 	const char* source = R"(
-		fn vec2(T : type) : type {
+		fn vec2(T : comptime type) : type {
 			return struct { x : T; y : T; };
 		}
 
@@ -955,7 +955,7 @@ TEST(TypeFactoryCallInfersGenericTypeAnnotation) {
 
 TEST(TypeFactoryValueDependentStructLayout) {
 	const char* source = R"(
-		fn array_type(T : type, N : comptime i32) : type {
+		fn array_type(T : comptime type, N : comptime i32) : type {
 			return struct { values : [N]T; };
 		}
 
@@ -976,7 +976,7 @@ TEST(TypeFactoryValueDependentStructLayout) {
 
 TEST(TypeFactoryValueDependentStructLayoutRejectsNegativeSize) {
 	const char* source = R"(
-		fn array_type(T : type, N : comptime i32) : type {
+		fn array_type(T : comptime type, N : comptime i32) : type {
 			return struct { values : [N]T; };
 		}
 
@@ -1094,7 +1094,7 @@ TEST(ComptimeFunctionCanCallOtherComptimeFunction) {
 
 TEST(ComptimeInitializerCanCallTypeProducingFunction) {
 	const char* source = R"(
-		fn make_vec2(T : type) : type {
+		fn make_vec2(T : comptime type) : type {
 			return struct {
 				x : T;
 				y : T;
@@ -2469,7 +2469,7 @@ TEST(ComptimeUnaryTypeMatch) {
 // on the body's shape.
 TEST(TypeFactoryWithMultiStatementBodyNamesItsType) {
 	const char* source = R"FACTORY(
-		fn tagged(T : type) : type {
+		fn tagged(T : comptime type) : type {
 			comptime unused = 1;
 			return struct { value : T; };
 		}
@@ -2487,7 +2487,7 @@ TEST(TypeFactoryWithMultiStatementBodyNamesItsType) {
 
 TEST(TypeFactoryWithMultiStatementBodyProducesDistinctTypes) {
 	const char* source = R"(
-		fn tagged(T : type) : type {
+		fn tagged(T : comptime type) : type {
 			comptime unused = 1;
 			return struct { value : T; };
 		}
@@ -2505,7 +2505,7 @@ TEST(TypeFactoryWithMultiStatementBodyProducesDistinctTypes) {
 
 TEST(TypeFactoryWithMultiStatementBodyInfersTypeArgument) {
 	const char* source = R"(
-		fn boxed(T : type) : type {
+		fn boxed(T : comptime type) : type {
 			comptime unused = 1;
 			return struct { value : T; };
 		}
@@ -2529,7 +2529,7 @@ TEST(TypeFactoryWithMultiStatementBodyInfersTypeArgument) {
 // annotation but nested under a slice, nullable, or array type.
 TEST(TypeFactoryCallNestedInSliceParameter) {
 	const char* source = R"(
-		fn vec2(T : type) : type {
+		fn vec2(T : comptime type) : type {
 			return struct { x : T; y : T; };
 		}
 
@@ -2551,7 +2551,7 @@ TEST(TypeFactoryCallNestedInSliceParameter) {
 
 TEST(TypeFactoryCallNestedInNullableParameter) {
 	const char* source = R"(
-		fn vec2(T : type) : type {
+		fn vec2(T : comptime type) : type {
 			return struct { x : T; y : T; };
 		}
 
@@ -2574,7 +2574,7 @@ TEST(TypeFactoryCallNestedInNullableParameter) {
 
 TEST(TypeFactoryCallNestedInNullableReturnType) {
 	const char* source = R"(
-		fn vec2(T : type) : type {
+		fn vec2(T : comptime type) : type {
 			return struct { x : T; y : T; };
 		}
 
@@ -2614,7 +2614,7 @@ TEST(ComptimeTypeListIndexInTypePosition) {
 // used to guard `struct[T, N : i32]` arguments still have to fire.
 TEST(TypeFactoryValueArgumentWrongTypeFails) {
 	const char* source = R"(
-		fn array_type(T : type, N : comptime i32) : type {
+		fn array_type(T : comptime type, N : comptime i32) : type {
 			return struct { values : [N]T; };
 		}
 
@@ -2653,7 +2653,7 @@ TEST(TypeFactoryNegativeValueArgumentRuntime) {
 // as a literal.
 TEST(TypeFactoryValueArgumentCanUseSizeof) {
 	const char* source = R"(
-		fn array_type(T : type, N : comptime i32) : type {
+		fn array_type(T : comptime type, N : comptime i32) : type {
 			return struct { values : [N]T; };
 		}
 
@@ -2667,7 +2667,7 @@ TEST(TypeFactoryValueArgumentCanUseSizeof) {
 
 TEST(TypeFactoryValueArgumentNonComptimeFails) {
 	const char* source = R"(
-		fn array_type(T : type, N : comptime i32) : type {
+		fn array_type(T : comptime type, N : comptime i32) : type {
 			return struct { values : [N]T; };
 		}
 
@@ -2696,7 +2696,7 @@ TEST(TypeFactoryValueArgumentNarrowingFails) {
 
 TEST(TypeFactoryMissingArgumentFails) {
 	const char* source = R"(
-		fn array_type(T : type, N : comptime i32) : type {
+		fn array_type(T : comptime type, N : comptime i32) : type {
 			return struct { values : [N]T; };
 		}
 
@@ -2710,7 +2710,7 @@ TEST(TypeFactoryMissingArgumentFails) {
 
 TEST(TypeFactoryTooManyArgumentsFails) {
 	const char* source = R"(
-		fn array_type(T : type, N : comptime i32) : type {
+		fn array_type(T : comptime type, N : comptime i32) : type {
 			return struct { values : [N]T; };
 		}
 
@@ -2724,7 +2724,7 @@ TEST(TypeFactoryTooManyArgumentsFails) {
 
 TEST(TypeFactoryUndefinedArgumentFails) {
 	const char* source = R"(
-		fn array_type(T : type, N : comptime i32) : type {
+		fn array_type(T : comptime type, N : comptime i32) : type {
 			return struct { values : [N]T; };
 		}
 

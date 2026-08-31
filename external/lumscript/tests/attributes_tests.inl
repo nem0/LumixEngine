@@ -265,7 +265,7 @@ TEST(TypeAttributeLookupRequiresACompileTimeTypeArgument) {
 		#[tag { 42 }]
 		struct Settings {}
 
-		fn main(tag : type) : void {
+		fn main(tag : comptime type) : void {
 			comptime found = Settings::attribute(tag);
 		}
 	)";

@@ -388,6 +388,25 @@ TEST(IntrospectionTypeValueRuntimeUseRejected) {
 	return true;
 }
 
+TEST(IntrospectionTypeValueCanBePassedToNative) {
+	const char* source = R"(
+		struct Settings { enabled : bool; }
+		extern fn getLumScriptData(t : comptime type) : []const byte;
+		fn main() : []const byte { return getLumScriptData(Settings); }
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(IntrospectionMultipleTypeValuesCanBePassedToNative) {
+	const char* source = R"(
+		extern fn sameType(a : comptime type, b : comptime type) : bool;
+		fn main() : bool { return sameType(i32, f32); }
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(IntrospectionStructValueIterationRejected) {
 	const char* source = R"(
 		struct S { x : i32; }
@@ -883,7 +902,7 @@ TEST(IntrospectionArrayLengthMaterializes) {
 
 TEST(IntrospectionTypeParametersAreComptime) {
 	const char* source = R"(
-		fn inspect(T : type) : void {
+		fn inspect(T : comptime type) : void {
 			comptime kind = T::kind;
 		}
 	)";
@@ -1028,9 +1047,9 @@ TEST(IntrospectionTypeNamesCoverDeclarationsTemplatesAndUnions) {
 	const char* source = R"FACTORY(
 		struct S { value : i32; }
 		enum E { Value }
-		fn pair(T : type) : type { return struct { first : T; second : T; }; }
-		fn box(T : type) : type { return struct { value : T; }; }
-		fn static_array(T : type, N : comptime i32) : type { return struct { values : [N]T; }; }
+		fn pair(T : comptime type) : type { return struct { first : T; second : T; }; }
+		fn box(T : comptime type) : type { return struct { value : T; }; }
+		fn static_array(T : comptime type, N : comptime i32) : type { return struct { values : [N]T; }; }
 		comptime PairI32 = pair(i32);
 		comptime Nested = box(pair(i32));
 		comptime Array = static_array(i32, 4);

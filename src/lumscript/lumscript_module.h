@@ -43,6 +43,7 @@ struct LumScriptModule : IModule {
 	virtual void destroyLumScript(EntityRef entity) = 0;
 
 	//@ component LumScript id lumscript label "Data"
+	virtual Span<const u8> getLumScriptData(const char* type_name) = 0;
 	//@ end
 
 	virtual void setLumScriptDataTypes(Span<const ls_type*> types) = 0;

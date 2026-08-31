@@ -973,7 +973,7 @@ TEST(UnionAllConcreteRuntimeMemberKinds) {
 
 TEST(UnionStructTemplateMember) {
 	const char* source = R"(
-		fn box(T : type) : type {
+		fn box(T : comptime type) : type {
 			return struct { value : T; };
 		}
 

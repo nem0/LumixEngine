@@ -810,11 +810,7 @@ struct Parser {
 			}
 			FunctionParam& param = fn.params.emplace_back();
 			param.name = type_param.name;
-			// A type value has no runtime representation, so a `type` parameter always
-			// specializes the function just like an explicitly comptime one.
-			param.is_comptime = type_param.is_comptime
-				|| (type_param.type_expr->kind == Expression::TYPE_LITERAL
-					&& static_cast<TypeLiteralExpression*>(type_param.type_expr)->type == ResolvedTypeKind::META);
+			param.is_comptime = type_param.is_comptime;
 			param.type_expr = type_param.type_expr;
 			for (i32 i = 0; i < fn.params.size() - 1; ++i) {
 				if (!equalStrings(fn.params[i].name, param.name)) continue;

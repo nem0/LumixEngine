@@ -499,6 +499,39 @@ TEST(Extern) {
 	return true;
 }
 
+// RED: type arguments should be reified as runtime descriptors at the native
+// boundary, allowing the host to compare them by identity.
+TEST(NativeTypeArgumentsAreComparable) {
+	const char* source = R"(
+		struct Settings { enabled : bool; }
+		extern fn sameType(a : comptime type, b : comptime type) : bool;
+
+		fn main() : i32 {
+			if sameType(Settings, Settings) {
+				if not sameType(Settings, i32) { return 42; }
+			}
+			return 0;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	auto same_type = [](ls_runtime* runtime, ls_call_frame frame) -> void {
+		(void)runtime;
+		LS_ARG(frame, u32, first);
+		LS_ARG(frame, u32, second);
+		LS_RESULT(frame, first == second);
+	};
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("sameType"), same_type) == LS_RESULT_OK);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(BytecodeStringLiteralArgumentShouldCompile) {
 	const char* source = R"(
 		extern fn findByName(name : []const u8) : void;

@@ -179,6 +179,16 @@ struct LumScriptModuleImpl : LumScriptModule {
 	}
 	void update(float) override {}
 
+	Span<const u8> getLumScriptData(const char* type_name) override {
+		const StringView requested_name(type_name);
+		for (const LumScriptDataType& data_type : m_data_storage) {
+			const ls_string_view name = ls_type_get_name(data_type.type);
+			if (requested_name != StringView(name.begin, (u64)name.length)) continue;
+			return Span<const u8>(data_type.values.data, data_type.values.size);
+		}
+		return {};
+	}
+
 	void setLumScriptDataTypes(Span<const ls_type*> types) override {
 		clearLumScriptData();
 		m_data_types.reserve(types.length());
@@ -188,17 +198,22 @@ struct LumScriptModuleImpl : LumScriptModule {
 			m_data_storage.emplace(type, m_allocator);
 		}
 	}
+
 	void clearLumScriptData() override {
 		for (LumScriptComponent& component : m_components) component.data.clear();
 		m_data_storage.clear();
 		m_data_types.clear();
 	}
+
 	bool isReady() const override { return m_system.isReady(); }
+
 	Span<const ls_type*> getLumScriptDataTypes() const override { return m_data_types; }
+
 	u32 getLumScriptDataCount(EntityRef entity) const override {
 		auto iter = m_components.find(entity);
 		return iter.isValid() ? iter.value().data.size() : 0;
 	}
+
 	const ls_type* getLumScriptDataType(EntityRef entity, u32 index) const override {
 		auto iter = m_components.find(entity);
 		if (!iter.isValid() || index >= (u32)iter.value().data.size()) return nullptr;
