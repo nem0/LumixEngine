@@ -391,8 +391,21 @@ TEST(IntrospectionTypeValueRuntimeUseRejected) {
 TEST(IntrospectionTypeValueCanBePassedToNative) {
 	const char* source = R"(
 		struct Settings { enabled : bool; }
-		extern fn getLumScriptData(t : comptime type) : []const byte;
+		extern fn getLumScriptData(t : type) : []const byte;
 		fn main() : []const byte { return getLumScriptData(Settings); }
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(IntrospectionComptimeTypeCanBeForwardedToNative) {
+	const char* source = R"(
+		extern fn getLumScriptDataRaw(t : type) : []const byte;
+		fn getLumScriptData(T : comptime type) : []T {
+			var raw = getLumScriptDataRaw(T);
+			return raw as []T;
+		}
+		fn main() : []i32 { return getLumScriptData(i32); }
 	)";
 	EXPECT_COMPILE(source);
 	return true;
@@ -400,10 +413,18 @@ TEST(IntrospectionTypeValueCanBePassedToNative) {
 
 TEST(IntrospectionMultipleTypeValuesCanBePassedToNative) {
 	const char* source = R"(
-		extern fn sameType(a : comptime type, b : comptime type) : bool;
+		extern fn sameType(a : type, b : type) : bool;
 		fn main() : bool { return sameType(i32, f32); }
 	)";
 	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(ExternFunctionComptimeParameterRejected) {
+	const char* source = R"(
+		extern fn invalid(T : comptime type) : void;
+	)";
+	EXPECT_COMPILE_FAIL(source);
 	return true;
 }
 

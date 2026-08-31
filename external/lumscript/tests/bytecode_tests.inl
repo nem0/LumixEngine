@@ -499,16 +499,20 @@ TEST(Extern) {
 	return true;
 }
 
-// RED: type arguments should be reified as runtime descriptors at the native
-// boundary, allowing the host to compare them by identity.
+// Type arguments are reified as runtime descriptors at the native boundary,
+// allowing the host to compare them by identity.
 TEST(NativeTypeArgumentsAreComparable) {
 	const char* source = R"(
 		struct Settings { enabled : bool; }
-		extern fn sameType(a : comptime type, b : comptime type) : bool;
+		extern fn sameType(a : type, b : type) : bool;
+
+		fn sameTypeWrapped(A : comptime type, B : comptime type) : bool {
+			return sameType(A, B);
+		}
 
 		fn main() : i32 {
-			if sameType(Settings, Settings) {
-				if not sameType(Settings, i32) { return 42; }
+			if sameTypeWrapped(Settings, Settings) {
+				if not sameTypeWrapped(Settings, i32) { return 42; }
 			}
 			return 0;
 		}

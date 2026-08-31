@@ -1,15 +1,21 @@
+import "core:entity"
 import "core:input"
 import "core:log"
 import "core:ui"
+import "core:model_instance"
 import "core:document"
 import "core:world"
 
 import "scripts/player" as player
 
 struct component {}
+struct inject {}
 
 #[component {}]
-struct RandomColorComponent {}
+struct RandomColorComponent {
+	#[inject {}]
+	entity: Entity;
+}
 
 var g_input : InputSystem = undefined;
 var g_world : World = undefined;
@@ -22,6 +28,14 @@ fn enableCursor(ui : UIModule, enable : bool) : void {
 fn update(td : f32) : void {
     player.update(td);
 	
+	// random color
+	var random_color_components = g_world.getLumScriptData(RandomColorComponent);
+
+	for c in random_color_components {
+		var mi = c.entity.model_instance() else return;
+		mi.overrideMaterialVec4(0, "Material color", {1, 0, 1, 1});
+	}
+
 	// UI
 	var ui = g_world.ui() else return;
 	var doc = ui.getDocument();

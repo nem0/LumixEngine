@@ -49,6 +49,9 @@ struct ResolvedType {
 struct MetaType : ResolvedType {
 	MetaType() : ResolvedType(ResolvedTypeKind::META) {}
 	ResolvedType* inner = nullptr; // the actual type (EnumResolvedType*, StructResolvedType*, etc.)
+	// Runtime `type` values occupy one u32 slot.  Compile-time type values keep
+	// the old pointer-sized representation used by the evaluator.
+	bool runtime = false;
 };
 
 struct EnumResolvedType : ResolvedType {

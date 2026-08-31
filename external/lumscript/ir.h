@@ -169,6 +169,9 @@ struct LsOpStringLiteral : LsIrOp {
 struct LsOpLoadConst : LsIrOp {
 	LsOpLoadConst() : LsIrOp(LsIrOpKind::LOAD_CONST) {}
 	ResolvedType* type = nullptr;
+	// Non-null for a runtime type literal; resolved to a bytecode type-table
+	// index by BytecodeCompiler, after all types are collected.
+	ResolvedType* represented_type = nullptr;
 	u8 value[8] = {};
 };
 

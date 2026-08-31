@@ -4,6 +4,7 @@
 #include "engine/world.h"
 #include "imgui/imgui.h"
 #include "lumscript/capi.h"
+#include "lumscript/bytecode.h"
 #include "lumscript/lumscript_module.h"
 #include "lumscript/lumscript_capi.gen.h"
 #include "lumscript/lumscript_wrapper.h"
@@ -123,6 +124,33 @@ static void lumscript_world_findByName(ls_runtime*, ls_call_frame frame) {
 	LS_RESULT(frame, LsEntity(entity.index, world));
 }
 
+static void lumscript_world_getLumScriptDataRaw(ls_runtime*, ls_call_frame frame) {
+	LS_ARG(frame, World*, world);
+	LS_ARG(frame, u32, type_index);
+
+	ls_slice result = {};
+	if (world) {
+		IModule* base = world->getModule(reflection::getComponentType("lumscript"));
+		LumScriptModule* module = static_cast<LumScriptModule*>(base);
+		const Span<const ls_type*> types = module ? module->getLumScriptDataTypes() : Span<const ls_type*>();
+
+		if (types.size() > 0) {
+			const ls_type* type = ls_bytecode_type(types[0]->bytecode, type_index);
+			if (!type) {
+				LS_RESULT(frame, result);
+				return;
+			}
+
+			const ls_string_view name = ls_type_get_name(type);
+			StaticString<256> type_name(StringView{name.begin, (u64)name.length});
+			const Span<const u8> data = module->getLumScriptData(type_name);
+			result.data = const_cast<u8*>(data.begin());
+			result.length = data.length();
+		}
+	}
+	LS_RESULT(frame, result);
+}
+
 static void lumscript_entity_findChildByName(ls_runtime*, ls_call_frame frame) {
 	const LsEntity parent = readArg<LsEntity>(frame);
 	char name[128];
@@ -210,6 +238,7 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	functions.insert({"core:world", "destroyEntity"}, &wrap<lumscript_world_destroyEntity>);
 	functions.insert({"core:world", "findByName"}, &lumscript_world_findByName);
 	functions.insert({"core:world", "hasEntity"}, &wrap<lumscript_world_hasEntity>);
+	functions.insert({"core:world", "getLumScriptDataRaw"}, &lumscript_world_getLumScriptDataRaw);
 }
 
 } // namespace Lumix::LumScript

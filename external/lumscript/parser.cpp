@@ -1706,6 +1706,12 @@ struct Parser {
 		FunctionExpression* fn = make<FunctionExpression>(m_unit.arena);
 		fn->is_extern = true;
 		if (!functionSignature(fn)) return false;
+		for (const FunctionParam& param : fn->params) {
+			if (param.is_comptime) {
+				m_output.errorAt(param.type_expr->token, "Extern function parameters cannot be comptime");
+				return false;
+			}
+		}
 		if (!consume(Token::SEMICOLON)) return false;
 
 		// Per the language reference, `extern fn foo() : T;` is sugar for a

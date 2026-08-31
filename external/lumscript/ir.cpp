@@ -409,6 +409,25 @@ struct IRBuilder {
 			return constant;
 		}
 
+		// A runtime type is represented by the index of its descriptor in the
+		// bytecode type table.  Keep the semantic type (META) on the expression,
+		// but materialize the descriptor index as a u32 at the IR boundary.
+		if (as_rvalue && expr.resolved_type && expr.resolved_type->kind == ResolvedTypeKind::META
+			&& static_cast<MetaType*>(expr.resolved_type)->runtime) {
+			ResolvedType* represented = static_cast<MetaType*>(expr.resolved_type)->inner;
+			if (!represented && expr.comptime_value.kind == ComptimeValue::TYPE) represented = expr.comptime_value.type;
+			if (!represented && expr.kind == Expression::IDENTIFIER) {
+				IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
+				if (id.symbol && id.symbol->comptime_value.kind == ComptimeValue::TYPE) represented = id.symbol->comptime_value.type;
+			}
+			if (represented) {
+				auto& constant = alloc<LsOpLoadConst>();
+				constant.type = expr.resolved_type;
+				constant.represented_type = represented;
+				return constant;
+			}
+		}
+
 		switch (expr.kind) {
 			case Expression::UNDEFINED: return alloc<LsOpNop>();
 			case Expression::ADDRESSOF: {
@@ -2602,34 +2621,41 @@ struct BytecodeCompiler {
 
 	u32 emitLoadConst(const LsOpLoadConst& load, EmitDst* dst) {
 		u32 size = typeByteSize(*load.type);
+		u8 value[8];
+		memcpy(value, load.value, sizeof(value));
+		if (load.represented_type) {
+			const u32 type_index = type_info.internType(*load.represented_type);
+			memcpy(value, &type_index, sizeof(type_index));
+		}
+		const u8* load_value = load.represented_type ? value : load.value;
 		u32 res = dst ? dst->dst : stack_top;
 		switch (size) {
 			case 1: {
 				emitOp(LS_OP_LOAD_CONST_1);
 				emit(res);
 				if (!dst) stack_top += 1;
-				emit(&load.value, 1);
+				emit(load_value, 1);
 				return res;
 			}
 			case 2: {
 				emitOp(LS_OP_LOAD_CONST_2);
 				emit(res);
 				if (!dst) stack_top += 2;
-				emit(&load.value, 2);
+				emit(load_value, 2);
 				return res;
 			}
 			case 4: {
 				emitOp(LS_OP_LOAD_CONST_4);
 				emit(res);
 				if (!dst) stack_top += 4;
-				emit(&load.value, 4);
+				emit(load_value, 4);
 				return res;
 			}
 			case 8: {
 				emitOp(LS_OP_LOAD_CONST_8);
 				emit(res);
 				if (!dst) stack_top += 8;
-				emit(&load.value, 8);
+				emit(load_value, 8);
 				return res;
 			}
 		}

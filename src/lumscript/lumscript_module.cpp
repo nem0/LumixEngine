@@ -240,7 +240,9 @@ struct LumScriptModuleImpl : LumScriptModule {
 		const u32 index = data_type->entities.size();
 		const u32 old_size = data_type->values.size;
 		data_type->values.resize(old_size + data_type->element_size);
-		memset(data_type->values.data + old_size, 0, data_type->element_size);
+		u8* value = data_type->values.data + old_size;
+		memset(value, 0, data_type->element_size);
+		injectEntity(*data_type, value, entity);
 		data_type->entities.push(entity);
 		component.data.push({type, index});
 		return true;
@@ -263,6 +265,44 @@ struct LumScriptModuleImpl : LumScriptModule {
 	bool removeDebugBreakpoint(const Path& source, u32 line) override { return m_system.removeDebugBreakpoint(source, line); }
 
 private:
+	void injectEntity(const LumScriptDataType& data_type, u8* value, EntityRef entity) {
+		for (u32 i = 0, count = ls_type_struct_field_count(data_type.type); i < count; ++i) {
+			bool inject = false;
+			for (u32 j = 0, attribute_count = ls_type_struct_field_attribute_count(data_type.type, i); j < attribute_count; ++j) {
+				const ls_attribute attribute = ls_type_struct_field_attribute_value(data_type.type, i, j);
+				if (!attribute.type) continue;
+
+				const ls_string_view name = ls_type_get_name(attribute.type);
+				if (StringView(name.begin, (u64)name.length) == "inject") {
+					inject = true;
+					break;
+				}
+			}
+			if (!inject) continue;
+
+			const ls_type* field_type = ls_type_struct_field_type(data_type.type, i);
+			if (!field_type || ls_type_get_kind(field_type) != LS_TYPE_STRUCT) continue;
+
+			const ls_string_view type_name = ls_type_get_name(field_type);
+			if (StringView(type_name.begin, (u64)type_name.length) != "Entity") continue;
+
+			u8* field_value = value + ls_type_struct_field_offset(data_type.type, i);
+			for (u32 j = 0, field_count = ls_type_struct_field_count(field_type); j < field_count; ++j) {
+				const ls_string_view name = ls_type_struct_field_name(field_type, j);
+				const StringView field_name(name.begin, (u64)name.length);
+				u8* dst = field_value + ls_type_struct_field_offset(field_type, j);
+				const ls_type* member_type = ls_type_struct_field_type(field_type, j);
+				if (field_name == "index" && member_type && ls_type_get_kind(member_type) == LS_TYPE_I32) {
+					memcpy(dst, &entity.index, sizeof(entity.index));
+				}
+				else if (field_name == "world" && member_type && ls_type_get_kind(member_type) == LS_TYPE_CPTR) {
+					World* world = &m_world;
+					memcpy(dst, &world, sizeof(world));
+				}
+			}
+		}
+	}
+
 	static i32 findDataRef(const LumScriptComponent& component, const ls_type* type) {
 		return component.data.find([type](const LumScriptDataRef& ref) { return ref.type == type; });
 	}

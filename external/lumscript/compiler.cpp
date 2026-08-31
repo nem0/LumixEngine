@@ -97,7 +97,7 @@ u32 typeAlignment(const ResolvedType& t) {
 		case ResolvedTypeKind::STRUCT: return static_cast<const StructResolvedType&>(t).alignment;
 		case ResolvedTypeKind::UNTYPED_FLOAT:
 		case ResolvedTypeKind::UNTYPED_INT: return 8;
-		case ResolvedTypeKind::META: return alignof(ResolvedType*);
+		case ResolvedTypeKind::META: return static_cast<const MetaType&>(t).runtime ? 4 : alignof(ResolvedType*);
 		default: ASSERT(false); return 1;
 	}
 }
@@ -170,7 +170,7 @@ u32 typeByteSize(const ResolvedType& t) {
 		case ResolvedTypeKind::UNTYPED_INT:
 			return 8;
 		case ResolvedTypeKind::META:
-			return sizeof(ResolvedType*);
+			return static_cast<const MetaType&>(t).runtime ? sizeof(u32) : sizeof(ResolvedType*);
 		case ResolvedTypeKind::POINTER: return 8;
 		default:
 			ASSERT(false);
@@ -792,9 +792,16 @@ struct Checker {
 			: Expression::COMPTIME_VALUE;
 	}
 
+	MetaType* runtimeMetaType(Unit& unit, ResolvedType* inner = nullptr) {
+		MetaType* meta = makeType<MetaType>(unit.arena);
+		meta->inner = inner;
+		meta->runtime = true;
+		return meta;
+	}
+
 	bool isRuntimeMaterializable(const ResolvedType& type) const {
 		switch (type.kind) {
-			case ResolvedTypeKind::META: return false;
+			case ResolvedTypeKind::META: return static_cast<const MetaType&>(type).runtime;
 			case ResolvedTypeKind::ARRAY: return isRuntimeMaterializable(*static_cast<const ArrayResolvedType&>(type).element_type);
 			case ResolvedTypeKind::SLICE: return isRuntimeMaterializable(*static_cast<const SliceResolvedType&>(type).element_type);
 			case ResolvedTypeKind::STRUCT: {
@@ -1705,6 +1712,9 @@ struct Checker {
 		for (FunctionParam& param : fn.params) {
 			param.resolved_type = asType(evalComptime(unit, *param.type_expr), param.type_expr->token);
 			if (!param.resolved_type) return nullptr;
+			if (!param.is_comptime && param.resolved_type->kind == ResolvedTypeKind::META) {
+				param.resolved_type = runtimeMetaType(unit, static_cast<MetaType*>(param.resolved_type)->inner);
+			}
 			FunctionResolvedParam& resolved_param = fn_type->params.emplace_back();
 			resolved_param.name = param.name;
 			resolved_param.type = param.resolved_type;
@@ -1772,7 +1782,19 @@ struct Checker {
 
 			ResolvedType* arg_type = checkExprForTarget(unit, ctx, *arg, param_type);
 			if (!arg_type) return nullptr;
-			if (!requireMaterializable(*arg, "a runtime function argument")) return nullptr;
+			// A compile-time type value can be materialized when the destination
+			// is a runtime `type` parameter. Template substitution can leave the
+			// represented type as the expression's resolved type, so normalize it
+			// back to a runtime meta type at the call boundary.
+			const bool runtime_type = param_type->kind == ResolvedTypeKind::META
+				&& static_cast<MetaType*>(param_type)->runtime;
+			if (runtime_type && arg->comptime_value.kind == ComptimeValue::TYPE
+				&& (!arg_type || arg_type->kind != ResolvedTypeKind::META)) {
+				arg->resolved_type = runtimeMetaType(unit, arg->comptime_value.type);
+				arg->eval_stage = Expression::COMPTIME_VALUE;
+				arg_type = arg->resolved_type;
+			}
+			if (!runtime_type && !requireMaterializable(*arg, "a runtime function argument")) return nullptr;
 
 			if (!canImplicitlyConvert(arg_type, param_type)) {
 				errorLine(call.args[i]->token, "Cannot convert ", arg_type, " to ", param_type, " for argument ", i + 1, " of function call");
@@ -3722,7 +3744,15 @@ struct Checker {
 					}
 				}
 				expr.resolved_type = local->type;
-				expr.eval_stage = local->is_comptime ? comptimeStageForType(local->type) : Expression::RUNTIME;
+				if (hint && hint->kind == ResolvedTypeKind::META && static_cast<MetaType*>(hint)->runtime
+					&& expr.resolved_type && expr.resolved_type->kind == ResolvedTypeKind::META) {
+					MetaType* source = static_cast<MetaType*>(expr.resolved_type);
+					expr.resolved_type = runtimeMetaType(unit, source->inner);
+					expr.eval_stage = Expression::COMPTIME_VALUE;
+				}
+				else {
+					expr.eval_stage = local->is_comptime ? comptimeStageForType(local->type) : Expression::RUNTIME;
+				}
 				return &expr;
 			}
 		}
@@ -3794,9 +3824,17 @@ struct Checker {
 			return &expr;
 		}
 		expr.resolved_type = ref.symbol->resolved_type;
-		expr.eval_stage = ref.symbol->kind == Symbol::COMPTIME
-			? comptimeStageForType(expr.resolved_type)
-			: Expression::RUNTIME;
+		if (hint && hint->kind == ResolvedTypeKind::META && static_cast<MetaType*>(hint)->runtime
+			&& expr.resolved_type && expr.resolved_type->kind == ResolvedTypeKind::META) {
+			MetaType* source = static_cast<MetaType*>(expr.resolved_type);
+			expr.resolved_type = runtimeMetaType(unit, source->inner);
+			expr.eval_stage = Expression::COMPTIME_VALUE;
+		}
+		else {
+			expr.eval_stage = ref.symbol->kind == Symbol::COMPTIME
+				? comptimeStageForType(expr.resolved_type)
+				: Expression::RUNTIME;
+		}
 		return &expr;
 	}
 
@@ -3856,7 +3894,17 @@ struct Checker {
 				expr.resolved_type = hint;
 				expr.eval_stage = Expression::COMPTIME_VALUE;
 				return &expr;
-			case Expression::RESOLVED_TYPE: expr.eval_stage = Expression::COMPTIME_ONLY; return &expr;
+			case Expression::RESOLVED_TYPE: {
+				if (hint && hint->kind == ResolvedTypeKind::META && static_cast<MetaType*>(hint)->runtime) {
+					ResolvedType* represented = expr.resolved_type;
+					expr.resolved_type = runtimeMetaType(unit, represented);
+					expr.eval_stage = Expression::COMPTIME_VALUE;
+				}
+				else {
+					expr.eval_stage = Expression::COMPTIME_ONLY;
+				}
+				return &expr;
+			}
 			case Expression::TYPEOF: {
 				TypeofExpression& typeof_expr = static_cast<TypeofExpression&>(expr);
 				if (!typeof_expr.operand || typeof_expr.operand->kind == Expression::TYPE_LITERAL
@@ -3882,8 +3930,10 @@ struct Checker {
 			}
 			case Expression::TYPE_LITERAL: {
 				auto* meta = makeType<MetaType>(unit.arena);
+				const bool runtime = hint && hint->kind == ResolvedTypeKind::META && static_cast<MetaType*>(hint)->runtime;
+				meta->runtime = runtime;
 				expr.resolved_type = meta;
-				expr.eval_stage = Expression::COMPTIME_ONLY;
+				expr.eval_stage = runtime ? Expression::COMPTIME_VALUE : Expression::COMPTIME_ONLY;
 				const ResolvedTypeKind kind = static_cast<TypeLiteralExpression&>(expr).type;
 				if (kind == ResolvedTypeKind::META) {
 					// TODO what about meta->inner?
