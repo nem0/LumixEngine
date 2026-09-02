@@ -1,0 +1,14 @@
+// use as an attribute, i.e. #[Data {}]
+// can be attached to LumScriptData component
+struct Data {}
+
+// system injects owning entity into field marked with #[Owner {}]
+struct Owner {}
+
+// example:
+// #[Data{}]
+// struct MyData {
+//     #[Owner{}]
+//     entity : Entity;
+//     some_data : f32;
+// }

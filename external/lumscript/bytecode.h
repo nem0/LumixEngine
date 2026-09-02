@@ -81,7 +81,8 @@
 // - jumps store signed 32-bit relative byte offsets; conditional jumps also
 //   carry a condition register
 //
-// `ABORT` is a hard stop: the VM terminates execution immediately.
+// `PANIC` is a hard stop: the VM terminates execution immediately and reports
+// its message slice.
 
 #ifdef __cplusplus
 extern "C" {
@@ -287,6 +288,8 @@ typedef enum ls_op {
 	// of a statement's first opcode byte by `ls_debug_set_breakpoint`, which
 	// saves the original byte so the patch can be reversed.
 	LS_OP_BREAK,
+	// Terminates execution and reports the UTF-8 slice in its register operand.
+	LS_OP_PANIC,
 } ls_op;
 
 typedef enum ls_function_kind {

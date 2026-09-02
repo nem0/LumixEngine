@@ -44,6 +44,7 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 	- [Compile-time branches](#compile-time-branches)
 	- [While](#while)
 	- [For](#for)
+	- [Custom iterators](#custom-iterators)
 	- [Break / continue / labels](#break--continue--labels)
 	- [Defer](#defer)
 	- [Return](#return)
@@ -58,6 +59,7 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 	- [Operator precedence](#operator-precedence)
 	- [Ternary operator](#ternary-operator)
 	- [Calls](#calls)
+		- [Panic](#panic)
 	- [Argument-dependent lookup](#argument-dependent-lookup)
 	- [UFCS](#ufcs)
 - [Memory](#memory)
@@ -1692,6 +1694,83 @@ for i in 0..arr.length {
 - `i` has type `isize`; `v` has the element type of `arr`. This holds for static arrays too: `.length` on a `[N]T` is an untyped compile-time constant, and the desugared range concretizes it to `isize`
 - both `i` and `v` are immutable inside the loop body, like the single-variable `for` loop variable
 
+### Custom iterators
+
+A `for` loop can also consume a stateful iterator struct. An iterator is any
+struct with a field named `next` whose function type has this shape:
+
+```cpp
+next : fn(iter : *IteratorType, out : *ElementType) : bool
+```
+
+The iterator type and element type are concrete types. The iterator may contain
+any additional fields needed to hold traversal state:
+
+```cpp
+struct ListIter {
+	next : fn(iter : *ListIter, out : *Node) : bool;
+
+	current : ?*Node;
+	reverse : bool;
+}
+
+fn list_next(iter : *ListIter, out : *Node) : bool {
+	var node = iter.current else return false;
+	out.* = node;
+	iter.current = iter.reverse ? node.previous : node.next;
+	return true;
+}
+```
+
+A constructor can select any function with the required signature and initialize
+any other iterator state:
+
+```cpp
+fn values(list : *List) : ListIter {
+	return { list_next, list.head, false };
+}
+
+for node in values(list) {
+	process(node);
+}
+```
+
+The iterable expression is evaluated once. The loop stores the resulting
+iterator in mutable storage and repeatedly invokes `next`, approximately as:
+
+```cpp
+var iter = values(list);
+var value : *Node = undefined;
+while iter.next(&iter, &value) {
+	process(value);
+}
+```
+
+`next` returns `true` when it has written a value to `out`, and `false` when the
+iteration is complete. The iterator can therefore contain nullable elements
+without using null as the end marker. `break` stops calling `next`; `continue`
+starts the next call. The iterator itself must remain valid for the duration of
+the loop, and `next` may mutate its state through the mutable iterator pointer.
+
+With an index binding, the index is the zero-based number of values produced by
+the iterator, not necessarily an index into the underlying collection:
+
+```cpp
+for index, node in values(list) {
+	process(index, node);
+}
+```
+
+This protocol is structural: no interface, trait, or special base type is
+required. The compiler only inspects the `next` field and its function type;
+all other fields are iterator-specific. Arrays and slices continue to use their
+direct indexed `for` lowering, while custom iterators are useful for linked
+lists, trees, filtered collections, and engine APIs whose count/get functions
+have different names.
+
+A `next` function must assign `out` before returning `true`. The compiler does
+not verify that the function actually writes through the output pointer.
+
 ### Break / continue / labels
 
 `break` exits a loop immediately. `continue` skips to the next loop iteration.
@@ -2115,6 +2194,13 @@ Calls are statically checked for:
 - argument types
 
 If callee expression is a function value, call is indirect.
+
+#### Panic
+
+`panic(msg)` is a built-in, non-returning call. `msg` must be a string or a
+`[]const u8` slice. It reports the message with the source location and stops
+execution; no caller frames are unwound. The compiler lowers it to the
+`PANIC` bytecode opcode rather than a native function call.
 
 ### Argument-dependent lookup
 
@@ -2975,7 +3061,6 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 	- REPL?
 
 * editor plugins in lumscript
-* getNumControllerHits + getControllerHit to slices
 * get rid of std::free
 * how to expose Span<const Item> foo() to script?
 * how can we push unions if we don't know the tag value of variants, i.e. U = A | B - we don't know if A's tag is 0 or 1
@@ -2985,6 +3070,7 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 
 ---
 
+* enum backing type
 * do temporaries survive until the end of statement? e.g. foo(bar().view())
 * jit/llvm/AOT?
 * AST API in lumscript?
@@ -2998,7 +3084,7 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 * attributes?
 * fibers/coroutines?
 * closures?
-* iterators/yield 
+* generators/yield (custom pull iterators use the `next` protocol above)
 	fn each(a : arr) : yield i32 { ...
 	for x in each(a) { ... }
 

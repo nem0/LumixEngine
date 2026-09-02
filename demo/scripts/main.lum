@@ -5,16 +5,13 @@ import "core:ui"
 import "core:model_instance"
 import "core:document"
 import "core:world"
+import "core:lumscript_data" as ld
 
 import "scripts/player" as player
 
-// TODO move into "core:something"
-struct component {}
-struct inject {}
-
-#[component {}]
+#[ld.Data {}]
 struct RandomColorComponent {
-	#[inject {}]
+	#[ld.Owner {}]
 	entity: Entity;
 }
 

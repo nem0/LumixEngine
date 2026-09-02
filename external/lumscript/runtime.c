@@ -642,6 +642,8 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 	const u8* ip;
 	u8* frame = NULL;
 	ls_op op = (ls_op)0;
+	ls_string_view panic_message = {NULL, 0};
+	bool is_panic = false;
 	// Restore point for the whole host call, retained across suspend/resume.
 	runtime_restore_point* initial;
 	if (resume_frame) {
@@ -880,6 +882,15 @@ static int runtime_execute_function(ls_runtime* runtime, const ls_function_bc* f
 				memcpy(&rhs, frame + rhs_reg, sizeof(rhs));
 				*out = (u8)(runtime_slice_equal(lhs, rhs, element_size, element_kind) ? 1u : 0u);
 				break;
+			}
+			case LS_OP_PANIC: {
+				const u32 message_reg = runtime_read_u32();
+				ls_runtime_slice message = {NULL, 0};
+				memcpy(&message, frame + message_reg, sizeof(message));
+				panic_message.begin = (const char*)message.data;
+				panic_message.length = message.length > 0 ? (u64)message.length : 0;
+				is_panic = true;
+				goto runtime_execute_function_fail;
 			}
 			case LS_OP_RETURN: {
 				const u32 src = runtime_read_u32();
@@ -1367,11 +1378,11 @@ runtime_execute_function_fail:
 		}
 		ip = entry ? fn->code + entry->code_offset : fn->code;
 	}
-	runtime_report_error(runtime, fn, ip, error_message);
+	runtime_report_error(runtime, fn, ip, is_panic ? panic_message : error_message);
 	// A runtime error suspends using the same reified frame as LS_OP_BREAK;
 	// state is left exactly as-is instead of being unwound.
 	runtime->pause_event.reason = LS_DEBUG_PAUSE_ERROR;
-	runtime->pause_event.message = error_message;
+	runtime->pause_event.message = is_panic ? panic_message : error_message;
 	goto runtime_execute_function_suspend;
 
 	// Snapshot the call stack (innermost first) so `ls_debug_*` can report a

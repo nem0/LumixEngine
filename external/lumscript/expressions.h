@@ -67,6 +67,8 @@ struct Expression {
 		TYPE_LITERAL,
 		// Runtime call: `foo(a, b)`.
 		CALL,
+		// Non-returning built-in panic(msg).
+		PANIC,
 		// Unary operator expression such as `-x`, `not x`, or `ref x` at a call site.
 		UNARY,
 		// Binary operator expression such as `a + b` or `x == y`.
@@ -251,6 +253,11 @@ struct SizeofExpression : Expression {
 	bool is_align = false;
 	// Filled in during checking; behaves like an untyped integer literal afterwards.
 	u64 value = 0;
+};
+
+struct PanicExpression : Expression {
+	PanicExpression() : Expression(PANIC) {}
+	Expression* message = nullptr;
 };
 
 struct CallExpression : Expression {

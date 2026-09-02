@@ -18,6 +18,7 @@ Main suites registered in `src/tests/main.cpp`:
 - UI parser/runtime tests
 - UI style tests
 - UI layout tests
+- LumScript module serialization tests
 
 ## Run All Headless Tests
 
@@ -29,8 +30,8 @@ scripts\run_tests.bat
 
 This script:
 
-1. Generates solution files with tests enabled (`genie.exe --with-tests vs2022`)
-2. Builds `tmp\vs2022\LumixEngine.sln` in `Debug|x64`
+1. Generates a test configuration with LumScript enabled
+2. Builds `tmp\vs2022\tests.vcxproj` in `Debug|x64`
 3. Runs `tmp\vs2022\bin\Debug\tests.exe`
 
 Exit codes:
@@ -78,11 +79,17 @@ studio.exe -imgui_test_ui -data_dir <repo>\data ...
 
 GitHub Actions workflow `.github/workflows/tests.yml` runs:
 
-- `scripts\run_tests.bat`
+- `scripts\run_tests.bat` on Windows
+- `scripts/run_tests.sh` on Linux
 
-Because `tests.exe` includes both particle script and UI test suites, this workflow currently triggers on pushes and pull requests when any of these paths change:
+Because `tests.exe` includes particle script, UI, and LumScript test suites, this workflow triggers on pushes and pull requests when related paths change:
 
 - `**/particle_script*`
 - `src/ui/**`
 - `src/tests/ui_*`
+- `src/tests/lumscript_*`
+- `src/lumscript/**`
+- `external/lumscript/**`
+- `scripts/run_tests.*`
+- `scripts/genie.lua`
 - `.github/workflows/tests.yml`

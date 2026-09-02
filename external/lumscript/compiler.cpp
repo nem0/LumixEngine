@@ -1240,6 +1240,13 @@ struct Checker {
 				out = sz;
 				break;
 			}
+			case Expression::PANIC: {
+				PanicExpression* s = static_cast<PanicExpression*>(src);
+				PanicExpression* panic = makeType<PanicExpression>(unit.arena);
+				panic->message = cloneExpression(unit, s->message, bindings);
+				out = panic;
+				break;
+			}
 			case Expression::CALL: {
 				CallExpression* s = static_cast<CallExpression*>(src);
 				CallExpression* call = makeType<CallExpression>(unit.arena, unit.arena);
@@ -1459,6 +1466,9 @@ struct Checker {
 				st->key_var = s->key_var;
 				st->value_var = s->value_var;
 				st->is_key_value = s->is_key_value;
+				st->is_custom_iterator = s->is_custom_iterator;
+				st->iterator_next_field = s->iterator_next_field;
+				st->iterator_element_type = s->iterator_element_type;
 				st->is_unroll = s->is_unroll;
 				st->unroll_begin = s->unroll_begin;
 				st->unroll_end = s->unroll_end;
@@ -3985,6 +3995,13 @@ struct Checker {
 				return &expr;
 			}
 			case Expression::IDENTIFIER: return checkIdentifierExpr(unit, ctx, expr, hint, first_arg_type);
+			case Expression::PANIC: {
+				PanicExpression& panic = static_cast<PanicExpression&>(expr);
+				if (!checkExprForTarget(unit, ctx, *panic.message, const_u8_slice)) return nullptr;
+				expr.resolved_type = primitiveType(ResolvedTypeKind::VOID);
+				expr.eval_stage = Expression::RUNTIME;
+				return &expr;
+			}
 			case Expression::CALL: return checkCallExpr(unit, ctx, expr);
 			case Expression::UNARY: return checkUnaryExpr(unit, ctx, expr, hint);
 			case Expression::BINARY: return checkBinaryExpr(unit, ctx, expr, hint);
@@ -4172,6 +4189,10 @@ struct Checker {
 	static bool statementAlwaysReturns(Statement& st) {
 		switch (st.kind) {
 			case Statement::RETURN: return true;
+			case Statement::EXPRESSION: {
+				Expression* expression = static_cast<ExpressionStatement&>(st).expression;
+				return expression && expression->kind == Expression::PANIC;
+			}
 			case Statement::BLOCK: return blockAlwaysReturns(static_cast<BlockStatement&>(st));
 			case Statement::LABEL: return statementAlwaysReturns(*static_cast<LabelStatement&>(st).statement);
 			case Statement::IF: {
@@ -4760,11 +4781,36 @@ struct Checker {
 			}
 		}
 		else {
-			if (begin_type->kind != ResolvedTypeKind::ARRAY && begin_type->kind != ResolvedTypeKind::SLICE) {
-				errorLine(fs.token, "For loop over a single bound must be an array or slice, got ", begin_type);
+			if (begin_type->kind == ResolvedTypeKind::STRUCT) {
+				StructResolvedType* iterator = static_cast<StructResolvedType*>(begin_type);
+				for (i32 i = 0; i < iterator->decl->fields.size(); ++i) {
+					if (equalStrings(iterator->decl->fields[i].name, "next")) {
+						fs.iterator_next_field = i;
+						break;
+					}
+				}
+				if (fs.iterator_next_field >= 0) {
+					ResolvedType* next_type = iterator->fields[fs.iterator_next_field].type;
+					if (next_type->kind == ResolvedTypeKind::FUNCTION) {
+						FunctionResolvedType* fn = static_cast<FunctionResolvedType*>(next_type);
+						if (fn->params.size() == 2 && fn->return_type->kind == ResolvedTypeKind::BOOL
+							&& fn->params[0].type->kind == ResolvedTypeKind::POINTER
+							&& fn->params[1].type->kind == ResolvedTypeKind::POINTER) {
+							PointerResolvedType* self = static_cast<PointerResolvedType*>(fn->params[0].type);
+							PointerResolvedType* out = static_cast<PointerResolvedType*>(fn->params[1].type);
+							if (self->inner == begin_type && !self->is_const && !out->is_const) {
+								fs.is_custom_iterator = true;
+								fs.iterator_element_type = out->inner;
+							}
+						}
+					}
+				}
+			}
+			if (!fs.is_custom_iterator && begin_type->kind != ResolvedTypeKind::ARRAY && begin_type->kind != ResolvedTypeKind::SLICE) {
+				errorLine(fs.token, "For loop over a single bound must be an array, slice, or iterator struct, got ", begin_type);
 				return false;
 			}
-			if (!fs.is_unroll && (begin_type->kind == ResolvedTypeKind::ARRAY || begin_type->kind == ResolvedTypeKind::SLICE)) {
+			if (!fs.is_unroll && !fs.is_custom_iterator && (begin_type->kind == ResolvedTypeKind::ARRAY || begin_type->kind == ResolvedTypeKind::SLICE)) {
 				ResolvedType* element = begin_type->kind == ResolvedTypeKind::ARRAY
 					? static_cast<ArrayResolvedType*>(begin_type)->element_type
 					: static_cast<SliceResolvedType*>(begin_type)->element_type;
@@ -4849,12 +4895,11 @@ struct Checker {
 		// user-visible name in value_var (key_var is an auto-generated hidden
 		// index in that case). The paired `for i, v in xs` form leaves a real
 		// name in key_var too, bound to the iteration index below.
-		ResolvedType* element_type = begin_type;
-		if (!fs.end) {
-			element_type = begin_type->kind == ResolvedTypeKind::ARRAY
-				? static_cast<ArrayResolvedType*>(begin_type)->element_type
-				: static_cast<SliceResolvedType*>(begin_type)->element_type;
-		}
+		ResolvedType* element_type =
+			 fs.end 					? begin_type
+			: fs.is_custom_iterator 	? fs.iterator_element_type
+			: begin_type->kind == ResolvedTypeKind::ARRAY ? static_cast<ArrayResolvedType*>(begin_type)->element_type
+			: static_cast<SliceResolvedType*>(begin_type)->element_type;
 
 		pushScope(ctx);
 		if (!fs.end && fs.is_key_value) {

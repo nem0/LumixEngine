@@ -125,6 +125,9 @@ struct ForStatement : Statement {
 	StorageSlot slot;
 	StorageSlot index_slot; // only used for the `for i, v in xs` array/slice form
 	bool is_key_value = false; // true for `for i, v in xs`; false for `for v in xs` and range loops
+	bool is_custom_iterator = false;
+	i32 iterator_next_field = -1;
+	ResolvedType* iterator_element_type = nullptr;
 	bool is_unroll = false;
 	bool is_expanded = false;
 	i64 unroll_begin = 0;

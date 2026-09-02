@@ -49,3 +49,7 @@ comptime InputEvent = ButtonEvent | AxisEvent | MouseWheelEvent | TextEvent | De
 
 extern fn getEventCount(system : InputSystem) : i32;
 extern fn getEvent(system: InputSystem, index : i32) : InputEvent;
+
+struct getEventsIterator { next : fn(iter : *getEventsIterator, out : *InputEvent) : bool; system : InputSystem; index : i32; }
+fn getEventsNext(iter : *getEventsIterator, out : *InputEvent) : bool { iter.index += 1; if iter.index >= getEventCount(iter.system) { return false; } out.* = getEvent(iter.system, iter.index); return true; }
+fn getEvents(system : InputSystem) : getEventsIterator { return { getEventsNext, system, -1 }; }

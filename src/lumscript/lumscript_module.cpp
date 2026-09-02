@@ -62,6 +62,205 @@ static void bindCoreFunctions(ls_module* module, ls_runtime* runtime, IAllocator
 	}
 }
 
+
+struct LumScriptSystemImpl : LumScriptSystem {
+	struct ImportContext {
+		FileSystem& filesystem;
+		IAllocator& allocator;
+		Array<OutputMemoryStream> sources;
+		ImportContext(FileSystem& filesystem, IAllocator& allocator)
+			: filesystem(filesystem), allocator(allocator), sources(allocator) {}
+	};
+
+	explicit LumScriptSystemImpl(Engine& engine);
+
+	~LumScriptSystemImpl() {
+		if (m_resource) {
+			m_resource->getObserverCb().unbind<&LumScriptSystemImpl::onResourceChanged>(this);
+			m_resource->decRefCount();
+		}
+		destroyScript();
+		m_lumscript_resource_manager.destroy();
+	}
+
+	void startGame() override {
+		m_is_game_running = true;
+	}
+
+	void stopGame() override {
+		m_is_game_running = false;
+	}
+
+
+	const char* getName() const override { return "lumscript_system"; }
+	Engine& getEngine() override { return m_engine; }
+
+	void serialize(OutputMemoryStream& out) const override {}
+
+	bool deserialize(i32, InputMemoryStream&) override { return true; }
+
+	void registerModule(LumScriptModule& module) override {
+		m_modules.push(&module);
+		module.setLumScriptDataTypes(m_data_types);
+	}
+
+	void unregisterModule(LumScriptModule& module) override { m_modules.eraseItem(&module); }
+	bool isReady() const override { return m_is_ready; }
+	Span<const ls_type*> getLumScriptDataTypes() const override { return m_data_types; }
+	ls_runtime* getDebugRuntime() override { return m_runtime; }
+	const Path& getDebugPath() const override { return m_path; }
+
+	bool setDebugBreakpoint(const Path& source, u32 line) override {
+		return m_bytecode && ls_debug_set_breakpoint(m_bytecode, toLs(source.c_str()), line, nullptr) != LS_RESULT_FAILURE;
+	}
+
+	bool removeDebugBreakpoint(const Path& source, u32 line) override {
+		return m_bytecode && ls_debug_remove_breakpoint(m_bytecode, toLs(source.c_str()), line) != LS_RESULT_FAILURE;
+	}
+
+	void createModules(World& world) override;
+
+	void update(float time_delta) override {
+		if (!m_is_ready || !m_runtime || ls_debug_is_suspended(m_runtime)) return;
+		if (!m_is_game_running) return;
+
+		const ls_string_view function_name = toLs("update");
+		if (ls_bytecode_runtime_result_kind(m_runtime, function_name) == LS_TYPE_INVALID) return;
+
+		ls_push_f32(m_runtime, time_delta);
+		if (ls_call(m_runtime, function_name) == LS_RESULT_FAILURE) logError("LumScript update failed");
+	}
+
+	void loadRoot() {
+		if (m_resource) return;
+		m_resource = m_engine.getResourceManager().load<LumScriptResource>(m_path);
+		if (m_resource) m_resource->onLoaded<&LumScriptSystemImpl::onResourceChanged>(this);
+	}
+
+	void addWorld(World& world) {
+		const ls_string_view function_name = toLs("addWorld");
+		if (ls_bytecode_runtime_result_kind(m_runtime, function_name) == LS_TYPE_INVALID) return;
+		ls_push_ptr(m_runtime, &world);
+		if (ls_call(m_runtime, function_name) == LS_RESULT_FAILURE) {
+			logError("LumScript addWorld failed");
+		}
+	}
+
+	static bool isLumScriptDataType(const ls_type& type) {
+		if (ls_type_get_kind(&type) != LS_TYPE_STRUCT) return false;
+
+		for (u32 i = 0, count = ls_type_attribute_count(&type); i < count; ++i) {
+			const ls_attribute attribute = ls_type_attribute_value(&type, i);
+			if (!attribute.type) continue;
+
+			const ls_string_view name = ls_type_get_name(attribute.type);
+			if (StringView(name.begin, name.length) == "Data") return true;
+		}
+		return false;
+	}
+
+	static int resolveImport(void* userdata, ls_string_view path, ls_string_view, ls_string_view* source) {
+		ImportContext& ctx = *(ImportContext*)userdata;
+		StringView requested(path.begin, path.length);
+		Path file_path;
+		if (startsWith(requested, "core:")) {
+			StringView name = requested.withoutLeft(5);
+			file_path = endsWith(name, ".lum") ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".lum");
+		}
+		else {
+			file_path = endsWith(requested, ".lum") ? Path(requested) : Path(requested, ".lum");
+		}
+		OutputMemoryStream& blob = ctx.sources.emplace(ctx.allocator);
+		if (!ctx.filesystem.getContentSync(file_path, blob)) {
+			ctx.sources.pop();
+			return 0;
+		}
+		*source = {(const char*)blob.data(), (i64)blob.size()};
+		return 1;
+	}
+
+	void onResourceChanged(Resource::State, Resource::State state, Resource&) {
+		m_resource_ready = state == Resource::State::READY;
+		if (!m_resource_ready) {
+			destroyScript();
+			return;
+		}
+		m_is_ready = compileAndRun();
+	}
+
+	void destroyScript() {
+		m_is_ready = false;
+		for (LumScriptModule* module : m_modules) module->clearLumScriptData();
+		m_data_types.clear();
+		if (m_runtime) { ls_runtime_destroy(m_runtime); m_runtime = nullptr; }
+		if (m_bytecode) { ls_bytecode_destroy(m_bytecode); m_bytecode = nullptr; }
+		if (m_module) { ls_module_destroy(m_module); m_module = nullptr; }
+		if (m_host.arena.allocate) {
+			ls_default_arena_destroy(&m_host.arena);
+			m_host.arena = {};
+		}
+	}
+
+	bool compileAndRun() {
+		if (!m_resource) return false;
+		destroyScript();
+		String diagnostics(m_allocator);
+		LumScriptDiagnosticsContext diagnostics_context = {&diagnostics, &m_host};
+		m_host.diagnostics_userdata = &diagnostics_context;
+		m_host.print = &printLumScriptMessage;
+		ls_default_arena_create(&m_host.arena);
+		m_module = ls_module_create(&m_host);
+		ImportContext imports(m_engine.getFileSystem(), m_allocator);
+		if (!m_module || !ls_module_compile(m_module, toLs(m_resource->getSourceCode()), toLs(m_path.c_str()), &resolveImport, &imports)) {
+			m_host.diagnostics_userdata = nullptr;
+			m_host.print = nullptr;
+			logError("LumScript compilation failed: ", diagnostics);
+			return false;
+		}
+		m_bytecode = ls_bytecode_compile(m_module, &m_host, nullptr);
+		m_host.diagnostics_userdata = nullptr;
+		m_host.print = nullptr;
+		if (!m_bytecode) {
+			logError("LumScript bytecode compilation failed: ", diagnostics);
+			return false;
+		}
+		for (u32 i = 0, count = ls_bytecode_type_count(m_bytecode); i < count; ++i) {
+			const ls_type* type = ls_bytecode_type(m_bytecode, i);
+			if (isLumScriptDataType(*type)) m_data_types.push(type);
+		}
+		m_runtime = ls_runtime_create(m_bytecode, &m_host);
+		if (!m_runtime) return false;
+		bindCoreFunctions(m_module, m_runtime, m_allocator);
+		for (LumScriptModule* module : m_modules) module->setLumScriptDataTypes(m_data_types);
+		const ls_string_view init_name = toLs("init");
+		if (ls_bytecode_runtime_result_kind(m_runtime, init_name) != LS_TYPE_INVALID) {
+			ls_push_ptr(m_runtime, &m_engine.getInputSystem());
+			if (ls_call(m_runtime, init_name) == LS_RESULT_FAILURE) {
+				logError("LumScript init failed");
+				return false;
+			}
+		}
+		for (LumScriptModule* module : m_modules) addWorld(module->getWorld());
+		return true;
+	}
+
+	Engine& m_engine;
+	TagAllocator m_allocator;
+	LumScriptResourceManager m_lumscript_resource_manager;
+	Path m_path;
+	LumScriptResource* m_resource = nullptr;
+	ls_host m_host;
+	ls_module* m_module = nullptr;
+	ls_bytecode* m_bytecode = nullptr;
+	ls_runtime* m_runtime = nullptr;
+	Array<const ls_type*> m_data_types;
+	Array<LumScriptModule*> m_modules;
+	bool m_resource_ready = false;
+	bool m_is_ready = false;
+	bool m_is_game_running = false;
+};
+
+
 struct LumScriptModuleImpl : LumScriptModule {
 	struct AlignedByteBuffer {
 		AlignedByteBuffer(IAllocator& allocator, u32 alignment)
@@ -136,13 +335,49 @@ struct LumScriptModuleImpl : LumScriptModule {
 		Array<LumScriptDataRef> data;
 	};
 
-	LumScriptModuleImpl(World& world, LumScriptSystem& system)
+	struct PendingField {
+		explicit PendingField(IAllocator& allocator)
+			: name(allocator)
+			, type_name(allocator)
+			, values(allocator)
+		{}
+		PendingField(PendingField&& rhs)
+			: name(static_cast<String&&>(rhs.name))
+			, type_name(static_cast<String&&>(rhs.type_name))
+			, size(rhs.size)
+			, values(static_cast<OutputMemoryStream&&>(rhs.values))
+		{}
+
+		String name;
+		String type_name;
+		u32 size;
+		OutputMemoryStream values;
+	};
+
+	struct PendingType {
+		explicit PendingType(IAllocator& allocator)
+			: name(allocator)
+			, fields(allocator)
+			, entities(allocator)
+		{}
+		PendingType(PendingType&& rhs)
+			: name(static_cast<String&&>(rhs.name))
+			, fields(rhs.fields.move())
+			, entities(rhs.entities.move())
+		{}
+
+		String name;
+		Array<PendingField> fields;
+		Array<EntityRef> entities;
+	};
+
+	LumScriptModuleImpl(World& world, LumScriptSystemImpl& system)
 		: m_world(world)
 		, m_system(system)
 		, m_allocator(world.getAllocator())
-		, m_data_types(m_allocator)
 		, m_data_storage(m_allocator)
 		, m_components(m_allocator)
+		, m_pending_types(m_allocator)
 	{
 		m_system.registerModule(*this);
 	}
@@ -167,16 +402,112 @@ struct LumScriptModuleImpl : LumScriptModule {
 		if (!iter.isValid()) return;
 		while (!iter.value().data.empty()) removeLumScriptDataAt(iter.value(), iter.value().data.size() - 1);
 		m_components.erase(iter);
+		removePendingData(entity);
 		m_world.onComponentDestroyed(entity, reflection::getComponentType("lumscript"), this);
 	}
 	ISystem& getSystem() const override { return m_system; }
-	i32 getVersion() const override { return 1; }
-	bool shouldSerialize() override { return false; }
-	void serialize(OutputMemoryStream&) override {}
-	void deserialize(InputMemoryStream& serializer, const EntityMap&, i32 version) override {
-		// Consume the level-script path written by the previous per-world implementation.
-		if (version != 1) serializer.readString();
+	i32 getVersion() const override { return 2; }
+	bool shouldSerialize() override { return true; }
+
+	static bool isSerializableField(const ls_type& type) {
+		switch (ls_type_get_kind(&type)) {
+			case LS_TYPE_BOOL:
+			case LS_TYPE_I8:
+			case LS_TYPE_U8:
+			case LS_TYPE_I16:
+			case LS_TYPE_U16:
+			case LS_TYPE_I32:
+			case LS_TYPE_U32:
+			case LS_TYPE_I64:
+			case LS_TYPE_U64:
+			case LS_TYPE_F32:
+			case LS_TYPE_F64: return true;
+			default: return false;
+		}
 	}
+
+	void serialize(OutputMemoryStream& out) override {
+		out.write(m_components.size());
+		for (auto iter = m_components.begin(), end = m_components.end(); iter != end; ++iter) {
+			out.write(iter.key());
+		}
+
+		// Live and pending types share the same serialized representation.
+		out.write(m_data_storage.size() + m_pending_types.size());
+		for (const LumScriptDataType& data : m_data_storage) {
+			const ls_type* type = data.type;
+			const ls_string_view type_name = ls_type_get_name(type);
+			out.writeString({type_name.begin, (u64)type_name.length});
+			u32 num_fields = 0;
+			for (u32 i = 0, count = ls_type_struct_field_count(type); i < count; ++i) {
+				if (isSerializableField(*ls_type_struct_field_type(type, i))) ++num_fields;
+			}
+			out.write(num_fields);
+			const u32 num_values = data.entities.size();
+			out.write(num_values);
+			for (u32 i = 0, field_count = ls_type_struct_field_count(type); i < field_count; ++i) {
+				const ls_type* field_type = ls_type_struct_field_type(type, i);
+				if (!isSerializableField(*field_type)) continue;
+				const ls_string_view field_name = ls_type_struct_field_name(type, i);
+				out.writeString({field_name.begin, (u64)field_name.length});
+				const u32 field_offset = ls_type_struct_field_offset(type, i);
+				const ls_string_view field_type_name = ls_type_get_name(field_type);
+				out.writeString({field_type_name.begin, (u64)field_type_name.length});
+				const u32 field_size = ls_type_get_size(field_type);
+				out.write(field_size);
+				for (u32 j = 0; j < num_values; ++j) {
+					out.write(data.values.data + field_offset + j * data.element_size, field_size);
+				}
+			}
+			out.write(data.entities.begin(), data.entities.byte_size());
+		}
+		for (const PendingType& type : m_pending_types) {
+			out.writeString(type.name);
+			out.write(type.fields.size());
+			out.write(type.entities.size());
+			for (const PendingField& field : type.fields) {
+				out.writeString(field.name);
+				out.writeString(field.type_name);
+				out.write(field.size);
+				out.write(field.values.data(), field.values.size());
+			}
+			out.write(type.entities.begin(), type.entities.byte_size());
+		}
+	}
+
+	void deserialize(InputMemoryStream& in, const EntityMap& entity_map, i32 version) override {
+		if (version <= 0) in.readString();
+		if (version <= 1) return;
+
+		const u32 component_count = in.read<u32>();
+		for (u32 i = 0; i < component_count; ++i) {
+			EntityRef entity = entity_map.get(in.read<EntityRef>());
+			createLumScript(entity);
+		}
+
+		const u32 type_count = in.read<u32>();
+		m_pending_types.reserve(m_pending_types.size() + type_count);
+		for (u32 i = 0; i < type_count; ++i) {
+			PendingType& type = m_pending_types.emplace(m_allocator);
+			in.read(type.name);
+			const u32 field_count = in.read<u32>();
+			const u32 value_count = in.read<u32>();
+			type.fields.reserve(field_count);
+			for (u32 j = 0; j < field_count; ++j) {
+				PendingField& field = type.fields.emplace(m_allocator);
+				in.read(field.name);
+				in.read(field.type_name);
+				in.read(field.size);
+				field.values.resize(field.size * value_count);
+				in.read(field.values.getMutableData(), field.values.size());
+			}
+			type.entities.resize(value_count);
+			in.read(type.entities.begin(), type.entities.byte_size());
+			for (EntityRef& entity : type.entities) entity = entity_map.get(entity);
+		}
+		applyPendingData();
+	}
+
 	void update(float) override {}
 
 	Span<const u8> getLumScriptData(const char* type_name) override {
@@ -191,23 +522,22 @@ struct LumScriptModuleImpl : LumScriptModule {
 
 	void setLumScriptDataTypes(Span<const ls_type*> types) override {
 		clearLumScriptData();
-		m_data_types.reserve(types.length());
 		m_data_storage.reserve(types.length());
 		for (const ls_type* type : types) {
-			m_data_types.push(type);
 			m_data_storage.emplace(type, m_allocator);
 		}
+		applyPendingData();
 	}
 
 	void clearLumScriptData() override {
+		stashCurrentData();
 		for (LumScriptComponent& component : m_components) component.data.clear();
 		m_data_storage.clear();
-		m_data_types.clear();
 	}
 
 	bool isReady() const override { return m_system.isReady(); }
 
-	Span<const ls_type*> getLumScriptDataTypes() const override { return m_data_types; }
+	Span<const ls_type*> getLumScriptDataTypes() const override { return m_system.getLumScriptDataTypes(); }
 
 	u32 getLumScriptDataCount(EntityRef entity) const override {
 		auto iter = m_components.find(entity);
@@ -265,6 +595,112 @@ struct LumScriptModuleImpl : LumScriptModule {
 	bool removeDebugBreakpoint(const Path& source, u32 line) override { return m_system.removeDebugBreakpoint(source, line); }
 
 private:
+	void stashCurrentData() {
+		for (const LumScriptDataType& data : m_data_storage) {
+			if (data.entities.empty()) continue;
+
+			PendingType& pending = m_pending_types.emplace(m_allocator);
+			const ls_string_view name = ls_type_get_name(data.type);
+			pending.name = StringView(name.begin, name.length);
+			data.entities.copyTo(pending.entities);
+			for (u32 i = 0, field_count = ls_type_struct_field_count(data.type); i < field_count; ++i) {
+				const ls_type* field_type = ls_type_struct_field_type(data.type, i);
+				if (!isSerializableField(*field_type)) continue;
+
+				PendingField& field = pending.fields.emplace(m_allocator);
+				const ls_string_view field_name = ls_type_struct_field_name(data.type, i);
+				field.name = StringView(field_name.begin, field_name.length);
+				const ls_string_view field_type_name = ls_type_get_name(field_type);
+				field.type_name = StringView(field_type_name.begin, field_type_name.length);
+				field.size = ls_type_get_size(field_type);
+				const u32 offset = ls_type_struct_field_offset(data.type, i);
+				field.values.resize(field.size * data.entities.size());
+				for (u32 j = 0; j < (u32)data.entities.size(); ++j) {
+					memcpy(field.values.getMutableData() + j * field.size,
+						data.values.data + j * data.element_size + offset,
+						field.size);
+				}
+			}
+		}
+	}
+
+	void applyPendingData() {
+		for (i32 pending_idx = m_pending_types.size() - 1; pending_idx >= 0; --pending_idx) {
+			PendingType& pending = m_pending_types[pending_idx];
+			LumScriptDataType* data_type = nullptr;
+			for (LumScriptDataType& candidate : m_data_storage) {
+				const ls_string_view name = ls_type_get_name(candidate.type);
+				if (pending.name == StringView(name.begin, name.length)) {
+					data_type = &candidate;
+					break;
+				}
+			}
+			if (!data_type) continue;
+
+			const u32 base_index = data_type->entities.size();
+			const u32 count = pending.entities.size();
+			const u32 old_size = data_type->values.size;
+			data_type->values.resize(old_size + count * data_type->element_size);
+			memset(data_type->values.data + old_size, 0, count * data_type->element_size);
+
+			for (const PendingField& field : pending.fields) {
+				for (u32 i = 0, field_count = ls_type_struct_field_count(data_type->type); i < field_count; ++i) {
+					const ls_string_view current_name = ls_type_struct_field_name(data_type->type, i);
+					if (field.name != StringView(current_name.begin, current_name.length)) continue;
+
+					const ls_type* current_type = ls_type_struct_field_type(data_type->type, i);
+					const ls_string_view current_type_name = ls_type_get_name(current_type);
+					if (field.size != ls_type_get_size(current_type)
+						|| field.type_name != StringView(current_type_name.begin, current_type_name.length))
+					{
+						logWarning("LumScript: ignoring incompatible field ", pending.name, ".", field.name);
+						break;
+					}
+					const u32 offset = ls_type_struct_field_offset(data_type->type, i);
+					for (u32 j = 0; j < count; ++j) {
+						memcpy(data_type->values.data + old_size + j * data_type->element_size + offset,
+							field.values.data() + j * field.size,
+							field.size);
+					}
+					break;
+				}
+			}
+
+			data_type->entities.reserve(base_index + count);
+			for (u32 i = 0; i < count; ++i) {
+				const EntityRef entity = pending.entities[i];
+				data_type->entities.push(entity);
+				injectEntity(*data_type, data_type->values.data + old_size + i * data_type->element_size, entity);
+			}
+
+			for (u32 i = 0; i < count; ++i) {
+				auto cmp = m_components.find(pending.entities[i]);
+				if (cmp.isValid() && findDataRef(cmp.value(), data_type->type) < 0) {
+					cmp.value().data.push({data_type->type, base_index + i});
+				}
+			}
+			m_pending_types.swapAndPop(pending_idx);
+		}
+	}
+
+	void removePendingData(EntityRef entity) {
+		for (PendingType& type : m_pending_types) {
+			for (i32 i = type.entities.size() - 1; i >= 0; --i) {
+				if (type.entities[i] != entity) continue;
+				const u32 last = type.entities.size() - 1;
+				for (PendingField& field : type.fields) {
+					if (i != (i32)last) {
+						memcpy(field.values.getMutableData() + i * field.size,
+							field.values.data() + last * field.size,
+							field.size);
+					}
+					field.values.resize(last * field.size);
+				}
+				type.entities.swapAndPop(i);
+			}
+		}
+	}
+
 	void injectEntity(const LumScriptDataType& data_type, u8* value, EntityRef entity) {
 		for (u32 i = 0, count = ls_type_struct_field_count(data_type.type); i < count; ++i) {
 			bool inject = false;
@@ -274,7 +710,7 @@ private:
 
 				const ls_string_view name = ls_type_get_name(attribute.type);
 				// TODO not string based compare
-				if (StringView(name.begin, (u64)name.length) == "inject") {
+				if (StringView(name.begin, (u64)name.length) == "Owner") {
 					inject = true;
 					break;
 				}
@@ -342,222 +778,32 @@ private:
 	}
 
 	World& m_world;
-	LumScriptSystem& m_system;
+	LumScriptSystemImpl& m_system;
 	IAllocator& m_allocator;
-	Array<const ls_type*> m_data_types;
 	Array<LumScriptDataType> m_data_storage;
 	HashMap<EntityRef, LumScriptComponent> m_components;
+	Array<PendingType> m_pending_types;
 };
 
-struct LumScriptSystemImpl : LumScriptSystem {
-	struct ImportContext {
-		FileSystem& filesystem;
-		IAllocator& allocator;
-		Array<OutputMemoryStream> sources;
-		ImportContext(FileSystem& filesystem, IAllocator& allocator)
-			: filesystem(filesystem), allocator(allocator), sources(allocator) {}
-	};
+LumScriptSystemImpl::LumScriptSystemImpl(Engine& engine)
+	: m_engine(engine)
+	, m_allocator(engine.getAllocator(), "lumscript")
+	, m_lumscript_resource_manager(m_allocator)
+	, m_path("scripts/main.lum")
+	, m_data_types(m_allocator)
+	, m_modules(m_allocator)
+{
+	m_host.arena = {};
+	LumScriptModuleImpl::reflect();
+	m_lumscript_resource_manager.create(LumScriptResource::TYPE, m_engine.getResourceManager());
+}
 
-	explicit LumScriptSystemImpl(Engine& engine)
-		: m_engine(engine)
-		, m_allocator(engine.getAllocator(), "lumscript")
-		, m_lumscript_resource_manager(m_allocator)
-		, m_path("scripts/main.lum")
-		, m_data_types(m_allocator)
-		, m_modules(m_allocator)
-	{
-		m_host.arena = {};
-		LumScriptModuleImpl::reflect();
-		m_lumscript_resource_manager.create(LumScriptResource::TYPE, m_engine.getResourceManager());
-	}
-
-	~LumScriptSystemImpl() {
-		if (m_resource) {
-			m_resource->getObserverCb().unbind<&LumScriptSystemImpl::onResourceChanged>(this);
-			m_resource->decRefCount();
-		}
-		destroyScript();
-		m_lumscript_resource_manager.destroy();
-	}
-
-	void startGame() override {
-		m_is_game_running = true;
-	}
-
-	void stopGame() override {
-		m_is_game_running = false;
-	}
-
-
-	const char* getName() const override { return "lumscript_system"; }
-	Engine& getEngine() override { return m_engine; }
-	void serialize(OutputMemoryStream&) const override {}
-	bool deserialize(i32, InputMemoryStream&) override { return true; }
-
-	void registerModule(LumScriptModule& module) override {
-		m_modules.push(&module);
-		module.setLumScriptDataTypes(m_data_types);
-	}
-
-	void unregisterModule(LumScriptModule& module) override { m_modules.eraseItem(&module); }
-	bool isReady() const override { return m_is_ready; }
-	Span<const ls_type*> getLumScriptDataTypes() const override { return m_data_types; }
-	ls_runtime* getDebugRuntime() override { return m_runtime; }
-	const Path& getDebugPath() const override { return m_path; }
-
-	bool setDebugBreakpoint(const Path& source, u32 line) override {
-		return m_bytecode && ls_debug_set_breakpoint(m_bytecode, toLs(source.c_str()), line, nullptr) != LS_RESULT_FAILURE;
-	}
-
-	bool removeDebugBreakpoint(const Path& source, u32 line) override {
-		return m_bytecode && ls_debug_remove_breakpoint(m_bytecode, toLs(source.c_str()), line) != LS_RESULT_FAILURE;
-	}
-
-	void createModules(World& world) override {
-		loadRoot();
-		auto module = UniquePtr<LumScriptModuleImpl>::create(m_allocator, world, *this);
-		world.addModule(module.move());
-		if (m_is_ready) addWorld(world);
-	}
-
-	void update(float time_delta) override {
-		if (!m_is_ready || !m_runtime || ls_debug_is_suspended(m_runtime)) return;
-		if (!m_is_game_running) return;
-
-		const ls_string_view function_name = toLs("update");
-		if (ls_bytecode_runtime_result_kind(m_runtime, function_name) == LS_TYPE_INVALID) return;
-
-		ls_push_f32(m_runtime, time_delta);
-		if (ls_call(m_runtime, function_name) == LS_RESULT_FAILURE) logError("LumScript update failed");
-	}
-
-private:
-	void loadRoot() {
-		if (m_resource) return;
-		m_resource = m_engine.getResourceManager().load<LumScriptResource>(m_path);
-		if (m_resource) m_resource->onLoaded<&LumScriptSystemImpl::onResourceChanged>(this);
-	}
-
-	void addWorld(World& world) {
-		const ls_string_view function_name = toLs("addWorld");
-		if (ls_bytecode_runtime_result_kind(m_runtime, function_name) == LS_TYPE_INVALID) return;
-		ls_push_ptr(m_runtime, &world);
-		if (ls_call(m_runtime, function_name) == LS_RESULT_FAILURE) {
-			logError("LumScript addWorld failed");
-		}
-	}
-
-	static bool isLumScriptDataType(const ls_type* type) {
-		if (!type || ls_type_get_kind(type) != LS_TYPE_STRUCT) return false;
-		for (u32 i = 0, count = ls_type_attribute_count(type); i < count; ++i) {
-			const ls_attribute attribute = ls_type_attribute_value(type, i);
-			if (!attribute.type) continue;
-			const ls_string_view name = ls_type_get_name(attribute.type);
-			if (StringView(name.begin, name.length) == "component") return true;
-		}
-		return false;
-	}
-
-	static int resolveImport(void* userdata, ls_string_view path, ls_string_view, ls_string_view* source) {
-		ImportContext& ctx = *(ImportContext*)userdata;
-		StringView requested(path.begin, path.length);
-		Path file_path;
-		if (startsWith(requested, "core:")) {
-			StringView name = requested.withoutLeft(5);
-			file_path = endsWith(name, ".lum") ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".lum");
-		}
-		else {
-			file_path = endsWith(requested, ".lum") ? Path(requested) : Path(requested, ".lum");
-		}
-		OutputMemoryStream& blob = ctx.sources.emplace(ctx.allocator);
-		if (!ctx.filesystem.getContentSync(file_path, blob)) {
-			ctx.sources.pop();
-			return 0;
-		}
-		*source = {(const char*)blob.data(), (i64)blob.size()};
-		return 1;
-	}
-
-	void onResourceChanged(Resource::State, Resource::State state, Resource&) {
-		m_resource_ready = state == Resource::State::READY;
-		if (!m_resource_ready) {
-			destroyScript();
-			return;
-		}
-		m_is_ready = compileAndRun();
-	}
-
-	void destroyScript() {
-		m_is_ready = false;
-		for (LumScriptModule* module : m_modules) module->clearLumScriptData();
-		m_data_types.clear();
-		if (m_runtime) { ls_runtime_destroy(m_runtime); m_runtime = nullptr; }
-		if (m_bytecode) { ls_bytecode_destroy(m_bytecode); m_bytecode = nullptr; }
-		if (m_module) { ls_module_destroy(m_module); m_module = nullptr; }
-		if (m_host.arena.allocate) {
-			ls_default_arena_destroy(&m_host.arena);
-			m_host.arena = {};
-		}
-	}
-
-	bool compileAndRun() {
-		if (!m_resource) return false;
-		destroyScript();
-		String diagnostics(m_allocator);
-		LumScriptDiagnosticsContext diagnostics_context = {&diagnostics, &m_host};
-		m_host.diagnostics_userdata = &diagnostics_context;
-		m_host.print = &printLumScriptMessage;
-		ls_default_arena_create(&m_host.arena);
-		m_module = ls_module_create(&m_host);
-		ImportContext imports(m_engine.getFileSystem(), m_allocator);
-		if (!m_module || !ls_module_compile(m_module, toLs(m_resource->getSourceCode()), toLs(m_path.c_str()), &resolveImport, &imports)) {
-			m_host.diagnostics_userdata = nullptr;
-			m_host.print = nullptr;
-			logError("LumScript compilation failed: ", diagnostics);
-			return false;
-		}
-		m_bytecode = ls_bytecode_compile(m_module, &m_host, nullptr);
-		m_host.diagnostics_userdata = nullptr;
-		m_host.print = nullptr;
-		if (!m_bytecode) {
-			logError("LumScript bytecode compilation failed: ", diagnostics);
-			return false;
-		}
-		for (u32 i = 0, count = ls_bytecode_type_count(m_bytecode); i < count; ++i) {
-			const ls_type* type = ls_bytecode_type(m_bytecode, i);
-			if (isLumScriptDataType(type)) m_data_types.push(type);
-		}
-		m_runtime = ls_runtime_create(m_bytecode, &m_host);
-		if (!m_runtime) return false;
-		bindCoreFunctions(m_module, m_runtime, m_allocator);
-		for (LumScriptModule* module : m_modules) module->setLumScriptDataTypes(m_data_types);
-		const ls_string_view init_name = toLs("init");
-		if (ls_bytecode_runtime_result_kind(m_runtime, init_name) != LS_TYPE_INVALID) {
-			ls_push_ptr(m_runtime, &m_engine.getInputSystem());
-			if (ls_call(m_runtime, init_name) == LS_RESULT_FAILURE) {
-				logError("LumScript init failed");
-				return false;
-			}
-		}
-		for (LumScriptModule* module : m_modules) addWorld(module->getWorld());
-		return true;
-	}
-
-	Engine& m_engine;
-	TagAllocator m_allocator;
-	LumScriptResourceManager m_lumscript_resource_manager;
-	Path m_path;
-	LumScriptResource* m_resource = nullptr;
-	ls_host m_host;
-	ls_module* m_module = nullptr;
-	ls_bytecode* m_bytecode = nullptr;
-	ls_runtime* m_runtime = nullptr;
-	Array<const ls_type*> m_data_types;
-	Array<LumScriptModule*> m_modules;
-	bool m_resource_ready = false;
-	bool m_is_ready = false;
-	bool m_is_game_running = false;
-};
+void LumScriptSystemImpl::createModules(World& world) {
+	loadRoot();
+	auto module = UniquePtr<LumScriptModuleImpl>::create(m_allocator, world, *this);
+	world.addModule(module.move());
+	if (m_is_ready) addWorld(world);
+}
 
 IModule* createLumScriptModule(World& world);
 void destroyLumScriptModule(IModule* module);

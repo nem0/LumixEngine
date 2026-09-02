@@ -109,6 +109,10 @@ function hasPlugin(plugin)
 	return false
 end
 
+if build_tests and not hasPlugin("lumscript") then
+	error("--with-tests requires the lumscript plugin")
+end
+
 -- common platform link helpers
 function linkWindowsLibs()
 	configuration { "windows" }
@@ -1054,7 +1058,7 @@ io.write "#elif defined LUMIX_PLUGINS_STRINGS\n"
 io.write "#else\n"
 	if not dynamic_plugins then
 		for _, plugin in ipairs(plugin_creators) do
-			io.write "{\n"
+			io.write("if (shouldCreateStaticPlugin(plugins, \"" .. plugin .. "\")) {\n")
 			io.write("\tISystem* p = createPlugin_" .. plugin .. "(engine);\n")
 			io.write "\tif (p) engine.getSystemManager().addSystem(p, nullptr);\n"
 			io.write "}\n"
@@ -1075,12 +1079,9 @@ if build_tests then
 			"../external/imgui_test_engine/**.cpp",
 			"../external/imgui_test_engine/**.h"
 		}
-	
 		if split_projects then
-			links { "core", "engine" }
-			if hasPlugin "renderer" then
-				links { "renderer" }
-			end
+			links { "core", "engine", "lumscript" }
+			if hasPlugin "renderer" then links { "renderer" } end
 		else
 			links { "engine_merged" }
 		end

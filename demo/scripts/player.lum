@@ -33,9 +33,7 @@ var physics_module : ?PhysicsModule = null;
 fn processInputEvents() : void {
 	if not handle_input { return; }
 
-	const event_count = input_system.getEventCount();
-	for i in 0..event_count {
-		const event = input_system.getEvent(i);
+	for event in input_system.getEvents() {
 		match event {
 			case AxisEvent:
 				if event.device_type == .MOUSE {
@@ -75,25 +73,21 @@ fn init(w : World, inp : InputSystem) : void {
 	input_system = inp;
 	physics_module = w.physics();
 
-	if player != null {
-		const anim = player.animator();
-		if anim != null {
-			speed_input_idx = anim.getInputIndex("speed_y");
-			dir_input_idx = anim.getInputIndex("speed_x");
-			stance_input_idx = anim.getInputIndex("stance");
-			falling_input_idx = anim.getInputIndex("is_falling");
-			aiming_input_idx = anim.getInputIndex("is_aiming");
-		}
-	}
+	if player == null { return; }
+	const anim = player.animator() else return;
+
+	speed_input_idx = anim.getInputIndex("speed_y");
+	dir_input_idx = anim.getInputIndex("speed_x");
+	stance_input_idx = anim.getInputIndex("stance");
+	falling_input_idx = anim.getInputIndex("is_falling");
+	aiming_input_idx = anim.getInputIndex("is_aiming");
 }
 
 fn update(dt : f32) : void {
 	processInputEvents();
 
 	if physics_module != null {
-		const num_hits = physics_module.getNumControllerHits();
-		for i in 0..num_hits {
-			const hit = physics_module.getControllerHit(i);
+		for hit in physics_module.getControllerHits() {
 			const obj = hit.hit_entity;
 			const a = obj.rigid_actor();
 			if a != null {

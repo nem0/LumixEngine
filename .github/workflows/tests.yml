@@ -5,12 +5,22 @@ on:
       - '**/particle_script*'
       - 'src/ui/**'
       - 'src/tests/ui_*'
+      - 'src/tests/lumscript_*'
+      - 'src/lumscript/**'
+      - 'external/lumscript/**'
+      - 'scripts/run_tests.*'
+      - 'scripts/genie.lua'
       - '.github/workflows/tests.yml'
   pull_request:
     paths:
       - '**/particle_script*'
       - 'src/ui/**'
       - 'src/tests/ui_*'
+      - 'src/tests/lumscript_*'
+      - 'src/lumscript/**'
+      - 'external/lumscript/**'
+      - 'scripts/run_tests.*'
+      - 'scripts/genie.lua'
       - '.github/workflows/tests.yml'
 
 jobs:

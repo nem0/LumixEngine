@@ -294,6 +294,8 @@ struct IRBuilder {
 		switch (expression.kind) {
 			case Expression::ADDRESSOF:
 				return true;
+			case Expression::PANIC:
+				return true;
 			case Expression::CALL: {
 				const auto& call = static_cast<const CallExpression&>(expression);
 				FunctionExpression* function = call.resolved_fn;
@@ -732,6 +734,12 @@ struct IRBuilder {
 				}
 
 				break;
+			}
+			case Expression::PANIC: {
+				auto& panic = static_cast<PanicExpression&>(expr);
+				auto& op = alloc<LsOpPanic>();
+				op.message = &buildImplicitConversionIR(*panic.message, *panic.message->resolved_type);
+				return op;
 			}
 			case Expression::CALL: {
 				auto& call = static_cast<CallExpression&>(expr);
@@ -1287,6 +1295,88 @@ struct IRBuilder {
 					pending_loop_label = {};
 					buildStatementIR(*for_statement.body, *loop.true_block);
 					finishLoopIteration(loop, increment_target, bottom, exit, &value, value_type);
+					return;
+				}
+
+				if (for_statement.is_custom_iterator) {
+					ResolvedType* iterator_type = for_statement.begin->resolved_type;
+					ResolvedType* element_type = for_statement.iterator_element_type;
+					auto& iterator = allocAlloca(iterator_type, {}, &buildExpressionIR(*for_statement.begin, true));
+					parent.ops.push(&iterator);
+					auto& value = allocAlloca(element_type, for_statement.value_var, &alloc<LsOpNop>());
+					parent.ops.push(&value);
+
+					LsOpAlloca* counter = nullptr;
+					if (for_statement.is_key_value) {
+						static ResolvedType index_type(ResolvedTypeKind::ISIZE);
+						auto& zero = alloc<LsOpLoadConst>();
+						zero.type = &index_type;
+						const u64 zero_value = 0;
+						memcpy(zero.value, &zero_value, typeByteSize(*zero.type));
+						counter = &allocAlloca(zero.type, for_statement.key_var, &zero);
+						parent.ops.push(counter);
+					}
+
+					locals.push({for_statement.value_var, &value});
+					if (counter) locals.push({for_statement.key_var, counter});
+
+					auto& iterator_addr = alloc<LsOpPushLocalAddr>();
+					iterator_addr.alloca = &iterator;
+					auto& iterator_load = alloc<LsOpLoad>();
+					iterator_load.addr = &iterator_addr;
+					iterator_load.size = typeByteSize(*iterator_type);
+					const StructResolvedType& struct_type = *static_cast<StructResolvedType*>(iterator_type);
+					const ResolvedType* next_type = struct_type.fields[for_statement.iterator_next_field].type;
+					auto& next = alloc<LsOpExtractValue>();
+					next.value = &iterator_load;
+					next.offset = struct_type.fields[for_statement.iterator_next_field].offset;
+					next.size = typeByteSize(*next_type);
+
+					auto& next_iterator_addr = alloc<LsOpPushLocalAddr>();
+					next_iterator_addr.alloca = &iterator;
+					auto& value_addr = alloc<LsOpPushLocalAddr>();
+					value_addr.alloca = &value;
+					auto& condition_call = alloc<LsOpCallIndirect>();
+					condition_call.callee = &next;
+					condition_call.arg_count = 2;
+					condition_call.return_size = sizeof(bool);
+					condition_call.args = static_cast<LsIrOp**>(host.arena.allocate(host.arena.user_data, sizeof(LsIrOp*) * 2, alignof(LsIrOp*)));
+					condition_call.arg_sizes = static_cast<u32*>(host.arena.allocate(host.arena.user_data, sizeof(u32) * 2, alignof(u32)));
+					condition_call.args[0] = &next_iterator_addr;
+					condition_call.args[1] = &value_addr;
+					condition_call.arg_sizes[0] = typeByteSize(*static_cast<PointerResolvedType*>(static_cast<const FunctionResolvedType*>(next_type)->params[0].type));
+					condition_call.arg_sizes[1] = typeByteSize(*static_cast<PointerResolvedType*>(static_cast<const FunctionResolvedType*>(next_type)->params[1].type));
+
+					auto& loop = alloc<LsOpConditionalJump>();
+					auto& increment_target = alloc<LsOpNop>();
+					auto& exit = alloc<LsOpNop>();
+					loop.condition = &condition_call;
+					loop.true_block = &alloc<LsIrBlockData>(host.arena);
+					auto& body_start = alloc<LsOpNop>();
+					loop.body_start = &body_start;
+					loop.true_block->ops.push(&body_start);
+					auto& bottom = alloc<LsOpConditionalJump>();
+					bottom.condition = &condition_call;
+					bottom.bottom_tested = true;
+					bottom.body_start = &body_start;
+					loops.push({pending_loop_label, &increment_target, &exit, (u32)defers.size()});
+					pending_loop_label = {};
+					buildStatementIR(*for_statement.body, *loop.true_block);
+					loop.true_block->ops.push(&increment_target);
+					if (counter) {
+						auto& addr = alloc<LsOpPushLocalAddr>(); addr.alloca = counter;
+						auto& load = alloc<LsOpLoad>(); load.addr = &addr; load.size = typeByteSize(*counter->type);
+						auto& one = alloc<LsOpLoadConst>(); one.type = counter->type; const u64 one_value = 1; memcpy(one.value, &one_value, typeByteSize(*one.type));
+						auto& add = alloc<LsOpAdd>(); add.operand_type = counter->type; add.lhs = &load; add.rhs = &one;
+						auto& dst = alloc<LsOpPushLocalAddr>(); dst.alloca = counter;
+						auto& store = alloc<LsOpCopy>(); store.type = counter->type; store.src = &add; store.dst = &dst;
+						loop.true_block->ops.push(&store);
+					}
+					loops.pop_back();
+					locals.resize(local_watermark);
+					loop.true_block->ops.push(&bottom);
+					parent.ops.push(&loop);
+					parent.ops.push(&exit);
 					return;
 				}
 
@@ -3538,6 +3628,15 @@ struct BytecodeCompiler {
 			case LsIrOpKind::JUMP: result = emitJump(static_cast<LsOpJump&>(op)); break;
 			case LsIrOpKind::CONDITIONAL_JUMP: result = emitConditionalJump(*static_cast<LsOpConditionalJump*>(&op)); break;
 			case LsIrOpKind::CALL_DIRECT: result = emitCallDirect(*static_cast<LsOpCallDirect*>(&op)); break;
+			case LsIrOpKind::PANIC: {
+				LsOpPanic& panic = *static_cast<LsOpPanic*>(&op);
+				const u32 message = emit(*panic.message, nullptr);
+				if (stack_top > stack_high_water) stack_high_water = stack_top;
+				emitOp(LS_OP_PANIC);
+				emit(message);
+				result = 0xffffffffu;
+				break;
+			}
 			case LsIrOpKind::CALL_INDIRECT: result = emitCallIndirect(*static_cast<LsOpCallIndirect*>(&op)); break;
 			case LsIrOpKind::EXTRACT_VALUE: result = emitExtractValue(*static_cast<LsOpExtractValue*>(&op), dst); break;
 			case LsIrOpKind::LOAD: result = emitLoad(*static_cast<LsOpLoad*>(&op), dst); break;

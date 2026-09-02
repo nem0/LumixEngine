@@ -15,14 +15,12 @@ if [[ ! -x ./genie ]]; then
   exit 1
 fi
 
-# The headless tests do not need the platform renderer or runtime plugins.
 ./genie --with-tests \
   --no-physics \
   --no-navigation \
   --no-animation \
   --no-audio \
   --no-lua \
-  --no-lumscript \
   gmake
 
 make -C "$BUILD_DIR" -j config=debug64 tests

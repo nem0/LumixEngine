@@ -52,6 +52,7 @@ enum class LsIrOpKind {
 	LOAD,
 	EXTRACT_VALUE,
 	CALL_DIRECT,
+	PANIC,
 	CALL_INDIRECT,
 	CONDITIONAL_JUMP,
 	JUMP,
@@ -118,6 +119,11 @@ struct LsOpExtractValue : LsIrOp {
 	LsIrOp* value = nullptr;
 	u32 offset = 0;
 	u32 size = 0;
+};
+
+struct LsOpPanic : LsIrOp {
+	LsOpPanic() : LsIrOp(LsIrOpKind::PANIC) {}
+	LsIrOp* message = nullptr;
 };
 
 struct LsOpCallIndirect : LsIrOp {

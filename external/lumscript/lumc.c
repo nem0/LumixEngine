@@ -240,6 +240,7 @@ static const char* lumc_opcode_name(ls_op op) {
 		case LS_OP_CAST: return "CAST";
 		case LS_OP_RETURN: return "RETURN";
 		case LS_OP_RETURN_BASE: return "RETURN_BASE";
+		case LS_OP_PANIC: return "PANIC";
 		default: return "UNKNOWN";
 	}
 }
@@ -627,6 +628,11 @@ static void lumc_dump_bytecode(const ls_bytecode* bytecode, const char* source_t
 				break;
 			}
 			case LS_OP_RETURN_BASE: {
+				break;
+			}
+			case LS_OP_PANIC: {
+				const u32 message = lumc_read_u32(fn->code, fn->code_size, &pc);
+				printf(" message=%u", message);
 				break;
 			}
 			case LS_OP_NOT:

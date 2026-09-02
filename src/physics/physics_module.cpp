@@ -2305,32 +2305,16 @@ struct PhysicsModuleImpl final : PhysicsModule
 		m_controllers[entity].use_root_motion = enable;
 	}
 
-	u32 getNumControllerHits() override {
-		return m_hit_report.m_hits.size();
+	Span<const ControllerHitData> getControllerHits() override {
+		return m_hit_report.m_hits;
 	}
 
-	ControllerHitData getControllerHit(u32 index) override {
-		ASSERT((i32)index < m_hit_report.m_hits.size());
-		const ControllerHit& hit = m_hit_report.m_hits[index];
-		return ControllerHitData{hit.controller, hit.hit_entity};
+	Span<const TriggerHitData> getTriggerHits() override {
+		return m_contact_callback.m_trigger_hits;
 	}
 
-	u32 getNumTriggerHits() override {
-		return m_contact_callback.m_trigger_hits.size();
-	}
-
-	TriggerHitData getTriggerHit(u32 index) override {
-		ASSERT((i32)index < m_contact_callback.m_trigger_hits.size());
-		return m_contact_callback.m_trigger_hits[index];
-	}
-
-	u32 getNumContactHits() override {
-		return m_contact_callback.m_contact_hits.size();
-	}
-
-	ContactHitData getContactHit(u32 index) override {
-		ASSERT((i32)index < m_contact_callback.m_contact_hits.size());
-		return m_contact_callback.m_contact_hits[index];
+	Span<const ContactHitData> getContactHits() override {
+		return m_contact_callback.m_contact_hits;
 	}
 
 	void resizeController(EntityRef entity, float height) override
@@ -3754,11 +3738,6 @@ struct PhysicsModuleImpl final : PhysicsModule
 		PxFilterData m_filter_data;
 	};
 
-	struct ControllerHit {
-		EntityRef controller;
-		EntityRef hit_entity;
-	};
-
 	struct HitReport : PxUserControllerHitReport {
 		HitReport(PhysicsModuleImpl& module, IAllocator& allocator) : module(module), m_hits(allocator) {}
 		void onShapeHit(const PxControllerShapeHit& hit) override {
@@ -3772,7 +3751,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		void onObstacleHit(const PxControllerObstacleHit& hit) override {}
 
 		PhysicsModuleImpl& module;
-		Array<ControllerHit> m_hits;
+		Array<ControllerHitData> m_hits;
 	} ;
 
 	struct InstancedCube {

@@ -639,7 +639,15 @@ struct Parser {
 						consumeToken();
 					}
 					if (!consume(Token::RIGHT_PAREN)) return nullptr;
-					expr = call;
+					if (call->callee->kind == Expression::IDENTIFIER
+						&& equalStrings(static_cast<IdentifierExpression*>(call->callee)->name, makeStringView("panic"))
+						&& call->args.size() == 1) {
+						PanicExpression* panic = makeExpr<PanicExpression>(paren);
+						panic->message = call->args[0];
+						expr = panic;
+					} else {
+						expr = call;
+					}
 					break;
 				}
 				case Token::LEFT_BRACE:
@@ -1451,6 +1459,7 @@ struct Parser {
 				}
 				return false;
 			}
+			case Expression::PANIC: return isGeneric(*static_cast<const PanicExpression&>(expr).message);
 			case Expression::CALL: {
 				const auto& call = static_cast<const CallExpression&>(expr);
 				if (isGeneric(*call.callee)) return true;
@@ -1561,8 +1570,11 @@ struct Parser {
 				m_output.errorAt(name, "Expected attribute type");
 				return nullptr;
 			}
-			IdentifierExpression* type_expr = makeExpr<IdentifierExpression>(name);
-			type_expr->name = name.value;
+			IdentifierExpression* identifier = makeExpr<IdentifierExpression>(name);
+			identifier->name = name.value;
+			Expression* type_expr = postfixSuffixes(identifier, ExprMode::HEAD);
+			if (!type_expr) return nullptr;
+
 			Attribute& attribute = attributes->emplace_back();
 			attribute.type = type_expr;
 			attribute.token = name;

@@ -1570,48 +1570,60 @@ namespace Lumix::LumScript::generated {
 		module->setGravity(gravity);
 	}
 	
-	static void lumscript_physics_getNumControllerHits_3(ls_runtime* runtime, ls_call_frame frame) {
+	static void lumscript_physics_getControllerHits_count_3(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, PhysicsModule*, module);
-		auto ret = module->getNumControllerHits();
-		LS_RESULT(frame, (i32)ret);
+		const auto ret = module->getControllerHits(
+		);
+		LS_RESULT(frame, (i32)ret.size());
 	}
 	
-	static void lumscript_physics_getControllerHit_4(ls_runtime* runtime, ls_call_frame frame) {
+	static void lumscript_physics_getControllerHits_get_4(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, PhysicsModule*, module);
-		LS_ARG(frame, u32, index);
-		auto ret = module->getControllerHit(index);
-		LS_RESULT(frame, LsEntity(ret.controller.index, &module->getWorld()));
-		LS_RESULT(frame, LsEntity(ret.hit_entity.index, &module->getWorld()));
+		LS_ARG(frame, i32, index);
+		const auto ret = module->getControllerHits(
+		);
+		ASSERT(index >= 0 && index < (i32)ret.size());
+		const ControllerHitData& value = ret[index];
+		LS_RESULT(frame, LsEntity(value.controller.index, &module->getWorld()));
+		LS_RESULT(frame, LsEntity(value.hit_entity.index, &module->getWorld()));
 	}
 	
-	static void lumscript_physics_getNumTriggerHits_5(ls_runtime* runtime, ls_call_frame frame) {
+	static void lumscript_physics_getTriggerHits_count_5(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, PhysicsModule*, module);
-		auto ret = module->getNumTriggerHits();
-		LS_RESULT(frame, (i32)ret);
+		const auto ret = module->getTriggerHits(
+		);
+		LS_RESULT(frame, (i32)ret.size());
 	}
 	
-	static void lumscript_physics_getTriggerHit_6(ls_runtime* runtime, ls_call_frame frame) {
+	static void lumscript_physics_getTriggerHits_get_6(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, PhysicsModule*, module);
-		LS_ARG(frame, u32, index);
-		auto ret = module->getTriggerHit(index);
-		LS_RESULT(frame, LsEntity(ret.e1.index, &module->getWorld()));
-		LS_RESULT(frame, LsEntity(ret.e2.index, &module->getWorld()));
-		LS_RESULT(frame, ret.touch_lost);
+		LS_ARG(frame, i32, index);
+		const auto ret = module->getTriggerHits(
+		);
+		ASSERT(index >= 0 && index < (i32)ret.size());
+		const TriggerHitData& value = ret[index];
+		LS_RESULT(frame, LsEntity(value.e1.index, &module->getWorld()));
+		LS_RESULT(frame, LsEntity(value.e2.index, &module->getWorld()));
+		LS_RESULT(frame, value.touch_lost);
 	}
 	
-	static void lumscript_physics_getNumContactHits_7(ls_runtime* runtime, ls_call_frame frame) {
+	static void lumscript_physics_getContactHits_count_7(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, PhysicsModule*, module);
-		auto ret = module->getNumContactHits();
-		LS_RESULT(frame, (i32)ret);
+		const auto ret = module->getContactHits(
+		);
+		LS_RESULT(frame, (i32)ret.size());
 	}
 	
-	static void lumscript_physics_getContactHit_8(ls_runtime* runtime, ls_call_frame frame) {
+	static void lumscript_physics_getContactHits_get_8(ls_runtime* runtime, ls_call_frame frame) {
 		LS_ARG(frame, PhysicsModule*, module);
-		LS_ARG(frame, u32, index);
-		auto ret = module->getContactHit(index);
-		LS_RESULT(frame, LsEntity(ret.e1.index, &module->getWorld()));
-		LS_RESULT(frame, LsEntity(ret.e2.index, &module->getWorld()));
-		LS_RESULT(frame, ret.position);
+		LS_ARG(frame, i32, index);
+		const auto ret = module->getContactHits(
+		);
+		ASSERT(index >= 0 && index < (i32)ret.size());
+		const ContactHitData& value = ret[index];
+		LS_RESULT(frame, LsEntity(value.e1.index, &module->getWorld()));
+		LS_RESULT(frame, LsEntity(value.e2.index, &module->getWorld()));
+		LS_RESULT(frame, value.position);
 	}
 	
 	static void lumscript_renderer_addDebugTriangle_9(ls_runtime* runtime, ls_call_frame frame) {
@@ -4305,12 +4317,12 @@ namespace Lumix::LumScript::generated {
 		functions.insert({StringView("core:audio"), StringView("audio")}, &lumscript_world_audio);
 		functions.insert({StringView("core:physics"), StringView("raycast")}, &lumscript_physics_raycast_1);
 		functions.insert({StringView("core:physics"), StringView("setGravity")}, &lumscript_physics_setGravity_2);
-		functions.insert({StringView("core:physics"), StringView("getNumControllerHits")}, &lumscript_physics_getNumControllerHits_3);
-		functions.insert({StringView("core:physics"), StringView("getControllerHit")}, &lumscript_physics_getControllerHit_4);
-		functions.insert({StringView("core:physics"), StringView("getNumTriggerHits")}, &lumscript_physics_getNumTriggerHits_5);
-		functions.insert({StringView("core:physics"), StringView("getTriggerHit")}, &lumscript_physics_getTriggerHit_6);
-		functions.insert({StringView("core:physics"), StringView("getNumContactHits")}, &lumscript_physics_getNumContactHits_7);
-		functions.insert({StringView("core:physics"), StringView("getContactHit")}, &lumscript_physics_getContactHit_8);
+		functions.insert({StringView("core:physics"), StringView("getControllerHitsCount")}, &lumscript_physics_getControllerHits_count_3);
+		functions.insert({StringView("core:physics"), StringView("getControllerHitsGet")}, &lumscript_physics_getControllerHits_get_4);
+		functions.insert({StringView("core:physics"), StringView("getTriggerHitsCount")}, &lumscript_physics_getTriggerHits_count_5);
+		functions.insert({StringView("core:physics"), StringView("getTriggerHitsGet")}, &lumscript_physics_getTriggerHits_get_6);
+		functions.insert({StringView("core:physics"), StringView("getContactHitsCount")}, &lumscript_physics_getContactHits_count_7);
+		functions.insert({StringView("core:physics"), StringView("getContactHitsGet")}, &lumscript_physics_getContactHits_get_8);
 		functions.insert({StringView("core:physics"), StringView("physics")}, &lumscript_world_physics);
 		functions.insert({StringView("core:renderer"), StringView("addDebugTriangle")}, &lumscript_renderer_addDebugTriangle_9);
 		functions.insert({StringView("core:renderer"), StringView("addDebugLine")}, &lumscript_renderer_addDebugLine_10);

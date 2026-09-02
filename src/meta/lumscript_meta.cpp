@@ -538,6 +538,14 @@ void appendObjectWrapperName(OutputStream& out, Object& o, Function& f, i32 idx)
 	out.add("lumscript_object_", o.name, "_", functionScriptName(f), "_", idx);
 }
 
+void appendSpanIteratorCountName(OutputStream& out, Module& m, Function& f, i32 idx) {
+	out.add("lumscript_", m.id, "_", functionScriptName(f), "_count_", idx);
+}
+
+void appendSpanIteratorGetName(OutputStream& out, Module& m, Function& f, i32 idx) {
+	out.add("lumscript_", m.id, "_", functionScriptName(f), "_get_", idx);
+}
+
 void serializeLumScriptObjectWrapper(OutputStream& out, Object& o, Function& f, i32 idx) {
 	out.add("static void ");
 	appendObjectWrapperName(out, o, f, idx);
@@ -555,7 +563,31 @@ void serializeLumScriptObjectWrapper(OutputStream& out, Object& o, Function& f, 
 	L("}" OUT_ENDL);
 }
 
+void serializeLumScriptSpanIteratorWrappers(OutputStream& out, Module& m, Function& f, i32 idx) {
+	const StringView element = spanElementBaseType(f.return_type);
+	out.add("static void "); appendSpanIteratorCountName(out, m, f, idx); L("(ls_runtime* runtime, ls_call_frame frame) {");
+	L("LS_ARG(frame, ", m.name, "*, module);");
+	forEachArg(f.args, [&](const Arg& arg, bool) { emitArgRead(out, arg); });
+	L("const auto ret = module->", f.name, "(");
+	forEachArg(f.args, [&](const Arg& arg, bool first) { if (!first) out.add(", "); appendArgExpression(out, arg); });
+	L(");");
+	L("LS_RESULT(frame, (i32)ret.size());");
+	L("}" OUT_ENDL);
+	out.add("static void "); appendSpanIteratorGetName(out, m, f, idx + 1); L("(ls_runtime* runtime, ls_call_frame frame) {");
+	L("LS_ARG(frame, ", m.name, "*, module);");
+	forEachArg(f.args, [&](const Arg& arg, bool) { emitArgRead(out, arg); });
+	L("LS_ARG(frame, i32, index);");
+	L("const auto ret = module->", f.name, "(");
+	forEachArg(f.args, [&](const Arg& arg, bool first) { if (!first) out.add(", "); appendArgExpression(out, arg); });
+	L(");");
+	L("ASSERT(index >= 0 && index < (i32)ret.size());");
+	L("const ", element, "& value = ret[index];");
+	appendReturnValue(out, element, "value", "&module->getWorld()");
+	L("}" OUT_ENDL);
+}
+
 void serializeLumScriptModuleWrapper(OutputStream& out, Module& m, Function& f, i32 idx) {
+	if (isSpanType(f.return_type)) return;
 	out.add("static void ");
 	appendModuleWrapperName(out, m, f, idx);
 	L("(ls_runtime* runtime, ls_call_frame frame) {");
@@ -746,8 +778,14 @@ void emitGeneratedModuleWrappers(OutputStream& out, MetaData& data, i32* wrapper
 	for (Module& m : data.modules) {
 		for (Function& f : m.functions) {
 			if (!isSupportedLumScriptFunction(f)) continue;
-			serializeLumScriptModuleWrapper(out, m, f, *wrapper_idx);
-			++*wrapper_idx;
+			if (isSpanType(f.return_type)) {
+				serializeLumScriptSpanIteratorWrappers(out, m, f, *wrapper_idx);
+				*wrapper_idx += 2;
+			}
+			else {
+				serializeLumScriptModuleWrapper(out, m, f, *wrapper_idx);
+				++*wrapper_idx;
+			}
 		}
 	}
 }
@@ -1225,6 +1263,31 @@ void serializeCoreImports(MetaData& data) {
 
 		for (Function& f : m.functions) {
 			if (!isSupportedLumScriptFunction(f)) continue;
+			if (isSpanType(f.return_type)) {
+				const StringView element = spanElementBaseType(f.return_type);
+				out.add("extern fn ", functionScriptName(f), "Count(module : ", m.name);
+				forEachArg(f.args, [&](const Arg& arg, bool) { out.add(", ", arg.name, " : "); appendLumScriptDeclArgType(out, arg); });
+				out.add(") : i32;" OUT_ENDL);
+				out.add("extern fn ", functionScriptName(f), "Get(module : ", m.name);
+				forEachArg(f.args, [&](const Arg& arg, bool) { out.add(", ", arg.name, " : "); appendLumScriptDeclArgType(out, arg); });
+				out.add(", index : i32) : "); appendLumScriptDeclType(out, element); out.add(";" OUT_ENDL);
+				out.add("struct ", functionScriptName(f), "Iterator { next : fn(iter : *", functionScriptName(f), "Iterator, out : *");
+				appendLumScriptDeclType(out, element); out.add(") : bool; module : ", m.name);
+				forEachArg(f.args, [&](const Arg& arg, bool) { out.add("; ", arg.name, " : "); appendLumScriptDeclArgType(out, arg); });
+				out.add("; index : i32; }" OUT_ENDL);
+				out.add("fn ", functionScriptName(f), "Next(iter : *", functionScriptName(f), "Iterator, out : *");
+				appendLumScriptDeclType(out, element); out.add(") : bool { iter.index += 1; if iter.index >= ", functionScriptName(f), "Count(iter.module");
+				forEachArg(f.args, [&](const Arg& arg, bool) { out.add(", iter.", arg.name); });
+				out.add(") { return false; } out.* = ", functionScriptName(f), "Get(iter.module");
+				forEachArg(f.args, [&](const Arg& arg, bool) { out.add(", iter.", arg.name); });
+				out.add(", iter.index); return true; }" OUT_ENDL);
+				out.add("fn ", functionScriptName(f), "(module : ", m.name);
+				forEachArg(f.args, [&](const Arg& arg, bool) { out.add(", ", arg.name, " : "); appendLumScriptDeclArgType(out, arg); });
+				out.add(") : ", functionScriptName(f), "Iterator { return { ", functionScriptName(f), "Next, module");
+				forEachArg(f.args, [&](const Arg& arg, bool) { out.add(", ", arg.name); });
+				out.add(", -1 }; }" OUT_ENDL);
+				continue;
+			}
 			out.add("extern fn ", functionScriptName(f), "(module : ", m.name);
 			forEachArg(f.args, [&](const Arg& arg, bool) {
 				out.add(", ", arg.name, " : ");
@@ -1422,10 +1485,16 @@ void serializeLumScriptMeta(MetaData& data) {
 		bool any_function = false;
 		for (Function& f : m.functions) {
 			if (!isSupportedLumScriptFunction(f)) continue;
-			out.add("functions.insert({StringView(\"core:", m.id, "\"), StringView(\"", functionScriptName(f), "\")}, &");
-			appendModuleWrapperName(out, m, f, wrapper_idx);
-			L(");");
-			++wrapper_idx;
+			if (isSpanType(f.return_type)) {
+				out.add("functions.insert({StringView(\"core:", m.id, "\"), StringView(\"", functionScriptName(f), "Count\")}, &"); appendSpanIteratorCountName(out, m, f, wrapper_idx); L(");"); ++wrapper_idx;
+				out.add("functions.insert({StringView(\"core:", m.id, "\"), StringView(\"", functionScriptName(f), "Get\")}, &"); appendSpanIteratorGetName(out, m, f, wrapper_idx); L(");"); ++wrapper_idx;
+			}
+			else {
+				out.add("functions.insert({StringView(\"core:", m.id, "\"), StringView(\"", functionScriptName(f), "\")}, &");
+				appendModuleWrapperName(out, m, f, wrapper_idx);
+				L(");");
+				++wrapper_idx;
+			}
 			any_function = true;
 		}
 		if (any_function) {

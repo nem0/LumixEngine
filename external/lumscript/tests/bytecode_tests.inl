@@ -38,6 +38,32 @@ TEST(BytecodeCompileAndRunMain) {
 	return true;
 }
 
+TEST(BytecodePanic) {
+	const char* source = R"(
+		fn main() : void {
+			panic("stop here");
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	ls_bytecode* bytecode = ls_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+	bool has_panic = false;
+	for (u32 i = 0; i < bytecode->functions[0].code_size; ++i) {
+		if (bytecode->functions[0].code[i] == (u8)LS_OP_PANIC) has_panic = true;
+	}
+	EXPECT_TRUE(has_panic);
+	ls_runtime* runtime = ls_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(!ls_call(runtime, toLs("main")));
+	EXPECT_TRUE(diagnostics.diagnostics.size > 0u);
+	ls_runtime_destroy(runtime);
+	ls_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
 TEST(BytecodeRecursion) {
 	const char* source = R"(
 		fn fib(n : i32) : i32 {

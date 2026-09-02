@@ -1120,54 +1120,27 @@ namespace Lumix {
 		return 0;
 	}
 	
-	int PhysicsModule_getNumControllerHits(lua_State* L) {
+	int PhysicsModule_getControllerHits(lua_State* L) {
 		LuaWrapper::checkTableArg(L, 1);
 		PhysicsModule* module;
 		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
-		LuaWrapper::push(L, 	module->getNumControllerHits());
+		LuaWrapper::push(L, 	module->getControllerHits());
 		return 1;
 	}
 	
-	int PhysicsModule_getControllerHit(lua_State* L) {
+	int PhysicsModule_getTriggerHits(lua_State* L) {
 		LuaWrapper::checkTableArg(L, 1);
 		PhysicsModule* module;
 		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
-		auto index = LuaWrapper::checkArg<u32>(L, 2);
-		LuaWrapper::push(L, 	module->getControllerHit(index));
+		LuaWrapper::push(L, 	module->getTriggerHits());
 		return 1;
 	}
 	
-	int PhysicsModule_getNumTriggerHits(lua_State* L) {
+	int PhysicsModule_getContactHits(lua_State* L) {
 		LuaWrapper::checkTableArg(L, 1);
 		PhysicsModule* module;
 		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
-		LuaWrapper::push(L, 	module->getNumTriggerHits());
-		return 1;
-	}
-	
-	int PhysicsModule_getTriggerHit(lua_State* L) {
-		LuaWrapper::checkTableArg(L, 1);
-		PhysicsModule* module;
-		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
-		auto index = LuaWrapper::checkArg<u32>(L, 2);
-		LuaWrapper::push(L, 	module->getTriggerHit(index));
-		return 1;
-	}
-	
-	int PhysicsModule_getNumContactHits(lua_State* L) {
-		LuaWrapper::checkTableArg(L, 1);
-		PhysicsModule* module;
-		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
-		LuaWrapper::push(L, 	module->getNumContactHits());
-		return 1;
-	}
-	
-	int PhysicsModule_getContactHit(lua_State* L) {
-		LuaWrapper::checkTableArg(L, 1);
-		PhysicsModule* module;
-		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
-		auto index = LuaWrapper::checkArg<u32>(L, 2);
-		LuaWrapper::push(L, 	module->getContactHit(index));
+		LuaWrapper::push(L, 	module->getContactHits());
 		return 1;
 	}
 	
@@ -2763,18 +2736,12 @@ namespace Lumix {
 			lua_setfield(L, -2, "raycast");
 			lua_pushcfunction(L, PhysicsModule_setGravity, "setGravity");
 			lua_setfield(L, -2, "setGravity");
-			lua_pushcfunction(L, PhysicsModule_getNumControllerHits, "getNumControllerHits");
-			lua_setfield(L, -2, "getNumControllerHits");
-			lua_pushcfunction(L, PhysicsModule_getControllerHit, "getControllerHit");
-			lua_setfield(L, -2, "getControllerHit");
-			lua_pushcfunction(L, PhysicsModule_getNumTriggerHits, "getNumTriggerHits");
-			lua_setfield(L, -2, "getNumTriggerHits");
-			lua_pushcfunction(L, PhysicsModule_getTriggerHit, "getTriggerHit");
-			lua_setfield(L, -2, "getTriggerHit");
-			lua_pushcfunction(L, PhysicsModule_getNumContactHits, "getNumContactHits");
-			lua_setfield(L, -2, "getNumContactHits");
-			lua_pushcfunction(L, PhysicsModule_getContactHit, "getContactHit");
-			lua_setfield(L, -2, "getContactHit");
+			lua_pushcfunction(L, PhysicsModule_getControllerHits, "getControllerHits");
+			lua_setfield(L, -2, "getControllerHits");
+			lua_pushcfunction(L, PhysicsModule_getTriggerHits, "getTriggerHits");
+			lua_setfield(L, -2, "getTriggerHits");
+			lua_pushcfunction(L, PhysicsModule_getContactHits, "getContactHits");
+			lua_setfield(L, -2, "getContactHits");
 			lua_pop(L, 1);
 		}
 		{

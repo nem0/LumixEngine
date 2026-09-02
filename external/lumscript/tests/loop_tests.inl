@@ -630,3 +630,164 @@ TEST(NestedForInNoIndexRuntime) {
 	CAPI_END(module);
 	return true;
 }
+
+TEST(CustomIteratorWithArbitraryStateRuntime) {
+	const char* source = R"(
+		struct Iter {
+			next : fn(iter : *Iter, out : *i32) : bool;
+			base : i32;
+			count : i32;
+			index : i32;
+		}
+
+		fn next(iter : *Iter, out : *i32) : bool {
+			if iter.index >= iter.count { return false; }
+			out.* = iter.base + iter.index;
+			iter.index += 1;
+			return true;
+		}
+
+		fn values(base : i32, count : i32) : Iter {
+			return { next, base, count, 0 };
+		}
+
+		fn main() : i32 {
+			var sum : i32 = 0;
+			for value in values(10, 3) { sum += value; }
+			return sum;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(33, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(CustomIteratorLinkedListRuntime) {
+	const char* source = R"(
+		struct Node { value : i32; next : i32; }
+		struct Iter {
+			next : fn(iter : *Iter, out : *i32) : bool;
+			nodes : [3]Node;
+			current : i32;
+		}
+
+		fn next_node(iter : *Iter, out : *i32) : bool {
+			if iter.current < 0 { return false; }
+			const node = iter.nodes[iter.current];
+			out.* = node.value;
+			iter.current = node.next;
+			return true;
+		}
+
+		fn main() : i32 {
+			var iter : Iter = { next_node, [Node { 1, 1 }, Node { 2, 2 }, Node { 3, -1 }], 0 };
+			var sum : i32 = 0;
+			for value in iter { sum += value; }
+			return sum;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(6, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(CustomIteratorIndexValueRuntime) {
+	const char* source = R"(
+		struct Iter {
+			next : fn(iter : *Iter, out : *i32) : bool;
+			index : i32;
+		}
+
+		fn next(iter : *Iter, out : *i32) : bool {
+			if iter.index >= 3 { return false; }
+			out.* = iter.index * 10;
+			iter.index += 1;
+			return true;
+		}
+
+		fn main() : i32 {
+			var iter : Iter = { next, 0 };
+			var result : i32 = 0;
+			for i, value in iter { result += i as i32 * 100 + value; }
+			return result;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(330, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(CustomIteratorExpressionEvaluatedOnce) {
+	const char* source = R"(
+		struct Iter {
+			next : fn(iter : *Iter, out : *i32) : bool;
+			index : i32;
+		}
+		var constructions : i32 = 0;
+		fn next(iter : *Iter, out : *i32) : bool {
+			if iter.index >= 2 { return false; }
+			out.* = iter.index;
+			iter.index += 1;
+			return true;
+		}
+		fn values() : Iter {
+			constructions += 1;
+			return { next, 0 };
+		}
+		fn main() : i32 {
+			var sum : i32 = 0;
+			for value in values() { sum += value; }
+			return constructions * 100 + sum;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(101, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(CustomIteratorBreakRuntime) {
+	const char* source = R"(
+		struct Iter {
+			next : fn(iter : *Iter, out : *i32) : bool;
+			index : i32;
+		}
+		fn next(iter : *Iter, out : *i32) : bool {
+			if iter.index >= 10 { return false; }
+			out.* = iter.index;
+			iter.index += 1;
+			return true;
+		}
+		fn main() : i32 {
+			var iter : Iter = { next, 0 };
+			var sum : i32 = 0;
+			for value in iter {
+				if value == 3 { break; }
+				sum += value;
+			}
+			return sum;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ls_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ls_call(runtime, toLs("main")));
+	EXPECT_EQ(3, ls_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
