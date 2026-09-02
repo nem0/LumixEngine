@@ -1,0 +1,65 @@
+import "core:entity"
+import "core:input"
+import "core:log"
+import "core:ui"
+import "core:model_instance"
+import "core:document"
+import "core:world"
+import "core:evox_data" as ld
+
+import "scripts/player" as player
+
+#[ld.Data {}]
+struct RandomColorComponent {
+	#[ld.Owner {}]
+	entity: Entity;
+}
+
+var g_input : InputSystem = undefined;
+var g_world : World = undefined;
+
+fn enableCursor(ui : UIModule, enable : bool) : void {
+	var sys = ui.getSystem();
+	sys.enableCursor(enable);
+}
+
+fn update(td : f32) : void {
+    player.update(td);
+	
+	// random color
+	var random_color_components = g_world.getEvoxData(RandomColorComponent);
+
+	for c in random_color_components {
+		var mi = c.entity.model_instance() else return;
+		mi.overrideMaterialVec4(0, "Material color", {1, 0, 1, 1});
+	}
+
+	// UI
+	var ui = g_world.ui() else return;
+	var doc = ui.getDocument();
+	var events = doc.getEvents();
+
+	for event in events {
+		match event.action {
+			case "start":
+				player.handle_input = true;
+				enableCursor(ui, false);
+				var elem = doc.getElement(0) else return;
+				elem.setVisible(false);
+			case "close":
+				player.handle_input = true;
+				enableCursor(ui, false);
+				var elem = doc.getElementByID("runtime_ui") else return;
+				elem.setVisible(false);
+		}
+	}	
+}
+
+fn init(input : InputSystem) : void {
+	g_input = input;
+}
+
+fn addWorld(world : World) : void {
+	g_world = world;
+	player.init(world, g_input);
+}

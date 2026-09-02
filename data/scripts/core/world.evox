@@ -1,0 +1,16 @@
+// import core:world as world
+
+import "core:entity"
+
+struct World { world : cptr; }
+
+extern fn createEntity(w : World) : Entity;
+extern fn destroyEntity(w : World, e : Entity) : void;
+extern fn hasEntity(w : World, e : Entity) : bool;
+extern fn findByName(w : World, name : []const u8) : ?Entity;
+extern fn getEvoxDataRaw(w : World, t : type) : [] byte;
+
+fn getEvoxData(w : World, T : comptime type) : []T {
+    var raw = getEvoxDataRaw(w, T);
+    return raw as []T;
+}

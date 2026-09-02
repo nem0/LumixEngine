@@ -13,8 +13,8 @@
 #include "animation/animation_module.h"
 #include "audio/audio_module.h"
 #include "engine/core.h"
+#include "evox/evox_module.h"
 #include "lua/lua_script_system.h"
-#include "lumscript/lumscript_module.h"
 #include "navigation/navigation_module.h"
 #include "physics/physics_module.h"
 #include "core/geometry.h"
@@ -761,6 +761,33 @@ namespace Lumix {
 }
 
 namespace Lumix {
+	int evox_getter(lua_State* L) {
+		auto [imodule, entity] = checkComponent(L);
+		auto* module = (EvoxModule*)imodule;
+		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
+		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
+		switch (name_hash) {
+			case 0:
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
+		}
+		return 1;
+	}
+	
+	int evox_setter(lua_State* L) {
+		auto [imodule, entity] = checkComponent(L);
+		auto* module = (EvoxModule*)imodule;
+		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
+		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
+		switch (name_hash) {
+			case 0:
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
+		}
+		return 0;
+	}
+	
+}
+
+namespace Lumix {
 	int lua_script_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (LuaScriptModule*)imodule;
@@ -899,33 +926,6 @@ namespace Lumix {
 		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
 		switch (name_hash) {
 			case /*code*/329780482934683790: module->setInlineScriptCode(entity, LuaWrapper::checkArg<const char*>(L, 3)); break;
-			case 0:
-			default: luaL_error(L, "Unknown property %s", prop_name); break;
-		}
-		return 0;
-	}
-	
-}
-
-namespace Lumix {
-	int lumscript_getter(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (LumScriptModule*)imodule;
-		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
-		switch (name_hash) {
-			case 0:
-			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
-		}
-		return 1;
-	}
-	
-	int lumscript_setter(lua_State* L) {
-		auto [imodule, entity] = checkComponent(L);
-		auto* module = (LumScriptModule*)imodule;
-		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
-		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
-		switch (name_hash) {
 			case 0:
 			default: luaL_error(L, "Unknown property %s", prop_name); break;
 		}
@@ -3766,9 +3766,9 @@ namespace Lumix {
 		registerLuaComponent(L, "ambient_sound", ambient_sound_getter, ambient_sound_setter);
 		registerLuaComponent(L, "spline", spline_getter, spline_setter);
 		registerLuaComponent(L, "signal", signal_getter, signal_setter);
+		registerLuaComponent(L, "evox", evox_getter, evox_setter);
 		registerLuaComponent(L, "lua_script", lua_script_getter, lua_script_setter);
 		registerLuaComponent(L, "lua_script_inline", lua_script_inline_getter, lua_script_inline_setter);
-		registerLuaComponent(L, "lumscript", lumscript_getter, lumscript_setter);
 		registerLuaComponent(L, "navmesh_zone", navmesh_zone_getter, navmesh_zone_setter);
 		registerLuaComponent(L, "navmesh_agent", navmesh_agent_getter, navmesh_agent_setter);
 		{

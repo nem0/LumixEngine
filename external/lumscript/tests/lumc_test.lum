@@ -1,5 +1,0 @@
-extern fn print(value : []const u8) : void;
-
-fn main() : void {
-	print("lumc smoke test");
-}

@@ -19,8 +19,8 @@
 * [Snippets](lua/snippets.md)
 * [Editor plugin](lua/editor_plugin.md)
 
-# LumScript
-* [Language](../external/lumscript/reference.md)
+# Evox
+* [Language](../external/evox/reference.md)
 
 # Ingame UI
 * [Text-based markup](ui/markup.md)

@@ -9,7 +9,7 @@ local simple_options = {
 	{ "no-renderer", "Do not build renderer plugin." },
 	{ "no-audio", "Do not build audio plugin." },
 	{ "no-lua", "Do not build lua plugin." },
-	{ "no-lumscript", "Do not build lumscript plugin." },
+	{ "no-evox", "Do not build evox plugin." },
 	{ "no-ui", "Do not build UI plugin." },
 	{ "with-app", "Do build app." },
 	{ "with-vulkan", "Use the minimal Vulkan clear/present backend." },
@@ -69,7 +69,7 @@ if _OPTIONS["plugins"] then
 	plugins = string.explode( _OPTIONS["plugins"], ",")
 end
 
-for	_, v in ipairs { "physics", "renderer", "audio", "ui", "animation", "navigation", "lua", "lumscript" } do
+for	_, v in ipairs { "physics", "renderer", "audio", "ui", "animation", "navigation", "lua", "evox" } do
 	if _OPTIONS["no-" .. v] == nil then
 		table.insert(plugins, v)
 		table.insert(base_plugins, v)
@@ -109,8 +109,8 @@ function hasPlugin(plugin)
 	return false
 end
 
-if build_tests and not hasPlugin("lumscript") then
-	error("--with-tests requires the lumscript plugin")
+if build_tests and not hasPlugin("evox") then
+	error("--with-tests requires the evox plugin")
 end
 
 -- common platform link helpers
@@ -616,11 +616,11 @@ if plugin "lua" then
 	end
 end
 
-if plugin "lumscript" then
-	files { "../src/lumscript/**.h", "../src/lumscript/**.cpp", "../external/lumscript/**.cpp", "../external/lumscript/**.c", "../external/lumscript/**.h" }
-	excludes { "../external/lumscript/lumc.c", "../external/lumscript/tests/*.cpp", "../external/lumscript/c_compiler/**.*", "../external/lumscript/benchmarks/**.*" }
-	includedirs { "../src", "../src/lumscript" }
-	defines { "BUILDING_LUMSCRIPT" }
+if plugin "evox" then
+	files { "../src/evox/**.h", "../src/evox/**.cpp", "../external/evox/**.cpp", "../external/evox/**.c", "../external/evox/**.h" }
+	excludes { "../external/evox/evoxc.c", "../external/evox/tests/*.cpp", "../external/evox/c_compiler/**.*", "../external/evox/benchmarks/**.*" }
+	includedirs { "../src", "../src/evox" }
+	defines { "BUILDING_EVOX" }
 	dynamic_link_plugin { "core", "engine" }
 end
 
@@ -1080,7 +1080,7 @@ if build_tests then
 			"../external/imgui_test_engine/**.h"
 		}
 		if split_projects then
-			links { "core", "engine", "lumscript" }
+			links { "core", "engine", "evox" }
 			if hasPlugin "renderer" then links { "renderer" } end
 		else
 			links { "engine_merged" }

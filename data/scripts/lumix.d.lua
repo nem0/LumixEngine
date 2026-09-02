@@ -103,8 +103,8 @@ export type World = {
 	animation: animation_module,
 	audio: audio_module,
 	core: core_module,
+	evox: evox_module,
 	lua_script: lua_script_module,
-	lumscript: lumscript_module,
 	navigation: navigation_module,
 	physics: physics_module,
 	renderer: renderer_module,
@@ -306,6 +306,12 @@ type spline_component =  {
 type signal_component =  {
 }
 
+type evox_module = {
+}
+
+type evox_component =  {
+}
+
 type lua_script_module = {
 }
 
@@ -314,12 +320,6 @@ type lua_script_component =  {
 
 type lua_script_inline_component =  {
 	code: string,
-}
-
-type lumscript_module = {
-}
-
-type lumscript_component =  {
 }
 
 type navigation_module = {
@@ -663,9 +663,9 @@ export type Entity = {
 	ambient_sound: ambient_sound_component,
 	spline: spline_component,
 	signal: signal_component,
+	evox: evox_component,
 	lua_script: lua_script_component,
 	lua_script_inline: lua_script_inline_component,
-	lumscript: lumscript_component,
 	navmesh_zone: navmesh_zone_component,
 	navmesh_agent: navmesh_agent_component,
 	physical_heightfield: physical_heightfield_component,

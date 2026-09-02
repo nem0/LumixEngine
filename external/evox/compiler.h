@@ -1,0 +1,180 @@
+#pragma once
+
+#include "capi.h"
+#include "expressions.h"
+#include "resolved_types.h"
+#include "statements.h"
+#include "utils.h"
+
+struct Unit;
+
+u32 typeByteSize(const ResolvedType& type);
+u32 typeAlignment(const ResolvedType& type);
+u32 structFieldOffset(const StructResolvedType& type, i32 field_index);
+
+struct Symbol {
+	enum Kind {
+		// Runtime storage. The initializer expression is evaluated at runtime unless
+		// later analysis proves it can be folded.
+		VARIABLE,
+		// Runtime storage initialized once and rejected as an assignment target.
+		CONST,
+		// Compile-time binding. Functions, structs and enums are represented
+		// as values bound here instead of as separate declaration categories.
+		COMPTIME,
+		// Aliased import (`import "path" as name`). Reserves the alias name in the
+		// symbol table so that collision detection covers it like any other name.
+		// The actual unit linkage is still stored in Unit::imports.
+		IMPORT,
+	};
+
+	enum CheckState {
+		UNCHECKED,
+		CHECKING, // re-entry here means a definition cycle
+		FAILED,
+		CHECKED,
+	};
+
+	Kind kind;
+	CheckState check_state = UNCHECKED;
+	ex_string_view name; // as written in unit
+	Token token = {};
+	// Syntax-level type annotation. This preserves aliases and unresolved names
+	// exactly as written; semantic resolution converts to resolved_type later.
+	Expression* type_expr = nullptr;
+	// Canonical semantic type of the symbol.
+	// For struct/enum/fn type declarations this is MetaType { inner = actual type }.
+	// For value symbols this is the value's type directly.
+	ResolvedType* resolved_type = nullptr;
+	// Symbols bind names to expressions. Top-level `fn`, `struct`, and `enum`
+	// syntax should eventually desugar to COMPTIME symbols with expression values.
+	Expression* expression = nullptr; // expression used to initialize the symbol
+	// Storage location in the global data segment. The checker points identifier
+	// expressions at this slot (see symbolHasGlobalStorage); its values are filled
+	// in by the IR compiler's global layout pass before function bodies compile.
+	StorageSlot slot;
+	// Folded compile-time value for COMPTIME value symbols, laid out exactly as the
+	// runtime memory representation of `resolved_type` (see typeByteSize / struct
+	// field ordering). Set by the checker when the initializer could be fully
+	// evaluated at compile time; the bytecode compiler emits these bytes inline at
+	// each use site so the symbol needs no runtime slot. Null when folding was not
+	// possible, in which case uses fall back to compiling the initializer expression.
+	u8* comptime_bytes = nullptr;
+	u32 comptime_byte_size = 0;
+	ComptimeValue comptime_value;
+};
+
+// True when the symbol occupies runtime storage in the global data segment.
+// The checker uses this to decide whether an identifier gets a slot pointer;
+// The IR compiler's global layout pass must lay out exactly these symbols.
+//
+// Comptime symbols are excluded: they are compile-time constants and are
+// materialized inline at each use site (folded to a value), so they never
+// occupy a runtime global slot nor need a global-init store.
+inline bool symbolHasGlobalStorage(const Symbol& sym) {
+	return sym.expression
+		&& sym.kind != Symbol::COMPTIME
+		&& (!sym.resolved_type || sym.resolved_type->kind != ResolvedTypeKind::META)
+		&& sym.expression->kind != Expression::FUNCTION
+		&& sym.expression->kind != Expression::STRUCT
+		&& sym.expression->kind != Expression::ENUM;
+}
+
+struct Import {
+	ex_string_view path = {};
+	ex_string_view alias = {}; // empty when imported without `as`
+	Unit* unit = nullptr; // cached resolved unit pointer, set during import resolution
+};
+
+// Returns the symbol name used to store an operator overload, e.g. Token::PLUS -> "+".
+// Operator names are non-identifier strings, so they cannot collide with user symbols.
+// Returns nullptr for non-overloadable tokens.
+inline const char* operatorSymbolName(Token::Type op) {
+	switch (op) {
+		case Token::PLUS:         return "+";
+		case Token::MINUS:        return "-";
+		case Token::STAR:         return "*";
+		case Token::SLASH:        return "/";
+		case Token::PERCENT:      return "%";
+		case Token::EQUAL_EQUAL:  return "==";
+		case Token::BANG_EQUAL:   return "!=";
+		case Token::LT:           return "<";
+		case Token::LT_EQUAL:     return "<=";
+		case Token::GT:           return ">";
+		case Token::GT_EQUAL:     return ">=";
+		default:                  return nullptr;
+	}
+}
+
+// Returns the operator token for a symbol named by operatorSymbolName, or
+// Token::ERROR if the name does not match any operator overload.
+inline Token::Type tokenFromOperatorName(ex_string_view name) {
+	struct Entry { const char* name; Token::Type token; };
+	static constexpr Entry table[] = {
+		{ "+",  Token::PLUS },
+		{ "-",  Token::MINUS },
+		{ "*",  Token::STAR },
+		{ "/",  Token::SLASH },
+		{ "%",  Token::PERCENT },
+		{ "==", Token::EQUAL_EQUAL },
+		{ "!=", Token::BANG_EQUAL },
+		{ "<",  Token::LT },
+		{ "<=", Token::LT_EQUAL },
+		{ ">",  Token::GT },
+		{ ">=", Token::GT_EQUAL },
+	};
+	for (const Entry& e : table) {
+		const char* p = name.begin;
+		const char* q = e.name;
+		const char* end = p + name.length;
+		while (p != end && *q && *p == *q) { ++p; ++q; }
+		if (p == end && *q == '\0') return e.token;
+	}
+	return Token::ERROR;
+}
+
+inline bool isOperatorSymbol(ex_string_view name) {
+	return tokenFromOperatorName(name) != Token::ERROR;
+}
+
+struct Unit {
+	Unit(ex_string_view path, ex_arena& module_arena)
+		: arena(module_arena)
+		, symbols(module_arena)
+		, types(module_arena)
+		, imports(module_arena)
+		, native_symbols(module_arena)
+		, path(path) {}
+
+	enum ImportState { IMPORT_PENDING, IMPORT_RESOLVING, IMPORT_DONE };
+	ImportState import_state = IMPORT_PENDING;
+
+	ex_string_view path;
+	ex_arena& arena;
+
+	ExpArray<Symbol> symbols;
+	ExpArray<ResolvedType> types;
+	ExpArray<Import> imports;
+	ExpArray<Symbol*> native_symbols;
+};
+
+struct ex_module {
+	ex_module(ex_host* host);
+
+	ex_host* host;
+	ex_arena& arena;
+	SourceLocTable src_locs;
+	ExpArray<Unit> units;
+	ExpArray<UnionResolvedType*> union_types;
+	// One canonical instance per primitive kind, indexed by ResolvedTypeKind::Kind.
+	// Pointer equality suffices for primitives; use typesEqual() for compound types.
+	ResolvedType primitives[(i32)ResolvedTypeKind::META];
+	EnumExpression type_kind_decl;
+	EnumResolvedType type_kind;
+};
+
+// Returns the integer discriminant of enum member `index`, matching runtime
+// semantics: implicit members use their index, explicit members their evaluated
+// constant. Values are cached on the enum expression by the checker after
+// typechecking; falls back to `index` when the cache is unavailable.
+i64 enumMemberValue(const EnumResolvedType& en, i32 index);

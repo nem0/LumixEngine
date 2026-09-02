@@ -13,7 +13,7 @@ if [[ ! -x ./genie ]]; then
   exit 1
 fi
 
-./genie --no-studio --no-physics --no-renderer --no-audio --no-navigation --no-animation --no-lua --no-lumscript gmake
+./genie --no-studio --no-physics --no-renderer --no-audio --no-navigation --no-animation --no-lua --no-evox gmake
 make -C "$BUILD_DIR" -j config=debug64 meta
 
 if [[ ! -x "$META_BIN" ]]; then

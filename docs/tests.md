@@ -18,7 +18,7 @@ Main suites registered in `src/tests/main.cpp`:
 - UI parser/runtime tests
 - UI style tests
 - UI layout tests
-- LumScript module serialization tests
+- Evox module serialization tests
 
 ## Run All Headless Tests
 
@@ -30,7 +30,7 @@ scripts\run_tests.bat
 
 This script:
 
-1. Generates a test configuration with LumScript enabled
+1. Generates a test configuration with Evox enabled
 2. Builds `tmp\vs2022\tests.vcxproj` in `Debug|x64`
 3. Runs `tmp\vs2022\bin\Debug\tests.exe`
 
@@ -82,14 +82,14 @@ GitHub Actions workflow `.github/workflows/tests.yml` runs:
 - `scripts\run_tests.bat` on Windows
 - `scripts/run_tests.sh` on Linux
 
-Because `tests.exe` includes particle script, UI, and LumScript test suites, this workflow triggers on pushes and pull requests when related paths change:
+Because `tests.exe` includes particle script, UI, and Evox test suites, this workflow triggers on pushes and pull requests when related paths change:
 
 - `**/particle_script*`
 - `src/ui/**`
 - `src/tests/ui_*`
-- `src/tests/lumscript_*`
-- `src/lumscript/**`
-- `external/lumscript/**`
+- `src/tests/evox_*`
+- `src/evox/**`
+- `external/evox/**`
 - `scripts/run_tests.*`
 - `scripts/genie.lua`
 - `.github/workflows/tests.yml`

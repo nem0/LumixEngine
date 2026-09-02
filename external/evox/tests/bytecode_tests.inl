@@ -1,0 +1,2990 @@
+#define CAPI_BEGIN(module_name, diagnostics_name) \
+	TestContext diagnostics_name; \
+	ex_module* module_name = ex_module_create(&diagnostics_name.host); \
+	EXPECT_TRUE(module_name != nullptr); \
+	auto& module_host = diagnostics_name.host; \
+	auto& test_diagnostics = diagnostics_name.diagnostics
+
+#define CAPI_END(module_name) \
+	do {} while (false)
+
+#define CAPI_RUNTIME(module_name, runtime_name) \
+	RuntimeGuard runtime_name(module_name, &module_host); \
+	EXPECT_TRUE(runtime_name)
+
+TEST(BytecodeCompileAndRunMain) {
+	const char* source = R"(
+		fn main() : i32 {
+			return 42;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+	EXPECT_TRUE(bytecode->functions[0].source_map_count > 0u);
+	EXPECT_EQ(0u, bytecode->functions[0].source_map[0].code_offset);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodePanic) {
+	const char* source = R"(
+		fn main() : void {
+			panic("stop here");
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+	bool has_panic = false;
+	for (u32 i = 0; i < bytecode->functions[0].code_size; ++i) {
+		if (bytecode->functions[0].code[i] == (u8)EX_OP_PANIC) has_panic = true;
+	}
+	EXPECT_TRUE(has_panic);
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_TRUE(diagnostics.diagnostics.size > 0u);
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeRecursion) {
+	const char* source = R"(
+		fn fib(n : i32) : i32 {
+			if n <= 1 {
+				return n;
+			}
+			return fib(n - 1) + fib(n - 2);
+		}
+
+		fn main() : i32 {
+			return fib(6);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(8, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeThreeByteStructUndefinedLocalCanBeFullyAssigned) {
+	const char* source = R"(
+		struct Packed {
+			a : bool;
+			b : u16;
+		}
+
+		fn main() : i32 {
+			var value : Packed = undefined;
+			value.a = true;
+			value.b = 41;
+			if value.a {
+				return value.b as i32 + 1;
+			}
+			return 0;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+
+
+TEST(StructExtern) {
+	struct NativeEntity {
+		i32 index;
+		void* world;
+	};
+
+	const char* source = R"(
+		struct Entity {
+			index : i32;
+			world : cptr;
+		}
+		extern fn create() : Entity;
+
+		fn main() : Entity {
+			var v : Entity = create();
+			return v;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	static int ptr;
+
+	auto create_fn = [](ex_runtime* runtime, ex_call_frame frame) -> void {
+		NativeEntity value = {42, &ptr};
+		memcpy(frame.result, &value, sizeof(value));
+	};
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("create"), create_fn) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	u32 result_size = 0;
+	const u8* result = (const u8*)ex_call_result(runtime, &result_size);
+	EXPECT_TRUE(result != nullptr);
+	EXPECT_EQ((u32)sizeof(NativeEntity), result_size);
+	i32 index_value = 0;
+	void* world_value = nullptr;
+	memcpy(&index_value, result + offsetof(NativeEntity, index), sizeof(index_value));
+	memcpy(&world_value, result + offsetof(NativeEntity, world), sizeof(world_value));
+	EXPECT_EQ(42, index_value);
+	EXPECT_TRUE(&ptr == world_value);
+	CAPI_END(module);
+	
+	return true;
+}
+
+TEST(NormalStructCAbiLayout) {
+	struct NativeEntity {
+		i32 index;
+		void* world;
+	};
+
+	const char* source = R"(
+		struct Entity {
+			index : i32;
+			world : cptr;
+		}
+
+		var g : Entity = undefined;
+
+		fn main() : void {
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_EQ(1u, ex_debug_global_count(runtime));
+	EXPECT_EQ((int)EX_TYPE_STRUCT, (int)ex_debug_global_kind(runtime, 0));
+	const ex_type* type = ex_debug_global_type(runtime, 0);
+	EXPECT_TRUE(type != nullptr);
+	EXPECT_EQ((u32)sizeof(NativeEntity), ex_type_get_size(type));
+	EXPECT_EQ((u32)offsetof(NativeEntity, index), ex_type_struct_field_offset(type, 0));
+	EXPECT_EQ((u32)offsetof(NativeEntity, world), ex_type_struct_field_offset(type, 1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ExternStructCAbiLayout) {
+	struct NativeEntity {
+		i32 index;
+		void* world;
+	};
+
+	const char* source = R"(
+		extern struct Entity {
+			index : i32;
+			world : cptr;
+		}
+
+		var g : Entity = undefined;
+
+		fn main() : void {
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_EQ(1u, ex_debug_global_count(runtime));
+	EXPECT_EQ((int)EX_TYPE_STRUCT, (int)ex_debug_global_kind(runtime, 0));
+	const ex_type* type = ex_debug_global_type(runtime, 0);
+	EXPECT_TRUE(type != nullptr);
+	EXPECT_EQ((int)EX_TYPE_STRUCT, (int)ex_type_get_kind(type));
+	EXPECT_EQ((u32)sizeof(NativeEntity), ex_type_get_size(type));
+	EXPECT_EQ(2u, ex_type_struct_field_count(type));
+	EXPECT_TRUE(equalStrings(ex_type_struct_field_name(type, 0), toLs("index")));
+	EXPECT_EQ((u32)offsetof(NativeEntity, index), ex_type_struct_field_offset(type, 0));
+	EXPECT_TRUE(equalStrings(ex_type_struct_field_name(type, 1), toLs("world")));
+	EXPECT_EQ((u32)offsetof(NativeEntity, world), ex_type_struct_field_offset(type, 1));
+
+	u32 value_size = 0;
+	const void* value = ex_debug_global_value(runtime, 0, &value_size);
+	EXPECT_TRUE(value != nullptr);
+	EXPECT_EQ((u32)sizeof(NativeEntity), value_size);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ExternStructPaddedFieldAccessAndAssignment) {
+	struct NativePadded {
+		i8 a;
+		i64 b;
+	};
+
+	const char* source = R"(
+		extern struct Padded {
+			a : i8;
+			b : i64;
+		}
+
+		extern fn read_native(v : Padded) : i64;
+
+		fn make() : Padded {
+			var v = Padded { 1, 42 };
+			v.b = v.b + 10;
+			return v;
+		}
+
+		fn main() : i64 {
+			return read_native(make());
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	auto read_native = [](ex_runtime*, ex_call_frame frame) -> void {
+		EX_ARG(frame, NativePadded, v);
+		EX_RESULT(frame, v.b);
+	};
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("read_native"), read_native) == EX_RESULT_OK);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("make")));
+	u32 result_size = 0;
+	const u8* result = (const u8*)ex_call_result(runtime, &result_size);
+	EXPECT_TRUE(result != nullptr);
+	EXPECT_EQ((u32)sizeof(NativePadded), result_size);
+
+	i8 a = 0;
+	i64 b = 0;
+	memcpy(&a, result + offsetof(NativePadded, a), sizeof(a));
+	memcpy(&b, result + offsetof(NativePadded, b), sizeof(b));
+	EXPECT_EQ(1, a);
+	EXPECT_EQ(52, b);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(52, ex_to_i64(runtime, -1));
+
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ExternStructSizeofAndAlignofUseCAbiLayout) {
+	const char* source = R"(
+		extern struct Padded {
+			a : i8;
+			b : i64;
+		}
+
+		fn size_of() : i32 { return sizeof(Padded) as i32; }
+		fn align_of() : i32 { return alignof(Padded) as i32; }
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("size_of")));
+	EXPECT_EQ(16, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("align_of")));
+	EXPECT_EQ(8, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ExternStructNestedAndArrayLayout) {
+	struct NativeInner {
+		i8 a;
+		i32 b;
+	};
+	struct NativeOuter {
+		i8 tag;
+		NativeInner inner;
+		i16 values[3];
+	};
+
+	const char* source = R"(
+		extern struct Inner {
+			a : i8;
+			b : i32;
+		}
+
+		extern struct Outer {
+			tag : i8;
+			inner : Inner;
+			values : [3]i16;
+		}
+
+		var g : Outer = Outer { 1, Inner { 2, 300 }, [4, 5, 6] };
+
+		fn main() : i32 {
+			return g.inner.b + g.values[1] as i32;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(305, ex_to_i32(runtime, -1));
+
+	EXPECT_EQ(1u, ex_debug_global_count(runtime));
+	const ex_type* type = ex_debug_global_type(runtime, 0);
+	EXPECT_TRUE(type != nullptr);
+	EXPECT_EQ((u32)sizeof(NativeOuter), ex_type_get_size(type));
+	EXPECT_EQ((u32)offsetof(NativeOuter, tag), ex_type_struct_field_offset(type, 0));
+	EXPECT_EQ((u32)offsetof(NativeOuter, inner), ex_type_struct_field_offset(type, 1));
+	EXPECT_EQ((u32)offsetof(NativeOuter, values), ex_type_struct_field_offset(type, 2));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(NativeStructAbiVec3DVec3Quat) {
+	struct NativeVec3 { float x, y, z; };
+	struct NativeDVec3 { double x, y, z; };
+	struct NativeQuat { float x, y, z, w; };
+
+	const char* source = R"(
+		struct Vec3 { x : f32; y : f32; z : f32; }
+		struct DVec3 { x : f64; y : f64; z : f64; }
+		struct Quat { x : f32; y : f32; z : f32; w : f32; }
+
+		extern fn native_vec3(v : Vec3) : Vec3;
+		extern fn native_dvec3(v : DVec3) : DVec3;
+		extern fn native_quat(v : Quat) : Quat;
+
+		fn vec3() : Vec3 { return native_vec3(Vec3 { 1.0, 2.0, 3.0 }); }
+		fn dvec3() : DVec3 { return native_dvec3(DVec3 { 4.0, 5.0, 6.0 }); }
+		fn quat() : Quat { return native_quat(Quat { 7.0, 8.0, 9.0, 10.0 }); }
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	auto native_vec3 = [](ex_runtime*, ex_call_frame frame) {
+		EX_ARG(frame, NativeVec3, value);
+		EX_RESULT(frame, value);
+	};
+	auto native_dvec3 = [](ex_runtime*, ex_call_frame frame) {
+		EX_ARG(frame, NativeDVec3, value);
+		EX_RESULT(frame, value);
+	};
+	auto native_quat = [](ex_runtime*, ex_call_frame frame) {
+		EX_ARG(frame, NativeQuat, value);
+		EX_RESULT(frame, value);
+	};
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("native_vec3"), native_vec3) == EX_RESULT_OK);
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("native_dvec3"), native_dvec3) == EX_RESULT_OK);
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("native_quat"), native_quat) == EX_RESULT_OK);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("vec3")));
+	NativeVec3 vec3_result{};
+	u32 size = 0;
+	memcpy(&vec3_result, ex_call_result(runtime, &size), sizeof(vec3_result));
+	EXPECT_EQ((u32)sizeof(vec3_result), size);
+	EXPECT_EQ(1.0f, vec3_result.x); EXPECT_EQ(2.0f, vec3_result.y); EXPECT_EQ(3.0f, vec3_result.z);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("dvec3")));
+	NativeDVec3 dvec3_result{};
+	memcpy(&dvec3_result, ex_call_result(runtime, &size), sizeof(dvec3_result));
+	EXPECT_EQ((u32)sizeof(dvec3_result), size);
+	EXPECT_EQ(4.0, dvec3_result.x); EXPECT_EQ(5.0, dvec3_result.y); EXPECT_EQ(6.0, dvec3_result.z);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("quat")));
+	NativeQuat quat_result{};
+	memcpy(&quat_result, ex_call_result(runtime, &size), sizeof(quat_result));
+	EXPECT_EQ((u32)sizeof(quat_result), size);
+	EXPECT_EQ(7.0f, quat_result.x); EXPECT_EQ(8.0f, quat_result.y);
+	EXPECT_EQ(9.0f, quat_result.z); EXPECT_EQ(10.0f, quat_result.w);
+
+	CAPI_END(module);
+	return true;
+}
+
+TEST(RawResultAccess) {
+	struct NativeEntity {
+		i32 index;
+		void* world;
+	};
+
+	const char* source = R"(
+		struct Entity {
+			index : i32;
+			world : cptr;
+		}
+		extern fn create() : Entity;
+
+		fn main() : Entity {
+			var v : Entity = create();
+			return v;
+		}
+
+		fn nothing() : void {
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	static int ptr;
+
+	auto create_fn = [](ex_runtime* runtime, ex_call_frame frame) -> void {
+		NativeEntity value = {42, &ptr};
+		memcpy(frame.result, &value, sizeof(value));
+	};
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("create"), create_fn) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+
+	u32 size = 0;
+	const u8* result = (const u8*)ex_call_result(runtime, &size);
+	EXPECT_TRUE(result != nullptr);
+	EXPECT_EQ((u32)sizeof(NativeEntity), size);
+	i32 index_value = 0;
+	void* world_value = nullptr;
+	memcpy(&index_value, result + offsetof(NativeEntity, index), sizeof(index_value));
+	memcpy(&world_value, result + offsetof(NativeEntity, world), sizeof(world_value));
+	EXPECT_EQ(42, index_value);
+	EXPECT_TRUE(&ptr == world_value);
+
+	// A void call leaves no result.
+	EXPECT_TRUE(ex_call(runtime, toLs("nothing")));
+	size = 99;
+	EXPECT_TRUE(ex_call_result(runtime, &size) == nullptr);
+	EXPECT_EQ(0u, size);
+
+	CAPI_END(module);
+
+	return true;
+}
+
+TEST(Extern) {
+	const char* source = R"(
+		extern fn nativefn() : i32;
+		extern fn nativefn2(v : i32) : i32;
+
+		fn main() : i32 {
+			var v : i32 = nativefn();
+			v = nativefn2(v);
+			return v;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	auto nativefn = [](ex_runtime* runtime, ex_call_frame frame) -> void {
+		EX_RESULT(frame, i32(41));
+	};
+
+	auto nativefn2 = [](ex_runtime* runtime, ex_call_frame frame) -> void {
+		EX_ARG(frame, i32, v); v += 1;
+		EX_RESULT(frame, v);
+	};
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("nativefn"), nativefn) == EX_RESULT_OK);
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("nativefn2"), nativefn2) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	
+	return true;
+}
+
+// Type arguments are reified as runtime descriptors at the native boundary,
+// allowing the host to compare them by identity.
+TEST(NativeTypeArgumentsAreComparable) {
+	const char* source = R"(
+		struct Settings { enabled : bool; }
+		extern fn sameType(a : type, b : type) : bool;
+
+		fn sameTypeWrapped(A : comptime type, B : comptime type) : bool {
+			return sameType(A, B);
+		}
+
+		fn main() : i32 {
+			if sameTypeWrapped(Settings, Settings) {
+				if not sameTypeWrapped(Settings, i32) { return 42; }
+			}
+			return 0;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	auto same_type = [](ex_runtime* runtime, ex_call_frame frame) -> void {
+		(void)runtime;
+		EX_ARG(frame, u32, first);
+		EX_ARG(frame, u32, second);
+		EX_RESULT(frame, first == second);
+	};
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("sameType"), same_type) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeStringLiteralArgumentShouldCompile) {
+	const char* source = R"(
+		extern fn findByName(name : []const u8) : void;
+
+		fn main() : void {
+			findByName("testor");
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(NativeStringArgument) {
+	const char* source = R"(
+		extern fn inspect(text : []const u8, value : i32) : i32;
+
+		fn main() : i32 {
+			return inspect("testor", 42);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	auto inspect = [](ex_runtime* runtime, ex_call_frame frame) -> void {
+		(void)runtime;
+		EX_STRING_ARG(frame, text);
+		EX_ARG(frame, i32, value);
+		const bool matches = text.length == 6 && memcmp(text.begin, "testor", 6) == 0;
+		EX_RESULT(frame, i32(matches && value == 42 ? 1 : 0));
+	};
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("inspect"), inspect) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(NativeTwoStringArguments) {
+	const char* source = R"(
+		extern fn inspect(first : []const u8, second : []const u8) : i32;
+
+		fn main() : i32 {
+			return inspect("first", "second");
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	auto inspect = [](ex_runtime* runtime, ex_call_frame frame) -> void {
+		(void)runtime;
+		EX_STRING_ARG(frame, first);
+		EX_STRING_ARG(frame, second);
+		const bool first_matches = first.length == 5 && memcmp(first.begin, "first", 5) == 0;
+		const bool second_matches = second.length == 6 && memcmp(second.begin, "second", 6) == 0;
+		EX_RESULT(frame, i32(first_matches && second_matches ? 1 : 0));
+	};
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("inspect"), inspect) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(NativeStringResult) {
+	const char* source = R"(
+		extern fn getText() : []const u8;
+
+		fn main() : i32 {
+			if getText() == "native result" {
+				return 42;
+			}
+			return 0;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	auto get_text = [](ex_runtime* runtime, ex_call_frame frame) -> void {
+		char temporary[] = "native result";
+		ex_result_string(runtime, &frame, ex_string_view{temporary, sizeof(temporary) - 1});
+		memset(temporary, 0, sizeof(temporary));
+	};
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("getText"), get_text) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeAddTwoConstants) {
+	const char* source = R"(
+		fn main() : i32 {
+			return 1 + 2;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(3, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeFloatArithmetic) {
+	const char* source = R"(
+		fn main() : f32 {
+			return 1.25 + 2.5;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_FLOAT_EQ(3.75f, ex_to_f32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeConstPropagationThroughCastAndArithmetic) {
+	const char* source = R"(
+		fn main() : f64 {
+			const n = 256;
+			const dx = 4.0 / (n as f64);
+			return dx;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_FLOAT_EQ(0.015625, ex_to_f64(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeF64Arithmetic) {
+	const char* source = R"(
+		fn main() : f64 {
+			return 1.5 + 2.25;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_FLOAT_EQ(3.75f, (float)ex_to_f64(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeMultiplyExpression) {
+	const char* source = R"(
+		fn main() : i32 {
+			return 6 * 7;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeDivideExpression) {
+	const char* source = R"(
+		fn main() : i32 {
+			return 42 / 2;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(21, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeModuloExpression) {
+	const char* source = R"(
+		fn main() : i32 {
+			return 42 % 5;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(2, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeMultiplyAssignment) {
+	const char* source = R"(
+		fn main() : i32 {
+			var value : i32 = 6;
+			value *= 7;
+			return value;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeDivideAssignment) {
+	const char* source = R"(
+		fn main() : i32 {
+			var value : i32 = 42;
+			value /= 2;
+			return value;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(21, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeDeferRunsOnReturn) {
+	const char* source = R"(
+		var g : i32 = 1;
+
+		fn main() : i32 {
+			defer g = 2;
+			return 7;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(7, ex_to_i32(runtime, -1));
+	EXPECT_EQ(2, ex_to_i32(runtime, 0));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeDeferLifoAcrossScopes) {
+	const char* source = R"(
+		var a : i32 = 0;
+		var b : i32 = 0;
+
+		fn main() : i32 {
+			{
+				defer a = 1;
+				{
+					defer b = a;
+					return 0;
+				}
+			}
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ex_to_i32(runtime, -1));
+	EXPECT_EQ(1, ex_to_i32(runtime, 0));
+	EXPECT_EQ(0, ex_to_i32(runtime, 1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeNestedDefer) {
+	const char* source = R"(
+		var a : i32 = 0;
+		var b : i32 = 0;
+
+		fn main() : i32 {
+			defer {
+				defer a = 1;
+				b = 2;
+			}
+			return 0;
+		}
+	)";
+	// outer defer block runs on return: b = 2, then inner defer: a = 1
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ex_to_i32(runtime, -1));
+	EXPECT_EQ(1, ex_to_i32(runtime, 0)); // a
+	EXPECT_EQ(2, ex_to_i32(runtime, 1)); // b
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeDeferRunsOnBreak) {
+	const char* source = R"(
+		var g : i32 = 0;
+
+		fn main() : i32 {
+			while true {
+				defer g = g + 1;
+				break;
+			}
+			return g;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeDeferRunsOnContinue) {
+	const char* source = R"(
+		var g : i32 = 0;
+
+		fn main() : i32 {
+			var i : i32 = 0;
+			while i < 2 {
+				i += 1;
+				defer g = g + 1;
+				continue;
+			}
+			return g;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(2, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeFunctionTypedLocalCanBeCalled) {
+	const char* source = R"(
+		fn foo(v : bool) : i32 {
+			return 7;
+		}
+
+		fn bar(v : i32) : i32 {
+			return v + 1;
+		}
+
+		fn main() : i32 {
+			const f : fn(i32) : i32 = bar;
+			return f(41);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeRunFunctionWithF64ParameterFromStack) {
+	const char* source = R"(
+		fn main(x : f64) : f64 {
+			return x + 0.5;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	ex_push_f64(runtime, 41.5);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_FLOAT_EQ(42.0f, (float)ex_to_f64(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeF64Comparisons) {
+	const char* source = R"(
+		fn is_gt() : bool {
+			return 2.25 > 1.5;
+		}
+
+		fn is_lt() : bool {
+			return 1.5 < 2.25;
+		}
+
+		fn is_eq() : bool {
+			return 3.75 == 3.75;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("is_gt")));
+	EXPECT_TRUE(ex_to_bool(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("is_lt")));
+	EXPECT_TRUE(ex_to_bool(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("is_eq")));
+	EXPECT_TRUE(ex_to_bool(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ADLResolvesViaFirstParameterNamespace) {
+	const char* main_source = R"(
+		import "math" as math
+
+		fn main() : i32 {
+			const v : math.Vec2 = math.Vec2 { 20, 22 };
+			return sum(v);
+		}
+	)";
+	const char* math_source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+		fn sum(v : Vec2) : i32 {
+			return v.x + v.y;
+		}
+	)";
+
+	EvoxImportFile files_storage[] = {
+		{ toLs("math"), toLs(math_source) }
+	};
+	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
+
+	TestContext diagnostics;
+	ex_module* module = ex_module_create(&diagnostics.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_TRUE(ex_module_compile(module, toLs(main_source), makeStringView(__func__), &resolveEvoxImportC, &files));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &diagnostics.host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	ex_module_destroy(module);
+	return true;
+}
+
+
+TEST(ADLChoosesNamespaceByFirstParameterType) {
+	const char* main_source = R"(
+		import "math" as math
+		import "geom" as geom
+
+		fn main() : i32 {
+			const a : math.Vec2 = math.Vec2 { 20, 22 };
+			const b : geom.Vec2 = geom.Vec2 { 10, 32 };
+			return sum(a) + sum(b);
+		}
+	)";
+	const char* math_source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+		fn sum(v : Vec2) : i32 {
+			return v.x + v.y;
+		}
+	)";
+	const char* geom_source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+		fn sum(v : Vec2) : i32 {
+			return v.x + v.y + 1;
+		}
+	)";
+
+	EvoxImportFile files_storage[] = {
+		{ toLs("math"), toLs(math_source) },
+		{ toLs("geom"), toLs(geom_source) }
+	};
+	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime, {
+		EXPECT_TRUE(ex_call(runtime, toLs("main")));
+		EXPECT_EQ(85, ex_to_i32(runtime, -1));
+	});
+	return true;
+}
+
+TEST(BytecodeStructsBasic) {
+	const char* source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+		fn main() : i32 {
+			const v : Vec2 = Vec2 { 20, 22 };
+			return v.x + v.y;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeNestedStructs) {
+	const char* source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+		struct Outer {
+			pos : Vec2;
+			z : i32;
+		}
+		fn main() : i32 {
+			const v : Outer = Outer { Vec2 { 20, 22 }, 7 };
+			return v.pos.x + v.pos.y + v.z;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(49, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeStructParameterPassing) {
+	const char* source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+		fn sum(v : Vec2) : i32 {
+			return v.x + v.y;
+		}
+
+		fn main() : i32 {
+			const v : Vec2 = Vec2 { 20, 22 };
+			return sum(v);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeChainedFieldAccess) {
+	const char* source = R"(
+		struct C {
+			d : i32;
+		}
+		struct B {
+			c : C;
+		}
+		struct A {
+			b : B;
+		}
+		fn main() : i32 {
+			const a : A = A { B { C { 42 } } };
+			return a.b.c.d;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeChainedFieldAssignment) {
+	const char* source = R"(
+		struct C {
+			d : i32;
+		}
+		struct B {
+			c : C;
+		}
+		struct A {
+			b : B;
+		}
+		fn main() : i32 {
+			var a : A = A { B { C { 1 } } };
+			a.b.c.d = 42;
+			return a.b.c.d;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeStructFieldAssignment) {
+	const char* source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+		fn main() : i32 {
+			var v : Vec2 = Vec2 { 1, 2 };
+			v.x = 20;
+			return v.x + v.y;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(22, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeStructFieldCompoundAssignment) {
+	const char* source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+		fn main() : i32 {
+			var v : Vec2 = Vec2 { 1, 2 };
+			v.x += 5;
+			return v.x + v.y;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(8, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeStructFieldAssignmentGlobal) {
+	const char* source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+		var g : Vec2 = Vec2 { 1, 2 };
+
+		fn main() : i32 {
+			g.x = 20;
+			return g.x + g.y;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(22, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeStructFieldAssignmentParameterLocalCopy) {
+	const char* source = R"(
+		struct Vec2 {
+			x : i32;
+			y : i32;
+		}
+		fn bump(v : Vec2) : i32 {
+			var tmp : Vec2 = v;
+			tmp.x = 20;
+			return tmp.x + tmp.y;
+		}
+
+		fn main() : i32 {
+			const v : Vec2 = Vec2 { 1, 2 };
+			return bump(v);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(22, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeEnumBasicUsage) {
+	const char* source = R"(
+		enum State {
+			Idle,
+			Running
+		}
+		fn main() : i32 {
+			const s : State = .Running;
+			if s == .Running {
+				return 42;
+			}
+			return 0;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeIntegerOverflowWraps) {
+	const char* source = R"(
+		fn add_i8_wrap() : i8 {
+			var x : i8 = 127;
+			x += 1;
+			return x;
+		}
+
+		fn add_u8_wrap() : u8 {
+			var x : u8 = 255;
+			x += 1;
+			return x;
+		}
+
+		fn sub_i8_wrap() : i8 {
+			var x : i8 = 0;
+			x -= 1;
+			return x;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("add_i8_wrap")));
+	EXPECT_EQ(-128, ex_to_i8(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("add_u8_wrap")));
+	EXPECT_EQ(0, ex_to_u8(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("sub_i8_wrap")));
+	EXPECT_EQ(-1, ex_to_i8(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeRunFunctionWithParameterFromStack) {
+	const char* source = R"(
+		fn main(x : i32) : i32 {
+			return x + 1;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	ex_push_i32(runtime, 41);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+
+	i32 result = ex_to_i32(runtime, -1);
+	EXPECT_EQ(42, result);
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeFunctionCallWorks) {
+	const char* source = R"(
+		fn add(a : i32, b : i32) : i32 {
+			return a + b;
+		}
+
+		fn main() : i32 {
+			return add(20, 22);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeWhile) {
+	const char* source = R"(
+		fn main() : i32 {
+			var value : i32 = 0;
+			while value < 6 {
+				value += 1;
+			}
+			return value;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(6, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeWhileBreakContinue) {
+	const char* source = R"(
+		fn main() : i32 {
+			var i : i32 = 0;
+			var sum : i32 = 0;
+
+			while i < 10 {
+				i += 1;
+				if i == 3 {
+					continue;
+				}
+				if i == 7 {
+					break;
+				}
+				sum += i;
+			}
+
+			return sum;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(18, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeNamedLabelBreakContinue) {
+	const char* source = R"(
+		fn main() : i32 {
+			var i : i32 = 0;
+			var hits : i32 = 0;
+			outer: while i < 5 {
+				i += 1;
+				var j : i32 = 0;
+				while j < 5 {
+					j += 1;
+					if i < 5 {
+						if j == 2 {
+							continue outer;
+						}
+					}
+					if i == 5 {
+						if j == 4 {
+							break outer;
+						}
+					}
+					hits += 1;
+				}
+			}
+			return i + hits;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(12, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeLocalVariable) {
+	const char* source = R"(
+		fn main() : i32 {
+			var x : i32 = 41;
+			return x + 1;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	i32 result = ex_to_i32(runtime, -1);
+	EXPECT_EQ(42, result);
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeGlobalVariable) {
+	const char* source = R"(
+		var counter : i32 = 41;
+
+		fn main() : i32 {
+			counter += 1;
+			return counter;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(43, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BinaryExpressionEvaluatesLeftOperandBeforeRightOperand) {
+	const char* source = R"(
+		var x : i32 = 1;
+
+		fn foo() : i32 {
+			x = 10;
+			return 2;
+		}
+
+		fn main() : i32 {
+			return x + foo();
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(3, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(FunctionCallArgumentsEvaluateLeftToRight) {
+	const char* source = R"(
+		var order : i32 = 0;
+
+		fn first() : i32 {
+			order = order * 10 + 1;
+			return 1;
+		}
+
+		fn second() : i32 {
+			order = order * 10 + 2;
+			return 2;
+		}
+
+		fn third() : i32 {
+			order = order * 10 + 3;
+			return 3;
+		}
+
+		fn pack(a : i32, b : i32, c : i32) : i32 {
+			return order * 1000 + a * 100 + b * 10 + c;
+		}
+
+		fn main() : i32 {
+			return pack(first(), second(), third());
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(123123, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(StructLiteralFieldsEvaluateLeftToRight) {
+	const char* source = R"(
+		struct Triple {
+			a : i32;
+			b : i32;
+			c : i32;
+		}
+
+		var order : i32 = 0;
+
+		fn first() : i32 {
+			order = order * 10 + 1;
+			return 1;
+		}
+
+		fn second() : i32 {
+			order = order * 10 + 2;
+			return 2;
+		}
+
+		fn third() : i32 {
+			order = order * 10 + 3;
+			return 3;
+		}
+
+		fn main() : i32 {
+			const value = Triple { first(), second(), third() };
+			return order * 1000 + value.a * 100 + value.b * 10 + value.c;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(123123, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(OverloadedBinaryExpressionEvaluatesLeftOperandBeforeRightOperand) {
+	const char* source = R"(
+		struct Box {
+			value : i32;
+		}
+
+		var x : Box = Box { 1 };
+
+		fn foo() : Box {
+			x = Box { 10 };
+			return Box { 2 };
+		}
+
+		operator +(a : Box, b : Box) : Box {
+			return Box { a.value + b.value };
+		}
+
+		fn main() : i32 {
+			const result = x + foo();
+			return result.value;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(3, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+
+
+
+
+TEST(BytecodeGlobalInitializationOrder) {
+	const char* source = R"(
+		var a : i32 = 1;
+		var b : i32 = a + 2;
+
+		fn main() : i32 {
+			return a + b;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(4, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeShortCircuitingWithGlobals) {
+	const char* source = R"(
+		var hits : i32 = 0;
+
+		fn touch() : bool {
+			hits += 1;
+			return true;
+		}
+
+		fn false_and_touch() : bool {
+			return false and touch();
+		}
+
+		fn true_or_touch() : bool {
+			return true or touch();
+		}
+
+		fn get_hits() : i32 {
+			return hits;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("false_and_touch")));
+	EXPECT_TRUE(!ex_to_bool(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("get_hits")));
+	EXPECT_EQ(0, ex_to_i32(runtime, -1));
+
+	EXPECT_TRUE(ex_call(runtime, toLs("true_or_touch")));
+	EXPECT_TRUE(ex_to_bool(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("get_hits")));
+	EXPECT_EQ(0, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeNestedShortCircuitingWithGlobals) {
+	const char* source = R"(
+		var hits : i32 = 0;
+
+		fn touch() : bool {
+			hits += 1;
+			return true;
+		}
+
+		fn false_and_nested() : bool {
+			return false and (touch() or touch());
+		}
+
+		fn true_or_nested() : bool {
+			return true or (touch() and touch());
+		}
+
+		fn get_hits() : i32 {
+			return hits;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("false_and_nested")));
+	EXPECT_TRUE(!ex_to_bool(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("get_hits")));
+	EXPECT_EQ(0, ex_to_i32(runtime, -1));
+
+	EXPECT_TRUE(ex_call(runtime, toLs("true_or_nested")));
+	EXPECT_TRUE(ex_to_bool(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("get_hits")));
+	EXPECT_EQ(0, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeAssignLocalVariable) {
+	const char* source = R"(
+		fn main() : i32 {
+			var x : i32 = 41;
+			x = x + 1;
+			return x;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	i32 result = ex_to_i32(runtime, -1);
+	EXPECT_EQ(42, result);
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeCompoundAssignLocalPlusEqual) {
+	const char* source = R"(
+		fn main() : i32 {
+			var x : i32 = 41;
+			x += 1;
+			return x;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	i32 result = ex_to_i32(runtime, -1);
+	EXPECT_EQ(42, result);
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeCompoundAssignLocalMinusEqual) {
+	const char* source = R"(
+		fn main() : i32 {
+			var x : i32 = 41;
+			x -= 1;
+			return x;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	i32 result = ex_to_i32(runtime, -1);
+	EXPECT_EQ(40, result);
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeExtendedIntegerReturnWidths) {
+	const char* source = R"(
+		fn ret_i8() : i8 {
+			return 10;
+		}
+
+		fn ret_u8() : u8 {
+			return 20;
+		}
+
+		fn ret_i16() : i16 {
+			return 30;
+		}
+
+		fn ret_u16() : u16 {
+			return 40;
+		}
+
+		fn ret_i64() : i64 {
+			return 50;
+		}
+
+		fn ret_u64() : u64 {
+			return 60;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("ret_i8")));
+	EXPECT_EQ(10, ex_to_i8(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("ret_u8")));
+	EXPECT_EQ(20, ex_to_u8(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("ret_i16")));
+	EXPECT_EQ(30, ex_to_i16(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("ret_u16")));
+	EXPECT_EQ(40, ex_to_u16(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("ret_i64")));
+	EXPECT_TRUE(50 == ex_to_i64(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("ret_u64")));
+	EXPECT_TRUE(60 == ex_to_u64(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeIfElse) {
+	const char* source = R"(
+		fn choose(flag : bool) : i32 {
+			if flag {
+				return 11;
+			} else {
+				return 22;
+			}
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	ex_push_bool(runtime, 1);
+	EXPECT_TRUE(ex_call(runtime, toLs("choose")));
+	EXPECT_EQ(11, ex_to_i32(runtime, -1));
+
+	ex_push_bool(runtime, 0);
+	EXPECT_TRUE(ex_call(runtime, toLs("choose")));
+	EXPECT_EQ(22, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeIfElseIf) {
+	const char* source = R"(
+		fn classify(v : i32) : i32 {
+			if v > 10 {
+				return 2;
+			} else if v > 0 {
+				return 1;
+			} else {
+				return 0;
+			}
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	ex_push_i32(runtime, -1);
+	EXPECT_TRUE(ex_call(runtime, toLs("classify")));
+	EXPECT_EQ(0, ex_to_i32(runtime, -1));
+
+	ex_push_i32(runtime, 4);
+	EXPECT_TRUE(ex_call(runtime, toLs("classify")));
+	EXPECT_EQ(1, ex_to_i32(runtime, -1));
+
+	ex_push_i32(runtime, 11);
+	EXPECT_TRUE(ex_call(runtime, toLs("classify")));
+	EXPECT_EQ(2, ex_to_i32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(DivisionAndModuloSemanticsRuntime) {
+	const char* source = R"(
+		fn q_pos() : i32 {
+			return 5 / 2;
+		}
+
+		fn q_neg() : i32 {
+			return -5 / 2;
+		}
+
+		fn r_neg_left() : i32 {
+			return -5 % 2;
+		}
+
+		fn r_neg_right() : i32 {
+			return 5 % -2;
+		}
+
+		fn float_div() : f32 {
+			return 6.0 / 2.0;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(bytecode != nullptr);
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+
+	EXPECT_TRUE(ex_call(runtime, toLs("q_pos")));
+	EXPECT_EQ(2, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("q_neg")));
+	EXPECT_EQ(-2, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("r_neg_left")));
+	EXPECT_EQ(-1, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("r_neg_right")));
+	EXPECT_EQ(1, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("float_div")));
+	EXPECT_FLOAT_EQ(3, ex_to_f32(runtime, -1));
+
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ShortCircuiting) {
+	const char* source = R"(
+		fn spin() : bool {
+			while true {
+			}
+			return true;
+		}
+
+		fn left_false() : bool {
+			return false and spin();
+		}
+
+		fn left_true() : bool {
+			return true or spin();
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("left_false")));
+	EXPECT_TRUE(!ex_to_bool(runtime, -1));
+
+	TestContext diagnostics2;
+	RuntimeGuard runtime2(module, &diagnostics2.host);
+	EXPECT_TRUE(runtime2);
+	EXPECT_TRUE(ex_call(runtime2, toLs("left_true")));
+	EXPECT_TRUE(ex_to_bool(runtime2, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(IfElse) {
+	const char* source = R"(
+		fn classify(v : i32) : i32 {
+			if v > 10 {
+				return 2;
+			} else if v > 0 {
+				return 1;
+			} else {
+				return 0;
+			}
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	ex_push_i32(runtime, 4);
+	EXPECT_TRUE(ex_call(runtime, toLs("classify")));
+	EXPECT_EQ(1, ex_to_i32(runtime, -1));
+
+	ex_push_i32(runtime, 11);
+	EXPECT_TRUE(ex_call(runtime, toLs("classify")));
+	EXPECT_EQ(2, ex_to_i32(runtime, -1));
+
+	ex_push_i32(runtime, -1);
+	EXPECT_TRUE(ex_call(runtime, toLs("classify")));
+	EXPECT_EQ(0, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(GlobalVariablesRuntime) {
+	const char* source = R"(
+		var counter : i32 = 1;
+		const step = 2;
+
+		fn increment() : i32 {
+			counter += step;
+			return counter;
+		}
+
+		fn read_counter() : i32 {
+			return counter;
+		}
+
+		fn shadow_counter() : i32 {
+			var c : i32 = 100;
+			c += 1;
+			return c;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("read_counter")));
+	EXPECT_EQ(1, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("increment")));
+	EXPECT_EQ(3, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("increment")));
+	EXPECT_EQ(5, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("read_counter")));
+	EXPECT_EQ(5, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("shadow_counter")));
+	EXPECT_EQ(101, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("read_counter")));
+	EXPECT_EQ(5, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(RuntimeBlockScope) {
+	const char* source = R"(
+		fn scoped() : i32 {
+			var a = 1;
+			{
+				var b = 5;
+				b = b + 1;
+			}
+			return a;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("scoped")));
+	EXPECT_EQ(1, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(DeferRunsAtScopeExit) {
+	const char* source = R"(
+		fn main() : i32 {
+			var x : i32 = 1;
+			{
+				defer x += 3;
+				x += 1;
+			}
+			return x;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(5, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(DeferRunsInLifoOrder) {
+	const char* source = R"(
+		fn main() : i32 {
+			var x : i32 = 1;
+			{
+				defer x += 1;
+				defer x *= 2;
+			}
+			return x;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(3, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(NullableNullBranchRuntime) {
+	const char* source = R"(
+		fn main() : i32 {
+			var x : ?i32 = null;
+			if x != null {
+				return x;
+			}
+			return 42;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(NullableNonNullBranchRuntime) {
+	const char* source = R"(
+		fn main() : i32 {
+			var x : ?i32 = 7;
+			if x != null {
+				return x;
+			}
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(7, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(NullableConversionBoundariesRuntime) {
+	const char* source = R"(
+		fn pass(x : ?i32) : ?i32 {
+			return x;
+		}
+
+		fn main() : i32 {
+			var x : ?i32 = null;
+			x = pass(7);
+			if x != null {
+				return x;
+			}
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(7, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ExtendedScalarTypesRuntime) {
+	const char* source = R"(
+		fn main() : i32 {
+			const a : i8 = 10;
+			const b : u8 = 20;
+			const c : i16 = 30;
+			const d : u16 = 40;
+			const e : i64 = 50;
+			const f : u64 = 60;
+			const g : f64 = 1;
+			return a as i32 + b as i32 + c as i32 + d as i32 + e as i32 + f as i32 + g as i32;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(211, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(LargeUntypedIntegerArithmeticRetainsWidthRuntime) {
+	const char* source = R"(
+		fn main() : i64 {
+			return 2147483648 + 1;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_TRUE(2147483649ll == ex_to_i64(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(IntegerOverflowWraparoundRuntime) {
+	const char* source = R"(
+		fn u8_add_wrap() : i32 {
+			const a : u8 = 255 as u8;
+			const b : u8 = (a + 1 as u8) as u8;
+			return b as i32;
+		}
+
+		fn i8_add_wrap() : i32 {
+			const a : i8 = 127 as i8;
+			const b : i8 = (a + 1 as i8) as i8;
+			return b as i32;
+		}
+
+		fn u8_add_assign_wrap() : i32 {
+			var x : u8 = 255 as u8;
+			x += 1 as u8;
+			return x as i32;
+		}
+
+		fn cast_i8_wrap() : i32 {
+			const x : i32 = 255;
+			return (x as i8) as i32;
+		}
+
+		fn cast_u8_wrap() : i32 {
+			const x : i32 = 256;
+			return (x as u8) as i32;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("u8_add_wrap")));
+	EXPECT_EQ(0, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("i8_add_wrap")));
+	EXPECT_EQ(-128, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("u8_add_assign_wrap")));
+	EXPECT_EQ(0, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("cast_i8_wrap")));
+	EXPECT_EQ(-1, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("cast_u8_wrap")));
+	EXPECT_EQ(0, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(DivisionByZeroRuntimeError) {
+	const char* source = R"(
+		fn divide(v : i32, d : i32) : i32 {
+			return v / d;
+		}
+
+		fn modulo(v : i32, d : i32) : i32 {
+			return v % d;
+		}
+
+		fn divide_assign(d : i32) : i32 {
+			var x : i32 = 8;
+			x /= d;
+			return x;
+		}
+
+		fn divide_constant_zero(v : i32) : i32 {
+			return v / 0;
+		}
+
+		fn modulo_constant_zero(v : i32) : i32 {
+			return v % 0;
+		}
+
+		fn divide_assign_constant_zero() : i32 {
+			var x : i32 = 8;
+			x /= 0;
+			return x;
+		}
+
+		fn divide_float_constant_zero() : f32 {
+			return 1.0 / 0.0;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	test_diagnostics.output_enabled = false;
+	ex_push_i32(runtime, 10);
+	ex_push_i32(runtime, 0);
+	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(runtime, toLs("divide")));
+
+	TestContext diagnostics2;
+	RuntimeGuard runtime2(module, &diagnostics2.host);
+	EXPECT_TRUE(runtime2);
+	diagnostics2.diagnostics.output_enabled = false;
+	ex_push_i32(runtime2, 10);
+	ex_push_i32(runtime2, 0);
+	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(runtime2, toLs("modulo")));
+
+	TestContext diagnostics3;
+	RuntimeGuard runtime3(module, &diagnostics3.host);
+	EXPECT_TRUE(runtime3);
+	diagnostics3.diagnostics.output_enabled = false;
+	ex_push_i32(runtime3, 0);
+	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(runtime3, toLs("divide_assign")));
+
+	TestContext diagnostics4;
+	RuntimeGuard runtime4(module, &diagnostics4.host);
+	EXPECT_TRUE(runtime4);
+	diagnostics4.diagnostics.output_enabled = false;
+	ex_push_i32(runtime4, 10);
+	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(runtime4, toLs("divide_constant_zero")));
+
+	TestContext diagnostics5;
+	RuntimeGuard runtime5(module, &diagnostics5.host);
+	EXPECT_TRUE(runtime5);
+	diagnostics5.diagnostics.output_enabled = false;
+	ex_push_i32(runtime5, 10);
+	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(runtime5, toLs("modulo_constant_zero")));
+
+	TestContext diagnostics6;
+	RuntimeGuard runtime6(module, &diagnostics6.host);
+	EXPECT_TRUE(runtime6);
+	diagnostics6.diagnostics.output_enabled = false;
+	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(runtime6, toLs("divide_assign_constant_zero")));
+
+	TestContext diagnostics7;
+	RuntimeGuard runtime7(module, &diagnostics7.host);
+	EXPECT_TRUE(runtime7);
+	diagnostics7.diagnostics.output_enabled = false;
+	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(runtime7, toLs("divide_float_constant_zero")));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(HostCallWithTooFewArgumentsFails) {
+	const char* source = R"(
+		fn add(a : i32, b : i32) : i32 {
+			return a + b;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	
+	ex_push_i32(runtime, 20);
+	EXPECT_EQ(EX_RESULT_FAILURE, ex_call(runtime, toLs("add")));
+	EXPECT_EQ(20, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(UntypedLiteralsRuntime) {
+	const char* source = R"(
+		struct Vec3 {
+            x : f32; y : f32; z : f32;
+        }
+
+		struct Pair {
+			x : u8;
+			y : f64;
+		}
+
+		fn vec3_sum() : f32 {
+			const v : Vec3 = { 1, 2, 3 };
+			return v.x + v.y + v.z;
+		}
+
+		fn integer_widths() : i32 {
+			const a : i8 = 10;
+			const b : u8 = 20;
+			const c : i16 = 30;
+			const d : u16 = 40;
+			const e : i64 = 50;
+			const f : u64 = 60;
+			const pair = Pair { 255, 2.5 };
+			return a as i32 + b as i32 + c as i32 + d as i32 + e as i32 + f as i32 + pair.x as i32 + pair.y as i32;
+		}
+
+		fn return_f64() : f64 {
+			return 1.5;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	bool compiled = ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr);
+	EXPECT_TRUE(compiled);
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("vec3_sum")));
+	EXPECT_FLOAT_EQ(6, ex_to_f32(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("integer_widths")));
+	EXPECT_EQ(467, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(ex_call(runtime, toLs("return_f64")));
+	EXPECT_FLOAT_EQ(1.5f, (float)ex_to_f64(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(FirstClassFunctionsRuntime) {
+	const char* source = R"(
+		fn add(a : i32, b : i32) : i32 {
+			return a + b;
+		}
+
+		fn mul(a : i32, b : i32) : i32 {
+			return a * b;
+		}
+
+		fn apply(f : fn(i32, i32) : i32, a : i32, b : i32) : i32 {
+			return f(a, b);
+		}
+
+		fn choose(use_mul : bool) : fn(i32, i32) : i32 {
+			if use_mul {
+				return mul;
+			}
+			return add;
+		}
+
+		fn main() : i32 {
+			const add_fn = choose(false);
+			const mul_fn = choose(true);
+			return apply(add_fn, 20, 2) + mul_fn(6, 7);
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	const bool ok = ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr);
+	EXPECT_TRUE(ok);
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(64, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(FirstClassFunctionsNoArgsRuntime) {
+	const char* source = R"(
+		fn make_one() : i32 {
+			return 1;
+		}
+
+		fn make_two() : i32 {
+			return 2;
+		}
+
+		fn choose(use_two : bool) : fn() : i32 {
+			if use_two {
+				return make_two;
+			}
+			return make_one;
+		}
+
+		fn call(f : fn() : i32) : i32 {
+			return f();
+		}
+
+		fn main() : i32 {
+			const one_fn = choose(false);
+			const two_fn = choose(true);
+			return call(one_fn) * 10 + two_fn();
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(12, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(FirstClassFunctionsImmediateCallRuntime) {
+	const char* source = R"(
+		fn inner() : i32 {
+			return 42;
+		}
+
+		fn make_fn() : fn() : i32 {
+			return inner;
+		}
+
+		fn main() : i32 {
+			return make_fn()();
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(FirstClassFunctionLiteralImmediateCallRuntime) {
+	const char* source = R"(
+		fn inner() : i32 {
+			return 42;
+		}
+
+		const make_fn = fn() : fn() : i32 {
+			return inner;
+		};
+
+		fn main() : i32 {
+			return make_fn()();
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(FirstClassFunctionsStructFieldImmediateCallRuntime) {
+	const char* source = R"(
+		struct Holder {
+			bar : fn() : i32;
+		}
+
+		fn inner() : i32 {
+			return 42;
+		}
+
+		fn make_holder() : Holder {
+			return Holder { inner };
+		}
+
+		fn main() : i32 {
+			return make_holder().bar();
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(StaticArrayRuntimeIndexing) {
+	const char* source = R"(
+		fn main() : i32 {
+			var d : [4]i32 = undefined;
+			var i : i32 = 2;
+			d[i] = 42;
+			return d[2];
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(StaticArrayRuntimeOutOfBoundsFails) {
+	const char* source = R"(
+		fn main(i : i32) : i32 {
+			var d : [2]i32 = undefined;
+			d[0] = 7;
+			return d[i];
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	test_diagnostics.output_enabled = false;
+	ex_push_i32(runtime, 5);
+	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(runtime, toLs("main")));
+	return true;
+}
