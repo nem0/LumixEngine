@@ -9,6 +9,7 @@ TEST(ComptimeBasic) {
 	return true;
 }
 
+
 TEST(TopLevelComptimeRequiresSemicolon) {
 	EXPECT_COMPILE_FAIL(R"(
 		comptime value = 1

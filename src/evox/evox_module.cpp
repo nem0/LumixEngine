@@ -85,6 +85,9 @@ struct EvoxSystemImpl : EvoxSystem {
 
 	void startGame() override {
 		m_is_game_running = true;
+		if (!m_is_ready) return;
+		for (EvoxModule* module : m_modules) addWorld(module->getWorld());
+		callStart();
 	}
 
 	void stopGame() override {
@@ -102,6 +105,7 @@ struct EvoxSystemImpl : EvoxSystem {
 	void registerModule(EvoxModule& module) override {
 		m_modules.push(&module);
 		module.setEvoxDataTypes(m_data_types);
+		if (m_is_game_running && m_is_ready) addWorld(module.getWorld());
 	}
 
 	void unregisterModule(EvoxModule& module) override { m_modules.eraseItem(&module); }
@@ -135,6 +139,13 @@ struct EvoxSystemImpl : EvoxSystem {
 		if (m_resource) return;
 		m_resource = m_engine.getResourceManager().load<EvoxResource>(m_path);
 		if (m_resource) m_resource->onLoaded<&EvoxSystemImpl::onResourceChanged>(this);
+	}
+
+	void callStart() {
+		if (!m_runtime) return;
+		const ex_string_view function_name = toLs("start");
+		if (ex_bytecode_runtime_result_kind(m_runtime, function_name) == EX_TYPE_INVALID) return;
+		if (ex_call(m_runtime, function_name) == EX_RESULT_FAILURE) logError("Evox start failed");
 	}
 
 	void addWorld(World& world) {
@@ -240,7 +251,11 @@ struct EvoxSystemImpl : EvoxSystem {
 				return false;
 			}
 		}
-		for (EvoxModule* module : m_modules) addWorld(module->getWorld());
+		// startGame can be called before the script resource has finished loading.
+		if (m_is_game_running) {
+			for (EvoxModule* module : m_modules) addWorld(module->getWorld());
+			callStart();
+		}
 		return true;
 	}
 
@@ -802,7 +817,6 @@ void EvoxSystemImpl::createModules(World& world) {
 	loadRoot();
 	auto module = UniquePtr<EvoxModuleImpl>::create(m_allocator, world, *this);
 	world.addModule(module.move());
-	if (m_is_ready) addWorld(world);
 }
 
 IModule* createEvoxModule(World& world);

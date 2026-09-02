@@ -101,6 +101,12 @@ struct Tokenizer {
 			advance();
 			if (!numberDigits()) return makeToken(Token::ERROR);
 		}
+		if (peekChar() == 'e' || peekChar() == 'E') {
+			advance();
+			if (peekChar() == '+' || peekChar() == '-') advance();
+			if (!isDigit(peekChar())) return makeToken(Token::ERROR);
+			while (isDigit(peekChar())) advance();
+		}
 		return makeToken(Token::NUMBER);
 	}
 

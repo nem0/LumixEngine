@@ -5,6 +5,7 @@ import "core:ui"
 import "core:model_instance"
 import "core:document"
 import "core:world"
+import "core:random"
 import "core:evox_data" as ld
 
 import "scripts/player" as player
@@ -23,16 +24,18 @@ fn enableCursor(ui : UIModule, enable : bool) : void {
 	sys.enableCursor(enable);
 }
 
-fn update(td : f32) : void {
-    player.update(td);
-	
+fn start() : void {
 	// random color
 	var random_color_components = g_world.getEvoxData(RandomColorComponent);
 
 	for c in random_color_components {
 		var mi = c.entity.model_instance() else return;
-		mi.overrideMaterialVec4(0, "Material color", {1, 0, 1, 1});
+		mi.overrideMaterialVec4(0, "Material color", {0, randFloat(), randFloat(), 1});
 	}
+}
+
+fn update(td : f32) : void {
+    player.update(td);
 
 	// UI
 	var ui = g_world.ui() else return;

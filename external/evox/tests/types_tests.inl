@@ -1,3 +1,47 @@
+TEST(ScientificNotationLiterals) {
+	EXPECT_COMPILE(R"(
+		fn main() : f32 {
+			return 2.328306436996595e-10;
+		}
+	)");
+	EXPECT_COMPILE(R"(
+		fn main() : f64 {
+			return 1.25E+3;
+		}
+	)");
+	return true;
+}
+
+TEST(MalformedScientificNotationLiterals) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn main() : f32 {
+			return 1e;
+		}
+	)");
+	EXPECT_COMPILE_FAIL(R"(
+		fn main() : f32 {
+			return 1e-;
+		}
+	)");
+	return true;
+}
+
+TEST(ScientificNotationRuntimeValues) {
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(R"(
+		fn small() : f32 { return 2.328306436996595e-10; }
+		fn large() : f32 { return 1.25E+3; }
+	)"), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("small")));
+	const float small = ex_to_f32(runtime, -1);
+	EXPECT_TRUE(small > 0.0f && small < 0.000001f);
+	EXPECT_TRUE(ex_call(runtime, toLs("large")));
+	EXPECT_FLOAT_EQ(1250.0f, ex_to_f32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(ExtendedScalarTypesTypecheck) {
 	const char* source = R"(
 		fn main() : i32 {
