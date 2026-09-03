@@ -25,6 +25,7 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 	- [Operators](#operators)
 - [Types](#types)
 	- [Untyped literals](#untyped-literals)
+	- [Any values](#any-values)
 	- [Nullable values](#nullable-values)
 	- [Pointers](#pointers)
 	- [Tagged unions](#tagged-unions)
@@ -739,6 +740,7 @@ Built-in and user types:
 - user-defined `enum` types
 - function types
 - tagged union types (`A | B`)
+- `any` values (see [Any values](#any-values))
 
 `isize` is the signed integer type used for memory sizes, slice lengths, and indices. It is signed and a fixed 64 bits on all targets (not platform/pointer-width dependent).
 
@@ -799,6 +801,30 @@ Concretization requires the value to be representable by the selected type; it
 is not an implicit cast between already-concrete numeric types. `typeof` is
 not a concretizing context, so `typeof(1)` and `typeof(deferred)` are errors.
 Cast or annotate the expression first.
+
+### Any values
+
+`any` is a runtime type-erased, non-owning value. It stores the concrete runtime type together with a pointer to the original value storage; it does not copy or own the payload.
+
+```cpp
+fn handle(value : any) : void {
+	match value {
+		case i32:
+			// value is promoted to i32 in this arm
+			print(value);
+		case []const u8:
+			print(value);
+		case:
+			print("unsupported value");
+	}
+}
+```
+
+Only runtime-materializable values can be assigned to `any`. When the source is an rvalue or literal, the compiler materializes a hidden temporary and `any` points to that temporary. The temporary remains valid for the lifetime of the `any` value that refers to it. Existing lvalues are referenced directly.
+
+`any` is only consumed through [`match`](#match). It does not support direct member access, operators, `is`, or `as` conversions. A match case names a concrete type and performs an exact runtime type comparison. The subject is promoted to that type inside the selected arm. Since the set of possible runtime types is open, a match on `any` must contain an unpatterned `case:` fallback; the fallback body may contain ordinary statements.
+
+An `any` reference must not outlive the value or temporary it references. Returning or storing an `any` whose source storage cannot remain valid is a compile-time error. `any` does not extend the lifetime of pointers, slices, or other referenced data stored in its payload.
 
 ### Nullable values
 
@@ -1105,8 +1131,27 @@ cannot be modified because the slice is `const`.
 
 There is no built-in concatenation operator. In particular, `"a" + "b"` is a
 compile-time error. Code that needs concatenation must copy the bytes into an
-owned container supplied by a library or application allocator. String
-interpolation is not implemented.
+owned container supplied by a library or application allocator.
+
+String literals support interpolation when passed as function-call arguments.
+An expression enclosed in `{}` is emitted as a separate argument, with the
+literal text before and after it emitted as `[]const u8` arguments:
+
+```cpp
+fn foo(a : i32, prefix : []const u8, value : i32, suffix : []const u8, c : f64) : i32 {
+	return value;
+}
+
+fn main() : i32 {
+	var value : i32 = 42;
+	return foo(42, "some {value} abc", 69.0);
+}
+```
+
+The call above is equivalent, for argument checking, to
+`foo(42, "some ", value, " abc", 69.0)`. Interpolated expressions use the
+normal expression syntax, including operators, function calls, member access,
+and indexing.
 
 Slices, including `[]const u8`, compare by content with `==` and `!=`, so
 string literals and byte slices can be compared directly:
@@ -1511,6 +1556,7 @@ Supported patterns:
 - string literals, when matching a `[]const u8` value
 - ranges (`a..=b`, inclusive on both bounds)
 - member types, when matching a tagged union value (see [Tagged unions](#tagged-unions))
+- concrete types, when matching an `any` value (see [Any values](#any-values))
 - comma-separated alternatives
 - empty `case:` fallback
 
@@ -1569,7 +1615,7 @@ fn handle_command(command : []const u8) : void {
 }
 ```
 
-Enum matches must be exhaustive unless an empty `case:` fallback is present. String matches cannot generally be exhaustive, so they require an empty `case:` fallback. Duplicate enum or string cases and multiple fallback cases are compile-time errors.
+Enum matches must be exhaustive unless an empty `case:` fallback is present. String matches cannot generally be exhaustive, so they require an empty `case:` fallback. Matches on `any` always require an unpatterned `case:` fallback; its body may contain ordinary statements. Duplicate enum, string, or `any` type cases and multiple fallback cases are compile-time errors.
 
 ### Compile-time branches
 
@@ -3046,6 +3092,7 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 
 # TODO
 
+* if var a = some_nullabe { ... } else { ... } and same for match
 * union tag is always 4 bytes
 * https://verdagon.dev/grimoire/grimoire#the-list
 * should we make string literal to cstr cast explicit?

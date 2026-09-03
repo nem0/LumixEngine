@@ -152,6 +152,7 @@ struct Tokenizer {
 		switch (m_start_token[0]) {
 			case 'a': {
 				if (u32(m_current - m_start_token) < 2) return makeToken(Token::IDENTIFIER);
+				if (u32(m_current - m_start_token) == 3 && compareMemory(m_start_token + 1, "ny", 2) == 0) return makeToken(Token::ANY);
 				switch (m_start_token[1]) {
 					case 'n': return checkKeyword("d", 2, 1, Token::AND);
 					case 's': return checkKeyword("", 2, 0, Token::AS);

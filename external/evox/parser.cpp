@@ -58,6 +58,49 @@ struct Parser {
 		return res;
 	}
 
+	// Expand interpolation at call sites.  Keeping this as argument expansion
+	// (rather than constructing a string expression) means the runtime can stream
+	// each part without allocating a concatenated string.
+	void appendInterpolatedArgument(ExpArray<Expression*>& args, Expression* argument) {
+		if (!argument || argument->kind != Expression::STRING_LITERAL) { args.push(argument); return; }
+		StringLiteralExpression* literal = static_cast<StringLiteralExpression*>(argument);
+		const char* begin = literal->value.begin;
+		const char* end = begin + literal->value.length;
+		const char* part = begin;
+		bool found = false;
+		for (const char* p = begin; p < end; ++p) {
+			if (*p != '{' || (p + 1 < end && p[1] == '{')) { if (*p == '{') ++p; continue; }
+			const char* close = p + 1;
+			i32 brace_depth = 1;
+			bool in_string = false;
+			for (; close < end; ++close) {
+				if (*close == '\\' && close + 1 < end) { ++close; continue; }
+				if (*close == '"') { in_string = !in_string; continue; }
+				if (in_string) continue;
+				if (*close == '{') ++brace_depth;
+				else if (*close == '}' && --brace_depth == 0) break;
+			}
+			if (close == end || close == p + 1) continue;
+			// Parse the embedded text with the normal expression parser. This keeps
+			// operators, calls, indexing, member access, and nested literals identical
+			// to their non-interpolated forms.
+			Parser embedded(m_unit, m_output.host, m_src_locs);
+			embedded.m_tokenizer.init({p + 1, close - (p + 1)}, makeStringView("<interpolation>"));
+			Expression* embedded_expr = embedded.expression();
+			if (!embedded_expr) {
+				// Keep malformed interpolation as an ordinary string; semantic checking
+				// will report the original call/type error.
+				continue;
+			}
+			found = true;
+			if (p != part) { Token t = literal->token; t.value = {part, p - part}; args.push(makeExpr<StringLiteralExpression>(t)); static_cast<StringLiteralExpression*>(args[args.size() - 1])->value = t.value; }
+			args.push(embedded_expr);
+			p = close; part = close + 1;
+		}
+		if (!found) { args.push(argument); return; }
+		{ Token t = literal->token; t.value = {part, end - part}; args.push(makeExpr<StringLiteralExpression>(t)); static_cast<StringLiteralExpression*>(args[args.size() - 1])->value = t.value; }
+	}
+
 	static int precedence(Token::Type type) {
 		switch (type) {
 			case Token::PIPE: return 1;
@@ -413,7 +456,7 @@ struct Parser {
 					return nullptr;
 				}
 				MemberExpression* expr = makeExpr<MemberExpression>(token);
-				expr->name = name.value;
+				expr->name = name;
 				return expr;
 			}
 			case Token::FN: {
@@ -463,6 +506,7 @@ struct Parser {
 			case Token::CPTR:
 			case Token::CSTR:
 			case Token::BYTE:
+			case Token::ANY:
 			case Token::TYPE_KW:
 				return postfixSuffixes(makeExpr<TypeLiteralExpression>(token, primitiveKindFromToken(token.type)), mode);
 			case Token::SIZEOF:
@@ -544,7 +588,7 @@ struct Parser {
 
 					MemberExpression* member = makeExpr<MemberExpression>(dot);
 					member->expression = expr;
-					member->name = name.value;
+					member->name = name;
 					expr = member;
 					break;
 				}
@@ -634,7 +678,7 @@ struct Parser {
 
 						Expression* arg = expression();
 						if (!arg) return nullptr;
-						call->args.push(arg);
+						appendInterpolatedArgument(call->args, arg);
 						if (peekToken().type != Token::COMMA) break;
 						consumeToken();
 					}
@@ -765,6 +809,7 @@ struct Parser {
 			case Token::CPTR: return ResolvedTypeKind::CPTR;
 			case Token::CSTR: return ResolvedTypeKind::CSTR;
 			case Token::BYTE: return ResolvedTypeKind::BYTE;
+			case Token::ANY: return ResolvedTypeKind::ANY;
 			// META stands for the `type` keyword.
 			case Token::TYPE_KW: return ResolvedTypeKind::META;
 			default: return ResolvedTypeKind::INVALID;
@@ -787,7 +832,7 @@ struct Parser {
 			m_output.errorAt(argument->token, "Expected parameter name");
 			return false;
 		}
-		param.name = static_cast<IdentifierExpression*>(argument)->name;
+		param.name = argument->token;
 		consumeToken();
 		if (peekToken().type == Token::COMPTIME) {
 			consumeToken();
@@ -812,7 +857,7 @@ struct Parser {
 
 	bool functionParams(FunctionExpression& fn, const FunctionTypeExpression& signature) {
 		for (const FunctionTypeParam& type_param : signature.params) {
-			if (empty(type_param.name)) {
+			if (empty(type_param.name.value)) {
 				m_output.errorAt(signature.token, "Function parameters require names");
 				return false;
 			}
@@ -821,8 +866,8 @@ struct Parser {
 			param.is_comptime = type_param.is_comptime;
 			param.type_expr = type_param.type_expr;
 			for (i32 i = 0; i < fn.params.size() - 1; ++i) {
-				if (!equalStrings(fn.params[i].name, param.name)) continue;
-				m_output.error("Duplicate parameter: ", param.name);
+				if (!equalStrings(fn.params[i].name.value, param.name.value)) continue;
+				m_output.error("Duplicate parameter: ", param.name.value);
 				return false;
 			}
 		}
@@ -907,7 +952,7 @@ struct Parser {
 					}
 					MemberExpression* member = makeExpr<MemberExpression>(dot);
 					member->expression = id;
-					member->name = name.value;
+					member->name = name;
 					res = member;
 				}
 				break;
@@ -1069,7 +1114,13 @@ struct Parser {
 		VarDeclStatement* res = makeStmt<VarDeclStatement>(type_token);
 		res->is_immutable = type_token.type == Token::CONST;
 		res->is_comptime = type_token.type == Token::COMPTIME;
-		if (!consume(Token::IDENTIFIER, res->name, "Expected identifier")) return nullptr;
+		Token name_token = consumeToken();
+		if (name_token.type != Token::IDENTIFIER) {
+			m_output.errorAt(name_token, "Expected identifier");
+			return nullptr;
+		}
+		res->name = name_token.value;
+		res->name_token = name_token;
 		if (peekToken().type == Token::COLON) {
 			consumeToken();
 			res->type_expr = type();
@@ -1094,16 +1145,22 @@ struct Parser {
 		if (for_token.type != Token::FOR) return nullptr;
 
 		ForStatement* res = makeStmt<ForStatement>(for_token);
-		if (!consume(Token::IDENTIFIER, res->key_var, "Expected identifier")) return nullptr;
+		res->key_token = consumeToken();
+		if (res->key_token.type != Token::IDENTIFIER) { m_output.errorAt(res->key_token, "Expected identifier"); return nullptr; }
+		res->key_var = res->key_token.value;
 
 		bool is_key_value = false;
 		if (peekToken().type == Token::COMMA) {
 			is_key_value = true;
 			consumeToken();
-			if (!consume(Token::IDENTIFIER, res->value_var, "Expected identifier")) return nullptr;
+			res->value_token = consumeToken();
+			if (res->value_token.type != Token::IDENTIFIER) { m_output.errorAt(res->value_token, "Expected identifier"); return nullptr; }
+			res->value_var = res->value_token.value;
 		}
 		else {
 			res->value_var = res->key_var;
+			res->value_token = res->key_token;
+			res->key_token = {};
 			res->key_var = makeForIndexName();
 		}
 
@@ -1247,7 +1304,7 @@ struct Parser {
 				return nullptr;
 			}
 			MemberExpression* expr = makeExpr<MemberExpression>(dot);
-			expr->name = name.value;
+			expr->name = name;
 			return expr;
 		}
 		return expression();
@@ -1610,10 +1667,10 @@ struct Parser {
 				m_output.errorAt(field_name, "Expected field name");
 				return nullptr;
 			}
-			field.name = field_name.value;
+			field.name = field_name;
 			for (i32 i = 0; i < st->fields.size() - 1; ++i) {
-				if (!equalStrings(st->fields[i].name, field.name)) continue;
-				m_output.error("Duplicate field: ", field.name);
+				if (!equalStrings(st->fields[i].name.value, field.name.value)) continue;
+				m_output.error("Duplicate field: ", field.name.value);
 				return nullptr;
 			}
 			if (!consume(Token::COLON)) return nullptr;
@@ -1635,10 +1692,14 @@ struct Parser {
 			}
 
 			EnumMember& member = en->members.emplace_back();
-			if (!consume(Token::IDENTIFIER, member.name, "Expected enum member name")) return nullptr;
+			member.name = consumeToken();
+			if (member.name.type != Token::IDENTIFIER) {
+				m_output.errorAt(member.name, "Expected enum member name");
+				return nullptr;
+			}
 			for (i32 i = 0; i < en->members.size() - 1; ++i) {
-				if (!equalStrings(en->members[i].name, member.name)) continue;
-				m_output.error("Duplicate enum member: ", member.name);
+				if (!equalStrings(en->members[i].name.value, member.name.value)) continue;
+				m_output.error("Duplicate enum member: ", member.name.value);
 				return nullptr;
 			}
 			if (peekToken().type == Token::EQUAL) {
@@ -1827,9 +1888,25 @@ struct Parser {
 
 // Parse a module, e.g. `ex_module_parse(module, source, name)`.
 ex_result ex_module_parse(ex_module* module, ex_string_view source, ex_string_view source_name) {
-	Unit& unit = module->units.emplace_back(source_name, module->arena);
+	if (!module) return EX_RESULT_FAILURE;
+	// Paths and source bytes are part of the module's result API (unit paths,
+	// token values, import paths/aliases, symbol names all reference them);
+	// retain them independently of the caller's buffers for module lifetime.
+	char* owned_path = nullptr;
+	if (source_name.length > 0) {
+		owned_path = (char*)module->arena.allocate(module->arena.user_data, (u32)source_name.length, 1);
+		copyMemory(owned_path, source_name.begin, (u32)source_name.length);
+	}
+	ex_string_view path{owned_path, source_name.length};
+	char* owned_source = nullptr;
+	if (source.length > 0) {
+		owned_source = (char*)module->arena.allocate(module->arena.user_data, (u32)source.length, 1);
+		copyMemory(owned_source, source.begin, (u32)source.length);
+	}
+	ex_string_view owned{owned_source, source.length};
+	Unit& unit = module->units.emplace_back(path, module->arena);
 	Parser parser(unit, module->host, module->src_locs);
-	if (parser.parse(source, source_name) == EX_RESULT_FAILURE) return EX_RESULT_FAILURE;
+	if (parser.parse(owned, path) == EX_RESULT_FAILURE) return EX_RESULT_FAILURE;
 
 	return EX_RESULT_OK;
 }

@@ -236,6 +236,7 @@ static void nativeAddC(ex_runtime* runtime, ex_call_frame frame) {
 #include "bytecode_tests.inl"
 #include "ir_tests.inl"
 #include "debugger_tests.inl"
+#include "capi_tests.inl"
 #include "casts_tests.inl"
 #include "types_tests.inl"
 #include "operator_tests.inl"
@@ -259,6 +260,8 @@ static void nativeAddC(ex_runtime* runtime, ex_call_frame frame) {
 #include "template_tests.inl"
 #include "memory_tests.inl"
 #include "temporaries_tests.inl"
+#include "any_tests.inl"
+#include "interpolation_tests.inl"
 
 int main(int argc, char** argv) {
 	const char* test_name = nullptr;

@@ -91,6 +91,8 @@ static u32 runtime_type_size(ex_type_kind kind) {
 			return 8u;
 		case EX_TYPE_SLICE:
 			return 16u;
+		case EX_TYPE_ANY:
+			return 16u;
 		default:
 			return 8u;
 	}

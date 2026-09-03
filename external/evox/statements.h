@@ -52,6 +52,7 @@ struct VarDeclStatement : Statement {
 	VarDeclStatement() : Statement(VAR_DECL) {}
 
 	ex_string_view name;
+	Token name_token = {};
 	Expression* type_expr = nullptr;
 	ResolvedType* resolved_type = nullptr;
 	Expression* expression = nullptr;
@@ -119,6 +120,8 @@ struct ForStatement : Statement {
 
 	ex_string_view key_var = {};
 	ex_string_view value_var = {};
+	Token key_token = {};
+	Token value_token = {};
 	Expression* begin = nullptr;
 	Expression* end = nullptr;
 	BlockStatement* body = nullptr;

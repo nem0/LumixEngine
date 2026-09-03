@@ -125,6 +125,7 @@ struct Token {
 		CPTR,
 		CSTR,
 		BYTE,
+		ANY,
 		SIZEOF,
 		ALIGNOF,
 		COMPTIME,

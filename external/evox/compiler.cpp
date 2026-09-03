@@ -21,6 +21,7 @@ static constexpr TypeKindInfo TYPE_KIND_INFOS[] = {
 	{ResolvedTypeKind::U32, "U32", "u32"},
 	{ResolvedTypeKind::U64, "U64", "u64"},
 	{ResolvedTypeKind::BYTE, "Byte", "byte"},
+	{ResolvedTypeKind::ANY, "Any", "any"},
 	{ResolvedTypeKind::F32, "F32", "f32"},
 	{ResolvedTypeKind::F64, "F64", "f64"},
 	{ResolvedTypeKind::CSTR, "CStr", "cstr"},
@@ -50,7 +51,7 @@ ex_module::ex_module(ex_host* host)
 	type_kind_decl.cached_name = makeStringView("TypeKind");
 	for (const TypeKindInfo& info : TYPE_KIND_INFOS) {
 		EnumMember& member = type_kind_decl.members.emplace_back();
-		member.name = makeStringView(info.member_name);
+		member.name.value = makeStringView(info.member_name);
 	}
 	type_kind.kind = ResolvedTypeKind::ENUM;
 	type_kind.decl = &type_kind_decl;
@@ -68,6 +69,7 @@ u32 typeAlignment(const ResolvedType& t) {
 		case ResolvedTypeKind::I8:
 		case ResolvedTypeKind::U8:
 		case ResolvedTypeKind::BYTE: return 1;
+		case ResolvedTypeKind::ANY: return 8;
 		case ResolvedTypeKind::I16:
 		case ResolvedTypeKind::U16: return 2;
 		case ResolvedTypeKind::I32:
@@ -134,6 +136,8 @@ u32 typeByteSize(const ResolvedType& t) {
 		case ResolvedTypeKind::U8:
 		case ResolvedTypeKind::BYTE:
 			return 1;
+		case ResolvedTypeKind::ANY:
+			return 16;
 		case ResolvedTypeKind::I16:
 		case ResolvedTypeKind::U16:
 			return 2;
@@ -490,7 +494,7 @@ struct Checker {
 		type->decl = decl;
 		for (u32 i = 0; i < count; ++i) {
 			StructFieldDecl& field = decl->fields.emplace_back();
-			field.name = makeStringView(names[i]);
+			field.name.value = makeStringView(names[i]);
 			type->fields.push(types[i]);
 		}
 		cacheStructFieldOffsets(*type);
@@ -579,6 +583,11 @@ struct Checker {
 
 	static bool canImplicitlyConvert(const ResolvedType* src, const ResolvedType* dst) {
 		if (typesEqual(src, dst)) return true;
+		// `any` is a runtime-erased, non-owning reference.  Materialization and
+		// lifetime checks are performed at the use site; semantically every
+		// runtime value can be erased to it.
+		if (dst && dst->kind == ResolvedTypeKind::ANY) return src && src->kind != ResolvedTypeKind::META && src->kind != ResolvedTypeKind::VOID;
+
 		if (!src || !dst) return false;
 		if (src->kind == ResolvedTypeKind::META && dst->kind == ResolvedTypeKind::META) return true;
 		if (dst->kind == ResolvedTypeKind::UNION) {
@@ -753,6 +762,7 @@ struct Checker {
 		// Slot of the underlying declaration (frame slot for locals, the symbol's
 		// global slot when the binding narrows a global).
 		StorageSlot* slot = nullptr;
+		Token* declaration_token = nullptr;
 	};
 
 	struct FunctionCheckContext {
@@ -1401,6 +1411,7 @@ struct Checker {
 			case Statement::VAR_DECL: {
 				VarDeclStatement* s = static_cast<VarDeclStatement*>(src);
 				VarDeclStatement* st = makeType<VarDeclStatement>(unit.arena);
+				st->name_token = s->name_token;
 				st->name = s->name;
 				st->type_expr = cloneExpression(unit, s->type_expr, bindings);
 				st->expression = cloneExpression(unit, s->expression, bindings);
@@ -1465,6 +1476,8 @@ struct Checker {
 				ForStatement* st = makeType<ForStatement>(unit.arena);
 				st->key_var = s->key_var;
 				st->value_var = s->value_var;
+				st->key_token = s->key_token;
+				st->value_token = s->value_token;
 				st->is_key_value = s->is_key_value;
 				st->is_custom_iterator = s->is_custom_iterator;
 				st->iterator_next_field = s->iterator_next_field;
@@ -1726,7 +1739,7 @@ struct Checker {
 				param.resolved_type = runtimeMetaType(unit, static_cast<MetaType*>(param.resolved_type)->inner);
 			}
 			FunctionResolvedParam& resolved_param = fn_type->params.emplace_back();
-			resolved_param.name = param.name;
+			resolved_param.name = param.name.value;
 			resolved_param.type = param.resolved_type;
 			resolved_param.is_comptime = param.is_comptime;
 		}
@@ -1779,7 +1792,7 @@ struct Checker {
 			ResolvedType* receiver_type = mem.expression->resolved_type;
 			ResolvedType* parameter_type = fn_type.params[0].type;
 			if (!receiver_type || !canImplicitlyConvert(receiver_type, parameter_type)) {
-				errorLine(call.token, "Cannot call member function ", mem.name, " on receiver of type ", receiver_type, "; expected ", parameter_type);
+				errorLine(call.token, "Cannot call member function ", mem.name.value, " on receiver of type ", receiver_type, "; expected ", parameter_type);
 				return nullptr;
 			}
 		}
@@ -2035,7 +2048,7 @@ struct Checker {
 			ResolvedType* field_type = asType(evalComptime(unit, *field.type_expr), field.type_expr->token);
 			if (!field_type) return false;
 			if (st.is_extern && !isCAbiCompatibleFieldType(*field_type)) {
-				errorLine(field.type_expr->token, "Extern struct field ", field.name, " is not C ABI compatible");
+				errorLine(field.type_expr->token, "Extern struct field ", field.name.value, " is not C ABI compatible");
 				return false;
 			}
 
@@ -2188,8 +2201,8 @@ struct Checker {
 		for (FunctionParam& src_param : fn.params) {
 			FunctionParam& dst_param = clone->params.emplace_back();
 			dst_param.name = src_param.name;
-				dst_param.is_comptime = src_param.is_comptime;
-			 dst_param.type_expr = cloneExpression(unit, src_param.type_expr, &bindings);
+			dst_param.is_comptime = src_param.is_comptime;
+			dst_param.type_expr = cloneExpression(unit, src_param.type_expr, &bindings);
 		}
 		clone->return_type = cloneExpression(unit, fn.return_type, &bindings);
 		clone->body = cloneStatement(unit, fn.body, &bindings);
@@ -2221,7 +2234,7 @@ struct Checker {
 			const MemberExpression& member = static_cast<const MemberExpression&>(expression);
 			if (!member.expression || member.expression->kind != Expression::IDENTIFIER) return {};
 			qualifier = static_cast<IdentifierExpression*>(member.expression)->name;
-			name = member.name;
+			name = member.name.value;
 		} else {
 			return {};
 		}
@@ -2422,6 +2435,10 @@ struct Checker {
 		if (!expr_type) return EX_RESULT_FAILURE;
 
 		if (!requireMaterializable(expr, "a runtime global initializer")) return EX_RESULT_FAILURE;
+		if (annotation && annotation->kind == ResolvedTypeKind::ANY) {
+			errorLine(sym.token, "any global initializer would create a dangling borrowed value");
+			return EX_RESULT_FAILURE;
+		}
 
 		if (annotation && !canImplicitlyConvert(expr_type, annotation)) {
 			errorLine(sym.token, "Cannot convert initializer type ", expr_type, " to annotated type ", annotation, " for: ", sym.name);
@@ -2483,7 +2500,7 @@ struct Checker {
 					errorLine(arg->token, "Could not resolve comptime template argument, expected ", expected, ", got ", template_arg.type);
 					return nullptr;
 				}
-				if (!bindTemplateArg(bindings, param.name, template_arg)) {
+				if (!bindTemplateArg(bindings, param.name.value, template_arg)) {
 					errorLine(arg->token, "Conflicting comptime template argument");
 					return nullptr;
 				}
@@ -2593,12 +2610,12 @@ struct Checker {
 		MemberExpression& mem = static_cast<MemberExpression&>(*call.callee);
 
 		if (!mem.expression) {
-			errorLine(expr.token, "Expected receiver expression for function call ", mem.name);
+			errorLine(expr.token, "Expected receiver expression for function call ", mem.name.value);
 			return nullptr;
 		}
 
 		if (!mem.expression->resolved_type) {
-			errorLine(expr.token, "Cannot call function ", mem.name, " with UFCS receiver with unknown type");
+			errorLine(expr.token, "Cannot call function ", mem.name.value, " with UFCS receiver with unknown type");
 			return nullptr;
 		}
 
@@ -2607,7 +2624,7 @@ struct Checker {
 			receiver_type = static_cast<PointerResolvedType*>(receiver_type)->inner;
 		}
 		if (receiver_type->kind != ResolvedTypeKind::STRUCT && receiver_type->kind != ResolvedTypeKind::ENUM) {
-			errorLine(expr.token, "Cannot call member function ", mem.name, " on type ", receiver_type, ", expected struct or enum");
+			errorLine(expr.token, "Cannot call member function ", mem.name.value, " on type ", receiver_type, ", expected struct or enum");
 			return nullptr;
 		}
 
@@ -2616,15 +2633,15 @@ struct Checker {
 		// shadow `array.init` in `a.init()`. Lexical lookup is only a fallback.
 		SymbolRef ref;
 		if (Unit* namespace_unit = findTypeNamespaceUnit(*receiver_type)) {
-			if (Symbol* candidate = findSymbol(*namespace_unit, mem.name)) {
+			if (Symbol* candidate = findSymbol(*namespace_unit, mem.name.value)) {
 				ref = {namespace_unit, candidate};
 				if (checkSymbol(*namespace_unit, *candidate) == EX_RESULT_FAILURE) ref.check_failed = true;
 			}
 		}
-		if (!ref.symbol) ref = resolveSymbol(unit, {}, mem.name, LookupPolicy::Checked);
+		if (!ref.symbol) ref = resolveSymbol(unit, {}, mem.name.value, LookupPolicy::Checked);
 
 		if (!ref) {
-			errorLine(expr.token, "Could not resolve member function: ", mem.name);
+			errorLine(expr.token, "Could not resolve member function: ", mem.name.value);
 			return nullptr;
 		}
 
@@ -2651,6 +2668,9 @@ struct Checker {
 
 		const ResolvedTypeKind untyped_kind = expr.resolved_type->kind;
 		concrete = unwrapNullable(concrete);
+		// Erasure is not a numeric concretization context; choose the normal
+		// literal default before materializing the value into any.
+		if (concrete && concrete->kind == ResolvedTypeKind::ANY) concrete = nullptr;
 		// no hint, use default type
 		if (!concrete) {
 			if (untyped_kind == ResolvedTypeKind::UNTYPED_FLOAT) {
@@ -3290,7 +3310,7 @@ struct Checker {
 
 	bool hasEnumMember(const EnumResolvedType& type, ex_string_view name) {
 		for (const EnumMember& member : type.decl->members) {
-			if (equalStrings(member.name, name)) return true;
+			if (equalStrings(member.name.value, name)) return true;
 		}
 		return false;
 	}
@@ -3301,19 +3321,19 @@ struct Checker {
 		// .enum_member
 		if (!member.expression) {
 			if (!hint) {
-				errorLine(expr.token, "Cannot resolve .", member.name, ", use EnumName.value syntax or provide a hint");
+				errorLine(expr.token, "Cannot resolve .", member.name.value, ", use EnumName.value syntax or provide a hint");
 				return nullptr;
 			}
 
 			hint = unwrapNullable(hint);
 			if (hint->kind != ResolvedTypeKind::ENUM) {
-				errorLine(expr.token, "Cannot convert .", member.name, " to ", hint);
+				errorLine(expr.token, "Cannot convert .", member.name.value, " to ", hint);
 				return nullptr;
 			}
 
 			EnumResolvedType* en = static_cast<EnumResolvedType*>(hint);
 			for (i32 i = 0; i < en->decl->members.size(); ++i) {
-				if (!equalStrings(en->decl->members[i].name, member.name)) continue;
+				if (!equalStrings(en->decl->members[i].name.value, member.name.value)) continue;
 				member.enum_member_index = i;
 				member.enum_member_value = i;
 				if (en->decl->members[i].value) {
@@ -3326,7 +3346,7 @@ struct Checker {
 				return &expr;
 			}
 
-			errorLine(expr.token, ".", member.name, " not found in ", hint);
+			errorLine(expr.token, ".", member.name.value, " not found in ", hint);
 			return nullptr;
 		}
 
@@ -3334,9 +3354,10 @@ struct Checker {
 		if (member.expression->kind == Expression::IDENTIFIER) {
 			IdentifierExpression* id = static_cast<IdentifierExpression*>(member.expression);
 			if (Unit* imported_unit = findImportedUnitByAlias(unit, id->name)) {
-				SymbolRef sym = resolveSymbol(*imported_unit, {}, member.name, LookupPolicy::Checked);
+				id->symbol = findSymbol(unit, id->name);
+				SymbolRef sym = resolveSymbol(*imported_unit, {}, member.name.value, LookupPolicy::Checked);
 				if (!sym.symbol) {
-					errorLine(expr.token, member.name, " not found in ", id->name);
+					errorLine(expr.token, member.name.value, " not found in ", id->name);
 					return nullptr;
 				}
 				if (sym.check_failed) return nullptr;
@@ -3356,7 +3377,7 @@ struct Checker {
 		if (!base_expr) return nullptr;
 		ResolvedType* base_type = base_expr->resolved_type;
 
-		if (equalStrings(member.name, makeStringView("length"))
+		if (equalStrings(member.name.value, makeStringView("length"))
 			&& (base_type->kind == ResolvedTypeKind::ARRAY || base_type->kind == ResolvedTypeKind::SLICE)) {
 			expr.resolved_type = primitiveType(ResolvedTypeKind::ISIZE);
 			expr.eval_stage = base_type->kind == ResolvedTypeKind::ARRAY || member.expression->eval_stage != Expression::RUNTIME
@@ -3382,7 +3403,7 @@ struct Checker {
 				StructResolvedType* st = static_cast<StructResolvedType*>(base_type);
 				for (i32 i = 0; i < st->decl->fields.size(); ++i) {
 					const StructFieldDecl& field = st->decl->fields[i];
-					if (!equalStrings(field.name, member.name)) continue;
+					if (!equalStrings(field.name.value, member.name.value)) continue;
 
 					member.struct_field_index = i;
 					ResolvedType* field_type = st->fields[i].type;
@@ -3398,7 +3419,7 @@ struct Checker {
 					}
 					return &expr;
 				}
-				errorLine(expr.token, member.name, " not found in ", base_type);
+				errorLine(expr.token, member.name.value, " not found in ", base_type);
 				return nullptr;
 			}
 			case ResolvedTypeKind::META: {
@@ -3407,7 +3428,7 @@ struct Checker {
 				if (inner->kind == ResolvedTypeKind::ENUM) {
 					EnumResolvedType* en = static_cast<EnumResolvedType*>(inner);
 					for (i32 i = 0; i < en->decl->members.size(); ++i) {
-						if (!equalStrings(en->decl->members[i].name, member.name)) continue;
+						if (!equalStrings(en->decl->members[i].name.value, member.name.value)) continue;
 						member.enum_member_index = i;
 						member.enum_member_value = i;
 						if (en->decl->members[i].value) {
@@ -3419,26 +3440,26 @@ struct Checker {
 						expr.eval_stage = Expression::COMPTIME_VALUE;
 						return &expr;
 					}
-					errorLine(expr.token, member.name, " not found in ", inner);
+					errorLine(expr.token, member.name.value, " not found in ", inner);
 					return nullptr;
 				}
-				errorLine(expr.token, "Cannot access member '", member.name, "' on type");
+				errorLine(expr.token, "Cannot access member '", member.name.value, "' on type");
 				return nullptr;
 			}
 			case ResolvedTypeKind::ENUM: {
 				// If the name matches a variant, the user wrote instance.Variant - give a clear error.
 				// Otherwise return nullptr silently so the call checker can try UFCS.
 				EnumResolvedType* en = static_cast<EnumResolvedType*>(base_type);
-				if (hasEnumMember(*en, member.name)) {
-					errorLine(expr.token, "Cannot access enum member '", member.name, "' through an instance; use the enum type name instead");
+				if (hasEnumMember(*en, member.name.value)) {
+					errorLine(expr.token, "Cannot access enum member '", member.name.value, "' through an instance; use the enum type name instead");
 				}
 				return nullptr;
 			}
 			case ResolvedTypeKind::NULLABLE:
-				errorLine(expr.token, "Cannot access member ", member.name, " of nullable type without a null check");
+				errorLine(expr.token, "Cannot access member ", member.name.value, " of nullable type without a null check");
 				return nullptr;
 			default:
-				errorLine(expr.token, "Cannot access member ", member.name, " on type ", base_type);
+				errorLine(expr.token, "Cannot access member ", member.name.value, " on type ", base_type);
 				return nullptr;
 		}
 	}
@@ -3506,8 +3527,8 @@ struct Checker {
 			const ex_string_view field_name{(const char*)field_name_value.data, field_name_value.length};
 			StructResolvedType* st = static_cast<StructResolvedType*>(base_type);
 			for (i32 i = 0; i < st->decl->fields.size(); ++i) {
-				if (equalStrings(st->decl->fields[i].name, field_name)) {
-					br.struct_field_name = st->decl->fields[i].name;
+				if (equalStrings(st->decl->fields[i].name.value, field_name)) {
+					br.struct_field_name = st->decl->fields[i].name.value;
 					expr.resolved_type = st->fields[i].type;
 					return &expr;
 				}
@@ -3735,6 +3756,9 @@ struct Checker {
 
 	Expression* checkIdentifierExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint, ResolvedType* first_arg_type = nullptr) {
 		IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
+		if (id.slot && ctx) {
+			for (SemanticLocalBinding& local : ctx->locals) if (local.slot == id.slot) { id.declaration_token = local.declaration_token; break; }
+		}
 		if (id.slot && id.slot->type) {
 			expr.resolved_type = id.slot->type;
 			expr.eval_stage = Expression::RUNTIME;
@@ -3744,6 +3768,7 @@ struct Checker {
 		if (ctx) {
 			if (SemanticLocalBinding* local = findLocal(*ctx, id.name); local && (!id.slot || local->slot == id.slot)) {
 				id.symbol = nullptr;
+				id.declaration_token = local->declaration_token;
 				id.slot = local->slot;
 				if (local->is_comptime) {
 					expr.comptime_value = local->comptime_value;
@@ -3795,11 +3820,11 @@ struct Checker {
 				for (FunctionParam& param : fn->params) {
 					u32 target_param_index = u32(&param - fn->params.data());
 					if (param.is_comptime) {
-						errorLine(expr.token, "Cannot infer template argument for comptime parameter ", param.name);
+						errorLine(expr.token, "Cannot infer template argument for comptime parameter ", param.name.value);
 						return nullptr;
 					}
 				if (!inferTemplateArg(*ref.owner, bindings, *param.type_expr, ComptimeValue{ComptimeValue::TYPE, target.params[target_param_index].type})) {
-						errorLine(expr.token, "Cannot infer template argument for parameter ", param.name);
+						errorLine(expr.token, "Cannot infer template argument for parameter ", param.name.value);
 						return nullptr;
 					}
 				}
@@ -4038,6 +4063,7 @@ struct Checker {
 				IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
 				if (ctx) {
 					if (SemanticLocalBinding* local = findLocal(*ctx, id.name); local && (!id.slot || local->slot == id.slot)) {
+						id.declaration_token = local->declaration_token;
 						is_writable = !local->is_immutable;
 						id.slot = local->slot;
 						expr.resolved_type = local->type;
@@ -4049,10 +4075,13 @@ struct Checker {
 					expr.resolved_type = id.slot->type;
 					return &expr;
 				}
-				// Import aliases name namespaces rather than values.  They are
-				// encountered by speculative compile-time probes, so leave them
-				// unresolved without emitting a misleading diagnostic.
-				if (findImportedUnitByAlias(unit, id.name)) return {};
+				// Import aliases name namespaces rather than values. Keep the import
+				// symbol attached so editor queries can navigate to the alias
+				// declaration, while leaving it without a value type.
+				if (findImportedUnitByAlias(unit, id.name)) {
+					id.symbol = findSymbol(unit, id.name);
+					return {};
+				}
 				SymbolRef ref = resolveSymbol(unit, {}, id.name, LookupPolicy::Checked);
 				if (!ref) {
 					errorLine(expr.token, "Unknown identifier ", id.name);
@@ -4069,7 +4098,7 @@ struct Checker {
 			case Expression::MEMBER: {
 				MemberExpression& member = static_cast<MemberExpression&>(expr);
 				if (!member.expression) {
-					errorLine(expr.token, "Cannot resolve .", member.name);
+					errorLine(expr.token, "Cannot resolve .", member.name.value);
 					return nullptr;
 				}
 				ResolvedType* descriptor_type = member.expression->resolved_type;
@@ -4078,7 +4107,7 @@ struct Checker {
 				}
 				SymbolRef ref = {};
 				if (member.expression->kind == Expression::IDENTIFIER) {
-					ref = resolveSymbol(unit, static_cast<IdentifierExpression&>(*member.expression).name, member.name, LookupPolicy::Checked);
+					ref = resolveSymbol(unit, static_cast<IdentifierExpression&>(*member.expression).name, member.name.value, LookupPolicy::Checked);
 				}
 				if (ref) {
 					if (ref.check_failed) {
@@ -4264,13 +4293,14 @@ struct Checker {
 		FunctionCheckContext ctx(unit.arena); // TODO reuse?
 		pushScope(ctx);
 		for (FunctionParam& param : fn.params) {
-			if (findSymbol(unit, param.name)) {
-				errorLine(fn.token, "Parameter ", param.name, " shadows a global symbol");
+			if (findSymbol(unit, param.name.value)) {
+				errorLine(fn.token, "Parameter ", param.name.value, " shadows a global symbol");
 				return false;
 			}
 			SemanticLocalBinding& binding = ctx.locals.emplace_back();
-			binding.name = param.name;
+			binding.name = param.name.value;
 			binding.type = param.resolved_type;
+			binding.declaration_token = &param.name;
 			binding.is_immutable = true;
 			binding.slot = &param.slot;
 		}
@@ -4357,6 +4387,7 @@ struct Checker {
 			SemanticLocalBinding& binding = ctx.locals.emplace_back();
 			binding.name = var.name;
 			binding.type = var.resolved_type;
+			binding.declaration_token = &var.name_token;
 			binding.is_immutable = true;
 			binding.is_comptime = true;
 			binding.comptime_value = value;
@@ -4431,6 +4462,12 @@ struct Checker {
 			}
 			}
 		}
+		if (annotation && annotation->kind == ResolvedTypeKind::ANY && var.slot.storage == StorageSlot::GLOBAL) {
+			// Global slots are initialized outside a function frame; they cannot
+			// safely retain a borrowed reference to an initializer temporary.
+			errorLine(var.token, "any value cannot reference a temporary or local storage in a global initializer");
+			return false;
+		}
 		if (!var.else_return && annotation && !canImplicitlyConvert(expr_type, annotation)) {
 			errorLine(var.token, "Cannot convert initializer expression of type ", expr_type, " to annotated type ", annotation);
 			return false;
@@ -4441,6 +4478,7 @@ struct Checker {
 		SemanticLocalBinding& binding = ctx.locals.emplace_back();
 		binding.name = var.name;
 		binding.type = final_type;
+		binding.declaration_token = &var.name_token;
 		binding.is_immutable = var.is_immutable;
 		binding.slot = &var.slot;
 		const bool scalar_comptime = final_type->kind == ResolvedTypeKind::BOOL
@@ -4784,7 +4822,7 @@ struct Checker {
 			if (begin_type->kind == ResolvedTypeKind::STRUCT) {
 				StructResolvedType* iterator = static_cast<StructResolvedType*>(begin_type);
 				for (i32 i = 0; i < iterator->decl->fields.size(); ++i) {
-					if (equalStrings(iterator->decl->fields[i].name, "next")) {
+					if (equalStrings(iterator->decl->fields[i].name.value, "next")) {
 						fs.iterator_next_field = i;
 						break;
 					}
@@ -4863,6 +4901,7 @@ struct Checker {
 					SemanticLocalBinding& value_binding = ctx.locals.emplace_back();
 					value_binding.name = fs.value_var;
 					value_binding.type = binding_type;
+					value_binding.declaration_token = &fs.value_token;
 					value_binding.is_immutable = true;
 					value_binding.is_comptime = true;
 					value_binding.comptime_value = binding_value;
@@ -4906,12 +4945,14 @@ struct Checker {
 			SemanticLocalBinding& key_binding = ctx.locals.emplace_back();
 			key_binding.name = fs.key_var;
 			key_binding.type = primitiveType(ResolvedTypeKind::ISIZE);
+			key_binding.declaration_token = &fs.key_token;
 			key_binding.is_immutable = true;
 			key_binding.slot = &fs.index_slot;
 		}
 		SemanticLocalBinding& binding = ctx.locals.emplace_back();
 		binding.name = fs.value_var;
 		binding.type = element_type;
+		binding.declaration_token = &fs.value_token;
 		binding.is_immutable = true;
 		binding.slot = &fs.slot;
 		ctx.loop_labels.push(pending_label);
@@ -4967,7 +5008,8 @@ struct Checker {
 			&& static_cast<SliceResolvedType*>(subject)->element_type
 			&& static_cast<SliceResolvedType*>(subject)->element_type->kind == ResolvedTypeKind::U8;
 		const bool subject_is_union = subject->kind == ResolvedTypeKind::UNION;
-		if (!subject_is_numeric && !subject_is_enum && !subject_is_string && !subject_is_union) {
+		const bool subject_is_any = subject->kind == ResolvedTypeKind::ANY;
+		if (!subject_is_numeric && !subject_is_enum && !subject_is_string && !subject_is_union && !subject_is_any) {
 			errorLine(ms.token, "Match statement subject must be a numeric type, enum, string, or union, got ", subject);
 			return false;
 		}
@@ -4983,11 +5025,11 @@ struct Checker {
 		if (comptime_subject && !subject_is_union) {
 			const auto matches = [&](MatchPattern& pattern) {
 				if (subject_is_enum && pattern.begin->kind == Expression::MEMBER && !static_cast<MemberExpression*>(pattern.begin)->expression) {
-					const ex_string_view name = static_cast<MemberExpression*>(pattern.begin)->name;
+					const ex_string_view name = static_cast<MemberExpression*>(pattern.begin)->name.value;
 					const EnumResolvedType* en = static_cast<const EnumResolvedType*>(subject);
 					for (i32 i = 0; i < en->decl->members.size(); ++i) {
 						const EnumMember& member = en->decl->members[i];
-						if (!equalStrings(member.name, name)) continue;
+						if (!equalStrings(member.name.value, name)) continue;
 						ComptimeValue value = member.value
 							? evalComptime(unit, *member.value, &ctx)
 							: makeComptimeEnumResult(const_cast<EnumResolvedType*>(en), (i64)i);
@@ -5044,6 +5086,7 @@ struct Checker {
 		const UnionResolvedType* subject_union = subject_is_union ? static_cast<const UnionResolvedType*>(subject) : nullptr;
 		ExpArray<bool> covered_union_members(unit.arena);
 		if (subject_union) covered_union_members.resize(subject_union->members.size(), false);
+		ExpArray<ResolvedType*> covered_any_types(unit.arena);
 		u32 covered_union_count = 0;
 		ExpArray<ComptimeValue> covered_string_patterns(unit.arena);
 
@@ -5057,6 +5100,15 @@ struct Checker {
 				has_fallback = true;
 			}
 			for (MatchPattern& pattern : arm.patterns) {
+				if (subject_is_any) {
+					if (pattern.end) { errorLine(pattern.begin->token, "Range patterns are not valid for any matches"); return false; }
+					ResolvedType* member = asType(evalComptime(unit, *pattern.begin, &ctx), pattern.begin->token);
+					if (!member) return false;
+					for (ResolvedType* old : covered_any_types) if (typesEqual(old, member)) { errorLine(pattern.begin->token, "Duplicate match arm for any type ", member); return false; }
+					covered_any_types.push(member);
+					MetaType* meta = makeType<MetaType>(unit.arena); meta->inner = member; pattern.begin->resolved_type = meta;
+					continue;
+				}
 				if (subject_union) {
 					if (pattern.end) {
 						errorLine(pattern.begin->token, "Range patterns are not valid for union matches");
@@ -5129,9 +5181,9 @@ struct Checker {
 				if (subject_enum && pattern.begin && pattern.begin->kind == Expression::MEMBER) {
 					MemberExpression* mem = static_cast<MemberExpression*>(pattern.begin);
 					for (i32 i = 0; i < subject_enum->decl->members.size(); ++i) {
-						if (!equalStrings(subject_enum->decl->members[i].name, mem->name)) continue;
+						if (!equalStrings(subject_enum->decl->members[i].name.value, mem->name.value)) continue;
 						if (covered_enum_members[i]) {
-							errorLine(pattern.begin->token, "Duplicate match arm for enum member ", mem->name);
+							errorLine(pattern.begin->token, "Duplicate match arm for enum member ", mem->name.value);
 							return false;
 						}
 						covered_enum_members[i] = true;
@@ -5149,22 +5201,25 @@ struct Checker {
 			}
 			if (ms.comptime_known && (i32)arm_index != ms.comptime_arm) continue;
 
-			ResolvedType* narrowed_union_member = nullptr;
-			if (subject_union && arm.patterns.size() == 1) {
-				narrowed_union_member = unwrapMeta(arm.patterns[0].begin->resolved_type);
+			ResolvedType* narrowed_type = nullptr;
+			if (subject_is_any && arm.patterns.size() == 1) {
+				narrowed_type = unwrapMeta(arm.patterns[0].begin->resolved_type);
+			}
+			else if (subject_union && arm.patterns.size() == 1) {
+				narrowed_type = unwrapMeta(arm.patterns[0].begin->resolved_type);
 			}
 			else if (subject_union && arm.is_fallback && covered_union_count == (u32)subject_union->members.size() - 1u) {
 				for (i32 i = 0; i < subject_union->members.size(); ++i) {
-					if (!covered_union_members[i]) { narrowed_union_member = subject_union->members[i]; break; }
+					if (!covered_union_members[i]) { narrowed_type = subject_union->members[i]; break; }
 				}
 			}
-			if (narrowed_union_member && ms.subject->kind == Expression::IDENTIFIER) {
+			if (narrowed_type && ms.subject->kind == Expression::IDENTIFIER) {
 				IdentifierExpression* id = static_cast<IdentifierExpression*>(ms.subject);
 				SemanticLocalBinding* local = findLocal(ctx, id->name);
 				pushScope(ctx);
 				SemanticLocalBinding& narrowed = ctx.locals.emplace_back();
 				narrowed.name = id->name;
-				narrowed.type = narrowed_union_member;
+				narrowed.type = narrowed_type;
 				if (local) {
 					narrowed.is_immutable = local->is_immutable;
 					narrowed.slot = local->slot;
@@ -5185,6 +5240,10 @@ struct Checker {
 				errorLine(ms.token, "Match statement on enum is not exhaustive");
 				return false;
 			}
+		}
+		if (subject_is_any && !has_fallback) {
+			errorLine(ms.token, "Match statement on any requires a fallback case");
+			return false;
 		}
 		if (subject_union && !has_fallback && covered_union_count != (u32)subject_union->members.size()) {
 			errorLine(ms.token, "Match statement on union is not exhaustive");
@@ -5239,6 +5298,10 @@ struct Checker {
 				}
 				ResolvedType* expr_type = checkExprForTarget(unit, &ctx, *ret->expression, return_type);
 				if (!expr_type) return false;
+				if (return_type->kind == ResolvedTypeKind::ANY && ret->expression->kind == Expression::IDENTIFIER) {
+					IdentifierExpression* id = static_cast<IdentifierExpression*>(ret->expression);
+					if (id->slot && id->slot->storage == StorageSlot::LOCAL) { errorLine(ret->token, "any return would outlive local storage"); return false; }
+				}
 				if (return_type->kind != ResolvedTypeKind::META && !requireMaterializable(*ret->expression, "a return value")) return false;
 				if (!canImplicitlyConvert(expr_type, return_type)) {
 					errorLine(ret->token, "Cannot convert return expression of type ", expr_type, " to function return type ", return_type);
@@ -5764,7 +5827,7 @@ struct Checker {
 				StructResolvedType& st = static_cast<StructResolvedType&>(*base_type);
 				if (!st.decl) return false;
 				for (i32 i = 0; i < st.decl->fields.size(); ++i) {
-					if (!equalStrings(st.decl->fields[i].name, member.name)) continue;
+					if (!equalStrings(st.decl->fields[i].name.value, member.name.value)) continue;
 					ResolvedType* field_type = st.fields[i].type;
 					if (!field_type) return false;
 					out_ptr = base_ptr + st.fields[i].offset;
@@ -5873,7 +5936,7 @@ struct Checker {
 						const u32 descriptor_size = typeByteSize(*descriptor_type);
 						for (i32 i = 0; i < st.decl->fields.size(); ++i) {
 							u8* descriptor = slice.data + descriptor_size * i;
-							const ex_string_view name = st.decl->fields[i].name;
+							const ex_string_view name = st.decl->fields[i].name.value;
 							ex_slice name_slice{(u8*)name.begin, name.length};
 							ResolvedType* type = st.fields[i].type;
 							copyMemory(descriptor, &name_slice, sizeof(name_slice));
@@ -5900,7 +5963,7 @@ struct Checker {
 								enum_value = (i32)comptimeNumericToI64(value.value, value.type->kind);
 							}
 							u8* descriptor = slice.data + descriptor_size * i;
-							const ex_string_view name = en.decl->members[i].name;
+							const ex_string_view name = en.decl->members[i].name.value;
 							ex_slice name_slice{(u8*)name.begin, name.length};
 							copyMemory(descriptor, &name_slice, sizeof(name_slice));
 							copyMemory(descriptor + structFieldOffset(*static_cast<StructResolvedType*>(descriptor_type), 1), &enum_value, sizeof(enum_value));
@@ -6058,7 +6121,7 @@ struct Checker {
 								return {};
 							}
 						}
-						if (!bindTemplateArg(factory_bindings, param.name, arg)) return {};
+						if (!bindTemplateArg(factory_bindings, param.name.value, arg)) return {};
 					}
 					fn = instantiateFunctionTemplate(*ref.owner, *fn, factory_bindings);
 					if (!fn) return {};
@@ -6094,7 +6157,7 @@ struct Checker {
 					if (!arg) return {};
 					args.push(arg);
 					ComptimeFrame::Local& binding = callee_frame.locals.emplace_back();
-					binding.name = fn->params[i].name;
+					binding.name = fn->params[i].name.value;
 					binding.bytes = arg.value;
 					binding.value = arg;
 					binding.type = arg.type;
@@ -6115,7 +6178,7 @@ struct Checker {
 
 				if (member.expression && member.expression->resolved_type
 					&& (member.expression->resolved_type->kind == ResolvedTypeKind::ARRAY || member.expression->resolved_type->kind == ResolvedTypeKind::SLICE)
-					&& equalStrings(member.name, makeStringView("length"))) {
+					&& equalStrings(member.name.value, makeStringView("length"))) {
 					i64 length = member.expression->resolved_type->kind == ResolvedTypeKind::ARRAY
 						? static_cast<ArrayResolvedType*>(member.expression->resolved_type)->size
 						: 0;
@@ -6148,7 +6211,7 @@ struct Checker {
 						StructResolvedType& st = *static_cast<StructResolvedType*>(base_type);
 						for (i32 i = 0; i < st.decl->fields.size(); ++i) {
 							ResolvedType* field_type = st.fields[i].type;
-							if (!equalStrings(st.decl->fields[i].name, member.name)) continue;
+							if (!equalStrings(st.decl->fields[i].name.value, member.name.value)) continue;
 							u8* field_value = base_value.value + offset + st.fields[i].offset;
 							if (field_type->kind == ResolvedTypeKind::META) {
 								ResolvedType* inner = nullptr;
@@ -6167,7 +6230,7 @@ struct Checker {
 						EnumResolvedType* en = static_cast<EnumResolvedType*>(expr.resolved_type);
 						for (i32 i = 0; i < en->decl->members.size(); ++i) {
 							const EnumMember& enum_member = en->decl->members[i];
-							if (!equalStrings(enum_member.name, member.name)) continue;
+							if (!equalStrings(enum_member.name.value, member.name.value)) continue;
 
 							if (!enum_member.value) return makeComptimeEnumResult(en, (i64)i);
 							ComptimeValue value = evalComptime(unit, *enum_member.value, ctx, bindings, frame);
@@ -6193,7 +6256,7 @@ struct Checker {
 						EnumResolvedType* en = static_cast<EnumResolvedType*>(inner);
 						for (i32 i = 0; i < en->decl->members.size(); ++i) {
 							const EnumMember& enum_member = en->decl->members[i];
-							if (!equalStrings(enum_member.name, member.name)) continue;
+							if (!equalStrings(enum_member.name.value, member.name.value)) continue;
 
 							if (!enum_member.value) return makeComptimeEnumResult(inner, (i64)i);
 
@@ -6212,14 +6275,14 @@ struct Checker {
 					return {};
 				}
 
-				SymbolRef ref = resolveSymbol(unit, qualifier, member.name, LookupPolicy::Checked);
+				SymbolRef ref = resolveSymbol(unit, qualifier, member.name.value, LookupPolicy::Checked);
 				if (!ref) {
-					errorLine(expr.token, "Unknown symbol ", qualifier, ".", member.name);
+					errorLine(expr.token, "Unknown symbol ", qualifier, ".", member.name.value);
 					return {};
 				}
 
 				if (ref.symbol->kind != Symbol::COMPTIME) {
-					errorLine(expr.token, "Symbol ", qualifier, ".", member.name, " is not a compile-time value");
+					errorLine(expr.token, "Symbol ", qualifier, ".", member.name.value, " is not a compile-time value");
 					return {};
 				}
 
@@ -6248,7 +6311,7 @@ struct Checker {
 							StructResolvedType* st = static_cast<StructResolvedType*>(base_value.type);
 							for (i32 field_index = 0; field_index < st->decl->fields.size(); ++field_index) {
 								ResolvedType* field_type = st->fields[field_index].type;
-								if (!equalStrings(st->decl->fields[field_index].name, be.struct_field_name)) continue;
+								if (!equalStrings(st->decl->fields[field_index].name.value, be.struct_field_name)) continue;
 								
 								u8* field_value = base_value.value + st->fields[field_index].offset;
 								if (field_type->kind == ResolvedTypeKind::META) {
@@ -6346,7 +6409,7 @@ struct Checker {
 					ResolvedType* param_type = asType(evalComptime(unit, *param.type_expr, ctx, bindings), param.type_expr->token);
 					if (!param_type) return {};
 					FunctionResolvedParam& resolved_param = fn_type->params.emplace_back();
-					resolved_param.name = param.name;
+					resolved_param.name = param.name.value;
 					resolved_param.type = param_type;
 					resolved_param.is_comptime = param.is_comptime;
 				}
@@ -6649,7 +6712,7 @@ struct Checker {
 			}
 			case Expression::TYPE_LITERAL: {
 				const ResolvedTypeKind kind = static_cast<TypeLiteralExpression&>(expr).type;
-				if (kind >= ResolvedTypeKind::VOID && kind <= ResolvedTypeKind::BYTE) return {ComptimeValue::TYPE, primitiveType(kind)};
+				if (kind >= ResolvedTypeKind::VOID && kind <= ResolvedTypeKind::ANY) return {ComptimeValue::TYPE, primitiveType(kind)};
 				if (kind == ResolvedTypeKind::META) return {ComptimeValue::TYPE, makeType<MetaType>(module.arena)};
 
 				errorLine(expr.token, "Type literal is not a compile-time constant");

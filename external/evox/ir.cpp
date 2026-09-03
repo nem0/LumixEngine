@@ -116,6 +116,20 @@ struct IRBuilder {
 			auto& storage = allocAlloca(&target_type, {}, &alloc<ExOpNop>());
 			return storage;
 		}
+		if (target_type.kind == ResolvedTypeKind::ANY && expression.resolved_type) {
+			ExIrOp* source = &buildExpressionIR(expression, false);
+			if (source->result_mode == ExIrOp::VALUE) {
+				auto& address = alloc<ExOpMaterializeAddr>(); address.value = source; source = &address;
+			}
+			auto& aggregate = alloc<ExOpAggregateInit>(); aggregate.type = &target_type; aggregate.value_count = 2;
+			aggregate.values = static_cast<ExIrOp**>(host.arena.allocate(host.arena.user_data, sizeof(ExIrOp*) * 2, alignof(ExIrOp*)));
+			aggregate.offsets = static_cast<u32*>(host.arena.allocate(host.arena.user_data, sizeof(u32) * 2, alignof(u32)));
+			aggregate.sizes = static_cast<u32*>(host.arena.allocate(host.arena.user_data, sizeof(u32) * 2, alignof(u32)));
+			aggregate.values[0] = source; aggregate.offsets[0] = 0; aggregate.sizes[0] = 8;
+			auto& type_value = alloc<ExOpLoadConst>(); static ResolvedType i32_type(ResolvedTypeKind::I32); type_value.type = &i32_type; const u32 type_id = (u32)expression.resolved_type->kind; memcpy(type_value.value, &type_id, sizeof(type_id));
+			aggregate.values[1] = &type_value; aggregate.offsets[1] = 8; aggregate.sizes[1] = 4;
+			return aggregate;
+		}
 		if (target_type.kind == ResolvedTypeKind::UNION && expression.resolved_type) {
 			return convertValue(buildExpressionIR(expression, true), *expression.resolved_type, target_type);
 		}
@@ -393,7 +407,7 @@ struct IRBuilder {
 		u32 arg_index = 0;
 		for (const FunctionParam& param : function.params) {
 			if (param.is_comptime) continue;
-			locals.push({param.name, nullptr, args[arg_index++]});
+			locals.push({param.name.value, nullptr, args[arg_index++]});
 		}
 		ExIrOp& result = buildImplicitConversionIR(*ret.expression, *static_cast<FunctionResolvedType*>(function.resolved_type)->return_type);
 		locals.resize(local_watermark);
@@ -481,7 +495,7 @@ struct IRBuilder {
 					auto& struct_type = static_cast<StructResolvedType&>(*be.base->resolved_type);
 					u32 offset = 0;
 					for (i32 i = 0; i < struct_type.decl->fields.size(); ++i) {
-						if (!equalStrings(struct_type.decl->fields[i].name, be.struct_field_name)) continue;
+						if (!equalStrings(struct_type.decl->fields[i].name.value, be.struct_field_name)) continue;
 						offset = structFieldOffset(struct_type, i);
 						if (as_rvalue) {
 							auto& extract = alloc<ExOpExtractValue>();
@@ -609,7 +623,7 @@ struct IRBuilder {
 
 				// slice.length
 				if (me.expression && me.expression->resolved_type && me.expression->resolved_type->kind == ResolvedTypeKind::SLICE) {
-					ASSERT(equalStrings(me.name, makeStringView("length")));
+					ASSERT(equalStrings(me.name.value, makeStringView("length")));
 					auto& length = alloc<ExOpExtractValue>();
 					length.value = &buildExpressionIR(*me.expression, true);
 					length.offset = sizeof(void*);
@@ -688,6 +702,14 @@ struct IRBuilder {
 					if (!equalStrings(locals[i].name, ie.name)) continue;
 					if (as_rvalue && locals[i].inline_value) return *locals[i].inline_value;
 					if (!locals[i].alloca) continue;
+
+					// A narrowed any binding reads through its erased payload pointer.
+					if (locals[i].alloca->type->kind == ResolvedTypeKind::ANY && ie.resolved_type->kind != ResolvedTypeKind::ANY) {
+						auto& any_addr = alloc<ExOpPushLocalAddr>(); any_addr.alloca = locals[i].alloca;
+						auto& ptr = alloc<ExOpLoad>(); ptr.addr = &any_addr; ptr.size = 8;
+						if (!as_rvalue) { ptr.result_mode = ExIrOp::ADDRESS; return ptr; }
+						auto& payload = alloc<ExOpLoad>(); payload.addr = &ptr; payload.size = typeByteSize(*ie.resolved_type); return payload;
+					}
 
 					auto& addr = alloc<ExOpPushLocalAddr>();
 					addr.alloca = locals[i].alloca;
@@ -1552,6 +1574,25 @@ struct IRBuilder {
 							range.lhs = &lower;
 							range.rhs = &upper;
 							condition = &range;
+						} else if (subject.type->kind == ResolvedTypeKind::ANY) {
+							auto& type_value = alloc<ExOpExtractValue>();
+							type_value.value = &subject_value;
+							type_value.offset = 8;
+							type_value.size = 4;
+							auto& expected = alloc<ExOpLoadConst>();
+							static ResolvedType i32_type(ResolvedTypeKind::I32);
+							static ResolvedType meta_type(ResolvedTypeKind::META);
+							expected.type = &i32_type;
+							ResolvedType* matched_type = pattern.begin->resolved_type && pattern.begin->resolved_type->kind == ResolvedTypeKind::META
+															 ? static_cast<MetaType*>(pattern.begin->resolved_type)->inner
+															 : pattern.begin->resolved_type;
+							const u32 type_id = (u32)matched_type->kind;
+							memcpy(expected.value, &type_id, sizeof(type_id));
+							auto& equality = alloc<ExOpEq>();
+							equality.operand_type = &i32_type;
+							equality.lhs = &type_value;
+							equality.rhs = &expected;
+							condition = &equality;
 						} else if (subject.type->kind == ResolvedTypeKind::UNION) {
 							i32 member_index = pattern.union_member_index;
 							ASSERT(member_index >= 0);
@@ -1816,9 +1857,9 @@ struct IRBuilder {
 			if (param.is_comptime) continue;
 			auto& alloca = alloc<ExOpAlloca>();
 			alloca.type = param.resolved_type;
-			alloca.name = param.name;
+			alloca.name = param.name.value;
 			alloca.stack_sp = param_offset;
-			locals.push({param.name, &alloca});
+			locals.push({param.name.value, &alloca});
 			param.slot.storage = StorageSlot::LOCAL;
 			param.slot.offset = param_offset;
 			param.slot.type = param.resolved_type;
@@ -1998,7 +2039,7 @@ struct TypeInfoBuilder {
 						if (!field_type) continue;
 						u32 field_index = (u32)fields.size();
 						ex_type_field_info& field = fields.emplace_back();
-						field.name = copyStringViewToArena(host.arena, st.decl->fields[i].name);
+						field.name = copyStringViewToArena(host.arena, st.decl->fields[i].name.value);
 						field.type_index = EX_TYPE_INDEX_NONE;
 						field.offset = structFieldOffset(st, i);
 						field.first_attribute_index = (u32)attributes.size();
@@ -2045,7 +2086,7 @@ struct TypeInfoBuilder {
 					entry.name = copyStringViewToArena(host.arena, en.decl->cached_name);
 					for (i32 i = 0; i < en.decl->members.size(); ++i) {
 						ex_type_enum_value_info& value = enum_values.emplace_back();
-						value.name = copyStringViewToArena(host.arena, en.decl->members[i].name);
+						value.name = copyStringViewToArena(host.arena, en.decl->members[i].name.value);
 						value.value = (i32)enumMemberValue(en, i);
 					}
 					entry.value_count = (u32)enum_values.size() - first_value;
@@ -2773,7 +2814,7 @@ struct BytecodeCompiler {
 	u32 emitAlloca(ExOpAlloca& alloca) {
 		ASSERT(alloca.stack_sp != 0xffFFffFF);
 		if (alloca.value->kind != ExIrOpKind::NOP) {
-			if (do_optimize) {
+			if (do_optimize && alloca.value->kind != ExIrOpKind::AGGREGATE_INIT) {
 				EmitDst dst = { .dst = alloca.stack_sp, .size = typeByteSize(*alloca.type) };
 				const u32 value_slot = emit(*alloca.value, &dst);
 				if (!empty(alloca.name)) recordLocal(alloca.name, alloca.stack_sp, *alloca.type, (u32)code.size());
@@ -3145,6 +3186,7 @@ struct BytecodeCompiler {
 			case ResolvedTypeKind::CPTR: return EX_TYPE_CPTR;
 			case ResolvedTypeKind::POINTER: return EX_TYPE_CPTR;
 			case ResolvedTypeKind::BYTE: return EX_TYPE_U8;
+			case ResolvedTypeKind::ANY: return EX_TYPE_ANY;
 			case ResolvedTypeKind::FUNCTION: return EX_TYPE_FUNCTION;
 			case ResolvedTypeKind::ARRAY: return EX_TYPE_ARRAY;
 			case ResolvedTypeKind::SLICE: return EX_TYPE_SLICE;
@@ -3919,7 +3961,7 @@ struct BytecodeCompiler {
 			if (param.is_comptime) continue;
 			const u32 size = typeByteSize(*param.resolved_type);
 			fn_bc->param_size += size;
-			recordLocal(param.name, param_offset, *param.resolved_type, 0u);
+			recordLocal(param.name.value, param_offset, *param.resolved_type, 0u);
 			param_offset += size;
 		}
 		fn_bc->return_kind = toTypeKind(*return_type);

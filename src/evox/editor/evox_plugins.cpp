@@ -154,6 +154,7 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8) {
 } // namespace EvoxTokens
 
 static Action g_toggle_evox_breakpoint{"Evox", "Toggle breakpoint", "Toggle breakpoint at cursor", "evox_toggle_breakpoint", ICON_FA_CIRCLE, Action::Type::NORMAL};
+static Action g_evox_go_to_definition{"Evox", "Go to definition", "Go to definition", "evox_go_to_definition", ""};
 static Action g_debugger_continue{"Evox", "Continue", "Continue execution", "evox_continue", ICON_FA_PLAY, Action::Type::NORMAL};
 static Action g_debugger_step_over{"Evox", "Step over", "Step over next statement", "evox_step_over", ICON_FA_ARROW_RIGHT, Action::Type::NORMAL};
 static Action g_debugger_step_into{"Evox", "Step into", "Step into function call", "evox_step_into", ICON_FA_ARROW_DOWN, Action::Type::NORMAL};
@@ -606,8 +607,71 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 		if (m_editor->gui("evox_editor", ImGui::GetContentRegionAvail(), m_app.getMonospaceFont(), m_app.getDefaultFont())) {
 			m_dirty = true;
 		}
+		if (m_editor->canHandleInput() && m_app.checkShortcut(g_evox_go_to_definition)) {
+			goToDefinition();
+		}
 		Action* toggle_breakpoint = m_app.getAction("evox_toggle_breakpoint");
 		if (toggle_breakpoint && ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && m_app.checkShortcut(*toggle_breakpoint)) toggleBreakpointAtCursor();
+	}
+
+	void goToDefinition() {
+		// TODO do not parse on every go to?
+		OutputMemoryStream blob(m_app.getAllocator());
+		m_editor->serializeText(blob);
+		ex_definition_location location = {};
+		const ex_string_view source{(const char*)blob.data(), (i64)blob.size()};
+		const ex_string_view source_name{m_path.c_str(), (i64)stringLength(m_path.c_str())};
+		ex_host host = {};
+		ex_default_arena_create(&host.arena);
+		struct ImportContext {
+			FileSystem* filesystem;
+			IAllocator* allocator;
+			Array<OutputMemoryStream> sources;
+			ImportContext(FileSystem& fs, IAllocator& allocator)
+				: filesystem(&fs)
+				, allocator(&allocator)
+				, sources(allocator) {}
+		};
+		ImportContext import_ctx(m_app.getEngine().getFileSystem(), m_app.getAllocator());
+		auto import_resolver = [](void* userdata, ex_string_view import_path, ex_string_view, ex_string_view* imported_source) -> int {
+			ImportContext* ctx = (ImportContext*)userdata;
+			StringView path(import_path.begin, import_path.length);
+			Path file_path;
+			if (startsWith(path, "core:")) {
+				StringView name = path.withoutLeft(5);
+				file_path = endsWith(name, ".evox") ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".evox");
+			} else {
+				file_path = endsWith(path, ".evox") ? Path(path) : Path(path, ".evox");
+			}
+			OutputMemoryStream& blob = ctx->sources.emplace(*ctx->allocator);
+			if (!ctx->filesystem->getContentSync(file_path, blob)) {
+				ctx->sources.pop();
+				return 0;
+			}
+			*imported_source = {(const char*)blob.data(), (i64)blob.size()};
+			return 1;
+		};
+		ex_module* module = ex_module_create(&host);
+		if (module && ex_module_compile(module, source, source_name, import_resolver, &import_ctx) == EX_RESULT_OK &&
+			ex_module_definition_at(module, source_name, m_editor->getCursorLine(), m_editor->getCursorColumn(), &location) == EX_RESULT_OK) {
+			StringView definition_source(location.source_name.begin, location.source_name.length);
+			Path definition_path;
+			if (startsWith(definition_source, "core:")) {
+				StringView name = definition_source.withoutLeft(5);
+				definition_path = endsWith(name, ".evox") ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".evox");
+			} else {
+				definition_path = endsWith(definition_source, ".evox") ? Path(definition_source) : Path(definition_source, ".evox");
+			}
+			m_app.getAssetBrowser().openEditor(definition_path);
+			AssetEditorWindow* window = m_app.getAssetBrowser().getWindow(definition_path);
+			if (window) {
+				EvoxEditorWindow* editor_window = (EvoxEditorWindow*)window;
+				editor_window->m_editor->setSelection(location.line, location.column, location.line, location.column + location.length, true);
+				editor_window->m_editor->focus();
+			}
+		}
+		if (module) ex_module_destroy(module);
+		ex_default_arena_destroy(&host.arena);
 	}
 
 	void toggleBreakpointAtCursor() {

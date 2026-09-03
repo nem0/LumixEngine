@@ -8,7 +8,11 @@
 //
 // Design notes:
 // - `ex_module` owns parsed declarations, registered native functions, and the
-//   string storage needed to keep copied names alive.
+//   string storage needed to keep copied names alive. `ex_module_parse`
+//   copies both the source text and the source path into the module arena,
+//   so token values, import paths/aliases and symbol names stay valid until
+//   the module is destroyed and callers may free their buffers after the
+//   call returns.
 // - `ex_bytecode` and `ex_runtime` are the public execution pipeline.
 // - `ex_host` bundles allocator hooks and diagnostics callbacks into one
 //   object. It is the main bridge between host code and Evox.
@@ -61,6 +65,16 @@ typedef struct ex_string_view {
 	i64 length;
 } ex_string_view;
 
+// Location of a declaration returned by ex_module_definition_at(). Lines and
+// columns are zero-based. Returned source_name storage is owned by the module
+// and remains valid until the module is destroyed.
+typedef struct ex_definition_location {
+	ex_string_view source_name;
+	u32 line;
+	u32 column;
+	u32 length;
+} ex_definition_location;
+
 typedef struct ex_slice {
 	u8* data;
 	i64 length;
@@ -92,7 +106,8 @@ typedef enum ex_type_kind {
 	EX_TYPE_NULL_VALUE,
 	EX_TYPE_CPTR,
 	EX_TYPE_NAMESPACE,
-	EX_TYPE_NULLABLE
+	EX_TYPE_NULLABLE,
+	EX_TYPE_ANY
 } ex_type_kind;
 
 // Generic status used by C API operations that only report success or failure.
@@ -214,6 +229,19 @@ ex_string_view ex_unit_get_native_function_name(ex_unit* unit, int index);
 ex_result ex_module_parse(ex_module* module, ex_string_view source, ex_string_view source_name);
 
 ex_result ex_module_typecheck(ex_module* module);
+
+// Finds the semantic declaration referred to by the token at `line`, `column`.
+// The module must already have been parsed and typechecked; all positions
+// are zero-based. Looks up the checked AST via source locations, so no source
+// text needs to be passed back in. Returns EX_RESULT_OK when a declaration is
+// found, and EX_RESULT_FAILURE otherwise.
+ex_result ex_module_definition_at(
+	ex_module* module,
+	ex_string_view source_name,
+	u32 line,
+	u32 column,
+	ex_definition_location* out_location
+);
 
 ex_result ex_module_compile(
 	ex_module* module,

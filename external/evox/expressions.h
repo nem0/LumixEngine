@@ -13,7 +13,7 @@ struct Expression;
 struct Attribute;
 
 struct StructFieldDecl {
-	ex_string_view name;
+	Token name = {};
 	ExpArray<Attribute>* attributes = nullptr;
 	Expression* type_expr = nullptr;
 };
@@ -36,7 +36,7 @@ struct StorageSlot {
 };
 
 struct FunctionParam {
-	ex_string_view name;
+	Token name = {};
 	bool is_comptime = false;
 	Expression* type_expr = nullptr;
 	ResolvedType* resolved_type = nullptr;
@@ -133,6 +133,8 @@ struct IdentifierExpression : Expression {
 
 	ex_string_view name = {};
 	Symbol* symbol = nullptr;
+	// For lexical locals the checker records the declaration token directly.
+	Token* declaration_token = nullptr;
 	FunctionExpression* resolved_fn = nullptr;
 	StorageSlot* slot = nullptr;
 
@@ -223,8 +225,8 @@ struct NullableTypeExpression : Expression {
 };
 
 struct FunctionTypeParam {
-	// Empty for positional-only parameters.
-	ex_string_view name;
+	// Empty name_token for positional-only parameters.
+	Token name = {};
 	bool is_comptime = false;
 	Expression* type_expr = nullptr;
 };
@@ -303,7 +305,7 @@ struct MemberExpression : Expression {
 	MemberExpression() : Expression(MEMBER) {}
 
 	Expression* expression = nullptr;
-	ex_string_view name = {};
+	Token name = {};
 	FunctionExpression* resolved_fn = nullptr;
 	struct Symbol* resolved_symbol = nullptr;
 	// Set during semantic checking for enum member expressions.
@@ -418,7 +420,7 @@ struct StructExpression : Expression {
 };
 
 struct EnumMember {
-	ex_string_view name;
+	Token name = {};
 	Expression* value = nullptr;
 };
 
