@@ -810,19 +810,32 @@ struct IRBuilder {
 				auto& fn_type = static_cast<FunctionResolvedType&>(*call.callee->resolved_type);
 				auto& op = alloc<ExOpCallIndirect>();
 				op.callee = &buildExpressionIR(*call.callee, true);
-				op.arg_count = call.args.size();
+				op.arg_count = 0;
+				for (const FunctionResolvedParam& param : fn_type.params) {
+					if (!param.is_comptime) ++op.arg_count;
+				}
 				op.return_size = typeByteSize(*call.resolved_type);
 				op.args = static_cast<ExIrOp**>(host.arena.allocate(host.arena.user_data, sizeof(ExIrOp*) * op.arg_count, alignof(ExIrOp*)));
 				op.arg_sizes = static_cast<u32*>(host.arena.allocate(host.arena.user_data, sizeof(u32) * op.arg_count, alignof(u32)));
-				for (u32 i = 0; i < op.arg_count; ++i) {
-					ResolvedType& target_type = *fn_type.params[i].type;
-					op.args[i] = &buildImplicitConversionIR(*call.args[i], target_type);
-					op.arg_sizes[i] = typeByteSize(target_type);
+				u32 param_index = 0;
+				u32 arg_index = 0;
+				for (Expression* arg : call.args) {
+					const FunctionResolvedParam& param = fn_type.params[param_index++];
+					if (param.is_comptime) continue;
+					ResolvedType& target_type = *param.type;
+					op.args[arg_index] = &buildImplicitConversionIR(*arg, target_type);
+					op.arg_sizes[arg_index] = typeByteSize(target_type);
+					++arg_index;
 				}
 				return op;
 			}
 			case Expression::ARRAY_LITERAL: {
 				auto& ale = static_cast<ArrayLiteralExpression&>(expr);
+				if (ale.values.empty()) {
+					auto& op = alloc<ExOpNull>();
+					op.size = typeByteSize(*ale.resolved_type);
+					return op;
+				}
 				auto& op = alloc<ExOpAggregateInit>();
 				op.type = ale.resolved_type;
 				op.value_count = ale.values.size();

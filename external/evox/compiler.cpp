@@ -1236,6 +1236,7 @@ struct Checker {
 					FunctionTypeParam& clone = fn->params.emplace_back();
 					clone.name = param.name;
 					clone.is_comptime = param.is_comptime;
+					clone.is_variadic = param.is_variadic;
 					clone.type_expr = cloneExpression(unit, param.type_expr, bindings);
 				}
 				fn->return_type = cloneExpression(unit, s->return_type, bindings);
@@ -1262,6 +1263,7 @@ struct Checker {
 				CallExpression* call = makeType<CallExpression>(unit.arena, unit.arena);
 				call->callee = cloneExpression(unit, s->callee, bindings);
 				for (Expression* arg : s->args) call->args.push(cloneExpression(unit, arg, bindings));
+				call->variadic_args_packed = s->variadic_args_packed;
 				out = call;
 				break;
 			}
@@ -1361,6 +1363,7 @@ struct Checker {
 				ArrayLiteralExpression* s = static_cast<ArrayLiteralExpression*>(src);
 				ArrayLiteralExpression* lit = makeType<ArrayLiteralExpression>(unit.arena, unit.arena);
 				for (Expression* value : s->values) lit->values.push(cloneExpression(unit, value, bindings));
+				lit->is_variadic_pack = s->is_variadic_pack;
 				out = lit;
 				break;
 			}
@@ -1732,6 +1735,7 @@ struct Checker {
 
 		FunctionResolvedType* fn_type = makeType<FunctionResolvedType>(unit.arena, unit.arena);
 		fn_type->decl = &fn;
+		fn_type->is_variadic = fn.is_variadic;
 		for (FunctionParam& param : fn.params) {
 			param.resolved_type = asType(evalComptime(unit, *param.type_expr), param.type_expr->token);
 			if (!param.resolved_type) return nullptr;
@@ -1773,6 +1777,30 @@ struct Checker {
 		return "symbol";
 	}
 
+	bool prepareCallArguments(Unit& unit, CallExpression& call, u32 parameter_count, bool variadic, u32 implicit_count = 0) {
+		if (parameter_count < implicit_count || (variadic && parameter_count == implicit_count)) {
+			errorLine(call.token, variadic ? "Variadic parameter cannot be used as a UFCS receiver" : "Function has no parameter for the UFCS receiver");
+			return false;
+		}
+		parameter_count -= implicit_count;
+		const u32 fixed_count = parameter_count - (variadic ? 1u : 0u);
+		const bool valid_count = variadic ? call.args.size() >= fixed_count : call.args.size() == fixed_count;
+		if (!valid_count) {
+			errorLine(call.token, "Function call argument count mismatch: expected ", fixed_count, variadic ? " or more, got " : ", got ", call.args.size());
+			return false;
+		}
+		if (variadic && !call.variadic_args_packed) {
+			ArrayLiteralExpression* pack = makeType<ArrayLiteralExpression>(unit.arena, unit.arena);
+			pack->token = call.token;
+			pack->is_variadic_pack = true;
+			for (u32 i = fixed_count; i < (u32)call.args.size(); ++i) pack->values.push(call.args[i]);
+			call.args.resize((i32)fixed_count);
+			call.args.push(pack);
+			call.variadic_args_packed = true;
+		}
+		return true;
+	}
+
 	Expression* checkCallCandidate(Unit& unit,
 		FunctionCheckContext* ctx,
 		CallExpression& call,
@@ -1780,11 +1808,7 @@ struct Checker {
 		FunctionExpression* resolved_fn = nullptr,
 		u32 ufcs_param_offset = 0)
 	{
-		// num args mismatch
-		if (fn_type.params.size() != call.args.size() + ufcs_param_offset) {
-			errorLine(call.token, "Function call argument count mismatch: expected ", fn_type.params.size() - ufcs_param_offset, ", got ", call.args.size());
-			return nullptr;
-		}
+		if (!prepareCallArguments(unit, call, (u32)fn_type.params.size(), fn_type.is_variadic, ufcs_param_offset)) return nullptr;
 
 		// ufcs type mismatch
 		if (ufcs_param_offset) {
@@ -2196,6 +2220,7 @@ struct Checker {
 		clone->token = fn.token;
 		clone->is_template = false;
 		clone->is_extern = fn.is_extern;
+		clone->is_variadic = fn.is_variadic;
 		FunctionResolvedType* fn_type = nullptr;
 		bool body_ok = false;
 		for (FunctionParam& src_param : fn.params) {
@@ -2458,17 +2483,14 @@ struct Checker {
 		return EX_RESULT_OK;
 	}
 
-	FunctionExpression* instantiateAndCheckTemplate(Unit& unit, FunctionCheckContext* ctx, Expression& call_expr, CallExpression& call, Unit& template_unit, FunctionExpression& fn, u32 ufcs_param_offset = 0) {
+	FunctionExpression* instantiateAndCheckTemplate(Unit& unit, FunctionCheckContext* ctx, CallExpression& call, Unit& template_unit, FunctionExpression& fn, u32 ufcs_param_offset = 0) {
 		ASSERT(fn.is_template);
 		TemplateBindings bindings(unit.arena); // TODO reuse?
-		if (fn.params.size() != call.args.size() + ufcs_param_offset) {
-			errorLine(call_expr.token, "Function call argument count mismatch: expected ", fn.params.size() - ufcs_param_offset, ", got ", call.args.size());
-			return nullptr;
-		}
+		if (!prepareCallArguments(unit, call, (u32)fn.params.size(), fn.is_variadic, ufcs_param_offset)) return nullptr;
 		if (ufcs_param_offset) {
 			MemberExpression& mem = static_cast<MemberExpression&>(*call.callee);
 			if (!inferTemplateArg(template_unit, bindings, *fn.params[0].type_expr, ComptimeValue{ComptimeValue::TYPE, mem.expression->resolved_type})) {
-				errorLine(call_expr.token, "Cannot infer template arguments for receiver of ", fn.token.value);
+				errorLine(call.token, "Cannot infer template arguments for receiver of ", fn.token.value);
 				return nullptr;
 			}
 		}
@@ -2588,7 +2610,7 @@ struct Checker {
 				return nullptr;
 			}
 			if (fn->is_template) {
-				FunctionExpression* instance = instantiateAndCheckTemplate(unit, ctx, expr, call, *sym.owner, *fn);
+				FunctionExpression* instance = instantiateAndCheckTemplate(unit, ctx, call, *sym.owner, *fn);
 				if (!instance) return nullptr;
 				if (call.callee->kind == Expression::IDENTIFIER) static_cast<IdentifierExpression*>(call.callee)->symbol = sym.symbol;
 				FunctionResolvedType* fn_type = asFunctionType(instance->resolved_type);
@@ -2647,7 +2669,7 @@ struct Checker {
 
 		FunctionExpression* fn = asFunctionExpression(*ref.symbol);
 		if (fn && fn->is_template) {
-			FunctionExpression* instance = instantiateAndCheckTemplate(unit, ctx, expr, call, *ref.owner, *fn, 1);
+			FunctionExpression* instance = instantiateAndCheckTemplate(unit, ctx, call, *ref.owner, *fn, 1);
 			if (!instance) return nullptr;
 			fn = instance;
 		}
@@ -3729,8 +3751,13 @@ struct Checker {
 			expected_element = static_cast<SliceResolvedType*>(hint)->element_type;
 		}
 		if (lit.values.empty()) {
-			errorLine(expr.token, "Array literal cannot be empty");
-			return nullptr;
+			if (!lit.is_variadic_pack || !hint || hint->kind != ResolvedTypeKind::SLICE) {
+				errorLine(expr.token, "Array literal cannot be empty");
+				return nullptr;
+			}
+			expr.resolved_type = hint;
+			expr.eval_stage = Expression::COMPTIME_VALUE;
+			return &expr;
 		}
 
 		ResolvedType* element_type = expected_element;
@@ -6405,6 +6432,7 @@ struct Checker {
 			case Expression::FUNCTION_TYPE: {
 				auto& ft = static_cast<FunctionTypeExpression&>(expr);
 				FunctionResolvedType* fn_type = makeType<FunctionResolvedType>(unit.arena, unit.arena);
+				fn_type->is_variadic = !ft.params.empty() && ft.params.back().is_variadic;
 				for (FunctionTypeParam& param : ft.params) {
 					ResolvedType* param_type = asType(evalComptime(unit, *param.type_expr, ctx, bindings), param.type_expr->token);
 					if (!param_type) return {};

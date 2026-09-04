@@ -54,6 +54,7 @@ struct Token {
 		DOUBLE_COLON,
 		COMMA,
 		DOT,
+		ELLIPSIS,
 		RANGE,
 		RANGE_INCLUSIVE,
 		QUESTION,

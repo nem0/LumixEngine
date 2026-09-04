@@ -246,6 +246,7 @@ static void nativeAddC(ex_runtime* runtime, ex_call_frame frame) {
 #include "slices_tests.inl"
 #include "string_tests.inl"
 #include "function_tests.inl"
+#include "variadic_tests.inl"
 #include "shadowing_tests.inl"
 #include "declaration_tests.inl"
 #include "comptime_tests.inl"

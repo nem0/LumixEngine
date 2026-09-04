@@ -427,16 +427,39 @@ fn apply(f : fn(i32, i32) : i32, a : i32, b : i32) : i32 {
 const result = apply(add, 2, 3);
 ```
 
+A final parameter may use variadic syntax. `...T` is syntactic sugar for a
+slice parameter `[]T`; inside the function it behaves as a slice of `T`:
+
+```cpp
+fn sum(values : ...i32) : i32 {
+	var result : i32 = 0;
+	for value in values {
+		result += value;
+	}
+	return result;
+}
+
+sum();
+sum(1, 2, 3);
+```
+
+Inside the function, a variadic parameter is an ordinary slice. Additional declaration and call rules are listed below.
+
 The type of a function value is written `fn(parameters) : return_type`; see
-[Function types](#function-types).
+[Function types](#function-types). Since `...T` is sugar for `[]T`, a variadic
+function value has the corresponding slice function type and retains the
+variadic call syntax when its static type uses `...T`.
 
 Rules:
 
 - parameter names must be unique
 - a parameter binding is immutable; a pointer parameter can still modify the
   pointed-to storage when its pointee is writable
-- arguments must match the declared parameter types and count; there are no
-  overloaded function declarations
+- non-variadic arguments must match the declared parameter types and count
+- a variadic parameter accepts zero or more arguments matching its element type
+- variadic syntax is only valid on the final parameter
+- a variadic parameter cannot be `comptime`
+- there are no overloaded function declarations
 - a non-`void` function must return a value compatible with its return type;
   `void` functions may use `return;`
 - named `fn name(...) : T { ... }` declarations are module-level; nested
@@ -1208,9 +1231,11 @@ Function type syntax:
 ```cpp
 fn(i32, i32) : i32
 fn(a : i32, b : i32) : void
+fn([]i32) : i32
+fn(prefix : cstr, values : ...i32) : void
 ```
 
-Parameters may optionally be named. Named and unnamed parameters can be mixed in the same function type.
+Parameters may optionally be named. Named and unnamed parameters can be mixed in the same function type. `fn(...i32) : i32` has the same ABI as `fn([]i32) : i32`, but enables variadic argument packing at call sites.
 
 Example:
 
@@ -3112,7 +3137,6 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 * how to expose Span<const Item> foo() to script?
 * how can we push unions if we don't know the tag value of variants, i.e. U = A | B - we don't know if A's tag is 0 or 1
 * use case - compile-time string hash
-* varargs - [Compile-time introspection](#compile-time-introspection) covers single-argument `print`; `print(a, " ", b)` still needs a variadic mechanism
 * MT typecheck
 
 ---

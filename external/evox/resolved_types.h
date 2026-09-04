@@ -92,6 +92,7 @@ struct FunctionResolvedType : ResolvedType {
 	ExpArray<FunctionResolvedParam> params;
 	ResolvedType* return_type = nullptr;
 	FunctionExpression* decl = nullptr;
+	bool is_variadic = false;
 };
 
 struct PointerResolvedType : ResolvedType {

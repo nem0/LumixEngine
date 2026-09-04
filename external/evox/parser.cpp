@@ -816,11 +816,26 @@ struct Parser {
 		}
 	}
 
+	bool functionVariadicTypeParam(FunctionTypeParam& param) {
+		if (param.is_comptime) {
+			m_output.errorAt(peekToken(), "Variadic parameters cannot be comptime");
+			return false;
+		}
+		Token ellipsis = consumeToken();
+		param.is_variadic = true;
+		SliceTypeExpression* slice = makeExpr<SliceTypeExpression>(ellipsis);
+		slice->element_type = type();
+		if (!slice->element_type) return false;
+		param.type_expr = slice;
+		return true;
+	}
+
 	bool functionTypeParam(FunctionTypeParam& param) {
 		if (peekToken().type == Token::COMPTIME) {
 			consumeToken();
 			param.is_comptime = true;
 		}
+		if (peekToken().type == Token::ELLIPSIS) return functionVariadicTypeParam(param);
 		Expression* argument = expression();
 		if (!argument) return false;
 		if (peekToken().type != Token::COLON) {
@@ -838,6 +853,7 @@ struct Parser {
 			consumeToken();
 			param.is_comptime = true;
 		}
+		if (peekToken().type == Token::ELLIPSIS) return functionVariadicTypeParam(param);
 		param.type_expr = expression();
 		return param.type_expr != nullptr;
 	}
@@ -849,6 +865,10 @@ struct Parser {
 			if (!functionTypeParam(param)) return false;
 			if (peekToken().type != Token::COMMA) break;
 			consumeToken();
+			if (param.is_variadic && peekToken().type != Token::RIGHT_PAREN) {
+				m_output.errorAt(param.type_expr->token, "Variadic parameter must be last");
+				return false;
+			}
 		}
 		if (!consume(Token::RIGHT_PAREN) || !consume(Token::COLON)) return false;
 		fn.return_type = type();
@@ -871,6 +891,7 @@ struct Parser {
 				return false;
 			}
 		}
+		fn.is_variadic = !signature.params.empty() && signature.params.back().is_variadic;
 		return true;
 	}
 

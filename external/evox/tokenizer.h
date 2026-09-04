@@ -311,6 +311,7 @@ struct Tokenizer {
 			case ',': return makeToken(Token::COMMA);
 			case '.': {
 				if (match('.')) {
+					if (match('.')) return makeToken(Token::ELLIPSIS);
 					return makeToken(match('=') ? Token::RANGE_INCLUSIVE : Token::RANGE);
 				}
 				return makeToken(Token::DOT);

@@ -228,6 +228,7 @@ struct FunctionTypeParam {
 	// Empty name_token for positional-only parameters.
 	Token name = {};
 	bool is_comptime = false;
+	bool is_variadic = false;
 	Expression* type_expr = nullptr;
 };
 
@@ -267,6 +268,9 @@ struct CallExpression : Expression {
 
 	Expression* callee = nullptr;
 	ExpArray<Expression*> args;
+	// Template inference may need to pack arguments before the concrete function
+	// candidate is checked. Prevent the candidate pass from packing them again.
+	bool variadic_args_packed = false;
 	// Set by the type checker when this call has a pre-resolved direct target - 
 	// either a template instantiation or a UFCS-selected free function. The bytecode
 	// compiler uses this instead of re-deriving resolution per callee shape.
@@ -383,6 +387,8 @@ struct ArrayLiteralExpression : Expression {
 	ArrayLiteralExpression(ex_arena& arena) : Expression(ARRAY_LITERAL), values(arena) {}
 
 	ExpArray<Expression*> values;
+	// Synthetic array literals used to pass variadic arguments may be empty.
+	bool is_variadic_pack = false;
 };
 
 struct FunctionExpression : Expression {
@@ -394,6 +400,7 @@ struct FunctionExpression : Expression {
 	Statement* body = nullptr;
 	bool is_extern = false;
 	bool is_template = false;
+	bool is_variadic = false;
 	// Canonical template specializations for this function declaration.
 	ExpArray<TemplateFunctionInstance> template_function_instances;
 	// Bytecode function index; assigned during bytecode compilation.
