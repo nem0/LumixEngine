@@ -292,7 +292,15 @@ static bool isEntityType(const ex_type* type) {
 }
 
 static void drawEntityValue(const ExEntity& entity, WorldEditor* editor) {
-	const bool valid = entity.world && entity.index >= 0 && entity.world->hasEntity(EntityRef(entity.index));
+	// Runtime values can retain pointers to the game world after game mode has
+	// stopped and that world has been destroyed. Do not inspect those pointers
+	// outside game mode; pointer equality alone cannot prove that a pointer is
+	// still alive.
+	World* current_world = editor && editor->isGameMode() ? editor->getWorld() : nullptr;
+	const bool valid = current_world
+		&& entity.world == current_world
+		&& entity.index >= 0
+		&& current_world->hasEntity(EntityRef(entity.index));
 	StaticString<256> label;
 	if (valid) {
 		const char* entity_name = entity.world->getEntityName(EntityRef(entity.index));
