@@ -1,3 +1,73 @@
+TEST(DebugVariadicAnySliceElementMetadata) {
+	const char* source = R"(
+		fn logError(args : ...any) : void { panic("stop"); }
+		fn main() : void {
+			var name = "LumixEngine";
+			logError("Hello {name}");
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(runtime, toLs("main")));
+
+	EXPECT_TRUE(ex_debug_frame_local_count(runtime, 0) >= 1u);
+	const ex_type* args_type = ex_debug_local_type(runtime, 0, 0);
+	EXPECT_TRUE(args_type != nullptr);
+	EXPECT_EQ((int)EX_TYPE_SLICE, (int)ex_type_get_kind(args_type));
+	const ex_type* element_type = ex_type_array_element_type(args_type);
+	EXPECT_TRUE(element_type != nullptr);
+	EXPECT_EQ((int)EX_TYPE_ANY, (int)ex_type_get_kind(element_type));
+
+	u32 args_size = 0;
+	const ex_slice* args = (const ex_slice*)ex_debug_local_value(runtime, 0, 0, &args_size);
+	EXPECT_TRUE(args != nullptr);
+	EXPECT_EQ((u32)sizeof(ex_slice), args_size);
+	EXPECT_EQ(2, args->length);
+	const ex_type* first_type = ex_type_from_any(runtime, args->data);
+	const ex_type* second_type = ex_type_from_any(runtime, args->data + 16);
+	EXPECT_TRUE(first_type != nullptr);
+	EXPECT_TRUE(second_type != nullptr);
+	EXPECT_EQ((int)EX_TYPE_SLICE, (int)ex_type_get_kind(first_type));
+	EXPECT_EQ((int)EX_TYPE_SLICE, (int)ex_type_get_kind(second_type));
+
+	CAPI_END(module);
+	return true;
+}
+
+TEST(DebugForLoopValueIsVisible) {
+	const char* source = R"(
+		import "log"
+		fn main() : void { logError(42); }
+	)";
+	const char* log_source = R"(
+		fn logError(args : ...any) : void {
+			for arg in args {
+				match arg {
+					case i32: panic("stop");
+					case: return;
+				}
+			}
+		}
+	)";
+	EvoxImportFile files_storage[] = {{toLs("log"), toLs(log_source)}};
+	EvoxImportFiles files = {files_storage, lengthOf(files_storage)};
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), &resolveEvoxImportC, &files));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, toLs("log"), 3u, nullptr));
+	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(runtime, toLs("main")));
+
+	bool found_arg = false;
+	for (u32 i = 0; i < ex_debug_frame_local_count(runtime, 0); ++i) {
+		if (equalStrings(ex_debug_local_name(runtime, 0, i), toLs("arg"))) found_arg = true;
+	}
+	EXPECT_TRUE(found_arg);
+
+	CAPI_END(module);
+	return true;
+}
+
 TEST(DebugStackDepthZeroWhenNotFailed) {
 	const char* source = R"(
 		fn main() : i32 {

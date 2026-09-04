@@ -10,6 +10,9 @@ struct EmitDst {
 	u32 size;
 };
 
+struct TypeInfoBuilder;
+u32 internRuntimeType(TypeInfoBuilder& type_info, ResolvedType& type);
+
 bool typesEqual(const ResolvedType* a, const ResolvedType* b) {
 	if (a == b) return true;
 	if (!a || !b || a->kind != b->kind) return false;
@@ -83,8 +86,9 @@ ExIrOpKind invertCompare(ExIrOpKind kind) {
 // ex_bytecode_compile copies the table verbatim into the bytecode.
 // AST to IR
 struct IRBuilder {
-	IRBuilder(ex_host& host)
+	IRBuilder(ex_host& host, TypeInfoBuilder& type_info)
 		: host(host)
+		, type_info(type_info)
 		, strings(host.arena)
 		, locals(host.arena)
 		, defers(host.arena)
@@ -125,9 +129,17 @@ struct IRBuilder {
 			aggregate.values = static_cast<ExIrOp**>(host.arena.allocate(host.arena.user_data, sizeof(ExIrOp*) * 2, alignof(ExIrOp*)));
 			aggregate.offsets = static_cast<u32*>(host.arena.allocate(host.arena.user_data, sizeof(u32) * 2, alignof(u32)));
 			aggregate.sizes = static_cast<u32*>(host.arena.allocate(host.arena.user_data, sizeof(u32) * 2, alignof(u32)));
-			aggregate.values[0] = source; aggregate.offsets[0] = 0; aggregate.sizes[0] = 8;
-			auto& type_value = alloc<ExOpLoadConst>(); static ResolvedType i32_type(ResolvedTypeKind::I32); type_value.type = &i32_type; const u32 type_id = (u32)expression.resolved_type->kind; memcpy(type_value.value, &type_id, sizeof(type_id));
-			aggregate.values[1] = &type_value; aggregate.offsets[1] = 8; aggregate.sizes[1] = 4;
+			aggregate.values[0] = source;
+			aggregate.offsets[0] = 0;
+			aggregate.sizes[0] = 8;
+			auto& type_value = alloc<ExOpLoadConst>();
+			static ResolvedType i32_type(ResolvedTypeKind::I32);
+			type_value.type = &i32_type;
+			const u32 type_id = internRuntimeType(type_info, *expression.resolved_type);
+			memcpy(type_value.value, &type_id, sizeof(type_id));
+			aggregate.values[1] = &type_value;
+			aggregate.offsets[1] = 8;
+			aggregate.sizes[1] = 4;
 			return aggregate;
 		}
 		if (target_type.kind == ResolvedTypeKind::UNION && expression.resolved_type) {
@@ -439,7 +451,8 @@ struct IRBuilder {
 			if (represented) {
 				auto& constant = alloc<ExOpLoadConst>();
 				constant.type = expr.resolved_type;
-				constant.represented_type = represented;
+				const u32 type_id = internRuntimeType(type_info, *represented);
+				memcpy(constant.value, &type_id, sizeof(type_id));
 				return constant;
 			}
 		}
@@ -840,7 +853,13 @@ struct IRBuilder {
 				op.type = ale.resolved_type;
 				op.value_count = ale.values.size();
 				op.values = static_cast<ExIrOp**>(host.arena.allocate(host.arena.user_data, sizeof(ExIrOp*) * op.value_count, alignof(ExIrOp*)));
-				for (u32 i = 0; i < op.value_count; ++i) op.values[i] = &buildExpressionIR(*ale.values[i], true);
+				ResolvedType* element_type = nullptr;
+				if (op.type->kind == ResolvedTypeKind::ARRAY) element_type = static_cast<ArrayResolvedType*>(op.type)->element_type;
+				for (u32 i = 0; i < op.value_count; ++i) {
+					op.values[i] = element_type
+						? &buildImplicitConversionIR(*ale.values[i], *element_type)
+						: &buildExpressionIR(*ale.values[i], true);
+				}
 				return op;
 			}
 			case Expression::STRUCT_LITERAL: {
@@ -1336,10 +1355,10 @@ struct IRBuilder {
 				if (for_statement.is_custom_iterator) {
 					ResolvedType* iterator_type = for_statement.begin->resolved_type;
 					ResolvedType* element_type = for_statement.iterator_element_type;
-					auto& iterator = allocAlloca(iterator_type, {}, &buildExpressionIR(*for_statement.begin, true));
-					parent.ops.push(&iterator);
 					auto& value = allocAlloca(element_type, for_statement.value_var, &alloc<ExOpNop>());
 					parent.ops.push(&value);
+					auto& iterator = allocAlloca(iterator_type, {}, &buildExpressionIR(*for_statement.begin, true));
+					parent.ops.push(&iterator);
 
 					ExOpAlloca* counter = nullptr;
 					if (for_statement.is_key_value) {
@@ -1425,6 +1444,9 @@ struct IRBuilder {
 				static ResolvedType array_index_type(ResolvedTypeKind::I32);
 				ResolvedType* index_type = is_slice ? &slice_index_type : &array_index_type;
 
+				auto& value = allocAlloca(element_type, for_statement.value_var, &alloc<ExOpNop>());
+				parent.ops.push(&value);
+
 				auto& container = allocAlloca(container_type, {}, &buildExpressionIR(*for_statement.begin, true));
 				parent.ops.push(&container);
 
@@ -1435,9 +1457,6 @@ struct IRBuilder {
 
 				auto& counter = allocAlloca(index_type, {}, &zero);
 				parent.ops.push(&counter);
-
-				auto& value = allocAlloca(element_type, for_statement.value_var, &alloc<ExOpNop>());
-				parent.ops.push(&value);
 				
 				if (for_statement.is_key_value) {
 					counter.name = for_statement.key_var;
@@ -1594,12 +1613,11 @@ struct IRBuilder {
 							type_value.size = 4;
 							auto& expected = alloc<ExOpLoadConst>();
 							static ResolvedType i32_type(ResolvedTypeKind::I32);
-							static ResolvedType meta_type(ResolvedTypeKind::META);
 							expected.type = &i32_type;
 							ResolvedType* matched_type = pattern.begin->resolved_type && pattern.begin->resolved_type->kind == ResolvedTypeKind::META
 															 ? static_cast<MetaType*>(pattern.begin->resolved_type)->inner
 															 : pattern.begin->resolved_type;
-							const u32 type_id = (u32)matched_type->kind;
+							const u32 type_id = internRuntimeType(type_info, *matched_type);
 							memcpy(expected.value, &type_id, sizeof(type_id));
 							auto& equality = alloc<ExOpEq>();
 							equality.operand_type = &i32_type;
@@ -1901,6 +1919,7 @@ struct IRBuilder {
 	};
 
 	ex_host& host;
+	TypeInfoBuilder& type_info;
 	ExpArray<Local> locals;
 	ExpArray<ex_string_view> strings;
 	ExpArray<Statement*> defers;
@@ -1943,41 +1962,6 @@ static ex_string_view copyStringViewToArena(ex_arena& arena, ex_string_view src)
 	return { mem, len };
 }
 
-// Debug-facing type kind: mirrors BytecodeCompiler::toTypeKind but reports
-// nullable as EX_TYPE_NULLABLE (toTypeKind maps it to EX_TYPE_NULL_VALUE for
-// bytecode comparison opcodes).
-static ex_type_kind debugTypeKind(const ResolvedType& type) {
-	if (type.kind == ResolvedTypeKind::NULLABLE) return EX_TYPE_NULLABLE;
-	switch (type.kind) {
-		case ResolvedTypeKind::VOID: return EX_TYPE_VOID;
-		case ResolvedTypeKind::BOOL: return EX_TYPE_BOOL;
-		case ResolvedTypeKind::I8: return EX_TYPE_I8;
-		case ResolvedTypeKind::I16: return EX_TYPE_I16;
-		case ResolvedTypeKind::I32: return EX_TYPE_I32;
-		case ResolvedTypeKind::I64: return EX_TYPE_I64;
-		case ResolvedTypeKind::UNTYPED_INT: return EX_TYPE_I64;
-		case ResolvedTypeKind::UNTYPED_FLOAT: return EX_TYPE_F64;
-		case ResolvedTypeKind::U8: return EX_TYPE_U8;
-		case ResolvedTypeKind::U16: return EX_TYPE_U16;
-		case ResolvedTypeKind::U32: return EX_TYPE_U32;
-		case ResolvedTypeKind::U64: return EX_TYPE_U64;
-		case ResolvedTypeKind::ISIZE: return EX_TYPE_I64;
-		case ResolvedTypeKind::F32: return EX_TYPE_F32;
-		case ResolvedTypeKind::F64: return EX_TYPE_F64;
-		case ResolvedTypeKind::CSTR: return EX_TYPE_CPTR;
-		case ResolvedTypeKind::CPTR: return EX_TYPE_CPTR;
-		case ResolvedTypeKind::POINTER: return EX_TYPE_CPTR;
-		case ResolvedTypeKind::BYTE: return EX_TYPE_U8;
-		case ResolvedTypeKind::FUNCTION: return EX_TYPE_FUNCTION;
-		case ResolvedTypeKind::ARRAY: return EX_TYPE_ARRAY;
-		case ResolvedTypeKind::SLICE: return EX_TYPE_SLICE;
-		case ResolvedTypeKind::ENUM: return EX_TYPE_ENUM;
-		case ResolvedTypeKind::STRUCT: return EX_TYPE_STRUCT;
-		case ResolvedTypeKind::UNION: return EX_TYPE_TAGGED_UNION;
-		default: return EX_TYPE_INVALID;
-	}
-}
-
 static ResolvedType* structFieldTypeAt(const StructResolvedType& st, i32 index) {
 	if (index < st.fields.size()) return st.fields[index].type;
 	return nullptr;
@@ -2015,7 +1999,7 @@ struct TypeInfoBuilder {
 		sources.push(&type);
 		ex_type& entry = types.emplace_back();
 		entry.bytecode = &bytecode;
-		entry.kind = debugTypeKind(type);
+		entry.kind = toExTypeKind(type.kind);
 		entry.byte_size = typeByteSize(type);
 		entry.alignment = typeAlignment(type);
 		entry.first_field_index = first_field;
@@ -2179,6 +2163,10 @@ struct TypeInfoBuilder {
 	ExpArray<u32> member_indices;
 	ExpArray<ex_type_enum_value_info> enum_values;
 };
+
+u32 internRuntimeType(TypeInfoBuilder& type_info, ResolvedType& type) {
+	return type_info.internType(type);
+}
 
 struct ByteArray {
 	explicit ByteArray(ex_arena& arena)
@@ -2717,7 +2705,10 @@ struct BytecodeCompiler {
 		}
 		u32 lhs = emitOperand(*ir_op.lhs);
 		const u8* immediate = nullptr;
-		if (ir_op.rhs->kind == ExIrOpKind::LOAD_CONST) immediate = static_cast<const ExOpLoadConst&>(*ir_op.rhs).value;
+		if (ir_op.rhs->kind == ExIrOpKind::LOAD_CONST) {
+			const auto& constant = static_cast<const ExOpLoadConst&>(*ir_op.rhs);
+			immediate = constant.value;
+		}
 		if (ir_op.rhs->kind == ExIrOpKind::LOAD_BYTES) immediate = static_cast<const ExOpLoadBytes&>(*ir_op.rhs).value;
 		if (immediate) {
 			const ResolvedType* rhs_type = nullptr;
@@ -2765,13 +2756,7 @@ struct BytecodeCompiler {
 
 	u32 emitLoadConst(const ExOpLoadConst& load, EmitDst* dst) {
 		u32 size = typeByteSize(*load.type);
-		u8 value[8];
-		memcpy(value, load.value, sizeof(value));
-		if (load.represented_type) {
-			const u32 type_index = type_info.internType(*load.represented_type);
-			memcpy(value, &type_index, sizeof(type_index));
-		}
-		const u8* load_value = load.represented_type ? value : load.value;
+		const u8* load_value = load.value;
 		u32 res = dst ? dst->dst : stack_top;
 		switch (size) {
 			case 1: {
@@ -2824,13 +2809,20 @@ struct BytecodeCompiler {
 		return result;
 	}
 
+	u32 functionCodeOffset(u32 absolute_offset) const {
+		ASSERT(fn_bc);
+		const u32 function_start = (u32)(u64)fn_bc->code;
+		ASSERT(absolute_offset >= function_start);
+		return absolute_offset - function_start;
+	}
+
 	u32 emitAlloca(ExOpAlloca& alloca) {
 		ASSERT(alloca.stack_sp != 0xffFFffFF);
 		if (alloca.value->kind != ExIrOpKind::NOP) {
 			if (do_optimize && alloca.value->kind != ExIrOpKind::AGGREGATE_INIT) {
 				EmitDst dst = { .dst = alloca.stack_sp, .size = typeByteSize(*alloca.type) };
 				const u32 value_slot = emit(*alloca.value, &dst);
-				if (!empty(alloca.name)) recordLocal(alloca.name, alloca.stack_sp, *alloca.type, (u32)code.size());
+				if (!empty(alloca.name)) recordLocal(alloca.name, alloca.stack_sp, *alloca.type, functionCodeOffset((u32)code.size()));
 			}
 			else {
 				const u32 value_slot = emit(*alloca.value, nullptr);
@@ -2838,10 +2830,10 @@ struct BytecodeCompiler {
 				emit(alloca.stack_sp);
 				emit(value_slot);
 				emit(typeByteSize(*alloca.type));
-				if (!empty(alloca.name)) recordLocal(alloca.name, alloca.stack_sp, *alloca.type, (u32)code.size());
+				if (!empty(alloca.name)) recordLocal(alloca.name, alloca.stack_sp, *alloca.type, functionCodeOffset((u32)code.size()));
 			}
 		} else {
-			if (!empty(alloca.name)) recordLocal(alloca.name, alloca.stack_sp, *alloca.type, alloca.bytecode_offset);
+			if (!empty(alloca.name)) recordLocal(alloca.name, alloca.stack_sp, *alloca.type, functionCodeOffset(alloca.bytecode_offset));
 		}
 		const u32 slot_end = alloca.stack_sp + typeByteSize(*alloca.type);
 		if (stack_top < slot_end) stack_top = slot_end;
@@ -2853,7 +2845,7 @@ struct BytecodeCompiler {
 		entry.name = copyStringViewToArena(host.arena, name);
 		entry.offset = offset;
 		entry.byte_size = typeByteSize(type);
-		entry.kind = debugTypeKind(type);
+		entry.kind = toExTypeKind(type.kind);
 		entry.type_index = type_info.internType(type);
 		entry.scope_begin_offset = scope_begin_offset;
 	}
@@ -4075,8 +4067,8 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 	bc->arena = &host->arena;
 
 	SourceLocTable& src_locs = module->src_locs;
-	IRBuilder builder(*host);
 	TypeInfoBuilder type_info(*host, *bc);
+	IRBuilder builder(*host, type_info);
 
 	bc->function_count = 0;
 	bc->global_size = 0;
@@ -4117,7 +4109,7 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 			entry.name = copyStringViewToArena(host->arena, s.name);
 			entry.offset = s.slot.offset;
 			entry.byte_size = byte_size;
-			entry.kind = debugTypeKind(*s.resolved_type);
+			entry.kind = toExTypeKind(s.resolved_type->kind);
 			entry.type_index = type_info.internType(*s.resolved_type);
 		}
 	}

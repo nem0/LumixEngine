@@ -57,6 +57,42 @@ ex_module::ex_module(ex_host* host)
 	type_kind.decl = &type_kind_decl;
 }
 
+ex_type_kind toExTypeKind(ResolvedTypeKind kind) {
+	switch (kind) {
+		case ResolvedTypeKind::INVALID: return EX_TYPE_INVALID;
+		case ResolvedTypeKind::VOID: return EX_TYPE_VOID;
+		case ResolvedTypeKind::BOOL: return EX_TYPE_BOOL;
+		case ResolvedTypeKind::I8: return EX_TYPE_I8;
+		case ResolvedTypeKind::I16: return EX_TYPE_I16;
+		case ResolvedTypeKind::I32: return EX_TYPE_I32;
+		case ResolvedTypeKind::I64: return EX_TYPE_I64;
+		case ResolvedTypeKind::U8: return EX_TYPE_U8;
+		case ResolvedTypeKind::U16: return EX_TYPE_U16;
+		case ResolvedTypeKind::U32: return EX_TYPE_U32;
+		case ResolvedTypeKind::U64: return EX_TYPE_U64;
+		case ResolvedTypeKind::ISIZE: return EX_TYPE_I64;
+		case ResolvedTypeKind::F32: return EX_TYPE_F32;
+		case ResolvedTypeKind::F64: return EX_TYPE_F64;
+		case ResolvedTypeKind::CSTR:
+		case ResolvedTypeKind::CPTR:
+		case ResolvedTypeKind::POINTER: return EX_TYPE_CPTR;
+		case ResolvedTypeKind::BYTE: return EX_TYPE_U8;
+		case ResolvedTypeKind::ANY: return EX_TYPE_ANY;
+		case ResolvedTypeKind::UNTYPED_INT: return EX_TYPE_UNTYPED_INT;
+		case ResolvedTypeKind::UNTYPED_FLOAT: return EX_TYPE_UNTYPED_FLOAT;
+		case ResolvedTypeKind::META: return EX_TYPE_INVALID;
+		case ResolvedTypeKind::ENUM: return EX_TYPE_ENUM;
+		case ResolvedTypeKind::STRUCT: return EX_TYPE_STRUCT;
+		case ResolvedTypeKind::FUNCTION: return EX_TYPE_FUNCTION;
+		case ResolvedTypeKind::ARRAY: return EX_TYPE_ARRAY;
+		case ResolvedTypeKind::SLICE: return EX_TYPE_SLICE;
+		case ResolvedTypeKind::NULLABLE: return EX_TYPE_NULLABLE;
+		case ResolvedTypeKind::UNION: return EX_TYPE_TAGGED_UNION;
+	}
+	ASSERT(false);
+	return EX_TYPE_INVALID;
+}
+
 static u32 alignTo(u32 offset, u32 alignment) {
 	ASSERT(alignment > 0);
 	return (offset + alignment - 1) & ~(alignment - 1);
@@ -1783,7 +1819,7 @@ struct Checker {
 			return false;
 		}
 		parameter_count -= implicit_count;
-		const u32 fixed_count = parameter_count - (variadic ? 1u : 0u);
+		const i32 fixed_count = parameter_count - (variadic ? 1u : 0u);
 		const bool valid_count = variadic ? call.args.size() >= fixed_count : call.args.size() == fixed_count;
 		if (!valid_count) {
 			errorLine(call.token, "Function call argument count mismatch: expected ", fixed_count, variadic ? " or more, got " : ", got ", call.args.size());

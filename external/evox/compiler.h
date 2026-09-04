@@ -11,6 +11,7 @@ struct Unit;
 u32 typeByteSize(const ResolvedType& type);
 u32 typeAlignment(const ResolvedType& type);
 u32 structFieldOffset(const StructResolvedType& type, i32 field_index);
+ex_type_kind toExTypeKind(ResolvedTypeKind kind);
 
 struct Symbol {
 	enum Kind {

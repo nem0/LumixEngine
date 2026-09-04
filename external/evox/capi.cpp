@@ -6,6 +6,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+const ex_type* ex_type_from_any(const ex_runtime* runtime, const void* value) {
+	if (!runtime || !value) return nullptr;
+	u32 type_index;
+	memcpy(&type_index, (const u8*)value + 8, sizeof(type_index));
+	return ex_bytecode_type(runtime->bytecode, type_index);
+}
+
 ex_module* ex_module_create(ex_host* host) {
 	if (!host || !host->arena.allocate) return nullptr;
 	return new ex_module(host);

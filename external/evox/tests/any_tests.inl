@@ -285,6 +285,29 @@ TEST(AnyRuntimeStructMatch) {
 	return true;
 }
 
+TEST(AnyRuntimeDistinguishesStructTypes) {
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(R"(
+		struct First { value : i32; }
+		struct Second { value : i32; }
+		fn classify(value : any) : i32 {
+			match value {
+				case First: return 1;
+				case Second: return 2;
+				case: return 3;
+			}
+		}
+		fn main() : i32 {
+			return classify(First { 10 }) * 10 + classify(Second { 20 });
+		}
+	)"), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_RESULT_OK, ex_call(runtime, toLs("main")));
+	EXPECT_EQ(12, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(AnyRuntimeRvalueArgumentMatch) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(R"(

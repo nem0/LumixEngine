@@ -547,6 +547,8 @@ ex_type_kind ex_debug_global_kind(ex_runtime* runtime, u32 global_index);
 void* ex_debug_global_value(ex_runtime* runtime, u32 global_index, u32* size);
 const ex_type* ex_debug_global_type(ex_runtime* runtime, u32 global_index);
 
+const ex_type* ex_type_from_any(const ex_runtime* runtime, const void* value);
+
 #ifdef __cplusplus
 }
 #endif

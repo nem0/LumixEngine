@@ -64,6 +64,32 @@ TEST(VariadicAnyAcceptsHeterogeneousArguments) {
 	return true;
 }
 
+TEST(VariadicAnyMatchesInterpolatedString) {
+	const char* source = R"(
+		fn logErrorString(value : []const u8) : i32 { return 1; }
+		fn logError(args : ...any) : i32 {
+			for arg in args {
+				match arg {
+					case []const u8: return logErrorString(arg);
+					case: return 0;
+				}
+			}
+			return 0;
+		}
+		fn main() : i32 {
+			var name = "LumixEngine";
+			return logError("Hello {name}");
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_RESULT_OK, ex_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(VariadicFunctionValueUsesSliceFunctionType) {
 	const char* source = R"(
 		fn sum(values : ...i32) : i32 {

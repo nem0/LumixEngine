@@ -98,7 +98,12 @@ struct Parser {
 			p = close; part = close + 1;
 		}
 		if (!found) { args.push(argument); return; }
-		{ Token t = literal->token; t.value = {part, end - part}; args.push(makeExpr<StringLiteralExpression>(t)); static_cast<StringLiteralExpression*>(args[args.size() - 1])->value = t.value; }
+		if (part != end) {
+			Token t = literal->token;
+			t.value = {part, end - part};
+			args.push(makeExpr<StringLiteralExpression>(t));
+			static_cast<StringLiteralExpression*>(args[args.size() - 1])->value = t.value;
+		}
 	}
 
 	static int precedence(Token::Type type) {

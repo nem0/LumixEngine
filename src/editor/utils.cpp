@@ -941,6 +941,9 @@ struct CodeEditorImpl final : CodeEditor {
 		, m_undo_stack(m_allocator)
 		, m_dpi_scale(maximum(1.f, os::getDPI() / 96.f))
 	{
+		// Keep the editor valid before the first document is assigned.  gui() assumes
+		// there is at least one line (and an empty document still has one empty line).
+		m_lines.emplace("", m_allocator);
 		m_cursors.emplace(Cursor{0, 0});
 	}
 

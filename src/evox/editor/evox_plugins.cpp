@@ -159,11 +159,88 @@ static Action g_debugger_continue{"Evox", "Continue", "Continue execution", "evo
 static Action g_debugger_step_over{"Evox", "Step over", "Step over next statement", "evox_step_over", ICON_FA_ARROW_RIGHT, Action::Type::NORMAL};
 static Action g_debugger_step_into{"Evox", "Step into", "Step into function call", "evox_step_into", ICON_FA_ARROW_DOWN, Action::Type::NORMAL};
 static Action g_debugger_step_out{"Evox", "Step out", "Step out of function", "evox_step_out", ICON_FA_ARROW_UP, Action::Type::NORMAL};
+static u32 g_debug_frame_index = 0;
 
 static bool isStringSlice(const ex_type* type) {
 	if (!type || ex_type_get_kind(type) != EX_TYPE_SLICE || !ex_type_is_const(type)) return false;
 	const ex_type* elem = ex_type_array_element_type(type);
 	return elem && ex_type_get_kind(elem) == EX_TYPE_U8;
+}
+
+static const char* anyValueTypeName(ex_type_kind kind) {
+	switch (kind) {
+		case EX_TYPE_VOID: return "void";
+		case EX_TYPE_BOOL: return "bool";
+		case EX_TYPE_I8: return "i8";
+		case EX_TYPE_U8: return "u8";
+		case EX_TYPE_I16: return "i16";
+		case EX_TYPE_U16: return "u16";
+		case EX_TYPE_I32: return "i32";
+		case EX_TYPE_U32: return "u32";
+		case EX_TYPE_I64: return "i64";
+		case EX_TYPE_U64: return "u64";
+		case EX_TYPE_F32: return "f32";
+		case EX_TYPE_F64: return "f64";
+		case EX_TYPE_CPTR: return "pointer";
+		case EX_TYPE_UNTYPED_INT: return "int";
+		case EX_TYPE_UNTYPED_FLOAT: return "float";
+		case EX_TYPE_STRUCT: return "struct";
+		case EX_TYPE_TAGGED_UNION: return "union";
+		case EX_TYPE_ENUM: return "enum";
+		case EX_TYPE_FUNCTION: return "function";
+		case EX_TYPE_ARRAY: return "array";
+		case EX_TYPE_SLICE: return "slice";
+		case EX_TYPE_NULL_VALUE: return "null";
+		case EX_TYPE_NULLABLE: return "nullable";
+		case EX_TYPE_ANY: return "any";
+		default: return "invalid";
+	}
+}
+
+static void drawPrimitiveValue(ex_type_kind kind, const void* value, const ex_type* type);
+
+static const ex_runtime* g_debug_runtime = nullptr;
+
+static void drawAnyValue(const void* value) {
+	const void* payload = *(const void* const*)value;
+	const ex_type* type = ex_type_from_any(g_debug_runtime, value);
+	const ex_type_kind kind = ex_type_get_kind(type);
+	ImGui::Text("%s: ", anyValueTypeName(kind));
+	ImGui::SameLine(0, 0);
+	if (!payload) {
+		ImGui::TextDisabled("<unavailable>");
+		return;
+	}
+
+	switch (kind) {
+		case EX_TYPE_BOOL:
+		case EX_TYPE_I8: case EX_TYPE_U8:
+		case EX_TYPE_I16: case EX_TYPE_U16:
+		case EX_TYPE_I32: case EX_TYPE_U32:
+		case EX_TYPE_I64: case EX_TYPE_U64:
+		case EX_TYPE_F32: case EX_TYPE_F64:
+		case EX_TYPE_CPTR:
+		case EX_TYPE_FUNCTION:
+		case EX_TYPE_ENUM:
+		case EX_TYPE_NULL_VALUE:
+			drawPrimitiveValue(kind, payload, nullptr);
+			break;
+		case EX_TYPE_SLICE: {
+			// `any` does not carry an ex_type descriptor, but interpolated
+			// strings are represented as []const u8 slices.  Display the erased
+			// slice directly instead of treating it as an unavailable value.
+			const ex_slice& slice = *(const ex_slice*)payload;
+			if (!slice.data) ImGui::TextUnformatted("null");
+			else {
+				const i64 length = slice.length < 0 ? 0 : slice.length;
+				ImGui::Text("\"%.*s\"", int(length > 0x7fffffffu ? 0x7fffffffu : length), (const char*)slice.data);
+			}
+			break;
+		}
+		default:
+			ImGui::TextUnformatted("<value unavailable>");
+			break;
+	}
 }
 
 static void drawPrimitiveValue(ex_type_kind kind, const void* value, const ex_type* type) {
@@ -251,6 +328,15 @@ static void drawVariable(ex_string_view name, ex_type_kind kind, const ex_type* 
 		drawVariableName(name);
 		ImGui::TableNextColumn();
 		ImGui::TextDisabled("<unavailable>");
+		return;
+	}
+
+	if (kind == EX_TYPE_ANY) {
+		ImGui::TableNextRow();
+		ImGui::TableNextColumn();
+		drawVariableName(name);
+		ImGui::TableNextColumn();
+		drawAnyValue(value);
 		return;
 	}
 
@@ -910,7 +996,9 @@ struct EvoxDebuggerWindow final : StudioApp::GUIPlugin {
 				ImGui::TableSetupColumn("Function");
 				ImGui::TableSetupColumn("Source");
 				ImGui::TableHeadersRow();
-				for (u32 i = 0, n = ex_debug_stack_depth(runtime); i < n; ++i) {
+				const u32 frame_count = ex_debug_stack_depth(runtime);
+				if (g_debug_frame_index >= frame_count) g_debug_frame_index = 0;
+				for (u32 i = 0; i < frame_count; ++i) {
 					ex_debug_location location;
 					ex_debug_frame_location(runtime, i, &location);
 					const ex_string_view name = ex_debug_frame_function_name(runtime, i);
@@ -918,6 +1006,12 @@ struct EvoxDebuggerWindow final : StudioApp::GUIPlugin {
 					ImGui::TableNextColumn();
 					ImGui::Text("%u", i);
 					ImGui::TableNextColumn();
+					ImGui::PushID((int)i);
+					if (ImGui::Selectable("##frame", g_debug_frame_index == i, ImGuiSelectableFlags_SpanAllColumns)) {
+						g_debug_frame_index = i;
+					}
+					ImGui::PopID();
+					ImGui::SameLine();
 					ImGui::TextWrapped("%.*s", int(name.length), name.begin);
 					ImGui::TableNextColumn();
 					ImGui::TextWrapped("%.*s:%u",
@@ -1021,6 +1115,7 @@ struct EvoxVariablesWindow final : StudioApp::GUIPlugin {
 		World* world = m_app.getWorldEditor().getWorld();
 		EvoxModule* module = world ? static_cast<EvoxModule*>(world->getModule("evox")) : nullptr;
 		ex_runtime* runtime = module ? module->getDebugRuntime() : nullptr;
+		g_debug_runtime = runtime;
 
 		const bool suspended = runtime && ex_debug_is_suspended(runtime);
 		if (!runtime) {
@@ -1040,13 +1135,15 @@ struct EvoxVariablesWindow final : StudioApp::GUIPlugin {
 				ImGui::TableHeadersRow();
 
 				if (suspended) {
-					for (u32 i = 0, n = ex_debug_frame_local_count(runtime, 0); i < n; ++i) {
-						const ex_string_view name = ex_debug_local_name(runtime, 0, i);
+					const u32 frame_count = ex_debug_stack_depth(runtime);
+					if (g_debug_frame_index >= frame_count) g_debug_frame_index = 0;
+					for (u32 i = 0, n = ex_debug_frame_local_count(runtime, g_debug_frame_index); i < n; ++i) {
+						const ex_string_view name = ex_debug_local_name(runtime, g_debug_frame_index, i);
 						if (has_filter && !nameMatchesFilter(name, m_filter)) continue;
-						const ex_type_kind kind = ex_debug_local_kind(runtime, 0, i);
-						const ex_type* type = ex_debug_local_type(runtime, 0, i);
+						const ex_type_kind kind = ex_debug_local_kind(runtime, g_debug_frame_index, i);
+						const ex_type* type = ex_debug_local_type(runtime, g_debug_frame_index, i);
 						u32 size = 0;
-						void* value = ex_debug_local_value(runtime, 0, i, &size);
+						void* value = ex_debug_local_value(runtime, g_debug_frame_index, i, &size);
 						drawVariable(name, kind, type, value, size, false, &m_app.getWorldEditor());
 					}
 				}

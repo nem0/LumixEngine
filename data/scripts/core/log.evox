@@ -1,2 +1,22 @@
-extern fn logError(v : []const u8) : void;
-extern fn logInfo(v : []const u8) : void;
+extern fn logErrorString(v : []const u8) : void;
+extern fn logInfoString(v : []const u8) : void;
+
+
+fn logError(args : ...any) : void {
+    for arg in args {
+        match arg {
+            case []const u8: logErrorString(arg);
+            case: logErrorString(" !UNSUPPORTED TYPE! ");
+        }
+    }
+}
+
+
+fn logInfo(args : ...any) : void {
+    for arg in args {
+        match arg {
+            case []const u8: logInfoString(arg);
+            case: logErrorString(" !UNSUPPORTED TYPE! ");
+        }
+    }
+}

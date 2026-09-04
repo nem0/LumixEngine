@@ -27,11 +27,11 @@ namespace {
 
 using NativeFunctionMap = HashMap<NativeFunctionKey, ex_native_fn, NativeFunctionKeyHash>;
 
-static void logLogError(ex_string_view v) {
+static void logErrorString(ex_string_view v) {
 	logError(StringView(v.begin, (u64)v.length));
 }
 
-static void logLogInfo(ex_string_view v) {
+static void logInfoString(ex_string_view v) {
 	logInfo(StringView(v.begin, (u64)v.length));
 }
 
@@ -221,8 +221,8 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	functions.insert({"core:input", "getEventCount"}, &wrap<inputGetEventCount>);
 	functions.insert({"core:input", "getEvent"}, &inputGetEvent);
 	// log
-	functions.insert({"core:log", "logError"}, &wrap<logLogError>);
-	functions.insert({"core:log", "logInfo"}, &wrap<logLogInfo>);
+	functions.insert({"core:log", "logErrorString"}, &wrap<logErrorString>);
+	functions.insert({"core:log", "logInfoString"}, &wrap<logInfoString>);
 	// entity
 	functions.insert({"core:entity", "destroy"}, &wrap<evox_entity_destroy>);
 	functions.insert({"core:entity", "isValid"}, &wrap<evox_entity_isValid>);
