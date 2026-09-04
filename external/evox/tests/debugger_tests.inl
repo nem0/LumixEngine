@@ -3,7 +3,7 @@ TEST(DebugVariadicAnySliceElementMetadata) {
 		fn logError(args : ...any) : void { panic("stop"); }
 		fn main() : void {
 			var name = "LumixEngine";
-			logError("Hello {name}");
+			logError(`Hello {name}`);
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);

@@ -10,7 +10,6 @@ enum class ExprMode {
 struct Parser {
 	Parser(Unit& unit, const ex_host* host, SourceLocTable& src_locs)
 		: m_unit(unit)
-		, m_src_locs(src_locs)
 		, m_tokenizer(src_locs)
 	{
 		m_output.host = host;
@@ -58,54 +57,6 @@ struct Parser {
 		return res;
 	}
 
-	// Expand interpolation at call sites.  Keeping this as argument expansion
-	// (rather than constructing a string expression) means the runtime can stream
-	// each part without allocating a concatenated string.
-	void appendInterpolatedArgument(ExpArray<Expression*>& args, Expression* argument) {
-		if (!argument || argument->kind != Expression::STRING_LITERAL) { args.push(argument); return; }
-		StringLiteralExpression* literal = static_cast<StringLiteralExpression*>(argument);
-		const char* begin = literal->value.begin;
-		const char* end = begin + literal->value.length;
-		const char* part = begin;
-		bool found = false;
-		for (const char* p = begin; p < end; ++p) {
-			if (*p != '{' || (p + 1 < end && p[1] == '{')) { if (*p == '{') ++p; continue; }
-			const char* close = p + 1;
-			i32 brace_depth = 1;
-			bool in_string = false;
-			for (; close < end; ++close) {
-				if (*close == '\\' && close + 1 < end) { ++close; continue; }
-				if (*close == '"') { in_string = !in_string; continue; }
-				if (in_string) continue;
-				if (*close == '{') ++brace_depth;
-				else if (*close == '}' && --brace_depth == 0) break;
-			}
-			if (close == end || close == p + 1) continue;
-			// Parse the embedded text with the normal expression parser. This keeps
-			// operators, calls, indexing, member access, and nested literals identical
-			// to their non-interpolated forms.
-			Parser embedded(m_unit, m_output.host, m_src_locs);
-			embedded.m_tokenizer.init({p + 1, close - (p + 1)}, makeStringView("<interpolation>"));
-			Expression* embedded_expr = embedded.expression();
-			if (!embedded_expr) {
-				// Keep malformed interpolation as an ordinary string; semantic checking
-				// will report the original call/type error.
-				continue;
-			}
-			found = true;
-			if (p != part) { Token t = literal->token; t.value = {part, p - part}; args.push(makeExpr<StringLiteralExpression>(t)); static_cast<StringLiteralExpression*>(args[args.size() - 1])->value = t.value; }
-			args.push(embedded_expr);
-			p = close; part = close + 1;
-		}
-		if (!found) { args.push(argument); return; }
-		if (part != end) {
-			Token t = literal->token;
-			t.value = {part, end - part};
-			args.push(makeExpr<StringLiteralExpression>(t));
-			static_cast<StringLiteralExpression*>(args[args.size() - 1])->value = t.value;
-		}
-	}
-
 	static int precedence(Token::Type type) {
 		switch (type) {
 			case Token::PIPE: return 1;
@@ -134,6 +85,7 @@ struct Parser {
 			case Token::IDENTIFIER: return "identifier";
 			case Token::NUMBER: return "number";
 			case Token::STRING: return "string";
+			case Token::INTERPOLATED_STRING_SEGMENT: return "interpolated string segment";
 			case Token::RUNE: return "rune";
 			case Token::LEFT_PAREN: return "(";
 			case Token::RIGHT_PAREN: return ")";
@@ -568,6 +520,29 @@ struct Parser {
 				expr->value = token.value;
 				return expr;
 			}
+			case Token::INTERPOLATED_STRING_SEGMENT: {
+				ex_string_view value = token.value;
+				i64 escaped = 0;
+				for (i64 i = 0; i + 1 < value.length; ++i) {
+					if (value.begin[i] != '{' || value.begin[i + 1] != '{') continue;
+					++escaped;
+					++i;
+				}
+				if (escaped > 0) {
+					char* decoded = static_cast<char*>(m_unit.arena.allocate(
+						m_unit.arena.user_data, value.length - escaped, 1));
+					i64 out = 0;
+					for (i64 i = 0; i < value.length; ++i) {
+						decoded[out++] = value.begin[i];
+						if (value.begin[i] == '{' && i + 1 < value.length && value.begin[i + 1] == '{') ++i;
+					}
+					value = {decoded, value.length - escaped};
+				}
+				token.type = Token::STRING;
+				StringLiteralExpression* expr = makeExpr<StringLiteralExpression>(token);
+				expr->value = value;
+				return expr;
+			}
 		}
 		m_output.errorAt(token, "Expected expression");
 		return nullptr;
@@ -683,9 +658,13 @@ struct Parser {
 
 						Expression* arg = expression();
 						if (!arg) return nullptr;
-						appendInterpolatedArgument(call->args, arg);
+						call->args.push(arg);
 						if (peekToken().type != Token::COMMA) break;
 						consumeToken();
+						if (peekToken().type == Token::RIGHT_PAREN) {
+							m_output.errorAt(peekToken(), "Trailing comma in argument list");
+							return nullptr;
+						}
 					}
 					if (!consume(Token::RIGHT_PAREN)) return nullptr;
 					if (call->callee->kind == Expression::IDENTIFIER
@@ -1023,6 +1002,10 @@ struct Parser {
 				call->args.push(arg);
 				if (peekToken().type != Token::COMMA) break;
 				consumeToken();
+				if (peekToken().type == Token::RIGHT_PAREN) {
+					m_output.errorAt(peekToken(), "Trailing comma in argument list");
+					return nullptr;
+				}
 			}
 			if (!consume(Token::RIGHT_PAREN)) return nullptr;
 			res = call;
@@ -1907,7 +1890,6 @@ struct Parser {
 	}
 
 	Unit& m_unit;
-	SourceLocTable& m_src_locs;
 	Tokenizer m_tokenizer;
 	OutputFormatter m_output;
 };

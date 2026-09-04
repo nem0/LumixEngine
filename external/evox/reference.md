@@ -1156,9 +1156,12 @@ There is no built-in concatenation operator. In particular, `"a" + "b"` is a
 compile-time error. Code that needs concatenation must copy the bytes into an
 owned container supplied by a library or application allocator.
 
-String literals support interpolation when passed as function-call arguments.
-An expression enclosed in `{}` is emitted as a separate argument, with the
-literal text before and after it emitted as `[]const u8` arguments:
+Interpolated string literals are delimited by backticks and are supported when
+passed as function-call arguments. Ordinary string literals treat braces as
+literal characters. In an interpolated string, an expression enclosed in `{}`
+is emitted as a separate argument, with the literal text before and after it
+emitted as `[]const u8` arguments. Use `{{` for one literal `{`; `}` is literal
+outside an interpolation:
 
 ```cpp
 fn foo(a : i32, prefix : []const u8, value : i32, suffix : []const u8, c : f64) : i32 {
@@ -1167,14 +1170,14 @@ fn foo(a : i32, prefix : []const u8, value : i32, suffix : []const u8, c : f64) 
 
 fn main() : i32 {
 	var value : i32 = 42;
-	return foo(42, "some {value} abc", 69.0);
+	return foo(42, `some {value} abc`, 69.0);
 }
 ```
 
 The call above is equivalent, for argument checking, to
 `foo(42, "some ", value, " abc", 69.0)`. Interpolated expressions use the
 normal expression syntax, including operators, function calls, member access,
-and indexing.
+and indexing. Braces cannot be nested inside an interpolation.
 
 Slices, including `[]const u8`, compare by content with `==` and `!=`, so
 string literals and byte slices can be compared directly:

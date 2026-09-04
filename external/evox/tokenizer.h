@@ -17,6 +17,15 @@ struct Tokenizer {
 	SourceLocTable& m_src_locs;
 	Token m_current_token;
 
+	enum class Mode : u8 {
+		NORMAL,
+		INSIDE_STRING,
+		INSIDE_INTERPOLATION,
+	};
+
+	Mode m_mode = Mode::NORMAL;
+	bool m_interpolation_has_token = false;
+
 	Tokenizer(SourceLocTable& src_locs)
 		: m_src_locs(src_locs) {}
 
@@ -26,6 +35,8 @@ struct Tokenizer {
 		m_current = data(document);
 		m_line = 1;
 		m_column = 1;
+		m_mode = Mode::NORMAL;
+		m_interpolation_has_token = false;
 		m_current_token = nextToken();
 	}
 
@@ -112,16 +123,56 @@ struct Tokenizer {
 
 	Token stringToken() {
 		const char* value_begin = m_current;
-		while (m_current != data(m_document) + size(m_document) && peekChar() != '"') {
-			if (peekChar() == '\n') return makeToken(Token::ERROR);
-			advance();
-		}
-		if (m_current == data(m_document) + size(m_document)) return makeToken(Token::ERROR);
+		const char* const end = data(m_document) + size(m_document);
+		while (m_current != end && peekChar() != '"') advance();
+		if (m_current == end) return makeToken(Token::ERROR);
+
 		const char* value_end = m_current;
 		advance();
-		Token res = makeToken(Token::STRING);
-		res.value = ex_string_view{value_begin, value_end - value_begin};
-		return res;
+		Token string = makeToken(Token::STRING);
+		string.value = {value_begin, value_end - value_begin};
+		return string;
+	}
+
+	Token interpolatedStringToken(bool continuation = false) {
+		const char* value_begin = m_current;
+		const char* const end = data(m_document) + size(m_document);
+		while (m_current != end) {
+			if (peekChar() == '`') {
+				const char* value_end = m_current;
+				advance();
+				Token segment = makeToken(Token::INTERPOLATED_STRING_SEGMENT);
+				segment.value = {value_begin, value_end - value_begin};
+				if (!continuation) return segment;
+
+				m_mode = Mode::NORMAL;
+				if (segment.value.length == 0) return nextToken();
+				return segment;
+			}
+			if (peekChar() == '{') {
+				if (peekNextChar() == '{') {
+					advance();
+					advance();
+					continue;
+				}
+				if (m_mode == Mode::INSIDE_INTERPOLATION) return makeToken(Token::ERROR);
+
+				Token segment = makeToken(Token::INTERPOLATED_STRING_SEGMENT);
+				segment.value = {value_begin, m_current - value_begin};
+				if (segment.value.length > 0) {
+					// Leave `{` for nextToken, which emits the separator after this segment.
+					m_mode = Mode::INSIDE_STRING;
+					return segment;
+				}
+
+				advance();
+				m_mode = Mode::INSIDE_INTERPOLATION;
+				m_interpolation_has_token = false;
+				return nextToken();
+			}
+			advance();
+		}
+		return makeToken(Token::ERROR);
 	}
 
 	Token runeToken() {
@@ -287,6 +338,19 @@ struct Tokenizer {
 	}
 
 	Token nextToken() {
+		if (m_mode == Mode::INSIDE_STRING) {
+			m_start_token = m_current;
+			m_start_line = m_line;
+			m_start_column = m_column;
+			if (peekChar() == '{' && peekNextChar() != '{') {
+				advance();
+				m_mode = Mode::INSIDE_INTERPOLATION;
+				m_interpolation_has_token = false;
+				return makeToken(Token::COMMA);
+			}
+			return interpolatedStringToken(true);
+		}
+
 		skipWhitespaces();
 		m_start_token = m_current;
 		m_start_line = m_line;
@@ -294,16 +358,33 @@ struct Tokenizer {
 		if (m_current == data(m_document) + size(m_document)) return makeToken(Token::END_OF_FILE);
 
 		const char c = advance();
+		if (m_mode == Mode::INSIDE_INTERPOLATION && c != '}') m_interpolation_has_token = true;
 		if (isDigit(c)) return numberToken();
 		if (isIdentifierStart(c)) return identifierOrKeywordToken();
 
 		switch (c) {
 			case '"': return stringToken();
+			case '`': return interpolatedStringToken();
 			case '\'': return runeToken();
 			case '(': return makeToken(Token::LEFT_PAREN);
 			case ')': return makeToken(Token::RIGHT_PAREN);
-			case '{': return makeToken(Token::LEFT_BRACE);
-			case '}': return makeToken(Token::RIGHT_BRACE);
+			case '{':
+				if (m_mode == Mode::INSIDE_INTERPOLATION) return makeToken(Token::ERROR);
+				return makeToken(Token::LEFT_BRACE);
+			case '}':
+				if (m_mode == Mode::INSIDE_INTERPOLATION) {
+					if (!m_interpolation_has_token) return makeToken(Token::ERROR);
+					m_mode = Mode::INSIDE_STRING;
+					// Empty suffix or empty segment before another interpolation.
+					if (peekChar() == '`') return nextToken();
+					if (peekChar() == '{' && peekNextChar() != '{') {
+						advance();
+						m_mode = Mode::INSIDE_INTERPOLATION;
+						m_interpolation_has_token = false;
+					}
+					return makeToken(Token::COMMA);
+				}
+				return makeToken(Token::RIGHT_BRACE);
 			case '[': return makeToken(Token::LEFT_BRACKET);
 			case ']': return makeToken(Token::RIGHT_BRACKET);
 			case ';': return makeToken(Token::SEMICOLON);

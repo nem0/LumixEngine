@@ -1,3 +1,11 @@
+TEST(CallTrailingCommaFails) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn foo(value : i32) : void {}
+		fn main() : void { foo(1,); }
+	)");
+	return true;
+}
+
 TEST(ParameterAssignmentFails) {
 	const char* source = R"(
 		fn foo(a : i32) : void {

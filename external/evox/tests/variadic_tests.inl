@@ -78,7 +78,7 @@ TEST(VariadicAnyMatchesInterpolatedString) {
 		}
 		fn main() : i32 {
 			var name = "LumixEngine";
-			return logError("Hello {name}");
+			return logError(`Hello {name}`);
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);
