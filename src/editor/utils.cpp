@@ -2522,7 +2522,14 @@ bool Action::shortcutText(Span<char> out) const {
 
 bool Action::iconButton(bool enabled, StudioApp* app) {
 	const bool result = app ? app->checkShortcut(*this) : false;
-	return ImGuiEx::IconButton(font_icon, label_short, enabled) || result;
+	const bool clicked = ImGuiEx::IconButton(font_icon, nullptr, enabled);
+	if (ImGui::IsItemHovered()) {
+		StaticString<128> tooltip(label_short);
+		char shortcut[32];
+		if (shortcutText(shortcut)) tooltip.append(" (", shortcut, ")");
+		ImGui::SetTooltip("%s", tooltip.data);
+	}
+	return clicked || result;
 }
 
 bool Action::toolbarButton(ImFont* font, bool is_selected) {
