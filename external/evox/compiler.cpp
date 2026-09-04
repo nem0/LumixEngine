@@ -1518,6 +1518,7 @@ struct Checker {
 				st->key_token = s->key_token;
 				st->value_token = s->value_token;
 				st->is_key_value = s->is_key_value;
+				st->value_by_reference = s->value_by_reference;
 				st->is_custom_iterator = s->is_custom_iterator;
 				st->iterator_next_field = s->iterator_next_field;
 				st->iterator_element_type = s->iterator_element_type;
@@ -4922,7 +4923,21 @@ struct Checker {
 			}
 		}
 
+		if (fs.value_by_reference && (fs.end || fs.is_custom_iterator)) {
+			errorLine(fs.token, "Mutable for-in references require an array or slice");
+			return false;
+		}
+		if (fs.value_by_reference && !fs.end && !fs.is_custom_iterator && begin_type->kind == ResolvedTypeKind::SLICE
+			&& static_cast<SliceResolvedType*>(begin_type)->is_const) {
+			errorLine(fs.token, "Cannot use a mutable for-in reference with a read-only slice");
+			return false;
+		}
+
 		if (fs.is_unroll) {
+			if (fs.value_by_reference) {
+				errorLine(fs.token, "Mutable for-in references are not supported by unroll for");
+				return false;
+			}
 			++suppress_errors;
 			ComptimeValue elements = evalComptime(unit, *fs.begin, &ctx);
 			--suppress_errors;
@@ -5016,7 +5031,7 @@ struct Checker {
 		binding.name = fs.value_var;
 		binding.type = element_type;
 		binding.declaration_token = &fs.value_token;
-		binding.is_immutable = true;
+		binding.is_immutable = !fs.value_by_reference;
 		binding.slot = &fs.slot;
 		ctx.loop_labels.push(pending_label);
 		bool ok = checkStatement(unit, ctx, fs.body, return_type, {});

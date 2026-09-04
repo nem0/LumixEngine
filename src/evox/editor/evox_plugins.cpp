@@ -154,6 +154,7 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8) {
 } // namespace EvoxTokens
 
 static Action g_toggle_evox_breakpoint{"Evox", "Toggle breakpoint", "Toggle breakpoint at cursor", "evox_toggle_breakpoint", ICON_FA_CIRCLE, Action::Type::NORMAL};
+static Action g_evox_check{"Evox", "Check", "Check Evox source", "evox_check", ICON_FA_CHECK, Action::Type::NORMAL};
 static Action g_evox_go_to_definition{"Evox", "Go to definition", "Go to definition", "evox_go_to_definition", ""};
 static Action g_debugger_continue{"Evox", "Continue", "Continue execution", "evox_continue", ICON_FA_PLAY, Action::Type::NORMAL};
 static Action g_debugger_step_over{"Evox", "Step over", "Step over next statement", "evox_step_over", ICON_FA_ARROW_RIGHT, Action::Type::NORMAL};
@@ -689,7 +690,7 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 			if (actions.save.iconButton(m_dirty, &m_app)) save();
 			if (actions.open_externally.iconButton(true, &m_app)) m_app.getAssetBrowser().openInExternalEditor(m_path);
 			if (actions.view_in_browser.iconButton(true, &m_app)) m_app.getAssetBrowser().locate(m_path);
-			if (ImGuiEx::IconButton(ICON_FA_CHECK, "Check")) check();
+			if (g_evox_check.iconButton(true, &m_app)) check();
 			ImGui::EndMenuBar();
 		}
 

@@ -1154,19 +1154,28 @@ struct Parser {
 		if (for_token.type != Token::FOR) return nullptr;
 
 		ForStatement* res = makeStmt<ForStatement>(for_token);
+		bool first_by_reference = peekToken().type == Token::AMPERSAND;
+		if (first_by_reference) consumeToken();
 		res->key_token = consumeToken();
 		if (res->key_token.type != Token::IDENTIFIER) { m_output.errorAt(res->key_token, "Expected identifier"); return nullptr; }
 		res->key_var = res->key_token.value;
 
 		bool is_key_value = false;
 		if (peekToken().type == Token::COMMA) {
+			if (first_by_reference) {
+				m_output.errorAt(peekToken(), "The index binding cannot be a reference");
+				return nullptr;
+			}
 			is_key_value = true;
 			consumeToken();
+			res->value_by_reference = peekToken().type == Token::AMPERSAND;
+			if (res->value_by_reference) consumeToken();
 			res->value_token = consumeToken();
 			if (res->value_token.type != Token::IDENTIFIER) { m_output.errorAt(res->value_token, "Expected identifier"); return nullptr; }
 			res->value_var = res->value_token.value;
 		}
 		else {
+			res->value_by_reference = first_by_reference;
 			res->value_var = res->key_var;
 			res->value_token = res->key_token;
 			res->key_token = {};

@@ -1745,7 +1745,8 @@ for i, v in arr {
 }
 ```
 
-`for v in arr` is syntax sugar for iterating the index range and binding the element:
+`for v in arr` is syntax sugar for iterating the index range and binding a
+read-only copy of the element:
 
 ```cpp
 for i in 0..arr.length {
@@ -1764,9 +1765,26 @@ for i in 0..arr.length {
 }
 ```
 
+Prefix `&` on the element binding iterates by mutable reference instead of
+copying the element:
+
+```cpp
+for &v in arr {
+	v += 1;
+}
+
+for i, &v in arr {
+	arr[i] = v * 2;
+}
+```
+
+The `&v` binding is equivalent to accessing `arr[i]` directly and can mutate
+the viewed storage. The index binding is always immutable.
+
 - `arr` must be a static-sized array or a slice
 - `i` has type `isize`; `v` has the element type of `arr`. This holds for static arrays too: `.length` on a `[N]T` is an untyped compile-time constant, and the desugared range concretizes it to `isize`
-- both `i` and `v` are immutable inside the loop body, like the single-variable `for` loop variable
+- without `&`, both `i` and `v` are immutable inside the loop body, like the single-variable `for` loop variable
+- `&v` requires writable, addressable storage; it is invalid for a read-only `[]const T` slice
 
 ### Custom iterators
 
@@ -3122,6 +3140,8 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 
 * if var a = some_nullabe { ... } else { ... } and same for match
 * union tag is always 4 bytes
+* how can we push unions if we don't know the tag value of variants, i.e. U = A | B - we don't know if A's tag is 0 or 1
+
 * https://verdagon.dev/grimoire/grimoire#the-list
 * should we make string literal to cstr cast explicit?
 * hex - 0x1234ABCD
@@ -3137,8 +3157,6 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 
 * editor plugins in evox
 * get rid of std::free
-* how to expose Span<const Item> foo() to script?
-* how can we push unions if we don't know the tag value of variants, i.e. U = A | B - we don't know if A's tag is 0 or 1
 * use case - compile-time string hash
 * MT typecheck
 
@@ -3153,12 +3171,9 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 * with/when/where/using?
 * context object?
 * multiple returns?
-* runtime reflection? (compile-time introspection is specified, see [Compile-time introspection](#compile-time-introspection))
+* runtime reflection?
 * gc?
 * attributes?
 * fibers/coroutines?
 * closures?
-* generators/yield (custom pull iterators use the `next` protocol above)
-	fn each(a : arr) : yield i32 { ...
-	for x in each(a) { ... }
 

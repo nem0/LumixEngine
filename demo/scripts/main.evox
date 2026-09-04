@@ -7,6 +7,7 @@ import "core:document"
 import "core:world"
 import "core:random"
 import "core:evox_data" as ld
+import "std:math" as math
 
 import "scripts/player" as player
 
@@ -14,6 +15,14 @@ import "scripts/player" as player
 struct RandomColorComponent {
 	#[ld.Owner {}]
 	entity: Entity;
+}
+
+#[ld.Data {}]
+struct RandomColorTickComponent {
+	#[ld.Owner {}]
+	entity: Entity;
+	t : f32;
+	green : f32;
 }
 
 var g_input : InputSystem = undefined;
@@ -32,10 +41,25 @@ fn start() : void {
 		var mi = c.entity.model_instance() else return;
 		mi.overrideMaterialVec4(0, "Material color", {0, randFloat(), randFloat(), 1});
 	}
+
+	var rnd_col = g_world.getEvoxData(RandomColorTickComponent);
+	for &c in rnd_col {
+		c.green = randFloat();
+	}
 }
+
+fn abs(v : f32) : f32 { return v < 0 ? -v : v; }
 
 fn update(td : f32) : void {
     player.update(td);
+
+	// random color tick
+	var rnd_col = g_world.getEvoxData(RandomColorTickComponent);
+	for &c in rnd_col {
+		c.t = c.t + td * 3;
+		var mi = c.entity.model_instance() else return;
+		mi.overrideMaterialVec4(0, "Material color", {0, c.green, abs(math.cos(c.t)), 1});	
+	}
 
 	// UI
 	var ui = g_world.ui() else return;

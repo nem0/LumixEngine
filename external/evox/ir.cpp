@@ -1515,13 +1515,24 @@ struct IRBuilder {
 				pending_loop_label = {};
 
 				ExIrOp* element = nullptr;
+				ExIrOp* element_address = nullptr;
 				if (is_slice) {
-					auto& load = alloc<ExOpSliceLoad>();
-					load.slice = &container_load;
-					load.index = &counter_load;
-					load.index_type = index_type;
-					load.element_size = typeByteSize(*element_type);
-					element = &load;
+					if (for_statement.value_by_reference) {
+						auto& ref = alloc<ExOpSliceRef>();
+						ref.slice = &container_load;
+						ref.index = &counter_load;
+						ref.index_type = index_type;
+						ref.element_size = typeByteSize(*element_type);
+						element_address = &ref;
+					}
+					else {
+						auto& load = alloc<ExOpSliceLoad>();
+						load.slice = &container_load;
+						load.index = &counter_load;
+						load.index_type = index_type;
+						load.element_size = typeByteSize(*element_type);
+						element = &load;
+					}
 				}
 				else {
 					auto& base = buildExpressionIR(*for_statement.begin, false);
@@ -1544,10 +1555,19 @@ struct IRBuilder {
 					address.lhs = &base;
 					address.rhs = &offset;
 					address.result_mode = ExIrOp::ADDRESS;
-					auto& load = alloc<ExOpLoad>();
-					load.addr = &address;
-					load.size = size;
-					element = &load;
+					if (for_statement.value_by_reference) element_address = &address;
+					else {
+						auto& load = alloc<ExOpLoad>();
+						load.addr = &address;
+						load.size = size;
+						element = &load;
+					}
+				}
+				if (for_statement.value_by_reference) {
+					auto& initial = alloc<ExOpLoad>();
+					initial.addr = element_address;
+					initial.size = typeByteSize(*element_type);
+					element = &initial;
 				}
 				auto& value_addr = alloc<ExOpPushLocalAddr>();
 				value_addr.alloca = &value;
@@ -1557,6 +1577,16 @@ struct IRBuilder {
 				assign_value.dst = &value_addr;
 				loop.true_block->ops.push(&assign_value);
 				buildStatementIR(*for_statement.body, *loop.true_block);
+				if (for_statement.value_by_reference) {
+					auto& updated = alloc<ExOpLoad>();
+					updated.addr = &value_addr;
+					updated.size = typeByteSize(*element_type);
+					auto& write_back = alloc<ExOpCopy>();
+					write_back.type = element_type;
+					write_back.src = &updated;
+					write_back.dst = element_address;
+					loop.true_block->ops.push(&write_back);
+				}
 				finishLoopIteration(loop, increment_target, bottom, exit, &counter, index_type);
 				return;
 			}

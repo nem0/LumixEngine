@@ -523,6 +523,51 @@ TEST(ForInIndexVariableIsImmutable) {
 	return true;
 }
 
+TEST(ForInMutableReferenceUpdatesArray) {
+	const char* source = R"(
+		fn main() : i32 {
+			var arr : [3]i32 = undefined;
+			arr[0] = 1;
+			arr[1] = 2;
+			arr[2] = 3;
+			for &v in arr {
+				v *= 2;
+			}
+			return arr[0] + arr[1] + arr[2];
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(12, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ForInMutableReferenceWithIndexUpdatesSlice) {
+	const char* source = R"(
+		fn main() : i32 {
+			var arr : [3]i32 = undefined;
+			arr[0] = 1;
+			arr[1] = 2;
+			arr[2] = 3;
+			var values : []i32 = arr[:];
+			for i, &v in values {
+				v += i as i32;
+			}
+			return arr[0] + arr[1] * 10 + arr[2] * 100;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(531, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(ForInEmptySliceDoesNotExecuteRuntime) {
 	const char* source = R"(
 		fn main() : i32 {
