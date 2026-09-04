@@ -2674,6 +2674,13 @@ struct Checker {
 		}
 
 		if (!mem.expression->resolved_type) {
+			if (mem.expression->kind == Expression::IDENTIFIER) {
+				ex_string_view qualifier = static_cast<IdentifierExpression*>(mem.expression)->name;
+				if (findImportedUnitByAlias(unit, qualifier)) {
+					errorLine(expr.token, "Unknown symbol ", qualifier, ".", mem.name.value);
+					return nullptr;
+				}
+			}
 			errorLine(expr.token, "Cannot call function ", mem.name.value, " with UFCS receiver with unknown type");
 			return nullptr;
 		}
