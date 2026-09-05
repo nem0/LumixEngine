@@ -3159,6 +3159,12 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 
 ---
 
+* contracts?
+	// #pre[player != null]
+	fn findClosestButton() : ClosestButton {
+* else break; else continue; else panic; else return foo;
+* type-safe c->evox function call
+
 * enum backing type
 * do temporaries survive until the end of statement? e.g. foo(bar().view())
 * jit/llvm/AOT?

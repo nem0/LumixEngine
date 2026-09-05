@@ -151,6 +151,7 @@ struct EvoxSystemImpl : EvoxSystem {
 		if (!m_runtime) return;
 		const ex_string_view function_name = toLs("start");
 		if (ex_bytecode_runtime_result_kind(m_runtime, function_name) == EX_TYPE_INVALID) return;
+		ex_push_ptr(m_runtime, &m_engine.getInputSystem());
 		if (ex_call(m_runtime, function_name) == EX_RESULT_FAILURE) logError("Evox start failed");
 	}
 
@@ -222,16 +223,6 @@ struct EvoxSystemImpl : EvoxSystem {
 		m_runtime = ex_runtime_create(m_bytecode, &m_host);
 		if (!m_runtime) return false;
 		bindCoreFunctions(m_module, m_runtime, m_allocator);
-		const ex_string_view init_name = toLs("init");
-		if (ex_bytecode_runtime_result_kind(m_runtime, init_name) != EX_TYPE_INVALID) {
-			ex_push_ptr(m_runtime, &m_engine.getInputSystem());
-			if (ex_call(m_runtime, init_name) == EX_RESULT_FAILURE) {
-				logError("Evox init failed");
-				ex_runtime_destroy(m_runtime);
-				m_runtime = nullptr;
-				return false;
-			}
-		}
 		return true;
 	}
 

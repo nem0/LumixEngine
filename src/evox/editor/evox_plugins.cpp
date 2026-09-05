@@ -67,17 +67,19 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8) {
 		"f64",
 		"false",
 		"fn",
+		"for",
 		"i8",
 		"i16",
 		"i32",
 		"i64",
 		"if",
 		"import",
+		"in",
 		"match",
 		"null",
 		"not",
 		"or",
-		"ref",
+		"panic",
 		"return",
 		"struct",
 		"true",
@@ -545,12 +547,48 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 	const Path& getPath() override { return m_path; }
 
 	void fileChangedExternally() override {
-		OutputMemoryStream editor_blob(m_app.getAllocator());
-		OutputMemoryStream file_blob(m_app.getAllocator());
-		m_editor->serializeText(editor_blob);
-		if (!m_app.getEngine().getFileSystem().getContentSync(m_path, file_blob)) return;
-		if (editor_blob.size() == file_blob.size() && memcmp(editor_blob.data(), file_blob.data(), editor_blob.size()) == 0) {
-			m_dirty = false;
+		m_show_external_modification_notification = true;
+	}
+
+	void modificationNotificationUI() {
+		if (m_show_external_modification_notification) {
+			OutputMemoryStream editor_blob(m_app.getAllocator());
+			OutputMemoryStream file_blob(m_app.getAllocator());
+			m_editor->serializeText(editor_blob);
+			FileSystem& fs = m_app.getEngine().getFileSystem();
+			if (fs.getContentSync(m_path, file_blob)) {
+				if (editor_blob.size() != file_blob.size()
+					|| memcmp(editor_blob.data(), file_blob.data(), editor_blob.size()) != 0) {
+					openCenterStrip("evox_external_modification");
+				}
+				else {
+					m_dirty = false;
+				}
+			}
+			else {
+				logError("Unexpected error while reading file ", m_path);
+			}
+			m_show_external_modification_notification = false;
+		}
+
+		if (beginCenterStrip("evox_external_modification")) {
+			ImGui::NewLine();
+			alignGUICenter([&]() {
+				ImGui::Text("File %s modified externally", m_path.c_str());
+			});
+			alignGUICenter([&]() {
+				if (ImGui::Button("Ignore")) ImGui::CloseCurrentPopup();
+				ImGui::SameLine();
+				if (ImGui::Button("Reload")) {
+					OutputMemoryStream blob(m_app.getAllocator());
+					if (m_app.getEngine().getFileSystem().getContentSync(m_path, blob)) {
+						m_editor->setText(StringView((const char*)blob.data(), (u32)blob.size()));
+						m_dirty = false;
+					}
+					ImGui::CloseCurrentPopup();
+				}
+			});
+			endCenterStrip();
 		}
 	}
 
@@ -683,6 +721,8 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 			ImGui::EndMenuBar();
 		}
 
+		modificationNotificationUI();
+
 		if (m_message.length() > 0) {
 			ImGui::TextUnformatted(m_message.c_str());
 			ImGui::Separator();
@@ -767,6 +807,7 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 	Path m_path;
 	UniquePtr<CodeEditor> m_editor;
 	String m_message;
+	bool m_show_external_modification_notification = false;
 };
 
 struct EvoxAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {

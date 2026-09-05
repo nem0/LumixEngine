@@ -43,9 +43,6 @@ struct Button {
 	action: ButtonAction;
 }
 
-// global vars
-var g_world : World = undefined;
-
 #[ld.Data {}]
 struct NavAgentSpawnPoint {
 	#[ld.Owner {}]
@@ -57,6 +54,9 @@ struct NavAgentWaypoint {
 	#[ld.Owner {}]
 	entity: Entity;
 }
+
+// global vars
+var g_world : World = undefined;
 
 // functions
 fn abs(v : f32) : f32 { return v < 0 ? -v : v; }
@@ -92,24 +92,24 @@ struct ClosestButton {
 }
 
 fn findClosestButton() : ClosestButton {
-	const pl = player.player;
-	if pl == null { 
-		panic("null player");
-	}
-	const player_pos = pl.getPosition();
-	const buttons = g_world.getEvoxData(Button);
-	if buttons.length == 0 { panic("No buttons"); }
-	var closest_button : Button = buttons[0];
-	var closest_dist = f64::max;
-	for button in buttons {
-		var button_pos = button.entity.getPosition();
-		var dist = length(player_pos - button_pos);
-		if dist < closest_dist {
-			closest_dist = dist;
-			closest_button = button;
+	if const pl = player.player { 
+		const player_pos = pl.getPosition();
+		const buttons = g_world.getEvoxData(Button);
+		if buttons.length == 0 { panic("No buttons"); }
+
+		var closest_button : Button = buttons[0];
+		var closest_dist = f64::max;
+		for button in buttons {
+			var button_pos = button.entity.getPosition();
+			var dist = length(player_pos - button_pos);
+			if dist < closest_dist {
+				closest_dist = dist;
+				closest_button = button;
+			}
 		}
+		return {closest_button, closest_dist};
 	}
-	return {closest_button, closest_dist};
+	panic("Null player");
 }
 
 fn update(td : f32, input : InputSystem) : void {
@@ -154,8 +154,8 @@ fn update(td : f32, input : InputSystem) : void {
 						match closest.button.action {
 							case .SPAWN_NAV_AGENT:
 								var spawn_point = g_world.getEvoxData(NavAgentSpawnPoint);
-								if spawn_point.length == 0 {
-									logError("No spawn point found");
+								if spawn_point.length != 1 {
+									logError("There must be exactly one spawn point");
 									return;
 								}
 							case: panic("TODO");

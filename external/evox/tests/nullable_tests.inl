@@ -30,6 +30,20 @@ TEST(NullableConstBindingIsImmutable) {
 	return true;
 }
 
+TEST(NullableComparisonDoesNotNarrow) {
+	const char* source = R"(
+		fn main() : i32 {
+			var value : ?i32 = 42;
+			if value != null {
+				return value;
+			}
+			return 0;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(NullableConstBindingRequiresNullableExpression) {
 	const char* source = R"(
 		fn main() : void {

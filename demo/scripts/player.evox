@@ -67,14 +67,12 @@ fn processInputEvents() : void {
 
 fn init(w : World, inp : InputSystem) : void {
 	player = w.findByName("player");
-	if player != null {
-		camera_pivot = player.findChildByName("camera_pivot");
-	}
 	input_system = inp;
 	physics_module = w.physics();
 
-	if player == null { return; }
-	const anim = player.animator() else return;
+	const p = player else return;
+	camera_pivot = p.findChildByName("camera_pivot");
+	const anim = p.animator() else return;
 
 	speed_input_idx = anim.getInputIndex("speed_y");
 	dir_input_idx = anim.getInputIndex("speed_x");
@@ -86,20 +84,18 @@ fn init(w : World, inp : InputSystem) : void {
 fn update(dt : f32) : void {
 	processInputEvents();
 
-	if physics_module != null {
-		for hit in physics_module.getControllerHits() {
+	if const pm = physics_module {
+		for hit in pm.getControllerHits() {
 			const obj = hit.hit_entity;
-			const a = obj.rigid_actor();
-			if a != null {
+			if const a = obj.rigid_actor() {
 				const force = yawToDir(yaw) * 50.0;
 				a.applyForce(force);
 			}
 		}
 	}
 
-	if player == null { return; }
-	const anim = player.animator();
-	if anim == null { return; }
+	const pl = player else return;
+	const anim = pl.animator() else return;
 
 	if speed_input_idx == -1 {
 		speed_input_idx = anim.getInputIndex("speed_y");
@@ -112,10 +108,10 @@ fn update(dt : f32) : void {
 	if pitch < -0.9 { pitch = -0.9; }
 	if pitch > 0.9 { pitch = 0.9; }
 
-	const phys_controller = player.physical_controller();
+	const phys_controller = pl.physical_controller();
 	var gravity_speed : f32 = 0.0;
-	if phys_controller != null {
-		gravity_speed = phys_controller.getGravitySpeed();
+	if const pc = phys_controller {
+		gravity_speed = pc.getGravitySpeed();
 	}
 
 	var speed_y : f32 = forward ? 3.0 :
@@ -140,9 +136,9 @@ fn update(dt : f32) : void {
 
 	const yaw_rot = makeQuatFromYaw(yaw);
 	const pitch_rot = makeQuatFromPitch(pitch);
-	player.setRotation(yaw_rot);
+	pl.setRotation(yaw_rot);
 
-	if camera_pivot != null {
-		camera_pivot.setRotation(yaw_rot * pitch_rot);
+	if const cp = camera_pivot {
+		cp.setRotation(yaw_rot * pitch_rot);
 	}
 }

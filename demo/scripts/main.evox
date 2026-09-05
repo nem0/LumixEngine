@@ -8,7 +8,9 @@ import "maps/demo/demo" as demo
 var g_input : InputSystem = undefined;
 var g_world : World = undefined;
 
-fn start() : void {
+fn start(input : InputSystem) : void {
+	g_input = input;
+	player.init(g_world, g_input);
 	demo.start(g_world);
 }
 
@@ -16,11 +18,6 @@ fn update(td : f32) : void {
     demo.update(td, g_input);
 }
 
-fn init(input : InputSystem) : void {
-	g_input = input;
-}
-
 fn addWorld(world : World) : void {
 	g_world = world;
-	player.init(world, g_input);
 }
