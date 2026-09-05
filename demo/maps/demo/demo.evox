@@ -2,6 +2,7 @@ import "core:dvec3"
 import "core:entity"
 import "core:keycode"
 import "core:input"
+import "core:log"
 import "core:model_instance"
 import "core:random"
 import "core:world"
@@ -45,8 +46,17 @@ struct Button {
 // global vars
 var g_world : World = undefined;
 
-#[MapGlobal {}]
-var nav_agent_spawn_point : ?Entity = null;
+#[ld.Data {}]
+struct NavAgentSpawnPoint {
+	#[ld.Owner {}]
+	entity: Entity;
+}
+
+#[ld.Data {}]
+struct NavAgentWaypoint {
+	#[ld.Owner {}]
+	entity: Entity;
+}
 
 // functions
 fn abs(v : f32) : f32 { return v < 0 ? -v : v; }
@@ -71,6 +81,9 @@ fn start(world : World) : void {
 	for &c in rnd_col {
 		c.green = randFloat();
 	}
+
+	var ui = g_world.ui() else return;
+	enableCursor(ui, true);
 }
 
 struct ClosestButton {
@@ -80,11 +93,12 @@ struct ClosestButton {
 
 fn findClosestButton() : ClosestButton {
 	const pl = player.player;
-	if pl == null {
+	if pl == null { 
 		panic("null player");
 	}
 	const player_pos = pl.getPosition();
 	const buttons = g_world.getEvoxData(Button);
+	if buttons.length == 0 { panic("No buttons"); }
 	var closest_button : Button = buttons[0];
 	var closest_dist = f64::max;
 	for button in buttons {
@@ -139,7 +153,11 @@ fn update(td : f32, input : InputSystem) : void {
 					if closest.dist < INTERACTION_DIST {
 						match closest.button.action {
 							case .SPAWN_NAV_AGENT:
-								
+								var spawn_point = g_world.getEvoxData(NavAgentSpawnPoint);
+								if spawn_point.length == 0 {
+									logError("No spawn point found");
+									return;
+								}
 							case: panic("TODO");
 						}
 					}
