@@ -608,8 +608,8 @@ TEST(IntrospectionTypeofRejectsUntypedNumerics) {
 TEST(IntrospectionTypeofObservesNullablePromotion) {
 	const char* source = R"(
 		fn inspect(value : ?i32) : void {
-			if value != null {
-				comptime T = typeof(value);
+			if const unwrapped = value {
+				comptime T = typeof(unwrapped);
 				if T == i32 { } else { var bad : MissingType = undefined; }
 			}
 		}
@@ -1380,8 +1380,8 @@ TEST(IntrospectionGenericPrintRendersEveryKind) {
 				case .I8, .I16, .I32, .I64, .ISize:  write_i64(v as i64);
 				case .U8, .U16, .U32, .U64:          write_u64(v as u64);
 				case .Nullable:
-					if v != null {
-						print(v);
+					if const value = v {
+						print(value);
 					} else {
 						write_bytes("null");
 					}

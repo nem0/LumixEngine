@@ -516,6 +516,14 @@ static EvoxDebuggerWindow* g_evox_debugger = nullptr;
 static bool toggleEvoxBreakpoint(StudioApp& app, const Path& source, u32 line);
 static void applyEvoxBreakpointMarkers(CodeEditor& editor, const Path& path);
 
+static Path evoxSourcePath(StringView source) {
+	if (startsWith(source, "core:")) {
+		const StringView name = source.withoutLeft(5);
+		return endsWith(name, ".evox") ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".evox");
+	}
+	return endsWith(source, ".evox") ? Path(source) : Path(source, ".evox");
+}
+
 struct EvoxEditorWindow final : AssetEditorWindow {
 	EvoxEditorWindow(const Path& path, StudioApp& app)
 		: AssetEditorWindow(app)
@@ -646,40 +654,19 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 		ex_runtime* runtime = module ? module->getDebugRuntime() : nullptr;
 
 		u32 current_line = 0;
+		bool has_current_line = false;
 		if (runtime && ex_debug_is_suspended(runtime)) {
 			ex_debug_event event = {};
-			if (ex_debug_pause_event(runtime, &event) == EX_RESULT_OK) {
-				StringView event_source(event.location.source_name.begin, event.location.source_name.length);
-				StringView editor_path(m_path.c_str(), m_path.c_str() + stringLength(m_path.c_str()));
-				if (!event_source.empty()) {
-					const char* event_filename = reverseFind(event_source, '/');
-					if (!event_filename) event_filename = reverseFind(event_source, '\\');
-					if (!event_filename) event_filename = event_source.data;
-					else ++event_filename;
-
-					const char* editor_filename = reverseFind(editor_path, '/');
-					if (!editor_filename) editor_filename = reverseFind(editor_path, '\\');
-					if (!editor_filename) editor_filename = editor_path.data;
-					else ++editor_filename;
-
-					const StringView ed_name(editor_filename, editor_path.end());
-					if (startsWith(event_source, "core:")) {
-						const StringView core_name = event_source.withoutLeft(5);
-						if (startsWith(ed_name, core_name)) {
-							current_line = event.location.line > 0 ? event.location.line - 1 : 0;
-						}
-					} else if (equalStrings(StringView(event_filename, event_source.end()), ed_name)
-						|| (endsWith(ed_name, ".evox")
-							&& equalStrings(StringView(event_filename, event_source.end()), StringView(ed_name.data, ed_name.end() - 4)))) {
-						current_line = event.location.line > 0 ? event.location.line - 1 : 0;
-					}
-				}
+			if (ex_debug_pause_event(runtime, &event) == EX_RESULT_OK && event.location.line > 0) {
+				const StringView event_source(event.location.source_name.begin, event.location.source_name.length);
+				has_current_line = !event_source.empty() && evoxSourcePath(event_source) == m_path;
+				current_line = event.location.line - 1;
 			}
 		}
 
-		if (runtime && ex_debug_is_suspended(runtime)) {
+		if (has_current_line) {
 			m_editor->setCurrentDebugLine(current_line);
-			if (m_focus_request && current_line > 0) {
+			if (m_focus_request) {
 				m_focus_request = false;
 				m_editor->setSelection(current_line, 0, current_line, 0, true);
 			}
@@ -977,16 +964,7 @@ struct EvoxDebuggerWindow final : StudioApp::GUIPlugin {
 			ex_debug_event event = {};
 			if (ex_debug_pause_event(runtime, &event) == EX_RESULT_OK) {
 				const StringView src_name(event.location.source_name.begin, event.location.source_name.length);
-				Path path;
-				if (startsWith(src_name, "core:")) {
-					const StringView file_name = src_name.withoutLeft(5);
-					const bool has_lum = endsWith(file_name, ".evox");
-					path = has_lum ? Path("engine/scripts/core/", file_name) : Path("engine/scripts/core/", file_name, ".evox");
-				} else {
-					// Imported units use the import spelling as their source name
-					// (e.g. `import demo` -> `demo`), while the asset is demo.evox.
-					path = endsWith(src_name, ".evox") ? Path(src_name) : Path(src_name, ".evox");
-				}
+				const Path path = evoxSourcePath(src_name);
 				m_app.getAssetBrowser().openEditor(path);
 				AssetEditorWindow* win = m_app.getAssetBrowser().getWindow(path);
 				if (win) {
@@ -1064,15 +1042,8 @@ struct EvoxDebuggerWindow final : StudioApp::GUIPlugin {
 					if (ImGui::IsItemHovered()) {
 						ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
 						if (ImGui::IsMouseDoubleClicked(0)) {
-							StringView src_name(location.source_name.begin, location.source_name.length);
-							Path path;
-							if (startsWith(src_name, "core:")) {
-								const StringView file_name = src_name.withoutLeft(5);
-								const bool has_lum = endsWith(file_name, ".evox");
-								path = has_lum ? Path("engine/scripts/core/", file_name) : Path("engine/scripts/core/", file_name, ".evox");
-							} else {
-								path = Path(src_name);
-							}
+							const StringView src_name(location.source_name.begin, location.source_name.length);
+							const Path path = evoxSourcePath(src_name);
 							m_app.getAssetBrowser().openEditor(path);
 							AssetEditorWindow* win = m_app.getAssetBrowser().getWindow(path);
 							if (win) {

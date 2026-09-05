@@ -7,9 +7,92 @@ TEST(NullablePromotionTypechecks) {
 		}
 
 		fn length_if_present(v : ?Vec3) : f32 {
-			if v != null {
-				return v.x;
+			if const value = v {
+				return value.x;
 			}
+			return 0;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
+TEST(NullableConstBindingIsImmutable) {
+	const char* source = R"(
+		fn main() : void {
+			var value : ?i32 = 42;
+			if const unwrapped = value {
+				unwrapped = 7;
+			}
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(NullableConstBindingRequiresNullableExpression) {
+	const char* source = R"(
+		fn main() : void {
+			if const value = 42 { }
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(NullableConstBindingRejectsShadowing) {
+	const char* source = R"(
+		fn main() : void {
+			var value : i32 = 0;
+			var optional : ?i32 = 42;
+			if const value = optional { }
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(NullableConstBindingRejectsInvalidExpression) {
+	const char* source = R"(
+		fn main() : void {
+			if const value = missing_nullable_value() { }
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(NullableConstBindingRejectsComptimeOnlyExpression) {
+	const char* source = R"(
+		comptime value : ?type = null;
+		fn main() : void {
+			if const payload = value { }
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(NullableConstBindingIsBranchScoped) {
+	const char* source = R"(
+		fn main() : i32 {
+			var value : ?i32 = 42;
+			if const unwrapped = value {
+				return unwrapped;
+			} else {
+				return unwrapped;
+			}
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(NullableConstBindingAcceptsExpression) {
+	const char* source = R"(
+		fn find() : ?i32 { return 42; }
+		fn main() : i32 {
+			if const value = find() { return value; }
 			return 0;
 		}
 	)";
@@ -20,7 +103,7 @@ TEST(NullablePromotionTypechecks) {
 TEST(ComptimeNullableNarrowing) {
 	const char* source = R"(
 		fn read(v : ?i32) : i32 {
-			if v != null { return v; }
+			if const unwrapped = v { return unwrapped; }
 			return 0;
 		}
 		comptime value : ?i32 = 42;
@@ -36,7 +119,7 @@ TEST(ComptimeNullableStructFieldNarrowing) {
 	const char* source = R"(
 		struct Value { number : i32; }
 		fn read(v : ?Value) : i32 {
-			if v != null { return v.number; }
+			if const unwrapped = v { return unwrapped.number; }
 			return 0;
 		}
 		comptime value : ?Value = Value { 42 };
@@ -64,8 +147,8 @@ TEST(NullableNarrowingPreservesConst) {
 	const char* source = R"(
 		fn main() : void {
 			const value : ?i32 = 1;
-			if value != null {
-				value = 2;
+			if const unwrapped = value {
+				unwrapped = 2;
 			}
 		}
 	)";
@@ -98,8 +181,8 @@ TEST(NullableStructUseWithCheck) {
 		}
 
 		fn bad(v : ?Vec3) : f32 {
-			if v != null {
-				return v.x;
+			if const value = v {
+				return value.x;
 			}
 			return 0;
 		}
@@ -115,8 +198,10 @@ TEST(NullableGuardClauseNarrowing) {
 		}
 
 		fn get_x(v : ?Vec3) : f32 {
-			if v == null { return 0; }
-			return v.x;
+			if const value = v {
+				return value.x;
+			}
+			return 0;
 		}
 	)";
 	EXPECT_COMPILE(source);
@@ -132,8 +217,10 @@ TEST(NullableGlobalGuardClauseNarrowing) {
 		var player : ?Vec3 = null;
 
 		fn get_x() : f32 {
-			if player == null { return 0; }
-			return player.x;
+			if const value = player {
+				return value.x;
+			}
+			return 0;
 		}
 	)";
 	EXPECT_COMPILE(source);
@@ -147,11 +234,10 @@ TEST(NullableElseReturnNarrowing) {
 		}
 
 		fn get_x(v : ?Vec3) : f32 {
-			if v != null {
-			} else {
-				return 0;
+			if const value = v {
+				return value.x;
 			}
-			return v.x;
+			return 0;
 		}
 	)";
 	EXPECT_COMPILE(source);
@@ -345,7 +431,7 @@ TEST(NullableUnaryRequiresNullCheckFails) {
 TEST(NullablePointerParameterTypechecks) {
 	const char* source = R"(
 		fn clear(v : ?*i32) : void {
-			if v != null { v.* = 0; }
+			if const ptr = v { ptr.* = 0; }
 		}
 
 		fn main() : void {
@@ -370,8 +456,8 @@ TEST(NullOnlyAssignableToNullable) {
 	const char* ok = R"(
 		fn ok() : i32 {
 			var x : ?i32 = null;
-			if x != null {
-				return x;
+			if const value = x {
+				return value;
 			}
 			return 0;
 		}
@@ -429,8 +515,8 @@ TEST(BytecodeNullableStructComparison) {
 		}
 		fn main() : i32 {
 			var v : ?Vec2 = null;
-			if v != null {
-				return v.x + v.y;
+			if const value = v {
+				return value.x + value.y;
 			}
 			return 42;
 		}

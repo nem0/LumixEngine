@@ -1474,6 +1474,13 @@ struct Checker {
 			case Statement::IF: {
 				IfStatement* s = static_cast<IfStatement*>(src);
 				IfStatement* st = makeType<IfStatement>(unit.arena);
+				if (s->nullable_binding) {
+					st->nullable_binding = makeType<VarDeclStatement>(unit.arena);
+					st->nullable_binding->name = s->nullable_binding->name;
+					st->nullable_binding->name_token = s->nullable_binding->name_token;
+					st->nullable_binding->is_immutable = true;
+					st->nullable_binding->expression = cloneExpression(unit, s->nullable_binding->expression, bindings);
+				}
 				st->condition = cloneExpression(unit, s->condition, bindings);
 				st->body = static_cast<BlockStatement*>(cloneStatement(unit, s->body, bindings));
 				st->else_branch = cloneStatement(unit, s->else_branch, bindings);
@@ -4672,11 +4679,41 @@ struct Checker {
 	}
 
 	bool checkIfStatement(Unit& unit, FunctionCheckContext& ctx, IfStatement& ifst, ResolvedType* return_type) {
-		Expression* cond = checkExpr(unit, &ctx, *ifst.condition, primitiveType(ResolvedTypeKind::BOOL));
-		if (!cond) return false;
-		if (!typesEqual(cond->resolved_type, primitiveType(ResolvedTypeKind::BOOL))) {
-			errorLine(ifst.token, "If condition must be of type bool, got ", cond->resolved_type);
-			return false;
+		Expression* cond = nullptr;
+		ResolvedType* nullable_payload_type = nullptr;
+		if (ifst.nullable_binding) {
+			VarDeclStatement& binding = *ifst.nullable_binding;
+			if (findLocal(ctx, binding.name) || findSymbol(unit, binding.name)) {
+				errorLine(binding.token, "Variable ", binding.name, " shadows an existing local or symbol");
+				return false;
+			}
+
+			cond = checkExpr(unit, &ctx, *binding.expression, nullptr);
+			if (!cond) return false;
+
+			binding.expression = cond;
+			ifst.condition = cond;
+			if (cond->resolved_type->kind != ResolvedTypeKind::NULLABLE) {
+				errorLine(binding.token, "Nullable if binding requires a nullable expression, got ", cond->resolved_type);
+				return false;
+			}
+
+			if (!requireMaterializable(*binding.expression, "a nullable if binding initializer")) {
+				return false;
+			}
+
+			nullable_payload_type = static_cast<NullableResolvedType*>(cond->resolved_type)->inner;
+			binding.resolved_type = nullable_payload_type;
+			binding.slot.type = nullable_payload_type;
+		}
+		else {
+			cond = checkExpr(unit, &ctx, *ifst.condition, primitiveType(ResolvedTypeKind::BOOL));
+			if (!cond) return false;
+			ifst.condition = cond;
+			if (!typesEqual(cond->resolved_type, primitiveType(ResolvedTypeKind::BOOL))) {
+				errorLine(ifst.token, "If condition must be of type bool, got ", cond->resolved_type);
+				return false;
+			}
 		}
 
 		// A condition made entirely from compile-time values selects one branch.
@@ -4689,7 +4726,14 @@ struct Checker {
 		ComptimeValue cmptime_t = evalComptime(unit, *ifst.condition, &ctx);
 		--suppress_errors;
 		if (!comptime_eval_start) comptime_eval_start = comptime_stack;
-		if (cmptime_t && cmptime_t.kind == ComptimeValue::VALUE && cmptime_t.type->kind == ResolvedTypeKind::BOOL) {
+		if (ifst.nullable_binding && cmptime_t && cmptime_t.kind == ComptimeValue::VALUE
+			&& cmptime_t.type->kind == ResolvedTypeKind::NULLABLE) {
+			comptime_branch_known = true;
+			comptime_branch_value = *(u8*)cmptime_t.value != 0;
+			ifst.comptime_known = true;
+			ifst.comptime_value = comptime_branch_value;
+		}
+		else if (cmptime_t && cmptime_t.kind == ComptimeValue::VALUE && cmptime_t.type->kind == ResolvedTypeKind::BOOL) {
 			bool comptime_bool_value;
 			memcpy(&comptime_bool_value, cmptime_t.value, sizeof(bool));
 			comptime_stack_ptr = comptime_eval_start;
@@ -4725,30 +4769,7 @@ struct Checker {
 		};
 		if (ifst.condition && ifst.condition->kind == Expression::BINARY) {
 			BinaryExpression* bin = static_cast<BinaryExpression*>(ifst.condition);
-			if (bin->op == Token::BANG_EQUAL || bin->op == Token::EQUAL_EQUAL) {
-				Expression* id_side = nullptr;
-				if (bin->rhs && bin->rhs->kind == Expression::NULL_LITERAL)
-					id_side = bin->lhs;
-				else if (bin->lhs && bin->lhs->kind == Expression::NULL_LITERAL)
-					id_side = bin->rhs;
-				if (id_side && id_side->kind == Expression::IDENTIFIER) {
-					ResolvedType* id_type = id_side->resolved_type;
-					if (id_type && id_type->kind == ResolvedTypeKind::NULLABLE) {
-						IdentifierExpression* id = static_cast<IdentifierExpression*>(id_side);
-						narrowed_name = id->name;
-						narrowed_type = static_cast<NullableResolvedType*>(id_type)->inner;
-						if (SemanticLocalBinding* local = findLocal(ctx, id->name)) {
-							narrowed_is_immutable = local->is_immutable;
-							narrowed_slot = local->slot;
-						} else if (id->symbol) {
-							narrowed_is_immutable = id->symbol->kind != Symbol::VARIABLE;
-							narrowed_slot = id->slot;
-						}
-						narrow_in_true = (bin->op == Token::BANG_EQUAL);
-					}
-				}
-			}
-			else if (bin->op == Token::IS && bin->lhs
+			if (bin->op == Token::IS && bin->lhs
 				&& (bin->lhs->kind == Expression::IDENTIFIER || bin->lhs->kind == Expression::DEREFERENCE)) {
 				IdentifierExpression* id = nullptr;
 				subject_type = bin->lhs->resolved_type;
@@ -4807,6 +4828,17 @@ struct Checker {
 		}
 
 		auto checkBranchWithNarrowing = [&](Statement* branch, ResolvedType* branch_type) -> bool {
+			if (ifst.nullable_binding && branch == ifst.body) {
+				pushScope(ctx);
+				SemanticLocalBinding& nb = ctx.locals.emplace_back();
+				nb.name = ifst.nullable_binding->name;
+				nb.type = nullable_payload_type;
+				nb.is_immutable = true;
+				nb.slot = &ifst.nullable_binding->slot;
+				bool ok = checkStatement(unit, ctx, branch, return_type, {});
+				popScope(ctx);
+				return ok;
+			}
 			if (branch && branch_type) {
 				pushScope(ctx);
 				SemanticLocalBinding& nb = ctx.locals.emplace_back();
@@ -5858,6 +5890,26 @@ struct Checker {
 				IfStatement& ifs = static_cast<IfStatement&>(statement);
 				ComptimeValue cond = evalComptime(unit, *ifs.condition, nullptr, nullptr, &frame);
 				if (!cond) return cond;
+				if (ifs.nullable_binding) {
+					if (cond.kind != ComptimeValue::VALUE || cond.type->kind != ResolvedTypeKind::NULLABLE) {
+						errorLine(ifs.condition->token, "Comptime nullable if binding requires a nullable value");
+						return {};
+					}
+					const bool present = *(u8*)cond.value != 0;
+					if (present) {
+						const u32 watermark = frame.locals.size();
+						ComptimeFrame::Local& binding = frame.locals.emplace_back();
+						binding.name = ifs.nullable_binding->name;
+						binding.type = static_cast<NullableResolvedType*>(cond.type)->inner;
+						binding.bytes = cond.value + 1;
+						binding.value = {ComptimeValue::VALUE, binding.type, binding.bytes};
+						ComptimeValue result = evalComptime(unit, *ifs.body, frame);
+						frame.locals.resize(watermark);
+						return result;
+					}
+					if (ifs.else_branch) return evalComptime(unit, *ifs.else_branch, frame);
+					return {ComptimeValue::VOID};
+				}
 				if (cond.kind != ComptimeValue::VALUE || cond.type->kind != ResolvedTypeKind::BOOL) {
 					errorLine(ifs.condition->token, "Comptime if condition must be a boolean value, got ", cond.type);
 					return {};

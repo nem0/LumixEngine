@@ -92,6 +92,12 @@ struct EvoxSystemImpl : EvoxSystem {
 
 	void stopGame() override {
 		m_is_game_running = false;
+		if (m_runtime) {
+			ex_runtime_destroy(m_runtime);
+			m_runtime = nullptr;
+			createRuntime();
+			// recreated the runtime to avoid any dangling stuff (changed globals, suspended state, ...)
+		}
 	}
 
 
@@ -212,6 +218,23 @@ struct EvoxSystemImpl : EvoxSystem {
 		}
 	}
 
+	bool createRuntime() {
+		m_runtime = ex_runtime_create(m_bytecode, &m_host);
+		if (!m_runtime) return false;
+		bindCoreFunctions(m_module, m_runtime, m_allocator);
+		const ex_string_view init_name = toLs("init");
+		if (ex_bytecode_runtime_result_kind(m_runtime, init_name) != EX_TYPE_INVALID) {
+			ex_push_ptr(m_runtime, &m_engine.getInputSystem());
+			if (ex_call(m_runtime, init_name) == EX_RESULT_FAILURE) {
+				logError("Evox init failed");
+				ex_runtime_destroy(m_runtime);
+				m_runtime = nullptr;
+				return false;
+			}
+		}
+		return true;
+	}
+
 	bool compileAndRun() {
 		if (!m_resource) return false;
 		destroyScript();
@@ -239,18 +262,8 @@ struct EvoxSystemImpl : EvoxSystem {
 			const ex_type* type = ex_bytecode_type(m_bytecode, i);
 			if (isEvoxDataType(*type)) m_data_types.push(type);
 		}
-		m_runtime = ex_runtime_create(m_bytecode, &m_host);
-		if (!m_runtime) return false;
-		bindCoreFunctions(m_module, m_runtime, m_allocator);
 		for (EvoxModule* module : m_modules) module->setEvoxDataTypes(m_data_types);
-		const ex_string_view init_name = toLs("init");
-		if (ex_bytecode_runtime_result_kind(m_runtime, init_name) != EX_TYPE_INVALID) {
-			ex_push_ptr(m_runtime, &m_engine.getInputSystem());
-			if (ex_call(m_runtime, init_name) == EX_RESULT_FAILURE) {
-				logError("Evox init failed");
-				return false;
-			}
-		}
+		if (!createRuntime()) return false;
 		// startGame can be called before the script resource has finished loading.
 		if (m_is_game_running) {
 			for (EvoxModule* module : m_modules) addWorld(module->getWorld());

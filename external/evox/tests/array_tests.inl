@@ -620,8 +620,7 @@ TEST(ArrayOfNullableInt) {
 			var values : [4]?i32 = undefined;
 			values[0] = 42;
 			values[1] = null;
-			if values[0] != null {
-				const x = values[0];
+			if const x = values[0] {
 			}
 		}
 	)";

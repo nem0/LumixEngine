@@ -2499,8 +2499,8 @@ TEST(NullableNullBranchRuntime) {
 	const char* source = R"(
 		fn main() : i32 {
 			var x : ?i32 = null;
-			if x != null {
-				return x;
+			if const value = x {
+				return value;
 			}
 			return 42;
 		}
@@ -2519,8 +2519,8 @@ TEST(NullableNonNullBranchRuntime) {
 	const char* source = R"(
 		fn main() : i32 {
 			var x : ?i32 = 7;
-			if x != null {
-				return x;
+			if const value = x {
+				return value;
 			}
 			return 0;
 		}
@@ -2544,8 +2544,8 @@ TEST(NullableConversionBoundariesRuntime) {
 		fn main() : i32 {
 			var x : ?i32 = null;
 			x = pass(7);
-			if x != null {
-				return x;
+			if const value = x {
+				return value;
 			}
 			return 0;
 		}

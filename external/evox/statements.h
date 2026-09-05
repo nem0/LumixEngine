@@ -77,6 +77,8 @@ struct AssignStatement : Statement {
 struct IfStatement : Statement {
 	IfStatement() : Statement(IF) {}
 
+	// Optional nullable payload binding from `if const name = expression`.
+	VarDeclStatement* nullable_binding = nullptr;
 	Expression* condition = nullptr;
 	BlockStatement* body = nullptr;
 	Statement* else_branch = nullptr;

@@ -480,7 +480,7 @@ TEST(TypeAttributeLookupChecksTheReturnedValue) {
 		comptime found = Settings::attribute(tag);
 
 		fn read(v : ?tag) : i32 {
-			if v != null { return v.value; }
+			if const value = v { return value.value; }
 			return 0;
 		}
 		fn main() : void {
@@ -527,7 +527,7 @@ TEST(TypeAttributeLookupPreservesFirstMatch) {
 		comptime found = Settings::attribute(tag);
 
 		fn read(v : ?tag) : i32 {
-			if v != null { return v.value; }
+			if const value = v { return value.value; }
 			return 0;
 		}
 		fn main() : void {

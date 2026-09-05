@@ -860,35 +860,37 @@ fn find_entity() : ?entity.Entity {
 
 fn main() : void {
 	const e = find_entity();
-	if e != null {
-		// e is promoted to entity.Entity in this branch
+	if const entity = e {
+		use_entity(entity); // entity is the non-null payload
+	} else {
+		// e was null
 	}
 }
 ```
 
-Promotion also continues after a guard branch that always returns. In this case the only path that reaches `e` is the non-null one:
+`if const name = expression` is the null-narrowing form. The expression may be
+any expression with a nullable type, and is evaluated once. When it is
+non-null, `name` is an immutable copy of the payload and is available only in
+the `then` branch. The original nullable expression is unchanged. The `else`
+branch is selected when the value is null.
+
+This also works for nullable pointers and nullable unions:
 
 ```cpp
-if e == null { return; }
-
-use_entity(e); // e is promoted to entity.Entity
-```
-
-The same promotion applies when the `else` branch returns:
-
-```cpp
-if e != null {
-	use_entity(e);
-} else {
-	return;
+if const p = maybe_pointer() {
+	p.* = 10;
 }
 
-use_entity(e); // e is promoted to entity.Entity
+if const value = maybe_value() {
+	use_value(value);
+}
 ```
 
-A nullable value can also use the `else return` declaration form. The target
-annotation is optional and defaults to the nullable type's non-null inner type.
-The non-null value initializes the variable; the null case returns immediately:
+Comparing a nullable value with `null` remains available as an ordinary boolean
+operation, but no longer narrows the value. A nullable value can also use the
+`else return` declaration form. The target annotation is optional and defaults
+to the nullable type's non-null inner type. The non-null value initializes the
+variable; the null case returns immediately:
 
 ```cpp
 fn load_entity() : void {
@@ -899,20 +901,15 @@ fn load_entity() : void {
 
 Using a nullable value without a required null check is a compile-time error.
 
-**Nullable values are not fully safe**
-
-The null check only applies to the value as it exists at that point in the control flow; if the variable is reassigned or otherwise mutated afterward, the earlier check does not keep later uses safe.
+The payload binding is an immutable copy, so later changes to the original
+nullable value do not invalidate the binding. As with ordinary assignment, this
+is a value copy: pointer and slice payloads copy their descriptors, not the data
+they refer to.
 
 ```cpp
-if a != null {
-	foo(a);
-	a = bar();
-	foo(a); // unsafe unless `bar()` is guaranteed to return a non-null value
-}
-
-if a != null {
-	bar(); // `bar` may mutate `a`
-	foo(a); // unsafe if `bar` can clear or replace `a`
+if const value = maybe_value() {
+	use(value);
+	// value remains non-null even if the original is reassigned
 }
 ```
 
@@ -954,8 +951,8 @@ Pointer rules:
   through `p` remains writable
 - field selection with `.` automatically dereferences a non-null pointer, so
 	`p.field` is equivalent to `p.*.field`
-- nullable pointers must be checked before dereference or field selection;
-  `if p != null` promotes `p` to `*T` in that branch
+- nullable pointers must be narrowed before dereference or field selection;
+  `if const p2 = p` binds a non-null `*T` payload in the then branch
 - `null` is valid for `?*T`, but not for `*T`
 - pointers are copied by value and do not copy their pointees
 - `*T` converts implicitly to `*const T`; the reverse conversion is invalid
@@ -1045,7 +1042,7 @@ All members must be pairwise distinct types. Because the member type is the tag,
 **Testing: `is`**
 
 - `e is ButtonEvent` evaluates to `bool`: whether the active variant is `ButtonEvent`
-- `if e is ButtonEvent { ... }` promotes `e` to `ButtonEvent` inside the branch, like nullable promotion in `if e != null`; the `else` branch and the code after an early return narrow it too (see [Narrowing](#narrowing))
+- `if e is ButtonEvent { ... }` promotes `e` to `ButtonEvent` inside the branch; the `else` branch and the code after an early return narrow it too (see [Narrowing](#narrowing))
 - `is` with a type that is not a member of the union is a compile-time error
 
 #### Narrowing
@@ -1086,7 +1083,7 @@ Rules:
 - narrowing to an empty member set is a compile-time error; it means the condition can never hold
 - only a bare `e is T` on a named subject narrows. A negated or compound condition (`not (e is T)`, `e is T and flag`) is not analyzed, and the subject keeps its declared type in both branches
 - a narrowed subject keeps the residual type for member access, `is`, `match`, and [`typeof`](#typeof)
-- narrowing is flow-typing with the same accepted unsoundness as promotion: assigning to the subject inside a narrowed region is allowed and is not re-checked (see [Nullable values](#nullable-values))
+- narrowing is flow-typing with the same accepted unsoundness as union promotion: assigning to the subject inside a narrowed region is allowed and is not re-checked
 
 **Match**
 
@@ -1109,7 +1106,7 @@ Rules:
 - an unqualified member type resolves against the union first, so `case ButtonEvent:` works even if the union was declared with `events.ButtonEvent`; qualify it only to disambiguate members with the same name
 - comma-separated alternatives (`case A, B:`) narrow the subject to `A | B`, the [residual](#narrowing) of that arm, rather than promoting it to a single member type
 - inside an empty `case:` fallback the subject narrows to the residual of every member matched by the arms above it, so a fallback after `case A:` on an `A | B | C` subject reads the subject as `B | C`
-- promotion is flow-typing, same as nullable promotion: assigning to the subject inside a case (which may switch the active variant) is allowed and is not re-checked; the earlier promotion does not keep later uses safe (see [Nullable values](#nullable-values) for the analogous caveat)
+- promotion is flow-typing: assigning to the subject inside a case (which may switch the active variant) is allowed and is not re-checked; the earlier promotion does not keep later uses safe
 
 **Namespaces, ADL, and UFCS**
 
@@ -2424,8 +2421,8 @@ fn print(v : $T) : void {
 		case .I8, .I16, .I32, .I64, .ISize:  io.write_i64(v as i64);
 		case .U8, .U16, .U32, .U64:          io.write_u64(v as u64); // no .Byte, no .CStr: see below
 		case .Nullable:
-			if v != null {
-				print(v); // v is promoted; the recursive call instantiates at the inner type
+			if const value = v {
+				print(value); // value is the payload; the recursive call instantiates at the inner type
 			} else {
 				io.write_bytes("null");
 			}
@@ -2476,7 +2473,7 @@ fn print(v : $T) : void {
 }
 ```
 
-Note what this example does *not* need. Because `T` is fully concrete at instantiation, `v` already has an exact static type in every arm - there is no type narrowing tied to the `case` patterns. In `case .Nullable:` the parameter simply *is* `?U`, so `if v != null` is ordinary [nullable promotion](#nullable-values); the only new rule is that the promoted read feeds `$T` deduction at the recursive call. Likewise `case .Union:` reuses the existing `is` promotion from [Tagged unions](#tagged-unions).
+Note what this example does *not* need. Because `T` is fully concrete at instantiation, `v` already has an exact static type in every arm - there is no type narrowing tied to the `case` patterns. In `case .Nullable:` the parameter simply *is* `?U`, so `if const value = v` binds its payload; the binding feeds `$T` deduction at the recursive call. Likewise `case .Union:` reuses the existing `is` promotion from [Tagged unions](#tagged-unions).
 
 `.Void`, `.Type`, `.CPtr`, and `.Fn` fall through to `case:` because no value of those kinds is meaningfully printable here - there is no value of type `void`, `type` is compile-time only, and `cptr`/`fn` have no byte representation `print` can walk.
 
@@ -2499,7 +2496,7 @@ Rules:
 - like `sizeof` and `alignof`, `typeof` is an operator resolved by the compiler, not a function: it cannot be bound to a name, passed as an argument, used as a function value, or reached through [UFCS](#ufcs); only its result is a value
 - the operand is type-checked but **not evaluated**, and no code is generated for it. `typeof(v[0])` on an empty slice is valid and yields the element type
 - it produces a `type` value, usable wherever a compile-time type is required (type-factory arguments, variable type positions, `comptime` bindings, `==` comparison)
-- `typeof` observes flow typing: after `if v != null`, `typeof(v)` inside the branch is the promoted type `U`, not `?U`. The same applies inside an `is` or `match` arm on a tagged union
+- `typeof` observes flow typing: inside `if const value = v`, `typeof(value)` is the payload type `U`, not `?U`. The same applies inside an `is` or `match` arm on a tagged union
 - the result is compile-time only and never materializes into runtime code (see [Comptime-to-runtime materialization](#comptime-to-runtime-materialization))
 
 ### Type members
@@ -2981,7 +2978,7 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 - `match` needs tighter rules for what counts as a valid pattern expression and the exact duplicate/exhaustiveness policy for non-enum subjects.
 - `for` ranges should define whether bounds must match exactly, what type the loop variable has, and what happens for descending or overflowing ranges.
 - Static-sized arrays still need complete rules for copy semantics and passing/returning by value. They have no built-in equality (see [Slice equality](#slice-equality)); whether that should stay, given that `xs[:] == ys[:]` expresses it, is open. Nesting reads left-to-right: `[4][8]i32` is an array of 4 arrays of 8 ints; `[][4]i32` is a slice of arrays of 4 ints.
-- Nullable promotion should define `else if`, compound conditions, and scope boundaries in more detail.
+- Nullable binding should define interactions with `else if`, compound conditions, and scope boundaries in more detail.
 - `defer` should define behavior on `break`, `continue`, runtime errors, and nested scopes, not only normal exit and `return`.
 - Imports and `extern` bindings still need explicit collision policy for same-path/same-alias cases, builtin module boundaries, and imported declaration conflicts.
 - Function values need clearer rules for equality/identity interactions with function declarations and literals.
@@ -3087,8 +3084,9 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 		- var a : SomeUnion = SomeMember { 1, "foo" }; is possible and uses only existing language features
 	- structural set semantics (order-insensitive, flattening) so anonymous unions like `Error | ASTNode` compose across modules and call layers
 	- subset → superset widening is implicit so error unions propagate without manual re-wrapping, including through [`else return`](#union-extraction-and-propagation)
-	- promotion in `match`/`is` is flow-typing with the same accepted unsoundness as nullable promotion - keeping the checker simple was preferred over a borrow-like aliasing rule
+	- promotion in `match`/`is` is flow-typing; keeping the checker simple was preferred over a borrow-like aliasing rule
 	- [narrowing](#narrowing) is one residual-type rule (member set minus excluded members) shared by the `else` branch, the `match` fallback arm, and post-early-return flow; promotion to a single member is just the case where one member is left
+	- nullable checks bind an immutable copied non-null payload with `if const name = expression`, rather than flow-narrowing the original nullable binding, so no null access is possible
 		- only a bare `e is T` narrows - negated and compound conditions are not analyzed. This keeps the checker's flow analysis to a single syntactic form, at the cost of `not (e is T)` reading as unnarrowed
 	- excluded from ADL/UFCS because a structural type has no declaring namespace
 	- **open questions**: propagation sugar, canonical member order exposure
@@ -3138,7 +3136,6 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 
 # TODO
 
-* if var a = some_nullabe { ... } else { ... } and same for match
 * union tag is always 4 bytes
 * how can we push unions if we don't know the tag value of variants, i.e. U = A | B - we don't know if A's tag is 0 or 1
 

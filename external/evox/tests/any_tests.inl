@@ -63,7 +63,7 @@ TEST(AnyNullableMatch) {
 		fn inspect(value : any) : i32 {
 			match value {
 				case ?i32:
-					if value != null { return value; }
+					if const unwrapped = value { return unwrapped; }
 					return -1;
 				case:
 					return -2;

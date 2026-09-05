@@ -1721,6 +1721,45 @@ struct IRBuilder {
 					if (branch) buildStatementIR(*branch, parent);
 					break;
 				}
+				if (ifs.nullable_binding) {
+					ASSERT(ifs.condition->resolved_type && ifs.condition->resolved_type->kind == ResolvedTypeKind::NULLABLE);
+					auto& nullable = static_cast<NullableResolvedType&>(*ifs.condition->resolved_type);
+					auto& tmp = allocAlloca(ifs.condition->resolved_type, {}, &buildExpressionIR(*ifs.condition, true));
+					parent.ops.push(&tmp);
+					static ResolvedType u8_type(ResolvedTypeKind::U8);
+					auto& flag = alloc<ExOpExtractValue>();
+					flag.value = &loadAllocaValue(tmp);
+					flag.offset = 0;
+					flag.size = 1;
+					auto& zero = alloc<ExOpLoadConst>();
+					zero.type = &u8_type;
+					const u8 zero_value = 0;
+					memcpy(zero.value, &zero_value, sizeof(zero_value));
+					auto& is_present = alloc<ExOpNe>();
+					is_present.operand_type = &u8_type;
+					is_present.lhs = &flag;
+					is_present.rhs = &zero;
+					auto& if_ir = alloc<ExOpConditionalJump>();
+					if_ir.condition = &is_present;
+					if_ir.true_block = &alloc<ExIrBlockData>(host.arena);
+					const u32 local_watermark = locals.size();
+					auto& value = allocAlloca(nullable.inner, ifs.nullable_binding->name,
+						&alloc<ExOpExtractValue>());
+					auto& payload = static_cast<ExOpExtractValue&>(*value.value);
+					payload.value = &loadAllocaValue(tmp);
+					payload.offset = 1;
+					payload.size = typeByteSize(*nullable.inner);
+					if_ir.true_block->ops.push(&value);
+					locals.push({ifs.nullable_binding->name, &value});
+					buildStatementIR(*ifs.body, *if_ir.true_block);
+					locals.resize(local_watermark);
+					if (ifs.else_branch) {
+						if_ir.false_block = &alloc<ExIrBlockData>(host.arena);
+						buildStatementIR(*ifs.else_branch, *if_ir.false_block);
+					}
+					parent.ops.push(&if_ir);
+					break;
+				}
 				auto& if_ir = alloc<ExOpConditionalJump>();
 				if_ir.condition = &buildExpressionIR(*ifs.condition, true);
 				if_ir.true_block = &alloc<ExIrBlockData>(host.arena);

@@ -1242,10 +1242,33 @@ struct Parser {
 		Token if_token = consumeToken();
 		if (if_token.type != Token::IF) return nullptr;
 		IfStatement* res = makeStmt<IfStatement>(if_token);
-		res->condition = expression(ExprMode::HEAD);
+		if (peekToken().type == Token::CONST) {
+			Token const_token = consumeToken();
+			VarDeclStatement* binding = makeStmt<VarDeclStatement>(const_token);
+			binding->is_immutable = true;
+			binding->name_token = consumeToken();
+			if (binding->name_token.type != Token::IDENTIFIER) {
+				m_output.errorAt(binding->name_token, "Expected identifier");
+				return nullptr;
+			}
+
+			binding->name = binding->name_token.value;
+			if (!consume(Token::EQUAL)) return nullptr;
+
+			binding->expression = expression(ExprMode::HEAD);
+			if (!binding->expression) return nullptr;
+
+			res->nullable_binding = binding;
+			res->condition = binding->expression;
+		}
+		else {
+			res->condition = expression(ExprMode::HEAD);
+		}
 		if (!res->condition) return nullptr;
+
 		res->body = blockStatement();
 		if (!res->body) return nullptr;
+
 		if (peekToken().type == Token::ELSE) {
 			consumeToken();
 			res->else_branch = peekToken().type == Token::IF ? static_cast<Statement*>(ifStatement()) : static_cast<Statement*>(blockStatement());
