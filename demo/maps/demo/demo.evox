@@ -1,0 +1,82 @@
+import "core:entity"
+import "core:random"
+import "core:model_instance"
+import "core:world"
+import "core:ui"
+import "core:evox_data" as ld
+import "scripts/player" as player
+import "std:math" as math
+import "maps/demo/random_walk" as random_walk
+
+#[ld.Data {}]
+struct RandomColorComponent {
+	#[ld.Owner {}]
+	entity: Entity;
+}
+
+#[ld.Data {}]
+struct RandomColorTickComponent {
+	#[ld.Owner {}]
+	entity: Entity;
+	t : f32;
+	green : f32;
+}
+
+var g_world : World = undefined;
+
+fn abs(v : f32) : f32 { return v < 0 ? -v : v; }
+
+fn enableCursor(ui : UIModule, enable : bool) : void {
+	var sys = ui.getSystem();
+	sys.enableCursor(enable);
+}
+
+fn start(world : World) : void {
+	g_world = world;
+
+	// random color
+	var random_color_components = world.getEvoxData(RandomColorComponent);
+
+	for c in random_color_components {
+		var mi = c.entity.model_instance() else return;
+		mi.overrideMaterialVec4(0, "Material color", {0, randFloat(), randFloat(), 1});
+	}
+
+	var rnd_col = g_world.getEvoxData(RandomColorTickComponent);
+	for &c in rnd_col {
+		c.green = randFloat();
+	}
+}
+
+fn update(td : f32) : void {
+    player.update(td);
+	random_walk.update(g_world, td);
+
+	// random color tick
+	var rnd_col = g_world.getEvoxData(RandomColorTickComponent);
+	for &c in rnd_col {
+		c.t = c.t + td * 3;
+		var mi = c.entity.model_instance() else return;
+		mi.overrideMaterialVec4(0, "Material color", {0, c.green, abs(math.cos(c.t)), 1});	
+	}
+
+	// UI
+	var ui = g_world.ui() else return;
+	var doc = ui.getDocument();
+	var events = doc.getEvents();
+
+	for event in events {
+		match event.action {
+			case "start":
+				player.handle_input = true;
+				enableCursor(ui, false);
+				var elem = doc.getElement(0) else return;
+				elem.setVisible(false);
+			case "close":
+				player.handle_input = true;
+				enableCursor(ui, false);
+				var elem = doc.getElementByID("runtime_ui") else return;
+				elem.setVisible(false);
+		}
+	}	
+}

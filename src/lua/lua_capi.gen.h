@@ -1047,6 +1047,13 @@ namespace Lumix {
 		return 1;
 	}
 	
+	int Agent_isFinished(lua_State* L) {
+		auto [imodule, entity] = checkComponent(L);
+		auto* module = (NavigationModule*)imodule;
+		LuaWrapper::push(L, 	module->isAgentFinished(entity));
+		return 1;
+	}
+	
 	int Agent_cancelNavigation(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (NavigationModule*)imodule;
@@ -1073,6 +1080,7 @@ namespace Lumix {
 			case /*move_entity*/3203804519501376147: LuaWrapper::push(L, module->getAgentMoveEntity(entity)); break;
 			case /*speed*/5411191639289302350: LuaWrapper::push(L, module->getAgentSpeed(entity)); break;
 			case /*navigate*/10641905485202240135: lua_pushcfunction(L, Agent_navigate, "Agent_navigate"); break;
+			case /*isFinished*/4737544788539832154: lua_pushcfunction(L, Agent_isFinished, "Agent_isFinished"); break;
 			case /*cancelNavigation*/10369242840717673752: lua_pushcfunction(L, Agent_cancelNavigation, "Agent_cancelNavigation"); break;
 			case /*drawPath*/15681074705421253585: lua_pushcfunction(L, Agent_drawPath, "Agent_drawPath"); break;
 			case 0:

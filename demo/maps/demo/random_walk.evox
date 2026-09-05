@@ -1,0 +1,16 @@
+import "core:entity"
+import "core:world"
+import "core:evox_data" as ld
+
+#[ld.Data {}]
+struct RandomWalkActor {
+	#[ld.Owner {}]
+	entity: Entity;
+}
+
+fn update(world : World, dt : f32) : void {
+	var actors = world.getEvoxData(RandomWalkActor);
+	for a in actors {
+		
+	}
+}

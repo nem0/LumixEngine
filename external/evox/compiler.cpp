@@ -2680,8 +2680,10 @@ struct Checker {
 					errorLine(expr.token, "Unknown symbol ", qualifier, ".", mem.name.value);
 					return nullptr;
 				}
+				errorLine(expr.token, "Cannot resolve ", qualifier, " as a value or imported module alias for ", qualifier, ".", mem.name.value);
+				return nullptr;
 			}
-			errorLine(expr.token, "Cannot call function ", mem.name.value, " with UFCS receiver with unknown type");
+			errorLine(expr.token, "Cannot resolve the receiver of ", mem.name.value, "(...); expected a typed value or imported module alias");
 			return nullptr;
 		}
 

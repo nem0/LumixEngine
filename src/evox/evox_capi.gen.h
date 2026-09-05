@@ -1548,13 +1548,13 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_audio_setMasterVolume_0(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_audio_setMasterVolume_14804945310456614025(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, AudioModule*, module);
 		EX_ARG(frame, float, volume);
 		module->setMasterVolume(volume);
 	}
 	
-	static void evox_physics_raycast_1(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physics_raycast_3415175403905315551(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, PhysicsModule*, module);
 		EX_ARG(frame, Vec3, origin);
 		EX_ARG(frame, Vec3, dir);
@@ -1564,20 +1564,20 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExEntity(ret.index, &module->getWorld()));
 	}
 	
-	static void evox_physics_setGravity_2(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physics_setGravity_15380368834725248530(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, PhysicsModule*, module);
 		EX_ARG(frame, Vec3, gravity);
 		module->setGravity(gravity);
 	}
 	
-	static void evox_physics_getControllerHits_count_3(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physics_getControllerHits_count_6067200848500777010(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, PhysicsModule*, module);
 		const auto ret = module->getControllerHits(
 		);
 		EX_RESULT(frame, (i32)ret.size());
 	}
 	
-	static void evox_physics_getControllerHits_get_4(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physics_getControllerHits_get_6075682698315308999(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, PhysicsModule*, module);
 		EX_ARG(frame, i32, index);
 		const auto ret = module->getControllerHits(
@@ -1588,14 +1588,14 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExEntity(value.hit_entity.index, &module->getWorld()));
 	}
 	
-	static void evox_physics_getTriggerHits_count_5(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physics_getTriggerHits_count_15909385450064360176(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, PhysicsModule*, module);
 		const auto ret = module->getTriggerHits(
 		);
 		EX_RESULT(frame, (i32)ret.size());
 	}
 	
-	static void evox_physics_getTriggerHits_get_6(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physics_getTriggerHits_get_12117019466983661535(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, PhysicsModule*, module);
 		EX_ARG(frame, i32, index);
 		const auto ret = module->getTriggerHits(
@@ -1607,14 +1607,14 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, value.touch_lost);
 	}
 	
-	static void evox_physics_getContactHits_count_7(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physics_getContactHits_count_8769190636714668351(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, PhysicsModule*, module);
 		const auto ret = module->getContactHits(
 		);
 		EX_RESULT(frame, (i32)ret.size());
 	}
 	
-	static void evox_physics_getContactHits_get_8(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physics_getContactHits_get_1259599258055043497(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, PhysicsModule*, module);
 		EX_ARG(frame, i32, index);
 		const auto ret = module->getContactHits(
@@ -1626,7 +1626,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, value.position);
 	}
 	
-	static void evox_renderer_addDebugTriangle_9(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_renderer_addDebugTriangle_9051351881586580716(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, RenderModule*, module);
 		EX_ARG(frame, DVec3, p0);
 		EX_ARG(frame, DVec3, p1);
@@ -1638,7 +1638,7 @@ namespace Lumix::Evox::generated {
 		module->addDebugTriangle(p0, p1, p2, Color(u8(color_r), u8(color_g), u8(color_b), u8(color_a)));
 	}
 	
-	static void evox_renderer_addDebugLine_10(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_renderer_addDebugLine_11999449654256854668(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, RenderModule*, module);
 		EX_ARG(frame, DVec3, from);
 		EX_ARG(frame, DVec3, to);
@@ -1649,7 +1649,7 @@ namespace Lumix::Evox::generated {
 		module->addDebugLine(from, to, Color(u8(color_r), u8(color_g), u8(color_b), u8(color_a)));
 	}
 	
-	static void evox_renderer_addDebugCross_11(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_renderer_addDebugCross_12225788651207943196(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, RenderModule*, module);
 		EX_ARG(frame, DVec3, center);
 		EX_ARG(frame, float, size);
@@ -1660,7 +1660,7 @@ namespace Lumix::Evox::generated {
 		module->addDebugCross(center, size, Color(u8(color_r), u8(color_g), u8(color_b), u8(color_a)));
 	}
 	
-	static void evox_renderer_addDebugBone_12(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_renderer_addDebugBone_8753979476089779328(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, RenderModule*, module);
 		EX_ARG(frame, DVec3, pos);
 		EX_ARG(frame, Vec3, dir);
@@ -1673,7 +1673,7 @@ namespace Lumix::Evox::generated {
 		module->addDebugBone(pos, dir, up, right, Color(u8(color_r), u8(color_g), u8(color_b), u8(color_a)));
 	}
 	
-	static void evox_renderer_addDebugCube_13(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_renderer_addDebugCube_263184294223126531(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, RenderModule*, module);
 		EX_ARG(frame, DVec3, pos);
 		EX_ARG(frame, Vec3, dir);
@@ -1686,7 +1686,7 @@ namespace Lumix::Evox::generated {
 		module->addDebugCube(pos, dir, up, right, Color(u8(color_r), u8(color_g), u8(color_b), u8(color_a)));
 	}
 	
-	static void evox_renderer_addDebugCubeSolid_14(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_renderer_addDebugCubeSolid_12864046118107539685(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, RenderModule*, module);
 		EX_ARG(frame, DVec3, from);
 		EX_ARG(frame, DVec3, max);
@@ -1697,92 +1697,92 @@ namespace Lumix::Evox::generated {
 		module->addDebugCubeSolid(from, max, Color(u8(color_r), u8(color_g), u8(color_b), u8(color_a)));
 	}
 	
-	static void evox_renderer_setActiveCamera_15(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_renderer_setActiveCamera_16964213945525572297(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, RenderModule*, module);
 		EX_ARG(frame, ExEntity, camera);
 		module->setActiveCamera(EntityRef(camera.index));
 	}
 	
-	static void evox_renderer_setActiveEnvironment_16(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_renderer_setActiveEnvironment_14874579541215673611(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, RenderModule*, module);
 		EX_ARG(frame, ExEntity, entity);
 		module->setActiveEnvironment(EntityRef(entity.index));
 	}
 	
-	static void evox_ui_getDocument_17(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_ui_getDocument_6532204115686324839(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, UIModule*, module);
 		auto& ret = module->getDocument();
 		EX_RESULT(frame, &ret);
 	}
 	
-	static void evox_ui_load_18(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_ui_load_18010826757131874131(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, UIModule*, module);
 		EX_STRING_ARG(frame, path);
 		module->load(Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_ui_isReady_19(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_ui_isReady_13861426650607350200(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, UIModule*, module);
 		auto ret = module->isReady();
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_ui_getSystem_20(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_ui_getSystem_14148007050043927689(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, UIModule*, module);
 		auto& ret = module->getSystemPtr();
 		EX_RESULT(frame, &ret);
 	}
 	
-	static void evox_property_animator_isPropertyAnimatorEnabled_21(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_property_animator_isPropertyAnimatorEnabled_12742070177058822018(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		auto ret = module->isPropertyAnimatorEnabled(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_property_animator_enablePropertyAnimator_22(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_property_animator_enablePropertyAnimator_11265307580004053127(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		EX_ARG(frame, bool, enabled);
 		module->enablePropertyAnimator(EntityRef(entity.index), enabled);
 	}
 	
-	static void evox_property_animator_getPropertyAnimatorLooped_23(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_property_animator_getPropertyAnimatorLooped_11673480956432975690(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		auto ret = module->getPropertyAnimatorLooped(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_property_animator_setPropertyAnimatorLooped_24(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_property_animator_setPropertyAnimatorLooped_14589021667225761304(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		EX_ARG(frame, bool, looped);
 		module->setPropertyAnimatorLooped(EntityRef(entity.index), looped);
 	}
 	
-	static void evox_property_animator_getPropertyAnimatorAnimation_25(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_property_animator_getPropertyAnimatorAnimation_4677209988032281809(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		auto ret = module->getPropertyAnimatorAnimation(EntityRef(entity.index));
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_property_animator_setPropertyAnimatorAnimation_26(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_property_animator_setPropertyAnimatorAnimation_17368489730427576649(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		EX_STRING_ARG(frame, path);
 		module->setPropertyAnimatorAnimation(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_animator_applySet_27(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_animator_applySet_16040823933969755447(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		EX_ARG(frame, u32, idx);
 		module->applyAnimatorSet(EntityRef(entity.index), idx);
 	}
 	
-	static void evox_animator_setBoolInput_28(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_animator_setBoolInput_11264800738315947820(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		EX_ARG(frame, u32, input_idx);
@@ -1790,7 +1790,7 @@ namespace Lumix::Evox::generated {
 		module->setAnimatorInput(EntityRef(entity.index), input_idx, value);
 	}
 	
-	static void evox_animator_setFloatInput_29(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_animator_setFloatInput_12167774824541287440(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		EX_ARG(frame, u32, input_idx);
@@ -1798,7 +1798,7 @@ namespace Lumix::Evox::generated {
 		module->setAnimatorInput(EntityRef(entity.index), input_idx, value);
 	}
 	
-	static void evox_animator_setVec3Input_30(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_animator_setVec3Input_3425313765252397208(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		EX_ARG(frame, u32, input_idx);
@@ -1806,7 +1806,7 @@ namespace Lumix::Evox::generated {
 		module->setAnimatorInput(EntityRef(entity.index), input_idx, value);
 	}
 	
-	static void evox_animator_getInputIndex_31(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_animator_getInputIndex_15568250204244809786(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		EX_STRING_ARG(frame, name);
@@ -1816,110 +1816,110 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_animator_getAnimatorSource_32(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_animator_getAnimatorSource_11155504970444435899(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		auto ret = module->getAnimatorSource(EntityRef(entity.index));
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_animator_setAnimatorSource_33(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_animator_setAnimatorSource_17892176931136230879(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		EX_STRING_ARG(frame, path);
 		module->setAnimatorSource(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_animator_getAnimatorUseRootMotion_34(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_animator_getAnimatorUseRootMotion_9741305205143477525(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		auto ret = module->getAnimatorUseRootMotion(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_animator_setAnimatorUseRootMotion_35(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_animator_setAnimatorUseRootMotion_9342718108203537783(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		EX_ARG(frame, bool, value);
 		module->setAnimatorUseRootMotion(EntityRef(entity.index), value);
 	}
 	
-	static void evox_animator_getAnimatorDefaultSet_36(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_animator_getAnimatorDefaultSet_17375738426851236115(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		auto ret = module->getAnimatorDefaultSet(EntityRef(entity.index));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_animator_setAnimatorDefaultSet_37(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_animator_setAnimatorDefaultSet_8642953903016100752(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		EX_ARG(frame, u32, idx);
 		module->setAnimatorDefaultSet(EntityRef(entity.index), idx);
 	}
 	
-	static void evox_animable_getAnimableAnimation_38(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_animable_getAnimableAnimation_11745291916317671749(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		auto ret = module->getAnimableAnimation(EntityRef(entity.index));
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_animable_setAnimableAnimation_39(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_animable_setAnimableAnimation_14956871121764638013(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AnimationModule* module = static_cast<AnimationModule*>(entity.module);
 		EX_STRING_ARG(frame, path);
 		module->setAnimableAnimation(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_ambient_sound_pause_40(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_ambient_sound_pause_7564319632766837034(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AudioModule* module = static_cast<AudioModule*>(entity.module);
 		module->pauseAmbientSound(EntityRef(entity.index));
 	}
 	
-	static void evox_ambient_sound_resume_41(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_ambient_sound_resume_15147770483073356605(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AudioModule* module = static_cast<AudioModule*>(entity.module);
 		module->resumeAmbientSound(EntityRef(entity.index));
 	}
 	
-	static void evox_ambient_sound_getAmbientSoundClip_42(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_ambient_sound_getAmbientSoundClip_18285036400960618982(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AudioModule* module = static_cast<AudioModule*>(entity.module);
 		auto ret = module->getAmbientSoundClip(EntityRef(entity.index));
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_ambient_sound_setAmbientSoundClip_43(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_ambient_sound_setAmbientSoundClip_1977866805267527577(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AudioModule* module = static_cast<AudioModule*>(entity.module);
 		EX_STRING_ARG(frame, clip);
 		module->setAmbientSoundClip(EntityRef(entity.index), Path(StringView{clip.begin, (u64)clip.length}));
 	}
 	
-	static void evox_ambient_sound_isAmbientSound3D_44(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_ambient_sound_isAmbientSound3D_6191921949559533236(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AudioModule* module = static_cast<AudioModule*>(entity.module);
 		auto ret = module->isAmbientSound3D(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_ambient_sound_setAmbientSound3D_45(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_ambient_sound_setAmbientSound3D_7682859713366114688(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AudioModule* module = static_cast<AudioModule*>(entity.module);
 		EX_ARG(frame, bool, is_3d);
 		module->setAmbientSound3D(EntityRef(entity.index), is_3d);
 	}
 	
-	static void evox_lua_script_scripts_count_46(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_lua_script_scripts_count_1969858549337313839(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, component);
 		LuaScriptModule* module = static_cast<LuaScriptModule*>(component.module);
 		const i32 count = module->getScriptCount(EntityRef(component.index));
 		EX_RESULT(frame, count);
 	}
 	
-	static void evox_lua_script_scripts_item_47(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_lua_script_scripts_item_14595206848404558398(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, component);
 		LuaScriptModule* module = static_cast<LuaScriptModule*>(component.module);
 		EX_ARG(frame, i32, item_idx);
@@ -1937,7 +1937,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, module);
 	}
 	
-	static void evox_lua_script_scripts_isScriptEnabled_48(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_lua_script_scripts_isScriptEnabled_17964535321660095912(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, LuaScriptModule*, module);
@@ -1945,7 +1945,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_lua_script_scripts_enableScript_49(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_lua_script_scripts_enableScript_5627495313735532483(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, LuaScriptModule*, module);
@@ -1953,7 +1953,7 @@ namespace Lumix::Evox::generated {
 		module->enableScript(EntityRef(entity_idx), item_idx, enable);
 	}
 	
-	static void evox_lua_script_scripts_getScriptPath_50(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_lua_script_scripts_getScriptPath_17603508703546419852(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, LuaScriptModule*, module);
@@ -1961,7 +1961,7 @@ namespace Lumix::Evox::generated {
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_lua_script_scripts_setScriptPath_51(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_lua_script_scripts_setScriptPath_10019960863008180274(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, LuaScriptModule*, module);
@@ -1969,7 +1969,7 @@ namespace Lumix::Evox::generated {
 		module->setScriptPath(EntityRef(entity_idx), item_idx, Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_lua_script_inline_setInlineScriptCode_52(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_lua_script_inline_setInlineScriptCode_13127526837028390910(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		LuaScriptModule* module = static_cast<LuaScriptModule*>(entity.module);
 		EX_STRING_ARG(frame, value);
@@ -1978,14 +1978,14 @@ namespace Lumix::Evox::generated {
 		module->setInlineScriptCode(EntityRef(entity.index), evox_string_arg_value);
 	}
 	
-	static void evox_navmesh_zone_load_53(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_navmesh_zone_load_13918995704249104099(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, zone_entity);
 		NavigationModule* module = static_cast<NavigationModule*>(zone_entity.module);
 		auto ret = module->loadZone(EntityRef(zone_entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_navmesh_zone_drawNavmesh_54(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_navmesh_zone_drawNavmesh_5134955218642488807(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, zone);
 		NavigationModule* module = static_cast<NavigationModule*>(zone.module);
 		EX_ARG(frame, DVec3, pos);
@@ -1995,60 +1995,60 @@ namespace Lumix::Evox::generated {
 		module->debugDrawNavmesh(EntityRef(zone.index), pos, inner_boundaries, outer_boundaries, portals);
 	}
 	
-	static void evox_navmesh_zone_drawCompactHeightfield_55(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_navmesh_zone_drawCompactHeightfield_5812805081547031182(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, zone);
 		NavigationModule* module = static_cast<NavigationModule*>(zone.module);
 		module->debugDrawCompactHeightfield(EntityRef(zone.index));
 	}
 	
-	static void evox_navmesh_zone_drawHeightfield_56(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_navmesh_zone_drawHeightfield_14679078041041130503(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, zone);
 		NavigationModule* module = static_cast<NavigationModule*>(zone.module);
 		module->debugDrawHeightfield(EntityRef(zone.index));
 	}
 	
-	static void evox_navmesh_zone_drawContours_57(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_navmesh_zone_drawContours_6798494238098731653(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, zone);
 		NavigationModule* module = static_cast<NavigationModule*>(zone.module);
 		module->debugDrawContours(EntityRef(zone.index));
 	}
 	
-	static void evox_navmesh_zone_saveZone_58(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_navmesh_zone_saveZone_30091838565818055(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, zone_entity);
 		NavigationModule* module = static_cast<NavigationModule*>(zone_entity.module);
 		auto ret = module->saveZone(EntityRef(zone_entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_navmesh_zone_getZoneAutoload_59(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_navmesh_zone_getZoneAutoload_14291138643344541979(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		NavigationModule* module = static_cast<NavigationModule*>(entity.module);
 		auto ret = module->getZoneAutoload(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_navmesh_zone_setZoneAutoload_60(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_navmesh_zone_setZoneAutoload_3016407451842724548(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		NavigationModule* module = static_cast<NavigationModule*>(entity.module);
 		EX_ARG(frame, bool, value);
 		module->setZoneAutoload(EntityRef(entity.index), value);
 	}
 	
-	static void evox_navmesh_zone_getZoneDetailed_61(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_navmesh_zone_getZoneDetailed_7813946106612811513(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		NavigationModule* module = static_cast<NavigationModule*>(entity.module);
 		auto ret = module->getZoneDetailed(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_navmesh_zone_setZoneDetailed_62(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_navmesh_zone_setZoneDetailed_11600996283663539980(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		NavigationModule* module = static_cast<NavigationModule*>(entity.module);
 		EX_ARG(frame, bool, value);
 		module->setZoneDetailed(EntityRef(entity.index), value);
 	}
 	
-	static void evox_navmesh_agent_navigate_63(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_navmesh_agent_navigate_599694585840344933(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		NavigationModule* module = static_cast<NavigationModule*>(entity.module);
 		EX_ARG(frame, DVec3, dest);
@@ -2058,712 +2058,719 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_navmesh_agent_cancelNavigation_64(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_navmesh_agent_isFinished_16660152684622094943(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, entity);
+		NavigationModule* module = static_cast<NavigationModule*>(entity.module);
+		auto ret = module->isAgentFinished(EntityRef(entity.index));
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_navmesh_agent_cancelNavigation_7425739489534912430(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		NavigationModule* module = static_cast<NavigationModule*>(entity.module);
 		module->cancelNavigation(EntityRef(entity.index));
 	}
 	
-	static void evox_navmesh_agent_drawPath_65(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_navmesh_agent_drawPath_11559871560978783390(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, agent_entity);
 		NavigationModule* module = static_cast<NavigationModule*>(agent_entity.module);
 		EX_ARG(frame, bool, include_polygons);
 		module->debugDrawPath(EntityRef(agent_entity.index), include_polygons);
 	}
 	
-	static void evox_navmesh_agent_getAgentRadius_66(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_navmesh_agent_getAgentRadius_563470164329861692(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		NavigationModule* module = static_cast<NavigationModule*>(entity.module);
 		auto ret = module->getAgentRadius(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_navmesh_agent_setAgentRadius_67(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_navmesh_agent_setAgentRadius_16949384499794200055(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		NavigationModule* module = static_cast<NavigationModule*>(entity.module);
 		EX_ARG(frame, float, radius);
 		module->setAgentRadius(EntityRef(entity.index), radius);
 	}
 	
-	static void evox_navmesh_agent_getAgentHeight_68(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_navmesh_agent_getAgentHeight_1069423188658384351(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		NavigationModule* module = static_cast<NavigationModule*>(entity.module);
 		auto ret = module->getAgentHeight(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_navmesh_agent_setAgentHeight_69(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_navmesh_agent_setAgentHeight_15021107481936670454(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		NavigationModule* module = static_cast<NavigationModule*>(entity.module);
 		EX_ARG(frame, float, height);
 		module->setAgentHeight(EntityRef(entity.index), height);
 	}
 	
-	static void evox_navmesh_agent_getAgentMoveEntity_70(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_navmesh_agent_getAgentMoveEntity_12818649202212790996(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		NavigationModule* module = static_cast<NavigationModule*>(entity.module);
 		auto ret = module->getAgentMoveEntity(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_navmesh_agent_setAgentMoveEntity_71(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_navmesh_agent_setAgentMoveEntity_13361431652517441269(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		NavigationModule* module = static_cast<NavigationModule*>(entity.module);
 		EX_ARG(frame, bool, value);
 		module->setAgentMoveEntity(EntityRef(entity.index), value);
 	}
 	
-	static void evox_navmesh_agent_getAgentSpeed_72(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_navmesh_agent_getAgentSpeed_5942787732699741932(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		NavigationModule* module = static_cast<NavigationModule*>(entity.module);
 		auto ret = module->getAgentSpeed(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_physical_heightfield_getHeightfieldSource_73(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_heightfield_getHeightfieldSource_17781085907241680804(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getHeightfieldSource(EntityRef(entity.index));
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_physical_heightfield_setHeightfieldSource_74(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_heightfield_setHeightfieldSource_10631205189205149640(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_STRING_ARG(frame, path);
 		module->setHeightfieldSource(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_physical_heightfield_getHeightfieldXZScale_75(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_heightfield_getHeightfieldXZScale_17927546630134259819(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getHeightfieldXZScale(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_physical_heightfield_setHeightfieldXZScale_76(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_heightfield_setHeightfieldXZScale_15289404238999113653(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, scale);
 		module->setHeightfieldXZScale(EntityRef(entity.index), scale);
 	}
 	
-	static void evox_physical_heightfield_getHeightfieldYScale_77(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_heightfield_getHeightfieldYScale_12976189580294514178(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getHeightfieldYScale(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_physical_heightfield_setHeightfieldYScale_78(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_heightfield_setHeightfieldYScale_10874814692147059073(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, scale);
 		module->setHeightfieldYScale(EntityRef(entity.index), scale);
 	}
 	
-	static void evox_physical_heightfield_getHeightfieldLayer_79(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_heightfield_getHeightfieldLayer_5041904754438919339(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getHeightfieldLayer(EntityRef(entity.index));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_physical_heightfield_setHeightfieldLayer_80(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_heightfield_setHeightfieldLayer_12968791845034531989(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, u32, layer);
 		module->setHeightfieldLayer(EntityRef(entity.index), layer);
 	}
 	
-	static void evox_d6_joint_getD6JointXMotion_81(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_getD6JointXMotion_14851665169879168421(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getD6JointXMotion(EntityRef(entity.index));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_d6_joint_setD6JointXMotion_82(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_setD6JointXMotion_17307665595482720832(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, i32, motion_value);
 		module->setD6JointXMotion(EntityRef(entity.index), (PhysicsModule::D6Motion)motion_value);
 	}
 	
-	static void evox_d6_joint_getD6JointYMotion_83(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_getD6JointYMotion_12817388917696084776(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getD6JointYMotion(EntityRef(entity.index));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_d6_joint_setD6JointYMotion_84(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_setD6JointYMotion_106387350368783163(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, i32, motion_value);
 		module->setD6JointYMotion(EntityRef(entity.index), (PhysicsModule::D6Motion)motion_value);
 	}
 	
-	static void evox_d6_joint_getD6JointZMotion_85(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_getD6JointZMotion_15772777298635389478(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getD6JointZMotion(EntityRef(entity.index));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_d6_joint_setD6JointZMotion_86(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_setD6JointZMotion_38632995566283774(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, i32, motion_value);
 		module->setD6JointZMotion(EntityRef(entity.index), (PhysicsModule::D6Motion)motion_value);
 	}
 	
-	static void evox_d6_joint_getD6JointSwing1Motion_87(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_getD6JointSwing1Motion_9693653114699259557(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getD6JointSwing1Motion(EntityRef(entity.index));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_d6_joint_setD6JointSwing1Motion_88(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_setD6JointSwing1Motion_6901089880810352757(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, i32, motion_value);
 		module->setD6JointSwing1Motion(EntityRef(entity.index), (PhysicsModule::D6Motion)motion_value);
 	}
 	
-	static void evox_d6_joint_getD6JointSwing2Motion_89(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_getD6JointSwing2Motion_6817669413231240915(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getD6JointSwing2Motion(EntityRef(entity.index));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_d6_joint_setD6JointSwing2Motion_90(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_setD6JointSwing2Motion_6253924451397780147(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, i32, motion_value);
 		module->setD6JointSwing2Motion(EntityRef(entity.index), (PhysicsModule::D6Motion)motion_value);
 	}
 	
-	static void evox_d6_joint_getD6JointTwistMotion_91(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_getD6JointTwistMotion_15257068924095220544(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getD6JointTwistMotion(EntityRef(entity.index));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_d6_joint_setD6JointTwistMotion_92(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_setD6JointTwistMotion_6928912952611027670(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, i32, motion_value);
 		module->setD6JointTwistMotion(EntityRef(entity.index), (PhysicsModule::D6Motion)motion_value);
 	}
 	
-	static void evox_d6_joint_getD6JointLinearLimit_93(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_getD6JointLinearLimit_15349128076700613771(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getD6JointLinearLimit(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_d6_joint_setD6JointLinearLimit_94(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_setD6JointLinearLimit_15165899222578936725(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, limit);
 		module->setD6JointLinearLimit(EntityRef(entity.index), limit);
 	}
 	
-	static void evox_d6_joint_getD6JointTwistLimit_95(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_getD6JointTwistLimit_4496171721025639328(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getD6JointTwistLimit(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_d6_joint_setD6JointTwistLimit_96(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_setD6JointTwistLimit_11005610837698845630(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, Vec2, limit);
 		module->setD6JointTwistLimit(EntityRef(entity.index), limit);
 	}
 	
-	static void evox_d6_joint_getD6JointSwingLimit_97(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_getD6JointSwingLimit_11256394858630478399(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getD6JointSwingLimit(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_d6_joint_setD6JointSwingLimit_98(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_setD6JointSwingLimit_11111925749191060291(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, Vec2, limit);
 		module->setD6JointSwingLimit(EntityRef(entity.index), limit);
 	}
 	
-	static void evox_d6_joint_getD6JointDamping_99(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_getD6JointDamping_10221431006591640771(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getD6JointDamping(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_d6_joint_setD6JointDamping_100(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_setD6JointDamping_10653450751299093694(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, value);
 		module->setD6JointDamping(EntityRef(entity.index), value);
 	}
 	
-	static void evox_d6_joint_getD6JointStiffness_101(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_getD6JointStiffness_9847380253633775714(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getD6JointStiffness(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_d6_joint_setD6JointStiffness_102(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_setD6JointStiffness_10658290720952257247(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, value);
 		module->setD6JointStiffness(EntityRef(entity.index), value);
 	}
 	
-	static void evox_d6_joint_getD6JointRestitution_103(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_getD6JointRestitution_5042347982436814904(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getD6JointRestitution(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_d6_joint_setD6JointRestitution_104(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_setD6JointRestitution_17936001404163028420(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, value);
 		module->setD6JointRestitution(EntityRef(entity.index), value);
 	}
 	
-	static void evox_d6_joint_getD6JointConnectedBody_105(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_getD6JointConnectedBody_4200054913671067562(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getD6JointConnectedBody(EntityRef(entity.index));
 		EX_RESULT(frame, ExEntity(ret.index, &module->getWorld()));
 	}
 	
-	static void evox_d6_joint_setD6JointConnectedBody_106(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_setD6JointConnectedBody_9997699774107214785(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, ExEntity, connected_body);
 		module->setD6JointConnectedBody(EntityRef(entity.index), EntityPtr(connected_body.index));
 	}
 	
-	static void evox_d6_joint_getD6JointAxisPosition_107(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_getD6JointAxisPosition_14718916932756373104(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getD6JointAxisPosition(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_d6_joint_setD6JointAxisPosition_108(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_setD6JointAxisPosition_14576363621168131187(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, Vec3, value);
 		module->setD6JointAxisPosition(EntityRef(entity.index), value);
 	}
 	
-	static void evox_d6_joint_getD6JointAxisDirection_109(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_getD6JointAxisDirection_1377741663140556808(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getD6JointAxisDirection(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_d6_joint_setD6JointAxisDirection_110(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_d6_joint_setD6JointAxisDirection_1692054175507140020(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, Vec3, value);
 		module->setD6JointAxisDirection(EntityRef(entity.index), value);
 	}
 	
-	static void evox_distance_joint_getDistanceJointConnectedBody_111(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_distance_joint_getDistanceJointConnectedBody_1434054716758312(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getDistanceJointConnectedBody(EntityRef(entity.index));
 		EX_RESULT(frame, ExEntity(ret.index, &module->getWorld()));
 	}
 	
-	static void evox_distance_joint_setDistanceJointConnectedBody_112(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_distance_joint_setDistanceJointConnectedBody_12657534439748792502(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, ExEntity, connected_body);
 		module->setDistanceJointConnectedBody(EntityRef(entity.index), EntityPtr(connected_body.index));
 	}
 	
-	static void evox_distance_joint_getDistanceJointAxisPosition_113(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_distance_joint_getDistanceJointAxisPosition_11515033595383308468(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getDistanceJointAxisPosition(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_distance_joint_setDistanceJointAxisPosition_114(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_distance_joint_setDistanceJointAxisPosition_14598389410531043903(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, Vec3, value);
 		module->setDistanceJointAxisPosition(EntityRef(entity.index), value);
 	}
 	
-	static void evox_distance_joint_getDistanceJointDamping_115(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_distance_joint_getDistanceJointDamping_13782928665327429848(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getDistanceJointDamping(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_distance_joint_setDistanceJointDamping_116(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_distance_joint_setDistanceJointDamping_3285447076358337367(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, value);
 		module->setDistanceJointDamping(EntityRef(entity.index), value);
 	}
 	
-	static void evox_distance_joint_getDistanceJointStiffness_117(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_distance_joint_getDistanceJointStiffness_16173270783245144469(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getDistanceJointStiffness(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_distance_joint_setDistanceJointStiffness_118(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_distance_joint_setDistanceJointStiffness_17724741753157694102(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, value);
 		module->setDistanceJointStiffness(EntityRef(entity.index), value);
 	}
 	
-	static void evox_distance_joint_getDistanceJointTolerance_119(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_distance_joint_getDistanceJointTolerance_16345374829377692530(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getDistanceJointTolerance(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_distance_joint_setDistanceJointTolerance_120(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_distance_joint_setDistanceJointTolerance_14007474814298328015(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, value);
 		module->setDistanceJointTolerance(EntityRef(entity.index), value);
 	}
 	
-	static void evox_distance_joint_getDistanceJointLimits_121(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_distance_joint_getDistanceJointLimits_14988408081859678925(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getDistanceJointLimits(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_distance_joint_setDistanceJointLimits_122(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_distance_joint_setDistanceJointLimits_12543637780255090828(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, Vec2, value);
 		module->setDistanceJointLimits(EntityRef(entity.index), value);
 	}
 	
-	static void evox_distance_joint_getDistanceJointLinearForce_123(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_distance_joint_getDistanceJointLinearForce_18368188944931014535(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getDistanceJointLinearForce(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_hinge_joint_getHingeJointConnectedBody_124(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_hinge_joint_getHingeJointConnectedBody_15994503914528094622(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getHingeJointConnectedBody(EntityRef(entity.index));
 		EX_RESULT(frame, ExEntity(ret.index, &module->getWorld()));
 	}
 	
-	static void evox_hinge_joint_setHingeJointConnectedBody_125(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_hinge_joint_setHingeJointConnectedBody_7875556491297733746(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, ExEntity, connected_body);
 		module->setHingeJointConnectedBody(EntityRef(entity.index), EntityPtr(connected_body.index));
 	}
 	
-	static void evox_hinge_joint_getHingeJointAxisPosition_126(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_hinge_joint_getHingeJointAxisPosition_9333331314296799913(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getHingeJointAxisPosition(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_hinge_joint_setHingeJointAxisPosition_127(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_hinge_joint_setHingeJointAxisPosition_18307278449459925821(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, Vec3, value);
 		module->setHingeJointAxisPosition(EntityRef(entity.index), value);
 	}
 	
-	static void evox_hinge_joint_getHingeJointAxisDirection_128(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_hinge_joint_getHingeJointAxisDirection_15280236378732488342(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getHingeJointAxisDirection(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_hinge_joint_setHingeJointAxisDirection_129(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_hinge_joint_setHingeJointAxisDirection_297401759348871008(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, Vec3, value);
 		module->setHingeJointAxisDirection(EntityRef(entity.index), value);
 	}
 	
-	static void evox_hinge_joint_getHingeJointDamping_130(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_hinge_joint_getHingeJointDamping_4645602423959427866(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getHingeJointDamping(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_hinge_joint_setHingeJointDamping_131(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_hinge_joint_setHingeJointDamping_18247942646745760926(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, value);
 		module->setHingeJointDamping(EntityRef(entity.index), value);
 	}
 	
-	static void evox_hinge_joint_getHingeJointStiffness_132(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_hinge_joint_getHingeJointStiffness_1452237863060231715(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getHingeJointStiffness(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_hinge_joint_setHingeJointStiffness_133(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_hinge_joint_setHingeJointStiffness_5000692854361300243(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, value);
 		module->setHingeJointStiffness(EntityRef(entity.index), value);
 	}
 	
-	static void evox_hinge_joint_getHingeJointUseLimit_134(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_hinge_joint_getHingeJointUseLimit_4622054269600052655(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getHingeJointUseLimit(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_hinge_joint_setHingeJointUseLimit_135(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_hinge_joint_setHingeJointUseLimit_10373495169524242986(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, bool, use_limit);
 		module->setHingeJointUseLimit(EntityRef(entity.index), use_limit);
 	}
 	
-	static void evox_hinge_joint_getHingeJointLimit_136(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_hinge_joint_getHingeJointLimit_12614552694852687768(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getHingeJointLimit(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_hinge_joint_setHingeJointLimit_137(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_hinge_joint_setHingeJointLimit_8084324946599403598(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, Vec2, limit);
 		module->setHingeJointLimit(EntityRef(entity.index), limit);
 	}
 	
-	static void evox_spherical_joint_getSphericalJointConnectedBody_138(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_spherical_joint_getSphericalJointConnectedBody_17436513678593960214(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getSphericalJointConnectedBody(EntityRef(entity.index));
 		EX_RESULT(frame, ExEntity(ret.index, &module->getWorld()));
 	}
 	
-	static void evox_spherical_joint_setSphericalJointConnectedBody_139(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_spherical_joint_setSphericalJointConnectedBody_10647608810307015114(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, ExEntity, connected_body);
 		module->setSphericalJointConnectedBody(EntityRef(entity.index), EntityPtr(connected_body.index));
 	}
 	
-	static void evox_spherical_joint_getSphericalJointAxisPosition_140(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_spherical_joint_getSphericalJointAxisPosition_9077846389983423491(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getSphericalJointAxisPosition(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_spherical_joint_setSphericalJointAxisPosition_141(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_spherical_joint_setSphericalJointAxisPosition_9076329884415739724(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, Vec3, value);
 		module->setSphericalJointAxisPosition(EntityRef(entity.index), value);
 	}
 	
-	static void evox_spherical_joint_getSphericalJointAxisDirection_142(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_spherical_joint_getSphericalJointAxisDirection_11368225689536224853(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getSphericalJointAxisDirection(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_spherical_joint_setSphericalJointAxisDirection_143(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_spherical_joint_setSphericalJointAxisDirection_6101817495257316471(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, Vec3, value);
 		module->setSphericalJointAxisDirection(EntityRef(entity.index), value);
 	}
 	
-	static void evox_spherical_joint_getSphericalJointUseLimit_144(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_spherical_joint_getSphericalJointUseLimit_16520376880044386843(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getSphericalJointUseLimit(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_spherical_joint_setSphericalJointUseLimit_145(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_spherical_joint_setSphericalJointUseLimit_14253577254698790444(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, bool, use_limit);
 		module->setSphericalJointUseLimit(EntityRef(entity.index), use_limit);
 	}
 	
-	static void evox_spherical_joint_getSphericalJointLimit_146(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_spherical_joint_getSphericalJointLimit_2517341946022156772(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getSphericalJointLimit(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_spherical_joint_setSphericalJointLimit_147(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_spherical_joint_setSphericalJointLimit_8649710650005621340(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, Vec2, limit);
 		module->setSphericalJointLimit(EntityRef(entity.index), limit);
 	}
 	
-	static void evox_physical_controller_getGravitySpeed_148(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_controller_getGravitySpeed_640901860125033706(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getGravitySpeed(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_physical_controller_move_149(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_controller_move_12217037797948846899(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, Vec3, v);
 		module->moveController(EntityRef(entity.index), v);
 	}
 	
-	static void evox_physical_controller_isCollisionDown_150(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_controller_isCollisionDown_16754886262220472(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->isControllerCollisionDown(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_physical_controller_resize_151(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_controller_resize_11351672279195859076(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, height);
 		module->resizeController(EntityRef(entity.index), height);
 	}
 	
-	static void evox_physical_controller_getControllerLayer_152(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_controller_getControllerLayer_10681862432018985673(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getControllerLayer(EntityRef(entity.index));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_physical_controller_setControllerLayer_153(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_controller_setControllerLayer_4500395427114960017(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, u32, layer);
 		module->setControllerLayer(EntityRef(entity.index), layer);
 	}
 	
-	static void evox_physical_controller_getControllerRadius_154(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_controller_getControllerRadius_13707151154605360232(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getControllerRadius(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_physical_controller_setControllerRadius_155(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_controller_setControllerRadius_1980177339851090739(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, radius);
 		module->setControllerRadius(EntityRef(entity.index), radius);
 	}
 	
-	static void evox_physical_controller_getControllerHeight_156(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_controller_getControllerHeight_2218298967685822184(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getControllerHeight(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_physical_controller_setControllerHeight_157(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_controller_setControllerHeight_9955170084555261553(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, height);
 		module->setControllerHeight(EntityRef(entity.index), height);
 	}
 	
-	static void evox_physical_controller_getControllerCustomGravity_158(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_controller_getControllerCustomGravity_10833915532152078669(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getControllerCustomGravity(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_physical_controller_setControllerCustomGravity_159(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_controller_setControllerCustomGravity_2080938024535880435(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, bool, gravity);
 		module->setControllerCustomGravity(EntityRef(entity.index), gravity);
 	}
 	
-	static void evox_physical_controller_getControllerCustomGravityAcceleration_160(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_controller_getControllerCustomGravityAcceleration_767251138867608339(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getControllerCustomGravityAcceleration(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_physical_controller_setControllerCustomGravityAcceleration_161(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_controller_setControllerCustomGravityAcceleration_883562244625708681(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, gravityacceleration);
 		module->setControllerCustomGravityAcceleration(EntityRef(entity.index), gravityacceleration);
 	}
 	
-	static void evox_physical_controller_getControllerUseRootMotion_162(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_controller_getControllerUseRootMotion_2775193054704344263(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getControllerUseRootMotion(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_physical_controller_setControllerUseRootMotion_163(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_controller_setControllerUseRootMotion_2952442224732328127(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, bool, enable);
 		module->setControllerUseRootMotion(EntityRef(entity.index), enable);
 	}
 	
-	static void evox_rigid_actor_putToSleep_164(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_putToSleep_13212098632275307867(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		module->putToSleep(EntityRef(entity.index));
 	}
 	
-	static void evox_rigid_actor_addForceAtPos_165(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_addForceAtPos_1672355055868707994(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, Vec3, force);
@@ -2771,126 +2778,126 @@ namespace Lumix::Evox::generated {
 		module->addForceAtPos(EntityRef(entity.index), force, pos);
 	}
 	
-	static void evox_rigid_actor_applyForce_166(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_applyForce_7928694750852486937(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, Vec3, force);
 		module->applyForceToActor(EntityRef(entity.index), force);
 	}
 	
-	static void evox_rigid_actor_applyImpulse_167(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_applyImpulse_9915435652071895898(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, Vec3, force);
 		module->applyImpulseToActor(EntityRef(entity.index), force);
 	}
 	
-	static void evox_rigid_actor_getActorVelocity_168(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_getActorVelocity_10593422383750788488(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getActorVelocity(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_rigid_actor_getActorSpeed_169(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_getActorSpeed_16674121296490049712(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getActorSpeed(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_rigid_actor_getActorLayer_170(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_getActorLayer_9509933179744781719(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getActorLayer(EntityRef(entity.index));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_rigid_actor_setActorLayer_171(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_setActorLayer_13867100007697589713(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, u32, layer);
 		module->setActorLayer(EntityRef(entity.index), layer);
 	}
 	
-	static void evox_rigid_actor_getActorDynamicType_172(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_getActorDynamicType_4405303283298304035(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getActorDynamicType(EntityRef(entity.index));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_rigid_actor_setActorDynamicType_173(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_setActorDynamicType_1282153940877898376(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, i32, _value);
 		module->setActorDynamicType(EntityRef(entity.index), (PhysicsModule::DynamicType)_value);
 	}
 	
-	static void evox_rigid_actor_getActorIsTrigger_174(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_getActorIsTrigger_4548474388385742385(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getActorIsTrigger(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_rigid_actor_setActorIsTrigger_175(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_setActorIsTrigger_7337888994561917648(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, bool, is_trigger);
 		module->setActorIsTrigger(EntityRef(entity.index), is_trigger);
 	}
 	
-	static void evox_rigid_actor_getActorMesh_176(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_getActorMesh_6841595999302178306(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getActorMesh(EntityRef(entity.index));
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_rigid_actor_setActorMesh_177(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_setActorMesh_3606743997615879415(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_STRING_ARG(frame, path);
 		module->setActorMesh(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_rigid_actor_getActorMaterial_178(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_getActorMaterial_18204827416253874349(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getActorMaterial(EntityRef(entity.index));
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_rigid_actor_setActorMaterial_179(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_setActorMaterial_18440470995069475488(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_STRING_ARG(frame, path);
 		module->setActorMaterial(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_rigid_actor_getActorCCD_180(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_getActorCCD_12434411244966946249(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, e);
 		PhysicsModule* module = static_cast<PhysicsModule*>(e.module);
 		auto ret = module->getActorCCD(EntityRef(e.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_rigid_actor_setActorCCD_181(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_setActorCCD_12897573747666523655(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, e);
 		PhysicsModule* module = static_cast<PhysicsModule*>(e.module);
 		EX_ARG(frame, bool, is_ccd);
 		module->setActorCCD(EntityRef(e.index), is_ccd);
 	}
 	
-	static void evox_rigid_actor_boxes_count_182(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_boxes_count_1859103441161182793(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, component);
 		PhysicsModule* module = static_cast<PhysicsModule*>(component.module);
 		const i32 count = module->getBoxCount(EntityRef(component.index));
 		EX_RESULT(frame, count);
 	}
 	
-	static void evox_rigid_actor_boxes_item_183(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_boxes_item_5914938366404223461(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, component);
 		PhysicsModule* module = static_cast<PhysicsModule*>(component.module);
 		EX_ARG(frame, i32, item_idx);
@@ -2908,7 +2915,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, module);
 	}
 	
-	static void evox_rigid_actor_boxes_getBoxHalfExtents_184(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_boxes_getBoxHalfExtents_11149060149111658776(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, PhysicsModule*, module);
@@ -2916,7 +2923,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_rigid_actor_boxes_setBoxHalfExtents_185(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_boxes_setBoxHalfExtents_4611497608357626578(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, PhysicsModule*, module);
@@ -2924,7 +2931,7 @@ namespace Lumix::Evox::generated {
 		module->setBoxHalfExtents(EntityRef(entity_idx), item_idx, size);
 	}
 	
-	static void evox_rigid_actor_boxes_getBoxOffsetPosition_186(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_boxes_getBoxOffsetPosition_9223472868671538271(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, PhysicsModule*, module);
@@ -2932,7 +2939,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_rigid_actor_boxes_setBoxOffsetPosition_187(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_boxes_setBoxOffsetPosition_14863133757109908430(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, PhysicsModule*, module);
@@ -2940,7 +2947,7 @@ namespace Lumix::Evox::generated {
 		module->setBoxOffsetPosition(EntityRef(entity_idx), item_idx, pos);
 	}
 	
-	static void evox_rigid_actor_boxes_getBoxOffsetRotation_188(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_boxes_getBoxOffsetRotation_2431858041647990820(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, PhysicsModule*, module);
@@ -2948,7 +2955,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_rigid_actor_boxes_setBoxOffsetRotation_189(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_boxes_setBoxOffsetRotation_8922633324043466941(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, PhysicsModule*, module);
@@ -2956,14 +2963,14 @@ namespace Lumix::Evox::generated {
 		module->setBoxOffsetRotation(EntityRef(entity_idx), item_idx, euler_angles);
 	}
 	
-	static void evox_rigid_actor_spheres_count_190(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_spheres_count_17182790551130778759(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, component);
 		PhysicsModule* module = static_cast<PhysicsModule*>(component.module);
 		const i32 count = module->getSphereCount(EntityRef(component.index));
 		EX_RESULT(frame, count);
 	}
 	
-	static void evox_rigid_actor_spheres_item_191(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_spheres_item_17607561480211165310(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, component);
 		PhysicsModule* module = static_cast<PhysicsModule*>(component.module);
 		EX_ARG(frame, i32, item_idx);
@@ -2981,7 +2988,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, module);
 	}
 	
-	static void evox_rigid_actor_spheres_getSphereRadius_192(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_spheres_getSphereRadius_6397635657662839133(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, PhysicsModule*, module);
@@ -2989,7 +2996,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_rigid_actor_spheres_setSphereRadius_193(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_spheres_setSphereRadius_7307604915894409717(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, PhysicsModule*, module);
@@ -2997,7 +3004,7 @@ namespace Lumix::Evox::generated {
 		module->setSphereRadius(EntityRef(entity_idx), item_idx, size);
 	}
 	
-	static void evox_rigid_actor_spheres_getSphereOffsetPosition_194(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_spheres_getSphereOffsetPosition_16116986349188912276(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, PhysicsModule*, module);
@@ -3005,7 +3012,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_rigid_actor_spheres_setSphereOffsetPosition_195(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_rigid_actor_spheres_setSphereOffsetPosition_1952631322990218758(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, PhysicsModule*, module);
@@ -3013,350 +3020,350 @@ namespace Lumix::Evox::generated {
 		module->setSphereOffsetPosition(EntityRef(entity_idx), item_idx, pos);
 	}
 	
-	static void evox_wheel_getWheelSpringStrength_196(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_wheel_getWheelSpringStrength_9991052682911294062(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getWheelSpringStrength(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_wheel_setWheelSpringStrength_197(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_wheel_setWheelSpringStrength_18168065559113677475(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, str);
 		module->setWheelSpringStrength(EntityRef(entity.index), str);
 	}
 	
-	static void evox_wheel_getWheelSpringMaxCompression_198(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_wheel_getWheelSpringMaxCompression_12571100289447445433(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getWheelSpringMaxCompression(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_wheel_setWheelSpringMaxCompression_199(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_wheel_setWheelSpringMaxCompression_6698486979946567210(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, str);
 		module->setWheelSpringMaxCompression(EntityRef(entity.index), str);
 	}
 	
-	static void evox_wheel_getWheelSpringMaxDroop_200(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_wheel_getWheelSpringMaxDroop_3714789021743023958(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getWheelSpringMaxDroop(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_wheel_setWheelSpringMaxDroop_201(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_wheel_setWheelSpringMaxDroop_6496625313203848390(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, str);
 		module->setWheelSpringMaxDroop(EntityRef(entity.index), str);
 	}
 	
-	static void evox_wheel_getWheelSpringDamperRate_202(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_wheel_getWheelSpringDamperRate_1747981479233960481(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getWheelSpringDamperRate(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_wheel_setWheelSpringDamperRate_203(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_wheel_setWheelSpringDamperRate_15195362835632280538(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, rate);
 		module->setWheelSpringDamperRate(EntityRef(entity.index), rate);
 	}
 	
-	static void evox_wheel_getWheelRadius_204(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_wheel_getWheelRadius_5797348775871118352(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getWheelRadius(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_wheel_setWheelRadius_205(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_wheel_setWheelRadius_8678945949368014735(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, r);
 		module->setWheelRadius(EntityRef(entity.index), r);
 	}
 	
-	static void evox_wheel_getWheelWidth_206(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_wheel_getWheelWidth_3962635950944976101(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getWheelWidth(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_wheel_setWheelWidth_207(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_wheel_setWheelWidth_11797606039286725233(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, w);
 		module->setWheelWidth(EntityRef(entity.index), w);
 	}
 	
-	static void evox_wheel_getWheelMass_208(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_wheel_getWheelMass_8457262383482815212(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getWheelMass(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_wheel_setWheelMass_209(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_wheel_setWheelMass_17802761249092374497(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, w);
 		module->setWheelMass(EntityRef(entity.index), w);
 	}
 	
-	static void evox_wheel_getWheelMOI_210(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_wheel_getWheelMOI_17329225448375028143(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getWheelMOI(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_wheel_setWheelMOI_211(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_wheel_setWheelMOI_4390672100227953385(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, moi);
 		module->setWheelMOI(EntityRef(entity.index), moi);
 	}
 	
-	static void evox_wheel_getWheelSlot_212(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_wheel_getWheelSlot_7661196083217858775(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getWheelSlot(EntityRef(entity.index));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_wheel_setWheelSlot_213(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_wheel_setWheelSlot_15303303718720374298(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, i32, s_value);
 		module->setWheelSlot(EntityRef(entity.index), (PhysicsModule::WheelSlot)s_value);
 	}
 	
-	static void evox_wheel_getWheelRPM_214(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_wheel_getWheelRPM_18403735250706726312(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getWheelRPM(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_vehicle_getVehiclePeakTorque_215(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_getVehiclePeakTorque_12865377709159215899(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getVehiclePeakTorque(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_vehicle_setVehiclePeakTorque_216(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_setVehiclePeakTorque_450708605479090462(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, value);
 		module->setVehiclePeakTorque(EntityRef(entity.index), value);
 	}
 	
-	static void evox_vehicle_getVehicleMaxRPM_217(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_getVehicleMaxRPM_7951270875727961620(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getVehicleMaxRPM(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_vehicle_setVehicleMaxRPM_218(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_setVehicleMaxRPM_15604138286429758706(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, value);
 		module->setVehicleMaxRPM(EntityRef(entity.index), value);
 	}
 	
-	static void evox_vehicle_getVehicleRPM_219(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_getVehicleRPM_2678310156978644759(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getVehicleRPM(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_vehicle_getVehicleCurrentGear_220(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_getVehicleCurrentGear_1172268433105709381(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getVehicleCurrentGear(EntityRef(entity.index));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_vehicle_getVehicleSpeed_221(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_getVehicleSpeed_7397302492130099443(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getVehicleSpeed(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_vehicle_setVehicleAccel_222(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_setVehicleAccel_5738020861438803904(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, accel);
 		module->setVehicleAccel(EntityRef(entity.index), accel);
 	}
 	
-	static void evox_vehicle_setVehicleSteer_223(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_setVehicleSteer_16986302533023363100(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, value);
 		module->setVehicleSteer(EntityRef(entity.index), value);
 	}
 	
-	static void evox_vehicle_setVehicleBrake_224(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_setVehicleBrake_136883192398412580(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, value);
 		module->setVehicleBrake(EntityRef(entity.index), value);
 	}
 	
-	static void evox_vehicle_getVehicleChassis_225(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_getVehicleChassis_15180539946997534210(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getVehicleChassis(EntityRef(entity.index));
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_vehicle_setVehicleChassis_226(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_setVehicleChassis_17815561654817463700(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_STRING_ARG(frame, path);
 		module->setVehicleChassis(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_vehicle_getVehicleMass_227(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_getVehicleMass_3826439275636292573(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getVehicleMass(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_vehicle_setVehicleMass_228(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_setVehicleMass_15779485969247915754(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, mass);
 		module->setVehicleMass(EntityRef(entity.index), mass);
 	}
 	
-	static void evox_vehicle_getVehicleMOIMultiplier_229(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_getVehicleMOIMultiplier_96501381039349968(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getVehicleMOIMultiplier(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_vehicle_setVehicleMOIMultiplier_230(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_setVehicleMOIMultiplier_3587670730009285845(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, float, m);
 		module->setVehicleMOIMultiplier(EntityRef(entity.index), m);
 	}
 	
-	static void evox_vehicle_getVehicleCenterOfMass_231(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_getVehicleCenterOfMass_13202032159238424522(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getVehicleCenterOfMass(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_vehicle_setVehicleCenterOfMass_232(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_setVehicleCenterOfMass_13714262401650207791(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, Vec3, center);
 		module->setVehicleCenterOfMass(EntityRef(entity.index), center);
 	}
 	
-	static void evox_vehicle_getVehicleWheelsLayer_233(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_getVehicleWheelsLayer_7781415653573910448(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getVehicleWheelsLayer(EntityRef(entity.index));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_vehicle_setVehicleWheelsLayer_234(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_setVehicleWheelsLayer_15673238082083035607(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, u32, layer);
 		module->setVehicleWheelsLayer(EntityRef(entity.index), layer);
 	}
 	
-	static void evox_vehicle_getVehicleChassisLayer_235(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_getVehicleChassisLayer_471834618907300638(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getVehicleChassisLayer(EntityRef(entity.index));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_vehicle_setVehicleChassisLayer_236(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_vehicle_setVehicleChassisLayer_8473725476134026144(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, u32, layer);
 		module->setVehicleChassisLayer(EntityRef(entity.index), layer);
 	}
 	
-	static void evox_physical_instanced_cube_getInstancedCubeHalfExtents_237(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_instanced_cube_getInstancedCubeHalfExtents_5811712922083731358(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getInstancedCubeHalfExtents(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_physical_instanced_cube_setInstancedCubeHalfExtents_238(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_instanced_cube_setInstancedCubeHalfExtents_2871694779134560304(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, Vec3, half_extents);
 		module->setInstancedCubeHalfExtents(EntityRef(entity.index), half_extents);
 	}
 	
-	static void evox_physical_instanced_cube_getInstancedCubeLayer_239(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_instanced_cube_getInstancedCubeLayer_11007112474105681337(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getInstancedCubeLayer(EntityRef(entity.index));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_physical_instanced_cube_setInstancedCubeLayer_240(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_instanced_cube_setInstancedCubeLayer_10191273074757588333(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, u32, layer);
 		module->setInstancedCubeLayer(EntityRef(entity.index), layer);
 	}
 	
-	static void evox_physical_instanced_mesh_getInstancedMeshLayer_241(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_instanced_mesh_getInstancedMeshLayer_14567361767800560888(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getInstancedMeshLayer(EntityRef(entity.index));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_physical_instanced_mesh_setInstancedMeshLayer_242(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_instanced_mesh_setInstancedMeshLayer_5700318157331230762(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_ARG(frame, u32, layer);
 		module->setInstancedMeshLayer(EntityRef(entity.index), layer);
 	}
 	
-	static void evox_physical_instanced_mesh_getInstancedMeshGeomPath_243(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_instanced_mesh_getInstancedMeshGeomPath_16637277119403782362(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getInstancedMeshGeomPath(EntityRef(entity.index));
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_physical_instanced_mesh_setInstancedMeshGeomPath_244(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_physical_instanced_mesh_setInstancedMeshGeomPath_3991197376419967785(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		EX_STRING_ARG(frame, path);
 		module->setInstancedMeshGeomPath(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_camera_getRay_245(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_camera_getRay_3372513399393209772(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, Vec2, screen_pos);
@@ -3365,224 +3372,224 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret.dir);
 	}
 	
-	static void evox_camera_getCameraScreenWidth_246(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_camera_getCameraScreenWidth_2731392340090998983(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getCameraScreenWidth(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_camera_getCameraScreenHeight_247(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_camera_getCameraScreenHeight_2402994306305726512(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getCameraScreenHeight(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_decal_getDecalMaterialPath_248(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_decal_getDecalMaterialPath_3447756100310666566(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getDecalMaterialPath(EntityRef(entity.index));
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_decal_setDecalMaterialPath_249(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_decal_setDecalMaterialPath_16654676966978376762(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_STRING_ARG(frame, path);
 		module->setDecalMaterialPath(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_decal_getDecalHalfExtents_250(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_decal_getDecalHalfExtents_5819726501367060100(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getDecalHalfExtents(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_decal_setDecalHalfExtents_251(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_decal_setDecalHalfExtents_10326364927035985528(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, Vec3, value);
 		module->setDecalHalfExtents(EntityRef(entity.index), value);
 	}
 	
-	static void evox_environment_getEnvironmentCastShadows_252(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_environment_getEnvironmentCastShadows_2502322743604025970(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getEnvironmentCastShadows(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_environment_setEnvironmentCastShadows_253(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_environment_setEnvironmentCastShadows_12728355724374346427(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, bool, enable);
 		module->setEnvironmentCastShadows(EntityRef(entity.index), enable);
 	}
 	
-	static void evox_environment_getEnvironmentSkyTexture_254(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_environment_getEnvironmentSkyTexture_12082802317082884790(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getEnvironmentSkyTexture(EntityRef(entity.index));
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_environment_setEnvironmentSkyTexture_255(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_environment_setEnvironmentSkyTexture_984049513280251158(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_STRING_ARG(frame, path);
 		module->setEnvironmentSkyTexture(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_environment_getEnvironmentShadowmapCascades_256(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_environment_getEnvironmentShadowmapCascades_5787290337346526077(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getEnvironmentShadowmapCascades(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_environment_setEnvironmentShadowmapCascades_257(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_environment_setEnvironmentShadowmapCascades_15884515140666313469(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, Vec4, value);
 		module->setEnvironmentShadowmapCascades(EntityRef(entity.index), value);
 	}
 	
-	static void evox_point_light_getPointLightRange_258(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_point_light_getPointLightRange_10244661856029492374(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getPointLightRange(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_point_light_setPointLightRange_259(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_point_light_setPointLightRange_11813343483428624361(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, float, value);
 		module->setPointLightRange(EntityRef(entity.index), value);
 	}
 	
-	static void evox_point_light_getPointLightCastShadows_260(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_point_light_getPointLightCastShadows_5581725951671009098(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getPointLightCastShadows(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_point_light_setPointLightCastShadows_261(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_point_light_setPointLightCastShadows_7627481180976591043(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, bool, value);
 		module->setPointLightCastShadows(EntityRef(entity.index), value);
 	}
 	
-	static void evox_point_light_getPointLightDynamic_262(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_point_light_getPointLightDynamic_8250510919620053405(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getPointLightDynamic(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_point_light_setPointLightDynamic_263(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_point_light_setPointLightDynamic_4827199232774172920(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, bool, value);
 		module->setPointLightDynamic(EntityRef(entity.index), value);
 	}
 	
-	static void evox_reflection_probe_isReflectionProbeEnabled_264(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_reflection_probe_isReflectionProbeEnabled_14161642990656081393(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->isReflectionProbeEnabled(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_reflection_probe_enableReflectionProbe_265(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_reflection_probe_enableReflectionProbe_14526316855359089557(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, bool, enable);
 		module->enableReflectionProbe(EntityRef(entity.index), enable);
 	}
 	
-	static void evox_environment_probe_isEnvironmentProbeEnabled_266(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_environment_probe_isEnvironmentProbeEnabled_6472315036682061276(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->isEnvironmentProbeEnabled(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_environment_probe_enableEnvironmentProbe_267(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_environment_probe_enableEnvironmentProbe_15467030845922521952(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, bool, enable);
 		module->enableEnvironmentProbe(EntityRef(entity.index), enable);
 	}
 	
-	static void evox_bone_attachment_setRotation_268(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_bone_attachment_setRotation_7525519620484028447(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, Quat, rot);
 		module->setBoneAttachmentRotationQuat(EntityRef(entity.index), rot);
 	}
 	
-	static void evox_bone_attachment_getBoneAttachmentParent_269(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_bone_attachment_getBoneAttachmentParent_18142689017962228472(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getBoneAttachmentParent(EntityRef(entity.index));
 		EX_RESULT(frame, ExEntity(ret.index, &module->getWorld()));
 	}
 	
-	static void evox_bone_attachment_setBoneAttachmentParent_270(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_bone_attachment_setBoneAttachmentParent_3779313276891743601(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, ExEntity, parent);
 		module->setBoneAttachmentParent(EntityRef(entity.index), EntityPtr(parent.index));
 	}
 	
-	static void evox_bone_attachment_getBoneAttachmentBone_271(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_bone_attachment_getBoneAttachmentBone_2784195155658238731(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getBoneAttachmentBone(EntityRef(entity.index));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_bone_attachment_setBoneAttachmentBone_272(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_bone_attachment_setBoneAttachmentBone_4742134950152804761(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, int, value);
 		module->setBoneAttachmentBone(EntityRef(entity.index), value);
 	}
 	
-	static void evox_bone_attachment_getBoneAttachmentPosition_273(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_bone_attachment_getBoneAttachmentPosition_14063061698960809797(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getBoneAttachmentPosition(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_bone_attachment_setBoneAttachmentPosition_274(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_bone_attachment_setBoneAttachmentPosition_10702452899333319646(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, Vec3, pos);
 		module->setBoneAttachmentPosition(EntityRef(entity.index), pos);
 	}
 	
-	static void evox_bone_attachment_getBoneAttachmentRotation_275(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_bone_attachment_getBoneAttachmentRotation_4979697275069747087(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getBoneAttachmentRotation(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_bone_attachment_setBoneAttachmentRotation_276(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_bone_attachment_setBoneAttachmentRotation_2627513105013326150(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, Vec3, rot);
 		module->setBoneAttachmentRotation(EntityRef(entity.index), rot);
 	}
 	
-	static void evox_particle_emitter_getGlobalID_277(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_particle_emitter_getGlobalID_903115760734972517(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_STRING_ARG(frame, name);
@@ -3592,7 +3599,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_particle_emitter_setFloatGlobal_278(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_particle_emitter_setFloatGlobal_8048456309304325320(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, i32, id);
@@ -3600,7 +3607,7 @@ namespace Lumix::Evox::generated {
 		module->setParticleEmitterGlobal(EntityRef(entity.index), id, value);
 	}
 	
-	static void evox_particle_emitter_setVec3Global_279(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_particle_emitter_setVec3Global_5038922086369882645(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, i32, id);
@@ -3608,7 +3615,7 @@ namespace Lumix::Evox::generated {
 		module->setParticleEmitterGlobal(EntityRef(entity.index), id, value);
 	}
 	
-	static void evox_particle_emitter_setVec4Global_280(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_particle_emitter_setVec4Global_767624962292035606(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, i32, id);
@@ -3616,7 +3623,7 @@ namespace Lumix::Evox::generated {
 		module->setParticleEmitterGlobal(EntityRef(entity.index), id, value);
 	}
 	
-	static void evox_particle_emitter_emitRibbons_281(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_particle_emitter_emitRibbons_5781840855685258371(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, u32, emitter_index);
@@ -3624,7 +3631,7 @@ namespace Lumix::Evox::generated {
 		module->emitRibbons(EntityRef(entity.index), emitter_index, num_ribbons);
 	}
 	
-	static void evox_particle_emitter_killRibbon_282(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_particle_emitter_killRibbon_7218400999598356956(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, u32, emitter_index);
@@ -3632,49 +3639,49 @@ namespace Lumix::Evox::generated {
 		module->killRibbon(EntityRef(entity.index), emitter_index, ribbon_index);
 	}
 	
-	static void evox_particle_emitter_getParticleEmitterPath_283(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_particle_emitter_getParticleEmitterPath_11330173879880210098(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getParticleEmitterPath(EntityRef(entity.index));
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_particle_emitter_setParticleEmitterPath_284(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_particle_emitter_setParticleEmitterPath_13850250279856496269(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_STRING_ARG(frame, path);
 		module->setParticleEmitterPath(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_particle_emitter_getParticleEmitterAutodestroy_285(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_particle_emitter_getParticleEmitterAutodestroy_4263130026576218239(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getParticleEmitterAutodestroy(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_particle_emitter_setParticleEmitterAutodestroy_286(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_particle_emitter_setParticleEmitterAutodestroy_12841861352903192919(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, bool, enable);
 		module->setParticleEmitterAutodestroy(EntityRef(entity.index), enable);
 	}
 	
-	static void evox_instanced_model_getInstancedModelPath_287(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_instanced_model_getInstancedModelPath_5042885846977672067(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getInstancedModelPath(EntityRef(entity.index));
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_instanced_model_setInstancedModelPath_288(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_instanced_model_setInstancedModelPath_11517420952746177454(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_STRING_ARG(frame, path);
 		module->setInstancedModelPath(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_model_instance_overrideMaterialVec4_289(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_model_instance_overrideMaterialVec4_4410224850514097651(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, u32, mesh_index);
@@ -3686,7 +3693,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_model_instance_getModel_290(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_model_instance_getModel_17163776195265150550(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getModelInstanceModel(EntityRef(entity.index));
@@ -3694,7 +3701,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_model_instance_setMaterialOverride_291(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_model_instance_setMaterialOverride_996603591774246378(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, u32, mesh_idx);
@@ -3702,7 +3709,7 @@ namespace Lumix::Evox::generated {
 		module->setModelInstanceMaterialOverride(EntityRef(entity.index), mesh_idx, Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_model_instance_getMaterialOverride_292(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_model_instance_getMaterialOverride_10931791879858139541(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, u32, mesh_idx);
@@ -3710,105 +3717,105 @@ namespace Lumix::Evox::generated {
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_model_instance_isModelInstanceEnabled_293(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_model_instance_isModelInstanceEnabled_6536336526105476060(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->isModelInstanceEnabled(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_model_instance_enableModelInstance_294(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_model_instance_enableModelInstance_1093951277701741996(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, bool, enable);
 		module->enableModelInstance(EntityRef(entity.index), enable);
 	}
 	
-	static void evox_model_instance_getModelInstancePath_295(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_model_instance_getModelInstancePath_480404235994227176(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getModelInstancePath(EntityRef(entity.index));
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_model_instance_setModelInstancePath_296(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_model_instance_setModelInstancePath_555781892820508759(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_STRING_ARG(frame, path);
 		module->setModelInstancePath(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_curve_decal_getCurveDecalMaterialPath_297(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_curve_decal_getCurveDecalMaterialPath_14883722537838298065(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getCurveDecalMaterialPath(EntityRef(entity.index));
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_curve_decal_setCurveDecalMaterialPath_298(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_curve_decal_setCurveDecalMaterialPath_4325468858749750754(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_STRING_ARG(frame, path);
 		module->setCurveDecalMaterialPath(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_curve_decal_getCurveDecalHalfExtents_299(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_curve_decal_getCurveDecalHalfExtents_6032783605772812549(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getCurveDecalHalfExtents(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_curve_decal_setCurveDecalHalfExtents_300(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_curve_decal_setCurveDecalHalfExtents_15657074898057640592(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, float, value);
 		module->setCurveDecalHalfExtents(EntityRef(entity.index), value);
 	}
 	
-	static void evox_curve_decal_getCurveDecalUVScale_301(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_curve_decal_getCurveDecalUVScale_9314353131851647976(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getCurveDecalUVScale(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_curve_decal_setCurveDecalUVScale_302(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_curve_decal_setCurveDecalUVScale_11922830816912627716(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, Vec2, value);
 		module->setCurveDecalUVScale(EntityRef(entity.index), value);
 	}
 	
-	static void evox_curve_decal_getCurveDecalBezierP0_303(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_curve_decal_getCurveDecalBezierP0_3468085010426487511(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getCurveDecalBezierP0(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_curve_decal_setCurveDecalBezierP0_304(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_curve_decal_setCurveDecalBezierP0_12067942103955500109(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, Vec2, value);
 		module->setCurveDecalBezierP0(EntityRef(entity.index), value);
 	}
 	
-	static void evox_curve_decal_getCurveDecalBezierP2_305(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_curve_decal_getCurveDecalBezierP2_11002163896324231854(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getCurveDecalBezierP2(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_curve_decal_setCurveDecalBezierP2_306(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_curve_decal_setCurveDecalBezierP2_14805499181827883260(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, Vec2, value);
 		module->setCurveDecalBezierP2(EntityRef(entity.index), value);
 	}
 	
-	static void evox_terrain_getHeightAt_307(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_getHeightAt_4135864093076350260(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, float, x);
@@ -3817,7 +3824,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_terrain_getNormalAt_308(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_getNormalAt_1311724776655016951(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, float, x);
@@ -3826,91 +3833,91 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_terrain_getTerrainSize_309(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_getTerrainSize_3020679776041108740(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getTerrainSize(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_terrain_getTerrainMaterialPath_310(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_getTerrainMaterialPath_2215532021269038697(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getTerrainMaterialPath(EntityRef(entity.index));
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_terrain_setTerrainMaterialPath_311(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_setTerrainMaterialPath_1966540602136072292(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_STRING_ARG(frame, path);
 		module->setTerrainMaterialPath(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_terrain_getTerrainXZScale_312(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_getTerrainXZScale_15339317355184973151(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getTerrainXZScale(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_terrain_setTerrainXZScale_313(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_setTerrainXZScale_16735516022020384810(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, float, scale);
 		module->setTerrainXZScale(EntityRef(entity.index), scale);
 	}
 	
-	static void evox_terrain_getTerrainTesselation_314(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_getTerrainTesselation_16430938751987681888(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getTerrainTesselation(EntityRef(entity.index));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_terrain_setTerrainTesselation_315(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_setTerrainTesselation_14084944351236148479(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, u32, value);
 		module->setTerrainTesselation(EntityRef(entity.index), value);
 	}
 	
-	static void evox_terrain_getTerrainBaseGridResolution_316(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_getTerrainBaseGridResolution_6946226270046439418(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getTerrainBaseGridResolution(EntityRef(entity.index));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_terrain_setTerrainBaseGridResolution_317(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_setTerrainBaseGridResolution_15993857900103366987(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, u32, value);
 		module->setTerrainBaseGridResolution(EntityRef(entity.index), value);
 	}
 	
-	static void evox_terrain_getTerrainYScale_318(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_getTerrainYScale_6808724379307216299(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getTerrainYScale(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_terrain_setTerrainYScale_319(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_setTerrainYScale_8612193105866137381(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, float, scale);
 		module->setTerrainYScale(EntityRef(entity.index), scale);
 	}
 	
-	static void evox_terrain_grass_count_320(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_grass_count_14741352061571450574(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, component);
 		RenderModule* module = static_cast<RenderModule*>(component.module);
 		const i32 count = module->getGrassCount(EntityRef(component.index));
 		EX_RESULT(frame, count);
 	}
 	
-	static void evox_terrain_grass_item_321(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_grass_item_5892846808699301772(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, component);
 		RenderModule* module = static_cast<RenderModule*>(component.module);
 		EX_ARG(frame, i32, item_idx);
@@ -3928,7 +3935,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, module);
 	}
 	
-	static void evox_terrain_grass_getGrassRotationMode_322(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_grass_getGrassRotationMode_14468789118457816776(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, RenderModule*, module);
@@ -3936,7 +3943,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, (i32)ret);
 	}
 	
-	static void evox_terrain_grass_setGrassRotationMode_323(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_grass_setGrassRotationMode_1328757637365446366(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, RenderModule*, module);
@@ -3944,7 +3951,7 @@ namespace Lumix::Evox::generated {
 		module->setGrassRotationMode(EntityRef(entity_idx), item_idx, (GrassRotationMode)value_value);
 	}
 	
-	static void evox_terrain_grass_getGrassDistance_324(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_grass_getGrassDistance_6527065972178915904(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, RenderModule*, module);
@@ -3952,7 +3959,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_terrain_grass_setGrassDistance_325(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_grass_setGrassDistance_1962933902425473914(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, RenderModule*, module);
@@ -3960,7 +3967,7 @@ namespace Lumix::Evox::generated {
 		module->setGrassDistance(EntityRef(entity_idx), item_idx, value);
 	}
 	
-	static void evox_terrain_grass_getGrassPath_326(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_grass_getGrassPath_10133631074678619462(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, RenderModule*, module);
@@ -3968,7 +3975,7 @@ namespace Lumix::Evox::generated {
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_terrain_grass_setGrassPath_327(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_grass_setGrassPath_3630854957332324363(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, RenderModule*, module);
@@ -3976,7 +3983,7 @@ namespace Lumix::Evox::generated {
 		module->setGrassPath(EntityRef(entity_idx), item_idx, Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_terrain_grass_getGrassSpacing_328(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_grass_getGrassSpacing_14061099111497580177(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, RenderModule*, module);
@@ -3984,7 +3991,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_terrain_grass_setGrassSpacing_329(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_terrain_grass_setGrassSpacing_405729763332359076(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
 		EX_ARG(frame, RenderModule*, module);
@@ -3992,85 +3999,85 @@ namespace Lumix::Evox::generated {
 		module->setGrassSpacing(EntityRef(entity_idx), item_idx, spacing);
 	}
 	
-	static void evox_procedural_geom_getProceduralGeometryMaterial_330(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_procedural_geom_getProceduralGeometryMaterial_6522136380315261577(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getProceduralGeometryMaterial(EntityRef(entity.index));
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_procedural_geom_setProceduralGeometryMaterial_331(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_procedural_geom_setProceduralGeometryMaterial_11069154491425504953(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_STRING_ARG(frame, path);
 		module->setProceduralGeometryMaterial(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_ui_3d_getUI3DPath_332(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_ui_3d_getUI3DPath_14812910613353120667(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		UIModule* module = static_cast<UIModule*>(entity.module);
 		auto ret = module->getUI3DPath(EntityRef(entity.index));
 		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
 	}
 	
-	static void evox_ui_3d_setUI3DPath_333(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_ui_3d_setUI3DPath_9334778907864705763(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		UIModule* module = static_cast<UIModule*>(entity.module);
 		EX_STRING_ARG(frame, path);
 		module->setUI3DPath(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_ui_3d_getUI3DVirtualSize_334(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_ui_3d_getUI3DVirtualSize_5246908877923932881(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		UIModule* module = static_cast<UIModule*>(entity.module);
 		auto ret = module->getUI3DVirtualSize(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_ui_3d_setUI3DVirtualSize_335(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_ui_3d_setUI3DVirtualSize_3443593634112763421(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		UIModule* module = static_cast<UIModule*>(entity.module);
 		EX_ARG(frame, Vec2, value);
 		module->setUI3DVirtualSize(EntityRef(entity.index), value);
 	}
 	
-	static void evox_ui_3d_getUI3DOrientToCamera_336(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_ui_3d_getUI3DOrientToCamera_2472985916441962820(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		UIModule* module = static_cast<UIModule*>(entity.module);
 		auto ret = module->getUI3DOrientToCamera(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_ui_3d_setUI3DOrientToCamera_337(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_ui_3d_setUI3DOrientToCamera_10517850954275228651(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		UIModule* module = static_cast<UIModule*>(entity.module);
 		EX_ARG(frame, bool, value);
 		module->setUI3DOrientToCamera(EntityRef(entity.index), value);
 	}
 	
-	static void evox_object_AssetBrowser_openEditor_338(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_AssetBrowser_openEditor_11783148113040368601(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, AssetBrowser*, object);
 		EX_STRING_ARG(frame, resource);
 		object->openEditor(Path(StringView{resource.begin, (u64)resource.length}));
 	}
 	
-	static void evox_object_StudioApp_exitWithCode_339(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_StudioApp_exitWithCode_758235736626335650(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, StudioApp*, object);
 		EX_ARG(frame, int, exit_code);
 		object->exitWithCode(exit_code);
 	}
 	
-	static void evox_object_StudioApp_exitGameMode_340(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_StudioApp_exitGameMode_3617391861646806333(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, StudioApp*, object);
 		object->exitGameMode();
 	}
 	
-	static void evox_object_StudioApp_newWorld_341(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_StudioApp_newWorld_6688068326512970617(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, StudioApp*, object);
 		object->newWorld();
 	}
 	
-	static void evox_object_GameView_forceViewport_342(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_GameView_forceViewport_14906880937046627925(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, GameView*, object);
 		EX_ARG(frame, bool, enable);
 		EX_ARG(frame, int, w);
@@ -4078,7 +4085,7 @@ namespace Lumix::Evox::generated {
 		object->forceViewport(enable, w, h);
 	}
 	
-	static void evox_object_SceneView_setViewport_343(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_SceneView_setViewport_14548538436635539605(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, SceneView*, object);
 		Viewport vp{};
 		EX_ARG(frame, bool, vp_is_ortho);
@@ -4104,32 +4111,32 @@ namespace Lumix::Evox::generated {
 		object->setViewport(vp);
 	}
 	
-	static void evox_object_SceneView_makeScreenshot_344(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_SceneView_makeScreenshot_13676003394318764375(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, SceneView*, object);
 		EX_STRING_ARG(frame, path);
 		object->makeScreenshot(StringView{path.begin, (u64)path.length});
 	}
 	
-	static void evox_object_Model_getOriginBoundingRadius_345(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_Model_getOriginBoundingRadius_10043197175785696766(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, Model*, object);
 		auto ret = object->getOriginBoundingRadius();
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_object_Model_getCenterBoundingRadius_346(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_Model_getCenterBoundingRadius_6203163798800546562(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, Model*, object);
 		auto ret = object->getCenterBoundingRadius();
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_object_Pipeline_render_347(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_Pipeline_render_16077624984126946320(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, Pipeline*, object);
 		EX_ARG(frame, bool, only_2d);
 		auto ret = object->render(only_2d);
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_object_Pipeline_setViewport_348(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_Pipeline_setViewport_10887991775244494685(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, Pipeline*, object);
 		Viewport viewport{};
 		EX_ARG(frame, bool, viewport_is_ortho);
@@ -4155,55 +4162,55 @@ namespace Lumix::Evox::generated {
 		object->setViewport(viewport);
 	}
 	
-	static void evox_object_Pipeline_setClearColor_349(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_Pipeline_setClearColor_1198735756463553615(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, Pipeline*, object);
 		EX_ARG(frame, Vec3, color);
 		object->setClearColor(color);
 	}
 	
-	static void evox_object_Renderer_getLODMultiplier_350(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_Renderer_getLODMultiplier_14506703837845548734(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, Renderer*, object);
 		auto ret = object->getLODMultiplier();
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_object_Renderer_setLODMultiplier_351(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_Renderer_setLODMultiplier_2531530158563778094(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, Renderer*, object);
 		EX_ARG(frame, float, value);
 		object->setLODMultiplier(value);
 	}
 	
-	static void evox_object_Element_getID_352(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_Element_getID_5043487033988361637(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ui::Element*, object);
 		auto ret = object->getID();
 		ex_result_string(runtime, &frame, ex_string_view{ret.data, (i64)ret.length});
 	}
 	
-	static void evox_object_Element_setVisible_353(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_Element_setVisible_10775676013963828726(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ui::Element*, object);
 		EX_ARG(frame, bool, show);
 		object->setVisible(show);
 	}
 	
-	static void evox_object_Element_setText_354(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_Element_setText_16123516204308000926(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ui::Element*, object);
 		EX_STRING_ARG(frame, value);
 		object->setText(StringView{value.begin, (u64)value.length});
 	}
 	
-	static void evox_object_Element_setWidth_355(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_Element_setWidth_1690122863701504102(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ui::Element*, object);
 		EX_STRING_ARG(frame, value);
 		object->setWidth(StringView{value.begin, (u64)value.length});
 	}
 	
-	static void evox_object_Element_setBGImage_356(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_Element_setBGImage_9641999657146036441(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ui::Element*, object);
 		EX_STRING_ARG(frame, path);
 		object->setBGImage(Path(StringView{path.begin, (u64)path.length}));
 	}
 	
-	static void evox_object_Document_getElement_357(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_Document_getElement_11405592870786360628(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ui::Document*, object);
 		EX_ARG(frame, u32, index);
 		auto ret = object->getElement(index);
@@ -4211,7 +4218,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_object_Document_getElementByID_358(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_Document_getElementByID_12240067967033170654(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ui::Document*, object);
 		EX_STRING_ARG(frame, id);
 		char evox_string_arg_id[128];
@@ -4221,14 +4228,14 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret);
 	}
 	
-	static void evox_object_Document_getEvents_359(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_Document_getEvents_4526885960883524382(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ui::Document*, object);
 		auto ret = object->getEvents();
 		ex_slice result{const_cast<u8*>(reinterpret_cast<const u8*>((ret).begin())), (i64)(ret).size()};
 		EX_RESULT(frame, result);
 	}
 	
-	static void evox_object_UISystem_enableCursor_360(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_object_UISystem_enableCursor_9613396029109500766(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, UISystem*, object);
 		EX_ARG(frame, bool, enable);
 		object->enableCursor(enable);
@@ -4313,379 +4320,380 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:procedural_geom"), StringView("procedural_geom")}, &evox_entity_procedural_geom);
 		functions.insert({StringView("core:ui_3d"), StringView("createUI3D")}, &evox_entity_createUI3D);
 		functions.insert({StringView("core:ui_3d"), StringView("ui_3d")}, &evox_entity_ui_3d);
-		functions.insert({StringView("core:audio"), StringView("setMasterVolume")}, &evox_audio_setMasterVolume_0);
+		functions.insert({StringView("core:audio"), StringView("setMasterVolume")}, &evox_audio_setMasterVolume_14804945310456614025);
 		functions.insert({StringView("core:audio"), StringView("audio")}, &evox_world_audio);
-		functions.insert({StringView("core:physics"), StringView("raycast")}, &evox_physics_raycast_1);
-		functions.insert({StringView("core:physics"), StringView("setGravity")}, &evox_physics_setGravity_2);
-		functions.insert({StringView("core:physics"), StringView("getControllerHitsCount")}, &evox_physics_getControllerHits_count_3);
-		functions.insert({StringView("core:physics"), StringView("getControllerHitsGet")}, &evox_physics_getControllerHits_get_4);
-		functions.insert({StringView("core:physics"), StringView("getTriggerHitsCount")}, &evox_physics_getTriggerHits_count_5);
-		functions.insert({StringView("core:physics"), StringView("getTriggerHitsGet")}, &evox_physics_getTriggerHits_get_6);
-		functions.insert({StringView("core:physics"), StringView("getContactHitsCount")}, &evox_physics_getContactHits_count_7);
-		functions.insert({StringView("core:physics"), StringView("getContactHitsGet")}, &evox_physics_getContactHits_get_8);
+		functions.insert({StringView("core:physics"), StringView("raycast")}, &evox_physics_raycast_3415175403905315551);
+		functions.insert({StringView("core:physics"), StringView("setGravity")}, &evox_physics_setGravity_15380368834725248530);
+		functions.insert({StringView("core:physics"), StringView("getControllerHitsCount")}, &evox_physics_getControllerHits_count_6067200848500777010);
+		functions.insert({StringView("core:physics"), StringView("getControllerHitsGet")}, &evox_physics_getControllerHits_get_6075682698315308999);
+		functions.insert({StringView("core:physics"), StringView("getTriggerHitsCount")}, &evox_physics_getTriggerHits_count_15909385450064360176);
+		functions.insert({StringView("core:physics"), StringView("getTriggerHitsGet")}, &evox_physics_getTriggerHits_get_12117019466983661535);
+		functions.insert({StringView("core:physics"), StringView("getContactHitsCount")}, &evox_physics_getContactHits_count_8769190636714668351);
+		functions.insert({StringView("core:physics"), StringView("getContactHitsGet")}, &evox_physics_getContactHits_get_1259599258055043497);
 		functions.insert({StringView("core:physics"), StringView("physics")}, &evox_world_physics);
-		functions.insert({StringView("core:renderer"), StringView("addDebugTriangle")}, &evox_renderer_addDebugTriangle_9);
-		functions.insert({StringView("core:renderer"), StringView("addDebugLine")}, &evox_renderer_addDebugLine_10);
-		functions.insert({StringView("core:renderer"), StringView("addDebugCross")}, &evox_renderer_addDebugCross_11);
-		functions.insert({StringView("core:renderer"), StringView("addDebugBone")}, &evox_renderer_addDebugBone_12);
-		functions.insert({StringView("core:renderer"), StringView("addDebugCube")}, &evox_renderer_addDebugCube_13);
-		functions.insert({StringView("core:renderer"), StringView("addDebugCubeSolid")}, &evox_renderer_addDebugCubeSolid_14);
-		functions.insert({StringView("core:renderer"), StringView("setActiveCamera")}, &evox_renderer_setActiveCamera_15);
-		functions.insert({StringView("core:renderer"), StringView("setActiveEnvironment")}, &evox_renderer_setActiveEnvironment_16);
+		functions.insert({StringView("core:renderer"), StringView("addDebugTriangle")}, &evox_renderer_addDebugTriangle_9051351881586580716);
+		functions.insert({StringView("core:renderer"), StringView("addDebugLine")}, &evox_renderer_addDebugLine_11999449654256854668);
+		functions.insert({StringView("core:renderer"), StringView("addDebugCross")}, &evox_renderer_addDebugCross_12225788651207943196);
+		functions.insert({StringView("core:renderer"), StringView("addDebugBone")}, &evox_renderer_addDebugBone_8753979476089779328);
+		functions.insert({StringView("core:renderer"), StringView("addDebugCube")}, &evox_renderer_addDebugCube_263184294223126531);
+		functions.insert({StringView("core:renderer"), StringView("addDebugCubeSolid")}, &evox_renderer_addDebugCubeSolid_12864046118107539685);
+		functions.insert({StringView("core:renderer"), StringView("setActiveCamera")}, &evox_renderer_setActiveCamera_16964213945525572297);
+		functions.insert({StringView("core:renderer"), StringView("setActiveEnvironment")}, &evox_renderer_setActiveEnvironment_14874579541215673611);
 		functions.insert({StringView("core:renderer"), StringView("renderer")}, &evox_world_renderer);
-		functions.insert({StringView("core:ui"), StringView("getDocument")}, &evox_ui_getDocument_17);
-		functions.insert({StringView("core:ui"), StringView("load")}, &evox_ui_load_18);
-		functions.insert({StringView("core:ui"), StringView("isReady")}, &evox_ui_isReady_19);
-		functions.insert({StringView("core:ui"), StringView("getSystem")}, &evox_ui_getSystem_20);
+		functions.insert({StringView("core:ui"), StringView("getDocument")}, &evox_ui_getDocument_6532204115686324839);
+		functions.insert({StringView("core:ui"), StringView("load")}, &evox_ui_load_18010826757131874131);
+		functions.insert({StringView("core:ui"), StringView("isReady")}, &evox_ui_isReady_13861426650607350200);
+		functions.insert({StringView("core:ui"), StringView("getSystem")}, &evox_ui_getSystem_14148007050043927689);
 		functions.insert({StringView("core:ui"), StringView("ui")}, &evox_world_ui);
-		functions.insert({StringView("core:property_animator"), StringView("isPropertyAnimatorEnabled")}, &evox_property_animator_isPropertyAnimatorEnabled_21);
-		functions.insert({StringView("core:property_animator"), StringView("enablePropertyAnimator")}, &evox_property_animator_enablePropertyAnimator_22);
-		functions.insert({StringView("core:property_animator"), StringView("getPropertyAnimatorLooped")}, &evox_property_animator_getPropertyAnimatorLooped_23);
-		functions.insert({StringView("core:property_animator"), StringView("setPropertyAnimatorLooped")}, &evox_property_animator_setPropertyAnimatorLooped_24);
-		functions.insert({StringView("core:property_animator"), StringView("getPropertyAnimatorAnimation")}, &evox_property_animator_getPropertyAnimatorAnimation_25);
-		functions.insert({StringView("core:property_animator"), StringView("setPropertyAnimatorAnimation")}, &evox_property_animator_setPropertyAnimatorAnimation_26);
-		functions.insert({StringView("core:animator"), StringView("applySet")}, &evox_animator_applySet_27);
-		functions.insert({StringView("core:animator"), StringView("setBoolInput")}, &evox_animator_setBoolInput_28);
-		functions.insert({StringView("core:animator"), StringView("setFloatInput")}, &evox_animator_setFloatInput_29);
-		functions.insert({StringView("core:animator"), StringView("setVec3Input")}, &evox_animator_setVec3Input_30);
-		functions.insert({StringView("core:animator"), StringView("getInputIndex")}, &evox_animator_getInputIndex_31);
-		functions.insert({StringView("core:animator"), StringView("getAnimatorSource")}, &evox_animator_getAnimatorSource_32);
-		functions.insert({StringView("core:animator"), StringView("setAnimatorSource")}, &evox_animator_setAnimatorSource_33);
-		functions.insert({StringView("core:animator"), StringView("getAnimatorUseRootMotion")}, &evox_animator_getAnimatorUseRootMotion_34);
-		functions.insert({StringView("core:animator"), StringView("setAnimatorUseRootMotion")}, &evox_animator_setAnimatorUseRootMotion_35);
-		functions.insert({StringView("core:animator"), StringView("getAnimatorDefaultSet")}, &evox_animator_getAnimatorDefaultSet_36);
-		functions.insert({StringView("core:animator"), StringView("setAnimatorDefaultSet")}, &evox_animator_setAnimatorDefaultSet_37);
-		functions.insert({StringView("core:animable"), StringView("getAnimableAnimation")}, &evox_animable_getAnimableAnimation_38);
-		functions.insert({StringView("core:animable"), StringView("setAnimableAnimation")}, &evox_animable_setAnimableAnimation_39);
-		functions.insert({StringView("core:ambient_sound"), StringView("pause")}, &evox_ambient_sound_pause_40);
-		functions.insert({StringView("core:ambient_sound"), StringView("resume")}, &evox_ambient_sound_resume_41);
-		functions.insert({StringView("core:ambient_sound"), StringView("getAmbientSoundClip")}, &evox_ambient_sound_getAmbientSoundClip_42);
-		functions.insert({StringView("core:ambient_sound"), StringView("setAmbientSoundClip")}, &evox_ambient_sound_setAmbientSoundClip_43);
-		functions.insert({StringView("core:ambient_sound"), StringView("isAmbientSound3D")}, &evox_ambient_sound_isAmbientSound3D_44);
-		functions.insert({StringView("core:ambient_sound"), StringView("setAmbientSound3D")}, &evox_ambient_sound_setAmbientSound3D_45);
+		functions.insert({StringView("core:property_animator"), StringView("isPropertyAnimatorEnabled")}, &evox_property_animator_isPropertyAnimatorEnabled_12742070177058822018);
+		functions.insert({StringView("core:property_animator"), StringView("enablePropertyAnimator")}, &evox_property_animator_enablePropertyAnimator_11265307580004053127);
+		functions.insert({StringView("core:property_animator"), StringView("getPropertyAnimatorLooped")}, &evox_property_animator_getPropertyAnimatorLooped_11673480956432975690);
+		functions.insert({StringView("core:property_animator"), StringView("setPropertyAnimatorLooped")}, &evox_property_animator_setPropertyAnimatorLooped_14589021667225761304);
+		functions.insert({StringView("core:property_animator"), StringView("getPropertyAnimatorAnimation")}, &evox_property_animator_getPropertyAnimatorAnimation_4677209988032281809);
+		functions.insert({StringView("core:property_animator"), StringView("setPropertyAnimatorAnimation")}, &evox_property_animator_setPropertyAnimatorAnimation_17368489730427576649);
+		functions.insert({StringView("core:animator"), StringView("applySet")}, &evox_animator_applySet_16040823933969755447);
+		functions.insert({StringView("core:animator"), StringView("setBoolInput")}, &evox_animator_setBoolInput_11264800738315947820);
+		functions.insert({StringView("core:animator"), StringView("setFloatInput")}, &evox_animator_setFloatInput_12167774824541287440);
+		functions.insert({StringView("core:animator"), StringView("setVec3Input")}, &evox_animator_setVec3Input_3425313765252397208);
+		functions.insert({StringView("core:animator"), StringView("getInputIndex")}, &evox_animator_getInputIndex_15568250204244809786);
+		functions.insert({StringView("core:animator"), StringView("getAnimatorSource")}, &evox_animator_getAnimatorSource_11155504970444435899);
+		functions.insert({StringView("core:animator"), StringView("setAnimatorSource")}, &evox_animator_setAnimatorSource_17892176931136230879);
+		functions.insert({StringView("core:animator"), StringView("getAnimatorUseRootMotion")}, &evox_animator_getAnimatorUseRootMotion_9741305205143477525);
+		functions.insert({StringView("core:animator"), StringView("setAnimatorUseRootMotion")}, &evox_animator_setAnimatorUseRootMotion_9342718108203537783);
+		functions.insert({StringView("core:animator"), StringView("getAnimatorDefaultSet")}, &evox_animator_getAnimatorDefaultSet_17375738426851236115);
+		functions.insert({StringView("core:animator"), StringView("setAnimatorDefaultSet")}, &evox_animator_setAnimatorDefaultSet_8642953903016100752);
+		functions.insert({StringView("core:animable"), StringView("getAnimableAnimation")}, &evox_animable_getAnimableAnimation_11745291916317671749);
+		functions.insert({StringView("core:animable"), StringView("setAnimableAnimation")}, &evox_animable_setAnimableAnimation_14956871121764638013);
+		functions.insert({StringView("core:ambient_sound"), StringView("pause")}, &evox_ambient_sound_pause_7564319632766837034);
+		functions.insert({StringView("core:ambient_sound"), StringView("resume")}, &evox_ambient_sound_resume_15147770483073356605);
+		functions.insert({StringView("core:ambient_sound"), StringView("getAmbientSoundClip")}, &evox_ambient_sound_getAmbientSoundClip_18285036400960618982);
+		functions.insert({StringView("core:ambient_sound"), StringView("setAmbientSoundClip")}, &evox_ambient_sound_setAmbientSoundClip_1977866805267527577);
+		functions.insert({StringView("core:ambient_sound"), StringView("isAmbientSound3D")}, &evox_ambient_sound_isAmbientSound3D_6191921949559533236);
+		functions.insert({StringView("core:ambient_sound"), StringView("setAmbientSound3D")}, &evox_ambient_sound_setAmbientSound3D_7682859713366114688);
 		functions.insert({StringView("core:lua_script"), StringView("scriptsCount")}, &
-		evox_lua_script_scripts_count_46);
+		evox_lua_script_scripts_count_1969858549337313839);
 		functions.insert({StringView("core:lua_script"), StringView("scripts")}, &
-		evox_lua_script_scripts_item_47);
-		functions.insert({StringView("core:lua_script"), StringView("isScriptEnabled")}, &evox_lua_script_scripts_isScriptEnabled_48);
-		functions.insert({StringView("core:lua_script"), StringView("enableScript")}, &evox_lua_script_scripts_enableScript_49);
-		functions.insert({StringView("core:lua_script"), StringView("getScriptPath")}, &evox_lua_script_scripts_getScriptPath_50);
-		functions.insert({StringView("core:lua_script"), StringView("setScriptPath")}, &evox_lua_script_scripts_setScriptPath_51);
-		functions.insert({StringView("core:lua_script_inline"), StringView("setInlineScriptCode")}, &evox_lua_script_inline_setInlineScriptCode_52);
-		functions.insert({StringView("core:navmesh_zone"), StringView("load")}, &evox_navmesh_zone_load_53);
-		functions.insert({StringView("core:navmesh_zone"), StringView("drawNavmesh")}, &evox_navmesh_zone_drawNavmesh_54);
-		functions.insert({StringView("core:navmesh_zone"), StringView("drawCompactHeightfield")}, &evox_navmesh_zone_drawCompactHeightfield_55);
-		functions.insert({StringView("core:navmesh_zone"), StringView("drawHeightfield")}, &evox_navmesh_zone_drawHeightfield_56);
-		functions.insert({StringView("core:navmesh_zone"), StringView("drawContours")}, &evox_navmesh_zone_drawContours_57);
-		functions.insert({StringView("core:navmesh_zone"), StringView("saveZone")}, &evox_navmesh_zone_saveZone_58);
-		functions.insert({StringView("core:navmesh_zone"), StringView("getZoneAutoload")}, &evox_navmesh_zone_getZoneAutoload_59);
-		functions.insert({StringView("core:navmesh_zone"), StringView("setZoneAutoload")}, &evox_navmesh_zone_setZoneAutoload_60);
-		functions.insert({StringView("core:navmesh_zone"), StringView("getZoneDetailed")}, &evox_navmesh_zone_getZoneDetailed_61);
-		functions.insert({StringView("core:navmesh_zone"), StringView("setZoneDetailed")}, &evox_navmesh_zone_setZoneDetailed_62);
-		functions.insert({StringView("core:navmesh_agent"), StringView("navigate")}, &evox_navmesh_agent_navigate_63);
-		functions.insert({StringView("core:navmesh_agent"), StringView("cancelNavigation")}, &evox_navmesh_agent_cancelNavigation_64);
-		functions.insert({StringView("core:navmesh_agent"), StringView("drawPath")}, &evox_navmesh_agent_drawPath_65);
-		functions.insert({StringView("core:navmesh_agent"), StringView("getAgentRadius")}, &evox_navmesh_agent_getAgentRadius_66);
-		functions.insert({StringView("core:navmesh_agent"), StringView("setAgentRadius")}, &evox_navmesh_agent_setAgentRadius_67);
-		functions.insert({StringView("core:navmesh_agent"), StringView("getAgentHeight")}, &evox_navmesh_agent_getAgentHeight_68);
-		functions.insert({StringView("core:navmesh_agent"), StringView("setAgentHeight")}, &evox_navmesh_agent_setAgentHeight_69);
-		functions.insert({StringView("core:navmesh_agent"), StringView("getAgentMoveEntity")}, &evox_navmesh_agent_getAgentMoveEntity_70);
-		functions.insert({StringView("core:navmesh_agent"), StringView("setAgentMoveEntity")}, &evox_navmesh_agent_setAgentMoveEntity_71);
-		functions.insert({StringView("core:navmesh_agent"), StringView("getAgentSpeed")}, &evox_navmesh_agent_getAgentSpeed_72);
-		functions.insert({StringView("core:physical_heightfield"), StringView("getHeightfieldSource")}, &evox_physical_heightfield_getHeightfieldSource_73);
-		functions.insert({StringView("core:physical_heightfield"), StringView("setHeightfieldSource")}, &evox_physical_heightfield_setHeightfieldSource_74);
-		functions.insert({StringView("core:physical_heightfield"), StringView("getHeightfieldXZScale")}, &evox_physical_heightfield_getHeightfieldXZScale_75);
-		functions.insert({StringView("core:physical_heightfield"), StringView("setHeightfieldXZScale")}, &evox_physical_heightfield_setHeightfieldXZScale_76);
-		functions.insert({StringView("core:physical_heightfield"), StringView("getHeightfieldYScale")}, &evox_physical_heightfield_getHeightfieldYScale_77);
-		functions.insert({StringView("core:physical_heightfield"), StringView("setHeightfieldYScale")}, &evox_physical_heightfield_setHeightfieldYScale_78);
-		functions.insert({StringView("core:physical_heightfield"), StringView("getHeightfieldLayer")}, &evox_physical_heightfield_getHeightfieldLayer_79);
-		functions.insert({StringView("core:physical_heightfield"), StringView("setHeightfieldLayer")}, &evox_physical_heightfield_setHeightfieldLayer_80);
-		functions.insert({StringView("core:d6_joint"), StringView("getD6JointXMotion")}, &evox_d6_joint_getD6JointXMotion_81);
-		functions.insert({StringView("core:d6_joint"), StringView("setD6JointXMotion")}, &evox_d6_joint_setD6JointXMotion_82);
-		functions.insert({StringView("core:d6_joint"), StringView("getD6JointYMotion")}, &evox_d6_joint_getD6JointYMotion_83);
-		functions.insert({StringView("core:d6_joint"), StringView("setD6JointYMotion")}, &evox_d6_joint_setD6JointYMotion_84);
-		functions.insert({StringView("core:d6_joint"), StringView("getD6JointZMotion")}, &evox_d6_joint_getD6JointZMotion_85);
-		functions.insert({StringView("core:d6_joint"), StringView("setD6JointZMotion")}, &evox_d6_joint_setD6JointZMotion_86);
-		functions.insert({StringView("core:d6_joint"), StringView("getD6JointSwing1Motion")}, &evox_d6_joint_getD6JointSwing1Motion_87);
-		functions.insert({StringView("core:d6_joint"), StringView("setD6JointSwing1Motion")}, &evox_d6_joint_setD6JointSwing1Motion_88);
-		functions.insert({StringView("core:d6_joint"), StringView("getD6JointSwing2Motion")}, &evox_d6_joint_getD6JointSwing2Motion_89);
-		functions.insert({StringView("core:d6_joint"), StringView("setD6JointSwing2Motion")}, &evox_d6_joint_setD6JointSwing2Motion_90);
-		functions.insert({StringView("core:d6_joint"), StringView("getD6JointTwistMotion")}, &evox_d6_joint_getD6JointTwistMotion_91);
-		functions.insert({StringView("core:d6_joint"), StringView("setD6JointTwistMotion")}, &evox_d6_joint_setD6JointTwistMotion_92);
-		functions.insert({StringView("core:d6_joint"), StringView("getD6JointLinearLimit")}, &evox_d6_joint_getD6JointLinearLimit_93);
-		functions.insert({StringView("core:d6_joint"), StringView("setD6JointLinearLimit")}, &evox_d6_joint_setD6JointLinearLimit_94);
-		functions.insert({StringView("core:d6_joint"), StringView("getD6JointTwistLimit")}, &evox_d6_joint_getD6JointTwistLimit_95);
-		functions.insert({StringView("core:d6_joint"), StringView("setD6JointTwistLimit")}, &evox_d6_joint_setD6JointTwistLimit_96);
-		functions.insert({StringView("core:d6_joint"), StringView("getD6JointSwingLimit")}, &evox_d6_joint_getD6JointSwingLimit_97);
-		functions.insert({StringView("core:d6_joint"), StringView("setD6JointSwingLimit")}, &evox_d6_joint_setD6JointSwingLimit_98);
-		functions.insert({StringView("core:d6_joint"), StringView("getD6JointDamping")}, &evox_d6_joint_getD6JointDamping_99);
-		functions.insert({StringView("core:d6_joint"), StringView("setD6JointDamping")}, &evox_d6_joint_setD6JointDamping_100);
-		functions.insert({StringView("core:d6_joint"), StringView("getD6JointStiffness")}, &evox_d6_joint_getD6JointStiffness_101);
-		functions.insert({StringView("core:d6_joint"), StringView("setD6JointStiffness")}, &evox_d6_joint_setD6JointStiffness_102);
-		functions.insert({StringView("core:d6_joint"), StringView("getD6JointRestitution")}, &evox_d6_joint_getD6JointRestitution_103);
-		functions.insert({StringView("core:d6_joint"), StringView("setD6JointRestitution")}, &evox_d6_joint_setD6JointRestitution_104);
-		functions.insert({StringView("core:d6_joint"), StringView("getD6JointConnectedBody")}, &evox_d6_joint_getD6JointConnectedBody_105);
-		functions.insert({StringView("core:d6_joint"), StringView("setD6JointConnectedBody")}, &evox_d6_joint_setD6JointConnectedBody_106);
-		functions.insert({StringView("core:d6_joint"), StringView("getD6JointAxisPosition")}, &evox_d6_joint_getD6JointAxisPosition_107);
-		functions.insert({StringView("core:d6_joint"), StringView("setD6JointAxisPosition")}, &evox_d6_joint_setD6JointAxisPosition_108);
-		functions.insert({StringView("core:d6_joint"), StringView("getD6JointAxisDirection")}, &evox_d6_joint_getD6JointAxisDirection_109);
-		functions.insert({StringView("core:d6_joint"), StringView("setD6JointAxisDirection")}, &evox_d6_joint_setD6JointAxisDirection_110);
-		functions.insert({StringView("core:distance_joint"), StringView("getDistanceJointConnectedBody")}, &evox_distance_joint_getDistanceJointConnectedBody_111);
-		functions.insert({StringView("core:distance_joint"), StringView("setDistanceJointConnectedBody")}, &evox_distance_joint_setDistanceJointConnectedBody_112);
-		functions.insert({StringView("core:distance_joint"), StringView("getDistanceJointAxisPosition")}, &evox_distance_joint_getDistanceJointAxisPosition_113);
-		functions.insert({StringView("core:distance_joint"), StringView("setDistanceJointAxisPosition")}, &evox_distance_joint_setDistanceJointAxisPosition_114);
-		functions.insert({StringView("core:distance_joint"), StringView("getDistanceJointDamping")}, &evox_distance_joint_getDistanceJointDamping_115);
-		functions.insert({StringView("core:distance_joint"), StringView("setDistanceJointDamping")}, &evox_distance_joint_setDistanceJointDamping_116);
-		functions.insert({StringView("core:distance_joint"), StringView("getDistanceJointStiffness")}, &evox_distance_joint_getDistanceJointStiffness_117);
-		functions.insert({StringView("core:distance_joint"), StringView("setDistanceJointStiffness")}, &evox_distance_joint_setDistanceJointStiffness_118);
-		functions.insert({StringView("core:distance_joint"), StringView("getDistanceJointTolerance")}, &evox_distance_joint_getDistanceJointTolerance_119);
-		functions.insert({StringView("core:distance_joint"), StringView("setDistanceJointTolerance")}, &evox_distance_joint_setDistanceJointTolerance_120);
-		functions.insert({StringView("core:distance_joint"), StringView("getDistanceJointLimits")}, &evox_distance_joint_getDistanceJointLimits_121);
-		functions.insert({StringView("core:distance_joint"), StringView("setDistanceJointLimits")}, &evox_distance_joint_setDistanceJointLimits_122);
-		functions.insert({StringView("core:distance_joint"), StringView("getDistanceJointLinearForce")}, &evox_distance_joint_getDistanceJointLinearForce_123);
-		functions.insert({StringView("core:hinge_joint"), StringView("getHingeJointConnectedBody")}, &evox_hinge_joint_getHingeJointConnectedBody_124);
-		functions.insert({StringView("core:hinge_joint"), StringView("setHingeJointConnectedBody")}, &evox_hinge_joint_setHingeJointConnectedBody_125);
-		functions.insert({StringView("core:hinge_joint"), StringView("getHingeJointAxisPosition")}, &evox_hinge_joint_getHingeJointAxisPosition_126);
-		functions.insert({StringView("core:hinge_joint"), StringView("setHingeJointAxisPosition")}, &evox_hinge_joint_setHingeJointAxisPosition_127);
-		functions.insert({StringView("core:hinge_joint"), StringView("getHingeJointAxisDirection")}, &evox_hinge_joint_getHingeJointAxisDirection_128);
-		functions.insert({StringView("core:hinge_joint"), StringView("setHingeJointAxisDirection")}, &evox_hinge_joint_setHingeJointAxisDirection_129);
-		functions.insert({StringView("core:hinge_joint"), StringView("getHingeJointDamping")}, &evox_hinge_joint_getHingeJointDamping_130);
-		functions.insert({StringView("core:hinge_joint"), StringView("setHingeJointDamping")}, &evox_hinge_joint_setHingeJointDamping_131);
-		functions.insert({StringView("core:hinge_joint"), StringView("getHingeJointStiffness")}, &evox_hinge_joint_getHingeJointStiffness_132);
-		functions.insert({StringView("core:hinge_joint"), StringView("setHingeJointStiffness")}, &evox_hinge_joint_setHingeJointStiffness_133);
-		functions.insert({StringView("core:hinge_joint"), StringView("getHingeJointUseLimit")}, &evox_hinge_joint_getHingeJointUseLimit_134);
-		functions.insert({StringView("core:hinge_joint"), StringView("setHingeJointUseLimit")}, &evox_hinge_joint_setHingeJointUseLimit_135);
-		functions.insert({StringView("core:hinge_joint"), StringView("getHingeJointLimit")}, &evox_hinge_joint_getHingeJointLimit_136);
-		functions.insert({StringView("core:hinge_joint"), StringView("setHingeJointLimit")}, &evox_hinge_joint_setHingeJointLimit_137);
-		functions.insert({StringView("core:spherical_joint"), StringView("getSphericalJointConnectedBody")}, &evox_spherical_joint_getSphericalJointConnectedBody_138);
-		functions.insert({StringView("core:spherical_joint"), StringView("setSphericalJointConnectedBody")}, &evox_spherical_joint_setSphericalJointConnectedBody_139);
-		functions.insert({StringView("core:spherical_joint"), StringView("getSphericalJointAxisPosition")}, &evox_spherical_joint_getSphericalJointAxisPosition_140);
-		functions.insert({StringView("core:spherical_joint"), StringView("setSphericalJointAxisPosition")}, &evox_spherical_joint_setSphericalJointAxisPosition_141);
-		functions.insert({StringView("core:spherical_joint"), StringView("getSphericalJointAxisDirection")}, &evox_spherical_joint_getSphericalJointAxisDirection_142);
-		functions.insert({StringView("core:spherical_joint"), StringView("setSphericalJointAxisDirection")}, &evox_spherical_joint_setSphericalJointAxisDirection_143);
-		functions.insert({StringView("core:spherical_joint"), StringView("getSphericalJointUseLimit")}, &evox_spherical_joint_getSphericalJointUseLimit_144);
-		functions.insert({StringView("core:spherical_joint"), StringView("setSphericalJointUseLimit")}, &evox_spherical_joint_setSphericalJointUseLimit_145);
-		functions.insert({StringView("core:spherical_joint"), StringView("getSphericalJointLimit")}, &evox_spherical_joint_getSphericalJointLimit_146);
-		functions.insert({StringView("core:spherical_joint"), StringView("setSphericalJointLimit")}, &evox_spherical_joint_setSphericalJointLimit_147);
-		functions.insert({StringView("core:physical_controller"), StringView("getGravitySpeed")}, &evox_physical_controller_getGravitySpeed_148);
-		functions.insert({StringView("core:physical_controller"), StringView("move")}, &evox_physical_controller_move_149);
-		functions.insert({StringView("core:physical_controller"), StringView("isCollisionDown")}, &evox_physical_controller_isCollisionDown_150);
-		functions.insert({StringView("core:physical_controller"), StringView("resize")}, &evox_physical_controller_resize_151);
-		functions.insert({StringView("core:physical_controller"), StringView("getControllerLayer")}, &evox_physical_controller_getControllerLayer_152);
-		functions.insert({StringView("core:physical_controller"), StringView("setControllerLayer")}, &evox_physical_controller_setControllerLayer_153);
-		functions.insert({StringView("core:physical_controller"), StringView("getControllerRadius")}, &evox_physical_controller_getControllerRadius_154);
-		functions.insert({StringView("core:physical_controller"), StringView("setControllerRadius")}, &evox_physical_controller_setControllerRadius_155);
-		functions.insert({StringView("core:physical_controller"), StringView("getControllerHeight")}, &evox_physical_controller_getControllerHeight_156);
-		functions.insert({StringView("core:physical_controller"), StringView("setControllerHeight")}, &evox_physical_controller_setControllerHeight_157);
-		functions.insert({StringView("core:physical_controller"), StringView("getControllerCustomGravity")}, &evox_physical_controller_getControllerCustomGravity_158);
-		functions.insert({StringView("core:physical_controller"), StringView("setControllerCustomGravity")}, &evox_physical_controller_setControllerCustomGravity_159);
-		functions.insert({StringView("core:physical_controller"), StringView("getControllerCustomGravityAcceleration")}, &evox_physical_controller_getControllerCustomGravityAcceleration_160);
-		functions.insert({StringView("core:physical_controller"), StringView("setControllerCustomGravityAcceleration")}, &evox_physical_controller_setControllerCustomGravityAcceleration_161);
-		functions.insert({StringView("core:physical_controller"), StringView("getControllerUseRootMotion")}, &evox_physical_controller_getControllerUseRootMotion_162);
-		functions.insert({StringView("core:physical_controller"), StringView("setControllerUseRootMotion")}, &evox_physical_controller_setControllerUseRootMotion_163);
-		functions.insert({StringView("core:rigid_actor"), StringView("putToSleep")}, &evox_rigid_actor_putToSleep_164);
-		functions.insert({StringView("core:rigid_actor"), StringView("addForceAtPos")}, &evox_rigid_actor_addForceAtPos_165);
-		functions.insert({StringView("core:rigid_actor"), StringView("applyForce")}, &evox_rigid_actor_applyForce_166);
-		functions.insert({StringView("core:rigid_actor"), StringView("applyImpulse")}, &evox_rigid_actor_applyImpulse_167);
-		functions.insert({StringView("core:rigid_actor"), StringView("getActorVelocity")}, &evox_rigid_actor_getActorVelocity_168);
-		functions.insert({StringView("core:rigid_actor"), StringView("getActorSpeed")}, &evox_rigid_actor_getActorSpeed_169);
-		functions.insert({StringView("core:rigid_actor"), StringView("getActorLayer")}, &evox_rigid_actor_getActorLayer_170);
-		functions.insert({StringView("core:rigid_actor"), StringView("setActorLayer")}, &evox_rigid_actor_setActorLayer_171);
-		functions.insert({StringView("core:rigid_actor"), StringView("getActorDynamicType")}, &evox_rigid_actor_getActorDynamicType_172);
-		functions.insert({StringView("core:rigid_actor"), StringView("setActorDynamicType")}, &evox_rigid_actor_setActorDynamicType_173);
-		functions.insert({StringView("core:rigid_actor"), StringView("getActorIsTrigger")}, &evox_rigid_actor_getActorIsTrigger_174);
-		functions.insert({StringView("core:rigid_actor"), StringView("setActorIsTrigger")}, &evox_rigid_actor_setActorIsTrigger_175);
-		functions.insert({StringView("core:rigid_actor"), StringView("getActorMesh")}, &evox_rigid_actor_getActorMesh_176);
-		functions.insert({StringView("core:rigid_actor"), StringView("setActorMesh")}, &evox_rigid_actor_setActorMesh_177);
-		functions.insert({StringView("core:rigid_actor"), StringView("getActorMaterial")}, &evox_rigid_actor_getActorMaterial_178);
-		functions.insert({StringView("core:rigid_actor"), StringView("setActorMaterial")}, &evox_rigid_actor_setActorMaterial_179);
-		functions.insert({StringView("core:rigid_actor"), StringView("getActorCCD")}, &evox_rigid_actor_getActorCCD_180);
-		functions.insert({StringView("core:rigid_actor"), StringView("setActorCCD")}, &evox_rigid_actor_setActorCCD_181);
+		evox_lua_script_scripts_item_14595206848404558398);
+		functions.insert({StringView("core:lua_script"), StringView("isScriptEnabled")}, &evox_lua_script_scripts_isScriptEnabled_17964535321660095912);
+		functions.insert({StringView("core:lua_script"), StringView("enableScript")}, &evox_lua_script_scripts_enableScript_5627495313735532483);
+		functions.insert({StringView("core:lua_script"), StringView("getScriptPath")}, &evox_lua_script_scripts_getScriptPath_17603508703546419852);
+		functions.insert({StringView("core:lua_script"), StringView("setScriptPath")}, &evox_lua_script_scripts_setScriptPath_10019960863008180274);
+		functions.insert({StringView("core:lua_script_inline"), StringView("setInlineScriptCode")}, &evox_lua_script_inline_setInlineScriptCode_13127526837028390910);
+		functions.insert({StringView("core:navmesh_zone"), StringView("load")}, &evox_navmesh_zone_load_13918995704249104099);
+		functions.insert({StringView("core:navmesh_zone"), StringView("drawNavmesh")}, &evox_navmesh_zone_drawNavmesh_5134955218642488807);
+		functions.insert({StringView("core:navmesh_zone"), StringView("drawCompactHeightfield")}, &evox_navmesh_zone_drawCompactHeightfield_5812805081547031182);
+		functions.insert({StringView("core:navmesh_zone"), StringView("drawHeightfield")}, &evox_navmesh_zone_drawHeightfield_14679078041041130503);
+		functions.insert({StringView("core:navmesh_zone"), StringView("drawContours")}, &evox_navmesh_zone_drawContours_6798494238098731653);
+		functions.insert({StringView("core:navmesh_zone"), StringView("saveZone")}, &evox_navmesh_zone_saveZone_30091838565818055);
+		functions.insert({StringView("core:navmesh_zone"), StringView("getZoneAutoload")}, &evox_navmesh_zone_getZoneAutoload_14291138643344541979);
+		functions.insert({StringView("core:navmesh_zone"), StringView("setZoneAutoload")}, &evox_navmesh_zone_setZoneAutoload_3016407451842724548);
+		functions.insert({StringView("core:navmesh_zone"), StringView("getZoneDetailed")}, &evox_navmesh_zone_getZoneDetailed_7813946106612811513);
+		functions.insert({StringView("core:navmesh_zone"), StringView("setZoneDetailed")}, &evox_navmesh_zone_setZoneDetailed_11600996283663539980);
+		functions.insert({StringView("core:navmesh_agent"), StringView("navigate")}, &evox_navmesh_agent_navigate_599694585840344933);
+		functions.insert({StringView("core:navmesh_agent"), StringView("isFinished")}, &evox_navmesh_agent_isFinished_16660152684622094943);
+		functions.insert({StringView("core:navmesh_agent"), StringView("cancelNavigation")}, &evox_navmesh_agent_cancelNavigation_7425739489534912430);
+		functions.insert({StringView("core:navmesh_agent"), StringView("drawPath")}, &evox_navmesh_agent_drawPath_11559871560978783390);
+		functions.insert({StringView("core:navmesh_agent"), StringView("getAgentRadius")}, &evox_navmesh_agent_getAgentRadius_563470164329861692);
+		functions.insert({StringView("core:navmesh_agent"), StringView("setAgentRadius")}, &evox_navmesh_agent_setAgentRadius_16949384499794200055);
+		functions.insert({StringView("core:navmesh_agent"), StringView("getAgentHeight")}, &evox_navmesh_agent_getAgentHeight_1069423188658384351);
+		functions.insert({StringView("core:navmesh_agent"), StringView("setAgentHeight")}, &evox_navmesh_agent_setAgentHeight_15021107481936670454);
+		functions.insert({StringView("core:navmesh_agent"), StringView("getAgentMoveEntity")}, &evox_navmesh_agent_getAgentMoveEntity_12818649202212790996);
+		functions.insert({StringView("core:navmesh_agent"), StringView("setAgentMoveEntity")}, &evox_navmesh_agent_setAgentMoveEntity_13361431652517441269);
+		functions.insert({StringView("core:navmesh_agent"), StringView("getAgentSpeed")}, &evox_navmesh_agent_getAgentSpeed_5942787732699741932);
+		functions.insert({StringView("core:physical_heightfield"), StringView("getHeightfieldSource")}, &evox_physical_heightfield_getHeightfieldSource_17781085907241680804);
+		functions.insert({StringView("core:physical_heightfield"), StringView("setHeightfieldSource")}, &evox_physical_heightfield_setHeightfieldSource_10631205189205149640);
+		functions.insert({StringView("core:physical_heightfield"), StringView("getHeightfieldXZScale")}, &evox_physical_heightfield_getHeightfieldXZScale_17927546630134259819);
+		functions.insert({StringView("core:physical_heightfield"), StringView("setHeightfieldXZScale")}, &evox_physical_heightfield_setHeightfieldXZScale_15289404238999113653);
+		functions.insert({StringView("core:physical_heightfield"), StringView("getHeightfieldYScale")}, &evox_physical_heightfield_getHeightfieldYScale_12976189580294514178);
+		functions.insert({StringView("core:physical_heightfield"), StringView("setHeightfieldYScale")}, &evox_physical_heightfield_setHeightfieldYScale_10874814692147059073);
+		functions.insert({StringView("core:physical_heightfield"), StringView("getHeightfieldLayer")}, &evox_physical_heightfield_getHeightfieldLayer_5041904754438919339);
+		functions.insert({StringView("core:physical_heightfield"), StringView("setHeightfieldLayer")}, &evox_physical_heightfield_setHeightfieldLayer_12968791845034531989);
+		functions.insert({StringView("core:d6_joint"), StringView("getD6JointXMotion")}, &evox_d6_joint_getD6JointXMotion_14851665169879168421);
+		functions.insert({StringView("core:d6_joint"), StringView("setD6JointXMotion")}, &evox_d6_joint_setD6JointXMotion_17307665595482720832);
+		functions.insert({StringView("core:d6_joint"), StringView("getD6JointYMotion")}, &evox_d6_joint_getD6JointYMotion_12817388917696084776);
+		functions.insert({StringView("core:d6_joint"), StringView("setD6JointYMotion")}, &evox_d6_joint_setD6JointYMotion_106387350368783163);
+		functions.insert({StringView("core:d6_joint"), StringView("getD6JointZMotion")}, &evox_d6_joint_getD6JointZMotion_15772777298635389478);
+		functions.insert({StringView("core:d6_joint"), StringView("setD6JointZMotion")}, &evox_d6_joint_setD6JointZMotion_38632995566283774);
+		functions.insert({StringView("core:d6_joint"), StringView("getD6JointSwing1Motion")}, &evox_d6_joint_getD6JointSwing1Motion_9693653114699259557);
+		functions.insert({StringView("core:d6_joint"), StringView("setD6JointSwing1Motion")}, &evox_d6_joint_setD6JointSwing1Motion_6901089880810352757);
+		functions.insert({StringView("core:d6_joint"), StringView("getD6JointSwing2Motion")}, &evox_d6_joint_getD6JointSwing2Motion_6817669413231240915);
+		functions.insert({StringView("core:d6_joint"), StringView("setD6JointSwing2Motion")}, &evox_d6_joint_setD6JointSwing2Motion_6253924451397780147);
+		functions.insert({StringView("core:d6_joint"), StringView("getD6JointTwistMotion")}, &evox_d6_joint_getD6JointTwistMotion_15257068924095220544);
+		functions.insert({StringView("core:d6_joint"), StringView("setD6JointTwistMotion")}, &evox_d6_joint_setD6JointTwistMotion_6928912952611027670);
+		functions.insert({StringView("core:d6_joint"), StringView("getD6JointLinearLimit")}, &evox_d6_joint_getD6JointLinearLimit_15349128076700613771);
+		functions.insert({StringView("core:d6_joint"), StringView("setD6JointLinearLimit")}, &evox_d6_joint_setD6JointLinearLimit_15165899222578936725);
+		functions.insert({StringView("core:d6_joint"), StringView("getD6JointTwistLimit")}, &evox_d6_joint_getD6JointTwistLimit_4496171721025639328);
+		functions.insert({StringView("core:d6_joint"), StringView("setD6JointTwistLimit")}, &evox_d6_joint_setD6JointTwistLimit_11005610837698845630);
+		functions.insert({StringView("core:d6_joint"), StringView("getD6JointSwingLimit")}, &evox_d6_joint_getD6JointSwingLimit_11256394858630478399);
+		functions.insert({StringView("core:d6_joint"), StringView("setD6JointSwingLimit")}, &evox_d6_joint_setD6JointSwingLimit_11111925749191060291);
+		functions.insert({StringView("core:d6_joint"), StringView("getD6JointDamping")}, &evox_d6_joint_getD6JointDamping_10221431006591640771);
+		functions.insert({StringView("core:d6_joint"), StringView("setD6JointDamping")}, &evox_d6_joint_setD6JointDamping_10653450751299093694);
+		functions.insert({StringView("core:d6_joint"), StringView("getD6JointStiffness")}, &evox_d6_joint_getD6JointStiffness_9847380253633775714);
+		functions.insert({StringView("core:d6_joint"), StringView("setD6JointStiffness")}, &evox_d6_joint_setD6JointStiffness_10658290720952257247);
+		functions.insert({StringView("core:d6_joint"), StringView("getD6JointRestitution")}, &evox_d6_joint_getD6JointRestitution_5042347982436814904);
+		functions.insert({StringView("core:d6_joint"), StringView("setD6JointRestitution")}, &evox_d6_joint_setD6JointRestitution_17936001404163028420);
+		functions.insert({StringView("core:d6_joint"), StringView("getD6JointConnectedBody")}, &evox_d6_joint_getD6JointConnectedBody_4200054913671067562);
+		functions.insert({StringView("core:d6_joint"), StringView("setD6JointConnectedBody")}, &evox_d6_joint_setD6JointConnectedBody_9997699774107214785);
+		functions.insert({StringView("core:d6_joint"), StringView("getD6JointAxisPosition")}, &evox_d6_joint_getD6JointAxisPosition_14718916932756373104);
+		functions.insert({StringView("core:d6_joint"), StringView("setD6JointAxisPosition")}, &evox_d6_joint_setD6JointAxisPosition_14576363621168131187);
+		functions.insert({StringView("core:d6_joint"), StringView("getD6JointAxisDirection")}, &evox_d6_joint_getD6JointAxisDirection_1377741663140556808);
+		functions.insert({StringView("core:d6_joint"), StringView("setD6JointAxisDirection")}, &evox_d6_joint_setD6JointAxisDirection_1692054175507140020);
+		functions.insert({StringView("core:distance_joint"), StringView("getDistanceJointConnectedBody")}, &evox_distance_joint_getDistanceJointConnectedBody_1434054716758312);
+		functions.insert({StringView("core:distance_joint"), StringView("setDistanceJointConnectedBody")}, &evox_distance_joint_setDistanceJointConnectedBody_12657534439748792502);
+		functions.insert({StringView("core:distance_joint"), StringView("getDistanceJointAxisPosition")}, &evox_distance_joint_getDistanceJointAxisPosition_11515033595383308468);
+		functions.insert({StringView("core:distance_joint"), StringView("setDistanceJointAxisPosition")}, &evox_distance_joint_setDistanceJointAxisPosition_14598389410531043903);
+		functions.insert({StringView("core:distance_joint"), StringView("getDistanceJointDamping")}, &evox_distance_joint_getDistanceJointDamping_13782928665327429848);
+		functions.insert({StringView("core:distance_joint"), StringView("setDistanceJointDamping")}, &evox_distance_joint_setDistanceJointDamping_3285447076358337367);
+		functions.insert({StringView("core:distance_joint"), StringView("getDistanceJointStiffness")}, &evox_distance_joint_getDistanceJointStiffness_16173270783245144469);
+		functions.insert({StringView("core:distance_joint"), StringView("setDistanceJointStiffness")}, &evox_distance_joint_setDistanceJointStiffness_17724741753157694102);
+		functions.insert({StringView("core:distance_joint"), StringView("getDistanceJointTolerance")}, &evox_distance_joint_getDistanceJointTolerance_16345374829377692530);
+		functions.insert({StringView("core:distance_joint"), StringView("setDistanceJointTolerance")}, &evox_distance_joint_setDistanceJointTolerance_14007474814298328015);
+		functions.insert({StringView("core:distance_joint"), StringView("getDistanceJointLimits")}, &evox_distance_joint_getDistanceJointLimits_14988408081859678925);
+		functions.insert({StringView("core:distance_joint"), StringView("setDistanceJointLimits")}, &evox_distance_joint_setDistanceJointLimits_12543637780255090828);
+		functions.insert({StringView("core:distance_joint"), StringView("getDistanceJointLinearForce")}, &evox_distance_joint_getDistanceJointLinearForce_18368188944931014535);
+		functions.insert({StringView("core:hinge_joint"), StringView("getHingeJointConnectedBody")}, &evox_hinge_joint_getHingeJointConnectedBody_15994503914528094622);
+		functions.insert({StringView("core:hinge_joint"), StringView("setHingeJointConnectedBody")}, &evox_hinge_joint_setHingeJointConnectedBody_7875556491297733746);
+		functions.insert({StringView("core:hinge_joint"), StringView("getHingeJointAxisPosition")}, &evox_hinge_joint_getHingeJointAxisPosition_9333331314296799913);
+		functions.insert({StringView("core:hinge_joint"), StringView("setHingeJointAxisPosition")}, &evox_hinge_joint_setHingeJointAxisPosition_18307278449459925821);
+		functions.insert({StringView("core:hinge_joint"), StringView("getHingeJointAxisDirection")}, &evox_hinge_joint_getHingeJointAxisDirection_15280236378732488342);
+		functions.insert({StringView("core:hinge_joint"), StringView("setHingeJointAxisDirection")}, &evox_hinge_joint_setHingeJointAxisDirection_297401759348871008);
+		functions.insert({StringView("core:hinge_joint"), StringView("getHingeJointDamping")}, &evox_hinge_joint_getHingeJointDamping_4645602423959427866);
+		functions.insert({StringView("core:hinge_joint"), StringView("setHingeJointDamping")}, &evox_hinge_joint_setHingeJointDamping_18247942646745760926);
+		functions.insert({StringView("core:hinge_joint"), StringView("getHingeJointStiffness")}, &evox_hinge_joint_getHingeJointStiffness_1452237863060231715);
+		functions.insert({StringView("core:hinge_joint"), StringView("setHingeJointStiffness")}, &evox_hinge_joint_setHingeJointStiffness_5000692854361300243);
+		functions.insert({StringView("core:hinge_joint"), StringView("getHingeJointUseLimit")}, &evox_hinge_joint_getHingeJointUseLimit_4622054269600052655);
+		functions.insert({StringView("core:hinge_joint"), StringView("setHingeJointUseLimit")}, &evox_hinge_joint_setHingeJointUseLimit_10373495169524242986);
+		functions.insert({StringView("core:hinge_joint"), StringView("getHingeJointLimit")}, &evox_hinge_joint_getHingeJointLimit_12614552694852687768);
+		functions.insert({StringView("core:hinge_joint"), StringView("setHingeJointLimit")}, &evox_hinge_joint_setHingeJointLimit_8084324946599403598);
+		functions.insert({StringView("core:spherical_joint"), StringView("getSphericalJointConnectedBody")}, &evox_spherical_joint_getSphericalJointConnectedBody_17436513678593960214);
+		functions.insert({StringView("core:spherical_joint"), StringView("setSphericalJointConnectedBody")}, &evox_spherical_joint_setSphericalJointConnectedBody_10647608810307015114);
+		functions.insert({StringView("core:spherical_joint"), StringView("getSphericalJointAxisPosition")}, &evox_spherical_joint_getSphericalJointAxisPosition_9077846389983423491);
+		functions.insert({StringView("core:spherical_joint"), StringView("setSphericalJointAxisPosition")}, &evox_spherical_joint_setSphericalJointAxisPosition_9076329884415739724);
+		functions.insert({StringView("core:spherical_joint"), StringView("getSphericalJointAxisDirection")}, &evox_spherical_joint_getSphericalJointAxisDirection_11368225689536224853);
+		functions.insert({StringView("core:spherical_joint"), StringView("setSphericalJointAxisDirection")}, &evox_spherical_joint_setSphericalJointAxisDirection_6101817495257316471);
+		functions.insert({StringView("core:spherical_joint"), StringView("getSphericalJointUseLimit")}, &evox_spherical_joint_getSphericalJointUseLimit_16520376880044386843);
+		functions.insert({StringView("core:spherical_joint"), StringView("setSphericalJointUseLimit")}, &evox_spherical_joint_setSphericalJointUseLimit_14253577254698790444);
+		functions.insert({StringView("core:spherical_joint"), StringView("getSphericalJointLimit")}, &evox_spherical_joint_getSphericalJointLimit_2517341946022156772);
+		functions.insert({StringView("core:spherical_joint"), StringView("setSphericalJointLimit")}, &evox_spherical_joint_setSphericalJointLimit_8649710650005621340);
+		functions.insert({StringView("core:physical_controller"), StringView("getGravitySpeed")}, &evox_physical_controller_getGravitySpeed_640901860125033706);
+		functions.insert({StringView("core:physical_controller"), StringView("move")}, &evox_physical_controller_move_12217037797948846899);
+		functions.insert({StringView("core:physical_controller"), StringView("isCollisionDown")}, &evox_physical_controller_isCollisionDown_16754886262220472);
+		functions.insert({StringView("core:physical_controller"), StringView("resize")}, &evox_physical_controller_resize_11351672279195859076);
+		functions.insert({StringView("core:physical_controller"), StringView("getControllerLayer")}, &evox_physical_controller_getControllerLayer_10681862432018985673);
+		functions.insert({StringView("core:physical_controller"), StringView("setControllerLayer")}, &evox_physical_controller_setControllerLayer_4500395427114960017);
+		functions.insert({StringView("core:physical_controller"), StringView("getControllerRadius")}, &evox_physical_controller_getControllerRadius_13707151154605360232);
+		functions.insert({StringView("core:physical_controller"), StringView("setControllerRadius")}, &evox_physical_controller_setControllerRadius_1980177339851090739);
+		functions.insert({StringView("core:physical_controller"), StringView("getControllerHeight")}, &evox_physical_controller_getControllerHeight_2218298967685822184);
+		functions.insert({StringView("core:physical_controller"), StringView("setControllerHeight")}, &evox_physical_controller_setControllerHeight_9955170084555261553);
+		functions.insert({StringView("core:physical_controller"), StringView("getControllerCustomGravity")}, &evox_physical_controller_getControllerCustomGravity_10833915532152078669);
+		functions.insert({StringView("core:physical_controller"), StringView("setControllerCustomGravity")}, &evox_physical_controller_setControllerCustomGravity_2080938024535880435);
+		functions.insert({StringView("core:physical_controller"), StringView("getControllerCustomGravityAcceleration")}, &evox_physical_controller_getControllerCustomGravityAcceleration_767251138867608339);
+		functions.insert({StringView("core:physical_controller"), StringView("setControllerCustomGravityAcceleration")}, &evox_physical_controller_setControllerCustomGravityAcceleration_883562244625708681);
+		functions.insert({StringView("core:physical_controller"), StringView("getControllerUseRootMotion")}, &evox_physical_controller_getControllerUseRootMotion_2775193054704344263);
+		functions.insert({StringView("core:physical_controller"), StringView("setControllerUseRootMotion")}, &evox_physical_controller_setControllerUseRootMotion_2952442224732328127);
+		functions.insert({StringView("core:rigid_actor"), StringView("putToSleep")}, &evox_rigid_actor_putToSleep_13212098632275307867);
+		functions.insert({StringView("core:rigid_actor"), StringView("addForceAtPos")}, &evox_rigid_actor_addForceAtPos_1672355055868707994);
+		functions.insert({StringView("core:rigid_actor"), StringView("applyForce")}, &evox_rigid_actor_applyForce_7928694750852486937);
+		functions.insert({StringView("core:rigid_actor"), StringView("applyImpulse")}, &evox_rigid_actor_applyImpulse_9915435652071895898);
+		functions.insert({StringView("core:rigid_actor"), StringView("getActorVelocity")}, &evox_rigid_actor_getActorVelocity_10593422383750788488);
+		functions.insert({StringView("core:rigid_actor"), StringView("getActorSpeed")}, &evox_rigid_actor_getActorSpeed_16674121296490049712);
+		functions.insert({StringView("core:rigid_actor"), StringView("getActorLayer")}, &evox_rigid_actor_getActorLayer_9509933179744781719);
+		functions.insert({StringView("core:rigid_actor"), StringView("setActorLayer")}, &evox_rigid_actor_setActorLayer_13867100007697589713);
+		functions.insert({StringView("core:rigid_actor"), StringView("getActorDynamicType")}, &evox_rigid_actor_getActorDynamicType_4405303283298304035);
+		functions.insert({StringView("core:rigid_actor"), StringView("setActorDynamicType")}, &evox_rigid_actor_setActorDynamicType_1282153940877898376);
+		functions.insert({StringView("core:rigid_actor"), StringView("getActorIsTrigger")}, &evox_rigid_actor_getActorIsTrigger_4548474388385742385);
+		functions.insert({StringView("core:rigid_actor"), StringView("setActorIsTrigger")}, &evox_rigid_actor_setActorIsTrigger_7337888994561917648);
+		functions.insert({StringView("core:rigid_actor"), StringView("getActorMesh")}, &evox_rigid_actor_getActorMesh_6841595999302178306);
+		functions.insert({StringView("core:rigid_actor"), StringView("setActorMesh")}, &evox_rigid_actor_setActorMesh_3606743997615879415);
+		functions.insert({StringView("core:rigid_actor"), StringView("getActorMaterial")}, &evox_rigid_actor_getActorMaterial_18204827416253874349);
+		functions.insert({StringView("core:rigid_actor"), StringView("setActorMaterial")}, &evox_rigid_actor_setActorMaterial_18440470995069475488);
+		functions.insert({StringView("core:rigid_actor"), StringView("getActorCCD")}, &evox_rigid_actor_getActorCCD_12434411244966946249);
+		functions.insert({StringView("core:rigid_actor"), StringView("setActorCCD")}, &evox_rigid_actor_setActorCCD_12897573747666523655);
 		functions.insert({StringView("core:rigid_actor"), StringView("boxesCount")}, &
-		evox_rigid_actor_boxes_count_182);
+		evox_rigid_actor_boxes_count_1859103441161182793);
 		functions.insert({StringView("core:rigid_actor"), StringView("boxes")}, &
-		evox_rigid_actor_boxes_item_183);
-		functions.insert({StringView("core:rigid_actor"), StringView("getBoxHalfExtents")}, &evox_rigid_actor_boxes_getBoxHalfExtents_184);
-		functions.insert({StringView("core:rigid_actor"), StringView("setBoxHalfExtents")}, &evox_rigid_actor_boxes_setBoxHalfExtents_185);
-		functions.insert({StringView("core:rigid_actor"), StringView("getBoxOffsetPosition")}, &evox_rigid_actor_boxes_getBoxOffsetPosition_186);
-		functions.insert({StringView("core:rigid_actor"), StringView("setBoxOffsetPosition")}, &evox_rigid_actor_boxes_setBoxOffsetPosition_187);
-		functions.insert({StringView("core:rigid_actor"), StringView("getBoxOffsetRotation")}, &evox_rigid_actor_boxes_getBoxOffsetRotation_188);
-		functions.insert({StringView("core:rigid_actor"), StringView("setBoxOffsetRotation")}, &evox_rigid_actor_boxes_setBoxOffsetRotation_189);
+		evox_rigid_actor_boxes_item_5914938366404223461);
+		functions.insert({StringView("core:rigid_actor"), StringView("getBoxHalfExtents")}, &evox_rigid_actor_boxes_getBoxHalfExtents_11149060149111658776);
+		functions.insert({StringView("core:rigid_actor"), StringView("setBoxHalfExtents")}, &evox_rigid_actor_boxes_setBoxHalfExtents_4611497608357626578);
+		functions.insert({StringView("core:rigid_actor"), StringView("getBoxOffsetPosition")}, &evox_rigid_actor_boxes_getBoxOffsetPosition_9223472868671538271);
+		functions.insert({StringView("core:rigid_actor"), StringView("setBoxOffsetPosition")}, &evox_rigid_actor_boxes_setBoxOffsetPosition_14863133757109908430);
+		functions.insert({StringView("core:rigid_actor"), StringView("getBoxOffsetRotation")}, &evox_rigid_actor_boxes_getBoxOffsetRotation_2431858041647990820);
+		functions.insert({StringView("core:rigid_actor"), StringView("setBoxOffsetRotation")}, &evox_rigid_actor_boxes_setBoxOffsetRotation_8922633324043466941);
 		functions.insert({StringView("core:rigid_actor"), StringView("spheresCount")}, &
-		evox_rigid_actor_spheres_count_190);
+		evox_rigid_actor_spheres_count_17182790551130778759);
 		functions.insert({StringView("core:rigid_actor"), StringView("spheres")}, &
-		evox_rigid_actor_spheres_item_191);
-		functions.insert({StringView("core:rigid_actor"), StringView("getSphereRadius")}, &evox_rigid_actor_spheres_getSphereRadius_192);
-		functions.insert({StringView("core:rigid_actor"), StringView("setSphereRadius")}, &evox_rigid_actor_spheres_setSphereRadius_193);
-		functions.insert({StringView("core:rigid_actor"), StringView("getSphereOffsetPosition")}, &evox_rigid_actor_spheres_getSphereOffsetPosition_194);
-		functions.insert({StringView("core:rigid_actor"), StringView("setSphereOffsetPosition")}, &evox_rigid_actor_spheres_setSphereOffsetPosition_195);
-		functions.insert({StringView("core:wheel"), StringView("getWheelSpringStrength")}, &evox_wheel_getWheelSpringStrength_196);
-		functions.insert({StringView("core:wheel"), StringView("setWheelSpringStrength")}, &evox_wheel_setWheelSpringStrength_197);
-		functions.insert({StringView("core:wheel"), StringView("getWheelSpringMaxCompression")}, &evox_wheel_getWheelSpringMaxCompression_198);
-		functions.insert({StringView("core:wheel"), StringView("setWheelSpringMaxCompression")}, &evox_wheel_setWheelSpringMaxCompression_199);
-		functions.insert({StringView("core:wheel"), StringView("getWheelSpringMaxDroop")}, &evox_wheel_getWheelSpringMaxDroop_200);
-		functions.insert({StringView("core:wheel"), StringView("setWheelSpringMaxDroop")}, &evox_wheel_setWheelSpringMaxDroop_201);
-		functions.insert({StringView("core:wheel"), StringView("getWheelSpringDamperRate")}, &evox_wheel_getWheelSpringDamperRate_202);
-		functions.insert({StringView("core:wheel"), StringView("setWheelSpringDamperRate")}, &evox_wheel_setWheelSpringDamperRate_203);
-		functions.insert({StringView("core:wheel"), StringView("getWheelRadius")}, &evox_wheel_getWheelRadius_204);
-		functions.insert({StringView("core:wheel"), StringView("setWheelRadius")}, &evox_wheel_setWheelRadius_205);
-		functions.insert({StringView("core:wheel"), StringView("getWheelWidth")}, &evox_wheel_getWheelWidth_206);
-		functions.insert({StringView("core:wheel"), StringView("setWheelWidth")}, &evox_wheel_setWheelWidth_207);
-		functions.insert({StringView("core:wheel"), StringView("getWheelMass")}, &evox_wheel_getWheelMass_208);
-		functions.insert({StringView("core:wheel"), StringView("setWheelMass")}, &evox_wheel_setWheelMass_209);
-		functions.insert({StringView("core:wheel"), StringView("getWheelMOI")}, &evox_wheel_getWheelMOI_210);
-		functions.insert({StringView("core:wheel"), StringView("setWheelMOI")}, &evox_wheel_setWheelMOI_211);
-		functions.insert({StringView("core:wheel"), StringView("getWheelSlot")}, &evox_wheel_getWheelSlot_212);
-		functions.insert({StringView("core:wheel"), StringView("setWheelSlot")}, &evox_wheel_setWheelSlot_213);
-		functions.insert({StringView("core:wheel"), StringView("getWheelRPM")}, &evox_wheel_getWheelRPM_214);
-		functions.insert({StringView("core:vehicle"), StringView("getVehiclePeakTorque")}, &evox_vehicle_getVehiclePeakTorque_215);
-		functions.insert({StringView("core:vehicle"), StringView("setVehiclePeakTorque")}, &evox_vehicle_setVehiclePeakTorque_216);
-		functions.insert({StringView("core:vehicle"), StringView("getVehicleMaxRPM")}, &evox_vehicle_getVehicleMaxRPM_217);
-		functions.insert({StringView("core:vehicle"), StringView("setVehicleMaxRPM")}, &evox_vehicle_setVehicleMaxRPM_218);
-		functions.insert({StringView("core:vehicle"), StringView("getVehicleRPM")}, &evox_vehicle_getVehicleRPM_219);
-		functions.insert({StringView("core:vehicle"), StringView("getVehicleCurrentGear")}, &evox_vehicle_getVehicleCurrentGear_220);
-		functions.insert({StringView("core:vehicle"), StringView("getVehicleSpeed")}, &evox_vehicle_getVehicleSpeed_221);
-		functions.insert({StringView("core:vehicle"), StringView("setVehicleAccel")}, &evox_vehicle_setVehicleAccel_222);
-		functions.insert({StringView("core:vehicle"), StringView("setVehicleSteer")}, &evox_vehicle_setVehicleSteer_223);
-		functions.insert({StringView("core:vehicle"), StringView("setVehicleBrake")}, &evox_vehicle_setVehicleBrake_224);
-		functions.insert({StringView("core:vehicle"), StringView("getVehicleChassis")}, &evox_vehicle_getVehicleChassis_225);
-		functions.insert({StringView("core:vehicle"), StringView("setVehicleChassis")}, &evox_vehicle_setVehicleChassis_226);
-		functions.insert({StringView("core:vehicle"), StringView("getVehicleMass")}, &evox_vehicle_getVehicleMass_227);
-		functions.insert({StringView("core:vehicle"), StringView("setVehicleMass")}, &evox_vehicle_setVehicleMass_228);
-		functions.insert({StringView("core:vehicle"), StringView("getVehicleMOIMultiplier")}, &evox_vehicle_getVehicleMOIMultiplier_229);
-		functions.insert({StringView("core:vehicle"), StringView("setVehicleMOIMultiplier")}, &evox_vehicle_setVehicleMOIMultiplier_230);
-		functions.insert({StringView("core:vehicle"), StringView("getVehicleCenterOfMass")}, &evox_vehicle_getVehicleCenterOfMass_231);
-		functions.insert({StringView("core:vehicle"), StringView("setVehicleCenterOfMass")}, &evox_vehicle_setVehicleCenterOfMass_232);
-		functions.insert({StringView("core:vehicle"), StringView("getVehicleWheelsLayer")}, &evox_vehicle_getVehicleWheelsLayer_233);
-		functions.insert({StringView("core:vehicle"), StringView("setVehicleWheelsLayer")}, &evox_vehicle_setVehicleWheelsLayer_234);
-		functions.insert({StringView("core:vehicle"), StringView("getVehicleChassisLayer")}, &evox_vehicle_getVehicleChassisLayer_235);
-		functions.insert({StringView("core:vehicle"), StringView("setVehicleChassisLayer")}, &evox_vehicle_setVehicleChassisLayer_236);
-		functions.insert({StringView("core:physical_instanced_cube"), StringView("getInstancedCubeHalfExtents")}, &evox_physical_instanced_cube_getInstancedCubeHalfExtents_237);
-		functions.insert({StringView("core:physical_instanced_cube"), StringView("setInstancedCubeHalfExtents")}, &evox_physical_instanced_cube_setInstancedCubeHalfExtents_238);
-		functions.insert({StringView("core:physical_instanced_cube"), StringView("getInstancedCubeLayer")}, &evox_physical_instanced_cube_getInstancedCubeLayer_239);
-		functions.insert({StringView("core:physical_instanced_cube"), StringView("setInstancedCubeLayer")}, &evox_physical_instanced_cube_setInstancedCubeLayer_240);
-		functions.insert({StringView("core:physical_instanced_mesh"), StringView("getInstancedMeshLayer")}, &evox_physical_instanced_mesh_getInstancedMeshLayer_241);
-		functions.insert({StringView("core:physical_instanced_mesh"), StringView("setInstancedMeshLayer")}, &evox_physical_instanced_mesh_setInstancedMeshLayer_242);
-		functions.insert({StringView("core:physical_instanced_mesh"), StringView("getInstancedMeshGeomPath")}, &evox_physical_instanced_mesh_getInstancedMeshGeomPath_243);
-		functions.insert({StringView("core:physical_instanced_mesh"), StringView("setInstancedMeshGeomPath")}, &evox_physical_instanced_mesh_setInstancedMeshGeomPath_244);
-		functions.insert({StringView("core:camera"), StringView("getRay")}, &evox_camera_getRay_245);
-		functions.insert({StringView("core:camera"), StringView("getCameraScreenWidth")}, &evox_camera_getCameraScreenWidth_246);
-		functions.insert({StringView("core:camera"), StringView("getCameraScreenHeight")}, &evox_camera_getCameraScreenHeight_247);
-		functions.insert({StringView("core:decal"), StringView("getDecalMaterialPath")}, &evox_decal_getDecalMaterialPath_248);
-		functions.insert({StringView("core:decal"), StringView("setDecalMaterialPath")}, &evox_decal_setDecalMaterialPath_249);
-		functions.insert({StringView("core:decal"), StringView("getDecalHalfExtents")}, &evox_decal_getDecalHalfExtents_250);
-		functions.insert({StringView("core:decal"), StringView("setDecalHalfExtents")}, &evox_decal_setDecalHalfExtents_251);
-		functions.insert({StringView("core:environment"), StringView("getEnvironmentCastShadows")}, &evox_environment_getEnvironmentCastShadows_252);
-		functions.insert({StringView("core:environment"), StringView("setEnvironmentCastShadows")}, &evox_environment_setEnvironmentCastShadows_253);
-		functions.insert({StringView("core:environment"), StringView("getEnvironmentSkyTexture")}, &evox_environment_getEnvironmentSkyTexture_254);
-		functions.insert({StringView("core:environment"), StringView("setEnvironmentSkyTexture")}, &evox_environment_setEnvironmentSkyTexture_255);
-		functions.insert({StringView("core:environment"), StringView("getEnvironmentShadowmapCascades")}, &evox_environment_getEnvironmentShadowmapCascades_256);
-		functions.insert({StringView("core:environment"), StringView("setEnvironmentShadowmapCascades")}, &evox_environment_setEnvironmentShadowmapCascades_257);
-		functions.insert({StringView("core:point_light"), StringView("getPointLightRange")}, &evox_point_light_getPointLightRange_258);
-		functions.insert({StringView("core:point_light"), StringView("setPointLightRange")}, &evox_point_light_setPointLightRange_259);
-		functions.insert({StringView("core:point_light"), StringView("getPointLightCastShadows")}, &evox_point_light_getPointLightCastShadows_260);
-		functions.insert({StringView("core:point_light"), StringView("setPointLightCastShadows")}, &evox_point_light_setPointLightCastShadows_261);
-		functions.insert({StringView("core:point_light"), StringView("getPointLightDynamic")}, &evox_point_light_getPointLightDynamic_262);
-		functions.insert({StringView("core:point_light"), StringView("setPointLightDynamic")}, &evox_point_light_setPointLightDynamic_263);
-		functions.insert({StringView("core:reflection_probe"), StringView("isReflectionProbeEnabled")}, &evox_reflection_probe_isReflectionProbeEnabled_264);
-		functions.insert({StringView("core:reflection_probe"), StringView("enableReflectionProbe")}, &evox_reflection_probe_enableReflectionProbe_265);
-		functions.insert({StringView("core:environment_probe"), StringView("isEnvironmentProbeEnabled")}, &evox_environment_probe_isEnvironmentProbeEnabled_266);
-		functions.insert({StringView("core:environment_probe"), StringView("enableEnvironmentProbe")}, &evox_environment_probe_enableEnvironmentProbe_267);
-		functions.insert({StringView("core:bone_attachment"), StringView("setRotation")}, &evox_bone_attachment_setRotation_268);
-		functions.insert({StringView("core:bone_attachment"), StringView("getBoneAttachmentParent")}, &evox_bone_attachment_getBoneAttachmentParent_269);
-		functions.insert({StringView("core:bone_attachment"), StringView("setBoneAttachmentParent")}, &evox_bone_attachment_setBoneAttachmentParent_270);
-		functions.insert({StringView("core:bone_attachment"), StringView("getBoneAttachmentBone")}, &evox_bone_attachment_getBoneAttachmentBone_271);
-		functions.insert({StringView("core:bone_attachment"), StringView("setBoneAttachmentBone")}, &evox_bone_attachment_setBoneAttachmentBone_272);
-		functions.insert({StringView("core:bone_attachment"), StringView("getBoneAttachmentPosition")}, &evox_bone_attachment_getBoneAttachmentPosition_273);
-		functions.insert({StringView("core:bone_attachment"), StringView("setBoneAttachmentPosition")}, &evox_bone_attachment_setBoneAttachmentPosition_274);
-		functions.insert({StringView("core:bone_attachment"), StringView("getBoneAttachmentRotation")}, &evox_bone_attachment_getBoneAttachmentRotation_275);
-		functions.insert({StringView("core:bone_attachment"), StringView("setBoneAttachmentRotation")}, &evox_bone_attachment_setBoneAttachmentRotation_276);
-		functions.insert({StringView("core:particle_emitter"), StringView("getGlobalID")}, &evox_particle_emitter_getGlobalID_277);
-		functions.insert({StringView("core:particle_emitter"), StringView("setFloatGlobal")}, &evox_particle_emitter_setFloatGlobal_278);
-		functions.insert({StringView("core:particle_emitter"), StringView("setVec3Global")}, &evox_particle_emitter_setVec3Global_279);
-		functions.insert({StringView("core:particle_emitter"), StringView("setVec4Global")}, &evox_particle_emitter_setVec4Global_280);
-		functions.insert({StringView("core:particle_emitter"), StringView("emitRibbons")}, &evox_particle_emitter_emitRibbons_281);
-		functions.insert({StringView("core:particle_emitter"), StringView("killRibbon")}, &evox_particle_emitter_killRibbon_282);
-		functions.insert({StringView("core:particle_emitter"), StringView("getParticleEmitterPath")}, &evox_particle_emitter_getParticleEmitterPath_283);
-		functions.insert({StringView("core:particle_emitter"), StringView("setParticleEmitterPath")}, &evox_particle_emitter_setParticleEmitterPath_284);
-		functions.insert({StringView("core:particle_emitter"), StringView("getParticleEmitterAutodestroy")}, &evox_particle_emitter_getParticleEmitterAutodestroy_285);
-		functions.insert({StringView("core:particle_emitter"), StringView("setParticleEmitterAutodestroy")}, &evox_particle_emitter_setParticleEmitterAutodestroy_286);
-		functions.insert({StringView("core:instanced_model"), StringView("getInstancedModelPath")}, &evox_instanced_model_getInstancedModelPath_287);
-		functions.insert({StringView("core:instanced_model"), StringView("setInstancedModelPath")}, &evox_instanced_model_setInstancedModelPath_288);
-		functions.insert({StringView("core:model_instance"), StringView("overrideMaterialVec4")}, &evox_model_instance_overrideMaterialVec4_289);
-		functions.insert({StringView("core:model_instance"), StringView("getModel")}, &evox_model_instance_getModel_290);
-		functions.insert({StringView("core:model_instance"), StringView("setMaterialOverride")}, &evox_model_instance_setMaterialOverride_291);
-		functions.insert({StringView("core:model_instance"), StringView("getMaterialOverride")}, &evox_model_instance_getMaterialOverride_292);
-		functions.insert({StringView("core:model_instance"), StringView("isModelInstanceEnabled")}, &evox_model_instance_isModelInstanceEnabled_293);
-		functions.insert({StringView("core:model_instance"), StringView("enableModelInstance")}, &evox_model_instance_enableModelInstance_294);
-		functions.insert({StringView("core:model_instance"), StringView("getModelInstancePath")}, &evox_model_instance_getModelInstancePath_295);
-		functions.insert({StringView("core:model_instance"), StringView("setModelInstancePath")}, &evox_model_instance_setModelInstancePath_296);
-		functions.insert({StringView("core:curve_decal"), StringView("getCurveDecalMaterialPath")}, &evox_curve_decal_getCurveDecalMaterialPath_297);
-		functions.insert({StringView("core:curve_decal"), StringView("setCurveDecalMaterialPath")}, &evox_curve_decal_setCurveDecalMaterialPath_298);
-		functions.insert({StringView("core:curve_decal"), StringView("getCurveDecalHalfExtents")}, &evox_curve_decal_getCurveDecalHalfExtents_299);
-		functions.insert({StringView("core:curve_decal"), StringView("setCurveDecalHalfExtents")}, &evox_curve_decal_setCurveDecalHalfExtents_300);
-		functions.insert({StringView("core:curve_decal"), StringView("getCurveDecalUVScale")}, &evox_curve_decal_getCurveDecalUVScale_301);
-		functions.insert({StringView("core:curve_decal"), StringView("setCurveDecalUVScale")}, &evox_curve_decal_setCurveDecalUVScale_302);
-		functions.insert({StringView("core:curve_decal"), StringView("getCurveDecalBezierP0")}, &evox_curve_decal_getCurveDecalBezierP0_303);
-		functions.insert({StringView("core:curve_decal"), StringView("setCurveDecalBezierP0")}, &evox_curve_decal_setCurveDecalBezierP0_304);
-		functions.insert({StringView("core:curve_decal"), StringView("getCurveDecalBezierP2")}, &evox_curve_decal_getCurveDecalBezierP2_305);
-		functions.insert({StringView("core:curve_decal"), StringView("setCurveDecalBezierP2")}, &evox_curve_decal_setCurveDecalBezierP2_306);
-		functions.insert({StringView("core:terrain"), StringView("getHeightAt")}, &evox_terrain_getHeightAt_307);
-		functions.insert({StringView("core:terrain"), StringView("getNormalAt")}, &evox_terrain_getNormalAt_308);
-		functions.insert({StringView("core:terrain"), StringView("getTerrainSize")}, &evox_terrain_getTerrainSize_309);
-		functions.insert({StringView("core:terrain"), StringView("getTerrainMaterialPath")}, &evox_terrain_getTerrainMaterialPath_310);
-		functions.insert({StringView("core:terrain"), StringView("setTerrainMaterialPath")}, &evox_terrain_setTerrainMaterialPath_311);
-		functions.insert({StringView("core:terrain"), StringView("getTerrainXZScale")}, &evox_terrain_getTerrainXZScale_312);
-		functions.insert({StringView("core:terrain"), StringView("setTerrainXZScale")}, &evox_terrain_setTerrainXZScale_313);
-		functions.insert({StringView("core:terrain"), StringView("getTerrainTesselation")}, &evox_terrain_getTerrainTesselation_314);
-		functions.insert({StringView("core:terrain"), StringView("setTerrainTesselation")}, &evox_terrain_setTerrainTesselation_315);
-		functions.insert({StringView("core:terrain"), StringView("getTerrainBaseGridResolution")}, &evox_terrain_getTerrainBaseGridResolution_316);
-		functions.insert({StringView("core:terrain"), StringView("setTerrainBaseGridResolution")}, &evox_terrain_setTerrainBaseGridResolution_317);
-		functions.insert({StringView("core:terrain"), StringView("getTerrainYScale")}, &evox_terrain_getTerrainYScale_318);
-		functions.insert({StringView("core:terrain"), StringView("setTerrainYScale")}, &evox_terrain_setTerrainYScale_319);
+		evox_rigid_actor_spheres_item_17607561480211165310);
+		functions.insert({StringView("core:rigid_actor"), StringView("getSphereRadius")}, &evox_rigid_actor_spheres_getSphereRadius_6397635657662839133);
+		functions.insert({StringView("core:rigid_actor"), StringView("setSphereRadius")}, &evox_rigid_actor_spheres_setSphereRadius_7307604915894409717);
+		functions.insert({StringView("core:rigid_actor"), StringView("getSphereOffsetPosition")}, &evox_rigid_actor_spheres_getSphereOffsetPosition_16116986349188912276);
+		functions.insert({StringView("core:rigid_actor"), StringView("setSphereOffsetPosition")}, &evox_rigid_actor_spheres_setSphereOffsetPosition_1952631322990218758);
+		functions.insert({StringView("core:wheel"), StringView("getWheelSpringStrength")}, &evox_wheel_getWheelSpringStrength_9991052682911294062);
+		functions.insert({StringView("core:wheel"), StringView("setWheelSpringStrength")}, &evox_wheel_setWheelSpringStrength_18168065559113677475);
+		functions.insert({StringView("core:wheel"), StringView("getWheelSpringMaxCompression")}, &evox_wheel_getWheelSpringMaxCompression_12571100289447445433);
+		functions.insert({StringView("core:wheel"), StringView("setWheelSpringMaxCompression")}, &evox_wheel_setWheelSpringMaxCompression_6698486979946567210);
+		functions.insert({StringView("core:wheel"), StringView("getWheelSpringMaxDroop")}, &evox_wheel_getWheelSpringMaxDroop_3714789021743023958);
+		functions.insert({StringView("core:wheel"), StringView("setWheelSpringMaxDroop")}, &evox_wheel_setWheelSpringMaxDroop_6496625313203848390);
+		functions.insert({StringView("core:wheel"), StringView("getWheelSpringDamperRate")}, &evox_wheel_getWheelSpringDamperRate_1747981479233960481);
+		functions.insert({StringView("core:wheel"), StringView("setWheelSpringDamperRate")}, &evox_wheel_setWheelSpringDamperRate_15195362835632280538);
+		functions.insert({StringView("core:wheel"), StringView("getWheelRadius")}, &evox_wheel_getWheelRadius_5797348775871118352);
+		functions.insert({StringView("core:wheel"), StringView("setWheelRadius")}, &evox_wheel_setWheelRadius_8678945949368014735);
+		functions.insert({StringView("core:wheel"), StringView("getWheelWidth")}, &evox_wheel_getWheelWidth_3962635950944976101);
+		functions.insert({StringView("core:wheel"), StringView("setWheelWidth")}, &evox_wheel_setWheelWidth_11797606039286725233);
+		functions.insert({StringView("core:wheel"), StringView("getWheelMass")}, &evox_wheel_getWheelMass_8457262383482815212);
+		functions.insert({StringView("core:wheel"), StringView("setWheelMass")}, &evox_wheel_setWheelMass_17802761249092374497);
+		functions.insert({StringView("core:wheel"), StringView("getWheelMOI")}, &evox_wheel_getWheelMOI_17329225448375028143);
+		functions.insert({StringView("core:wheel"), StringView("setWheelMOI")}, &evox_wheel_setWheelMOI_4390672100227953385);
+		functions.insert({StringView("core:wheel"), StringView("getWheelSlot")}, &evox_wheel_getWheelSlot_7661196083217858775);
+		functions.insert({StringView("core:wheel"), StringView("setWheelSlot")}, &evox_wheel_setWheelSlot_15303303718720374298);
+		functions.insert({StringView("core:wheel"), StringView("getWheelRPM")}, &evox_wheel_getWheelRPM_18403735250706726312);
+		functions.insert({StringView("core:vehicle"), StringView("getVehiclePeakTorque")}, &evox_vehicle_getVehiclePeakTorque_12865377709159215899);
+		functions.insert({StringView("core:vehicle"), StringView("setVehiclePeakTorque")}, &evox_vehicle_setVehiclePeakTorque_450708605479090462);
+		functions.insert({StringView("core:vehicle"), StringView("getVehicleMaxRPM")}, &evox_vehicle_getVehicleMaxRPM_7951270875727961620);
+		functions.insert({StringView("core:vehicle"), StringView("setVehicleMaxRPM")}, &evox_vehicle_setVehicleMaxRPM_15604138286429758706);
+		functions.insert({StringView("core:vehicle"), StringView("getVehicleRPM")}, &evox_vehicle_getVehicleRPM_2678310156978644759);
+		functions.insert({StringView("core:vehicle"), StringView("getVehicleCurrentGear")}, &evox_vehicle_getVehicleCurrentGear_1172268433105709381);
+		functions.insert({StringView("core:vehicle"), StringView("getVehicleSpeed")}, &evox_vehicle_getVehicleSpeed_7397302492130099443);
+		functions.insert({StringView("core:vehicle"), StringView("setVehicleAccel")}, &evox_vehicle_setVehicleAccel_5738020861438803904);
+		functions.insert({StringView("core:vehicle"), StringView("setVehicleSteer")}, &evox_vehicle_setVehicleSteer_16986302533023363100);
+		functions.insert({StringView("core:vehicle"), StringView("setVehicleBrake")}, &evox_vehicle_setVehicleBrake_136883192398412580);
+		functions.insert({StringView("core:vehicle"), StringView("getVehicleChassis")}, &evox_vehicle_getVehicleChassis_15180539946997534210);
+		functions.insert({StringView("core:vehicle"), StringView("setVehicleChassis")}, &evox_vehicle_setVehicleChassis_17815561654817463700);
+		functions.insert({StringView("core:vehicle"), StringView("getVehicleMass")}, &evox_vehicle_getVehicleMass_3826439275636292573);
+		functions.insert({StringView("core:vehicle"), StringView("setVehicleMass")}, &evox_vehicle_setVehicleMass_15779485969247915754);
+		functions.insert({StringView("core:vehicle"), StringView("getVehicleMOIMultiplier")}, &evox_vehicle_getVehicleMOIMultiplier_96501381039349968);
+		functions.insert({StringView("core:vehicle"), StringView("setVehicleMOIMultiplier")}, &evox_vehicle_setVehicleMOIMultiplier_3587670730009285845);
+		functions.insert({StringView("core:vehicle"), StringView("getVehicleCenterOfMass")}, &evox_vehicle_getVehicleCenterOfMass_13202032159238424522);
+		functions.insert({StringView("core:vehicle"), StringView("setVehicleCenterOfMass")}, &evox_vehicle_setVehicleCenterOfMass_13714262401650207791);
+		functions.insert({StringView("core:vehicle"), StringView("getVehicleWheelsLayer")}, &evox_vehicle_getVehicleWheelsLayer_7781415653573910448);
+		functions.insert({StringView("core:vehicle"), StringView("setVehicleWheelsLayer")}, &evox_vehicle_setVehicleWheelsLayer_15673238082083035607);
+		functions.insert({StringView("core:vehicle"), StringView("getVehicleChassisLayer")}, &evox_vehicle_getVehicleChassisLayer_471834618907300638);
+		functions.insert({StringView("core:vehicle"), StringView("setVehicleChassisLayer")}, &evox_vehicle_setVehicleChassisLayer_8473725476134026144);
+		functions.insert({StringView("core:physical_instanced_cube"), StringView("getInstancedCubeHalfExtents")}, &evox_physical_instanced_cube_getInstancedCubeHalfExtents_5811712922083731358);
+		functions.insert({StringView("core:physical_instanced_cube"), StringView("setInstancedCubeHalfExtents")}, &evox_physical_instanced_cube_setInstancedCubeHalfExtents_2871694779134560304);
+		functions.insert({StringView("core:physical_instanced_cube"), StringView("getInstancedCubeLayer")}, &evox_physical_instanced_cube_getInstancedCubeLayer_11007112474105681337);
+		functions.insert({StringView("core:physical_instanced_cube"), StringView("setInstancedCubeLayer")}, &evox_physical_instanced_cube_setInstancedCubeLayer_10191273074757588333);
+		functions.insert({StringView("core:physical_instanced_mesh"), StringView("getInstancedMeshLayer")}, &evox_physical_instanced_mesh_getInstancedMeshLayer_14567361767800560888);
+		functions.insert({StringView("core:physical_instanced_mesh"), StringView("setInstancedMeshLayer")}, &evox_physical_instanced_mesh_setInstancedMeshLayer_5700318157331230762);
+		functions.insert({StringView("core:physical_instanced_mesh"), StringView("getInstancedMeshGeomPath")}, &evox_physical_instanced_mesh_getInstancedMeshGeomPath_16637277119403782362);
+		functions.insert({StringView("core:physical_instanced_mesh"), StringView("setInstancedMeshGeomPath")}, &evox_physical_instanced_mesh_setInstancedMeshGeomPath_3991197376419967785);
+		functions.insert({StringView("core:camera"), StringView("getRay")}, &evox_camera_getRay_3372513399393209772);
+		functions.insert({StringView("core:camera"), StringView("getCameraScreenWidth")}, &evox_camera_getCameraScreenWidth_2731392340090998983);
+		functions.insert({StringView("core:camera"), StringView("getCameraScreenHeight")}, &evox_camera_getCameraScreenHeight_2402994306305726512);
+		functions.insert({StringView("core:decal"), StringView("getDecalMaterialPath")}, &evox_decal_getDecalMaterialPath_3447756100310666566);
+		functions.insert({StringView("core:decal"), StringView("setDecalMaterialPath")}, &evox_decal_setDecalMaterialPath_16654676966978376762);
+		functions.insert({StringView("core:decal"), StringView("getDecalHalfExtents")}, &evox_decal_getDecalHalfExtents_5819726501367060100);
+		functions.insert({StringView("core:decal"), StringView("setDecalHalfExtents")}, &evox_decal_setDecalHalfExtents_10326364927035985528);
+		functions.insert({StringView("core:environment"), StringView("getEnvironmentCastShadows")}, &evox_environment_getEnvironmentCastShadows_2502322743604025970);
+		functions.insert({StringView("core:environment"), StringView("setEnvironmentCastShadows")}, &evox_environment_setEnvironmentCastShadows_12728355724374346427);
+		functions.insert({StringView("core:environment"), StringView("getEnvironmentSkyTexture")}, &evox_environment_getEnvironmentSkyTexture_12082802317082884790);
+		functions.insert({StringView("core:environment"), StringView("setEnvironmentSkyTexture")}, &evox_environment_setEnvironmentSkyTexture_984049513280251158);
+		functions.insert({StringView("core:environment"), StringView("getEnvironmentShadowmapCascades")}, &evox_environment_getEnvironmentShadowmapCascades_5787290337346526077);
+		functions.insert({StringView("core:environment"), StringView("setEnvironmentShadowmapCascades")}, &evox_environment_setEnvironmentShadowmapCascades_15884515140666313469);
+		functions.insert({StringView("core:point_light"), StringView("getPointLightRange")}, &evox_point_light_getPointLightRange_10244661856029492374);
+		functions.insert({StringView("core:point_light"), StringView("setPointLightRange")}, &evox_point_light_setPointLightRange_11813343483428624361);
+		functions.insert({StringView("core:point_light"), StringView("getPointLightCastShadows")}, &evox_point_light_getPointLightCastShadows_5581725951671009098);
+		functions.insert({StringView("core:point_light"), StringView("setPointLightCastShadows")}, &evox_point_light_setPointLightCastShadows_7627481180976591043);
+		functions.insert({StringView("core:point_light"), StringView("getPointLightDynamic")}, &evox_point_light_getPointLightDynamic_8250510919620053405);
+		functions.insert({StringView("core:point_light"), StringView("setPointLightDynamic")}, &evox_point_light_setPointLightDynamic_4827199232774172920);
+		functions.insert({StringView("core:reflection_probe"), StringView("isReflectionProbeEnabled")}, &evox_reflection_probe_isReflectionProbeEnabled_14161642990656081393);
+		functions.insert({StringView("core:reflection_probe"), StringView("enableReflectionProbe")}, &evox_reflection_probe_enableReflectionProbe_14526316855359089557);
+		functions.insert({StringView("core:environment_probe"), StringView("isEnvironmentProbeEnabled")}, &evox_environment_probe_isEnvironmentProbeEnabled_6472315036682061276);
+		functions.insert({StringView("core:environment_probe"), StringView("enableEnvironmentProbe")}, &evox_environment_probe_enableEnvironmentProbe_15467030845922521952);
+		functions.insert({StringView("core:bone_attachment"), StringView("setRotation")}, &evox_bone_attachment_setRotation_7525519620484028447);
+		functions.insert({StringView("core:bone_attachment"), StringView("getBoneAttachmentParent")}, &evox_bone_attachment_getBoneAttachmentParent_18142689017962228472);
+		functions.insert({StringView("core:bone_attachment"), StringView("setBoneAttachmentParent")}, &evox_bone_attachment_setBoneAttachmentParent_3779313276891743601);
+		functions.insert({StringView("core:bone_attachment"), StringView("getBoneAttachmentBone")}, &evox_bone_attachment_getBoneAttachmentBone_2784195155658238731);
+		functions.insert({StringView("core:bone_attachment"), StringView("setBoneAttachmentBone")}, &evox_bone_attachment_setBoneAttachmentBone_4742134950152804761);
+		functions.insert({StringView("core:bone_attachment"), StringView("getBoneAttachmentPosition")}, &evox_bone_attachment_getBoneAttachmentPosition_14063061698960809797);
+		functions.insert({StringView("core:bone_attachment"), StringView("setBoneAttachmentPosition")}, &evox_bone_attachment_setBoneAttachmentPosition_10702452899333319646);
+		functions.insert({StringView("core:bone_attachment"), StringView("getBoneAttachmentRotation")}, &evox_bone_attachment_getBoneAttachmentRotation_4979697275069747087);
+		functions.insert({StringView("core:bone_attachment"), StringView("setBoneAttachmentRotation")}, &evox_bone_attachment_setBoneAttachmentRotation_2627513105013326150);
+		functions.insert({StringView("core:particle_emitter"), StringView("getGlobalID")}, &evox_particle_emitter_getGlobalID_903115760734972517);
+		functions.insert({StringView("core:particle_emitter"), StringView("setFloatGlobal")}, &evox_particle_emitter_setFloatGlobal_8048456309304325320);
+		functions.insert({StringView("core:particle_emitter"), StringView("setVec3Global")}, &evox_particle_emitter_setVec3Global_5038922086369882645);
+		functions.insert({StringView("core:particle_emitter"), StringView("setVec4Global")}, &evox_particle_emitter_setVec4Global_767624962292035606);
+		functions.insert({StringView("core:particle_emitter"), StringView("emitRibbons")}, &evox_particle_emitter_emitRibbons_5781840855685258371);
+		functions.insert({StringView("core:particle_emitter"), StringView("killRibbon")}, &evox_particle_emitter_killRibbon_7218400999598356956);
+		functions.insert({StringView("core:particle_emitter"), StringView("getParticleEmitterPath")}, &evox_particle_emitter_getParticleEmitterPath_11330173879880210098);
+		functions.insert({StringView("core:particle_emitter"), StringView("setParticleEmitterPath")}, &evox_particle_emitter_setParticleEmitterPath_13850250279856496269);
+		functions.insert({StringView("core:particle_emitter"), StringView("getParticleEmitterAutodestroy")}, &evox_particle_emitter_getParticleEmitterAutodestroy_4263130026576218239);
+		functions.insert({StringView("core:particle_emitter"), StringView("setParticleEmitterAutodestroy")}, &evox_particle_emitter_setParticleEmitterAutodestroy_12841861352903192919);
+		functions.insert({StringView("core:instanced_model"), StringView("getInstancedModelPath")}, &evox_instanced_model_getInstancedModelPath_5042885846977672067);
+		functions.insert({StringView("core:instanced_model"), StringView("setInstancedModelPath")}, &evox_instanced_model_setInstancedModelPath_11517420952746177454);
+		functions.insert({StringView("core:model_instance"), StringView("overrideMaterialVec4")}, &evox_model_instance_overrideMaterialVec4_4410224850514097651);
+		functions.insert({StringView("core:model_instance"), StringView("getModel")}, &evox_model_instance_getModel_17163776195265150550);
+		functions.insert({StringView("core:model_instance"), StringView("setMaterialOverride")}, &evox_model_instance_setMaterialOverride_996603591774246378);
+		functions.insert({StringView("core:model_instance"), StringView("getMaterialOverride")}, &evox_model_instance_getMaterialOverride_10931791879858139541);
+		functions.insert({StringView("core:model_instance"), StringView("isModelInstanceEnabled")}, &evox_model_instance_isModelInstanceEnabled_6536336526105476060);
+		functions.insert({StringView("core:model_instance"), StringView("enableModelInstance")}, &evox_model_instance_enableModelInstance_1093951277701741996);
+		functions.insert({StringView("core:model_instance"), StringView("getModelInstancePath")}, &evox_model_instance_getModelInstancePath_480404235994227176);
+		functions.insert({StringView("core:model_instance"), StringView("setModelInstancePath")}, &evox_model_instance_setModelInstancePath_555781892820508759);
+		functions.insert({StringView("core:curve_decal"), StringView("getCurveDecalMaterialPath")}, &evox_curve_decal_getCurveDecalMaterialPath_14883722537838298065);
+		functions.insert({StringView("core:curve_decal"), StringView("setCurveDecalMaterialPath")}, &evox_curve_decal_setCurveDecalMaterialPath_4325468858749750754);
+		functions.insert({StringView("core:curve_decal"), StringView("getCurveDecalHalfExtents")}, &evox_curve_decal_getCurveDecalHalfExtents_6032783605772812549);
+		functions.insert({StringView("core:curve_decal"), StringView("setCurveDecalHalfExtents")}, &evox_curve_decal_setCurveDecalHalfExtents_15657074898057640592);
+		functions.insert({StringView("core:curve_decal"), StringView("getCurveDecalUVScale")}, &evox_curve_decal_getCurveDecalUVScale_9314353131851647976);
+		functions.insert({StringView("core:curve_decal"), StringView("setCurveDecalUVScale")}, &evox_curve_decal_setCurveDecalUVScale_11922830816912627716);
+		functions.insert({StringView("core:curve_decal"), StringView("getCurveDecalBezierP0")}, &evox_curve_decal_getCurveDecalBezierP0_3468085010426487511);
+		functions.insert({StringView("core:curve_decal"), StringView("setCurveDecalBezierP0")}, &evox_curve_decal_setCurveDecalBezierP0_12067942103955500109);
+		functions.insert({StringView("core:curve_decal"), StringView("getCurveDecalBezierP2")}, &evox_curve_decal_getCurveDecalBezierP2_11002163896324231854);
+		functions.insert({StringView("core:curve_decal"), StringView("setCurveDecalBezierP2")}, &evox_curve_decal_setCurveDecalBezierP2_14805499181827883260);
+		functions.insert({StringView("core:terrain"), StringView("getHeightAt")}, &evox_terrain_getHeightAt_4135864093076350260);
+		functions.insert({StringView("core:terrain"), StringView("getNormalAt")}, &evox_terrain_getNormalAt_1311724776655016951);
+		functions.insert({StringView("core:terrain"), StringView("getTerrainSize")}, &evox_terrain_getTerrainSize_3020679776041108740);
+		functions.insert({StringView("core:terrain"), StringView("getTerrainMaterialPath")}, &evox_terrain_getTerrainMaterialPath_2215532021269038697);
+		functions.insert({StringView("core:terrain"), StringView("setTerrainMaterialPath")}, &evox_terrain_setTerrainMaterialPath_1966540602136072292);
+		functions.insert({StringView("core:terrain"), StringView("getTerrainXZScale")}, &evox_terrain_getTerrainXZScale_15339317355184973151);
+		functions.insert({StringView("core:terrain"), StringView("setTerrainXZScale")}, &evox_terrain_setTerrainXZScale_16735516022020384810);
+		functions.insert({StringView("core:terrain"), StringView("getTerrainTesselation")}, &evox_terrain_getTerrainTesselation_16430938751987681888);
+		functions.insert({StringView("core:terrain"), StringView("setTerrainTesselation")}, &evox_terrain_setTerrainTesselation_14084944351236148479);
+		functions.insert({StringView("core:terrain"), StringView("getTerrainBaseGridResolution")}, &evox_terrain_getTerrainBaseGridResolution_6946226270046439418);
+		functions.insert({StringView("core:terrain"), StringView("setTerrainBaseGridResolution")}, &evox_terrain_setTerrainBaseGridResolution_15993857900103366987);
+		functions.insert({StringView("core:terrain"), StringView("getTerrainYScale")}, &evox_terrain_getTerrainYScale_6808724379307216299);
+		functions.insert({StringView("core:terrain"), StringView("setTerrainYScale")}, &evox_terrain_setTerrainYScale_8612193105866137381);
 		functions.insert({StringView("core:terrain"), StringView("grassCount")}, &
-		evox_terrain_grass_count_320);
+		evox_terrain_grass_count_14741352061571450574);
 		functions.insert({StringView("core:terrain"), StringView("grass")}, &
-		evox_terrain_grass_item_321);
-		functions.insert({StringView("core:terrain"), StringView("getGrassRotationMode")}, &evox_terrain_grass_getGrassRotationMode_322);
-		functions.insert({StringView("core:terrain"), StringView("setGrassRotationMode")}, &evox_terrain_grass_setGrassRotationMode_323);
-		functions.insert({StringView("core:terrain"), StringView("getGrassDistance")}, &evox_terrain_grass_getGrassDistance_324);
-		functions.insert({StringView("core:terrain"), StringView("setGrassDistance")}, &evox_terrain_grass_setGrassDistance_325);
-		functions.insert({StringView("core:terrain"), StringView("getGrassPath")}, &evox_terrain_grass_getGrassPath_326);
-		functions.insert({StringView("core:terrain"), StringView("setGrassPath")}, &evox_terrain_grass_setGrassPath_327);
-		functions.insert({StringView("core:terrain"), StringView("getGrassSpacing")}, &evox_terrain_grass_getGrassSpacing_328);
-		functions.insert({StringView("core:terrain"), StringView("setGrassSpacing")}, &evox_terrain_grass_setGrassSpacing_329);
-		functions.insert({StringView("core:procedural_geom"), StringView("getProceduralGeometryMaterial")}, &evox_procedural_geom_getProceduralGeometryMaterial_330);
-		functions.insert({StringView("core:procedural_geom"), StringView("setProceduralGeometryMaterial")}, &evox_procedural_geom_setProceduralGeometryMaterial_331);
-		functions.insert({StringView("core:ui_3d"), StringView("getUI3DPath")}, &evox_ui_3d_getUI3DPath_332);
-		functions.insert({StringView("core:ui_3d"), StringView("setUI3DPath")}, &evox_ui_3d_setUI3DPath_333);
-		functions.insert({StringView("core:ui_3d"), StringView("getUI3DVirtualSize")}, &evox_ui_3d_getUI3DVirtualSize_334);
-		functions.insert({StringView("core:ui_3d"), StringView("setUI3DVirtualSize")}, &evox_ui_3d_setUI3DVirtualSize_335);
-		functions.insert({StringView("core:ui_3d"), StringView("getUI3DOrientToCamera")}, &evox_ui_3d_getUI3DOrientToCamera_336);
-		functions.insert({StringView("core:ui_3d"), StringView("setUI3DOrientToCamera")}, &evox_ui_3d_setUI3DOrientToCamera_337);
-		functions.insert({StringView("core:assetbrowser"), StringView("openEditor")}, &evox_object_AssetBrowser_openEditor_338);
-		functions.insert({StringView("core:studioapp"), StringView("exitWithCode")}, &evox_object_StudioApp_exitWithCode_339);
-		functions.insert({StringView("core:studioapp"), StringView("exitGameMode")}, &evox_object_StudioApp_exitGameMode_340);
-		functions.insert({StringView("core:studioapp"), StringView("newWorld")}, &evox_object_StudioApp_newWorld_341);
-		functions.insert({StringView("core:gameview"), StringView("forceViewport")}, &evox_object_GameView_forceViewport_342);
-		functions.insert({StringView("core:sceneview"), StringView("setViewport")}, &evox_object_SceneView_setViewport_343);
-		functions.insert({StringView("core:sceneview"), StringView("makeScreenshot")}, &evox_object_SceneView_makeScreenshot_344);
-		functions.insert({StringView("core:model"), StringView("getOriginBoundingRadius")}, &evox_object_Model_getOriginBoundingRadius_345);
-		functions.insert({StringView("core:model"), StringView("getCenterBoundingRadius")}, &evox_object_Model_getCenterBoundingRadius_346);
-		functions.insert({StringView("core:pipeline"), StringView("render")}, &evox_object_Pipeline_render_347);
-		functions.insert({StringView("core:pipeline"), StringView("setViewport")}, &evox_object_Pipeline_setViewport_348);
-		functions.insert({StringView("core:pipeline"), StringView("setClearColor")}, &evox_object_Pipeline_setClearColor_349);
-		functions.insert({StringView("core:renderer"), StringView("getLODMultiplier")}, &evox_object_Renderer_getLODMultiplier_350);
-		functions.insert({StringView("core:renderer"), StringView("setLODMultiplier")}, &evox_object_Renderer_setLODMultiplier_351);
-		functions.insert({StringView("core:element"), StringView("getID")}, &evox_object_Element_getID_352);
-		functions.insert({StringView("core:element"), StringView("setVisible")}, &evox_object_Element_setVisible_353);
-		functions.insert({StringView("core:element"), StringView("setText")}, &evox_object_Element_setText_354);
-		functions.insert({StringView("core:element"), StringView("setWidth")}, &evox_object_Element_setWidth_355);
-		functions.insert({StringView("core:element"), StringView("setBGImage")}, &evox_object_Element_setBGImage_356);
-		functions.insert({StringView("core:document"), StringView("getElement")}, &evox_object_Document_getElement_357);
-		functions.insert({StringView("core:document"), StringView("getElementByID")}, &evox_object_Document_getElementByID_358);
-		functions.insert({StringView("core:document"), StringView("getEvents")}, &evox_object_Document_getEvents_359);
-		functions.insert({StringView("core:uisystem"), StringView("enableCursor")}, &evox_object_UISystem_enableCursor_360);
+		evox_terrain_grass_item_5892846808699301772);
+		functions.insert({StringView("core:terrain"), StringView("getGrassRotationMode")}, &evox_terrain_grass_getGrassRotationMode_14468789118457816776);
+		functions.insert({StringView("core:terrain"), StringView("setGrassRotationMode")}, &evox_terrain_grass_setGrassRotationMode_1328757637365446366);
+		functions.insert({StringView("core:terrain"), StringView("getGrassDistance")}, &evox_terrain_grass_getGrassDistance_6527065972178915904);
+		functions.insert({StringView("core:terrain"), StringView("setGrassDistance")}, &evox_terrain_grass_setGrassDistance_1962933902425473914);
+		functions.insert({StringView("core:terrain"), StringView("getGrassPath")}, &evox_terrain_grass_getGrassPath_10133631074678619462);
+		functions.insert({StringView("core:terrain"), StringView("setGrassPath")}, &evox_terrain_grass_setGrassPath_3630854957332324363);
+		functions.insert({StringView("core:terrain"), StringView("getGrassSpacing")}, &evox_terrain_grass_getGrassSpacing_14061099111497580177);
+		functions.insert({StringView("core:terrain"), StringView("setGrassSpacing")}, &evox_terrain_grass_setGrassSpacing_405729763332359076);
+		functions.insert({StringView("core:procedural_geom"), StringView("getProceduralGeometryMaterial")}, &evox_procedural_geom_getProceduralGeometryMaterial_6522136380315261577);
+		functions.insert({StringView("core:procedural_geom"), StringView("setProceduralGeometryMaterial")}, &evox_procedural_geom_setProceduralGeometryMaterial_11069154491425504953);
+		functions.insert({StringView("core:ui_3d"), StringView("getUI3DPath")}, &evox_ui_3d_getUI3DPath_14812910613353120667);
+		functions.insert({StringView("core:ui_3d"), StringView("setUI3DPath")}, &evox_ui_3d_setUI3DPath_9334778907864705763);
+		functions.insert({StringView("core:ui_3d"), StringView("getUI3DVirtualSize")}, &evox_ui_3d_getUI3DVirtualSize_5246908877923932881);
+		functions.insert({StringView("core:ui_3d"), StringView("setUI3DVirtualSize")}, &evox_ui_3d_setUI3DVirtualSize_3443593634112763421);
+		functions.insert({StringView("core:ui_3d"), StringView("getUI3DOrientToCamera")}, &evox_ui_3d_getUI3DOrientToCamera_2472985916441962820);
+		functions.insert({StringView("core:ui_3d"), StringView("setUI3DOrientToCamera")}, &evox_ui_3d_setUI3DOrientToCamera_10517850954275228651);
+		functions.insert({StringView("core:assetbrowser"), StringView("openEditor")}, &evox_object_AssetBrowser_openEditor_11783148113040368601);
+		functions.insert({StringView("core:studioapp"), StringView("exitWithCode")}, &evox_object_StudioApp_exitWithCode_758235736626335650);
+		functions.insert({StringView("core:studioapp"), StringView("exitGameMode")}, &evox_object_StudioApp_exitGameMode_3617391861646806333);
+		functions.insert({StringView("core:studioapp"), StringView("newWorld")}, &evox_object_StudioApp_newWorld_6688068326512970617);
+		functions.insert({StringView("core:gameview"), StringView("forceViewport")}, &evox_object_GameView_forceViewport_14906880937046627925);
+		functions.insert({StringView("core:sceneview"), StringView("setViewport")}, &evox_object_SceneView_setViewport_14548538436635539605);
+		functions.insert({StringView("core:sceneview"), StringView("makeScreenshot")}, &evox_object_SceneView_makeScreenshot_13676003394318764375);
+		functions.insert({StringView("core:model"), StringView("getOriginBoundingRadius")}, &evox_object_Model_getOriginBoundingRadius_10043197175785696766);
+		functions.insert({StringView("core:model"), StringView("getCenterBoundingRadius")}, &evox_object_Model_getCenterBoundingRadius_6203163798800546562);
+		functions.insert({StringView("core:pipeline"), StringView("render")}, &evox_object_Pipeline_render_16077624984126946320);
+		functions.insert({StringView("core:pipeline"), StringView("setViewport")}, &evox_object_Pipeline_setViewport_10887991775244494685);
+		functions.insert({StringView("core:pipeline"), StringView("setClearColor")}, &evox_object_Pipeline_setClearColor_1198735756463553615);
+		functions.insert({StringView("core:renderer"), StringView("getLODMultiplier")}, &evox_object_Renderer_getLODMultiplier_14506703837845548734);
+		functions.insert({StringView("core:renderer"), StringView("setLODMultiplier")}, &evox_object_Renderer_setLODMultiplier_2531530158563778094);
+		functions.insert({StringView("core:element"), StringView("getID")}, &evox_object_Element_getID_5043487033988361637);
+		functions.insert({StringView("core:element"), StringView("setVisible")}, &evox_object_Element_setVisible_10775676013963828726);
+		functions.insert({StringView("core:element"), StringView("setText")}, &evox_object_Element_setText_16123516204308000926);
+		functions.insert({StringView("core:element"), StringView("setWidth")}, &evox_object_Element_setWidth_1690122863701504102);
+		functions.insert({StringView("core:element"), StringView("setBGImage")}, &evox_object_Element_setBGImage_9641999657146036441);
+		functions.insert({StringView("core:document"), StringView("getElement")}, &evox_object_Document_getElement_11405592870786360628);
+		functions.insert({StringView("core:document"), StringView("getElementByID")}, &evox_object_Document_getElementByID_12240067967033170654);
+		functions.insert({StringView("core:document"), StringView("getEvents")}, &evox_object_Document_getEvents_4526885960883524382);
+		functions.insert({StringView("core:uisystem"), StringView("enableCursor")}, &evox_object_UISystem_enableCursor_9613396029109500766);
 	}
 	
 } // namespace Lumix::Evox::generated

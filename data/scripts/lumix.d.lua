@@ -350,6 +350,7 @@ type navmesh_agent_component =  {
 	move_entity: boolean,
 	speed: number,
 	navigate: (navmesh_agent_component, DVec3, number, number) -> boolean,
+	isFinished: (navmesh_agent_component) -> boolean,
 	cancelNavigation: (navmesh_agent_component) -> (),
 	drawPath: (navmesh_agent_component, boolean) -> (),
 }

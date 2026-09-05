@@ -8,6 +8,7 @@ struct Agent { entity : i32; module : cptr; }
 extern fn navmesh_agent(e : Entity) : ?Agent;
 extern fn createAgent(e : Entity) : ?Agent;
 extern fn navigate(entity : Agent, dest : DVec3, speed : f32, stop_distance : f32) : bool;
+extern fn isFinished(entity : Agent) : bool;
 extern fn cancelNavigation(entity : Agent) : void;
 extern fn drawPath(agent_entity : Agent, include_polygons : bool) : void;
 extern fn getAgentRadius(entity : Agent) : f32;

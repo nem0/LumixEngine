@@ -461,17 +461,28 @@ bool isSupportedEvoxArrayChildSetter(Property& p) {
 	return supported;
 }
 
-void appendWrapperName(OutputStream& out, Component& c, Function& f, i32 idx) {
-	out.add("evox_", c.id, "_", functionScriptName(f), "_", idx);
+void appendWrapperName(OutputStream& out, Component& c, Function& f) {
+	// Do not use the generated function order here: inserting a declaration
+	// must not rename every wrapper that follows it in the generated file.
+	StaticString<2048> signature(c.id, "::", functionScriptName(f), "(", f.args, ")->", f.return_type);
+	const XXH64_hash_t hash = XXH3_64bits(signature.buffer, signature.length);
+	out.add("evox_", c.id, "_", functionScriptName(f), "_", hash);
 }
 
-void appendPropertyWrapperName(OutputStream& out, Component& c, Property& p, bool is_setter, i32 idx) {
-	out.add("evox_", c.id, "_", is_setter ? p.setter_name : p.getter_name, "_", idx);
+void appendPropertyWrapperName(OutputStream& out, Component& c, Property& p, bool is_setter) {
+	// Property wrappers must use the same order-independent naming scheme as
+	// ordinary function wrappers. Include the accessor signature so distinct
+	// properties/accessors cannot collide.
+	const StringView accessor = is_setter ? p.setter_name : p.getter_name;
+	const StringView args = is_setter ? p.setter_args : p.getter_args;
+	StaticString<2048> signature(c.id, "::", accessor, "(", args, ")->", p.type);
+	const XXH64_hash_t hash = XXH3_64bits(signature.buffer, signature.length);
+	out.add("evox_", c.id, "_", accessor, "_", hash);
 }
 
-void serializeEvoxWrapper(OutputStream& out, Module& m, Component& c, Function& f, i32 idx) {
+void serializeEvoxWrapper(OutputStream& out, Module& m, Component& c, Function& f) {
 	out.add("static void ");
-	appendWrapperName(out, c, f, idx);
+	appendWrapperName(out, c, f);
 	L("(ex_runtime* runtime, ex_call_frame frame) {");
 	forEachArg(f.args, [&](const Arg& arg, bool is_first) {
 		if (is_first) {
@@ -493,10 +504,10 @@ void serializeEvoxWrapper(OutputStream& out, Module& m, Component& c, Function& 
 	L("}" OUT_ENDL);
 }
 
-void serializeEvoxPropertyWrapper(OutputStream& out, Module& m, Component& c, Property& p, bool is_setter, i32 idx) {
+void serializeEvoxPropertyWrapper(OutputStream& out, Module& m, Component& c, Property& p, bool is_setter) {
 	StringView accessor_args = is_setter ? p.setter_args : p.getter_args;
 	out.add("static void ");
-	appendPropertyWrapperName(out, c, p, is_setter, idx);
+	appendPropertyWrapperName(out, c, p, is_setter);
 	L("(ex_runtime* runtime, ex_call_frame frame) {");
 	forEachArg(accessor_args, [&](const Arg& arg, bool is_first) {
 		if (is_first) {
@@ -518,37 +529,51 @@ void serializeEvoxPropertyWrapper(OutputStream& out, Module& m, Component& c, Pr
 	L("}" OUT_ENDL);
 }
 
-void appendArrayCountWrapperName(OutputStream& out, Component& c, ArrayProperty& a, i32 idx) {
-	out.add("evox_", c.id, "_", a.id, "_count_", idx);
+template <int CAPACITY> void appendStableWrapperHash(OutputStream& out, const StaticString<CAPACITY>& signature) {
+	const XXH64_hash_t hash = XXH3_64bits(signature.buffer, signature.length);
+	out.add("_", hash);
 }
 
-void appendArrayItemWrapperName(OutputStream& out, Component& c, ArrayProperty& a, i32 idx) {
-	out.add("evox_", c.id, "_", a.id, "_item_", idx);
+void appendArrayCountWrapperName(OutputStream& out, Component& c, ArrayProperty& a) {
+	StaticString<2048> s(c.id, "::", a.id, "::count");
+	out.add("evox_", c.id, "_", a.id, "_count"); appendStableWrapperHash(out, s);
 }
 
-void appendArrayChildWrapperName(OutputStream& out, Component& c, ArrayProperty& a, Property& p, bool is_setter, i32 idx) {
-	out.add("evox_", c.id, "_", a.id, "_", is_setter ? p.setter_name : p.getter_name, "_", idx);
+void appendArrayItemWrapperName(OutputStream& out, Component& c, ArrayProperty& a) {
+	StaticString<2048> s(c.id, "::", a.id, "::item");
+	out.add("evox_", c.id, "_", a.id, "_item"); appendStableWrapperHash(out, s);
 }
 
-void appendModuleWrapperName(OutputStream& out, Module& m, Function& f, i32 idx) {
-	out.add("evox_", m.id, "_", functionScriptName(f), "_", idx);
+void appendArrayChildWrapperName(OutputStream& out, Component& c, ArrayProperty& a, Property& p, bool is_setter) {
+	const StringView name = is_setter ? p.setter_name : p.getter_name;
+	const StringView args = is_setter ? p.setter_args : p.getter_args;
+	StaticString<2048> s(c.id, "::", a.id, "::", name, "(", args, ")->", p.type);
+	out.add("evox_", c.id, "_", a.id, "_", name); appendStableWrapperHash(out, s);
 }
 
-void appendObjectWrapperName(OutputStream& out, Object& o, Function& f, i32 idx) {
-	out.add("evox_object_", o.name, "_", functionScriptName(f), "_", idx);
+void appendModuleWrapperName(OutputStream& out, Module& m, Function& f) {
+	StaticString<2048> s(m.id, "::", functionScriptName(f), "(", f.args, ")->", f.return_type);
+	out.add("evox_", m.id, "_", functionScriptName(f)); appendStableWrapperHash(out, s);
 }
 
-void appendSpanIteratorCountName(OutputStream& out, Module& m, Function& f, i32 idx) {
-	out.add("evox_", m.id, "_", functionScriptName(f), "_count_", idx);
+void appendObjectWrapperName(OutputStream& out, Object& o, Function& f) {
+	StaticString<2048> s(o.name, "::", functionScriptName(f), "(", f.args, ")->", f.return_type);
+	out.add("evox_object_", o.name, "_", functionScriptName(f)); appendStableWrapperHash(out, s);
 }
 
-void appendSpanIteratorGetName(OutputStream& out, Module& m, Function& f, i32 idx) {
-	out.add("evox_", m.id, "_", functionScriptName(f), "_get_", idx);
+void appendSpanIteratorCountName(OutputStream& out, Module& m, Function& f) {
+	StaticString<2048> s(m.id, "::", functionScriptName(f), "(", f.args, ")->", f.return_type, "::count");
+	out.add("evox_", m.id, "_", functionScriptName(f), "_count"); appendStableWrapperHash(out, s);
 }
 
-void serializeEvoxObjectWrapper(OutputStream& out, Object& o, Function& f, i32 idx) {
+void appendSpanIteratorGetName(OutputStream& out, Module& m, Function& f) {
+	StaticString<2048> s(m.id, "::", functionScriptName(f), "(", f.args, ")->", f.return_type, "::get");
+	out.add("evox_", m.id, "_", functionScriptName(f), "_get"); appendStableWrapperHash(out, s);
+}
+
+void serializeEvoxObjectWrapper(OutputStream& out, Object& o, Function& f) {
 	out.add("static void ");
-	appendObjectWrapperName(out, o, f, idx);
+	appendObjectWrapperName(out, o, f);
 	L("(ex_runtime* runtime, ex_call_frame frame) {");
 	L("EX_ARG(frame, ", o.full, "*, object);");
 	forEachArg(f.args, [&](const Arg& arg, bool) { emitArgRead(out, arg); });
@@ -563,9 +588,9 @@ void serializeEvoxObjectWrapper(OutputStream& out, Object& o, Function& f, i32 i
 	L("}" OUT_ENDL);
 }
 
-void serializeEvoxSpanIteratorWrappers(OutputStream& out, Module& m, Function& f, i32 idx) {
+void serializeEvoxSpanIteratorWrappers(OutputStream& out, Module& m, Function& f) {
 	const StringView element = spanElementBaseType(f.return_type);
-	out.add("static void "); appendSpanIteratorCountName(out, m, f, idx); L("(ex_runtime* runtime, ex_call_frame frame) {");
+	out.add("static void "); appendSpanIteratorCountName(out, m, f); L("(ex_runtime* runtime, ex_call_frame frame) {");
 	L("EX_ARG(frame, ", m.name, "*, module);");
 	forEachArg(f.args, [&](const Arg& arg, bool) { emitArgRead(out, arg); });
 	L("const auto ret = module->", f.name, "(");
@@ -573,7 +598,7 @@ void serializeEvoxSpanIteratorWrappers(OutputStream& out, Module& m, Function& f
 	L(");");
 	L("EX_RESULT(frame, (i32)ret.size());");
 	L("}" OUT_ENDL);
-	out.add("static void "); appendSpanIteratorGetName(out, m, f, idx + 1); L("(ex_runtime* runtime, ex_call_frame frame) {");
+	out.add("static void "); appendSpanIteratorGetName(out, m, f); L("(ex_runtime* runtime, ex_call_frame frame) {");
 	L("EX_ARG(frame, ", m.name, "*, module);");
 	forEachArg(f.args, [&](const Arg& arg, bool) { emitArgRead(out, arg); });
 	L("EX_ARG(frame, i32, index);");
@@ -586,10 +611,10 @@ void serializeEvoxSpanIteratorWrappers(OutputStream& out, Module& m, Function& f
 	L("}" OUT_ENDL);
 }
 
-void serializeEvoxModuleWrapper(OutputStream& out, Module& m, Function& f, i32 idx) {
+void serializeEvoxModuleWrapper(OutputStream& out, Module& m, Function& f) {
 	if (isSpanType(f.return_type)) return;
 	out.add("static void ");
-	appendModuleWrapperName(out, m, f, idx);
+	appendModuleWrapperName(out, m, f);
 	L("(ex_runtime* runtime, ex_call_frame frame) {");
 	L("EX_ARG(frame, ", m.name, "*, module);");
 	forEachArg(f.args, [&](const Arg& arg, bool) { emitArgRead(out, arg); });
@@ -605,9 +630,9 @@ void serializeEvoxModuleWrapper(OutputStream& out, Module& m, Function& f, i32 i
 	L("}" OUT_ENDL);
 }
 
-void serializeEvoxArrayCountWrapper(OutputStream& out, Module& m, Component& c, ArrayProperty& a, i32 idx) {
+void serializeEvoxArrayCountWrapper(OutputStream& out, Module& m, Component& c, ArrayProperty& a) {
 	out.add("static void ");
-	appendArrayCountWrapperName(out, c, a, idx);
+	appendArrayCountWrapperName(out, c, a);
 	L("(ex_runtime* runtime, ex_call_frame frame) {");
 	L("EX_ARG(frame, ExComponent, component);");
 	L(m.name, "* module = static_cast<", m.name, "*>(component.module);");
@@ -616,9 +641,9 @@ void serializeEvoxArrayCountWrapper(OutputStream& out, Module& m, Component& c, 
 	L("}" OUT_ENDL);
 }
 
-void serializeEvoxArrayItemWrapper(OutputStream& out, Module& m, Component& c, ArrayProperty& a, i32 idx) {
+void serializeEvoxArrayItemWrapper(OutputStream& out, Module& m, Component& c, ArrayProperty& a) {
 	out.add("static void ");
-	appendArrayItemWrapperName(out, c, a, idx);
+	appendArrayItemWrapperName(out, c, a);
 	L("(ex_runtime* runtime, ex_call_frame frame) {");
 	L("EX_ARG(frame, ExComponent, component);");
 	L(m.name, "* module = static_cast<", m.name, "*>(component.module);");
@@ -638,10 +663,10 @@ void serializeEvoxArrayItemWrapper(OutputStream& out, Module& m, Component& c, A
 	L("}" OUT_ENDL);
 }
 
-void serializeEvoxArrayChildWrapper(OutputStream& out, Module& m, Component& c, ArrayProperty& a, Property& p, bool is_setter, i32 idx) {
+void serializeEvoxArrayChildWrapper(OutputStream& out, Module& m, Component& c, ArrayProperty& a, Property& p, bool is_setter) {
 	StringView accessor_args = is_setter ? p.setter_args : p.getter_args;
 	out.add("static void ");
-	appendArrayChildWrapperName(out, c, a, p, is_setter, idx);
+	appendArrayChildWrapperName(out, c, a, p, is_setter);
 	L("(ex_runtime* runtime, ex_call_frame frame) {");
 	L("EX_ARG(frame, i32, entity_idx);");
 	L("EX_ARG(frame, i32, item_idx);");
@@ -774,63 +799,53 @@ void emitGeneratedComponentCreators(OutputStream& out, MetaData& data) {
 	}
 }
 
-void emitGeneratedModuleWrappers(OutputStream& out, MetaData& data, i32* wrapper_idx) {
+void emitGeneratedModuleWrappers(OutputStream& out, MetaData& data) {
 	for (Module& m : data.modules) {
 		for (Function& f : m.functions) {
 			if (!isSupportedEvoxFunction(f)) continue;
 			if (isSpanType(f.return_type)) {
-				serializeEvoxSpanIteratorWrappers(out, m, f, *wrapper_idx);
-				*wrapper_idx += 2;
+				serializeEvoxSpanIteratorWrappers(out, m, f);
 			}
 			else {
-				serializeEvoxModuleWrapper(out, m, f, *wrapper_idx);
-				++*wrapper_idx;
+				serializeEvoxModuleWrapper(out, m, f);
 			}
 		}
 	}
 }
 
-void emitGeneratedObjectWrappers(OutputStream& out, MetaData& data, i32* wrapper_idx) {
+void emitGeneratedObjectWrappers(OutputStream& out, MetaData& data) {
 	for (Object& o : data.objects) {
 		for (Function& f : o.functions) {
 			if (!isSupportedEvoxFunction(f)) continue;
-			serializeEvoxObjectWrapper(out, o, f, *wrapper_idx);
-			++*wrapper_idx;
+			serializeEvoxObjectWrapper(out, o, f);
 		}
 	}
 }
 
-void emitGeneratedComponentWrappers(OutputStream& out, MetaData& data, i32* wrapper_idx) {
+void emitGeneratedComponentWrappers(OutputStream& out, MetaData& data) {
 	for (Module& m : data.modules) {
 		for (Component& c : m.components) {
 			for (Function& f : c.functions) {
 				if (!isSupportedEvoxFunction(f)) continue;
-				serializeEvoxWrapper(out, m, c, f, *wrapper_idx);
-				++*wrapper_idx;
+				serializeEvoxWrapper(out, m, c, f);
 			}
 			for (Property& p : c.properties) {
 				if (isSupportedEvoxPropertyGetter(p)) {
-					serializeEvoxPropertyWrapper(out, m, c, p, false, *wrapper_idx);
-					++*wrapper_idx;
+					serializeEvoxPropertyWrapper(out, m, c, p, false);
 				}
 				if (isSupportedEvoxPropertySetter(p)) {
-					serializeEvoxPropertyWrapper(out, m, c, p, true, *wrapper_idx);
-					++*wrapper_idx;
+					serializeEvoxPropertyWrapper(out, m, c, p, true);
 				}
 			}
 			for (ArrayProperty& a : c.arrays) {
-				serializeEvoxArrayCountWrapper(out, m, c, a, *wrapper_idx);
-				++*wrapper_idx;
-				serializeEvoxArrayItemWrapper(out, m, c, a, *wrapper_idx);
-				++*wrapper_idx;
+				serializeEvoxArrayCountWrapper(out, m, c, a);
+				serializeEvoxArrayItemWrapper(out, m, c, a);
 				for (Property& p : a.children) {
 					if (isSupportedEvoxArrayChildGetter(p)) {
-						serializeEvoxArrayChildWrapper(out, m, c, a, p, false, *wrapper_idx);
-						++*wrapper_idx;
+						serializeEvoxArrayChildWrapper(out, m, c, a, p, false);
 					}
 					if (isSupportedEvoxArrayChildSetter(p)) {
-						serializeEvoxArrayChildWrapper(out, m, c, a, p, true, *wrapper_idx);
-						++*wrapper_idx;
+						serializeEvoxArrayChildWrapper(out, m, c, a, p, true);
 					}
 				}
 			}
@@ -838,7 +853,7 @@ void emitGeneratedComponentWrappers(OutputStream& out, MetaData& data, i32* wrap
 	}
 }
 
-void emitGeneratedComponentImportRegistrations(OutputStream& out, MetaData& data, i32* wrapper_idx) {
+void emitGeneratedComponentImportRegistrations(OutputStream& out, MetaData& data) {
 	for (Module& m : data.modules) {
 		for (Component& c : m.components) {
 			bool has_supported_function = false;
@@ -874,45 +889,38 @@ void emitGeneratedComponentImportRegistrations(OutputStream& out, MetaData& data
 			for (Function& f : c.functions) {
 				if (!isSupportedEvoxFunction(f)) continue;
 				out.add("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", functionScriptName(f), "\")}, &");
-				appendWrapperName(out, c, f, *wrapper_idx);
+				appendWrapperName(out, c, f);
 				L(");");
-				++*wrapper_idx;
 			}
 			for (Property& p : c.properties) {
 				if (isSupportedEvoxPropertyGetter(p)) {
 					out.add("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", p.getter_name, "\")}, &");
-					appendPropertyWrapperName(out, c, p, false, *wrapper_idx);
+					appendPropertyWrapperName(out, c, p, false);
 					L(");");
-					++*wrapper_idx;
 				}
 				if (isSupportedEvoxPropertySetter(p)) {
 					out.add("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", p.setter_name, "\")}, &");
-					appendPropertyWrapperName(out, c, p, true, *wrapper_idx);
+					appendPropertyWrapperName(out, c, p, true);
 					L(");");
-					++*wrapper_idx;
 				}
 			}
 			for (ArrayProperty& a : c.arrays) {
 				L("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", a.id, "Count\")}, &");
-				appendArrayCountWrapperName(out, c, a, *wrapper_idx);
+				appendArrayCountWrapperName(out, c, a);
 				L(");");
-				++*wrapper_idx;
 				L("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", a.id, "\")}, &");
-				appendArrayItemWrapperName(out, c, a, *wrapper_idx);
+				appendArrayItemWrapperName(out, c, a);
 				L(");");
-				++*wrapper_idx;
 				for (Property& p : a.children) {
 					if (isSupportedEvoxArrayChildGetter(p)) {
 						out.add("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", p.getter_name, "\")}, &");
-						appendArrayChildWrapperName(out, c, a, p, false, *wrapper_idx);
+						appendArrayChildWrapperName(out, c, a, p, false);
 						L(");");
-						++*wrapper_idx;
 					}
 					if (isSupportedEvoxArrayChildSetter(p)) {
 						out.add("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", p.setter_name, "\")}, &");
-						appendArrayChildWrapperName(out, c, a, p, true, *wrapper_idx);
+						appendArrayChildWrapperName(out, c, a, p, true);
 						L(");");
-						++*wrapper_idx;
 					}
 				}
 			}
@@ -920,16 +928,15 @@ void emitGeneratedComponentImportRegistrations(OutputStream& out, MetaData& data
 	}
 }
 
-void emitGeneratedObjectImportRegistrations(OutputStream& out, MetaData& data, i32* wrapper_idx) {
+void emitGeneratedObjectImportRegistrations(OutputStream& out, MetaData& data) {
 	for (Object& o : data.objects) {
 		StaticString<256> unit("core:");
 		appendLowercase(unit, o.name);
 		for (Function& f : o.functions) {
 			if (!isSupportedEvoxFunction(f)) continue;
 			out.add("functions.insert({StringView(\"", unit.buffer, "\"), StringView(\"", functionScriptName(f), "\")}, &");
-			appendObjectWrapperName(out, o, f, *wrapper_idx);
+			appendObjectWrapperName(out, o, f);
 			L(");");
-			++*wrapper_idx;
 		}
 	}
 }
@@ -1466,10 +1473,9 @@ void serializeEvoxMeta(MetaData& data) {
 	emitGeneratedWorldModuleAccessors(out, data);
 	emitGeneratedComponentEntityAccessors(out, data);
 	emitGeneratedComponentCreators(out, data);
-	i32 wrapper_idx = 0;
-	emitGeneratedModuleWrappers(out, data, &wrapper_idx);
-	emitGeneratedComponentWrappers(out, data, &wrapper_idx);
-	emitGeneratedObjectWrappers(out, data, &wrapper_idx);
+	emitGeneratedModuleWrappers(out, data);
+	emitGeneratedComponentWrappers(out, data);
+	emitGeneratedObjectWrappers(out, data);
 
 	L("static void registerGeneratedEngineImport(HashMap<NativeFunctionKey, ex_native_fn, NativeFunctionKeyHash>& functions) {");
 	for (Module& m : data.modules) {
@@ -1478,7 +1484,6 @@ void serializeEvoxMeta(MetaData& data) {
 			L("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", c.id, "\")}, &evox_entity_", c.id, ");");
 		}
 	}
-	wrapper_idx = 0;
 	for (Module& m : data.modules) {
 		if (m.components.size == 0) continue;
 
@@ -1486,14 +1491,13 @@ void serializeEvoxMeta(MetaData& data) {
 		for (Function& f : m.functions) {
 			if (!isSupportedEvoxFunction(f)) continue;
 			if (isSpanType(f.return_type)) {
-				out.add("functions.insert({StringView(\"core:", m.id, "\"), StringView(\"", functionScriptName(f), "Count\")}, &"); appendSpanIteratorCountName(out, m, f, wrapper_idx); L(");"); ++wrapper_idx;
-				out.add("functions.insert({StringView(\"core:", m.id, "\"), StringView(\"", functionScriptName(f), "Get\")}, &"); appendSpanIteratorGetName(out, m, f, wrapper_idx); L(");"); ++wrapper_idx;
+				out.add("functions.insert({StringView(\"core:", m.id, "\"), StringView(\"", functionScriptName(f), "Count\")}, &"); appendSpanIteratorCountName(out, m, f); L(");");
+				out.add("functions.insert({StringView(\"core:", m.id, "\"), StringView(\"", functionScriptName(f), "Get\")}, &"); appendSpanIteratorGetName(out, m, f); L(");");
 			}
 			else {
 				out.add("functions.insert({StringView(\"core:", m.id, "\"), StringView(\"", functionScriptName(f), "\")}, &");
-				appendModuleWrapperName(out, m, f, wrapper_idx);
+				appendModuleWrapperName(out, m, f);
 				L(");");
-				++wrapper_idx;
 			}
 			any_function = true;
 		}
@@ -1501,8 +1505,8 @@ void serializeEvoxMeta(MetaData& data) {
 			L("functions.insert({StringView(\"core:", m.id, "\"), StringView(\"", m.id, "\")}, &evox_world_", m.id, ");");
 		}
 	}
-	emitGeneratedComponentImportRegistrations(out, data, &wrapper_idx);
-	emitGeneratedObjectImportRegistrations(out, data, &wrapper_idx);
+	emitGeneratedComponentImportRegistrations(out, data);
+	emitGeneratedObjectImportRegistrations(out, data);
 
 	L("}" OUT_ENDL);
 	L("} // namespace Lumix::Evox::generated");
