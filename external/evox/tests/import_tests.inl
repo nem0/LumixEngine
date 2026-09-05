@@ -411,6 +411,44 @@ TEST(UnusedUnaliasedImportCollisionIsAllowed) {
 	return true;
 }
 
+TEST(ImportedFunctionErrorIsNotReplacedByCallError) {
+	const char* main_source = R"(
+		import "lib" as lib
+		fn main() : void {
+			lib.update();
+		}
+	)";
+	const char* lib_source = R"(
+		fn update() : void {
+			missing();
+		}
+	)";
+	EvoxImportFile file = { toLs("lib"), toLs(lib_source) };
+	EvoxImportFiles files = { &file, 1 };
+
+	struct Diagnostics { char text[1024] = {}; } diagnostics;
+	ex_host host = {};
+	ex_default_arena_create(&host.arena);
+	host.diagnostics_userdata = &diagnostics;
+	host.print = [](void* userdata, ex_string_view message) {
+		Diagnostics& diagnostics = *(Diagnostics*)userdata;
+		size_t offset = strlen(diagnostics.text);
+		size_t count = (size_t)message.length;
+		if (count > sizeof(diagnostics.text) - offset - 1) count = sizeof(diagnostics.text) - offset - 1;
+		memcpy(diagnostics.text + offset, message.begin, count);
+		diagnostics.text[offset + count] = '\0';
+	};
+
+	ex_module* module = ex_module_create(&host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_EQ(EX_RESULT_FAILURE, ex_module_compile(module, toLs(main_source), makeStringView(__func__), &resolveEvoxImportC, &files));
+	EXPECT_TRUE(strstr(diagnostics.text, "Unknown identifier missing") != nullptr);
+	EXPECT_TRUE(strstr(diagnostics.text, "Cannot call compile-time value") == nullptr);
+	ex_module_destroy(module);
+	ex_default_arena_destroy(&host.arena);
+	return true;
+}
+
 TEST(MissingImportFails) {
 	const char* source = R"(
 		import "missing"

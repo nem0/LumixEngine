@@ -789,8 +789,42 @@ struct EvoxAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		app.getAssetCompiler().registerExtension("evox", EvoxResource::TYPE);
 	}
 
+	void findImports(const Path& path) {
+		OutputMemoryStream content(m_app.getAllocator());
+		if (!m_app.getEngine().getFileSystem().getContentSync(path, content)) return;
+
+		ex_host host = {};
+		ex_default_arena_create(&host.arena);
+		ex_module* module = ex_module_create(&host);
+		if (!module) {
+			ex_default_arena_destroy(&host.arena);
+			return;
+		}
+
+		ex_module_parse(module, ex_string_view{(const char*)content.data(), (i64)content.size()}, ex_string_view{path.c_str(), stringLength(path.c_str())});
+		ex_unit* unit = ex_module_get_unit(module, 0);
+		for (int i = 0, count = ex_unit_get_import_count(unit); i < count; ++i) {
+			const ex_string_view value = ex_unit_get_import_path(unit, i);
+			const StringView import_path(value.begin, value.length);
+			if (startsWith(import_path, "std:")) continue;
+
+			Path dependency;
+			if (startsWith(import_path, "core:")) {
+				const StringView name = import_path.withoutLeft(5);
+				dependency = endsWith(name, ".evox") ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".evox");
+			} else {
+				dependency = endsWith(import_path, ".evox") ? Path(import_path) : Path(import_path, ".evox");
+			}
+			m_app.getAssetCompiler().registerDependency(path, dependency);
+		}
+
+		ex_module_destroy(module);
+		ex_default_arena_destroy(&host.arena);
+	}
+
 	void addSubresources(AssetCompiler& compiler, const Path& path, AtomicI32&) override {
 		compiler.addResource(EvoxResource::TYPE, path);
+		findImports(path);
 	}
 
 	void openEditor(const Path& path) override {

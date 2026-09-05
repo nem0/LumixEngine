@@ -217,6 +217,8 @@ void ex_module_destroy(ex_module* module);
 int ex_module_get_unit_count(ex_module* module);
 ex_unit* ex_module_get_unit(ex_module* module, int index);
 ex_string_view ex_unit_get_path(ex_unit* unit);
+int ex_unit_get_import_count(ex_unit* unit);
+ex_string_view ex_unit_get_import_path(ex_unit* unit, int index);
 int ex_unit_get_native_function_count(ex_unit* unit);
 ex_string_view ex_unit_get_native_function_name(ex_unit* unit, int index);
 

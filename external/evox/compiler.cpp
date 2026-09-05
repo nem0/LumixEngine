@@ -2583,148 +2583,141 @@ struct Checker {
 		return instance;
 	}
 
-	Expression* checkCallExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr) {
-		CallExpression& call = static_cast<CallExpression&>(expr);
+	struct MemberLookupResult {
+		bool missing = false;
+		SymbolRef symbol;
+	};
 
-		// `t::attribute(T)` is a compiler intrinsic rather than a function call.
-		if (call.callee->kind == Expression::TYPE_MEMBER
-			&& static_cast<TypeMemberExpression*>(call.callee)->kind == TypeMemberExpression::ATTRIBUTE) {
-			TypeMemberExpression& member = static_cast<TypeMemberExpression&>(*call.callee);
-			if (!checkTypeMemberExpr(unit, ctx, member)) return nullptr;
+	struct CallTarget {
+		FunctionResolvedType* type = nullptr;
+		FunctionExpression* fn = nullptr;
+		Unit* owner = nullptr;
+		u32 receiver_offset = 0;
+		explicit operator bool() const { return type || (fn && fn->is_template); }
+	};
 
-			if (call.args.size() != 1) {
-				errorLine(call.token, "::attribute expects exactly one type argument");
-				return nullptr;
-			}
-
-			Expression* argument = call.args[0];
-			if (!checkExpr(unit, ctx, *argument, nullptr)) return nullptr;
-
-			ComptimeValue argument_value = evalComptime(unit, *argument, ctx);
-			ResolvedType* attribute_type = argument_value.kind == ComptimeValue::TYPE
-				? argument_value.type : nullptr;
-			if (!attribute_type) {
-				errorLine(argument->token, "::attribute argument must be a compile-time type");
-				return nullptr;
-			}
-			
-			NullableResolvedType* result_type = makeType<NullableResolvedType>(unit.arena);
-			result_type->inner = attribute_type;
-			call.resolved_type = result_type;
-			call.eval_stage = Expression::COMPTIME_ONLY;
-			return &call;
+	CallTarget callTargetFromType(const Token& token, ResolvedType* type) {
+		if (!type) return {};
+		if (type->kind == ResolvedTypeKind::FUNCTION) return {static_cast<FunctionResolvedType*>(type)};
+		if (type->kind == ResolvedTypeKind::NULLABLE) {
+			errorLine(token, "Cannot call nullable function type ", type, " without a null check");
 		}
+		else errorLine(token, "Cannot call non-function type ", type);
+		return {};
+	}
 
-		// Suppress errors while probing normal lookup because a failed member lookup can
-		// fall back to UFCS, and the first argument can be checked again during the call.
-		++suppress_errors;
-		ResolvedType* first_arg_type = nullptr;
-		if (!call.args.empty()) {
-			Expression* first_arg = checkExpr(unit, ctx, *call.args[0], nullptr);
-			if (first_arg) first_arg_type = first_arg->resolved_type;
-		}
-		Expression* callee = checkExpr(unit, ctx, *call.callee, nullptr, first_arg_type);
-		--suppress_errors;
-
-		if (callee && callee->resolved_type) {
-			switch (callee->resolved_type->kind) {
-				case ResolvedTypeKind::FUNCTION:
-					return checkCallCandidate(unit, ctx, call, static_cast<FunctionResolvedType&>(*callee->resolved_type));
-				case ResolvedTypeKind::NULLABLE:
-					errorLine(expr.token, "Cannot call nullable function type ", callee->resolved_type, "without a null check");
-					return nullptr;
-				default:
-					errorLine(expr.token, "Cannot call non-function type ", callee->resolved_type);
-					return nullptr;
-			}
-		}
-
-		// template with inferred parameters
-		if (SymbolRef sym = resolveSymbol(unit, *call.callee)) {
-			FunctionExpression* fn = asFunctionExpression(*sym.symbol);
-			if (!fn) {
-				errorLine(expr.token, "Cannot call ", symbolKind(*sym.symbol), " '", sym.symbol->name, "' as a function");
-				return nullptr;
-			}
-			if (fn->is_template) {
-				FunctionExpression* instance = instantiateAndCheckTemplate(unit, ctx, call, *sym.owner, *fn);
-				if (!instance) return nullptr;
-				if (call.callee->kind == Expression::IDENTIFIER) static_cast<IdentifierExpression*>(call.callee)->symbol = sym.symbol;
-				FunctionResolvedType* fn_type = asFunctionType(instance->resolved_type);
-				ASSERT(fn_type);
-				return checkCallCandidate(unit, ctx, call, *fn_type, instance);
-			}
-
-			errorLine(expr.token, "Cannot call ", symbolKind(*sym.symbol), " '", sym.symbol->name, "' as a function");
-			return nullptr;
-		}
-
-		// UFCS: x.foo(a, b) -> foo(x, a, b)
-		if (call.callee->kind != Expression::MEMBER) {
-			// check again without suppressed errors
-			checkExpr(unit, ctx, *call.callee, nullptr, first_arg_type);
-			return nullptr;
-		}
-
+	CallTarget resolveUFCSCallTarget(Unit& unit, CallExpression& call) {
 		MemberExpression& mem = static_cast<MemberExpression&>(*call.callee);
-
-		if (!mem.expression) {
-			errorLine(expr.token, "Expected receiver expression for function call ", mem.name.value);
-			return nullptr;
-		}
-
-		if (!mem.expression->resolved_type) {
-			if (mem.expression->kind == Expression::IDENTIFIER) {
-				ex_string_view qualifier = static_cast<IdentifierExpression*>(mem.expression)->name;
-				if (findImportedUnitByAlias(unit, qualifier)) {
-					errorLine(expr.token, "Unknown symbol ", qualifier, ".", mem.name.value);
-					return nullptr;
-				}
-				errorLine(expr.token, "Cannot resolve ", qualifier, " as a value or imported module alias for ", qualifier, ".", mem.name.value);
-				return nullptr;
-			}
-			errorLine(expr.token, "Cannot resolve the receiver of ", mem.name.value, "(...); expected a typed value or imported module alias");
-			return nullptr;
-		}
-
 		ResolvedType* receiver_type = mem.expression->resolved_type;
 		if (receiver_type->kind == ResolvedTypeKind::POINTER) {
 			receiver_type = static_cast<PointerResolvedType*>(receiver_type)->inner;
 		}
-		if (receiver_type->kind != ResolvedTypeKind::STRUCT && receiver_type->kind != ResolvedTypeKind::ENUM) {
-			errorLine(expr.token, "Cannot call member function ", mem.name.value, " on type ", receiver_type, ", expected struct or enum");
-			return nullptr;
-		}
+		ASSERT(receiver_type->kind == ResolvedTypeKind::STRUCT || receiver_type->kind == ResolvedTypeKind::ENUM);
 
-		// Method syntax dispatches on the receiver: the type's own unit wins over
-		// local and imported declarations, so e.g. a script's own `init` does not
-		// shadow `array.init` in `a.init()`. Lexical lookup is only a fallback.
+		// The receiver's namespace wins; lexical lookup is only a fallback.
 		SymbolRef ref;
 		if (Unit* namespace_unit = findTypeNamespaceUnit(*receiver_type)) {
 			if (Symbol* candidate = findSymbol(*namespace_unit, mem.name.value)) {
 				ref = {namespace_unit, candidate};
-				if (checkSymbol(*namespace_unit, *candidate) == EX_RESULT_FAILURE) ref.check_failed = true;
+				if (checkSymbol(*namespace_unit, *candidate) == EX_RESULT_FAILURE) return {};
 			}
 		}
 		if (!ref.symbol) ref = resolveSymbol(unit, {}, mem.name.value, LookupPolicy::Checked);
-
+		if (ref.check_failed) return {};
 		if (!ref) {
-			errorLine(expr.token, "Could not resolve member function: ", mem.name.value);
-			return nullptr;
+			errorLine(call.token, "Could not resolve member function: ", mem.name.value);
+			return {};
 		}
 
 		FunctionExpression* fn = asFunctionExpression(*ref.symbol);
-		if (fn && fn->is_template) {
-			FunctionExpression* instance = instantiateAndCheckTemplate(unit, ctx, call, *ref.owner, *fn, 1);
-			if (!instance) return nullptr;
-			fn = instance;
+		if (fn && fn->is_template) return {nullptr, fn, ref.owner, 1};
+		FunctionResolvedType* type = asFunctionType(fn ? fn->resolved_type : ref.symbol->resolved_type);
+		if (!type) {
+			errorLine(call.token, "Cannot call ", symbolKind(*ref.symbol), " '", ref.symbol->name, "' as a function");
+			return {};
 		}
-		FunctionResolvedType* fn_type = asFunctionType(fn ? fn->resolved_type : ref.symbol->resolved_type);
-		if (!fn_type) {
-			errorLine(expr.token, "Cannot call ", symbolKind(*ref.symbol), " '", ref.symbol->name, "' as a function");
+		return {type, fn, ref.owner, 1};
+	}
+
+	CallTarget resolveCallTarget(Unit& unit, FunctionCheckContext* ctx, CallExpression& call) {
+		Expression* callee = nullptr;
+		if (call.callee->kind == Expression::IDENTIFIER) {
+			IdentifierExpression& id = static_cast<IdentifierExpression&>(*call.callee);
+			if ((id.slot && id.slot->type) || (ctx && findLocal(*ctx, id.name))) {
+				callee = checkIdentifierExpr(unit, ctx, id, nullptr);
+			}
+			else {
+				// ADL needs the first argument's type before the parameter hint is known.
+				ResolvedType* first_arg_type = nullptr;
+				if (!call.args.empty()) {
+					++suppress_errors;
+					Expression* first_arg = checkExpr(unit, ctx, *call.args[0], nullptr);
+					--suppress_errors;
+					if (first_arg) first_arg_type = first_arg->resolved_type;
+				}
+				SymbolRef ref = resolveSymbol(unit, {}, id.name, LookupPolicy::Checked, first_arg_type);
+				callee = checkIdentifierExpr(unit, ctx, id, nullptr, nullptr, &ref);
+				if (!callee) return {};
+				FunctionExpression* fn = asFunctionExpression(*ref.symbol);
+				if (fn && fn->is_template) return {nullptr, fn, ref.owner};
+			}
+		}
+		else if (call.callee->kind == Expression::MEMBER) {
+			MemberExpression& mem = static_cast<MemberExpression&>(*call.callee);
+			MemberLookupResult lookup;
+			callee = checkMemberExpr(unit, ctx, mem, nullptr, &lookup);
+			if (lookup.missing) return resolveUFCSCallTarget(unit, call);
+			if (!callee) return {};
+			if (lookup.symbol) {
+				FunctionExpression* fn = asFunctionExpression(*lookup.symbol.symbol);
+				if (fn && fn->is_template) return {nullptr, fn, lookup.symbol.owner};
+			}
+		}
+		else callee = checkExpr(unit, ctx, *call.callee, nullptr);
+		return callee ? callTargetFromType(call.token, callee->resolved_type) : CallTarget{};
+	}
+
+	Expression* checkAttributeCall(Unit& unit, FunctionCheckContext* ctx, CallExpression& call) {
+		TypeMemberExpression& member = static_cast<TypeMemberExpression&>(*call.callee);
+		if (!checkTypeMemberExpr(unit, ctx, member)) return nullptr;
+		if (call.args.size() != 1) {
+			errorLine(call.token, "::attribute expects exactly one type argument");
 			return nullptr;
 		}
-		return checkCallCandidate(unit, ctx, call, *fn_type, fn, 1);
+
+		Expression* argument = call.args[0];
+		if (!checkExpr(unit, ctx, *argument, nullptr)) return nullptr;
+		ComptimeValue argument_value = evalComptime(unit, *argument, ctx);
+		ResolvedType* attribute_type = argument_value.kind == ComptimeValue::TYPE ? argument_value.type : nullptr;
+		if (!attribute_type) {
+			errorLine(argument->token, "::attribute argument must be a compile-time type");
+			return nullptr;
+		}
+
+		NullableResolvedType* result_type = makeType<NullableResolvedType>(unit.arena);
+		result_type->inner = attribute_type;
+		call.resolved_type = result_type;
+		call.eval_stage = Expression::COMPTIME_ONLY;
+		return &call;
+	}
+
+	Expression* checkCallExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr) {
+		CallExpression& call = static_cast<CallExpression&>(expr);
+		// `t::attribute(T)` is a compiler intrinsic rather than a function call.
+		if (call.callee->kind == Expression::TYPE_MEMBER
+			&& static_cast<TypeMemberExpression*>(call.callee)->kind == TypeMemberExpression::ATTRIBUTE) {
+			return checkAttributeCall(unit, ctx, call);
+		}
+
+		CallTarget target = resolveCallTarget(unit, ctx, call);
+		if (!target) return nullptr;
+		if (target.fn && target.fn->is_template) {
+			target.fn = instantiateAndCheckTemplate(unit, ctx, call, *target.owner, *target.fn, target.receiver_offset);
+			if (!target.fn) return nullptr;
+			target.type = asFunctionType(target.fn->resolved_type);
+		}
+		ASSERT(target.type);
+		return checkCallCandidate(unit, ctx, call, *target.type, target.fn, target.receiver_offset);
 	}
 
 	// Pin an untyped numeric expression to a concrete type. With no compatible
@@ -3386,7 +3379,8 @@ struct Checker {
 		return false;
 	}
 
-	Expression* checkMemberExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint) {
+	Expression* checkMemberExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint, MemberLookupResult* lookup = nullptr) {
+		if (lookup) *lookup = {};
 		MemberExpression& member = static_cast<MemberExpression&>(expr);
 
 		// .enum_member
@@ -3432,6 +3426,11 @@ struct Checker {
 					return nullptr;
 				}
 				if (sym.check_failed) return nullptr;
+				if (sym.ambiguous) {
+					errorLine(expr.token, "Ambiguous identifier ", member.name.value);
+					return nullptr;
+				}
+				if (lookup) lookup->symbol = sym;
 
 				expr.resolved_type = sym.symbol->resolved_type;
 				expr.eval_stage = sym.symbol->kind == Symbol::COMPTIME ? comptimeStageForType(expr.resolved_type) : Expression::RUNTIME;
@@ -3490,7 +3489,8 @@ struct Checker {
 					}
 					return &expr;
 				}
-				errorLine(expr.token, member.name.value, " not found in ", base_type);
+				if (lookup) lookup->missing = true;
+				else errorLine(expr.token, member.name.value, " not found in ", base_type);
 				return nullptr;
 			}
 			case ResolvedTypeKind::META: {
@@ -3518,12 +3518,13 @@ struct Checker {
 				return nullptr;
 			}
 			case ResolvedTypeKind::ENUM: {
-				// If the name matches a variant, the user wrote instance.Variant - give a clear error.
-				// Otherwise return nullptr silently so the call checker can try UFCS.
+				// Variants accessed through an instance are invalid, not missing.
 				EnumResolvedType* en = static_cast<EnumResolvedType*>(base_type);
 				if (hasEnumMember(*en, member.name.value)) {
 					errorLine(expr.token, "Cannot access enum member '", member.name.value, "' through an instance; use the enum type name instead");
 				}
+				else if (lookup) lookup->missing = true;
+				else errorLine(expr.token, member.name.value, " not found in ", base_type);
 				return nullptr;
 			}
 			case ResolvedTypeKind::NULLABLE:
@@ -3830,7 +3831,7 @@ struct Checker {
 		return &expr;
 	}
 
-	Expression* checkIdentifierExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint, ResolvedType* first_arg_type = nullptr) {
+	Expression* checkIdentifierExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint, ResolvedType* first_arg_type = nullptr, const SymbolRef* selected = nullptr) {
 		IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
 		if (id.slot && ctx) {
 			for (SemanticLocalBinding& local : ctx->locals) if (local.slot == id.slot) { id.declaration_token = local.declaration_token; break; }
@@ -3868,7 +3869,8 @@ struct Checker {
 			}
 		}
 
-		SymbolRef ref = resolveSymbol(unit, {}, id.name, LookupPolicy::Checked, first_arg_type);
+		SymbolRef ref = selected ? *selected : resolveSymbol(unit, {}, id.name, LookupPolicy::Checked, first_arg_type);
+		if (ref.check_failed) return nullptr;
 		if (ref.ambiguous) {
 			// TODO list collisions
 			errorLine(expr.token, "Ambiguous identifier ", id.name);

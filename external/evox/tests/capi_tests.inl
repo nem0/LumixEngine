@@ -1,3 +1,28 @@
+TEST(UnitImportsAfterParse) {
+	TestContext context;
+	const ex_string_view source = makeStringView(
+		"import \"core:vec3\";\n"
+		"import \"gameplay/player\" as player;\n"
+		"fn main() : void {}\n");
+	const ex_string_view path = makeStringView("main.evox");
+	ex_module* module = ex_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_EQ(EX_RESULT_OK, ex_module_parse(module, source, path));
+	EXPECT_EQ(1, ex_module_get_unit_count(module));
+
+	ex_unit* unit = ex_module_get_unit(module, 0);
+	EXPECT_TRUE(unit != nullptr);
+	EXPECT_EQ(2, ex_unit_get_import_count(unit));
+	EXPECT_TRUE(equalStrings(makeStringView("core:vec3"), ex_unit_get_import_path(unit, 0)));
+	EXPECT_TRUE(equalStrings(makeStringView("gameplay/player"), ex_unit_get_import_path(unit, 1)));
+	EXPECT_EQ(0, ex_unit_get_import_count(nullptr));
+	EXPECT_EQ(0, ex_unit_get_import_path(unit, -1).length);
+	EXPECT_EQ(0, ex_unit_get_import_path(unit, 2).length);
+
+	ex_module_destroy(module);
+	return true;
+}
+
 TEST(ModuleDefinitionAt) {
 	TestContext context;
 	const char* source =

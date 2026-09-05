@@ -35,6 +35,16 @@ ex_string_view ex_unit_get_path(ex_unit* unit) {
 	return unit ? ((Unit*)unit)->path : ex_string_view{};
 }
 
+int ex_unit_get_import_count(ex_unit* unit) {
+	return unit ? ((Unit*)unit)->imports.size() : 0;
+}
+
+ex_string_view ex_unit_get_import_path(ex_unit* unit, int index) {
+	Unit* impl = (Unit*)unit;
+	if (!impl || index < 0 || index >= impl->imports.size()) return {};
+	return impl->imports[index].path;
+}
+
 int ex_unit_get_native_function_count(ex_unit* unit) {
 	return unit ? ((Unit*)unit)->native_symbols.size() : 0;
 }

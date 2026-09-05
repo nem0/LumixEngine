@@ -1,3 +1,58 @@
+TEST(CallLocalFunctionUsesArgumentHint) {
+	EXPECT_COMPILE(R"(
+		enum State { Ready }
+		fn run(state : State) : i32 { return 42; }
+		fn main() : i32 {
+			const callback : fn(State) : i32 = run;
+			return callback(.Ready);
+		}
+	)");
+	return true;
+}
+
+TEST(CallFunctionFieldWinsOverUFCS) {
+	const char* source = R"(
+		struct Handler { invoke : fn(i32) : i32; }
+		fn invoke(handler : Handler, value : i32) : i32 { return 0; }
+		fn identity(value : i32) : i32 { return value; }
+		fn main() : i32 {
+			const handler = Handler { identity };
+			return handler.invoke(42);
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(CallNonFunctionFieldDoesNotFallBackToUFCS) {
+	EXPECT_COMPILE_FAIL(R"(
+		struct Handler { invoke : i32; }
+		fn invoke(handler : Handler) : i32 { return 42; }
+		fn main() : i32 {
+			const handler = Handler { 0 };
+			return handler.invoke();
+		}
+	)");
+	return true;
+}
+
+TEST(CallEnumVariantThroughInstanceDoesNotFallBackToUFCS) {
+	EXPECT_COMPILE_FAIL(R"(
+		enum State { Ready }
+		fn Ready(state : State) : i32 { return 42; }
+		fn main() : i32 {
+			const state = State.Ready;
+			return state.Ready();
+		}
+	)");
+	return true;
+}
+
 TEST(CallTrailingCommaFails) {
 	EXPECT_COMPILE_FAIL(R"(
 		fn foo(value : i32) : void {}
