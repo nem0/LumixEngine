@@ -13,7 +13,7 @@ fn start() : void {
 }
 
 fn update(td : f32) : void {
-    demo.update(td);
+    demo.update(td, g_input);
 }
 
 fn init(input : InputSystem) : void {

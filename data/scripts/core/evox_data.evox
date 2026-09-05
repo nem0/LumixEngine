@@ -12,3 +12,11 @@ struct Owner {}
 //     entity : Entity;
 //     some_data : f32;
 // }
+
+// can be used as an attribute on global variable
+// MapGlobal variables can be set in the editor
+struct MapGlobal {}
+
+// example:
+// #[MapGlobal {}]
+// var spawn_point : ?Entity = null;

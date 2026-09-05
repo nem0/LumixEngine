@@ -2923,6 +2923,9 @@ struct Checker {
 		++suppress_errors;
 		Expression* lhs = checkExpr(unit, ctx, *bin.lhs, nullptr);
 		--suppress_errors;
+		// TODO: preserve the diagnostic from a failed lhs check instead of
+		// allowing contextual rhs checking to mask it (for example, `as XXX ==
+		// .F` currently reports a misleading conversion-to-bool error).
 		// typeless struct literals are not allowed in operators
 		// so we can't use structs as hints
 		const bool lhs_is_struct = lhs && lhs->resolved_type->kind == ResolvedTypeKind::STRUCT;

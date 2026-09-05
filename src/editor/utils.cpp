@@ -1912,6 +1912,13 @@ struct CodeEditorImpl final : CodeEditor {
 		m_first_untokenized_line = minimum(m_first_untokenized_line, line_index);
 	}
 
+	void clearUnderlines() override {
+		m_underlines.clear();
+		for (Line& line : m_lines) {
+			for (Token& token : line.tokens) token.flags = token.flags & ~Token::UNDERLINE;
+		}
+	}
+
 	bool canHandleInput() override {
 		return m_handle_input;
 	}

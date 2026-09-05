@@ -58,6 +58,7 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8) {
 		"as",
 		"bool",
 		"case",
+		"comptime",
 		"const",
 		"defer",
 		"else",
@@ -553,6 +554,7 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 	}
 
 	void check() {
+		m_editor->clearUnderlines();
 		OutputMemoryStream blob(m_app.getAllocator());
 		m_editor->serializeText(blob);
 		String diagnostics_message(m_app.getAllocator());

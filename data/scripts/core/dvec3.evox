@@ -1,3 +1,5 @@
+import "std:math"
+
 extern struct DVec3 {
 	x : f64;
 	y : f64;
@@ -50,4 +52,8 @@ operator /(a : DVec3, b : f64) : DVec3 {
 		a.y / b,
 		a.z / b
 	};
+}
+
+fn length(v : DVec3) : f64 {
+	return sqrt_f64(v.x * v.x + v.y * v.y + v.z * v.z);
 }

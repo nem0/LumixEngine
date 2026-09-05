@@ -151,6 +151,7 @@ struct CodeEditor {
 	virtual void selectWord() = 0;
 	virtual bool canHandleInput() = 0;
 	virtual void underlineTokens(u32 line, u32 col_from, u32 col_to, const char* msg) = 0;
+	virtual void clearUnderlines() = 0;
 	virtual void insertText(const char* text) = 0;
 	virtual u32 getNumCursors() = 0;
 	virtual ImVec2 getCursorScreenPosition(u32 cursor_index = 0) = 0;

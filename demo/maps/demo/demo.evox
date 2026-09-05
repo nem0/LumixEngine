@@ -1,6 +1,9 @@
+import "core:dvec3"
 import "core:entity"
-import "core:random"
+import "core:keycode"
+import "core:input"
 import "core:model_instance"
+import "core:random"
 import "core:world"
 import "core:ui"
 import "core:evox_data" as ld
@@ -8,6 +11,16 @@ import "scripts/player" as player
 import "std:math" as math
 import "maps/demo/random_walk" as random_walk
 
+// constants
+comptime INTERACTION_DIST = 1.5;
+
+enum ButtonAction {
+	SPAWN_NAV_AGENT,
+	OPEN_MENU,
+	PHYSICS_TEST
+}
+
+// structs
 #[ld.Data {}]
 struct RandomColorComponent {
 	#[ld.Owner {}]
@@ -22,8 +35,20 @@ struct RandomColorTickComponent {
 	green : f32;
 }
 
+#[ld.Data {}]
+struct Button {
+	#[ld.Owner {}]
+	entity: Entity;
+	action: ButtonAction;
+}
+
+// global vars
 var g_world : World = undefined;
 
+#[MapGlobal {}]
+var nav_agent_spawn_point : ?Entity = null;
+
+// functions
 fn abs(v : f32) : f32 { return v < 0 ? -v : v; }
 
 fn enableCursor(ui : UIModule, enable : bool) : void {
@@ -48,12 +73,37 @@ fn start(world : World) : void {
 	}
 }
 
-fn update(td : f32) : void {
+struct ClosestButton {
+	button : Button;
+	dist : f64;
+}
+
+fn findClosestButton() : ClosestButton {
+	const pl = player.player;
+	if pl == null {
+		panic("null player");
+	}
+	const player_pos = pl.getPosition();
+	const buttons = g_world.getEvoxData(Button);
+	var closest_button : Button = buttons[0];
+	var closest_dist = f64::max;
+	for button in buttons {
+		var button_pos = button.entity.getPosition();
+		var dist = length(player_pos - button_pos);
+		if dist < closest_dist {
+			closest_dist = dist;
+			closest_button = button;
+		}
+	}
+	return {closest_button, closest_dist};
+}
+
+fn update(td : f32, input : InputSystem) : void {
     player.update(td);
 	random_walk.update(g_world, td);
 
 	// random color tick
-	var rnd_col = g_world.getEvoxData(RandomColorTickComponent);
+	const rnd_col = g_world.getEvoxData(RandomColorTickComponent);
 	for &c in rnd_col {
 		c.t = c.t + td * 3;
 		var mi = c.entity.model_instance() else return;
@@ -78,5 +128,23 @@ fn update(td : f32) : void {
 				var elem = doc.getElementByID("runtime_ui") else return;
 				elem.setVisible(false);
 		}
-	}	
+	}
+
+	// input
+	for event in getEvents(input) {
+		match event {
+			case ButtonEvent:
+				if event.device_type == .KEYBOARD and event.key_id as Keycode == .F {
+					const closest = findClosestButton();
+					if closest.dist < INTERACTION_DIST {
+						match closest.button.action {
+							case .SPAWN_NAV_AGENT:
+								
+							case: panic("TODO");
+						}
+					}
+				}
+			case:
+		}
+	}
 }
