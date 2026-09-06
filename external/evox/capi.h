@@ -334,9 +334,6 @@ void* ex_to_ptr(ex_runtime* runtime, i32 index);
 // After the call, the return value is left on top of the runtime stack.
 ex_result ex_call(ex_runtime* runtime, ex_string_view function_name);
 
-// Execute a bytecode function by index.
-ex_result ex_call_index(ex_runtime* runtime, i32 function_index);
-
 // Query the declared return type of the function named `function_name`.
 // Callers can then read the value from the runtime stack using the `ex_to_*`
 // helpers with index `-1`.
@@ -474,7 +471,7 @@ const void* ex_type_nullable_value_ptr(const ex_type* type, const void* value);
 // calls. Host-provided native callbacks are plain C function calls with no
 // suspension support at all: none of this project's native functions call
 // back into script, so this hasn't needed guarding, but a native callback
-// that did call `ex_call`/`ex_call_index` reentrantly would be calling into
+// that did call `ex_call` reentrantly would be calling into
 // an interpreter loop nested on the live C stack, which cannot suspend out
 // from under it.
 //
@@ -527,7 +524,7 @@ ex_result ex_debug_remove_breakpoint(ex_bytecode* bytecode, ex_string_view sourc
 void ex_debug_remove_all_breakpoints(ex_bytecode* bytecode);
 
 // Call stack inspection. Frame 0 is the innermost frame. Also valid
-// immediately after a failed `ex_call`/`ex_call_index`, reporting the stack at
+// immediately after a failed `ex_call`, reporting the stack at
 // the point of failure; the next call overwrites it.
 u32 ex_debug_stack_depth(ex_runtime* runtime);
 ex_string_view ex_debug_frame_function_name(ex_runtime* runtime, u32 frame_index);
@@ -539,13 +536,23 @@ ex_result ex_debug_frame_location(ex_runtime* runtime, u32 frame_index, ex_debug
 // them mutates the running script.
 u32 ex_debug_frame_local_count(ex_runtime* runtime, u32 frame_index);
 ex_string_view ex_debug_local_name(ex_runtime* runtime, u32 frame_index, u32 local_index);
-ex_type_kind ex_debug_local_kind(ex_runtime* runtime, u32 frame_index, u32 local_index);
 void* ex_debug_local_value(ex_runtime* runtime, u32 frame_index, u32 local_index, u32* size);
 const ex_type* ex_debug_local_type(ex_runtime* runtime, u32 frame_index, u32 local_index);
 
+// Bytecode-owned unit metadata. Indices are valid only for this runtime's
+// bytecode lifetime. These queries do not require suspension or a live module.
+#define EX_DEBUG_UNIT_NONE ((u32)-1)
+u32 ex_debug_unit_count(const ex_runtime* runtime);
+u32 ex_debug_find_unit(const ex_runtime* runtime, ex_string_view source_name);
+ex_string_view ex_debug_unit_source_name(const ex_runtime* runtime, u32 unit_index);
+u32 ex_debug_unit_import_count(const ex_runtime* runtime, u32 unit_index);
+// Returns the imported unit index, or EX_DEBUG_UNIT_NONE for invalid indices.
+u32 ex_debug_unit_import(const ex_runtime* runtime, u32 unit_index, u32 import_index);
+// Returns EX_DEBUG_UNIT_NONE for an invalid global index.
+u32 ex_debug_global_unit(const ex_runtime* runtime, u32 global_index);
+
 u32 ex_debug_global_count(ex_runtime* runtime);
 ex_string_view ex_debug_global_name(ex_runtime* runtime, u32 global_index);
-ex_type_kind ex_debug_global_kind(ex_runtime* runtime, u32 global_index);
 void* ex_debug_global_value(ex_runtime* runtime, u32 global_index, u32* size);
 const ex_type* ex_debug_global_type(ex_runtime* runtime, u32 global_index);
 

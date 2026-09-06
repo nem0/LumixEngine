@@ -2914,7 +2914,6 @@ struct BytecodeCompiler {
 		entry.name = copyStringViewToArena(host.arena, name);
 		entry.offset = offset;
 		entry.byte_size = typeByteSize(type);
-		entry.kind = toExTypeKind(type.kind);
 		entry.type_index = type_info.internType(type);
 		entry.scope_begin_offset = scope_begin_offset;
 	}
@@ -4135,6 +4134,30 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 	bc->host = host;
 	bc->arena = &host->arena;
 
+	bc->unit_count = (u32)module->units.size();
+	if (bc->unit_count > 0) {
+		bc->units = (ex_bytecode_unit*)host->arena.allocate(host->arena.user_data,
+			sizeof(ex_bytecode_unit) * bc->unit_count, alignof(ex_bytecode_unit));
+	}
+	for (Unit& unit : module->units) bc->unit_import_count += (u32)unit.imports.size();
+	if (bc->unit_import_count > 0) {
+		bc->unit_imports = (u32*)host->arena.allocate(host->arena.user_data,
+			sizeof(u32) * bc->unit_import_count, alignof(u32));
+	}
+	u32 import_index = 0;
+	for (u32 i = 0; i < bc->unit_count; ++i) {
+		const Unit& unit = module->units[i];
+		bc->units[i] = {copyStringViewToArena(host->arena, unit.path), import_index, (u32)unit.imports.size()};
+		for (const Import& import : unit.imports) {
+			u32 target = EX_DEBUG_UNIT_NONE;
+			for (u32 j = 0; j < bc->unit_count; ++j) {
+				if (import.unit == &module->units[j]) { target = j; break; }
+			}
+			ASSERT(target != EX_DEBUG_UNIT_NONE);
+			bc->unit_imports[import_index++] = target;
+		}
+	}
+
 	SourceLocTable& src_locs = module->src_locs;
 	TypeInfoBuilder type_info(*host, *bc);
 	IRBuilder builder(*host, type_info);
@@ -4165,7 +4188,8 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 	}
 
 	u32 global_debug_index = 0;
-	for (Unit& u : module->units) {
+	for (u32 unit_index = 0; unit_index < bc->unit_count; ++unit_index) {
+		Unit& u = module->units[unit_index];
 		for (Symbol& s : u.symbols) {
 			if (!symbolHasGlobalStorage(s)) continue;
 			s.slot.storage = StorageSlot::GLOBAL;
@@ -4176,9 +4200,9 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 
 			ex_bytecode_global_debug_entry& entry = bc->global_debug[global_debug_index++];
 			entry.name = copyStringViewToArena(host->arena, s.name);
+			entry.unit_index = unit_index;
 			entry.offset = s.slot.offset;
 			entry.byte_size = byte_size;
-			entry.kind = toExTypeKind(s.resolved_type->kind);
 			entry.type_index = type_info.internType(*s.resolved_type);
 		}
 	}
@@ -4292,8 +4316,7 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 
 	// Copy the module's append-only SourceLocTable into the bytecode location
 	// table verbatim (one entry per token; token indices are reused as-is by
-	// the source maps). source_name strings are copied into the bytecode arena
-	// so the bytecode does not reference the module after compilation.
+	// the source maps). Unit indices are recorded during parsing and reused as-is.
 	const u32 location_count = (u32)src_locs.entries.size();
 	bc->location_count = location_count;
 	if (location_count > 0u) {
@@ -4303,7 +4326,8 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 			alignof(ex_bytecode_location));
 		for (i32 i = 0; i < (i32)location_count; ++i) {
 			const SourceLocTable::Entry& src = src_locs.entries[i];
-			bc->locations[i].source_name = copyStringViewToArena(host->arena, src.source_name);
+			ASSERT(src.unit_index < bc->unit_count);
+			bc->locations[i].unit_index = src.unit_index;
 			bc->locations[i].line = src.line;
 			bc->locations[i].column = src.column;
 		}

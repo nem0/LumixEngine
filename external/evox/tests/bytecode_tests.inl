@@ -195,7 +195,7 @@ TEST(NormalStructCAbiLayout) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_EQ(1u, ex_debug_global_count(runtime));
-	EXPECT_EQ((int)EX_TYPE_STRUCT, (int)ex_debug_global_kind(runtime, 0));
+	EXPECT_EQ((int)EX_TYPE_STRUCT, (int)ex_type_get_kind(ex_debug_global_type(runtime, 0)));
 	const ex_type* type = ex_debug_global_type(runtime, 0);
 	EXPECT_TRUE(type != nullptr);
 	EXPECT_EQ((u32)sizeof(NativeEntity), ex_type_get_size(type));
@@ -228,7 +228,7 @@ TEST(ExternStructCAbiLayout) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_EQ(1u, ex_debug_global_count(runtime));
-	EXPECT_EQ((int)EX_TYPE_STRUCT, (int)ex_debug_global_kind(runtime, 0));
+	EXPECT_EQ((int)EX_TYPE_STRUCT, (int)ex_type_get_kind(ex_debug_global_type(runtime, 0)));
 	const ex_type* type = ex_debug_global_type(runtime, 0);
 	EXPECT_TRUE(type != nullptr);
 	EXPECT_EQ((int)EX_TYPE_STRUCT, (int)ex_type_get_kind(type));

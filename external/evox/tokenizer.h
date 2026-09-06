@@ -13,7 +13,7 @@ struct Tokenizer {
 	i32 m_column = 1;
 	i32 m_start_line = 1;
 	i32 m_start_column = 1;
-	ex_string_view m_source_name;
+	u32 m_unit_index = EX_DEBUG_UNIT_NONE;
 	SourceLocTable& m_src_locs;
 	Token m_current_token;
 
@@ -29,9 +29,9 @@ struct Tokenizer {
 	Tokenizer(SourceLocTable& src_locs)
 		: m_src_locs(src_locs) {}
 
-	void init(ex_string_view document, ex_string_view source_name) {
+	void init(ex_string_view document, u32 unit_index) {
 		m_document = document;
-		m_source_name = source_name;
+		m_unit_index = unit_index;
 		m_current = data(document);
 		m_line = 1;
 		m_column = 1;
@@ -61,7 +61,7 @@ struct Tokenizer {
 		res.type = type;
 		res.value = ex_string_view{m_start_token, m_current - m_start_token};
 		if (type != Token::END_OF_FILE) {
-			res.src_loc = m_src_locs.add(m_source_name, (u32)m_start_line, (u32)m_start_column);
+			res.src_loc = m_src_locs.add(m_unit_index, (u32)m_start_line, (u32)m_start_column);
 		}
 		return res;
 	}

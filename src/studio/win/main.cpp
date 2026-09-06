@@ -19,6 +19,6 @@ int main(int argc, char* argv[])
 	app->run();
 	const int exit_code = app->getExitCode();
 	Lumix::StudioApp::destroy(*app);
-	if(shcore) Lumix::os::unloadLibrary(shcore);
+	if (shcore) Lumix::os::unloadLibrary(shcore);
 	return exit_code;
 }

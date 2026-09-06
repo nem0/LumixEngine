@@ -59,7 +59,7 @@ namespace {
 
 struct DefinitionQuery {
 	ex_module& module;
-	ex_string_view source_name;
+	u32 unit_index;
 	u32 line;
 	u32 column;
 	ex_definition_location result = {};
@@ -72,7 +72,7 @@ struct DefinitionQuery {
 	bool covers(const Token& token) const {
 		if (token.src_loc == EX_INVALID_SOURCE_LOC || token.src_loc >= (u32)module.src_locs.entries.size()) return false;
 		const SourceLocTable::Entry& l = module.src_locs.entries[token.src_loc];
-		if (!same(l.source_name, source_name) || l.line != line + 1) return false;
+		if (l.unit_index != unit_index || l.line != line + 1) return false;
 
 		u32 start = l.column ? l.column - 1 : 0;
 		u32 length = token.value.length > 0 ? (u32)token.value.length : 1;
@@ -83,7 +83,8 @@ struct DefinitionQuery {
 		if (!covers(use) || declaration.src_loc == EX_INVALID_SOURCE_LOC || declaration.src_loc >= (u32)module.src_locs.entries.size()) return;
 
 		const SourceLocTable::Entry& l = module.src_locs.entries[declaration.src_loc];
-		result = {l.source_name, l.line ? l.line - 1 : 0, l.column ? l.column - 1 : 0, length};
+		if (l.unit_index >= (u32)module.units.size()) return;
+		result = {module.units[l.unit_index].path, l.line ? l.line - 1 : 0, l.column ? l.column - 1 : 0, length};
 		found = true;
 	}
 
@@ -365,17 +366,19 @@ struct DefinitionQuery {
 ex_result ex_module_definition_at(ex_module* module, ex_string_view source_name, u32 line, u32 column, ex_definition_location* out_location) {
 	if (!module || !out_location) return EX_RESULT_FAILURE;
 	*out_location = {};
-	DefinitionQuery query{*module, source_name, line, column};
-	for (Unit& unit : module->units) {
-		if (!query.same(unit.path, source_name)) continue;
+	for (u32 unit_index = 0; unit_index < (u32)module->units.size(); ++unit_index) {
+		Unit& unit = module->units[unit_index];
+		if (!equalStrings(unit.path, source_name)) continue;
+		DefinitionQuery query{*module, unit_index, line, column};
 		for (Symbol& symbol : unit.symbols) {
 			query.set(symbol.token, symbol.token, (u32)symbol.name.length);
 			query.visitExpression(symbol.expression);
 		}
+		if (!query.found) return EX_RESULT_FAILURE;
+		*out_location = query.result;
+		return EX_RESULT_OK;
 	}
-	if (!query.found) return EX_RESULT_FAILURE;
-	*out_location = query.result;
-	return EX_RESULT_OK;
+	return EX_RESULT_FAILURE;
 }
 
 ex_result ex_runtime_set_native_function_callback(ex_runtime* runtime, ex_unit* unit, int function_index, ex_native_fn callback) {

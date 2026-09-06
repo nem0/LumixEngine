@@ -218,7 +218,7 @@ static bool runtime_debug_frame_location(const ex_bytecode* bytecode, const ex_f
 	}
 	if (!result || !bytecode || result->location_index >= bytecode->location_count) return false;
 	const ex_bytecode_location* loc = &bytecode->locations[result->location_index];
-	out_location->source_name = loc->source_name;
+	out_location->source_name = bytecode->units[loc->unit_index].source_name;
 	out_location->line = loc->line;
 	out_location->column = loc->column;
 	return true;
@@ -1580,15 +1580,6 @@ ex_result ex_call(ex_runtime* runtime, ex_string_view function_name) {
 	if (runtime->is_suspended) return EX_RESULT_FAILURE;
 	const ex_function_bc* function = runtime_find_function_by_name(runtime->bytecode, function_name, NULL);
 	if (!function) return EX_RESULT_FAILURE;
-	runtime->fail_frame_count = 0u;
-	return runtime_exec_result_to_ls_result(runtime_execute_function(runtime, function, NULL));
-}
-
-ex_result ex_call_index(ex_runtime* runtime, i32 function_index) {
-	if (runtime->is_suspended) return EX_RESULT_FAILURE;
-	if (function_index < 0) return EX_RESULT_FAILURE;
-	if ((u32)function_index >= runtime->bytecode->function_count) return EX_RESULT_FAILURE;
-	const ex_function_bc* function = &runtime->bytecode->functions[(u32)function_index];
 	runtime->fail_frame_count = 0u;
 	return runtime_exec_result_to_ls_result(runtime_execute_function(runtime, function, NULL));
 }

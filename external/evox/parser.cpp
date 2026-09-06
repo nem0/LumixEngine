@@ -8,12 +8,12 @@ enum class ExprMode {
 };
 
 struct Parser {
-	Parser(Unit& unit, const ex_host* host, SourceLocTable& src_locs)
+	Parser(Unit& unit, const ex_host* host, ex_module& module)
 		: m_unit(unit)
-		, m_tokenizer(src_locs)
+		, m_tokenizer(module.src_locs)
 	{
 		m_output.host = host;
-		m_output.src_locs = &src_locs;
+		m_output.module = &module;
 	}
 
 	// Counter for synthesizing unique hidden index names for `for v in arr` (no
@@ -1877,8 +1877,8 @@ struct Parser {
 	}
 
 	// Parse a source file, e.g. a whole `.evox` script.
-	ex_result parse(ex_string_view source, ex_string_view source_name) {
-		m_tokenizer.init(source, source_name);
+	ex_result parse(ex_string_view source, u32 unit_index) {
+		m_tokenizer.init(source, unit_index);
 
 		for (;;) {
 			Token token = consumeToken();
@@ -1945,12 +1945,22 @@ ex_result ex_module_parse(ex_module* module, ex_string_view source, ex_string_vi
 	}
 	ex_string_view owned{owned_source, source.length};
 	Unit& unit = module->units.emplace_back(path, module->arena);
-	Parser parser(unit, module->host, module->src_locs);
-	if (parser.parse(owned, path) == EX_RESULT_FAILURE) return EX_RESULT_FAILURE;
+	Parser parser(unit, module->host, *module);
+	if (parser.parse(owned, (u32)module->units.size() - 1) == EX_RESULT_FAILURE) return EX_RESULT_FAILURE;
 
 	return EX_RESULT_OK;
 }
 
+
+const SourceLocTable::Entry* OutputFormatter::resolve(const Token& token) const {
+	if (!module || token.src_loc == EX_INVALID_SOURCE_LOC || token.src_loc >= (u32)module->src_locs.entries.size()) return nullptr;
+	return &module->src_locs.entries[(i32)token.src_loc];
+}
+
+ex_string_view OutputFormatter::sourceName(const SourceLocTable::Entry* location) const {
+	if (!module || !location || location->unit_index >= (u32)module->units.size()) return {};
+	return module->units[location->unit_index].path;
+}
 
 void OutputFormatter::print(int v) {
 	char tmp[32];

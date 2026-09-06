@@ -138,7 +138,7 @@ TEST(DebugGlobalsTable) {
 		const ex_string_view name = ex_debug_global_name(runtime, i);
 		if (equalStrings(name, toLs("counter"))) {
 			found_counter = true;
-			EXPECT_EQ((int)EX_TYPE_I32, (int)ex_debug_global_kind(runtime, i));
+			EXPECT_EQ((int)EX_TYPE_I32, (int)ex_type_get_kind(ex_debug_global_type(runtime, i)));
 			u32 size = 0;
 			const void* value = ex_debug_global_value(runtime, i, &size);
 			EXPECT_TRUE(value != nullptr);
@@ -149,7 +149,7 @@ TEST(DebugGlobalsTable) {
 		}
 		else if (equalStrings(name, toLs("ratio"))) {
 			found_ratio = true;
-			EXPECT_EQ((int)EX_TYPE_F64, (int)ex_debug_global_kind(runtime, i));
+			EXPECT_EQ((int)EX_TYPE_F64, (int)ex_type_get_kind(ex_debug_global_type(runtime, i)));
 			u32 size = 0;
 			const void* value = ex_debug_global_value(runtime, i, &size);
 			EXPECT_TRUE(value != nullptr);
@@ -163,6 +163,110 @@ TEST(DebugGlobalsTable) {
 	EXPECT_TRUE(found_ratio);
 
 	CAPI_END(module);
+	return true;
+}
+
+TEST(DebugGlobalSourceNames) {
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_parse(module, toLs("var g_world : i32 = 1;"), toLs("main.evox")));
+	EXPECT_TRUE(ex_module_parse(module, toLs("var g_world : i32 = 2;"), toLs("demo.evox")));
+	EXPECT_TRUE(ex_module_typecheck(module));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_EQ(2u, ex_debug_global_count(runtime));
+	bool found_main = false;
+	bool found_demo = false;
+	for (u32 i = 0; i < ex_debug_global_count(runtime); ++i) {
+		EXPECT_TRUE(equalStrings(ex_debug_global_name(runtime, i), toLs("g_world")));
+		const ex_string_view source = ex_debug_unit_source_name(runtime, ex_debug_global_unit(runtime, i));
+		if (equalStrings(source, toLs("main.evox"))) found_main = true;
+		else if (equalStrings(source, toLs("demo.evox"))) found_demo = true;
+		else EXPECT_TRUE(false);
+	}
+	EXPECT_TRUE(found_main);
+	EXPECT_TRUE(found_demo);
+	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_global_unit(runtime, 2));
+	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_global_unit(nullptr, 0));
+
+	CAPI_END(module);
+	return true;
+}
+
+TEST(DebugUnitsAndSourceLocationsOutliveModule) {
+	TestContext bytecode_context;
+	ex_bytecode* bytecode = nullptr;
+	{
+		TestContext compiler_context;
+		ex_module* module = ex_module_create(&compiler_context.host);
+		EXPECT_TRUE(module != nullptr);
+		auto resolver = [](void*, ex_string_view path, ex_string_view, ex_string_view* source) -> int {
+			if (equalStrings(path, toLs("helper"))) {
+				*source = toLs("import \"leaf\" as leaf\nvar g : i32 = 2;\nfn get() : i32 { return g + leaf.g; }");
+				return 1;
+			}
+			if (equalStrings(path, toLs("leaf"))) {
+				*source = toLs("var g : i32 = 3;");
+				return 1;
+			}
+			return 0;
+		};
+		EXPECT_TRUE(ex_module_compile(module,
+			toLs("import \"helper\" as helper\nvar g : i32 = 1;\nfn main() : i32 { return g + helper.get(); }"),
+			toLs("main.evox"), resolver, nullptr));
+		bytecode = ex_bytecode_compile(module, &bytecode_context.host, nullptr);
+		EXPECT_TRUE(bytecode != nullptr);
+		ex_module_destroy(module);
+	} // Release all compiler-owned storage before inspecting metadata or running.
+
+	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_EQ(3u, ex_debug_unit_count(runtime));
+	const u32 main_unit = ex_debug_find_unit(runtime, toLs("main.evox"));
+	const u32 helper_unit = ex_debug_find_unit(runtime, toLs("helper"));
+	const u32 leaf_unit = ex_debug_find_unit(runtime, toLs("leaf"));
+	EXPECT_TRUE(main_unit != EX_DEBUG_UNIT_NONE);
+	EXPECT_TRUE(helper_unit != EX_DEBUG_UNIT_NONE);
+	EXPECT_TRUE(leaf_unit != EX_DEBUG_UNIT_NONE);
+	EXPECT_EQ(1u, ex_debug_unit_import_count(runtime, main_unit));
+	EXPECT_EQ(helper_unit, ex_debug_unit_import(runtime, main_unit, 0));
+	EXPECT_EQ(1u, ex_debug_unit_import_count(runtime, helper_unit));
+	EXPECT_EQ(leaf_unit, ex_debug_unit_import(runtime, helper_unit, 0));
+	EXPECT_EQ(0u, ex_debug_unit_import_count(runtime, leaf_unit));
+
+	EXPECT_EQ(3u, ex_debug_global_count(runtime));
+	for (u32 i = 0; i < ex_debug_global_count(runtime); ++i) {
+		const u32 unit = ex_debug_global_unit(runtime, i);
+		EXPECT_TRUE(unit < ex_debug_unit_count(runtime));
+		EXPECT_TRUE(ex_debug_unit_source_name(runtime, unit).begin
+			== bytecode->units[unit].source_name.begin);
+	}
+	for (u32 i = 0; i < bytecode->location_count; ++i) {
+		const u32 unit = bytecode->locations[i].unit_index;
+		EXPECT_TRUE(unit < bytecode->unit_count);
+		const ex_string_view source = ex_debug_unit_source_name(runtime, unit);
+		EXPECT_EQ(unit, ex_debug_find_unit(runtime, source));
+	}
+	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_find_unit(runtime, toLs("missing")));
+	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_unit_import(runtime, main_unit, 1));
+	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_unit_import(runtime, EX_DEBUG_UNIT_NONE, 0));
+	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_global_unit(runtime, 3));
+	EXPECT_EQ(0u, ex_debug_unit_count(nullptr));
+	EXPECT_EQ(0u, ex_debug_unit_import_count(nullptr, 0));
+	EXPECT_EQ(0, ex_debug_unit_source_name(runtime, EX_DEBUG_UNIT_NONE).length);
+	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_find_unit(nullptr, toLs("main.evox")));
+	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_unit_import(nullptr, 0, 0));
+	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_global_unit(nullptr, 0));
+
+	EXPECT_EQ(EX_RESULT_OK, ex_debug_set_breakpoint(bytecode, toLs("main.evox"), 3, nullptr));
+	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(runtime, toLs("main")));
+	ex_debug_location location = {};
+	EXPECT_EQ(EX_RESULT_OK, ex_debug_frame_location(runtime, 0, &location));
+	EXPECT_TRUE(location.source_name.begin == ex_debug_unit_source_name(runtime, main_unit).begin);
+	EXPECT_EQ(EX_RESULT_OK, ex_debug_remove_breakpoint(bytecode, toLs("main.evox"), 3));
+	EXPECT_EQ(EX_RESULT_OK, ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
+	EXPECT_EQ(6, ex_to_i32(runtime, -1));
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
 	return true;
 }
 
@@ -476,7 +580,7 @@ TEST(DebugFrameLocalsVisibleWhenSuspended) {
 		const ex_string_view name = ex_debug_local_name(runtime, 0, i);
 		if (equalStrings(name, toLs("a"))) {
 			found_a = true;
-			EXPECT_EQ((int)EX_TYPE_I32, (int)ex_debug_local_kind(runtime, 0, i));
+			EXPECT_EQ((int)EX_TYPE_I32, (int)ex_type_get_kind(ex_debug_local_type(runtime, 0, i)));
 			u32 size = 0;
 			const void* value = ex_debug_local_value(runtime, 0, i, &size);
 			EXPECT_TRUE(value != nullptr);
@@ -487,7 +591,7 @@ TEST(DebugFrameLocalsVisibleWhenSuspended) {
 		}
 		else if (equalStrings(name, toLs("doubled"))) {
 			found_doubled = true;
-			EXPECT_EQ((int)EX_TYPE_I32, (int)ex_debug_local_kind(runtime, 0, i));
+			EXPECT_EQ((int)EX_TYPE_I32, (int)ex_type_get_kind(ex_debug_local_type(runtime, 0, i)));
 			u32 size = 0;
 			const void* value = ex_debug_local_value(runtime, 0, i, &size);
 			EXPECT_TRUE(value != nullptr);
@@ -1208,7 +1312,7 @@ TEST(DebugStructGlobalInspection) {
 		if (equalStrings(ex_debug_global_name(runtime, i), toLs("g"))) {
 			found_g = true;
 
-			EXPECT_EQ((int)EX_TYPE_STRUCT, (int)ex_debug_global_kind(runtime, i));
+			EXPECT_EQ((int)EX_TYPE_STRUCT, (int)ex_type_get_kind(ex_debug_global_type(runtime, i)));
 
 			const ex_type* g_type = ex_debug_global_type(runtime, i);
 			EXPECT_TRUE(g_type != nullptr);

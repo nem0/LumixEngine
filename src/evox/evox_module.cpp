@@ -120,12 +120,29 @@ struct EvoxSystemImpl : EvoxSystem {
 	ex_runtime* getDebugRuntime() override { return m_runtime; }
 	const Path& getDebugPath() const override { return m_path; }
 
+	ex_string_view debugSourceName(const Path& source) {
+		// Debug locations retain import names, while the editor uses filesystem paths.
+		for (u32 i = 0, count = ex_debug_unit_count(m_runtime); i < count; ++i) {
+			const ex_string_view name = ex_debug_unit_source_name(m_runtime, i);
+			const StringView requested(name.begin, name.length);
+			Path file_path;
+			if (startsWith(requested, "core:")) {
+				const StringView core_name = requested.withoutLeft(5);
+				file_path = endsWith(core_name, ".evox") ? Path("engine/scripts/core/", core_name) : Path("engine/scripts/core/", core_name, ".evox");
+			} else {
+				file_path = endsWith(requested, ".evox") ? Path(requested) : Path(requested, ".evox");
+			}
+			if (file_path == source) return name;
+		}
+		return toLs(source.c_str());
+	}
+
 	bool setDebugBreakpoint(const Path& source, u32 line) override {
-		return m_bytecode && ex_debug_set_breakpoint(m_bytecode, toLs(source.c_str()), line, nullptr) != EX_RESULT_FAILURE;
+		return m_bytecode && ex_debug_set_breakpoint(m_bytecode, debugSourceName(source), line, nullptr) != EX_RESULT_FAILURE;
 	}
 
 	bool removeDebugBreakpoint(const Path& source, u32 line) override {
-		return m_bytecode && ex_debug_remove_breakpoint(m_bytecode, toLs(source.c_str()), line) != EX_RESULT_FAILURE;
+		return m_bytecode && ex_debug_remove_breakpoint(m_bytecode, debugSourceName(source), line) != EX_RESULT_FAILURE;
 	}
 
 	void createModules(World& world) override;

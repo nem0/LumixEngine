@@ -297,11 +297,10 @@ typedef enum ex_function_kind {
 	EX_FUNCTION_NATIVE,
 } ex_function_kind;
 
-// One source position in the bytecode's location table (the PDB "file table"
-// model). source_name is copied into the bytecode arena, so the bytecode is
-// self-contained after compilation.
+// Source paths are owned by units; locations reference the same unit table
+// as globals and imports. Synthetic operations have no source location.
 typedef struct ex_bytecode_location {
-	ex_string_view source_name;
+	u32 unit_index;
 	u32 line;
 	u32 column;
 } ex_bytecode_location;
@@ -377,10 +376,9 @@ typedef struct ex_bytecode_local_debug_entry {
 	// operands, i.e. relative to `ex_runtime::frame`).
 	u32 offset;
 	u32 byte_size;
-	ex_type_kind kind;
 	// Index into ex_bytecode::type_info[], or EX_TYPE_INDEX_NONE.
 	// Lets the debugger resolve full type metadata (struct fields, array
-	// element types, etc.) from the flat debug kind.
+	// element types, etc.).
 	u32 type_index;
 	// Bytecode offset (in the owning function's `code`) of the first
 	// instruction at which this local is live. Parameters are live from 0.
@@ -415,11 +413,11 @@ typedef struct ex_function_bc {
 // Debug-only description of one global's storage, used by `ex_debug_global_*`.
 typedef struct ex_bytecode_global_debug_entry {
 	ex_string_view name;
+	u32 unit_index;
 	// Byte offset into the runtime's global memory region (`ex_runtime`'s
 	// stack, bytes [0, ex_bytecode::global_size)).
 	u32 offset;
 	u32 byte_size;
-	ex_type_kind kind;
 	u32 type_index;  // EX_TYPE_INDEX_NONE when no type metadata
 } ex_bytecode_global_debug_entry;
 
@@ -430,7 +428,19 @@ typedef struct ex_bytecode_breakpoint {
 	u8 original_byte;
 } ex_bytecode_breakpoint;
 
+typedef struct ex_bytecode_unit {
+	ex_string_view source_name;
+	u32 first_import;
+	u32 import_count;
+} ex_bytecode_unit;
+
 typedef struct ex_bytecode {
+	// One owned path per unit, shared by globals and source locations.
+	ex_bytecode_unit* units;
+	u32 unit_count;
+	// Direct imports, stored as indices into units (not transitive).
+	u32* unit_imports;
+	u32 unit_import_count;
 	ex_host* host;
 	ex_arena* arena;
 
@@ -542,7 +552,7 @@ typedef struct ex_runtime {
 	u32 native_callback_count;
 
 	// Snapshot of the call stack at the point of the most recent
-	// `ex_call`/`ex_call_index` failure, innermost frame first. Overwritten by
+	// `ex_call` failure, innermost frame first. Overwritten by
 	// the next call; `fail_frame_count` is 0 when the last call succeeded.
 	runtime_call_frame fail_frames[EX_MAX_CALL_DEPTH + 1u];
 	u32 fail_frame_count;

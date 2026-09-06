@@ -4,6 +4,8 @@ import "core:keycode"
 import "core:input"
 import "core:log"
 import "core:model_instance"
+import "core:navmesh_agent"
+import "core:quat"
 import "core:random"
 import "core:world"
 import "core:ui"
@@ -55,6 +57,14 @@ struct NavAgentWaypoint {
 	entity: Entity;
 }
 
+#[ld.Data {}]
+struct PhysicsTestObject {
+	#[ld.Owner {}]
+	entity: Entity;
+	start_pos : DVec3;
+	start_rot : Quat;
+}
+
 // global vars
 var g_world : World = undefined;
 
@@ -80,6 +90,12 @@ fn start(world : World) : void {
 	var rnd_col = g_world.getEvoxData(RandomColorTickComponent);
 	for &c in rnd_col {
 		c.green = randFloat();
+	}
+
+	var objs = g_world.getEvoxData(PhysicsTestObject);
+	for &obj in objs {
+		obj.start_pos = obj.entity.getPosition();
+		obj.start_rot = obj.entity.getRotation();
 	}
 
 	var ui = g_world.ui() else return;
@@ -110,6 +126,29 @@ fn findClosestButton() : ClosestButton {
 		return {closest_button, closest_dist};
 	}
 	panic("Null player");
+}
+
+fn spawnNavAgent() : void {
+	var spawn_point = g_world.getEvoxData(NavAgentSpawnPoint);
+	if spawn_point.length != 1 {
+		logError("There must be exactly one spawn point");
+		return;
+	}
+	var pos = spawn_point[0].entity.getPosition();
+	var agent = g_world.createEntity();
+	agent.setPosition(pos);
+	agent.setScale({0.3, 1.5, 0.3});
+	agent.createAgent();
+	var mi = agent.createModelInstance() else return;
+	mi.setModelInstancePath("engine/models/cylinder.fbx");
+}
+
+fn resetPhysicsTest() : void {
+	var objs = g_world.getEvoxData(PhysicsTestObject);
+	for obj in objs {
+		obj.entity.setPosition(obj.start_pos);
+		obj.entity.setRotation(obj.start_rot);
+	}
 }
 
 fn update(td : f32, input : InputSystem) : void {
@@ -152,12 +191,15 @@ fn update(td : f32, input : InputSystem) : void {
 					const closest = findClosestButton();
 					if closest.dist < INTERACTION_DIST {
 						match closest.button.action {
+							case .OPEN_MENU:
+								var elem = doc.getElementByID("runtime_ui") else return;
+								elem.setVisible(true);
+								player.handle_input = false;
+								enableCursor(ui, true);
+							case .PHYSICS_TEST:
+								resetPhysicsTest();
 							case .SPAWN_NAV_AGENT:
-								var spawn_point = g_world.getEvoxData(NavAgentSpawnPoint);
-								if spawn_point.length != 1 {
-									logError("There must be exactly one spawn point");
-									return;
-								}
+								spawnNavAgent();
 							case: panic("TODO");
 						}
 					}

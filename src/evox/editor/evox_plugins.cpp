@@ -289,12 +289,6 @@ static void drawVariableName(ex_string_view name) {
 	ImGui::Unindent(ImGui::GetTreeNodeToLabelSpacing());
 }
 
-static bool isEntityType(const ex_type* type) {
-	if (!type || ex_type_get_kind(type) != EX_TYPE_STRUCT) return false;
-	const ex_string_view type_name = ex_type_get_name(type);
-	return type_name.length == 6 && equalStrings(StringView(type_name.begin, type_name.length), "Entity");
-}
-
 static void drawEntityValue(const ExEntity& entity, WorldEditor* editor) {
 	// Runtime values can retain pointers to the game world after game mode has
 	// stopped and that world has been destroyed. Do not inspect those pointers
@@ -328,13 +322,8 @@ static void drawEntityValue(const ExEntity& entity, WorldEditor* editor) {
 	}
 }
 
-static void drawVariable(ex_string_view name, ex_type_kind kind, const ex_type* type, void* value, u32 size, bool editable = false, WorldEditor* editor = nullptr) {
-	if (type && ex_type_get_kind(type) != EX_TYPE_INVALID) {
-		kind = ex_type_get_kind(type);
-		size = ex_type_get_size(type);
-	}
-
-	if (!value || size == 0) {
+static void drawVariable(ex_string_view name, const ex_type* type, void* value, bool editable = false, WorldEditor* editor = nullptr) {
+	if (!type || !value) {
 		ImGui::TableNextRow();
 		ImGui::TableNextColumn();
 		drawVariableName(name);
@@ -342,6 +331,8 @@ static void drawVariable(ex_string_view name, ex_type_kind kind, const ex_type* 
 		ImGui::TextDisabled("<unavailable>");
 		return;
 	}
+
+	const ex_type_kind kind = ex_type_get_kind(type);
 
 	if (kind == EX_TYPE_ANY) {
 		ImGui::TableNextRow();
@@ -352,14 +343,12 @@ static void drawVariable(ex_string_view name, ex_type_kind kind, const ex_type* 
 		return;
 	}
 
-	if (kind == EX_TYPE_NULLABLE && type && !ex_type_nullable_is_null(type, value)) {
+	if (kind == EX_TYPE_NULLABLE && !ex_type_nullable_is_null(type, value)) {
 		const ex_type* inner = ex_type_nullable_inner_type(type);
 		if (inner) {
 			drawVariable(name
-				, ex_type_get_kind(inner)
 				, inner
 				, (void*)ex_type_nullable_value_ptr(type, value)
-				, ex_type_get_size(inner)
 				, editable
 				, editor);
 			return;
@@ -369,14 +358,17 @@ static void drawVariable(ex_string_view name, ex_type_kind kind, const ex_type* 
 	ImGui::TableNextRow();
 	ImGui::TableNextColumn();
 
-	if (isEntityType(type) && size >= sizeof(ExEntity)) {
-		drawVariableName(name);
-		ImGui::TableNextColumn();
-		drawEntityValue(*(const ExEntity*)value, editor);
-		return;
-	}
+	if (kind == EX_TYPE_STRUCT) {
+		const ex_string_view type_name = ex_type_get_name(type);
+		if (type_name.length == 6
+			&& equalStrings(StringView(type_name.begin, type_name.length), "Entity")
+			&& ex_type_get_size(type) >= sizeof(ExEntity)) {
+			drawVariableName(name);
+			ImGui::TableNextColumn();
+			drawEntityValue(*(const ExEntity*)value, editor);
+			return;
+		}
 
-	if (kind == EX_TYPE_STRUCT && type) {
 		const bool open = ImGui::TreeNodeEx(value, ImGuiTreeNodeFlags_SpanAvailWidth, "%.*s", int(name.length), name.begin);
 		ImGui::TableNextColumn();
 		if (open) {
@@ -384,10 +376,8 @@ static void drawVariable(ex_string_view name, ex_type_kind kind, const ex_type* 
 				const ex_string_view field_name = ex_type_struct_field_name(type, i);
 				const ex_type* field_type = ex_type_struct_field_type(type, i);
 				drawVariable(field_name
-					, field_type ? ex_type_get_kind(field_type) : EX_TYPE_INVALID
 					, field_type
 					, (u8*)value + ex_type_struct_field_offset(type, i)
-					, field_type ? ex_type_get_size(field_type) : 0
 					, editable
 					, editor);
 			}
@@ -396,7 +386,7 @@ static void drawVariable(ex_string_view name, ex_type_kind kind, const ex_type* 
 		return;
 	}
 
-	if (kind == EX_TYPE_TAGGED_UNION && type) {
+	if (kind == EX_TYPE_TAGGED_UNION) {
 		const i32 tag = ex_type_union_tag(type, value);
 		const u32 member_count = ex_type_union_member_count(type);
 		const bool valid_tag = tag >= 0 && (u32)tag < member_count;
@@ -413,20 +403,16 @@ static void drawVariable(ex_string_view name, ex_type_kind kind, const ex_type* 
 						const ex_string_view field_name = ex_type_struct_field_name(member_type, i);
 						const ex_type* field_type = ex_type_struct_field_type(member_type, i);
 						drawVariable(field_name
-							, field_type ? ex_type_get_kind(field_type) : EX_TYPE_INVALID
 							, field_type
 							, (u8*)payload + ex_type_struct_field_offset(member_type, i)
-							, field_type ? ex_type_get_size(field_type) : 0
 							, editable
 							, editor);
 					}
 				} else {
 					static const char value_name[] = "value";
 					drawVariable({value_name, sizeof(value_name) - 1}
-						, member_type ? ex_type_get_kind(member_type) : EX_TYPE_INVALID
 						, member_type
 						, payload
-						, member_type ? ex_type_get_size(member_type) : 0
 						, editable
 						, editor);
 				}
@@ -436,7 +422,7 @@ static void drawVariable(ex_string_view name, ex_type_kind kind, const ex_type* 
 		return;
 	}
 
-	if ((kind == EX_TYPE_ARRAY || kind == EX_TYPE_SLICE) && type) {
+	if (kind == EX_TYPE_ARRAY || kind == EX_TYPE_SLICE) {
 		const ex_type* element_type = ex_type_array_element_type(type);
 		const u32 element_size = element_type ? ex_type_get_size(element_type) : 1;
 		const bool slice = kind == EX_TYPE_SLICE;
@@ -463,10 +449,8 @@ static void drawVariable(ex_string_view name, ex_type_kind kind, const ex_type* 
 					*end = ']';
 					*(end + 1) = '\0';
 					drawVariable({index, u32(end - index + 1)}
-						, element_type ? ex_type_get_kind(element_type) : EX_TYPE_INVALID
 						, element_type
 						, (u8*)data + i * element_size
-						, element_size
 						, editable
 						, editor);
 				}
@@ -481,9 +465,6 @@ static void drawVariable(ex_string_view name, ex_type_kind kind, const ex_type* 
 	ImGui::PushID(value);
 	if (kind == EX_TYPE_NULLABLE) {
 		ImGui::TextDisabled("null");
-	}
-	else if (isEntityType(type) && size >= sizeof(ExEntity)) {
-		drawEntityValue(*(const ExEntity*)value, editor);
 	}
 	else if (kind == EX_TYPE_CPTR && editor) {
 		drawPrimitiveValue(kind, value, type);
@@ -503,7 +484,35 @@ static void drawVariable(ex_string_view name, ex_type_kind kind, const ex_type* 
 			case EX_TYPE_U64: ImGui::InputScalar("##value", ImGuiDataType_U64, value); break;
 			case EX_TYPE_F32: ImGui::InputFloat("##value", (f32*)value); break;
 			case EX_TYPE_F64: ImGui::InputDouble("##value", (f64*)value); break;
-			case EX_TYPE_ENUM: ImGui::InputInt("##value", (i32*)value); break;
+			case EX_TYPE_ENUM: {
+				const i32 current = *(const i32*)value;
+				const u32 count = ex_type_enum_value_count(type);
+				StaticString<64> preview;
+				bool has_current = false;
+				for (u32 i = 0; i < count; ++i) {
+					if (ex_type_enum_value_value(type, i) == current) {
+						const ex_string_view enum_name = ex_type_enum_value_name(type, i);
+						preview.append(StringView(enum_name.begin, enum_name.length));
+						has_current = true;
+						break;
+					}
+				}
+				if (!has_current) preview.append("<invalid>");
+
+				if (ImGui::BeginCombo("##value", preview.data)) {
+					for (u32 i = 0; i < count; ++i) {
+						const i32 enum_value = ex_type_enum_value_value(type, i);
+						const ex_string_view enum_name = ex_type_enum_value_name(type, i);
+						StaticString<256> label(StringView(enum_name.begin, enum_name.length));
+						if (ImGui::Selectable(label.data, enum_value == current)) {
+							*(i32*)value = enum_value;
+						}
+						if (enum_value == current) ImGui::SetItemDefaultFocus();
+					}
+					ImGui::EndCombo();
+				}
+				break;
+			}
 			default: drawPrimitiveValue(kind, value, type); break;
 		}
 	}
@@ -1177,6 +1186,8 @@ struct EvoxVariablesWindow final : StudioApp::GUIPlugin {
 		const bool suspended = runtime && ex_debug_is_suspended(runtime);
 		if (!runtime) {
 			ImGui::TextDisabled("Waiting for runtime...");
+		} else if (!suspended) {
+			ImGui::TextDisabled("Pause the script to inspect variables.");
 		} else {
 			ImGui::InputTextWithHint("##filter", "Filter variables...", m_filter, sizeof(m_filter), ImGuiInputTextFlags_AutoSelectAll);
 			const bool has_filter = m_filter[0] != '\0';
@@ -1191,28 +1202,73 @@ struct EvoxVariablesWindow final : StudioApp::GUIPlugin {
 				ImGui::TableSetupScrollFreeze(0, 1);
 				ImGui::TableHeadersRow();
 
-				if (suspended) {
-					const u32 frame_count = ex_debug_stack_depth(runtime);
-					if (g_debug_frame_index >= frame_count) g_debug_frame_index = 0;
+				const u32 frame_count = ex_debug_stack_depth(runtime);
+				if (g_debug_frame_index >= frame_count) g_debug_frame_index = 0;
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				if (has_filter) ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+				const bool locals_open = ImGui::TreeNodeEx("Locals", ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DefaultOpen);
+				ImGui::TableNextColumn();
+				if (locals_open) {
 					for (u32 i = 0, n = ex_debug_frame_local_count(runtime, g_debug_frame_index); i < n; ++i) {
 						const ex_string_view name = ex_debug_local_name(runtime, g_debug_frame_index, i);
 						if (has_filter && !nameMatchesFilter(name, m_filter)) continue;
-						const ex_type_kind kind = ex_debug_local_kind(runtime, g_debug_frame_index, i);
 						const ex_type* type = ex_debug_local_type(runtime, g_debug_frame_index, i);
-						u32 size = 0;
-						void* value = ex_debug_local_value(runtime, g_debug_frame_index, i, &size);
-						drawVariable(name, kind, type, value, size, false, &m_app.getWorldEditor());
+						if (!type) continue;
+						void* value = ex_debug_local_value(runtime, g_debug_frame_index, i, nullptr);
+						ImGui::PushID((int)i);
+						drawVariable(name, type, value, false, &m_app.getWorldEditor());
+						ImGui::PopID();
 					}
+					ImGui::TreePop();
 				}
 
-				for (u32 i = 0, n = ex_debug_global_count(runtime); i < n; ++i) {
-					const ex_string_view name = ex_debug_global_name(runtime, i);
-					if (has_filter && !nameMatchesFilter(name, m_filter)) continue;
-					const ex_type_kind kind = ex_debug_global_kind(runtime, i);
-					const ex_type* type = ex_debug_global_type(runtime, i);
-					u32 size = 0;
-					void* value = ex_debug_global_value(runtime, i, &size);
-					drawVariable(name, kind, type, value, size, false, &m_app.getWorldEditor());
+				ex_debug_location location = {};
+				if (ex_debug_frame_location(runtime, g_debug_frame_index, &location) == EX_RESULT_OK
+					&& location.source_name.length > 0) {
+					ImGui::PushID("globals");
+					auto drawFileGlobals = [&](u32 unit_index, bool current_file) {
+						const ex_string_view source = ex_debug_unit_source_name(runtime, unit_index);
+						if (source.length == 0 || startsWith(StringView(source.begin, source.length), "core:")) return;
+						const bool source_matches = has_filter && nameMatchesFilter(source, m_filter);
+						auto isVisible = [&](u32 index) {
+							return ex_debug_global_unit(runtime, index) == unit_index
+								&& ex_debug_global_type(runtime, index)
+								&& (!has_filter || source_matches || nameMatchesFilter(ex_debug_global_name(runtime, index), m_filter));
+						};
+						const u32 count = ex_debug_global_count(runtime);
+						bool visible = false;
+						for (u32 i = 0; i < count && !visible; ++i) visible = isVisible(i);
+						if (!visible) return;
+
+						ImGui::TableNextRow();
+						ImGui::TableNextColumn();
+						ImGui::PushID(source.begin, source.begin + source.length);
+						if (has_filter) ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+						const ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth
+							| (current_file ? ImGuiTreeNodeFlags_DefaultOpen : 0);
+						const bool open = ImGui::TreeNodeEx("##file", flags, "%.*s", int(source.length), source.begin);
+						ImGui::TableNextColumn();
+						if (open) {
+							for (u32 i = 0; i < count; ++i) {
+								if (!isVisible(i)) continue;
+								const ex_string_view name = ex_debug_global_name(runtime, i);
+								const ex_type* type = ex_debug_global_type(runtime, i);
+								void* value = ex_debug_global_value(runtime, i, nullptr);
+								ImGui::PushID((int)i);
+								drawVariable(name, type, value, false, &m_app.getWorldEditor());
+								ImGui::PopID();
+							}
+							ImGui::TreePop();
+						}
+						ImGui::PopID();
+					};
+					const u32 unit = ex_debug_find_unit(runtime, location.source_name);
+					drawFileGlobals(unit, true);
+					for (u32 i = 0, count = ex_debug_unit_import_count(runtime, unit); i < count; ++i) {
+						drawFileGlobals(ex_debug_unit_import(runtime, unit, i), false);
+					}
+					ImGui::PopID();
 				}
 				ImGui::EndTable();
 			}
@@ -1298,16 +1354,14 @@ struct EvoxPropertyGridPlugin final : PropertyGrid::IPlugin {
 							const ex_type* field_type = ex_type_struct_field_type(type, j);
 							const u32 offset = ex_type_struct_field_offset(type, j);
 							drawVariable(field_name
-								, field_type ? ex_type_get_kind(field_type) : EX_TYPE_INVALID
 								, field_type
 								, value ? (void*)((const u8*)value + offset) : nullptr
-								, field_type ? ex_type_get_size(field_type) : 0
 								, true);
 						}
 					}
 					else {
 						static const char value_name[] = "value";
-						drawVariable({value_name, lengthOf(value_name) - 1}, kind, type, (void*)value, ex_type_get_size(type), true);
+						drawVariable({value_name, lengthOf(value_name) - 1}, type, (void*)value, true);
 					}
 					ImGui::EndTable();
 				}

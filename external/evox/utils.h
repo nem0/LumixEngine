@@ -63,7 +63,7 @@ inline ex_string_view makeStringView(const char* cstr) {
 
 struct OutputFormatter {
 	const ex_host* host = nullptr;
-	const SourceLocTable* src_locs = nullptr;
+	const ex_module* module = nullptr;
 	bool has_error = false;
 
 	void print(i32 v);
@@ -73,18 +73,17 @@ struct OutputFormatter {
 		host->print(host->diagnostics_userdata, s);
 	}
 
-	const SourceLocTable::Entry* resolve(const Token& token) const {
-		if (!src_locs || token.src_loc == EX_INVALID_SOURCE_LOC || token.src_loc >= (u32)src_locs->entries.size()) return nullptr;
-		return &src_locs->entries[(i32)token.src_loc];
-	}
+	const SourceLocTable::Entry* resolve(const Token& token) const;
+	ex_string_view sourceName(const SourceLocTable::Entry* location) const;
 
 	template <typename... Args> void errorAt(const Token& token, Args&&... args) {
 		if (has_error) return;
 		has_error = true;
 
 		const SourceLocTable::Entry* loc = resolve(token);
-		if (loc && !empty(loc->source_name)) {
-			print(loc->source_name);
+		const ex_string_view source_name = sourceName(loc);
+		if (!empty(source_name)) {
+			print(source_name);
 			print(": ");
 		}
 		print("line ");

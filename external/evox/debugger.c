@@ -85,7 +85,7 @@ ex_result ex_debug_frame_location(ex_runtime* runtime, u32 frame_index, ex_debug
 	if (!entry) return EX_RESULT_FAILURE;
 	if (!runtime->bytecode || entry->location_index >= runtime->bytecode->location_count) return EX_RESULT_FAILURE;
 	const ex_bytecode_location* loc = &runtime->bytecode->locations[entry->location_index];
-	out_location->source_name = loc->source_name;
+	out_location->source_name = runtime->bytecode->units[loc->unit_index].source_name;
 	out_location->line = loc->line;
 	out_location->column = loc->column;
 	return EX_RESULT_OK;
@@ -107,7 +107,7 @@ static int debug_find_breakpoint_target(const ex_bytecode* bytecode, ex_string_v
 			if (entry->location_index >= bytecode->location_count) continue;
 			const ex_bytecode_location* loc = &bytecode->locations[entry->location_index];
 			if (loc->line < line) continue;
-			if (!debug_string_equals(loc->source_name, source_name)) continue;
+			if (!debug_string_equals(bytecode->units[loc->unit_index].source_name, source_name)) continue;
 			if (!found || loc->line < best_line || (loc->line == best_line && entry->code_offset < best_code_offset)) {
 				found = 1;
 				best_line = loc->line;
@@ -195,8 +195,8 @@ void ex_debug_remove_all_breakpoints(ex_bytecode* bytecode) {
 
 // Ends a live suspension without resuming the interpreter: reports the
 // suspend point as a failed-call stack trace (fail_frames, same shape
-// ex_call's fail path leaves it in) and clears is_suspended so ex_call/
-// ex_call_index accept new calls again. Used by ex_debug_resume(EX_DEBUG_ABORT).
+// ex_call's fail path leaves it in) and clears is_suspended so ex_call
+// accepts new calls again. Used by ex_debug_resume(EX_DEBUG_ABORT).
 static void debug_abandon_suspension(ex_runtime* runtime) {
 	u32 recorded = 0u;
 	if (recorded < (u32)(sizeof(runtime->fail_frames) / sizeof(runtime->fail_frames[0]))) {
@@ -288,11 +288,6 @@ ex_string_view ex_debug_local_name(ex_runtime* runtime, u32 frame_index, u32 loc
 	return entry ? entry->name : empty;
 }
 
-ex_type_kind ex_debug_local_kind(ex_runtime* runtime, u32 frame_index, u32 local_index) {
-	const ex_bytecode_local_debug_entry* entry = debug_local_at(runtime, frame_index, local_index, NULL);
-	return entry ? entry->kind : EX_TYPE_INVALID;
-}
-
 void* ex_debug_local_value(ex_runtime* runtime, u32 frame_index, u32 local_index, u32* size) {
 	if (size) *size = 0u;
 	const ex_bytecode_local_debug_entry* entry = debug_local_at(runtime, frame_index, local_index, NULL);
@@ -304,6 +299,40 @@ void* ex_debug_local_value(ex_runtime* runtime, u32 frame_index, u32 local_index
 	return value;
 }
 
+u32 ex_debug_unit_count(const ex_runtime* runtime) {
+	return runtime ? runtime->bytecode->unit_count : 0u;
+}
+
+ex_string_view ex_debug_unit_source_name(const ex_runtime* runtime, u32 unit_index) {
+	const ex_string_view empty = {NULL, 0};
+	if (!runtime || unit_index >= runtime->bytecode->unit_count) return empty;
+	const ex_bytecode* bytecode = runtime->bytecode;
+	return bytecode->units[unit_index].source_name;
+}
+
+u32 ex_debug_find_unit(const ex_runtime* runtime, ex_string_view source_name) {
+	for (u32 i = 0, count = ex_debug_unit_count(runtime); i < count; ++i) {
+		if (debug_string_equals(ex_debug_unit_source_name(runtime, i), source_name)) return i;
+	}
+	return EX_DEBUG_UNIT_NONE;
+}
+
+u32 ex_debug_unit_import_count(const ex_runtime* runtime, u32 unit_index) {
+	return runtime && unit_index < runtime->bytecode->unit_count
+		? runtime->bytecode->units[unit_index].import_count : 0u;
+}
+
+u32 ex_debug_unit_import(const ex_runtime* runtime, u32 unit_index, u32 import_index) {
+	if (import_index >= ex_debug_unit_import_count(runtime, unit_index)) return EX_DEBUG_UNIT_NONE;
+	const ex_bytecode* bytecode = runtime->bytecode;
+	return bytecode->unit_imports[bytecode->units[unit_index].first_import + import_index];
+}
+
+u32 ex_debug_global_unit(const ex_runtime* runtime, u32 global_index) {
+	return runtime && global_index < runtime->bytecode->global_debug_count
+		? runtime->bytecode->global_debug[global_index].unit_index : EX_DEBUG_UNIT_NONE;
+}
+
 u32 ex_debug_global_count(ex_runtime* runtime) {
 	return runtime->bytecode->global_debug_count;
 }
@@ -312,11 +341,6 @@ ex_string_view ex_debug_global_name(ex_runtime* runtime, u32 global_index) {
 	ex_string_view empty = {NULL, 0};
 	if (global_index >= runtime->bytecode->global_debug_count) return empty;
 	return runtime->bytecode->global_debug[global_index].name;
-}
-
-ex_type_kind ex_debug_global_kind(ex_runtime* runtime, u32 global_index) {
-	if (global_index >= runtime->bytecode->global_debug_count) return EX_TYPE_INVALID;
-	return runtime->bytecode->global_debug[global_index].kind;
 }
 
 void* ex_debug_global_value(ex_runtime* runtime, u32 global_index, u32* size) {

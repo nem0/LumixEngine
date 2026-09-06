@@ -16,15 +16,16 @@ static constexpr u32 EX_INVALID_SOURCE_LOC = 0xffffffffu;
 // resolve through it.
 struct SourceLocTable {
 	struct Entry {
-		ex_string_view source_name;
+		// Stable index into the module's append-only unit table.
+		u32 unit_index = EX_DEBUG_UNIT_NONE;
 		u32 line = 0;
 		u32 column = 0;
 	};
 	explicit SourceLocTable(ex_arena& arena) : entries(arena) {}
 
-	u32 add(ex_string_view source_name, u32 line, u32 column) {
+	u32 add(u32 unit_index, u32 line, u32 column) {
 		Entry entry;
-		entry.source_name = source_name;
+		entry.unit_index = unit_index;
 		entry.line = line;
 		entry.column = column;
 		entries.push(entry);
