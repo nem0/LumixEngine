@@ -141,7 +141,7 @@ bool MouseSensitivity::load(Tokenizer& tokenizer) {
 		if (token == "]") break;
 		if (token != ",") {
 			logError(tokenizer.filename, "(", tokenizer.getLine(), "): Expected ',' or ']' got ", token.value);
-			tokenizer.logErrorPosition(token.value.begin);
+			tokenizer.logErrorPosition(token.value.data);
 			return false;
 		}
 	}
@@ -335,7 +335,7 @@ static bool loadShortcuts(Settings& settings, Tokenizer& tokenizer) {
 
 		if (token.type != Tokenizer::Token::IDENTIFIER) {
 			logError(tokenizer.filename, "(", tokenizer.getLine(), "): unexpected token in settings: ", token.value);
-			tokenizer.logErrorPosition(token.value.begin);
+			tokenizer.logErrorPosition(token.value.data);
 			return false;
 		}
 
@@ -360,7 +360,7 @@ static bool loadShortcuts(Settings& settings, Tokenizer& tokenizer) {
 		if (next_token == "}") return true;
 		if (next_token != ",") {
 			logError(tokenizer.filename, "(", tokenizer.getLine(), "): unexpected token in settings: ", next_token.value);
-			tokenizer.logErrorPosition(next_token.value.begin);
+			tokenizer.logErrorPosition(next_token.value.data);
 			return false;
 		}
 	}
@@ -378,7 +378,7 @@ static bool loadStyle(Tokenizer& tokenizer) {
 
 		if (token.type != Tokenizer::Token::IDENTIFIER) {
 			logError(tokenizer.filename, "(", tokenizer.getLine(), "): unexpected token in settings: ", token.value);
-			tokenizer.logErrorPosition(token.value.begin);
+			tokenizer.logErrorPosition(token.value.data);
 			return false;
 		}
 
@@ -389,7 +389,7 @@ static bool loadStyle(Tokenizer& tokenizer) {
 				if (!tokenizer.consumeVector(&style.Colors[i].x, vec_size)) return false;
 				if (vec_size != 4) {
 					logError(tokenizer.filename, "(", tokenizer.getLine(), "): expected 4 numbers");
-					tokenizer.logErrorPosition(token.value.begin);
+					tokenizer.logErrorPosition(token.value.data);
 				}
 				break;
 			}
@@ -455,7 +455,7 @@ static bool loadStyle(Tokenizer& tokenizer) {
 		if (next_token == "}") break;
 		if (next_token != ",") {
 			logError(tokenizer.filename, "(", tokenizer.getLine(), "): unexpected token in settings: ", next_token.value);
-			tokenizer.logErrorPosition(next_token.value.begin);
+			tokenizer.logErrorPosition(next_token.value.data);
 			return false;
 		}
 	}
@@ -537,7 +537,7 @@ void Settings::load(bool user_data_only) {
 					case Tokenizer::Token::SYMBOL:
 						if (value != "{") {
 							logError(tokenizer.filename, "(", tokenizer.getLine(), "): Unexpected token in settings: ", value.value);
-							tokenizer.logErrorPosition(value.value.begin);
+							tokenizer.logErrorPosition(value.value.data);
 							return false;
 						}
 						if (!tokenizer.consume(var->vec3_value)) return false;
@@ -553,14 +553,14 @@ void Settings::load(bool user_data_only) {
 						} else {
 							m_variables.erase(var_name.value);
 							logError(tokenizer.filename, "(", tokenizer.getLine(), "): Unexpected token in settings: ", value.value);
-							tokenizer.logErrorPosition(value.value.begin);
+							tokenizer.logErrorPosition(value.value.data);
 							return false;
 						}
 						break;
 					default: 
 						m_variables.erase(var_name.value);
 						logError(tokenizer.filename, "(", tokenizer.getLine(), "): Unexpected token in settings: ", value.value);
-						tokenizer.logErrorPosition(value.value.begin);
+						tokenizer.logErrorPosition(value.value.data);
 						return false;
 				}
 			}

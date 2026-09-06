@@ -9,8 +9,10 @@ local simple_options = {
 	{ "no-renderer", "Do not build renderer plugin." },
 	{ "no-audio", "Do not build audio plugin." },
 	{ "no-lua", "Do not build lua plugin." },
+	{ "no-evox", "Do not build evox plugin." },
 	{ "no-ui", "Do not build UI plugin." },
 	{ "with-app", "Do build app." },
+	{ "with-vulkan", "Use the minimal Vulkan clear/present backend." },
 	{ "with-basis-universal", "Use basis universal compression." },
 	{ "with-game", "Build game plugin." },
 	{ "working-dir", "Working directory." },
@@ -43,6 +45,7 @@ newoption {
 -- process _OPTIONS
 build_studio = not _OPTIONS["no-studio"]
 build_app = _OPTIONS["with-app"] or false
+build_vulkan = _OPTIONS["with-vulkan"] or false
 build_tests = _OPTIONS["with-tests"] or false
 local embed_resources = _OPTIONS["embed-resources"]
 local working_dir = _OPTIONS["working-dir"]
@@ -66,7 +69,7 @@ if _OPTIONS["plugins"] then
 	plugins = string.explode( _OPTIONS["plugins"], ",")
 end
 
-for	_, v in ipairs { "physics", "renderer", "audio", "ui", "animation", "navigation", "lua" } do
+for	_, v in ipairs { "physics", "renderer", "audio", "ui", "animation", "navigation", "lua", "evox" } do
 	if _OPTIONS["no-" .. v] == nil then
 		table.insert(plugins, v)
 		table.insert(base_plugins, v)
@@ -104,6 +107,10 @@ function hasPlugin(plugin)
 		end
 	end
 	return false
+end
+
+if build_tests and not hasPlugin("evox") then
+	error("--with-tests requires the evox plugin")
 end
 
 -- common platform link helpers
@@ -369,8 +376,11 @@ lib_project "core"
 	libType()
 	defaultConfigurations()
 	defines { "BUILDING_CORE" }
-	-- Run meta tool before any compilation to generate reflection headers and Lua bindings
-	prebuildcommands { "msbuild $(SolutionDir)meta.vcxproj /p:Configuration=$(Configuration) /p:Platform=$(Platform) /verbosity:minimal", "cd $(ProjectDir)../../../ && $(SolutionDir)bin\\$(Configuration)\\meta.exe" }
+	-- Run the meta tool before compilation on Windows. Linux currently uses the
+	-- checked-in generated headers until the meta tool is made portable.
+	configuration { "not linux" }
+		prebuildcommands { "msbuild $(SolutionDir)meta.vcxproj /p:Configuration=$(Configuration) /p:Platform=$(Platform) /verbosity:minimal", "cd $(ProjectDir)../../../ && $(SolutionDir)bin\\$(Configuration)\\meta.exe" }
+	configuration {}
 
 	files { "../src/core/**.h",
 			"../src/core/**.c",
@@ -474,9 +484,26 @@ if plugin "renderer" then
 
 	configuration { "linux" }
 		links { "GL", "X11", "Xi" }
+		if build_vulkan then links { "vulkan" } end
+		-- TODO pipeline
+		removefiles { "../src/renderer/gpu/gpu_dx12.cpp", "../src/renderer/pipeline.cpp", "../src/renderer/pose.cpp", "../src/renderer/render_module.cpp" }
+		if not build_vulkan then removefiles { "../src/renderer/gpu/gpu_vulkan.cpp" } end
 	
 	configuration { "windows" }
 		links { "psapi", "dxguid" }
+		if build_vulkan then
+			local vulkan_sdk = os.getenv("VULKAN_SDK")
+			if vulkan_sdk then
+				includedirs { vulkan_sdk .. "/Include" }
+				libdirs { vulkan_sdk .. "/Lib" }
+			else
+				printf("VULKAN_SDK is not set; install the Vulkan SDK before building with --with-vulkan")
+			end
+			links { "vulkan-1" }
+			removefiles { "../src/renderer/gpu/gpu_dx12.cpp" }
+		else
+			removefiles { "../src/renderer/gpu/gpu_vulkan.cpp" }
+		end
 end
 		
 if plugin "animation" then
@@ -589,6 +616,14 @@ if plugin "lua" then
 	end
 end
 
+if plugin "evox" then
+	files { "../src/evox/**.h", "../src/evox/**.cpp", "../external/evox/**.cpp", "../external/evox/**.c", "../external/evox/**.h" }
+	excludes { "../external/evox/evoxc.c", "../external/evox/tests/*.cpp", "../external/evox/c_compiler/**.*", "../external/evox/benchmarks/**.*" }
+	includedirs { "../src", "../src/evox" }
+	defines { "BUILDING_EVOX" }
+	dynamic_link_plugin { "core", "engine" }
+end
+
 if _OPTIONS["with-game"] ~= nil then
 	dofile("../../" .. _OPTIONS["with-game"] .. "/genie.lua")
 end
@@ -652,6 +687,14 @@ if build_app then
 		configuration {"vs*"}
 			links { "winmm", "imm32", "version" }
 		configuration {}
+
+		if build_vulkan then
+			configuration { "windows" }
+				local vulkan_sdk = os.getenv("VULKAN_SDK")
+				if vulkan_sdk then libdirs { vulkan_sdk .. "/Lib" } end
+				links { "vulkan-1" }
+			configuration {}
+		end
 
 		for _, callback in ipairs(build_app_callbacks) do
 			callback()
@@ -1015,7 +1058,7 @@ io.write "#elif defined LUMIX_PLUGINS_STRINGS\n"
 io.write "#else\n"
 	if not dynamic_plugins then
 		for _, plugin in ipairs(plugin_creators) do
-			io.write "{\n"
+			io.write("if (shouldCreateStaticPlugin(plugins, \"" .. plugin .. "\")) {\n")
 			io.write("\tISystem* p = createPlugin_" .. plugin .. "(engine);\n")
 			io.write "\tif (p) engine.getSystemManager().addSystem(p, nullptr);\n"
 			io.write "}\n"
@@ -1036,12 +1079,9 @@ if build_tests then
 			"../external/imgui_test_engine/**.cpp",
 			"../external/imgui_test_engine/**.h"
 		}
-	
 		if split_projects then
-			links { "core", "engine" }
-			if hasPlugin "renderer" then
-				links { "renderer" }
-			end
+			links { "core", "engine", "evox" }
+			if hasPlugin "renderer" then links { "renderer" } end
 		else
 			links { "engine_merged" }
 		end

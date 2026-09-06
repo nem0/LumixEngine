@@ -80,9 +80,9 @@ static DWORD WINAPI threadFunction(LPVOID ptr)
 	setThreadName(impl->m_thread_id, impl->m_thread_name);
 	profiler::setThreadName(impl->m_thread_name);
 	const u32 ret = impl->m_owner->task();
+	debug::unregisterAlloc(impl->m_allocation_info);
 	impl->m_exited = true;
 	impl->m_is_running = false;
-	debug::unregisterAlloc(impl->m_allocation_info);
 	return ret;
 }
 

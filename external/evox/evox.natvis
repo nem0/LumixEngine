@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+	<Type Name="ExpArray&lt;*&gt;">
+		<DisplayString>size={m_size}</DisplayString>
+		<Expand>
+			<Item Name="[size]">m_size</Item>
+			<CustomListItems MaxItemsPerView="5000">
+				<Variable Name="i" InitialValue="0" />
+				<Variable Name="bin" InitialValue="0" />
+				<Variable Name="inner" InitialValue="0" />
+				<Variable Name="bin_size" InitialValue="4" />
+				<Loop>
+					<Break Condition="i == m_size" />
+					<Item Name="[{i}]">bins[bin][inner]</Item>
+					<Exec>++i</Exec>
+					<Exec>++inner</Exec>
+					<If Condition="inner == bin_size">
+						<Exec>++bin</Exec>
+						<Exec>inner = 0</Exec>
+						<Exec>bin_size *= 2</Exec>
+					</If>
+				</Loop>
+			</CustomListItems>
+		</Expand>
+	</Type>
+</AutoVisualizer>

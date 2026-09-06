@@ -206,6 +206,10 @@ namespace Lumix
 		float x, y, z, w;
 	};
 
+	LUMIX_FORCE_INLINE float4 f4Init(float x, float y, float z, float w)
+	{
+		return {x, y, z, w};
+	}
 
 	LUMIX_FORCE_INLINE float4 f4LoadUnaligned(const void* src)
 	{

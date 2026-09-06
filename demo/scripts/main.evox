@@ -1,0 +1,23 @@
+import "core:input"
+import "core:world"
+import "core:random"
+
+import "scripts/player" as player
+import "maps/demo/demo" as demo
+
+var g_input : InputSystem = undefined;
+var g_world : World = undefined;
+
+fn start(input : InputSystem) : void {
+	g_input = input;
+	player.init(g_world, g_input);
+	demo.start(g_world);
+}
+
+fn update(td : f32) : void {
+    demo.update(td, g_input);
+}
+
+fn addWorld(world : World) : void {
+	g_world = world;
+}

@@ -127,7 +127,7 @@ bool componentTypeExists(const char* id) {
 ComponentType getComponentType(StringView name)
 {
 	Context& ctx = getContext();
-	const RuntimeHash name_hash(name.begin, name.size());
+	const RuntimeHash name_hash(name.data, name.size());
 	for (u32 i = 0, c = ctx.components_count; i < c; ++i) {
 		if (ctx.component_bases[i].name_hash == name_hash) {
 			return {(i32)i};

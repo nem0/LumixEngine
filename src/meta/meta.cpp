@@ -1,8 +1,33 @@
 #include "core/defer.h"
 #include <float.h>
-#include <Windows.h>
 #include <assert.h>
+#include <stdio.h>
+#include <ctype.h>
+#include <string.h>
+#ifdef _WIN32
+	#include <Windows.h>
+#else
+	#include <dirent.h>
+	#include <limits.h>
+	#include <sys/mman.h>
+	#include <sys/stat.h>
+	#include <time.h>
+#endif
+#ifndef _WIN32
+static int _itoa_s(int value, char* out, int radix) { return snprintf(out, 32, radix == 10 ? "%d" : "%x", value) < 0; }
+static int _ui64toa_s(unsigned long long value, char* out, size_t, int radix) { return snprintf(out, 64, radix == 10 ? "%llu" : "%llx", value) < 0; }
+static int strcpy_s(char* dst, size_t size, const char* src) { if (strlen(src) + 1 > size) return 1; strcpy(dst, src); return 0; }
+static int strncpy_s(char* dst, size_t size, const char* src, size_t count) { if (count + 1 > size) return 1; memcpy(dst, src, count); dst[count] = 0; return 0; }
+#endif
 #include "meta.h"
+
+#ifndef MAX_PATH
+	#ifdef _WIN32
+		#define MAX_PATH 260
+	#else
+		#define MAX_PATH PATH_MAX
+	#endif
+#endif
 
 #define XXH_STATIC_LINKING_ONLY
 #define XXH_IMPLEMENTATION
@@ -16,11 +41,20 @@
 struct ArenaAllocator : IAllocator {
 	static constexpr size_t CAPACITY = 1024*1024*1024;
 	ArenaAllocator() {
+#ifdef _WIN32
 		mem = VirtualAlloc(nullptr, CAPACITY, MEM_RESERVE, PAGE_READWRITE);
+#else
+		mem = mmap(nullptr, CAPACITY, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+		if (mem == MAP_FAILED) mem = nullptr;
+#endif
 	}
 
 	~ArenaAllocator() {
+#ifdef _WIN32
 		VirtualFree(mem, 0, MEM_RELEASE);
+#else
+		if (mem) munmap(mem, CAPACITY);
+#endif
 	}
 	
 	void* allocate(size_t size) override {
@@ -29,7 +63,11 @@ struct ArenaAllocator : IAllocator {
 			size_t required = allocated + size;
 			size_t new_commited = (required + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
 			if (new_commited > CAPACITY) return nullptr;
+#ifdef _WIN32
 			if (!VirtualAlloc((char*)mem + comitted, new_commited - comitted, MEM_COMMIT, PAGE_READWRITE)) return nullptr;
+#else
+			if (mprotect((char*)mem + comitted, new_commited - comitted, PROT_READ | PROT_WRITE) != 0) return nullptr;
+#endif
 			comitted = new_commited;
 		}
 
@@ -94,7 +132,7 @@ struct StringBuilder {
 
 	void add(i32 v) {
 		char tmp[32];
-		_itoa_s(v, tmp, 10);
+		snprintf(tmp, sizeof(tmp), "%d", v);
 		add(tmp);
 	}
 
@@ -126,16 +164,20 @@ void logInfo(Args... args) {
 	StringBuilder builder(buffer, sizeof(buffer));
 	(builder.add(args), ...);
 	builder.add("\n");
+#ifdef _WIN32
 	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
 	DWORD written;
 	WriteFile(hStdout, buffer, (DWORD)strlen(buffer), &written, NULL);
+#else
+	fputs(buffer, stdout);
+#endif
 }
 
-struct FileIterator {
-	WIN32_FIND_DATAA ffd;
-	HANDLE handle;
-	bool is_valid;
-};
+#ifdef _WIN32
+struct FileIterator { WIN32_FIND_DATAA ffd; HANDLE handle; bool is_valid; };
+#else
+struct FileIterator { DIR* handle; bool is_valid; };
+#endif
 
 struct FileInfo {
 	bool is_directory;
@@ -144,27 +186,40 @@ struct FileInfo {
 
 static bool getNextFile(FileIterator& iterator, FileInfo& info) {
 	if (!iterator.is_valid) return false;
-
+#ifdef _WIN32
 	info.is_directory = (iterator.ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
-	
 	buildString(info.name, iterator.ffd.cFileName);
-
 	iterator.is_valid = FindNextFile(iterator.handle, &iterator.ffd) != FALSE;
+#else
+	dirent* entry = readdir(iterator.handle);
+	if (!entry) { iterator.is_valid = false; return false; }
+	info.is_directory = entry->d_type == DT_DIR;
+	buildString(info.name, entry->d_name);
+#endif
 	return true;
 }
 
-
 static void destroyFileIterator(FileIterator iterator) {
+#ifdef _WIN32
 	FindClose(iterator.handle);
+#else
+	if (iterator.handle) closedir(iterator.handle);
+#endif
 }
 
 static FileIterator createFileIterator(StringView path) {
+	FileIterator iter;
+#ifdef _WIN32
 	char pattern[MAX_PATH];
 	buildString(pattern, path, "/*");
-	
-	FileIterator iter;
 	iter.handle = FindFirstFileA(pattern, &iter.ffd);
 	iter.is_valid = iter.handle != INVALID_HANDLE_VALUE;
+#else
+	char directory[PATH_MAX];
+	buildString(directory, path);
+	iter.handle = opendir(directory);
+	iter.is_valid = iter.handle != nullptr;
+#endif
 	return iter;
 }
 
@@ -552,6 +607,10 @@ struct Parser {
 		res.return_type = consumeType(str);
 		res.name = consumeIdentifier(str);
 		res.args = consumeArgs(str);
+		StringView suffix = skipWhitespaces(str);
+		res.is_const = suffix.size() >= 5
+			&& suffix.begin[0] == 'c' && suffix.begin[1] == 'o' && suffix.begin[2] == 'n'
+			&& suffix.begin[3] == 's' && suffix.begin[4] == 't';
 		StringView def = find(str, "//@");
 		if (def.size() > 2) {
 			def.begin += 3;
@@ -1265,21 +1324,29 @@ void parseFile(StringView path, StringView filename) {
 	char full[MAX_PATH];
 	buildString(full, path, "/", filename);
 
+#ifdef _WIN32
 	HANDLE h = CreateFileA(full, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 	if (h == INVALID_HANDLE_VALUE) return;
 	defer { CloseHandle(h); };
-
 	DWORD size = GetFileSize(h, nullptr);
 	if (size == INVALID_FILE_SIZE) return;
-
 	char* data = (char*)allocator.allocate(size + 1);
 	DWORD read = 0;
-	if (ReadFile(h, data, size, &read, nullptr)) {
-		data[read] = 0;
-	}
-
+	if (!ReadFile(h, data, size, &read, nullptr)) return;
+#else
+	FILE* h = fopen(full, "rb");
+	if (!h) return;
+	defer { fclose(h); };
+	fseek(h, 0, SEEK_END);
+	size_t size = ftell(h);
+	fseek(h, 0, SEEK_SET);
+	char* data = (char*)allocator.allocate(size + 1);
+	size_t read = fread(data, 1, size, h);
+	if (read != size) return;
+#endif
+	data[read] = 0;
 	++num_parsed_files;
-	num_parsed_bytes += size;
+	num_parsed_bytes += (i32)read;
 
 	parser.beginFile(makeStringView(full));
 	parser.content.begin = data;
@@ -1410,6 +1477,7 @@ static void outputLuaObjectTypename(OutputStream& out, StringView type) {
 }
 
 void wrap(OutputStream& out, Module& m, Function& f) {
+	const bool return_is_reference = f.return_type.size() > 0 && f.return_type[f.return_type.size() - 1] == '&';
 	L("int ",m.name,"_",f.name,"(lua_State* L) {");
 	L("LuaWrapper::checkTableArg(L, 1);");
 	L(m.name,"* module;");
@@ -1430,6 +1498,7 @@ void wrap(OutputStream& out, Module& m, Function& f) {
 
 	bool has_return = !equal(f.return_type, "void");
 	if (has_return) out.add("\tLuaWrapper::push(L, ");
+	if (return_is_reference) out.add("&");
 	out.add("\tmodule->", f.name, "(");
 	forEachArg(args, [&](const Arg& arg, bool is_first) {
 		if (!is_first) out.add(", ");
@@ -1987,10 +2056,12 @@ StringView toLuaType(StringView ctype) {
 	#undef C
 
 	// TODO structs	
-	Struct* s = getStruct(ctype);
+	StringView base_type = ctype;
+	if (base_type.size() > 0 && base_type[base_type.size() - 1] == '&') --base_type.end;
+	Struct* s = getStruct(base_type);
 	if (s) return s->name;
 
-	Object* o = getObject(ctype);
+	Object* o = getObject(base_type);
 	if (o) return o->name;
 
 	return makeStringView("any");
@@ -2389,7 +2460,7 @@ void serializeReflection(OutputStream& out, Module& m) {
 	for (Function& fn : m.functions) {
 		StringView name = fn.name;
 		if (fn.attributes.alias.size() > 0) name = fn.attributes.alias;
-		L("\t.function<(", fn.return_type, " (", m.name, "::*)(", fn.args, "))&", m.name, "::", fn.name ,">(\"", name, "\")");
+		L("\t.function<(", fn.return_type, " (", m.name, "::*)(", fn.args, ")", fn.is_const ? " const" : "", ")&", m.name, "::", fn.name ,">(\"", name, "\")");
 	}
 
 	for (Component& cmp : m.components) {
@@ -2459,7 +2530,7 @@ void serializeReflection(OutputStream& out, Module& m) {
 
 		for (Function& fn : cmp.functions) {
 			StringView name = fn.attributes.alias.size() > 0 ? fn.attributes.alias : fn.name;
-			L("\t\t.function<(", fn.return_type, " (", m.name, "::*)(", fn.args, "))&", m.name, "::", fn.name, ">(\"", name, "\")");
+			L("\t\t.function<(", fn.return_type, " (", m.name, "::*)(", fn.args, ")", fn.is_const ? " const" : "", ")&", m.name, "::", fn.name, ">(\"", name, "\")");
 		}
 
 		for (Property& prop : cmp.properties) {
@@ -2478,34 +2549,52 @@ void serializeReflection(OutputStream& out, Module& m) {
 }
 
 void writeFile(const char* out_path, OutputStream& stream) {
-	// skip writing if file exists and content is identical
+#ifdef _WIN32
 	HANDLE h_existing = CreateFileA(out_path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 	if (h_existing != INVALID_HANDLE_VALUE) {
 		defer { CloseHandle(h_existing); };
 		DWORD existing_size = GetFileSize(h_existing, nullptr);
 		if (existing_size == (DWORD)stream.length) {
 			char* existing_data = new char[existing_size];
-			defer { delete existing_data; };
+			defer { delete[] existing_data; };
 			DWORD read_bytes = 0;
-			if (ReadFile(h_existing, existing_data, existing_size, &read_bytes, nullptr) && read_bytes == existing_size) {
-				if (memcmp(existing_data, stream.data, existing_size) == 0) {
-					return;
-				}
-			}
+			if (ReadFile(h_existing, existing_data, existing_size, &read_bytes, nullptr) && read_bytes == existing_size && memcmp(existing_data, stream.data, existing_size) == 0) return;
 		}
 	}
-	
 	HANDLE hout = CreateFileA(out_path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 	if (hout != INVALID_HANDLE_VALUE) {
 		DWORD written = 0;
 		WriteFile(hout, stream.data, (DWORD)stream.length, &written, nullptr);
 		CloseHandle(hout);
 	}
+#else
+	FILE* existing = fopen(out_path, "rb");
+	if (existing) {
+		fseek(existing, 0, SEEK_END);
+		size_t size = ftell(existing);
+		fseek(existing, 0, SEEK_SET);
+		if (size == stream.length) {
+			char* data = new char[size];
+			const bool same = fread(data, 1, size, existing) == size && memcmp(data, stream.data, size) == 0;
+			delete[] data;
+			fclose(existing);
+			if (same) return;
+		}
+		else fclose(existing);
+	}
+	FILE* output = fopen(out_path, "wb");
+	if (output) { fwrite(stream.data, 1, stream.length, output); fclose(output); }
+#endif
 }
 
 int main() {
+#ifdef _WIN32
 	LARGE_INTEGER start, stop, freq;
 	QueryPerformanceCounter(&start);
+#else
+	timespec start, stop;
+	clock_gettime(CLOCK_MONOTONIC, &start);
+#endif
 	
 	scan(makeStringView("src"));
 	scan(makeStringView("plugins"));
@@ -2587,9 +2676,14 @@ int main() {
 		(r->fn)(metadata);
 	}
 
+#ifdef _WIN32
 	QueryPerformanceCounter(&stop);
 	QueryPerformanceFrequency(&freq);
 	i32 duration = i32(float((stop.QuadPart - start.QuadPart) / double(freq.QuadPart)) * 1000);
+#else
+	clock_gettime(CLOCK_MONOTONIC, &stop);
+	i32 duration = i32((stop.tv_sec - start.tv_sec) * 1000 + (stop.tv_nsec - start.tv_nsec) / 1000000);
+#endif
 	logInfo("Meta: Processed ",num_parsed_bytes/1024," KB in ",num_parsed_files," files in ", duration, " ms");
 	return 0;
 }

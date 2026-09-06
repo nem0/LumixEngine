@@ -1,0 +1,33 @@
+// Fixed-capacity array with stack operations.
+fn StaticArray(T : comptime type, N : comptime i32) : type {
+	return struct {
+		values : [N]T;
+		size : i32;
+	};
+}
+
+fn init(T : comptime type, N : comptime i32) : StaticArray(T, N) {
+	return { undefined, 0 };
+}
+
+fn push(array : *StaticArray($T, $N), value : T) : bool {
+	if array.size >= N {
+		return false;
+	}
+	array.values[array.size] = value;
+	array.size += 1;
+	return true;
+}
+
+fn pop(array : *StaticArray($T, $N), out : *T) : bool {
+	if array.size <= 0 {
+		return false;
+	}
+	array.size -= 1;
+	out.* = array.values[array.size];
+	return true;
+}
+
+fn get(array : StaticArray($T, $N), index : i32) : T {
+	return array.values[index];
+}

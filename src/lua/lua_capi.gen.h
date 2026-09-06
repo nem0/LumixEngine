@@ -13,6 +13,7 @@
 #include "animation/animation_module.h"
 #include "audio/audio_module.h"
 #include "engine/core.h"
+#include "evox/evox_module.h"
 #include "lua/lua_script_system.h"
 #include "navigation/navigation_module.h"
 #include "physics/physics_module.h"
@@ -29,6 +30,12 @@ namespace Lumix::LuaWrapper {
 	
 	void push(lua_State* L, os::Keycode value) { LuaWrapper::push(L, (i32)value); }
 	template <> os::Keycode checkArg<os::Keycode>(lua_State* L, int index) { return (os::Keycode)checkArg<i32>(L, index); }
+	
+	void push(lua_State* L, InputDeviceType value) { LuaWrapper::push(L, (i32)value); }
+	template <> InputDeviceType checkArg<InputDeviceType>(lua_State* L, int index) { return (InputDeviceType)checkArg<i32>(L, index); }
+	
+	void push(lua_State* L, InputEventType value) { LuaWrapper::push(L, (i32)value); }
+	template <> InputEventType checkArg<InputEventType>(lua_State* L, int index) { return (InputEventType)checkArg<i32>(L, index); }
 	
 	void push(lua_State* L, GrassRotationMode value) { LuaWrapper::push(L, (i32)value); }
 	template <> GrassRotationMode checkArg<GrassRotationMode>(lua_State* L, int index) { return (GrassRotationMode)checkArg<i32>(L, index); }
@@ -178,6 +185,70 @@ namespace Lumix::LuaWrapper {
 		lua_pop(L, 1);
 		lua_getfield(L, index, "distance");
 		res.distance = checkArg<float>(L, -1);
+		lua_pop(L, 1);
+		return res;
+	}
+	void push(lua_State* L, const ControllerHitData& value) {
+		lua_newtable(L);
+		push(L, value.controller);
+		lua_setfield(L, -2, "controller");
+		push(L, value.hit_entity);
+		lua_setfield(L, -2, "hit_entity");
+	}
+	template <> ControllerHitData checkArg<ControllerHitData>(lua_State* L, int index) {
+		ControllerHitData res;
+		if (!lua_istable(L, index)) luaL_argerror(L, index, "expected table");
+		lua_getfield(L, index, "controller");
+		res.controller = checkArg<EntityRef>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "hit_entity");
+		res.hit_entity = checkArg<EntityRef>(L, -1);
+		lua_pop(L, 1);
+		return res;
+	}
+	void push(lua_State* L, const TriggerHitData& value) {
+		lua_newtable(L);
+		push(L, value.e1);
+		lua_setfield(L, -2, "e1");
+		push(L, value.e2);
+		lua_setfield(L, -2, "e2");
+		push(L, value.touch_lost);
+		lua_setfield(L, -2, "touch_lost");
+	}
+	template <> TriggerHitData checkArg<TriggerHitData>(lua_State* L, int index) {
+		TriggerHitData res;
+		if (!lua_istable(L, index)) luaL_argerror(L, index, "expected table");
+		lua_getfield(L, index, "e1");
+		res.e1 = checkArg<EntityRef>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "e2");
+		res.e2 = checkArg<EntityRef>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "touch_lost");
+		res.touch_lost = checkArg<bool>(L, -1);
+		lua_pop(L, 1);
+		return res;
+	}
+	void push(lua_State* L, const ContactHitData& value) {
+		lua_newtable(L);
+		push(L, value.e1);
+		lua_setfield(L, -2, "e1");
+		push(L, value.e2);
+		lua_setfield(L, -2, "e2");
+		push(L, value.position);
+		lua_setfield(L, -2, "position");
+	}
+	template <> ContactHitData checkArg<ContactHitData>(lua_State* L, int index) {
+		ContactHitData res;
+		if (!lua_istable(L, index)) luaL_argerror(L, index, "expected table");
+		lua_getfield(L, index, "e1");
+		res.e1 = checkArg<EntityRef>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "e2");
+		res.e2 = checkArg<EntityRef>(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, index, "position");
+		res.position = checkArg<Vec3>(L, -1);
 		lua_pop(L, 1);
 		return res;
 	}
@@ -690,6 +761,33 @@ namespace Lumix {
 }
 
 namespace Lumix {
+	int evox_getter(lua_State* L) {
+		auto [imodule, entity] = checkComponent(L);
+		auto* module = (EvoxModule*)imodule;
+		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
+		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
+		switch (name_hash) {
+			case 0:
+			default: { luaL_error(L, "Unknown property %s", prop_name); break; }
+		}
+		return 1;
+	}
+	
+	int evox_setter(lua_State* L) {
+		auto [imodule, entity] = checkComponent(L);
+		auto* module = (EvoxModule*)imodule;
+		const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
+		XXH64_hash_t name_hash = XXH3_64bits(prop_name, strlen(prop_name));
+		switch (name_hash) {
+			case 0:
+			default: luaL_error(L, "Unknown property %s", prop_name); break;
+		}
+		return 0;
+	}
+	
+}
+
+namespace Lumix {
 	int lua_script_getter(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (LuaScriptModule*)imodule;
@@ -949,6 +1047,13 @@ namespace Lumix {
 		return 1;
 	}
 	
+	int Agent_isFinished(lua_State* L) {
+		auto [imodule, entity] = checkComponent(L);
+		auto* module = (NavigationModule*)imodule;
+		LuaWrapper::push(L, 	module->isAgentFinished(entity));
+		return 1;
+	}
+	
 	int Agent_cancelNavigation(lua_State* L) {
 		auto [imodule, entity] = checkComponent(L);
 		auto* module = (NavigationModule*)imodule;
@@ -975,6 +1080,7 @@ namespace Lumix {
 			case /*move_entity*/3203804519501376147: LuaWrapper::push(L, module->getAgentMoveEntity(entity)); break;
 			case /*speed*/5411191639289302350: LuaWrapper::push(L, module->getAgentSpeed(entity)); break;
 			case /*navigate*/10641905485202240135: lua_pushcfunction(L, Agent_navigate, "Agent_navigate"); break;
+			case /*isFinished*/4737544788539832154: lua_pushcfunction(L, Agent_isFinished, "Agent_isFinished"); break;
 			case /*cancelNavigation*/10369242840717673752: lua_pushcfunction(L, Agent_cancelNavigation, "Agent_cancelNavigation"); break;
 			case /*drawPath*/15681074705421253585: lua_pushcfunction(L, Agent_drawPath, "Agent_drawPath"); break;
 			case 0:
@@ -1020,6 +1126,30 @@ namespace Lumix {
 		auto gravity = LuaWrapper::checkArg<Vec3>(L, 2);
 		module->setGravity(gravity);
 		return 0;
+	}
+	
+	int PhysicsModule_getControllerHits(lua_State* L) {
+		LuaWrapper::checkTableArg(L, 1);
+		PhysicsModule* module;
+		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+		LuaWrapper::push(L, 	module->getControllerHits());
+		return 1;
+	}
+	
+	int PhysicsModule_getTriggerHits(lua_State* L) {
+		LuaWrapper::checkTableArg(L, 1);
+		PhysicsModule* module;
+		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+		LuaWrapper::push(L, 	module->getTriggerHits());
+		return 1;
+	}
+	
+	int PhysicsModule_getContactHits(lua_State* L) {
+		LuaWrapper::checkTableArg(L, 1);
+		PhysicsModule* module;
+		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+		LuaWrapper::push(L, 	module->getContactHits());
+		return 1;
 	}
 	
 	int physical_heightfield_getter(lua_State* L) {
@@ -2508,7 +2638,7 @@ namespace Lumix {
 		LuaWrapper::checkTableArg(L, 1);
 		UIModule* module;
 		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
-		LuaWrapper::push(L, 	module->getDocument());
+		LuaWrapper::push(L, &	module->getDocument());
 		return 1;
 	}
 	
@@ -2533,7 +2663,7 @@ namespace Lumix {
 		LuaWrapper::checkTableArg(L, 1);
 		UIModule* module;
 		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
-		LuaWrapper::push(L, 	module->getSystemPtr());
+		LuaWrapper::push(L, &	module->getSystemPtr());
 		return 1;
 	}
 	
@@ -2614,6 +2744,12 @@ namespace Lumix {
 			lua_setfield(L, -2, "raycast");
 			lua_pushcfunction(L, PhysicsModule_setGravity, "setGravity");
 			lua_setfield(L, -2, "setGravity");
+			lua_pushcfunction(L, PhysicsModule_getControllerHits, "getControllerHits");
+			lua_setfield(L, -2, "getControllerHits");
+			lua_pushcfunction(L, PhysicsModule_getTriggerHits, "getTriggerHits");
+			lua_setfield(L, -2, "getTriggerHits");
+			lua_pushcfunction(L, PhysicsModule_getContactHits, "getContactHits");
+			lua_setfield(L, -2, "getContactHits");
 			lua_pop(L, 1);
 		}
 		{
@@ -3563,6 +3699,36 @@ namespace Lumix {
 			lua_getglobal(L, "LumixAPI");
 			lua_newtable(L);
 			LuaWrapper::push(L, 0);
+			lua_setfield(L, -2, "MOUSE");
+			LuaWrapper::push(L, 1);
+			lua_setfield(L, -2, "KEYBOARD");
+			LuaWrapper::push(L, 2);
+			lua_setfield(L, -2, "GAMEPAD");
+			lua_setfield(L, -2, "InputDeviceType");
+			lua_pop(L, 1);
+		}
+		{
+			lua_getglobal(L, "LumixAPI");
+			lua_newtable(L);
+			LuaWrapper::push(L, 0);
+			lua_setfield(L, -2, "BUTTON");
+			LuaWrapper::push(L, 1);
+			lua_setfield(L, -2, "AXIS");
+			LuaWrapper::push(L, 2);
+			lua_setfield(L, -2, "MOUSE_WHEEL");
+			LuaWrapper::push(L, 3);
+			lua_setfield(L, -2, "TEXT_INPUT");
+			LuaWrapper::push(L, 4);
+			lua_setfield(L, -2, "DEVICE_ADDED");
+			LuaWrapper::push(L, 5);
+			lua_setfield(L, -2, "DEVICE_REMOVED");
+			lua_setfield(L, -2, "InputEventType");
+			lua_pop(L, 1);
+		}
+		{
+			lua_getglobal(L, "LumixAPI");
+			lua_newtable(L);
+			LuaWrapper::push(L, 0);
 			lua_setfield(L, -2, "Y_UP");
 			LuaWrapper::push(L, 1);
 			lua_setfield(L, -2, "ALL_RANDOM");
@@ -3608,6 +3774,7 @@ namespace Lumix {
 		registerLuaComponent(L, "ambient_sound", ambient_sound_getter, ambient_sound_setter);
 		registerLuaComponent(L, "spline", spline_getter, spline_setter);
 		registerLuaComponent(L, "signal", signal_getter, signal_setter);
+		registerLuaComponent(L, "evox", evox_getter, evox_setter);
 		registerLuaComponent(L, "lua_script", lua_script_getter, lua_script_setter);
 		registerLuaComponent(L, "lua_script_inline", lua_script_inline_getter, lua_script_inline_setter);
 		registerLuaComponent(L, "navmesh_zone", navmesh_zone_getter, navmesh_zone_setter);

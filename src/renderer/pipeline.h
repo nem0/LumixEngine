@@ -134,7 +134,11 @@ struct LUMIX_RENDERER_API Pipeline {
 	// e.g. auto* data = pipeline.getData<TDAOPipelineData>();
 	template <typename T>
 	T* getData() {
-		static_assert(__is_trivially_destructible(T), "Only trivially desctructible types are allowed");
+		#if defined(__GNUC__) && !defined(__clang__)
+			static_assert(__has_trivial_destructor(T), "Only trivially desctructible types are allowed");
+		#else
+			static_assert(__is_trivially_destructible(T), "Only trivially desctructible types are allowed");
+		#endif
 		static u32 idx = s_data_type_generator++;
 		auto [mem, first_use] = getData(idx, sizeof(T), alignof(T));
 		if (first_use) new (NewPlaceholder(), mem) T();

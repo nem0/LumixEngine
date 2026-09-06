@@ -46,18 +46,20 @@ const Glyph* findGlyph(const Font& font, u32 codepoint) {
 
 SplitWord splitFirstWord(const Font& font, StringView text) {
 	// trim leading whitespace
-	while (text.begin < text.end && isWhitespace(*text.begin)) ++text.begin;
+	const char* text_end = text.end();
+	while (text.data < text_end && isWhitespace(*text.data)) { ++text.data; --text.length; }
 	
 	SplitWord res;
-	res.head.begin = text.begin;
-	res.head.end = text.begin;
+	res.head.data = text.data;
+	res.head.length = 0;
 	res.tail = text;
 	// find the first whitespace
-	while (res.head.end != text.end && !isWhitespace(*res.head.end)) ++res.head.end;
-	res.tail.begin = res.head.end;
+	while (res.head.end() != text_end && !isWhitespace(*res.head.end())) ++res.head.length;
+	res.tail.data = res.head.end();
+	res.tail.length = text_end - res.tail.data;
 
 	// measure the word
-	Vec2 size = measureTextA(font, res.head.begin, res.head.end);
+	Vec2 size = measureTextA(font, res.head.data, res.head.end());
 	res.head_width = size.x;
 	return res;
 }

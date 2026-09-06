@@ -1,0 +1,94 @@
+enum ParseError {
+    NotANumber,
+    Overeflow
+}
+
+// parse string until not a number character is encountered
+// var a : u64 = parseU64(text) else return;
+fn parseU64(a : []const u8) : u64 | ParseError {
+    var len = a.length;
+    if len < 1 { return ParseError.NotANumber; }
+    
+    var res : u64 = 0;
+
+    for i, c in a {
+        if c < '0' or c > '9' { 
+            if i == 0 { return ParseError.NotANumber; }
+            break; // end of number
+        }
+        const digit = (c - '0') as u64;
+        if res > (u64::max - digit) / 10 {
+            return ParseError.Overeflow;
+        }
+
+        res = 10 * res + digit;
+    }
+
+    return res;
+}
+
+fn parseU32(a : []u8) : u32 | ParseError {
+    var tmp : u64 = parseU64(a) else return;
+    if tmp > u32::max { return ParseError.Overeflow; }
+    return tmp as u32;
+}
+
+fn parseU16(a : []u8) : u16 | ParseError {
+    var tmp : u64 = parseU64(a) else return;
+    if tmp > u16::max { return ParseError.Overeflow; }
+    return tmp as u16;
+}
+
+fn parseU8(a : []u8) : u8 | ParseError {
+    var tmp : u64 = parseU64(a) else return;
+    if tmp > u8::max { return ParseError.Overeflow; }
+    return tmp as u8;
+}
+
+
+struct String {
+	buffer : [64]u8;
+	slice : []const u8;
+}
+
+fn integerToString(val : $T) : String {
+	var res : String = undefined;
+	var n : u64 = 0;
+	var negative = false;
+	match T::kind {
+		case .I8, .I16, .I32, .I64, .ISize:
+			negative = val < 0;
+			if negative {
+				// Convert through u64 so i64::min is handled without overflow.
+				n = (0 as u64) - (val as u64);
+			} else {
+				n = val as u64;
+			}
+		case .U8, .U16, .U32, .U64:
+			n = val as u64;
+		case:
+			panic("integerToString requires an integer type");
+	}
+	var pos : i32 = 63;
+	if n == 0 {
+		res.buffer[pos] = '0';
+		pos -= 1;
+	} else {
+		while n > 0 {
+			res.buffer[pos] = ('0' + (n % 10)) as u8;
+			pos -= 1;
+			n /= 10;
+		}
+	}
+	if negative {
+		res.buffer[pos] = '-';
+		pos -= 1;
+	}
+	res.slice = res.buffer[pos + 1:];
+	return res;
+}
+
+//fn buildString(buffer : []u8, args : ...any) : []const u8 {
+//	panic("TODO");
+//	return null;
+//}

@@ -103,6 +103,7 @@ export type World = {
 	animation: animation_module,
 	audio: audio_module,
 	core: core_module,
+	evox: evox_module,
 	lua_script: lua_script_module,
 	navigation: navigation_module,
 	physics: physics_module,
@@ -144,6 +145,23 @@ type SweepHit = {
 	normal: Vec3,
 	entity: Entity?,
 	distance: number,
+}
+
+type ControllerHitData = {
+	controller: Entity,
+	hit_entity: Entity,
+}
+
+type TriggerHitData = {
+	e1: Entity,
+	e2: Entity,
+	touch_lost: boolean,
+}
+
+type ContactHitData = {
+	e1: Entity,
+	e2: Entity,
+	position: Vec3,
 }
 
 type RayCastModelHit = {
@@ -288,6 +306,12 @@ type spline_component =  {
 type signal_component =  {
 }
 
+type evox_module = {
+}
+
+type evox_component =  {
+}
+
 type lua_script_module = {
 }
 
@@ -326,6 +350,7 @@ type navmesh_agent_component =  {
 	move_entity: boolean,
 	speed: number,
 	navigate: (navmesh_agent_component, DVec3, number, number) -> boolean,
+	isFinished: (navmesh_agent_component) -> boolean,
 	cancelNavigation: (navmesh_agent_component) -> (),
 	drawPath: (navmesh_agent_component, boolean) -> (),
 }
@@ -333,6 +358,9 @@ type navmesh_agent_component =  {
 type physics_module = {
 	raycast: (physics_module, Vec3, Vec3, number, Entity?) -> Entity?,
 	setGravity: (physics_module, Vec3) -> (),
+	getControllerHits: (physics_module) -> any,
+	getTriggerHits: (physics_module) -> any,
+	getContactHits: (physics_module) -> any,
 }
 
 type physical_heightfield_component =  {
@@ -636,6 +664,7 @@ export type Entity = {
 	ambient_sound: ambient_sound_component,
 	spline: spline_component,
 	signal: signal_component,
+	evox: evox_component,
 	lua_script: lua_script_component,
 	lua_script_inline: lua_script_inline_component,
 	navmesh_zone: navmesh_zone_component,
@@ -898,6 +927,19 @@ declare this : Entity
 			Z : number,
 			INVALID : number,
 			MAX : number,
+		},
+		InputDeviceType : {
+			MOUSE : number,
+			KEYBOARD : number,
+			GAMEPAD : number,
+		},
+		InputEventType : {
+			BUTTON : number,
+			AXIS : number,
+			MOUSE_WHEEL : number,
+			TEXT_INPUT : number,
+			DEVICE_ADDED : number,
+			DEVICE_REMOVED : number,
 		},
 		GrassRotationMode : {
 			Y_UP : number,

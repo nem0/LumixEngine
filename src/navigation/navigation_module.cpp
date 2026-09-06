@@ -345,7 +345,7 @@ struct NavigationModuleImpl final : NavigationModule
 	}
 
 
-	bool isFinished(EntityRef entity) override
+	bool isAgentFinished(EntityRef entity) override
 	{
 		return m_agents[entity].is_finished;
 	}

@@ -1,0 +1,55 @@
+import "core:inputdevicetype"
+
+struct InputSystem { system : cptr; }
+
+struct ButtonEvent {
+	device_type : InputDeviceType;
+	device_index : i32;
+	key_id : i32;
+	down : bool;
+	is_repeat : bool;
+	x : f32;
+	y : f32;
+}
+
+struct AxisEvent {
+	device_type : InputDeviceType;
+	device_index : i32;
+	x : f32;
+	y : f32;
+	x_abs : f32;
+	y_abs : f32;
+	axis : i32;
+}
+
+struct MouseWheelEvent {
+	device_type : InputDeviceType;
+	device_index : i32;
+	x : f32;
+	y : f32;
+}
+
+struct TextEvent {
+	device_type : InputDeviceType;
+	device_index : i32;
+	utf8 : i32;
+}
+
+struct DeviceAddedEvent {
+	device_type : InputDeviceType;
+	device_index : i32;
+}
+
+struct DeviceRemovedEvent {
+	device_type : InputDeviceType;
+	device_index : i32;
+}
+
+comptime InputEvent = ButtonEvent | AxisEvent | MouseWheelEvent | TextEvent | DeviceAddedEvent | DeviceRemovedEvent;
+
+extern fn getEventCount(system : InputSystem) : i32;
+extern fn getEvent(system: InputSystem, index : i32) : InputEvent;
+
+struct getEventsIterator { next : fn(iter : *getEventsIterator, out : *InputEvent) : bool; system : InputSystem; index : i32; }
+fn getEventsNext(iter : *getEventsIterator, out : *InputEvent) : bool { iter.index += 1; if iter.index >= getEventCount(iter.system) { return false; } out.* = getEvent(iter.system, iter.index); return true; }
+fn getEvents(system : InputSystem) : getEventsIterator { return { getEventsNext, system, -1 }; }

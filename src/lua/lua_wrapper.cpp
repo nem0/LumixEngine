@@ -103,7 +103,7 @@ bool execute(lua_State* L
 	lua_pushcfunction(L, traceback, "traceback");
 	
 	size_t bytecode_size = 0;
-	char* bytecode = luau_compile((const char*)content.begin, content.size(), NULL, &bytecode_size);
+	char* bytecode = luau_compile(content.data, content.length, NULL, &bytecode_size);
 	if (bytecode_size == 0) {
 		logError(name, ": ", bytecode);
 		free(bytecode);

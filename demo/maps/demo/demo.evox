@@ -1,0 +1,210 @@
+import "core:dvec3"
+import "core:entity"
+import "core:keycode"
+import "core:input"
+import "core:log"
+import "core:model_instance"
+import "core:navmesh_agent"
+import "core:quat"
+import "core:random"
+import "core:world"
+import "core:ui"
+import "core:evox_data" as ld
+import "scripts/player" as player
+import "std:math" as math
+import "maps/demo/random_walk" as random_walk
+
+// constants
+comptime INTERACTION_DIST = 1.5;
+
+enum ButtonAction {
+	SPAWN_NAV_AGENT,
+	OPEN_MENU,
+	PHYSICS_TEST
+}
+
+// structs
+#[ld.Data {}]
+struct RandomColorComponent {
+	#[ld.Owner {}]
+	entity: Entity;
+}
+
+#[ld.Data {}]
+struct RandomColorTickComponent {
+	#[ld.Owner {}]
+	entity: Entity;
+	t : f32;
+	green : f32;
+}
+
+#[ld.Data {}]
+struct Button {
+	#[ld.Owner {}]
+	entity: Entity;
+	action: ButtonAction;
+}
+
+#[ld.Data {}]
+struct NavAgentSpawnPoint {
+	#[ld.Owner {}]
+	entity: Entity;
+}
+
+#[ld.Data {}]
+struct NavAgentWaypoint {
+	#[ld.Owner {}]
+	entity: Entity;
+}
+
+#[ld.Data {}]
+struct PhysicsTestObject {
+	#[ld.Owner {}]
+	entity: Entity;
+	start_pos : DVec3;
+	start_rot : Quat;
+}
+
+// global vars
+var g_world : World = undefined;
+
+// functions
+fn abs(v : f32) : f32 { return v < 0 ? -v : v; }
+
+fn enableCursor(ui : UIModule, enable : bool) : void {
+	var sys = ui.getSystem();
+	sys.enableCursor(enable);
+}
+
+fn start(world : World) : void {
+	g_world = world;
+
+	// random color
+	var random_color_components = world.getEvoxData(RandomColorComponent);
+
+	for c in random_color_components {
+		var mi = c.entity.model_instance() else return;
+		mi.overrideMaterialVec4(0, "Material color", {0, randFloat(), randFloat(), 1});
+	}
+
+	var rnd_col = g_world.getEvoxData(RandomColorTickComponent);
+	for &c in rnd_col {
+		c.green = randFloat();
+	}
+
+	var objs = g_world.getEvoxData(PhysicsTestObject);
+	for &obj in objs {
+		obj.start_pos = obj.entity.getPosition();
+		obj.start_rot = obj.entity.getRotation();
+	}
+
+	var ui = g_world.ui() else return;
+	enableCursor(ui, true);
+}
+
+struct ClosestButton {
+	button : Button;
+	dist : f64;
+}
+
+fn findClosestButton() : ClosestButton {
+	if const pl = player.player { 
+		const player_pos = pl.getPosition();
+		const buttons = g_world.getEvoxData(Button);
+		if buttons.length == 0 { panic("No buttons"); }
+
+		var closest_button : Button = buttons[0];
+		var closest_dist = f64::max;
+		for button in buttons {
+			var button_pos = button.entity.getPosition();
+			var dist = length(player_pos - button_pos);
+			if dist < closest_dist {
+				closest_dist = dist;
+				closest_button = button;
+			}
+		}
+		return {closest_button, closest_dist};
+	}
+	panic("Null player");
+}
+
+fn spawnNavAgent() : void {
+	var spawn_point = g_world.getEvoxData(NavAgentSpawnPoint);
+	if spawn_point.length != 1 {
+		logError("There must be exactly one spawn point");
+		return;
+	}
+	var pos = spawn_point[0].entity.getPosition();
+	var agent = g_world.createEntity();
+	agent.setPosition(pos);
+	agent.setScale({0.3, 1.5, 0.3});
+	agent.createAgent();
+	var mi = agent.createModelInstance() else return;
+	mi.setModelInstancePath("engine/models/cylinder.fbx");
+}
+
+fn resetPhysicsTest() : void {
+	var objs = g_world.getEvoxData(PhysicsTestObject);
+	for obj in objs {
+		obj.entity.setPosition(obj.start_pos);
+		obj.entity.setRotation(obj.start_rot);
+	}
+}
+
+fn update(td : f32, input : InputSystem) : void {
+    player.update(td);
+	random_walk.update(g_world, td);
+
+	// random color tick
+	const rnd_col = g_world.getEvoxData(RandomColorTickComponent);
+	for &c in rnd_col {
+		c.t = c.t + td * 3;
+		var mi = c.entity.model_instance() else return;
+		mi.overrideMaterialVec4(0, "Material color", {0, c.green, abs(math.cos(c.t)), 1});	
+	}
+
+	// UI
+	var ui = g_world.ui() else return;
+	var doc = ui.getDocument();
+	var events = doc.getEvents();
+
+	for event in events {
+		match event.action {
+			case "start":
+				player.handle_input = true;
+				enableCursor(ui, false);
+				var elem = doc.getElement(0) else return;
+				elem.setVisible(false);
+			case "close":
+				player.handle_input = true;
+				enableCursor(ui, false);
+				var elem = doc.getElementByID("runtime_ui") else return;
+				elem.setVisible(false);
+		}
+	}
+
+	// input
+	for event in getEvents(input) {
+		match event {
+			case ButtonEvent:
+				if event.device_type == .KEYBOARD and event.key_id as Keycode == .F {
+					const closest = findClosestButton();
+					if closest.dist < INTERACTION_DIST {
+						match closest.button.action {
+							case .OPEN_MENU:
+								var elem = doc.getElementByID("runtime_ui") else return;
+								elem.setVisible(true);
+								player.handle_input = false;
+								enableCursor(ui, true);
+							case .PHYSICS_TEST:
+								resetPhysicsTest();
+							case .SPAWN_NAV_AGENT:
+								spawnNavAgent();
+							case: panic("TODO");
+						}
+					}
+				}
+			case:
+		}
+	}
+}

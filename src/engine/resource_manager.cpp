@@ -135,7 +135,9 @@ ResourceManager::ResourceManager(IAllocator& allocator)
 
 ResourceManager::~ResourceManager()
 {
-	ASSERT(m_resources.empty());
+	if (!m_resources.empty()) {
+		logError("Leaking resources");
+	}
 }
 
 ResourceManagerHub::ResourceManagerHub(Engine& engine, IAllocator& allocator) 

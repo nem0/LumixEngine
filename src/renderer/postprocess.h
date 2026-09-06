@@ -725,10 +725,10 @@ struct SSAO : public RenderPlugin {
 	float m_depth_diff_weight = 2;
 	float m_radius = 0.4f;
 	float m_intensity = 1.f;
-	IVec2 m_temporal_size;
 
 	struct PipelineInstanceData {
 		RenderBufferHandle m_history_rb = INVALID_RENDERBUFFER;
+		IVec2 temporal_size;
 	};
 
 	SSAO(Renderer& renderer) : m_renderer(renderer) {}
@@ -822,7 +822,7 @@ struct SSAO : public RenderPlugin {
 		}
 
 		if (m_temporal) {
-			if (data->m_history_rb == INVALID_RENDERBUFFER || width != m_temporal_size.x || height != m_temporal_size.y) {
+			if (data->m_history_rb == INVALID_RENDERBUFFER || width != data->temporal_size.x || height != data->temporal_size.y) {
 				renderer.releaseRenderbuffer(data->m_history_rb);
 				data->m_history_rb = renderer.createRenderbuffer({
 					.size = IVec2(width, height),
@@ -830,7 +830,7 @@ struct SSAO : public RenderPlugin {
 					.flags = gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET,
 					.debug_name = "ssao"
 				});
-				m_temporal_size = IVec2(width, height);
+				data->temporal_size = IVec2(width, height);
 				// TODO compute shader
 				renderer.setRenderTargets(Span(&data->m_history_rb, 1), INVALID_RENDERBUFFER);
 				pipeline.clear(gpu::ClearFlags::ALL, 1, 1, 1, 1, 1);
@@ -941,10 +941,10 @@ struct TDAO : public RenderPlugin {
 	float m_intensity = 0.9f;
 	bool m_enabled = true;
 	float m_scale = 0.01f;
-	DVec3 m_last_camera_pos = DVec3(DBL_MAX);
 	
 	struct PipelineInstanceData {
 		RenderBufferHandle rb = INVALID_RENDERBUFFER;
+		DVec3 last_camera_pos = DVec3(DBL_MAX);
 	};
 
 	TDAO(Renderer& renderer) : m_renderer(renderer) {}
@@ -985,14 +985,16 @@ struct TDAO : public RenderPlugin {
 		if (pipeline.getType() == PipelineType::PREVIEW) return;
 		PROFILE_FUNCTION();
 		auto* inst_data = pipeline.getData<PipelineInstanceData>();
+		Renderer& renderer = pipeline.getRenderer();
 
 		if (!m_enabled) {
-			m_last_camera_pos = DVec3(DBL_MAX);
-			inst_data->rb = INVALID_RENDERBUFFER;
+			if (inst_data->rb != INVALID_RENDERBUFFER) {
+				renderer.releaseRenderbuffer(inst_data->rb);
+				inst_data->rb = INVALID_RENDERBUFFER;
+			}
+			inst_data->last_camera_pos = DVec3(DBL_MAX);
 			return;
 		}
-
-		Renderer& renderer = pipeline.getRenderer();
 
 		pipeline.beginBlock("tdao");
 		if (inst_data->rb == INVALID_RENDERBUFFER) {
@@ -1005,9 +1007,9 @@ struct TDAO : public RenderPlugin {
 		DrawStream& stream = renderer.getDrawStream();
 
 		const Viewport& vp = pipeline.getViewport();
-		const bool camera_moved = fabs(vp.pos.x - m_last_camera_pos.x) > 3 || fabs(vp.pos.y - m_last_camera_pos.y) > 3 || fabs(vp.pos.z - m_last_camera_pos.z) > 3;
+		const bool camera_moved = fabs(vp.pos.x - inst_data->last_camera_pos.x) > 3 || fabs(vp.pos.y - inst_data->last_camera_pos.y) > 3 || fabs(vp.pos.z - inst_data->last_camera_pos.z) > 3;
 		if (camera_moved) {
-			m_last_camera_pos = vp.pos;
+			inst_data->last_camera_pos = vp.pos;
 			renderer.setRenderTargets({}, inst_data->rb);
 			pipeline.clear(gpu::ClearFlags::ALL, 0, 0, 0, 1, 0);
 
@@ -1059,7 +1061,7 @@ struct TDAO : public RenderPlugin {
 			gpu::RWBindlessHandle u_gbufferB;
 			gpu::BindlessHandle u_topdown_depthmap;
 		} ubdata = {
-			Vec4(Vec3(vp.pos - m_last_camera_pos), 0),
+			Vec4(Vec3(vp.pos - inst_data->last_camera_pos), 0),
 			Vec2(1.f / vp.w, 1.f / vp.h),
 			m_intensity,
 			1.f / m_xz_range,

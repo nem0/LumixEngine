@@ -7,11 +7,24 @@ Triggers are special collision shapes that detect when other objects enter or ex
 - Creating invisible boundaries or checkpoints
 - Implementing pickup detection for items
 
-When an object enters or exits a trigger, the `onTrigger` function is called with the entity that triggered the event and a boolean indicating whether contact was lost.
+Trigger events can be polled each frame using the physics module's polling functions. Call `getNumTriggerHits()` to get the number of trigger events for the current frame, then use `getTriggerHit()` to retrieve each event:
 
 ```lua
-function onTrigger(entity, touch_lost)
-	LumixAPI.logError("trigger")
-	LumixAPI.logError(entity.name)
+import "core:physics" as physics
+
+function update()
+	let num_hits = physics.getNumTriggerHits()
+	for i = 0..num_hits {
+		let hit = physics.getTriggerHit(i)
+		let entity1 = hit.e1
+		let entity2 = hit.e2
+		let touch_lost = hit.touch_lost
+		
+		if touch_lost {
+			-- Entity exited the trigger
+		} else {
+			-- Entity entered the trigger
+		}
+	}
 end
 ```

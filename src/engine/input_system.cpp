@@ -45,9 +45,9 @@ struct InputSystemImpl final : InputSystem {
 		, m_down_keys(m_allocator)
 		, m_gamepad_devices(m_allocator) {
 		m_mouse_device = LUMIX_NEW(m_allocator, MouseDevice);
-		m_mouse_device->type = Device::MOUSE;
+		m_mouse_device->type = InputDeviceType::MOUSE;
 		m_keyboard_device = LUMIX_NEW(m_allocator, KeyboardDevice);
-		m_keyboard_device->type = Device::KEYBOARD;
+		m_keyboard_device->type = InputDeviceType::KEYBOARD;
 		m_devices.push(m_keyboard_device);
 		m_devices.push(m_mouse_device);
 	}
@@ -66,7 +66,7 @@ struct InputSystemImpl final : InputSystem {
 	void addDevice(Device* device) override {
 		m_devices.push(device);
 		Event event;
-		event.type = Event::DEVICE_ADDED;
+		event.type = InputEventType::DEVICE_ADDED;
 		event.device = device;
 		injectEvent(event);
 	}
@@ -78,7 +78,7 @@ struct InputSystemImpl final : InputSystem {
 		m_to_remove.push(device);
 
 		Event event;
-		event.type = Event::DEVICE_REMOVED;
+		event.type = InputEventType::DEVICE_REMOVED;
 		event.device = device;
 		injectEvent(event);
 	}
@@ -117,7 +117,7 @@ struct InputSystemImpl final : InputSystem {
 				GamepadDevice* device = getOrCreateGamepadDevice(event.gamepad_axis.gamepad);
 
 				Event input_event;
-				input_event.type = Event::AXIS;
+				input_event.type = InputEventType::AXIS;
 				input_event.device = device;
 				input_event.data.axis.x_abs = 0;
 				input_event.data.axis.y_abs = 0;
@@ -137,7 +137,7 @@ struct InputSystemImpl final : InputSystem {
 				GamepadDevice* device = getOrCreateGamepadDevice(event.gamepad_button.gamepad);
 
 				Event input_event;
-				input_event.type = Event::BUTTON;
+				input_event.type = InputEventType::BUTTON;
 				input_event.device = device;
 				input_event.data.button.key_id = (int)event.gamepad_button.button;
 				input_event.data.button.is_repeat = false;
@@ -149,7 +149,7 @@ struct InputSystemImpl final : InputSystem {
 			}
 			case os::Event::Type::MOUSE_BUTTON: {
 				Event input_event;
-				input_event.type = Event::BUTTON;
+				input_event.type = InputEventType::BUTTON;
 				input_event.device = m_mouse_device;
 				input_event.data.button.key_id = (int)event.mouse_button.button;
 				input_event.data.button.is_repeat = false;
@@ -162,7 +162,7 @@ struct InputSystemImpl final : InputSystem {
 			}
 			case os::Event::Type::MOUSE_MOVE: {
 				Event input_event;
-				input_event.type = Event::AXIS;
+				input_event.type = InputEventType::AXIS;
 				input_event.device = m_mouse_device;
 				const os::Point cp = os::getMouseScreenPos();
 				input_event.data.axis.x_abs = (float)cp.x - mouse_base_x;
@@ -174,7 +174,7 @@ struct InputSystemImpl final : InputSystem {
 			}
 			case os::Event::Type::MOUSE_WHEEL: {
 				Event input_event;
-				input_event.type = Event::MOUSE_WHEEL;
+				input_event.type = InputEventType::MOUSE_WHEEL;
 				input_event.device = m_mouse_device;
 				input_event.data.mouse_wheel.x = 0; // TODO
 				input_event.data.mouse_wheel.y = (float)event.mouse_wheel.amount;
@@ -183,7 +183,7 @@ struct InputSystemImpl final : InputSystem {
 			}
 			case os::Event::Type::KEY: {
 				Event input_event;
-				input_event.type = Event::BUTTON;
+				input_event.type = InputEventType::BUTTON;
 				input_event.device = m_keyboard_device;
 				input_event.data.button.down = event.key.down;
 				input_event.data.button.key_id = (int)event.key.keycode;
@@ -202,7 +202,7 @@ struct InputSystemImpl final : InputSystem {
 			}
 			case os::Event::Type::CHAR: {
 				Event input_event;
-				input_event.type = Event::TEXT_INPUT;
+				input_event.type = InputEventType::TEXT_INPUT;
 				input_event.device = m_keyboard_device;
 				input_event.data.text.utf8 = event.text_input.utf8;
 				injectEvent(input_event);
@@ -215,7 +215,7 @@ struct InputSystemImpl final : InputSystem {
 	void resetDownKeys() override {
 		for (const ButtonEvent& e : m_down_keys) {
 			Event event;
-			event.type = Event::BUTTON;
+			event.type = InputEventType::BUTTON;
 			event.device = m_keyboard_device;
 			event.data.button.down = false;
 			event.data.button.x = e.x;
@@ -255,7 +255,7 @@ private:
 		if (device) return device;
 
 		device = LUMIX_NEW(m_allocator, GamepadDevice)(uid);
-		device->type = Device::GAMEPAD;
+		device->type = InputDeviceType::GAMEPAD;
 		m_gamepad_devices.push(device);
 		addDevice(device);
 		return device;

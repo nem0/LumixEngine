@@ -368,14 +368,14 @@ template <> LUMIX_EDITOR_API Path readFromStream<Path>(InputMemoryStream& stream
 
 template <> LUMIX_EDITOR_API void writeToStream<const Path&>(OutputMemoryStream& stream, const Path& path) {
 	StringView str = path;
-	stream.write(str.begin, str.size());
+	stream.write(str.data, str.length);
 	stream.write((char)0);
 }
 
 
 template <> LUMIX_EDITOR_API void writeToStream<Path>(OutputMemoryStream& stream, Path path) {
 	StringView str = path;
-	stream.write(str.begin, str.size());
+	stream.write(str.data, str.length);
 	stream.write((char)0);
 }
 

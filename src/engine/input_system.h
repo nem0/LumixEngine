@@ -9,15 +9,26 @@ namespace Lumix {
 template <typename T> struct UniquePtr;
 namespace os { struct Event; }
 
+//@ enum
+enum class InputDeviceType : u32 {
+	MOUSE,
+	KEYBOARD,
+	GAMEPAD
+};
+
+//@ enum
+enum InputEventType : u32 {
+	BUTTON,
+	AXIS,
+	MOUSE_WHEEL,
+	TEXT_INPUT,
+	DEVICE_ADDED,
+	DEVICE_REMOVED
+};
+
 struct LUMIX_ENGINE_API InputSystem {
 	struct Device {
-		enum Type : u32 {
-			MOUSE,
-			KEYBOARD,
-			GAMEPAD
-		};
-
-		Type type;
+		InputDeviceType type;
 		u32 index = 0;
 
 		virtual ~Device() {}
@@ -57,16 +68,7 @@ struct LUMIX_ENGINE_API InputSystem {
 	};
 
 	struct Event {
-		enum Type : u32 {
-			BUTTON,
-			AXIS,
-			MOUSE_WHEEL,
-			TEXT_INPUT,
-			DEVICE_ADDED,
-			DEVICE_REMOVED
-		};
-
-		Type type;
+		InputEventType type;
 		Device* device;
 		union EventData {
 			ButtonEvent button;

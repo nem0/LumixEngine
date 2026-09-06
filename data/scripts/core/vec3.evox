@@ -1,0 +1,118 @@
+import "std:math" as math
+
+extern struct Vec3 {
+	x : f32;
+	y : f32;
+	z : f32;
+}
+
+operator +(a : Vec3, b : Vec3) : Vec3 {
+	return Vec3 {
+		a.x + b.x,
+		a.y + b.y,
+		a.z + b.z
+	};
+}
+
+operator -(a : Vec3, b : Vec3) : Vec3 {
+	return Vec3 {
+		a.x - b.x,
+		a.y - b.y,
+		a.z - b.z
+	};
+}
+
+operator -(a : Vec3) : Vec3 {
+	return Vec3 {
+		-a.x,
+		-a.y,
+		-a.z
+	};
+}
+
+operator *(a : Vec3, b : f32) : Vec3 {
+	return Vec3 {
+		a.x * b,
+		a.y * b,
+		a.z * b
+	};
+}
+
+operator *(a : f32, b : Vec3) : Vec3 {
+	return Vec3 {
+		a * b.x,
+		a * b.y,
+		a * b.z
+	};
+}
+
+operator /(a : Vec3, b : f32) : Vec3 {
+	return Vec3 {
+		a.x / b,
+		a.y / b,
+		a.z / b
+	};
+}
+
+fn lengthSquared(v : Vec3) : f32 {
+	return v.x * v.x + v.y * v.y + v.z * v.z;
+}
+
+fn distanceSquared(a : Vec3, b : Vec3) : f32 {
+	const x = a.x - b.x;
+	const y = a.y - b.y;
+	const z = a.z - b.z;
+	return x * x + y * y + z * z;
+}
+
+fn length(v : Vec3) : f32 {
+	// TODO
+	return 1.0;
+}
+
+fn normalizeSafe(v : Vec3) : Vec3 {
+	const l = length(v);
+	if l > -0.000001 and l < 0.000001 {
+		return v;
+	}
+	const t = 1.0 / l;
+	return Vec3 {
+		v.x * t,
+		v.y * t,
+		v.z * t
+	};
+}
+
+fn normalize(v : Vec3) : Vec3 {
+	const l = length(v);
+	const t = 1.0 / l;
+	return Vec3 {
+		v.x * t,
+		v.y * t,
+		v.z * t
+	};
+}
+
+fn dot(a : Vec3, b : Vec3) : f32 {
+	return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+fn cross(a : Vec3, b : Vec3) : Vec3 {
+	return Vec3 {
+		a.y * b.z - a.z * b.y,
+		a.z * b.x - a.x * b.z,
+		a.x * b.y - a.y * b.x
+	};
+}
+
+fn lerp(a : Vec3, b : Vec3, t : f32) : Vec3 {
+	return Vec3 {
+		a.x + (b.x - a.x) * t,
+		a.y + (b.y - a.y) * t,
+		a.z + (b.z - a.z) * t
+	};
+}
+
+fn yawToDir(value : f32) : Vec3 {
+	return { math.sin(value), 0.0, math.cos(value) };
+}

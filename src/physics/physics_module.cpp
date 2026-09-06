@@ -254,8 +254,8 @@ struct PhysicsModuleImpl final : PhysicsModule
 
 	struct PhysxContactCallback final : PxSimulationEventCallback
 	{
-		explicit PhysxContactCallback(PhysicsModuleImpl& module)
-			: m_module(module)
+		explicit PhysxContactCallback(PhysicsModuleImpl& module, IAllocator& allocator)
+			: m_module(module), m_trigger_hits(allocator), m_contact_hits(allocator)
 		{
 		}
 
@@ -276,12 +276,12 @@ struct PhysicsModuleImpl final : PhysicsModule
 				PxContactPairPoint contact;
 				cp.extractContacts(&contact, 1);
 
-				ContactData contact_data;
-				contact_data.position = fromPhysx(contact.position);
-				contact_data.e1 = EntityRef{(int)(intptr_t)(pairHeader.actors[0]->userData)};
-				contact_data.e2 = EntityRef{(int)(intptr_t)(pairHeader.actors[1]->userData)};
+				ContactHitData hit;
+				hit.position = fromPhysx(contact.position);
+				hit.e1 = EntityRef{(int)(intptr_t)(pairHeader.actors[0]->userData)};
+				hit.e2 = EntityRef{(int)(intptr_t)(pairHeader.actors[1]->userData)};
 
-				m_module.onContact(contact_data);
+				m_contact_hits.push(hit);
 			}
 		}
 
@@ -297,7 +297,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 				EntityRef e1 = EntityRef{(int)(intptr_t)(pairs[i].triggerActor->userData)};
 				EntityRef e2 = EntityRef{(int)(intptr_t)(pairs[i].otherActor->userData)};
 
-				m_module.onTrigger(e1, e2, pairs[i].status == PxPairFlag::eNOTIFY_TOUCH_LOST);
+				m_trigger_hits.push({e1, e2, pairs[i].status == PxPairFlag::eNOTIFY_TOUCH_LOST});
 			}
 		}
 
@@ -306,8 +306,9 @@ struct PhysicsModuleImpl final : PhysicsModule
 		void onWake(PxActor**, PxU32) override {}
 		void onSleep(PxActor**, PxU32) override {}
 
-
 		PhysicsModuleImpl& m_module;
+		Array<TriggerHitData> m_trigger_hits;
+		Array<ContactHitData> m_contact_hits;
 	};
 
 
@@ -462,67 +463,8 @@ struct PhysicsModuleImpl final : PhysicsModule
 		m_scene->release();
 	}
 
-	// TODO move to lua plugin
-	void onTrigger(EntityRef e1, EntityRef e2, bool touch_lost)
-	{
-		if (!m_script_module) return;
 
-		auto send = [this, touch_lost](EntityRef e1, EntityRef e2) {
-			if (!m_script_module->getWorld().hasComponent(e1, types::lua_script)) return;
 
-			for (int i = 0, c = m_script_module->getScriptCount(e1); i < c; ++i)
-			{
-				auto* call = m_script_module->beginFunctionCall(e1, i, "onTrigger");
-				if (!call) continue;
-
-				call->add(e2);
-				call->add(touch_lost);
-				m_script_module->endFunctionCall();
-			}
-		};
-
-		send(e1, e2);
-		send(e2, e1);
-	}
-
-	// TODO move to lua plugin
-	void onControllerHit(EntityRef controller, EntityRef obj) {
-		if (!m_script_module) return;
-		if (!m_script_module->getWorld().hasComponent(controller, types::lua_script)) return;
-
-		for (int i = 0, c = m_script_module->getScriptCount(controller); i < c; ++i) {
-			auto* call = m_script_module->beginFunctionCall(controller, i, "onControllerHit");
-			if (!call) continue;
-
-			call->add(obj);
-			m_script_module->endFunctionCall();
-		}
-	}
-
-	void onContact(const ContactData& contact_data)
-	{
-		if (!m_script_module) return;
-
-		auto send = [this](EntityRef e1, EntityRef e2, const Vec3& position) {
-			if (!m_script_module->getWorld().hasComponent(e1, types::lua_script)) return;
-
-			for (int i = 0, c = m_script_module->getScriptCount(e1); i < c; ++i)
-			{
-				auto* call = m_script_module->beginFunctionCall(e1, i, "onContact");
-				if (!call) continue;
-
-				call->add(e2.index);
-				call->add(position.x);
-				call->add(position.y);
-				call->add(position.z);
-				m_script_module->endFunctionCall();
-			}
-		};
-
-		send(contact_data.e1, contact_data.e2, contact_data.position);
-		send(contact_data.e2, contact_data.e1, contact_data.position);
-		m_contact_callbacks.invoke(contact_data);
-	}
 
 
 	u32 getDebugVisualizationFlags() const override { return m_debug_visualization_flags; }
@@ -1879,6 +1821,10 @@ struct PhysicsModuleImpl final : PhysicsModule
 	void update(float time_delta) override {
 		if (!m_is_game_running) return;
 
+		m_hit_report.m_hits.clear();
+		m_contact_callback.m_trigger_hits.clear();
+		m_contact_callback.m_contact_hits.clear();
+
 		updateDynamicActors(true);
 		updateControllers(time_delta);
 
@@ -1886,7 +1832,6 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 
-	DelegateList<void(const ContactData&)>& onContact() override { return m_contact_callbacks; }
 
 
 	void initJoint(EntityRef entity, Joint& joint)
@@ -2358,6 +2303,18 @@ struct PhysicsModuleImpl final : PhysicsModule
 
 	void setControllerUseRootMotion(EntityRef entity, bool enable) override {
 		m_controllers[entity].use_root_motion = enable;
+	}
+
+	Span<const ControllerHitData> getControllerHits() override {
+		return m_hit_report.m_hits;
+	}
+
+	Span<const TriggerHitData> getTriggerHits() override {
+		return m_contact_callback.m_trigger_hits;
+	}
+
+	Span<const ContactHitData> getContactHits() override {
+		return m_contact_callback.m_contact_hits;
 	}
 
 	void resizeController(EntityRef entity, float height) override
@@ -3782,18 +3739,19 @@ struct PhysicsModuleImpl final : PhysicsModule
 	};
 
 	struct HitReport : PxUserControllerHitReport {
-		HitReport(PhysicsModuleImpl& module) : module(module) {}
+		HitReport(PhysicsModuleImpl& module, IAllocator& allocator) : module(module), m_hits(allocator) {}
 		void onShapeHit(const PxControllerShapeHit& hit) override {
 			void* user_data = hit.controller->getActor()->userData;
 			const EntityRef e1 {(i32)(uintptr)user_data};
 			const EntityRef e2 {(i32)(uintptr)hit.actor->userData};
 
-			module.onControllerHit(e1, e2);
+			m_hits.push({e1, e2});
 		}
 		void onControllerHit(const PxControllersHit& hit) override {}
 		void onObstacleHit(const PxControllerObstacleHit& hit) override {}
 
 		PhysicsModuleImpl& module;
+		Array<ControllerHitData> m_hits;
 	} ;
 
 	struct InstancedCube {
@@ -3840,7 +3798,6 @@ struct PhysicsModuleImpl final : PhysicsModule
 	Array<EntityRef> m_dynamic_actors;
 	RigidActor* m_update_in_progress;
 	EntityPtr m_moving_controller = INVALID_ENTITY;
-	DelegateList<void(const ContactData&)> m_contact_callbacks;
 	bool m_is_game_running;
 	u32 m_debug_visualization_flags;
 	CPUDispatcher m_cpu_dispatcher;
@@ -3860,15 +3817,14 @@ PhysicsModuleImpl::PhysicsModuleImpl(Engine& engine, World& world, PhysicsSystem
 	, m_instanced_meshes(m_allocator)
 	, m_world(world)
 	, m_is_game_running(false)
-	, m_contact_callback(*this)
-	, m_contact_callbacks(m_allocator)
+	, m_contact_callback(*this, allocator)
 	, m_joints(m_allocator)
 	, m_script_module(nullptr)
 	, m_debug_visualization_flags(0)
 	, m_update_in_progress(nullptr)
 	, m_vehicle_batch_query(nullptr)
 	, m_system(&system)
-	, m_hit_report(*this)
+	, m_hit_report(*this, allocator)
 	, m_layers(m_system->getCollisionLayers())
 	, m_resource_actor_map(m_allocator)
 {

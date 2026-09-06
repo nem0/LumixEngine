@@ -18,23 +18,25 @@ LUMIX_CORE_API int stringLength(const char* str);
 // a range of characters between begin (inclusive) and end (exclusive)
 struct LUMIX_CORE_API StringView {
 	StringView() {}
-	StringView(Span<const u8> str) : begin((const char*)str.m_begin), end((const char*)str.m_end) {}
-	StringView(const char* str) : begin(str), end(str ? str + stringLength(str) : 0) {}
-	StringView(const char* str, u32 len) : begin(str), end(str + len) {}
-	StringView(const char* begin, const char* end) : begin(begin), end(end) {}
+	StringView(Span<const u8> str) : data((const char*)str.m_begin), length(str.length()) {}
+	StringView(const char* str) : data(str), length(str ? u64(stringLength(str)) : 0) {}
+	StringView(const char* str, u64 len) : data(str), length(len) {}
+	StringView(const char* begin, const char* end) : data(begin), length(begin && end ? u64(end - begin) : 0) { ASSERT(end >= begin); }
 	template <int N> StringView(const StaticString<N>& str);
 
-	u32 size() const { return u32(end - begin); }
-	char operator[](u32 idx) { ASSERT(!end || begin + idx < end); return begin[idx]; }
-	char back() const { ASSERT(end && begin != end); return *(end - 1); }
-	void removeSuffix(u32 count) { ASSERT(count <= size()); end -= count; }
-	void removePrefix(u32 count) { ASSERT(count <= size()); begin += count; }
-	bool empty() const { return begin == end || !begin[0]; }
+	const char* begin() const { return data; }
+	const char* end() const { return data ? data + length : nullptr; }
+	u64 size() const { return length; }
+	char operator[](u64 idx) const { ASSERT(idx < length); return data[idx]; }
+	char back() const { ASSERT(length > 0); return data[length - 1]; }
+	void removeSuffix(u64 count) { ASSERT(count <= length); length -= count; }
+	void removePrefix(u64 count) { ASSERT(count <= length); data += count; length -= count; }
+	bool empty() const { return length == 0; }
 	bool operator==(const StringView& rhs) const;
-	StringView withoutLeft(u32 count) const { ASSERT(count <= size()); return {begin + count, end}; }
+	StringView withoutLeft(u64 count) const { ASSERT(count <= length); return {data + count, length - count}; }
 
-	const char* begin = nullptr;
-	const char* end = nullptr;
+	const char* data = nullptr;
+	u64 length = 0;
 };
 
 LUMIX_CORE_API char toLower(char c);
@@ -61,7 +63,6 @@ LUMIX_CORE_API const char* fromCString(StringView input, i64& value);
 LUMIX_CORE_API const char* fromCString(StringView input, u32& value);
 LUMIX_CORE_API const char* fromCString(StringView input, u16& value);
 LUMIX_CORE_API const char* fromCString(StringView input, float& value);
-LUMIX_CORE_API const char* fromCString(StringView input, bool& value);
 LUMIX_CORE_API const char* fromCStringOctal(StringView input, u32& value);
 
 LUMIX_CORE_API char* copyString(Span<char> output, StringView source);
@@ -171,8 +172,8 @@ private:
 };
 
 template <int N> StringView::StringView(const StaticString<N>& str)
-	: begin(str.data)
-	, end(str.data + stringLength(str.data))
+	: data(str.data)
+	, length(u64(stringLength(str.data)))
 {}
 
 } // namespace Lumix

@@ -11,6 +11,7 @@ extern const ComponentType audio_listener = reflection::getComponentType("audio_
 extern const ComponentType ambient_sound = reflection::getComponentType("ambient_sound");
 extern const ComponentType spline = reflection::getComponentType("spline");
 extern const ComponentType signal = reflection::getComponentType("signal");
+extern const ComponentType evox = reflection::getComponentType("evox");
 extern const ComponentType lua_script = reflection::getComponentType("lua_script");
 extern const ComponentType lua_script_inline = reflection::getComponentType("lua_script_inline");
 extern const ComponentType navmesh_zone = reflection::getComponentType("navmesh_zone");

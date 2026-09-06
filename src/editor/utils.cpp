@@ -867,8 +867,8 @@ struct CodeEditorImpl final : CodeEditor {
 				}
 				case INSERT: {
 					StringView sv;
-					sv.begin = (const char*)text.data();
-					sv.end = sv.begin + text.size();
+					sv.data = (const char*)text.data();
+					sv.length = text.size();
 					to = editor.rawInsertText(from, sv);
 					editor.invalidateTokens(point.line);
 					break;
@@ -920,8 +920,8 @@ struct CodeEditorImpl final : CodeEditor {
 					break;
 				case REMOVE: {
 					StringView sv;
-					sv.begin = (const char*)text.data();
-					sv.end = (const char*)text.data() + text.size();
+					sv.data = (const char*)text.data();
+					sv.length = text.size();
 					editor.rawInsertText(from, sv);
 					editor.invalidateTokens(from.line);
 					break;
@@ -936,10 +936,14 @@ struct CodeEditorImpl final : CodeEditor {
 		, m_allocator(app.getAllocator(), "code_editor")
 		, m_lines(m_allocator)
 		, m_underlines(m_allocator)
+		, m_breakpoints(m_allocator)
 		, m_cursors(m_allocator)
 		, m_undo_stack(m_allocator)
 		, m_dpi_scale(maximum(1.f, os::getDPI() / 96.f))
 	{
+		// Keep the editor valid before the first document is assigned.  gui() assumes
+		// there is at least one line (and an empty document still has one empty line).
+		m_lines.emplace("", m_allocator);
 		m_cursors.emplace(Cursor{0, 0});
 	}
 
@@ -1046,8 +1050,8 @@ struct CodeEditorImpl final : CodeEditor {
 	StringView toStringView(const Token& token, u32 line) {
 		const char* str = m_lines[line].value.c_str();
 		StringView res;
-		res.begin = str + token.from;
-		res.end = res.begin + token.len;
+		res.data = str + token.from;
+		res.length = token.len;
 		return res;
 	}
 
@@ -1277,14 +1281,16 @@ struct CodeEditorImpl final : CodeEditor {
 
 		struct Iter {
 			bool operator != (const Iter& rhs) { 
-				return view.begin != rhs.view.begin || view.end != rhs.view.end || end != rhs.end;
+				return view.data != rhs.view.data || view.end() != rhs.view.end() || end != rhs.end;
 			}
 			
 			void operator ++() {
-				view.begin = view.end;
+				view.data = view.end();
+				const char* line_end = view.data;
 				// TODO '\r'
-				while (view.end != end && *view.end != '\n') ++view.end;
-				if (view.end != end) ++view.end;
+				while (line_end != end && *line_end != '\n') ++line_end;
+				if (line_end != end) ++line_end;
+				view.length = line_end - view.data;
 			}
 
 			StringView operator*() const { return view; }
@@ -1294,17 +1300,18 @@ struct CodeEditorImpl final : CodeEditor {
 
 		Iter begin() {
 			Iter iter;
-			iter.view.begin = str.begin;
-			iter.view.end = str.begin;
-			iter.end = str.end;
+			iter.view.data = str.data;
+			iter.view.length = 0;
+			iter.end = str.end();
 			++iter;
 			return iter;
 		}
 
 		Iter end() {
 			Iter iter;
-			iter.end = str.end;
-			iter.view.begin = iter.view.end = str.end;
+			iter.end = str.end();
+			iter.view.data = str.end();
+			iter.view.length = 0;
 			return iter;
 		}
 
@@ -1348,7 +1355,8 @@ struct CodeEditorImpl final : CodeEditor {
 			}
 			else {
 				m_lines[p.line].value.insert(p.col, line);
-				p.col += line.size();
+				ASSERT(line.size() < 0x7fFFffFF);
+				p.col += (i32)line.size();
 			}
 		}
 		return p;
@@ -1468,9 +1476,10 @@ struct CodeEditorImpl final : CodeEditor {
 	void addNextOccurence() {
 		Cursor& cursor = getBottomCursor();
 		if (cursor.hasSelection()) {
-			StringView sel_view;
-			sel_view.begin = m_lines[cursor.line].value.c_str() + cursor.sel.col;
-			sel_view.end = sel_view.begin - cursor.sel.col + cursor.col;
+			const char* selection_line = m_lines[cursor.line].value.c_str();
+			const u32 from = minimum(cursor.sel.col, cursor.col);
+			const u32 to = maximum(cursor.sel.col, cursor.col);
+			const StringView sel_view(selection_line + from, selection_line + to);
 
 			i32 line = cursor.line;
 			while (line < m_lines.size()) {
@@ -1481,7 +1490,8 @@ struct CodeEditorImpl final : CodeEditor {
 					new_cursor.line = line;
 					new_cursor.sel.line = line;
 					new_cursor.sel.col = i32(found - m_lines[line].value.c_str());
-					new_cursor.col = new_cursor.sel.col + sel_view.size();
+					ASSERT(sel_view.size() < 0x7fFFffFF);
+					new_cursor.col = new_cursor.sel.col + (i32)sel_view.size();
 					new_cursor.virtual_x = computeCursorX(new_cursor);
 					ensurePointVisible(new_cursor);
 					return;
@@ -1546,10 +1556,7 @@ struct CodeEditorImpl final : CodeEditor {
 		if (m_cursors[0].col == 0) return {};
 		TextPoint left = getPrevTokenStartPoint(m_cursors[0]);
 		const char* line_str = m_lines[m_cursors[0].line].value.c_str();
-		StringView res;
-		res.begin = line_str + left.col;
-		res.end = line_str + m_cursors[0].col;
-		return res;
+		return StringView(line_str + left.col, line_str + m_cursors[0].col);
 	}
 
 	TextPoint getPrevTokenStartPoint(TextPoint point) {
@@ -1756,7 +1763,8 @@ struct CodeEditorImpl final : CodeEditor {
 				new_cursor.line = line;
 				new_cursor.sel.line = line;
 				new_cursor.sel.col = i32(found - m_lines[line].value.c_str());
-				new_cursor.col = new_cursor.sel.col + sel_view.size();
+				ASSERT(sel_view.size() < 0x7fFFffFF);
+				new_cursor.col = new_cursor.sel.col + (i32)sel_view.size();
 				ensurePointVisible(new_cursor, true);
 				return;
 			}
@@ -1817,14 +1825,36 @@ struct CodeEditorImpl final : CodeEditor {
 	
 	void focus() override { m_focus_editor = true; }
 
+	void setBreakpoint(u32 line, bool enabled) override {
+		if (enabled) {
+			for (u32 breakpoint : m_breakpoints) if (breakpoint == line) return;
+			m_breakpoints.push(line);
+		}
+		else {
+			for (i32 i = 0; i < m_breakpoints.size(); ++i) {
+				if (m_breakpoints[i] == line) {
+					m_breakpoints.erase(i);
+					return;
+				}
+			}
+		}
+	}
+
+	void setCurrentDebugLine(u32 line) override {
+		m_current_debug_line = (i32)line;
+	}
+
+	void clearCurrentDebugLine() override {
+		m_current_debug_line = -1;
+	}
+
 	void copy(Span<char> out, const Cursor& cursor) const {
 		ASSERT(cursor.line == cursor.sel.line);
 		
-		StringView sv;
-		sv.begin = m_lines[cursor.line].value.c_str() + cursor.sel.col;
-		sv.end = m_lines[cursor.line].value.c_str() + cursor.col;
-		if (sv.begin > sv.end) swap(sv.begin, sv.end);
-		copyString(out, sv);
+		const char* line = m_lines[cursor.line].value.c_str();
+		const u32 from = minimum(cursor.sel.col, cursor.col);
+		const u32 to = maximum(cursor.sel.col, cursor.col);
+		copyString(out, StringView(line + from, line + to));
 	}
 
 	u32 getNumCursors() override { return m_cursors.size(); }
@@ -1882,6 +1912,13 @@ struct CodeEditorImpl final : CodeEditor {
 		m_first_untokenized_line = minimum(m_first_untokenized_line, line_index);
 	}
 
+	void clearUnderlines() override {
+		m_underlines.clear();
+		for (Line& line : m_lines) {
+			for (Token& token : line.tokens) token.flags = token.flags & ~Token::UNDERLINE;
+		}
+	}
+
 	bool canHandleInput() override {
 		return m_handle_input;
 	}
@@ -1918,7 +1955,8 @@ struct CodeEditorImpl final : CodeEditor {
 		const u32 selection_color = ImGui::GetColorU32(ImGuiCol_TextSelectedBg);
 		const u32 scrollbar_bg_color = ImGui::GetColorU32(ImGuiCol_ScrollbarBg);
 		const float char_width = CalcTextSize("x").x;
-		const float line_num_width = s_show_line_numbers ? u32(log10(m_lines.size()) + 1) * char_width + 2 * style.FramePadding.x : 0;
+		const float breakpoint_width = s_show_line_numbers ? line_height : 0;
+		const float line_num_width = s_show_line_numbers ? breakpoint_width + u32(log10(m_lines.size()) + 1) * char_width + 2 * style.FramePadding.x : 0;
 
 		ImGuiID id = ImGui::GetID("codeditor");
 		ImRect bb = { min, min + content_size };
@@ -2021,9 +2059,23 @@ struct CodeEditorImpl final : CodeEditor {
 		for (int j = m_first_visible_line; j <= m_last_visible_line; ++j) {
 			float line_offset_y = j * line_height;
 			ImVec2 line_pos = min + ImVec2(0, line_offset_y);
+
+			if (m_current_debug_line == j) {
+				ImVec2 debug_line_start = text_area_pos + ImVec2(-line_num_width - style.FramePadding.x, line_offset_y);
+				ImVec2 debug_line_end = debug_line_start + ImVec2(content_size.x, line_height);
+				dl->AddRectFilled(debug_line_start, debug_line_end, IM_COL32(0xff, 0xd7, 0x00, 0x20));
+			}
+
 			if (s_show_line_numbers) {
+				// TODO optimize this
+				for (u32 breakpoint : m_breakpoints) {
+					if (breakpoint == (u32)j) {
+						dl->AddCircleFilled(line_pos + ImVec2(breakpoint_width * 0.5f, line_height * 0.5f), line_height * 0.3f, IM_COL32(0xe8, 0x4a, 0x4a, 0xff));
+						break;
+					}
+				}
 				StaticString<16> line_num_str(j + 1);
-				dl->AddText(line_pos, line_num_color, line_num_str);
+				dl->AddText(line_pos + ImVec2(breakpoint_width, 0), line_num_color, line_num_str);
 			}
 			const char* str = m_lines[j].value.c_str();
 			ImVec2 p = text_area_pos + ImVec2(0, line_offset_y);
@@ -2056,8 +2108,8 @@ struct CodeEditorImpl final : CodeEditor {
 		if (m_time_since_cursor_moved > 0.5f && prev_since_cursor_moved <= 0.5f) {
 			m_highlighted_str = toStringView(getToken(m_cursors[0]), m_cursors[0].line);
 			bool empty = true;
-			for (const char* c = m_highlighted_str.begin; c != m_highlighted_str.end; ++c) {
-				if (isWordChar(*c)) {
+			for (char c : m_highlighted_str) {
+				if (isWordChar(c)) {
 					empty = false;
 					break;
 				}
@@ -2307,13 +2359,14 @@ struct CodeEditorImpl final : CodeEditor {
 	}
 
 	i32 m_first_untokenized_line = 0;
-	TagAllocator m_allocator; 
+	TagAllocator m_allocator;
 	float m_blink_timer = 0;
 	float m_time_since_cursor_moved = 0;
 	StringView m_highlighted_str;
 	StudioApp& m_app;
 	Array<Line> m_lines;
 	Array<Underline> m_underlines;
+	Array<u32> m_breakpoints;
 	Array<Cursor> m_cursors;
 	float m_scroll_diff = 0;
 	i32 m_first_visible_line = 0;
@@ -2326,7 +2379,8 @@ struct CodeEditorImpl final : CodeEditor {
 	i32 m_undo_stack_idx = -1;
 	ImVec2 m_text_area_screen_pos;
 	float m_dpi_scale = 1;
-	
+	i32 m_current_debug_line = -1;
+
 	bool m_is_readonly = false;
 	bool m_handle_input = false;
 	bool m_handle_search_input = false;
@@ -2387,42 +2441,44 @@ UniquePtr<CodeEditor> createHLSLCodeEditor(StudioApp& app) {
 
 ResourceLocator::ResourceLocator(StringView path) {
 	full = path;
-	const char* c = path.begin;
-	subresource.begin = c;
-	while(c != path.end && *c != ':') {
+	const char* c = path.data;
+	const char* path_end = path.end();
+	subresource.data = c;
+	while(c != path_end && *c != ':') {
 		++c;
 	}
-	if(c != path.end) {
-		subresource.end = c;
-		dir.begin = c + 1;
+	if(c != path_end) {
+		subresource.length = c - subresource.data;
+		dir.data = c + 1;
 	}
 	else {
-		subresource.end = subresource.begin;
-		dir.begin = path.begin;
+		subresource.length = subresource.data - subresource.data;
+		dir.data = path.data;
 	}
 	
-	ext.end = path.end;
-	ext.begin = reverseFind(StringView(dir.begin, ext.end), '.');
-	if (ext.begin) {
-		basename.end = ext.begin;
-		++ext.begin;
+	const char* resource_begin = dir.data;
+	const char* dot = reverseFind(StringView(resource_begin, path_end), '.');
+	if (dot) {
+		ext = StringView(dot + 1, path_end);
+		basename = StringView(resource_begin, dot);
 	}
 	else {
-		ext.begin = ext.end;
-		basename.end = path.end;
+		ext = StringView(path_end, path_end);
+		basename = StringView(resource_begin, path_end);
 	}
-	basename.begin = reverseFind(StringView(dir.begin, basename.end), '/');
-	if (!basename.begin) basename.begin = reverseFind(StringView(dir.begin, basename.end), '\\');
-	if (basename.begin)  {
-		dir.end = basename.begin;
-		++basename.begin;
+
+	const char* slash = reverseFind(basename, '/');
+	if (!slash) slash = reverseFind(basename, '\\');
+	if (slash) {
+		const char* basename_end = basename.end();
+		dir = StringView(resource_begin, slash);
+		basename.data = slash + 1;
+		basename.length = basename_end - basename.data;
 	}
 	else {
-		basename.begin = dir.begin;
-		dir.end = dir.begin;
+		dir = StringView(dir.data, dir.data);
 	}
-	resource.begin = dir.begin;
-	resource.end = ext.end;
+	resource = StringView(resource_begin, path_end);
 }
 
 Action* Action::first_action = nullptr;
@@ -2473,7 +2529,14 @@ bool Action::shortcutText(Span<char> out) const {
 
 bool Action::iconButton(bool enabled, StudioApp* app) {
 	const bool result = app ? app->checkShortcut(*this) : false;
-	return ImGuiEx::IconButton(font_icon, label_short, enabled) || result;
+	const bool clicked = ImGuiEx::IconButton(font_icon, nullptr, enabled);
+	if (ImGui::IsItemHovered()) {
+		StaticString<128> tooltip(label_short);
+		char shortcut[32];
+		if (shortcutText(shortcut)) tooltip.append(" (", shortcut, ")");
+		ImGui::SetTooltip("%s", tooltip.data);
+	}
+	return clicked || result;
 }
 
 bool Action::toolbarButton(ImFont* font, bool is_selected) {
@@ -2666,7 +2729,7 @@ void FileSelector::fillSubitems() {
 	FileIterator* iter;
 	if (!fs.dirExists(m_path)) {
 		StringView dir = Path::getDir(m_path);
-		copyString(filter.filter, dir.end);
+		copyString(filter.filter, dir.end());
 		filter.build();
 		iter = fs.createFileIterator(dir);
 	}
@@ -2724,7 +2787,7 @@ void DirSelector::fillSubitems() {
 	}
 	else {
 		StringView dir = Path::getDir(m_current_dir);
-		copyString(filter.filter, dir.end);
+		copyString(filter.filter, dir.end());
 		filter.build();
 		iter = fs.createFileIterator(dir);
 	}
@@ -2803,7 +2866,7 @@ bool DirSelector::gui(const char* label, bool* open) {
 				FileSystem& fs = ds->m_app.getEngine().getFileSystem();
 				const Path fullpath = fs.getFullPath(ds->m_current_dir);
 				if (!os::dirExists(fullpath) && !ds->m_subdirs.empty()) {
-					const u32 dir_size = Path::getDir(ds->m_current_dir).size();
+					const u32 dir_size = (u32)Path::getDir(ds->m_current_dir).size();
 					ds->m_current_dir.resize(dir_size);
 					ds->m_current_dir.append(ds->m_subdirs[0], "/");
 					ds->fillSubitems();
@@ -2831,7 +2894,7 @@ bool DirSelector::gui(const char* label, bool* open) {
 						m_current_dir.append("/", subdir.c_str());
 					}
 					else {
-						const u32 dir_size = Path::getDir(m_current_dir).size();
+						const u32 dir_size = (u32)Path::getDir(m_current_dir).size();
 						m_current_dir.resize(dir_size);
 						m_current_dir.append(subdir.c_str());
 					}
@@ -2887,7 +2950,7 @@ bool FileSelector::gui(const char* accepted_extension) {
 					dir_size = selector->m_path.length();
 				}
 				else {
-					dir_size = Path::getDir(selector->m_path).size();
+					dir_size = (u32)Path::getDir(selector->m_path).size();
 				}
 				if (!selector->m_subdirs.empty()) {
 					selector->m_path.resize(dir_size);
@@ -2946,7 +3009,7 @@ bool FileSelector::gui(const char* accepted_extension) {
 					m_path.append("/", subdir.c_str());
 				}
 				else {
-					const u32 dir_size = Path::getDir(m_path).size();
+					const u32 dir_size = (u32)Path::getDir(m_path).size();
 					m_path.resize(dir_size);
 					m_path.append(subdir.c_str());
 				}
@@ -2961,7 +3024,7 @@ bool FileSelector::gui(const char* accepted_extension) {
 					m_path.append("/", subfile.c_str());
 				}
 				else {
-					const u32 dir_size = Path::getDir(m_path).size();
+					const u32 dir_size = (u32)Path::getDir(m_path).size();
 					m_path.resize(dir_size);
 					m_path.append(subfile.c_str());
 				}
@@ -3196,15 +3259,15 @@ void NodeEditor::nodeEditorGUI(Span<NodeEditorNode*> nodes, Array<NodeEditorLink
 u32 TextFilter::passWithScore(StringView text) const {
 	if (count == 0) return 1;
 
-	u32 score = (1 << 31) - text.size();
+	u32 score = (1 << 31) - (u32)text.size();
 	for (u32 i = 0; i < count; ++i) {
-		if (*subfilters[i].begin == '-') {
-			if (findInsensitive(text, StringView(subfilters[i].begin + 1, subfilters[i].end))) return 0;
+		if (*subfilters[i].data == '-') {
+			if (findInsensitive(text, StringView(subfilters[i].data + 1, subfilters[i].end()))) return 0;
 		}
 		else {
 			const char* found = findInsensitive(text, subfilters[i]);
 			if (!found) return 0;
-			u32 pattern_size = subfilters[i].size();
+			u32 pattern_size = (u32)subfilters[i].size();
 
 			auto getSeparatorScore = [](char c) {
 				if (c == '.' || c == '/' || c == '\\') return 8;
@@ -3214,15 +3277,15 @@ u32 TextFilter::passWithScore(StringView text) const {
 			};
 
 			auto computeScore = [&](const char* found) {
-				const u32 from_start = minimum(4, u32(found - text.begin));
+				const u32 from_start = minimum(4, u32(found - text.data));
 				score += (4 - from_start) * 4; // the closer to the beginning the better
-				if (found > text.begin) score += getSeparatorScore(found[-1]); // next to "separator" is better
-				if (found + pattern_size < text.end)  score += getSeparatorScore(found[pattern_size]); // next to "separator" is better
+				if (found > text.data) score += getSeparatorScore(found[-1]); // next to "separator" is better
+				if (found + pattern_size < text.end())  score += getSeparatorScore(found[pattern_size]); // next to "separator" is better
 			};
 			computeScore(found);
 
 			for (;;) {
-				found = findInsensitive(StringView(found + pattern_size, text.end), subfilters[i]);
+				found = findInsensitive(StringView(found + pattern_size, text.end()), subfilters[i]);
 				if (!found) break;
 
 				computeScore(found);
@@ -3234,8 +3297,8 @@ u32 TextFilter::passWithScore(StringView text) const {
 
 bool TextFilter::pass(StringView text) const {
 	for (u32 i = 0; i < count; ++i) {
-		if (*subfilters[i].begin == '-') {
-			if (findInsensitive(text, StringView(subfilters[i].begin + 1, subfilters[i].end))) return false;
+		if (*subfilters[i].data == '-') {
+			if (findInsensitive(text, StringView(subfilters[i].data + 1, subfilters[i].end()))) return false;
 		}
 		else {
 			if (!findInsensitive(text, subfilters[i])) return false;
@@ -3246,25 +3309,18 @@ bool TextFilter::pass(StringView text) const {
 
 void TextFilter::build() {
 	count = 0;
-	StringView tmp;
-	tmp.begin = filter;
-	tmp.end = filter;
-	for (;;) {
-		if (*tmp.end == ' ' || *tmp.end == '\0') {
-			if (tmp.size() > 0) {
-				if (tmp.size() > 1 || *tmp.begin != '-') {
-					subfilters[count] = tmp;
-					++count;
-					if (count == lengthOf(subfilters)) break;
-				}
-			}
-			if (*tmp.end == '\0') break;
-			tmp.begin = tmp.end + 1;
-			tmp.end = tmp.begin;
+	const char* token_begin = filter;
+	for (const char* c = filter;; ++c) {
+		if (*c != ' ' && *c != '\0') continue;
+
+		const StringView token(token_begin, c);
+		if (!token.empty() && (token.size() > 1 || *token.data != '-')) {
+			subfilters[count] = token;
+			++count;
+			if (count == lengthOf(subfilters)) break;
 		}
-		else {
-			++tmp.end;
-		}
+		if (*c == '\0') break;
+		token_begin = c + 1;
 	}
 }
 

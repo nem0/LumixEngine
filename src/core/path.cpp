@@ -84,7 +84,7 @@ bool Path::operator!=(const Path& rhs) const {
 }
 
 char* Path::normalize(StringView path, Span<char> output) {
-	ASSERT(path.begin <= output.begin() || path.begin > output.end());
+	ASSERT(path.data <= output.begin() || path.data > output.end());
 	u32 max_size = output.length();
 	ASSERT(max_size > 0);
 	char* out = output.begin();
@@ -98,16 +98,17 @@ char* Path::normalize(StringView path, Span<char> output) {
 	u32 i = 0;
 	bool is_prev_slash = false;
 
-	const char* c = path.begin;
+	const char* c = path.data;
+	const char* path_end = path.end();
 	// skip "./" or ".\"
 	if (c[0] == '.' && path.size() > 1 && (c[1] == '\\' || c[1] == '/')) c += 2;
-	
+
 	#ifdef _WIN32
 		// skip slashes at the beginning
-		if (c != path.end && (c[0] == '\\' || c[0] == '/')) ++c;
+		if (c != path_end && (c[0] == '\\' || c[0] == '/')) ++c;
 	#endif
 
-	while (c != path.end && i < max_size) {
+	while (c != path_end && i < max_size) {
 		bool is_current_slash = *c == '\\' || *c == '/';
 
 		if (is_current_slash && is_prev_slash) {
@@ -136,15 +137,10 @@ char* Path::normalize(StringView path, Span<char> output) {
 
 StringView Path::getDir(StringView src) {
 	if (src.empty()) return src;
-	
-	StringView dir = src;
-	dir.removeSuffix(1);
 
-	while (dir.end > dir.begin && *(dir.end - 1) != '\\' && *(dir.end - 1) != '/') {
-		--dir.end;
-	}
-	
-	return dir;
+	const char* dir_end = src.end() - 1;
+	while (dir_end > src.data && dir_end[-1] != '\\' && dir_end[-1] != '/') --dir_end;
+	return StringView(src.data, dir_end);
 }
 
 StringView Path::getBasename(StringView src) {
@@ -152,17 +148,16 @@ StringView Path::getBasename(StringView src) {
 	if (src.back() == '/' || src.back() == '\\') src.removeSuffix(1);
 
 	StringView res;
-	const char* end = src.end;
-	res.end = end;
-	res.begin = end - 1;
-	while (res.begin != src.begin && *res.begin != '\\' && *res.begin != '/') {
-		--res.begin;
+	const char* end = src.end();
+	res.data = end - 1;
+	while (res.data != src.data && *res.data != '\\' && *res.data != '/') {
+		--res.data;
 	}
 
-	if (*res.begin == '\\' || *res.begin == '/') ++res.begin;
-	res.end = res.begin;
-
-	while (res.end != end && *res.end != '.') ++res.end;
+	if (*res.data == '\\' || *res.data == '/') ++res.data;
+	const char* basename_end = res.data;
+	while (basename_end != end && *basename_end != '.') ++basename_end;
+	res.length = basename_end - res.data;
 
 	return res;
 }
@@ -171,22 +166,22 @@ StringView Path::getExtension(StringView src) {
 	if (src.empty()) return src;
 
 	StringView res;
-	res.end = src.end;
-	res.begin = src.end - 1;
+	res.data = src.end() - 1;
 
-	while(res.begin != src.begin && *res.begin != '.') {
-		--res.begin;
+	while(res.data != src.data && *res.data != '.') {
+		--res.data;
 	}
-	if (*res.begin != '.') return StringView(nullptr, nullptr);
-	++res.begin;
+	if (*res.data != '.') return StringView(nullptr, nullptr);
+	++res.data;
+	res.length = src.end() - res.data;
 	return res;
 }
 
 bool Path::isSame(StringView a, StringView b) {
-	if (a.size() > 0 && (a.back() == '\\' || a.back() == '/')) --a.end;
-	if (b.size() > 0 && (b.back() == '\\' || b.back() == '/')) --b.end;
-	if (a.size() == 0 && b.size() == 1 && b[0] == '.') return true; 
-	if (b.size() == 0 && a.size() == 1 && a[0] == '.') return true; 
+	if (a.length > 0 && (a.back() == '\\' || a.back() == '/')) --a.length;
+	if (b.length > 0 && (b.back() == '\\' || b.back() == '/')) --b.length;
+	if (a.length == 0 && b.length == 1 && b[0] == '.') return true; 
+	if (b.length == 0 && a.length == 1 && a[0] == '.') return true; 
 	return equalStrings(a, b);
 }
 

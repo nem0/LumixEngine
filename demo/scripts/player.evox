@@ -1,0 +1,144 @@
+import "core:world"
+import "core:input"
+import "core:entity"
+import "core:animator"
+import "core:physical_controller"
+import "core:rigid_actor"
+import "core:physics"
+import "core:Keycode"
+import "core:quat"
+import "core:vec3"
+import "std:math"
+
+var player : ?Entity = null;
+var camera_pivot : ?Entity = null;
+var handle_input = false;
+var forward = false;
+var backward = false;
+var left = false;
+var right = false;
+var yaw : f32 = 0.0;
+var pitch : f32 = 0.0;
+var sprint = false;
+var speed_input_idx = -1;
+var falling_input_idx = -1;
+var aiming_input_idx = -1;
+var dir_input_idx = -1;
+var stance_input_idx = -1;
+var crouched = false;
+var aiming = false;
+var input_system : InputSystem = undefined;
+var physics_module : ?PhysicsModule = null;
+
+fn processInputEvents() : void {
+	if not handle_input { return; }
+
+	for event in input_system.getEvents() {
+		match event {
+			case AxisEvent:
+				if event.device_type == .MOUSE {
+					yaw = yaw + event.x * -0.01;
+					pitch = pitch + event.y * -0.01;
+				}
+			case ButtonEvent:
+				match event.device_type {
+					case:
+					case .MOUSE:
+						aiming = event.down and event.key_id == 1;
+					case .KEYBOARD:
+						match event.key_id as Keycode {
+							case:
+							case .W: forward = event.down;
+							case .S: backward = event.down;
+							case .A: left = event.down;
+							case .D: right = event.down;
+							case .SHIFT: sprint = event.down;
+							case .C: {
+								if event.down {
+									crouched = not crouched;
+								}
+							}
+						}
+				}
+			case:
+		}
+	}
+}
+
+fn init(w : World, inp : InputSystem) : void {
+	player = w.findByName("player");
+	input_system = inp;
+	physics_module = w.physics();
+
+	const p = player else return;
+	camera_pivot = p.findChildByName("camera_pivot");
+	const anim = p.animator() else return;
+
+	speed_input_idx = anim.getInputIndex("speed_y");
+	dir_input_idx = anim.getInputIndex("speed_x");
+	stance_input_idx = anim.getInputIndex("stance");
+	falling_input_idx = anim.getInputIndex("is_falling");
+	aiming_input_idx = anim.getInputIndex("is_aiming");
+}
+
+fn update(dt : f32) : void {
+	processInputEvents();
+
+	if const pm = physics_module {
+		for hit in pm.getControllerHits() {
+			const obj = hit.hit_entity;
+			if const a = obj.rigid_actor() {
+				const force = yawToDir(yaw) * 50.0;
+				a.applyForce(force);
+			}
+		}
+	}
+
+	const pl = player else return;
+	const anim = pl.animator() else return;
+
+	if speed_input_idx == -1 {
+		speed_input_idx = anim.getInputIndex("speed_y");
+		dir_input_idx = anim.getInputIndex("speed_x");
+		stance_input_idx = anim.getInputIndex("stance");
+		falling_input_idx = anim.getInputIndex("is_falling");
+		aiming_input_idx = anim.getInputIndex("is_aiming");
+	}
+
+	if pitch < -0.9 { pitch = -0.9; }
+	if pitch > 0.9 { pitch = 0.9; }
+
+	const phys_controller = pl.physical_controller();
+	var gravity_speed : f32 = 0.0;
+	if const pc = phys_controller {
+		gravity_speed = pc.getGravitySpeed();
+	}
+
+	var speed_y : f32 = forward ? 3.0 :
+						backward ? -3.0 :
+						0;
+
+	var speed_x : f32 = left ? -3.0 :
+						right ? 3.0 :
+						0;
+	if sprint {
+		speed_x = speed_x * 2.0;
+		speed_y = speed_y * 2.0;
+	}
+
+	anim.setFloatInput(speed_input_idx, speed_y);
+	anim.setFloatInput(dir_input_idx, speed_x);
+
+	anim.setFloatInput(stance_input_idx, crouched ? 1.0 : 0.0);
+
+	anim.setBoolInput(falling_input_idx, gravity_speed < -4.0);
+	anim.setBoolInput(aiming_input_idx, aiming);
+
+	const yaw_rot = makeQuatFromYaw(yaw);
+	const pitch_rot = makeQuatFromPitch(pitch);
+	pl.setRotation(yaw_rot);
+
+	if const cp = camera_pivot {
+		cp.setRotation(yaw_rot * pitch_rot);
+	}
+}
