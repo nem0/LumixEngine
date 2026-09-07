@@ -1,3 +1,4 @@
+import "core:animator"
 import "core:dvec3"
 import "core:entity"
 import "core:keycode"
@@ -12,6 +13,7 @@ import "core:ui"
 import "core:evox_data" as ld
 import "scripts/player" as player
 import "std:math" as math
+import "core:array" as array
 import "maps/demo/random_walk" as random_walk
 
 // constants
@@ -67,6 +69,7 @@ struct PhysicsTestObject {
 
 // global vars
 var g_world : World = undefined;
+var g_nav_agents = array.init(Entity);
 
 // functions
 fn abs(v : f32) : f32 { return v < 0 ? -v : v; }
@@ -78,8 +81,8 @@ fn enableCursor(ui : UIModule, enable : bool) : void {
 
 fn start(world : World) : void {
 	g_world = world;
+	array.deinit(&g_nav_agents);
 
-	// random color
 	var random_color_components = world.getEvoxData(RandomColorComponent);
 
 	for c in random_color_components {
@@ -137,10 +140,41 @@ fn spawnNavAgent() : void {
 	var pos = spawn_point[0].entity.getPosition();
 	var agent = g_world.createEntity();
 	agent.setPosition(pos);
-	agent.setScale({0.3, 1.5, 0.3});
-	agent.createAgent();
-	var mi = agent.createModelInstance() else return;
-	mi.setModelInstancePath("engine/models/cylinder.fbx");
+	const created_agent = agent.createAgent();
+	if created_agent == null {
+		g_world.destroyEntity(agent);
+		return;
+	}
+	var nav_agent = created_agent else return;
+	const created_model = agent.createModelInstance();
+	if created_model == null {
+		g_world.destroyEntity(agent);
+		return;
+	}
+	var mi = created_model else return;
+	mi.setModelInstancePath("models/ybot/ybot.fbx");
+	const created_animator = agent.createAnimator();
+	if created_animator == null {
+		g_world.destroyEntity(agent);
+		return;
+	}
+	var anim = created_animator else return;
+	anim.setAnimatorUseRootMotion(false);
+	anim.setAnimatorSource("models/ybot/ybot.act");
+
+	// TODO g_nav_agents.push(agent);
+	array.push(&g_nav_agents, agent);
+	goToRandomPoint(nav_agent);
+}
+
+fn goToRandomPoint(agent : Agent) : void {
+	const waypoints = g_world.getEvoxData(NavAgentWaypoint);
+	if waypoints.length == 0 { return; }
+	const index = randRange(0, (waypoints.length - 1) as u32);
+	const point = waypoints[index].entity;
+	if g_world.hasEntity(point) {
+		agent.navigate(point.getPosition(), 5, 1);
+	}
 }
 
 fn resetPhysicsTest() : void {
@@ -154,6 +188,20 @@ fn resetPhysicsTest() : void {
 fn update(td : f32, input : InputSystem) : void {
     player.update(td);
 	random_walk.update(g_world, td);
+
+	for entity in g_nav_agents.slice() {
+		if const agent = entity.navmesh_agent() {
+			if agent.isFinished() {
+				goToRandomPoint(agent);
+			}
+			if const anim = entity.animator() {
+				const speed_input = anim.getInputIndex("speed_y");
+				if speed_input >= 0 {
+					anim.setFloatInput(speed_input, agent.getAgentSpeed());
+				}
+			}
+		}
+	}
 
 	// random color tick
 	const rnd_col = g_world.getEvoxData(RandomColorTickComponent);
@@ -187,7 +235,7 @@ fn update(td : f32, input : InputSystem) : void {
 	for event in getEvents(input) {
 		match event {
 			case ButtonEvent:
-				if event.device_type == .KEYBOARD and event.key_id as Keycode == .F {
+				if event.device_type == .KEYBOARD and event.key_id as Keycode == .F and event.down and not event.is_repeat {
 					const closest = findClosestButton();
 					if closest.dist < INTERACTION_DIST {
 						match closest.button.action {

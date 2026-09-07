@@ -98,7 +98,7 @@ struct Atmo : public RenderPlugin {
 			env.clouds_top,
 			env.clouds_bottom,
 			gpu::getRWBindlessHandle(m_optical_depth_precomputed),
-			gpu::INVALID_BINDLESS_HANDLE,
+			gpu::getBindlessHandle(m_optical_depth_precomputed),
 			pipeline.toBindless(gbuffer.DS, stream),
 			gpu::INVALID_BINDLESS_HANDLE
 		};

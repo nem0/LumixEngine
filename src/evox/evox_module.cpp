@@ -532,8 +532,8 @@ struct EvoxModuleImpl : EvoxModule {
 		const u32 component_count = in.read<u32>();
 		for (u32 i = 0; i < component_count; ++i) {
 			const EntityRef source_entity = in.read<EntityRef>();
-			const EntityPtr mapped = entity_map.get((EntityPtr)source_entity);
-			if (mapped.isValid()) createEvox((EntityRef)mapped);
+			const EntityRef mapped = entity_map.get(source_entity);
+			createEvox((EntityRef)mapped);
 		}
 
 		const u32 num_types = in.read<u32>();
@@ -546,6 +546,7 @@ struct EvoxModuleImpl : EvoxModule {
 			t.values.resize(data_size);
 			in.read(t.values.getMutableData(), data_size);
 			deserializeTypeDesc(in, t.type_desc);
+			remapEntityProperties(t.type_desc, t.values.getMutableData(), t.type_desc.getSize(), t.entities.size(), entity_map);
 		}
 		applyPendingData();
 	}
@@ -725,6 +726,35 @@ struct EvoxModuleImpl : EvoxModule {
 		}
 	}
 
+	void remapEntityProperties(const EvoxTypeDesc& type_desc, u8* values, u32 stride, u32 num_values, const EntityMap& entity_map) {
+		if (type_desc.type_name == "Entity") {
+			u32 index_offset = 0;
+			bool has_index = false;
+			for (const EvoxFieldDesc& field : type_desc.fields) {
+				if (field.name == "index") {
+					has_index = true;
+					break;
+				}
+				index_offset += field.type.getSize();
+			}
+			if (!has_index) return;
+			for (u32 i = 0; i < num_values; ++i) {
+				i32 source_index;
+				memcpy(&source_index, values + i * stride + index_offset, sizeof(source_index));
+				const EntityPtr mapped = source_index >= 0 ? entity_map.get(EntityPtr(source_index)) : INVALID_ENTITY;
+				memcpy(values + i * stride + index_offset, &mapped.index, sizeof(mapped.index));
+			}
+			return;
+		}
+		if (type_desc.kind != EX_TYPE_STRUCT) return;
+		u32 offset = 0;
+		for (const EvoxFieldDesc& field : type_desc.fields) {
+			const u32 size = field.type.getSize();
+			if (size > 0) remapEntityProperties(field.type, values + offset, stride, num_values, entity_map);
+			offset += size;
+		}
+	}
+
 	void copyValues(const ex_type* dst_type, const EvoxTypeDesc& src_type_desc, u8* dst, u32 dst_stride, const u8* src, u32 src_stride, u32 num_values) {
 		switch (src_type_desc.kind) {
 			case EX_TYPE_CPTR:
@@ -770,6 +800,21 @@ struct EvoxModuleImpl : EvoxModule {
 					u32 dst_offset = ex_type_struct_field_offset(dst_type, field_index);
 					copyValues(dst_field_type, f.type, dst + dst_offset, dst_stride, src + src_offset, src_stride, num_values);
 					src_offset += field_size;
+				}
+				// Entity values are serialized as a struct. Their world pointer is
+				// runtime-only and must point at this world after loading.
+				if (src_type_desc.type_name == "Entity") {
+					const i32 dst_index_field = findField(dst_type, "index");
+					const i32 dst_world_field = findField(dst_type, "world");
+					if (dst_index_field >= 0 && dst_world_field >= 0) {
+						const u32 dst_world_offset = ex_type_struct_field_offset(dst_type, dst_world_field);
+						for (u32 i = 0; i < num_values; ++i) {
+							i32 index;
+							memcpy(&index, dst + i * dst_stride + ex_type_struct_field_offset(dst_type, dst_index_field), sizeof(index));
+							World* world = index >= 0 ? &m_world : nullptr;
+							memcpy(dst + i * dst_stride + dst_world_offset, &world, sizeof(world));
+						}
+					}
 				}
 				return;
 			}

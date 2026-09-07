@@ -94,12 +94,14 @@ static ExEntity evox_world_createEntity(World* world) {
 	return ExEntity(world->createEntity({0, 0, 0}, Quat::IDENTITY).index, world);
 }
 
-static void evox_world_destroyEntity(ExEntity entity) {
-	entity.world->destroyEntity(EntityRef{entity.index});
+static void evox_world_destroyEntity(World* world, ExEntity entity) {
+	if (world && entity.world == world && entity.index >= 0 && world->hasEntity(EntityRef{entity.index})) {
+		world->destroyEntity(EntityRef{entity.index});
+	}
 }
 
-static bool evox_world_hasEntity(ExEntity entity) {
-	return entity.index >= 0 && entity.world->hasEntity(EntityRef{entity.index});
+static bool evox_world_hasEntity(World* world, ExEntity entity) {
+	return world && entity.world == world && entity.index >= 0 && world->hasEntity(EntityRef{entity.index});
 }
 
 static void evox_world_findByName(ex_runtime*, ex_call_frame frame) {
