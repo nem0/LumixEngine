@@ -42,7 +42,7 @@
 	#endif
 #endif
 
-typedef char i8;
+typedef signed char i8;
 typedef unsigned char u8;
 typedef short i16;
 typedef unsigned short u16;
@@ -214,13 +214,35 @@ void ex_module_destroy(ex_module* module);
 // Native types let scripts talk about engine objects by name, while native
 // functions expose host behavior to scripts.
 // Units and their native functions are available after a successful typecheck.
+int ex_unit_get_native_function_count(ex_unit* unit);
+ex_string_view ex_unit_get_native_function_name(ex_unit* unit, int index);
+
+// unit enumeration
 int ex_module_get_unit_count(ex_module* module);
 ex_unit* ex_module_get_unit(ex_module* module, int index);
 ex_string_view ex_unit_get_path(ex_unit* unit);
+
+// import enumeration
 int ex_unit_get_import_count(ex_unit* unit);
 ex_string_view ex_unit_get_import_path(ex_unit* unit, int index);
-int ex_unit_get_native_function_count(ex_unit* unit);
-ex_string_view ex_unit_get_native_function_name(ex_unit* unit, int index);
+
+// symbol/global enumeration
+typedef enum ex_symbol_kind {
+	EX_SYM_KIND_INVALID,
+	
+	EX_SYM_KIND_VARIABLE,
+	EX_SYM_KIND_CONST,
+	EX_SYM_KIND_COMPTIME,
+	EX_SYM_KIND_IMPORT,
+} ex_symbol_kind;
+
+typedef struct ex_symbol_desc {
+	ex_symbol_kind kind;
+	ex_string_view name;
+} ex_symbol_desc;
+
+int ex_unit_get_symbols_count(ex_unit* unit);
+ex_symbol_desc ex_unit_get_symbol(ex_unit* unit, int index);
 
 // Front-end pipeline helpers.
 //
@@ -254,7 +276,6 @@ ex_result ex_module_compile(
 );
 
 int ex_module_get_function_count(ex_module* module);
-int ex_module_get_global_count(ex_module* module);
 
 typedef struct ex_bytecode_compile_options {
 	bool optimize;

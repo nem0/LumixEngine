@@ -222,7 +222,8 @@ TEST(GlobalVariablesTypecheck) {
 	ex_module* module = ex_module_create(&diagnostics.host);
 	EXPECT_TRUE(module != nullptr);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
-	EXPECT_TRUE(ex_module_get_global_count(module) == 5);
+	ex_unit* unit = ex_module_get_unit(module, 0);
+	EXPECT_TRUE(ex_unit_get_symbols_count(unit) == 5);
 	ex_module_destroy(module);
 	return true;
 }

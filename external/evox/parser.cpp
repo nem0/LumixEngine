@@ -201,7 +201,7 @@ struct Parser {
 	// Push a top-level symbol. Operator overloads may share a name with other
 	// overloads of the same operator; all other symbols reject redeclarations.
 	bool addSymbol(const Symbol& sym) {
-		ASSERT(sym.expression || sym.kind == Symbol::IMPORT);
+		ASSERT(sym.expression || sym.kind == EX_SYM_KIND_IMPORT);
 		if (!isOperatorSymbol(sym.name)) {
 			for (const Symbol& other : m_unit.symbols) {
 				if (!equalStrings(other.name, sym.name)) continue;
@@ -261,7 +261,7 @@ struct Parser {
 		return expr;
 	}
 
-	bool symbolDecl(Symbol::Kind kind) {
+	bool symbolDecl(ex_symbol_kind kind) {
 		Symbol sym;
 		sym.kind = kind;
 
@@ -293,7 +293,7 @@ struct Parser {
 		sym.name = name_token.value;
 		sym.token = name_token;
 		sym.expression = expression;
-		sym.kind = Symbol::COMPTIME;
+		sym.kind = EX_SYM_KIND_COMPTIME;
 		return addSymbol(sym);
 	}
 
@@ -1794,7 +1794,7 @@ struct Parser {
 
 		if (!empty(import.alias)) {
 			Symbol sym;
-			sym.kind = Symbol::IMPORT;
+			sym.kind = EX_SYM_KIND_IMPORT;
 			sym.name = import.alias;
 			sym.token = alias_token;
 			if (!addSymbol(sym)) return false;
@@ -1834,7 +1834,7 @@ struct Parser {
 		s.name = name_token.value;
 		s.token = name_token;
 		s.expression = fn;
-		s.kind = Symbol::VARIABLE;
+		s.kind = EX_SYM_KIND_VARIABLE;
 		return addSymbol(s);
 	}
 
@@ -1861,7 +1861,7 @@ struct Parser {
 		sym.name = makeStringView(sym_name);
 		sym.token = op;
 		sym.expression = fn;
-		sym.kind = Symbol::COMPTIME;
+		sym.kind = EX_SYM_KIND_COMPTIME;
 		return addSymbol(sym);
 	}
 
@@ -1884,9 +1884,9 @@ struct Parser {
 			Token token = consumeToken();
 			switch (token.type) {
 				case Token::END_OF_FILE: return EX_RESULT_OK;
-				case Token::CONST: if (!symbolDecl(Symbol::CONST)) return EX_RESULT_FAILURE; break;
-				case Token::VAR: if (!symbolDecl(Symbol::VARIABLE)) return EX_RESULT_FAILURE; break;
-				case Token::COMPTIME: if (!symbolDecl(Symbol::COMPTIME)) return EX_RESULT_FAILURE; break;
+				case Token::CONST: if (!symbolDecl(EX_SYM_KIND_CONST)) return EX_RESULT_FAILURE; break;
+				case Token::VAR: if (!symbolDecl(EX_SYM_KIND_VARIABLE)) return EX_RESULT_FAILURE; break;
+				case Token::COMPTIME: if (!symbolDecl(EX_SYM_KIND_COMPTIME)) return EX_RESULT_FAILURE; break;
 				case Token::FN: if (!functionDecl()) return EX_RESULT_FAILURE; break;
 				case Token::STRUCT: if (!structDecl(nullptr, false)) return EX_RESULT_FAILURE; break;
 				case Token::HASH: {

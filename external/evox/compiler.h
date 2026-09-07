@@ -14,21 +14,6 @@ u32 structFieldOffset(const StructResolvedType& type, i32 field_index);
 ex_type_kind toExTypeKind(ResolvedTypeKind kind);
 
 struct Symbol {
-	enum Kind {
-		// Runtime storage. The initializer expression is evaluated at runtime unless
-		// later analysis proves it can be folded.
-		VARIABLE,
-		// Runtime storage initialized once and rejected as an assignment target.
-		CONST,
-		// Compile-time binding. Functions, structs and enums are represented
-		// as values bound here instead of as separate declaration categories.
-		COMPTIME,
-		// Aliased import (`import "path" as name`). Reserves the alias name in the
-		// symbol table so that collision detection covers it like any other name.
-		// The actual unit linkage is still stored in Unit::imports.
-		IMPORT,
-	};
-
 	enum CheckState {
 		UNCHECKED,
 		CHECKING, // re-entry here means a definition cycle
@@ -36,7 +21,7 @@ struct Symbol {
 		CHECKED,
 	};
 
-	Kind kind;
+	ex_symbol_kind kind;
 	CheckState check_state = UNCHECKED;
 	ex_string_view name; // as written in unit
 	Token token = {};
@@ -74,7 +59,7 @@ struct Symbol {
 // occupy a runtime global slot nor need a global-init store.
 inline bool symbolHasGlobalStorage(const Symbol& sym) {
 	return sym.expression
-		&& sym.kind != Symbol::COMPTIME
+		&& sym.kind != EX_SYM_KIND_COMPTIME
 		&& (!sym.resolved_type || sym.resolved_type->kind != ResolvedTypeKind::META)
 		&& sym.expression->kind != Expression::FUNCTION
 		&& sym.expression->kind != Expression::STRUCT

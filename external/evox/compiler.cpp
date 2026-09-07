@@ -2397,7 +2397,7 @@ struct Checker {
 				errorLine(sym.token, "'undefined' initializer requires an explicit type annotation: ", sym.name);
 				return EX_RESULT_FAILURE;
 			}
-			if (sym.kind == Symbol::CONST) {
+			if (sym.kind == EX_SYM_KIND_CONST) {
 				// const a : i32 = undefined; - not useful
 				errorLine(sym.token, "const cannot be initialized with 'undefined': ", sym.name);
 				return EX_RESULT_FAILURE;
@@ -2426,7 +2426,7 @@ struct Checker {
 		}
 
 		sym.resolved_type = annotation ? annotation : expr_type;
-		const bool runtime_comptime = sym.kind == Symbol::CONST && isRuntimeMaterializable(*sym.resolved_type);
+		const bool runtime_comptime = sym.kind == EX_SYM_KIND_CONST && isRuntimeMaterializable(*sym.resolved_type);
 		if (runtime_comptime) {
 			ComptimeValue value = foldRuntimeConstant(unit, expr, nullptr, annotation);
 			if (value && value.kind == ComptimeValue::VALUE) {
@@ -2543,10 +2543,10 @@ struct Checker {
 		if (!type) {
 			const char* kind = "symbol";
 			switch (ref.symbol->kind) {
-				case Symbol::VARIABLE: kind = "variable"; break;
-				case Symbol::CONST: kind = "constant"; break;
-				case Symbol::IMPORT: kind = "namespace"; break;
-				case Symbol::COMPTIME: kind = ref.symbol->resolved_type && ref.symbol->resolved_type->kind == ResolvedTypeKind::META
+				case EX_SYM_KIND_VARIABLE: kind = "variable"; break;
+				case EX_SYM_KIND_CONST: kind = "constant"; break;
+				case EX_SYM_KIND_IMPORT: kind = "namespace"; break;
+				case EX_SYM_KIND_COMPTIME: kind = ref.symbol->resolved_type && ref.symbol->resolved_type->kind == ResolvedTypeKind::META
 					? "type" : "compile-time value"; break;
 			}
 			errorLine(call.token, "Cannot call ", kind, " '", ref.symbol->name, "' as a function");
@@ -3322,7 +3322,7 @@ struct Checker {
 				if (lookup) lookup->symbol = sym;
 
 				expr.resolved_type = sym.symbol->resolved_type;
-				expr.eval_stage = sym.symbol->kind == Symbol::COMPTIME ? comptimeStageForType(expr.resolved_type) : Expression::RUNTIME;
+				expr.eval_stage = sym.symbol->kind == EX_SYM_KIND_COMPTIME ? comptimeStageForType(expr.resolved_type) : Expression::RUNTIME;
 				member.resolved_symbol = sym.symbol;
 				if (sym.symbol->expression && sym.symbol->expression->kind == Expression::FUNCTION) {
 					member.resolved_fn = static_cast<FunctionExpression*>(sym.symbol->expression);
@@ -3817,7 +3817,7 @@ struct Checker {
 		if (symbolHasGlobalStorage(*ref.symbol)) id.slot = &ref.symbol->slot;
 		// Reflection lengths are untyped compile-time integers. Keep the symbol's
 		// default type, but allow each use to adopt its numeric context.
-		if (hint && isIntegerType(*hint) && ref.symbol->kind == Symbol::COMPTIME
+		if (hint && isIntegerType(*hint) && ref.symbol->kind == EX_SYM_KIND_COMPTIME
 			&& ref.symbol->expression->kind == Expression::TYPE_MEMBER
 			&& (static_cast<TypeMemberExpression*>(ref.symbol->expression)->kind == TypeMemberExpression::LENGTH
 				|| static_cast<TypeMemberExpression*>(ref.symbol->expression)->kind == TypeMemberExpression::MIN
@@ -3834,7 +3834,7 @@ struct Checker {
 			expr.eval_stage = Expression::COMPTIME_VALUE;
 		}
 		else {
-			expr.eval_stage = ref.symbol->kind == Symbol::COMPTIME
+			expr.eval_stage = ref.symbol->kind == EX_SYM_KIND_COMPTIME
 				? comptimeStageForType(expr.resolved_type)
 				: Expression::RUNTIME;
 		}
@@ -4059,7 +4059,7 @@ struct Checker {
 				id.symbol = ref.symbol;
 				// TODO why is this here?
 				if (symbolHasGlobalStorage(*ref.symbol)) id.slot = &ref.symbol->slot;
-				is_writable = ref.symbol->kind == Symbol::VARIABLE;
+				is_writable = ref.symbol->kind == EX_SYM_KIND_VARIABLE;
 				expr.resolved_type = unwrapMeta(ref.symbol->resolved_type);
 				return &expr;
 			}
@@ -4082,7 +4082,7 @@ struct Checker {
 						is_writable = false;
 						return nullptr;
 					}
-					is_writable = ref.symbol->kind == Symbol::VARIABLE;
+					is_writable = ref.symbol->kind == EX_SYM_KIND_VARIABLE;
 					member.resolved_symbol = ref.symbol;
 					if (ref.symbol->expression && ref.symbol->expression->kind == Expression::FUNCTION) {
 						member.resolved_fn = static_cast<FunctionExpression*>(ref.symbol->expression);
@@ -4668,7 +4668,7 @@ struct Checker {
 						narrowed_is_immutable = local->is_immutable;
 						narrowed_slot = local->slot;
 					} else if (id->symbol) {
-						narrowed_is_immutable = id->symbol->kind != Symbol::VARIABLE;
+						narrowed_is_immutable = id->symbol->kind != EX_SYM_KIND_VARIABLE;
 						narrowed_slot = id->slot;
 					}
 					narrow_in_true = true;
@@ -4764,7 +4764,7 @@ struct Checker {
 		if (expr.kind == Expression::ARRAY_LITERAL) return static_cast<ArrayLiteralExpression*>(&expr);
 		if (expr.kind != Expression::IDENTIFIER) return nullptr;
 		IdentifierExpression& id = static_cast<IdentifierExpression&>(expr);
-		if (!id.symbol || id.symbol->kind != Symbol::COMPTIME || !id.symbol->expression) return nullptr;
+		if (!id.symbol || id.symbol->kind != EX_SYM_KIND_COMPTIME || !id.symbol->expression) return nullptr;
 		return resolveUnrollElements(*id.symbol->expression);
 	}
 
@@ -5223,7 +5223,7 @@ struct Checker {
 					narrowed.is_immutable = local->is_immutable;
 					narrowed.slot = local->slot;
 				} else {
-					narrowed.is_immutable = id->symbol && id->symbol->kind != Symbol::VARIABLE;
+					narrowed.is_immutable = id->symbol && id->symbol->kind != EX_SYM_KIND_VARIABLE;
 					narrowed.slot = id->slot;
 				}
 				const bool ok = checkStatement(unit, ctx, arm.body, return_type, {});
@@ -5474,7 +5474,7 @@ struct Checker {
 				if (!fn.is_template) continue;
 				for (TemplateFunctionInstance& instance : fn.template_function_instances) {
 					Symbol& new_sym = unit.symbols.emplace_back();
-					new_sym.kind = Symbol::COMPTIME;
+					new_sym.kind = EX_SYM_KIND_COMPTIME;
 					new_sym.check_state = Symbol::CHECKED;
 					new_sym.expression = instance.instance;
 					new_sym.resolved_type = instance.type;
@@ -5488,12 +5488,12 @@ struct Checker {
 		if (sym.check_state == Symbol::CHECKED) return EX_RESULT_OK;
 		if (sym.check_state == Symbol::FAILED) return EX_RESULT_FAILURE;
 
-		if (sym.kind == Symbol::IMPORT) {
+		if (sym.kind == EX_SYM_KIND_IMPORT) {
 			sym.check_state = Symbol::CHECKED;
 			return EX_RESULT_OK;
 		}
 
-		if (sym.kind == Symbol::COMPTIME && isPrimitiveShadowName(sym.name)) {
+		if (sym.kind == EX_SYM_KIND_COMPTIME && isPrimitiveShadowName(sym.name)) {
 			errorLine(sym.token, "Can not shadow primitive type: ", sym.name);
 			sym.check_state = Symbol::FAILED;
 			return EX_RESULT_FAILURE;
@@ -5523,7 +5523,7 @@ struct Checker {
 			FunctionExpression& fn = static_cast<FunctionExpression&>(*sym.expression);
 			if (!fn.is_template) {
 				// TODO what's going on on the next line?
-				ResolvedType* annotation = sym.kind == Symbol::COMPTIME ? nullptr : (sym.type_expr ? asType(evalComptime(unit, *sym.type_expr), sym.type_expr->token) : nullptr);
+				ResolvedType* annotation = sym.kind == EX_SYM_KIND_COMPTIME ? nullptr : (sym.type_expr ? asType(evalComptime(unit, *sym.type_expr), sym.type_expr->token) : nullptr);
 				FunctionResolvedType* fn_type = buildFunctionType(unit, fn);
 				if (!fn_type) {
 					sym.check_state = Symbol::FAILED;
@@ -5533,7 +5533,7 @@ struct Checker {
 			}
 		}
 
-		if (sym.kind == Symbol::COMPTIME) {
+		if (sym.kind == EX_SYM_KIND_COMPTIME) {
 			if (checkComptimeSymbol(unit, sym) == EX_RESULT_FAILURE) {
 				sym.check_state = Symbol::FAILED;
 				return EX_RESULT_FAILURE;
@@ -6315,7 +6315,7 @@ struct Checker {
 					return {};
 				}
 
-				if (ref.symbol->kind != Symbol::COMPTIME) {
+				if (ref.symbol->kind != EX_SYM_KIND_COMPTIME) {
 					errorLine(expr.token, "Symbol ", qualifier, ".", member.name.value, " is not a compile-time value");
 					return {};
 				}
@@ -6714,10 +6714,10 @@ struct Checker {
 					return {};
 				}
 
-				if (allow_runtime_const && ref.symbol->kind == Symbol::CONST && ref.symbol->comptime_bytes) {
+				if (allow_runtime_const && ref.symbol->kind == EX_SYM_KIND_CONST && ref.symbol->comptime_bytes) {
 					return copyComptimeValue(ref.symbol->resolved_type, ref.symbol->comptime_bytes, ref.symbol->comptime_byte_size);
 				}
-				if (ref.symbol->kind != Symbol::COMPTIME) {
+				if (ref.symbol->kind != EX_SYM_KIND_COMPTIME) {
 					errorLine(id.token, "Symbol '", id.name, "' is not a compile-time value");
 					return {};
 				}

@@ -138,7 +138,7 @@ struct DefinitionQuery {
 							if (same(imp.alias, base->name)) {
 								if (!base->symbol) {
 									for (Symbol& s : u.symbols) {
-										if (s.kind == Symbol::IMPORT && same(s.name, base->name)) declaration(&s, base->token);
+										if (s.kind == EX_SYM_KIND_IMPORT && same(s.name, base->name)) declaration(&s, base->token);
 									}
 								}
 								if (!x->resolved_symbol && imp.unit) {
@@ -399,15 +399,18 @@ int ex_module_get_function_count(ex_module* module) {
 	return count;
 }
 
-int ex_module_get_global_count(ex_module* module) {
-	if (!module) return 0;
-	i32 count = 0;
-	for (const Unit& unit : module->units) {
-		for (const Symbol& sym : unit.symbols) {
-			if (sym.expression) ++count;
-		}
-	}
-	return count;
+int ex_unit_get_symbols_count(ex_unit* unit) {
+	if (!unit) return 0;
+	return ((Unit*)unit)->symbols.size();
+}
+
+ex_symbol_desc ex_unit_get_symbol(ex_unit* unit, int index) {
+	ex_symbol_desc desc = { EX_SYM_KIND_INVALID };
+	if (!unit) return desc;
+	const Symbol& sym = ((Unit*)unit)->symbols[index];
+	desc.kind = sym.kind;
+	desc.name = sym.name;
+	return desc;
 }
 
 void ex_bytecode_destroy(ex_bytecode* bytecode) {

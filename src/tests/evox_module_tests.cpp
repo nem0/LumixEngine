@@ -1,4 +1,5 @@
 #include "../../external/evox/arena.h"
+#include "core/crt.h"
 #include "core/log.h"
 #include "core/stream.h"
 #include "engine/engine.h"
@@ -26,7 +27,7 @@ bool testEvoxModuleSerialization() {
 	const char* source = R"(
 		struct Data {}
 		#[Data{}]
-		struct TestData { value : i32; }
+		struct TestData { value : i32; second : i32; }
 	)";
 	ex_module* script = ex_module_create(&script_host.host);
 	ASSERT_TRUE(script);
@@ -63,12 +64,15 @@ bool testEvoxModuleSerialization() {
 		source_world.createEntity({}, Quat::IDENTITY)
 	};
 	const i32 source_values[] = { 111, 222, 333 };
+	const i32 source_second_values[] = { 444, 555, 666 };
+	const u32 second_offset = ex_type_struct_field_offset(data_type, 1);
 	for (u32 i = 0; i < lengthOf(source_entities); ++i) {
 		source_module->createEvox(source_entities[i]);
 		ASSERT_TRUE(source_module->addEvoxData(source_entities[i], data_type));
-		i32* value = (i32*)source_module->getEvoxData(source_entities[i], data_type);
+		u8* value = (u8*)source_module->getEvoxData(source_entities[i], data_type);
 		ASSERT_TRUE(value);
-		*value = source_values[i];
+		memcpy(value, &source_values[i], sizeof(source_values[i]));
+		memcpy(value + second_offset, &source_second_values[i], sizeof(source_second_values[i]));
 	}
 
 	OutputMemoryStream blob(getGlobalAllocator());
@@ -94,9 +98,14 @@ bool testEvoxModuleSerialization() {
 	target_module->setEvoxDataTypes(Span<const ex_type*>(&data_type, 1));
 	for (u32 i = 0; i < lengthOf(target_entities); ++i) {
 		ASSERT_EQ(1, target_module->getEvoxDataCount(target_entities[i]));
-		const i32* restored = (const i32*)target_module->getEvoxData(target_entities[i], data_type);
+		const u8* restored = (const u8*)target_module->getEvoxData(target_entities[i], data_type);
 		ASSERT_TRUE(restored);
-		ASSERT_EQ(source_values[i], *restored);
+		i32 restored_value;
+		i32 restored_second_value;
+		memcpy(&restored_value, restored, sizeof(restored_value));
+		memcpy(&restored_second_value, restored + second_offset, sizeof(restored_second_value));
+		ASSERT_EQ(source_values[i], restored_value);
+		ASSERT_EQ(source_second_values[i], restored_second_value);
 	}
 
 	// Destroying an entity must remove its data and compact storage without
@@ -116,8 +125,309 @@ bool testEvoxModuleSerialization() {
 	return true;
 }
 
+bool testEvoxModuleSerializationSchemaMigration() {
+	EvoxTestHost source_script_host;
+	EvoxTestHost target_script_host;
+	const char* source = R"(
+		struct Data {}
+		struct Nested { first : i32; second : i32; }
+		#[Data{}]
+		struct TestData { first : i32; nested : Nested; changed : i32; removed : i32; }
+	)";
+	const char* target = R"(
+		struct Data {}
+		struct Nested { first : i32; added : i32; second : i32; }
+		#[Data{}]
+		struct TestData { first : i32; nested : Nested; changed : f32; added : i32; }
+	)";
+
+	ex_module* source_script = ex_module_create(&source_script_host.host);
+	ex_module* target_script = ex_module_create(&target_script_host.host);
+	ASSERT_TRUE(source_script && target_script);
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(source_script, {source, (i64)stringLength(source)}, {"source.evox", 11}, nullptr, nullptr));
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(target_script, {target, (i64)stringLength(target)}, {"target.evox", 11}, nullptr, nullptr));
+	ex_bytecode* source_bytecode = ex_bytecode_compile(source_script, &source_script_host.host, nullptr);
+	ex_bytecode* target_bytecode = ex_bytecode_compile(target_script, &target_script_host.host, nullptr);
+	ASSERT_TRUE(source_bytecode && target_bytecode);
+
+	auto findTestData = [](ex_bytecode* bytecode) -> const ex_type* {
+		for (u32 i = 0; i < ex_bytecode_type_count(bytecode); ++i) {
+			const ex_type* type = ex_bytecode_type(bytecode, i);
+			const ex_string_view name = ex_type_get_name(type);
+			if (StringView(name.begin, (u64)name.length) == "TestData") return type;
+		}
+		return nullptr;
+	};
+	const ex_type* source_type = findTestData(source_bytecode);
+	const ex_type* target_type = findTestData(target_bytecode);
+	ASSERT_TRUE(source_type && target_type);
+
+	const char* static_plugins[] = {"evox"};
+	Engine::InitArgs args;
+	args.static_plugins = static_plugins;
+	UniquePtr<Engine> engine = Engine::create(static_cast<Engine::InitArgs&&>(args), getGlobalAllocator());
+	ASSERT_TRUE(engine);
+	engine->getFileSystem().mount(".", "");
+
+	World& source_world = engine->createWorld();
+	EvoxModule* source_module = (EvoxModule*)source_world.getModule("evox");
+	ASSERT_TRUE(source_module);
+	source_module->setEvoxDataTypes(Span<const ex_type*>(&source_type, 1));
+	const EntityRef source_entity = source_world.createEntity({}, Quat::IDENTITY);
+	source_module->createEvox(source_entity);
+	ASSERT_TRUE(source_module->addEvoxData(source_entity, source_type));
+	u8* source_value = (u8*)source_module->getEvoxData(source_entity, source_type);
+	ASSERT_TRUE(source_value);
+	const i32 first = 123;
+	const i32 nested_first = 456;
+	const i32 nested_second = 789;
+	const i32 changed = 321;
+	const i32 removed = 654;
+	const u32 source_nested_offset = ex_type_struct_field_offset(source_type, 1);
+	const ex_type* source_nested_type = ex_type_struct_field_type(source_type, 1);
+	memcpy(source_value + ex_type_struct_field_offset(source_type, 0), &first, sizeof(first));
+	memcpy(source_value + source_nested_offset + ex_type_struct_field_offset(source_nested_type, 0), &nested_first, sizeof(nested_first));
+	memcpy(source_value + source_nested_offset + ex_type_struct_field_offset(source_nested_type, 1), &nested_second, sizeof(nested_second));
+	memcpy(source_value + ex_type_struct_field_offset(source_type, 2), &changed, sizeof(changed));
+	memcpy(source_value + ex_type_struct_field_offset(source_type, 3), &removed, sizeof(removed));
+
+	OutputMemoryStream blob(getGlobalAllocator());
+	source_module->serialize(blob);
+
+	World& target_world = engine->createWorld();
+	EvoxModule* target_module = (EvoxModule*)target_world.getModule("evox");
+	ASSERT_TRUE(target_module);
+	target_module->setEvoxDataTypes(Span<const ex_type*>(&target_type, 1));
+	const EntityRef target_entity = target_world.createEntity({}, Quat::IDENTITY);
+	EntityMap entity_map(getGlobalAllocator());
+	entity_map.set(source_entity, target_entity);
+	InputMemoryStream input(blob);
+	target_module->deserialize(input, entity_map, 2);
+
+	const u8* restored = (const u8*)target_module->getEvoxData(target_entity, target_type);
+	ASSERT_TRUE(restored);
+	i32 restored_first;
+	i32 restored_nested_first;
+	i32 restored_nested_added;
+	i32 restored_nested_second;
+	f32 restored_changed;
+	i32 restored_added;
+	const u32 target_nested_offset = ex_type_struct_field_offset(target_type, 1);
+	const ex_type* target_nested_type = ex_type_struct_field_type(target_type, 1);
+	memcpy(&restored_first, restored + ex_type_struct_field_offset(target_type, 0), sizeof(restored_first));
+	memcpy(&restored_nested_first, restored + target_nested_offset + ex_type_struct_field_offset(target_nested_type, 0), sizeof(restored_nested_first));
+	memcpy(&restored_nested_added, restored + target_nested_offset + ex_type_struct_field_offset(target_nested_type, 1), sizeof(restored_nested_added));
+	memcpy(&restored_nested_second, restored + target_nested_offset + ex_type_struct_field_offset(target_nested_type, 2), sizeof(restored_nested_second));
+	memcpy(&restored_changed, restored + ex_type_struct_field_offset(target_type, 2), sizeof(restored_changed));
+	memcpy(&restored_added, restored + ex_type_struct_field_offset(target_type, 3), sizeof(restored_added));
+	ASSERT_EQ(first, restored_first);
+	ASSERT_EQ(nested_first, restored_nested_first);
+	ASSERT_EQ(0, restored_nested_added);
+	ASSERT_EQ(nested_second, restored_nested_second);
+	ASSERT_EQ(0, restored_changed);
+	ASSERT_EQ(0, restored_added);
+
+	engine->destroyWorld(target_world);
+	engine->destroyWorld(source_world);
+	engine.reset();
+	ex_bytecode_destroy(target_bytecode);
+	ex_bytecode_destroy(source_bytecode);
+	ex_module_destroy(target_script);
+	ex_module_destroy(source_script);
+	return true;
+}
+
+bool testEvoxModulePendingDataDestroyedEntity() {
+	EvoxTestHost script_host;
+	const char* source = R"(
+		struct Data {}
+		#[Data{}]
+		struct TestData { value : i32; }
+	)";
+	ex_module* script = ex_module_create(&script_host.host);
+	ASSERT_TRUE(script);
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(script, {source, (i64)stringLength(source)}, {"test.evox", 8}, nullptr, nullptr));
+	ex_bytecode* bytecode = ex_bytecode_compile(script, &script_host.host, nullptr);
+	ASSERT_TRUE(bytecode);
+
+	const ex_type* data_type = nullptr;
+	for (u32 i = 0; i < ex_bytecode_type_count(bytecode); ++i) {
+		const ex_type* type = ex_bytecode_type(bytecode, i);
+		const ex_string_view name = ex_type_get_name(type);
+		if (StringView(name.begin, (u64)name.length) == "TestData") data_type = type;
+	}
+	ASSERT_TRUE(data_type);
+
+	const char* static_plugins[] = {"evox"};
+	Engine::InitArgs args;
+	args.static_plugins = static_plugins;
+	UniquePtr<Engine> engine = Engine::create(static_cast<Engine::InitArgs&&>(args), getGlobalAllocator());
+	ASSERT_TRUE(engine);
+	engine->getFileSystem().mount(".", "");
+	World& source_world = engine->createWorld();
+	EvoxModule* source_module = (EvoxModule*)source_world.getModule("evox");
+	ASSERT_TRUE(source_module);
+	source_module->setEvoxDataTypes(Span<const ex_type*>(&data_type, 1));
+	const EntityRef source_entity = source_world.createEntity({}, Quat::IDENTITY);
+	source_module->createEvox(source_entity);
+	ASSERT_TRUE(source_module->addEvoxData(source_entity, data_type));
+	OutputMemoryStream blob(getGlobalAllocator());
+	source_module->serialize(blob);
+
+	World& target_world = engine->createWorld();
+	EvoxModule* target_module = (EvoxModule*)target_world.getModule("evox");
+	ASSERT_TRUE(target_module);
+	const EntityRef target_entity = target_world.createEntity({}, Quat::IDENTITY);
+	EntityMap entity_map(getGlobalAllocator());
+	entity_map.set(source_entity, target_entity);
+	InputMemoryStream input(blob);
+	target_module->deserialize(input, entity_map, 2);
+	target_world.destroyEntity(target_entity);
+	target_module->setEvoxDataTypes(Span<const ex_type*>(&data_type, 1));
+	ASSERT_EQ(0, target_module->getEvoxDataCount(target_entity));
+	ASSERT_TRUE(!target_module->getEvoxData(target_entity, data_type));
+
+	engine->destroyWorld(target_world);
+	engine->destroyWorld(source_world);
+	engine.reset();
+	ex_bytecode_destroy(bytecode);
+	ex_module_destroy(script);
+	return true;
+}
+
+bool testEvoxModuleMultiplePendingTypes() {
+	EvoxTestHost script_host;
+	const char* source = R"(
+		struct Data {}
+		#[Data{}]
+		struct FirstData { value : i32; }
+		#[Data{}]
+		struct SecondData { value : i32; }
+	)";
+	ex_module* script = ex_module_create(&script_host.host);
+	ASSERT_TRUE(script);
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(script, {source, (i64)stringLength(source)}, {"test.evox", 8}, nullptr, nullptr));
+	ex_bytecode* bytecode = ex_bytecode_compile(script, &script_host.host, nullptr);
+	ASSERT_TRUE(bytecode);
+
+	const ex_type* first_type = nullptr;
+	const ex_type* second_type = nullptr;
+	for (u32 i = 0; i < ex_bytecode_type_count(bytecode); ++i) {
+		const ex_type* type = ex_bytecode_type(bytecode, i);
+		const ex_string_view name = ex_type_get_name(type);
+		if (StringView(name.begin, (u64)name.length) == "FirstData") first_type = type;
+		if (StringView(name.begin, (u64)name.length) == "SecondData") second_type = type;
+	}
+	ASSERT_TRUE(first_type && second_type);
+
+	const char* static_plugins[] = {"evox"};
+	Engine::InitArgs args;
+	args.static_plugins = static_plugins;
+	UniquePtr<Engine> engine = Engine::create(static_cast<Engine::InitArgs&&>(args), getGlobalAllocator());
+	ASSERT_TRUE(engine);
+	engine->getFileSystem().mount(".", "");
+	World& source_world = engine->createWorld();
+	EvoxModule* source_module = (EvoxModule*)source_world.getModule("evox");
+	ASSERT_TRUE(source_module);
+	const ex_type* source_types[] = {first_type, second_type};
+	source_module->setEvoxDataTypes(source_types);
+	const EntityRef source_entity = source_world.createEntity({}, Quat::IDENTITY);
+	source_module->createEvox(source_entity);
+	ASSERT_TRUE(source_module->addEvoxData(source_entity, first_type));
+	ASSERT_TRUE(source_module->addEvoxData(source_entity, second_type));
+	const i32 first_value = 123;
+	const i32 second_value = 456;
+	memcpy((void*)source_module->getEvoxData(source_entity, first_type), &first_value, sizeof(first_value));
+	memcpy((void*)source_module->getEvoxData(source_entity, second_type), &second_value, sizeof(second_value));
+	OutputMemoryStream blob(getGlobalAllocator());
+	source_module->serialize(blob);
+
+	World& target_world = engine->createWorld();
+	EvoxModule* target_module = (EvoxModule*)target_world.getModule("evox");
+	ASSERT_TRUE(target_module);
+	const EntityRef target_entity = target_world.createEntity({}, Quat::IDENTITY);
+	EntityMap entity_map(getGlobalAllocator());
+	entity_map.set(source_entity, target_entity);
+	target_module->setEvoxDataTypes(Span<const ex_type*>(&first_type, 1));
+	InputMemoryStream input(blob);
+	target_module->deserialize(input, entity_map, 2);
+	ASSERT_TRUE(target_module->getEvoxData(target_entity, first_type));
+	ASSERT_TRUE(!target_module->getEvoxData(target_entity, second_type));
+
+	target_module->setEvoxDataTypes(source_types);
+	const i32* restored_first = (const i32*)target_module->getEvoxData(target_entity, first_type);
+	const i32* restored_second = (const i32*)target_module->getEvoxData(target_entity, second_type);
+	ASSERT_TRUE(restored_first && restored_second);
+	ASSERT_EQ(first_value, *restored_first);
+	ASSERT_EQ(second_value, *restored_second);
+
+	engine->destroyWorld(target_world);
+	engine->destroyWorld(source_world);
+	engine.reset();
+	ex_bytecode_destroy(bytecode);
+	ex_module_destroy(script);
+	return true;
+}
+
+bool testEvoxModuleZeroSizedData() {
+	EvoxTestHost script_host;
+	const char* source = R"(
+		struct Data {}
+		#[Data{}]
+		struct EmptyData {}
+	)";
+	ex_module* script = ex_module_create(&script_host.host);
+	ASSERT_TRUE(script);
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(script, {source, (i64)stringLength(source)}, {"test.evox", 8}, nullptr, nullptr));
+	ex_bytecode* bytecode = ex_bytecode_compile(script, &script_host.host, nullptr);
+	ASSERT_TRUE(bytecode);
+	const ex_type* data_type = nullptr;
+	for (u32 i = 0; i < ex_bytecode_type_count(bytecode); ++i) {
+		const ex_type* type = ex_bytecode_type(bytecode, i);
+		const ex_string_view name = ex_type_get_name(type);
+		if (StringView(name.begin, (u64)name.length) == "EmptyData") data_type = type;
+	}
+	ASSERT_TRUE(data_type);
+
+	const char* static_plugins[] = {"evox"};
+	Engine::InitArgs args;
+	args.static_plugins = static_plugins;
+	UniquePtr<Engine> engine = Engine::create(static_cast<Engine::InitArgs&&>(args), getGlobalAllocator());
+	ASSERT_TRUE(engine);
+	engine->getFileSystem().mount(".", "");
+	World& source_world = engine->createWorld();
+	EvoxModule* source_module = (EvoxModule*)source_world.getModule("evox");
+	source_module->setEvoxDataTypes(Span<const ex_type*>(&data_type, 1));
+	const EntityRef source_entity = source_world.createEntity({}, Quat::IDENTITY);
+	source_module->createEvox(source_entity);
+	ASSERT_TRUE(source_module->addEvoxData(source_entity, data_type));
+	OutputMemoryStream blob(getGlobalAllocator());
+	source_module->serialize(blob);
+
+	World& target_world = engine->createWorld();
+	EvoxModule* target_module = (EvoxModule*)target_world.getModule("evox");
+	const EntityRef target_entity = target_world.createEntity({}, Quat::IDENTITY);
+	EntityMap entity_map(getGlobalAllocator());
+	entity_map.set(source_entity, target_entity);
+	InputMemoryStream input(blob);
+	target_module->deserialize(input, entity_map, 2);
+	target_module->setEvoxDataTypes(Span<const ex_type*>(&data_type, 1));
+	ASSERT_EQ(1, target_module->getEvoxDataCount(target_entity));
+
+	engine->destroyWorld(target_world);
+	engine->destroyWorld(source_world);
+	engine.reset();
+	ex_bytecode_destroy(bytecode);
+	ex_module_destroy(script);
+	return true;
+}
+
 } // namespace
 
 void runEvoxModuleTests() {
 	RUN_TEST(testEvoxModuleSerialization);
+	RUN_TEST(testEvoxModuleSerializationSchemaMigration);
+	RUN_TEST(testEvoxModulePendingDataDestroyedEntity);
+	RUN_TEST(testEvoxModuleMultiplePendingTypes);
+	RUN_TEST(testEvoxModuleZeroSizedData);
 }

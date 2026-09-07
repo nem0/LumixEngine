@@ -33,12 +33,16 @@ static void printEvoxMessage(void* userdata, ex_string_view msg) {
 	if (ctx->message) ctx->message->append(StringView(msg.begin, (u64)msg.length));
 }
 
-static ex_string_view toLs(StringView value) {
+static ex_string_view toEvox(StringView value) {
 	return {value.data, (i64)value.length};
 }
 
-static ex_string_view toLs(const char* value) {
+static ex_string_view toEvox(const char* value) {
 	return {value, (i64)stringLength(value)};
+}
+
+static StringView fromEvox(ex_string_view value) {
+	return {value.begin, (u64)value.length};
 }
 
 static void bindCoreFunctions(ex_module* module, ex_runtime* runtime, IAllocator& allocator) {
@@ -134,7 +138,7 @@ struct EvoxSystemImpl : EvoxSystem {
 			}
 			if (file_path == source) return name;
 		}
-		return toLs(source.c_str());
+		return toEvox(source.c_str());
 	}
 
 	bool setDebugBreakpoint(const Path& source, u32 line) override {
@@ -151,7 +155,7 @@ struct EvoxSystemImpl : EvoxSystem {
 		if (!m_is_ready || !m_runtime || ex_debug_is_suspended(m_runtime)) return;
 		if (!m_is_game_running) return;
 
-		const ex_string_view function_name = toLs("update");
+		const ex_string_view function_name = toEvox("update");
 		if (ex_bytecode_runtime_result_kind(m_runtime, function_name) == EX_TYPE_INVALID) return;
 
 		ex_push_f32(m_runtime, time_delta);
@@ -166,14 +170,14 @@ struct EvoxSystemImpl : EvoxSystem {
 
 	void callStart() {
 		if (!m_runtime) return;
-		const ex_string_view function_name = toLs("start");
+		const ex_string_view function_name = toEvox("start");
 		if (ex_bytecode_runtime_result_kind(m_runtime, function_name) == EX_TYPE_INVALID) return;
 		ex_push_ptr(m_runtime, &m_engine.getInputSystem());
 		if (ex_call(m_runtime, function_name) == EX_RESULT_FAILURE) logError("Evox start failed");
 	}
 
 	void addWorld(World& world) {
-		const ex_string_view function_name = toLs("addWorld");
+		const ex_string_view function_name = toEvox("addWorld");
 		if (ex_bytecode_runtime_result_kind(m_runtime, function_name) == EX_TYPE_INVALID) return;
 		ex_push_ptr(m_runtime, &world);
 		if (ex_call(m_runtime, function_name) == EX_RESULT_FAILURE) {
@@ -253,7 +257,7 @@ struct EvoxSystemImpl : EvoxSystem {
 		ex_default_arena_create(&m_host.arena);
 		m_module = ex_module_create(&m_host);
 		ImportContext imports(m_engine.getFileSystem(), m_allocator);
-		if (!m_module || !ex_module_compile(m_module, toLs(m_resource->getSourceCode()), toLs(m_path.c_str()), &resolveImport, &imports)) {
+		if (!m_module || !ex_module_compile(m_module, toEvox(m_resource->getSourceCode()), toEvox(m_path.c_str()), &resolveImport, &imports)) {
 			m_host.diagnostics_userdata = nullptr;
 			m_host.print = nullptr;
 			logError("Evox compilation failed: ", diagnostics);
@@ -355,7 +359,7 @@ struct EvoxModuleImpl : EvoxModule {
 			, entities(rhs.entities.move())
 		{}
 
-		const ex_type* type;
+		const ex_type* type = nullptr;
 		u32 element_size;
 		AlignedByteBuffer values;
 		Array<EntityRef> entities;
@@ -371,39 +375,33 @@ struct EvoxModuleImpl : EvoxModule {
 		Array<EvoxDataRef> data;
 	};
 
-	struct PendingField {
-		explicit PendingField(IAllocator& allocator)
-			: name(allocator)
-			, type_name(allocator)
-			, values(allocator)
-		{}
-		PendingField(PendingField&& rhs)
-			: name(static_cast<String&&>(rhs.name))
-			, type_name(static_cast<String&&>(rhs.type_name))
-			, size(rhs.size)
-			, values(static_cast<OutputMemoryStream&&>(rhs.values))
-		{}
+	struct EvoxFieldDesc;
 
-		String name;
+	struct EvoxTypeDesc {
+		explicit EvoxTypeDesc(IAllocator& allocator) : type_name(allocator), fields(allocator) {}
+		
+		u32 getSize() const;
+
 		String type_name;
-		u32 size;
-		OutputMemoryStream values;
+		ex_type_kind kind = EX_TYPE_INVALID;
+		Array<EvoxFieldDesc> fields;
+	};
+
+	struct EvoxFieldDesc {
+		explicit EvoxFieldDesc(IAllocator& allocator) : name(allocator), type(allocator) {}
+		String name;
+		EvoxTypeDesc type;
 	};
 
 	struct PendingType {
-		explicit PendingType(IAllocator& allocator)
-			: name(allocator)
-			, fields(allocator)
-			, entities(allocator)
-		{}
+		explicit PendingType(IAllocator& allocator) : type_desc(allocator), values(allocator), entities(allocator) {}
 		PendingType(PendingType&& rhs)
-			: name(static_cast<String&&>(rhs.name))
-			, fields(rhs.fields.move())
-			, entities(rhs.entities.move())
-		{}
+			: type_desc(static_cast<EvoxTypeDesc&&>(rhs.type_desc))
+			, values(static_cast<OutputMemoryStream&&>(rhs.values))
+			, entities(static_cast<Array<EntityRef>&&>(rhs.entities)) {}
 
-		String name;
-		Array<PendingField> fields;
+		EvoxTypeDesc type_desc;
+		OutputMemoryStream values;
 		Array<EntityRef> entities;
 	};
 
@@ -457,89 +455,95 @@ struct EvoxModuleImpl : EvoxModule {
 			case EX_TYPE_I64:
 			case EX_TYPE_U64:
 			case EX_TYPE_F32:
-			case EX_TYPE_F64: return true;
+			case EX_TYPE_F64:
+			case EX_TYPE_STRUCT:
+				return true;
 			default: return false;
 		}
 	}
 
-	void serialize(OutputMemoryStream& out) override {
-		out.write(m_components.size());
-		for (auto iter = m_components.begin(), end = m_components.end(); iter != end; ++iter) {
-			out.write(iter.key());
+	void deserializeTypeDesc(InputMemoryStream& in, EvoxTypeDesc& desc) {
+		desc.type_name = in.readString();
+		in.read(desc.kind);
+		u32 num_fields = in.read<u32>();
+		desc.fields.reserve(num_fields);
+		for (u32 i = 0; i < num_fields; ++i) {
+			EvoxFieldDesc& field = desc.fields.emplace(m_allocator);
+			field.name = in.readString();
+			deserializeTypeDesc(in, field.type);
+		}
+	}
+
+	void serializeTypeDesc(OutputMemoryStream& out, const EvoxTypeDesc& desc) {
+		out.writeString(desc.type_name);
+		out.write(desc.kind);
+		out.write(desc.fields.size());
+		for (const EvoxFieldDesc& field : desc.fields) {
+			out.writeString(field.name);
+			serializeTypeDesc(out, field.type);
+		}
+	}
+
+	void serializeTypeDesc(OutputMemoryStream& out, const ex_type* type) {
+		ex_string_view type_name = ex_type_get_name(type);
+		ex_type_kind kind = ex_type_get_kind(type);
+		out.writeString(fromEvox(type_name));
+		out.write(kind);
+		u32 num_fields = 0;
+		if (kind != EX_TYPE_STRUCT) {
+			out.write(num_fields);
+			return;
 		}
 
-		// Live and pending types share the same serialized representation.
-		out.write(m_data_storage.size() + m_pending_types.size());
-		for (const EvoxDataType& data : m_data_storage) {
-			const ex_type* type = data.type;
-			const ex_string_view type_name = ex_type_get_name(type);
-			out.writeString({type_name.begin, (u64)type_name.length});
-			u32 num_fields = 0;
-			for (u32 i = 0, count = ex_type_struct_field_count(type); i < count; ++i) {
-				if (isSerializableField(*ex_type_struct_field_type(type, i))) ++num_fields;
-			}
-			out.write(num_fields);
-			const u32 num_values = data.entities.size();
-			out.write(num_values);
-			for (u32 i = 0, field_count = ex_type_struct_field_count(type); i < field_count; ++i) {
-				const ex_type* field_type = ex_type_struct_field_type(type, i);
-				if (!isSerializableField(*field_type)) continue;
-				const ex_string_view field_name = ex_type_struct_field_name(type, i);
-				out.writeString({field_name.begin, (u64)field_name.length});
-				const u32 field_offset = ex_type_struct_field_offset(type, i);
-				const ex_string_view field_type_name = ex_type_get_name(field_type);
-				out.writeString({field_type_name.begin, (u64)field_type_name.length});
-				const u32 field_size = ex_type_get_size(field_type);
-				out.write(field_size);
-				for (u32 j = 0; j < num_values; ++j) {
-					out.write(data.values.data + field_offset + j * data.element_size, field_size);
-				}
-			}
-			out.write(data.entities.begin(), data.entities.byte_size());
+		num_fields = ex_type_struct_field_count(type);
+		out.write(num_fields);
+		for (u32 f = 0; f < num_fields; ++f) {
+			ex_string_view field_name = ex_type_struct_field_name(type, f);
+			const ex_type* field_type = ex_type_struct_field_type(type, f);
+			out.writeString(fromEvox(field_name));
+			serializeTypeDesc(out, field_type);
 		}
-		for (const PendingType& type : m_pending_types) {
-			out.writeString(type.name);
-			out.write(type.fields.size());
-			out.write(type.entities.size());
-			for (const PendingField& field : type.fields) {
-				out.writeString(field.name);
-				out.writeString(field.type_name);
-				out.write(field.size);
-				out.write(field.values.data(), field.values.size());
-			}
-			out.write(type.entities.begin(), type.entities.byte_size());
+	}
+
+	void serialize(OutputMemoryStream& out) override {
+		out.write((u32)m_components.size());
+		for (auto iter = m_components.begin(), end = m_components.end(); iter != end; ++iter) out.write(iter.key());
+
+		out.write((u32)(m_data_storage.size() + m_pending_types.size()));
+		for (const PendingType& t : m_pending_types) {
+			out.writeArray(t.entities);
+			out.write((u64)t.values.size());
+			out.write(t.values.data(), t.values.size());
+			serializeTypeDesc(out, t.type_desc);
+		}
+		for (const EvoxDataType& t : m_data_storage) {
+			out.writeArray(t.entities);
+			out.write((u64)t.values.size);
+			out.write(t.values.data, t.values.size);
+			serializeTypeDesc(out, t.type);
 		}
 	}
 
 	void deserialize(InputMemoryStream& in, const EntityMap& entity_map, i32 version) override {
 		if (version <= 0) in.readString();
 		if (version <= 1) return;
-
 		const u32 component_count = in.read<u32>();
 		for (u32 i = 0; i < component_count; ++i) {
-			EntityRef entity = entity_map.get(in.read<EntityRef>());
-			createEvox(entity);
+			const EntityRef source_entity = in.read<EntityRef>();
+			const EntityPtr mapped = entity_map.get((EntityPtr)source_entity);
+			if (mapped.isValid()) createEvox((EntityRef)mapped);
 		}
 
-		const u32 type_count = in.read<u32>();
-		m_pending_types.reserve(m_pending_types.size() + type_count);
-		for (u32 i = 0; i < type_count; ++i) {
-			PendingType& type = m_pending_types.emplace(m_allocator);
-			in.read(type.name);
-			const u32 field_count = in.read<u32>();
-			const u32 value_count = in.read<u32>();
-			type.fields.reserve(field_count);
-			for (u32 j = 0; j < field_count; ++j) {
-				PendingField& field = type.fields.emplace(m_allocator);
-				in.read(field.name);
-				in.read(field.type_name);
-				in.read(field.size);
-				field.values.resize(field.size * value_count);
-				in.read(field.values.getMutableData(), field.values.size());
-			}
-			type.entities.resize(value_count);
-			in.read(type.entities.begin(), type.entities.byte_size());
-			for (EntityRef& entity : type.entities) entity = entity_map.get(entity);
+		const u32 num_types = in.read<u32>();
+		m_pending_types.reserve(m_pending_types.size() + num_types);
+		for (u32 i = 0; i < num_types; ++i) {
+			PendingType& t = m_pending_types.emplace(m_allocator);
+			in.readArray(&t.entities);
+			for (EntityRef& entity : t.entities) entity = entity_map.get(entity);
+			u64 data_size = in.read<u64>();
+			t.values.resize(data_size);
+			in.read(t.values.getMutableData(), data_size);
+			deserializeTypeDesc(in, t.type_desc);
 		}
 		applyPendingData();
 	}
@@ -566,7 +570,23 @@ struct EvoxModuleImpl : EvoxModule {
 	}
 
 	void clearEvoxData() override {
-		stashCurrentData();
+		// stash data from m_data_storage to m_pending_types
+		m_pending_types.reserve(m_pending_types.size() + m_data_storage.size());
+		for (const EvoxDataType& src : m_data_storage) {
+			PendingType& dst = m_pending_types.emplace(m_allocator);
+			src.entities.copyTo(dst.entities);
+			createTypeDesc(dst.type_desc, src.type);
+			dst.values.resize(src.entities.size() * dst.type_desc.getSize());
+			packValues(src.type
+				, dst.type_desc
+				, dst.values.getMutableData()
+				, dst.type_desc.getSize()
+				, src.values.data
+				, src.element_size
+				, src.entities.size());
+		}
+
+		m_data_storage.clear();
 		for (EvoxComponent& component : m_components) component.data.clear();
 		m_data_storage.clear();
 	}
@@ -630,90 +650,149 @@ struct EvoxModuleImpl : EvoxModule {
 	bool setDebugBreakpoint(const Path& source, u32 line) override { return m_system.setDebugBreakpoint(source, line); }
 	bool removeDebugBreakpoint(const Path& source, u32 line) override { return m_system.removeDebugBreakpoint(source, line); }
 
-private:
-	void stashCurrentData() {
-		for (const EvoxDataType& data : m_data_storage) {
-			if (data.entities.empty()) continue;
+	void createTypeDesc(EvoxTypeDesc& dst, const ex_type* src) {
+		dst.type_name = fromEvox(ex_type_get_name(src));
+		dst.kind = ex_type_get_kind(src);
+		const u32 num_fields = ex_type_struct_field_count(src);
+		dst.fields.reserve(num_fields);
+		for (u32 i = 0; i < num_fields; ++i) {
+			EvoxFieldDesc& field = dst.fields.emplace(m_allocator);
+			field.name = fromEvox(ex_type_struct_field_name(src, i));
+			createTypeDesc(field.type, ex_type_struct_field_type(src, i));
+		}
+	}
 
-			PendingType& pending = m_pending_types.emplace(m_allocator);
-			const ex_string_view name = ex_type_get_name(data.type);
-			pending.name = StringView(name.begin, name.length);
-			data.entities.copyTo(pending.entities);
-			for (u32 i = 0, field_count = ex_type_struct_field_count(data.type); i < field_count; ++i) {
-				const ex_type* field_type = ex_type_struct_field_type(data.type, i);
-				if (!isSerializableField(*field_type)) continue;
+	EvoxDataType* getDataStorage(StringView type_name) {
+		for (EvoxDataType& t : m_data_storage) {
+			StringView tmp = fromEvox(ex_type_get_name(t.type));
+			if (equalStrings(tmp, type_name)) return &t;
+		}
 
-				PendingField& field = pending.fields.emplace(m_allocator);
-				const ex_string_view field_name = ex_type_struct_field_name(data.type, i);
-				field.name = StringView(field_name.begin, field_name.length);
-				const ex_string_view field_type_name = ex_type_get_name(field_type);
-				field.type_name = StringView(field_type_name.begin, field_type_name.length);
-				field.size = ex_type_get_size(field_type);
-				const u32 offset = ex_type_struct_field_offset(data.type, i);
-				field.values.resize(field.size * data.entities.size());
-				for (u32 j = 0; j < (u32)data.entities.size(); ++j) {
-					memcpy(field.values.getMutableData() + j * field.size,
-						data.values.data + j * data.element_size + offset,
-						field.size);
-				}
+		for (const ex_type* type : m_system.getEvoxDataTypes()) {
+			ASSERT(type);
+			const ex_string_view name = ex_type_get_name(type);
+			if (!equalStrings(fromEvox(name), type_name)) continue;
+
+			return &m_data_storage.emplace(type, m_allocator);
+		}
+		return nullptr;
+	}
+
+	i32 findField(const ex_type* conatiner_type, StringView field_name) {
+		u32 num_fields = ex_type_struct_field_count(conatiner_type);
+		for (u32 i = 0; i < num_fields; ++i) {
+			StringView fn = fromEvox(ex_type_struct_field_name(conatiner_type, i));
+			if (equalStrings(fn, field_name)) return i;
+		}
+		return -1;
+	}
+
+	void packValues(const ex_type* src_type, const EvoxTypeDesc& src_type_desc, u8* dst, u32 dst_stride, const u8* src, u32 src_stride, u32 num_values) {
+		if (src_type_desc.kind != EX_TYPE_STRUCT) {
+			const u32 size = ex_type_get_size(src_type);
+			for (u32 i = 0; i < num_values; ++i) {
+				memcpy(dst, src, size);
+				dst += dst_stride;
+				src += src_stride;
 			}
+			return;
+		}
+
+		for (u32 i = 0; i < num_values; ++i) {
+			u32 dst_offset = 0;
+			for (u32 field_index = 0, field_count = src_type_desc.fields.size(); field_index < field_count; ++field_index) {
+				const EvoxFieldDesc& field = src_type_desc.fields[field_index];
+				const ex_type* field_type = ex_type_struct_field_type(src_type, field_index);
+				const u32 src_offset = ex_type_struct_field_offset(src_type, field_index);
+				packValues(field_type
+					, field.type
+					, dst + dst_offset
+					, field.type.getSize()
+					, src + src_offset
+					, ex_type_get_size(field_type)
+					, 1);
+				dst_offset += field.type.getSize();
+			}
+			dst += dst_stride;
+			src += src_stride;
+		}
+	}
+
+	void copyValues(const ex_type* dst_type, const EvoxTypeDesc& src_type_desc, u8* dst, u32 dst_stride, const u8* src, u32 src_stride, u32 num_values) {
+		switch (src_type_desc.kind) {
+			case EX_TYPE_BOOL:
+			case EX_TYPE_U8:
+			case EX_TYPE_I8:
+			case EX_TYPE_U16:
+			case EX_TYPE_I16:
+			case EX_TYPE_I32:
+			case EX_TYPE_U32:
+			case EX_TYPE_I64:
+			case EX_TYPE_U64:
+			case EX_TYPE_F32:
+			case EX_TYPE_F64: {
+				u32 size = ex_type_get_size(dst_type);
+				for (i32 i = 0, c = num_values; i < c; ++i) {
+					memcpy(dst, src, size);
+					dst += dst_stride;
+					src += src_stride;
+				}
+				return;
+			}
+			case EX_TYPE_STRUCT: {
+				// TODO
+				u32 src_offset = 0;
+				for (const EvoxFieldDesc& f : src_type_desc.fields) {
+					i32 field_index = findField(dst_type, f.name);
+					if (field_index < 0) {
+						src_offset += f.type.getSize();
+						continue; // field no longer exists
+					}
+
+					const ex_type* dst_field_type = ex_type_struct_field_type(dst_type, field_index);
+					if (f.type.kind != ex_type_get_kind(dst_field_type)) {
+						src_offset += f.type.getSize();
+						continue; // field kind changed
+					}
+
+					u32 dst_offset = ex_type_struct_field_offset(dst_type, field_index);
+					copyValues(dst_field_type, f.type, dst + dst_offset, dst_stride, src + src_offset, src_stride, num_values);
+					src_offset += f.type.getSize();
+				}
+				return;
+			}
+			default:
+				ASSERT(false); // TODO
+				return;
 		}
 	}
 
 	void applyPendingData() {
 		for (i32 pending_idx = m_pending_types.size() - 1; pending_idx >= 0; --pending_idx) {
-			PendingType& pending = m_pending_types[pending_idx];
-			EvoxDataType* data_type = nullptr;
-			for (EvoxDataType& candidate : m_data_storage) {
-				const ex_string_view name = ex_type_get_name(candidate.type);
-				if (pending.name == StringView(name.begin, name.length)) {
-					data_type = &candidate;
-					break;
-				}
-			}
-			if (!data_type) continue;
-
-			const u32 base_index = data_type->entities.size();
-			const u32 count = pending.entities.size();
-			const u32 old_size = data_type->values.size;
-			data_type->values.resize(old_size + count * data_type->element_size);
-			memset(data_type->values.data + old_size, 0, count * data_type->element_size);
-
-			for (const PendingField& field : pending.fields) {
-				for (u32 i = 0, field_count = ex_type_struct_field_count(data_type->type); i < field_count; ++i) {
-					const ex_string_view current_name = ex_type_struct_field_name(data_type->type, i);
-					if (field.name != StringView(current_name.begin, current_name.length)) continue;
-
-					const ex_type* current_type = ex_type_struct_field_type(data_type->type, i);
-					const ex_string_view current_type_name = ex_type_get_name(current_type);
-					if (field.size != ex_type_get_size(current_type)
-						|| field.type_name != StringView(current_type_name.begin, current_type_name.length))
-					{
-						logWarning("Evox: ignoring incompatible field ", pending.name, ".", field.name);
-						break;
-					}
-					const u32 offset = ex_type_struct_field_offset(data_type->type, i);
-					for (u32 j = 0; j < count; ++j) {
-						memcpy(data_type->values.data + old_size + j * data_type->element_size + offset,
-							field.values.data() + j * field.size,
-							field.size);
-					}
-					break;
-				}
+			const PendingType& src = m_pending_types[pending_idx];
+			if (src.entities.empty()) {
+				m_pending_types.swapAndPop(pending_idx);
+				continue;
 			}
 
-			data_type->entities.reserve(base_index + count);
-			for (u32 i = 0; i < count; ++i) {
-				const EntityRef entity = pending.entities[i];
-				data_type->entities.push(entity);
-				injectEntity(*data_type, data_type->values.data + old_size + i * data_type->element_size, entity);
-			}
+			EvoxDataType* dst = getDataStorage(src.type_desc.type_name);
+			if (!dst) continue; // type is not available yet
+			if (src.type_desc.kind != ex_type_get_kind(dst->type)) continue; // kind changed
 
-			for (u32 i = 0; i < count; ++i) {
-				auto cmp = m_components.find(pending.entities[i]);
-				if (cmp.isValid() && findDataRef(cmp.value(), data_type->type) < 0) {
-					cmp.value().data.push({data_type->type, base_index + i});
-				}
+			i32 old_num_entities = dst->entities.size();
+			dst->entities.resize(old_num_entities + src.entities.size());
+			dst->values.resize((old_num_entities + src.entities.size()) * dst->element_size);
+			memset(dst->values.data + old_num_entities * dst->element_size
+				, 0
+				, src.entities.size() * dst->element_size);
+			memcpy(dst->entities.data() + old_num_entities, src.entities.data(), src.entities.byte_size());
+
+			copyValues(dst->type, src.type_desc, dst->values.data + old_num_entities * dst->element_size, dst->element_size, src.values.data(), src.type_desc.getSize(), src.entities.size());
+			for (i32 i = 0, count = src.entities.size(); i < count; ++i) {
+				const EntityRef e = src.entities[i];
+				injectEntity(*dst, dst->values.data + (old_num_entities + i) * dst->element_size, e);
+				EvoxComponent& cmp = m_components[e];
+				cmp.data.push({dst->type, (u32)old_num_entities + i});
 			}
 			m_pending_types.swapAndPop(pending_idx);
 		}
@@ -721,18 +800,18 @@ private:
 
 	void removePendingData(EntityRef entity) {
 		for (PendingType& type : m_pending_types) {
-			for (i32 i = type.entities.size() - 1; i >= 0; --i) {
+			const u32 value_size = type.type_desc.getSize();
+			for (i32 i = (i32)type.entities.size() - 1; i >= 0; --i) {
 				if (type.entities[i] != entity) continue;
+
 				const u32 last = type.entities.size() - 1;
-				for (PendingField& field : type.fields) {
-					if (i != (i32)last) {
-						memcpy(field.values.getMutableData() + i * field.size,
-							field.values.data() + last * field.size,
-							field.size);
-					}
-					field.values.resize(last * field.size);
+				if ((u32)i != last && value_size > 0) {
+					memcpy(type.values.getMutableData() + (u32)i * value_size
+						, type.values.data() + last * value_size
+						, value_size);
 				}
 				type.entities.swapAndPop(i);
+				type.values.resize(last * value_size);
 			}
 		}
 	}
@@ -832,6 +911,29 @@ EvoxSystemImpl::EvoxSystemImpl(Engine& engine)
 	m_host.arena = {};
 	EvoxModuleImpl::reflect();
 	m_evox_resource_manager.create(EvoxResource::TYPE, m_engine.getResourceManager());
+}
+
+u32 EvoxModuleImpl::EvoxTypeDesc::getSize() const {
+	switch (kind) {
+		case EX_TYPE_BOOL:
+		case EX_TYPE_I8:
+		case EX_TYPE_U8: return 1;
+		case EX_TYPE_I16:
+		case EX_TYPE_U16: return 2;
+		case EX_TYPE_I32:
+		case EX_TYPE_U32:
+		case EX_TYPE_F32: return 4;
+		case EX_TYPE_I64:
+		case EX_TYPE_U64:
+		case EX_TYPE_F64: return 8;
+		default: {
+			u32 sum = 0;
+			for (const EvoxFieldDesc& f : fields) {
+				sum += f.type.getSize();
+			}
+			return sum;
+		}
+	}
 }
 
 void EvoxSystemImpl::createModules(World& world) {

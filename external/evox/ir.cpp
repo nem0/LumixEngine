@@ -614,7 +614,7 @@ struct IRBuilder {
 				}
 
 				// namespace.comptime
-				if (me.resolved_symbol && me.resolved_symbol->kind == Symbol::COMPTIME) {
+				if (me.resolved_symbol && me.resolved_symbol->kind == EX_SYM_KIND_COMPTIME) {
 					ASSERT(as_rvalue);
 					auto& value = alloc<ExOpLoadBytes>();
 					value.type = expr.resolved_type;
@@ -736,7 +736,7 @@ struct IRBuilder {
 					return value_addr;
 				}
 
-				if (ie.symbol && ie.symbol->kind == Symbol::COMPTIME && ie.symbol->comptime_bytes) {
+				if (ie.symbol && ie.symbol->kind == EX_SYM_KIND_COMPTIME && ie.symbol->comptime_bytes) {
 					auto& value = alloc<ExOpLoadBytes>();
 					value.type = ie.symbol->resolved_type;
 					value.value = ie.symbol->comptime_bytes;
