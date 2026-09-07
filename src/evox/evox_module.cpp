@@ -45,6 +45,28 @@ static StringView fromEvox(ex_string_view value) {
 	return {value.begin, (u64)value.length};
 }
 
+static bool isSerializableType(const ex_type& type) {
+	switch (ex_type_get_kind(&type)) {
+		case EX_TYPE_BOOL:
+		case EX_TYPE_I8:
+		case EX_TYPE_U8:
+		case EX_TYPE_I16:
+		case EX_TYPE_U16:
+		case EX_TYPE_I32:
+		case EX_TYPE_U32:
+		case EX_TYPE_I64:
+		case EX_TYPE_U64:
+		case EX_TYPE_F32:
+		case EX_TYPE_F64:
+		case EX_TYPE_ENUM:
+		case EX_TYPE_CPTR:
+		case EX_TYPE_STRUCT: // Keep structs even when all their fields are filtered out.
+			return true;
+		default:
+			return false;
+	}
+}
+
 static void bindCoreFunctions(ex_module* module, ex_runtime* runtime, IAllocator& allocator) {
 	HashMap<NativeFunctionKey, ex_native_fn, NativeFunctionKeyHash> functions(allocator);
 	Lumix::Evox::gatherCoreFunctions(functions);
@@ -443,25 +465,6 @@ struct EvoxModuleImpl : EvoxModule {
 	i32 getVersion() const override { return 2; }
 	bool shouldSerialize() override { return true; }
 
-	static bool isSerializableField(const ex_type& type) {
-		switch (ex_type_get_kind(&type)) {
-			case EX_TYPE_BOOL:
-			case EX_TYPE_I8:
-			case EX_TYPE_U8:
-			case EX_TYPE_I16:
-			case EX_TYPE_U16:
-			case EX_TYPE_I32:
-			case EX_TYPE_U32:
-			case EX_TYPE_I64:
-			case EX_TYPE_U64:
-			case EX_TYPE_F32:
-			case EX_TYPE_F64:
-			case EX_TYPE_STRUCT:
-				return true;
-			default: return false;
-		}
-	}
-
 	void deserializeTypeDesc(InputMemoryStream& in, EvoxTypeDesc& desc) {
 		desc.type_name = in.readString();
 		in.read(desc.kind);
@@ -485,22 +488,18 @@ struct EvoxModuleImpl : EvoxModule {
 	}
 
 	void serializeTypeDesc(OutputMemoryStream& out, const ex_type* type) {
-		ex_string_view type_name = ex_type_get_name(type);
-		ex_type_kind kind = ex_type_get_kind(type);
-		out.writeString(fromEvox(type_name));
-		out.write(kind);
-		u32 num_fields = 0;
-		if (kind != EX_TYPE_STRUCT) {
-			out.write(num_fields);
-			return;
+		out.writeString(fromEvox(ex_type_get_name(type)));
+		out.write(ex_type_get_kind(type));
+		const u32 num_fields = ex_type_struct_field_count(type);
+		u32 serializable_fields = 0;
+		for (u32 i = 0; i < num_fields; ++i) {
+			if (isSerializableType(*ex_type_struct_field_type(type, i))) ++serializable_fields;
 		}
-
-		num_fields = ex_type_struct_field_count(type);
-		out.write(num_fields);
-		for (u32 f = 0; f < num_fields; ++f) {
-			ex_string_view field_name = ex_type_struct_field_name(type, f);
-			const ex_type* field_type = ex_type_struct_field_type(type, f);
-			out.writeString(fromEvox(field_name));
+		out.write(serializable_fields);
+		for (u32 i = 0; i < num_fields; ++i) {
+			const ex_type* field_type = ex_type_struct_field_type(type, i);
+			if (!isSerializableType(*field_type)) continue;
+			out.writeString(fromEvox(ex_type_struct_field_name(type, i)));
 			serializeTypeDesc(out, field_type);
 		}
 	}
@@ -517,9 +516,12 @@ struct EvoxModuleImpl : EvoxModule {
 			serializeTypeDesc(out, t.type_desc);
 		}
 		for (const EvoxDataType& t : m_data_storage) {
+			const u32 packed_stride = getPackedSize(t.type);
+			const u64 packed_size = (u64)t.entities.size() * packed_stride;
 			out.writeArray(t.entities);
-			out.write((u64)t.values.size);
-			out.write(t.values.data, t.values.size);
+			out.write(packed_size);
+			u8* packed = (u8*)out.skip(packed_size);
+			packValues(t.type, packed, packed_stride, t.values.data, t.element_size, t.entities.size());
 			serializeTypeDesc(out, t.type);
 		}
 	}
@@ -578,7 +580,6 @@ struct EvoxModuleImpl : EvoxModule {
 			createTypeDesc(dst.type_desc, src.type);
 			dst.values.resize(src.entities.size() * dst.type_desc.getSize());
 			packValues(src.type
-				, dst.type_desc
 				, dst.values.getMutableData()
 				, dst.type_desc.getSize()
 				, src.values.data
@@ -656,9 +657,11 @@ struct EvoxModuleImpl : EvoxModule {
 		const u32 num_fields = ex_type_struct_field_count(src);
 		dst.fields.reserve(num_fields);
 		for (u32 i = 0; i < num_fields; ++i) {
+			const ex_type* field_type = ex_type_struct_field_type(src, i);
+			if (!isSerializableType(*field_type)) continue;
 			EvoxFieldDesc& field = dst.fields.emplace(m_allocator);
 			field.name = fromEvox(ex_type_struct_field_name(src, i));
-			createTypeDesc(field.type, ex_type_struct_field_type(src, i));
+			createTypeDesc(field.type, field_type);
 		}
 	}
 
@@ -687,39 +690,46 @@ struct EvoxModuleImpl : EvoxModule {
 		return -1;
 	}
 
-	void packValues(const ex_type* src_type, const EvoxTypeDesc& src_type_desc, u8* dst, u32 dst_stride, const u8* src, u32 src_stride, u32 num_values) {
-		if (src_type_desc.kind != EX_TYPE_STRUCT) {
+	static u32 getPackedSize(const ex_type* type) {
+		if (!isSerializableType(*type)) return 0;
+		if (ex_type_get_kind(type) != EX_TYPE_STRUCT) return ex_type_get_size(type);
+		u32 size = 0;
+		for (u32 i = 0, count = ex_type_struct_field_count(type); i < count; ++i) {
+			size += getPackedSize(ex_type_struct_field_type(type, i));
+		}
+		return size;
+	}
+
+	void packValues(const ex_type* src_type, u8* dst, u32 dst_stride, const u8* src, u32 src_stride, u32 num_values) {
+		if (num_values == 0) return;
+		const ex_type_kind kind = ex_type_get_kind(src_type);
+		if (kind != EX_TYPE_STRUCT) {
 			const u32 size = ex_type_get_size(src_type);
 			for (u32 i = 0; i < num_values; ++i) {
-				memcpy(dst, src, size);
+				if (kind == EX_TYPE_CPTR) memset(dst, 0, size);
+				else memcpy(dst, src, size);
 				dst += dst_stride;
 				src += src_stride;
 			}
 			return;
 		}
 
-		for (u32 i = 0; i < num_values; ++i) {
-			u32 dst_offset = 0;
-			for (u32 field_index = 0, field_count = src_type_desc.fields.size(); field_index < field_count; ++field_index) {
-				const EvoxFieldDesc& field = src_type_desc.fields[field_index];
-				const ex_type* field_type = ex_type_struct_field_type(src_type, field_index);
-				const u32 src_offset = ex_type_struct_field_offset(src_type, field_index);
-				packValues(field_type
-					, field.type
-					, dst + dst_offset
-					, field.type.getSize()
-					, src + src_offset
-					, ex_type_get_size(field_type)
-					, 1);
-				dst_offset += field.type.getSize();
-			}
-			dst += dst_stride;
-			src += src_stride;
+		u32 dst_offset = 0;
+		for (u32 i = 0, count = ex_type_struct_field_count(src_type); i < count; ++i) {
+			const ex_type* field_type = ex_type_struct_field_type(src_type, i);
+			const u32 packed_size = getPackedSize(field_type);
+			if (packed_size == 0) continue;
+			const u32 src_offset = ex_type_struct_field_offset(src_type, i);
+			packValues(field_type, dst + dst_offset, dst_stride, src + src_offset, src_stride, num_values);
+			dst_offset += packed_size;
 		}
 	}
 
 	void copyValues(const ex_type* dst_type, const EvoxTypeDesc& src_type_desc, u8* dst, u32 dst_stride, const u8* src, u32 src_stride, u32 num_values) {
 		switch (src_type_desc.kind) {
+			case EX_TYPE_CPTR:
+				// keep cptr null
+				return;
 			case EX_TYPE_BOOL:
 			case EX_TYPE_U8:
 			case EX_TYPE_I8:
@@ -727,6 +737,7 @@ struct EvoxModuleImpl : EvoxModule {
 			case EX_TYPE_I16:
 			case EX_TYPE_I32:
 			case EX_TYPE_U32:
+			case EX_TYPE_ENUM:
 			case EX_TYPE_I64:
 			case EX_TYPE_U64:
 			case EX_TYPE_F32:
@@ -740,24 +751,25 @@ struct EvoxModuleImpl : EvoxModule {
 				return;
 			}
 			case EX_TYPE_STRUCT: {
-				// TODO
 				u32 src_offset = 0;
 				for (const EvoxFieldDesc& f : src_type_desc.fields) {
+					const u32 field_size = f.type.getSize();
+					if (field_size == 0) continue;
 					i32 field_index = findField(dst_type, f.name);
 					if (field_index < 0) {
-						src_offset += f.type.getSize();
+						src_offset += field_size;
 						continue; // field no longer exists
 					}
 
 					const ex_type* dst_field_type = ex_type_struct_field_type(dst_type, field_index);
 					if (f.type.kind != ex_type_get_kind(dst_field_type)) {
-						src_offset += f.type.getSize();
+						src_offset += field_size;
 						continue; // field kind changed
 					}
 
 					u32 dst_offset = ex_type_struct_field_offset(dst_type, field_index);
 					copyValues(dst_field_type, f.type, dst + dst_offset, dst_stride, src + src_offset, src_stride, num_values);
-					src_offset += f.type.getSize();
+					src_offset += field_size;
 				}
 				return;
 			}
@@ -922,17 +934,22 @@ u32 EvoxModuleImpl::EvoxTypeDesc::getSize() const {
 		case EX_TYPE_U16: return 2;
 		case EX_TYPE_I32:
 		case EX_TYPE_U32:
+		case EX_TYPE_ENUM:
 		case EX_TYPE_F32: return 4;
 		case EX_TYPE_I64:
 		case EX_TYPE_U64:
+		case EX_TYPE_CPTR:
 		case EX_TYPE_F64: return 8;
-		default: {
+		case EX_TYPE_STRUCT: {
 			u32 sum = 0;
 			for (const EvoxFieldDesc& f : fields) {
 				sum += f.type.getSize();
 			}
 			return sum;
 		}
+		default:
+			ASSERT(false); // unsupported serialized type
+			return 0;
 	}
 }
 

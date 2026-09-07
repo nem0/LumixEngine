@@ -4,6 +4,7 @@
 #include "core/stream.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
+#include "engine/resource.h"
 #include "engine/world.h"
 #include "evox/capi.h"
 #include "evox/evox_module.h"
@@ -19,6 +20,110 @@ struct EvoxTestHost {
 
 	ex_host host = {};
 };
+
+// Serve the compiled root resource through the normal asynchronous loading path.
+// This exercises EvoxSystem's type discovery instead of injecting type handles.
+struct EvoxDiscoveryFileSystem : FileSystem {
+	explicit EvoxDiscoveryFileSystem(const char* source)
+		: content(getGlobalAllocator())
+		, resource_path(".lumix/resources/", Path("scripts/main.evox").getHash(), ".res")
+	{
+		content.write(CompiledResourceHeader{});
+		content.write(source, stringLength(source));
+	}
+
+	const char* getEngineDataDir() override { return ""; }
+	u64 getLastModified(StringView) override { return 0; }
+	bool copyFile(StringView, StringView) override { return false; }
+	bool moveFile(StringView, StringView) override { return false; }
+	bool deleteFile(StringView) override { return false; }
+	bool fileExists(StringView path) override { return Path(path) == resource_path; }
+	bool dirExists(StringView) override { return false; }
+	FileIterator* createFileIterator(StringView) override { return nullptr; }
+	bool open(StringView, os::InputFile&) override { return false; }
+	bool open(StringView, os::OutputFile&) override { return false; }
+	void mount(StringView, StringView) override {}
+	Path getFullPath(StringView path) const override { return Path(path); }
+	bool saveContentSync(const Path&, Span<const u8>) override { return false; }
+	bool getContentSync(const Path&, OutputMemoryStream&) override { return false; }
+	bool hasWork() override { return pending; }
+	AsyncHandle getContent(const Path& path, const ContentCallback& cb) override {
+		ASSERT(!pending);
+		callback = cb;
+		found = path == resource_path;
+		pending = true;
+		return AsyncHandle(0);
+	}
+	void cancel(AsyncHandle) override { pending = false; }
+	void processCallbacks() override {
+		if (!pending) return;
+		pending = false;
+		callback.invoke(Span<const u8>(content.data(), content.size()), found);
+	}
+
+	OutputMemoryStream content;
+	Path resource_path;
+	ContentCallback callback;
+	bool pending = false;
+	bool found = false;
+};
+
+bool testEvoxDataTypeDiscovery() {
+	const char* source = R"(
+		struct Data {}
+		struct Unmarked { value : i32; }
+		#[Data{}]
+		struct Supported { value : i32; }
+		#[Data{}]
+		struct Mixed { values : [2]i32; tail : i32; }
+		struct Nested { values : []i32; tail : i32; }
+		#[Data{}]
+		struct NestedData { nested : Nested; }
+		#[Data{}]
+		struct Unsupported { values : [2]i32; slice : []i32; }
+	)";
+	const char* static_plugins[] = {"evox"};
+	Engine::InitArgs args;
+	args.static_plugins = static_plugins;
+	args.file_system = UniquePtr<EvoxDiscoveryFileSystem>::create(getGlobalAllocator(), source).move();
+	UniquePtr<Engine> engine = Engine::create(static_cast<Engine::InitArgs&&>(args), getGlobalAllocator());
+	ASSERT_TRUE(engine);
+	World& world = engine->createWorld();
+	EvoxModule* module = (EvoxModule*)world.getModule("evox");
+	ASSERT_TRUE(module);
+	ASSERT_TRUE(!module->isReady());
+	engine->getFileSystem().processCallbacks();
+	ASSERT_TRUE(module->isReady());
+	const Span<const ex_type*> types = module->getEvoxDataTypes();
+	ASSERT_EQ(4, types.length());
+	const EntityRef entity = world.createEntity({}, Quat::IDENTITY);
+	module->createEvox(entity);
+	bool supported = false, mixed = false, nested = false, unsupported = false;
+	for (const ex_type* type : types) {
+		const ex_string_view ex_name = ex_type_get_name(type);
+		const StringView name(ex_name.begin, (u64)ex_name.length);
+		ASSERT_TRUE(name != "Unmarked" && name != "Data" && name != "Nested");
+		if (name == "Supported") supported = true;
+		if (name == "Mixed") mixed = true;
+		if (name == "NestedData") nested = true;
+		if (name == "Unsupported") unsupported = true;
+		ASSERT_TRUE(module->addEvoxData(entity, type));
+	}
+	ASSERT_TRUE(supported && mixed && nested && unsupported);
+	ASSERT_EQ(4, module->getEvoxDataCount(entity));
+
+	// A world created after compilation must receive the same discovered types.
+	World& second_world = engine->createWorld();
+	EvoxModule* second_module = (EvoxModule*)second_world.getModule("evox");
+	ASSERT_TRUE(second_module && second_module->isReady());
+	const EntityRef second_entity = second_world.createEntity({}, Quat::IDENTITY);
+	second_module->createEvox(second_entity);
+	for (const ex_type* type : types) ASSERT_TRUE(second_module->addEvoxData(second_entity, type));
+	ASSERT_EQ(4, second_module->getEvoxDataCount(second_entity));
+	engine->destroyWorld(second_world);
+	engine->destroyWorld(world);
+	return true;
+}
 
 bool testEvoxModuleSerialization() {
 	// The type handles used by the module point into the bytecode, so keep the
@@ -237,6 +342,326 @@ bool testEvoxModuleSerializationSchemaMigration() {
 	return true;
 }
 
+bool testEvoxModuleEnumSerialization(bool migrate_schema) {
+	EvoxTestHost source_script_host;
+	EvoxTestHost target_script_host;
+	const char* source = R"(
+		struct Data {}
+		enum State { Idle = 0, Running = 10, Failed = -7 }
+		struct Nested { state : State; tail : i32; flag : bool; wide : i64; pointer : cptr; }
+		#[Data{}]
+		struct TestData { state : State; nested : Nested; tail : i32; flag : bool; wide : i64; pointer : cptr; removed : State; after : i64; }
+	)";
+	const char* migrated = R"(
+		struct Data {}
+		enum State { Idle = 0, Running = 10, Failed = -7 }
+		struct Nested { tail : i32; state : State; flag : bool; wide : i64; pointer : cptr; }
+		#[Data{}]
+		struct TestData { tail : i32; nested : Nested; state : State; flag : bool; wide : i64; pointer : cptr; after : i64; }
+	)";
+	const char* target = migrate_schema ? migrated : source;
+	ex_module* source_script = ex_module_create(&source_script_host.host);
+	ex_module* target_script = ex_module_create(&target_script_host.host);
+	ASSERT_TRUE(source_script && target_script);
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(source_script, {source, (i64)stringLength(source)}, {"source.evox", 11}, nullptr, nullptr));
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(target_script, {target, (i64)stringLength(target)}, {"target.evox", 11}, nullptr, nullptr));
+	ex_bytecode* source_bytecode = ex_bytecode_compile(source_script, &source_script_host.host, nullptr);
+	ex_bytecode* target_bytecode = ex_bytecode_compile(target_script, &target_script_host.host, nullptr);
+	ASSERT_TRUE(source_bytecode && target_bytecode);
+	auto findTestData = [](ex_bytecode* bytecode) -> const ex_type* {
+		for (u32 i = 0; i < ex_bytecode_type_count(bytecode); ++i) {
+			const ex_type* type = ex_bytecode_type(bytecode, i);
+			const ex_string_view name = ex_type_get_name(type);
+			if (StringView(name.begin, (u64)name.length) == "TestData") return type;
+		}
+		return nullptr;
+	};
+	const ex_type* source_type = findTestData(source_bytecode);
+	const ex_type* target_type = findTestData(target_bytecode);
+	ASSERT_TRUE(source_type && target_type);
+
+	const char* static_plugins[] = {"evox"};
+	Engine::InitArgs args;
+	args.static_plugins = static_plugins;
+	UniquePtr<Engine> engine = Engine::create(static_cast<Engine::InitArgs&&>(args), getGlobalAllocator());
+	ASSERT_TRUE(engine);
+	engine->getFileSystem().mount(".", "");
+	World& source_world = engine->createWorld();
+	World& target_world = engine->createWorld();
+	EvoxModule* source_module = (EvoxModule*)source_world.getModule("evox");
+	EvoxModule* target_module = (EvoxModule*)target_world.getModule("evox");
+	ASSERT_TRUE(source_module && target_module);
+	source_module->setEvoxDataTypes(Span<const ex_type*>(&source_type, 1));
+
+	const i32 states[] = {0, 10, -7};
+	const i32 nested_states[] = {-7, 0, 10};
+	const i32 tails[] = {111, 222, 333};
+	const i32 nested_tails[] = {444, 555, 666};
+	const bool flags[] = {true, false, true};
+	const i64 wide_values[] = {0x123456789abcdefLL, -0x123456789abcdefLL, 0x76543210abcdefLL};
+	void* pointer = &source_world;
+	const EntityRef target_entities[] = {
+		target_world.createEntity({}, Quat::IDENTITY),
+		target_world.createEntity({}, Quat::IDENTITY),
+		target_world.createEntity({}, Quat::IDENTITY)
+	};
+	EntityMap entity_map(getGlobalAllocator());
+	const u32 source_nested_offset = ex_type_struct_field_offset(source_type, 1);
+	const ex_type* source_nested_type = ex_type_struct_field_type(source_type, 1);
+	for (u32 i = 0; i < lengthOf(target_entities); ++i) {
+		const EntityRef entity = source_world.createEntity({}, Quat::IDENTITY);
+		entity_map.set(entity, target_entities[i]);
+		source_module->createEvox(entity);
+		ASSERT_TRUE(source_module->addEvoxData(entity, source_type));
+		u8* value = (u8*)source_module->getEvoxData(entity, source_type);
+		ASSERT_TRUE(value);
+		// Poison padding so accidentally serializing it cannot pass as zero values.
+		memset(value, 0xcd, ex_type_get_size(source_type));
+		memcpy(value + ex_type_struct_field_offset(source_type, 0), &states[i], sizeof(i32));
+		memcpy(value + source_nested_offset + ex_type_struct_field_offset(source_nested_type, 0), &nested_states[i], sizeof(i32));
+		memcpy(value + source_nested_offset + ex_type_struct_field_offset(source_nested_type, 1), &nested_tails[i], sizeof(i32));
+		memcpy(value + ex_type_struct_field_offset(source_type, 2), &tails[i], sizeof(i32));
+		memcpy(value + ex_type_struct_field_offset(source_type, 3), &flags[i], sizeof(bool));
+		memcpy(value + ex_type_struct_field_offset(source_type, 4), &wide_values[i], sizeof(i64));
+		memcpy(value + ex_type_struct_field_offset(source_type, 5), &pointer, sizeof(pointer));
+		memcpy(value + ex_type_struct_field_offset(source_type, 6), &states[i], sizeof(i32));
+		memcpy(value + ex_type_struct_field_offset(source_type, 7), &wide_values[i], sizeof(i64));
+		memcpy(value + source_nested_offset + ex_type_struct_field_offset(source_nested_type, 2), &flags[i], sizeof(bool));
+		memcpy(value + source_nested_offset + ex_type_struct_field_offset(source_nested_type, 3), &wide_values[i], sizeof(i64));
+		memcpy(value + source_nested_offset + ex_type_struct_field_offset(source_nested_type, 4), &pointer, sizeof(pointer));
+	}
+
+	OutputMemoryStream blob(getGlobalAllocator());
+	source_module->serialize(blob);
+	// The serialized records must be packed, with pointer slots zeroed.
+	InputMemoryStream packed_input(blob);
+	ASSERT_EQ(3, packed_input.read<u32>());
+	for (u32 i = 0; i < 3; ++i) packed_input.read<EntityRef>();
+	ASSERT_EQ(1, packed_input.read<u32>());
+	Array<EntityRef> packed_entities(getGlobalAllocator());
+	packed_input.readArray(&packed_entities);
+	ASSERT_EQ(3, packed_entities.size());
+	const u32 packed_nested_size = 4 + 4 + 1 + 8 + 8;
+	const u32 packed_root_pointer_offset = 4 + packed_nested_size + 4 + 1 + 8;
+	const u32 packed_nested_pointer_offset = 4 + 4 + 4 + 1 + 8;
+	const u32 packed_stride = packed_root_pointer_offset + 8 + 4 + 8;
+	ASSERT_TRUE(ex_type_get_size(source_type) > packed_stride);
+	ASSERT_EQ((u64)(3 * packed_stride), packed_input.read<u64>());
+	const u64 packed_offset = packed_input.getPosition();
+	for (u32 i = 0; i < 3; ++i) {
+		u8 record[packed_stride];
+		packed_input.read(record, sizeof(record));
+		u64 nested_pointer, root_pointer;
+		memcpy(&nested_pointer, record + packed_nested_pointer_offset, sizeof(nested_pointer));
+		memcpy(&root_pointer, record + packed_root_pointer_offset, sizeof(root_pointer));
+		ASSERT_EQ(0, nested_pointer);
+		ASSERT_EQ(0, root_pointer);
+	}
+	InputMemoryStream input(blob);
+	target_module->deserialize(input, entity_map, 2);
+	ASSERT_EQ(0, target_module->getEvoxDataCount(target_entities[0]));
+	// Re-saving unresolved data must preserve the same packed representation.
+	OutputMemoryStream pending_blob(getGlobalAllocator());
+	target_module->serialize(pending_blob);
+	ASSERT_EQ(blob.size(), pending_blob.size());
+	ASSERT_EQ(0, memcmp(blob.data() + packed_offset, pending_blob.data() + packed_offset, 3 * packed_stride));
+	target_module->setEvoxDataTypes(Span<const ex_type*>(&target_type, 1));
+
+	// Check both deserialization and the packed-data path used by hot reload.
+	for (u32 pass = 0; pass < 2; ++pass) {
+		if (pass == 1) {
+			// Also verify live pointers are discarded by the hot-reload packer.
+			for (EntityRef entity : target_entities) {
+				u8* value = (u8*)target_module->getEvoxData(entity, target_type);
+				memcpy(value + ex_type_struct_field_offset(target_type, 5), &pointer, sizeof(pointer));
+			}
+			target_module->setEvoxDataTypes(Span<const ex_type*>(&target_type, 1));
+		}
+		const u32 nested_offset = ex_type_struct_field_offset(target_type, 1);
+		const ex_type* nested_type = ex_type_struct_field_type(target_type, 1);
+		for (u32 i = 0; i < lengthOf(target_entities); ++i) {
+			ASSERT_EQ(1, target_module->getEvoxDataCount(target_entities[i]));
+			const u8* value = (const u8*)target_module->getEvoxData(target_entities[i], target_type);
+			ASSERT_TRUE(value);
+			i32 state, nested_state, tail, nested_tail;
+			memcpy(&state, value + ex_type_struct_field_offset(target_type, migrate_schema ? 2 : 0), sizeof(state));
+			memcpy(&nested_state, value + nested_offset + ex_type_struct_field_offset(nested_type, migrate_schema ? 1 : 0), sizeof(nested_state));
+			memcpy(&nested_tail, value + nested_offset + ex_type_struct_field_offset(nested_type, migrate_schema ? 0 : 1), sizeof(nested_tail));
+			memcpy(&tail, value + ex_type_struct_field_offset(target_type, migrate_schema ? 0 : 2), sizeof(tail));
+			ASSERT_EQ(states[i], state);
+			ASSERT_EQ(nested_states[i], nested_state);
+			ASSERT_EQ(tails[i], tail);
+			ASSERT_EQ(nested_tails[i], nested_tail);
+			bool flag, nested_flag;
+			i64 wide, nested_wide, after;
+			void* restored_pointer;
+			void* nested_pointer;
+			memcpy(&flag, value + ex_type_struct_field_offset(target_type, 3), sizeof(flag));
+			memcpy(&wide, value + ex_type_struct_field_offset(target_type, 4), sizeof(wide));
+			memcpy(&restored_pointer, value + ex_type_struct_field_offset(target_type, 5), sizeof(restored_pointer));
+			memcpy(&after, value + ex_type_struct_field_offset(target_type, migrate_schema ? 6 : 7), sizeof(after));
+			memcpy(&nested_flag, value + nested_offset + ex_type_struct_field_offset(nested_type, 2), sizeof(nested_flag));
+			memcpy(&nested_wide, value + nested_offset + ex_type_struct_field_offset(nested_type, 3), sizeof(nested_wide));
+			memcpy(&nested_pointer, value + nested_offset + ex_type_struct_field_offset(nested_type, 4), sizeof(nested_pointer));
+			ASSERT_EQ(flags[i], flag);
+			ASSERT_EQ(flags[i], nested_flag);
+			ASSERT_EQ(wide_values[i], wide);
+			ASSERT_EQ(wide_values[i], nested_wide);
+			ASSERT_EQ(wide_values[i], after);
+			ASSERT_TRUE(!restored_pointer && !nested_pointer);
+		}
+	}
+
+	engine->destroyWorld(target_world);
+	engine->destroyWorld(source_world);
+	engine.reset();
+	ex_bytecode_destroy(target_bytecode);
+	ex_bytecode_destroy(source_bytecode);
+	ex_module_destroy(target_script);
+	ex_module_destroy(source_script);
+	return true;
+}
+
+bool testEvoxModuleEnumSerializationRoundTrip() {
+	return testEvoxModuleEnumSerialization(false);
+}
+
+bool testEvoxModuleEnumSerializationSchemaMigration() {
+	return testEvoxModuleEnumSerialization(true);
+}
+
+bool testEvoxModuleSerializationFilteredFieldsAndOwner() {
+	EvoxTestHost script_host;
+	const char* source = R"(
+		struct Data {}
+		struct Owner {}
+		struct Entity { index : i32; world : cptr; }
+		#[Data{}]
+		struct ValidData { flag : bool; #[Owner{}] owner : Entity; tail : i64; }
+		#[Data{}]
+		struct ArrayData { values : [2]i32; tail : i32; }
+		struct Nested { values : []i32; tail : i32; }
+		#[Data{}]
+		struct SliceData { nested : Nested; tail : i32; }
+		struct EmptyNested { values : []i32; }
+		#[Data{}]
+		struct UnsupportedData { values : [2]i32; nested : EmptyNested; }
+	)";
+	ex_module* script = ex_module_create(&script_host.host);
+	ASSERT_TRUE(script);
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(script, {source, (i64)stringLength(source)}, {"test.evox", 8}, nullptr, nullptr));
+	ex_bytecode* bytecode = ex_bytecode_compile(script, &script_host.host, nullptr);
+	ASSERT_TRUE(bytecode);
+	const ex_type* types[4] = {};
+	for (u32 i = 0; i < ex_bytecode_type_count(bytecode); ++i) {
+		const ex_type* type = ex_bytecode_type(bytecode, i);
+		const ex_string_view name = ex_type_get_name(type);
+		const StringView type_name(name.begin, (u64)name.length);
+		if (type_name == "ValidData") types[0] = type;
+		if (type_name == "ArrayData") types[1] = type;
+		if (type_name == "SliceData") types[2] = type;
+		if (type_name == "UnsupportedData") types[3] = type;
+	}
+	ASSERT_TRUE(types[0] && types[1] && types[2] && types[3]);
+	const char* static_plugins[] = {"evox"};
+	Engine::InitArgs args;
+	args.static_plugins = static_plugins;
+	UniquePtr<Engine> engine = Engine::create(static_cast<Engine::InitArgs&&>(args), getGlobalAllocator());
+	ASSERT_TRUE(engine);
+	engine->getFileSystem().mount(".", "");
+	World& source_world = engine->createWorld();
+	World& target_world = engine->createWorld();
+	EvoxModule* source_module = (EvoxModule*)source_world.getModule("evox");
+	EvoxModule* target_module = (EvoxModule*)target_world.getModule("evox");
+	ASSERT_TRUE(source_module && target_module);
+	source_module->setEvoxDataTypes(types);
+	const EntityRef source_entity = source_world.createEntity({}, Quat::IDENTITY);
+	source_module->createEvox(source_entity);
+	for (const ex_type* type : types) ASSERT_TRUE(source_module->addEvoxData(source_entity, type));
+	ASSERT_EQ(4, source_module->getEvoxDataCount(source_entity));
+	const i32 filtered_tail = 12345;
+	auto populateFilteredData = [&](EvoxModule& module, EntityRef entity) {
+		for (u32 i = 1; i < lengthOf(types); ++i) {
+			u8* data = (u8*)module.getEvoxData(entity, types[i]);
+			// Nonzero unsupported fields must not survive save/load or hot reload.
+			memset(data, 0x5a, ex_type_get_size(types[i]));
+			if (i < 3) memcpy(data + ex_type_struct_field_offset(types[i], 1), &filtered_tail, sizeof(filtered_tail));
+			if (i == 2) {
+				const ex_type* nested_type = ex_type_struct_field_type(types[i], 0);
+				memcpy(data + ex_type_struct_field_offset(types[i], 0) + ex_type_struct_field_offset(nested_type, 1), &filtered_tail, sizeof(filtered_tail));
+			}
+		}
+	};
+	populateFilteredData(*source_module, source_entity);
+	const bool flag = true;
+	const i64 tail = 0x123456789abcdefLL;
+	u8* value = (u8*)source_module->getEvoxData(source_entity, types[0]);
+	ASSERT_TRUE(value);
+	memcpy(value + ex_type_struct_field_offset(types[0], 0), &flag, sizeof(flag));
+	memcpy(value + ex_type_struct_field_offset(types[0], 2), &tail, sizeof(tail));
+	OutputMemoryStream blob(getGlobalAllocator());
+	source_module->serialize(blob);
+	// Ensure the owner entity index really needs remapping.
+	target_world.createEntity({}, Quat::IDENTITY);
+	const EntityRef target_entity = target_world.createEntity({}, Quat::IDENTITY);
+	EntityMap entity_map(getGlobalAllocator());
+	entity_map.set(source_entity, target_entity);
+	InputMemoryStream input(blob);
+	target_module->deserialize(input, entity_map, 2);
+	ASSERT_EQ(0, target_module->getEvoxDataCount(target_entity));
+	target_module->setEvoxDataTypes(types);
+	for (u32 pass = 0; pass < 2; ++pass) {
+		if (pass == 1) {
+			populateFilteredData(*target_module, target_entity);
+			target_module->setEvoxDataTypes(types);
+		}
+		ASSERT_EQ(4, target_module->getEvoxDataCount(target_entity));
+		for (u32 i = 1; i < lengthOf(types); ++i) {
+			const u8* data = (const u8*)target_module->getEvoxData(target_entity, types[i]);
+			ASSERT_TRUE(data);
+			u32 zero_size = ex_type_get_size(types[i]);
+			const u8* zero_data = data;
+			if (i < 3) {
+				i32 restored_filtered_tail;
+				memcpy(&restored_filtered_tail, data + ex_type_struct_field_offset(types[i], 1), sizeof(restored_filtered_tail));
+				ASSERT_EQ(filtered_tail, restored_filtered_tail);
+				const ex_type* field_type = ex_type_struct_field_type(types[i], 0);
+				zero_data += ex_type_struct_field_offset(types[i], 0);
+				zero_size = ex_type_get_size(field_type);
+				if (i == 2) {
+					memcpy(&restored_filtered_tail, zero_data + ex_type_struct_field_offset(field_type, 1), sizeof(restored_filtered_tail));
+					ASSERT_EQ(filtered_tail, restored_filtered_tail);
+					zero_data += ex_type_struct_field_offset(field_type, 0);
+					zero_size = ex_type_get_size(ex_type_struct_field_type(field_type, 0));
+				}
+			}
+			for (u32 j = 0; j < zero_size; ++j) ASSERT_EQ(0, zero_data[j]);
+		}
+		const u8* restored = (const u8*)target_module->getEvoxData(target_entity, types[0]);
+		ASSERT_TRUE(restored);
+		bool restored_flag;
+		i64 restored_tail;
+		i32 owner_index;
+		World* owner_world;
+		const u32 owner_offset = ex_type_struct_field_offset(types[0], 1);
+		const ex_type* owner_type = ex_type_struct_field_type(types[0], 1);
+		memcpy(&restored_flag, restored + ex_type_struct_field_offset(types[0], 0), sizeof(restored_flag));
+		memcpy(&restored_tail, restored + ex_type_struct_field_offset(types[0], 2), sizeof(restored_tail));
+		memcpy(&owner_index, restored + owner_offset + ex_type_struct_field_offset(owner_type, 0), sizeof(owner_index));
+		memcpy(&owner_world, restored + owner_offset + ex_type_struct_field_offset(owner_type, 1), sizeof(owner_world));
+		ASSERT_EQ(flag, restored_flag);
+		ASSERT_EQ(tail, restored_tail);
+		ASSERT_EQ(target_entity.index, owner_index);
+		ASSERT_TRUE(owner_world == &target_world);
+	}
+	engine->destroyWorld(target_world);
+	engine->destroyWorld(source_world);
+	engine.reset();
+	ex_bytecode_destroy(bytecode);
+	ex_module_destroy(script);
+	return true;
+}
+
 bool testEvoxModulePendingDataDestroyedEntity() {
 	EvoxTestHost script_host;
 	const char* source = R"(
@@ -425,8 +850,12 @@ bool testEvoxModuleZeroSizedData() {
 } // namespace
 
 void runEvoxModuleTests() {
+	RUN_TEST(testEvoxDataTypeDiscovery);
 	RUN_TEST(testEvoxModuleSerialization);
 	RUN_TEST(testEvoxModuleSerializationSchemaMigration);
+	RUN_TEST(testEvoxModuleEnumSerializationRoundTrip);
+	RUN_TEST(testEvoxModuleEnumSerializationSchemaMigration);
+	RUN_TEST(testEvoxModuleSerializationFilteredFieldsAndOwner);
 	RUN_TEST(testEvoxModulePendingDataDestroyedEntity);
 	RUN_TEST(testEvoxModuleMultiplePendingTypes);
 	RUN_TEST(testEvoxModuleZeroSizedData);
