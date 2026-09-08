@@ -21,6 +21,27 @@ struct EvoxTestHost {
 	ex_host host = {};
 };
 
+static constexpr const char* EVOX_DATA_ATTRIBUTES_SOURCE = "struct Data {} struct Owner {}";
+static constexpr const char* EVOX_ENTITY_SOURCE = "struct Entity { index : i32; world : cptr; }";
+static constexpr const char* EVOX_SAME_DATA_SOURCE = "import \"core:attributes\" #[Data{}] struct Same { value : i32; }";
+
+static int resolveTestImport(void*, ex_string_view path, ex_string_view, ex_string_view* source) {
+	const StringView requested(path.begin, (u64)path.length);
+	if (requested == "core:attributes") {
+		*source = {EVOX_DATA_ATTRIBUTES_SOURCE, (i64)stringLength(EVOX_DATA_ATTRIBUTES_SOURCE)};
+		return 1;
+	}
+	if (requested == "core:entity") {
+		*source = {EVOX_ENTITY_SOURCE, (i64)stringLength(EVOX_ENTITY_SOURCE)};
+		return 1;
+	}
+	if (requested == "a" || requested == "b") {
+		*source = {EVOX_SAME_DATA_SOURCE, (i64)stringLength(EVOX_SAME_DATA_SOURCE)};
+		return 1;
+	}
+	return 0;
+}
+
 // Serve the compiled root resource through the normal asynchronous loading path.
 // This exercises EvoxSystem's type discovery instead of injecting type handles.
 struct EvoxDiscoveryFileSystem : FileSystem {
@@ -45,7 +66,11 @@ struct EvoxDiscoveryFileSystem : FileSystem {
 	void mount(StringView, StringView) override {}
 	Path getFullPath(StringView path) const override { return Path(path); }
 	bool saveContentSync(const Path&, Span<const u8>) override { return false; }
-	bool getContentSync(const Path&, OutputMemoryStream&) override { return false; }
+	bool getContentSync(const Path& path, OutputMemoryStream& output) override {
+		if (path != Path("engine/scripts/core/attributes.evox")) return false;
+		output.write(EVOX_DATA_ATTRIBUTES_SOURCE, stringLength(EVOX_DATA_ATTRIBUTES_SOURCE));
+		return true;
+	}
 	bool hasWork() override { return pending; }
 	AsyncHandle getContent(const Path& path, const ContentCallback& cb) override {
 		ASSERT(!pending);
@@ -70,7 +95,7 @@ struct EvoxDiscoveryFileSystem : FileSystem {
 
 bool testEvoxDataTypeDiscovery() {
 	const char* source = R"(
-		struct Data {}
+		import "core:attributes"
 		struct Unmarked { value : i32; }
 		#[Data{}]
 		struct Supported { value : i32; }
@@ -102,11 +127,11 @@ bool testEvoxDataTypeDiscovery() {
 	for (const ex_type* type : types) {
 		const ex_string_view ex_name = ex_type_get_name(type);
 		const StringView name(ex_name.begin, (u64)ex_name.length);
-		ASSERT_TRUE(name != "Unmarked" && name != "Data" && name != "Nested");
-		if (name == "Supported") supported = true;
-		if (name == "Mixed") mixed = true;
-		if (name == "NestedData") nested = true;
-		if (name == "Unsupported") unsupported = true;
+		ASSERT_TRUE(name != "scripts/main.evox.Unmarked" && name != "core:attributes.Data" && name != "scripts/main.evox.Nested");
+		if (name == "scripts/main.evox.Supported") supported = true;
+		if (name == "scripts/main.evox.Mixed") mixed = true;
+		if (name == "scripts/main.evox.NestedData") nested = true;
+		if (name == "scripts/main.evox.Unsupported") unsupported = true;
 		ASSERT_TRUE(module->addEvoxData(entity, type));
 	}
 	ASSERT_TRUE(supported && mixed && nested && unsupported);
@@ -130,13 +155,13 @@ bool testEvoxModuleSerialization() {
 	// script alive until both the source and destination worlds are destroyed.
 	EvoxTestHost script_host;
 	const char* source = R"(
-		struct Data {}
+		import "core:attributes"
 		#[Data{}]
 		struct TestData { value : i32; second : i32; }
 	)";
 	ex_module* script = ex_module_create(&script_host.host);
 	ASSERT_TRUE(script);
-	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(script, {source, (i64)stringLength(source)}, {"test.evox", 8}, nullptr, nullptr));
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(script, {source, (i64)stringLength(source)}, {"test.evox", 9}, &resolveTestImport, nullptr));
 	ex_bytecode* bytecode = ex_bytecode_compile(script, &script_host.host, nullptr);
 	ASSERT_TRUE(bytecode);
 
@@ -144,7 +169,7 @@ bool testEvoxModuleSerialization() {
 	for (u32 i = 0; i < ex_bytecode_type_count(bytecode); ++i) {
 		const ex_type* type = ex_bytecode_type(bytecode, i);
 		const ex_string_view name = ex_type_get_name(type);
-		if (StringView(name.begin, (u64)name.length) == "TestData") data_type = type;
+		if (StringView(name.begin, (u64)name.length) == "test.evox.TestData") data_type = type;
 	}
 	ASSERT_TRUE(data_type);
 
@@ -234,13 +259,13 @@ bool testEvoxModuleSerializationSchemaMigration() {
 	EvoxTestHost source_script_host;
 	EvoxTestHost target_script_host;
 	const char* source = R"(
-		struct Data {}
+		import "core:attributes"
 		struct Nested { first : i32; second : i32; }
 		#[Data{}]
 		struct TestData { first : i32; nested : Nested; changed : i32; removed : i32; }
 	)";
 	const char* target = R"(
-		struct Data {}
+		import "core:attributes"
 		struct Nested { first : i32; added : i32; second : i32; }
 		#[Data{}]
 		struct TestData { first : i32; nested : Nested; changed : f32; added : i32; }
@@ -249,8 +274,8 @@ bool testEvoxModuleSerializationSchemaMigration() {
 	ex_module* source_script = ex_module_create(&source_script_host.host);
 	ex_module* target_script = ex_module_create(&target_script_host.host);
 	ASSERT_TRUE(source_script && target_script);
-	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(source_script, {source, (i64)stringLength(source)}, {"source.evox", 11}, nullptr, nullptr));
-	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(target_script, {target, (i64)stringLength(target)}, {"target.evox", 11}, nullptr, nullptr));
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(source_script, {source, (i64)stringLength(source)}, {"test.evox", 9}, &resolveTestImport, nullptr));
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(target_script, {target, (i64)stringLength(target)}, {"test.evox", 9}, &resolveTestImport, nullptr));
 	ex_bytecode* source_bytecode = ex_bytecode_compile(source_script, &source_script_host.host, nullptr);
 	ex_bytecode* target_bytecode = ex_bytecode_compile(target_script, &target_script_host.host, nullptr);
 	ASSERT_TRUE(source_bytecode && target_bytecode);
@@ -259,7 +284,7 @@ bool testEvoxModuleSerializationSchemaMigration() {
 		for (u32 i = 0; i < ex_bytecode_type_count(bytecode); ++i) {
 			const ex_type* type = ex_bytecode_type(bytecode, i);
 			const ex_string_view name = ex_type_get_name(type);
-			if (StringView(name.begin, (u64)name.length) == "TestData") return type;
+			if (StringView(name.begin, (u64)name.length) == "test.evox.TestData") return type;
 		}
 		return nullptr;
 	};
@@ -346,14 +371,14 @@ bool testEvoxModuleEnumSerialization(bool migrate_schema) {
 	EvoxTestHost source_script_host;
 	EvoxTestHost target_script_host;
 	const char* source = R"(
-		struct Data {}
+		import "core:attributes"
 		enum State { Idle = 0, Running = 10, Failed = -7 }
 		struct Nested { state : State; tail : i32; flag : bool; wide : i64; pointer : cptr; }
 		#[Data{}]
 		struct TestData { state : State; nested : Nested; tail : i32; flag : bool; wide : i64; pointer : cptr; removed : State; after : i64; }
 	)";
 	const char* migrated = R"(
-		struct Data {}
+		import "core:attributes"
 		enum State { Idle = 0, Running = 10, Failed = -7 }
 		struct Nested { tail : i32; state : State; flag : bool; wide : i64; pointer : cptr; }
 		#[Data{}]
@@ -363,8 +388,8 @@ bool testEvoxModuleEnumSerialization(bool migrate_schema) {
 	ex_module* source_script = ex_module_create(&source_script_host.host);
 	ex_module* target_script = ex_module_create(&target_script_host.host);
 	ASSERT_TRUE(source_script && target_script);
-	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(source_script, {source, (i64)stringLength(source)}, {"source.evox", 11}, nullptr, nullptr));
-	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(target_script, {target, (i64)stringLength(target)}, {"target.evox", 11}, nullptr, nullptr));
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(source_script, {source, (i64)stringLength(source)}, {"test.evox", 9}, &resolveTestImport, nullptr));
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(target_script, {target, (i64)stringLength(target)}, {"test.evox", 9}, &resolveTestImport, nullptr));
 	ex_bytecode* source_bytecode = ex_bytecode_compile(source_script, &source_script_host.host, nullptr);
 	ex_bytecode* target_bytecode = ex_bytecode_compile(target_script, &target_script_host.host, nullptr);
 	ASSERT_TRUE(source_bytecode && target_bytecode);
@@ -372,7 +397,7 @@ bool testEvoxModuleEnumSerialization(bool migrate_schema) {
 		for (u32 i = 0; i < ex_bytecode_type_count(bytecode); ++i) {
 			const ex_type* type = ex_bytecode_type(bytecode, i);
 			const ex_string_view name = ex_type_get_name(type);
-			if (StringView(name.begin, (u64)name.length) == "TestData") return type;
+			if (StringView(name.begin, (u64)name.length) == "test.evox.TestData") return type;
 		}
 		return nullptr;
 	};
@@ -533,9 +558,8 @@ bool testEvoxModuleEnumSerializationSchemaMigration() {
 bool testEvoxModuleSerializationFilteredFieldsAndOwner() {
 	EvoxTestHost script_host;
 	const char* source = R"(
-		struct Data {}
-		struct Owner {}
-		struct Entity { index : i32; world : cptr; }
+		import "core:attributes"
+		import "core:entity"
 		#[Data{}]
 		struct ValidData { flag : bool; #[Owner{}] owner : Entity; tail : i64; }
 		#[Data{}]
@@ -549,7 +573,7 @@ bool testEvoxModuleSerializationFilteredFieldsAndOwner() {
 	)";
 	ex_module* script = ex_module_create(&script_host.host);
 	ASSERT_TRUE(script);
-	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(script, {source, (i64)stringLength(source)}, {"test.evox", 8}, nullptr, nullptr));
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(script, {source, (i64)stringLength(source)}, {"test.evox", 9}, &resolveTestImport, nullptr));
 	ex_bytecode* bytecode = ex_bytecode_compile(script, &script_host.host, nullptr);
 	ASSERT_TRUE(bytecode);
 	const ex_type* types[4] = {};
@@ -557,10 +581,10 @@ bool testEvoxModuleSerializationFilteredFieldsAndOwner() {
 		const ex_type* type = ex_bytecode_type(bytecode, i);
 		const ex_string_view name = ex_type_get_name(type);
 		const StringView type_name(name.begin, (u64)name.length);
-		if (type_name == "ValidData") types[0] = type;
-		if (type_name == "ArrayData") types[1] = type;
-		if (type_name == "SliceData") types[2] = type;
-		if (type_name == "UnsupportedData") types[3] = type;
+		if (type_name == "test.evox.ValidData") types[0] = type;
+		if (type_name == "test.evox.ArrayData") types[1] = type;
+		if (type_name == "test.evox.SliceData") types[2] = type;
+		if (type_name == "test.evox.UnsupportedData") types[3] = type;
 	}
 	ASSERT_TRUE(types[0] && types[1] && types[2] && types[3]);
 	const char* static_plugins[] = {"evox"};
@@ -665,13 +689,13 @@ bool testEvoxModuleSerializationFilteredFieldsAndOwner() {
 bool testEvoxModulePendingDataDestroyedEntity() {
 	EvoxTestHost script_host;
 	const char* source = R"(
-		struct Data {}
+		import "core:attributes"
 		#[Data{}]
 		struct TestData { value : i32; }
 	)";
 	ex_module* script = ex_module_create(&script_host.host);
 	ASSERT_TRUE(script);
-	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(script, {source, (i64)stringLength(source)}, {"test.evox", 8}, nullptr, nullptr));
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(script, {source, (i64)stringLength(source)}, {"test.evox", 9}, &resolveTestImport, nullptr));
 	ex_bytecode* bytecode = ex_bytecode_compile(script, &script_host.host, nullptr);
 	ASSERT_TRUE(bytecode);
 
@@ -679,7 +703,7 @@ bool testEvoxModulePendingDataDestroyedEntity() {
 	for (u32 i = 0; i < ex_bytecode_type_count(bytecode); ++i) {
 		const ex_type* type = ex_bytecode_type(bytecode, i);
 		const ex_string_view name = ex_type_get_name(type);
-		if (StringView(name.begin, (u64)name.length) == "TestData") data_type = type;
+		if (StringView(name.begin, (u64)name.length) == "test.evox.TestData") data_type = type;
 	}
 	ASSERT_TRUE(data_type);
 
@@ -723,7 +747,7 @@ bool testEvoxModulePendingDataDestroyedEntity() {
 bool testEvoxModuleMultiplePendingTypes() {
 	EvoxTestHost script_host;
 	const char* source = R"(
-		struct Data {}
+		import "core:attributes"
 		#[Data{}]
 		struct FirstData { value : i32; }
 		#[Data{}]
@@ -731,7 +755,7 @@ bool testEvoxModuleMultiplePendingTypes() {
 	)";
 	ex_module* script = ex_module_create(&script_host.host);
 	ASSERT_TRUE(script);
-	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(script, {source, (i64)stringLength(source)}, {"test.evox", 8}, nullptr, nullptr));
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(script, {source, (i64)stringLength(source)}, {"test.evox", 9}, &resolveTestImport, nullptr));
 	ex_bytecode* bytecode = ex_bytecode_compile(script, &script_host.host, nullptr);
 	ASSERT_TRUE(bytecode);
 
@@ -740,8 +764,8 @@ bool testEvoxModuleMultiplePendingTypes() {
 	for (u32 i = 0; i < ex_bytecode_type_count(bytecode); ++i) {
 		const ex_type* type = ex_bytecode_type(bytecode, i);
 		const ex_string_view name = ex_type_get_name(type);
-		if (StringView(name.begin, (u64)name.length) == "FirstData") first_type = type;
-		if (StringView(name.begin, (u64)name.length) == "SecondData") second_type = type;
+		if (StringView(name.begin, (u64)name.length) == "test.evox.FirstData") first_type = type;
+		if (StringView(name.begin, (u64)name.length) == "test.evox.SecondData") second_type = type;
 	}
 	ASSERT_TRUE(first_type && second_type);
 
@@ -797,20 +821,20 @@ bool testEvoxModuleMultiplePendingTypes() {
 bool testEvoxModuleZeroSizedData() {
 	EvoxTestHost script_host;
 	const char* source = R"(
-		struct Data {}
+		import "core:attributes"
 		#[Data{}]
 		struct EmptyData {}
 	)";
 	ex_module* script = ex_module_create(&script_host.host);
 	ASSERT_TRUE(script);
-	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(script, {source, (i64)stringLength(source)}, {"test.evox", 8}, nullptr, nullptr));
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(script, {source, (i64)stringLength(source)}, {"test.evox", 9}, &resolveTestImport, nullptr));
 	ex_bytecode* bytecode = ex_bytecode_compile(script, &script_host.host, nullptr);
 	ASSERT_TRUE(bytecode);
 	const ex_type* data_type = nullptr;
 	for (u32 i = 0; i < ex_bytecode_type_count(bytecode); ++i) {
 		const ex_type* type = ex_bytecode_type(bytecode, i);
 		const ex_string_view name = ex_type_get_name(type);
-		if (StringView(name.begin, (u64)name.length) == "EmptyData") data_type = type;
+		if (StringView(name.begin, (u64)name.length) == "test.evox.EmptyData") data_type = type;
 	}
 	ASSERT_TRUE(data_type);
 
@@ -847,6 +871,66 @@ bool testEvoxModuleZeroSizedData() {
 	return true;
 }
 
+bool testEvoxModuleSameNamedTypes() {
+	EvoxTestHost script_host;
+	const char* source = "import \"a\" as a import \"b\" as b";
+	ex_module* script = ex_module_create(&script_host.host);
+	ASSERT_TRUE(script);
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(script, {source, (i64)stringLength(source)}, {"test.evox", 9}, &resolveTestImport, nullptr));
+	ex_bytecode* bytecode = ex_bytecode_compile(script, &script_host.host, nullptr);
+	ASSERT_TRUE(bytecode);
+
+	const ex_type* types[2] = {};
+	for (u32 i = 0; i < ex_bytecode_type_count(bytecode); ++i) {
+		const ex_type* type = ex_bytecode_type(bytecode, i);
+		const ex_string_view ex_name = ex_type_get_name(type);
+		const StringView name(ex_name.begin, (u64)ex_name.length);
+		if (name == "a.Same") types[0] = type;
+		if (name == "b.Same") types[1] = type;
+	}
+	ASSERT_TRUE(types[0] && types[1]);
+
+	const char* static_plugins[] = {"evox"};
+	Engine::InitArgs args;
+	args.static_plugins = static_plugins;
+	UniquePtr<Engine> engine = Engine::create(static_cast<Engine::InitArgs&&>(args), getGlobalAllocator());
+	ASSERT_TRUE(engine);
+	engine->getFileSystem().mount(".", "");
+	World& source_world = engine->createWorld();
+	World& target_world = engine->createWorld();
+	EvoxModule* source_module = (EvoxModule*)source_world.getModule("evox");
+	EvoxModule* target_module = (EvoxModule*)target_world.getModule("evox");
+	ASSERT_TRUE(source_module && target_module);
+	source_module->setEvoxDataTypes(types);
+
+	const EntityRef source_entity = source_world.createEntity({}, Quat::IDENTITY);
+	const EntityRef target_entity = target_world.createEntity({}, Quat::IDENTITY);
+	source_module->createEvox(source_entity);
+	ASSERT_TRUE(source_module->addEvoxData(source_entity, types[0]));
+	ASSERT_TRUE(source_module->addEvoxData(source_entity, types[1]));
+	const i32 values[] = {42, 99};
+	memcpy((void*)source_module->getEvoxData(source_entity, types[0]), &values[0], sizeof(values[0]));
+	memcpy((void*)source_module->getEvoxData(source_entity, types[1]), &values[1], sizeof(values[1]));
+
+	OutputMemoryStream blob(getGlobalAllocator());
+	source_module->serialize(blob);
+	EntityMap entity_map(getGlobalAllocator());
+	entity_map.set(source_entity, target_entity);
+	InputMemoryStream input(blob);
+	target_module->deserialize(input, entity_map, 2);
+	target_module->setEvoxDataTypes(types);
+	ASSERT_EQ(2, target_module->getEvoxDataCount(target_entity));
+	ASSERT_EQ(values[0], *(const i32*)target_module->getEvoxData(target_entity, types[0]));
+	ASSERT_EQ(values[1], *(const i32*)target_module->getEvoxData(target_entity, types[1]));
+
+	engine->destroyWorld(target_world);
+	engine->destroyWorld(source_world);
+	engine.reset();
+	ex_bytecode_destroy(bytecode);
+	ex_module_destroy(script);
+	return true;
+}
+
 } // namespace
 
 void runEvoxModuleTests() {
@@ -859,4 +943,5 @@ void runEvoxModuleTests() {
 	RUN_TEST(testEvoxModulePendingDataDestroyedEntity);
 	RUN_TEST(testEvoxModuleMultiplePendingTypes);
 	RUN_TEST(testEvoxModuleZeroSizedData);
+	RUN_TEST(testEvoxModuleSameNamedTypes);
 }

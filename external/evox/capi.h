@@ -397,8 +397,9 @@ ex_type_kind ex_bytecode_runtime_result_kind(ex_runtime* runtime, ex_string_view
 // Returns the kind category of the type.
 ex_type_kind ex_type_get_kind(const ex_type* type);
 
-// Returns the name of the type (struct name, enum name, etc.).
-// Returns an empty string_view for anonymous or unnamed types.
+// Returns the fully qualified name of the type (unit path + '.' + declaration
+// name, e.g. "core:entity.Entity"). Returns an empty string_view for
+// anonymous or unnamed types.
 ex_string_view ex_type_get_name(const ex_type* type);
 
 // Returns the byte size of values of this type. Matches the byte_size

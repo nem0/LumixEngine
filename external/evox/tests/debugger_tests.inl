@@ -1559,7 +1559,7 @@ TEST(TypeGetNameStruct) {
 	const ex_type* type = ex_debug_local_type(runtime, 0, 0);
 	EXPECT_TRUE(type != nullptr);
 	EXPECT_EQ((int)EX_TYPE_STRUCT, (int)ex_type_get_kind(type));
-	EXPECT_TRUE(equalStrings(ex_type_get_name(type), toLs("Vec2")));
+	EXPECT_TRUE(equalStrings(ex_type_get_name(type), toLs("TypeGetNameStruct.Vec2")));
 
 	// Null pointer safety
 	EXPECT_EQ(0u, size(ex_type_get_name(nullptr)));
@@ -1592,7 +1592,7 @@ TEST(TypeGetNameEnum) {
 	const ex_type* type = ex_debug_local_type(runtime, 0, 0);
 	EXPECT_TRUE(type != nullptr);
 	EXPECT_EQ((int)EX_TYPE_ENUM, (int)ex_type_get_kind(type));
-	EXPECT_TRUE(equalStrings(ex_type_get_name(type), toLs("State")));
+	EXPECT_TRUE(equalStrings(ex_type_get_name(type), toLs("TypeGetNameEnum.State")));
 
 	EXPECT_EQ((int)EX_RESULT_OK, (int)ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
 	CAPI_END(module);
@@ -1749,12 +1749,12 @@ TEST(TypeGetNameNestedStruct) {
 	const ex_type* outer = ex_debug_local_type(runtime, 0, 0);
 	EXPECT_TRUE(outer != nullptr);
 	EXPECT_EQ((int)EX_TYPE_STRUCT, (int)ex_type_get_kind(outer));
-	EXPECT_TRUE(equalStrings(ex_type_get_name(outer), toLs("Outer")));
+	EXPECT_TRUE(equalStrings(ex_type_get_name(outer), toLs("TypeGetNameNestedStruct.Outer")));
 
 	const ex_type* inner = ex_type_struct_field_type(outer, 0);
 	EXPECT_TRUE(inner != nullptr);
 	EXPECT_EQ((int)EX_TYPE_STRUCT, (int)ex_type_get_kind(inner));
-	EXPECT_TRUE(equalStrings(ex_type_get_name(inner), toLs("Inner")));
+	EXPECT_TRUE(equalStrings(ex_type_get_name(inner), toLs("TypeGetNameNestedStruct.Inner")));
 
 	EXPECT_EQ((int)EX_RESULT_OK, (int)ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
 	EXPECT_EQ(3, ex_to_i32(runtime, -1));

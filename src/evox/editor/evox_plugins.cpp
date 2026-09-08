@@ -360,8 +360,7 @@ static void drawVariable(ex_string_view name, const ex_type* type, void* value, 
 
 	if (kind == EX_TYPE_STRUCT) {
 		const ex_string_view type_name = ex_type_get_name(type);
-		if (type_name.length == 6
-			&& equalStrings(StringView(type_name.begin, type_name.length), "Entity")
+		if (equalStrings(StringView(type_name.begin, type_name.length), "core:entity.Entity")
 			&& ex_type_get_size(type) >= sizeof(ExEntity)) {
 			drawVariableName(name);
 			ImGui::TableNextColumn();

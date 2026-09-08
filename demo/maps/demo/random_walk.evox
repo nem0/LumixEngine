@@ -1,10 +1,10 @@
 import "core:entity"
 import "core:world"
-import "core:evox_data" as ld
+import "core:attributes" as attr
 
-#[ld.Data {}]
+#[attr.Data {}]
 struct RandomWalkActor {
-	#[ld.Owner {}]
+	#[attr.Owner {}]
 	entity: Entity;
 }
 

@@ -2031,6 +2031,19 @@ static ex_string_view copyStringViewToArena(ex_arena& arena, ex_string_view src)
 	return { mem, len };
 }
 
+static ex_string_view copyQualifiedTypeNameToArena(ex_arena& arena, ex_string_view unit_path, ex_string_view name) {
+	if (empty(name)) return name;
+	if (empty(unit_path)) return copyStringViewToArena(arena, name);
+	const i64 len = unit_path.length + 1 + name.length;
+	char* mem = (char*)arena.allocate(arena.user_data, len + 1, 1);
+	if (!mem) return name;
+	memcpy(mem, unit_path.begin, unit_path.length);
+	mem[unit_path.length] = '.';
+	memcpy(mem + unit_path.length + 1, name.begin, name.length);
+	mem[len] = '\0';
+	return { mem, len };
+}
+
 static ResolvedType* structFieldTypeAt(const StructResolvedType& st, i32 index) {
 	if (index < st.fields.size()) return st.fields[index].type;
 	return nullptr;
@@ -2084,7 +2097,7 @@ struct TypeInfoBuilder {
 			case ResolvedTypeKind::STRUCT: {
 				const StructResolvedType& st = static_cast<const StructResolvedType&>(type);
 				if (st.decl) {
-					entry.name = copyStringViewToArena(host.arena, st.decl->cached_name);
+					entry.name = copyQualifiedTypeNameToArena(host.arena, st.decl->cached_owner ? st.decl->cached_owner->path : ex_string_view{}, st.decl->cached_name);
 					if (st.decl->attributes) {
 						for (const Attribute& attr : *st.decl->attributes) {
 							if (!attr.resolved_type || !attr.comptime_bytes) continue;
@@ -2149,7 +2162,7 @@ struct TypeInfoBuilder {
 			case ResolvedTypeKind::ENUM: {
 				const EnumResolvedType& en = static_cast<const EnumResolvedType&>(type);
 				if (en.decl) {
-					entry.name = copyStringViewToArena(host.arena, en.decl->cached_name);
+					entry.name = copyQualifiedTypeNameToArena(host.arena, en.decl->cached_owner ? en.decl->cached_owner->path : ex_string_view{}, en.decl->cached_name);
 					for (i32 i = 0; i < en.decl->members.size(); ++i) {
 						ex_type_enum_value_info& value = enum_values.emplace_back();
 						value.name = copyStringViewToArena(host.arena, en.decl->members[i].name.value);

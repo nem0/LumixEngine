@@ -64,7 +64,7 @@ TEST(UnusedAnnotatedStructIsAvailableThroughBytecodeTypeEnumeration) {
 	const ex_type* inventory = nullptr;
 	for (u32 i = 0, count = ex_bytecode_type_count(runtime.bytecode); i < count; ++i) {
 		const ex_type* type = ex_bytecode_type(runtime.bytecode, i);
-		if (ex_type_get_kind(type) == EX_TYPE_STRUCT && equalStrings(ex_type_get_name(type), toLs("Inventory"))) {
+		if (ex_type_get_kind(type) == EX_TYPE_STRUCT && equalStrings(ex_type_get_name(type), toLs("UnusedAnnotatedStructIsAvailableThroughBytecodeTypeEnumeration.Inventory"))) {
 			inventory = type;
 			break;
 		}
@@ -73,7 +73,7 @@ TEST(UnusedAnnotatedStructIsAvailableThroughBytecodeTypeEnumeration) {
 	EXPECT_EQ(1u, ex_type_attribute_count(inventory));
 	const ex_attribute attribute = ex_type_attribute_value(inventory, 0);
 	EXPECT_TRUE(attribute.type != nullptr);
-	EXPECT_TRUE(equalStrings(ex_type_get_name(attribute.type), toLs("component")));
+	EXPECT_TRUE(equalStrings(ex_type_get_name(attribute.type), toLs("UnusedAnnotatedStructIsAvailableThroughBytecodeTypeEnumeration.component")));
 	EXPECT_EQ(0u, ex_bytecode_type_count(nullptr));
 	EXPECT_TRUE(ex_bytecode_type(runtime.bytecode, ex_bytecode_type_count(runtime.bytecode)) == nullptr);
 	EXPECT_TRUE(ex_bytecode_type(nullptr, 0) == nullptr);
@@ -101,7 +101,7 @@ TEST(BytecodeTypeMetadataExposesSizeAndAlignment) {
 	const ex_type* data = nullptr;
 	for (u32 i = 0, count = ex_bytecode_type_count(runtime.bytecode); i < count; ++i) {
 		const ex_type* type = ex_bytecode_type(runtime.bytecode, i);
-		if (ex_type_get_kind(type) == EX_TYPE_STRUCT && equalStrings(ex_type_get_name(type), toLs("AlignedData"))) {
+		if (ex_type_get_kind(type) == EX_TYPE_STRUCT && equalStrings(ex_type_get_name(type), toLs("BytecodeTypeMetadataExposesSizeAndAlignment.AlignedData"))) {
 			data = type;
 			break;
 		}
@@ -146,7 +146,7 @@ TEST(AttributeMetadataIsAvailableThroughCAPI) {
 	EXPECT_EQ(1u, ex_type_attribute_count(settings_type));
 	ex_attribute type_attribute = ex_type_attribute_value(settings_type, 0);
 	EXPECT_TRUE(type_attribute.type != nullptr);
-	EXPECT_TRUE(equalStrings(ex_type_get_name(type_attribute.type), toLs("range")));
+	EXPECT_TRUE(equalStrings(ex_type_get_name(type_attribute.type), toLs("AttributeMetadataIsAvailableThroughCAPI.range")));
 	EXPECT_EQ(2u, ex_type_struct_field_count(type_attribute.type));
 
 	i32 min = 0;
@@ -159,7 +159,7 @@ TEST(AttributeMetadataIsAvailableThroughCAPI) {
 	EXPECT_EQ(1u, ex_type_struct_field_attribute_count(settings_type, 0));
 	ex_attribute field_attribute = ex_type_struct_field_attribute_value(settings_type, 0, 0);
 	EXPECT_TRUE(field_attribute.type != nullptr);
-	EXPECT_TRUE(equalStrings(ex_type_get_name(field_attribute.type), toLs("range")));
+	EXPECT_TRUE(equalStrings(ex_type_get_name(field_attribute.type), toLs("AttributeMetadataIsAvailableThroughCAPI.range")));
 	memcpy(&min, (const u8*)field_attribute.value + ex_type_struct_field_offset(field_attribute.type, 0), sizeof(min));
 	memcpy(&max, (const u8*)field_attribute.value + ex_type_struct_field_offset(field_attribute.type, 1), sizeof(max));
 	EXPECT_EQ(2, min);

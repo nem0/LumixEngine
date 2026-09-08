@@ -181,12 +181,12 @@ Import the marker attributes and annotate a struct:
 
 ```evox
 import "core:entity"
-import "core:evox_data" as evox_data
+import "core:attributes" as attributes
 import "core:world"
 
-#[evox_data.Data {}]
+#[attributes.Data {}]
 struct Spinner {
-	#[evox_data.Owner {}]
+	#[attributes.Owner {}]
 	entity : Entity;
 	speed : f32;
 	angle : f32;
@@ -213,9 +213,9 @@ Use `for &value in ...` when fields must be changed. Plain `for value in ...` it
 A direct field marked `#[Owner {}]` is filled with the entity that owns the data:
 
 ```evox
-#[evox_data.Data {}]
+#[attributes.Data {}]
 struct Health {
-	#[evox_data.Owner {}]
+	#[attributes.Owner {}]
 	owner : Entity;
 	current : i32;
 	maximum : i32;
@@ -293,7 +293,7 @@ Debug source names use import names. Studio maps `core:name` to `engine/scripts/
 
 ### A data type does not appear in Studio
 
-- Import `core:evox_data` and apply `#[evox_data.Data {}]` to a struct.
+- Import `core:attributes` and apply `#[attributes.Data {}]` to a struct.
 - Ensure the file containing the declaration is reachable from the root's import graph.
 - Fix all root compilation errors; types are discovered from successful bytecode only.
 - Re-enter or reload after the compiled root resource changes.

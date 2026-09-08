@@ -23,6 +23,10 @@ namespace Evox {
 void gatherCoreFunctions(HashMap<NativeFunctionKey, ex_native_fn, NativeFunctionKeyHash>& functions);
 }
 
+static constexpr const char* EVOX_DATA_ATTRIBUTE_TYPE = "core:attributes.Data";
+static constexpr const char* EVOX_OWNER_ATTRIBUTE_TYPE = "core:attributes.Owner";
+static constexpr const char* EVOX_ENTITY_TYPE = "core:entity.Entity";
+
 struct EvoxDiagnosticsContext {
 	String* message = nullptr;
 	ex_host* host = nullptr;
@@ -204,7 +208,7 @@ struct EvoxSystemImpl : EvoxSystem {
 			if (!attribute.type) continue;
 
 			const ex_string_view name = ex_type_get_name(attribute.type);
-			if (StringView(name.begin, name.length) == "Data") return true;
+			if (StringView(name.begin, name.length) == EVOX_DATA_ATTRIBUTE_TYPE) return true;
 		}
 		return false;
 	}
@@ -717,7 +721,7 @@ struct EvoxModuleImpl : EvoxModule {
 	}
 
 	void remapEntityProperties(const EvoxTypeDesc& type_desc, u8* values, u32 stride, u32 num_values, const EntityMap& entity_map) {
-		if (type_desc.type_name == "Entity") {
+		if (type_desc.type_name == EVOX_ENTITY_TYPE) {
 			u32 index_offset = 0;
 			bool has_index = false;
 			for (const EvoxFieldDesc& field : type_desc.fields) {
@@ -793,7 +797,7 @@ struct EvoxModuleImpl : EvoxModule {
 				}
 				// Entity values are serialized as a struct. Their world pointer is
 				// runtime-only and must point at this world after loading.
-				if (src_type_desc.type_name == "Entity") {
+				if (src_type_desc.type_name == EVOX_ENTITY_TYPE) {
 					const i32 dst_index_field = findField(dst_type, "index");
 					const i32 dst_world_field = findField(dst_type, "world");
 					if (dst_index_field >= 0 && dst_world_field >= 0) {
@@ -871,8 +875,7 @@ struct EvoxModuleImpl : EvoxModule {
 				if (!attribute.type) continue;
 
 				const ex_string_view name = ex_type_get_name(attribute.type);
-				// TODO not string based compare
-				if (StringView(name.begin, (u64)name.length) == "Owner") {
+				if (StringView(name.begin, (u64)name.length) == EVOX_OWNER_ATTRIBUTE_TYPE) {
 					inject = true;
 					break;
 				}
@@ -883,7 +886,7 @@ struct EvoxModuleImpl : EvoxModule {
 			if (!field_type || ex_type_get_kind(field_type) != EX_TYPE_STRUCT) continue;
 
 			const ex_string_view type_name = ex_type_get_name(field_type);
-			if (StringView(type_name.begin, (u64)type_name.length) != "Entity") continue;
+			if (StringView(type_name.begin, (u64)type_name.length) != EVOX_ENTITY_TYPE) continue;
 
 			u8* field_value = value + ex_type_struct_field_offset(data_type.type, i);
 			for (u32 j = 0, field_count = ex_type_struct_field_count(field_type); j < field_count; ++j) {
