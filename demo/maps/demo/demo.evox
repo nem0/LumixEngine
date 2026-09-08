@@ -197,7 +197,7 @@ fn update(td : f32, input : InputSystem) : void {
 			if const anim = entity.animator() {
 				const speed_input = anim.getInputIndex("speed_y");
 				if speed_input >= 0 {
-					anim.setFloatInput(speed_input, agent.getSpeed());
+					anim.setFloatInput(speed_input as u32, agent.getSpeed());
 				}
 			}
 		}
