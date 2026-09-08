@@ -1872,6 +1872,62 @@ namespace Lumix::Evox::generated {
 		module->setAnimableAnimation(EntityRef(entity.index), Path(StringView{path.begin, (u64)path.length}));
 	}
 	
+	static void evox_echo_zone_getRadius_14412196389905655702(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		AudioModule* module = static_cast<AudioModule*>(component.module);
+		const auto& value = module->getEchoZone(EntityRef(component.index)).radius;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_echo_zone_setRadius_18099321851067076536(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		AudioModule* module = static_cast<AudioModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getEchoZone(EntityRef(component.index)).radius = value;
+	}
+	
+	static void evox_echo_zone_getDelay_4941122841768625222(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		AudioModule* module = static_cast<AudioModule*>(component.module);
+		const auto& value = module->getEchoZone(EntityRef(component.index)).delay;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_echo_zone_setDelay_9898379770390490964(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		AudioModule* module = static_cast<AudioModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getEchoZone(EntityRef(component.index)).delay = value;
+	}
+	
+	static void evox_chorus_zone_getRadius_10408826854414690254(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		AudioModule* module = static_cast<AudioModule*>(component.module);
+		const auto& value = module->getChorusZone(EntityRef(component.index)).radius;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_chorus_zone_setRadius_16121929089403981875(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		AudioModule* module = static_cast<AudioModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getChorusZone(EntityRef(component.index)).radius = value;
+	}
+	
+	static void evox_chorus_zone_getDelay_6740423318750549255(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		AudioModule* module = static_cast<AudioModule*>(component.module);
+		const auto& value = module->getChorusZone(EntityRef(component.index)).delay;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_chorus_zone_setDelay_12142100524772977810(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		AudioModule* module = static_cast<AudioModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getChorusZone(EntityRef(component.index)).delay = value;
+	}
+	
 	static void evox_ambient_sound_pause_7564319632766837034(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		AudioModule* module = static_cast<AudioModule*>(entity.module);
@@ -2018,6 +2074,104 @@ namespace Lumix::Evox::generated {
 		NavigationModule* module = static_cast<NavigationModule*>(zone_entity.module);
 		auto ret = module->saveZone(EntityRef(zone_entity.index));
 		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_navmesh_zone_getExtents_5786343579700983426(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		NavigationModule* module = static_cast<NavigationModule*>(component.module);
+		const auto& value = module->getZone(EntityRef(component.index)).extents;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_navmesh_zone_setExtents_8407716537624333519(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		NavigationModule* module = static_cast<NavigationModule*>(component.module);
+		EX_ARG(frame, Vec3, value);
+		module->getZone(EntityRef(component.index)).extents = value;
+	}
+	
+	static void evox_navmesh_zone_getCellSize_9553507152235735814(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		NavigationModule* module = static_cast<NavigationModule*>(component.module);
+		const auto& value = module->getZone(EntityRef(component.index)).cell_size;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_navmesh_zone_setCellSize_12701331011507180730(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		NavigationModule* module = static_cast<NavigationModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getZone(EntityRef(component.index)).cell_size = value;
+	}
+	
+	static void evox_navmesh_zone_getCellHeight_6669357003742402338(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		NavigationModule* module = static_cast<NavigationModule*>(component.module);
+		const auto& value = module->getZone(EntityRef(component.index)).cell_height;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_navmesh_zone_setCellHeight_1008823805547497917(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		NavigationModule* module = static_cast<NavigationModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getZone(EntityRef(component.index)).cell_height = value;
+	}
+	
+	static void evox_navmesh_zone_getWalkableSlopeAngle_4655627854626803696(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		NavigationModule* module = static_cast<NavigationModule*>(component.module);
+		const auto& value = module->getZone(EntityRef(component.index)).walkable_slope_angle;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_navmesh_zone_setWalkableSlopeAngle_12062283977830102689(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		NavigationModule* module = static_cast<NavigationModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getZone(EntityRef(component.index)).walkable_slope_angle = value;
+	}
+	
+	static void evox_navmesh_zone_getAgentHeight_16366912342766219691(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		NavigationModule* module = static_cast<NavigationModule*>(component.module);
+		const auto& value = module->getZone(EntityRef(component.index)).agent_height;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_navmesh_zone_setAgentHeight_17392598553574037013(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		NavigationModule* module = static_cast<NavigationModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getZone(EntityRef(component.index)).agent_height = value;
+	}
+	
+	static void evox_navmesh_zone_getAgentRadius_17662781810989981000(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		NavigationModule* module = static_cast<NavigationModule*>(component.module);
+		const auto& value = module->getZone(EntityRef(component.index)).agent_radius;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_navmesh_zone_setAgentRadius_2227497727120224699(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		NavigationModule* module = static_cast<NavigationModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getZone(EntityRef(component.index)).agent_radius = value;
+	}
+	
+	static void evox_navmesh_zone_getMaxClimb_11561485989238141708(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		NavigationModule* module = static_cast<NavigationModule*>(component.module);
+		const auto& value = module->getZone(EntityRef(component.index)).max_climb;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_navmesh_zone_setMaxClimb_117523459700922968(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		NavigationModule* module = static_cast<NavigationModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getZone(EntityRef(component.index)).max_climb = value;
 	}
 	
 	static void evox_navmesh_zone_getZoneAutoload_14291138643344541979(ex_runtime* runtime, ex_call_frame frame) {
@@ -3372,6 +3526,230 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret.dir);
 	}
 	
+	static void evox_camera_getFov_9990112738143434778(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getCamera(EntityRef(component.index)).fov;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_camera_setFov_14096670635071212363(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getCamera(EntityRef(component.index)).fov = value;
+	}
+	
+	static void evox_camera_getNear_12702355375512519820(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getCamera(EntityRef(component.index)).near;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_camera_setNear_12568890967110186095(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getCamera(EntityRef(component.index)).near = value;
+	}
+	
+	static void evox_camera_getFar_1618995004236969193(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getCamera(EntityRef(component.index)).far;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_camera_setFar_14907038745333734996(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getCamera(EntityRef(component.index)).far = value;
+	}
+	
+	static void evox_camera_getIsOrtho_12976717670926087578(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getCamera(EntityRef(component.index)).is_ortho;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_camera_setIsOrtho_1071857099778624671(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, bool, value);
+		module->getCamera(EntityRef(component.index)).is_ortho = value;
+	}
+	
+	static void evox_camera_getOrthoSize_17867052473391596855(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getCamera(EntityRef(component.index)).ortho_size;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_camera_setOrthoSize_7829941951901047506(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getCamera(EntityRef(component.index)).ortho_size = value;
+	}
+	
+	static void evox_camera_getFilmGrainIntensity_14908625487786781714(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getCamera(EntityRef(component.index)).film_grain_intensity;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_camera_setFilmGrainIntensity_8392618345290896161(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getCamera(EntityRef(component.index)).film_grain_intensity = value;
+	}
+	
+	static void evox_camera_getDofEnabled_4804657123138436961(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getCamera(EntityRef(component.index)).dof_enabled;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_camera_setDofEnabled_5895703637767370074(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, bool, value);
+		module->getCamera(EntityRef(component.index)).dof_enabled = value;
+	}
+	
+	static void evox_camera_getDofDistance_17861145635016618215(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getCamera(EntityRef(component.index)).dof_distance;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_camera_setDofDistance_9676123866449145186(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getCamera(EntityRef(component.index)).dof_distance = value;
+	}
+	
+	static void evox_camera_getDofRange_15231053732142417732(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getCamera(EntityRef(component.index)).dof_range;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_camera_setDofRange_15776834182956926057(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getCamera(EntityRef(component.index)).dof_range = value;
+	}
+	
+	static void evox_camera_getDofMaxBlurSize_17830100418462163626(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getCamera(EntityRef(component.index)).dof_max_blur_size;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_camera_setDofMaxBlurSize_8164663351918275155(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getCamera(EntityRef(component.index)).dof_max_blur_size = value;
+	}
+	
+	static void evox_camera_getDofSharpRange_12822324397801314205(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getCamera(EntityRef(component.index)).dof_sharp_range;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_camera_setDofSharpRange_8845291792152063745(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getCamera(EntityRef(component.index)).dof_sharp_range = value;
+	}
+	
+	static void evox_camera_getBloomEnabled_18419641550437939156(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getCamera(EntityRef(component.index)).bloom_enabled;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_camera_setBloomEnabled_6960995375214985164(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, bool, value);
+		module->getCamera(EntityRef(component.index)).bloom_enabled = value;
+	}
+	
+	static void evox_camera_getBloomTonemapEnabled_9826097710676155098(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getCamera(EntityRef(component.index)).bloom_tonemap_enabled;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_camera_setBloomTonemapEnabled_11781817533238382091(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, bool, value);
+		module->getCamera(EntityRef(component.index)).bloom_tonemap_enabled = value;
+	}
+	
+	static void evox_camera_getBloomAccomodationSpeed_5228508676603337924(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getCamera(EntityRef(component.index)).bloom_accomodation_speed;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_camera_setBloomAccomodationSpeed_8229962355509600292(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getCamera(EntityRef(component.index)).bloom_accomodation_speed = value;
+	}
+	
+	static void evox_camera_getBloomAvgBloomMultiplier_13593973513970296280(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getCamera(EntityRef(component.index)).bloom_avg_bloom_multiplier;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_camera_setBloomAvgBloomMultiplier_7328252305718110389(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getCamera(EntityRef(component.index)).bloom_avg_bloom_multiplier = value;
+	}
+	
+	static void evox_camera_getBloomExposure_12795612409397753948(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getCamera(EntityRef(component.index)).bloom_exposure;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_camera_setBloomExposure_3753532384362497676(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getCamera(EntityRef(component.index)).bloom_exposure = value;
+	}
+	
 	static void evox_camera_getCameraScreenWidth_2731392340090998983(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
@@ -3384,6 +3762,20 @@ namespace Lumix::Evox::generated {
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getCameraScreenHeight(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_decal_getUvScale_10656899872027255756(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getDecal(EntityRef(component.index)).uv_scale;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_decal_setUvScale_7765682767453995470(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, Vec2, value);
+		module->getDecal(EntityRef(component.index)).uv_scale = value;
 	}
 	
 	static void evox_decal_getDecalMaterialPath_3447756100310666566(ex_runtime* runtime, ex_call_frame frame) {
@@ -3412,6 +3804,300 @@ namespace Lumix::Evox::generated {
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, Vec3, value);
 		module->setDecalHalfExtents(EntityRef(entity.index), value);
+	}
+	
+	static void evox_environment_getLightColor_16382208618828599186(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).light_color;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setLightColor_8944976523658103480(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, Vec3, value);
+		module->getEnvironment(EntityRef(component.index)).light_color = value;
+	}
+	
+	static void evox_environment_getDirectIntensity_14474607904286260634(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).direct_intensity;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setDirectIntensity_2328878078934314774(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getEnvironment(EntityRef(component.index)).direct_intensity = value;
+	}
+	
+	static void evox_environment_getIndirectIntensity_11519588357182638778(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).indirect_intensity;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setIndirectIntensity_12458133122574475938(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getEnvironment(EntityRef(component.index)).indirect_intensity = value;
+	}
+	
+	static void evox_environment_getSkyIntensity_10410516888194551599(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).sky_intensity;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setSkyIntensity_15346716637620100742(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getEnvironment(EntityRef(component.index)).sky_intensity = value;
+	}
+	
+	static void evox_environment_getScatterRayleigh_17989133328226838431(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).scatter_rayleigh;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setScatterRayleigh_10358117745291816869(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, Vec3, value);
+		module->getEnvironment(EntityRef(component.index)).scatter_rayleigh = value;
+	}
+	
+	static void evox_environment_getScatterMie_9693338704273809249(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).scatter_mie;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setScatterMie_10627580852343890815(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, Vec3, value);
+		module->getEnvironment(EntityRef(component.index)).scatter_mie = value;
+	}
+	
+	static void evox_environment_getAbsorbMie_15887589359511142709(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).absorb_mie;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setAbsorbMie_13848854306948851984(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, Vec3, value);
+		module->getEnvironment(EntityRef(component.index)).absorb_mie = value;
+	}
+	
+	static void evox_environment_getSunlightColor_11459228694845993796(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).sunlight_color;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setSunlightColor_15022864383331343031(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, Vec3, value);
+		module->getEnvironment(EntityRef(component.index)).sunlight_color = value;
+	}
+	
+	static void evox_environment_getFogScattering_315389040057761980(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).fog_scattering;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setFogScattering_7382414176206450560(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, Vec3, value);
+		module->getEnvironment(EntityRef(component.index)).fog_scattering = value;
+	}
+	
+	static void evox_environment_getFogDensity_3113509707443825768(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).fog_density;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setFogDensity_15728938362458017259(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getEnvironment(EntityRef(component.index)).fog_density = value;
+	}
+	
+	static void evox_environment_getSunlightStrength_16813434360401072784(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).sunlight_strength;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setSunlightStrength_15657216292682064027(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getEnvironment(EntityRef(component.index)).sunlight_strength = value;
+	}
+	
+	static void evox_environment_getHeightDistributionRayleigh_8539623749722860773(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).height_distribution_rayleigh;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setHeightDistributionRayleigh_14241232845301239108(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getEnvironment(EntityRef(component.index)).height_distribution_rayleigh = value;
+	}
+	
+	static void evox_environment_getHeightDistributionMie_17303282824565923701(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).height_distribution_mie;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setHeightDistributionMie_16579988733679396197(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getEnvironment(EntityRef(component.index)).height_distribution_mie = value;
+	}
+	
+	static void evox_environment_getGroundR_381138011170115999(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).ground_r;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setGroundR_8556110825194457475(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getEnvironment(EntityRef(component.index)).ground_r = value;
+	}
+	
+	static void evox_environment_getAtmoR_8369076525064127704(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).atmo_r;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setAtmoR_15538722969014055077(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getEnvironment(EntityRef(component.index)).atmo_r = value;
+	}
+	
+	static void evox_environment_getFogTop_9230429821898193118(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).fog_top;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setFogTop_3398470431319387977(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getEnvironment(EntityRef(component.index)).fog_top = value;
+	}
+	
+	static void evox_environment_getGodraysEnabled_3406609403378385265(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).godrays_enabled;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setGodraysEnabled_6226094086927741966(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, bool, value);
+		module->getEnvironment(EntityRef(component.index)).godrays_enabled = value;
+	}
+	
+	static void evox_environment_getAtmoEnabled_16329200966924001744(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).atmo_enabled;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setAtmoEnabled_14544246525805228899(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, bool, value);
+		module->getEnvironment(EntityRef(component.index)).atmo_enabled = value;
+	}
+	
+	static void evox_environment_getCloudsEnabled_2591630807374415227(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).clouds_enabled;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setCloudsEnabled_10701808077012606145(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, bool, value);
+		module->getEnvironment(EntityRef(component.index)).clouds_enabled = value;
+	}
+	
+	static void evox_environment_getCloudsTop_11654074041852586188(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).clouds_top;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setCloudsTop_7110933700015416589(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getEnvironment(EntityRef(component.index)).clouds_top = value;
+	}
+	
+	static void evox_environment_getCloudsBottom_15778442241537626947(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironment(EntityRef(component.index)).clouds_bottom;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_setCloudsBottom_1355434402706311745(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getEnvironment(EntityRef(component.index)).clouds_bottom = value;
 	}
 	
 	static void evox_environment_getEnvironmentCastShadows_2502322743604025970(ex_runtime* runtime, ex_call_frame frame) {
@@ -3456,6 +4142,62 @@ namespace Lumix::Evox::generated {
 		module->setEnvironmentShadowmapCascades(EntityRef(entity.index), value);
 	}
 	
+	static void evox_point_light_getColor_15615261076830925554(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getPointLight(EntityRef(component.index)).color;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_point_light_setColor_4936288161876567148(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, Vec3, value);
+		module->getPointLight(EntityRef(component.index)).color = value;
+	}
+	
+	static void evox_point_light_getIntensity_1376293284434350714(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getPointLight(EntityRef(component.index)).intensity;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_point_light_setIntensity_11007268989186513464(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getPointLight(EntityRef(component.index)).intensity = value;
+	}
+	
+	static void evox_point_light_getFov_10451253150292990719(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getPointLight(EntityRef(component.index)).fov;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_point_light_setFov_1480573591757673993(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getPointLight(EntityRef(component.index)).fov = value;
+	}
+	
+	static void evox_point_light_getAttenuationParam_10001340549927415022(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getPointLight(EntityRef(component.index)).attenuation_param;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_point_light_setAttenuationParam_5801204463589213038(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, float, value);
+		module->getPointLight(EntityRef(component.index)).attenuation_param = value;
+	}
+	
 	static void evox_point_light_getPointLightRange_10244661856029492374(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
@@ -3498,6 +4240,34 @@ namespace Lumix::Evox::generated {
 		module->setPointLightDynamic(EntityRef(entity.index), value);
 	}
 	
+	static void evox_reflection_probe_getSize_17685467407613481935(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getReflectionProbe(EntityRef(component.index)).size;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_reflection_probe_setSize_5871585247981963351(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, u32, value);
+		module->getReflectionProbe(EntityRef(component.index)).size = value;
+	}
+	
+	static void evox_reflection_probe_getHalfExtents_276208769592418021(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getReflectionProbe(EntityRef(component.index)).half_extents;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_reflection_probe_setHalfExtents_15426284768395120829(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, Vec3, value);
+		module->getReflectionProbe(EntityRef(component.index)).half_extents = value;
+	}
+	
 	static void evox_reflection_probe_isReflectionProbeEnabled_14161642990656081393(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
@@ -3510,6 +4280,34 @@ namespace Lumix::Evox::generated {
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		EX_ARG(frame, bool, enable);
 		module->enableReflectionProbe(EntityRef(entity.index), enable);
+	}
+	
+	static void evox_environment_probe_getInnerRange_15383746413188029301(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironmentProbe(EntityRef(component.index)).inner_range;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_probe_setInnerRange_13941889240352559249(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, Vec3, value);
+		module->getEnvironmentProbe(EntityRef(component.index)).inner_range = value;
+	}
+	
+	static void evox_environment_probe_getOuterRange_16291743178132755933(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		const auto& value = module->getEnvironmentProbe(EntityRef(component.index)).outer_range;
+		EX_RESULT(frame, value);
+	}
+	
+	static void evox_environment_probe_setOuterRange_7715174042875948366(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, Vec3, value);
+		module->getEnvironmentProbe(EntityRef(component.index)).outer_range = value;
 	}
 	
 	static void evox_environment_probe_isEnvironmentProbeEnabled_6472315036682061276(ex_runtime* runtime, ex_call_frame frame) {
@@ -4364,6 +5162,14 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:animator"), StringView("setDefaultSet")}, &evox_animator_setAnimatorDefaultSet_8642953903016100752);
 		functions.insert({StringView("core:animable"), StringView("getAnimation")}, &evox_animable_getAnimableAnimation_11745291916317671749);
 		functions.insert({StringView("core:animable"), StringView("setAnimation")}, &evox_animable_setAnimableAnimation_14956871121764638013);
+		functions.insert({StringView("core:echo_zone"), StringView("getRadius")}, &evox_echo_zone_getRadius_14412196389905655702);
+		functions.insert({StringView("core:echo_zone"), StringView("setRadius")}, &evox_echo_zone_setRadius_18099321851067076536);
+		functions.insert({StringView("core:echo_zone"), StringView("getDelay")}, &evox_echo_zone_getDelay_4941122841768625222);
+		functions.insert({StringView("core:echo_zone"), StringView("setDelay")}, &evox_echo_zone_setDelay_9898379770390490964);
+		functions.insert({StringView("core:chorus_zone"), StringView("getRadius")}, &evox_chorus_zone_getRadius_10408826854414690254);
+		functions.insert({StringView("core:chorus_zone"), StringView("setRadius")}, &evox_chorus_zone_setRadius_16121929089403981875);
+		functions.insert({StringView("core:chorus_zone"), StringView("getDelay")}, &evox_chorus_zone_getDelay_6740423318750549255);
+		functions.insert({StringView("core:chorus_zone"), StringView("setDelay")}, &evox_chorus_zone_setDelay_12142100524772977810);
 		functions.insert({StringView("core:ambient_sound"), StringView("pause")}, &evox_ambient_sound_pause_7564319632766837034);
 		functions.insert({StringView("core:ambient_sound"), StringView("resume")}, &evox_ambient_sound_resume_15147770483073356605);
 		functions.insert({StringView("core:ambient_sound"), StringView("getClip")}, &evox_ambient_sound_getAmbientSoundClip_18285036400960618982);
@@ -4385,6 +5191,20 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:navmesh_zone"), StringView("drawHeightfield")}, &evox_navmesh_zone_drawHeightfield_14679078041041130503);
 		functions.insert({StringView("core:navmesh_zone"), StringView("drawContours")}, &evox_navmesh_zone_drawContours_6798494238098731653);
 		functions.insert({StringView("core:navmesh_zone"), StringView("saveZone")}, &evox_navmesh_zone_saveZone_30091838565818055);
+		functions.insert({StringView("core:navmesh_zone"), StringView("getExtents")}, &evox_navmesh_zone_getExtents_5786343579700983426);
+		functions.insert({StringView("core:navmesh_zone"), StringView("setExtents")}, &evox_navmesh_zone_setExtents_8407716537624333519);
+		functions.insert({StringView("core:navmesh_zone"), StringView("getCellSize")}, &evox_navmesh_zone_getCellSize_9553507152235735814);
+		functions.insert({StringView("core:navmesh_zone"), StringView("setCellSize")}, &evox_navmesh_zone_setCellSize_12701331011507180730);
+		functions.insert({StringView("core:navmesh_zone"), StringView("getCellHeight")}, &evox_navmesh_zone_getCellHeight_6669357003742402338);
+		functions.insert({StringView("core:navmesh_zone"), StringView("setCellHeight")}, &evox_navmesh_zone_setCellHeight_1008823805547497917);
+		functions.insert({StringView("core:navmesh_zone"), StringView("getWalkableSlopeAngle")}, &evox_navmesh_zone_getWalkableSlopeAngle_4655627854626803696);
+		functions.insert({StringView("core:navmesh_zone"), StringView("setWalkableSlopeAngle")}, &evox_navmesh_zone_setWalkableSlopeAngle_12062283977830102689);
+		functions.insert({StringView("core:navmesh_zone"), StringView("getAgentHeight")}, &evox_navmesh_zone_getAgentHeight_16366912342766219691);
+		functions.insert({StringView("core:navmesh_zone"), StringView("setAgentHeight")}, &evox_navmesh_zone_setAgentHeight_17392598553574037013);
+		functions.insert({StringView("core:navmesh_zone"), StringView("getAgentRadius")}, &evox_navmesh_zone_getAgentRadius_17662781810989981000);
+		functions.insert({StringView("core:navmesh_zone"), StringView("setAgentRadius")}, &evox_navmesh_zone_setAgentRadius_2227497727120224699);
+		functions.insert({StringView("core:navmesh_zone"), StringView("getMaxClimb")}, &evox_navmesh_zone_getMaxClimb_11561485989238141708);
+		functions.insert({StringView("core:navmesh_zone"), StringView("setMaxClimb")}, &evox_navmesh_zone_setMaxClimb_117523459700922968);
 		functions.insert({StringView("core:navmesh_zone"), StringView("getAutoload")}, &evox_navmesh_zone_getZoneAutoload_14291138643344541979);
 		functions.insert({StringView("core:navmesh_zone"), StringView("setAutoload")}, &evox_navmesh_zone_setZoneAutoload_3016407451842724548);
 		functions.insert({StringView("core:navmesh_zone"), StringView("getDetailed")}, &evox_navmesh_zone_getZoneDetailed_7813946106612811513);
@@ -4577,26 +5397,118 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:physical_instanced_mesh"), StringView("getGeomPath")}, &evox_physical_instanced_mesh_getInstancedMeshGeomPath_16637277119403782362);
 		functions.insert({StringView("core:physical_instanced_mesh"), StringView("setGeomPath")}, &evox_physical_instanced_mesh_setInstancedMeshGeomPath_3991197376419967785);
 		functions.insert({StringView("core:camera"), StringView("getRay")}, &evox_camera_getRay_3372513399393209772);
+		functions.insert({StringView("core:camera"), StringView("getFov")}, &evox_camera_getFov_9990112738143434778);
+		functions.insert({StringView("core:camera"), StringView("setFov")}, &evox_camera_setFov_14096670635071212363);
+		functions.insert({StringView("core:camera"), StringView("getNear")}, &evox_camera_getNear_12702355375512519820);
+		functions.insert({StringView("core:camera"), StringView("setNear")}, &evox_camera_setNear_12568890967110186095);
+		functions.insert({StringView("core:camera"), StringView("getFar")}, &evox_camera_getFar_1618995004236969193);
+		functions.insert({StringView("core:camera"), StringView("setFar")}, &evox_camera_setFar_14907038745333734996);
+		functions.insert({StringView("core:camera"), StringView("getIsOrtho")}, &evox_camera_getIsOrtho_12976717670926087578);
+		functions.insert({StringView("core:camera"), StringView("setIsOrtho")}, &evox_camera_setIsOrtho_1071857099778624671);
+		functions.insert({StringView("core:camera"), StringView("getOrthoSize")}, &evox_camera_getOrthoSize_17867052473391596855);
+		functions.insert({StringView("core:camera"), StringView("setOrthoSize")}, &evox_camera_setOrthoSize_7829941951901047506);
+		functions.insert({StringView("core:camera"), StringView("getFilmGrainIntensity")}, &evox_camera_getFilmGrainIntensity_14908625487786781714);
+		functions.insert({StringView("core:camera"), StringView("setFilmGrainIntensity")}, &evox_camera_setFilmGrainIntensity_8392618345290896161);
+		functions.insert({StringView("core:camera"), StringView("getDofEnabled")}, &evox_camera_getDofEnabled_4804657123138436961);
+		functions.insert({StringView("core:camera"), StringView("setDofEnabled")}, &evox_camera_setDofEnabled_5895703637767370074);
+		functions.insert({StringView("core:camera"), StringView("getDofDistance")}, &evox_camera_getDofDistance_17861145635016618215);
+		functions.insert({StringView("core:camera"), StringView("setDofDistance")}, &evox_camera_setDofDistance_9676123866449145186);
+		functions.insert({StringView("core:camera"), StringView("getDofRange")}, &evox_camera_getDofRange_15231053732142417732);
+		functions.insert({StringView("core:camera"), StringView("setDofRange")}, &evox_camera_setDofRange_15776834182956926057);
+		functions.insert({StringView("core:camera"), StringView("getDofMaxBlurSize")}, &evox_camera_getDofMaxBlurSize_17830100418462163626);
+		functions.insert({StringView("core:camera"), StringView("setDofMaxBlurSize")}, &evox_camera_setDofMaxBlurSize_8164663351918275155);
+		functions.insert({StringView("core:camera"), StringView("getDofSharpRange")}, &evox_camera_getDofSharpRange_12822324397801314205);
+		functions.insert({StringView("core:camera"), StringView("setDofSharpRange")}, &evox_camera_setDofSharpRange_8845291792152063745);
+		functions.insert({StringView("core:camera"), StringView("getBloomEnabled")}, &evox_camera_getBloomEnabled_18419641550437939156);
+		functions.insert({StringView("core:camera"), StringView("setBloomEnabled")}, &evox_camera_setBloomEnabled_6960995375214985164);
+		functions.insert({StringView("core:camera"), StringView("getBloomTonemapEnabled")}, &evox_camera_getBloomTonemapEnabled_9826097710676155098);
+		functions.insert({StringView("core:camera"), StringView("setBloomTonemapEnabled")}, &evox_camera_setBloomTonemapEnabled_11781817533238382091);
+		functions.insert({StringView("core:camera"), StringView("getBloomAccomodationSpeed")}, &evox_camera_getBloomAccomodationSpeed_5228508676603337924);
+		functions.insert({StringView("core:camera"), StringView("setBloomAccomodationSpeed")}, &evox_camera_setBloomAccomodationSpeed_8229962355509600292);
+		functions.insert({StringView("core:camera"), StringView("getBloomAvgBloomMultiplier")}, &evox_camera_getBloomAvgBloomMultiplier_13593973513970296280);
+		functions.insert({StringView("core:camera"), StringView("setBloomAvgBloomMultiplier")}, &evox_camera_setBloomAvgBloomMultiplier_7328252305718110389);
+		functions.insert({StringView("core:camera"), StringView("getBloomExposure")}, &evox_camera_getBloomExposure_12795612409397753948);
+		functions.insert({StringView("core:camera"), StringView("setBloomExposure")}, &evox_camera_setBloomExposure_3753532384362497676);
 		functions.insert({StringView("core:camera"), StringView("getScreenWidth")}, &evox_camera_getCameraScreenWidth_2731392340090998983);
 		functions.insert({StringView("core:camera"), StringView("getScreenHeight")}, &evox_camera_getCameraScreenHeight_2402994306305726512);
+		functions.insert({StringView("core:decal"), StringView("getUvScale")}, &evox_decal_getUvScale_10656899872027255756);
+		functions.insert({StringView("core:decal"), StringView("setUvScale")}, &evox_decal_setUvScale_7765682767453995470);
 		functions.insert({StringView("core:decal"), StringView("getMaterialPath")}, &evox_decal_getDecalMaterialPath_3447756100310666566);
 		functions.insert({StringView("core:decal"), StringView("setMaterialPath")}, &evox_decal_setDecalMaterialPath_16654676966978376762);
 		functions.insert({StringView("core:decal"), StringView("getHalfExtents")}, &evox_decal_getDecalHalfExtents_5819726501367060100);
 		functions.insert({StringView("core:decal"), StringView("setHalfExtents")}, &evox_decal_setDecalHalfExtents_10326364927035985528);
+		functions.insert({StringView("core:environment"), StringView("getLightColor")}, &evox_environment_getLightColor_16382208618828599186);
+		functions.insert({StringView("core:environment"), StringView("setLightColor")}, &evox_environment_setLightColor_8944976523658103480);
+		functions.insert({StringView("core:environment"), StringView("getDirectIntensity")}, &evox_environment_getDirectIntensity_14474607904286260634);
+		functions.insert({StringView("core:environment"), StringView("setDirectIntensity")}, &evox_environment_setDirectIntensity_2328878078934314774);
+		functions.insert({StringView("core:environment"), StringView("getIndirectIntensity")}, &evox_environment_getIndirectIntensity_11519588357182638778);
+		functions.insert({StringView("core:environment"), StringView("setIndirectIntensity")}, &evox_environment_setIndirectIntensity_12458133122574475938);
+		functions.insert({StringView("core:environment"), StringView("getSkyIntensity")}, &evox_environment_getSkyIntensity_10410516888194551599);
+		functions.insert({StringView("core:environment"), StringView("setSkyIntensity")}, &evox_environment_setSkyIntensity_15346716637620100742);
+		functions.insert({StringView("core:environment"), StringView("getScatterRayleigh")}, &evox_environment_getScatterRayleigh_17989133328226838431);
+		functions.insert({StringView("core:environment"), StringView("setScatterRayleigh")}, &evox_environment_setScatterRayleigh_10358117745291816869);
+		functions.insert({StringView("core:environment"), StringView("getScatterMie")}, &evox_environment_getScatterMie_9693338704273809249);
+		functions.insert({StringView("core:environment"), StringView("setScatterMie")}, &evox_environment_setScatterMie_10627580852343890815);
+		functions.insert({StringView("core:environment"), StringView("getAbsorbMie")}, &evox_environment_getAbsorbMie_15887589359511142709);
+		functions.insert({StringView("core:environment"), StringView("setAbsorbMie")}, &evox_environment_setAbsorbMie_13848854306948851984);
+		functions.insert({StringView("core:environment"), StringView("getSunlightColor")}, &evox_environment_getSunlightColor_11459228694845993796);
+		functions.insert({StringView("core:environment"), StringView("setSunlightColor")}, &evox_environment_setSunlightColor_15022864383331343031);
+		functions.insert({StringView("core:environment"), StringView("getFogScattering")}, &evox_environment_getFogScattering_315389040057761980);
+		functions.insert({StringView("core:environment"), StringView("setFogScattering")}, &evox_environment_setFogScattering_7382414176206450560);
+		functions.insert({StringView("core:environment"), StringView("getFogDensity")}, &evox_environment_getFogDensity_3113509707443825768);
+		functions.insert({StringView("core:environment"), StringView("setFogDensity")}, &evox_environment_setFogDensity_15728938362458017259);
+		functions.insert({StringView("core:environment"), StringView("getSunlightStrength")}, &evox_environment_getSunlightStrength_16813434360401072784);
+		functions.insert({StringView("core:environment"), StringView("setSunlightStrength")}, &evox_environment_setSunlightStrength_15657216292682064027);
+		functions.insert({StringView("core:environment"), StringView("getHeightDistributionRayleigh")}, &evox_environment_getHeightDistributionRayleigh_8539623749722860773);
+		functions.insert({StringView("core:environment"), StringView("setHeightDistributionRayleigh")}, &evox_environment_setHeightDistributionRayleigh_14241232845301239108);
+		functions.insert({StringView("core:environment"), StringView("getHeightDistributionMie")}, &evox_environment_getHeightDistributionMie_17303282824565923701);
+		functions.insert({StringView("core:environment"), StringView("setHeightDistributionMie")}, &evox_environment_setHeightDistributionMie_16579988733679396197);
+		functions.insert({StringView("core:environment"), StringView("getGroundR")}, &evox_environment_getGroundR_381138011170115999);
+		functions.insert({StringView("core:environment"), StringView("setGroundR")}, &evox_environment_setGroundR_8556110825194457475);
+		functions.insert({StringView("core:environment"), StringView("getAtmoR")}, &evox_environment_getAtmoR_8369076525064127704);
+		functions.insert({StringView("core:environment"), StringView("setAtmoR")}, &evox_environment_setAtmoR_15538722969014055077);
+		functions.insert({StringView("core:environment"), StringView("getFogTop")}, &evox_environment_getFogTop_9230429821898193118);
+		functions.insert({StringView("core:environment"), StringView("setFogTop")}, &evox_environment_setFogTop_3398470431319387977);
+		functions.insert({StringView("core:environment"), StringView("getGodraysEnabled")}, &evox_environment_getGodraysEnabled_3406609403378385265);
+		functions.insert({StringView("core:environment"), StringView("setGodraysEnabled")}, &evox_environment_setGodraysEnabled_6226094086927741966);
+		functions.insert({StringView("core:environment"), StringView("getAtmoEnabled")}, &evox_environment_getAtmoEnabled_16329200966924001744);
+		functions.insert({StringView("core:environment"), StringView("setAtmoEnabled")}, &evox_environment_setAtmoEnabled_14544246525805228899);
+		functions.insert({StringView("core:environment"), StringView("getCloudsEnabled")}, &evox_environment_getCloudsEnabled_2591630807374415227);
+		functions.insert({StringView("core:environment"), StringView("setCloudsEnabled")}, &evox_environment_setCloudsEnabled_10701808077012606145);
+		functions.insert({StringView("core:environment"), StringView("getCloudsTop")}, &evox_environment_getCloudsTop_11654074041852586188);
+		functions.insert({StringView("core:environment"), StringView("setCloudsTop")}, &evox_environment_setCloudsTop_7110933700015416589);
+		functions.insert({StringView("core:environment"), StringView("getCloudsBottom")}, &evox_environment_getCloudsBottom_15778442241537626947);
+		functions.insert({StringView("core:environment"), StringView("setCloudsBottom")}, &evox_environment_setCloudsBottom_1355434402706311745);
 		functions.insert({StringView("core:environment"), StringView("getCastShadows")}, &evox_environment_getEnvironmentCastShadows_2502322743604025970);
 		functions.insert({StringView("core:environment"), StringView("setCastShadows")}, &evox_environment_setEnvironmentCastShadows_12728355724374346427);
 		functions.insert({StringView("core:environment"), StringView("getSkyTexture")}, &evox_environment_getEnvironmentSkyTexture_12082802317082884790);
 		functions.insert({StringView("core:environment"), StringView("setSkyTexture")}, &evox_environment_setEnvironmentSkyTexture_984049513280251158);
 		functions.insert({StringView("core:environment"), StringView("getShadowmapCascades")}, &evox_environment_getEnvironmentShadowmapCascades_5787290337346526077);
 		functions.insert({StringView("core:environment"), StringView("setShadowmapCascades")}, &evox_environment_setEnvironmentShadowmapCascades_15884515140666313469);
+		functions.insert({StringView("core:point_light"), StringView("getColor")}, &evox_point_light_getColor_15615261076830925554);
+		functions.insert({StringView("core:point_light"), StringView("setColor")}, &evox_point_light_setColor_4936288161876567148);
+		functions.insert({StringView("core:point_light"), StringView("getIntensity")}, &evox_point_light_getIntensity_1376293284434350714);
+		functions.insert({StringView("core:point_light"), StringView("setIntensity")}, &evox_point_light_setIntensity_11007268989186513464);
+		functions.insert({StringView("core:point_light"), StringView("getFov")}, &evox_point_light_getFov_10451253150292990719);
+		functions.insert({StringView("core:point_light"), StringView("setFov")}, &evox_point_light_setFov_1480573591757673993);
+		functions.insert({StringView("core:point_light"), StringView("getAttenuationParam")}, &evox_point_light_getAttenuationParam_10001340549927415022);
+		functions.insert({StringView("core:point_light"), StringView("setAttenuationParam")}, &evox_point_light_setAttenuationParam_5801204463589213038);
 		functions.insert({StringView("core:point_light"), StringView("getRange")}, &evox_point_light_getPointLightRange_10244661856029492374);
 		functions.insert({StringView("core:point_light"), StringView("setRange")}, &evox_point_light_setPointLightRange_11813343483428624361);
 		functions.insert({StringView("core:point_light"), StringView("getCastShadows")}, &evox_point_light_getPointLightCastShadows_5581725951671009098);
 		functions.insert({StringView("core:point_light"), StringView("setCastShadows")}, &evox_point_light_setPointLightCastShadows_7627481180976591043);
 		functions.insert({StringView("core:point_light"), StringView("getDynamic")}, &evox_point_light_getPointLightDynamic_8250510919620053405);
 		functions.insert({StringView("core:point_light"), StringView("setDynamic")}, &evox_point_light_setPointLightDynamic_4827199232774172920);
+		functions.insert({StringView("core:reflection_probe"), StringView("getSize")}, &evox_reflection_probe_getSize_17685467407613481935);
+		functions.insert({StringView("core:reflection_probe"), StringView("setSize")}, &evox_reflection_probe_setSize_5871585247981963351);
+		functions.insert({StringView("core:reflection_probe"), StringView("getHalfExtents")}, &evox_reflection_probe_getHalfExtents_276208769592418021);
+		functions.insert({StringView("core:reflection_probe"), StringView("setHalfExtents")}, &evox_reflection_probe_setHalfExtents_15426284768395120829);
 		functions.insert({StringView("core:reflection_probe"), StringView("getEnabled")}, &evox_reflection_probe_isReflectionProbeEnabled_14161642990656081393);
 		functions.insert({StringView("core:reflection_probe"), StringView("setEnabled")}, &evox_reflection_probe_enableReflectionProbe_14526316855359089557);
+		functions.insert({StringView("core:environment_probe"), StringView("getInnerRange")}, &evox_environment_probe_getInnerRange_15383746413188029301);
+		functions.insert({StringView("core:environment_probe"), StringView("setInnerRange")}, &evox_environment_probe_setInnerRange_13941889240352559249);
+		functions.insert({StringView("core:environment_probe"), StringView("getOuterRange")}, &evox_environment_probe_getOuterRange_16291743178132755933);
+		functions.insert({StringView("core:environment_probe"), StringView("setOuterRange")}, &evox_environment_probe_setOuterRange_7715174042875948366);
 		functions.insert({StringView("core:environment_probe"), StringView("getEnabled")}, &evox_environment_probe_isEnvironmentProbeEnabled_6472315036682061276);
 		functions.insert({StringView("core:environment_probe"), StringView("setEnabled")}, &evox_environment_probe_enableEnvironmentProbe_15467030845922521952);
 		functions.insert({StringView("core:bone_attachment"), StringView("setRotation")}, &evox_bone_attachment_setRotation_7525519620484028447);

@@ -7,6 +7,10 @@ struct ReflectionProbe { entity : i32; module : cptr; }
 
 extern fn reflection_probe(e : Entity) : ?ReflectionProbe;
 extern fn createReflectionProbe(e : Entity) : ?ReflectionProbe;
+extern fn getSize(entity : ReflectionProbe) : u32;
+extern fn setSize(entity : ReflectionProbe, value : u32) : void;
+extern fn getHalfExtents(entity : ReflectionProbe) : Vec3;
+extern fn setHalfExtents(entity : ReflectionProbe, value : Vec3) : void;
 extern fn getEnabled(entity : ReflectionProbe) : bool;
 extern fn setEnabled(entity : ReflectionProbe, enable : bool) : void;
 

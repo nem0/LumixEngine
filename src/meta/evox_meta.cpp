@@ -217,7 +217,23 @@ StringView functionScriptName(Function& f) {
 }
 
 void appendPropertyScriptName(OutputStream& out, Property& p, bool is_setter) {
-	out.add(is_setter ? "set" : "get", p.name);
+	out.add(is_setter ? "set" : "get");
+	if (!p.is_var) {
+		out.add(p.name);
+		return;
+	}
+
+	bool uppercase = true;
+	for (const char* c = p.name.begin; c != p.name.end; ++c) {
+		if (*c == '_') {
+			uppercase = true;
+			continue;
+		}
+		char value = *c;
+		if (uppercase && value >= 'a' && value <= 'z') value = char(value - 'a' + 'A');
+		out.add(value);
+		uppercase = false;
+	}
 }
 
 void logUnsupportedEvoxFunctionArgs(const char* scope, StringView owner, Function& f) {
@@ -411,7 +427,7 @@ bool isSupportedEvoxPropertyArg(const Arg& arg) {
 }
 
 bool isSupportedEvoxPropertyGetter(Property& p) {
-	if (p.getter_name.size() == 0) return false;
+	if (!p.is_var && p.getter_name.size() == 0) return false;
 	const EvoxType type = getEvoxType(p.type);
 	if (!isSupportedEvoxType(p.type, type)) return false;
 	bool supported = true;
@@ -422,7 +438,7 @@ bool isSupportedEvoxPropertyGetter(Property& p) {
 }
 
 bool isSupportedEvoxPropertySetter(Property& p) {
-	if (p.setter_name.size() == 0) return false;
+	if (!p.is_var && p.setter_name.size() == 0) return false;
 	bool supported = true;
 	forEachArg(p.setter_args, [&](const Arg& arg, bool) {
 		if (!isSupportedEvoxPropertyArg(arg)) supported = false;
@@ -479,7 +495,22 @@ void appendPropertyWrapperName(OutputStream& out, Component& c, Property& p, boo
 	// Property wrappers must use the same order-independent naming scheme as
 	// ordinary function wrappers. Include the accessor signature so distinct
 	// properties/accessors cannot collide.
-	const StringView accessor = is_setter ? p.setter_name : p.getter_name;
+	StaticString<256> var_accessor("");
+	if (p.is_var) {
+		var_accessor.append(is_setter ? "set" : "get");
+		bool uppercase = true;
+		for (const char* c = p.name.begin; c != p.name.end; ++c) {
+			if (*c == '_') {
+				uppercase = true;
+				continue;
+			}
+			char value = *c;
+			if (uppercase && value >= 'a' && value <= 'z') value = char(value - 'a' + 'A');
+			var_accessor.append(StringView{&value, &value + 1});
+			uppercase = false;
+		}
+	}
+	const StringView accessor = p.is_var ? StringView(var_accessor.buffer, var_accessor.buffer + var_accessor.length) : (is_setter ? p.setter_name : p.getter_name);
 	const StringView args = is_setter ? p.setter_args : p.getter_args;
 	StaticString<2048> signature(c.id, "::", accessor, "(", args, ")->", p.type);
 	const XXH64_hash_t hash = XXH3_64bits(signature.buffer, signature.length);
@@ -515,23 +546,37 @@ void serializeEvoxPropertyWrapper(OutputStream& out, Module& m, Component& c, Pr
 	out.add("static void ");
 	appendPropertyWrapperName(out, c, p, is_setter);
 	L("(ex_runtime* runtime, ex_call_frame frame) {");
-	forEachArg(accessor_args, [&](const Arg& arg, bool is_first) {
-		if (is_first) {
-			L("EX_ARG(frame, ExComponent, ", arg.name, ");");
-			L(m.name, "* module = static_cast<", m.name, "*>(", arg.name, ".module);");
+	if (p.is_var) {
+		L("EX_ARG(frame, ExComponent, component);");
+		L(m.name, "* module = static_cast<", m.name, "*>(component.module);");
+		if (is_setter) {
+			emitFrameValueRead(out, p.type, makeStringView("value"));
+			L("module->get", c.name, "(EntityRef(component.index)).", p.name, " = value;");
 		}
 		else {
-			emitArgRead(out, arg);
+			L("const auto& value = module->get", c.name, "(EntityRef(component.index)).", p.name, ";");
+			appendReturnValue(out, p.type, "value", "&module->getWorld()");
 		}
-	});
-	if (!is_setter) out.add("auto ret = ");
-	out.add("module->", is_setter ? p.setter_name : p.getter_name, "(");
-	forEachArg(accessor_args, [&](const Arg& arg, bool is_first) {
-		if (!is_first) out.add(", ");
-		appendArgExpression(out, arg);
-	});
-	L(");");
-	if (!is_setter) appendReturnValue(out, p.type, "ret", "&module->getWorld()");
+	}
+	else {
+		forEachArg(accessor_args, [&](const Arg& arg, bool is_first) {
+			if (is_first) {
+				L("EX_ARG(frame, ExComponent, ", arg.name, ");");
+				L(m.name, "* module = static_cast<", m.name, "*>(", arg.name, ".module);");
+			}
+			else {
+				emitArgRead(out, arg);
+			}
+		});
+		if (!is_setter) out.add("auto ret = ");
+		out.add("module->", is_setter ? p.setter_name : p.getter_name, "(");
+		forEachArg(accessor_args, [&](const Arg& arg, bool is_first) {
+			if (!is_first) out.add(", ");
+			appendArgExpression(out, arg);
+		});
+		L(");");
+		if (!is_setter) appendReturnValue(out, p.type, "ret", "&module->getWorld()");
+	}
 	L("}" OUT_ENDL);
 }
 
@@ -1051,6 +1096,12 @@ void emitComponentPropertyDecl(OutputStream& out, Component& c, Property& p, boo
 	out.add("extern fn ");
 	appendPropertyScriptName(out, p, is_setter);
 	out.add("(");
+	if (p.is_var) {
+		out.add("entity : ", c.name);
+		if (is_setter) out.add(", value : ");
+		if (is_setter) appendEvoxDeclType(out, p.type);
+		if (accessor_args.size() > 0) out.add(", ");
+	}
 	i32 arg_idx = 0;
 	forEachArg(accessor_args, [&](const Arg& arg, bool is_first) {
 		if (!is_first) out.add(", ");

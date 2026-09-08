@@ -5,4 +5,8 @@ struct ChorusZone { entity : i32; module : cptr; }
 
 extern fn chorus_zone(e : Entity) : ?ChorusZone;
 extern fn createChorusZone(e : Entity) : ?ChorusZone;
+extern fn getRadius(entity : ChorusZone) : f32;
+extern fn setRadius(entity : ChorusZone, value : f32) : void;
+extern fn getDelay(entity : ChorusZone) : f32;
+extern fn setDelay(entity : ChorusZone, value : f32) : void;
 
