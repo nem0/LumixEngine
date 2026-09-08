@@ -1301,6 +1301,7 @@ struct StudioAppImpl final : StudioApp {
 			}
 			
 			if (checkShortcut(m_command_palette_action, true)) m_open_commands_palette = true;
+			else if (checkShortcut(m_assets_palette_action, true)) m_open_assets_palette = true;
 			else if (checkShortcut(m_start_standalone_app, true)) startStandaloneApp();
 			else if (checkShortcut(m_next_frame, true)) m_engine->nextFrame();
 			else if (checkShortcut(m_pause_game, true)) m_engine->pause(!m_engine->isPaused());
@@ -1317,6 +1318,7 @@ struct StudioAppImpl final : StudioApp {
 
 			m_asset_compiler->onGUI();
 			commandPaletteUI();
+			assetsPaletteUI();
 			guiSaveAsDialog();
 			for (i32 i = m_gui_plugins.size() - 1; i >= 0; --i) {
 				GUIPlugin* win = m_gui_plugins[i];
@@ -2727,6 +2729,67 @@ struct StudioAppImpl final : StudioApp {
 		return idx;
 	}
 
+	void assetsPaletteUI() {
+		PROFILE_FUNCTION();
+		if (m_open_assets_palette) ImGui::OpenPopup("Assets palette");
+
+		const ImGuiViewport* viewport = ImGui::GetMainViewport();
+		ImVec2 size = viewport->Size;
+		size.x *= 0.45f;
+		size.y *= 0.8f;
+		ImVec2 pos = ImVec2(viewport->Pos.x + (viewport->Size.x - size.x) * 0.5f, viewport->Pos.y + (viewport->Size.y - size.y) * 0.5f);
+		ImGui::SetNextWindowPos(pos);
+		ImGui::SetNextWindowSize(size, ImGuiCond_Always);
+
+		if (ImGui::BeginPopup("Assets palette", ImGuiWindowFlags_NoNavInputs)) {
+			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+			if (m_open_assets_palette) m_assets_palette_selected = 0;
+			if (m_assets_palette_filter.gui("Search", -1, m_open_assets_palette, nullptr, false)) {
+				m_assets_palette_selected = 0;
+			}
+			const bool insert_enter = ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter);
+			bool moved = false;
+			if (ImGui::IsItemFocused()) {
+				if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && m_assets_palette_selected > 0) {
+					--m_assets_palette_selected;
+					moved = true;
+				}
+				if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
+					++m_assets_palette_selected;
+					moved = true;
+				}
+			}
+			ImGui::Separator();
+
+			Path asset_to_open;
+			const auto& resources = m_asset_compiler->lockResources();
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
+			if (ImGui::BeginChild("##asset_list", ImVec2(0, 0))) {
+				u32 idx = 0;
+				for (const AssetCompiler::ResourceItem& resource : resources) {
+					if (!m_assets_palette_filter.isActive() || !m_assets_palette_filter.pass(resource.path)) continue;
+					const bool selected = idx == m_assets_palette_selected;
+					ImGui::PushID(resource.path.c_str());
+					if (moved && selected) ImGui::SetScrollHereY();
+					if (ImGui::Selectable(resource.path.c_str(), selected, ImGuiSelectableFlags_SpanAvailWidth)
+						|| (selected && insert_enter)) {
+						asset_to_open = resource.path;
+						ImGui::CloseCurrentPopup();
+					}
+					ImGui::PopID();
+					++idx;
+				}
+				if (idx != 0) m_assets_palette_selected = m_assets_palette_selected > 0 ? m_assets_palette_selected % idx : 0;
+			}
+			ImGui::EndChild();
+			ImGui::PopStyleColor();
+			m_asset_compiler->unlockResources();
+			ImGui::EndPopup();
+			if (!asset_to_open.isEmpty()) m_asset_browser->openEditor(asset_to_open);
+		}
+		m_open_assets_palette = false;
+	}
+
 	void commandPaletteUI() {
 		PROFILE_FUNCTION();
 		if (m_open_commands_palette) ImGui::OpenPopup("Commands palette");
@@ -3170,6 +3233,7 @@ struct StudioAppImpl final : StudioApp {
 
 	CommonActions m_common_actions;
 	Action m_command_palette_action{"Studio", "Commands palette", "Open commands palette lister", "show_all_commands", "", Action::WINDOW};
+	Action m_assets_palette_action{"Studio", "Assets palette", "Open assets palette", "show_all_assets", "", Action::WINDOW};
 	Action m_new_world_action{"Studio", "New", "New world", "world_new", ICON_FA_PLUS};
 	Action m_exit_action{"Studio", "Exit", "Exit Studio", "studio_exit", ICON_FA_SIGN_OUT_ALT};
 	Action m_show_export_action{"Studio", "Package game", "Package game", "package_game", ICON_FA_FILE_EXPORT};
@@ -3266,6 +3330,9 @@ struct StudioAppImpl final : StudioApp {
 	} m_watched_plugin;
 
 	bool m_open_commands_palette = false;
+	bool m_open_assets_palette = false;
+	i32 m_assets_palette_selected = 0;
+	TextFilter m_assets_palette_filter;
 	i32 m_all_actions_selected = 0;
 	TextFilter m_all_actions_filter;
 	bool m_sleep_when_inactive = true;
