@@ -14,7 +14,6 @@ import "core:attributes" as attr
 import "scripts/player" as player
 import "std:math" as math
 import "core:array" as array
-import "maps/demo/random_walk" as random_walk
 
 // constants
 comptime INTERACTION_DIST = 1.5;
@@ -187,7 +186,6 @@ fn resetPhysicsTest() : void {
 
 fn update(td : f32, input : InputSystem) : void {
     player.update(td);
-	random_walk.update(g_world, td);
 
 	for entity in g_nav_agents.slice() {
 		if const agent = entity.navmesh_agent() {
