@@ -9,18 +9,18 @@ struct HingeJoint { entity : i32; module : cptr; }
 
 extern fn hinge_joint(e : Entity) : ?HingeJoint;
 extern fn createHingeJoint(e : Entity) : ?HingeJoint;
-extern fn getHingeJointConnectedBody(entity : HingeJoint) : Entity;
-extern fn setHingeJointConnectedBody(entity : HingeJoint, connected_body : Entity) : void;
-extern fn getHingeJointAxisPosition(entity : HingeJoint) : Vec3;
-extern fn setHingeJointAxisPosition(entity : HingeJoint, value : Vec3) : void;
-extern fn getHingeJointAxisDirection(entity : HingeJoint) : Vec3;
-extern fn setHingeJointAxisDirection(entity : HingeJoint, value : Vec3) : void;
-extern fn getHingeJointDamping(entity : HingeJoint) : f32;
-extern fn setHingeJointDamping(entity : HingeJoint, value : f32) : void;
-extern fn getHingeJointStiffness(entity : HingeJoint) : f32;
-extern fn setHingeJointStiffness(entity : HingeJoint, value : f32) : void;
-extern fn getHingeJointUseLimit(entity : HingeJoint) : bool;
-extern fn setHingeJointUseLimit(entity : HingeJoint, use_limit : bool) : void;
-extern fn getHingeJointLimit(entity : HingeJoint) : Vec2;
-extern fn setHingeJointLimit(entity : HingeJoint, limit : Vec2) : void;
+extern fn getConnectedBody(entity : HingeJoint) : Entity;
+extern fn setConnectedBody(entity : HingeJoint, connected_body : Entity) : void;
+extern fn getAxisPosition(entity : HingeJoint) : Vec3;
+extern fn setAxisPosition(entity : HingeJoint, value : Vec3) : void;
+extern fn getAxisDirection(entity : HingeJoint) : Vec3;
+extern fn setAxisDirection(entity : HingeJoint, value : Vec3) : void;
+extern fn getDamping(entity : HingeJoint) : f32;
+extern fn setDamping(entity : HingeJoint, value : f32) : void;
+extern fn getStiffness(entity : HingeJoint) : f32;
+extern fn setStiffness(entity : HingeJoint, value : f32) : void;
+extern fn getUseLimit(entity : HingeJoint) : bool;
+extern fn setUseLimit(entity : HingeJoint, use_limit : bool) : void;
+extern fn getLimit(entity : HingeJoint) : Vec2;
+extern fn setLimit(entity : HingeJoint, limit : Vec2) : void;
 

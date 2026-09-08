@@ -1455,11 +1455,14 @@ TEST(IntrospectionGenericPrintRendersEveryKind) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
 
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("write_bytes"), &printCaptureBytes) == EX_RESULT_OK);
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("write_i64"), &printCaptureI64) == EX_RESULT_OK);
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("write_u64"), &printCaptureU64) == EX_RESULT_OK);
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("write_f64"), &printCaptureF64) == EX_RESULT_OK);
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("write_bool"), &printCaptureBool) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc function, void*) -> ex_native_fn {
+		if (equalStrings(function.name, "write_bytes")) return &printCaptureBytes;
+		if (equalStrings(function.name, "write_i64")) return &printCaptureI64;
+		if (equalStrings(function.name, "write_u64")) return &printCaptureU64;
+		if (equalStrings(function.name, "write_f64")) return &printCaptureF64;
+		if (equalStrings(function.name, "write_bool")) return &printCaptureBool;
+		return nullptr;
+	}, nullptr) == EX_RESULT_OK);
 
 	struct Case {
 		const char* function;

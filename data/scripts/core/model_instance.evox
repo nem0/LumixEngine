@@ -8,12 +8,12 @@ struct ModelInstance { entity : i32; module : cptr; }
 
 extern fn model_instance(e : Entity) : ?ModelInstance;
 extern fn createModelInstance(e : Entity) : ?ModelInstance;
-extern fn overrideMaterialVec4(entity : ModelInstance, mesh_index : i32, uniform_name : []const u8, value : Vec4) : bool;
+extern fn overrideMaterialVec4(entity : ModelInstance, mesh_index : u32, uniform_name : []const u8, value : Vec4) : bool;
 extern fn getModel(entity : ModelInstance) : ?Model;
-extern fn setMaterialOverride(entity : ModelInstance, mesh_idx : i32, path : []const u8) : void;
-extern fn getMaterialOverride(entity : ModelInstance, mesh_idx : i32) : []const u8;
-extern fn isModelInstanceEnabled(entity : ModelInstance) : bool;
-extern fn enableModelInstance(entity : ModelInstance, enable : bool) : void;
-extern fn getModelInstancePath(entity : ModelInstance) : []const u8;
-extern fn setModelInstancePath(entity : ModelInstance, path : []const u8) : void;
+extern fn setMaterialOverride(entity : ModelInstance, mesh_idx : u32, path : []const u8) : void;
+extern fn getMaterialOverride(entity : ModelInstance, mesh_idx : u32) : []const u8;
+extern fn getEnabled(entity : ModelInstance) : bool;
+extern fn setEnabled(entity : ModelInstance, enable : bool) : void;
+extern fn getPath(entity : ModelInstance) : []const u8;
+extern fn setPath(entity : ModelInstance, path : []const u8) : void;
 

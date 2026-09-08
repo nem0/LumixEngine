@@ -2907,7 +2907,7 @@ if (ex_module_compile(module, source, source_name, nullptr, nullptr) == EX_RESUL
 	ex_runtime* runtime = bytecode ? ex_runtime_create(bytecode, &host) : nullptr;
 	ex_unit* unit = ex_module_get_unit(module, 0);
 	if (runtime && unit && ex_unit_get_native_function_count(unit) == 1) {
-		ex_runtime_set_native_function_callback(runtime, unit, 0, &native_add);
+		ex_runtime_set_native_resolver(runtime, &resolve_native, nullptr);
 	}
 }
 ex_runtime_destroy(runtime);
@@ -2930,7 +2930,7 @@ fn main() : i32 {
 }
 ```
 
-`extern` declarations inform the compiler about a function's name and signature but do not provide an implementation. Each declaration is enumerated by `ex_unit_get_native_function_count` and `ex_unit_get_native_function_name`; bind it with `ex_runtime_set_native_function_callback` using the corresponding unit-local index. Use `ex_unit_get_path` to identify declarations from imported units.
+`extern` declarations inform the compiler about a function's name and signature but do not provide an implementation. The runtime invokes the configured lazy resolver on first use, passing the declaration name, unit path, and bytecode index. Returning the callback binds it for subsequent calls.
 
 
 ## Diagnostic

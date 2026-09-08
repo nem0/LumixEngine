@@ -6,10 +6,10 @@ struct PropertyAnimator { entity : i32; module : cptr; }
 
 extern fn property_animator(e : Entity) : ?PropertyAnimator;
 extern fn createPropertyAnimator(e : Entity) : ?PropertyAnimator;
-extern fn isPropertyAnimatorEnabled(entity : PropertyAnimator) : bool;
-extern fn enablePropertyAnimator(entity : PropertyAnimator, enabled : bool) : void;
-extern fn getPropertyAnimatorLooped(entity : PropertyAnimator) : bool;
-extern fn setPropertyAnimatorLooped(entity : PropertyAnimator, looped : bool) : void;
-extern fn getPropertyAnimatorAnimation(entity : PropertyAnimator) : []const u8;
-extern fn setPropertyAnimatorAnimation(entity : PropertyAnimator, path : []const u8) : void;
+extern fn getEnabled(entity : PropertyAnimator) : bool;
+extern fn setEnabled(entity : PropertyAnimator, enabled : bool) : void;
+extern fn getLooped(entity : PropertyAnimator) : bool;
+extern fn setLooped(entity : PropertyAnimator, looped : bool) : void;
+extern fn getAnimation(entity : PropertyAnimator) : []const u8;
+extern fn setAnimation(entity : PropertyAnimator, path : []const u8) : void;
 

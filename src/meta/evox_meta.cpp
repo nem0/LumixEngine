@@ -6,7 +6,7 @@
 
 namespace {
 
-enum class EvoxType { UNKNOWN, VOID_T, BOOL_T, U8_T, I32_T, F32_T, VEC2_T, VEC3_T, DVEC3_T, VEC4_T, COLOR_T, QUAT_T, ENTITY_T, ENUM_T, STRUCT_T, OBJECT_T, PATH_T, STRING_T };
+enum class EvoxType { UNKNOWN, VOID_T, BOOL_T, U8_T, I32_T, U32_T, F32_T, VEC2_T, VEC3_T, DVEC3_T, VEC4_T, COLOR_T, QUAT_T, ENTITY_T, ENUM_T, STRUCT_T, OBJECT_T, PATH_T, STRING_T };
 
 template <int CAPACITY> struct StaticString {
 	template <typename... Args> StaticString(Args&&... args) {
@@ -124,7 +124,8 @@ EvoxType getEvoxType(StringView type) {
 	if (equal(type, "void")) return EvoxType::VOID_T;
 	if (equal(type, "bool")) return EvoxType::BOOL_T;
 	if (equal(type, "u8")) return EvoxType::U8_T;
-	if (equal(type, "i32") || equal(type, "int") || equal(type, "u32")) return EvoxType::I32_T;
+	if (equal(type, "i32") || equal(type, "int")) return EvoxType::I32_T;
+	if (equal(type, "u32")) return EvoxType::U32_T;
 	if (equal(type, "float")) return EvoxType::F32_T;
 	if (equal(type, "Vec2")) return EvoxType::VEC2_T;
 	if (equal(type, "Vec3")) return EvoxType::VEC3_T;
@@ -213,6 +214,10 @@ bool hasUnsupportedEvoxFunctionArg(Function& f) {
 
 StringView functionScriptName(Function& f) {
 	return f.attributes.alias.size() > 0 ? f.attributes.alias : f.name;
+}
+
+void appendPropertyScriptName(OutputStream& out, Property& p, bool is_setter) {
+	out.add(is_setter ? "set" : "get", p.name);
 }
 
 void logUnsupportedEvoxFunctionArgs(const char* scope, StringView owner, Function& f) {
@@ -330,6 +335,7 @@ void appendReturnValue(OutputStream& out, StringView type, const char* value, co
 			emitResult(out, v);
 			break;
 		}
+		case EvoxType::U32_T: emitResult(out, value); break;
 		case EvoxType::F32_T: emitResult(out, value); break;
 		case EvoxType::VEC2_T: emitResult(out, value); break;
 		case EvoxType::VEC3_T: emitResult(out, value); break;
@@ -894,12 +900,16 @@ void emitGeneratedComponentImportRegistrations(OutputStream& out, MetaData& data
 			}
 			for (Property& p : c.properties) {
 				if (isSupportedEvoxPropertyGetter(p)) {
-					out.add("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", p.getter_name, "\")}, &");
+					out.add("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"");
+					appendPropertyScriptName(out, p, false);
+					out.add("\")}, &");
 					appendPropertyWrapperName(out, c, p, false);
 					L(");");
 				}
 				if (isSupportedEvoxPropertySetter(p)) {
-					out.add("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", p.setter_name, "\")}, &");
+					out.add("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"");
+					appendPropertyScriptName(out, p, true);
+					out.add("\")}, &");
 					appendPropertyWrapperName(out, c, p, true);
 					L(");");
 				}
@@ -954,6 +964,7 @@ void appendEvoxDeclType(OutputStream& out, StringView type) {
 		case EvoxType::BOOL_T: out.add("bool"); break;
 		case EvoxType::U8_T: out.add("u8"); break;
 		case EvoxType::I32_T: out.add("i32"); break;
+		case EvoxType::U32_T: out.add("u32"); break;
 		case EvoxType::F32_T: out.add("f32"); break;
 		case EvoxType::VEC2_T: out.add("Vec2"); break;
 		case EvoxType::VEC3_T: out.add("Vec3"); break;
@@ -1037,8 +1048,9 @@ void appendEvoxDeclArgName(OutputStream& out, StringView name, i32 idx) {
 
 void emitComponentPropertyDecl(OutputStream& out, Component& c, Property& p, bool is_setter) {
 	StringView accessor_args = is_setter ? p.setter_args : p.getter_args;
-	StringView script_name = is_setter ? p.setter_name : p.getter_name;
-	out.add("extern fn ", script_name, "(");
+	out.add("extern fn ");
+	appendPropertyScriptName(out, p, is_setter);
+	out.add("(");
 	i32 arg_idx = 0;
 	forEachArg(accessor_args, [&](const Arg& arg, bool is_first) {
 		if (!is_first) out.add(", ");

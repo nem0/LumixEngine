@@ -7,6 +7,6 @@ struct ReflectionProbe { entity : i32; module : cptr; }
 
 extern fn reflection_probe(e : Entity) : ?ReflectionProbe;
 extern fn createReflectionProbe(e : Entity) : ?ReflectionProbe;
-extern fn isReflectionProbeEnabled(entity : ReflectionProbe) : bool;
-extern fn enableReflectionProbe(entity : ReflectionProbe, enable : bool) : void;
+extern fn getEnabled(entity : ReflectionProbe) : bool;
+extern fn setEnabled(entity : ReflectionProbe, enable : bool) : void;
 

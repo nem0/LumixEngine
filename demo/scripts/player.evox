@@ -126,13 +126,13 @@ fn update(dt : f32) : void {
 		speed_y = speed_y * 2.0;
 	}
 
-	anim.setFloatInput(speed_input_idx, speed_y);
-	anim.setFloatInput(dir_input_idx, speed_x);
+	anim.setFloatInput(speed_input_idx as u32, speed_y);
+	anim.setFloatInput(dir_input_idx as u32, speed_x);
 
-	anim.setFloatInput(stance_input_idx, crouched ? 1.0 : 0.0);
+	anim.setFloatInput(stance_input_idx as u32, crouched ? 1.0 : 0.0);
 
-	anim.setBoolInput(falling_input_idx, gravity_speed < -4.0);
-	anim.setBoolInput(aiming_input_idx, aiming);
+	anim.setBoolInput(falling_input_idx as u32, gravity_speed < -4.0);
+	anim.setBoolInput(aiming_input_idx as u32, aiming);
 
 	const yaw_rot = makeQuatFromYaw(yaw);
 	const pitch_rot = makeQuatFromPitch(pitch);

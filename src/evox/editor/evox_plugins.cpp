@@ -540,6 +540,7 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 		: AssetEditorWindow(app)
 		, m_path(path)
 		, m_message(app.getAllocator())
+		, m_autocomplete_list(app.getAllocator())
 	{
 		m_editor = createCodeEditor(app);
 		m_editor->setTokenColors(EvoxTokens::token_colors);
@@ -651,11 +652,26 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 		};
 		ImportContext import_ctx(m_app.getEngine().getFileSystem(), m_app.getAllocator());
 		ImportResolverContext resolver_ctx = {};
+		struct DiagnosticContext {
+			String* message;
+			ex_string_view source;
+			u32 line = 0;
+			u32 column = 0;
+			u32 length = 0;
+		};
+		DiagnosticContext diagnostic_context{&diagnostics_message};
 		ex_host host = {};
 		ex_default_arena_create(&host.arena);
-		host.diagnostics_userdata = &diagnostics_message;
+		host.diagnostics_userdata = &diagnostic_context;
 		host.print = [](void* userdata, ex_string_view msg) {
-			((String*)userdata)->append(StringView(msg.begin, msg.length));
+			((DiagnosticContext*)userdata)->message->append(StringView(msg.begin, msg.length));
+		};
+		host.diagnostic = [](void* userdata, ex_string_view source, u32 line, u32 column, u32 length) {
+			DiagnosticContext* ctx = (DiagnosticContext*)userdata;
+			ctx->source = source;
+			ctx->line = line;
+			ctx->column = column;
+			ctx->length = length;
 		};
 		ex_module* module = ex_module_create(&host);
 		if (module) {
@@ -672,19 +688,13 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 			}
 			else {
 				m_message = diagnostics_message;
-				const StringView diagnostics = diagnostics_message;
-				if (const char* line_marker = find(diagnostics, ": line ")) {
-					const StringView error_path(diagnostics.data, line_marker);
-					line_marker += stringLength(": line ");
-					i32 line;
-					if (equalStrings(error_path, m_path.c_str())
-						&& fromCString(StringView(line_marker, diagnostics.end()), line)
-						&& line > 0)
-					{
-						m_editor->underlineTokens(line - 1, 0, 0xffFFffFF, diagnostics_message.c_str());
-					}
+				if (diagnostic_context.line > 0
+					&& equalStrings(StringView(diagnostic_context.source.begin, diagnostic_context.source.length), m_path.c_str())) {
+					const u32 line = diagnostic_context.line - 1;
+					const u32 column = diagnostic_context.column > 0 ? diagnostic_context.column - 1 : 0;
+					m_editor->underlineTokens(line, column, column + diagnostic_context.length, diagnostics_message.c_str());
 				}
-				logError("Evox check failed: ", m_path, ": ", diagnostics_message);
+				logError("Evox check failed: ", diagnostics_message);
 			}
 			ex_module_destroy(module);
 		}
@@ -727,15 +737,14 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 			if (actions.open_externally.iconButton(true, &m_app)) m_app.getAssetBrowser().openInExternalEditor(m_path);
 			if (actions.view_in_browser.iconButton(true, &m_app)) m_app.getAssetBrowser().locate(m_path);
 			if (g_evox_check.iconButton(true, &m_app)) check();
+			if (m_message.length() > 0) {
+				ImGui::TextUnformatted(m_message.c_str());
+			}
 			ImGui::EndMenuBar();
 		}
 
 		modificationNotificationUI();
 
-		if (m_message.length() > 0) {
-			ImGui::TextUnformatted(m_message.c_str());
-			ImGui::Separator();
-		}
 		applyEvoxBreakpointMarkers(*m_editor, m_path);
 		if (m_editor->gui("evox_editor", ImGui::GetContentRegionAvail(), m_app.getMonospaceFont(), m_app.getDefaultFont())) {
 			m_dirty = true;
@@ -743,8 +752,102 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 		if (m_editor->canHandleInput() && m_app.checkShortcut(g_evox_go_to_definition)) {
 			goToDefinition();
 		}
+		if (m_editor->canHandleInput() && m_editor->getNumCursors() == 1 && m_app.checkShortcut(m_app.getCommonActions().autocomplete)) {
+			showAutocomplete();
+		}
+		autocompletePopupGUI();
 		Action* toggle_breakpoint = m_app.getAction("evox_toggle_breakpoint");
 		if (toggle_breakpoint && ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && m_app.checkShortcut(*toggle_breakpoint)) toggleBreakpointAtCursor();
+	}
+
+	void showAutocomplete() {
+		m_autocomplete_list.clear();
+		World* world = m_app.getWorldEditor().getWorld();
+		EvoxModule* evox = world ? static_cast<EvoxModule*>(world->getModule("evox")) : nullptr;
+		ex_module* module = evox ? evox->getDebugModule() : nullptr;
+		if (!module) return;
+
+		const StringView prefix = m_editor->getPrefix();
+		for (u32 unit_idx = 0, unit_count = ex_module_get_unit_count(module); unit_idx < unit_count; ++unit_idx) {
+			ex_unit* unit = ex_module_get_unit(module, unit_idx);
+			const ex_string_view ex_source = ex_unit_get_path(unit);
+			const StringView source(ex_source.begin, ex_source.length);
+			for (int i = 0, count = ex_unit_get_symbols_count(unit); i < count; ++i) {
+				const ex_symbol_desc symbol = ex_unit_get_symbol(unit, i);
+				if (symbol.kind != EX_SYM_KIND_VARIABLE
+					&& symbol.kind != EX_SYM_KIND_CONST
+					&& symbol.kind != EX_SYM_KIND_COMPTIME) continue;
+				const StringView name(symbol.name.begin, symbol.name.length);
+				if (!startsWith(name, prefix)) continue;
+				const char* kind = symbol.kind == EX_SYM_KIND_VARIABLE ? "variable"
+					: symbol.kind == EX_SYM_KIND_CONST ? "const" : "comptime";
+				bool duplicate = false;
+				for (const AutocompleteItem& existing : m_autocomplete_list) {
+					if (equalStrings(StringView(existing.symbol.c_str()), name)) {
+						duplicate = true;
+						break;
+					}
+				}
+				if (!duplicate) m_autocomplete_list.emplace(name, kind, source, m_app.getAllocator());
+			}
+		}
+
+		if (m_autocomplete_list.empty()) return;
+		if (m_autocomplete_list.size() == 1) {
+			m_editor->selectWord();
+			m_editor->insertText(m_autocomplete_list[0].symbol.c_str());
+			m_dirty = true;
+			return;
+		}
+		m_autocomplete_selection_idx = 0;
+		ImGui::OpenPopup("evox_autocomplete");
+		ImGui::SetNextWindowPos(m_editor->getCursorScreenPosition());
+	}
+
+	void autocompletePopupGUI() {
+		if (!ImGui::BeginPopup("evox_autocomplete", ImGuiWindowFlags_NoNav)) return;
+
+		if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+			ImGui::CloseCurrentPopup();
+			m_editor->focus();
+		}
+		if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
+			m_autocomplete_selection_idx = (m_autocomplete_selection_idx + m_autocomplete_list.size() - 1) % m_autocomplete_list.size();
+		}
+		if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
+			m_autocomplete_selection_idx = (m_autocomplete_selection_idx + 1) % m_autocomplete_list.size();
+		}
+
+		const bool enter = ImGui::IsKeyPressed(ImGuiKey_Enter);
+		if (ImGui::BeginTable("##evox_autocomplete_table", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp)) {
+			ImGui::TableSetupColumn("Symbol");
+			ImGui::TableSetupColumn("Kind");
+			ImGui::TableSetupColumn("File");
+			ImGui::TableHeadersRow();
+			for (i32 i = 0; i < m_autocomplete_list.size(); ++i) {
+				const bool selected = i == m_autocomplete_selection_idx;
+				ImGui::TableNextRow();
+				ImGui::TableSetColumnIndex(0);
+				if (selected) ImGui::SetScrollHereY();
+				const bool choose = ImGui::Selectable(m_autocomplete_list[i].symbol.c_str(), selected, ImGuiSelectableFlags_SpanAllColumns)
+					|| (selected && enter);
+				ImGui::TableSetColumnIndex(1);
+				ImGui::TextUnformatted(m_autocomplete_list[i].kind.c_str());
+				ImGui::TableSetColumnIndex(2);
+				ImGui::TextUnformatted(m_autocomplete_list[i].file.c_str());
+				if (choose) {
+					m_editor->selectWord();
+					m_editor->insertText(m_autocomplete_list[i].symbol.c_str());
+					m_dirty = true;
+					m_autocomplete_list.clear();
+					ImGui::CloseCurrentPopup();
+					m_editor->focus();
+					break;
+				}
+			}
+			ImGui::EndTable();
+		}
+		ImGui::EndPopup();
 	}
 
 	void goToDefinition() {
@@ -815,7 +918,20 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 
 	Path m_path;
 	UniquePtr<CodeEditor> m_editor;
+	struct AutocompleteItem {
+		AutocompleteItem(StringView symbol, StringView kind, StringView file, IAllocator& allocator)
+			: symbol(symbol, allocator)
+			, kind(kind, allocator)
+			, file(file, allocator)
+		{}
+		String symbol;
+		String kind;
+		String file;
+	};
+
 	String m_message;
+	Array<AutocompleteItem> m_autocomplete_list;
+	i32 m_autocomplete_selection_idx = 0;
 	bool m_show_external_modification_notification = false;
 };
 
@@ -1155,7 +1271,6 @@ struct EvoxVariablesWindow final : StudioApp::GUIPlugin {
 	const char* getName() const override { return "evox_variables"; }
 	bool isOpen() const { return m_is_open; }
 	void setOpen(bool open) { m_is_open = open; }
-
 	static bool nameMatchesFilter(ex_string_view name, const char* filter) {
 		if (!filter || !filter[0]) return true;
 		for (const char* c = name.begin; c < name.begin + name.length; ++c) {
@@ -1177,7 +1292,6 @@ struct EvoxVariablesWindow final : StudioApp::GUIPlugin {
 			ImGui::End();
 			return;
 		}
-
 		World* world = m_app.getWorldEditor().getWorld();
 		EvoxModule* module = world ? static_cast<EvoxModule*>(world->getModule("evox")) : nullptr;
 		ex_runtime* runtime = module ? module->getDebugRuntime() : nullptr;
@@ -1282,12 +1396,154 @@ struct EvoxVariablesWindow final : StudioApp::GUIPlugin {
 	char m_filter[64];
 };
 
+struct EvoxSymbolsPopup final : StudioApp::GUIPlugin {
+	explicit EvoxSymbolsPopup(StudioApp& app) : m_app(app) { m_filter.clear(); }
+	const char* getName() const override { return "evox_symbols_popup"; }
+	void open() { m_open = true; m_focus_filter = true; }
+	static bool nameMatchesFilter(ex_string_view name, const char* filter) {
+		if (!filter || !filter[0]) return true;
+		for (const char* c = name.begin; c < name.begin + name.length; ++c) {
+			const char* f = filter;
+			const char* n = c;
+			while (*f && n < name.begin + name.length && toLower(*n) == toLower(*f)) { ++n; ++f; }
+			if (!*f) return true;
+		}
+		return false;
+	}
+
+	void onGUI() override {
+		if (m_open) ImGui::OpenPopup("evox_symbols_palette");
+		const ImGuiViewport* viewport = ImGui::GetMainViewport();
+		ImVec2 size = viewport->Size;
+		size.x *= 0.4f;
+		size.y *= 0.8f;
+		const ImVec2 pos = ImVec2(viewport->Pos.x + (viewport->Size.x - size.x) * 0.5f,
+			viewport->Pos.y + (viewport->Size.y - size.y) * 0.5f);
+		ImGui::SetNextWindowPos(pos);
+		ImGui::SetNextWindowSize(size, ImGuiCond_Always);
+		World* world = m_app.getWorldEditor().getWorld();
+		EvoxModule* module = world ? static_cast<EvoxModule*>(world->getModule("evox")) : nullptr;
+		ex_runtime* runtime = module ? module->getDebugRuntime() : nullptr;
+		ImGui::SetNextWindowSize(ImVec2(500, 300), ImGuiCond_Always);
+		if (!ImGui::BeginPopup("evox_symbols_palette", ImGuiWindowFlags_NoNavInputs)) {
+			m_open = false;
+			return;
+		}
+		if (!runtime) {
+			ImGui::TextDisabled("Waiting for runtime...");
+			ImGui::EndPopup();
+			m_open = false;
+			return;
+		}
+
+		ImGui::TextUnformatted("Evox Symbols");
+		if (m_open || m_focus_filter) {
+			ImGui::SetKeyboardFocusHere();
+			m_focus_filter = false;
+		}
+		ImGui::SetNextItemWidth(-1);
+		const bool filter_changed = m_filter.gui("Filter symbols...", -1, m_open || m_focus_filter, nullptr, true);
+		m_focus_filter = false;
+		if (filter_changed) m_selected = 0;
+		if (!m_filter.isActive()) {
+			m_selected = -1;
+			ImGui::TextDisabled("Type to search symbols...");
+			ImGui::EndPopup();
+			m_open = false;
+			return;
+		}
+		ex_module* debug_module = module->getDebugModule();
+		if (!debug_module) {
+			ImGui::TextDisabled("Waiting for module...");
+			ImGui::EndPopup();
+			m_open = false;
+			return;
+		}
+		const u32 unit_count = ex_module_get_unit_count(debug_module);
+		const bool filter_focused = ImGui::IsItemFocused();
+		const int move = filter_focused && ImGui::IsKeyPressed(ImGuiKey_DownArrow) ? 1
+			: filter_focused && ImGui::IsKeyPressed(ImGuiKey_UpArrow) ? -1 : 0;
+		const bool activate = filter_focused && ImGui::IsKeyPressed(ImGuiKey_Enter);
+		int visible_index = 0;
+		for (u32 unit_index = 0; unit_index < unit_count; ++unit_index) {
+			ex_unit* unit = ex_module_get_unit(debug_module, unit_index);
+			const ex_string_view source = ex_unit_get_path(unit);
+			const int symbol_count = ex_unit_get_symbols_count(unit);
+			for (int symbol_index = 0; symbol_index < symbol_count; ++symbol_index) {
+				const ex_symbol_desc symbol = ex_unit_get_symbol(unit, symbol_index);
+				const StaticString<512> searchable(
+					StringView(symbol.name.begin, symbol.name.length), " ", StringView(source.begin, source.length));
+				if (!m_filter.pass(searchable)) continue;
+				const char* kind = "symbol";
+				switch (symbol.kind) {
+					case EX_SYM_KIND_VARIABLE: kind = "variable"; break;
+					case EX_SYM_KIND_CONST: kind = "const"; break;
+					case EX_SYM_KIND_COMPTIME: kind = "comptime"; break;
+					case EX_SYM_KIND_IMPORT: kind = "import"; break;
+					default: break;
+				}
+				const bool selected = visible_index == m_selected;
+				const bool choose = selected && activate;
+				ImGui::PushID((int)unit_index);
+				ImGui::PushID(symbol_index);
+				if (ImGui::Selectable("##symbol", selected) || choose) {
+					const Path path = evoxSourcePath(StringView(source.begin, source.length));
+					m_app.getAssetBrowser().openEditor(path);
+					if (AssetEditorWindow* window = m_app.getAssetBrowser().getWindow(path)) {
+						auto* editor_window = (EvoxEditorWindow*)window;
+						const u32 line = symbol.line > 0 ? symbol.line - 1 : 0;
+						const u32 column = symbol.column > 0 ? symbol.column - 1 : 0;
+						editor_window->m_editor->setSelection(line, column, line, column, true);
+						editor_window->m_editor->focus();
+					}
+					ImGui::CloseCurrentPopup();
+				}
+				if (selected && m_scroll_to_selected) {
+					ImGui::SetScrollHereY();
+					m_scroll_to_selected = false;
+				}
+				ImGui::PopID();
+				ImGui::PopID();
+				++visible_index;
+				ImGui::SameLine();
+				ImGui::Text("%.*s", int(symbol.name.length), symbol.name.begin);
+				ImGui::SameLine(280);
+				ImGui::TextDisabled("%s  %.*s", kind, int(source.length), source.begin);
+			}
+		}
+		if (visible_index == 0) {
+			ImGui::TextDisabled("No matching symbols");
+			m_selected = -1;
+		} else {
+			if (m_selected < 0 || m_selected >= visible_index) m_selected = 0;
+			if (move > 0) {
+				m_selected = (m_selected + 1) % visible_index;
+				m_scroll_to_selected = true;
+			}
+			if (move < 0) {
+				m_selected = (m_selected + visible_index - 1) % visible_index;
+				m_scroll_to_selected = true;
+			}
+		}
+		ImGui::EndPopup();
+		m_open = false;
+	}
+
+	StudioApp& m_app;
+	bool m_open = false;
+	bool m_focus_filter = false;
+	int m_selected = -1;
+	bool m_scroll_to_selected = false;
+	TextFilter m_filter;
+};
+
 static bool toggleEvoxBreakpoint(StudioApp& app, const Path& source, u32 line) {
 	if (!g_evox_debugger) return false;
 	return g_evox_debugger->toggleBreakpoint(source, line);
 }
 
 static Action g_toggle_variables_window{"Evox", "Variables window", "Show/hide variables window", "evox_toggle_variables", ICON_FA_CUBE, Action::Type::TOOL};
+static Action g_show_evox_symbols{"Evox", "Symbols", "Show Evox symbols", "evox_symbols", ICON_FA_LIST, Action::Type::NORMAL};
 
 struct EvoxDataCommand final : IEditorCommand {
 	EvoxDataCommand(WorldEditor& editor, EntityRef entity, const ex_type* type, bool add)
@@ -1388,12 +1644,51 @@ struct EvoxPropertyGridPlugin final : PropertyGrid::IPlugin {
 
 };
 
+struct EvoxDataAddComponentPlugin final : StudioApp::IAddComponentPlugin {
+	explicit EvoxDataAddComponentPlugin(StudioApp& app) : m_app(app) {}
+
+	const char* getLabel() const override { return "Evox/Data"; }
+
+	void onGUI(bool create_entity, bool from_filter, EntityPtr parent, WorldEditor& editor) override {
+		World* world = editor.getWorld();
+		EvoxModule* module = world ? static_cast<EvoxModule*>(world->getModule("evox")) : nullptr;
+		if (!module) return;
+
+		const char* label = from_filter ? getLabel() : "Data";
+		if (!ImGui::BeginMenu(label)) return;
+		for (const ex_type* type : module->getEvoxDataTypes()) {
+			const ex_string_view ex_name = ex_type_get_name(type);
+			const StringView name(ex_name.begin, ex_name.length);
+			if (!ImGui::MenuItem(StaticString<128>(name))) continue;
+
+			editor.beginCommandGroup("createEntityWithEvoxData");
+			if (create_entity) {
+				EntityRef entity = editor.addEntity();
+				editor.selectEntities(Span(&entity, 1), false);
+			}
+			const Span<const EntityRef> selected = editor.getSelectedEntities();
+			editor.addComponent(selected, reflection::getComponentType("evox"));
+			UniquePtr<IEditorCommand> command = UniquePtr<EvoxDataCommand>::create(
+				editor.getAllocator(), editor, selected[0], type, true);
+			editor.executeCommand(command.move());
+			if (parent.isValid()) editor.makeParent(parent, selected[0]);
+			editor.endCommandGroup();
+			editor.lockGroupCommand();
+		}
+		ImGui::EndMenu();
+	}
+
+	StudioApp& m_app;
+};
+
 struct EvoxPlugin : StudioApp::IPlugin {
 	explicit EvoxPlugin(StudioApp& app)
 		: m_app(app)
 		, m_asset_plugin(app)
 		, m_debugger(app)
 		, m_variables_window(app)
+		, m_symbols_popup(app)
+		, m_add_data_plugin(app)
 	{
 	}
 
@@ -1406,11 +1701,14 @@ struct EvoxPlugin : StudioApp::IPlugin {
 		g_debugger_step_over.shortcut = os::Keycode::F2;
 		g_debugger_step_into.shortcut = os::Keycode::F3;
 		g_debugger_step_out.shortcut = os::Keycode::SHIFT | os::Keycode::F11;
+		g_show_evox_symbols.shortcut = os::Keycode::CTRL | os::Keycode::Q;
 		m_app.getAssetBrowser().addPlugin(m_asset_plugin, Span(evox_exts));
 		m_app.getAssetCompiler().addPlugin(m_asset_plugin, Span(evox_exts));
+		m_app.registerComponent("", "evox", m_add_data_plugin);
 		m_app.getPropertyGrid().addPlugin(m_property_grid_plugin);
 		m_app.addPlugin(m_debugger);
 		m_app.addPlugin(m_variables_window);
+		m_app.addPlugin(m_symbols_popup);
 	}
 
 	void update(float) override {
@@ -1421,6 +1719,10 @@ struct EvoxPlugin : StudioApp::IPlugin {
 		if (g_toggle_variables_window.request) {
 			m_variables_window.setOpen(!m_variables_window.isOpen());
 			g_toggle_variables_window.request = false;
+		}
+		if (g_show_evox_symbols.request || m_app.checkShortcut(g_show_evox_symbols, true)) {
+			m_symbols_popup.open();
+			g_show_evox_symbols.request = false;
 		}
 
 		// Handle debugger shortcuts globally
@@ -1443,6 +1745,7 @@ struct EvoxPlugin : StudioApp::IPlugin {
 	~EvoxPlugin() {
 		m_app.getPropertyGrid().removePlugin(m_property_grid_plugin);
 		m_app.removePlugin(m_variables_window);
+		m_app.removePlugin(m_symbols_popup);
 		m_app.removePlugin(m_debugger);
 		m_app.getAssetBrowser().removePlugin(m_asset_plugin);
 		m_app.getAssetCompiler().removePlugin(m_asset_plugin);
@@ -1453,6 +1756,8 @@ private:
 	EvoxAssetPlugin m_asset_plugin;
 	EvoxDebuggerWindow m_debugger;
 	EvoxVariablesWindow m_variables_window;
+	EvoxSymbolsPopup m_symbols_popup;
+	EvoxDataAddComponentPlugin m_add_data_plugin;
 	EvoxPropertyGridPlugin m_property_grid_plugin;
 	Action m_debugger_action{"Evox", "Debugger", "Evox Debugger", "evox_debugger", ICON_FA_BUG, Action::Type::TOOL};
 };

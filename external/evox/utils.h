@@ -75,19 +75,25 @@ struct OutputFormatter {
 
 	const SourceLocTable::Entry* resolve(const Token& token) const;
 	ex_string_view sourceName(const SourceLocTable::Entry* location) const;
+	void report(const Token& token, u32 length) const {
+		if (!host->diagnostic) return;
+		const SourceLocTable::Entry* loc = resolve(token);
+		if (!loc) return;
+		host->diagnostic(host->diagnostics_userdata, sourceName(loc), loc->line, loc->column, length);
+	}
 
 	template <typename... Args> void errorAt(const Token& token, Args&&... args) {
 		if (has_error) return;
 		has_error = true;
 
+		report(token, token.value.length > 0 ? (u32)token.value.length : 1);
 		const SourceLocTable::Entry* loc = resolve(token);
 		const ex_string_view source_name = sourceName(loc);
-		if (!empty(source_name)) {
-			print(source_name);
-			print(": ");
-		}
-		print("line ");
+		if (!empty(source_name)) print(source_name);
+		print(":");
 		print(loc ? (i32)loc->line : 0);
+		print(":");
+		print(loc ? (i32)loc->column : 0);
 		print(": ");
 		int dummy[] = {
 			(print(static_cast<Args&&>(args)), 0)...,

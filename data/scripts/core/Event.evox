@@ -5,10 +5,10 @@ import "core:vec2"
 extern struct Event {
 	type : EventType;
 	position : Vec2;
-	element_index : i32;
+	element_index : u32;
 	action : []const u8;
 	key_code : i32;
-	text_utf8 : i32;
+	text_utf8 : u32;
 	wheel_y : f32;
 }
 

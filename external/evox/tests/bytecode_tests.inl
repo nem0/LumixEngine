@@ -149,13 +149,13 @@ TEST(StructExtern) {
 
 	static int ptr;
 
-	auto create_fn = [](ex_runtime* runtime, ex_call_frame frame) -> void {
-		NativeEntity value = {42, &ptr};
-		memcpy(frame.result, &value, sizeof(value));
-	};
-
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("create"), create_fn) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
+		return [](ex_runtime*, ex_call_frame frame) {
+			NativeEntity value = {42, &ptr};
+			memcpy(frame.result, &value, sizeof(value));
+		};
+	}, nullptr) == EX_RESULT_OK);
 	EXPECT_TRUE(ex_call(runtime, toLs("main")));
 	u32 result_size = 0;
 	const u8* result = (const u8*)ex_call_result(runtime, &result_size);
@@ -275,11 +275,12 @@ TEST(ExternStructPaddedFieldAccessAndAssignment) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	auto read_native = [](ex_runtime*, ex_call_frame frame) -> void {
-		EX_ARG(frame, NativePadded, v);
-		EX_RESULT(frame, v.b);
-	};
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("read_native"), read_native) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
+		return [](ex_runtime*, ex_call_frame frame) {
+			EX_ARG(frame, NativePadded, v);
+			EX_RESULT(frame, v.b);
+		};
+	}, nullptr) == EX_RESULT_OK);
 
 	EXPECT_TRUE(ex_call(runtime, toLs("make")));
 	u32 result_size = 0;
@@ -393,21 +394,21 @@ TEST(NativeStructAbiVec3DVec3Quat) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
 
-	auto native_vec3 = [](ex_runtime*, ex_call_frame frame) {
-		EX_ARG(frame, NativeVec3, value);
-		EX_RESULT(frame, value);
-	};
-	auto native_dvec3 = [](ex_runtime*, ex_call_frame frame) {
-		EX_ARG(frame, NativeDVec3, value);
-		EX_RESULT(frame, value);
-	};
-	auto native_quat = [](ex_runtime*, ex_call_frame frame) {
-		EX_ARG(frame, NativeQuat, value);
-		EX_RESULT(frame, value);
-	};
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("native_vec3"), native_vec3) == EX_RESULT_OK);
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("native_dvec3"), native_dvec3) == EX_RESULT_OK);
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("native_quat"), native_quat) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc function, void*) -> ex_native_fn {
+		if (equalStrings(function.name, "native_vec3")) return [](ex_runtime*, ex_call_frame frame) {
+			EX_ARG(frame, NativeVec3, value);
+			EX_RESULT(frame, value);
+		};
+		if (equalStrings(function.name, "native_dvec3")) return [](ex_runtime*, ex_call_frame frame) {
+			EX_ARG(frame, NativeDVec3, value);
+			EX_RESULT(frame, value);
+		};
+		if (equalStrings(function.name, "native_quat")) return [](ex_runtime*, ex_call_frame frame) {
+			EX_ARG(frame, NativeQuat, value);
+			EX_RESULT(frame, value);
+		};
+		return nullptr;
+	}, nullptr) == EX_RESULT_OK);
 
 	EXPECT_TRUE(ex_call(runtime, toLs("vec3")));
 	NativeVec3 vec3_result{};
@@ -460,13 +461,13 @@ TEST(RawResultAccess) {
 
 	static int ptr;
 
-	auto create_fn = [](ex_runtime* runtime, ex_call_frame frame) -> void {
-		NativeEntity value = {42, &ptr};
-		memcpy(frame.result, &value, sizeof(value));
-	};
-
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("create"), create_fn) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
+		return [](ex_runtime*, ex_call_frame frame) {
+			NativeEntity value = {42, &ptr};
+			memcpy(frame.result, &value, sizeof(value));
+		};
+	}, nullptr) == EX_RESULT_OK);
 	EXPECT_TRUE(ex_call(runtime, toLs("main")));
 
 	u32 size = 0;
@@ -506,18 +507,17 @@ TEST(Extern) {
 
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	auto nativefn = [](ex_runtime* runtime, ex_call_frame frame) -> void {
-		EX_RESULT(frame, i32(41));
-	};
-
-	auto nativefn2 = [](ex_runtime* runtime, ex_call_frame frame) -> void {
-		EX_ARG(frame, i32, v); v += 1;
-		EX_RESULT(frame, v);
-	};
-
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("nativefn"), nativefn) == EX_RESULT_OK);
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("nativefn2"), nativefn2) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc function, void*) -> ex_native_fn {
+		if (equalStrings(function.name, "nativefn")) return [](ex_runtime*, ex_call_frame frame) {
+			EX_RESULT(frame, i32(41));
+		};
+		if (equalStrings(function.name, "nativefn2")) return [](ex_runtime*, ex_call_frame frame) {
+			EX_ARG(frame, i32, v); v += 1;
+			EX_RESULT(frame, v);
+		};
+		return nullptr;
+	}, nullptr) == EX_RESULT_OK);
 	EXPECT_TRUE(ex_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_to_i32(runtime, -1));
 	CAPI_END(module);
@@ -547,15 +547,14 @@ TEST(NativeTypeArgumentsAreComparable) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	auto same_type = [](ex_runtime* runtime, ex_call_frame frame) -> void {
-		(void)runtime;
-		EX_ARG(frame, u32, first);
-		EX_ARG(frame, u32, second);
-		EX_RESULT(frame, first == second);
-	};
-
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("sameType"), same_type) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
+		return [](ex_runtime*, ex_call_frame frame) {
+			EX_ARG(frame, u32, first);
+			EX_ARG(frame, u32, second);
+			EX_RESULT(frame, first == second);
+		};
+	}, nullptr) == EX_RESULT_OK);
 	EXPECT_TRUE(ex_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_to_i32(runtime, -1));
 	CAPI_END(module);
@@ -595,16 +594,15 @@ TEST(NativeStringArgument) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	auto inspect = [](ex_runtime* runtime, ex_call_frame frame) -> void {
-		(void)runtime;
-		EX_STRING_ARG(frame, text);
-		EX_ARG(frame, i32, value);
-		const bool matches = text.length == 6 && memcmp(text.begin, "testor", 6) == 0;
-		EX_RESULT(frame, i32(matches && value == 42 ? 1 : 0));
-	};
-
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("inspect"), inspect) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
+		return [](ex_runtime*, ex_call_frame frame) {
+			EX_STRING_ARG(frame, text);
+			EX_ARG(frame, i32, value);
+			const bool matches = text.length == 6 && memcmp(text.begin, "testor", 6) == 0;
+			EX_RESULT(frame, i32(matches && value == 42 ? 1 : 0));
+		};
+	}, nullptr) == EX_RESULT_OK);
 	EXPECT_TRUE(ex_call(runtime, toLs("main")));
 	EXPECT_EQ(1, ex_to_i32(runtime, -1));
 	CAPI_END(module);
@@ -623,17 +621,16 @@ TEST(NativeTwoStringArguments) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	auto inspect = [](ex_runtime* runtime, ex_call_frame frame) -> void {
-		(void)runtime;
-		EX_STRING_ARG(frame, first);
-		EX_STRING_ARG(frame, second);
-		const bool first_matches = first.length == 5 && memcmp(first.begin, "first", 5) == 0;
-		const bool second_matches = second.length == 6 && memcmp(second.begin, "second", 6) == 0;
-		EX_RESULT(frame, i32(first_matches && second_matches ? 1 : 0));
-	};
-
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("inspect"), inspect) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
+		return [](ex_runtime*, ex_call_frame frame) {
+			EX_STRING_ARG(frame, first);
+			EX_STRING_ARG(frame, second);
+			const bool first_matches = first.length == 5 && memcmp(first.begin, "first", 5) == 0;
+			const bool second_matches = second.length == 6 && memcmp(second.begin, "second", 6) == 0;
+			EX_RESULT(frame, i32(first_matches && second_matches ? 1 : 0));
+		};
+	}, nullptr) == EX_RESULT_OK);
 	EXPECT_TRUE(ex_call(runtime, toLs("main")));
 	EXPECT_EQ(1, ex_to_i32(runtime, -1));
 	CAPI_END(module);
@@ -655,14 +652,14 @@ TEST(NativeStringResult) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
-	auto get_text = [](ex_runtime* runtime, ex_call_frame frame) -> void {
-		char temporary[] = "native result";
-		ex_result_string(runtime, &frame, ex_string_view{temporary, sizeof(temporary) - 1});
-		memset(temporary, 0, sizeof(temporary));
-	};
-
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("getText"), get_text) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
+		return [](ex_runtime* runtime, ex_call_frame frame) {
+			char temporary[] = "native result";
+			ex_result_string(runtime, &frame, ex_string_view{temporary, sizeof(temporary) - 1});
+			memset(temporary, 0, sizeof(temporary));
+		};
+	}, nullptr) == EX_RESULT_OK);
 	EXPECT_TRUE(ex_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_to_i32(runtime, -1));
 	CAPI_END(module);

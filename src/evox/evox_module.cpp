@@ -67,25 +67,13 @@ static bool isSerializableType(const ex_type& type) {
 	}
 }
 
-static void bindCoreFunctions(ex_module* module, ex_runtime* runtime, IAllocator& allocator) {
-	HashMap<NativeFunctionKey, ex_native_fn, NativeFunctionKeyHash> functions(allocator);
-	Lumix::Evox::gatherCoreFunctions(functions);
-	for (i32 unit_index = 0, unit_count = ex_module_get_unit_count(module); unit_index < unit_count; ++unit_index) {
-		ex_unit* unit = ex_module_get_unit(module, unit_index);
-		const ex_string_view path = ex_unit_get_path(unit);
-		const StringView unit_path(path.begin, path.length);
-		if (unit_path == "std:math" || unit_path == "std:mem") continue;
-		for (i32 function_index = 0, function_count = ex_unit_get_native_function_count(unit); function_index < function_count; ++function_index) {
-			const ex_string_view name = ex_unit_get_native_function_name(unit, function_index);
-			const NativeFunctionKey key{unit_path, {name.begin, (u64)name.length}};
-			auto iter = functions.find(key);
-			if (!iter.isValid()) {
-				logError("Evox : failed to bind native function ", key.unit_path, ".", key.name);
-				continue;
-			}
-			ex_runtime_set_native_function_callback(runtime, unit, function_index, iter.value());
-		}
-	}
+static ex_native_fn resolveCoreFunction(ex_runtime*, ex_native_function_desc function, void* userdata) {
+	auto& functions = *(HashMap<NativeFunctionKey, ex_native_fn, NativeFunctionKeyHash>*)userdata;
+	const NativeFunctionKey key{fromEvox(function.unit_path), fromEvox(function.name)};
+	auto iter = functions.find(key);
+	if (iter.isValid()) return iter.value();
+	logError("Evox : failed to resolve native function ", key.unit_path, ".", key.name);
+	return nullptr;
 }
 
 
@@ -144,6 +132,7 @@ struct EvoxSystemImpl : EvoxSystem {
 	bool isReady() const override { return m_is_ready; }
 	Span<const ex_type*> getEvoxDataTypes() const override { return m_data_types; }
 	ex_runtime* getDebugRuntime() override { return m_runtime; }
+	ex_module* getDebugModule() override { return m_module; }
 	const Path& getDebugPath() const override { return m_path; }
 
 	ex_string_view debugSourceName(const Path& source) {
@@ -265,8 +254,7 @@ struct EvoxSystemImpl : EvoxSystem {
 	bool createRuntime() {
 		m_runtime = ex_runtime_create(m_bytecode, &m_host);
 		if (!m_runtime) return false;
-		bindCoreFunctions(m_module, m_runtime, m_allocator);
-		return true;
+		return ex_runtime_set_native_resolver(m_runtime, &resolveCoreFunction, &m_native_functions) == EX_RESULT_OK;
 	}
 
 	bool compileAndRun() {
@@ -315,6 +303,7 @@ struct EvoxSystemImpl : EvoxSystem {
 	ex_module* m_module = nullptr;
 	ex_bytecode* m_bytecode = nullptr;
 	ex_runtime* m_runtime = nullptr;
+	HashMap<NativeFunctionKey, ex_native_fn, NativeFunctionKeyHash> m_native_functions;
 	Array<const ex_type*> m_data_types;
 	Array<EvoxModule*> m_modules;
 	bool m_resource_ready = false;
@@ -533,7 +522,7 @@ struct EvoxModuleImpl : EvoxModule {
 		for (u32 i = 0; i < component_count; ++i) {
 			const EntityRef source_entity = in.read<EntityRef>();
 			const EntityRef mapped = entity_map.get(source_entity);
-			createEvox((EntityRef)mapped);
+			createEvox(mapped);
 		}
 
 		const u32 num_types = in.read<u32>();
@@ -648,6 +637,7 @@ struct EvoxModuleImpl : EvoxModule {
 		return iter.isValid() && findDataRef(iter.value(), type) >= 0;
 	}
 	ex_runtime* getDebugRuntime() override { return m_system.getDebugRuntime(); }
+	ex_module* getDebugModule() override { return m_system.getDebugModule(); }
 	const Path& getDebugPath() const override { return m_system.getDebugPath(); }
 	bool setDebugBreakpoint(const Path& source, u32 line) override { return m_system.setDebugBreakpoint(source, line); }
 	bool removeDebugBreakpoint(const Path& source, u32 line) override { return m_system.removeDebugBreakpoint(source, line); }
@@ -962,10 +952,12 @@ EvoxSystemImpl::EvoxSystemImpl(Engine& engine)
 	, m_allocator(engine.getAllocator(), "evox")
 	, m_evox_resource_manager(m_allocator)
 	, m_path("scripts/main.evox")
+	, m_native_functions(m_allocator)
 	, m_data_types(m_allocator)
 	, m_modules(m_allocator)
 {
-	m_host.arena = {};
+	m_host = {};
+	Evox::gatherCoreFunctions(m_native_functions);
 	EvoxModuleImpl::reflect();
 	m_evox_resource_manager.create(EvoxResource::TYPE, m_engine.getResourceManager());
 }

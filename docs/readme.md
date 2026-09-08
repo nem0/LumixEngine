@@ -20,7 +20,8 @@
 * [Editor plugin](lua/editor_plugin.md)
 
 # Evox
-* [Language](../external/evox/reference.md)
+* [Evox overview](evox.md)
+* [Language reference](../external/evox/reference.md)
 
 # Ingame UI
 * [Text-based markup](ui/markup.md)

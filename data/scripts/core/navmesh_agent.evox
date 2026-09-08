@@ -11,11 +11,11 @@ extern fn navigate(entity : Agent, dest : DVec3, speed : f32, stop_distance : f3
 extern fn isFinished(entity : Agent) : bool;
 extern fn cancelNavigation(entity : Agent) : void;
 extern fn drawPath(agent_entity : Agent, include_polygons : bool) : void;
-extern fn getAgentRadius(entity : Agent) : f32;
-extern fn setAgentRadius(entity : Agent, radius : f32) : void;
-extern fn getAgentHeight(entity : Agent) : f32;
-extern fn setAgentHeight(entity : Agent, height : f32) : void;
-extern fn getAgentMoveEntity(entity : Agent) : bool;
-extern fn setAgentMoveEntity(entity : Agent, value : bool) : void;
-extern fn getAgentSpeed(entity : Agent) : f32;
+extern fn getRadius(entity : Agent) : f32;
+extern fn setRadius(entity : Agent, radius : f32) : void;
+extern fn getHeight(entity : Agent) : f32;
+extern fn setHeight(entity : Agent, height : f32) : void;
+extern fn getMoveEntity(entity : Agent) : bool;
+extern fn setMoveEntity(entity : Agent, value : bool) : void;
+extern fn getSpeed(entity : Agent) : f32;
 

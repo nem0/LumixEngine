@@ -6,6 +6,6 @@ struct ProceduralGeometry { entity : i32; module : cptr; }
 
 extern fn procedural_geom(e : Entity) : ?ProceduralGeometry;
 extern fn createProceduralGeometry(e : Entity) : ?ProceduralGeometry;
-extern fn getProceduralGeometryMaterial(entity : ProceduralGeometry) : []const u8;
-extern fn setProceduralGeometryMaterial(entity : ProceduralGeometry, path : []const u8) : void;
+extern fn getMaterial(entity : ProceduralGeometry) : []const u8;
+extern fn setMaterial(entity : ProceduralGeometry, path : []const u8) : void;
 

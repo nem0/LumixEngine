@@ -896,13 +896,14 @@ TEST(DebugAbortRestoresOuterCallAfterNativeReentry) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	auto bridge = [](ex_runtime* runtime, ex_call_frame frame) {
-		EX_ARG(frame, i32, value);
-		ex_push_i32(runtime, value);
-		if (ex_call(runtime, toLs("helper")) != EX_RESULT_OK) return;
-		EX_RESULT(frame, ex_to_i32(runtime, -1));
-	};
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("bridge"), bridge) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
+		return [](ex_runtime* runtime, ex_call_frame frame) {
+			EX_ARG(frame, i32, value);
+			ex_push_i32(runtime, value);
+			if (ex_call(runtime, toLs("helper")) != EX_RESULT_OK) return;
+			EX_RESULT(frame, ex_to_i32(runtime, -1));
+		};
+	}, nullptr) == EX_RESULT_OK);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 9u, nullptr));
 	ex_push_i32(runtime, 41);

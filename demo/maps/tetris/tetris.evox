@@ -44,8 +44,8 @@ fn createCubeAt(cx : i32, cy : i32) : Entity {
 	const entity = createEntity(game_world);
 	setPosition(entity, worldPosFromCell(cx, cy));
 	const model = createModelInstance(entity);
-	if model != null {
-		setModelInstancePath(model, "engine/models/cube.fbx");
+	if const m = model {
+		setPath(m, "engine/models/cube.fbx");
 	}
 	return entity;
 }
@@ -125,14 +125,14 @@ fn clearLines() : void {
 		if full {
 			for x in 0..GRID_W {
 				const entity = grid[x][y];
-				if entity != null { destroy(entity); }
+				if const e = entity { destroy(e); }
 			}
 			for yy in y..(GRID_H - 1) {
 				for x in 0..GRID_W {
 					grid[x][yy] = grid[x][yy + 1];
 					const entity = grid[x][yy];
-					if entity != null {
-						setPosition(entity, worldPosFromCell(x + 1, yy + 1));
+					if const e = entity {
+						setPosition(e, worldPosFromCell(x + 1, yy + 1));
 					}
 				}
 			}

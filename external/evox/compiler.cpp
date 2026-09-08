@@ -907,17 +907,15 @@ struct Checker {
 
 	template <typename... Args> void errorLine(Token token, Args&&... args) {
 		if (suppress_errors != 0) return;
+		error_stream.report(token, token.value.length > 0 ? (u32)token.value.length : 1);
 		const SourceLocTable::Entry* loc = error_stream.resolve(token);
 		const ex_string_view source_name = error_stream.sourceName(loc);
-		if (!empty(source_name)) {
-			error_stream.print(source_name);
-			error_stream.print(": ");
-		}
-		if (loc && loc->line > 0) {
-			error_stream.print("line ");
-			error_stream.print(loc->line);
-			error_stream.print(": ");
-		}
+		if (!empty(source_name)) error_stream.print(source_name);
+		error_stream.print(":");
+		error_stream.print(loc ? loc->line : 0);
+		error_stream.print(":");
+		error_stream.print(loc ? loc->column : 0);
+		error_stream.print(": ");
 		int dummy[] = {(error(static_cast<Args&&>(args)), 0)...};
 		(void)dummy;
 		error("\n");

@@ -108,6 +108,12 @@ static void evoxc_native_print(ex_runtime* runtime, ex_call_frame frame) {
 	putchar('\n');
 }
 
+static ex_native_fn evoxc_native_resolver(ex_runtime* runtime, ex_native_function_desc function, void* userdata) {
+	(void)runtime;
+	(void)userdata;
+	return equalStrings(function.name, "print") ? &evoxc_native_print : NULL;
+}
+
 static const char* evoxc_type_name(ex_type_kind kind) {
 	switch (kind) {
 		case EX_TYPE_VOID: return "void";
@@ -754,13 +760,9 @@ int main(int argc, char** argv) {
 		goto cleanup;
 	}
 
-	int native_print = -1;
-	ex_unit* native_print_unit = evoxc_find_native_function(ctx.module, "print", &native_print);
-	if (native_print_unit) {
-		if (!ex_runtime_set_native_function_callback(ctx.runtime, native_print_unit, native_print, &evoxc_native_print)) {
-			fprintf(stderr, "Error: Failed to bind native print\n");
-			goto cleanup;
-		}
+	if (!ex_runtime_set_native_resolver(ctx.runtime, &evoxc_native_resolver, NULL)) {
+		fprintf(stderr, "Error: Failed to install native resolver\n");
+		goto cleanup;
 	}
 
 	const int first_call_arg = script_arg + 2;

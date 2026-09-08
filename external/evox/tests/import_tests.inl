@@ -915,15 +915,15 @@ TEST(ExternImport) {
 	ex_bytecode* bytecode = ex_bytecode_compile(module, &diagnostics.host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
-	auto sumfn = [](ex_runtime* runtime, ex_call_frame frame) -> void {
-		EX_ARG(frame, i32, a);
-		EX_ARG(frame, i32, b);
-		EX_RESULT(frame, a + b);
-	};
-
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("math.sum"), sumfn) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
+		return [](ex_runtime*, ex_call_frame frame) {
+			EX_ARG(frame, i32, a);
+			EX_ARG(frame, i32, b);
+			EX_RESULT(frame, a + b);
+		};
+	}, nullptr) == EX_RESULT_OK);
 
 	EXPECT_TRUE(ex_call(runtime, toLs("main")));
 	EXPECT_EQ(63, ex_to_i32(runtime, -1));
@@ -1109,9 +1109,7 @@ TEST(AliasedImportRuntime) {
 	return true;
 }
 
-// Two imports each contribute one extern fn. The flat native-function index must
-// account for all units, so lib_b's fn is at index 1, not 0. If findNativeFunction
-// (CanonicalName) forgets to count previous units, the wrong callback fires.
+// Two imports each contribute one extern fn after the root unit's main function.
 TEST(ExternFnSecondImportCorrectIndex) {
 	const char* main_source = R"(
 		import "lib_a" as a
@@ -1143,14 +1141,21 @@ TEST(ExternFnSecondImportCorrectIndex) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("lib_a.add"), [](ex_runtime* rt, ex_call_frame frame) {
-		EX_ARG(frame, i32, a); EX_ARG(frame, i32, b);
-		EX_RESULT(frame, a + b);
-	}) == EX_RESULT_OK);
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("lib_b.mul"), [](ex_runtime* rt, ex_call_frame frame) {
-		EX_ARG(frame, i32, a); EX_ARG(frame, i32, b);
-		EX_RESULT(frame, a * b);
-	}) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc function, void*) -> ex_native_fn {
+		if (equalStrings(function.unit_path, "lib_a") && equalStrings(function.name, "add")) {
+			return [](ex_runtime*, ex_call_frame frame) {
+				EX_ARG(frame, i32, a); EX_ARG(frame, i32, b);
+				EX_RESULT(frame, a + b);
+			};
+		}
+		if (equalStrings(function.unit_path, "lib_b") && equalStrings(function.name, "mul")) {
+			return [](ex_runtime*, ex_call_frame frame) {
+				EX_ARG(frame, i32, a); EX_ARG(frame, i32, b);
+				EX_RESULT(frame, a * b);
+			};
+		}
+		return nullptr;
+	}, nullptr) == EX_RESULT_OK);
 
 	EXPECT_TRUE(ex_call(runtime, toLs("main")));
 	EXPECT_EQ(21, ex_to_i32(runtime, -1)); // 3 * 7 = 21, not 3 + 7 = 10

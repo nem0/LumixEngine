@@ -137,13 +137,13 @@ TEST(StringLiteralImplicitlyConvertsToCStr) {
 
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
-	auto inspect = [](ex_runtime* runtime, ex_call_frame frame) -> void {
-		(void)runtime;
-		EX_ARG(frame, const char*, text);
-		EX_RESULT(frame, i32(text && strcmp(text, "native cstr") == 0 ? 42 : 0));
-	};
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("inspect"), inspect) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
+		return [](ex_runtime*, ex_call_frame frame) {
+			EX_ARG(frame, const char*, text);
+			EX_RESULT(frame, i32(text && strcmp(text, "native cstr") == 0 ? 42 : 0));
+		};
+	}, nullptr) == EX_RESULT_OK);
 	EXPECT_TRUE(ex_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_to_i32(runtime, -1));
 	CAPI_END(module);

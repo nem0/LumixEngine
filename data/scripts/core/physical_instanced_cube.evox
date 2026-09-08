@@ -7,8 +7,8 @@ struct InstancedCube { entity : i32; module : cptr; }
 
 extern fn physical_instanced_cube(e : Entity) : ?InstancedCube;
 extern fn createInstancedCube(e : Entity) : ?InstancedCube;
-extern fn getInstancedCubeHalfExtents(entity : InstancedCube) : Vec3;
-extern fn setInstancedCubeHalfExtents(entity : InstancedCube, half_extents : Vec3) : void;
-extern fn getInstancedCubeLayer(entity : InstancedCube) : i32;
-extern fn setInstancedCubeLayer(entity : InstancedCube, layer : i32) : void;
+extern fn getHalfExtents(entity : InstancedCube) : Vec3;
+extern fn setHalfExtents(entity : InstancedCube, half_extents : Vec3) : void;
+extern fn getLayer(entity : InstancedCube) : u32;
+extern fn setLayer(entity : InstancedCube, layer : u32) : void;
 

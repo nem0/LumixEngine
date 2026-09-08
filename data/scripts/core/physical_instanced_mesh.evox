@@ -6,8 +6,8 @@ struct InstancedMesh { entity : i32; module : cptr; }
 
 extern fn physical_instanced_mesh(e : Entity) : ?InstancedMesh;
 extern fn createInstancedMesh(e : Entity) : ?InstancedMesh;
-extern fn getInstancedMeshLayer(entity : InstancedMesh) : i32;
-extern fn setInstancedMeshLayer(entity : InstancedMesh, layer : i32) : void;
-extern fn getInstancedMeshGeomPath(entity : InstancedMesh) : []const u8;
-extern fn setInstancedMeshGeomPath(entity : InstancedMesh, path : []const u8) : void;
+extern fn getLayer(entity : InstancedMesh) : u32;
+extern fn setLayer(entity : InstancedMesh, layer : u32) : void;
+extern fn getGeomPath(entity : InstancedMesh) : []const u8;
+extern fn setGeomPath(entity : InstancedMesh, path : []const u8) : void;
 

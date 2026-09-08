@@ -124,8 +124,9 @@ inline bool isOperatorSymbol(ex_string_view name) {
 }
 
 struct Unit {
-	Unit(ex_string_view path, ex_arena& module_arena)
-		: arena(module_arena)
+	Unit(ex_string_view path, ex_arena& module_arena, ex_module* owner)
+		: module(owner)
+		, arena(module_arena)
 		, symbols(module_arena)
 		, types(module_arena)
 		, imports(module_arena)
@@ -135,6 +136,7 @@ struct Unit {
 	enum ImportState { IMPORT_PENDING, IMPORT_RESOLVING, IMPORT_DONE };
 	ImportState import_state = IMPORT_PENDING;
 
+	ex_module* module;
 	ex_string_view path;
 	ex_arena& arena;
 

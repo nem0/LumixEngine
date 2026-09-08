@@ -482,6 +482,72 @@ TEST(BytecodeGlobalFunctionVariable) {
 	return true;
 }
 
+struct LazyNativeResolverState {
+	int calls = 0;
+	bool return_callback = true;
+};
+
+static void lazyNativeValue(ex_runtime*, ex_call_frame frame) {
+	EX_RESULT(frame, 42);
+}
+
+static ex_native_fn lazyNativeResolver(ex_runtime*, ex_native_function_desc function, void* userdata) {
+	LazyNativeResolverState* state = (LazyNativeResolverState*)userdata;
+	++state->calls;
+	if (!state->return_callback) return nullptr;
+	if (!equalStrings(function.unit_path, "testLazyNativeResolver") || !equalStrings(function.name, "lazy_value")) return nullptr;
+	return &lazyNativeValue;
+}
+
+TEST(LazyNativeResolverBindsOnFirstUse) {
+	const char* source = R"(
+		extern fn unused() : i32;
+		extern fn lazy_value() : i32;
+
+		fn main() : i32 {
+			return lazy_value() + lazy_value();
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView("testLazyNativeResolver"), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	LazyNativeResolverState state;
+	EXPECT_EQ(EX_RESULT_OK, ex_runtime_set_native_resolver(runtime, &lazyNativeResolver, &state));
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(84, ex_to_i32(runtime, -1));
+	EXPECT_EQ(1, state.calls);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(LazyNativeResolverRetriesMissingFunction) {
+	const char* source = R"(
+		extern fn lazy_value() : i32;
+		fn main() : i32 { return lazy_value(); }
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView("testLazyNativeResolver"), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	LazyNativeResolverState state;
+	state.return_callback = false;
+	EXPECT_EQ(EX_RESULT_OK, ex_runtime_set_native_resolver(runtime, &lazyNativeResolver, &state));
+	test_diagnostics.output_enabled = false;
+	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(runtime, toLs("main")));
+	// Runtime errors suspend the runtime; abandon that failed call before
+	// trying the resolver again.
+	ex_debug_resume(runtime, EX_DEBUG_ABORT);
+	state.return_callback = true;
+	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_EQ(2, state.calls);
+	CAPI_END(module);
+	return true;
+}
+
 TEST(testNativeFunctionCall) {
 	const char* source = R"(
 		extern fn native_add(a : i32, b : i32) : i32;
@@ -496,7 +562,9 @@ TEST(testNativeFunctionCall) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("native_add"), &nativeAddC) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
+		return &nativeAddC;
+	}, nullptr) == EX_RESULT_OK);
 	EXPECT_TRUE(ex_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_to_i32(runtime, -1));
 	CAPI_END(module);
@@ -520,13 +588,14 @@ TEST(ScriptNativeScriptReentry) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	auto bridge = [](ex_runtime* runtime, ex_call_frame frame) {
-		EX_ARG(frame, i32, value);
-		ex_push_i32(runtime, value);
-		if (ex_call(runtime, toLs("helper")) != EX_RESULT_OK) return;
-		EX_RESULT(frame, ex_to_i32(runtime, -1));
-	};
-	EXPECT_TRUE(setNativeFunctionCallback(runtime, module, toLs("bridge"), bridge) == EX_RESULT_OK);
+	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
+		return [](ex_runtime* runtime, ex_call_frame frame) {
+			EX_ARG(frame, i32, value);
+			ex_push_i32(runtime, value);
+			if (ex_call(runtime, toLs("helper")) != EX_RESULT_OK) return;
+			EX_RESULT(frame, ex_to_i32(runtime, -1));
+		};
+	}, nullptr) == EX_RESULT_OK);
 	EXPECT_TRUE(ex_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_to_i32(runtime, -1));
 	CAPI_END(module);

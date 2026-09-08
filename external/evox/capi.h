@@ -121,6 +121,7 @@ typedef enum ex_result {
 
 // Native print callback used by `ex_host`.
 typedef void (*ex_print_fn)(void* userdata, ex_string_view msg);
+typedef void (*ex_diagnostic_fn)(void* userdata, ex_string_view source_name, u32 line, u32 column, u32 length);
 
 // Import resolver used by `ex_module_compile`.
 //
@@ -160,12 +161,29 @@ void ex_result_string(ex_runtime* runtime, ex_call_frame* frame, ex_string_view 
 	(frame).result += sizeof(_ls_val); \
 } while(0)
 
-// Native function callback used by `ex_runtime_set_native_function_callback`.
+// Native function callback used by the lazy native resolver.
 // Slice arguments and results in `frame` use the `ex_slice` representation
 // above and occupy sizeof(ex_slice) bytes. Use EX_ARG/EX_RESULT with ex_slice
 // to read or write them; the element type and element size come from the
 // declared script signature.
 typedef void (*ex_native_fn)(ex_runtime* runtime, ex_call_frame frame);
+
+// Resolves an extern function the first time it is called. The returned
+// callback is cached in the runtime; returning NULL leaves the function
+// unresolved and causes that call to fail.
+typedef struct ex_native_function_desc {
+	ex_string_view unit_path;
+	ex_string_view name;
+	int bytecode_index;
+	u32 param_size;
+	u32 return_size;
+} ex_native_function_desc;
+
+typedef ex_native_fn (*ex_native_resolver_fn)(
+	ex_runtime* runtime,
+	ex_native_function_desc function,
+	void* userdata
+);
 
 typedef struct ex_arena {
 	void* (*allocate)(void* user_data, size_t size, size_t align);
@@ -183,6 +201,7 @@ typedef struct ex_host {
 
 	void* diagnostics_userdata;
 	ex_print_fn print;
+	ex_diagnostic_fn diagnostic;
 } ex_host;
 
 // Opaque module/runtime handles.
@@ -239,6 +258,8 @@ typedef enum ex_symbol_kind {
 typedef struct ex_symbol_desc {
 	ex_symbol_kind kind;
 	ex_string_view name;
+	u32 line;
+	u32 column;
 } ex_symbol_desc;
 
 int ex_unit_get_symbols_count(ex_unit* unit);
@@ -302,11 +323,13 @@ const ex_type* ex_bytecode_type(const ex_bytecode* bytecode, u32 index);
 ex_runtime* ex_runtime_create(ex_bytecode* bytecode, ex_host* host);
 void ex_runtime_destroy(ex_runtime* runtime);
 
-ex_result ex_runtime_set_native_function_callback(
+// TODO: Accept the resolver during ex_runtime_create and remove this setter.
+// Installs a runtime-local lazy resolver for extern functions. A returned
+// callback is cached; unresolved functions are retried on later calls.
+ex_result ex_runtime_set_native_resolver(
 	ex_runtime* runtime,
-	ex_unit* unit,
-	int function_index,
-	ex_native_fn callback
+	ex_native_resolver_fn resolver,
+	void* userdata
 );
 
 void ex_push_bool(ex_runtime* runtime, int value);

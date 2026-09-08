@@ -352,8 +352,21 @@ static __forceinline bool runtime_enter_script_call(
 
 static __forceinline bool runtime_invoke_native(ex_runtime* runtime, u32 function_index, const ex_function_bc* function, u8* args, u8** result_stack_top) {
 	if (function_index >= runtime->native_callback_count) return false; // TODO can this even happen?
-	const ex_native_fn callback = runtime->native_callbacks[function_index];
-	if (!callback) return false; // TODO should we even allow script to execute if some natives are missing?
+	ex_native_fn callback = runtime->native_callbacks[function_index];
+	if (!callback) {
+		if (!runtime->native_resolver) return false;
+
+		const ex_native_function_desc desc = {
+			function->unit_path,
+			function->name,
+			(int)function_index,
+			function->param_size,
+			function->return_size
+		};
+		callback = runtime->native_resolver(runtime, desc, runtime->native_resolver_userdata);
+		runtime->native_callbacks[function_index] = callback;
+		if (!callback) return false;
+	}
 
 	u8* stack_top = args + function->return_size;
 	if (stack_top > runtime->stack_end) return false;
@@ -1477,6 +1490,7 @@ ex_runtime* ex_runtime_create(ex_bytecode* bytecode, ex_host* host) {
 	if (bytecode->function_count > 0u) {
 		runtime->native_callbacks = (ex_native_fn*)calloc((size_t)bytecode->function_count, sizeof(ex_native_fn));
 		if (!runtime->native_callbacks) {
+			free(runtime->native_callbacks);
 			free(runtime->stack);
 			free(runtime);
 			return NULL;
@@ -1507,10 +1521,10 @@ void ex_runtime_destroy(ex_runtime* runtime) {
 	free(runtime);
 }
 
-ex_result ex_runtime_set_native_function_callback_by_bytecode_index(ex_runtime* runtime, int bytecode_index, ex_native_fn callback) {
-	if (!runtime || bytecode_index < 0 || (u32)bytecode_index >= runtime->bytecode->function_count) return EX_RESULT_FAILURE;
-	if (runtime->bytecode->functions[bytecode_index].kind != EX_FUNCTION_NATIVE) return EX_RESULT_FAILURE;
-	runtime->native_callbacks[bytecode_index] = callback;
+ex_result ex_runtime_set_native_resolver(ex_runtime* runtime, ex_native_resolver_fn resolver, void* userdata) {
+	if (!runtime) return EX_RESULT_FAILURE;
+	runtime->native_resolver = resolver;
+	runtime->native_resolver_userdata = userdata;
 	return EX_RESULT_OK;
 }
 

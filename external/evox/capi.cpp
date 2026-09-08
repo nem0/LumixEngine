@@ -381,13 +381,6 @@ ex_result ex_module_definition_at(ex_module* module, ex_string_view source_name,
 	return EX_RESULT_FAILURE;
 }
 
-ex_result ex_runtime_set_native_function_callback(ex_runtime* runtime, ex_unit* unit, int function_index, ex_native_fn callback) {
-	Unit* impl = (Unit*)unit;
-	if (!impl || function_index < 0 || function_index >= impl->native_symbols.size()) return EX_RESULT_FAILURE;
-	FunctionExpression* fn = static_cast<FunctionExpression*>(impl->native_symbols[function_index]->expression);
-	return ex_runtime_set_native_function_callback_by_bytecode_index(runtime, (int)fn->bytecode_index, callback);
-}
-
 int ex_module_get_function_count(ex_module* module) {
 	if (!module) return 0;
 	i32 count = 0;
@@ -405,11 +398,16 @@ int ex_unit_get_symbols_count(ex_unit* unit) {
 }
 
 ex_symbol_desc ex_unit_get_symbol(ex_unit* unit, int index) {
-	ex_symbol_desc desc = { EX_SYM_KIND_INVALID };
+	ex_symbol_desc desc = { EX_SYM_KIND_INVALID, {}, 0, 0 };
 	if (!unit) return desc;
 	const Symbol& sym = ((Unit*)unit)->symbols[index];
 	desc.kind = sym.kind;
 	desc.name = sym.name;
+	if (sym.token.src_loc != EX_INVALID_SOURCE_LOC && sym.token.src_loc < (u32)((Unit*)unit)->module->src_locs.entries.size()) {
+		const SourceLocTable::Entry& loc = ((Unit*)unit)->module->src_locs.entries[(i32)sym.token.src_loc];
+		desc.line = loc.line;
+		desc.column = loc.column;
+	}
 	return desc;
 }
 

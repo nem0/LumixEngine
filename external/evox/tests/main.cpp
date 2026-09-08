@@ -210,23 +210,6 @@ static int resolveEvoxImportC(void* userdata, ex_string_view path, ex_string_vie
 	return 0;
 }
 
-static ex_result setNativeFunctionCallback(ex_runtime* runtime, ex_module* module, ex_string_view name, ex_native_fn callback) {
-	for (int unit_index = 0, unit_count = ex_module_get_unit_count(module); unit_index < unit_count; ++unit_index) {
-		ex_unit* unit = ex_module_get_unit(module, unit_index);
-		const ex_string_view path = ex_unit_get_path(unit);
-		for (int function_index = 0, function_count = ex_unit_get_native_function_count(unit); function_index < function_count; ++function_index) {
-			const ex_string_view function_name = ex_unit_get_native_function_name(unit, function_index);
-			if (equalStrings(name, function_name)) return ex_runtime_set_native_function_callback(runtime, unit, function_index, callback);
-			if (size(name) != size(path) + 1u + size(function_name)) continue;
-			if (compareMemory(data(name), data(path), size(path)) != 0) continue;
-			if (data(name)[size(path)] != '.') continue;
-			if (compareMemory(data(name) + size(path) + 1u, data(function_name), size(function_name)) != 0) continue;
-			return ex_runtime_set_native_function_callback(runtime, unit, function_index, callback);
-		}
-	}
-	return EX_RESULT_FAILURE;
-}
-
 static void nativeAddC(ex_runtime* runtime, ex_call_frame frame) {
 	EX_ARG(frame, i32, a);
 	EX_ARG(frame, i32, b);

@@ -1944,7 +1944,7 @@ ex_result ex_module_parse(ex_module* module, ex_string_view source, ex_string_vi
 		copyMemory(owned_source, source.begin, (u32)source.length);
 	}
 	ex_string_view owned{owned_source, source.length};
-	Unit& unit = module->units.emplace_back(path, module->arena);
+	Unit& unit = module->units.emplace_back(path, module->arena, module);
 	Parser parser(unit, module->host, *module);
 	if (parser.parse(owned, (u32)module->units.size() - 1) == EX_RESULT_FAILURE) return EX_RESULT_FAILURE;
 

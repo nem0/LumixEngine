@@ -152,15 +152,15 @@ fn spawnNavAgent() : void {
 		return;
 	}
 	var mi = created_model else return;
-	mi.setModelInstancePath("models/ybot/ybot.fbx");
+	mi.setPath("models/ybot/ybot.fbx");
 	const created_animator = agent.createAnimator();
 	if created_animator == null {
 		g_world.destroyEntity(agent);
 		return;
 	}
 	var anim = created_animator else return;
-	anim.setAnimatorUseRootMotion(false);
-	anim.setAnimatorSource("models/ybot/ybot.act");
+	anim.setUseRootMotion(false);
+	anim.setSource("models/ybot/ybot.act");
 
 	// TODO g_nav_agents.push(agent);
 	array.push(&g_nav_agents, agent);
@@ -197,7 +197,7 @@ fn update(td : f32, input : InputSystem) : void {
 			if const anim = entity.animator() {
 				const speed_input = anim.getInputIndex("speed_y");
 				if speed_input >= 0 {
-					anim.setFloatInput(speed_input, agent.getAgentSpeed());
+					anim.setFloatInput(speed_input, agent.getSpeed());
 				}
 			}
 		}

@@ -387,6 +387,7 @@ typedef struct ex_bytecode_local_debug_entry {
 
 typedef struct ex_function_bc {
 	ex_string_view name;
+	ex_string_view unit_path;
 	ex_function_kind kind;
 	bool is_builtin_native;
 
@@ -550,6 +551,8 @@ typedef struct ex_runtime {
 	// Indexed by bytecode function index.
 	ex_native_fn* native_callbacks;
 	u32 native_callback_count;
+	ex_native_resolver_fn native_resolver;
+	void* native_resolver_userdata;
 
 	// Snapshot of the call stack at the point of the most recent
 	// `ex_call` failure, innermost frame first. Overwritten by
@@ -595,12 +598,6 @@ typedef struct ex_runtime {
 	u32 step_trap_count;
 	u32 step_trap_capacity;
 } ex_runtime;
-
-ex_result ex_runtime_set_native_function_callback_by_bytecode_index(
-	ex_runtime* runtime,
-	int bytecode_index,
-	ex_native_fn callback
-);
 
 // Re-enters the interpreter at `runtime->suspended_frame`. Internal entry
 // point used by `ex_debug_resume` (debugger.c); not part of the public C ABI.

@@ -4251,6 +4251,7 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 				if (fn_expr.is_template) continue;
 				ex_function_bc& fn_bc = bc->functions[fn_expr.bytecode_index];
 				fn_bc.name = copyStringViewToArena(host->arena, s.name);
+				fn_bc.unit_path = copyStringViewToArena(host->arena, u.path);
 
 				if (fn_expr.body) {
 					ExIrBlockData& body = builder.buildFunctionIR(fn_expr);
