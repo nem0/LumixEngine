@@ -15,3 +15,23 @@ extern fn setPosition(e : Entity, position : DVec3) : void;
 extern fn setScale(e : Entity, scale : Vec3) : void;
 extern fn setRotation(e : Entity, rotation : Quat) : void;
 extern fn findChildByName(e: Entity, child_name : []const u8) : ?Entity;
+extern fn getFirstChild(e : Entity) : ?Entity;
+extern fn getNextSibling(e : Entity) : ?Entity;
+
+struct ChildrenIterator {
+	next : fn(iter : *ChildrenIterator, out : *Entity) : bool;
+	current : ?Entity;
+}
+
+fn childrenNext(iter : *ChildrenIterator, out : *Entity) : bool {
+	if const child = iter.current {
+		out.* = child;
+		iter.current = child.getNextSibling();
+		return true;
+	}
+	return false;
+}
+
+fn children(entity : Entity) : ChildrenIterator {
+	return {childrenNext, entity.getFirstChild()};
+}

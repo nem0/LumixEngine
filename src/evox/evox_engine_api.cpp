@@ -200,6 +200,30 @@ static void evox_entity_findChildByName(ex_runtime*, ex_call_frame frame) {
 	EX_RESULT(frame, ExEntity(entity.index, parent.world));
 }
 
+static void evox_entity_getFirstChild(ex_runtime*, ex_call_frame frame) {
+	const ExEntity parent = readArg<ExEntity>(frame);
+	const EntityPtr entity = parent.world->getFirstChild(EntityRef{parent.index});
+	if (!entity.isValid()) {
+		EX_RESULT(frame, u8(0));
+		EX_RESULT(frame, ExEntity(i32(0), nullptr));
+		return;
+	}
+	EX_RESULT(frame, u8(1));
+	EX_RESULT(frame, ExEntity(entity.index, parent.world));
+}
+
+static void evox_entity_getNextSibling(ex_runtime*, ex_call_frame frame) {
+	const ExEntity entity = readArg<ExEntity>(frame);
+	const EntityPtr sibling = entity.world->getNextSibling(EntityRef{entity.index});
+	if (!sibling.isValid()) {
+		EX_RESULT(frame, u8(0));
+		EX_RESULT(frame, ExEntity(i32(0), nullptr));
+		return;
+	}
+	EX_RESULT(frame, u8(1));
+	EX_RESULT(frame, ExEntity(sibling.index, entity.world));
+}
+
 static void evox_entity_destroy(ExEntity entity) {
 	entity.world->destroyEntity(EntityRef{entity.index});
 }
@@ -260,6 +284,8 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	functions.insert({"core:entity", "setScale"}, &wrap<evox_entity_setScale>);
 	functions.insert({"core:entity", "setRotation"}, &wrap<evox_entity_setRotation>);
 	functions.insert({"core:entity", "findChildByName"}, &evox_entity_findChildByName);
+	functions.insert({"core:entity", "getFirstChild"}, &evox_entity_getFirstChild);
+	functions.insert({"core:entity", "getNextSibling"}, &evox_entity_getNextSibling);
 	// world
 	functions.insert({"core:world", "createEntity"}, &wrap<evox_world_createEntity>);
 	functions.insert({"core:world", "destroyEntity"}, &wrap<evox_world_destroyEntity>);

@@ -42,6 +42,36 @@ static int resolveTestImport(void*, ex_string_view path, ex_string_view, ex_stri
 	return 0;
 }
 
+bool testEvoxCustomChildIterator() {
+	EvoxTestHost host;
+	const char* source = R"(
+		struct Entity { index : i32; }
+		struct ChildrenIterator {
+			next : fn(iter : *ChildrenIterator, out : *Entity) : bool;
+			current : ?Entity;
+		}
+		fn nextChild(iter : *ChildrenIterator, out : *Entity) : bool {
+			if const child = iter.current {
+				out.* = child;
+				iter.current = null;
+				return true;
+			}
+			return false;
+		}
+		fn children() : ChildrenIterator { return {nextChild, null}; }
+		fn test() : i32 {
+			var result : i32 = 0;
+			for child in children() { result += child.index; }
+			return result;
+		}
+	)";
+	ex_module* module = ex_module_create(&host.host);
+	ASSERT_TRUE(module);
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(module, {source, (i64)stringLength(source)}, {"iterator.evox", 13}, &resolveTestImport, nullptr));
+	ex_module_destroy(module);
+	return true;
+}
+
 // Serve the compiled root resource through the normal asynchronous loading path.
 // This exercises EvoxSystem's type discovery instead of injecting type handles.
 struct EvoxDiscoveryFileSystem : FileSystem {
@@ -934,6 +964,7 @@ bool testEvoxModuleSameNamedTypes() {
 } // namespace
 
 void runEvoxModuleTests() {
+	RUN_TEST(testEvoxCustomChildIterator);
 	RUN_TEST(testEvoxDataTypeDiscovery);
 	RUN_TEST(testEvoxModuleSerialization);
 	RUN_TEST(testEvoxModuleSerializationSchemaMigration);

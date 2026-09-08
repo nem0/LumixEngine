@@ -6,6 +6,8 @@ import "core:string"
 import "scripts/player" as player
 import "maps/demo/demo" as demo
 import "maps/particles/lightning" as lightning
+import "maps/particles/move" as particle_move
+import "maps/particles/clutter_sphere" as clutter_sphere
 
 var g_input : InputSystem = undefined;
 var g_world : World = undefined;
@@ -13,6 +15,7 @@ var g_world : World = undefined;
 enum WorldType {
 	DEMO,
 	LIGHTNING,
+	PARTICLES,
 }
 
 var world_type : WorldType = .DEMO;
@@ -37,6 +40,20 @@ fn start(input : InputSystem) : void {
 			}
 			break;
 		}
+		if endsWith(name, "particles.unv") {
+			const moving = g_world.findByName("world_space_particle");
+			const clutter = g_world.findByName("clutter");
+			if const moving_entity = moving {
+				if const clutter_entity = clutter {
+					if const clutter_child = clutter_entity.getFirstChild() {
+						world_type = .PARTICLES;
+						particle_move.start(moving_entity);
+						clutter_sphere.start(clutter_child, clutter_entity);
+					}
+				}
+			}
+			break;
+		}
 	}
 }
 
@@ -44,6 +61,9 @@ fn update(td : f32) : void {
 	match world_type {
 		case .DEMO: demo.update(td, g_input);
 		case .LIGHTNING: lightning.update(td);
+		case .PARTICLES:
+			particle_move.update(td);
+			clutter_sphere.update(td);
 	}
 }
 
