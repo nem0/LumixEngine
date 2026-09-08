@@ -10,55 +10,86 @@ import "maps/particles/move" as particle_move
 import "maps/particles/clutter_sphere" as clutter_sphere
 
 var g_input : InputSystem = undefined;
-var g_world : World = undefined;
+var g_world : ?World = null;
 
 enum WorldType {
+	NONE,
+	MAIN,
 	DEMO,
 	LIGHTNING,
 	PARTICLES,
 }
 
-var world_type : WorldType = .DEMO;
+var world_type : WorldType = .NONE;
 
 fn start(input : InputSystem) : void {
 	g_input = input;
 
-	for i in 0..g_world.getPartitionCount() {
-		const handle = g_world.getPartitionHandle(i);
-		const name = g_world.getPartitionName(handle);
-		if endsWith(name, "demo.unv") {
-			world_type = .DEMO;
-			demo.start(g_world);
-			player.init(g_world, g_input);
-			break;
-		}
-		if endsWith(name, "lightning.unv") {
-			const source_value = g_world.findByName("core");
-			if const source = source_value {
-				world_type = .LIGHTNING;
-				lightning.start(g_world, source);
+	if const world = g_world {
+		for i in 0..world.getPartitionCount() {
+			const handle = world.getPartitionHandle(i);
+			const name = world.getPartitionName(handle);
+			if endsWith(name, "demo.unv") {
+				world_type = .DEMO;
+				demo.start(world);
+				player.init(world, g_input);
+				break;
 			}
-			break;
-		}
-		if endsWith(name, "particles.unv") {
-			const moving = g_world.findByName("world_space_particle");
-			const clutter = g_world.findByName("clutter");
-			if const moving_entity = moving {
-				if const clutter_entity = clutter {
-					if const clutter_child = clutter_entity.getFirstChild() {
-						world_type = .PARTICLES;
-						particle_move.start(moving_entity);
-						clutter_sphere.start(clutter_child, clutter_entity);
+			if endsWith(name, "lightning.unv") {
+				const source_value = world.findByName("core");
+				if const source = source_value {
+					world_type = .LIGHTNING;
+					lightning.start(world, source);
+				}
+				break;
+			}
+			if endsWith(name, "particles.unv") {
+				const moving = world.findByName("world_space_particle");
+				const clutter = world.findByName("clutter");
+				if const moving_entity = moving {
+					if const clutter_entity = clutter {
+						if const clutter_child = clutter_entity.getFirstChild() {
+							world_type = .PARTICLES;
+							particle_move.start(moving_entity);
+							clutter_sphere.start(clutter_child, clutter_entity);
+						}
 					}
 				}
+				break;
 			}
-			break;
 		}
+	}
+	else {
+		panic("Unknown world");
 	}
 }
 
 fn update(td : f32) : void {
 	match world_type {
+		case .NONE:
+		case .MAIN:
+			panic("TODO"); //TODO
+			for event in g_input.getEvents() {
+				match event {
+					case ButtonEvent:
+						if event.device_type == .KEYBOARD {
+						}
+					case:
+				}
+			}
+			//if not loaded and event.type == "button" then
+			//       if event.device.type == "keyboard" then
+			//			local old_partition = this.world:getActivePartition()
+			//			local demo = this.world:createPartition("demo")
+			//			this.world:setActivePartition(demo)
+			//			this.world:load("maps/demo/demo.unv", function() 
+			//				this.world.ui:load("maps/demo/demo.ui")
+			//				--this.world:destroyPartition(old_partition)
+			//			end)
+			//
+			//			loaded = true
+			//		end
+			//	end			
 		case .DEMO: demo.update(td, g_input);
 		case .LIGHTNING: lightning.update(td);
 		case .PARTICLES:
