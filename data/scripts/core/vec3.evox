@@ -66,8 +66,7 @@ fn distanceSquared(a : Vec3, b : Vec3) : f32 {
 }
 
 fn length(v : Vec3) : f32 {
-	// TODO
-	return 1.0;
+	return math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
 }
 
 fn normalizeSafe(v : Vec3) : Vec3 {

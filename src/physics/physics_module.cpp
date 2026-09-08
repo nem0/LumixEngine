@@ -2347,8 +2347,8 @@ struct PhysicsModuleImpl final : PhysicsModule
 	}
 
 	EntityPtr raycast(Vec3 origin, Vec3 dir, float distance, EntityPtr ignore_entity) override {
-		RaycastHit hit;
-		if (raycastEx(origin, dir, distance, hit, ignore_entity, -1)) return hit.entity;
+		RaycastHit hit = raycastEx(origin, dir, distance, ignore_entity, -1);
+		if (hit.hit) return hit.entity;
 		return INVALID_ENTITY;
 	}
 
@@ -2405,10 +2405,9 @@ struct PhysicsModuleImpl final : PhysicsModule
 		return true;	
 	}
 
-	bool raycastEx(Vec3 origin,
+	RaycastHit raycastEx(Vec3 origin,
 		Vec3 dir,
 		float distance,
-		RaycastHit& result,
 		EntityPtr ignored,
 		int layer) override
 	{
@@ -2426,6 +2425,9 @@ struct PhysicsModuleImpl final : PhysicsModule
 		PxQueryFilterData filter_data;
 		filter_data.flags = PxQueryFlag::eDYNAMIC | PxQueryFlag::eSTATIC | PxQueryFlag::ePREFILTER;
 		bool status = m_scene->raycast(physx_origin, unit_dir, max_distance, hit, flags, filter_data, &filter);
+		RaycastHit result = {};
+		result.hit = status && hit.hasBlock;
+		if (!result.hit) return result;
 		result.normal.x = hit.block.normal.x;
 		result.normal.y = hit.block.normal.y;
 		result.normal.z = hit.block.normal.z;
@@ -2438,7 +2440,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 			PxRigidActor* actor = hit.block.shape->getActor();
 			if (actor) result.entity = EntityPtr{(int)(intptr_t)actor->userData};
 		}
-		return status;
+		return result;
 	}
 
 	void onEntityDestroyed(EntityRef entity)

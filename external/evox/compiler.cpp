@@ -849,6 +849,11 @@ struct Checker {
 			case ResolvedTypeKind::STRUCT: {
 				const StructResolvedType* st = static_cast<const StructResolvedType*>(type);
 				error(empty(st->decl->cached_name) ? makeStringView("<anonymous>") : st->decl->cached_name);
+				if (st->decl->cached_owner && !empty(st->decl->cached_owner->path)) {
+					error(" [");
+					error(st->decl->cached_owner->path);
+					error("]");
+				}
 				return;
 			}
 			case ResolvedTypeKind::FUNCTION: {
@@ -881,6 +886,13 @@ struct Checker {
 				error("?");
 				error(static_cast<const NullableResolvedType*>(type)->inner);
 				return;
+			case ResolvedTypeKind::POINTER: {
+				const PointerResolvedType* pointer = static_cast<const PointerResolvedType*>(type);
+				error("*");
+				if (pointer->is_const) error("const ");
+				error(pointer->inner);
+				return;
+			}
 			case ResolvedTypeKind::UNION: {
 				const UnionResolvedType* un = static_cast<const UnionResolvedType*>(type);
 				for (i32 i = 0; i < un->members.size(); ++i) {
@@ -1805,6 +1817,10 @@ struct Checker {
 			}
 			if (!runtime_type && !requireMaterializable(*arg, "a runtime function argument")) return nullptr;
 
+			if (!arg_type || arg_type->kind == ResolvedTypeKind::INVALID || !param_type || param_type->kind == ResolvedTypeKind::INVALID) {
+				errorLine(call.args[i]->token, "Invalid type while checking argument ", i + 1, " of function call (expression `", call.args[i]->token.value, "`); expected ", param_type);
+				return nullptr;
+			}
 			if (!canImplicitlyConvert(arg_type, param_type)) {
 				errorLine(call.args[i]->token, "Cannot convert ", arg_type, " to ", param_type, " for argument ", i + 1, " of function call");
 				return nullptr;
@@ -2484,6 +2500,10 @@ struct Checker {
 
 			ResolvedType* arg_type = checkExprForTarget(unit, ctx, *arg, expected);
 			if (!arg_type) return nullptr;
+			if (expected && (!arg_type || arg_type->kind == ResolvedTypeKind::INVALID || expected->kind == ResolvedTypeKind::INVALID)) {
+				errorLine(arg->token, "Invalid type while checking argument ", i + 1, " of function call (expression `", arg->token.value, "`); expected ", expected);
+				return nullptr;
+			}
 			if (expected && !canImplicitlyConvert(arg_type, expected)) {
 				errorLine(arg->token, "Cannot convert ", arg_type, " to ", expected, " for argument ", i + 1, " of function call");
 				return nullptr;

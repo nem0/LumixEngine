@@ -200,7 +200,7 @@ bool isSupportedEvoxFunctionArg(const Arg& arg) {
 	const EvoxType type = getEvoxType(arg.type);
 	if (type == EvoxType::OBJECT_T) return arg.is_ptr || arg.is_ref;
 	if (arg.is_ptr) return false;
-	if (arg.is_ref && !arg.is_const) return false;
+	if (arg.is_ref && !arg.is_const) return type != EvoxType::UNKNOWN && type != EvoxType::ENUM_T && type != EvoxType::PATH_T;
 	return type != EvoxType::UNKNOWN && type != EvoxType::ENUM_T && type != EvoxType::PATH_T;
 }
 
@@ -308,7 +308,47 @@ void emitFrameValueRead(OutputStream& out, StringView type, StringView name) {
 	}
 }
 
+void emitMutableRefCopy(OutputStream& out, StringView type, StringView dst, StringView src, bool to_native, const char* world_expr = nullptr) {
+	const EvoxType evox_type = getEvoxType(type);
+	if (evox_type == EvoxType::ENTITY_T) {
+		if (to_native) L(dst, " = EntityPtr(", src, ".index);");
+		else {
+			L(dst, ".index = ", src, ".index;");
+			L(dst, ".padding = 0;");
+			L(dst, ".world = ", world_expr ? world_expr : "nullptr", ";");
+		}
+		return;
+	}
+	if (evox_type == EvoxType::STRUCT_T) {
+		const Struct* s = findStructByTypeName(type);
+		if (s) {
+			for (const StructVar& field : s->vars) {
+				StaticString<256> dst_field(dst, dst.size() > 0 && dst[dst.size() - 1] == '>' ? "" : ".", field.name);
+				StaticString<256> src_field(src, src.size() > 0 && src[src.size() - 1] == '>' ? "" : ".", field.name);
+				emitMutableRefCopy(out, field.type,
+					StringView{dst_field.buffer, dst_field.buffer + dst_field.length},
+					StringView{src_field.buffer, src_field.buffer + src_field.length},
+					to_native, world_expr);
+			}
+			return;
+		}
+	}
+	L(dst, " = ", src, ";");
+}
+
 void emitArgRead(OutputStream& out, const Arg& arg) {
+	if (arg.is_ref && !arg.is_const) {
+		if (isExternCompatibleEvoxType(arg.type)) {
+			L("EX_ARG(frame, ", arg.type, "*, ", arg.name, ");");
+			return;
+		}
+		L("EX_ARG(frame, Evox_", arg.type, "*, ", arg.name, ");");
+		L(arg.type, " ", arg.name, "_value{};");
+		StaticString<256> value_name(arg.name, "_value");
+		StaticString<256> source_name(arg.name, "->");
+		emitMutableRefCopy(out, arg.type, StringView{value_name.buffer, value_name.buffer + value_name.length}, StringView{source_name.buffer, source_name.buffer + source_name.length}, true);
+		return;
+	}
 	if (isSpanType(arg.type)) {
 		L("EX_ARG(frame, ex_slice, ", arg.name, "_slice);");
 		out.add(arg.type, " ", arg.name, "(reinterpret_cast<", spanElementType(arg.type), "*>(", arg.name, "_slice.data), ", arg.name, "_slice.length);" OUT_ENDL);
@@ -324,7 +364,11 @@ void emitArgRead(OutputStream& out, const Arg& arg) {
 }
 
 void appendArgExpression(OutputStream& out, const Arg& arg) {
-	if (isEvoxStringArg(arg)) out.add("evox_string_arg_", arg.name);
+	if (arg.is_ref && !arg.is_const) {
+		if (isExternCompatibleEvoxType(arg.type)) out.add("*", arg.name);
+		else out.add(arg.name, "_value");
+	}
+	else if (isEvoxStringArg(arg)) out.add("evox_string_arg_", arg.name);
 	else if (isEvoxPathArg(arg)) out.add("Path(StringView{", arg.name, ".begin, (u64)", arg.name, ".length})");
 	else if (getEvoxType(arg.type) == EvoxType::STRING_T) out.add("StringView{", arg.name, ".begin, (u64)", arg.name, ".length}");
 	else if (getEvoxType(arg.type) == EvoxType::OBJECT_T && arg.is_ref) out.add("*", arg.name);
@@ -333,6 +377,79 @@ void appendArgExpression(OutputStream& out, const Arg& arg) {
 
 void emitResult(OutputStream& out, const char* value) {
 	L("EX_RESULT(frame, ", value, ");");
+}
+
+i32 evoxTypeAlignment(StringView type);
+i32 evoxTypeSize(StringView type);
+
+i32 evoxTypeAlignment(StringView type) {
+	switch (getEvoxType(type)) {
+		case EvoxType::VOID_T:
+		case EvoxType::BOOL_T:
+		case EvoxType::U8_T: return 1;
+		case EvoxType::I32_T:
+		case EvoxType::U32_T:
+		case EvoxType::F32_T:
+		case EvoxType::VEC2_T:
+		case EvoxType::VEC3_T:
+		case EvoxType::VEC4_T:
+		case EvoxType::COLOR_T:
+		case EvoxType::QUAT_T:
+		case EvoxType::ENUM_T: return 4;
+		case EvoxType::DVEC3_T:
+		case EvoxType::ENTITY_T:
+		case EvoxType::PATH_T:
+		case EvoxType::STRING_T:
+		case EvoxType::OBJECT_T: return 8;
+		case EvoxType::STRUCT_T: {
+			const Struct* s = findStructByTypeName(type);
+			if (!s) return 1;
+			i32 alignment = 1;
+			for (const StructVar& v : s->vars) {
+				const i32 field_alignment = evoxTypeAlignment(v.type);
+				if (field_alignment > alignment) alignment = field_alignment;
+			}
+			return alignment;
+		}
+		case EvoxType::UNKNOWN: return 1;
+	}
+	return 1;
+}
+
+i32 evoxTypeSize(StringView type) {
+	switch (getEvoxType(type)) {
+		case EvoxType::VOID_T: return 0;
+		case EvoxType::BOOL_T:
+		case EvoxType::U8_T: return 1;
+		case EvoxType::I32_T:
+		case EvoxType::U32_T:
+		case EvoxType::F32_T:
+		case EvoxType::ENUM_T: return 4;
+		case EvoxType::VEC2_T: return 8;
+		case EvoxType::VEC3_T: return 12;
+		case EvoxType::DVEC3_T: return 24;
+		case EvoxType::VEC4_T:
+		case EvoxType::COLOR_T:
+		case EvoxType::QUAT_T:
+		case EvoxType::ENTITY_T:
+		case EvoxType::PATH_T:
+		case EvoxType::STRING_T: return 16;
+		case EvoxType::OBJECT_T: return 8;
+		case EvoxType::STRUCT_T: {
+			const Struct* s = findStructByTypeName(type);
+			if (!s) return 0;
+			i32 size = 0;
+			for (const StructVar& v : s->vars) {
+				const i32 alignment = evoxTypeAlignment(v.type);
+				size = (size + alignment - 1) & ~(alignment - 1);
+				size += evoxTypeSize(v.type);
+			}
+			const i32 alignment = evoxTypeAlignment(type);
+			return (size + alignment - 1) & ~(alignment - 1);
+		}
+		case EvoxType::UNKNOWN: return 0;
+	}
+	return 0;
 }
 
 void appendReturnValue(OutputStream& out, StringView type, const char* value, const char* world_expr = nullptr) {
@@ -384,11 +501,18 @@ void appendReturnValue(OutputStream& out, StringView type, const char* value, co
 		case EvoxType::STRUCT_T: {
 			const Struct* s = findStructByTypeName(type);
 			if (!s) break;
+			i32 offset = 0;
 			for (const StructVar& v : s->vars) {
 				if (getEvoxType(v.type) == EvoxType::VOID_T) continue;
+				const i32 alignment = evoxTypeAlignment(v.type);
+				const i32 field_offset = (offset + alignment - 1) & ~(alignment - 1);
+				if (field_offset > offset) L("frame.result += ", (i32)(field_offset - offset), ";");
 				StaticString<128> field_value(value, ".", v.name);
 				appendReturnValue(out, v.type, field_value.buffer, world_expr);
+				offset = field_offset + evoxTypeSize(v.type);
 			}
+			const i32 size = evoxTypeSize(type);
+			if (size > offset) L("frame.result += ", (i32)(size - offset), ";");
 			break;
 		}
 		case EvoxType::OBJECT_T:
@@ -677,6 +801,12 @@ void serializeEvoxModuleWrapper(OutputStream& out, Module& m, Function& f) {
 		appendArgExpression(out, arg);
 	});
 	L(");");
+	forEachArg(f.args, [&](const Arg& arg, bool) {
+		if (!arg.is_ref || arg.is_const || isExternCompatibleEvoxType(arg.type)) return;
+		StaticString<256> value_name(arg.name, "_value");
+		StaticString<256> target_name(arg.name, "->");
+		emitMutableRefCopy(out, arg.type, StringView{target_name.buffer, target_name.buffer + target_name.length}, StringView{value_name.buffer, value_name.buffer + value_name.length}, false, "&module->getWorld()");
+	});
 	appendReturnValue(out, f.return_type, "ret", "&module->getWorld()");
 	L("}" OUT_ENDL);
 }
@@ -780,6 +910,42 @@ void emitGeneratedHeader(OutputStream& out, MetaData& data) {
 	};
 	for (Module& m : data.modules) emitInclude(m.filename);
 	for (Object& o : data.objects) emitInclude(o.filename);
+	out.add(OUT_ENDL);
+
+	auto isMutableRefTypeUsed = [&](StringView type) {
+		bool used = false;
+		for (Module& module : data.modules) {
+			for (Function& function : module.functions) {
+				forEachArg(function.args, [&](const Arg& arg, bool) { if (arg.is_ref && !arg.is_const && equal(arg.type, type)) used = true; });
+			}
+			for (Component& component : module.components) {
+				for (Function& function : component.functions) {
+					forEachArg(function.args, [&](const Arg& arg, bool) { if (arg.is_ref && !arg.is_const && equal(arg.type, type)) used = true; });
+				}
+			}
+		}
+		for (Object& object : data.objects) {
+			for (Function& function : object.functions) {
+				forEachArg(function.args, [&](const Arg& arg, bool) { if (arg.is_ref && !arg.is_const && equal(arg.type, type)) used = true; });
+			}
+		}
+		return used;
+	};
+	for (Struct& s : data.structs) {
+		if (isExternCompatibleEvoxType(s.name) || !isMutableRefTypeUsed(s.name)) continue;
+		out.add("struct Evox_", s.name, " {" OUT_ENDL);
+		for (const StructVar& field : s.vars) {
+			out.add("\t");
+			if (getEvoxType(field.type) == EvoxType::ENTITY_T) out.add("ExEntity");
+			else if (getEvoxType(field.type) == EvoxType::STRUCT_T && !isExternCompatibleEvoxType(field.type)) out.add("Evox_", field.type);
+			else if (getEvoxType(field.type) == EvoxType::VEC2_T || getEvoxType(field.type) == EvoxType::VEC3_T || getEvoxType(field.type) == EvoxType::DVEC3_T ||
+				getEvoxType(field.type) == EvoxType::VEC4_T || getEvoxType(field.type) == EvoxType::COLOR_T || getEvoxType(field.type) == EvoxType::QUAT_T ||
+				getEvoxType(field.type) == EvoxType::OBJECT_T) out.add("Lumix::", field.type);
+			else out.add(field.type);
+			L(" ", field.name, ";");
+		}
+		L("};");
+	}
 	out.add(OUT_ENDL);
 }
 
@@ -1041,6 +1207,7 @@ void appendEvoxDeclType(OutputStream& out, StringView type) {
 }
 
 void appendEvoxDeclArgType(OutputStream& out, const Arg& arg) {
+	if (arg.is_ref && !arg.is_const) out.add("*");
 	if (isEvoxStringArg(arg)) {
 		out.add("[]const u8");
 		return;

@@ -36,6 +36,7 @@ template <typename T> struct DelegateList;
 
 //@ struct
 struct RaycastHit {
+	bool hit;
 	Vec3 position;
 	Vec3 normal;
 	EntityPtr entity;
@@ -112,8 +113,8 @@ struct PhysicsModule : IModule {
 	virtual Span<const ControllerHitData> getControllerHits() = 0;
 	virtual Span<const TriggerHitData> getTriggerHits() = 0;
 	virtual Span<const ContactHitData> getContactHits() = 0;
+	virtual RaycastHit raycastEx(Vec3 origin, Vec3 dir, float distance, EntityPtr ignored, i32 layer) = 0;
 	//@ end
-	virtual bool raycastEx(Vec3 origin, Vec3 dir, float distance, RaycastHit& result, EntityPtr ignored, i32 layer) = 0;
 	virtual bool sweepSphere(DVec3 pos, float radius, Vec3 dir, float distance, SweepHit& result, EntityPtr ignored, i32 layer) = 0;
 
 	virtual void createInstancedMesh(EntityRef entity) = 0;

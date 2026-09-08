@@ -822,8 +822,8 @@ static int LUA_raycastEx(lua_State* L)
 	Vec3 dir = LuaWrapper::checkArg<Vec3>(L, 3);
 	dir = normalize(dir);
 	const int layer = lua_gettop(L) > 3 ? LuaWrapper::checkArg<int>(L, 4) : -1;
-	RaycastHit hit;
-	if (module->raycastEx(origin, dir, FLT_MAX, hit, INVALID_ENTITY, layer))
+	RaycastHit hit = module->raycastEx(origin, dir, FLT_MAX, INVALID_ENTITY, layer);
+	if (hit.hit)
 	{
 		LuaWrapper::push(L, hit.entity != INVALID_ENTITY);
 		LuaWrapper::pushEntity(L, hit.entity, &module->getWorld());

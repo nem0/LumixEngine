@@ -1,21 +1,50 @@
 import "core:input"
 import "core:world"
 import "core:random"
+import "core:string"
 
 import "scripts/player" as player
 import "maps/demo/demo" as demo
+import "maps/particles/lightning" as lightning
 
 var g_input : InputSystem = undefined;
 var g_world : World = undefined;
 
+enum WorldType {
+	DEMO,
+	LIGHTNING,
+}
+
+var world_type : WorldType = .DEMO;
+
 fn start(input : InputSystem) : void {
 	g_input = input;
-	player.init(g_world, g_input);
-	demo.start(g_world);
+
+	for i in 0..g_world.getPartitionCount() {
+		const handle = g_world.getPartitionHandle(i);
+		const name = g_world.getPartitionName(handle);
+		if endsWith(name, "demo.unv") {
+			world_type = .DEMO;
+			demo.start(g_world);
+			player.init(g_world, g_input);
+			break;
+		}
+		if endsWith(name, "lightning.unv") {
+			const source_value = g_world.findByName("core");
+			if const source = source_value {
+				world_type = .LIGHTNING;
+				lightning.start(g_world, source);
+			}
+			break;
+		}
+	}
 }
 
 fn update(td : f32) : void {
-    demo.update(td, g_input);
+	match world_type {
+		case .DEMO: demo.update(td, g_input);
+		case .LIGHTNING: lightning.update(td);
+	}
 }
 
 fn addWorld(world : World) : void {

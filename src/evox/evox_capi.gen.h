@@ -34,6 +34,7 @@ static_assert(sizeof(ExComponent) == 16);
 #include "ui/ui.h"
 #include "ui/ui_system.h"
 
+
 namespace Lumix::Evox::generated {
 	
 	static void evox_world_animation(ex_runtime* runtime, ex_call_frame frame) {
@@ -1605,6 +1606,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExEntity(value.e1.index, &module->getWorld()));
 		EX_RESULT(frame, ExEntity(value.e2.index, &module->getWorld()));
 		EX_RESULT(frame, value.touch_lost);
+		frame.result += 7;
 	}
 	
 	static void evox_physics_getContactHits_count_8769190636714668351(ex_runtime* runtime, ex_call_frame frame) {
@@ -1624,6 +1626,23 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExEntity(value.e1.index, &module->getWorld()));
 		EX_RESULT(frame, ExEntity(value.e2.index, &module->getWorld()));
 		EX_RESULT(frame, value.position);
+		frame.result += 4;
+	}
+	
+	static void evox_physics_raycastEx_5324446236776470796(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, PhysicsModule*, module);
+		EX_ARG(frame, Vec3, origin);
+		EX_ARG(frame, Vec3, dir);
+		EX_ARG(frame, float, distance);
+		EX_ARG(frame, ExEntity, ignored);
+		EX_ARG(frame, i32, layer);
+		auto ret = module->raycastEx(origin, dir, distance, EntityPtr(ignored.index), layer);
+		EX_RESULT(frame, ret.hit);
+		frame.result += 3;
+		EX_RESULT(frame, ret.position);
+		EX_RESULT(frame, ret.normal);
+		frame.result += 4;
+		EX_RESULT(frame, ExEntity(ret.entity.index, &module->getWorld()));
 	}
 	
 	static void evox_renderer_addDebugTriangle_9051351881586580716(ex_runtime* runtime, ex_call_frame frame) {
@@ -3524,6 +3543,7 @@ namespace Lumix::Evox::generated {
 		auto ret = module->getCameraRay(EntityRef(entity.index), screen_pos);
 		EX_RESULT(frame, ret.origin);
 		EX_RESULT(frame, ret.dir);
+		frame.result += 4;
 	}
 	
 	static void evox_camera_getFov_9990112738143434778(ex_runtime* runtime, ex_call_frame frame) {
@@ -5128,6 +5148,7 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:physics"), StringView("getTriggerHitsGet")}, &evox_physics_getTriggerHits_get_12117019466983661535);
 		functions.insert({StringView("core:physics"), StringView("getContactHitsCount")}, &evox_physics_getContactHits_count_8769190636714668351);
 		functions.insert({StringView("core:physics"), StringView("getContactHitsGet")}, &evox_physics_getContactHits_get_1259599258055043497);
+		functions.insert({StringView("core:physics"), StringView("raycastEx")}, &evox_physics_raycastEx_5324446236776470796);
 		functions.insert({StringView("core:physics"), StringView("physics")}, &evox_world_physics);
 		functions.insert({StringView("core:renderer"), StringView("addDebugTriangle")}, &evox_renderer_addDebugTriangle_9051351881586580716);
 		functions.insert({StringView("core:renderer"), StringView("addDebugLine")}, &evox_renderer_addDebugLine_11999449654256854668);

@@ -126,6 +126,31 @@ static void evox_world_findByName(ex_runtime*, ex_call_frame frame) {
 	EX_RESULT(frame, ExEntity(entity.index, world));
 }
 
+static i32 evox_world_getPartitionCount(World* world) {
+	return world ? world->getPartitions().size() : 0;
+}
+
+static u32 evox_world_getPartitionHandle(World* world, i32 index) {
+	if (!world || index < 0 || index >= world->getPartitions().size()) return 0xffff;
+	return world->getPartitions()[index].handle;
+}
+
+static void evox_world_getPartitionName(ex_runtime* runtime, ex_call_frame frame) {
+	EX_ARG(frame, World*, world);
+	EX_ARG(frame, u32, handle);
+	if (!world) {
+		ex_result_string(runtime, &frame, ex_string_view{nullptr, 0});
+		return;
+	}
+	for (const World::Partition& partition : world->getPartitions()) {
+		if (partition.handle == handle) {
+			ex_result_string(runtime, &frame, ex_string_view{partition.name, (i64)strlen(partition.name)});
+			return;
+		}
+	}
+	ex_result_string(runtime, &frame, ex_string_view{nullptr, 0});
+}
+
 static void evox_world_getEvoxDataRaw(ex_runtime*, ex_call_frame frame) {
 	EX_ARG(frame, World*, world);
 	EX_ARG(frame, u32, type_index);
@@ -239,6 +264,9 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	functions.insert({"core:world", "createEntity"}, &wrap<evox_world_createEntity>);
 	functions.insert({"core:world", "destroyEntity"}, &wrap<evox_world_destroyEntity>);
 	functions.insert({"core:world", "findByName"}, &evox_world_findByName);
+	functions.insert({"core:world", "getPartitionCount"}, &wrap<evox_world_getPartitionCount>);
+	functions.insert({"core:world", "getPartitionHandle"}, &wrap<evox_world_getPartitionHandle>);
+	functions.insert({"core:world", "getPartitionName"}, &evox_world_getPartitionName);
 	functions.insert({"core:world", "hasEntity"}, &wrap<evox_world_hasEntity>);
 	functions.insert({"core:world", "getEvoxDataRaw"}, &evox_world_getEvoxDataRaw);
 }

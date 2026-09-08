@@ -1,0 +1,83 @@
+import "core:entity"
+import "core:dvec3"
+import "core:physics"
+import "core:particle_emitter"
+import "core:point_light"
+import "core:random"
+import "core:RaycastHit"
+import "core:vec3"
+import "core:world"
+
+struct Bolt {
+	entity : Entity;
+	timeout : f32;
+}
+
+var g_bolts : [5]Bolt = undefined;
+var g_world : World = undefined;
+var g_source : Entity = undefined;
+
+fn toVec3(position : DVec3) : Vec3 {
+	return {position.x as f32, position.y as f32, position.z as f32};
+}
+
+fn toDVec3(position : Vec3) : DVec3 {
+	return {position.x as f64, position.y as f64, position.z as f64};
+}
+
+fn moveRibbon(bolt : *Bolt) : void {
+	const physics_module = g_world.physics() else return;
+	const origin = toVec3(g_source.getPosition());
+	// Keep the random calls separate: each component must consume a new RNG value.
+	const dx = randFloat() * 2.0 - 1.0;
+	const dy = randFloat() * 2.0 - 1.0;
+	const dz = randFloat() * 2.0 - 1.0;
+	const direction : Vec3 = normalize({dx, dy, dz});
+	const hit = raycastEx(physics_module, origin, direction, 1000.0, g_source, -1);
+	if hit.hit and distanceSquared(hit.position, origin) < 25.0 {
+		bolt.entity.setPosition(toDVec3(hit.position + hit.normal * 0.15));
+		bolt.timeout = randFloatRange(0.2, 0.9);
+		if const emitter = bolt.entity.particle_emitter() {
+			emitter.killRibbon(0, 0);
+			emitter.emitRibbons(0, 1);
+		}
+	} else {
+		bolt.timeout = -1.0;
+	}
+}
+
+fn start(world : World, source : Entity) : void {
+	g_world = world;
+	g_source = source;
+	for &bolt in g_bolts {
+		bolt.entity = world.createEntity();
+		if const emitter = bolt.entity.createParticleEmitter() {
+			emitter.setPath("maps/particles/lightning.pat");
+			emitter.emitRibbons(0, 1);
+		}
+		if const light = bolt.entity.createPointLight() {
+			light.setRange(4.0);
+			light.setIntensity(1.0);
+			light.setColor({0.3, 0.3, 1.0});
+		}
+
+		moveRibbon(&bolt);
+	}
+}
+
+fn update(td : f32) : void {
+	const source_position = toVec3(g_source.getPosition());
+	for &bolt in g_bolts {
+		const emitter = bolt.entity.particle_emitter() else return;
+		const target_id = emitter.getGlobalID("g_target");
+		emitter.setVec3Global(target_id, source_position);
+
+		const light = bolt.entity.point_light() else return;
+		light.setIntensity(randFloatRange(0.5, 1.0));
+
+		bolt.timeout -= td;
+		if bolt.timeout < 0.0 {
+			moveRibbon(&bolt);
+		}
+	}
+}

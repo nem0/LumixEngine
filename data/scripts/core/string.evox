@@ -1,3 +1,16 @@
+fn endsWith(value : []const u8, suffix : []const u8) : bool {
+	if value.length < suffix.length {
+		return false;
+	}
+	const offset = value.length - suffix.length;
+	for i in 0..suffix.length {
+		if value[offset + i] != suffix[i] {
+			return false;
+		}
+	}
+	return true;
+}
+
 enum ParseError {
     NotANumber,
     Overeflow

@@ -139,6 +139,8 @@ namespace Lumix::LuaWrapper {
 	}
 	void push(lua_State* L, const RaycastHit& value) {
 		lua_newtable(L);
+		push(L, value.hit);
+		lua_setfield(L, -2, "hit");
 		push(L, value.position);
 		lua_setfield(L, -2, "position");
 		push(L, value.normal);
@@ -149,6 +151,9 @@ namespace Lumix::LuaWrapper {
 	template <> RaycastHit checkArg<RaycastHit>(lua_State* L, int index) {
 		RaycastHit res;
 		if (!lua_istable(L, index)) luaL_argerror(L, index, "expected table");
+		lua_getfield(L, index, "hit");
+		res.hit = checkArg<bool>(L, -1);
+		lua_pop(L, 1);
 		lua_getfield(L, index, "position");
 		res.position = checkArg<Vec3>(L, -1);
 		lua_pop(L, 1);
@@ -1149,6 +1154,19 @@ namespace Lumix {
 		PhysicsModule* module;
 		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
 		LuaWrapper::push(L, 	module->getContactHits());
+		return 1;
+	}
+	
+	int PhysicsModule_raycastEx(lua_State* L) {
+		LuaWrapper::checkTableArg(L, 1);
+		PhysicsModule* module;
+		if (!LuaWrapper::checkField(L, 1, "_module", &module)) luaL_argerror(L, 1, "Module expected");
+		auto origin = LuaWrapper::checkArg<Vec3>(L, 2);
+		auto dir = LuaWrapper::checkArg<Vec3>(L, 3);
+		auto distance = LuaWrapper::checkArg<float>(L, 4);
+		auto ignored = LuaWrapper::checkArg<EntityPtr>(L, 5);
+		auto layer = LuaWrapper::checkArg<i32>(L, 6);
+		LuaWrapper::push(L, 	module->raycastEx(origin, dir, distance, ignored, layer));
 		return 1;
 	}
 	
@@ -2750,6 +2768,8 @@ namespace Lumix {
 			lua_setfield(L, -2, "getTriggerHits");
 			lua_pushcfunction(L, PhysicsModule_getContactHits, "getContactHits");
 			lua_setfield(L, -2, "getContactHits");
+			lua_pushcfunction(L, PhysicsModule_raycastEx, "raycastEx");
+			lua_setfield(L, -2, "raycastEx");
 			lua_pop(L, 1);
 		}
 		{

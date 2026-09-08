@@ -8,6 +8,7 @@ import "core:vec3"
 import "core:ControllerHitData"
 import "core:TriggerHitData"
 import "core:ContactHitData"
+import "core:RaycastHit"
 struct PhysicsModule { module : cptr; }
 
 extern fn physics(w : World) : ?PhysicsModule;
@@ -28,4 +29,5 @@ extern fn getContactHitsGet(module : PhysicsModule, index : i32) : ContactHitDat
 struct getContactHitsIterator { next : fn(iter : *getContactHitsIterator, out : *ContactHitData) : bool; module : PhysicsModule; index : i32; }
 fn getContactHitsNext(iter : *getContactHitsIterator, out : *ContactHitData) : bool { iter.index += 1; if iter.index >= getContactHitsCount(iter.module) { return false; } out.* = getContactHitsGet(iter.module, iter.index); return true; }
 fn getContactHits(module : PhysicsModule) : getContactHitsIterator { return { getContactHitsNext, module, -1 }; }
+extern fn raycastEx(module : PhysicsModule, origin : Vec3, dir : Vec3, distance : f32, ignored : Entity, layer : i32) : RaycastHit;
 

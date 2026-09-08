@@ -135,6 +135,7 @@ type Viewport = {
 }
 
 type RaycastHit = {
+	hit: boolean,
 	position: Vec3,
 	normal: Vec3,
 	entity: Entity?,
@@ -361,6 +362,7 @@ type physics_module = {
 	getControllerHits: (physics_module) -> any,
 	getTriggerHits: (physics_module) -> any,
 	getContactHits: (physics_module) -> any,
+	raycastEx: (physics_module, Vec3, Vec3, number, Entity?, number) -> RaycastHit,
 }
 
 type physical_heightfield_component =  {
