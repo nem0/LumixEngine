@@ -2091,11 +2091,17 @@ struct CodeEditorImpl final : CodeEditor {
 				dl->AddText(start_p, m_token_colors[t.type], str + t.from, str + t.from + t.len);
 
 				if (t.flags & Token::UNDERLINE) {
-					if (m_handle_input && ImGui::IsMouseHoveringRect(start_p, p + ImVec2(0, line_height))) {
-						const Underline* underline = getUnderline(j, t);
-						ImGui::SetTooltip("%s", underline->msg.c_str());
+					const Underline* underline = getUnderline(j, t);
+					if (underline) {
+						const u32 from = underline->col_from > t.from ? underline->col_from : t.from;
+						const u32 to = underline->col_to < t.from + t.len ? underline->col_to : t.from + t.len;
+						const ImVec2 underline_start = start_p + ImVec2(CalcTextSize(str + t.from, str + from).x, line_height);
+						const ImVec2 underline_end = start_p + ImVec2(CalcTextSize(str + t.from, str + to).x, line_height);
+						if (m_handle_input && ImGui::IsMouseHoveringRect(start_p, p + ImVec2(0, line_height))) {
+							ImGui::SetTooltip("%s", underline->msg.c_str());
+						}
+						dl->AddLine(underline_start, underline_end, IM_COL32(0xff, 0x50, 0x50, 0xff));
 					}
-					dl->AddLine(start_p + ImVec2(0, line_height), p + ImVec2(0, line_height), IM_COL32(0xff, 0x50, 0x50, 0xff)); 
 				}
 				++visible_tokens;
 			}
