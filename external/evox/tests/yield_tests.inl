@@ -284,7 +284,7 @@ TEST(CannotCallWhileYielded) {
 	RuntimeGuard runtime(module, &module_host);
 	EXPECT_TRUE(runtime);
 	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
-	EXPECT_EQ(EX_RESULT_FAILURE, test_call(runtime, toLs("other")));
+	EXPECT_EQ(EX_RESULT_INVALID_STATE, test_call(runtime, toLs("other")));
 	EXPECT_EQ(EX_RESULT_OK, ex_task_resume(runtime));
 	CAPI_END(module);
 	return true;

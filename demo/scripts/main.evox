@@ -1,5 +1,6 @@
 import "core:input"
 import "core:world"
+import "core:log"
 import "core:random"
 import "core:string"
 
@@ -21,9 +22,11 @@ enum WorldType {
 }
 
 var world_type : WorldType = .NONE;
+var g_dt : f32 = 0;
 
-fn start(input : InputSystem) : void {
+fn main(input : InputSystem, w : World) : void {
 	g_input = input;
+	g_world = w;
 
 	if const world = g_world {
 		player.init(world, input);
@@ -64,44 +67,42 @@ fn start(input : InputSystem) : void {
 	else {
 		panic("Unknown world");
 	}
-}
 
-fn update(td : f32) : void {
-	player.update(td);
+	while true {
+		yield;
+		player.update(g_dt);
 
-	match world_type {
-		case .NONE:
-		case .MAIN:
-			panic("TODO"); //TODO
-			for event in g_input.getEvents() {
-				match event {
-					case ButtonEvent:
-						if event.device_type == .KEYBOARD {
-						}
-					case:
+		match world_type {
+			case .NONE:
+			case .MAIN:
+				panic("TODO"); //TODO
+				for event in g_input.getEvents() {
+					match event {
+						case ButtonEvent:
+							if event.device_type == .KEYBOARD {
+							}
+						case:
+					}
 				}
-			}
-			//if not loaded and event.type == "button" then
-			//       if event.device.type == "keyboard" then
-			//			local old_partition = this.world:getActivePartition()
-			//			local demo = this.world:createPartition("demo")
-			//			this.world:setActivePartition(demo)
-			//			this.world:load("maps/demo/demo.unv", function() 
-			//				this.world.ui:load("maps/demo/demo.ui")
-			//				--this.world:destroyPartition(old_partition)
-			//			end)
-			//
-			//			loaded = true
-			//		end
-			//	end			
-		case .DEMO: demo.update(td, g_input);
-		case .LIGHTNING: lightning.update(td);
-		case .PARTICLES:
-			particle_move.update(td);
-			clutter_sphere.update(td);
+				//if not loaded and event.type == "button" then
+				//       if event.device.type == "keyboard" then
+				//			local old_partition = this.world:getActivePartition()
+				//			local demo = this.world:createPartition("demo")
+				//			this.world:setActivePartition(demo)
+				//			this.world:load("maps/demo/demo.unv", function() 
+				//				this.world.ui:load("maps/demo/demo.ui")
+				//				--this.world:destroyPartition(old_partition)
+				//			end)
+				//
+				//			loaded = true
+				//		end
+				//	end			
+			case .DEMO: demo.update(g_dt, g_input);
+			case .LIGHTNING: lightning.update(g_dt);
+			case .PARTICLES:
+				particle_move.update(g_dt);
+				clutter_sphere.update(g_dt);
+		}
 	}
 }
 
-fn addWorld(world : World) : void {
-	g_world = world;
-}

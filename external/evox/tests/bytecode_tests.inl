@@ -2746,7 +2746,7 @@ TEST(HostCallWithTooFewArgumentsFails) {
 	CAPI_RUNTIME(module, runtime);
 	
 	test_push_i32(runtime, 20);
-	EXPECT_EQ(EX_RESULT_FAILURE, test_call(runtime, toLs("add")));
+	EXPECT_EQ(EX_RESULT_INVALID_ARGUMENT, test_call(runtime, toLs("add")));
 	u32 result_size = 123u;
 	EXPECT_TRUE(ex_task_result(runtime, &result_size) == nullptr);
 	EXPECT_EQ(0u, result_size);

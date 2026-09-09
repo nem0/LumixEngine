@@ -451,6 +451,12 @@ const ex_type* ex_type_array_element_type(const ex_type* type) {
 	return (const ex_type*)&type->bytecode->type_info[type->element_type_index];
 }
 
+const ex_type* ex_type_pointer_inner_type(const ex_type* type) {
+	if (!type || !type->bytecode || type->kind != EX_TYPE_CPTR) return NULL;
+	if (type->element_type_index >= type->bytecode->type_info_count) return NULL;
+	return (const ex_type*)&type->bytecode->type_info[type->element_type_index];
+}
+
 u32 ex_type_array_length(const ex_type* type) {
 	if (!type || type->kind != EX_TYPE_ARRAY) return 0u;
 	return type->array_length;

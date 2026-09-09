@@ -41,7 +41,7 @@ TEST(CallReportsAlreadyExecuting) {
 		return &nativeReenter;
 	}, nullptr));
 	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
-	EXPECT_EQ(EX_RESULT_ALREADY_EXECUTING, g_reentrant_call_result);
+	EXPECT_EQ(EX_RESULT_INVALID_STATE, g_reentrant_call_result);
 	ex_module_destroy(module);
 	return true;
 }
@@ -73,7 +73,10 @@ TEST(CallReturnsRuntimeError) {
 	EXPECT_EQ(EX_RESULT_OK, ex_module_compile(module, source, makeStringView(__func__), nullptr, nullptr));
 	RuntimeGuard runtime(module, &context.host);
 	EXPECT_TRUE(runtime);
-	EXPECT_EQ(EX_RESULT_RUNTIME_ERROR, test_call(runtime, toLs("recurse")));
+	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("recurse")));
+	ex_debug_event event = {};
+	EXPECT_EQ(EX_RESULT_OK, ex_debug_pause_event(runtime, &event));
+	EXPECT_EQ(EX_DEBUG_PAUSE_ERROR, event.reason);
 	ex_module_destroy(module);
 	return true;
 }

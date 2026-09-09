@@ -13,18 +13,18 @@ import "std:math"
 
 import "core:attributes" as attributes
 
-#[attributes.Data]
+#[attributes.Data {}]
 struct Player {
-	#[attributes.Owner]
+	#[attributes.Owner {}]
 	entity : Entity;
 	camera_pivot : ?Entity;
-	handle_input = false;
+	handle_input : bool;
 	forward : bool;
 	backward : bool;
 	left : bool;
 	right : bool;
-	pl.yaw : f32;
-	pl.pitch : f32;
+	yaw : f32;
+	pitch : f32;
 	sprint : bool;
 	speed_input_idx : i32;
 	falling_input_idx : i32;
@@ -38,6 +38,7 @@ struct Player {
 }
 
 var g_world : World = undefined;
+var g_input_system : InputSystem = undefined;
 
 fn getPlayer() : ?*Player {
 	var players = g_world.getEvoxData(Player);
@@ -51,7 +52,7 @@ fn processInputEvents() : void {
 
 	if not pl.handle_input { return; }
 
-	for event in input_system.getEvents() {
+	for event in g_input_system.getEvents() {
 		match event {
 			case AxisEvent:
 				if event.device_type == .MOUSE {
@@ -85,24 +86,13 @@ fn processInputEvents() : void {
 
 fn init(w : World, inp : InputSystem) : void {
 	g_world = w;
-	input_system = inp;
-	physics_module = w.physics();
+	g_input_system = inp;
 
 	var pl = getPlayer() else return;
 
-	camera_pivot = pl.entity.findChildByName("camera_pivot");
-	var animator = pl.entity.animator();
-	if animator == null {
-		logError("player.evox: Player without animator component");
-		return;
-	}
-	const anim = animator else return;
-
-	pl.speed_input_idx = anim.getInputIndex("speed_y");
-	pl.dir_input_idx = anim.getInputIndex("speed_x");
-	pl.stance_input_idx = anim.getInputIndex("stance");
-	pl.falling_input_idx = anim.getInputIndex("is_falling");
-	pl.aiming_input_idx = anim.getInputIndex("is_aiming");
+	pl.physics_module = w.physics();
+	pl.camera_pivot = pl.entity.findChildByName("camera_pivot");
+	pl.speed_input_idx = -1;
 }
 
 fn enableInput(enable : bool) : void {
@@ -127,7 +117,8 @@ fn safeSetBoolInput(anim : Animator, idx : i32, val : bool) : void {
 fn update(dt : f32) : void {
 	processInputEvents();
 
-	if const pm = physics_module {
+	var pl = getPlayer() else return;
+	if const pm = pl.physics_module {
 		for hit in pm.getControllerHits() {
 			const obj = hit.hit_entity;
 			if const a = obj.rigid_actor() {
@@ -137,7 +128,6 @@ fn update(dt : f32) : void {
 		}
 	}
 
-	var pl = getPlayer() else return;
 	const anim = pl.entity.animator() else return;
 
 	if pl.pitch < -0.9 { pl.pitch = -0.9; }
@@ -156,16 +146,24 @@ fn update(dt : f32) : void {
 						pl.right ? 3.0 :
 						0;
 	if pl.sprint {
-		pl.speed_x = pl.speed_x * 2.0;
-		pl.speed_y = pl.speed_y * 2.0;
+		speed_x = speed_x * 2.0;
+		speed_y = speed_y * 2.0;
 	}
 
-	safeSetFloatInput(anim, pl.speed_input_idx, pl.speed_x);
-	safeSetFloatInput(anim, pl.dir_input_idx, pl.speed_x);
+	if pl.speed_input_idx < 0 {
+		pl.speed_input_idx = anim.getInputIndex("speed_y");
+		pl.dir_input_idx = anim.getInputIndex("speed_x");
+		pl.stance_input_idx = anim.getInputIndex("stance");
+		pl.falling_input_idx = anim.getInputIndex("is_falling");
+		pl.aiming_input_idx = anim.getInputIndex("is_aiming");
+	}
+
+	safeSetFloatInput(anim, pl.speed_input_idx, speed_y);
+	safeSetFloatInput(anim, pl.dir_input_idx, speed_x);
 
 	safeSetFloatInput(anim, pl.stance_input_idx, pl.crouched ? 1.0 : 0.0);
 
-	safeSetBoolInput(anim, pl.falling_input_idx, pl.gravity_speed < -4.0);
+	safeSetBoolInput(anim, pl.falling_input_idx, gravity_speed < -4.0);
 	safeSetBoolInput(anim, pl.aiming_input_idx, pl.aiming);
 
 	const yaw_rot = makeQuatFromYaw(pl.yaw);

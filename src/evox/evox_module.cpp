@@ -104,8 +104,7 @@ struct EvoxSystemImpl : EvoxSystem {
 	void startGame() override {
 		m_is_game_running = true;
 		if (!m_is_ready) return;
-		for (EvoxModule* module : m_modules) addWorld(module->getWorld());
-		callStart();
+		callMain();
 	}
 
 	void stopGame() override {
@@ -129,7 +128,7 @@ struct EvoxSystemImpl : EvoxSystem {
 	void registerModule(EvoxModule& module) override {
 		m_modules.push(&module);
 		module.setEvoxDataTypes(m_data_types);
-		if (m_is_game_running && m_is_ready) addWorld(module.getWorld());
+		// The world is passed to main when the task starts.
 	}
 
 	void unregisterModule(EvoxModule& module) override { m_modules.eraseItem(&module); }
@@ -167,15 +166,25 @@ struct EvoxSystemImpl : EvoxSystem {
 	void createModules(World& world) override;
 
 	void update(float time_delta) override {
-		if (!m_is_ready || !m_runtime || !m_task) return;
-		// update() is not a resumable invocation. A suspended task can only be
-		// continued by the debugger; update scripts must not yield.
-		if (ex_task_get_state(m_task) == EX_TASK_SUSPENDED) return;
-		if (!m_is_game_running) return;
+		if (!m_is_ready || !m_runtime || !m_task || !m_is_game_running) return;
+		if (ex_task_get_state(m_task) != EX_TASK_SUSPENDED) return;
 
-		const ex_string_view function_name = toEvox("update");
-		const ex_result result = ex_call(m_task, function_name, &time_delta, sizeof(time_delta));
-		if (result != EX_RESULT_OK && result != EX_RESULT_FUNCTION_NOT_FOUND) logError("Evox update failed");
+		// The main script owns the frame loop and yields once per frame.
+		for (u32 i = 0, count = ex_debug_global_count(m_runtime); i < count; ++i) {
+			const ex_string_view name = ex_debug_global_name(m_runtime, i);
+			if (name.length != 4 || memcmp(name.begin, "g_dt", 4) != 0) continue;
+			u32 size = 0;
+			void* value = ex_debug_global_value(m_runtime, i, &size);
+			if (value && size == sizeof(time_delta)) memcpy(value, &time_delta, sizeof(time_delta));
+			break;
+		}
+
+		ex_debug_event event = {};
+		const bool debug_suspended = ex_debug_pause_event(m_task, &event) == EX_RESULT_OK;
+		if (debug_suspended && event.reason != EX_DEBUG_PAUSE_YIELD) return;
+
+		const ex_result result = ex_task_resume(m_task);
+		if (result != EX_RESULT_SUSPENDED && result != EX_RESULT_OK) logError("Evox main failed");
 	}
 
 	void loadRoot() {
@@ -184,21 +193,15 @@ struct EvoxSystemImpl : EvoxSystem {
 		if (m_resource) m_resource->onLoaded<&EvoxSystemImpl::onResourceChanged>(this);
 	}
 
-	void callStart() {
-		if (!m_runtime) return;
-		const ex_string_view function_name = toEvox("start");
-		InputSystem* input = &m_engine.getInputSystem();
-		const ex_result result = ex_call(m_task, function_name, &input, sizeof(input));
-		if (result != EX_RESULT_OK && result != EX_RESULT_FUNCTION_NOT_FOUND) logError("Evox start failed");
-	}
-
-	void addWorld(World& world) {
-		const ex_string_view function_name = toEvox("addWorld");
-		World* world_ptr = &world;
-		const ex_result result = ex_call(m_task, function_name, &world_ptr, sizeof(world_ptr));
-		if (result != EX_RESULT_OK && result != EX_RESULT_FUNCTION_NOT_FOUND) {
-			logError("Evox addWorld failed");
-		}
+	void callMain() {
+		if (!m_runtime || m_modules.empty()) return;
+		const ex_string_view function_name = toEvox("main");
+		struct Args {
+			InputSystem* input;
+			World* world;
+		} args{&m_engine.getInputSystem(), &m_modules[0]->getWorld()};
+		const ex_result result = ex_call(m_task, function_name, &args, sizeof(args));
+		if (result != EX_RESULT_SUSPENDED && result != EX_RESULT_OK && result != EX_RESULT_FUNCTION_NOT_FOUND) logError("Evox main failed");
 	}
 
 	static bool isEvoxDataType(const ex_type& type) {
@@ -296,8 +299,7 @@ struct EvoxSystemImpl : EvoxSystem {
 		if (!createRuntime()) return false;
 		// startGame can be called before the script resource has finished loading.
 		if (m_is_game_running) {
-			for (EvoxModule* module : m_modules) addWorld(module->getWorld());
-			callStart();
+			callMain();
 		}
 		return true;
 	}

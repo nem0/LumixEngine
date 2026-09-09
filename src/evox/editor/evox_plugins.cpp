@@ -26,6 +26,12 @@
 
 namespace Lumix {
 
+static bool isDebuggerSuspended(ex_task& task) {
+	if (!ex_debug_is_suspended(&task)) return false;
+	ex_debug_event event = {};
+	return ex_debug_pause_event(&task, &event) == EX_RESULT_OK && event.reason != EX_DEBUG_PAUSE_YIELD;
+}
+
 namespace EvoxTokens {
 
 static inline const u32 token_colors[] = {
@@ -333,6 +339,14 @@ static void drawVariable(ex_string_view name, const ex_type* type, void* value, 
 	}
 
 	const ex_type_kind kind = ex_type_get_kind(type);
+	if (kind == EX_TYPE_CPTR) {
+		const ex_type* inner = ex_type_pointer_inner_type(type);
+		void* pointee = *(void**)value;
+		if (inner && pointee) {
+			drawVariable(name, inner, pointee, editable, editor);
+			return;
+		}
+	}
 
 	if (kind == EX_TYPE_ANY) {
 		ImGui::TableNextRow();
@@ -465,10 +479,14 @@ static void drawVariable(ex_string_view name, const ex_type* type, void* value, 
 	if (kind == EX_TYPE_NULLABLE) {
 		ImGui::TextDisabled("null");
 	}
-	else if (kind == EX_TYPE_CPTR && editor) {
+	else if (kind == EX_TYPE_CPTR) {
+		// Typed pointers were handled before the table row was created.
+		// This path is only for opaque/null pointers.
 		drawPrimitiveValue(kind, value, type);
-		ImGui::SameLine();
-		if (ImGuiEx::IconButton(ICON_FA_BUG, "Break into C++ debugger")) debug::debugBreak();
+		if (editor) {
+			ImGui::SameLine();
+			if (ImGuiEx::IconButton(ICON_FA_BUG, "Break into C++ debugger")) debug::debugBreak();
+		}
 	}
 	else if (editable) {
 		switch (kind) {
@@ -711,7 +729,7 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 
 		u32 current_line = 0;
 		bool has_current_line = false;
-		if (task && ex_debug_is_suspended(task)) {
+		if (task && isDebuggerSuspended(*task)) {
 			ex_debug_event event = {};
 			if (ex_debug_pause_event(task, &event) == EX_RESULT_OK && event.location.line > 0) {
 				const StringView event_source(event.location.source_name.begin, event.location.source_name.length);
@@ -994,8 +1012,14 @@ struct EvoxAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	const char* getDefaultExtension() const override { return "evox"; }
 	
 	void createResource(OutputMemoryStream& content) override {
-		const char* template_str = R"(fn update(dt : f32) : void {
-	// Update logic here
+		const char* template_str = R"(import "core:input"
+import "core:world"
+
+fn main(input : InputSystem, world : World) : void {
+	while true {
+		yield;
+		// Update logic here
+	}
 }
 )";
 		content.write(template_str, stringLength(template_str));
@@ -1071,7 +1095,7 @@ struct EvoxDebuggerWindow final : StudioApp::GUIPlugin {
 		World* world = m_app.getWorldEditor().getWorld();
 		EvoxModule* module = world ? static_cast<EvoxModule*>(world->getModule("evox")) : nullptr;
 		ex_task* task = module ? module->getTask() : nullptr;
-		const bool suspended = task && ex_debug_is_suspended(task);
+		const bool suspended = task && isDebuggerSuspended(*task);
 		const bool just_suspended = suspended && !m_was_suspended;
 		m_was_suspended = suspended;
 
@@ -1090,25 +1114,13 @@ struct EvoxDebuggerWindow final : StudioApp::GUIPlugin {
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
 
 		// Execution controls
-		if (task && ex_debug_is_suspended(task)) {
-			if (g_debugger_continue.iconButton(true, &m_app)) { ex_debug_resume(task, EX_DEBUG_CONTINUE); m_step_requested = true; }
-			ImGui::SameLine();
-			if (g_debugger_step_over.iconButton(true, &m_app)) { ex_debug_resume(task, EX_DEBUG_STEP_OVER); m_step_requested = true; }
-			ImGui::SameLine();
-			if (g_debugger_step_into.iconButton(true, &m_app)) { ex_debug_resume(task, EX_DEBUG_STEP_INTO); m_step_requested = true; }
-			ImGui::SameLine();
-			if (g_debugger_step_out.iconButton(true, &m_app)) { ex_debug_resume(task, EX_DEBUG_STEP_OUT); m_step_requested = true; }
-		} else {
-			ImGui::BeginDisabled();
-			g_debugger_continue.iconButton(false, &m_app);
-			ImGui::SameLine();
-			g_debugger_step_over.iconButton(false, &m_app);
-			ImGui::SameLine();
-			g_debugger_step_into.iconButton(false, &m_app);
-			ImGui::SameLine();
-			g_debugger_step_out.iconButton(false, &m_app);
-			ImGui::EndDisabled();
-		}
+		if (g_debugger_continue.iconButton(suspended, &m_app)) { ex_debug_resume(task, EX_DEBUG_CONTINUE); m_step_requested = true; }
+		ImGui::SameLine();
+		if (g_debugger_step_over.iconButton(suspended, &m_app)) { ex_debug_resume(task, EX_DEBUG_STEP_OVER); m_step_requested = true; }
+		ImGui::SameLine();
+		if (g_debugger_step_into.iconButton(suspended, &m_app)) { ex_debug_resume(task, EX_DEBUG_STEP_INTO); m_step_requested = true; }
+		ImGui::SameLine();
+		if (g_debugger_step_out.iconButton(suspended, &m_app)) { ex_debug_resume(task, EX_DEBUG_STEP_OUT); m_step_requested = true; }
 
 		ImGui::PopStyleVar();
 
@@ -1124,7 +1136,7 @@ struct EvoxDebuggerWindow final : StudioApp::GUIPlugin {
 
 		const bool should_focus = just_suspended || m_step_requested;
 		m_step_requested = false;
-		if (should_focus && task && ex_debug_is_suspended(task)) {
+		if (should_focus && task && isDebuggerSuspended(*task)) {
 			ex_debug_event event = {};
 			if (ex_debug_pause_event(task, &event) == EX_RESULT_OK) {
 				const StringView src_name(event.location.source_name.begin, event.location.source_name.length);
@@ -1297,7 +1309,7 @@ struct EvoxVariablesWindow final : StudioApp::GUIPlugin {
 		ex_task* task = module ? module->getTask() : nullptr;
 		g_debug_runtime = runtime;
 
-		const bool suspended = task && ex_debug_is_suspended(task);
+		const bool suspended = task && isDebuggerSuspended(*task);
 		if (!task) {
 			ImGui::TextDisabled("Waiting for runtime...");
 		} else if (!suspended) {
@@ -1722,7 +1734,7 @@ struct EvoxPlugin : StudioApp::IPlugin {
 		EvoxModule* module = world ? static_cast<EvoxModule*>(world->getModule("evox")) : nullptr;
 		ex_task* task = module ? module->getTask() : nullptr;
 
-		if (task && ex_debug_is_suspended(task)) {
+		if (task && isDebuggerSuspended(*task)) {
 			if (m_app.checkShortcut(g_debugger_continue, true)) { ex_debug_resume(task, EX_DEBUG_CONTINUE); m_debugger.m_step_requested = true; }
 			if (m_app.checkShortcut(g_debugger_step_over, true)) { ex_debug_resume(task, EX_DEBUG_STEP_OVER); m_debugger.m_step_requested = true; }
 			if (m_app.checkShortcut(g_debugger_step_into, true)) { ex_debug_resume(task, EX_DEBUG_STEP_INTO); m_debugger.m_step_requested = true; }

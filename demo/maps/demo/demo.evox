@@ -110,8 +110,8 @@ struct ClosestButton {
 }
 
 fn findClosestButton() : ClosestButton {
-	if const pl = player.player { 
-		const player_pos = pl.getPosition();
+	if const pl = player.getPlayer() { 
+		const player_pos = pl.entity.getPosition();
 		const buttons = g_world.getEvoxData(Button);
 		if buttons.length == 0 { panic("No buttons"); }
 

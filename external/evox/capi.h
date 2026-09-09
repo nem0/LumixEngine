@@ -502,6 +502,8 @@ i32 ex_type_enum_value_value(const ex_type* type, u32 value_index);
 
 // Element type of the array or slice.
 const ex_type* ex_type_array_element_type(const ex_type* type);
+// Returns the pointee type for a language pointer, or NULL for opaque cptrs.
+const ex_type* ex_type_pointer_inner_type(const ex_type* type);
 
 // Compile-time element count. Returns the fixed length for EX_TYPE_ARRAY;
 // returns 0 for EX_TYPE_SLICE (whose length is dynamic at runtime).

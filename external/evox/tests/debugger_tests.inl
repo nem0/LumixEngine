@@ -68,6 +68,36 @@ TEST(DebugForLoopValueIsVisible) {
 	return true;
 }
 
+TEST(DebugBreakpointAfterYield) {
+	const char* source = R"(
+		fn main() : i32 {
+			yield;
+			return 42;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, toLs(__func__), 4u, nullptr));
+
+	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
+	ex_debug_event event = {};
+	EXPECT_EQ(EX_RESULT_OK, ex_debug_pause_event(runtime, &event));
+	EXPECT_EQ(EX_DEBUG_PAUSE_YIELD, event.reason);
+
+	// Resuming a normal yield must still execute breakpoint traps immediately
+	// after the yield.
+	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_task_resume(runtime));
+	EXPECT_EQ(EX_RESULT_OK, ex_debug_pause_event(runtime, &event));
+	EXPECT_EQ(EX_DEBUG_PAUSE_BREAKPOINT, event.reason);
+	EXPECT_EQ(4u, event.location.line);
+	EXPECT_EQ(EX_RESULT_OK, ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+
+	CAPI_END(module);
+	return true;
+}
+
 TEST(DebugStackDepthZeroWhenNotFailed) {
 	const char* source = R"(
 		fn main() : i32 {

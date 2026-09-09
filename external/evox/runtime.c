@@ -561,11 +561,17 @@ static int runtime_execute_function(ex_task* task, const ex_function_bc* functio
 		frame = resume_frame->frame;
 		task->is_suspended = false;
 
+		const bool resume_from_yield = task->pause_event.reason == EX_DEBUG_PAUSE_YIELD;
 		const ex_bytecode_breakpoint* breakpoint = runtime_find_breakpoint(task->bytecode, ip);
-		if (breakpoint) {
+		if (breakpoint && !resume_from_yield) {
 			op = (ex_op)breakpoint->original_byte;
 			++ip;
 			goto runtime_execute_function_dispatch;
+		}
+		if (breakpoint) {
+			task->pause_event.reason = EX_DEBUG_PAUSE_BREAKPOINT;
+			task->pause_event.message = (ex_string_view){NULL, 0};
+			goto runtime_execute_function_suspend;
 		}
 	} else {
 		if (!fn) return EXEC_FAIL;
