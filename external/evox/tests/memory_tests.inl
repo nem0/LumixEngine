@@ -167,7 +167,7 @@ TEST(IsizeIndexRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -364,7 +364,7 @@ TEST(SliceReinterpretToBytesLengthRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(16, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -385,7 +385,7 @@ TEST(SliceReinterpretRoundTripLengthRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(4, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -409,7 +409,7 @@ TEST(AllocWriteReadFreeRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -431,7 +431,7 @@ TEST(ByteSliceReinterpretLengthRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(4, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -453,7 +453,7 @@ TEST(MemberNullableAssignmentRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	// A nullable is a flag byte followed by the packed payload.
 	u32 result_size = 0;
 	const u8* result = (const u8*)ex_task_result(runtime, &result_size);
@@ -486,7 +486,7 @@ TEST(MemberArrayToSliceAssignmentRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(5, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;

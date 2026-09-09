@@ -345,7 +345,7 @@ TEST(BytecodeNullableElseReturn) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(4212, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -512,7 +512,7 @@ TEST(BytecodeNullableLocalNullCheck) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -545,7 +545,7 @@ TEST(BytecodeNullableStructComparison) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -569,7 +569,7 @@ TEST(BytecodeNullableReturnNull) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	// A nullable is a flag byte followed by the packed payload.
 	u32 result_size = 0;
 	const u8* result = (const u8*)ex_task_result(runtime, &result_size);
@@ -601,7 +601,7 @@ TEST(BytecodeNullableReturnValue) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	// A nullable is a flag byte followed by the packed payload.
 	u32 result_size = 0;
 	const u8* result = (const u8*)ex_task_result(runtime, &result_size);
@@ -651,7 +651,7 @@ TEST(BytecodeNullableThreeBytePayloadNullReturnHasFullSize) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);

@@ -582,7 +582,7 @@ typedef struct ex_task {
 // Re-enters the interpreter at the task's suspended frame. Internal entry
 // point used by `ex_debug_resume` (debugger.c); not part of the public C ABI.
 // Fails immediately when the task is not suspended.
-ex_result ex_task_resume_suspended(ex_task* task);
+ex_call_result ex_task_resume_suspended(ex_task* task);
 
 #ifdef __cplusplus
 }

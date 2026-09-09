@@ -33,10 +33,10 @@ TEST(ScientificNotationRuntimeValues) {
 		fn large() : f32 { return 1.25E+3; }
 	)"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("small")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("small")));
 	const float small = ex_task_to_f32(runtime, -1);
 	EXPECT_TRUE(small > 0.0f && small < 0.000001f);
-	EXPECT_TRUE(test_call(runtime, toLs("large")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("large")));
 	EXPECT_FLOAT_EQ(1250.0f, ex_task_to_f32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -100,7 +100,7 @@ TEST(RuneLiteralConcretizesToU8Runtime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(48, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -126,7 +126,7 @@ TEST(RuneLiteralUnicodeCodePointRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(128512, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -308,13 +308,13 @@ TEST(UntypedComptimeBindingsRemainUntypedUntilConsumed) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("as_i8")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("as_i8")));
 	EXPECT_EQ(12, ex_task_to_i8(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("as_i64")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("as_i64")));
 	EXPECT_EQ(12, ex_task_to_i64(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("as_f32")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("as_f32")));
 	EXPECT_FLOAT_EQ(1.5f, ex_task_to_f32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("as_f64")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("as_f64")));
 	EXPECT_FLOAT_EQ(1.5, ex_task_to_f64(runtime, -1));
 	CAPI_END(module);
 
@@ -449,7 +449,7 @@ TEST(NumericLiteralDigitSeparatorsRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_TRUE(ex_task_to_bool(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -475,7 +475,7 @@ TEST(HexadecimalIntegerLiteralsRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_TRUE(ex_task_to_bool(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -641,7 +641,7 @@ TEST(FunctionTypePointerQualifierIndirectCall) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(7, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -680,7 +680,7 @@ TEST(NullCPtrRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_TRUE(ex_task_to_ptr(runtime, -1) == nullptr);
 	CAPI_END(module);
 	return true;

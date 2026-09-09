@@ -16,7 +16,7 @@ TEST(ImportConst) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(main_source), makeStringView(__func__), &resolveEvoxImportC, &files));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(test_call(runtime, toLs("main")), EX_RESULT_OK);
+	EXPECT_EQ(test_call(runtime, toLs("main")), EX_CALL_RESULT_OK);
 	EXPECT_EQ(ex_task_to_i32(runtime, -1), 42);
 	CAPI_END(module);
 	return true;
@@ -44,7 +44,7 @@ TEST(ExternStructCanBeImported) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(main_source), makeStringView(__func__), &resolveEvoxImportC, &files));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(test_call(runtime, toLs("main")), EX_RESULT_OK);
+	EXPECT_EQ(test_call(runtime, toLs("main")), EX_CALL_RESULT_OK);
 	EXPECT_EQ(ex_task_to_i64(runtime, -1), 42);
 	CAPI_END(module);
 	return true;
@@ -629,7 +629,7 @@ TEST(UFCSNamespacePreferredOverLocalFunction) {
 	// e.destroy() = 2 (qualified), x.destroy() = 7 (method syntax prefers the
 	// receiver type's unit), destroy(x) = 3 (plain call stays lexical)
 	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
-		EXPECT_TRUE(test_call(runtime, toLs("main")));
+		EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 		EXPECT_EQ(12, ex_task_to_i32(runtime, -1));
 	);
 	return true;
@@ -666,7 +666,7 @@ TEST(UFCSPrefersNamespaceOverLocalFunction) {
 
 	// x.destroy() binds to entity_mod.destroy (receiver's unit), not the local fn
 	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
-		EXPECT_TRUE(test_call(runtime, toLs("main")));
+		EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 		EXPECT_EQ(7, ex_task_to_i32(runtime, -1));
 	);
 	return true;
@@ -925,7 +925,7 @@ TEST(ExternImport) {
 		};
 	}, nullptr) == EX_RESULT_OK);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(63, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -1043,21 +1043,21 @@ TEST(CoreMathImportRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("sin32")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("sin32")));
 	EXPECT_FLOAT_EQ(0.0f, ex_task_to_f32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("cos32")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("cos32")));
 	EXPECT_FLOAT_EQ(1.0f, ex_task_to_f32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("sin64")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("sin64")));
 	EXPECT_FLOAT_EQ(0.0f, (float)ex_task_to_f64(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("cos64")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("cos64")));
 	EXPECT_FLOAT_EQ(1.0f, (float)ex_task_to_f64(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("sqrt32")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("sqrt32")));
 	EXPECT_FLOAT_EQ(3.0f, ex_task_to_f32(runtime, -1));
-		EXPECT_TRUE(test_call(runtime, toLs("sqrt64")));
+		EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("sqrt64")));
 		EXPECT_FLOAT_EQ(4.0f, (float)ex_task_to_f64(runtime, -1));
-		EXPECT_TRUE(test_call(runtime, toLs("pow32")));
+		EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("pow32")));
 		EXPECT_FLOAT_EQ(2.0f, ex_task_to_f32(runtime, -1));
-		EXPECT_TRUE(test_call(runtime, toLs("pow64")));
+		EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("pow64")));
 		EXPECT_FLOAT_EQ(2.0f, (float)ex_task_to_f64(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1103,7 +1103,7 @@ TEST(AliasedImportRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(main_source), makeStringView(__func__), &resolveEvoxImportC, &files));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1157,7 +1157,7 @@ TEST(ExternFnSecondImportCorrectIndex) {
 		return nullptr;
 	}, nullptr) == EX_RESULT_OK);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(21, ex_task_to_i32(runtime, -1)); // 3 * 7 = 21, not 3 + 7 = 10
 
 	test_runtime_destroy(runtime);

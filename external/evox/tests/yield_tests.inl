@@ -12,14 +12,14 @@ TEST(YieldSuspendsAndResumes) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	RuntimeGuard runtime(module, &module_host);
 	EXPECT_TRUE(runtime);
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
 	EXPECT_EQ(1, ex_debug_is_suspended(runtime));
 	EXPECT_EQ(EX_RESULT_FAILURE, ex_debug_pause_event(runtime, nullptr)); // invalid output is rejected
 	// The event itself is available and identifies a language-level yield.
 	ex_debug_event event = {};
 	EXPECT_EQ(EX_RESULT_OK, ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ(EX_DEBUG_PAUSE_YIELD, event.reason);
-	EXPECT_EQ(EX_RESULT_OK, ex_task_resume(runtime));
+	EXPECT_EQ(EX_CALL_RESULT_OK, ex_task_resume(runtime));
 	EXPECT_EQ(2, ex_task_to_i32(runtime, -1));
 	EXPECT_EQ(0, ex_debug_is_suspended(runtime));
 	CAPI_END(module);
@@ -54,15 +54,15 @@ TEST(MultipleTasksCanBeCooperativelyInterleaved) {
 
 	const i32 seed_a = 10;
 	const i32 seed_b = 20;
-	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(task_a, toLs("worker"), &seed_a, sizeof(seed_a)));
-	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(task_b, toLs("worker"), &seed_b, sizeof(seed_b)));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, ex_call(task_a, toLs("worker"), &seed_a, sizeof(seed_a)));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, ex_call(task_b, toLs("worker"), &seed_b, sizeof(seed_b)));
 
 	// Advancing one task must not affect the other task's suspension.
-	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_task_resume(task_a));
-	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_task_resume(task_b));
-	EXPECT_EQ(EX_RESULT_OK, ex_task_resume(task_a));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, ex_task_resume(task_a));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, ex_task_resume(task_b));
+	EXPECT_EQ(EX_CALL_RESULT_OK, ex_task_resume(task_a));
 	EXPECT_EQ(11, ex_task_to_i32(task_a, -1));
-	EXPECT_EQ(EX_RESULT_OK, ex_task_resume(task_b));
+	EXPECT_EQ(EX_CALL_RESULT_OK, ex_task_resume(task_b));
 	EXPECT_EQ(21, ex_task_to_i32(task_b, -1));
 
 	ex_task_destroy(task_a);
@@ -101,18 +101,18 @@ TEST(MultipleTasksShareGlobalsWhileInterleaving) {
 
 	const i32 step_a = 1;
 	const i32 step_b = 10;
-	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(task_a, toLs("worker"), &step_a, sizeof(step_a)));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, ex_call(task_a, toLs("worker"), &step_a, sizeof(step_a)));
 	EXPECT_EQ(1, test_global_i32(runtime.runtime, 0));
-	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(task_b, toLs("worker"), &step_b, sizeof(step_b)));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, ex_call(task_b, toLs("worker"), &step_b, sizeof(step_b)));
 	EXPECT_EQ(11, test_global_i32(runtime.runtime, 0));
 
-	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_task_resume(task_a));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, ex_task_resume(task_a));
 	EXPECT_EQ(12, test_global_i32(runtime.runtime, 0));
-	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_task_resume(task_b));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, ex_task_resume(task_b));
 	EXPECT_EQ(22, test_global_i32(runtime.runtime, 0));
-	EXPECT_EQ(EX_RESULT_OK, ex_task_resume(task_a));
+	EXPECT_EQ(EX_CALL_RESULT_OK, ex_task_resume(task_a));
 	EXPECT_EQ(22, ex_task_to_i32(task_a, -1));
-	EXPECT_EQ(EX_RESULT_OK, ex_task_resume(task_b));
+	EXPECT_EQ(EX_CALL_RESULT_OK, ex_task_resume(task_b));
 	EXPECT_EQ(22, ex_task_to_i32(task_b, -1));
 	EXPECT_EQ(22, test_global_i32(runtime.runtime, 0));
 
@@ -137,9 +137,9 @@ TEST(YieldCanBeReachedMultipleTimes) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	RuntimeGuard runtime(module, &module_host);
 	EXPECT_TRUE(runtime);
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
-	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_task_resume(runtime));
-	EXPECT_EQ(EX_RESULT_OK, ex_task_resume(runtime));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, ex_task_resume(runtime));
+	EXPECT_EQ(EX_CALL_RESULT_OK, ex_task_resume(runtime));
 	EXPECT_EQ(111, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -163,8 +163,8 @@ TEST(YieldPreservesLocalsAndCallFrames) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	RuntimeGuard runtime(module, &module_host);
 	EXPECT_TRUE(runtime);
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
-	EXPECT_EQ(EX_RESULT_OK, ex_task_resume(runtime));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, ex_task_resume(runtime));
 	EXPECT_EQ(43, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -184,12 +184,12 @@ TEST(YieldDoesNotRunDeferUntilFunctionReturns) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	RuntimeGuard runtime(module, &module_host);
 	EXPECT_TRUE(runtime);
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
-	EXPECT_EQ(EX_RESULT_OK, ex_task_resume(runtime));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, ex_task_resume(runtime));
 	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 	// The deferred call runs after the return value has been produced.
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
-	EXPECT_EQ(EX_RESULT_OK, ex_task_resume(runtime));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, ex_task_resume(runtime));
 	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -210,10 +210,10 @@ TEST(YieldInLoopCanDriveFrameByFrameWork) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	RuntimeGuard runtime(module, &module_host);
 	EXPECT_TRUE(runtime);
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
-	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_task_resume(runtime));
-	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_task_resume(runtime));
-	EXPECT_EQ(EX_RESULT_OK, ex_task_resume(runtime));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, ex_task_resume(runtime));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, ex_task_resume(runtime));
+	EXPECT_EQ(EX_CALL_RESULT_OK, ex_task_resume(runtime));
 	EXPECT_EQ(3, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -231,8 +231,8 @@ TEST(YieldInConditionalBranch) {
 	RuntimeGuard runtime(module, &module_host);
 	EXPECT_TRUE(runtime);
 	test_push_bool(runtime, 1);
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
-	EXPECT_EQ(EX_RESULT_OK, ex_task_resume(runtime));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, ex_task_resume(runtime));
 	EXPECT_EQ(7, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -266,10 +266,10 @@ TEST(ResumeWithoutYieldFails) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	RuntimeGuard runtime(module, &module_host);
 	EXPECT_TRUE(runtime);
-	EXPECT_EQ(EX_RESULT_NOT_SUSPENDED, ex_task_resume(runtime));
-	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_NOT_SUSPENDED, ex_task_resume(runtime));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
-	EXPECT_EQ(EX_RESULT_NOT_SUSPENDED, ex_task_resume(runtime));
+	EXPECT_EQ(EX_CALL_RESULT_NOT_SUSPENDED, ex_task_resume(runtime));
 	CAPI_END(module);
 	return true;
 }
@@ -283,9 +283,9 @@ TEST(CannotCallWhileYielded) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	RuntimeGuard runtime(module, &module_host);
 	EXPECT_TRUE(runtime);
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
-	EXPECT_EQ(EX_RESULT_INVALID_STATE, test_call(runtime, toLs("other")));
-	EXPECT_EQ(EX_RESULT_OK, ex_task_resume(runtime));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_INVALID_STATE, test_call(runtime, toLs("other")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, ex_task_resume(runtime));
 	CAPI_END(module);
 	return true;
 }

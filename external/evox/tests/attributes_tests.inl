@@ -133,7 +133,7 @@ TEST(AttributeMetadataIsAvailableThroughCAPI) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 11u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_CALL_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	const ex_type* settings_type = nullptr;
 	for (u32 i = 0; i < ex_debug_frame_local_count(runtime, 0); ++i) {

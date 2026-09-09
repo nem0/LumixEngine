@@ -16,12 +16,6 @@ typedef struct ex_runtime_slice {
 	i64 length;
 } ex_runtime_slice;
 
-enum {
-	EXEC_FAIL = 0,
-	EXEC_OK = 1,
-	EXEC_SUSPENDED = 2,
-};
-
 ex_string_view ex_arg_read_string(ex_call_frame* frame) {
 	ex_runtime_slice slice = {NULL, 0};
 	memcpy(&slice, frame->args, sizeof(slice));
@@ -176,24 +170,6 @@ static bool runtime_debug_frame_location(const ex_bytecode* bytecode, const ex_f
 	return true;
 }
 
-static ex_string_view runtime_error_message(ex_op op) {
-	static const char generic[] = "runtime error";
-	static const char division_by_zero[] = "division by zero";
-	static const char modulo_by_zero[] = "modulo by zero";
-	static const char index_out_of_bounds[] = "index out of bounds";
-	static const char invalid_function[] = "invalid function call";
-
-	if ((op >= EX_OP_DIV_I8 && op <= EX_OP_DIV_F64) || (op >= EX_OP_DIV_I8_IMM && op <= EX_OP_DIV_F64_IMM)) {
-		return (ex_string_view){division_by_zero, sizeof(division_by_zero) - 1u};
-	}
-	if ((op >= EX_OP_MOD_I8 && op <= EX_OP_MOD_U64) || (op >= EX_OP_MOD_I8_IMM && op <= EX_OP_MOD_U64_IMM)) {
-		return (ex_string_view){modulo_by_zero, sizeof(modulo_by_zero) - 1u};
-	}
-	if (op >= EX_OP_LOAD_INDEXED_8 && op <= EX_OP_SLICE_STORE_64) return (ex_string_view){index_out_of_bounds, sizeof(index_out_of_bounds) - 1u};
-	if (op == EX_OP_CALL_DIRECT || op == EX_OP_CALL_INDIRECT) return (ex_string_view){invalid_function, sizeof(invalid_function) - 1u};
-	return (ex_string_view){generic, sizeof(generic) - 1u};
-}
-
 static void runtime_report_error(const ex_task* task, const ex_function_bc* function, const u8* ip, ex_string_view message) {
 	if (!task->host->print) return;
 	ex_debug_location location;
@@ -234,7 +210,7 @@ static void runtime_clear_step_traps(ex_task* task) {
 	task->step_trap_count = 0u;
 }
 
-static __forceinline bool runtime_enter_script_call(
+static __forceinline ex_call_result runtime_enter_script_call(
 	ex_task* task,
 	const ex_function_bc** function,
 	const u8** ip,
@@ -242,9 +218,9 @@ static __forceinline bool runtime_enter_script_call(
 	u8* callee_frame,
 	u8* caller_stack_top
 ) {
-	if (task->call_depth >= EX_MAX_CALL_DEPTH) return false;
+	if (task->call_depth >= EX_MAX_CALL_DEPTH) return EX_CALL_RESULT_CALL_DEPTH;
 	u8* callee_stack_top = callee_frame + callee->frame_size;
-	if (callee_stack_top > task->stack_end) return false;
+	if (callee_stack_top > task->stack_end) return EX_CALL_RESULT_STACK_OVERFLOW;
 
 	task->call_stack[task->call_depth] = (runtime_call_frame){ *function, *ip, task->frame, caller_stack_top };
 	task->call_depth++;
@@ -252,7 +228,7 @@ static __forceinline bool runtime_enter_script_call(
 	*ip = callee->code;
 	task->frame = callee_frame;
 	task->stack_top = callee_stack_top;
-	return true;
+	return EX_CALL_RESULT_OK;
 }
 
 static __forceinline bool runtime_invoke_native(ex_task* task, u32 function_index, const ex_function_bc* function, u8* args, u8** result_stack_top) {
@@ -537,20 +513,21 @@ static u64 runtime_numeric_to_u64(const u8* value, ex_type_kind kind) {
 // Runs either a fresh call to `function` or a previously suspended
 // frame. The task stack is already parked at the correct state when
 // `resume_frame` is non-NULL, so fresh-call setup is skipped in that case.
-static int runtime_execute_function(ex_task* task, const ex_function_bc* function, const runtime_call_frame* resume_frame) {
-	const ex_function_bc* fn = function;
+static ex_call_result runtime_execute_function(ex_task* task, const ex_function_bc* fn, const runtime_call_frame* resume_frame) {
 	const u8* ip;
 	u8* frame = NULL;
 	ex_op op = (ex_op)0;
 	ex_string_view panic_message = {NULL, 0};
 	bool is_panic = false;
+	ex_call_result call_result = EX_CALL_RESULT_SUSPENDED;
+	ex_call_result failure_result = EX_CALL_RESULT_RUNTIME_ERROR;
 	// Restore point for the whole host call, retained across suspend/resume.
 	runtime_restore_point* initial;
 	if (resume_frame) {
 		ASSERT(fn == resume_frame->function);
 		fn = resume_frame->function;
 		ip = resume_frame->ip;
-		if (task->call_start_depth == 0u) return EXEC_FAIL;
+		ASSERT(task->call_start_depth > 0u);
 		initial = &task->call_starts[task->call_start_depth - 1];
 		// The interpreter's locals (`frame` and `stack_top`) no longer exist
 		// after a suspension.  Do not rely on the cached task values here:
@@ -574,15 +551,15 @@ static int runtime_execute_function(ex_task* task, const ex_function_bc* functio
 			goto runtime_execute_function_suspend;
 		}
 	} else {
-		if (!fn) return EXEC_FAIL;
+		ASSERT(fn);
 
 		// Set before the frame-size check below can jump to the fail label, so a
 		// failure there (stack overflow at call entry, before the loop starts)
 		// reports this call's own function/instruction instead of reading garbage.
 		ip = fn->code;
 
-		if (task->stack_top < task->stack + fn->param_size) return EXEC_FAIL;
-		if (task->call_start_depth >= EX_MAX_CALL_DEPTH) return EXEC_FAIL;
+		ASSERT(task->stack_top >= task->stack + fn->param_size);
+		if (task->call_start_depth >= EX_MAX_CALL_DEPTH) return EX_CALL_RESULT_CALL_DEPTH;
 
 		initial = &task->call_starts[task->call_start_depth];
 		task->call_start_depth++;
@@ -599,7 +576,7 @@ static int runtime_execute_function(ex_task* task, const ex_function_bc* functio
 			task->frame = initial->frame;
 			task->call_depth = initial->call_depth;
 			--task->call_start_depth;
-			return EXEC_OK;
+			return EX_CALL_RESULT_OK;
 		}
 
 		u8* frame_stack_top = args + fn->frame_size;
@@ -815,7 +792,7 @@ static int runtime_execute_function(ex_task* task, const ex_function_bc* functio
 						task->result_size = size;
 						task->frame = initial->frame;
 						--task->call_start_depth;
-						return 1;
+						return EX_CALL_RESULT_OK;
 				}
 				const runtime_call_frame caller = task->call_stack[--task->call_depth];
 				fn = caller.function;
@@ -831,7 +808,11 @@ static int runtime_execute_function(ex_task* task, const ex_function_bc* functio
 				u8* caller_top = task->stack_top;
 				const ex_function_bc* callee = &task->bytecode->functions[callee_index];
 
-				if (!runtime_enter_script_call(task, &fn, &ip, callee, frame + arg_base, caller_top)) goto runtime_execute_function_fail;
+				ex_call_result enter_result = runtime_enter_script_call(task, &fn, &ip, callee, frame + arg_base, caller_top);
+				if (enter_result != EX_CALL_RESULT_OK) {
+					failure_result = enter_result;
+					goto runtime_execute_function_fail;
+				}
 				frame = task->frame;
 				break;
 			}
@@ -878,7 +859,11 @@ static int runtime_execute_function(ex_task* task, const ex_function_bc* functio
 					break;
 				}
 
-				if (!runtime_enter_script_call(task, &fn, &ip, callee, frame + dst, caller_top)) goto runtime_execute_function_fail;
+				ex_call_result enter_result = runtime_enter_script_call(task, &fn, &ip, callee, frame + dst, caller_top);
+				if (enter_result != EX_CALL_RESULT_OK) {
+					failure_result = enter_result;
+					goto runtime_execute_function_fail;
+				}
 				frame = task->frame;
 				break;
 			}
@@ -1163,7 +1148,7 @@ static int runtime_execute_function(ex_task* task, const ex_function_bc* functio
 					task->result_size = size;
 					task->frame = initial->frame;
 					--task->call_start_depth;
-					return 1;
+					return EX_CALL_RESULT_OK;
 				}
 
 				task->call_depth--;
@@ -1288,7 +1273,6 @@ static int runtime_execute_function(ex_task* task, const ex_function_bc* functio
 	}
 
 runtime_execute_function_fail:
-	const ex_string_view error_message = runtime_error_message(op);
 	runtime_clear_step_traps(task);
 	// The dispatch loop advances ip while decoding operands. On this rare path,
 	// recover the preceding emitted opcode from the source map instead of
@@ -1302,11 +1286,22 @@ runtime_execute_function_fail:
 		}
 		ip = entry ? fn->code + entry->code_offset : fn->code;
 	}
-	runtime_report_error(task, fn, ip, is_panic ? panic_message : error_message);
+	call_result = 	is_panic 													? EX_CALL_RESULT_PANIC
+					: op >= EX_OP_DIV_I8 && op <= EX_OP_DIV_F64 				? EX_CALL_RESULT_DIVISION_BY_ZERO
+					: op >= EX_OP_DIV_I8_IMM && op <= EX_OP_DIV_F64_IMM 		? EX_CALL_RESULT_DIVISION_BY_ZERO
+					: op >= EX_OP_MOD_I8 && op <= EX_OP_MOD_U64 				? EX_CALL_RESULT_MODULO_BY_ZERO
+					: op >= EX_OP_MOD_I8_IMM && op <= EX_OP_MOD_U64_IMM			? EX_CALL_RESULT_MODULO_BY_ZERO
+					: op >= EX_OP_LOAD_INDEXED_8 && op <= EX_OP_SLICE_STORE_64	? EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS
+					: op == EX_OP_CALL_DIRECT									? EX_CALL_RESULT_INVALID_FUNCTION_CALL
+					: op == EX_OP_CALL_NATIVE									? EX_CALL_RESULT_INVALID_FUNCTION_CALL
+					: op == EX_OP_CALL_INDIRECT 								? EX_CALL_RESULT_INVALID_FUNCTION_CALL
+					: EX_CALL_RESULT_RUNTIME_ERROR;
+	if (failure_result != EX_CALL_RESULT_RUNTIME_ERROR) call_result = failure_result;
+	if (is_panic) runtime_report_error(task, fn, ip, panic_message);
 	// A task error suspends using the same reified frame as EX_OP_BREAK;
 	// state is left exactly as-is instead of being unwound.
 	task->pause_event.reason = EX_DEBUG_PAUSE_ERROR;
-	task->pause_event.message = is_panic ? panic_message : error_message;
+	task->pause_event.message = is_panic ? panic_message : (ex_string_view){NULL, 0};
 
 runtime_execute_function_suspend:
 	runtime_clear_step_traps(task);
@@ -1341,14 +1336,14 @@ runtime_execute_function_suspend:
 		if (caller->function && caller->ip > caller->function->code) {
 			const u32 caller_offset = (u32)(caller->ip - 1u - caller->function->code);
 			if (runtime_debug_frame_location(task->bytecode, caller->function, caller_offset, &task->pause_event.location)) {
-				return EXEC_SUSPENDED;
+				return EX_CALL_RESULT_SUSPENDED;
 			}
 		}
 	}
 	if (!runtime_debug_frame_location(task->bytecode, fn, (u32)(ip - fn->code), &task->pause_event.location)) {
 		task->pause_event.location = (ex_debug_location){ {NULL, 0}, 0u, 0u };
 	}
-	return EXEC_SUSPENDED;
+	return call_result;
 }
 
 ex_runtime* ex_runtime_create(ex_bytecode* bytecode, ex_host* host) {
@@ -1383,7 +1378,7 @@ ex_runtime* ex_runtime_create(ex_bytecode* bytecode, ex_host* host) {
 		// Global initialization gets a private stack, but its writes target the
 		// runtime-global storage. A suspension during creation is unsupported.
 		ex_task* init_task = ex_task_create(runtime);
-		if (!init_task || runtime_execute_function(init_task, &bytecode->functions[bytecode->function_count - 1u], NULL) != EXEC_OK) {
+		if (!init_task || runtime_execute_function(init_task, &bytecode->functions[bytecode->function_count - 1u], NULL) != EX_CALL_RESULT_OK) {
 			if (init_task) ex_task_destroy(init_task);
 			ex_runtime_destroy(runtime);
 			return NULL;
@@ -1494,31 +1489,25 @@ void* ex_task_to_ptr(ex_task* task, i32 index) {
 	return value;
 }
 
-static ex_result runtime_exec_result_to_ls_result(int exec_result) {
-	switch (exec_result) {
-		case EXEC_OK: return EX_RESULT_OK;
-		case EXEC_SUSPENDED: return EX_RESULT_SUSPENDED;
-		default: return EX_RESULT_RUNTIME_ERROR;
-	}
-}
+ex_call_result ex_call(ex_task* task, ex_string_view function_name, const void* args, u32 args_size) {
+	if (!task) return EX_CALL_RESULT_INVALID_ARGUMENT;
+	if (task->executing || task->is_suspended) return EX_CALL_RESULT_INVALID_STATE;
 
-ex_result ex_call(ex_task* task, ex_string_view function_name, const void* args, u32 args_size) {
-	if (!task) return EX_RESULT_INVALID_ARGUMENT;
-	if (task->executing || task->is_suspended) return EX_RESULT_INVALID_STATE;
 	task->result_size = 0u;
 	const ex_function_bc* function = runtime_find_function_by_name(task->bytecode, function_name, NULL);
-	if (!function) return EX_RESULT_FUNCTION_NOT_FOUND;
+	if (!function) return EX_CALL_RESULT_FUNCTION_NOT_FOUND;
+	
 	if (args_size != function->param_size) {
 		task->state = EX_TASK_FAILED;
-		return EX_RESULT_INVALID_ARGUMENT;
+		return EX_CALL_RESULT_INVALID_ARGUMENT;
 	}
 	if (args_size > 0u && !args) {
 		task->state = EX_TASK_FAILED;
-		return EX_RESULT_INVALID_ARGUMENT;
+		return EX_CALL_RESULT_INVALID_ARGUMENT;
 	}
 	if (function->param_size > EX_STACK_CAPACITY_BYTES) {
 		task->state = EX_TASK_FAILED;
-		return EX_RESULT_INVALID_ARGUMENT;
+		return EX_CALL_RESULT_INVALID_ARGUMENT;
 	}
 
 	runtime_clear_step_traps(task);
@@ -1533,17 +1522,17 @@ ex_result ex_call(ex_task* task, ex_string_view function_name, const void* args,
 	task->stack_top += args_size;
 
 	task->executing = true;
-	const ex_result result = runtime_exec_result_to_ls_result(runtime_execute_function(task, function, NULL));
+	const ex_call_result result = runtime_execute_function(task, function, NULL);
 	task->executing = false;
-	if (result == EX_RESULT_SUSPENDED) task->state = EX_TASK_SUSPENDED;
-	else if (result == EX_RESULT_OK) task->state = EX_TASK_READY;
+	if (result == EX_CALL_RESULT_SUSPENDED) task->state = EX_TASK_SUSPENDED;
+	else if (result == EX_CALL_RESULT_OK) task->state = EX_TASK_READY;
 	else task->state = EX_TASK_FAILED;
 	return result;
 }
 
-ex_result ex_task_resume_suspended(ex_task* task) {
-	if (!task) return EX_RESULT_INVALID_ARGUMENT;
-	if (!task->is_suspended) return EX_RESULT_NOT_SUSPENDED;
+ex_call_result ex_task_resume_suspended(ex_task* task) {
+	if (!task) return EX_CALL_RESULT_INVALID_ARGUMENT;
+	if (!task->is_suspended) return EX_CALL_RESULT_NOT_SUSPENDED;
 	if (task->step_action != EX_DEBUG_CONTINUE) {
 		// Arm source-location traps only while executing a step. This shifts the
 		// debugger's work from the interpreter's hot loop to resume time.
@@ -1557,7 +1546,7 @@ ex_result ex_task_resume_suspended(ex_task* task) {
 		}
 		if (count > task->step_trap_capacity) {
 			runtime_step_trap* traps = (runtime_step_trap*)realloc(task->step_traps, sizeof(runtime_step_trap) * count);
-			if (!traps) return EX_RESULT_OUT_OF_MEMORY;
+			if (!traps) return EX_CALL_RESULT_OUT_OF_MEMORY;
 			task->step_traps = traps;
 			task->step_trap_capacity = count;
 		}
@@ -1573,20 +1562,20 @@ ex_result ex_task_resume_suspended(ex_task* task) {
 		}
 	}
 	task->fail_frame_count = 0u;
-	return runtime_exec_result_to_ls_result(runtime_execute_function(task, task->suspended_frame.function, &task->suspended_frame));
+	return runtime_execute_function(task, task->suspended_frame.function, &task->suspended_frame);
 }
 
-ex_result ex_task_resume(ex_task* task) {
-	if (!task) return EX_RESULT_INVALID_ARGUMENT;
-	if (task->executing) return EX_RESULT_ALREADY_EXECUTING;
-	if (!task->is_suspended) return EX_RESULT_NOT_SUSPENDED;
-	if (task->pause_event.reason != EX_DEBUG_PAUSE_YIELD) return EX_RESULT_NOT_RESUMABLE;
+ex_call_result ex_task_resume(ex_task* task) {
+	if (!task) return EX_CALL_RESULT_INVALID_ARGUMENT;
+	if (task->executing) return EX_CALL_RESULT_ALREADY_EXECUTING;
+	if (!task->is_suspended) return EX_CALL_RESULT_NOT_SUSPENDED;
+	if (task->pause_event.reason != EX_DEBUG_PAUSE_YIELD) return EX_CALL_RESULT_NOT_RESUMABLE;
 
 	task->executing = true;
-	const ex_result result = ex_task_resume_suspended(task);
+	const ex_call_result result = ex_task_resume_suspended(task);
 	task->executing = false;
-	if (result == EX_RESULT_SUSPENDED) task->state = EX_TASK_SUSPENDED;
-	else if (result == EX_RESULT_OK) task->state = EX_TASK_READY;
+	if (result == EX_CALL_RESULT_SUSPENDED) task->state = EX_TASK_SUSPENDED;
+	else if (result == EX_CALL_RESULT_OK) task->state = EX_TASK_READY;
 	else task->state = EX_TASK_FAILED;
 	return result;
 }

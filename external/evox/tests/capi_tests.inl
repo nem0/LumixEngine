@@ -10,16 +10,16 @@ TEST(CallReturnsSpecificResults) {
 	{
 		RuntimeGuard runtime(module, &context.host);
 		EXPECT_TRUE(runtime);
-		EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
-		EXPECT_EQ(EX_RESULT_FUNCTION_NOT_FOUND, test_call(runtime, toLs("missing")));
-		EXPECT_EQ(EX_RESULT_NOT_SUSPENDED, ex_task_resume(runtime));
+		EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+		EXPECT_EQ(EX_CALL_RESULT_FUNCTION_NOT_FOUND, test_call(runtime, toLs("missing")));
+		EXPECT_EQ(EX_CALL_RESULT_NOT_SUSPENDED, ex_task_resume(runtime));
 	}
 	{
 		RuntimeGuard runtime(module, &context.host);
 		EXPECT_TRUE(runtime);
 		i32 value = 1;
-		EXPECT_EQ(EX_RESULT_INVALID_ARGUMENT, ex_call(runtime.get(), toLs("takes_arg"), nullptr, 0));
-		EXPECT_EQ(EX_RESULT_OK, ex_call(runtime.get(), toLs("takes_arg"), &value, sizeof(value)));
+		EXPECT_EQ(EX_CALL_RESULT_INVALID_ARGUMENT, ex_call(runtime.get(), toLs("takes_arg"), nullptr, 0));
+		EXPECT_EQ(EX_CALL_RESULT_OK, ex_call(runtime.get(), toLs("takes_arg"), &value, sizeof(value)));
 	}
 
 	ex_module_destroy(module);
@@ -36,12 +36,12 @@ TEST(CallReportsAlreadyExecuting) {
 	EXPECT_EQ(EX_RESULT_OK, ex_module_compile(module, source, makeStringView(__func__), nullptr, nullptr));
 	RuntimeGuard runtime(module, &context.host);
 	EXPECT_TRUE(runtime);
-	g_reentrant_call_result = EX_RESULT_FAILURE;
+	g_reentrant_call_result = EX_CALL_RESULT_RUNTIME_ERROR;
 	EXPECT_EQ(EX_RESULT_OK, ex_runtime_set_native_resolver(test_vm(runtime), [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
 		return &nativeReenter;
 	}, nullptr));
-	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
-	EXPECT_EQ(EX_RESULT_INVALID_STATE, g_reentrant_call_result);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_INVALID_STATE, g_reentrant_call_result);
 	ex_module_destroy(module);
 	return true;
 }
@@ -56,11 +56,11 @@ TEST(CallReturnsSuspended) {
 	EXPECT_EQ(EX_RESULT_OK, ex_module_compile(module, source, makeStringView(__func__), nullptr, nullptr));
 	RuntimeGuard runtime(module, &context.host);
 	EXPECT_TRUE(runtime);
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
-	EXPECT_EQ(EX_RESULT_INVALID_STATE, ex_call(runtime.get(), toLs("main"), nullptr, 0));
-	EXPECT_EQ(EX_RESULT_OK, ex_task_resume(runtime));
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("fail")));
-	EXPECT_EQ(EX_RESULT_NOT_RESUMABLE, ex_task_resume(runtime));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_INVALID_STATE, ex_call(runtime.get(), toLs("main"), nullptr, 0));
+	EXPECT_EQ(EX_CALL_RESULT_OK, ex_task_resume(runtime));
+	EXPECT_EQ(EX_CALL_RESULT_PANIC, test_call(runtime, toLs("fail")));
+	EXPECT_EQ(EX_CALL_RESULT_NOT_RESUMABLE, ex_task_resume(runtime));
 	ex_module_destroy(module);
 	return true;
 }
@@ -73,10 +73,28 @@ TEST(CallReturnsRuntimeError) {
 	EXPECT_EQ(EX_RESULT_OK, ex_module_compile(module, source, makeStringView(__func__), nullptr, nullptr));
 	RuntimeGuard runtime(module, &context.host);
 	EXPECT_TRUE(runtime);
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("recurse")));
+	EXPECT_EQ(EX_CALL_RESULT_CALL_DEPTH, test_call(runtime, toLs("recurse")));
 	ex_debug_event event = {};
 	EXPECT_EQ(EX_RESULT_OK, ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ(EX_DEBUG_PAUSE_ERROR, event.reason);
+	ex_module_destroy(module);
+	return true;
+}
+
+TEST(CallReturnsIndexOutOfBounds) {
+	TestContext context;
+	ex_module* module = ex_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const ex_string_view source = makeStringView(
+		"fn index(i : i32) : i32 {\n"
+		"\tvar values : [1]i32 = [42];\n"
+		"\treturn values[i];\n"
+		"}\n");
+	EXPECT_EQ(EX_RESULT_OK, ex_module_compile(module, source, makeStringView(__func__), nullptr, nullptr));
+	RuntimeGuard runtime(module, &context.host);
+	EXPECT_TRUE(runtime);
+	test_push_i32(runtime, 1);
+	EXPECT_EQ(EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS, test_call(runtime, toLs("index")));
 	ex_module_destroy(module);
 	return true;
 }

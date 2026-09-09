@@ -242,7 +242,7 @@ TEST(AnyRuntimePrimitiveMatch) {
 		}
 	)"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(43, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -260,7 +260,7 @@ TEST(AnyRuntimeFallbackMatch) {
 		}
 	)"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(2, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -279,7 +279,7 @@ TEST(AnyRuntimeStructMatch) {
 		}
 	)"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -302,7 +302,7 @@ TEST(AnyRuntimeDistinguishesStructTypes) {
 		}
 	)"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(12, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -320,7 +320,7 @@ TEST(AnyRuntimeRvalueArgumentMatch) {
 		fn main() : i32 { return inspect(123); }
 	)"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(123, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -340,7 +340,7 @@ TEST(AnyRuntimeOriginalLvalueMatch) {
 		}
 	)"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(9, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;

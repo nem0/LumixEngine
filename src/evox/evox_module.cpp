@@ -183,8 +183,8 @@ struct EvoxSystemImpl : EvoxSystem {
 		const bool debug_suspended = ex_debug_pause_event(m_task, &event) == EX_RESULT_OK;
 		if (debug_suspended && event.reason != EX_DEBUG_PAUSE_YIELD) return;
 
-		const ex_result result = ex_task_resume(m_task);
-		if (result != EX_RESULT_SUSPENDED && result != EX_RESULT_OK) logError("Evox main failed");
+		const ex_call_result result = ex_task_resume(m_task);
+		if (result != EX_CALL_RESULT_SUSPENDED && result != EX_CALL_RESULT_OK) logError("Evox main failed");
 	}
 
 	void loadRoot() {
@@ -200,8 +200,8 @@ struct EvoxSystemImpl : EvoxSystem {
 			InputSystem* input;
 			World* world;
 		} args{&m_engine.getInputSystem(), &m_modules[0]->getWorld()};
-		const ex_result result = ex_call(m_task, function_name, &args, sizeof(args));
-		if (result != EX_RESULT_SUSPENDED && result != EX_RESULT_OK && result != EX_RESULT_FUNCTION_NOT_FOUND) logError("Evox main failed");
+		const ex_call_result result = ex_call(m_task, function_name, &args, sizeof(args));
+		if (result != EX_CALL_RESULT_SUSPENDED && result != EX_CALL_RESULT_OK && result != EX_CALL_RESULT_FUNCTION_NOT_FOUND) logError("Evox main failed");
 	}
 
 	static bool isEvoxDataType(const ex_type& type) {

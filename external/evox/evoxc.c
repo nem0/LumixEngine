@@ -37,17 +37,25 @@ static ex_string_view ex_from_cstr(const char* str) {
 	return (ex_string_view){str, str ? (i64)strlen(str) : 0};
 }
 
-static const char* evoxc_result_name(ex_result result) {
+static const char* evoxc_result_name(ex_call_result result) {
 	switch (result) {
-		case EX_RESULT_FUNCTION_NOT_FOUND: return "function not found";
-		case EX_RESULT_INVALID_ARGUMENT: return "invalid arguments";
-		case EX_RESULT_INVALID_STATE: return "invalid task state";
-		case EX_RESULT_ALREADY_EXECUTING: return "task already executing";
-		case EX_RESULT_NOT_SUSPENDED: return "task is not suspended";
-		case EX_RESULT_NOT_RESUMABLE: return "task suspension is not resumable";
-		case EX_RESULT_OUT_OF_MEMORY: return "out of memory";
-		case EX_RESULT_RUNTIME_ERROR: return "script runtime error";
-		case EX_RESULT_SUSPENDED: return "execution suspended";
+		case EX_CALL_RESULT_FUNCTION_NOT_FOUND: return "function not found";
+		case EX_CALL_RESULT_INVALID_ARGUMENT: return "invalid arguments";
+		case EX_CALL_RESULT_INVALID_STATE: return "invalid task state";
+		case EX_CALL_RESULT_ALREADY_EXECUTING: return "task already executing";
+		case EX_CALL_RESULT_NOT_SUSPENDED: return "task is not suspended";
+		case EX_CALL_RESULT_NOT_RESUMABLE: return "task suspension is not resumable";
+		case EX_CALL_RESULT_OUT_OF_MEMORY: return "out of memory";
+		case EX_CALL_RESULT_RUNTIME_ERROR: return "script runtime error";
+		case EX_CALL_RESULT_DIVISION_BY_ZERO: return "division by zero";
+		case EX_CALL_RESULT_MODULO_BY_ZERO: return "modulo by zero";
+		case EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS: return "index out of bounds";
+		case EX_CALL_RESULT_INVALID_FUNCTION_CALL: return "invalid function call";
+		case EX_CALL_RESULT_PANIC: return "panic";
+		case EX_CALL_RESULT_STACK_OVERFLOW: return "stack overflow";
+		case EX_CALL_RESULT_CALL_DEPTH: return "call depth exceeded";
+		case EX_CALL_RESULT_ABORTED: return "execution aborted";
+		case EX_CALL_RESULT_SUSPENDED: return "execution suspended";
 		case EX_RESULT_FAILURE: return "internal failure";
 		default: return "unknown error";
 	}
@@ -830,7 +838,7 @@ int main(int argc, char** argv) {
 
 		// Bytecode compilation and runtime setup are intentionally outside the benchmark.
 		double start = ex_platform_now_ms();
-		ex_result call_result = ex_call(ctx.task, ex_from_cstr(function_name), call_args, call_args_size);
+		ex_call_result call_result = ex_call(ctx.task, ex_from_cstr(function_name), call_args, call_args_size);
 		if (call_result != EX_RESULT_OK) {
 			fprintf(stderr, "Error: Failed to call '%s': %s\n", function_name, evoxc_result_name(call_result));
 			goto cleanup;

@@ -17,14 +17,18 @@ void print(const char* val) { printf("%s", val); }
 void print(int val) { printf("%d", val); }
 
 #define EXPECT_EQ(expected, actual) \
-	if ((expected) != (actual)) { \
-		if constexpr (sizeof(expected) == 8) { \
-			printf("TEST FAILED at %s:%d: Expected: %lld, Actual: %lld\n", __FILE__, __LINE__, (long long)(expected), (long long)(actual)); \
-		} else { \
-			printf("TEST FAILED at %s:%d: Expected: %d, Actual: %d\n", __FILE__, __LINE__, (int)(expected), (int)(actual)); \
+	do { \
+		auto expected_value = (expected); \
+		auto actual_value = (actual); \
+		if (expected_value != actual_value) { \
+			if constexpr (sizeof(expected_value) == 8) { \
+				printf("TEST FAILED at %s:%d: Expected: %lld, Actual: %lld\n", __FILE__, __LINE__, (long long)expected_value, (long long)actual_value); \
+			} else { \
+				printf("TEST FAILED at %s:%d: Expected: %d, Actual: %d\n", __FILE__, __LINE__, (int)expected_value, (int)actual_value); \
+			} \
+			return false; \
 		} \
-		return false; \
-	}
+	} while (false)
 
 #define EXPECT_FLOAT_EQ(expected, actual) \
 	do { \
@@ -231,8 +235,8 @@ struct RuntimeGuard {
 		push(slice);
 	}
 
-	ex_result call(ex_string_view name) {
-		ex_result result = ex_call(task, name, args.empty() ? nullptr : args.data(), (u32)args.size());
+	ex_call_result call(ex_string_view name) {
+		ex_call_result result = ex_call(task, name, args.empty() ? nullptr : args.data(), (u32)args.size());
 		args.clear();
 		return result;
 	}
@@ -251,11 +255,11 @@ static ex_task* test_task_for_runtime(ex_runtime* runtime) {
 	return task;
 }
 
-static ex_result test_call(RuntimeGuard& runtime, ex_string_view name) { return runtime.call(name); }
-static ex_result test_call(ex_runtime* runtime, ex_string_view name) {
+static ex_call_result test_call(RuntimeGuard& runtime, ex_string_view name) { return runtime.call(name); }
+static ex_call_result test_call(ex_runtime* runtime, ex_string_view name) {
 	ex_task* task = test_task_for_runtime(runtime);
 	std::vector<u8>& args = test_task_args()[task];
-	ex_result result = ex_call(task, name, args.empty() ? nullptr : args.data(), (u32)args.size());
+	ex_call_result result = ex_call(task, name, args.empty() ? nullptr : args.data(), (u32)args.size());
 	args.clear();
 	return result;
 }
@@ -324,7 +328,7 @@ static const void* ex_task_result(ex_runtime* runtime, u32* size) { return ex_ta
 
 static int ex_debug_is_suspended(ex_runtime* runtime) { return ex_debug_is_suspended(test_task_for_runtime(runtime)); }
 static ex_result ex_debug_pause_event(ex_runtime* runtime, ex_debug_event* event) { return ex_debug_pause_event(test_task_for_runtime(runtime), event); }
-static ex_result ex_debug_resume(ex_runtime* runtime, ex_debug_action action) { return ex_debug_resume(test_task_for_runtime(runtime), action); }
+static ex_call_result ex_debug_resume(ex_runtime* runtime, ex_debug_action action) { return ex_debug_resume(test_task_for_runtime(runtime), action); }
 static u32 ex_debug_stack_depth(ex_runtime* runtime) { return ex_debug_stack_depth(test_task_for_runtime(runtime)); }
 static ex_string_view ex_debug_frame_function_name(ex_runtime* runtime, u32 index) { return ex_debug_frame_function_name(test_task_for_runtime(runtime), index); }
 static ex_result ex_debug_frame_location(ex_runtime* runtime, u32 index, ex_debug_location* location) { return ex_debug_frame_location(test_task_for_runtime(runtime), index, location); }
@@ -359,7 +363,7 @@ static void nativeAddC(ex_runtime* runtime, ex_call_frame frame) {
 	EX_RESULT(frame, a + b);
 }
 
-static ex_result g_reentrant_call_result = EX_RESULT_FAILURE;
+static ex_call_result g_reentrant_call_result = EX_CALL_RESULT_RUNTIME_ERROR;
 
 static void nativeReenter(ex_runtime* runtime, ex_call_frame) {
 	g_reentrant_call_result = ex_call(test_task_for_runtime(runtime), makeStringView("main"), nullptr, 0);

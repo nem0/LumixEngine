@@ -192,8 +192,9 @@ ex_result ex_debug_pause_event(ex_task* task, ex_debug_event* out_event) {
 	return EX_RESULT_OK;
 }
 
-ex_result ex_debug_resume(ex_task* task, ex_debug_action action) {
-	if (!task || task->executing || !task->is_suspended) return EX_RESULT_FAILURE;
+ex_call_result ex_debug_resume(ex_task* task, ex_debug_action action) {
+	if (!task) return EX_CALL_RESULT_INVALID_ARGUMENT;
+	if (task->executing || !task->is_suspended) return EX_CALL_RESULT_INVALID_STATE;
 	if (action == EX_DEBUG_ABORT) {
 		// Preserve the suspended call stack as a failed-call trace, then reset
 		// the task to its call-start state without resuming the interpreter.
@@ -215,7 +216,7 @@ ex_result ex_debug_resume(ex_task* task, ex_debug_action action) {
 		--task->call_start_depth;
 		task->step_action = EX_DEBUG_CONTINUE;
 		task->state = EX_TASK_FAILED;
-		return EX_RESULT_FAILURE;
+		return EX_CALL_RESULT_ABORTED;
 	}
 	// The pause event's location is exactly "the line we're stopped at" (it
 	// was populated from this same suspended_frame at suspend time), so it
@@ -224,10 +225,10 @@ ex_result ex_debug_resume(ex_task* task, ex_debug_action action) {
 	task->step_start_line = task->pause_event.location.line;
 	task->step_start_call_depth = task->call_depth;
 	task->executing = true;
-	const ex_result result = ex_task_resume_suspended(task);
+	const ex_call_result result = ex_task_resume_suspended(task);
 	task->executing = false;
-	if (result == EX_RESULT_SUSPENDED) task->state = EX_TASK_SUSPENDED;
-	else if (result == EX_RESULT_OK) task->state = EX_TASK_READY;
+	if (result == EX_CALL_RESULT_SUSPENDED) task->state = EX_TASK_SUSPENDED;
+	else if (result == EX_CALL_RESULT_OK) task->state = EX_TASK_READY;
 	else task->state = EX_TASK_FAILED;
 	return result;
 }

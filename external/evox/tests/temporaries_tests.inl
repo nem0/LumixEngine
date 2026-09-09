@@ -109,7 +109,7 @@ TEST(TemporarySliceIndexAssignmentFails) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(9, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -128,7 +128,7 @@ TEST(DynamicNestedArrayIndexAssignmentNeedsIRSupport) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(9, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -147,7 +147,7 @@ TEST(DynamicNonSquareNestedArrayIndexStore) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(139, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -165,7 +165,7 @@ TEST(DynamicNonSquareNestedArrayIndexLoad) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(50, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -194,7 +194,7 @@ TEST(NestedArrayIndicesEvaluateLeftToRight) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(12, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -211,7 +211,7 @@ TEST(ComputedArraySliceNeedsIRSupport) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(5, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;

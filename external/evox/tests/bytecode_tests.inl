@@ -29,7 +29,7 @@ TEST(BytecodeCompileAndRunMain) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -56,7 +56,7 @@ TEST(BytecodePanic) {
 	EXPECT_TRUE(has_panic);
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_CALL_RESULT_PANIC, (int)test_call(runtime, toLs("main")));
 	EXPECT_TRUE(diagnostics.diagnostics.size > 0u);
 	test_runtime_destroy(runtime);
 	ex_bytecode_destroy(bytecode);
@@ -82,7 +82,7 @@ TEST(BytecodeRecursion) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(8, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -114,7 +114,7 @@ TEST(BytecodeThreeByteStructUndefinedLocalCanBeFullyAssigned) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -156,7 +156,7 @@ TEST(StructExtern) {
 			memcpy(frame.result, &value, sizeof(value));
 		};
 	}, nullptr) == EX_RESULT_OK);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	u32 result_size = 0;
 	const u8* result = (const u8*)ex_task_result(runtime, &result_size);
 	EXPECT_TRUE(result != nullptr);
@@ -282,7 +282,7 @@ TEST(ExternStructPaddedFieldAccessAndAssignment) {
 		};
 	}, nullptr) == EX_RESULT_OK);
 
-	EXPECT_TRUE(test_call(runtime, toLs("make")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("make")));
 	u32 result_size = 0;
 	const u8* result = (const u8*)ex_task_result(runtime, &result_size);
 	EXPECT_TRUE(result != nullptr);
@@ -295,7 +295,7 @@ TEST(ExternStructPaddedFieldAccessAndAssignment) {
 	EXPECT_EQ(1, a);
 	EXPECT_EQ(52, b);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(52, ex_task_to_i64(runtime, -1));
 
 	CAPI_END(module);
@@ -316,9 +316,9 @@ TEST(ExternStructSizeofAndAlignofUseCAbiLayout) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("size_of")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("size_of")));
 	EXPECT_EQ(16, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("align_of")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("align_of")));
 	EXPECT_EQ(8, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -357,7 +357,7 @@ TEST(ExternStructNestedAndArrayLayout) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(305, ex_task_to_i32(runtime, -1));
 
 	EXPECT_EQ(1u, ex_debug_global_count(test_vm(runtime)));
@@ -410,20 +410,20 @@ TEST(NativeStructAbiVec3DVec3Quat) {
 		return nullptr;
 	}, nullptr) == EX_RESULT_OK);
 
-	EXPECT_TRUE(test_call(runtime, toLs("vec3")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("vec3")));
 	NativeVec3 vec3_result{};
 	u32 size = 0;
 	memcpy(&vec3_result, ex_task_result(runtime, &size), sizeof(vec3_result));
 	EXPECT_EQ((u32)sizeof(vec3_result), size);
 	EXPECT_EQ(1.0f, vec3_result.x); EXPECT_EQ(2.0f, vec3_result.y); EXPECT_EQ(3.0f, vec3_result.z);
 
-	EXPECT_TRUE(test_call(runtime, toLs("dvec3")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("dvec3")));
 	NativeDVec3 dvec3_result{};
 	memcpy(&dvec3_result, ex_task_result(runtime, &size), sizeof(dvec3_result));
 	EXPECT_EQ((u32)sizeof(dvec3_result), size);
 	EXPECT_EQ(4.0, dvec3_result.x); EXPECT_EQ(5.0, dvec3_result.y); EXPECT_EQ(6.0, dvec3_result.z);
 
-	EXPECT_TRUE(test_call(runtime, toLs("quat")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("quat")));
 	NativeQuat quat_result{};
 	memcpy(&quat_result, ex_task_result(runtime, &size), sizeof(quat_result));
 	EXPECT_EQ((u32)sizeof(quat_result), size);
@@ -468,7 +468,7 @@ TEST(RawResultAccess) {
 			memcpy(frame.result, &value, sizeof(value));
 		};
 	}, nullptr) == EX_RESULT_OK);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 
 	u32 size = 0;
 	const u8* result = (const u8*)ex_task_result(runtime, &size);
@@ -482,7 +482,7 @@ TEST(RawResultAccess) {
 	EXPECT_TRUE(&ptr == world_value);
 
 	// A void call leaves no result.
-	EXPECT_TRUE(test_call(runtime, toLs("nothing")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("nothing")));
 	size = 99;
 	EXPECT_TRUE(ex_task_result(runtime, &size) == nullptr);
 	EXPECT_EQ(0u, size);
@@ -518,7 +518,7 @@ TEST(Extern) {
 		};
 		return nullptr;
 	}, nullptr) == EX_RESULT_OK);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	
@@ -555,7 +555,7 @@ TEST(NativeTypeArgumentsAreComparable) {
 			EX_RESULT(frame, first == second);
 		};
 	}, nullptr) == EX_RESULT_OK);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -603,7 +603,7 @@ TEST(NativeStringArgument) {
 			EX_RESULT(frame, i32(matches && value == 42 ? 1 : 0));
 		};
 	}, nullptr) == EX_RESULT_OK);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -631,7 +631,7 @@ TEST(NativeTwoStringArguments) {
 			EX_RESULT(frame, i32(first_matches && second_matches ? 1 : 0));
 		};
 	}, nullptr) == EX_RESULT_OK);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -660,7 +660,7 @@ TEST(NativeStringResult) {
 			memset(temporary, 0, sizeof(temporary));
 		};
 	}, nullptr) == EX_RESULT_OK);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -681,7 +681,7 @@ TEST(BytecodeAddTwoConstants) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(3, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -705,7 +705,7 @@ TEST(BytecodeFloatArithmetic) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_FLOAT_EQ(3.75f, ex_task_to_f32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -731,7 +731,7 @@ TEST(BytecodeConstPropagationThroughCastAndArithmetic) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_FLOAT_EQ(0.015625, ex_task_to_f64(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -755,7 +755,7 @@ TEST(BytecodeF64Arithmetic) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_FLOAT_EQ(3.75f, (float)ex_task_to_f64(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -779,7 +779,7 @@ TEST(BytecodeMultiplyExpression) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -803,7 +803,7 @@ TEST(BytecodeDivideExpression) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(21, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -827,7 +827,7 @@ TEST(BytecodeModuloExpression) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(2, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -853,7 +853,7 @@ TEST(BytecodeMultiplyAssignment) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -879,7 +879,7 @@ TEST(BytecodeDivideAssignment) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(21, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -907,7 +907,7 @@ TEST(BytecodeDeferRunsOnReturn) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(7, ex_task_to_i32(runtime, -1));
 	EXPECT_EQ(2, test_global_i32(test_vm(runtime), 0));
 
@@ -942,7 +942,7 @@ TEST(BytecodeDeferLifoAcrossScopes) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 	EXPECT_EQ(1, test_global_i32(test_vm(runtime), 0));
 	EXPECT_EQ(0, test_global_i32(test_vm(runtime), 1));
@@ -970,7 +970,7 @@ TEST(BytecodeNestedDefer) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 	EXPECT_EQ(1, test_global_i32(test_vm(runtime), 0)); // a
 	EXPECT_EQ(2, test_global_i32(test_vm(runtime), 1)); // b
@@ -994,7 +994,7 @@ TEST(BytecodeDeferRunsOnBreak) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1018,7 +1018,7 @@ TEST(BytecodeDeferRunsOnContinue) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(2, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1049,7 +1049,7 @@ TEST(BytecodeFunctionTypedLocalCanBeCalled) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -1075,7 +1075,7 @@ TEST(BytecodeRunFunctionWithF64ParameterFromStack) {
 	EXPECT_TRUE(runtime != nullptr);
 
 	test_push_f64(runtime, 41.5);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_FLOAT_EQ(42.0f, (float)ex_task_to_f64(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -1108,11 +1108,11 @@ TEST(BytecodeF64Comparisons) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("is_gt")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("is_gt")));
 	EXPECT_TRUE(ex_task_to_bool(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("is_lt")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("is_lt")));
 	EXPECT_TRUE(ex_task_to_bool(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("is_eq")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("is_eq")));
 	EXPECT_TRUE(ex_task_to_bool(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -1156,7 +1156,7 @@ TEST(ADLResolvesViaFirstParameterNamespace) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -1202,7 +1202,7 @@ TEST(ADLChoosesNamespaceByFirstParameterType) {
 	};
 	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
 	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime, {
-		EXPECT_TRUE(test_call(runtime, toLs("main")));
+		EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 		EXPECT_EQ(85, ex_task_to_i32(runtime, -1));
 	});
 	return true;
@@ -1229,7 +1229,7 @@ TEST(BytecodeStructsBasic) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -1263,7 +1263,7 @@ TEST(BytecodeNestedStructs) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(49, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -1297,7 +1297,7 @@ TEST(BytecodeStructParameterPassing) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -1332,7 +1332,7 @@ TEST(BytecodeChainedFieldAccess) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -1368,7 +1368,7 @@ TEST(BytecodeChainedFieldAssignment) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -1399,7 +1399,7 @@ TEST(BytecodeStructFieldAssignment) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(22, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -1430,7 +1430,7 @@ TEST(BytecodeStructFieldCompoundAssignment) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(8, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -1462,7 +1462,7 @@ TEST(BytecodeStructFieldAssignmentGlobal) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(22, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -1498,7 +1498,7 @@ TEST(BytecodeStructFieldAssignmentParameterLocalCopy) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(22, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -1531,7 +1531,7 @@ TEST(BytecodeEnumBasicUsage) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -1570,11 +1570,11 @@ TEST(BytecodeIntegerOverflowWraps) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("add_i8_wrap")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("add_i8_wrap")));
 	EXPECT_EQ(-128, ex_task_to_i8(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("add_u8_wrap")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("add_u8_wrap")));
 	EXPECT_EQ(0, ex_task_to_u8(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("sub_i8_wrap")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("sub_i8_wrap")));
 	EXPECT_EQ(-1, ex_task_to_i8(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -1600,7 +1600,7 @@ TEST(BytecodeRunFunctionWithParameterFromStack) {
 	EXPECT_TRUE(runtime != nullptr);
 
 	test_push_i32(runtime, 41);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 
 	i32 result = ex_task_to_i32(runtime, -1);
 	EXPECT_EQ(42, result);
@@ -1631,7 +1631,7 @@ TEST(BytecodeFunctionCallWorks) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -1655,7 +1655,7 @@ TEST(BytecodeWhile) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(6, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1691,7 +1691,7 @@ TEST(BytecodeWhileBreakContinue) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(18, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -1736,7 +1736,7 @@ TEST(BytecodeNamedLabelBreakContinue) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(12, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -1762,7 +1762,7 @@ TEST(BytecodeLocalVariable) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	i32 result = ex_task_to_i32(runtime, -1);
 	EXPECT_EQ(42, result);
 
@@ -1791,9 +1791,9 @@ TEST(BytecodeGlobalVariable) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(43, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -1820,7 +1820,7 @@ TEST(BinaryExpressionEvaluatesLeftOperandBeforeRightOperand) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(3, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1858,7 +1858,7 @@ TEST(FunctionCallArgumentsEvaluateLeftToRight) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(123123, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1899,7 +1899,7 @@ TEST(StructLiteralFieldsEvaluateLeftToRight) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(123123, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1932,7 +1932,7 @@ TEST(OverloadedBinaryExpressionEvaluatesLeftOperandBeforeRightOperand) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(3, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1961,7 +1961,7 @@ TEST(BytecodeGlobalInitializationOrder) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(4, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -2001,14 +2001,14 @@ TEST(BytecodeShortCircuitingWithGlobals) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("false_and_touch")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("false_and_touch")));
 	EXPECT_TRUE(!ex_task_to_bool(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("get_hits")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("get_hits")));
 	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 
-	EXPECT_TRUE(test_call(runtime, toLs("true_or_touch")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("true_or_touch")));
 	EXPECT_TRUE(ex_task_to_bool(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("get_hits")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("get_hits")));
 	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -2048,14 +2048,14 @@ TEST(BytecodeNestedShortCircuitingWithGlobals) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("false_and_nested")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("false_and_nested")));
 	EXPECT_TRUE(!ex_task_to_bool(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("get_hits")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("get_hits")));
 	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 
-	EXPECT_TRUE(test_call(runtime, toLs("true_or_nested")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("true_or_nested")));
 	EXPECT_TRUE(ex_task_to_bool(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("get_hits")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("get_hits")));
 	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -2082,7 +2082,7 @@ TEST(BytecodeAssignLocalVariable) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	i32 result = ex_task_to_i32(runtime, -1);
 	EXPECT_EQ(42, result);
 
@@ -2110,7 +2110,7 @@ TEST(BytecodeCompoundAssignLocalPlusEqual) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	i32 result = ex_task_to_i32(runtime, -1);
 	EXPECT_EQ(42, result);
 
@@ -2138,7 +2138,7 @@ TEST(BytecodeCompoundAssignLocalMinusEqual) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	i32 result = ex_task_to_i32(runtime, -1);
 	EXPECT_EQ(40, result);
 
@@ -2184,17 +2184,17 @@ TEST(BytecodeExtendedIntegerReturnWidths) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("ret_i8")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("ret_i8")));
 	EXPECT_EQ(10, ex_task_to_i8(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("ret_u8")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("ret_u8")));
 	EXPECT_EQ(20, ex_task_to_u8(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("ret_i16")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("ret_i16")));
 	EXPECT_EQ(30, ex_task_to_i16(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("ret_u16")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("ret_u16")));
 	EXPECT_EQ(40, ex_task_to_u16(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("ret_i64")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("ret_i64")));
 	EXPECT_TRUE(50 == ex_task_to_i64(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("ret_u64")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("ret_u64")));
 	EXPECT_TRUE(60 == ex_task_to_u64(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -2224,11 +2224,11 @@ TEST(BytecodeIfElse) {
 	EXPECT_TRUE(runtime != nullptr);
 
 	test_push_bool(runtime, 1);
-	EXPECT_TRUE(test_call(runtime, toLs("choose")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("choose")));
 	EXPECT_EQ(11, ex_task_to_i32(runtime, -1));
 
 	test_push_bool(runtime, 0);
-	EXPECT_TRUE(test_call(runtime, toLs("choose")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("choose")));
 	EXPECT_EQ(22, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -2260,15 +2260,15 @@ TEST(BytecodeIfElseIf) {
 	EXPECT_TRUE(runtime != nullptr);
 
 	test_push_i32(runtime, -1);
-	EXPECT_TRUE(test_call(runtime, toLs("classify")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("classify")));
 	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 
 	test_push_i32(runtime, 4);
-	EXPECT_TRUE(test_call(runtime, toLs("classify")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("classify")));
 	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 
 	test_push_i32(runtime, 11);
-	EXPECT_TRUE(test_call(runtime, toLs("classify")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("classify")));
 	EXPECT_EQ(2, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -2309,15 +2309,15 @@ TEST(DivisionAndModuloSemanticsRuntime) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("q_pos")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("q_pos")));
 	EXPECT_EQ(2, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("q_neg")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("q_neg")));
 	EXPECT_EQ(-2, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("r_neg_left")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("r_neg_left")));
 	EXPECT_EQ(-1, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("r_neg_right")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("r_neg_right")));
 	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("float_div")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("float_div")));
 	EXPECT_FLOAT_EQ(3, ex_task_to_f32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -2346,13 +2346,13 @@ TEST(ShortCircuiting) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("left_false")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("left_false")));
 	EXPECT_TRUE(!ex_task_to_bool(runtime, -1));
 
 	TestContext diagnostics2;
 	RuntimeGuard runtime2(module, &diagnostics2.host);
 	EXPECT_TRUE(runtime2);
-	EXPECT_TRUE(test_call(runtime2, toLs("left_true")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime2, toLs("left_true")));
 	EXPECT_TRUE(ex_task_to_bool(runtime2, -1));
 	CAPI_END(module);
 	return true;
@@ -2375,15 +2375,15 @@ TEST(IfElse) {
 
 	CAPI_RUNTIME(module, runtime);
 	test_push_i32(runtime, 4);
-	EXPECT_TRUE(test_call(runtime, toLs("classify")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("classify")));
 	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 
 	test_push_i32(runtime, 11);
-	EXPECT_TRUE(test_call(runtime, toLs("classify")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("classify")));
 	EXPECT_EQ(2, ex_task_to_i32(runtime, -1));
 
 	test_push_i32(runtime, -1);
-	EXPECT_TRUE(test_call(runtime, toLs("classify")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("classify")));
 	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2413,17 +2413,17 @@ TEST(GlobalVariablesRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("read_counter")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("read_counter")));
 	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("increment")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("increment")));
 	EXPECT_EQ(3, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("increment")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("increment")));
 	EXPECT_EQ(5, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("read_counter")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("read_counter")));
 	EXPECT_EQ(5, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("shadow_counter")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("shadow_counter")));
 	EXPECT_EQ(101, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("read_counter")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("read_counter")));
 	EXPECT_EQ(5, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2444,7 +2444,7 @@ TEST(RuntimeBlockScope) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("scoped")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("scoped")));
 	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2465,7 +2465,7 @@ TEST(DeferRunsAtScopeExit) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(5, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2486,7 +2486,7 @@ TEST(DeferRunsInLifoOrder) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(3, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2506,7 +2506,7 @@ TEST(NullableNullBranchRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2526,7 +2526,7 @@ TEST(NullableNonNullBranchRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(7, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2551,7 +2551,7 @@ TEST(NullableConversionBoundariesRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(7, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2574,7 +2574,7 @@ TEST(ExtendedScalarTypesRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(211, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2591,7 +2591,7 @@ TEST(LargeUntypedIntegerArithmeticRetainsWidthRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_TRUE(2147483649ll == ex_task_to_i64(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2632,15 +2632,15 @@ TEST(IntegerOverflowWraparoundRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("u8_add_wrap")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("u8_add_wrap")));
 	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("i8_add_wrap")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("i8_add_wrap")));
 	EXPECT_EQ(-128, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("u8_add_assign_wrap")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("u8_add_assign_wrap")));
 	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("cast_i8_wrap")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("cast_i8_wrap")));
 	EXPECT_EQ(-1, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("cast_u8_wrap")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("cast_u8_wrap")));
 	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2688,7 +2688,7 @@ TEST(DivisionByZeroRuntimeError) {
 	test_diagnostics.output_enabled = false;
 	test_push_i32(runtime, 10);
 	test_push_i32(runtime, 0);
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("divide")));
+	EXPECT_EQ(EX_CALL_RESULT_DIVISION_BY_ZERO, test_call(runtime, toLs("divide")));
 
 	TestContext diagnostics2;
 	RuntimeGuard runtime2(module, &diagnostics2.host);
@@ -2696,40 +2696,40 @@ TEST(DivisionByZeroRuntimeError) {
 	diagnostics2.diagnostics.output_enabled = false;
 	test_push_i32(runtime2, 10);
 	test_push_i32(runtime2, 0);
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime2, toLs("modulo")));
+	EXPECT_EQ(EX_CALL_RESULT_MODULO_BY_ZERO, test_call(runtime2, toLs("modulo")));
 
 	TestContext diagnostics3;
 	RuntimeGuard runtime3(module, &diagnostics3.host);
 	EXPECT_TRUE(runtime3);
 	diagnostics3.diagnostics.output_enabled = false;
 	test_push_i32(runtime3, 0);
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime3, toLs("divide_assign")));
+	EXPECT_EQ(EX_CALL_RESULT_DIVISION_BY_ZERO, test_call(runtime3, toLs("divide_assign")));
 
 	TestContext diagnostics4;
 	RuntimeGuard runtime4(module, &diagnostics4.host);
 	EXPECT_TRUE(runtime4);
 	diagnostics4.diagnostics.output_enabled = false;
 	test_push_i32(runtime4, 10);
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime4, toLs("divide_constant_zero")));
+	EXPECT_EQ(EX_CALL_RESULT_DIVISION_BY_ZERO, test_call(runtime4, toLs("divide_constant_zero")));
 
 	TestContext diagnostics5;
 	RuntimeGuard runtime5(module, &diagnostics5.host);
 	EXPECT_TRUE(runtime5);
 	diagnostics5.diagnostics.output_enabled = false;
 	test_push_i32(runtime5, 10);
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime5, toLs("modulo_constant_zero")));
+	EXPECT_EQ(EX_CALL_RESULT_MODULO_BY_ZERO, test_call(runtime5, toLs("modulo_constant_zero")));
 
 	TestContext diagnostics6;
 	RuntimeGuard runtime6(module, &diagnostics6.host);
 	EXPECT_TRUE(runtime6);
 	diagnostics6.diagnostics.output_enabled = false;
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime6, toLs("divide_assign_constant_zero")));
+	EXPECT_EQ(EX_CALL_RESULT_DIVISION_BY_ZERO, test_call(runtime6, toLs("divide_assign_constant_zero")));
 
 	TestContext diagnostics7;
 	RuntimeGuard runtime7(module, &diagnostics7.host);
 	EXPECT_TRUE(runtime7);
 	diagnostics7.diagnostics.output_enabled = false;
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime7, toLs("divide_float_constant_zero")));
+	EXPECT_EQ(EX_CALL_RESULT_DIVISION_BY_ZERO, test_call(runtime7, toLs("divide_float_constant_zero")));
 	CAPI_END(module);
 	return true;
 }
@@ -2746,7 +2746,7 @@ TEST(HostCallWithTooFewArgumentsFails) {
 	CAPI_RUNTIME(module, runtime);
 	
 	test_push_i32(runtime, 20);
-	EXPECT_EQ(EX_RESULT_INVALID_ARGUMENT, test_call(runtime, toLs("add")));
+	EXPECT_EQ(EX_CALL_RESULT_INVALID_ARGUMENT, test_call(runtime, toLs("add")));
 	u32 result_size = 123u;
 	EXPECT_TRUE(ex_task_result(runtime, &result_size) == nullptr);
 	EXPECT_EQ(0u, result_size);
@@ -2790,11 +2790,11 @@ TEST(UntypedLiteralsRuntime) {
 	EXPECT_TRUE(compiled);
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("vec3_sum")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("vec3_sum")));
 	EXPECT_FLOAT_EQ(6, ex_task_to_f32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("integer_widths")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("integer_widths")));
 	EXPECT_EQ(467, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("return_f64")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("return_f64")));
 	EXPECT_FLOAT_EQ(1.5f, (float)ex_task_to_f64(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2832,7 +2832,7 @@ TEST(FirstClassFunctionsRuntime) {
 	EXPECT_TRUE(ok);
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(64, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2869,7 +2869,7 @@ TEST(FirstClassFunctionsNoArgsRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(12, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2893,7 +2893,7 @@ TEST(FirstClassFunctionsImmediateCallRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2917,7 +2917,7 @@ TEST(FirstClassFunctionLiteralImmediateCallRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2945,7 +2945,7 @@ TEST(FirstClassFunctionsStructFieldImmediateCallRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2964,7 +2964,7 @@ TEST(StaticArrayRuntimeIndexing) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -2984,6 +2984,6 @@ TEST(StaticArrayRuntimeOutOfBoundsFails) {
 	CAPI_RUNTIME(module, runtime);
 	test_diagnostics.output_enabled = false;
 	test_push_i32(runtime, 5);
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS, test_call(runtime, toLs("main")));
 	return true;
 }

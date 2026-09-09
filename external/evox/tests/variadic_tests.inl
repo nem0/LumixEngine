@@ -8,7 +8,7 @@ TEST(VariadicNoArguments) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -26,7 +26,7 @@ TEST(VariadicArgumentsArePackedAsSlice) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(10, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -44,7 +44,7 @@ TEST(VariadicParameterMayFollowFixedParameters) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(16, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -58,7 +58,7 @@ TEST(VariadicAnyAcceptsHeterogeneousArguments) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(3, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -84,7 +84,7 @@ TEST(VariadicAnyMatchesInterpolatedString) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -106,7 +106,7 @@ TEST(VariadicFunctionValueUsesSliceFunctionType) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(6, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -128,7 +128,7 @@ TEST(UnnamedVariadicFunctionType) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(3, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -165,7 +165,7 @@ TEST(VariadicFixedArgumentsWithoutVariadicArguments) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -183,7 +183,7 @@ TEST(VariadicTemplateArgumentsArePackedOnce) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(6, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -205,7 +205,7 @@ TEST(VariadicUFCSArgumentsArePacked) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(16, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;

@@ -93,7 +93,7 @@ TEST(RegisterAllocatorPreservesValuesAcrossCalls) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(test_call(runtime, toLs("main")), EX_RESULT_OK);
+	EXPECT_EQ(test_call(runtime, toLs("main")), EX_CALL_RESULT_OK);
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -111,7 +111,7 @@ TEST(SliceBoundsCanContainSliceExpressions) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(30, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -143,7 +143,7 @@ TEST(BytecodeSliceStructFieldElementStore) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -217,7 +217,7 @@ TEST(ConstSliceTypeSyntaxAndConversion) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(12, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -264,7 +264,7 @@ TEST(ConstArrayCanCreateReadOnlySlice) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(9, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -299,7 +299,7 @@ TEST(ConstSliceCanBeReturned) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(9, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -397,7 +397,7 @@ TEST(ScalarSliceViewTypeInferenceAndLength) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(12, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -419,7 +419,7 @@ TEST(ConstScalarCanCreateReadOnlySlice) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(7, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -445,7 +445,7 @@ TEST(ScalarSliceViewSupportsPrimitiveTypes) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(19, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -468,7 +468,7 @@ TEST(ScalarSliceViewWorksForPointerParameters) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(15, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -495,7 +495,7 @@ TEST(ScalarSliceViewWorksForFieldsAndArrayElements) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(39, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -520,7 +520,7 @@ TEST(ScalarSliceViewCanBeReslicedAndCopied) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(23, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -604,7 +604,7 @@ TEST(SliceImplicitConversionFromTemporaryArray) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -761,7 +761,7 @@ TEST(SliceImplicitConversionLengthRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(4, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -804,7 +804,7 @@ TEST(SliceLengthAndIndexRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(257, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -826,7 +826,7 @@ TEST(SliceAliasesBackingArrayRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(43, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -849,7 +849,7 @@ TEST(SliceFromSliceRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(281, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -886,7 +886,7 @@ TEST(SliceZeroLengthRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -903,7 +903,7 @@ TEST(SliceNullInitializationRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -934,7 +934,7 @@ TEST(SliceIterationRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(5, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -961,7 +961,7 @@ TEST(SliceReturnAliasesOriginalRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(99, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -984,7 +984,7 @@ TEST(SliceRuntimeOutOfBoundsFails) {
 	CAPI_RUNTIME(module, runtime);
 	test_diagnostics.output_enabled = false;
 	test_push_i32(runtime, 2);
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS, test_call(runtime, toLs("main")));
 	CAPI_END(module);
 	return true;
 }
@@ -1006,7 +1006,7 @@ TEST(SliceElementWriteThroughParameterRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1029,7 +1029,7 @@ TEST(SliceI32IndexWriteThroughParameterRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(3, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1057,7 +1057,7 @@ TEST(SliceU8IndexReadWriteRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(149, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1078,7 +1078,7 @@ TEST(SliceU32IndexOutOfBoundsFails) {
 	CAPI_RUNTIME(module, runtime);
 	test_diagnostics.output_enabled = false;
 	test_push_u32(runtime, 3);
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS, test_call(runtime, toLs("main")));
 	CAPI_END(module);
 	return true;
 }
@@ -1104,7 +1104,7 @@ TEST(SliceCastIndexFieldReadRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(11, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1129,7 +1129,7 @@ TEST(SliceStructFieldReadRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(37, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1161,7 +1161,7 @@ TEST(SliceStructFieldWriteThroughParameterRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(128, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1186,7 +1186,7 @@ TEST(SliceStructFieldPointerOutOfBoundsFails) {
 	CAPI_RUNTIME(module, runtime);
 	test_diagnostics.output_enabled = false;
 	test_push_i32(runtime, 2);
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS, test_call(runtime, toLs("main")));
 	CAPI_END(module);
 	return true;
 }
@@ -1210,7 +1210,7 @@ TEST(SliceEqualityComparesContentRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(101, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1232,7 +1232,7 @@ TEST(SliceEqualityUnequalLengthsAreUnequal) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1253,7 +1253,7 @@ TEST(SliceEqualitySameStorageIsEqual) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1274,7 +1274,7 @@ TEST(SliceEqualityMixesMutableAndConstViews) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1294,7 +1294,7 @@ TEST(SliceEqualityEmptyAndNullSlicesAreEqual) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1317,7 +1317,7 @@ TEST(SliceEqualityAcceptsEnumElements) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1340,7 +1340,7 @@ TEST(SliceEqualityComparesFloatsNumericallyNotBitwise) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1364,7 +1364,7 @@ TEST(SliceEqualityComparesF64Elements) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(43, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1456,7 +1456,7 @@ TEST(SliceEqualityOfArraysRequiresSlicing) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1477,7 +1477,7 @@ TEST(SliceEqualityOnFunctionParameters) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1496,7 +1496,7 @@ TEST(ComptimeSliceLengthRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(5, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -1514,7 +1514,7 @@ TEST(ComptimeSliceLengthNarrowedToI32Runtime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(50, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;

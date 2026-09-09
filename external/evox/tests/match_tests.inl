@@ -286,7 +286,7 @@ TEST(BytecodeEnumMatch) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(2, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -328,16 +328,16 @@ TEST(MatchRuntime) {
 
 	CAPI_RUNTIME(module, runtime);
 	test_push_i32(runtime, 0);
-	EXPECT_TRUE(test_call(runtime, toLs("enum_match")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("enum_match")));
 	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 	test_push_i32(runtime, 2);
-	EXPECT_TRUE(test_call(runtime, toLs("enum_match")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("enum_match")));
 	EXPECT_EQ(2, ex_task_to_i32(runtime, -1));
 	test_push_i32(runtime, 5);
-	EXPECT_TRUE(test_call(runtime, toLs("range_match")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("range_match")));
 	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 	test_push_i32(runtime, 42);
-	EXPECT_TRUE(test_call(runtime, toLs("range_match")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("range_match")));
 	EXPECT_EQ(2, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -361,17 +361,17 @@ TEST(MatchStringRuntimeUsesContentEquality) {
 	CAPI_RUNTIME(module, runtime);
 
 	test_push_string(runtime, {"run", 3});
-	EXPECT_TRUE(test_call(runtime, toLs("classify")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("classify")));
 	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 
 	// The input is not the pooled literal used by the match arm.
 	const char input[] = {'s', 't', 'o', 'p'};
 	test_push_string(runtime, {input, 4});
-	EXPECT_TRUE(test_call(runtime, toLs("classify")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("classify")));
 	EXPECT_EQ(2, ex_task_to_i32(runtime, -1));
 
 	test_push_string(runtime, {"unknown", 7});
-	EXPECT_TRUE(test_call(runtime, toLs("classify")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("classify")));
 	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -396,10 +396,10 @@ TEST(MatchArmMultipleStatementsRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
 	test_push_i32(runtime, 0);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(3, ex_task_to_i32(runtime, -1));
 	test_push_i32(runtime, 7);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(30, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -420,10 +420,10 @@ TEST(MatchFallbackFirstRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
 	test_push_i32(runtime, 7);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(20, ex_task_to_i32(runtime, -1));
 	test_push_i32(runtime, 3);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(10, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;

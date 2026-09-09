@@ -23,7 +23,7 @@ TEST(CallFunctionFieldWinsOverUFCS) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -144,7 +144,7 @@ TEST(GlobalFunctionLiteralCanRecursivelyCallItself) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(21, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -344,7 +344,7 @@ TEST(BytecodeFunctionValueLocal) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -377,7 +377,7 @@ TEST(BytecodeIndirectFunctionCall) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -412,7 +412,7 @@ TEST(BytecodeIndirectFunctionCallWithAggregateArgument) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -444,7 +444,7 @@ TEST(BytecodeGlobalFunctionLiteral) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -473,7 +473,7 @@ TEST(BytecodeGlobalFunctionVariable) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -515,7 +515,7 @@ TEST(LazyNativeResolverBindsOnFirstUse) {
 
 	LazyNativeResolverState state;
 	EXPECT_EQ(EX_RESULT_OK, ex_runtime_set_native_resolver(test_vm(runtime), &lazyNativeResolver, &state));
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(84, ex_task_to_i32(runtime, -1));
 	EXPECT_EQ(1, state.calls);
 	CAPI_END(module);
@@ -536,12 +536,12 @@ TEST(LazyNativeResolverRetriesMissingFunction) {
 	state.return_callback = false;
 	EXPECT_EQ(EX_RESULT_OK, ex_runtime_set_native_resolver(test_vm(runtime), &lazyNativeResolver, &state));
 	test_diagnostics.output_enabled = false;
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_INVALID_FUNCTION_CALL, test_call(runtime, toLs("main")));
 	// Runtime errors suspend the runtime; abandon that failed call before
 	// trying the resolver again.
 	ex_debug_resume(runtime, EX_DEBUG_ABORT);
 	state.return_callback = true;
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	EXPECT_EQ(2, state.calls);
 	CAPI_END(module);
@@ -565,7 +565,7 @@ TEST(testNativeFunctionCall) {
 	EXPECT_TRUE(ex_runtime_set_native_resolver(test_vm(runtime), [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
 		return &nativeAddC;
 	}, nullptr) == EX_RESULT_OK);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -593,12 +593,12 @@ TEST(ScriptNativeScriptReentry) {
 			EX_ARG(frame, i32, value);
 			ex_task* helper_task = ex_task_create(runtime);
 			if (!helper_task) return;
-			ex_result result = ex_call(helper_task, toLs("helper"), &value, sizeof(value));
-			if (result == EX_RESULT_OK) EX_RESULT(frame, ex_task_to_i32(helper_task, -1));
+			ex_call_result result = ex_call(helper_task, toLs("helper"), &value, sizeof(value));
+			if (result == EX_CALL_RESULT_OK) EX_RESULT(frame, ex_task_to_i32(helper_task, -1));
 			ex_task_destroy(helper_task);
 		};
 	}, nullptr) == EX_RESULT_OK);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -627,7 +627,7 @@ TEST(IndirectCallWideReturnInNestedExpression) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_TRUE(4003 == ex_task_to_i64(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -648,7 +648,7 @@ TEST(FunctionNamedSinCompilesAndRuns) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -669,7 +669,7 @@ TEST(FunctionNamedLengthCompilesAndRuns) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -708,14 +708,34 @@ TEST(ExternSinDoesNotAutoBindBuiltin) {
 
 	CAPI_RUNTIME(module, runtime);
 	test_diagnostics.output_enabled = false;
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_INVALID_FUNCTION_CALL, test_call(runtime, toLs("main")));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(FrameStackOverflowFailsCleanly) {
+	const char* source = R"(
+		fn huge_frame() : void {
+			var values : [131072]u32 = undefined;
+		}
+
+		fn main() : void {
+			huge_frame();
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	test_diagnostics.output_enabled = false;
+	EXPECT_EQ(EX_CALL_RESULT_STACK_OVERFLOW, test_call(runtime, toLs("main")));
 	CAPI_END(module);
 	return true;
 }
 
 TEST(DeepRecursionFailsCleanly) {
 	// The flat interpreter call loop bounds script call depth (EX_MAX_CALL_DEPTH)
-	// and reports a runtime error instead of overflowing the C stack.
+	// and reports a call-depth error instead of overflowing the C stack.
 	const char* source = R"(
 		fn deep(n : i32) : i32 {
 			if n == 0 {
@@ -733,7 +753,7 @@ TEST(DeepRecursionFailsCleanly) {
 
 	CAPI_RUNTIME(module, runtime);
 	test_diagnostics.output_enabled = false;
-	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_CALL_DEPTH, test_call(runtime, toLs("main")));
 	CAPI_END(module);
 	return true;
 }

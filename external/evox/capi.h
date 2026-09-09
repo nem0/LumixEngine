@@ -114,18 +114,34 @@ typedef enum ex_type_kind {
 // compare against the specific result they expect (except EX_RESULT_FAILURE,
 // which is retained for unexpected/internal failures).
 typedef enum ex_result {
-	EX_RESULT_FAILURE = 0,
-	EX_RESULT_OK = 1,
-	EX_RESULT_SUSPENDED = 2,
-	EX_RESULT_FUNCTION_NOT_FOUND = 3,
-	EX_RESULT_INVALID_ARGUMENT = 4,
-	EX_RESULT_INVALID_STATE = 5,
-	EX_RESULT_ALREADY_EXECUTING = 6,
-	EX_RESULT_NOT_SUSPENDED = 7,
-	EX_RESULT_NOT_RESUMABLE = 8,
-	EX_RESULT_OUT_OF_MEMORY = 9,
-	EX_RESULT_RUNTIME_ERROR = 10
+	EX_RESULT_FAILURE,
+	EX_RESULT_OK,
+	EX_RESULT_INVALID_ARGUMENT
 } ex_result;
+
+// Results specific to starting or resuming script execution. Keep these
+// separate from ex_result so execution outcomes cannot be confused with
+// results of module, debugger, or runtime-management operations.
+typedef enum ex_call_result {
+	EX_CALL_RESULT_OK,
+	EX_CALL_RESULT_SUSPENDED,
+	EX_CALL_RESULT_FUNCTION_NOT_FOUND,
+	EX_CALL_RESULT_INVALID_ARGUMENT,
+	EX_CALL_RESULT_INVALID_STATE,
+	EX_CALL_RESULT_ALREADY_EXECUTING,
+	EX_CALL_RESULT_NOT_SUSPENDED,
+	EX_CALL_RESULT_NOT_RESUMABLE,
+	EX_CALL_RESULT_OUT_OF_MEMORY,
+	EX_CALL_RESULT_RUNTIME_ERROR,
+	EX_CALL_RESULT_DIVISION_BY_ZERO,
+	EX_CALL_RESULT_MODULO_BY_ZERO,
+	EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS,
+	EX_CALL_RESULT_INVALID_FUNCTION_CALL,
+	EX_CALL_RESULT_PANIC,
+	EX_CALL_RESULT_STACK_OVERFLOW,
+	EX_CALL_RESULT_CALL_DEPTH,
+	EX_CALL_RESULT_ABORTED
+} ex_call_result;
 
 // Native print callback used by `ex_host`.
 typedef void (*ex_print_fn)(void* userdata, ex_string_view msg);
@@ -359,16 +375,16 @@ ex_task_state ex_task_get_state(const ex_task* task);
 // valid while the task is running or suspended. Returns FUNCTION_NOT_FOUND,
 // INVALID_ARGUMENT, INVALID_STATE, or RUNTIME_ERROR when the invocation
 // cannot complete.
-ex_result ex_call(
+ex_call_result ex_call(
 	ex_task* task,
 	ex_string_view function_name,
 	const void* args,
 	u32 args_size
 );
 
-// Resume a SUSPENDED task. Returns EX_RESULT_SUSPENDED when yield is reached,
+// Resume a SUSPENDED task. Returns EX_CALL_RESULT_SUSPENDED when yield is reached,
 // EX_RESULT_OK when the task completes, or FAILURE when it fails.
-ex_result ex_task_resume(ex_task* task);
+ex_call_result ex_task_resume(ex_task* task);
 
 // TODO: Accept the resolver during ex_runtime_create and remove this setter.
 // Installs a runtime-local lazy resolver for extern functions. A returned
@@ -532,7 +548,7 @@ const ex_type* ex_type_from_any(const ex_runtime* runtime, const void* value);
 // Debugger.
 //
 // Suspension-based: when a debug-enabled task pauses, the task execution
-// returns `EX_RESULT_SUSPENDED` with the script state kept intact. The host queries `ex_debug_pause_event`, inspects task state, then
+// returns `EX_CALL_RESULT_SUSPENDED` with the script state kept intact. The host queries `ex_debug_pause_event`, inspects task state, then
 // continues with `ex_debug_resume`. While suspended, don't start new execution
 // on the task.
 //
@@ -584,7 +600,7 @@ ex_result ex_debug_pause_event(ex_task* task, ex_debug_event* out_event);
 
 // Re-enter the task where it paused. Must be called on the script thread;
 // fails when the task is not suspended.
-ex_result ex_debug_resume(ex_task* task, ex_debug_action action);
+ex_call_result ex_debug_resume(ex_task* task, ex_debug_action action);
 
 // Breakpoints. `line` is 1-based; the snapped statement line is written to
 // `*resolved_line` (may be null). Fails when the source or line is unknown.

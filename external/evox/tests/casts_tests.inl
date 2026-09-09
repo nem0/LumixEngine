@@ -13,7 +13,7 @@ TEST(BytecodeExplicitCastNumeric) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_FLOAT_EQ(1.0f, ex_task_to_f32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -37,7 +37,7 @@ TEST(BytecodeExplicitCastLargeIntegerToI64) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_TRUE(ex_task_to_i64(runtime, -1) == 2147483648ll);
 
 	test_runtime_destroy(runtime);
@@ -70,9 +70,9 @@ TEST(BytecodeExplicitCastLargeIntegerToI64LocalAndArg) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("local")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("local")));
 	EXPECT_TRUE(ex_task_to_i64(runtime, -1) == 2147483648ll);
-	EXPECT_TRUE(test_call(runtime, toLs("arg")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("arg")));
 	EXPECT_TRUE(ex_task_to_i64(runtime, -1) == 2147483648ll);
 
 	test_runtime_destroy(runtime);
@@ -101,7 +101,7 @@ TEST(BytecodeExplicitCastEnumToInteger) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 
 	test_runtime_destroy(runtime);
@@ -141,9 +141,9 @@ TEST(RuntimeCasts) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("to_f32")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("to_f32")));
 	EXPECT_FLOAT_EQ(10, ex_task_to_f32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("to_i32")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("to_i32")));
 	EXPECT_EQ(12, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -162,7 +162,7 @@ TEST(RuntimeScalarToSliceView) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(8, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -184,7 +184,7 @@ TEST(RuntimeScalarToSliceViewPassesAlias) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(5, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -261,9 +261,9 @@ TEST(IntegerToEnumCastAllowsAnyIntegerRuntime) {
 
 	CAPI_RUNTIME(module, runtime);
 	test_push_i32(runtime, 123);
-	EXPECT_TRUE(test_call(runtime, toLs("to_state")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("to_state")));
 	test_push_i32(runtime, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("to_i32")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("to_i32")));
 	EXPECT_EQ(123, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -281,7 +281,7 @@ TEST(IntegerSignExtensionRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(-128, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
@@ -315,42 +315,42 @@ TEST(RuntimeCastOverflowBoundaries) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(test_call(runtime, toLs("i8_from_127")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("i8_from_127")));
 	EXPECT_EQ(127, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("i8_from_128")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("i8_from_128")));
 	EXPECT_EQ(-128, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("i8_from_255")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("i8_from_255")));
 	EXPECT_EQ(-1, ex_task_to_i32(runtime, -1));
 
-	EXPECT_TRUE(test_call(runtime, toLs("u8_from_neg1")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("u8_from_neg1")));
 	EXPECT_EQ(255, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("u8_from_255")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("u8_from_255")));
 	EXPECT_EQ(255, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("u8_from_256")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("u8_from_256")));
 	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 
-	EXPECT_TRUE(test_call(runtime, toLs("i16_from_32767")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("i16_from_32767")));
 	EXPECT_EQ(32767, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("i16_from_32768")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("i16_from_32768")));
 	EXPECT_EQ(-32768, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("i16_from_65535")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("i16_from_65535")));
 	EXPECT_EQ(-1, ex_task_to_i32(runtime, -1));
 
-	EXPECT_TRUE(test_call(runtime, toLs("u16_from_neg1")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("u16_from_neg1")));
 	EXPECT_EQ(65535, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("u16_from_65535")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("u16_from_65535")));
 	EXPECT_EQ(65535, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("u16_from_65536")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("u16_from_65536")));
 	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 
-	EXPECT_TRUE(test_call(runtime, toLs("i32_from_2147483647")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("i32_from_2147483647")));
 	EXPECT_EQ(2147483647, ex_task_to_i32(runtime, -1));
-	EXPECT_TRUE(test_call(runtime, toLs("i32_from_2147483648")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("i32_from_2147483648")));
 	EXPECT_TRUE(ex_task_to_i32(runtime, -1) == (i32)0x80000000u);
 
-	EXPECT_TRUE(test_call(runtime, toLs("u32_from_neg1")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("u32_from_neg1")));
 	EXPECT_TRUE(ex_task_to_u64(runtime, -1) == 4294967295ull);
-	EXPECT_TRUE(test_call(runtime, toLs("u32_from_4294967295")));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("u32_from_4294967295")));
 	EXPECT_TRUE(ex_task_to_u64(runtime, -1) == 4294967295ull);
 	CAPI_END(module);
 	return true;
