@@ -27,6 +27,56 @@ namespace {
 
 using NativeFunctionMap = HashMap<NativeFunctionKey, ex_native_fn, NativeFunctionKeyHash>;
 
+enum class LoadRequestStatus : i32 { PENDING, SUCCESS, FAIL };
+
+struct EvoxLoadRequest {
+	World* world;
+	LoadRequestStatus status = LoadRequestStatus::PENDING;
+	char error[256] = {};
+
+	void complete(Span<const u8> mem, bool success) {
+		if (!success) {
+			copyString(error, "Failed to read world");
+			status = LoadRequestStatus::FAIL;
+			return;
+		}
+
+		InputMemoryStream blob(mem);
+		EntityMap entity_map(world->getAllocator());
+		WorldVersion editor_version;
+		if (!world->deserialize(blob, entity_map, editor_version)) {
+			copyString(error, "Failed to deserialize world");
+			status = LoadRequestStatus::FAIL;
+			return;
+		}
+		status = LoadRequestStatus::SUCCESS;
+	}
+};
+
+static EvoxLoadRequest* evox_world_load(World* world, ex_string_view path) {
+	if (!world || path.length == 0) return nullptr;
+	EvoxLoadRequest* request = LUMIX_NEW(world->getAllocator(), EvoxLoadRequest);
+	request->world = world;
+	Path file_path(StringView(path.begin, (u64)path.length));
+	world->getEngine().getFileSystem().getContent(file_path, makeDelegate<&EvoxLoadRequest::complete>(request));
+	return request;
+}
+
+static i32 evox_load_getStatus(EvoxLoadRequest* request) {
+	return request ? (i32)request->status : (i32)LoadRequestStatus::FAIL;
+}
+
+static void evox_load_getError(ex_runtime* runtime, ex_call_frame frame) {
+	EX_ARG(frame, EvoxLoadRequest*, request);
+	const char* error = request ? request->error : "Invalid load request";
+	ex_result_string(runtime, &frame, ex_string_view{error, (i64)strlen(error)});
+}
+
+static void evox_load_destroy(EvoxLoadRequest* request) {
+	if (!request) return;
+	LUMIX_DELETE(request->world->getAllocator(), request);
+}
+
 static void logErrorString(ex_string_view v) {
 	logError(StringView(v.begin, (u64)v.length));
 }
@@ -133,6 +183,27 @@ static i32 evox_world_getPartitionCount(World* world) {
 static u32 evox_world_getPartitionHandle(World* world, i32 index) {
 	if (!world || index < 0 || index >= world->getPartitions().size()) return 0xffff;
 	return world->getPartitions()[index].handle;
+}
+
+static u32 evox_world_getActivePartition(World* world) {
+	return world ? world->getActivePartition() : 0xffff;
+}
+
+static void evox_world_createPartition(ex_runtime*, ex_call_frame frame) {
+	EX_ARG(frame, World*, world);
+	EX_STRING_ARG(frame, name_sv);
+	if (!world || name_sv.length >= 64) {
+		EX_RESULT(frame, u32(0xffff));
+		return;
+	}
+	char name[64];
+	if (name_sv.length > 0) memcpy(name, name_sv.begin, name_sv.length);
+	name[name_sv.length] = '\0';
+	EX_RESULT(frame, u32(world->createPartition(name)));
+}
+
+static void evox_world_setActivePartition(World* world, u32 handle) {
+	if (world) world->setActivePartition(World::PartitionHandle(handle));
 }
 
 static void evox_world_getPartitionName(ex_runtime* runtime, ex_call_frame frame) {
@@ -293,6 +364,13 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	functions.insert({"core:world", "getPartitionCount"}, &wrap<evox_world_getPartitionCount>);
 	functions.insert({"core:world", "getPartitionHandle"}, &wrap<evox_world_getPartitionHandle>);
 	functions.insert({"core:world", "getPartitionName"}, &evox_world_getPartitionName);
+	functions.insert({"core:world", "getActivePartition"}, &wrap<evox_world_getActivePartition>);
+	functions.insert({"core:world", "createPartition"}, &evox_world_createPartition);
+	functions.insert({"core:world", "setActivePartition"}, &wrap<evox_world_setActivePartition>);
+	functions.insert({"core:world", "load"}, &wrap<evox_world_load>);
+	functions.insert({"core:world", "getStatus"}, &wrap<evox_load_getStatus>);
+	functions.insert({"core:world", "getError"}, &evox_load_getError);
+	functions.insert({"core:world", "destroy"}, &wrap<evox_load_destroy>);
 	functions.insert({"core:world", "hasEntity"}, &wrap<evox_world_hasEntity>);
 	functions.insert({"core:world", "getEvoxDataRaw"}, &evox_world_getEvoxDataRaw);
 }

@@ -1381,6 +1381,8 @@ struct StudioAppPlugin : StudioApp::IPlugin {
 	void initPlugins() {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		FileIterator* iter = fs.createFileIterator("engine/editor/scripts/plugins");
+		if (!iter) return;
+
 		os::FileInfo info;
 		while (getNextFile(iter, &info)) {
 			info.is_directory = info.is_directory;

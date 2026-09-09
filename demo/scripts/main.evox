@@ -3,6 +3,7 @@ import "core:world"
 import "core:log"
 import "core:random"
 import "core:string"
+import "core:ui"
 
 import "scripts/player" as player
 import "maps/demo/demo" as demo
@@ -24,6 +25,10 @@ enum WorldType {
 var world_type : WorldType = .NONE;
 var g_dt : f32 = 0;
 
+fn await(r : LoadRequest) : void {
+	while r.getStatus() == .PENDING { yield; }
+}
+
 fn main(input : InputSystem, w : World) : void {
 	g_input = input;
 	g_world = w;
@@ -34,6 +39,10 @@ fn main(input : InputSystem, w : World) : void {
 		for i in 0..world.getPartitionCount() {
 			const handle = world.getPartitionHandle(i);
 			const name = world.getPartitionName(handle);
+			if endsWith(name, "main.unv") {
+				world_type = .MAIN;
+				break;
+			}
 			if endsWith(name, "demo.unv") {
 				world_type = .DEMO;
 				demo.start(world);
@@ -75,28 +84,33 @@ fn main(input : InputSystem, w : World) : void {
 		match world_type {
 			case .NONE:
 			case .MAIN:
-				panic("TODO"); //TODO
 				for event in g_input.getEvents() {
 					match event {
 						case ButtonEvent:
 							if event.device_type == .KEYBOARD {
+								var request = w.load("maps/demo/demo.unv");
+								defer request.destroy();
+
+								await(request);
+
+								if request.getStatus() == .SUCCESS {
+									if const ui = w.ui() {
+										ui.load("maps/demo/demo.ui");
+									}
+									else {
+										panic("Missing UI");
+									}
+									demo.start(w);
+									player.init(w, g_input);
+									world_type = .DEMO;
+								}
+								else {
+									logError(`Failed to load maps/demo/demo.unv: {request.getError()}`); 
+								}
 							}
 						case:
 					}
 				}
-				//if not loaded and event.type == "button" then
-				//       if event.device.type == "keyboard" then
-				//			local old_partition = this.world:getActivePartition()
-				//			local demo = this.world:createPartition("demo")
-				//			this.world:setActivePartition(demo)
-				//			this.world:load("maps/demo/demo.unv", function() 
-				//				this.world.ui:load("maps/demo/demo.ui")
-				//				--this.world:destroyPartition(old_partition)
-				//			end)
-				//
-				//			loaded = true
-				//		end
-				//	end			
 			case .DEMO: demo.update(g_dt, g_input);
 			case .LIGHTNING: lightning.update(g_dt);
 			case .PARTICLES:

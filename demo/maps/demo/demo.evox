@@ -185,8 +185,6 @@ fn resetPhysicsTest() : void {
 }
 
 fn update(td : f32, input : InputSystem) : void {
-    player.update(td);
-
 	for entity in g_nav_agents.slice() {
 		if const agent = entity.navmesh_agent() {
 			if agent.isFinished() {

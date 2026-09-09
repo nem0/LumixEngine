@@ -4,6 +4,14 @@ import "core:entity"
 
 struct World { world : cptr; }
 
+struct LoadRequest { request : cptr; }
+
+enum LoadRequestStatus {
+	PENDING,
+	SUCCESS,
+	FAIL,
+}
+
 extern fn createEntity(w : World) : Entity;
 extern fn destroyEntity(w : World, e : Entity) : void;
 extern fn hasEntity(w : World, e : Entity) : bool;
@@ -11,6 +19,13 @@ extern fn findByName(w : World, name : []const u8) : ?Entity;
 extern fn getPartitionCount(w : World) : i32;
 extern fn getPartitionHandle(w : World, index : i32) : u32;
 extern fn getPartitionName(w : World, handle : u32) : []const u8;
+extern fn getActivePartition(w : World) : u32;
+extern fn createPartition(w : World, name : []const u8) : u32;
+extern fn setActivePartition(w : World, handle : u32) : void;
+extern fn load(w : World, path : []const u8) : LoadRequest;
+extern fn getStatus(r : LoadRequest) : LoadRequestStatus;
+extern fn getError(r : LoadRequest) : []const u8;
+extern fn destroy(r : LoadRequest) : void;
 extern fn getEvoxDataRaw(w : World, t : type) : [] byte;
 
 fn getEvoxData(w : World, T : comptime type) : []T {
