@@ -110,13 +110,21 @@ typedef enum ex_type_kind {
 	EX_TYPE_ANY
 } ex_type_kind;
 
-// Generic status used by C API operations that only report success or failure.
-// `EX_RESULT_SUSPENDED` (returned by calls interrupted by the debugger) is
-// deliberately non-zero so `if (!result)` keeps meaning "failed".
+// Result of a C API operation. Failure results are non-zero so callers must
+// compare against the specific result they expect (except EX_RESULT_FAILURE,
+// which is retained for unexpected/internal failures).
 typedef enum ex_result {
 	EX_RESULT_FAILURE = 0,
 	EX_RESULT_OK = 1,
-	EX_RESULT_SUSPENDED = 2
+	EX_RESULT_SUSPENDED = 2,
+	EX_RESULT_FUNCTION_NOT_FOUND = 3,
+	EX_RESULT_INVALID_ARGUMENT = 4,
+	EX_RESULT_INVALID_STATE = 5,
+	EX_RESULT_ALREADY_EXECUTING = 6,
+	EX_RESULT_NOT_SUSPENDED = 7,
+	EX_RESULT_NOT_RESUMABLE = 8,
+	EX_RESULT_OUT_OF_MEMORY = 9,
+	EX_RESULT_RUNTIME_ERROR = 10
 } ex_result;
 
 // Native print callback used by `ex_host`.
@@ -129,6 +137,13 @@ typedef void (*ex_diagnostic_fn)(void* userdata, ex_string_view source_name, u32
 typedef int (*ex_import_resolver_fn)(void* userdata, ex_string_view path, ex_string_view alias, ex_string_view* source);
 
 typedef struct ex_runtime ex_runtime;
+typedef struct ex_task ex_task;
+
+typedef enum ex_task_state {
+	EX_TASK_READY = 0,
+	EX_TASK_SUSPENDED,
+	EX_TASK_FAILED,
+} ex_task_state;
 
 typedef struct ex_call_frame {
 	const u8* args;
@@ -315,13 +330,45 @@ void ex_bytecode_destroy(ex_bytecode* bytecode);
 u32 ex_bytecode_type_count(const ex_bytecode* bytecode);
 const ex_type* ex_bytecode_type(const ex_bytecode* bytecode, u32 index);
 
-// Bytecode runtime lifetime.
+// Bytecode VM lifetime.
 //
-// Bind a runtime to compiled bytecode to call script functions repeatedly.
-// Pass a distinct host to use a separate runtime arena; null uses the bytecode host.
-// Destroy it when execution is finished.
+// An ex_runtime owns VM-wide state such as bytecode, globals, and native
+// bindings. It is not an execution context: script execution happens only
+// through ex_task. The runtime must outlive every task created from it;
+// destroy tasks before destroying their runtime.
 ex_runtime* ex_runtime_create(ex_bytecode* bytecode, ex_host* host);
 void ex_runtime_destroy(ex_runtime* runtime);
+
+// Task lifetime and execution.
+//
+// Creating a task allocates an independent execution context but does not
+// select or invoke a function. Call it separately with ex_call(). A task may
+// execute multiple sequential calls; each new call starts after the previous
+// call has finished. Each task owns its stack, call frames, locals, and
+// suspension state; tasks share the runtime's bytecode, globals, and native
+// bindings.
+ex_task* ex_task_create(ex_runtime* runtime);
+void ex_task_destroy(ex_task* task);
+ex_task_state ex_task_get_state(const ex_task* task);
+
+// Begin executing a script function on a newly-created task. Arguments are
+// copied from `args` according to the function's declared ABI. `args_size`
+// must match the function's declared parameter byte size; `args` may be null
+// when args_size is zero. This starts a fresh invocation and is valid on a
+// newly-created task or after the previous invocation finished. It is not
+// valid while the task is running or suspended. Returns FUNCTION_NOT_FOUND,
+// INVALID_ARGUMENT, INVALID_STATE, or RUNTIME_ERROR when the invocation
+// cannot complete.
+ex_result ex_call(
+	ex_task* task,
+	ex_string_view function_name,
+	const void* args,
+	u32 args_size
+);
+
+// Resume a SUSPENDED task. Returns EX_RESULT_SUSPENDED when yield is reached,
+// EX_RESULT_OK when the task completes, or FAILURE when it fails.
+ex_result ex_task_resume(ex_task* task);
 
 // TODO: Accept the resolver during ex_runtime_create and remove this setter.
 // Installs a runtime-local lazy resolver for extern functions. A returned
@@ -332,55 +379,29 @@ ex_result ex_runtime_set_native_resolver(
 	void* userdata
 );
 
-void ex_push_bool(ex_runtime* runtime, int value);
-void ex_push_i32(ex_runtime* runtime, i32 value);
-void ex_push_u32(ex_runtime* runtime, u32 value);
-void ex_push_i64(ex_runtime* runtime, i64 value);
-void ex_push_u64(ex_runtime* runtime, u64 value);
-void ex_push_f32(ex_runtime* runtime, float value);
-void ex_push_f64(ex_runtime* runtime, double value);
-void ex_push_string(ex_runtime* runtime, ex_string_view value);
-void ex_push_null(ex_runtime* runtime);
-void ex_push_ptr(ex_runtime* runtime, void* value);
+// Result access for the most recently completed task execution. Result memory
+// belongs to the task and remains valid until the next ex_call, task resume,
+// or task destruction.
+const void* ex_task_result(ex_task* task, u32* size);
 
-// Raw access to the most recent call result.
-//
-// Returns a pointer to the raw bytes of the value returned by the last
-// executed function and writes their count to `*size`, or returns null (and
-// writes 0) when there is no result. A slice value in these bytes is laid out
-// as `ex_slice`: pointer first, then signed i64 element count. It is a
-// non-owning view; the host must keep its backing storage alive. Non-extern
-// struct layout is implementation-defined; extern struct fields use target C
-// ABI layout. Hosts can read components at introspected offsets instead of
-// relying on the positional `ex_to_*` helpers. The pointer is invalidated by
-// the next push or
-// call.
-const void* ex_call_result(ex_runtime* runtime, u32* size);
-
-i32 ex_to_bool(ex_runtime* runtime, i32 index);
-i8  ex_to_i8 (ex_runtime* runtime, i32 index);
-u8  ex_to_u8 (ex_runtime* runtime, i32 index);
-i16 ex_to_i16(ex_runtime* runtime, i32 index);
-u16 ex_to_u16(ex_runtime* runtime, i32 index);
-i32 ex_to_i32(ex_runtime* runtime, i32 index);
-u32 ex_to_u32(ex_runtime* runtime, i32 index);
-i64 ex_to_i64(ex_runtime* runtime, i32 index);
-u64 ex_to_u64(ex_runtime* runtime, i32 index);
-float ex_to_f32(ex_runtime* runtime, i32 index);
-double ex_to_f64(ex_runtime* runtime, i32 index);
-ex_string_view ex_to_string(ex_runtime* runtime, i32 index);
-void* ex_to_ptr(ex_runtime* runtime, i32 index);
-
-// Execute a bytecode function by name.
-//
-// Push every declared argument onto the runtime stack with the `ex_push_*`
-// helpers first. The call fails if fewer argument bytes are available.
-// After the call, the return value is left on top of the runtime stack.
-ex_result ex_call(ex_runtime* runtime, ex_string_view function_name);
+// Typed accessors for the current task result. Index -1 refers to the result.
+i32 ex_task_to_bool(ex_task* task, i32 index);
+i8  ex_task_to_i8 (ex_task* task, i32 index);
+u8  ex_task_to_u8 (ex_task* task, i32 index);
+i16 ex_task_to_i16(ex_task* task, i32 index);
+u16 ex_task_to_u16(ex_task* task, i32 index);
+i32 ex_task_to_i32(ex_task* task, i32 index);
+u32 ex_task_to_u32(ex_task* task, i32 index);
+i64 ex_task_to_i64(ex_task* task, i32 index);
+u64 ex_task_to_u64(ex_task* task, i32 index);
+float ex_task_to_f32(ex_task* task, i32 index);
+double ex_task_to_f64(ex_task* task, i32 index);
+ex_string_view ex_task_to_string(ex_task* task, i32 index);
+void* ex_task_to_ptr(ex_task* task, i32 index);
 
 // Query the declared return type of the function named `function_name`.
-// Callers can then read the value from the runtime stack using the `ex_to_*`
-// helpers with index `-1`.
+// Callers can then read the result through ex_task_result() or the
+// ex_task_to_* helpers.
 ex_type_kind ex_bytecode_runtime_result_kind(ex_runtime* runtime, ex_string_view function_name);
 
 // Type introspection.
@@ -503,21 +524,23 @@ bool ex_type_nullable_is_null(const ex_type* type, const void* value);
 // Only valid when ex_type_nullable_is_null returns false.
 const void* ex_type_nullable_value_ptr(const ex_type* type, const void* value);
 
+const ex_type* ex_type_from_any(const ex_runtime* runtime, const void* value);
+
+//////////////////////////
 // Debugger.
 //
-// Suspension-based: when a debug-enabled runtime pauses, the interrupted
-// `ex_call` unwinds and returns `EX_RESULT_SUSPENDED` with the script state
-// kept intact. The host queries `ex_debug_pause_event`, inspects state, then
-// continues with `ex_debug_resume`. While suspended, don't push arguments or
-// start new calls on the runtime.
+// Suspension-based: when a debug-enabled task pauses, the task execution
+// returns `EX_RESULT_SUSPENDED` with the script state kept intact. The host queries `ex_debug_pause_event`, inspects task state, then
+// continues with `ex_debug_resume`. While suspended, don't start new execution
+// on the task.
 //
 // Calls through a function value (indirect calls) are ordinary script-to-
 // script calls at the bytecode level and suspend normally, same as direct
 // calls. Host-provided native callbacks are plain C function calls with no
 // suspension support at all: none of this project's native functions call
 // back into script, so this hasn't needed guarding, but a native callback
-// that did call `ex_call` reentrantly would be calling into
-// an interpreter loop nested on the live C stack, which cannot suspend out
+// that did start another task reentrantly would be calling into an interpreter
+// loop nested on the live C stack, which cannot suspend out
 // from under it.
 //
 // Inspection calls are only valid while suspended; pointers they return are
@@ -527,6 +550,7 @@ typedef enum ex_debug_pause_reason {
 	EX_DEBUG_PAUSE_BREAKPOINT = 0,
 	EX_DEBUG_PAUSE_STEP,
 	EX_DEBUG_PAUSE_ERROR,
+	EX_DEBUG_PAUSE_YIELD,
 } ex_debug_pause_reason;
 
 typedef enum ex_debug_action {
@@ -534,7 +558,7 @@ typedef enum ex_debug_action {
 	EX_DEBUG_STEP_INTO,
 	EX_DEBUG_STEP_OVER,
 	EX_DEBUG_STEP_OUT,
-	// Abort script execution; the interrupted `ex_call` fails.
+	// Abort script execution; the interrupted task fails.
 	EX_DEBUG_ABORT,
 } ex_debug_action;
 
@@ -552,15 +576,13 @@ typedef struct ex_debug_event {
 	ex_string_view message;
 } ex_debug_event;
 
-int ex_debug_is_suspended(ex_runtime* runtime);
+int ex_debug_is_suspended(ex_task* task);
 
-ex_result ex_debug_pause_event(ex_runtime* runtime, ex_debug_event* out_event);
+ex_result ex_debug_pause_event(ex_task* task, ex_debug_event* out_event);
 
-// Re-enter the interpreter where it paused. Must be called on the script
-// thread; fails when the runtime is not suspended. Returns like the original
-// `ex_call`: `EX_RESULT_OK` with the result on the runtime stack,
-// `EX_RESULT_SUSPENDED`, or `EX_RESULT_FAILURE`.
-ex_result ex_debug_resume(ex_runtime* runtime, ex_debug_action action);
+// Re-enter the task where it paused. Must be called on the script thread;
+// fails when the task is not suspended.
+ex_result ex_debug_resume(ex_task* task, ex_debug_action action);
 
 // Breakpoints. `line` is 1-based; the snapped statement line is written to
 // `*resolved_line` (may be null). Fails when the source or line is unknown.
@@ -569,20 +591,19 @@ ex_result ex_debug_remove_breakpoint(ex_bytecode* bytecode, ex_string_view sourc
 void ex_debug_remove_all_breakpoints(ex_bytecode* bytecode);
 
 // Call stack inspection. Frame 0 is the innermost frame. Also valid
-// immediately after a failed `ex_call`, reporting the stack at
-// the point of failure; the next call overwrites it.
-u32 ex_debug_stack_depth(ex_runtime* runtime);
-ex_string_view ex_debug_frame_function_name(ex_runtime* runtime, u32 frame_index);
-ex_result ex_debug_frame_location(ex_runtime* runtime, u32 frame_index, ex_debug_location* out_location);
+// immediately after a failed task execution, reporting the stack at the
+// point of failure; the next task execution overwrites it.
+u32 ex_debug_stack_depth(ex_task* task);
+ex_string_view ex_debug_frame_function_name(ex_task* task, u32 frame_index);
+ex_result ex_debug_frame_location(ex_task* task, u32 frame_index, ex_debug_location* out_location);
 
 // Variable inspection. Locals enumerate the parameters and locals in scope at
-// the frame's current statement. Values point at the raw bytes in live
-// frame/global storage (runtime layout, see `ex_call_result`); writing through
-// them mutates the running script.
-u32 ex_debug_frame_local_count(ex_runtime* runtime, u32 frame_index);
-ex_string_view ex_debug_local_name(ex_runtime* runtime, u32 frame_index, u32 local_index);
-void* ex_debug_local_value(ex_runtime* runtime, u32 frame_index, u32 local_index, u32* size);
-const ex_type* ex_debug_local_type(ex_runtime* runtime, u32 frame_index, u32 local_index);
+// the frame's current statement. Values point at the raw bytes in live task
+// frame storage; writing through them mutates the running script.
+u32 ex_debug_frame_local_count(ex_task* task, u32 frame_index);
+ex_string_view ex_debug_local_name(ex_task* task, u32 frame_index, u32 local_index);
+void* ex_debug_local_value(ex_task* task, u32 frame_index, u32 local_index, u32* size);
+const ex_type* ex_debug_local_type(ex_task* task, u32 frame_index, u32 local_index);
 
 // Bytecode-owned unit metadata. Indices are valid only for this runtime's
 // bytecode lifetime. These queries do not require suspension or a live module.
@@ -600,8 +621,6 @@ u32 ex_debug_global_count(ex_runtime* runtime);
 ex_string_view ex_debug_global_name(ex_runtime* runtime, u32 global_index);
 void* ex_debug_global_value(ex_runtime* runtime, u32 global_index, u32* size);
 const ex_type* ex_debug_global_type(ex_runtime* runtime, u32 global_index);
-
-const ex_type* ex_type_from_any(const ex_runtime* runtime, const void* value);
 
 #ifdef __cplusplus
 }

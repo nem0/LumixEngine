@@ -10,16 +10,6 @@ static int debug_string_equals(ex_string_view a, ex_string_view b) {
 	return a_size == 0 || memcmp(a.begin, b.begin, (size_t)a_size) == 0;
 }
 
-static const ex_bytecode_source_map_entry* runtime_source_at(const ex_function_bc* fn, u32 code_offset) {
-	const ex_bytecode_source_map_entry* result = NULL;
-	for (u32 i = 0; i < fn->source_map_count; ++i) {
-		const ex_bytecode_source_map_entry* entry = &fn->source_map[i];
-		if (entry->code_offset > code_offset) break;
-		result = entry;
-	}
-	return result;
-}
-
 // Both a failed call and a live suspension expose "the call stack, innermost
 // first" through the same `ex_debug_stack_depth`/`frame_function_name`/
 // `frame_location` API. A failed call already has this reified in
@@ -29,30 +19,30 @@ static const ex_bytecode_source_map_entry* runtime_source_at(const ex_function_b
 // ancestors in `call_stack[0..call_depth)`, exactly like `fail_frames` is
 // assembled - so this reads from whichever is current instead of duplicating
 // the assembly logic into a second array.
-static u32 debug_active_frame_count(ex_runtime* runtime) {
-	if (runtime->is_suspended && runtime->fail_frame_count) return runtime->fail_frame_count;
-	if (runtime->is_suspended) return 1u + runtime->call_depth;
-	return runtime->fail_frame_count;
+static u32 debug_active_frame_count(ex_task* task) {
+	if (task->is_suspended && task->fail_frame_count) return task->fail_frame_count;
+	if (task->is_suspended) return 1u + task->call_depth;
+	return task->fail_frame_count;
 }
 
-static const runtime_call_frame* debug_active_frame(ex_runtime* runtime, u32 frame_index) {
-	if (runtime->is_suspended) {
-		if (runtime->fail_frame_count) return &runtime->fail_frames[frame_index];
-		if (frame_index == 0u) return &runtime->suspended_frame;
-		const u32 call_stack_index = runtime->call_depth - frame_index;
-		return &runtime->call_stack[call_stack_index];
+static const runtime_call_frame* debug_active_frame(ex_task* task, u32 frame_index) {
+	if (task->is_suspended) {
+		if (task->fail_frame_count) return &task->fail_frames[frame_index];
+		if (frame_index == 0u) return &task->suspended_frame;
+		const u32 call_stack_index = task->call_depth - frame_index;
+		return &task->call_stack[call_stack_index];
 	}
-	return &runtime->fail_frames[frame_index];
+	return &task->fail_frames[frame_index];
 }
 
-u32 ex_debug_stack_depth(ex_runtime* runtime) {
-	return debug_active_frame_count(runtime);
+u32 ex_debug_stack_depth(ex_task* task) {
+	return task ? debug_active_frame_count(task) : 0u;
 }
 
-ex_string_view ex_debug_frame_function_name(ex_runtime* runtime, u32 frame_index) {
+ex_string_view ex_debug_frame_function_name(ex_task* task, u32 frame_index) {
 	ex_string_view empty = {NULL, 0};
-	if (frame_index >= debug_active_frame_count(runtime)) return empty;
-	const runtime_call_frame* frame = debug_active_frame(runtime, frame_index);
+	if (!task || frame_index >= debug_active_frame_count(task)) return empty;
+	const runtime_call_frame* frame = debug_active_frame(task, frame_index);
 	return frame->function ? frame->function->name : empty;
 }
 
@@ -66,26 +56,31 @@ ex_string_view ex_debug_frame_function_name(ex_runtime* runtime, u32 frame_index
 // so no adjustment is needed there; a plain failure's snapshot (milestone 1,
 // `fail_frames`) captures ip AFTER the failing instruction's fetch, matching
 // the ancestor convention, so it needs the same ip - 1 adjustment.
-static u32 debug_frame_lookup_offset(ex_runtime* runtime, u32 frame_index, const runtime_call_frame* frame) {
-	const int ip_already_at_instruction = frame_index == 0u && runtime->is_suspended;
+static u32 debug_frame_lookup_offset(ex_task* task, u32 frame_index, const runtime_call_frame* frame) {
+	const int ip_already_at_instruction = frame_index == 0u && task->is_suspended;
 	const u32 offset = (u32)(frame->ip - frame->function->code);
 	return (!ip_already_at_instruction && offset > 0u) ? offset - 1u : offset;
 }
 
-ex_result ex_debug_frame_location(ex_runtime* runtime, u32 frame_index, ex_debug_location* out_location) {
-	if (!out_location) return EX_RESULT_FAILURE;
+ex_result ex_debug_frame_location(ex_task* task, u32 frame_index, ex_debug_location* out_location) {
+	if (!task || !out_location) return EX_RESULT_FAILURE;
 	out_location->source_name = (ex_string_view){NULL, 0};
 	out_location->line = 0u;
 	out_location->column = 0u;
-	if (frame_index >= debug_active_frame_count(runtime)) return EX_RESULT_FAILURE;
-	const runtime_call_frame* frame = debug_active_frame(runtime, frame_index);
+	if (frame_index >= debug_active_frame_count(task)) return EX_RESULT_FAILURE;
+	const runtime_call_frame* frame = debug_active_frame(task, frame_index);
 	if (!frame->function) return EX_RESULT_FAILURE;
-	const u32 lookup_offset = debug_frame_lookup_offset(runtime, frame_index, frame);
-	const ex_bytecode_source_map_entry* entry = runtime_source_at(frame->function, lookup_offset);
+	const u32 lookup_offset = debug_frame_lookup_offset(task, frame_index, frame);
+	const ex_bytecode_source_map_entry* entry = NULL;
+	for (u32 i = 0; i < frame->function->source_map_count; ++i) {
+		const ex_bytecode_source_map_entry* candidate = &frame->function->source_map[i];
+		if (candidate->code_offset > lookup_offset) break;
+		entry = candidate;
+	}
 	if (!entry) return EX_RESULT_FAILURE;
-	if (!runtime->bytecode || entry->location_index >= runtime->bytecode->location_count) return EX_RESULT_FAILURE;
-	const ex_bytecode_location* loc = &runtime->bytecode->locations[entry->location_index];
-	out_location->source_name = runtime->bytecode->units[loc->unit_index].source_name;
+	if (!task->bytecode || entry->location_index >= task->bytecode->location_count) return EX_RESULT_FAILURE;
+	const ex_bytecode_location* loc = &task->bytecode->locations[entry->location_index];
+	out_location->source_name = task->bytecode->units[loc->unit_index].source_name;
 	out_location->line = loc->line;
 	out_location->column = loc->column;
 	return EX_RESULT_OK;
@@ -123,14 +118,6 @@ static int debug_find_breakpoint_target(const ex_bytecode* bytecode, ex_string_v
 	return 1;
 }
 
-static ex_bytecode_breakpoint* debug_find_breakpoint(ex_bytecode* bytecode, const u8* code) {
-	for (u32 i = 0; i < bytecode->breakpoint_count; ++i) {
-		ex_bytecode_breakpoint* bp = &bytecode->breakpoints[i];
-		if (bp->code == code) return bp;
-	}
-	return NULL;
-}
-
 ex_result ex_debug_set_breakpoint(ex_bytecode* bytecode, ex_string_view source_name, u32 line, u32* resolved_line) {
 	if (resolved_line) *resolved_line = 0u;
 	if (!bytecode) return EX_RESULT_FAILURE;
@@ -142,7 +129,8 @@ ex_result ex_debug_set_breakpoint(ex_bytecode* bytecode, ex_string_view source_n
 
 	ex_function_bc* fn = &bytecode->functions[function_index];
 	u8* code = fn->code + code_offset;
-	if (debug_find_breakpoint(bytecode, code)) {
+	for (u32 i = 0; i < bytecode->breakpoint_count; ++i) {
+		if (bytecode->breakpoints[i].code != code) continue;
 		if (resolved_line) *resolved_line = found_line;
 		return EX_RESULT_OK;
 	}
@@ -193,59 +181,55 @@ void ex_debug_remove_all_breakpoints(ex_bytecode* bytecode) {
 	bytecode->breakpoint_count = 0u;
 }
 
-// Ends a live suspension without resuming the interpreter: reports the
-// suspend point as a failed-call stack trace (fail_frames, same shape
-// ex_call's fail path leaves it in) and clears is_suspended so ex_call
-// accepts new calls again. Used by ex_debug_resume(EX_DEBUG_ABORT).
-static void debug_abandon_suspension(ex_runtime* runtime) {
-	u32 recorded = 0u;
-	if (recorded < (u32)(sizeof(runtime->fail_frames) / sizeof(runtime->fail_frames[0]))) {
-		runtime->fail_frames[recorded++] = runtime->suspended_frame;
-	}
-	for (u32 i = runtime->call_depth; i > 0u && recorded < (u32)(sizeof(runtime->fail_frames) / sizeof(runtime->fail_frames[0])); --i) {
-		runtime->fail_frames[recorded++] = runtime->call_stack[i - 1u];
-	}
-	runtime->fail_frame_count = recorded;
-	runtime->is_suspended = false;
-	ASSERT(runtime->call_start_depth > 0u);
-	const runtime_restore_point* initial = &runtime->call_starts[runtime->call_start_depth - 1u];
-	runtime->call_depth = initial->call_depth;
-	runtime->stack_top = initial->stack_top;
-	runtime->frame = initial->frame;
-	runtime->result_size = initial->result_size;
-	--runtime->call_start_depth;
-	runtime->step_action = EX_DEBUG_CONTINUE;
+int ex_debug_is_suspended(ex_task* task) {
+	return task && task->is_suspended ? 1 : 0;
 }
 
-int ex_debug_is_suspended(ex_runtime* runtime) {
-	return runtime->is_suspended ? 1 : 0;
-}
-
-ex_result ex_debug_pause_event(ex_runtime* runtime, ex_debug_event* out_event) {
-	if (!out_event) return EX_RESULT_FAILURE;
-	if (!runtime->is_suspended) return EX_RESULT_FAILURE;
-	*out_event = runtime->pause_event;
+ex_result ex_debug_pause_event(ex_task* task, ex_debug_event* out_event) {
+	if (!task || !out_event) return EX_RESULT_FAILURE;
+	if (!task->is_suspended) return EX_RESULT_FAILURE;
+	*out_event = task->pause_event;
 	return EX_RESULT_OK;
 }
 
-ex_result ex_debug_resume(ex_runtime* runtime, ex_debug_action action) {
-	if (!runtime->is_suspended) return EX_RESULT_FAILURE;
+ex_result ex_debug_resume(ex_task* task, ex_debug_action action) {
+	if (!task || task->executing || !task->is_suspended) return EX_RESULT_FAILURE;
 	if (action == EX_DEBUG_ABORT) {
-		debug_abandon_suspension(runtime);
+		// Preserve the suspended call stack as a failed-call trace, then reset
+		// the task to its call-start state without resuming the interpreter.
+		u32 recorded = 0u;
+		if (recorded < (u32)(sizeof(task->fail_frames) / sizeof(task->fail_frames[0]))) {
+			task->fail_frames[recorded++] = task->suspended_frame;
+		}
+		for (u32 i = task->call_depth; i > 0u && recorded < (u32)(sizeof(task->fail_frames) / sizeof(task->fail_frames[0])); --i) {
+			task->fail_frames[recorded++] = task->call_stack[i - 1u];
+		}
+		task->fail_frame_count = recorded;
+		task->is_suspended = false;
+		ASSERT(task->call_start_depth > 0u);
+		const runtime_restore_point* initial = &task->call_starts[task->call_start_depth - 1u];
+		task->call_depth = initial->call_depth;
+		task->stack_top = task->stack;
+		task->frame = task->stack;
+		task->result_size = 0u;
+		--task->call_start_depth;
+		task->step_action = EX_DEBUG_CONTINUE;
+		task->state = EX_TASK_FAILED;
 		return EX_RESULT_FAILURE;
 	}
 	// The pause event's location is exactly "the line we're stopped at" (it
 	// was populated from this same suspended_frame at suspend time), so it
 	// doubles as the step's starting line without a second source-map lookup.
-	// call_depth is still whatever it was at suspend (resume hasn't touched
-	// it yet), i.e. the depth of the suspended innermost frame's caller chain.
-	// runtime.c clears step_action at the next suspend, whatever the reason
-	// (step condition met, a breakpoint, or an error) - from the host's
-	// perspective any suspension ends this step attempt.
-	runtime->step_action = action;
-	runtime->step_start_line = runtime->pause_event.location.line;
-	runtime->step_start_call_depth = runtime->call_depth;
-	return ex_runtime_resume_suspended(runtime);
+	task->step_action = action;
+	task->step_start_line = task->pause_event.location.line;
+	task->step_start_call_depth = task->call_depth;
+	task->executing = true;
+	const ex_result result = ex_task_resume_suspended(task);
+	task->executing = false;
+	if (result == EX_RESULT_SUSPENDED) task->state = EX_TASK_SUSPENDED;
+	else if (result == EX_RESULT_OK) task->state = EX_TASK_READY;
+	else task->state = EX_TASK_FAILED;
+	return result;
 }
 
 // Finds the local_index'th entry among `frame`'s locals whose scope has
@@ -253,17 +237,17 @@ ex_result ex_debug_resume(ex_runtime* runtime, ex_debug_action action) {
 // ex_bytecode_local_debug_entry's scope_begin_offset), or NULL past the end.
 // `ex_debug_frame_local_count` is the same walk with no target index, kept
 // separate from a cached array since function->local_count is typically small.
-static const ex_bytecode_local_debug_entry* debug_local_at(ex_runtime* runtime, u32 frame_index, u32 local_index, u32* out_visible_count) {
-	if (frame_index >= debug_active_frame_count(runtime)) {
+static const ex_bytecode_local_debug_entry* debug_local_at(ex_task* task, u32 frame_index, u32 local_index, u32* out_visible_count) {
+	if (frame_index >= debug_active_frame_count(task)) {
 		if (out_visible_count) *out_visible_count = 0u;
 		return NULL;
 	}
-	const runtime_call_frame* frame = debug_active_frame(runtime, frame_index);
+	const runtime_call_frame* frame = debug_active_frame(task, frame_index);
 	if (!frame->function) {
 		if (out_visible_count) *out_visible_count = 0u;
 		return NULL;
 	}
-	const u32 lookup_offset = debug_frame_lookup_offset(runtime, frame_index, frame);
+	const u32 lookup_offset = debug_frame_lookup_offset(task, frame_index, frame);
 	const ex_bytecode_local_debug_entry* found = NULL;
 	u32 visible_count = 0u;
 	for (u32 i = 0; i < frame->function->local_count; ++i) {
@@ -276,25 +260,28 @@ static const ex_bytecode_local_debug_entry* debug_local_at(ex_runtime* runtime, 
 	return found;
 }
 
-u32 ex_debug_frame_local_count(ex_runtime* runtime, u32 frame_index) {
+u32 ex_debug_frame_local_count(ex_task* task, u32 frame_index) {
+	if (!task) return 0u;
 	u32 count = 0u;
-	debug_local_at(runtime, frame_index, (u32)-1, &count);
+	debug_local_at(task, frame_index, (u32)-1, &count);
 	return count;
 }
 
-ex_string_view ex_debug_local_name(ex_runtime* runtime, u32 frame_index, u32 local_index) {
+ex_string_view ex_debug_local_name(ex_task* task, u32 frame_index, u32 local_index) {
 	ex_string_view empty = {NULL, 0};
-	const ex_bytecode_local_debug_entry* entry = debug_local_at(runtime, frame_index, local_index, NULL);
+	if (!task) return empty;
+	const ex_bytecode_local_debug_entry* entry = debug_local_at(task, frame_index, local_index, NULL);
 	return entry ? entry->name : empty;
 }
 
-void* ex_debug_local_value(ex_runtime* runtime, u32 frame_index, u32 local_index, u32* size) {
+void* ex_debug_local_value(ex_task* task, u32 frame_index, u32 local_index, u32* size) {
 	if (size) *size = 0u;
-	const ex_bytecode_local_debug_entry* entry = debug_local_at(runtime, frame_index, local_index, NULL);
+	if (!task) return NULL;
+	const ex_bytecode_local_debug_entry* entry = debug_local_at(task, frame_index, local_index, NULL);
 	if (!entry) return NULL;
-	const runtime_call_frame* frame = debug_active_frame(runtime, frame_index);
+	const runtime_call_frame* frame = debug_active_frame(task, frame_index);
 	u8* value = frame->frame + entry->offset;
-	if (value + entry->byte_size > runtime->stack_end) return NULL;
+	if (value + entry->byte_size > task->stack_end) return NULL;
 	if (size) *size = entry->byte_size;
 	return value;
 }
@@ -347,15 +334,16 @@ void* ex_debug_global_value(ex_runtime* runtime, u32 global_index, u32* size) {
 	if (size) *size = 0u;
 	if (global_index >= runtime->bytecode->global_debug_count) return NULL;
 	const ex_bytecode_global_debug_entry* entry = &runtime->bytecode->global_debug[global_index];
-	if (runtime->stack + entry->offset + entry->byte_size > runtime->stack_end) return NULL;
+	if ((u64)entry->offset + entry->byte_size > runtime->global_size) return NULL;
 	if (size) *size = entry->byte_size;
-	return runtime->stack + entry->offset;
+	return runtime->globals + entry->offset;
 }
 
-const ex_type* ex_debug_local_type(ex_runtime* runtime, u32 frame_index, u32 local_index) {
-	const ex_bytecode_local_debug_entry* entry = debug_local_at(runtime, frame_index, local_index, NULL);
-	if (!entry || entry->type_index >= runtime->bytecode->type_info_count) return NULL;
-	return (const ex_type*)&runtime->bytecode->type_info[entry->type_index];
+const ex_type* ex_debug_local_type(ex_task* task, u32 frame_index, u32 local_index) {
+	if (!task) return NULL;
+	const ex_bytecode_local_debug_entry* entry = debug_local_at(task, frame_index, local_index, NULL);
+	if (!entry || entry->type_index >= task->bytecode->type_info_count) return NULL;
+	return (const ex_type*)&task->bytecode->type_info[entry->type_index];
 }
 
 const ex_type* ex_debug_global_type(ex_runtime* runtime, u32 global_index) {

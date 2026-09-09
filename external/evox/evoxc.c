@@ -24,6 +24,7 @@ typedef struct evoxc_context {
 	ex_module* module;
 	ex_bytecode* bytecode;
 	ex_runtime* runtime;
+	ex_task* task;
 } evoxc_context;
 
 static const ex_host g_host_template = {
@@ -34,6 +35,22 @@ static const ex_host g_host_template = {
 
 static ex_string_view ex_from_cstr(const char* str) {
 	return (ex_string_view){str, str ? (i64)strlen(str) : 0};
+}
+
+static const char* evoxc_result_name(ex_result result) {
+	switch (result) {
+		case EX_RESULT_FUNCTION_NOT_FOUND: return "function not found";
+		case EX_RESULT_INVALID_ARGUMENT: return "invalid arguments";
+		case EX_RESULT_INVALID_STATE: return "invalid task state";
+		case EX_RESULT_ALREADY_EXECUTING: return "task already executing";
+		case EX_RESULT_NOT_SUSPENDED: return "task is not suspended";
+		case EX_RESULT_NOT_RESUMABLE: return "task suspension is not resumable";
+		case EX_RESULT_OUT_OF_MEMORY: return "out of memory";
+		case EX_RESULT_RUNTIME_ERROR: return "script runtime error";
+		case EX_RESULT_SUSPENDED: return "execution suspended";
+		case EX_RESULT_FAILURE: return "internal failure";
+		default: return "unknown error";
+	}
 }
 
 static ex_unit* evoxc_find_native_function(ex_module* module, const char* name, int* out_function_index) {
@@ -57,41 +74,50 @@ static void evoxc_print_string(FILE* out, ex_string_view value) {
 	fwrite(value.begin, 1, value.length, out);
 }
 
-static void evoxc_write_result(FILE* out, ex_runtime* runtime, ex_type_kind kind) {
+static void evoxc_write_result(FILE* out, ex_task* task, ex_type_kind kind) {
 	switch (kind) {
 		case EX_TYPE_VOID:
 			break;
 		case EX_TYPE_BOOL:
-			fputs(ex_to_bool(runtime, -1) ? "true" : "false", out);
+			fputs(ex_task_to_bool(task, -1) ? "true" : "false", out);
 			break;
 		case EX_TYPE_I8:
 		case EX_TYPE_I16:
 		case EX_TYPE_I32:
 		case EX_TYPE_ENUM:
 		case EX_TYPE_UNTYPED_INT:
-			fprintf(out, "%d", ex_to_i32(runtime, -1));
+			fprintf(out, "%d", ex_task_to_i32(task, -1));
 			break;
 		case EX_TYPE_U8:
 		case EX_TYPE_U16:
 		case EX_TYPE_U32:
-			fprintf(out, "%u", ex_to_u32(runtime, -1));
+			fprintf(out, "%u", ex_task_to_u32(task, -1));
 			break;
 		case EX_TYPE_I64:
-			fprintf(out, "%lld", (long long)ex_to_i64(runtime, -1));
+			fprintf(out, "%lld", (long long)ex_task_to_i64(task, -1));
 			break;
 		case EX_TYPE_U64:
-			fprintf(out, "%llu", (unsigned long long)ex_to_u64(runtime, -1));
+			fprintf(out, "%llu", (unsigned long long)ex_task_to_u64(task, -1));
 			break;
 		case EX_TYPE_F32:
-			fprintf(out, "%f", ex_to_f32(runtime, -1));
+			fprintf(out, "%f", ex_task_to_f32(task, -1));
 			break;
 		case EX_TYPE_F64:
-			fprintf(out, "%lf", ex_to_f64(runtime, -1));
+			fprintf(out, "%lf", ex_task_to_f64(task, -1));
 			break;
 		default:
 			fprintf(out, "<%d>", (int)kind);
 			break;
 	}
+}
+
+static int evoxc_append_arg(u8** data, u32* size, const void* value, u32 value_size) {
+	u8* grown = (u8*)realloc(*data, (size_t)*size + value_size);
+	if (!grown) return 0;
+	memcpy(grown + *size, value, value_size);
+	*data = grown;
+	*size += value_size;
+	return 1;
 }
 
 static void evoxc_diagnostics_print(void* userdata, ex_string_view msg) {
@@ -246,6 +272,7 @@ static const char* evoxc_opcode_name(ex_op op) {
 		case EX_OP_CAST: return "CAST";
 		case EX_OP_RETURN: return "RETURN";
 		case EX_OP_RETURN_BASE: return "RETURN_BASE";
+		case EX_OP_YIELD: return "YIELD";
 		case EX_OP_PANIC: return "PANIC";
 		default: return "UNKNOWN";
 	}
@@ -677,6 +704,8 @@ int main(int argc, char** argv) {
 	}
 
 	evoxc_context ctx;
+	u8* call_args = NULL;
+	u32 call_args_size = 0u;
 	memset(&ctx, 0, sizeof(ctx));
 	ctx.host = g_host_template;
 	ex_default_arena_create(&ctx.host.arena);
@@ -759,8 +788,13 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "Error: Failed to create bytecode runtime\n");
 		goto cleanup;
 	}
+	ctx.task = ex_task_create(ctx.runtime);
+	if (!ctx.task) {
+		fprintf(stderr, "Error: Failed to create bytecode task\n");
+		goto cleanup;
+	}
 
-	if (!ex_runtime_set_native_resolver(ctx.runtime, &evoxc_native_resolver, NULL)) {
+	if (ex_runtime_set_native_resolver(ctx.runtime, &evoxc_native_resolver, NULL) != EX_RESULT_OK) {
 		fprintf(stderr, "Error: Failed to install native resolver\n");
 		goto cleanup;
 	}
@@ -771,26 +805,34 @@ int main(int argc, char** argv) {
 		for (size_t i = 0; i < call_arg_count; ++i) {
 			char* end = NULL;
 			const char* arg = argv[i + first_call_arg];
+			int ok = 1;
 			double d = strtod(arg, &end);
 			if (end != arg && *end == '\0') {
 				if (strpbrk(arg, ".eE")) {
-					ex_push_f64(ctx.runtime, d);
+					ok = evoxc_append_arg(&call_args, &call_args_size, &d, sizeof(d));
 				} else {
-					ex_push_i64(ctx.runtime, (i64)d);
+					i64 value = (i64)d;
+					ok = evoxc_append_arg(&call_args, &call_args_size, &value, sizeof(value));
 				}
-			} else if (strcmp(arg, "true") == 0) {
-				ex_push_bool(ctx.runtime, 1);
-			} else if (strcmp(arg, "false") == 0) {
-				ex_push_bool(ctx.runtime, 0);
+			} else if (strcmp(arg, "true") == 0 || strcmp(arg, "false") == 0) {
+				u8 value = (u8)(strcmp(arg, "true") == 0);
+				ok = evoxc_append_arg(&call_args, &call_args_size, &value, sizeof(value));
 			} else {
-				ex_push_string(ctx.runtime, ex_from_cstr(arg));
+				ex_slice slice = {(u8*)arg, (i64)strlen(arg)};
+				ok = evoxc_append_arg(&call_args, &call_args_size, &slice, sizeof(slice));
+			}
+			if (!ok) {
+				fprintf(stderr, "Error: Failed to allocate call arguments\n");
+				free(call_args);
+				goto cleanup;
 			}
 		}
 
 		// Bytecode compilation and runtime setup are intentionally outside the benchmark.
 		double start = ex_platform_now_ms();
-		if (!ex_call(ctx.runtime, ex_from_cstr(function_name))) {
-			fprintf(stderr, "Runtime error\n");
+		ex_result call_result = ex_call(ctx.task, ex_from_cstr(function_name), call_args, call_args_size);
+		if (call_result != EX_RESULT_OK) {
+			fprintf(stderr, "Error: Failed to call '%s': %s\n", function_name, evoxc_result_name(call_result));
 			goto cleanup;
 		}
 		double elapsed_ms = ex_platform_now_ms() - start;
@@ -798,7 +840,7 @@ int main(int argc, char** argv) {
 		{
 			ex_type_kind result_kind = ex_bytecode_runtime_result_kind(ctx.runtime, ex_from_cstr(function_name));
 			if (result_kind != EX_TYPE_VOID) {
-				evoxc_write_result(stdout, ctx.runtime, result_kind);
+				evoxc_write_result(stdout, ctx.task, result_kind);
 				putchar('\n');
 			}
 		}
@@ -809,6 +851,8 @@ int main(int argc, char** argv) {
 	rc = 0;
 
 cleanup:
+	free(call_args);
+	if (ctx.task) ex_task_destroy(ctx.task);
 	if (ctx.runtime) ex_runtime_destroy(ctx.runtime);
 	if (ctx.bytecode) ex_bytecode_destroy(ctx.bytecode);
 	if (ctx.module) ex_module_destroy(ctx.module);

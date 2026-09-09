@@ -209,8 +209,8 @@ TEST(BreakContinueRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(25, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(25, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -240,8 +240,8 @@ TEST(ForLoopRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(203, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(203, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -271,8 +271,8 @@ TEST(ForLoopRangeEvaluatedOnce) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(201, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(201, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -302,8 +302,8 @@ TEST(NamedLabelBreakContinueRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(12, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(12, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -329,8 +329,8 @@ TEST(ForLoopUntypedBoundAdoptsEndTypeRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -396,8 +396,8 @@ TEST(ForInValueOverSliceRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -423,8 +423,8 @@ TEST(ForInIndexValueOverSliceRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(306, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(306, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -450,8 +450,8 @@ TEST(ForInValueOverSubSliceRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(6, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(6, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -477,9 +477,9 @@ TEST(ForInIndexValueOverSubSliceRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
 	// slice-relative indices 0,1,2 (not the backing array's 1,2,3): 10+1020+2030 = 3060
-	EXPECT_EQ(3060, ex_to_i32(runtime, -1));
+	EXPECT_EQ(3060, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -539,8 +539,8 @@ TEST(ForInMutableReferenceUpdatesArray) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(12, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(12, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -562,8 +562,8 @@ TEST(ForInMutableReferenceWithIndexUpdatesSlice) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(531, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(531, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -583,8 +583,8 @@ TEST(ForInEmptySliceDoesNotExecuteRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(0, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -605,9 +605,9 @@ TEST(ForRangeZeroIterationsDoesNotExecuteBody) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	ex_push_i32(runtime, 0);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(0, ex_to_i32(runtime, -1));
+	test_push_i32(runtime, 0);
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -636,10 +636,10 @@ TEST(NestedForInRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
 	// outer index 0, value 10: (10+1+0)+(10+2+0)+(10+3+0) = 36
 	// outer index 1, value 20: (20+1+1)+(20+2+1)+(20+3+1) = 69
-	EXPECT_EQ(105, ex_to_i32(runtime, -1));
+	EXPECT_EQ(105, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -668,10 +668,10 @@ TEST(NestedForInNoIndexRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
 	// outer value 10: (10+1)+(10+2)+(10+3) = 36
 	// outer value 20: (20+1)+(20+2)+(20+3) = 66
-	EXPECT_EQ(102, ex_to_i32(runtime, -1));
+	EXPECT_EQ(102, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -705,8 +705,8 @@ TEST(CustomIteratorWithArbitraryStateRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(33, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(33, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -738,8 +738,8 @@ TEST(CustomIteratorLinkedListRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(6, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(6, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -768,8 +768,8 @@ TEST(CustomIteratorIndexValueRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(330, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(330, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -800,8 +800,8 @@ TEST(CustomIteratorExpressionEvaluatedOnce) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(101, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(101, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -831,8 +831,8 @@ TEST(CustomIteratorBreakRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(3, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(3, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }

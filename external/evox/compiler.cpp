@@ -1521,6 +1521,11 @@ struct Checker {
 				out = st;
 				break;
 			}
+			case Statement::YIELD: {
+				YieldStatement* st = makeType<YieldStatement>(unit.arena);
+				out = st;
+				break;
+			}
 			case Statement::LABEL: {
 				LabelStatement* s = static_cast<LabelStatement*>(src);
 				LabelStatement* st = makeType<LabelStatement>(unit.arena);
@@ -5364,6 +5369,12 @@ struct Checker {
 				--ctx.in_defer;
 				return ok;
 			}
+			case Statement::YIELD:
+				if (ctx.in_defer) {
+					errorLine(st->token, "Yield statement cannot be used in a defer statement");
+					return false;
+				}
+				return true;
 			case Statement::FOR: return checkForStatement(unit, ctx, static_cast<ForStatement&>(*st), return_type, pending_label);
 			case Statement::VAR_DECL: return checkVarDeclStatement(unit, ctx, static_cast<VarDeclStatement&>(*st), return_type);
 			case Statement::ASSIGN: return checkAssignStatement(unit, ctx, static_cast<AssignStatement&>(*st));
@@ -5654,6 +5665,7 @@ struct Checker {
 			case Statement::CONTINUE:
 			case Statement::LABEL:
 			case Statement::MATCH:
+			case Statement::YIELD:
 			case Statement::EXPRESSION: {
 				errorLine(statement.token, "Comptime evaluation of statement kind ", statement.kind, " not implemented yet");
 				return {};

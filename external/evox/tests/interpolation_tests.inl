@@ -25,8 +25,8 @@ TEST(OrdinaryStringBracesAreLiteral) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, ex_call(runtime, toLs("main")));
-	EXPECT_EQ(3, ex_to_i32(runtime, -1));
+	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(3, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -39,8 +39,8 @@ TEST(InterpolationEscapedOpenBrace) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, ex_call(runtime, toLs("main")));
-	EXPECT_EQ(12, ex_to_i32(runtime, -1));
+	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(12, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -142,8 +142,8 @@ TEST(InterpolationRuntimeBinaryAndCall) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, ex_call(runtime, toLs("main")));
-	EXPECT_EQ(49, ex_to_i32(runtime, -1));
+	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(49, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -163,8 +163,8 @@ TEST(InterpolationRuntimeMemberIndexAndNested) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, ex_call(runtime, toLs("main")));
-	EXPECT_EQ(38, ex_to_i32(runtime, -1));
+	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(38, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -180,8 +180,8 @@ TEST(InterpolationRuntimeMixedCallArguments) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -200,8 +200,8 @@ TEST(InterpolationRuntimeMultipleParts) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, ex_call(runtime, toLs("main")));
-	EXPECT_EQ(47, ex_to_i32(runtime, -1));
+	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(47, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -226,8 +226,8 @@ TEST(InterpolationRuntimeVariadicAny) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_OK, ex_call(runtime, toLs("main")));
-	EXPECT_EQ(114, ex_to_i32(runtime, -1));
+	EXPECT_EQ(EX_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(114, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }

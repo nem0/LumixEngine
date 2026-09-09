@@ -19,6 +19,7 @@ struct Statement {
 		BREAK,
 		CONTINUE,
 		DEFER,
+		YIELD,
 		LABEL
 	};
 
@@ -157,6 +158,10 @@ struct DeferStatement : Statement {
 	DeferStatement() : Statement(DEFER) {}
 
 	Statement* statement = nullptr;
+};
+
+struct YieldStatement : Statement {
+	YieldStatement() : Statement(YIELD) {}
 };
 
 struct LabelStatement : Statement {

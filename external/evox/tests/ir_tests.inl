@@ -2,8 +2,8 @@ TEST(ir_to_bytecode_basic) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs("fn main() : i32 { return 2 + 3; }"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(ex_call(runtime, toLs("main")), EX_RESULT_OK);
-	EXPECT_EQ(ex_to_i32(runtime, -1), 5);
+	EXPECT_EQ(test_call(runtime, toLs("main")), EX_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 5);
 	CAPI_END(module);
 	return true;
 }
@@ -12,8 +12,8 @@ TEST(ir_to_bytecode_compare_and_if) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs("fn main() : i32 { if 2 < 3 { return 7; } else { return 9; } }"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(ex_call(runtime, toLs("main")), EX_RESULT_OK);
-	EXPECT_EQ(ex_to_i32(runtime, -1), 7);
+	EXPECT_EQ(test_call(runtime, toLs("main")), EX_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 7);
 	CAPI_END(module);
 	return true;
 }
@@ -22,8 +22,8 @@ TEST(ir_to_bytecode_locals) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs("fn main() : i32 { var x : i32 = 2; x += 3; return x; }"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(ex_call(runtime, toLs("main")), EX_RESULT_OK);
-	EXPECT_EQ(ex_to_i32(runtime, -1), 5);
+	EXPECT_EQ(test_call(runtime, toLs("main")), EX_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 5);
 	CAPI_END(module);
 	return true;
 }
@@ -32,8 +32,8 @@ TEST(ir_to_bytecode_module_call) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs("fn helper(x : i32) : i32 { return x + 1; } fn main() : i32 { return helper(2); }"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(ex_call(runtime, toLs("main")), EX_RESULT_OK);
-	EXPECT_EQ(ex_to_i32(runtime, -1), 3);
+	EXPECT_EQ(test_call(runtime, toLs("main")), EX_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 3);
 	CAPI_END(module);
 	return true;
 }
@@ -42,8 +42,8 @@ TEST(ir_to_bytecode_globals) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs("var g : i32 = 4; fn main() : i32 { g += 2; return g; }"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(ex_call(runtime, toLs("main")), EX_RESULT_OK);
-	EXPECT_EQ(ex_to_i32(runtime, -1), 6);
+	EXPECT_EQ(test_call(runtime, toLs("main")), EX_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 6);
 	CAPI_END(module);
 	return true;
 }
@@ -57,8 +57,8 @@ TEST(ir_to_bytecode_while_loop) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs("fn main() : i32 { var x : i32 = 0; while x < 3 { x += 1; } return x; }"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(ex_call(runtime, toLs("main")), EX_RESULT_OK);
-	EXPECT_EQ(ex_to_i32(runtime, -1), 3);
+	EXPECT_EQ(test_call(runtime, toLs("main")), EX_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 3);
 	CAPI_END(module);
 	return true;
 }
@@ -67,8 +67,8 @@ TEST(ir_to_bytecode_loop_control) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs("fn main() : i32 { var x : i32 = 0; while x < 10 { x += 1; if x == 3 { continue; } if x == 5 { break; } } return x; }"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(ex_call(runtime, toLs("main")), EX_RESULT_OK);
-	EXPECT_EQ(ex_to_i32(runtime, -1), 5);
+	EXPECT_EQ(test_call(runtime, toLs("main")), EX_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 5);
 	CAPI_END(module);
 	return true;
 }
@@ -77,8 +77,8 @@ TEST(ir_to_bytecode_for_range) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs("fn main() : i32 { var sum : i32 = 0; for i in 0 .. 4 { sum += i; } return sum; }"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(ex_call(runtime, toLs("main")), EX_RESULT_OK);
-	EXPECT_EQ(ex_to_i32(runtime, -1), 6);
+	EXPECT_EQ(test_call(runtime, toLs("main")), EX_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 6);
 	CAPI_END(module);
 	return true;
 }
@@ -87,8 +87,8 @@ TEST(ir_to_bytecode_array_access) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs("fn main() : i32 { var values : [3]i32 = [ 4, 5, 6 ]; values[1] = 8; return values[1]; }"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(ex_call(runtime, toLs("main")), EX_RESULT_OK);
-	EXPECT_EQ(ex_to_i32(runtime, -1), 8);
+	EXPECT_EQ(test_call(runtime, toLs("main")), EX_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 8);
 	CAPI_END(module);
 	return true;
 }
@@ -102,20 +102,20 @@ TEST(ir_to_bytecode_array_bounds_check) {
 	)"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
 	test_diagnostics.output_enabled = false;
-	EXPECT_EQ(ex_call(runtime, toLs("valid")), EX_RESULT_OK);
-	EXPECT_EQ(ex_to_i32(runtime, -1), 8);
+	EXPECT_EQ(test_call(runtime, toLs("valid")), EX_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 8);
 
 	// Runtime errors suspend with EX_DEBUG_PAUSE_ERROR instead of failing the
 	// call (see DebugErrorSuspendsWhenEnabled); the host aborts to unwind.
 	ex_debug_event event;
-	EXPECT_EQ(ex_call(runtime, toLs("negative")), EX_RESULT_SUSPENDED);
+	EXPECT_EQ(test_call(runtime, toLs("negative")), EX_RESULT_SUSPENDED);
 	EXPECT_TRUE(ex_debug_is_suspended(runtime));
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ((int)EX_DEBUG_PAUSE_ERROR, (int)event.reason);
 	EXPECT_EQ((int)EX_RESULT_FAILURE, (int)ex_debug_resume(runtime, EX_DEBUG_ABORT));
 	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
 
-	EXPECT_EQ(ex_call(runtime, toLs("past_end")), EX_RESULT_SUSPENDED);
+	EXPECT_EQ(test_call(runtime, toLs("past_end")), EX_RESULT_SUSPENDED);
 	EXPECT_TRUE(ex_debug_is_suspended(runtime));
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ((int)EX_DEBUG_PAUSE_ERROR, (int)event.reason);
@@ -142,39 +142,39 @@ TEST(ir_to_bytecode_array_index_kinds) {
 	)"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
 
-	EXPECT_EQ(ex_call(runtime, toLs("load_u8")), EX_RESULT_OK);
-	EXPECT_EQ(ex_to_i32(runtime, -1), 6);
-	EXPECT_EQ(ex_call(runtime, toLs("load_u16")), EX_RESULT_OK);
-	EXPECT_EQ(ex_to_i32(runtime, -1), 5);
-	EXPECT_EQ(ex_call(runtime, toLs("load_u32")), EX_RESULT_OK);
-	EXPECT_EQ(ex_to_i32(runtime, -1), 6);
-	EXPECT_EQ(ex_call(runtime, toLs("store_u8")), EX_RESULT_OK);
-	EXPECT_EQ(ex_to_i32(runtime, -1), 7);
+	EXPECT_EQ(test_call(runtime, toLs("load_u8")), EX_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 6);
+	EXPECT_EQ(test_call(runtime, toLs("load_u16")), EX_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 5);
+	EXPECT_EQ(test_call(runtime, toLs("load_u32")), EX_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 6);
+	EXPECT_EQ(test_call(runtime, toLs("store_u8")), EX_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 7);
 
 	test_diagnostics.output_enabled = false;
 	ex_debug_event event;
-	EXPECT_EQ(ex_call(runtime, toLs("negative_i8")), EX_RESULT_SUSPENDED);
+	EXPECT_EQ(test_call(runtime, toLs("negative_i8")), EX_RESULT_SUSPENDED);
 	EXPECT_TRUE(ex_debug_is_suspended(runtime));
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ((int)EX_DEBUG_PAUSE_ERROR, (int)event.reason);
 	EXPECT_EQ((int)EX_RESULT_FAILURE, (int)ex_debug_resume(runtime, EX_DEBUG_ABORT));
 	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
 
-	EXPECT_EQ(ex_call(runtime, toLs("negative_i16")), EX_RESULT_SUSPENDED);
+	EXPECT_EQ(test_call(runtime, toLs("negative_i16")), EX_RESULT_SUSPENDED);
 	EXPECT_TRUE(ex_debug_is_suspended(runtime));
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ((int)EX_DEBUG_PAUSE_ERROR, (int)event.reason);
 	EXPECT_EQ((int)EX_RESULT_FAILURE, (int)ex_debug_resume(runtime, EX_DEBUG_ABORT));
 	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
 
-	EXPECT_EQ(ex_call(runtime, toLs("negative_i32")), EX_RESULT_SUSPENDED);
+	EXPECT_EQ(test_call(runtime, toLs("negative_i32")), EX_RESULT_SUSPENDED);
 	EXPECT_TRUE(ex_debug_is_suspended(runtime));
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ((int)EX_DEBUG_PAUSE_ERROR, (int)event.reason);
 	EXPECT_EQ((int)EX_RESULT_FAILURE, (int)ex_debug_resume(runtime, EX_DEBUG_ABORT));
 	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
 
-	EXPECT_EQ(ex_call(runtime, toLs("past_end_u8")), EX_RESULT_SUSPENDED);
+	EXPECT_EQ(test_call(runtime, toLs("past_end_u8")), EX_RESULT_SUSPENDED);
 	EXPECT_TRUE(ex_debug_is_suspended(runtime));
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ((int)EX_DEBUG_PAUSE_ERROR, (int)event.reason);
@@ -188,8 +188,8 @@ TEST(ir_to_bytecode_undefined_array_and_greater_than) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs("fn main() : i32 { var values : [3]i32 = undefined; for i in 0..3 { values[i] = i; } if values[2] > 1 { return values[2]; } return 0; }"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(ex_call(runtime, toLs("main")), EX_RESULT_OK);
-	EXPECT_EQ(ex_to_i32(runtime, -1), 2);
+	EXPECT_EQ(test_call(runtime, toLs("main")), EX_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 2);
 	CAPI_END(module);
 	return true;
 }
@@ -198,8 +198,8 @@ TEST(ir_to_bytecode_array_for) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs("fn main() : i32 { var values : [3]i32 = [ 1, 2, 3 ]; var sum : i32 = 0; for value in values { sum += value; } return sum; }"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(ex_call(runtime, toLs("main")), EX_RESULT_OK);
-	EXPECT_EQ(ex_to_i32(runtime, -1), 6);
+	EXPECT_EQ(test_call(runtime, toLs("main")), EX_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 6);
 	CAPI_END(module);
 	return true;
 }
@@ -208,8 +208,8 @@ TEST(ir_to_bytecode_slice_access) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs("fn main() : i32 { var values : [3]i32 = [ 4, 5, 6 ]; var view : []i32 = values[0:3]; view[1] = 8; return view[1]; }"), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(ex_call(runtime, toLs("main")), EX_RESULT_OK);
-	EXPECT_EQ(ex_to_i32(runtime, -1), 8);
+	EXPECT_EQ(test_call(runtime, toLs("main")), EX_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 8);
 	CAPI_END(module);
 	return true;
 }

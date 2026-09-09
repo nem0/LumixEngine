@@ -26,6 +26,8 @@ fn start(input : InputSystem) : void {
 	g_input = input;
 
 	if const world = g_world {
+		player.init(world, input);
+
 		for i in 0..world.getPartitionCount() {
 			const handle = world.getPartitionHandle(i);
 			const name = world.getPartitionName(handle);
@@ -65,6 +67,8 @@ fn start(input : InputSystem) : void {
 }
 
 fn update(td : f32) : void {
+	player.update(td);
+
 	match world_type {
 		case .NONE:
 		case .MAIN:

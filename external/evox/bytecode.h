@@ -23,7 +23,7 @@
 // - register operands are byte offsets relative to the current frame base
 // - parameter bytes occupy the first `param_size` frame bytes
 // - local bytes follow parameters, and compiler temporaries follow locals
-// - globals live at absolute byte offsets in the runtime memory buffer
+// - globals live at absolute byte offsets in the runtime-global memory buffer
 // - aggregate values are copied as raw byte ranges
 //
 // Call contract:
@@ -283,6 +283,7 @@ typedef enum ex_op {
 	EX_OP_CAST,
 	EX_OP_RETURN,
 	EX_OP_RETURN_BASE,
+	EX_OP_YIELD,
 
 	// Debugger breakpoint trap. Never emitted by the compiler; written in place
 	// of a statement's first opcode byte by `ex_debug_set_breakpoint`, which
@@ -415,8 +416,8 @@ typedef struct ex_function_bc {
 typedef struct ex_bytecode_global_debug_entry {
 	ex_string_view name;
 	u32 unit_index;
-	// Byte offset into the runtime's global memory region (`ex_runtime`'s
-	// stack, bytes [0, ex_bytecode::global_size)).
+	// Byte offset into the runtime-global memory region, bytes
+	// [0, ex_bytecode::global_size).
 	u32 offset;
 	u32 byte_size;
 	u32 type_index;  // EX_TYPE_INDEX_NONE when no type metadata
@@ -496,7 +497,7 @@ typedef struct ex_bytecode {
 
 	// Active breakpoint patches, set by `ex_debug_set_breakpoint`. Directly
 	// malloc'd/realloc'd and freed in `ex_bytecode_destroy`, same as this
-	// struct itself and `ex_runtime::stack`/`native_callbacks`: the arena's
+	// struct itself and runtime-owned native callback storage: the arena's
 	// `restore` only rewinds to an earlier watermark (LIFO), which doesn't fit
 	// entries added/removed in arbitrary order across a debug session, so
 	// object-owned mutable collections like this one bypass the arena.
@@ -533,77 +534,55 @@ typedef struct ex_runtime {
 	const ex_bytecode* bytecode;
 	ex_arena* arena;
 
-	// One past the topmost live stack value.
-	u8* stack_top;
-	// Cached pointer to the current call frame.
-	u8* frame;
-
-	u8* stack;
-	u8* stack_end;
-
-	// Byte count of the last call result at the top of the stack. Host pushes
-	// invalidate it; zero represents no result or a void result.
-	u32 result_size;
-
-	runtime_call_frame call_stack[EX_MAX_CALL_DEPTH];
-	u32 call_depth;
-
-	// Indexed by bytecode function index.
+	// Runtime-global storage and VM-wide native bindings.
+	u8* globals;
+	u32 global_size;
 	ex_native_fn* native_callbacks;
 	u32 native_callback_count;
 	ex_native_resolver_fn native_resolver;
 	void* native_resolver_userdata;
+} ex_runtime;
 
-	// Snapshot of the call stack at the point of the most recent
-	// `ex_call` failure, innermost frame first. Overwritten by
-	// the next call; `fail_frame_count` is 0 when the last call succeeded.
+// Public task handle. Execution state is stored directly on the task; the
+// runtime pointer and copied metadata fields provide access to shared VM data.
+typedef struct ex_task {
+	ex_runtime* runtime;
+	ex_host* host;
+	const ex_bytecode* bytecode;
+	u8* globals;
+
+	u8* stack_top;
+	u8* frame;
+	u8* stack;
+	u8* stack_end;
+	u32 result_size;
+
+	runtime_call_frame call_stack[EX_MAX_CALL_DEPTH];
+	u32 call_depth;
 	runtime_call_frame fail_frames[EX_MAX_CALL_DEPTH + 1u];
 	u32 fail_frame_count;
 
-	// Debugger suspension. See `ex_debug_resume` in capi.h.
-	//
-	// True while a debug-enabled call is parked instead of having returned.
-	// `call_stack[0..call_depth)` holds ancestor frames exactly as during
-	// normal execution; `suspended_frame` holds the innermost (currently
-	// "executing") frame's resume point, since that one only lived in the
-	// interpreter loop's locals and would otherwise be lost when the loop's
-	// C stack frame returns to the host.
 	bool is_suspended;
 	runtime_call_frame suspended_frame;
-	// Runtime state at the beginning of each active host call. An entry stays
-	// live while that call is suspended, so nested script -> native -> script
-	// calls cannot overwrite their caller's restore point.
 	runtime_restore_point call_starts[EX_MAX_CALL_DEPTH];
 	u32 call_start_depth;
-	// Reported by `ex_debug_pause_event` while suspended.
 	ex_debug_event pause_event;
 
-	// Stepping, armed by `ex_debug_resume(EX_DEBUG_STEP_*)`. `step_action` is
-	// `EX_DEBUG_CONTINUE` (0, the calloc default) when no step is in
-	// progress. While armed, the interpreter suspends with
-	// `EX_DEBUG_PAUSE_STEP` at the first source line or call depth reached that
-	// differs from the step start and satisfies the action's call-depth rule,
-	// measured against `step_start_call_depth` (`runtime->call_depth` at the
-	// moment the step began): STEP_INTO has no depth rule (any depth stops
-	// it), STEP_OVER requires `call_depth <= step_start_call_depth` (calls
-	// made from the starting statement run to completion without stopping
-	// inside them), STEP_OUT requires `call_depth < step_start_call_depth`
-	// (stop only after returning to a shallower frame).
 	ex_debug_action step_action;
 	u32 step_start_line;
 	u32 step_start_call_depth;
-	// Temporary EX_OP_BREAK patches installed for one step action. They are
-	// runtime-owned so user breakpoints in ex_bytecode remain independent.
 	runtime_step_trap* step_traps;
 	u32 step_trap_count;
 	u32 step_trap_capacity;
-} ex_runtime;
 
-// Re-enters the interpreter at `runtime->suspended_frame`. Internal entry
+	ex_task_state state;
+	bool executing;
+} ex_task;
+
+// Re-enters the interpreter at the task's suspended frame. Internal entry
 // point used by `ex_debug_resume` (debugger.c); not part of the public C ABI.
-// Fails immediately when the runtime is not suspended. Returns like
-// `ex_call`: OK with the result on the stack, SUSPENDED, or FAILURE.
-ex_result ex_runtime_resume_suspended(ex_runtime* runtime);
+// Fails immediately when the task is not suspended.
+ex_result ex_task_resume_suspended(ex_task* task);
 
 #ifdef __cplusplus
 }

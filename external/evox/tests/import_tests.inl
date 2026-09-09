@@ -16,8 +16,8 @@ TEST(ImportConst) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(main_source), makeStringView(__func__), &resolveEvoxImportC, &files));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(ex_call(runtime, toLs("main")), EX_RESULT_OK);
-	EXPECT_EQ(ex_to_i32(runtime, -1), 42);
+	EXPECT_EQ(test_call(runtime, toLs("main")), EX_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 42);
 	CAPI_END(module);
 	return true;
 }
@@ -44,8 +44,8 @@ TEST(ExternStructCanBeImported) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(main_source), makeStringView(__func__), &resolveEvoxImportC, &files));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(ex_call(runtime, toLs("main")), EX_RESULT_OK);
-	EXPECT_EQ(ex_to_i64(runtime, -1), 42);
+	EXPECT_EQ(test_call(runtime, toLs("main")), EX_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i64(runtime, -1), 42);
 	CAPI_END(module);
 	return true;
 }
@@ -629,8 +629,8 @@ TEST(UFCSNamespacePreferredOverLocalFunction) {
 	// e.destroy() = 2 (qualified), x.destroy() = 7 (method syntax prefers the
 	// receiver type's unit), destroy(x) = 3 (plain call stays lexical)
 	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
-		EXPECT_TRUE(ex_call(runtime, toLs("main")));
-		EXPECT_EQ(12, ex_to_i32(runtime, -1));
+		EXPECT_TRUE(test_call(runtime, toLs("main")));
+		EXPECT_EQ(12, ex_task_to_i32(runtime, -1));
 	);
 	return true;
 }
@@ -666,8 +666,8 @@ TEST(UFCSPrefersNamespaceOverLocalFunction) {
 
 	// x.destroy() binds to entity_mod.destroy (receiver's unit), not the local fn
 	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
-		EXPECT_TRUE(ex_call(runtime, toLs("main")));
-		EXPECT_EQ(7, ex_to_i32(runtime, -1));
+		EXPECT_TRUE(test_call(runtime, toLs("main")));
+		EXPECT_EQ(7, ex_task_to_i32(runtime, -1));
 	);
 	return true;
 }
@@ -917,7 +917,7 @@ TEST(ExternImport) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
+	EXPECT_TRUE(ex_runtime_set_native_resolver(test_vm(runtime), [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
 		return [](ex_runtime*, ex_call_frame frame) {
 			EX_ARG(frame, i32, a);
 			EX_ARG(frame, i32, b);
@@ -925,10 +925,10 @@ TEST(ExternImport) {
 		};
 	}, nullptr) == EX_RESULT_OK);
 
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(63, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(63, ex_task_to_i32(runtime, -1));
 
-	ex_runtime_destroy(runtime);
+	test_runtime_destroy(runtime);
 	ex_bytecode_destroy(bytecode);
 	ex_module_destroy(module);
 	return true;
@@ -1043,22 +1043,22 @@ TEST(CoreMathImportRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("sin32")));
-	EXPECT_FLOAT_EQ(0.0f, ex_to_f32(runtime, -1));
-	EXPECT_TRUE(ex_call(runtime, toLs("cos32")));
-	EXPECT_FLOAT_EQ(1.0f, ex_to_f32(runtime, -1));
-	EXPECT_TRUE(ex_call(runtime, toLs("sin64")));
-	EXPECT_FLOAT_EQ(0.0f, (float)ex_to_f64(runtime, -1));
-	EXPECT_TRUE(ex_call(runtime, toLs("cos64")));
-	EXPECT_FLOAT_EQ(1.0f, (float)ex_to_f64(runtime, -1));
-	EXPECT_TRUE(ex_call(runtime, toLs("sqrt32")));
-	EXPECT_FLOAT_EQ(3.0f, ex_to_f32(runtime, -1));
-		EXPECT_TRUE(ex_call(runtime, toLs("sqrt64")));
-		EXPECT_FLOAT_EQ(4.0f, (float)ex_to_f64(runtime, -1));
-		EXPECT_TRUE(ex_call(runtime, toLs("pow32")));
-		EXPECT_FLOAT_EQ(2.0f, ex_to_f32(runtime, -1));
-		EXPECT_TRUE(ex_call(runtime, toLs("pow64")));
-		EXPECT_FLOAT_EQ(2.0f, (float)ex_to_f64(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("sin32")));
+	EXPECT_FLOAT_EQ(0.0f, ex_task_to_f32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("cos32")));
+	EXPECT_FLOAT_EQ(1.0f, ex_task_to_f32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("sin64")));
+	EXPECT_FLOAT_EQ(0.0f, (float)ex_task_to_f64(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("cos64")));
+	EXPECT_FLOAT_EQ(1.0f, (float)ex_task_to_f64(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("sqrt32")));
+	EXPECT_FLOAT_EQ(3.0f, ex_task_to_f32(runtime, -1));
+		EXPECT_TRUE(test_call(runtime, toLs("sqrt64")));
+		EXPECT_FLOAT_EQ(4.0f, (float)ex_task_to_f64(runtime, -1));
+		EXPECT_TRUE(test_call(runtime, toLs("pow32")));
+		EXPECT_FLOAT_EQ(2.0f, ex_task_to_f32(runtime, -1));
+		EXPECT_TRUE(test_call(runtime, toLs("pow64")));
+		EXPECT_FLOAT_EQ(2.0f, (float)ex_task_to_f64(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1103,8 +1103,8 @@ TEST(AliasedImportRuntime) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(main_source), makeStringView(__func__), &resolveEvoxImportC, &files));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1141,7 +1141,7 @@ TEST(ExternFnSecondImportCorrectIndex) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc function, void*) -> ex_native_fn {
+	EXPECT_TRUE(ex_runtime_set_native_resolver(test_vm(runtime), [](ex_runtime*, ex_native_function_desc function, void*) -> ex_native_fn {
 		if (equalStrings(function.unit_path, "lib_a") && equalStrings(function.name, "add")) {
 			return [](ex_runtime*, ex_call_frame frame) {
 				EX_ARG(frame, i32, a); EX_ARG(frame, i32, b);
@@ -1157,10 +1157,10 @@ TEST(ExternFnSecondImportCorrectIndex) {
 		return nullptr;
 	}, nullptr) == EX_RESULT_OK);
 
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(21, ex_to_i32(runtime, -1)); // 3 * 7 = 21, not 3 + 7 = 10
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(21, ex_task_to_i32(runtime, -1)); // 3 * 7 = 21, not 3 + 7 = 10
 
-	ex_runtime_destroy(runtime);
+	test_runtime_destroy(runtime);
 	ex_bytecode_destroy(bytecode);
 	ex_module_destroy(module);
 	return true;

@@ -345,8 +345,8 @@ TEST(BytecodeNullableElseReturn) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(4212, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(4212, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -512,10 +512,10 @@ TEST(BytecodeNullableLocalNullCheck) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
-	ex_runtime_destroy(runtime);
+	test_runtime_destroy(runtime);
 	ex_bytecode_destroy(bytecode);
 	CAPI_END(module);
 	return true;
@@ -545,10 +545,10 @@ TEST(BytecodeNullableStructComparison) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
-	ex_runtime_destroy(runtime);
+	test_runtime_destroy(runtime);
 	ex_bytecode_destroy(bytecode);
 	CAPI_END(module);
 	return true;
@@ -569,17 +569,17 @@ TEST(BytecodeNullableReturnNull) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
 	// A nullable is a flag byte followed by the packed payload.
 	u32 result_size = 0;
-	const u8* result = (const u8*)ex_call_result(runtime, &result_size);
+	const u8* result = (const u8*)ex_task_result(runtime, &result_size);
 	EXPECT_TRUE(result != nullptr);
 	EXPECT_EQ(5u, result_size);
 	EXPECT_EQ(0, result[0]);
 	i32 payload = -1;
 	memcpy(&payload, result + 1, sizeof(payload));
 	EXPECT_EQ(0, payload);
-	ex_runtime_destroy(runtime);
+	test_runtime_destroy(runtime);
 
 	ex_bytecode_destroy(bytecode);
 	CAPI_END(module);
@@ -601,17 +601,17 @@ TEST(BytecodeNullableReturnValue) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
 	// A nullable is a flag byte followed by the packed payload.
 	u32 result_size = 0;
-	const u8* result = (const u8*)ex_call_result(runtime, &result_size);
+	const u8* result = (const u8*)ex_task_result(runtime, &result_size);
 	EXPECT_TRUE(result != nullptr);
 	EXPECT_EQ(5u, result_size);
 	EXPECT_EQ(1, result[0]);
 	i32 payload = 0;
 	memcpy(&payload, result + 1, sizeof(payload));
 	EXPECT_EQ(7, payload);
-	ex_runtime_destroy(runtime);
+	test_runtime_destroy(runtime);
 
 	ex_bytecode_destroy(bytecode);
 	CAPI_END(module);
@@ -651,10 +651,10 @@ TEST(BytecodeNullableThreeBytePayloadNullReturnHasFullSize) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
-	ex_runtime_destroy(runtime);
+	test_runtime_destroy(runtime);
 	ex_bytecode_destroy(bytecode);
 	CAPI_END(module);
 	return true;

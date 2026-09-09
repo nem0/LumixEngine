@@ -239,8 +239,8 @@ TEST(EnumMethodCallOnReturnValue) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(3, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(3, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -349,8 +349,8 @@ TEST(EnumMemberWithExplicitValueReturnsValue) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(5, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(5, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -369,8 +369,8 @@ TEST(EnumMemberWithImplicitValueReturnsIndex) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(1, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -387,8 +387,8 @@ TEST(EnumValueExceedsInt32Max) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(2147483648LL, ex_to_i64(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(2147483648LL, ex_task_to_i64(runtime, -1));
 	CAPI_END(module);
 	return true;
 }

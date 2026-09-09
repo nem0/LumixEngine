@@ -48,6 +48,7 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 	- [Custom iterators](#custom-iterators)
 	- [Break / continue / labels](#break--continue--labels)
 	- [Defer](#defer)
+	- [Yield](#yield)
 	- [Return](#return)
 - [Expressions](#expressions)
 	- [Literals](#literals)
@@ -1919,6 +1920,16 @@ fn main() : void {
 
 Deferred statements run on normal scope exit and on early `return`.
 
+### Yield
+
+`yield;` cooperatively suspends the current VM execution. The runtime keeps
+its call stack, locals, and active scopes alive; resuming continues with the
+statement after `yield`. Deferred statements do not run when yielding, and run
+when the function later returns. A host resumes a yielded task with
+`ex_task_resume`.
+
+`yield` is not allowed inside a deferred statement.
+
 ### Return
 
 ```cpp
@@ -2857,13 +2868,14 @@ demo.evox: line 12, column 2: instantiation depth limit exceeded
 
 ## Runtime model
 
-Current runtime executes compiled bytecode through the public `ex_runtime` API.
+The runtime owns shared bytecode, globals, and native bindings. Script
+execution happens through independently-managed public `ex_task` handles.
 
 - calls create call frames
 - blocks create nested local scopes
 - struct values store fields in declaration order
 - function values reference existing script or native functions
-- bytecode functions consume arguments from the runtime stack
+- each task supplies arguments through its declared byte-level ABI
 
 Example C++ shape:
 
@@ -2879,13 +2891,15 @@ ex_arena runtime_arena;
 ex_default_arena_create(&runtime_arena);
 ex_host runtime_host = {runtime_arena};
 ex_runtime* runtime = bytecode ? ex_runtime_create(bytecode, &runtime_host) : nullptr;
-if (runtime) {
+ex_task* task = runtime ? ex_task_create(runtime) : nullptr;
+if (task) {
 	ex_string_view main_name = { "main", 4 };
-	ex_call(runtime, main_name);
+	ex_call(task, main_name, nullptr, 0);
 	if (ex_bytecode_runtime_result_kind(runtime, main_name) != EX_TYPE_VOID) {
-		i32 result = ex_to_i32(runtime, -1);
+		i32 result = ex_task_to_i32(task, -1);
 	}
 }
+ex_task_destroy(task);
 ```
 
 ### Native functions

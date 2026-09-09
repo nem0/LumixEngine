@@ -238,6 +238,7 @@ struct Tokenizer {
 				return checkKeyword("ontinue", 1, 7, Token::CONTINUE);
 			}
 			case 'd': return checkKeyword("efer", 1, 4, Token::DEFER);
+			case 'y': return checkKeyword("ield", 1, 4, Token::YIELD);
 			case 'e': {
 				if (u32(m_current - m_start_token) < 2) return makeToken(Token::IDENTIFIER);
 				switch (m_start_token[1]) {

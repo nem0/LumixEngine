@@ -217,12 +217,12 @@ fn update(td : f32, input : InputSystem) : void {
 	for event in events {
 		match event.action {
 			case "start":
-				player.handle_input = true;
+				player.enableInput(true);
 				enableCursor(ui, false);
 				var elem = doc.getElement(0) else return;
 				elem.setVisible(false);
 			case "close":
-				player.handle_input = true;
+				player.enableInput(true);
 				enableCursor(ui, false);
 				var elem = doc.getElementByID("runtime_ui") else return;
 				elem.setVisible(false);
@@ -240,7 +240,7 @@ fn update(td : f32, input : InputSystem) : void {
 							case .OPEN_MENU:
 								var elem = doc.getElementByID("runtime_ui") else return;
 								elem.setVisible(true);
-								player.handle_input = false;
+								player.enableInput(false);
 								enableCursor(ui, true);
 							case .PHYSICS_TEST:
 								resetPhysicsTest();

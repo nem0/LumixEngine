@@ -1935,6 +1935,12 @@ struct IRBuilder {
 				buildReturnIR(parent, value);
 				break;
 			}
+			case Statement::YIELD: {
+				auto& op = alloc<ExIrOp>(ExIrOpKind::YIELD);
+				op.src_loc = st.token.src_loc;
+				parent.ops.push(&op);
+				break;
+			}
 			case Statement::DEFER: {
 				auto& defer = static_cast<DeferStatement&>(st);
 				if (defer.statement) defers.push(defer.statement);
@@ -3765,6 +3771,10 @@ struct BytecodeCompiler {
 				result = 0xffffffffu;
 				break;
 			}
+			case ExIrOpKind::YIELD:
+				emitOp(EX_OP_YIELD);
+				result = 0xffffffffu;
+				break;
 			case ExIrOpKind::CALL_INDIRECT: result = emitCallIndirect(*static_cast<ExOpCallIndirect*>(&op)); break;
 			case ExIrOpKind::EXTRACT_VALUE: result = emitExtractValue(*static_cast<ExOpExtractValue*>(&op), dst); break;
 			case ExIrOpKind::LOAD: result = emitLoad(*static_cast<ExOpLoad*>(&op), dst); break;

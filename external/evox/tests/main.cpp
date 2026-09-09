@@ -4,6 +4,8 @@
 #include <string.h>
 #include "../compiler.h"
 #include <chrono>
+#include <vector>
+#include <unordered_map>
 
 #include "../arena.h"
 #include "../utils.h"
@@ -152,12 +154,33 @@ struct TestContext {
 	ex_host host = {};
 };
 
+static std::unordered_map<ex_runtime*, ex_task*>& test_tasks() {
+	static std::unordered_map<ex_runtime*, ex_task*> value;
+	return value;
+}
+static std::unordered_map<ex_task*, std::vector<u8>>& test_task_args() {
+	static std::unordered_map<ex_task*, std::vector<u8>> value;
+	return value;
+}
+
 struct RuntimeGuard {
 	explicit RuntimeGuard(ex_module* module, ex_host* host)
 		: bytecode(ex_bytecode_compile(module, host, nullptr))
-		, runtime(bytecode ? ex_runtime_create(bytecode, nullptr) : nullptr) {}
+		, runtime(bytecode ? ex_runtime_create(bytecode, nullptr) : nullptr)
+		, task(runtime ? ex_task_create(runtime) : nullptr) {
+		if (runtime && task) test_tasks()[runtime] = task;
+	}
+
 
 	~RuntimeGuard() {
+		if (runtime) {
+			auto it = test_tasks().find(runtime);
+			if (it != test_tasks().end() && it->second == task) test_tasks().erase(it);
+		}
+		if (task) {
+			test_task_args().erase(task);
+			ex_task_destroy(task);
+		}
 		if (runtime) ex_runtime_destroy(runtime);
 		if (bytecode) ex_bytecode_destroy(bytecode);
 	}
@@ -166,29 +189,149 @@ struct RuntimeGuard {
 	RuntimeGuard& operator=(const RuntimeGuard&) = delete;
 
 	RuntimeGuard(RuntimeGuard&& rhs) noexcept
-		: bytecode(rhs.bytecode), runtime(rhs.runtime) {
+		: bytecode(rhs.bytecode), runtime(rhs.runtime), task(rhs.task) {
 		rhs.bytecode = nullptr;
 		rhs.runtime = nullptr;
+		rhs.task = nullptr;
 	}
 
 	RuntimeGuard& operator=(RuntimeGuard&& rhs) noexcept {
 		if (this == &rhs) return *this;
+		if (runtime) {
+			auto it = test_tasks().find(runtime);
+			if (it != test_tasks().end() && it->second == task) test_tasks().erase(it);
+		}
+		if (task) {
+			test_task_args().erase(task);
+			ex_task_destroy(task);
+		}
 		if (runtime) ex_runtime_destroy(runtime);
 		if (bytecode) ex_bytecode_destroy(bytecode);
 		bytecode = rhs.bytecode;
 		runtime = rhs.runtime;
+		task = rhs.task;
 		rhs.bytecode = nullptr;
 		rhs.runtime = nullptr;
+		rhs.task = nullptr;
 		return *this;
 	}
 
-	operator bool() const { return runtime != nullptr; }
-	operator ex_runtime*() const { return runtime; }
-	ex_runtime* get() const { return runtime; }
+	operator bool() const { return task != nullptr; }
+	operator ex_task*() const { return task; }
+	ex_task* get() const { return task; }
+
+	template <typename T>
+	void push(T value) {
+		const u8* bytes = reinterpret_cast<const u8*>(&value);
+		args.insert(args.end(), bytes, bytes + sizeof(value));
+	}
+
+	void pushString(ex_string_view value) {
+		struct Slice { const void* data; i64 length; } slice = { value.begin, value.length };
+		push(slice);
+	}
+
+	ex_result call(ex_string_view name) {
+		ex_result result = ex_call(task, name, args.empty() ? nullptr : args.data(), (u32)args.size());
+		args.clear();
+		return result;
+	}
 
 	ex_bytecode* bytecode = nullptr;
 	ex_runtime* runtime = nullptr;
+	ex_task* task = nullptr;
+	std::vector<u8> args;
 };
+
+static ex_task* test_task_for_runtime(ex_runtime* runtime) {
+	auto found = test_tasks().find(runtime);
+	if (found != test_tasks().end()) return found->second;
+	ex_task* task = ex_task_create(runtime);
+	test_tasks()[runtime] = task;
+	return task;
+}
+
+static ex_result test_call(RuntimeGuard& runtime, ex_string_view name) { return runtime.call(name); }
+static ex_result test_call(ex_runtime* runtime, ex_string_view name) {
+	ex_task* task = test_task_for_runtime(runtime);
+	std::vector<u8>& args = test_task_args()[task];
+	ex_result result = ex_call(task, name, args.empty() ? nullptr : args.data(), (u32)args.size());
+	args.clear();
+	return result;
+}
+static void test_push_bytes(ex_task* task, const void* data, size_t size) {
+	const u8* bytes = reinterpret_cast<const u8*>(data);
+	test_task_args()[task].insert(test_task_args()[task].end(), bytes, bytes + size);
+}
+static void test_push_bool(RuntimeGuard& runtime, int value) { runtime.push((u8)(value ? 1 : 0)); }
+static void test_push_i32(RuntimeGuard& runtime, i32 value) { runtime.push(value); }
+static void test_push_u32(RuntimeGuard& runtime, u32 value) { runtime.push(value); }
+static void test_push_i64(RuntimeGuard& runtime, i64 value) { runtime.push(value); }
+static void test_push_u64(RuntimeGuard& runtime, u64 value) { runtime.push(value); }
+static void test_push_f32(RuntimeGuard& runtime, float value) { runtime.push(value); }
+static void test_push_f64(RuntimeGuard& runtime, double value) { runtime.push(value); }
+static void test_push_string(RuntimeGuard& runtime, ex_string_view value) { runtime.pushString(value); }
+static void test_push_bool(ex_runtime* runtime, int value) { u8 v = value ? 1 : 0; test_push_bytes(test_task_for_runtime(runtime), &v, sizeof(v)); }
+static void test_push_i32(ex_runtime* runtime, i32 value) { test_push_bytes(test_task_for_runtime(runtime), &value, sizeof(value)); }
+static void test_push_u32(ex_runtime* runtime, u32 value) { test_push_bytes(test_task_for_runtime(runtime), &value, sizeof(value)); }
+static void test_push_i64(ex_runtime* runtime, i64 value) { test_push_bytes(test_task_for_runtime(runtime), &value, sizeof(value)); }
+static void test_push_u64(ex_runtime* runtime, u64 value) { test_push_bytes(test_task_for_runtime(runtime), &value, sizeof(value)); }
+static void test_push_f32(ex_runtime* runtime, float value) { test_push_bytes(test_task_for_runtime(runtime), &value, sizeof(value)); }
+static void test_push_f64(ex_runtime* runtime, double value) { test_push_bytes(test_task_for_runtime(runtime), &value, sizeof(value)); }
+static void test_push_string(ex_runtime* runtime, ex_string_view value) {
+	struct Slice { const void* data; i64 length; } slice = { value.begin, value.length };
+	test_push_bytes(test_task_for_runtime(runtime), &slice, sizeof(slice));
+}
+static ex_runtime* test_vm(RuntimeGuard& runtime) { return runtime.runtime; }
+static ex_runtime* test_vm(ex_runtime* runtime) { return runtime; }
+static i32 test_global_i32(ex_runtime* runtime, u32 index) {
+	u32 size = 0u;
+	const void* value = ex_debug_global_value(runtime, index, &size);
+	i32 result = 0;
+	if (value && size == sizeof(result)) memcpy(&result, value, sizeof(result));
+	return result;
+}
+
+static const ex_type* ex_type_from_any(RuntimeGuard& runtime, const void* value) { return ex_type_from_any(runtime.runtime, value); }
+
+static void test_runtime_destroy(ex_runtime* runtime) {
+	auto it = test_tasks().find(runtime);
+	if (it != test_tasks().end()) {
+		test_task_args().erase(it->second);
+		ex_task_destroy(it->second);
+		test_tasks().erase(it);
+	}
+	ex_runtime_destroy(runtime);
+}
+
+#define TEST_TASK_ACCESSOR(name, type) \
+	static type name(ex_runtime* runtime, i32 index) { return name(test_task_for_runtime(runtime), index); }
+TEST_TASK_ACCESSOR(ex_task_to_bool, i32)
+TEST_TASK_ACCESSOR(ex_task_to_i8, i8)
+TEST_TASK_ACCESSOR(ex_task_to_u8, u8)
+TEST_TASK_ACCESSOR(ex_task_to_i16, i16)
+TEST_TASK_ACCESSOR(ex_task_to_u16, u16)
+TEST_TASK_ACCESSOR(ex_task_to_i32, i32)
+TEST_TASK_ACCESSOR(ex_task_to_u32, u32)
+TEST_TASK_ACCESSOR(ex_task_to_i64, i64)
+TEST_TASK_ACCESSOR(ex_task_to_u64, u64)
+TEST_TASK_ACCESSOR(ex_task_to_f32, float)
+TEST_TASK_ACCESSOR(ex_task_to_f64, double)
+TEST_TASK_ACCESSOR(ex_task_to_string, ex_string_view)
+TEST_TASK_ACCESSOR(ex_task_to_ptr, void*)
+#undef TEST_TASK_ACCESSOR
+static const void* ex_task_result(ex_runtime* runtime, u32* size) { return ex_task_result(test_task_for_runtime(runtime), size); }
+
+static int ex_debug_is_suspended(ex_runtime* runtime) { return ex_debug_is_suspended(test_task_for_runtime(runtime)); }
+static ex_result ex_debug_pause_event(ex_runtime* runtime, ex_debug_event* event) { return ex_debug_pause_event(test_task_for_runtime(runtime), event); }
+static ex_result ex_debug_resume(ex_runtime* runtime, ex_debug_action action) { return ex_debug_resume(test_task_for_runtime(runtime), action); }
+static u32 ex_debug_stack_depth(ex_runtime* runtime) { return ex_debug_stack_depth(test_task_for_runtime(runtime)); }
+static ex_string_view ex_debug_frame_function_name(ex_runtime* runtime, u32 index) { return ex_debug_frame_function_name(test_task_for_runtime(runtime), index); }
+static ex_result ex_debug_frame_location(ex_runtime* runtime, u32 index, ex_debug_location* location) { return ex_debug_frame_location(test_task_for_runtime(runtime), index, location); }
+static u32 ex_debug_frame_local_count(ex_runtime* runtime, u32 frame) { return ex_debug_frame_local_count(test_task_for_runtime(runtime), frame); }
+static ex_string_view ex_debug_local_name(ex_runtime* runtime, u32 frame, u32 local) { return ex_debug_local_name(test_task_for_runtime(runtime), frame, local); }
+static void* ex_debug_local_value(ex_runtime* runtime, u32 frame, u32 local, u32* size) { return ex_debug_local_value(test_task_for_runtime(runtime), frame, local, size); }
+static const ex_type* ex_debug_local_type(ex_runtime* runtime, u32 frame, u32 local) { return ex_debug_local_type(test_task_for_runtime(runtime), frame, local); }
 
 static void testPrint(void* userdata, ex_string_view msg) {
 	TestContext* context = (TestContext*)userdata;
@@ -214,6 +357,12 @@ static void nativeAddC(ex_runtime* runtime, ex_call_frame frame) {
 	EX_ARG(frame, i32, a);
 	EX_ARG(frame, i32, b);
 	EX_RESULT(frame, a + b);
+}
+
+static ex_result g_reentrant_call_result = EX_RESULT_FAILURE;
+
+static void nativeReenter(ex_runtime* runtime, ex_call_frame) {
+	g_reentrant_call_result = ex_call(test_task_for_runtime(runtime), makeStringView("main"), nullptr, 0);
 }
 
 #include "bytecode_tests.inl"
@@ -246,6 +395,7 @@ static void nativeAddC(ex_runtime* runtime, ex_call_frame frame) {
 #include "temporaries_tests.inl"
 #include "any_tests.inl"
 #include "interpolation_tests.inl"
+#include "yield_tests.inl"
 
 int main(int argc, char** argv) {
 	const char* test_name = nullptr;
@@ -263,7 +413,7 @@ int main(int argc, char** argv) {
 			return -1;
 		}
 	}
-	printf("Running Evox tests...\n");
+	printf("Running Evox tests...\n"); fflush(stdout);
 	if (test_name) printf("Filtering to test: %s\n", test_name);
 	const auto start_time = std::chrono::steady_clock::now();
 	bool found = false;

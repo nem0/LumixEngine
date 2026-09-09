@@ -23,8 +23,8 @@ TEST(CallFunctionFieldWinsOverUFCS) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -144,8 +144,8 @@ TEST(GlobalFunctionLiteralCanRecursivelyCallItself) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(21, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(21, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -344,10 +344,10 @@ TEST(BytecodeFunctionValueLocal) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
-	ex_runtime_destroy(runtime);
+	test_runtime_destroy(runtime);
 	ex_bytecode_destroy(bytecode);
 
 	CAPI_END(module);
@@ -377,10 +377,10 @@ TEST(BytecodeIndirectFunctionCall) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
-	ex_runtime_destroy(runtime);
+	test_runtime_destroy(runtime);
 	ex_bytecode_destroy(bytecode);
 
 	CAPI_END(module);
@@ -412,10 +412,10 @@ TEST(BytecodeIndirectFunctionCallWithAggregateArgument) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
-	ex_runtime_destroy(runtime);
+	test_runtime_destroy(runtime);
 	ex_bytecode_destroy(bytecode);
 
 	CAPI_END(module);
@@ -444,10 +444,10 @@ TEST(BytecodeGlobalFunctionLiteral) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(1, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 
-	ex_runtime_destroy(runtime);
+	test_runtime_destroy(runtime);
 	ex_bytecode_destroy(bytecode);
 	CAPI_END(module);
 	return true;
@@ -473,10 +473,10 @@ TEST(BytecodeGlobalFunctionVariable) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(1, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 
-	ex_runtime_destroy(runtime);
+	test_runtime_destroy(runtime);
 	ex_bytecode_destroy(bytecode);
 	CAPI_END(module);
 	return true;
@@ -514,9 +514,9 @@ TEST(LazyNativeResolverBindsOnFirstUse) {
 	CAPI_RUNTIME(module, runtime);
 
 	LazyNativeResolverState state;
-	EXPECT_EQ(EX_RESULT_OK, ex_runtime_set_native_resolver(runtime, &lazyNativeResolver, &state));
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(84, ex_to_i32(runtime, -1));
+	EXPECT_EQ(EX_RESULT_OK, ex_runtime_set_native_resolver(test_vm(runtime), &lazyNativeResolver, &state));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(84, ex_task_to_i32(runtime, -1));
 	EXPECT_EQ(1, state.calls);
 	CAPI_END(module);
 	return true;
@@ -534,15 +534,15 @@ TEST(LazyNativeResolverRetriesMissingFunction) {
 
 	LazyNativeResolverState state;
 	state.return_callback = false;
-	EXPECT_EQ(EX_RESULT_OK, ex_runtime_set_native_resolver(runtime, &lazyNativeResolver, &state));
+	EXPECT_EQ(EX_RESULT_OK, ex_runtime_set_native_resolver(test_vm(runtime), &lazyNativeResolver, &state));
 	test_diagnostics.output_enabled = false;
-	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
 	// Runtime errors suspend the runtime; abandon that failed call before
 	// trying the resolver again.
 	ex_debug_resume(runtime, EX_DEBUG_ABORT);
 	state.return_callback = true;
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	EXPECT_EQ(2, state.calls);
 	CAPI_END(module);
 	return true;
@@ -562,11 +562,11 @@ TEST(testNativeFunctionCall) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
+	EXPECT_TRUE(ex_runtime_set_native_resolver(test_vm(runtime), [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
 		return &nativeAddC;
 	}, nullptr) == EX_RESULT_OK);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -588,16 +588,18 @@ TEST(ScriptNativeScriptReentry) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
+	EXPECT_TRUE(ex_runtime_set_native_resolver(test_vm(runtime), [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
 		return [](ex_runtime* runtime, ex_call_frame frame) {
 			EX_ARG(frame, i32, value);
-			ex_push_i32(runtime, value);
-			if (ex_call(runtime, toLs("helper")) != EX_RESULT_OK) return;
-			EX_RESULT(frame, ex_to_i32(runtime, -1));
+			ex_task* helper_task = ex_task_create(runtime);
+			if (!helper_task) return;
+			ex_result result = ex_call(helper_task, toLs("helper"), &value, sizeof(value));
+			if (result == EX_RESULT_OK) EX_RESULT(frame, ex_task_to_i32(helper_task, -1));
+			ex_task_destroy(helper_task);
 		};
 	}, nullptr) == EX_RESULT_OK);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -625,8 +627,8 @@ TEST(IndirectCallWideReturnInNestedExpression) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_TRUE(4003 == ex_to_i64(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_TRUE(4003 == ex_task_to_i64(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -646,8 +648,8 @@ TEST(FunctionNamedSinCompilesAndRuns) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -667,8 +669,8 @@ TEST(FunctionNamedLengthCompilesAndRuns) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -706,7 +708,7 @@ TEST(ExternSinDoesNotAutoBindBuiltin) {
 
 	CAPI_RUNTIME(module, runtime);
 	test_diagnostics.output_enabled = false;
-	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
 	CAPI_END(module);
 	return true;
 }
@@ -731,7 +733,7 @@ TEST(DeepRecursionFailsCleanly) {
 
 	CAPI_RUNTIME(module, runtime);
 	test_diagnostics.output_enabled = false;
-	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
 	CAPI_END(module);
 	return true;
 }

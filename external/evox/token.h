@@ -91,6 +91,7 @@ struct Token {
 		VAR,
 		CONST,
 		DEFER,
+		YIELD,
 		RETURN,
 		WHILE,
 		FOR,

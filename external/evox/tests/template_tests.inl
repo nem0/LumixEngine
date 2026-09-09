@@ -142,8 +142,8 @@ TEST(TemplateFunctionLoopBodyIsClonedPerInstantiation) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -227,8 +227,8 @@ TEST(TemplateFunctionSpecializationKeyIsCanonical) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -459,8 +459,8 @@ TEST(TemplateFunctionInstantiatedAsFirstClassValueRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -524,8 +524,8 @@ TEST(TemplateFunctionInstantiatedPassedAsArgumentRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -638,8 +638,8 @@ TEST(OperatorOnConcreteTemplateStructRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -739,8 +739,8 @@ TEST(TemplateImportedFunctionTwoInstantiationsRuntime) {
 	};
 	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
 	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
-		EXPECT_TRUE(ex_call(runtime, toLs("main")));
-		EXPECT_EQ(42, ex_to_i32(runtime, -1));
+		EXPECT_TRUE(test_call(runtime, toLs("main")));
+		EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	);
 	return true;
 }
@@ -762,8 +762,8 @@ TEST(TemplateStructImportedAndInstantiatedRuntime) {
 	};
 	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
 	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
-		EXPECT_TRUE(ex_call(runtime, toLs("main")));
-		EXPECT_EQ(42, ex_to_i32(runtime, -1));
+		EXPECT_TRUE(test_call(runtime, toLs("main")));
+		EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	);
 	return true;
 }
@@ -791,8 +791,8 @@ TEST(TemplateStructImportedAcceptsCallerTypeArgument) {
 	};
 	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
 	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
-		EXPECT_TRUE(ex_call(runtime, toLs("main")));
-		EXPECT_EQ(42, ex_to_i32(runtime, -1));
+		EXPECT_TRUE(test_call(runtime, toLs("main")));
+		EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	);
 	return true;
 }
@@ -903,8 +903,8 @@ TEST(TemplateFunctionTwoLibsEachWithTemplateRuntime) {
 	};
 	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
 	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
-		EXPECT_TRUE(ex_call(runtime, toLs("main")));
-		EXPECT_EQ(105, ex_to_i32(runtime, -1));
+		EXPECT_TRUE(test_call(runtime, toLs("main")));
+		EXPECT_EQ(105, ex_task_to_i32(runtime, -1));
 	);
 	return true;
 }
@@ -934,8 +934,8 @@ TEST(TemplateFunctionTwoLibsSameTemplateNameRuntime) {
 	};
 	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
 	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
-		EXPECT_TRUE(ex_call(runtime, toLs("main")));
-		EXPECT_EQ(42, ex_to_i32(runtime, -1));
+		EXPECT_TRUE(test_call(runtime, toLs("main")));
+		EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	);
 	return true;
 }
@@ -1001,8 +1001,8 @@ TEST(TemplateFunctionImportCallDisambiguatesAtCheckTime) {
 	};
 	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
 	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
-		EXPECT_TRUE(ex_call(runtime, toLs("main")));
-		EXPECT_EQ(42, ex_to_i32(runtime, -1));
+		EXPECT_TRUE(test_call(runtime, toLs("main")));
+		EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	);
 	return true;
 }
@@ -1097,8 +1097,8 @@ TEST(TemplateImportedChainedTemplateCallsRuntime) {
 	};
 	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
 	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
-		EXPECT_TRUE(ex_call(runtime, toLs("main")));
-		EXPECT_EQ(42, ex_to_i32(runtime, -1));
+		EXPECT_TRUE(test_call(runtime, toLs("main")));
+		EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	);
 	return true;
 }
@@ -1129,8 +1129,8 @@ TEST(TemplateFunctionInSecondUnitWithLeadingFunctionsRuntime) {
 	};
 	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
 	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
-		EXPECT_TRUE(ex_call(runtime, toLs("main")));
-		EXPECT_EQ(42, ex_to_i32(runtime, -1));
+		EXPECT_TRUE(test_call(runtime, toLs("main")));
+		EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	);
 	return true;
 }
@@ -1148,8 +1148,8 @@ TEST(TemplateFunctionIdentityI32Runtime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1172,8 +1172,8 @@ TEST(TemplateFunctionPointerSwapRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1190,8 +1190,8 @@ TEST(TemplateStructInstantiationRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1209,8 +1209,8 @@ TEST(TemplateNestedGenericRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1232,8 +1232,8 @@ TEST(TemplateFunctionCallingTemplateFunctionRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1253,8 +1253,8 @@ TEST(TemplateFunctionTwoInstantiationsSameCallSite) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1271,8 +1271,8 @@ TEST(TemplateStructMultipleTypeParamsRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1293,8 +1293,8 @@ TEST(TemplateStructPassedToFunctionRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1317,8 +1317,8 @@ TEST(TemplateImportedFunctionRuntime) {
 	};
 	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
 	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
-		EXPECT_TRUE(ex_call(runtime, toLs("main")));
-		EXPECT_EQ(42, ex_to_i32(runtime, -1));
+		EXPECT_TRUE(test_call(runtime, toLs("main")));
+		EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	);
 	return true;
 }
@@ -1336,8 +1336,8 @@ TEST(TemplateFunctionInferredInstantiationRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1374,8 +1374,8 @@ TEST(TemplateFunctionInferredInstantiationMultipleParamsRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1520,8 +1520,8 @@ TEST(TemplateFunctionComptimeTypeParamDrivesLiteralTypeRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_FLOAT_EQ(42.0f, ex_to_f32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_FLOAT_EQ(42.0f, ex_task_to_f32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1560,8 +1560,8 @@ TEST(TemplateFunctionComptimeTypeParamImportedRuntime) {
 	};
 	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
 	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
-		EXPECT_TRUE(ex_call(runtime, toLs("main")));
-		EXPECT_EQ(42, ex_to_i32(runtime, -1));
+		EXPECT_TRUE(test_call(runtime, toLs("main")));
+		EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	);
 	return true;
 }
@@ -1580,8 +1580,8 @@ TEST(TemplateNestedGenericTwoParamInnerRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1612,8 +1612,8 @@ TEST(TemplateNestedGenericSameStructTwiceRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1632,8 +1632,8 @@ TEST(TemplateNestedGenericAsSecondTypeArgRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1652,8 +1652,8 @@ TEST(TemplateNestedGenericThreeLevelsRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1676,8 +1676,8 @@ TEST(TemplateFunctionWithNestedGenericParamRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1707,8 +1707,8 @@ TEST(ComptimeFunctionParameterBasicRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(15, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(15, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1769,8 +1769,8 @@ TEST(ComptimeIntBinaryOp) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(4, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(4, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1788,8 +1788,8 @@ TEST(ComptimeFunctionParameterMultipleTypesRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(14, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(14, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1807,8 +1807,8 @@ TEST(ComptimeFunctionParameterBoolRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_TRUE(ex_to_bool(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_TRUE(ex_task_to_bool(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1826,8 +1826,8 @@ TEST(ComptimeFunctionParameterF32Runtime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_TRUE(ex_to_f32(runtime, -1) == 1.5f);
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_TRUE(ex_task_to_f32(runtime, -1) == 1.5f);
 	CAPI_END(module);
 	return true;
 }
@@ -1845,8 +1845,8 @@ TEST(ComptimeFunctionParameterI64Runtime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_TRUE(ex_to_i64(runtime, -1) == 2147483648ll);
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_TRUE(ex_task_to_i64(runtime, -1) == 2147483648ll);
 	CAPI_END(module);
 	return true;
 }
@@ -1864,8 +1864,8 @@ TEST(ComptimeFunctionParameterF64Runtime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_TRUE(ex_to_f64(runtime, -1) == 1.5);
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_TRUE(ex_task_to_f64(runtime, -1) == 1.5);
 	CAPI_END(module);
 	return true;
 }
@@ -1883,8 +1883,8 @@ TEST(ComptimeFunctionParameterStringRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_TRUE(equalStrings(ex_to_string(runtime, -1), toLs("hello")));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_TRUE(equalStrings(ex_task_to_string(runtime, -1), toLs("hello")));
 	CAPI_END(module);
 	return true;
 }
@@ -1907,8 +1907,8 @@ TEST(ComptimeFunctionParameterImportedRuntime) {
 	};
 	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
 	EXPECT_RUNTIME_WITH_IMPORTS(main_source, files, runtime,
-		EXPECT_TRUE(ex_call(runtime, toLs("main")));
-		EXPECT_EQ(7, ex_to_i32(runtime, -1));
+		EXPECT_TRUE(test_call(runtime, toLs("main")));
+		EXPECT_EQ(7, ex_task_to_i32(runtime, -1));
 	);
 	return true;
 }
@@ -1930,8 +1930,8 @@ TEST(TemplateFunctionReturnsConcreteTemplateStructRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1953,8 +1953,8 @@ TEST(TemplateFunctionReturnsDerivedTemplateStructRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1977,8 +1977,8 @@ TEST(NonTemplateStructWithTemplateStructFieldRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -2002,8 +2002,8 @@ TEST(TemplateFunctionReturnedAsFirstClassValueRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -2056,8 +2056,8 @@ TEST(TemplateFunctionInferredInstantiationPointerParamsRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -2078,8 +2078,8 @@ TEST(NullableTemplateStructInstantiationRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -2103,8 +2103,8 @@ TEST(TemplateFunctionSliceOfTParamRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -2137,8 +2137,8 @@ TEST(ComptimeGenericStructBindingRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -2156,8 +2156,8 @@ TEST(ComptimeGenericFunctionBindingRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -2175,8 +2175,8 @@ TEST(ComptimeFunctionParameterRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(5, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(5, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -2199,8 +2199,8 @@ TEST(ComptimeFunctionParameterDependentArraySizeRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), {}, nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }

@@ -135,7 +135,7 @@ struct EvoxSystemImpl : EvoxSystem {
 	void unregisterModule(EvoxModule& module) override { m_modules.eraseItem(&module); }
 	bool isReady() const override { return m_is_ready; }
 	Span<const ex_type*> getEvoxDataTypes() const override { return m_data_types; }
-	ex_runtime* getDebugRuntime() override { return m_runtime; }
+	ex_task* getTask() override { return m_task; }
 	ex_module* getDebugModule() override { return m_module; }
 	const Path& getDebugPath() const override { return m_path; }
 
@@ -167,14 +167,15 @@ struct EvoxSystemImpl : EvoxSystem {
 	void createModules(World& world) override;
 
 	void update(float time_delta) override {
-		if (!m_is_ready || !m_runtime || ex_debug_is_suspended(m_runtime)) return;
+		if (!m_is_ready || !m_runtime || !m_task) return;
+		// update() is not a resumable invocation. A suspended task can only be
+		// continued by the debugger; update scripts must not yield.
+		if (ex_task_get_state(m_task) == EX_TASK_SUSPENDED) return;
 		if (!m_is_game_running) return;
 
 		const ex_string_view function_name = toEvox("update");
-		if (ex_bytecode_runtime_result_kind(m_runtime, function_name) == EX_TYPE_INVALID) return;
-
-		ex_push_f32(m_runtime, time_delta);
-		if (ex_call(m_runtime, function_name) == EX_RESULT_FAILURE) logError("Evox update failed");
+		const ex_result result = ex_call(m_task, function_name, &time_delta, sizeof(time_delta));
+		if (result != EX_RESULT_OK && result != EX_RESULT_FUNCTION_NOT_FOUND) logError("Evox update failed");
 	}
 
 	void loadRoot() {
@@ -186,16 +187,16 @@ struct EvoxSystemImpl : EvoxSystem {
 	void callStart() {
 		if (!m_runtime) return;
 		const ex_string_view function_name = toEvox("start");
-		if (ex_bytecode_runtime_result_kind(m_runtime, function_name) == EX_TYPE_INVALID) return;
-		ex_push_ptr(m_runtime, &m_engine.getInputSystem());
-		if (ex_call(m_runtime, function_name) == EX_RESULT_FAILURE) logError("Evox start failed");
+		InputSystem* input = &m_engine.getInputSystem();
+		const ex_result result = ex_call(m_task, function_name, &input, sizeof(input));
+		if (result != EX_RESULT_OK && result != EX_RESULT_FUNCTION_NOT_FOUND) logError("Evox start failed");
 	}
 
 	void addWorld(World& world) {
 		const ex_string_view function_name = toEvox("addWorld");
-		if (ex_bytecode_runtime_result_kind(m_runtime, function_name) == EX_TYPE_INVALID) return;
-		ex_push_ptr(m_runtime, &world);
-		if (ex_call(m_runtime, function_name) == EX_RESULT_FAILURE) {
+		World* world_ptr = &world;
+		const ex_result result = ex_call(m_task, function_name, &world_ptr, sizeof(world_ptr));
+		if (result != EX_RESULT_OK && result != EX_RESULT_FUNCTION_NOT_FOUND) {
 			logError("Evox addWorld failed");
 		}
 	}
@@ -246,6 +247,7 @@ struct EvoxSystemImpl : EvoxSystem {
 		m_is_ready = false;
 		for (EvoxModule* module : m_modules) module->clearEvoxData();
 		m_data_types.clear();
+		if (m_task) { ex_task_destroy(m_task); m_task = nullptr; }
 		if (m_runtime) { ex_runtime_destroy(m_runtime); m_runtime = nullptr; }
 		if (m_bytecode) { ex_bytecode_destroy(m_bytecode); m_bytecode = nullptr; }
 		if (m_module) { ex_module_destroy(m_module); m_module = nullptr; }
@@ -258,7 +260,9 @@ struct EvoxSystemImpl : EvoxSystem {
 	bool createRuntime() {
 		m_runtime = ex_runtime_create(m_bytecode, &m_host);
 		if (!m_runtime) return false;
-		return ex_runtime_set_native_resolver(m_runtime, &resolveCoreFunction, &m_native_functions) == EX_RESULT_OK;
+		if (ex_runtime_set_native_resolver(m_runtime, &resolveCoreFunction, &m_native_functions) != EX_RESULT_OK) return false;
+		m_task = ex_task_create(m_runtime);
+		return m_task != nullptr;
 	}
 
 	bool compileAndRun() {
@@ -307,6 +311,7 @@ struct EvoxSystemImpl : EvoxSystem {
 	ex_module* m_module = nullptr;
 	ex_bytecode* m_bytecode = nullptr;
 	ex_runtime* m_runtime = nullptr;
+	ex_task* m_task = nullptr;
 	HashMap<NativeFunctionKey, ex_native_fn, NativeFunctionKeyHash> m_native_functions;
 	Array<const ex_type*> m_data_types;
 	Array<EvoxModule*> m_modules;
@@ -640,7 +645,8 @@ struct EvoxModuleImpl : EvoxModule {
 		auto iter = m_components.find(entity);
 		return iter.isValid() && findDataRef(iter.value(), type) >= 0;
 	}
-	ex_runtime* getDebugRuntime() override { return m_system.getDebugRuntime(); }
+	ex_runtime* getDebugRuntime() override { return m_system.m_runtime; }
+	ex_task* getTask() override { return m_system.getTask(); }
 	ex_module* getDebugModule() override { return m_system.getDebugModule(); }
 	const Path& getDebugPath() const override { return m_system.getDebugPath(); }
 	bool setDebugBreakpoint(const Path& source, u32 line) override { return m_system.setDebugBreakpoint(source, line); }

@@ -45,8 +45,8 @@ TEST(TernaryUntypedBranchAdoptsConcreteBranchType) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(10, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(10, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -352,8 +352,8 @@ TEST(RejectedOperatorCandidateDoesNotRetypeOperands) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(77, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(77, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -381,8 +381,8 @@ TEST(RejectedSameHostOperatorCandidateDoesNotRetypeOperands) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -626,10 +626,10 @@ TEST(NotBindsLooserThanEquality) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(1, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 
-	ex_runtime_destroy(runtime);
+	test_runtime_destroy(runtime);
 	ex_bytecode_destroy(bytecode);
 	CAPI_END(module);
 	return true;
@@ -654,10 +654,10 @@ TEST(NotBindsLooserThanComparison) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(0, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 
-	ex_runtime_destroy(runtime);
+	test_runtime_destroy(runtime);
 	ex_bytecode_destroy(bytecode);
 	CAPI_END(module);
 	return true;
@@ -682,10 +682,10 @@ TEST(NotBindsTighterThanAnd) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(0, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 
-	ex_runtime_destroy(runtime);
+	test_runtime_destroy(runtime);
 	ex_bytecode_destroy(bytecode);
 	CAPI_END(module);
 	return true;
@@ -710,10 +710,10 @@ TEST(NotBindsTighterThanAndOnRight) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(1, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 
-	ex_runtime_destroy(runtime);
+	test_runtime_destroy(runtime);
 	ex_bytecode_destroy(bytecode);
 	CAPI_END(module);
 	return true;
@@ -737,10 +737,10 @@ TEST(NotIsRightAssociative) {
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
 
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(1, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 
-	ex_runtime_destroy(runtime);
+	test_runtime_destroy(runtime);
 	ex_bytecode_destroy(bytecode);
 	CAPI_END(module);
 	return true;
@@ -765,8 +765,8 @@ TEST(NotBindsLooserThanArithmeticFails) {
 		CAPI_BEGIN(module, diagnostics); \
 		EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr)); \
 		CAPI_RUNTIME(module, runtime); \
-		EXPECT_TRUE(ex_call(runtime, toLs("main"))); \
-		EXPECT_EQ(expected, ex_to_i32(runtime, -1)); \
+		EXPECT_TRUE(test_call(runtime, toLs("main"))); \
+		EXPECT_EQ(expected, ex_task_to_i32(runtime, -1)); \
 		CAPI_END(module); \
 	} while (false)
 
@@ -865,8 +865,8 @@ TEST(CustomOperatorGlobalCompoundAssignmentRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(main_source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_FLOAT_EQ(3.0f, ex_to_f32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_FLOAT_EQ(3.0f, ex_task_to_f32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -890,8 +890,8 @@ TEST(CustomOperatorBinaryRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(main_source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_FLOAT_EQ(3.0f, ex_to_f32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_FLOAT_EQ(3.0f, ex_task_to_f32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -915,8 +915,8 @@ TEST(CustomOperatorBinarySubtractionRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(main_source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(7, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(7, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1021,8 +1021,8 @@ TEST(MixedStructPrimitiveOperatorRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_FLOAT_EQ(6.0f, ex_to_f32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_FLOAT_EQ(6.0f, ex_task_to_f32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1141,8 +1141,8 @@ TEST(PrimitiveLhsUserTypeRhsOperatorRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_FLOAT_EQ(6.0f, ex_to_f32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_FLOAT_EQ(6.0f, ex_task_to_f32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1176,8 +1176,8 @@ TEST(MultiplePrimitiveLhsOverloadsOnSameTypeRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_FLOAT_EQ(12.0f, ex_to_f32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_FLOAT_EQ(12.0f, ex_task_to_f32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1290,8 +1290,8 @@ TEST(MemberCompoundAssignmentWithOperatorRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_FLOAT_EQ(4.0f, ex_to_f32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_FLOAT_EQ(4.0f, ex_task_to_f32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1317,8 +1317,8 @@ TEST(BracketCompoundAssignmentWithOperatorRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_FLOAT_EQ(11.0f, ex_to_f32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_FLOAT_EQ(11.0f, ex_task_to_f32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1416,8 +1416,8 @@ TEST(SliceEqualityReturnsContentComparison) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1465,8 +1465,8 @@ TEST(NullableEqualityAgainstNullLiteralRuntime) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1580,14 +1580,14 @@ TEST(NegationPushThroughAddSubRuntime) {
 				{"sub_negated_mul", 3.0, -14.0},
 			};
 			for (const Case& c : cases) {
-				ex_push_f64(runtime, c.arg);
-				EXPECT_TRUE(ex_call(runtime, toLs(c.name)));
-				EXPECT_FLOAT_EQ(c.expected, ex_to_f64(runtime, -1));
+				test_push_f64(runtime, c.arg);
+				EXPECT_TRUE(test_call(runtime, toLs(c.name)));
+				EXPECT_FLOAT_EQ(c.expected, ex_task_to_f64(runtime, -1));
 			}
-			ex_push_f64(runtime, 3.0);
-			ex_push_f64(runtime, 4.0);
-			EXPECT_TRUE(ex_call(runtime, toLs("mandel_check")));
-			EXPECT_FLOAT_EQ(25.0, ex_to_f64(runtime, -1));
+			test_push_f64(runtime, 3.0);
+			test_push_f64(runtime, 4.0);
+			EXPECT_TRUE(test_call(runtime, toLs("mandel_check")));
+			EXPECT_FLOAT_EQ(25.0, ex_task_to_f64(runtime, -1));
 		}
 		ex_bytecode_destroy(bytecode);
 	}
@@ -1633,9 +1633,9 @@ TEST(FusedMultiplyOpsRuntime) {
 				{"both_sides_mul", 3.0, 6.0},
 			};
 			for (const F64Case& c : f64_cases) {
-				ex_push_f64(runtime, c.arg);
-				EXPECT_TRUE(ex_call(runtime, toLs(c.name)));
-				EXPECT_FLOAT_EQ(c.expected, ex_to_f64(runtime, -1));
+				test_push_f64(runtime, c.arg);
+				EXPECT_TRUE(test_call(runtime, toLs(c.name)));
+				EXPECT_FLOAT_EQ(c.expected, ex_task_to_f64(runtime, -1));
 			}
 			struct F32Case {
 				const char* name;
@@ -1648,9 +1648,9 @@ TEST(FusedMultiplyOpsRuntime) {
 				{"nmsub_f32", 3.0f, -14.0f},
 			};
 			for (const F32Case& c : f32_cases) {
-				ex_push_f32(runtime, c.arg);
-				EXPECT_TRUE(ex_call(runtime, toLs(c.name)));
-				EXPECT_FLOAT_EQ(c.expected, ex_to_f32(runtime, -1));
+				test_push_f32(runtime, c.arg);
+				EXPECT_TRUE(test_call(runtime, toLs(c.name)));
+				EXPECT_FLOAT_EQ(c.expected, ex_task_to_f32(runtime, -1));
 			}
 		}
 		ex_bytecode_destroy(bytecode);

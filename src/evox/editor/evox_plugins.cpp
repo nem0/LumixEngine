@@ -707,13 +707,13 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 	void windowGUI() override {
 		World* world = m_app.getWorldEditor().getWorld();
 		EvoxModule* module = world ? static_cast<EvoxModule*>(world->getModule("evox")) : nullptr;
-		ex_runtime* runtime = module ? module->getDebugRuntime() : nullptr;
+		ex_task* task = module ? module->getTask() : nullptr;
 
 		u32 current_line = 0;
 		bool has_current_line = false;
-		if (runtime && ex_debug_is_suspended(runtime)) {
+		if (task && ex_debug_is_suspended(task)) {
 			ex_debug_event event = {};
-			if (ex_debug_pause_event(runtime, &event) == EX_RESULT_OK && event.location.line > 0) {
+			if (ex_debug_pause_event(task, &event) == EX_RESULT_OK && event.location.line > 0) {
 				const StringView event_source(event.location.source_name.begin, event.location.source_name.length);
 				has_current_line = !event_source.empty() && evoxSourcePath(event_source) == m_path;
 				current_line = event.location.line - 1;
@@ -1048,15 +1048,14 @@ struct EvoxDebuggerWindow final : StudioApp::GUIPlugin {
 	void addBreakpoint(EvoxModule* module, const Path& source, u32 line) {
 		if (hasBreakpoint(source, line)) return;
 		m_breakpoints.emplace(Breakpoint{source, line});
-		if (module && module->getDebugRuntime()) module->setDebugBreakpoint(source, line);
+		if (module) module->setDebugBreakpoint(source, line);
 	}
 
 	void removeBreakpoint(EvoxModule* module, const Path& source, u32 line) {
-		if (module && module->getDebugRuntime()) module->removeDebugBreakpoint(source, line);
+		if (module) module->removeDebugBreakpoint(source, line);
 	}
 
 	void applyBreakpoints(EvoxModule* module) {
-		if (!module->getDebugRuntime()) return;
 		for (const Breakpoint& breakpoint : m_breakpoints) module->setDebugBreakpoint(breakpoint.source, breakpoint.line);
 	}
 
@@ -1071,8 +1070,8 @@ struct EvoxDebuggerWindow final : StudioApp::GUIPlugin {
 
 		World* world = m_app.getWorldEditor().getWorld();
 		EvoxModule* module = world ? static_cast<EvoxModule*>(world->getModule("evox")) : nullptr;
-		ex_runtime* runtime = module ? module->getDebugRuntime() : nullptr;
-		const bool suspended = runtime && ex_debug_is_suspended(runtime);
+		ex_task* task = module ? module->getTask() : nullptr;
+		const bool suspended = task && ex_debug_is_suspended(task);
 		const bool just_suspended = suspended && !m_was_suspended;
 		m_was_suspended = suspended;
 
@@ -1091,14 +1090,14 @@ struct EvoxDebuggerWindow final : StudioApp::GUIPlugin {
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
 
 		// Execution controls
-		if (runtime && ex_debug_is_suspended(runtime)) {
-			if (g_debugger_continue.iconButton(true, &m_app)) { ex_debug_resume(runtime, EX_DEBUG_CONTINUE); m_step_requested = true; }
+		if (task && ex_debug_is_suspended(task)) {
+			if (g_debugger_continue.iconButton(true, &m_app)) { ex_debug_resume(task, EX_DEBUG_CONTINUE); m_step_requested = true; }
 			ImGui::SameLine();
-			if (g_debugger_step_over.iconButton(true, &m_app)) { ex_debug_resume(runtime, EX_DEBUG_STEP_OVER); m_step_requested = true; }
+			if (g_debugger_step_over.iconButton(true, &m_app)) { ex_debug_resume(task, EX_DEBUG_STEP_OVER); m_step_requested = true; }
 			ImGui::SameLine();
-			if (g_debugger_step_into.iconButton(true, &m_app)) { ex_debug_resume(runtime, EX_DEBUG_STEP_INTO); m_step_requested = true; }
+			if (g_debugger_step_into.iconButton(true, &m_app)) { ex_debug_resume(task, EX_DEBUG_STEP_INTO); m_step_requested = true; }
 			ImGui::SameLine();
-			if (g_debugger_step_out.iconButton(true, &m_app)) { ex_debug_resume(runtime, EX_DEBUG_STEP_OUT); m_step_requested = true; }
+			if (g_debugger_step_out.iconButton(true, &m_app)) { ex_debug_resume(task, EX_DEBUG_STEP_OUT); m_step_requested = true; }
 		} else {
 			ImGui::BeginDisabled();
 			g_debugger_continue.iconButton(false, &m_app);
@@ -1115,7 +1114,7 @@ struct EvoxDebuggerWindow final : StudioApp::GUIPlugin {
 
 		if (suspended) {
 			ex_debug_event event = {};
-			if (ex_debug_pause_event(runtime, &event) == EX_RESULT_OK) {
+			if (ex_debug_pause_event(task, &event) == EX_RESULT_OK) {
 				ImGui::Text("Suspended: %s", pauseReason(event.reason));
 				if (event.reason == EX_DEBUG_PAUSE_ERROR && event.message.length > 0) {
 					ImGui::TextWrapped("%.*s", int(event.message.length), event.message.begin);
@@ -1125,9 +1124,9 @@ struct EvoxDebuggerWindow final : StudioApp::GUIPlugin {
 
 		const bool should_focus = just_suspended || m_step_requested;
 		m_step_requested = false;
-		if (should_focus && runtime && ex_debug_is_suspended(runtime)) {
+		if (should_focus && task && ex_debug_is_suspended(task)) {
 			ex_debug_event event = {};
-			if (ex_debug_pause_event(runtime, &event) == EX_RESULT_OK) {
+			if (ex_debug_pause_event(task, &event) == EX_RESULT_OK) {
 				const StringView src_name(event.location.source_name.begin, event.location.source_name.length);
 				const Path path = evoxSourcePath(src_name);
 				m_app.getAssetBrowser().openEditor(path);
@@ -1173,10 +1172,10 @@ struct EvoxDebuggerWindow final : StudioApp::GUIPlugin {
 		ImGui::TextUnformatted(ICON_FA_LIST " Call Stack");
 
 		if (!suspended) {
-			ImGui::TextDisabled(runtime ? "Running" : "Waiting for runtime...");
+			ImGui::TextDisabled(task ? "Running" : "Waiting for runtime...");
 		} else {
 			ex_debug_event event = {};
-			ex_debug_pause_event(runtime, &event);
+			ex_debug_pause_event(task, &event);
 			ImGui::Separator();
 
 			if (ImGui::BeginTable("debugger_callstack", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY)) {
@@ -1184,12 +1183,12 @@ struct EvoxDebuggerWindow final : StudioApp::GUIPlugin {
 				ImGui::TableSetupColumn("Function");
 				ImGui::TableSetupColumn("Source");
 				ImGui::TableHeadersRow();
-				const u32 frame_count = ex_debug_stack_depth(runtime);
+				const u32 frame_count = ex_debug_stack_depth(task);
 				if (g_debug_frame_index >= frame_count) g_debug_frame_index = 0;
 				for (u32 i = 0; i < frame_count; ++i) {
 					ex_debug_location location;
-					ex_debug_frame_location(runtime, i, &location);
-					const ex_string_view name = ex_debug_frame_function_name(runtime, i);
+					ex_debug_frame_location(task, i, &location);
+					const ex_string_view name = ex_debug_frame_function_name(task, i);
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					ImGui::Text("%u", i);
@@ -1236,6 +1235,7 @@ struct EvoxDebuggerWindow final : StudioApp::GUIPlugin {
 			case EX_DEBUG_PAUSE_BREAKPOINT: return "breakpoint";
 			case EX_DEBUG_PAUSE_STEP: return "step";
 			case EX_DEBUG_PAUSE_ERROR: return "error";
+			case EX_DEBUG_PAUSE_YIELD: return "yield";
 		}
 		return "unknown";
 	}
@@ -1294,10 +1294,11 @@ struct EvoxVariablesWindow final : StudioApp::GUIPlugin {
 		World* world = m_app.getWorldEditor().getWorld();
 		EvoxModule* module = world ? static_cast<EvoxModule*>(world->getModule("evox")) : nullptr;
 		ex_runtime* runtime = module ? module->getDebugRuntime() : nullptr;
+		ex_task* task = module ? module->getTask() : nullptr;
 		g_debug_runtime = runtime;
 
-		const bool suspended = runtime && ex_debug_is_suspended(runtime);
-		if (!runtime) {
+		const bool suspended = task && ex_debug_is_suspended(task);
+		if (!task) {
 			ImGui::TextDisabled("Waiting for runtime...");
 		} else if (!suspended) {
 			ImGui::TextDisabled("Pause the script to inspect variables.");
@@ -1315,7 +1316,7 @@ struct EvoxVariablesWindow final : StudioApp::GUIPlugin {
 				ImGui::TableSetupScrollFreeze(0, 1);
 				ImGui::TableHeadersRow();
 
-				const u32 frame_count = ex_debug_stack_depth(runtime);
+				const u32 frame_count = ex_debug_stack_depth(task);
 				if (g_debug_frame_index >= frame_count) g_debug_frame_index = 0;
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn();
@@ -1323,12 +1324,12 @@ struct EvoxVariablesWindow final : StudioApp::GUIPlugin {
 				const bool locals_open = ImGui::TreeNodeEx("Locals", ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DefaultOpen);
 				ImGui::TableNextColumn();
 				if (locals_open) {
-					for (u32 i = 0, n = ex_debug_frame_local_count(runtime, g_debug_frame_index); i < n; ++i) {
-						const ex_string_view name = ex_debug_local_name(runtime, g_debug_frame_index, i);
+					for (u32 i = 0, n = ex_debug_frame_local_count(task, g_debug_frame_index); i < n; ++i) {
+						const ex_string_view name = ex_debug_local_name(task, g_debug_frame_index, i);
 						if (has_filter && !nameMatchesFilter(name, m_filter)) continue;
-						const ex_type* type = ex_debug_local_type(runtime, g_debug_frame_index, i);
+						const ex_type* type = ex_debug_local_type(task, g_debug_frame_index, i);
 						if (!type) continue;
-						void* value = ex_debug_local_value(runtime, g_debug_frame_index, i, nullptr);
+						void* value = ex_debug_local_value(task, g_debug_frame_index, i, nullptr);
 						ImGui::PushID((int)i);
 						drawVariable(name, type, value, false, &m_app.getWorldEditor());
 						ImGui::PopID();
@@ -1337,7 +1338,7 @@ struct EvoxVariablesWindow final : StudioApp::GUIPlugin {
 				}
 
 				ex_debug_location location = {};
-				if (ex_debug_frame_location(runtime, g_debug_frame_index, &location) == EX_RESULT_OK
+				if (ex_debug_frame_location(task, g_debug_frame_index, &location) == EX_RESULT_OK
 					&& location.source_name.length > 0) {
 					ImGui::PushID("globals");
 					auto drawFileGlobals = [&](u32 unit_index, bool current_file) {
@@ -1422,19 +1423,11 @@ struct EvoxSymbolsPopup final : StudioApp::GUIPlugin {
 		ImGui::SetNextWindowSize(size, ImGuiCond_Always);
 		World* world = m_app.getWorldEditor().getWorld();
 		EvoxModule* module = world ? static_cast<EvoxModule*>(world->getModule("evox")) : nullptr;
-		ex_runtime* runtime = module ? module->getDebugRuntime() : nullptr;
 		ImGui::SetNextWindowSize(ImVec2(500, 300), ImGuiCond_Always);
 		if (!ImGui::BeginPopup("evox_symbols_palette", ImGuiWindowFlags_NoNavInputs)) {
 			m_open = false;
 			return;
 		}
-		if (!runtime) {
-			ImGui::TextDisabled("Waiting for runtime...");
-			ImGui::EndPopup();
-			m_open = false;
-			return;
-		}
-
 		ImGui::TextUnformatted("Evox Symbols");
 		if (m_open || m_focus_filter) {
 			ImGui::SetKeyboardFocusHere();
@@ -1727,13 +1720,13 @@ struct EvoxPlugin : StudioApp::IPlugin {
 		// Handle debugger shortcuts globally
 		World* world = m_app.getWorldEditor().getWorld();
 		EvoxModule* module = world ? static_cast<EvoxModule*>(world->getModule("evox")) : nullptr;
-		ex_runtime* runtime = module ? module->getDebugRuntime() : nullptr;
+		ex_task* task = module ? module->getTask() : nullptr;
 
-		if (runtime && ex_debug_is_suspended(runtime)) {
-			if (m_app.checkShortcut(g_debugger_continue, true)) { ex_debug_resume(runtime, EX_DEBUG_CONTINUE); m_debugger.m_step_requested = true; }
-			if (m_app.checkShortcut(g_debugger_step_over, true)) { ex_debug_resume(runtime, EX_DEBUG_STEP_OVER); m_debugger.m_step_requested = true; }
-			if (m_app.checkShortcut(g_debugger_step_into, true)) { ex_debug_resume(runtime, EX_DEBUG_STEP_INTO); m_debugger.m_step_requested = true; }
-			if (m_app.checkShortcut(g_debugger_step_out, true)) { ex_debug_resume(runtime, EX_DEBUG_STEP_OUT); m_debugger.m_step_requested = true; }
+		if (task && ex_debug_is_suspended(task)) {
+			if (m_app.checkShortcut(g_debugger_continue, true)) { ex_debug_resume(task, EX_DEBUG_CONTINUE); m_debugger.m_step_requested = true; }
+			if (m_app.checkShortcut(g_debugger_step_over, true)) { ex_debug_resume(task, EX_DEBUG_STEP_OVER); m_debugger.m_step_requested = true; }
+			if (m_app.checkShortcut(g_debugger_step_into, true)) { ex_debug_resume(task, EX_DEBUG_STEP_INTO); m_debugger.m_step_requested = true; }
+			if (m_app.checkShortcut(g_debugger_step_out, true)) { ex_debug_resume(task, EX_DEBUG_STEP_OUT); m_debugger.m_step_requested = true; }
 		}
 	}
 

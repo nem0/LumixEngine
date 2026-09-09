@@ -130,6 +130,7 @@ struct Parser {
 			case Token::VAR: return "var";
 			case Token::CONST: return "const";
 			case Token::DEFER: return "defer";
+			case Token::YIELD: return "yield";
 			case Token::RETURN: return "return";
 			case Token::WHILE: return "while";
 			case Token::FOR: return "for";
@@ -1238,6 +1239,14 @@ struct Parser {
 		return res;
 	}
 
+	YieldStatement* yieldStatement() {
+		Token yield_token = consumeToken();
+		if (yield_token.type != Token::YIELD) return nullptr;
+		YieldStatement* res = makeStmt<YieldStatement>(yield_token);
+		if (!consume(Token::SEMICOLON)) return nullptr;
+		return res;
+	}
+
 	IfStatement* ifStatement() {
 		Token if_token = consumeToken();
 		if (if_token.type != Token::IF) return nullptr;
@@ -1444,6 +1453,7 @@ struct Parser {
 			case Token::VAR:
 			case Token::COMPTIME: return varDecl();
 			case Token::RETURN: return returnStatement();
+			case Token::YIELD: return yieldStatement();
 			case Token::IF: return ifStatement();
 			case Token::DEFER: return deferStatement();
 			case Token::IDENTIFIER: {

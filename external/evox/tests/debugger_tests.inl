@@ -9,7 +9,7 @@ TEST(DebugVariadicAnySliceElementMetadata) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
 
 	EXPECT_TRUE(ex_debug_frame_local_count(runtime, 0) >= 1u);
 	const ex_type* args_type = ex_debug_local_type(runtime, 0, 0);
@@ -56,7 +56,7 @@ TEST(DebugForLoopValueIsVisible) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), &resolveEvoxImportC, &files));
 	CAPI_RUNTIME(module, runtime);
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, toLs("log"), 3u, nullptr));
-	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
 
 	bool found_arg = false;
 	for (u32 i = 0; i < ex_debug_frame_local_count(runtime, 0); ++i) {
@@ -78,7 +78,7 @@ TEST(DebugStackDepthZeroWhenNotFailed) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
 	EXPECT_EQ(0u, ex_debug_stack_depth(runtime));
 	CAPI_END(module);
 	return true;
@@ -99,7 +99,7 @@ TEST(DebugStackTraceOnDivideByZero) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
 	test_diagnostics.output_enabled = false;
-	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
 
 	EXPECT_EQ(2u, ex_debug_stack_depth(runtime));
 
@@ -128,19 +128,19 @@ TEST(DebugGlobalsTable) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
 
-	EXPECT_EQ(2u, ex_debug_global_count(runtime));
+	EXPECT_EQ(2u, ex_debug_global_count(test_vm(runtime)));
 
 	bool found_counter = false;
 	bool found_ratio = false;
-	for (u32 i = 0, count = ex_debug_global_count(runtime); i < count; ++i) {
-		const ex_string_view name = ex_debug_global_name(runtime, i);
+	for (u32 i = 0, count = ex_debug_global_count(test_vm(runtime)); i < count; ++i) {
+		const ex_string_view name = ex_debug_global_name(test_vm(runtime), i);
 		if (equalStrings(name, toLs("counter"))) {
 			found_counter = true;
-			EXPECT_EQ((int)EX_TYPE_I32, (int)ex_type_get_kind(ex_debug_global_type(runtime, i)));
+			EXPECT_EQ((int)EX_TYPE_I32, (int)ex_type_get_kind(ex_debug_global_type(test_vm(runtime), i)));
 			u32 size = 0;
-			const void* value = ex_debug_global_value(runtime, i, &size);
+			const void* value = ex_debug_global_value(test_vm(runtime), i, &size);
 			EXPECT_TRUE(value != nullptr);
 			EXPECT_EQ(4u, size);
 			i32 int_value = 0;
@@ -149,9 +149,9 @@ TEST(DebugGlobalsTable) {
 		}
 		else if (equalStrings(name, toLs("ratio"))) {
 			found_ratio = true;
-			EXPECT_EQ((int)EX_TYPE_F64, (int)ex_type_get_kind(ex_debug_global_type(runtime, i)));
+			EXPECT_EQ((int)EX_TYPE_F64, (int)ex_type_get_kind(ex_debug_global_type(test_vm(runtime), i)));
 			u32 size = 0;
-			const void* value = ex_debug_global_value(runtime, i, &size);
+			const void* value = ex_debug_global_value(test_vm(runtime), i, &size);
 			EXPECT_TRUE(value != nullptr);
 			EXPECT_EQ(8u, size);
 			double double_value = 0;
@@ -173,19 +173,19 @@ TEST(DebugGlobalSourceNames) {
 	EXPECT_TRUE(ex_module_typecheck(module));
 	CAPI_RUNTIME(module, runtime);
 
-	EXPECT_EQ(2u, ex_debug_global_count(runtime));
+	EXPECT_EQ(2u, ex_debug_global_count(test_vm(runtime)));
 	bool found_main = false;
 	bool found_demo = false;
-	for (u32 i = 0; i < ex_debug_global_count(runtime); ++i) {
-		EXPECT_TRUE(equalStrings(ex_debug_global_name(runtime, i), toLs("g_world")));
-		const ex_string_view source = ex_debug_unit_source_name(runtime, ex_debug_global_unit(runtime, i));
+	for (u32 i = 0; i < ex_debug_global_count(test_vm(runtime)); ++i) {
+		EXPECT_TRUE(equalStrings(ex_debug_global_name(test_vm(runtime), i), toLs("g_world")));
+		const ex_string_view source = ex_debug_unit_source_name(test_vm(runtime), ex_debug_global_unit(test_vm(runtime), i));
 		if (equalStrings(source, toLs("main.evox"))) found_main = true;
 		else if (equalStrings(source, toLs("demo.evox"))) found_demo = true;
 		else EXPECT_TRUE(false);
 	}
 	EXPECT_TRUE(found_main);
 	EXPECT_TRUE(found_demo);
-	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_global_unit(runtime, 2));
+	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_global_unit(test_vm(runtime), 2));
 	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_global_unit(nullptr, 0));
 
 	CAPI_END(module);
@@ -220,52 +220,52 @@ TEST(DebugUnitsAndSourceLocationsOutliveModule) {
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
-	EXPECT_EQ(3u, ex_debug_unit_count(runtime));
-	const u32 main_unit = ex_debug_find_unit(runtime, toLs("main.evox"));
-	const u32 helper_unit = ex_debug_find_unit(runtime, toLs("helper"));
-	const u32 leaf_unit = ex_debug_find_unit(runtime, toLs("leaf"));
+	EXPECT_EQ(3u, ex_debug_unit_count(test_vm(runtime)));
+	const u32 main_unit = ex_debug_find_unit(test_vm(runtime), toLs("main.evox"));
+	const u32 helper_unit = ex_debug_find_unit(test_vm(runtime), toLs("helper"));
+	const u32 leaf_unit = ex_debug_find_unit(test_vm(runtime), toLs("leaf"));
 	EXPECT_TRUE(main_unit != EX_DEBUG_UNIT_NONE);
 	EXPECT_TRUE(helper_unit != EX_DEBUG_UNIT_NONE);
 	EXPECT_TRUE(leaf_unit != EX_DEBUG_UNIT_NONE);
-	EXPECT_EQ(1u, ex_debug_unit_import_count(runtime, main_unit));
-	EXPECT_EQ(helper_unit, ex_debug_unit_import(runtime, main_unit, 0));
-	EXPECT_EQ(1u, ex_debug_unit_import_count(runtime, helper_unit));
-	EXPECT_EQ(leaf_unit, ex_debug_unit_import(runtime, helper_unit, 0));
-	EXPECT_EQ(0u, ex_debug_unit_import_count(runtime, leaf_unit));
+	EXPECT_EQ(1u, ex_debug_unit_import_count(test_vm(runtime), main_unit));
+	EXPECT_EQ(helper_unit, ex_debug_unit_import(test_vm(runtime), main_unit, 0));
+	EXPECT_EQ(1u, ex_debug_unit_import_count(test_vm(runtime), helper_unit));
+	EXPECT_EQ(leaf_unit, ex_debug_unit_import(test_vm(runtime), helper_unit, 0));
+	EXPECT_EQ(0u, ex_debug_unit_import_count(test_vm(runtime), leaf_unit));
 
-	EXPECT_EQ(3u, ex_debug_global_count(runtime));
-	for (u32 i = 0; i < ex_debug_global_count(runtime); ++i) {
-		const u32 unit = ex_debug_global_unit(runtime, i);
-		EXPECT_TRUE(unit < ex_debug_unit_count(runtime));
-		EXPECT_TRUE(ex_debug_unit_source_name(runtime, unit).begin
+	EXPECT_EQ(3u, ex_debug_global_count(test_vm(runtime)));
+	for (u32 i = 0; i < ex_debug_global_count(test_vm(runtime)); ++i) {
+		const u32 unit = ex_debug_global_unit(test_vm(runtime), i);
+		EXPECT_TRUE(unit < ex_debug_unit_count(test_vm(runtime)));
+		EXPECT_TRUE(ex_debug_unit_source_name(test_vm(runtime), unit).begin
 			== bytecode->units[unit].source_name.begin);
 	}
 	for (u32 i = 0; i < bytecode->location_count; ++i) {
 		const u32 unit = bytecode->locations[i].unit_index;
 		EXPECT_TRUE(unit < bytecode->unit_count);
-		const ex_string_view source = ex_debug_unit_source_name(runtime, unit);
-		EXPECT_EQ(unit, ex_debug_find_unit(runtime, source));
+		const ex_string_view source = ex_debug_unit_source_name(test_vm(runtime), unit);
+		EXPECT_EQ(unit, ex_debug_find_unit(test_vm(runtime), source));
 	}
-	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_find_unit(runtime, toLs("missing")));
-	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_unit_import(runtime, main_unit, 1));
-	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_unit_import(runtime, EX_DEBUG_UNIT_NONE, 0));
-	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_global_unit(runtime, 3));
+	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_find_unit(test_vm(runtime), toLs("missing")));
+	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_unit_import(test_vm(runtime), main_unit, 1));
+	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_unit_import(test_vm(runtime), EX_DEBUG_UNIT_NONE, 0));
+	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_global_unit(test_vm(runtime), 3));
 	EXPECT_EQ(0u, ex_debug_unit_count(nullptr));
 	EXPECT_EQ(0u, ex_debug_unit_import_count(nullptr, 0));
-	EXPECT_EQ(0, ex_debug_unit_source_name(runtime, EX_DEBUG_UNIT_NONE).length);
+	EXPECT_EQ(0, ex_debug_unit_source_name(test_vm(runtime), EX_DEBUG_UNIT_NONE).length);
 	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_find_unit(nullptr, toLs("main.evox")));
 	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_unit_import(nullptr, 0, 0));
 	EXPECT_EQ(EX_DEBUG_UNIT_NONE, ex_debug_global_unit(nullptr, 0));
 
 	EXPECT_EQ(EX_RESULT_OK, ex_debug_set_breakpoint(bytecode, toLs("main.evox"), 3, nullptr));
-	EXPECT_EQ(EX_RESULT_SUSPENDED, ex_call(runtime, toLs("main")));
+	EXPECT_EQ(EX_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
 	ex_debug_location location = {};
 	EXPECT_EQ(EX_RESULT_OK, ex_debug_frame_location(runtime, 0, &location));
-	EXPECT_TRUE(location.source_name.begin == ex_debug_unit_source_name(runtime, main_unit).begin);
+	EXPECT_TRUE(location.source_name.begin == ex_debug_unit_source_name(test_vm(runtime), main_unit).begin);
 	EXPECT_EQ(EX_RESULT_OK, ex_debug_remove_breakpoint(bytecode, toLs("main.evox"), 3));
 	EXPECT_EQ(EX_RESULT_OK, ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
-	EXPECT_EQ(6, ex_to_i32(runtime, -1));
-	ex_runtime_destroy(runtime);
+	EXPECT_EQ(6, ex_task_to_i32(runtime, -1));
+	test_runtime_destroy(runtime);
 	ex_bytecode_destroy(bytecode);
 	return true;
 }
@@ -420,7 +420,7 @@ TEST(DebugBreakpointSuspendsWhenEnabled) {
 
 	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
 
-	const ex_result call_result = ex_call(runtime, toLs("main"));
+	const ex_result call_result = test_call(runtime, toLs("main"));
 	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)call_result);
 	EXPECT_TRUE(ex_debug_is_suspended(runtime));
 
@@ -436,7 +436,7 @@ TEST(DebugBreakpointSuspendsWhenEnabled) {
 	const ex_result resume_result = ex_debug_resume(runtime, EX_DEBUG_CONTINUE);
 	EXPECT_EQ((int)EX_RESULT_OK, (int)resume_result);
 	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
-	EXPECT_EQ(2, ex_to_i32(runtime, -1));
+	EXPECT_EQ(2, ex_task_to_i32(runtime, -1));
 
 	CAPI_END(module);
 	return true;
@@ -456,10 +456,10 @@ TEST(DebugBreakpointSuspendsByDefault) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 	EXPECT_TRUE(ex_debug_is_suspended(runtime));
 	EXPECT_EQ((int)EX_RESULT_OK, (int)ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
-	EXPECT_EQ(2, ex_to_i32(runtime, -1));
+	EXPECT_EQ(2, ex_task_to_i32(runtime, -1));
 
 	CAPI_END(module);
 	return true;
@@ -484,11 +484,11 @@ TEST(DebugBreakpointHitAgainAfterResume) {
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 6u, nullptr));
 
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
 	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
 	EXPECT_EQ((int)EX_RESULT_OK, (int)ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
-	EXPECT_EQ(3, ex_to_i32(runtime, -1));
+	EXPECT_EQ(3, ex_task_to_i32(runtime, -1));
 
 	CAPI_END(module);
 	return true;
@@ -510,7 +510,7 @@ TEST(DebugErrorSuspendsWhenEnabled) {
 	CAPI_RUNTIME(module, runtime);
 	test_diagnostics.output_enabled = false;
 
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 	EXPECT_TRUE(ex_debug_is_suspended(runtime));
 
 	ex_debug_event event;
@@ -543,14 +543,14 @@ TEST(DebugAbortingSuspendedRuntimeUnblocksCalls) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	EXPECT_EQ((int)EX_RESULT_FAILURE, (int)ex_debug_resume(runtime, EX_DEBUG_ABORT));
 	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
 
 	ex_debug_remove_all_breakpoints(runtime.bytecode);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(2, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(2, ex_task_to_i32(runtime, -1));
 
 	CAPI_END(module);
 	return true;
@@ -569,8 +569,8 @@ TEST(DebugFrameLocalsVisibleWhenSuspended) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
-	ex_push_i32(runtime, 5);
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("compute")));
+	test_push_i32(runtime, 5);
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("compute")));
 
 	EXPECT_EQ(2u, ex_debug_frame_local_count(runtime, 0));
 
@@ -625,8 +625,8 @@ TEST(DebugFrameLocalsExcludeNotYetDeclaredLocal) {
 	// value, but "second" itself hasn't been declared yet at this statement,
 	// so only "a" and "first" should be reported.
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
-	ex_push_i32(runtime, 7);
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("compute")));
+	test_push_i32(runtime, 7);
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("compute")));
 
 	bool found_second = false;
 	for (u32 i = 0, count = ex_debug_frame_local_count(runtime, 0); i < count; ++i) {
@@ -653,7 +653,7 @@ TEST(DebugStepIntoStopsAtNextLine) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 3u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	ex_debug_event event;
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
@@ -669,7 +669,7 @@ TEST(DebugStepIntoStopsAtNextLine) {
 	EXPECT_EQ(5u, event.location.line);
 
 	EXPECT_EQ((int)EX_RESULT_OK, (int)ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
-	EXPECT_EQ(6, ex_to_i32(runtime, -1));
+	EXPECT_EQ(6, ex_task_to_i32(runtime, -1));
 
 	CAPI_END(module);
 	return true;
@@ -693,7 +693,7 @@ TEST(DebugStepIntoEntersCalledFunction) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 8u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	ex_debug_event event;
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
@@ -729,7 +729,7 @@ TEST(DebugStepOverSkipsCalledFunction) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 8u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_debug_resume(runtime, EX_DEBUG_STEP_OVER));
 
@@ -762,7 +762,7 @@ TEST(DebugStepOutReturnsToCaller) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	ex_debug_event event;
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
@@ -809,7 +809,7 @@ TEST(DebugBreakpointSuspendsThroughIndirectCall) {
 	// recurses through C.
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
 
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	ex_debug_event event;
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
@@ -822,7 +822,7 @@ TEST(DebugBreakpointSuspendsThroughIndirectCall) {
 	EXPECT_TRUE(equalStrings(ex_debug_frame_function_name(runtime, 2), toLs("main")));
 
 	EXPECT_EQ((int)EX_RESULT_OK, (int)ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 
 	CAPI_END(module);
 	return true;
@@ -841,15 +841,15 @@ TEST(ScratchStepActionLeaksAfterCompletion) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 	// Step over "return a;" - runs to completion, never re-suspends.
 	EXPECT_EQ((int)EX_RESULT_OK, (int)ex_debug_resume(runtime, EX_DEBUG_STEP_OVER));
 
 	// Remove the breakpoint; a fresh call must now run to completion,
 	// not spuriously suspend with a stale armed step.
 	ex_debug_remove_all_breakpoints(runtime.bytecode);
-	EXPECT_EQ((int)EX_RESULT_OK, (int)ex_call(runtime, toLs("main")));
-	EXPECT_EQ(1, ex_to_i32(runtime, -1));
+	EXPECT_EQ((int)EX_RESULT_OK, (int)test_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
 
 	CAPI_END(module);
 	return true;
@@ -869,11 +869,11 @@ TEST(ScratchAbortLeaksStackTop) {
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
 
-	u8* const stack_top_before = runtime.runtime->stack_top;
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	u8* const stack_top_before = runtime.get()->stack_top;
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 	EXPECT_EQ((int)EX_RESULT_FAILURE, (int)ex_debug_resume(runtime, EX_DEBUG_ABORT));
-	// After aborting, the runtime should be back at its pre-call stack state.
-	EXPECT_TRUE(stack_top_before == runtime.runtime->stack_top);
+	// After aborting, the task should be back at its pre-call stack state.
+	EXPECT_TRUE(stack_top_before == runtime.get()->stack_top);
 
 	CAPI_END(module);
 	return true;
@@ -896,22 +896,26 @@ TEST(DebugAbortRestoresOuterCallAfterNativeReentry) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
+	EXPECT_TRUE(ex_runtime_set_native_resolver(test_vm(runtime), [](ex_runtime*, ex_native_function_desc, void*) -> ex_native_fn {
 		return [](ex_runtime* runtime, ex_call_frame frame) {
 			EX_ARG(frame, i32, value);
-			ex_push_i32(runtime, value);
-			if (ex_call(runtime, toLs("helper")) != EX_RESULT_OK) return;
-			EX_RESULT(frame, ex_to_i32(runtime, -1));
+			ex_task* helper_task = ex_task_create(runtime);
+			if (!helper_task) return;
+			ex_result result = ex_call(helper_task, toLs("helper"), &value, sizeof(value));
+			if (result == EX_RESULT_OK) EX_RESULT(frame, ex_task_to_i32(helper_task, -1));
+			ex_task_destroy(helper_task);
 		};
 	}, nullptr) == EX_RESULT_OK);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 9u, nullptr));
-	ex_push_i32(runtime, 41);
-	u8* const stack_top_before = runtime.runtime->stack_top;
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	test_push_i32(runtime, 41);
+	u8* const stack_top_before = runtime.get()->stack_top;
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 	EXPECT_EQ((int)EX_RESULT_FAILURE, (int)ex_debug_resume(runtime, EX_DEBUG_ABORT));
-	EXPECT_TRUE(stack_top_before == runtime.runtime->stack_top);
-	EXPECT_EQ(41, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(stack_top_before == runtime.get()->stack_top);
+	u32 result_size = 123u;
+	EXPECT_TRUE(ex_task_result(runtime, &result_size) == nullptr);
+	EXPECT_EQ(0u, result_size);
 
 	CAPI_END(module);
 	return true;
@@ -933,7 +937,7 @@ TEST(DebugContinuingRuntimeErrorReexecutesFailingInstruction) {
 	CAPI_RUNTIME(module, runtime);
 	test_diagnostics.output_enabled = false;
 
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	ex_debug_event event;
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
@@ -959,8 +963,8 @@ TEST(DebugStepIntoStopsInRecursiveCallOnSameSourceLine) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 2u, nullptr));
-	ex_push_i32(runtime, 1);
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("recurse")));
+	test_push_i32(runtime, 1);
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("recurse")));
 
 	// A different invocation is a different source location even when both
 	// statements share a physical line; step-into must stop in that callee.
@@ -989,8 +993,8 @@ TEST(DebugLiteralReturnFunctionExposesParameters) {
 		CAPI_END(module);
 		return false;
 	}
-	ex_push_i32(runtime, 42);
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("always_true")));
+	test_push_i32(runtime, 42);
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("always_true")));
 
 	EXPECT_EQ(1u, ex_debug_frame_local_count(runtime, 0));
 	EXPECT_TRUE(equalStrings(ex_debug_local_name(runtime, 0, 0), toLs("value")));
@@ -1023,7 +1027,7 @@ TEST(DebugStructFieldMetadata) {
 
 	// Break at the return statement so v is in scope and initialized
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 8u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	EXPECT_EQ(1u, ex_debug_frame_local_count(runtime, 0));
 	EXPECT_TRUE(equalStrings(ex_debug_local_name(runtime, 0, 0), toLs("v")));
@@ -1062,7 +1066,7 @@ TEST(DebugStructFieldMetadata) {
 	EXPECT_EQ(0u, ex_type_struct_field_count(nullptr));
 
 	EXPECT_EQ((int)EX_RESULT_OK, (int)ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
-	EXPECT_EQ(30, ex_to_i32(runtime, -1));
+	EXPECT_EQ(30, ex_task_to_i32(runtime, -1));
 
 	CAPI_END(module);
 	return true;
@@ -1084,7 +1088,7 @@ TEST(DebugStructReadFieldValue) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 8u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	const ex_type* type = ex_debug_local_type(runtime, 0, 0);
 	EXPECT_TRUE(type != nullptr);
@@ -1114,7 +1118,7 @@ TEST(DebugStructReadFieldValue) {
 	EXPECT_EQ(4u, ex_type_get_size(y_type));
 
 	EXPECT_EQ((int)EX_RESULT_OK, (int)ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
-	EXPECT_EQ(30, ex_to_i32(runtime, -1));
+	EXPECT_EQ(30, ex_task_to_i32(runtime, -1));
 
 	CAPI_END(module);
 	return true;
@@ -1140,7 +1144,7 @@ TEST(DebugNestedStructFieldType) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 12u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	const ex_type* type = ex_debug_local_type(runtime, 0, 0);
 	EXPECT_TRUE(type != nullptr);
@@ -1197,7 +1201,7 @@ TEST(DebugStructWithArrayField) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 8u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	const ex_type* type = ex_debug_local_type(runtime, 0, 0);
 	EXPECT_TRUE(type != nullptr);
@@ -1248,7 +1252,7 @@ TEST(DebugStructSliceField) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 8u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	const ex_type* type = ex_debug_local_type(runtime, 0, 0);
 	EXPECT_TRUE(type != nullptr);
@@ -1304,18 +1308,18 @@ TEST(DebugStructGlobalInspection) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 8u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
-	EXPECT_TRUE(ex_debug_global_count(runtime) >= 1);
+	EXPECT_TRUE(ex_debug_global_count(test_vm(runtime)) >= 1);
 
 	bool found_g = false;
-	for (u32 i = 0, count = ex_debug_global_count(runtime); i < count; ++i) {
-		if (equalStrings(ex_debug_global_name(runtime, i), toLs("g"))) {
+	for (u32 i = 0, count = ex_debug_global_count(test_vm(runtime)); i < count; ++i) {
+		if (equalStrings(ex_debug_global_name(test_vm(runtime), i), toLs("g"))) {
 			found_g = true;
 
-			EXPECT_EQ((int)EX_TYPE_STRUCT, (int)ex_type_get_kind(ex_debug_global_type(runtime, i)));
+			EXPECT_EQ((int)EX_TYPE_STRUCT, (int)ex_type_get_kind(ex_debug_global_type(test_vm(runtime), i)));
 
-			const ex_type* g_type = ex_debug_global_type(runtime, i);
+			const ex_type* g_type = ex_debug_global_type(test_vm(runtime), i);
 			EXPECT_TRUE(g_type != nullptr);
 			EXPECT_EQ((int)EX_TYPE_STRUCT, (int)ex_type_get_kind(g_type));
 			EXPECT_EQ(8u, ex_type_get_size(g_type));
@@ -1330,7 +1334,7 @@ TEST(DebugStructGlobalInspection) {
 			EXPECT_EQ((int)EX_TYPE_I32, (int)ex_type_get_kind(ex_type_struct_field_type(g_type, 1)));
 
 			u32 value_size = 0;
-			const void* value = ex_debug_global_value(runtime, i, &value_size);
+			const void* value = ex_debug_global_value(test_vm(runtime), i, &value_size);
 			EXPECT_TRUE(value != nullptr);
 			EXPECT_EQ(8u, value_size);
 
@@ -1346,7 +1350,7 @@ TEST(DebugStructGlobalInspection) {
 	EXPECT_TRUE(found_g);
 
 	EXPECT_EQ((int)EX_RESULT_OK, (int)ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
-	EXPECT_EQ(300, ex_to_i32(runtime, -1));
+	EXPECT_EQ(300, ex_task_to_i32(runtime, -1));
 
 	CAPI_END(module);
 	return true;
@@ -1365,7 +1369,7 @@ TEST(DebugNullableTypeIntrospection) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 5u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	// Find the two locals
 	int null_idx = -1, some_idx = -1;
@@ -1446,7 +1450,7 @@ TEST(DebugTaggedUnionMemberCountAndTypes) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 12u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	const ex_type* type = ex_debug_local_type(runtime, 0, 0);
 	EXPECT_TRUE(type != nullptr);
@@ -1511,7 +1515,7 @@ TEST(DebugTaggedUnionTagChangesWithMember) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 14u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	const ex_type* type = ex_debug_local_type(runtime, 0, 0);
 	EXPECT_TRUE(type != nullptr);
@@ -1554,7 +1558,7 @@ TEST(TypeGetNameStruct) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 9u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	const ex_type* type = ex_debug_local_type(runtime, 0, 0);
 	EXPECT_TRUE(type != nullptr);
@@ -1565,7 +1569,7 @@ TEST(TypeGetNameStruct) {
 	EXPECT_EQ(0u, size(ex_type_get_name(nullptr)));
 
 	EXPECT_EQ((int)EX_RESULT_OK, (int)ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
-	EXPECT_EQ(30, ex_to_i32(runtime, -1));
+	EXPECT_EQ(30, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1587,7 +1591,7 @@ TEST(TypeGetNameEnum) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 9u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	const ex_type* type = ex_debug_local_type(runtime, 0, 0);
 	EXPECT_TRUE(type != nullptr);
@@ -1617,7 +1621,7 @@ TEST(TypeEnumValueIntrospectionImplicit) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 10u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	const ex_type* type = ex_debug_local_type(runtime, 0, 0);
 	EXPECT_TRUE(type != nullptr);
@@ -1658,7 +1662,7 @@ TEST(TypeEnumValueIntrospectionExplicit) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 10u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	const ex_type* type = ex_debug_local_type(runtime, 0, 0);
 	EXPECT_TRUE(type != nullptr);
@@ -1697,7 +1701,7 @@ TEST(TypeEnumValueIntrospectionMixed) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 12u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	const ex_type* type = ex_debug_local_type(runtime, 0, 0);
 	EXPECT_TRUE(type != nullptr);
@@ -1744,7 +1748,7 @@ TEST(TypeGetNameNestedStruct) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 14u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	const ex_type* outer = ex_debug_local_type(runtime, 0, 0);
 	EXPECT_TRUE(outer != nullptr);
@@ -1757,7 +1761,7 @@ TEST(TypeGetNameNestedStruct) {
 	EXPECT_TRUE(equalStrings(ex_type_get_name(inner), toLs("TypeGetNameNestedStruct.Inner")));
 
 	EXPECT_EQ((int)EX_RESULT_OK, (int)ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
-	EXPECT_EQ(3, ex_to_i32(runtime, -1));
+	EXPECT_EQ(3, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1774,7 +1778,7 @@ TEST(TypeGetNamePrimitiveReturnsEmpty) {
 	CAPI_RUNTIME(module, runtime);
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
-	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)ex_call(runtime, toLs("main")));
+	EXPECT_EQ((int)EX_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	const ex_type* type = ex_debug_local_type(runtime, 0, 0);
 	EXPECT_TRUE(type != nullptr);
@@ -1783,7 +1787,7 @@ TEST(TypeGetNamePrimitiveReturnsEmpty) {
 	EXPECT_EQ(0u, size(ex_type_get_name(type)));
 
 	EXPECT_EQ((int)EX_RESULT_OK, (int)ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
-	EXPECT_EQ(42, ex_to_i32(runtime, -1));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }

@@ -26,8 +26,8 @@ TEST(TypeMembersAcceptValueReceivers) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(0, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -525,8 +525,8 @@ TEST(IntrospectionEmptySequenceLength) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(0, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1103,8 +1103,8 @@ TEST(IntrospectionNamesSelectUnrolledBranchWithSliceEquality) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(21, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(21, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1126,8 +1126,8 @@ TEST(IntrospectionUnrollSliceContinueSkipsField) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
-	EXPECT_TRUE(ex_call(runtime, toLs("main")));
-	EXPECT_EQ(40, ex_to_i32(runtime, -1));
+	EXPECT_TRUE(test_call(runtime, toLs("main")));
+	EXPECT_EQ(40, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
 	return true;
 }
@@ -1455,7 +1455,7 @@ TEST(IntrospectionGenericPrintRendersEveryKind) {
 	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
 	CAPI_RUNTIME(module, runtime);
 
-	EXPECT_TRUE(ex_runtime_set_native_resolver(runtime, [](ex_runtime*, ex_native_function_desc function, void*) -> ex_native_fn {
+	EXPECT_TRUE(ex_runtime_set_native_resolver(test_vm(runtime), [](ex_runtime*, ex_native_function_desc function, void*) -> ex_native_fn {
 		if (equalStrings(function.name, "write_bytes")) return &printCaptureBytes;
 		if (equalStrings(function.name, "write_i64")) return &printCaptureI64;
 		if (equalStrings(function.name, "write_u64")) return &printCaptureU64;
@@ -1488,7 +1488,7 @@ TEST(IntrospectionGenericPrintRendersEveryKind) {
 
 	for (const Case& test_case : cases) {
 		g_print_capture.reset();
-		EXPECT_TRUE(ex_call(runtime, toLs(test_case.function)) == EX_RESULT_OK);
+		EXPECT_TRUE(test_call(runtime, toLs(test_case.function)) == EX_RESULT_OK);
 		if (!g_print_capture.equals(test_case.expected)) {
 			printf("TEST FAILED at %s:%d: %s printed \"%.*s\", expected \"%s\"\n",
 				__FILE__, __LINE__, test_case.function,
