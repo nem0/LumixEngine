@@ -54,7 +54,6 @@ static const char* evoxc_result_name(ex_call_result result) {
 		case EX_CALL_RESULT_PANIC: return "panic";
 		case EX_CALL_RESULT_STACK_OVERFLOW: return "stack overflow";
 		case EX_CALL_RESULT_CALL_DEPTH: return "call depth exceeded";
-		case EX_CALL_RESULT_ABORTED: return "execution aborted";
 		case EX_CALL_RESULT_SUSPENDED: return "execution suspended";
 		case EX_RESULT_FAILURE: return "internal failure";
 		default: return "unknown error";

@@ -220,6 +220,14 @@ struct RuntimeGuard {
 		return *this;
 	}
 
+	void reset_task() {
+		test_tasks().erase(runtime);
+		test_task_args().erase(task);
+		ex_task_destroy(task);
+		task = ex_task_create(runtime);
+		test_tasks()[runtime] = task;
+	}
+
 	operator bool() const { return task != nullptr; }
 	operator ex_task*() const { return task; }
 	ex_task* get() const { return task; }
@@ -255,6 +263,7 @@ static ex_task* test_task_for_runtime(ex_runtime* runtime) {
 	return task;
 }
 
+static void test_abort(RuntimeGuard& runtime) { runtime.reset_task(); }
 static ex_call_result test_call(RuntimeGuard& runtime, ex_string_view name) { return runtime.call(name); }
 static ex_call_result test_call(ex_runtime* runtime, ex_string_view name) {
 	ex_task* task = test_task_for_runtime(runtime);

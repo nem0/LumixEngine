@@ -551,8 +551,7 @@ TEST(DebugErrorSuspendsWhenEnabled) {
 	EXPECT_TRUE(equalStrings(ex_debug_frame_function_name(runtime, 0), toLs("divide")));
 	EXPECT_TRUE(equalStrings(ex_debug_frame_function_name(runtime, 1), toLs("main")));
 
-	const ex_call_result resume_result = ex_debug_resume(runtime, EX_DEBUG_ABORT);
-	EXPECT_EQ((int)EX_CALL_RESULT_ABORTED, (int)resume_result);
+	test_abort(runtime);
 	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
 
 	CAPI_END(module);
@@ -575,7 +574,7 @@ TEST(DebugAbortingSuspendedRuntimeUnblocksCalls) {
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
 	EXPECT_EQ((int)EX_CALL_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
-	EXPECT_EQ((int)EX_CALL_RESULT_ABORTED, (int)ex_debug_resume(runtime, EX_DEBUG_ABORT));
+	test_abort(runtime);
 	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
 
 	ex_debug_remove_all_breakpoints(runtime.bytecode);
@@ -899,11 +898,8 @@ TEST(ScratchAbortLeaksStackTop) {
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
 
-	u8* const stack_top_before = runtime.get()->stack_top;
 	EXPECT_EQ((int)EX_CALL_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
-	EXPECT_EQ((int)EX_CALL_RESULT_ABORTED, (int)ex_debug_resume(runtime, EX_DEBUG_ABORT));
-	// After aborting, the task should be back at its pre-call stack state.
-	EXPECT_TRUE(stack_top_before == runtime.get()->stack_top);
+	test_abort(runtime);
 
 	CAPI_END(module);
 	return true;
@@ -939,10 +935,8 @@ TEST(DebugAbortRestoresOuterCallAfterNativeReentry) {
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 9u, nullptr));
 	test_push_i32(runtime, 41);
-	u8* const stack_top_before = runtime.get()->stack_top;
 	EXPECT_EQ((int)EX_CALL_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
-	EXPECT_EQ((int)EX_CALL_RESULT_ABORTED, (int)ex_debug_resume(runtime, EX_DEBUG_ABORT));
-	EXPECT_TRUE(stack_top_before == runtime.get()->stack_top);
+	test_abort(runtime);
 	u32 result_size = 123u;
 	EXPECT_TRUE(ex_task_result(runtime, &result_size) == nullptr);
 	EXPECT_EQ(0u, result_size);

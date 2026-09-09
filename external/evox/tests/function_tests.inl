@@ -539,7 +539,7 @@ TEST(LazyNativeResolverRetriesMissingFunction) {
 	EXPECT_EQ(EX_CALL_RESULT_INVALID_FUNCTION_CALL, test_call(runtime, toLs("main")));
 	// Runtime errors suspend the runtime; abandon that failed call before
 	// trying the resolver again.
-	ex_debug_resume(runtime, EX_DEBUG_ABORT);
+	test_abort(runtime);
 	state.return_callback = true;
 	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));

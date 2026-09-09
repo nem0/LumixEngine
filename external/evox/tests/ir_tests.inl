@@ -112,14 +112,14 @@ TEST(ir_to_bytecode_array_bounds_check) {
 	EXPECT_TRUE(ex_debug_is_suspended(runtime));
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ((int)EX_DEBUG_PAUSE_ERROR, (int)event.reason);
-	EXPECT_EQ((int)EX_CALL_RESULT_ABORTED, (int)ex_debug_resume(runtime, EX_DEBUG_ABORT));
+	test_abort(runtime);
 	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
 
 	EXPECT_EQ(test_call(runtime, toLs("past_end")), EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS);
 	EXPECT_TRUE(ex_debug_is_suspended(runtime));
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ((int)EX_DEBUG_PAUSE_ERROR, (int)event.reason);
-	EXPECT_EQ((int)EX_CALL_RESULT_ABORTED, (int)ex_debug_resume(runtime, EX_DEBUG_ABORT));
+	test_abort(runtime);
 	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
 	CAPI_END(module);
 	return true;
@@ -157,28 +157,28 @@ TEST(ir_to_bytecode_array_index_kinds) {
 	EXPECT_TRUE(ex_debug_is_suspended(runtime));
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ((int)EX_DEBUG_PAUSE_ERROR, (int)event.reason);
-	EXPECT_EQ((int)EX_CALL_RESULT_ABORTED, (int)ex_debug_resume(runtime, EX_DEBUG_ABORT));
+	test_abort(runtime);
 	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
 
 	EXPECT_EQ(test_call(runtime, toLs("negative_i16")), EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS);
 	EXPECT_TRUE(ex_debug_is_suspended(runtime));
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ((int)EX_DEBUG_PAUSE_ERROR, (int)event.reason);
-	EXPECT_EQ((int)EX_CALL_RESULT_ABORTED, (int)ex_debug_resume(runtime, EX_DEBUG_ABORT));
+	test_abort(runtime);
 	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
 
 	EXPECT_EQ(test_call(runtime, toLs("negative_i32")), EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS);
 	EXPECT_TRUE(ex_debug_is_suspended(runtime));
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ((int)EX_DEBUG_PAUSE_ERROR, (int)event.reason);
-	EXPECT_EQ((int)EX_CALL_RESULT_ABORTED, (int)ex_debug_resume(runtime, EX_DEBUG_ABORT));
+	test_abort(runtime);
 	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
 
 	EXPECT_EQ(test_call(runtime, toLs("past_end_u8")), EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS);
 	EXPECT_TRUE(ex_debug_is_suspended(runtime));
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ((int)EX_DEBUG_PAUSE_ERROR, (int)event.reason);
-	EXPECT_EQ((int)EX_CALL_RESULT_ABORTED, (int)ex_debug_resume(runtime, EX_DEBUG_ABORT));
+	test_abort(runtime);
 	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
 	CAPI_END(module);
 	return true;

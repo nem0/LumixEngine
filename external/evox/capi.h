@@ -139,8 +139,7 @@ typedef enum ex_call_result {
 	EX_CALL_RESULT_INVALID_FUNCTION_CALL,
 	EX_CALL_RESULT_PANIC,
 	EX_CALL_RESULT_STACK_OVERFLOW,
-	EX_CALL_RESULT_CALL_DEPTH,
-	EX_CALL_RESULT_ABORTED
+	EX_CALL_RESULT_CALL_DEPTH
 } ex_call_result;
 
 // Native print callback used by `ex_host`.
@@ -576,8 +575,6 @@ typedef enum ex_debug_action {
 	EX_DEBUG_STEP_INTO,
 	EX_DEBUG_STEP_OVER,
 	EX_DEBUG_STEP_OUT,
-	// Abort script execution; the interrupted task fails.
-	EX_DEBUG_ABORT,
 } ex_debug_action;
 
 typedef struct ex_debug_location {

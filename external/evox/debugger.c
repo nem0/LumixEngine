@@ -195,29 +195,6 @@ ex_result ex_debug_pause_event(ex_task* task, ex_debug_event* out_event) {
 ex_call_result ex_debug_resume(ex_task* task, ex_debug_action action) {
 	if (!task) return EX_CALL_RESULT_INVALID_ARGUMENT;
 	if (task->executing || !task->is_suspended) return EX_CALL_RESULT_INVALID_STATE;
-	if (action == EX_DEBUG_ABORT) {
-		// Preserve the suspended call stack as a failed-call trace, then reset
-		// the task to its call-start state without resuming the interpreter.
-		u32 recorded = 0u;
-		if (recorded < (u32)(sizeof(task->fail_frames) / sizeof(task->fail_frames[0]))) {
-			task->fail_frames[recorded++] = task->suspended_frame;
-		}
-		for (u32 i = task->call_depth; i > 0u && recorded < (u32)(sizeof(task->fail_frames) / sizeof(task->fail_frames[0])); --i) {
-			task->fail_frames[recorded++] = task->call_stack[i - 1u];
-		}
-		task->fail_frame_count = recorded;
-		task->is_suspended = false;
-		ASSERT(task->call_start_depth > 0u);
-		const runtime_restore_point* initial = &task->call_starts[task->call_start_depth - 1u];
-		task->call_depth = initial->call_depth;
-		task->stack_top = task->stack;
-		task->frame = task->stack;
-		task->result_size = 0u;
-		--task->call_start_depth;
-		task->step_action = EX_DEBUG_CONTINUE;
-		task->state = EX_TASK_FAILED;
-		return EX_CALL_RESULT_ABORTED;
-	}
 	// The pause event's location is exactly "the line we're stopped at" (it
 	// was populated from this same suspended_frame at suspend time), so it
 	// doubles as the step's starting line without a second source-map lookup.
