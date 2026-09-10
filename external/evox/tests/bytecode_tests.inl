@@ -2923,6 +2923,41 @@ TEST(FirstClassFunctionLiteralImmediateCallRuntime) {
 	return true;
 }
 
+TEST(FirstClassFunctionNestedLiteralRuntime) {
+	const char* source = R"(
+		fn make_fn() : fn() : i32 {
+			return fn() : i32 { return 42; };
+		}
+
+		fn main() : i32 {
+			return make_fn()();
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(LocalFunctionLiteralCallRuntime) {
+	const char* source = R"(
+		fn main() : i32 {
+			const local = fn() : i32 { return 42; };
+			return local();
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(FirstClassFunctionsStructFieldImmediateCallRuntime) {
 	const char* source = R"(
 		struct Holder {

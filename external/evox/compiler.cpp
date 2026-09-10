@@ -1364,6 +1364,23 @@ struct Checker {
 				out = lit;
 				break;
 			}
+			case Expression::FUNCTION: {
+				FunctionExpression* s = static_cast<FunctionExpression*>(src);
+				FunctionExpression* fn = makeType<FunctionExpression>(unit.arena, unit.arena);
+				fn->is_extern = s->is_extern;
+				fn->is_template = s->is_template;
+				fn->is_variadic = s->is_variadic;
+				for (FunctionParam& param : s->params) {
+					FunctionParam& clone = fn->params.emplace_back();
+					clone.name = param.name;
+					clone.is_comptime = param.is_comptime;
+					clone.type_expr = cloneExpression(unit, param.type_expr, bindings);
+				}
+				fn->return_type = cloneExpression(unit, s->return_type, bindings);
+				fn->body = cloneStatement(unit, s->body, bindings);
+				out = fn;
+				break;
+			}
 			case Expression::STRUCT: {
 				StructExpression* s = static_cast<StructExpression*>(src);
 				StructExpression* st = makeType<StructExpression>(unit.arena, unit.arena);
@@ -3995,6 +4012,14 @@ struct Checker {
 					expr.resolved_type = nullptr;
 					return nullptr;
 				}
+
+				// Top-level function literals are already represented by a symbol. Nested
+				// literals have no symbol, but still need to be emitted as bytecode.
+				bool has_symbol = false;
+				for (Symbol& symbol : unit.symbols) {
+					if (symbol.expression == &fn) { has_symbol = true; break; }
+				}
+				if (!has_symbol) unit.anonymous_functions.push(&fn);
 				return &expr;
 			}
 			case Expression::STRUCT: {
@@ -4011,6 +4036,19 @@ struct Checker {
 				return &expr;
 			}
 			case Expression::IDENTIFIER: return checkIdentifierExpr(unit, ctx, expr, hint, first_arg_type);
+			case Expression::YIELD: {
+				if (!ctx || ctx->in_defer) {
+					errorLine(expr.token, "Yield expression cannot be used in a defer statement");
+					return nullptr;
+				}
+				if (!hint || hint->kind == ResolvedTypeKind::UNTYPED_INT || hint->kind == ResolvedTypeKind::UNTYPED_FLOAT) {
+					errorLine(expr.token, "Yield expression requires an explicit concrete type");
+					return nullptr;
+				}
+				expr.resolved_type = hint;
+				expr.eval_stage = Expression::RUNTIME;
+				return &expr;
+			}
 			case Expression::PANIC: {
 				PanicExpression& panic = static_cast<PanicExpression&>(expr);
 				if (!checkExprForTarget(unit, ctx, *panic.message, const_u8_slice)) return nullptr;
@@ -5124,6 +5162,7 @@ struct Checker {
 			for (MatchPattern& pattern : arm.patterns) {
 				if (subject_is_any) {
 					if (pattern.end) { errorLine(pattern.begin->token, "Range patterns are not valid for any matches"); return false; }
+					if (!checkExpr(unit, &ctx, *pattern.begin, nullptr)) return false;
 					ResolvedType* member = asType(evalComptime(unit, *pattern.begin, &ctx), pattern.begin->token);
 					if (!member) return false;
 					for (ResolvedType* old : covered_any_types) if (typesEqual(old, member)) { errorLine(pattern.begin->token, "Duplicate match arm for any type ", member); return false; }

@@ -1224,10 +1224,14 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 				if (value != 0) ip += offset;
 				break;
 			}
-			case EX_OP_YIELD:
+			case EX_OP_YIELD: {
+				task->suspended_yield_destination = runtime_read_u32();
+				task->suspended_yield_type = runtime_read_u32();
+				task->suspended_yield_size = runtime_read_u32();
 				task->pause_event.reason = EX_DEBUG_PAUSE_YIELD;
 				task->pause_event.message = (ex_string_view){NULL, 0};
 				goto runtime_execute_function_suspend;
+			}
 			case EX_OP_BREAK: {
 				// ip already points one byte past EX_OP_BREAK. Rewind it before a
 				// suspend so resuming re-executes the trapped original opcode.
@@ -1565,11 +1569,26 @@ ex_call_result ex_task_resume_suspended(ex_task* task) {
 	return runtime_execute_function(task, task->suspended_frame.function, &task->suspended_frame);
 }
 
-ex_call_result ex_task_resume(ex_task* task) {
+ex_call_result ex_task_resume(ex_task* task, const ex_type* type, const void* data, u32 size) {
 	if (!task) return EX_CALL_RESULT_INVALID_ARGUMENT;
 	if (task->executing) return EX_CALL_RESULT_ALREADY_EXECUTING;
 	if (!task->is_suspended) return EX_CALL_RESULT_NOT_SUSPENDED;
 	if (task->pause_event.reason != EX_DEBUG_PAUSE_YIELD) return EX_CALL_RESULT_NOT_RESUMABLE;
+
+	const bool expects_value = task->suspended_yield_type != EX_TYPE_INDEX_NONE;
+	if (!expects_value) {
+		if (type || data || size != 0u) return EX_CALL_RESULT_INVALID_YIELD_VALUE;
+	}
+	else {
+		if (!type || type->bytecode != task->bytecode
+			|| task->suspended_yield_type >= task->bytecode->type_info_count
+			|| type != &task->bytecode->type_info[task->suspended_yield_type]
+			|| !data || size != task->suspended_yield_size)
+		{
+			return EX_CALL_RESULT_INVALID_YIELD_VALUE;
+		}
+		memcpy(task->suspended_frame.frame + task->suspended_yield_destination, data, size);
+	}
 
 	task->executing = true;
 	const ex_call_result result = ex_task_resume_suspended(task);

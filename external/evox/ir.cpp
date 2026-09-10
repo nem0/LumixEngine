@@ -458,6 +458,13 @@ struct IRBuilder {
 		}
 
 		switch (expr.kind) {
+			case Expression::YIELD: {
+				auto& op = alloc<ExOpYield>();
+				op.type = expr.resolved_type;
+				auto& destination = allocAlloca(expr.resolved_type, {}, nullptr);
+				op.destination = &destination;
+				return op;
+			}
 			case Expression::UNDEFINED: return alloc<ExOpNop>();
 			case Expression::ADDRESSOF: {
 				auto& address = static_cast<AddressOfExpression&>(expr);
@@ -697,6 +704,14 @@ struct IRBuilder {
 				load.addr = &add;
 				load.size = typeByteSize(*me.resolved_type);
 				return load;
+			}
+			case Expression::FUNCTION: {
+				auto& fn = static_cast<FunctionExpression&>(expr);
+				ASSERT(fn.bytecode_index != ~0u);
+				auto& op = alloc<ExOpLoadConst>();
+				op.type = expr.resolved_type;
+				memcpy(op.value, &fn.bytecode_index, sizeof(fn.bytecode_index));
+				return op;
 			}
 			case Expression::IDENTIFIER: {
 				auto& ie = static_cast<IdentifierExpression&>(expr);
@@ -1936,7 +1951,7 @@ struct IRBuilder {
 				break;
 			}
 			case Statement::YIELD: {
-				auto& op = alloc<ExIrOp>(ExIrOpKind::YIELD);
+				auto& op = alloc<ExOpYield>();
 				op.src_loc = st.token.src_loc;
 				parent.ops.push(&op);
 				break;
@@ -3771,10 +3786,16 @@ struct BytecodeCompiler {
 				result = 0xffffffffu;
 				break;
 			}
-			case ExIrOpKind::YIELD:
+			case ExIrOpKind::YIELD: {
+				ExOpYield& yield = static_cast<ExOpYield&>(op);
 				emitOp(EX_OP_YIELD);
-				result = 0xffffffffu;
+				const u32 destination = dst ? dst->dst : (yield.destination ? yield.destination->stack_sp : 0xffffffffu);
+				emit(destination);
+				emit(yield.type ? internRuntimeType(type_info, *yield.type) : EX_TYPE_INDEX_NONE);
+				emit(yield.type ? typeByteSize(*yield.type) : 0u);
+				result = destination;
 				break;
+			}
 			case ExIrOpKind::CALL_INDIRECT: result = emitCallIndirect(*static_cast<ExOpCallIndirect*>(&op)); break;
 			case ExIrOpKind::EXTRACT_VALUE: result = emitExtractValue(*static_cast<ExOpExtractValue*>(&op), dst); break;
 			case ExIrOpKind::LOAD: result = emitLoad(*static_cast<ExOpLoad*>(&op), dst); break;
@@ -4251,6 +4272,12 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 			fn_expr.bytecode_index = bc->function_count++;
 		}
 	}
+	for (Unit& u : module->units) {
+		for (FunctionExpression* fn : u.anonymous_functions) {
+			if (!fn || fn->is_template || isTypeFactory(*fn)) continue;
+			fn->bytecode_index = bc->function_count++;
+		}
+	}
 	if (bc->global_size > 0) ++bc->function_count;
 
 	if (bc->function_count > 0) {
@@ -4289,6 +4316,23 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 				bc_compiler.endFunction();
 				++fn_index;
 			}
+		}
+	}
+	for (Unit& u : module->units) {
+		for (FunctionExpression* fn_expr : u.anonymous_functions) {
+			if (!fn_expr || fn_expr->is_template || isTypeFactory(*fn_expr)) continue;
+			ex_function_bc& fn_bc = bc->functions[fn_expr->bytecode_index];
+			if (fn_expr->body) {
+				ExIrBlockData& body = builder.buildFunctionIR(*fn_expr);
+				bc_compiler.beginFunction(&fn_bc, *fn_expr, builder.alloca_region_size);
+				bc_compiler.optimize(body);
+				bc_compiler.emitBlock(body);
+				bc_compiler.patchJumps(body);
+			} else {
+				bc_compiler.beginFunction(&fn_bc, *fn_expr, 0);
+			}
+			bc_compiler.endFunction();
+			++fn_index;
 		}
 	}
 

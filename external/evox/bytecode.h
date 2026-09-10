@@ -564,6 +564,9 @@ typedef struct ex_task {
 
 	bool is_suspended;
 	runtime_call_frame suspended_frame;
+	u32 suspended_yield_type;
+	u32 suspended_yield_destination;
+	u32 suspended_yield_size;
 	runtime_restore_point call_starts[EX_MAX_CALL_DEPTH];
 	u32 call_start_depth;
 	ex_debug_event pause_event;

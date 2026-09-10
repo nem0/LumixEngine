@@ -131,6 +131,7 @@ struct Unit {
 		, types(module_arena)
 		, imports(module_arena)
 		, native_symbols(module_arena)
+		, anonymous_functions(module_arena)
 		, path(path) {}
 
 	enum ImportState { IMPORT_PENDING, IMPORT_RESOLVING, IMPORT_DONE };
@@ -144,6 +145,9 @@ struct Unit {
 	ExpArray<ResolvedType> types;
 	ExpArray<Import> imports;
 	ExpArray<Symbol*> native_symbols;
+	// Function literals not owned by a top-level symbol. They still need
+	// bytecode slots so function values can refer to them at runtime.
+	ExpArray<FunctionExpression*> anonymous_functions;
 };
 
 struct ex_module {

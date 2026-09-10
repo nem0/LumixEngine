@@ -87,7 +87,7 @@ TEST(DebugBreakpointAfterYield) {
 
 	// Resuming a normal yield must still execute breakpoint traps immediately
 	// after the yield.
-	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, ex_task_resume(runtime));
+	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, ex_task_resume(runtime, nullptr, nullptr, 0));
 	EXPECT_EQ(EX_RESULT_OK, ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ(EX_DEBUG_PAUSE_BREAKPOINT, event.reason);
 	EXPECT_EQ(4u, event.location.line);

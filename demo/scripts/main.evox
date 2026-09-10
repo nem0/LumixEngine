@@ -23,63 +23,58 @@ enum WorldType {
 }
 
 var world_type : WorldType = .NONE;
-var g_dt : f32 = 0;
-
 fn await(r : LoadRequest) : void {
-	while r.getStatus() == .PENDING { yield; }
+	while r.getStatus() == .PENDING {
+		const dt : f32 = yield;
+	}
 }
 
-fn main(input : InputSystem, w : World) : void {
+fn main(input : InputSystem, world : World) : void {
 	g_input = input;
-	g_world = w;
+	g_world = world;
 
-	if const world = g_world {
-		player.init(world, input);
+	player.init(world, input);
 
-		for i in 0..world.getPartitionCount() {
-			const handle = world.getPartitionHandle(i);
-			const name = world.getPartitionName(handle);
-			if endsWith(name, "main.unv") {
-				world_type = .MAIN;
-				break;
+	for i in 0..world.getPartitionCount() {
+		const handle = world.getPartitionHandle(i);
+		const name = world.getPartitionName(handle);
+		if endsWith(name, "main.unv") {
+			world_type = .MAIN;
+			break;
+		}
+		if endsWith(name, "demo.unv") {
+			world_type = .DEMO;
+			demo.start(world);
+			player.init(world, g_input);
+			break;
+		}
+		if endsWith(name, "lightning.unv") {
+			const source_value = world.findByName("core");
+			if const source = source_value {
+				world_type = .LIGHTNING;
+				lightning.start(world, source);
 			}
-			if endsWith(name, "demo.unv") {
-				world_type = .DEMO;
-				demo.start(world);
-				player.init(world, g_input);
-				break;
-			}
-			if endsWith(name, "lightning.unv") {
-				const source_value = world.findByName("core");
-				if const source = source_value {
-					world_type = .LIGHTNING;
-					lightning.start(world, source);
-				}
-				break;
-			}
-			if endsWith(name, "particles.unv") {
-				const moving = world.findByName("world_space_particle");
-				const clutter = world.findByName("clutter");
-				if const moving_entity = moving {
-					if const clutter_entity = clutter {
-						if const clutter_child = clutter_entity.getFirstChild() {
-							world_type = .PARTICLES;
-							particle_move.start(moving_entity);
-							clutter_sphere.start(clutter_child, clutter_entity);
-						}
+			break;
+		}
+		if endsWith(name, "particles.unv") {
+			const moving = world.findByName("world_space_particle");
+			const clutter = world.findByName("clutter");
+			if const moving_entity = moving {
+				if const clutter_entity = clutter {
+					if const clutter_child = clutter_entity.getFirstChild() {
+						world_type = .PARTICLES;
+						particle_move.start(moving_entity);
+						clutter_sphere.start(clutter_child, clutter_entity);
 					}
 				}
-				break;
 			}
+			break;
 		}
-	}
-	else {
-		panic("Unknown world");
 	}
 
 	while true {
-		yield;
-		player.update(g_dt);
+		const dt : f32 = yield;
+		player.update(dt);
 
 		match world_type {
 			case .NONE:
@@ -88,20 +83,20 @@ fn main(input : InputSystem, w : World) : void {
 					match event {
 						case ButtonEvent:
 							if event.device_type == .KEYBOARD {
-								var request = w.load("maps/demo/demo.unv");
+								var request = world.load("maps/demo/demo.unv");
 								defer request.destroy();
 
 								await(request);
 
 								if request.getStatus() == .SUCCESS {
-									if const ui = w.ui() {
+									if const ui = world.ui() {
 										ui.load("maps/demo/demo.ui");
 									}
 									else {
 										panic("Missing UI");
 									}
-									demo.start(w);
-									player.init(w, g_input);
+									demo.start(world);
+									player.init(world, g_input);
 									world_type = .DEMO;
 								}
 								else {
@@ -111,11 +106,11 @@ fn main(input : InputSystem, w : World) : void {
 						case:
 					}
 				}
-			case .DEMO: demo.update(g_dt, g_input);
-			case .LIGHTNING: lightning.update(g_dt);
+			case .DEMO: demo.update(dt, g_input);
+			case .LIGHTNING: lightning.update(dt);
 			case .PARTICLES:
-				particle_move.update(g_dt);
-				clutter_sphere.update(g_dt);
+				particle_move.update(dt);
+				clutter_sphere.update(dt);
 		}
 	}
 }

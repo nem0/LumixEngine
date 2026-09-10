@@ -2695,6 +2695,26 @@ TEST(TypeFactoryValueArgumentNarrowingFails) {
 	return true;
 }
 
+TEST(ComptimeTypeFactoryReturnsSpecializedFunction) {
+	const char* source = R"(
+		fn make(t : comptime type) : fn() : t {
+			return fn() : t { return 0; };
+		}
+
+		fn main() : i32 {
+			const f = make(i32);
+			return f();
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(TypeFactoryMissingArgumentFails) {
 	const char* source = R"(
 		fn array_type(T : comptime type, N : comptime i32) : type {
@@ -2734,5 +2754,61 @@ TEST(TypeFactoryUndefinedArgumentFails) {
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+
+TEST(VariadicAnyCanValidateFunctionParametersThroughReflection) {
+	const char* source = R"(
+		fn validate(entry : $T, args : ...any) : i32 {
+			if args.length != T::params.length { return -1; }
+
+			var matched : i32 = 0;
+			unroll for i, param in T::params {
+				match args[i] {
+					case param.type: matched += 1;
+					case: matched += 0;
+				}
+			}
+			return matched;
+		}
+
+		fn worker(value : i32, scale : f32) : void {}
+
+		fn main() : i32 {
+			return validate(worker, 41 as i32, 2.0 as f32);
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(2, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(VariadicAnyDoesNotCountMismatchedReflectedParameters) {
+	const char* source = R"(
+		fn validate(entry : $T, args : ...any) : i32 {
+			var matched : i32 = 0;
+			unroll for i, param in T::params {
+				match args[i] {
+					case param.type: matched += 1;
+					case: matched += 0;
+				}
+			}
+			return matched;
+		}
+		fn worker(value : i32, scale : f32) : void {}
+		fn main() : i32 { return validate(worker, 41 as i32, true); }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	// Only the i32 argument matches; the bool must not count as f32.
+	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }

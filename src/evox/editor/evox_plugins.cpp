@@ -101,14 +101,15 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8) {
 	const char* c = str;
 	if (!*c) return false;
 
-	if (*c == '"') {
+	if (*c == '"' || *c == '`') {
+		const char quote = *c;
 		token_type = (u8)TokenType::STRING;
 		++c;
-		while (*c && *c != '"') {
+		while (*c && *c != quote) {
 			if (*c == '\\' && c[1]) ++c;
 			++c;
 		}
-		if (*c == '"') ++c;
+		if (*c == quote) ++c;
 		token_len = u32(c - str);
 		return *c;
 	}

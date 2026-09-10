@@ -138,6 +138,7 @@ typedef enum ex_call_result {
 	EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS,
 	EX_CALL_RESULT_INVALID_FUNCTION_CALL,
 	EX_CALL_RESULT_PANIC,
+	EX_CALL_RESULT_INVALID_YIELD_VALUE,
 	EX_CALL_RESULT_STACK_OVERFLOW,
 	EX_CALL_RESULT_CALL_DEPTH
 } ex_call_result;
@@ -381,9 +382,23 @@ ex_call_result ex_call(
 	u32 args_size
 );
 
-// Resume a SUSPENDED task. Returns EX_CALL_RESULT_SUSPENDED when yield is reached,
-// EX_RESULT_OK when the task completes, or FAILURE when it fails.
-ex_call_result ex_task_resume(ex_task* task);
+// Resume a SUSPENDED task with an optional input value. Pass NULL, NULL, 0
+// to resume without a value. The supplied type must exactly match the type
+// expected by the current `yield` expression; no implicit conversions apply.
+// Supplying a value of the wrong type, supplying no value when one is expected,
+// or supplying a value to a standalone `yield;` produces
+// EX_CALL_RESULT_INVALID_YIELD_VALUE; the task remains suspended so the host
+// can retry.
+// Returns EX_CALL_RESULT_SUSPENDED when another yield is reached,
+// EX_CALL_RESULT_OK when the task completes, or a failure result otherwise.
+// `data` must contain one value in the runtime representation of `type`; the
+// runtime copies it before this call returns.
+ex_call_result ex_task_resume(
+	ex_task* task,
+	const ex_type* type,
+	const void* data,
+	u32 size
+);
 
 // TODO: Accept the resolver during ex_runtime_create and remove this setter.
 // Installs a runtime-local lazy resolver for extern functions. A returned
@@ -429,6 +444,9 @@ ex_type_kind ex_bytecode_runtime_result_kind(ex_runtime* runtime, ex_string_view
 // ex_debug_global_type) or from module-level struct queries. The handle is
 // valid while the owning bytecode (or bytecode-compiled module) lives.
 //
+
+// Returns a type handle for a primitive kind in the runtime bytecode.
+const ex_type* ex_primitive_type_from_kind(const ex_runtime* runtime, ex_type_kind kind);
 
 // Returns the kind category of the type.
 ex_type_kind ex_type_get_kind(const ex_type* type);

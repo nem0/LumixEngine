@@ -1922,11 +1922,37 @@ Deferred statements run on normal scope exit and on early `return`.
 
 ### Yield
 
-`yield;` cooperatively suspends the current VM execution. The runtime keeps
-its call stack, locals, and active scopes alive; resuming continues with the
-statement after `yield`. Deferred statements do not run when yielding, and run
-when the function later returns. A host resumes a yielded task with
-`ex_task_resume`.
+`yield` cooperatively suspends the current VM execution. The runtime keeps
+its call stack, locals, and active scopes alive. Deferred statements do not run
+when yielding, and run when the function later returns. A host resumes a
+yielded
+task with `ex_task_resume(task, type, data, size)`, passing `NULL, NULL, 0`
+when no input value is supplied.
+
+A standalone `yield;` suspends without expecting an input value. `yield` can
+also be used as an expression when the expected type is explicit:
+
+```cpp
+fn task() : void {
+	var count : i32 = yield;
+	var scale : f32 = yield;
+	var message : []const u8 = yield;
+}
+```
+
+`const value = yield` and other uses without an explicit expected type are
+compile-time errors. The value supplied when resuming must exactly match the
+type expected at that suspension point. No implicit conversions are performed,
+including numeric conversions, union widening, pointer conversions, or slice
+conversions. Supplying a value of the wrong type, or supplying no value when a
+value is expected, returns `EX_CALL_RESULT_INVALID_YIELD_VALUE`. Supplying a
+value to a standalone `yield;` returns the same result. The task remains
+suspended so the host can retry.
+
+Each suspension point may expect a different type, and the host must provide
+resume values in suspension order. A task records the expected type at its
+current suspension point so the runtime can validate the next resume value.
+Resuming a completed task is a runtime error.
 
 `yield` is not allowed inside a deferred statement.
 

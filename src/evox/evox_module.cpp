@@ -170,20 +170,12 @@ struct EvoxSystemImpl : EvoxSystem {
 		if (ex_task_get_state(m_task) != EX_TASK_SUSPENDED) return;
 
 		// The main script owns the frame loop and yields once per frame.
-		for (u32 i = 0, count = ex_debug_global_count(m_runtime); i < count; ++i) {
-			const ex_string_view name = ex_debug_global_name(m_runtime, i);
-			if (name.length != 4 || memcmp(name.begin, "g_dt", 4) != 0) continue;
-			u32 size = 0;
-			void* value = ex_debug_global_value(m_runtime, i, &size);
-			if (value && size == sizeof(time_delta)) memcpy(value, &time_delta, sizeof(time_delta));
-			break;
-		}
-
 		ex_debug_event event = {};
 		const bool debug_suspended = ex_debug_pause_event(m_task, &event) == EX_RESULT_OK;
 		if (debug_suspended && event.reason != EX_DEBUG_PAUSE_YIELD) return;
 
-		const ex_call_result result = ex_task_resume(m_task);
+		const ex_type* dt_type = ex_primitive_type_from_kind(m_runtime, EX_TYPE_F32);
+		const ex_call_result result = ex_task_resume(m_task, dt_type, &time_delta, sizeof(time_delta));
 		if (result != EX_CALL_RESULT_SUSPENDED && result != EX_CALL_RESULT_OK) logError("Evox main failed");
 	}
 

@@ -13,6 +13,33 @@ const ex_type* ex_type_from_any(const ex_runtime* runtime, const void* value) {
 	return ex_bytecode_type(runtime->bytecode, type_index);
 }
 
+const ex_type* ex_primitive_type_from_kind(const ex_runtime* runtime, ex_type_kind kind) {
+	switch (kind) {
+		case EX_TYPE_VOID:
+		case EX_TYPE_BOOL:
+		case EX_TYPE_I8:
+		case EX_TYPE_U8:
+		case EX_TYPE_I16:
+		case EX_TYPE_U16:
+		case EX_TYPE_I32:
+		case EX_TYPE_U32:
+		case EX_TYPE_I64:
+		case EX_TYPE_U64:
+		case EX_TYPE_F32:
+		case EX_TYPE_F64:
+		case EX_TYPE_CPTR:
+			break;
+		default:
+			return nullptr;
+	}
+	if (!runtime || !runtime->bytecode) return nullptr;
+	for (u32 i = 0; i < runtime->bytecode->type_info_count; ++i) {
+		const ex_type* type = &runtime->bytecode->type_info[i];
+		if (type->kind == kind) return type;
+	}
+	return nullptr;
+}
+
 ex_module* ex_module_create(ex_host* host) {
 	if (!host || !host->arena.allocate) return nullptr;
 	return new ex_module(host);

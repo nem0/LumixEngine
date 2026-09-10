@@ -9,6 +9,7 @@ struct FunctionExpression;
 struct ex_module;
 struct ex_host;
 struct ex_bytecode;
+struct ExOpAlloca;
 
 // Index into the per-compile SourceLocTable (token.h). INVALID when the
 // op is not tied to a source location.
@@ -125,6 +126,12 @@ struct ExOpExtractValue : ExIrOp {
 struct ExOpPanic : ExIrOp {
 	ExOpPanic() : ExIrOp(ExIrOpKind::PANIC) {}
 	ExIrOp* message = nullptr;
+};
+
+struct ExOpYield : ExIrOp {
+	ExOpYield() : ExIrOp(ExIrOpKind::YIELD) {}
+	ResolvedType* type = nullptr;
+	ExOpAlloca* destination = nullptr;
 };
 
 struct ExOpCallIndirect : ExIrOp {

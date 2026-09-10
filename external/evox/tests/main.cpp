@@ -263,6 +263,9 @@ static ex_task* test_task_for_runtime(ex_runtime* runtime) {
 	return task;
 }
 
+static ex_call_result ex_task_resume(ex_runtime* runtime, const ex_type* type, const void* data, u32 size) {
+	return ex_task_resume(test_task_for_runtime(runtime), type, data, size);
+}
 static void test_abort(RuntimeGuard& runtime) { runtime.reset_task(); }
 static ex_call_result test_call(RuntimeGuard& runtime, ex_string_view name) { return runtime.call(name); }
 static ex_call_result test_call(ex_runtime* runtime, ex_string_view name) {

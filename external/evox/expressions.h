@@ -114,6 +114,7 @@ struct Expression {
 		POINTER_TYPE, // *T
 		DEREFERENCE, // .*
 		ADDRESSOF, // &
+		YIELD, // yield expression; the resume value type is supplied by context
 	};
 
 	Expression() = default;
@@ -126,6 +127,10 @@ struct Expression {
 	EvalStage eval_stage = RUNTIME;
 	Token token = {};
 	bool parenthesized = false;
+};
+
+struct YieldExpression : Expression {
+	YieldExpression() : Expression(YIELD) {}
 };
 
 struct IdentifierExpression : Expression {

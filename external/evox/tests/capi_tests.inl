@@ -12,7 +12,7 @@ TEST(CallReturnsSpecificResults) {
 		EXPECT_TRUE(runtime);
 		EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 		EXPECT_EQ(EX_CALL_RESULT_FUNCTION_NOT_FOUND, test_call(runtime, toLs("missing")));
-		EXPECT_EQ(EX_CALL_RESULT_NOT_SUSPENDED, ex_task_resume(runtime));
+		EXPECT_EQ(EX_CALL_RESULT_NOT_SUSPENDED, ex_task_resume(runtime, nullptr, nullptr, 0));
 	}
 	{
 		RuntimeGuard runtime(module, &context.host);
@@ -58,9 +58,9 @@ TEST(CallReturnsSuspended) {
 	EXPECT_TRUE(runtime);
 	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
 	EXPECT_EQ(EX_CALL_RESULT_INVALID_STATE, ex_call(runtime.get(), toLs("main"), nullptr, 0));
-	EXPECT_EQ(EX_CALL_RESULT_OK, ex_task_resume(runtime));
+	EXPECT_EQ(EX_CALL_RESULT_OK, ex_task_resume(runtime, nullptr, nullptr, 0));
 	EXPECT_EQ(EX_CALL_RESULT_PANIC, test_call(runtime, toLs("fail")));
-	EXPECT_EQ(EX_CALL_RESULT_NOT_RESUMABLE, ex_task_resume(runtime));
+	EXPECT_EQ(EX_CALL_RESULT_NOT_RESUMABLE, ex_task_resume(runtime, nullptr, nullptr, 0));
 	ex_module_destroy(module);
 	return true;
 }

@@ -434,6 +434,7 @@ struct Parser {
 			}
 			case Token::NULL_KW: return makeExpr<NullLiteralExpression>(token);
 			case Token::UNDEFINED: return makeExpr<UndefinedExpression>(token);
+			case Token::YIELD: return makeExpr<YieldExpression>(token);
 			case Token::STAR: {
 				PointerTypeExpression* pointer = makeExpr<PointerTypeExpression>(token);
 				if (peekToken().type == Token::CONST) {
