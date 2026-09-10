@@ -13,6 +13,24 @@ TEST(PointerParameterTypechecks) {
 	return true;
 }
 
+TEST(ReturnPointerThroughLocalSliceToCallerStorage) {
+	const char* source = R"(
+		fn first(values : []i32) : *i32 {
+			var local_view : []i32 = values;
+			return &local_view[0];
+		}
+
+		fn main() : i32 {
+			var values : [2]i32 = [10, 32];
+			const ptr = first(values);
+			ptr.* = 42;
+			return values[0];
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(PointerParameterRequiresPointerArgument) {
 	const char* source = R"(
 		fn increment(v : *i32) : void {

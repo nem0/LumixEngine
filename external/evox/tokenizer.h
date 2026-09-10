@@ -297,6 +297,7 @@ struct Tokenizer {
 			}
 			case 't': {
 				if (u32(m_current - m_start_token) < 2) return makeToken(Token::IDENTIFIER);
+				if (checkKeyword("uple", 1, 4, Token::TUPLE).type != Token::IDENTIFIER) return makeToken(Token::TUPLE);
 				switch (m_start_token[1]) {
 					case 'r': return checkKeyword("ue", 2, 2, Token::TRUE);
 					case 'y': {

@@ -29,6 +29,12 @@ bool typesEqual(const ResolvedType* a, const ResolvedType* b) {
 			}
 			return true;
 		}
+		case ResolvedTypeKind::TUPLE: {
+			const auto* ta = static_cast<const TupleResolvedType*>(a); const auto* tb = static_cast<const TupleResolvedType*>(b);
+			if (ta->elements.size() != tb->elements.size()) return false;
+			for (i32 i = 0; i < ta->elements.size(); ++i) if (!typesEqual(ta->elements[i], tb->elements[i])) return false;
+			return true;
+		}
 		case ResolvedTypeKind::ARRAY: {
 			const auto* aa = static_cast<const ArrayResolvedType*>(a);
 			const auto* ab = static_cast<const ArrayResolvedType*>(b);
@@ -380,6 +386,11 @@ struct IRBuilder {
 				for (Expression* value : literal.values) if (hasInliningBlocker(*value, depth + 1)) return true;
 				return false;
 			}
+			case Expression::TUPLE_LITERAL: {
+				const auto& literal = static_cast<const TupleLiteralExpression&>(expression);
+				for (Expression* value : literal.values) if (hasInliningBlocker(*value, depth + 1)) return true;
+				return false;
+			}
 			case Expression::TERNARY: {
 				const auto& ternary = static_cast<const TernaryExpression&>(expression);
 				return hasInliningBlocker(*ternary.condition, depth + 1) ||
@@ -541,6 +552,35 @@ struct IRBuilder {
 					return alloc<ExOpNop>();
 				}
 				
+				// tuple[index] (the checker guarantees a constant index)
+				if (be.base->resolved_type->kind == ResolvedTypeKind::TUPLE) {
+					auto* tuple = static_cast<TupleResolvedType*>(be.base->resolved_type);
+					i64 index = static_cast<BracketExpression&>(expr).tuple_index;
+					ExIrOp& base = buildExpressionIR(*be.base, false);
+					ExIrOp* address = &base;
+					if (base.result_mode == ExIrOp::VALUE) {
+						auto& material = alloc<ExOpMaterializeAddr>();
+						material.value = &base;
+						address = &material;
+					}
+					auto& add = alloc<ExOpAdd>();
+					add.lhs = address;
+					auto& off = alloc<ExOpLoadConst>();
+					static ResolvedType U(ResolvedTypeKind::U64);
+					off.type = &U;
+					u64 value = tuple->offsets[(i32)index];
+					memcpy(off.value, &value, sizeof(value));
+					add.rhs = &off;
+					add.operand_type = &U;
+					add.result_mode = ExIrOp::ADDRESS;
+					if (!as_rvalue) return add;
+
+					auto& load = alloc<ExOpLoad>();
+					load.addr = &add;
+					load.size = typeByteSize(*be.resolved_type);
+					return load;
+				}
+
 				// slice[index]
 				if (be.base->resolved_type->kind == ResolvedTypeKind::SLICE) {
 					ASSERT(be.args.size() == 1);
@@ -854,6 +894,27 @@ struct IRBuilder {
 					op.args[arg_index] = &buildImplicitConversionIR(*arg, target_type);
 					op.arg_sizes[arg_index] = typeByteSize(target_type);
 					++arg_index;
+				}
+				return op;
+			}
+			case Expression::TUPLE_LITERAL: {
+				auto& ale = static_cast<TupleLiteralExpression&>(expr);
+				if (ale.values.empty()) {
+					auto& op = alloc<ExOpNull>();
+					op.size = typeByteSize(*ale.resolved_type);
+					return op;
+				}
+				auto& op = alloc<ExOpAggregateInit>();
+				op.type = ale.resolved_type;
+				op.value_count = ale.values.size();
+				op.values = static_cast<ExIrOp**>(host.arena.allocate(host.arena.user_data, sizeof(ExIrOp*) * op.value_count, alignof(ExIrOp*)));
+				auto* tuple = static_cast<TupleResolvedType*>(op.type);
+				op.offsets = static_cast<u32*>(host.arena.allocate(host.arena.user_data, sizeof(u32) * op.value_count, alignof(u32)));
+				op.sizes = static_cast<u32*>(host.arena.allocate(host.arena.user_data, sizeof(u32) * op.value_count, alignof(u32)));
+				for (u32 i = 0; i < op.value_count; ++i) {
+					op.offsets[i] = tuple->offsets[i];
+					op.sizes[i] = typeByteSize(*tuple->elements[i]);
+					op.values[i] = &buildExpressionIR(*ale.values[i], true);
 				}
 				return op;
 			}
@@ -1277,11 +1338,17 @@ struct IRBuilder {
 				if (for_statement.is_expanded) {
 					auto& expanded = static_cast<BlockStatement&>(*for_statement.body);
 					ExOpNop& exit = alloc<ExOpNop>();
+					const ex_string_view expanded_label = pending_loop_label;
 					for (i32 i = 0; i < expanded.statements.size(); ++i) {
 						ExOpNop& next = alloc<ExOpNop>();
 						const bool is_last = i + 1 == expanded.statements.size();
-						loops.push({pending_loop_label, is_last ? static_cast<ExIrOp*>(&exit) : static_cast<ExIrOp*>(&next), &exit, (u32)defers.size()});
+						loops.push({expanded_label, is_last ? static_cast<ExIrOp*>(&exit) : static_cast<ExIrOp*>(&next), &exit, (u32)defers.size()});
+						// The label belongs to this expanded loop, not to nested
+						// expanded loops; keep it visible in the loop stack while
+						// preventing the nested lowering from consuming it.
+						pending_loop_label = {};
 						buildStatementIR(*expanded.statements[i], parent);
+						pending_loop_label = expanded_label;
 						loops.pop_back();
 						if (!is_last) parent.ops.push(&next);
 					}
@@ -3273,35 +3340,12 @@ struct BytecodeCompiler {
 	}
 
 	static ex_type_kind toTypeKind(const ResolvedType& type) {
+		// Untyped values have already been materialized as their default numeric
+		// types; all declared types use the shared mapping below.
 		switch (type.kind) {
-			case ResolvedTypeKind::VOID: return EX_TYPE_VOID;
-			case ResolvedTypeKind::BOOL: return EX_TYPE_BOOL;
-			case ResolvedTypeKind::I8: return EX_TYPE_I8;
-			case ResolvedTypeKind::I16: return EX_TYPE_I16;
-			case ResolvedTypeKind::I32: return EX_TYPE_I32;
-			case ResolvedTypeKind::I64: return EX_TYPE_I64;
 			case ResolvedTypeKind::UNTYPED_INT: return EX_TYPE_I64;
 			case ResolvedTypeKind::UNTYPED_FLOAT: return EX_TYPE_F64;
-			case ResolvedTypeKind::U8: return EX_TYPE_U8;
-			case ResolvedTypeKind::U16: return EX_TYPE_U16;
-			case ResolvedTypeKind::U32: return EX_TYPE_U32;
-			case ResolvedTypeKind::U64: return EX_TYPE_U64;
-			case ResolvedTypeKind::ISIZE: return EX_TYPE_I64;
-			case ResolvedTypeKind::F32: return EX_TYPE_F32;
-			case ResolvedTypeKind::F64: return EX_TYPE_F64;
-			case ResolvedTypeKind::CSTR: return EX_TYPE_CPTR;
-			case ResolvedTypeKind::CPTR: return EX_TYPE_CPTR;
-			case ResolvedTypeKind::POINTER: return EX_TYPE_CPTR;
-			case ResolvedTypeKind::BYTE: return EX_TYPE_U8;
-			case ResolvedTypeKind::ANY: return EX_TYPE_ANY;
-			case ResolvedTypeKind::FUNCTION: return EX_TYPE_FUNCTION;
-			case ResolvedTypeKind::ARRAY: return EX_TYPE_ARRAY;
-			case ResolvedTypeKind::SLICE: return EX_TYPE_SLICE;
-			case ResolvedTypeKind::NULLABLE: return EX_TYPE_NULL_VALUE;
-			case ResolvedTypeKind::ENUM: return EX_TYPE_ENUM;
-			case ResolvedTypeKind::STRUCT: return EX_TYPE_STRUCT;
-			case ResolvedTypeKind::UNION: return EX_TYPE_TAGGED_UNION;
-			default: return EX_TYPE_INVALID;
+			default: return toExTypeKind(type.kind);
 		}
 	}
 

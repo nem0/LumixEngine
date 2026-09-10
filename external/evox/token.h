@@ -86,6 +86,7 @@ struct Token {
 		EXTERN,
 		OPERATOR,
 		STRUCT,
+		TUPLE,
 		ENUM,
 		FN,
 		VAR,

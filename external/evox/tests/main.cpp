@@ -391,6 +391,7 @@ static void nativeReenter(ex_runtime* runtime, ex_call_frame) {
 #include "loop_tests.inl"
 #include "import_tests.inl"
 #include "array_tests.inl"
+#include "tuple_tests.inl"
 #include "slices_tests.inl"
 #include "string_tests.inl"
 #include "function_tests.inl"

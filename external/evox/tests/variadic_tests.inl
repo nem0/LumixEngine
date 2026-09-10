@@ -14,6 +14,26 @@ TEST(VariadicNoArguments) {
 	return true;
 }
 
+TEST(ComptimeVariadicNoArguments) {
+	const char* source = R"(
+		fn count(values : ...i32) : i32 { return values.length as i32; }
+		fn warm(a : i64, b : i64) : bool { return a + b == 84; }
+		fn main() : i32 {
+			// Leave nonzero bytes in the comptime stack before it is reused for the empty pack.
+			if warm(42, 42) {} else { return -1; }
+			comptime result = count();
+			return result;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(VariadicArgumentsArePackedAsSlice) {
 	const char* source = R"(
 		fn sum(values : ...i32) : i32 {

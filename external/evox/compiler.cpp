@@ -34,6 +34,7 @@ static constexpr TypeKindInfo TYPE_KIND_INFOS[] = {
 	{ResolvedTypeKind::ENUM, "Enum", nullptr},
 	{ResolvedTypeKind::STRUCT, "Struct", nullptr},
 	{ResolvedTypeKind::UNION, "Union", nullptr},
+	{ResolvedTypeKind::TUPLE, "Tuple", nullptr},
 	{ResolvedTypeKind::FUNCTION, "Fn", nullptr},
 	{ResolvedTypeKind::POINTER, "Pointer", nullptr},
 };
@@ -88,6 +89,7 @@ ex_type_kind toExTypeKind(ResolvedTypeKind kind) {
 		case ResolvedTypeKind::SLICE: return EX_TYPE_SLICE;
 		case ResolvedTypeKind::NULLABLE: return EX_TYPE_NULLABLE;
 		case ResolvedTypeKind::UNION: return EX_TYPE_TAGGED_UNION;
+		case ResolvedTypeKind::TUPLE: return EX_TYPE_TUPLE;
 	}
 	ASSERT(false);
 	return EX_TYPE_INVALID;
@@ -132,6 +134,7 @@ u32 typeAlignment(const ResolvedType& t) {
 			return alignment;
 		}
 		case ResolvedTypeKind::ARRAY: return typeAlignment(*static_cast<const ArrayResolvedType&>(t).element_type);
+		case ResolvedTypeKind::TUPLE: return static_cast<const TupleResolvedType&>(t).alignment;
 		case ResolvedTypeKind::STRUCT: return static_cast<const StructResolvedType&>(t).alignment;
 		case ResolvedTypeKind::UNTYPED_FLOAT:
 		case ResolvedTypeKind::UNTYPED_INT: return 8;
@@ -198,6 +201,7 @@ u32 typeByteSize(const ResolvedType& t) {
 			return 4 + max_size; // i32 tag followed by the largest member payload
 		}
 		case ResolvedTypeKind::SLICE: return 16;
+		case ResolvedTypeKind::TUPLE: return static_cast<const TupleResolvedType&>(t).byte_size;
 		case ResolvedTypeKind::ARRAY: {
 			const ArrayResolvedType& arr = static_cast<const ArrayResolvedType&>(t);
 			ASSERT(arr.size > 0);
@@ -354,6 +358,11 @@ static void appendReflectedTypeName(char*& out, char* end, const ResolvedType& t
 			char digits[32]; char* digits_end = digits + sizeof(digits); char* d = digits_end; i64 n = a.size; if (!n) *--d = '0';
 			while (n) { *--d = char('0' + n % 10); n /= 10; } while (d != digits_end && out < end) *out++ = *d++;
 			text("]"); appendReflectedTypeName(out, end, *a.element_type); return;
+		}
+		case ResolvedTypeKind::TUPLE: {
+			const auto& tuple = static_cast<const TupleResolvedType&>(type); text("tuple { ");
+			for (i32 i = 0; i < tuple.elements.size(); ++i) { if (i) text(", "); appendReflectedTypeName(out, end, *tuple.elements[i]); }
+			text(" }"); return;
 		}
 		case ResolvedTypeKind::SLICE: {
 			const auto& slice = static_cast<const SliceResolvedType&>(type);
@@ -547,6 +556,12 @@ struct Checker {
 					if (fa->params[i].is_comptime != fb->params[i].is_comptime) return false;
 					if (!typesEqual(fa->params[i].type, fb->params[i].type)) return false;
 				}
+				return true;
+			}
+			case ResolvedTypeKind::TUPLE: {
+				const auto* ta = static_cast<const TupleResolvedType*>(a); const auto* tb = static_cast<const TupleResolvedType*>(b);
+				if (ta->elements.size() != tb->elements.size()) return false;
+				for (i32 i = 0; i < ta->elements.size(); ++i) if (!typesEqual(ta->elements[i], tb->elements[i])) return false;
 				return true;
 			}
 			case ResolvedTypeKind::ARRAY: {
@@ -803,6 +818,10 @@ struct Checker {
 			case ResolvedTypeKind::META: return static_cast<const MetaType&>(type).runtime;
 			case ResolvedTypeKind::ARRAY: return isRuntimeMaterializable(*static_cast<const ArrayResolvedType&>(type).element_type);
 			case ResolvedTypeKind::SLICE: return isRuntimeMaterializable(*static_cast<const SliceResolvedType&>(type).element_type);
+			case ResolvedTypeKind::TUPLE: {
+				for (ResolvedType* element : static_cast<const TupleResolvedType&>(type).elements) if (!isRuntimeMaterializable(*element)) return false;
+				return true;
+			}
 			case ResolvedTypeKind::STRUCT: {
 				const StructResolvedType& st = static_cast<const StructResolvedType&>(type);
 				for (i32 i = 0; i < st.fields.size(); ++i) if (!isRuntimeMaterializable(*st.fields[i].type)) return false;
@@ -1199,6 +1218,13 @@ struct Checker {
 				out = arr;
 				break;
 			}
+			case Expression::TUPLE_TYPE: {
+				TupleTypeExpression* s = static_cast<TupleTypeExpression*>(src);
+				TupleTypeExpression* tuple = makeType<TupleTypeExpression>(unit.arena, unit.arena);
+				for (Expression* element : s->elements) tuple->elements.push(cloneExpression(unit, element, bindings));
+				out = tuple;
+				break;
+			}
 			case Expression::POINTER_TYPE: {
 				PointerTypeExpression* s = static_cast<PointerTypeExpression*>(src);
 				PointerTypeExpression* ptr = makeType<PointerTypeExpression>(unit.arena);
@@ -1336,6 +1362,7 @@ struct Checker {
 				br->base = cloneExpression(unit, s->base, bindings);
 				for (Expression* arg : s->args) br->args.push(cloneExpression(unit, arg, bindings));
 				br->struct_field_name = s->struct_field_name;
+				br->tuple_index = s->tuple_index;
 				out = br;
 				break;
 			}
@@ -1361,6 +1388,13 @@ struct Checker {
 				ArrayLiteralExpression* lit = makeType<ArrayLiteralExpression>(unit.arena, unit.arena);
 				for (Expression* value : s->values) lit->values.push(cloneExpression(unit, value, bindings));
 				lit->is_variadic_pack = s->is_variadic_pack;
+				out = lit;
+				break;
+			}
+			case Expression::TUPLE_LITERAL: {
+				TupleLiteralExpression* s = static_cast<TupleLiteralExpression*>(src);
+				TupleLiteralExpression* lit = makeType<TupleLiteralExpression>(unit.arena, unit.arena);
+				for (Expression* value : s->values) lit->values.push(cloneExpression(unit, value, bindings));
 				out = lit;
 				break;
 			}
@@ -2286,6 +2320,10 @@ struct Checker {
 			}
 
 			for (const FunctionResolvedParam& param : fn_type->params) {
+				if (param.type->kind == ResolvedTypeKind::TUPLE) {
+					errorLine(sym.token, "Operator overloads cannot have tuple parameters");
+					return EX_RESULT_FAILURE;
+				}
 				if (param.type->kind == ResolvedTypeKind::ENUM) {
 					errorLine(sym.token, "Operator overloads with enum parameters are not allowed; use a wrapper struct instead");
 					return EX_RESULT_FAILURE;
@@ -2530,7 +2568,10 @@ struct Checker {
 				errorLine(arg->token, "Cannot convert ", arg_type, " to ", expected, " for argument ", i + 1, " of function call");
 				return nullptr;
 			}
-			if (!inferTemplateArg(template_unit, bindings, *param.type_expr, ComptimeValue{ComptimeValue::TYPE, arg_type})) {
+			ResolvedType* inferred_type = expected && expected->kind == ResolvedTypeKind::META
+				? unwrapMeta(arg_type)
+				: arg_type;
+			if (!inferTemplateArg(template_unit, bindings, *param.type_expr, ComptimeValue{ComptimeValue::TYPE, inferred_type})) {
 				errorLine(arg->token, "Cannot infer template parameter type for argument ", i + 1, " of ", fn.token.value);
 				return nullptr;
 			}
@@ -3536,6 +3577,32 @@ struct Checker {
 			errorLine(expr.token, "Cannot index nullable type without a null check");
 			return nullptr;
 		}
+		if (base_type->kind == ResolvedTypeKind::TUPLE) {
+			TupleResolvedType* tuple = static_cast<TupleResolvedType*>(base_type);
+			if (br.args.size() != 1) {
+				errorLine(expr.token, "Tuple indexing expects exactly one argument");
+				return nullptr;
+			}
+
+			Expression* index_expr = checkExpr(unit, ctx, *br.args[0], nullptr);
+			if (!index_expr) return nullptr;
+
+			ComptimeValue value = evalComptime(unit, *br.args[0], ctx);
+			if (!value || value.kind != ComptimeValue::VALUE || !isIntegerOrUntyped(*value.type)) {
+				errorLine(expr.token, "Tuple index must be a constant integer");
+				return nullptr;
+			}
+
+			const i64 index = comptimeNumericToI64(value.value, value.type->kind);
+			if (index < 0 || index >= tuple->elements.size()) {
+				errorLine(expr.token, "Tuple index out of range");
+				return nullptr;
+			}
+
+			br.tuple_index = index;
+			expr.resolved_type = tuple->elements[(i32)index];
+			return &expr;
+		}
 		if (base_type->kind != ResolvedTypeKind::ARRAY && base_type->kind != ResolvedTypeKind::SLICE) {
 			errorLine(expr.token, "Cannot index type ", base_type);
 			return nullptr;
@@ -3713,6 +3780,28 @@ struct Checker {
 		expr.resolved_type = type;
 		expr.eval_stage = comptimeStageForType(type);
 		for (Expression* value : lit.values) if (value->eval_stage == Expression::RUNTIME) expr.eval_stage = Expression::RUNTIME;
+		return &expr;
+	}
+
+	Expression* checkTupleLiteralExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint) {
+		TupleLiteralExpression& lit = static_cast<TupleLiteralExpression&>(expr);
+		if (!hint || hint->kind != ResolvedTypeKind::TUPLE) {
+			errorLine(expr.token, "Tuple literal requires an expected tuple type");
+			return nullptr;
+		}
+		TupleResolvedType* tuple = static_cast<TupleResolvedType*>(hint);
+		if (tuple->elements.size() != lit.values.size()) {
+			errorLine(expr.token, "Tuple literal has wrong number of elements");
+			return nullptr;
+		}
+		for (i32 i = 0; i < lit.values.size(); ++i) {
+			ResolvedType* t = checkExprForTarget(unit, ctx, *lit.values[i], tuple->elements[i]);
+			if (!t || !canImplicitlyConvert(t, tuple->elements[i])) return nullptr;
+		}
+		expr.resolved_type = hint;
+		expr.eval_stage = comptimeStageForType(hint);
+		for (Expression* v : lit.values)
+			if (v->eval_stage == Expression::RUNTIME) expr.eval_stage = Expression::RUNTIME;
 		return &expr;
 	}
 
@@ -3986,13 +4075,16 @@ struct Checker {
 				return &expr;
 			}
 			case Expression::UNION_TYPE:
+			case Expression::TUPLE_TYPE:
 			case Expression::ARRAY_TYPE:
 			case Expression::SLICE_TYPE:
 			case Expression::NULLABLE_TYPE:
 			case Expression::POINTER_TYPE:
 			case Expression::FUNCTION_TYPE: {
 				ResolvedType* type = asType(evalComptime(unit, expr, ctx), expr.token);
-				expr.resolved_type = type;
+				if (!type) return nullptr;
+				MetaType* meta = makeType<MetaType>(unit.arena); meta->inner = type;
+				expr.resolved_type = meta;
 				expr.eval_stage = Expression::COMPTIME_ONLY;
 				return &expr;
 			}
@@ -4066,6 +4158,7 @@ struct Checker {
 			case Expression::BRACKET: return checkBracketExpr(unit, ctx, expr, hint);
 			case Expression::SLICE: return checkSliceExpr(unit, ctx, expr);
 			case Expression::STRUCT_LITERAL: return checkStructLiteralExpr(unit, ctx, expr, hint);
+			case Expression::TUPLE_LITERAL: return checkTupleLiteralExpr(unit, ctx, expr, hint);
 			case Expression::ARRAY_LITERAL: return checkArrayLiteralExpr(unit, ctx, expr, hint);
 			case Expression::DEREFERENCE: {
 				auto& deref = static_cast<DereferenceExpression&>(expr);
@@ -4980,6 +5073,34 @@ struct Checker {
 					errorLine(fs.token, "unroll for bounds must be compile-time constant integers");
 					return false;
 				}
+
+				// TODO review this
+				// Range unrolling is expanded just like slice unrolling.  In
+				// particular, the loop variable must be a comptime binding so it
+				// can be used as a heterogeneous tuple index.
+				BlockStatement* source_body = fs.body;
+				BlockStatement* expanded_body = makeType<BlockStatement>(unit.arena, unit.arena);
+				expanded_body->token = source_body->token;
+				ctx.loop_labels.push(pending_label);
+				for (i64 value = fs.unroll_begin; value < fs.unroll_end; ++value) {
+					Statement* body = cloneStatement(unit, source_body, nullptr);
+					pushScope(ctx);
+					SemanticLocalBinding& binding = ctx.locals.emplace_back();
+					binding.name = fs.value_var;
+					binding.type = begin_type;
+					binding.declaration_token = &fs.value_token;
+					binding.is_immutable = true;
+					binding.is_comptime = true;
+					binding.comptime_value = copyComptimeValue(binding.type, &value, typeByteSize(*binding.type));
+					bool body_ok = checkStatement(unit, ctx, body, return_type, {});
+					popScope(ctx);
+					if (!body_ok) return false;
+					expanded_body->statements.push(body);
+				}
+				ctx.loop_labels.pop_back();
+				fs.body = expanded_body;
+				fs.is_expanded = true;
+				return true;
 			}
 			else {
 				fs.unroll_elements = resolveUnrollElements(*fs.begin);
@@ -6427,6 +6548,28 @@ struct Checker {
 							return {};
 						}
 
+						if (base_value.type->kind == ResolvedTypeKind::TUPLE) {
+							TupleResolvedType* tuple = static_cast<TupleResolvedType*>(base_value.type);
+							ComptimeValue index = evalComptime(unit, *be.args[0], ctx, bindings, frame);
+							if (!index || index.kind != ComptimeValue::VALUE || !isIntegerOrUntyped(*index.type)) {
+								errorLine(be.args[0]->token, "Comptime tuple index must be a compile-time integer");
+								return {};
+							}
+							i64 i = comptimeNumericToI64(index.value, index.type->kind);
+							if (i < 0 || i >= tuple->elements.size()) {
+								errorLine(be.base->token, "Comptime tuple index out of bounds");
+								return {};
+							}
+							ResolvedType* element_type = tuple->elements[(i32)i];
+							u8* element = base_value.value + tuple->offsets[(i32)i];
+							if (element_type->kind == ResolvedTypeKind::META) {
+								ResolvedType* inner = nullptr;
+								copyMemory(&inner, element, sizeof(inner));
+								return {ComptimeValue::TYPE, inner};
+							}
+							return {ComptimeValue::VALUE, element_type, element};
+						}
+
 						if (base_value.type->kind == ResolvedTypeKind::SLICE || base_value.type->kind == ResolvedTypeKind::ARRAY) {
 							const bool is_array = base_value.type->kind == ResolvedTypeKind::ARRAY;
 							const char* container_name = is_array ? "array" : "slice";
@@ -6596,45 +6739,54 @@ struct Checker {
 				ex_slice value{(u8*)sl.value.begin, sl.value.length};
 				return copyComptimeValue(const_u8_slice, &value, sizeof(value));
 			}
+			case Expression::TUPLE_LITERAL: {
+				auto& al = static_cast<TupleLiteralExpression&>(expr);
+				u8* data = comptime_stack_ptr;
+				const u32 size = typeByteSize(*expr.resolved_type);
+				comptime_stack_ptr += size;
+				auto* tuple = static_cast<TupleResolvedType*>(expr.resolved_type);
+				for (i32 i = 0; i < al.values.size(); ++i) {
+					ComptimeValue element = evalComptime(unit, *al.values[i], ctx, bindings, frame);
+					if (!element) return {};
+					writeComptimeValue(data + tuple->offsets[i], *tuple->elements[i], element);
+				}
+				return {ComptimeValue::VALUE, expr.resolved_type, data};
+			}
 			case Expression::ARRAY_LITERAL: {
 				auto& al = static_cast<ArrayLiteralExpression&>(expr);
-				if (expr.resolved_type && !isRuntimeMaterializable(*expr.resolved_type)) {
-					u8* data = static_cast<u8*>(unit.arena.allocate(unit.arena.user_data, typeByteSize(*expr.resolved_type), 1));
+				ASSERT(expr.resolved_type);
+				if (expr.resolved_type->kind == ResolvedTypeKind::ARRAY) {
+					u8* data = comptime_stack_ptr;
+					const u32 size = typeByteSize(*expr.resolved_type);
+					comptime_stack_ptr += size;
 					ResolvedType* element_type = static_cast<ArrayResolvedType*>(expr.resolved_type)->element_type;
+					const u32 element_size = typeByteSize(*element_type);
 					for (i32 i = 0; i < al.values.size(); ++i) {
 						ComptimeValue element = evalComptime(unit, *al.values[i], ctx, bindings, frame);
 						if (!element) return {};
-						writeComptimeValue(data + typeByteSize(*element_type) * i, *element_type, element);
+						writeComptimeValue(data + element_size * i, *element_type, element);
 					}
 					return {ComptimeValue::VALUE, expr.resolved_type, data};
 				}
-				u8* value = comptime_stack_ptr;
-				for (Expression* element_expr : al.values) {
-					// TODO are we sure we don't have to check the element_expr type against the array type?
-					if (!evalComptime(unit, *element_expr, ctx, bindings, frame)) return {};
+				if (expr.resolved_type->kind == ResolvedTypeKind::SLICE && al.is_variadic_pack && al.values.empty()) {
+					ex_slice value = {};
+					return copyComptimeValue(expr.resolved_type, &value, sizeof(value));
 				}
-				return {ComptimeValue::VALUE, expr.resolved_type, value};
+				return {};
 			}
 			case Expression::STRUCT_LITERAL: {
 				auto& sl = static_cast<StructLiteralExpression&>(expr);
-				StructResolvedType* resolved_struct = expr.resolved_type && expr.resolved_type->kind == ResolvedTypeKind::STRUCT ? static_cast<StructResolvedType*>(expr.resolved_type) : nullptr;
-				if (resolved_struct && (resolved_struct->decl->is_extern || !isRuntimeMaterializable(*expr.resolved_type))) {
-					StructResolvedType* st = resolved_struct;
-					u8* data = static_cast<u8*>(unit.arena.allocate(unit.arena.user_data, typeByteSize(*st), 1));
-					memset(data, 0, typeByteSize(*st));
-					for (i32 i = 0; i < sl.values.size(); ++i) {
-						ComptimeValue field = evalComptime(unit, *sl.values[i], ctx, bindings, frame);
-						if (!field) return {};
-						writeComptimeValue(data + st->fields[i].offset, *st->fields[i].type, field);
-					}
-					return {ComptimeValue::VALUE, expr.resolved_type, data};
+				ASSERT (expr.resolved_type && expr.resolved_type->kind == ResolvedTypeKind::STRUCT);
+				auto* st = static_cast<StructResolvedType*>(expr.resolved_type);
+				u8* data = comptime_stack_ptr;
+				const u32 size = typeByteSize(*st);
+				comptime_stack_ptr += size;
+				for (i32 i = 0; i < sl.values.size(); ++i) {
+					ComptimeValue field = evalComptime(unit, *sl.values[i], ctx, bindings, frame);
+					if (!field) return {};
+					writeComptimeValue(data + st->fields[i].offset, *st->fields[i].type, field);
 				}
-				u8* value = comptime_stack_ptr;
-				for (Expression* field_expr : sl.values) {
-					if (!evalComptime(unit, *field_expr, ctx, bindings, frame)) return {};
-				}
-
-				return {ComptimeValue::VALUE, sl.type->resolved_type, value};
+				return {ComptimeValue::VALUE, expr.resolved_type, data};
 			}
 			case Expression::CAST: {
 				auto& ce = static_cast<CastExpression&>(expr);
@@ -6734,6 +6886,26 @@ struct Checker {
 				pointer_type->inner = asType(evalComptime(unit, *pt.inner, ctx, bindings, frame), pt.inner->token);
 				if (!pointer_type->inner) return {};
 				return {ComptimeValue::TYPE, pointer_type};
+			}
+			case Expression::TUPLE_TYPE: {
+				auto& tt = static_cast<TupleTypeExpression&>(expr);
+				TupleResolvedType* tuple = makeType<TupleResolvedType>(module.arena, module.arena);
+				for (Expression* e : tt.elements) {
+					ResolvedType* t = asType(evalComptime(unit, *e, ctx, bindings, frame), e->token);
+					if (!t) return {};
+					tuple->elements.push(t);
+				}
+				u32 size = 0;
+				tuple->alignment = 1;
+				for (ResolvedType* t : tuple->elements) {
+					u32 a = typeAlignment(*t);
+					if (a > tuple->alignment) tuple->alignment = a;
+					size = alignTo(size, a);
+					tuple->offsets.push(size);
+					size += typeByteSize(*t);
+				}
+				tuple->byte_size = size ? alignTo(size, tuple->alignment) : 1;
+				return {ComptimeValue::TYPE, tuple};
 			}
 			case Expression::ARRAY_TYPE: {
 				auto& at = static_cast<ArrayTypeExpression&>(expr);

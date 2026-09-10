@@ -33,6 +33,7 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 	- [String literals](#string-literals)
 	- [Function types](#function-types)
 	- [Static-sized arrays](#static-sized-arrays)
+	- [Tuples](#tuples)
 	- [Slices](#slices)
 - [Variables](#variables)
 	- [Union extraction and propagation](#union-extraction-and-propagation)
@@ -616,10 +617,10 @@ once in a signature, and parameter names must be unique.
 
 #### Explicit type parameters
 
-A parameter annotated with `type` is supplied explicitly as a type argument:
+A parameter annotated with `comptime type` is supplied explicitly as a compile-time type argument:
 
 ```cpp
-fn make(T : type) : T {
+fn make(T : comptime type) : T {
 	return undefined;
 }
 
@@ -643,7 +644,7 @@ type, and the call uses ordinary parentheses in type positions and struct
 literals:
 
 ```cpp
-fn Pair(T : type) : type {
+fn Pair(T : comptime type) : type {
 	return struct {
 		first : T;
 		second : T;
@@ -681,7 +682,24 @@ fn main() : void {
 ```
 
 Compile-time value parameters can be combined with type parameters, including
-in a type factory: `fn array_type(T : type, N : comptime i32) : type`.
+in a type factory: `fn array_type(T : comptime type, N : comptime i32) : type`.
+Returning `type` does not itself make a function a template or implicitly
+make any parameter `comptime`. Generic or explicit `comptime` parameters make
+a function a template.
+
+Ordinary functions returning `type` can be evaluated at compile time with
+compile-time-known arguments, without `comptime` parameter annotations:
+
+```cpp
+fn identity(T : type) : type { return T; }
+fn main() : void {
+	const value : identity(i32) = 42;
+}
+```
+
+Use `comptime type` when a parameter's value must be known while checking the
+function body, such as `T` in `struct { value : T; }` or `tuple { T }`. Compile-time evaluation
+of an ordinary call does not implicitly specialize its function body.
 
 #### Rules
 
@@ -733,6 +751,7 @@ Rules:
 - declaring an operator overload for a built-in primitive signature, such as `operator +(f32, f32)`, is a compile-time error
 - declaring `operator ==` or `operator !=` with slice parameters is a compile-time error for the same reason; slice equality is built in (see [Slice equality](#slice-equality))
 - declaring an operator overload where any parameter is an enum type is a compile-time error; use a wrapper struct for bit-flag patterns instead
+- declaring an operator overload where any parameter is a tuple type is a compile-time error
 - overload resolution uses exact type matching on the operands' natural types
 - an untyped numeric expression matches a parameter when all of its literals fit and adopts that parameter type
 - a typeless struct literal operand `{ ... }` cannot select an operator overload; write its type explicitly, such as `Vec2 { ... }`
@@ -762,6 +781,7 @@ Built-in and user types:
 - `TypeKind` (compile-time only, see [TypeKind](#typekind))
 - user-defined `struct` types
 - user-defined `enum` types
+- tuple types
 - function types
 - tagged union types (`A | B`)
 - `any` values (see [Any values](#any-values))
@@ -1304,6 +1324,67 @@ Type rules:
 - index expression must have an integer type
 - `.length` on a `[N]T` produces the untyped compile-time integer constant `N`, so it can be used where a compile-time integer is required (`unroll for` bounds, array sizes, `comptime` parameters). When context does not require another type it concretizes to `isize`, matching `.length` on a slice
 - postfix `[` in type position (after a type constructor like size and element) means indexing or slicing on runtime values; array types always use prefix `[N]T` notation
+
+### Tuples
+
+Tuples are fixed-size, heterogeneous product types. Their element types are
+written in declaration order:
+
+```cpp
+var a : tuple { i32, f32 } = .{ 42, 3.14 };
+var b = a[1]; // f32
+```
+
+Tuple literals use `.{ ... }` and require an expected tuple type. Each element
+is checked against the corresponding tuple element type; untyped numeric
+literals are concretized by that type. A tuple value has exactly the number of
+elements specified by its type and cannot be resized.
+
+#### Types and literals
+
+- tuples are structural: two tuple types are identical when they have the same
+  number of elements and the same element types in the same order
+- element order matters: `tuple { i32, f32 }` and `tuple { f32, i32 }` are
+  different types
+- empty tuples are valid: `const empty : tuple {} = .{};`
+- a single-element tuple is distinct from its element type:
+  `tuple { i32 }` is not `i32`
+- an optional trailing comma is allowed in nonempty tuple types and literals:
+  `const value : tuple { i32, f32, } = .{ 42, 3.14, };`
+- tuple types are distinct from structs and arrays; there are no implicit
+  conversions between these aggregate types
+
+#### Access and assignment
+
+Tuple elements are selected with a compile-time integer index, starting at
+zero. Any expression evaluating to a compile-time integer may be used,
+including constant arithmetic, `comptime` bindings, compile-time calls, and
+compile-time parameters. A runtime index is invalid even when all elements
+have the same type. Negative and out-of-range indices are compile-time errors.
+The result has the declared type of the selected element.
+
+Element addressability follows the rules for struct fields:
+
+- an element of writable tuple storage is a writable lvalue and may be assigned
+  to or addressed with `&`
+- an element of read-only tuple storage is read-only; taking its address
+  produces a pointer to const storage
+- an element of a temporary tuple is readable but cannot be assigned to or
+  used to form a pointer
+- nested element access preserves the containing storage's mutability
+- assignment and passing or returning a tuple by value copy the value;
+  pointer and slice elements copy their descriptors, not the referenced data
+- taking an element's address does not extend the containing storage's lifetime
+
+#### Comparison and layout
+
+Tuples have no built-in equality or ordering and do not support operator
+overloading. Declaring an operator with a tuple parameter is a compile-time
+error. Tuple elements retain the operators supported by their own types.
+
+Tuple layout follows the same rules as ordinary non-`extern` structs, with
+elements in declaration order. Size, alignment, padding, and element offsets
+are implementation-defined; tuples provide no native C ABI layout guarantee.
 
 ### Slices
 
@@ -2144,7 +2225,7 @@ Rules:
 - the operand is a type, not a value
 - the operand must be a concrete type. Untyped integer and float values have no size or alignment, and `sizeof`/`alignof` do not default them; use a concrete type such as `sizeof(i32)`, or cast or annotate the value before obtaining its type
 - both produce an untyped integer constant, usable wherever a compile-time integer is required (array sizes, type-factory value arguments, `comptime` parameters, other comptime expressions)
-- `sizeof(T)` is the size of `T` measured in `byte` units: `byte`, `bool`, `i8`, and `u8` are 1 byte; `i16`/`u16` are 2; `i32`/`u32`/`f32`/enums/function values are 4; `i64`/`u64`/`isize`/`f64`/pointers are 8; a slice is a pointer followed by an `i64` element length (16 bytes on supported targets); an array is `size * sizeof(element)`; a struct is the sum of its field sizes; and a tagged union is `sizeof(i32)` for the tag plus the size of its largest member
+- `sizeof(T)` is the size of `T` measured in `byte` units: `byte`, `bool`, `i8`, and `u8` are 1 byte; `i16`/`u16` are 2; `i32`/`u32`/`f32`/enums/function values are 4; `i64`/`u64`/`isize`/`f64`/pointers are 8; a slice is a pointer followed by an `i64` element length (16 bytes on supported targets); an array is `size * sizeof(element)`; a tuple and struct contain their elements or fields in declaration order; and a tagged union is `sizeof(i32)` for the tag plus the size of its largest member
 - `alignof(T)` is derived from the byte size and capped at pointer alignment
 - they are most commonly used with the raw-memory allocator and slice reinterpret casts, for example `alloc(n * sizeof(i32), alignof(i32))`
 
@@ -2607,6 +2688,7 @@ This is the same [compile-time branch](#compile-time-branches) pruning used ever
 | nullable | `"?Vec3"` |
 | pointers | `"*Vec3"`, `"*const Vec3"`, `"?*Vec3"`, `"?*const Vec3"` |
 | slices and arrays | `"[]i32"`, `"[]const u8"`, `"[4]i32"` |
+| tuples | `"tuple { i32, f32 }"` |
 | unions | `"A \| B \| C"` in canonical member order |
 | function types | `"fn(i32, i32) : i32"` or `"fn(a : i32, b : i32) : void"` |
 
@@ -2630,6 +2712,7 @@ enum TypeKind {
 	Pointer,   // *T
 	Slice,     // []T
 	Array,     // [N]T
+	Tuple,     // tuple { T1, T2, ... }
 	Enum,
 	Struct,
 	Union,     // A | B
@@ -3176,6 +3259,12 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 
 # TODO
 
+* tuple-specific operations (not yet specified):
+	- value-side `.length` and type-side `::length`
+	- destructuring declarations and assignment
+	- iteration, including heterogeneous `unroll for`
+	- slicing
+	- concatenation
 * union tag is always 4 bytes
 * how can we push unions if we don't know the tag value of variants, i.e. U = A | B - we don't know if A's tag is 0 or 1
 

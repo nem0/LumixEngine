@@ -162,11 +162,13 @@ static const char* evoxc_type_name(ex_type_kind kind) {
 		case EX_TYPE_F32: return "f32";
 		case EX_TYPE_F64: return "f64";
 		case EX_TYPE_ENUM: return "enum";
+		case EX_TYPE_STRUCT: return "struct";
+		case EX_TYPE_TUPLE: return "tuple";
 		case EX_TYPE_FUNCTION: return "function";
 		case EX_TYPE_CPTR: return "cptr";
 		case EX_TYPE_SLICE: return "slice";
-		default: return "invalid";
 	}
+	return "invalid";
 }
 
 static const char* evoxc_opcode_name(ex_op op) {

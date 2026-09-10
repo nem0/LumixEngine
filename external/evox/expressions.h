@@ -87,6 +87,7 @@ struct Expression {
 		// Struct literal such as `Vec3 { 1, 2, 3 }`.
 		STRUCT_LITERAL,
 		ARRAY_LITERAL,
+		TUPLE_LITERAL,
 		// `fn (...) ... { ... }` creates a function value. A named function is just a
 		// symbol bound to one of these expressions.
 		FUNCTION,
@@ -107,6 +108,7 @@ struct Expression {
 		NULLABLE_TYPE, // ?T
 		FUNCTION_TYPE, // fn(A, B) : R used as a type
 		UNION_TYPE,    // A | B used as a type
+		TUPLE_TYPE,
 		// A fully resolved type injected by template substitution during cloning.
 		RESOLVED_TYPE,
 		// Ternary conditional operator: `condition ? true_expr : false_expr`
@@ -197,6 +199,11 @@ struct ArrayTypeExpression : Expression {
 
 	Expression* size = nullptr;
 	Expression* element_type = nullptr;
+};
+
+struct TupleTypeExpression : Expression {
+	TupleTypeExpression(ex_arena& arena) : Expression(TUPLE_TYPE), elements(arena) {}
+	ExpArray<Expression*> elements;
 };
 
 struct SliceTypeExpression : Expression {
@@ -355,6 +362,7 @@ struct BracketExpression : Expression {
 	// Set when this is compile-time string access to a struct field. Empty means
 	// the bracket is ordinary array/slice/template access.
 	ex_string_view struct_field_name = {};
+	i64 tuple_index = -1;
 };
 
 struct SliceExpression : Expression {
@@ -394,6 +402,12 @@ struct ArrayLiteralExpression : Expression {
 	ExpArray<Expression*> values;
 	// Synthetic array literals used to pass variadic arguments may be empty.
 	bool is_variadic_pack = false;
+};
+
+struct TupleLiteralExpression : Expression {
+	TupleLiteralExpression(ex_arena& arena) : Expression(TUPLE_LITERAL), values(arena) {}
+
+	ExpArray<Expression*> values;
 };
 
 struct FunctionExpression : Expression {

@@ -36,6 +36,7 @@ enum class ResolvedTypeKind {
 	SLICE,
 	NULLABLE,
 	UNION,
+	TUPLE,
 	POINTER
 };
 
@@ -107,6 +108,14 @@ struct ArrayResolvedType : ResolvedType {
 
 	ResolvedType* element_type = nullptr;
 	i64 size = 0;
+};
+
+struct TupleResolvedType : ResolvedType {
+	TupleResolvedType(ex_arena& arena) : ResolvedType(ResolvedTypeKind::TUPLE), elements(arena), offsets(arena) {}
+	ExpArray<ResolvedType*> elements;
+	ExpArray<u32> offsets;
+	u32 byte_size = 1;
+	u32 alignment = 1;
 };
 
 struct SliceResolvedType : ResolvedType {

@@ -324,6 +324,52 @@ TEST(TemplateFunctionPointerArgumentMustBeWritableFails) {
 	return true;
 }
 
+TEST(OrdinaryFunctionReturnsType) {
+	EXPECT_COMPILE(R"(
+		fn fixed() : type { return i32; }
+		fn main() : i32 {
+			const value : fixed() = 42;
+			return value;
+		}
+	)");
+	return true;
+}
+
+TEST(OrdinaryFunctionReturnsStructType) {
+	EXPECT_COMPILE(R"(
+		fn fixed() : type { return struct { value : i32; }; }
+		fn main() : i32 {
+			const value : fixed() = fixed() { 42 };
+			return value.value;
+		}
+	)");
+	return true;
+}
+
+TEST(OrdinaryTypeParameterCanBeEvaluatedAtComptime) {
+	EXPECT_COMPILE(R"(
+		fn identity(T : type) : type { return T; }
+		fn main() : i32 {
+			const value : identity(i32) = 42;
+			return value;
+		}
+	)");
+	return true;
+}
+
+TEST(TemplateStructFactoryRequiresExplicitComptimeTypeParameter) {
+	const char* source = R"(
+		fn Box(T : type) : type { return struct { value : T; }; }
+
+		fn main() : i32 {
+			const box : Box(i32) = Box(i32) { 42 };
+			return box.value;
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(TemplateStructFieldTypeMismatchFails) {
 	const char* source = R"(
 		fn Pair(T : comptime type) : type { return struct { first : T; second : T; }; }

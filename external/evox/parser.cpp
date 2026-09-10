@@ -408,6 +408,17 @@ struct Parser {
 				m_output.error("Unexpected end of file");
 				return nullptr;
 			case Token::DOT: {
+				if (peekToken().type == Token::LEFT_BRACE) {
+					consumeToken();
+					auto* tuple = makeExpr<TupleLiteralExpression>(token, m_unit.arena);
+					while (peekToken().type != Token::RIGHT_BRACE) {
+						tuple->values.push(expression());
+						if (peekToken().type != Token::COMMA) break;
+						consumeToken();
+					}
+					if (!consume(Token::RIGHT_BRACE)) return nullptr;
+					return tuple;
+				}
 				Token name = consumeToken();
 				if (name.type != Token::IDENTIFIER) {
 					m_output.errorAt(name, "Expected identifier");
@@ -421,6 +432,18 @@ struct Parser {
 				Expression* expr = functionOrTypeExpression(token);
 				if (expr) expr->token = token;
 				return expr;
+			}
+			case Token::TUPLE: {
+				if (!consume(Token::LEFT_BRACE)) return nullptr;
+
+				auto* tuple = makeExpr<TupleTypeExpression>(token, m_unit.arena);
+				while (peekToken().type != Token::RIGHT_BRACE) {
+					tuple->elements.push(type());
+					if (peekToken().type != Token::COMMA) break;
+					consumeToken();
+				}
+				if (!consume(Token::RIGHT_BRACE)) return nullptr;
+				return tuple;
 			}
 			case Token::STRUCT: {
 				StructExpression* expr = structExpression();
@@ -893,6 +916,19 @@ struct Parser {
 		Expression* res = nullptr;
 
 		switch (token.type) {
+			case Token::TUPLE: {
+				if (!consume(Token::LEFT_BRACE)) return nullptr;
+
+				auto* tuple = makeExpr<TupleTypeExpression>(token, m_unit.arena);
+				while (peekToken().type != Token::RIGHT_BRACE) {
+					tuple->elements.push(type());
+					if (peekToken().type != Token::COMMA) break;
+					consumeToken();
+				}
+				if (!consume(Token::RIGHT_BRACE)) return nullptr;
+				res = tuple;
+				break;
+			}
 			case Token::LEFT_BRACKET: {
 				if (peekToken().type == Token::RIGHT_BRACKET) {
 					consumeToken();
