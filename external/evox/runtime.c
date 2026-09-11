@@ -484,7 +484,7 @@ static u64 runtime_numeric_to_u64(const u8* value, ex_type_kind kind) {
 		TYPE index = 0;                                                           \
 		memcpy(&index, frame + index_reg, sizeof(index));                         \
 		if ((u64)index >= length) goto runtime_execute_function_fail;             \
-		ASSERT(element_size != 0);                                                \
+		EX_ASSERT(element_size != 0);                                                \
 		u8* field_ptr = (u8*)base_ptr + (u64)index * element_size + field_offset; \
 		memmove(frame + dst, field_ptr, field_size);                              \
 		break;                                                                    \
@@ -504,7 +504,7 @@ static u64 runtime_numeric_to_u64(const u8* value, ex_type_kind kind) {
 		TYPE index = 0;                                                           \
 		memcpy(&index, frame + index_reg, sizeof(index));                         \
 		if ((u64)index >= length) goto runtime_execute_function_fail;             \
-		ASSERT(element_size != 0);                                                \
+		EX_ASSERT(element_size != 0);                                                \
 		u8* field_ptr = (u8*)base_ptr + (u64)index * element_size + field_offset; \
 		memmove(field_ptr, frame + src, field_size);                              \
 		break;                                                                    \
@@ -524,10 +524,10 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 	// Restore point for the whole host call, retained across suspend/resume.
 	runtime_restore_point* initial;
 	if (resume_frame) {
-		ASSERT(fn == resume_frame->function);
+		EX_ASSERT(fn == resume_frame->function);
 		fn = resume_frame->function;
 		ip = resume_frame->ip;
-		ASSERT(task->call_start_depth > 0u);
+		EX_ASSERT(task->call_start_depth > 0u);
 		initial = &task->call_starts[task->call_start_depth - 1];
 		// The interpreter's locals (`frame` and `stack_top`) no longer exist
 		// after a suspension.  Do not rely on the cached task values here:
@@ -551,14 +551,14 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 			goto runtime_execute_function_suspend;
 		}
 	} else {
-		ASSERT(fn);
+		EX_ASSERT(fn);
 
 		// Set before the frame-size check below can jump to the fail label, so a
 		// failure there (stack overflow at call entry, before the loop starts)
 		// reports this call's own function/instruction instead of reading garbage.
 		ip = fn->code;
 
-		ASSERT(task->stack_top >= task->stack + fn->param_size);
+		EX_ASSERT(task->stack_top >= task->stack + fn->param_size);
 		if (task->call_start_depth >= EX_MAX_CALL_DEPTH) return EX_CALL_RESULT_CALL_DEPTH;
 
 		initial = &task->call_starts[task->call_start_depth];

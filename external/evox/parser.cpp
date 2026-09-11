@@ -172,7 +172,7 @@ struct Parser {
 			case Token::ALIGNOF: return "alignof";
 			case Token::TYPEOF: return "typeof";
 			case Token::COMPTIME: return "comptime";
-			default: ASSERT(false); return "Unknown";
+			default: EX_ASSERT(false); return "Unknown";
 		}
 	}
 
@@ -202,7 +202,7 @@ struct Parser {
 	// Push a top-level symbol. Operator overloads may share a name with other
 	// overloads of the same operator; all other symbols reject redeclarations.
 	bool addSymbol(const Symbol& sym) {
-		ASSERT(sym.expression || sym.kind == EX_SYM_KIND_IMPORT);
+		EX_ASSERT(sym.expression || sym.kind == EX_SYM_KIND_IMPORT);
 		if (!isOperatorSymbol(sym.name)) {
 			for (const Symbol& other : m_unit.symbols) {
 				if (!equalStrings(other.name, sym.name)) continue;

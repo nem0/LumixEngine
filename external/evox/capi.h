@@ -24,13 +24,13 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#ifndef ASSERT
+#ifndef EX_ASSERT
 	#ifdef NDEBUG
-		#define ASSERT(X)
+		#define EX_ASSERT(X)
 	#elif defined EX_TESTS
 		#include <stdio.h>
 		#include <stdlib.h>
-		#define ASSERT(x) do { \
+		#define EX_ASSERT(x) do { \
 			if (!(x)) { \
 				fprintf(stderr, "TEST ASSERT FAILED at %s:%d: %s\n", __FILE__, __LINE__, #x); \
 				fflush(stderr); \
@@ -38,7 +38,7 @@
 			} \
 		} while (false)
 	#else
-		#define ASSERT(x) assert(x)
+		#define EX_ASSERT(x) assert(x)
 	#endif
 #endif
 
@@ -104,9 +104,9 @@ typedef enum ex_type_kind {
 	EX_TYPE_FUNCTION,
 	EX_TYPE_ARRAY,
 	EX_TYPE_SLICE,
+	EX_TYPE_NULLABLE,
 	EX_TYPE_CPTR,
 	EX_TYPE_NAMESPACE,
-	EX_TYPE_NULLABLE,
 	EX_TYPE_ANY
 } ex_type_kind;
 

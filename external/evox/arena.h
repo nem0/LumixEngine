@@ -47,13 +47,13 @@ static inline void* ex_default_arena_allocate(void* userdata, size_t size, size_
 	size_t start = (size_t)(ex_default_arena_align_up_uintptr(base_addr + (uintptr)arena->cursor, align) - base_addr);
 	size_t end = start + size;
 	if (end < start || end > arena->reserve_size) {
-		ASSERT(false);
+		EX_ASSERT(false);
 		return NULL;
 	}
 
 	size_t committed_end = (size_t)ex_default_arena_align_up_uintptr((uintptr)end, arena->page_size);
 	if (committed_end > arena->reserve_size) {
-		ASSERT(false);
+		EX_ASSERT(false);
 		return NULL;
 	}
 	if (committed_end > arena->committed_size) {
@@ -61,7 +61,7 @@ static inline void* ex_default_arena_allocate(void* userdata, size_t size, size_
 		size_t commit_size = committed_end - arena->committed_size;
 		void* committed = ex_platform_commit(commit_base, commit_size) ? commit_base : NULL;
 		if (!committed) {
-			ASSERT(false);
+			EX_ASSERT(false);
 			return NULL;
 		}
 		arena->committed_size = committed_end;

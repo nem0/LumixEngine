@@ -532,7 +532,7 @@ struct IRBuilder {
 			case Expression::BRACKET: {
 				auto& be = static_cast<BracketExpression&>(expr);
 				if (be.is_unpack_element) {
-					ASSERT(as_rvalue);
+					EX_ASSERT(as_rvalue);
 					// Normalization keeps each unpack expansion contiguous.
 					ExIrOp* tuple_value = nullptr;
 					if (be.tuple_index == 0 || unpack_temporary.base != be.base) {
@@ -583,7 +583,7 @@ struct IRBuilder {
 						add.result_mode = ExIrOp::ADDRESS;
 						return add;
 					}
-					ASSERT(false);
+					EX_ASSERT(false);
 					return alloc<ExOpNop>();
 				}
 				
@@ -618,7 +618,7 @@ struct IRBuilder {
 
 				// slice[index]
 				if (be.base->resolved_type->kind == ResolvedTypeKind::SLICE) {
-					ASSERT(be.args.size() == 1);
+					EX_ASSERT(be.args.size() == 1);
 					ExIrOp& index = buildExpressionIR(*be.args[0], true);
 					if (as_rvalue) {
 						auto& load = alloc<ExOpSliceLoad>();
@@ -637,8 +637,8 @@ struct IRBuilder {
 				}
 
 				// array[index]
-				ASSERT(be.base->resolved_type->kind == ResolvedTypeKind::ARRAY);
-				ASSERT(be.args.size() == 1);
+				EX_ASSERT(be.base->resolved_type->kind == ResolvedTypeKind::ARRAY);
+				EX_ASSERT(be.args.size() == 1);
 				ExIrOp& base = buildExpressionIR(*be.base, false);
 				// A temporary array (for example, a function call returning an array)
 				// is a value, not an address. Materialize its frame address before
@@ -688,7 +688,7 @@ struct IRBuilder {
 			case Expression::MEMBER: {
 				auto& me = static_cast<MemberExpression&>(expr);
 				if (me.resolved_fn) {
-					ASSERT(as_rvalue);
+					EX_ASSERT(as_rvalue);
 					auto& value = alloc<ExOpLoadConst>();
 					value.type = expr.resolved_type;
 					memcpy(value.value, &me.resolved_fn->bytecode_index, sizeof(me.resolved_fn->bytecode_index));
@@ -697,7 +697,7 @@ struct IRBuilder {
 
 				// namespace.comptime
 				if (me.resolved_symbol && me.resolved_symbol->kind == EX_SYM_KIND_COMPTIME) {
-					ASSERT(as_rvalue);
+					EX_ASSERT(as_rvalue);
 					auto& value = alloc<ExOpLoadBytes>();
 					value.type = expr.resolved_type;
 					value.value = me.resolved_symbol->comptime_value.value;
@@ -718,7 +718,7 @@ struct IRBuilder {
 
 				// slice.length
 				if (me.expression && me.expression->resolved_type && me.expression->resolved_type->kind == ResolvedTypeKind::SLICE) {
-					ASSERT(equalStrings(me.name.value, makeStringView("length")));
+					EX_ASSERT(equalStrings(me.name.value, makeStringView("length")));
 					auto& length = alloc<ExOpExtractValue>();
 					length.value = &buildExpressionIR(*me.expression, true);
 					length.offset = sizeof(void*);
@@ -736,7 +736,7 @@ struct IRBuilder {
 					if (type->kind == ResolvedTypeKind::ENUM) enum_type = static_cast<EnumResolvedType*>(type);
 				}
 				if (enum_type) {
-					ASSERT(me.enum_member_index >= 0);
+					EX_ASSERT(me.enum_member_index >= 0);
 					auto& op = alloc<ExOpLoadConst>();
 					op.type = expr.resolved_type;
 					const u32 value = (u32)me.enum_member_value;
@@ -748,7 +748,7 @@ struct IRBuilder {
 				ResolvedType* base_type = me.expression->resolved_type;
 				const bool pointer_base = base_type->kind == ResolvedTypeKind::POINTER;
 				if (pointer_base) base_type = static_cast<PointerResolvedType*>(base_type)->inner;
-				ASSERT(base_type->kind == ResolvedTypeKind::STRUCT);
+				EX_ASSERT(base_type->kind == ResolvedTypeKind::STRUCT);
 				auto* struct_type = static_cast<StructResolvedType*>(base_type);
 				auto& fields = struct_type->decl->fields;
 				u32 offset = structFieldOffset(*struct_type, me.struct_field_index);
@@ -782,7 +782,7 @@ struct IRBuilder {
 			}
 			case Expression::FUNCTION: {
 				auto& fn = static_cast<FunctionExpression&>(expr);
-				ASSERT(fn.bytecode_index != ~0u);
+				EX_ASSERT(fn.bytecode_index != ~0u);
 				auto& op = alloc<ExOpLoadConst>();
 				op.type = expr.resolved_type;
 				memcpy(op.value, &fn.bytecode_index, sizeof(fn.bytecode_index));
@@ -858,7 +858,7 @@ struct IRBuilder {
 					return load;
 				}
 
-				ASSERT(false);
+				EX_ASSERT(false);
 				break;
 			}
 			case Expression::PANIC: {
@@ -910,7 +910,7 @@ struct IRBuilder {
 					return op;
 				}
 
-				ASSERT(call.callee->resolved_type && call.callee->resolved_type->kind == ResolvedTypeKind::FUNCTION);
+				EX_ASSERT(call.callee->resolved_type && call.callee->resolved_type->kind == ResolvedTypeKind::FUNCTION);
 				auto& fn_type = static_cast<FunctionResolvedType&>(*call.callee->resolved_type);
 				auto& op = alloc<ExOpCallIndirect>();
 				op.callee = &buildExpressionIR(*call.callee, true);
@@ -1052,7 +1052,7 @@ struct IRBuilder {
 					}
 					case TypeMemberExpression::MIN:
 					case TypeMemberExpression::MAX: {
-						ASSERT(member.reflected_type && expr.resolved_type);
+						EX_ASSERT(member.reflected_type && expr.resolved_type);
 						const bool is_min = member.kind == TypeMemberExpression::MIN;
 						auto& value = alloc<ExOpLoadConst>();
 						value.type = expr.resolved_type;
@@ -1109,12 +1109,12 @@ struct IRBuilder {
 								memcpy(value.value, &v, sizeof(v));
 								break;
 							}
-							default: ASSERT(false); break;
+							default: EX_ASSERT(false); break;
 						}
 						return value;
 					}
 					default:
-						ASSERT(false);
+						EX_ASSERT(false);
 						return alloc<ExOpNop>();
 				}
 			}
@@ -1183,14 +1183,14 @@ struct IRBuilder {
 				auto& be = static_cast<BinaryExpression&>(expr);
 				ExIrOp& lhs = buildExpressionIR(*be.lhs, true);
 				if (be.op == Token::IS) {
-					ASSERT(be.lhs->resolved_type->kind == ResolvedTypeKind::UNION);
-					ASSERT(be.rhs->resolved_type->kind == ResolvedTypeKind::META);
+					EX_ASSERT(be.lhs->resolved_type->kind == ResolvedTypeKind::UNION);
+					EX_ASSERT(be.rhs->resolved_type->kind == ResolvedTypeKind::META);
 					auto& tag = alloc<ExOpExtractValue>();
 					tag.value = &lhs;
 					tag.offset = 0;
 					tag.size = sizeof(i32);
 					i32 member_index = be.union_member_index;
-					ASSERT(member_index >= 0);
+					EX_ASSERT(member_index >= 0);
 					static ResolvedType tag_type(ResolvedTypeKind::I32);
 					auto& expected = alloc<ExOpLoadConst>();
 					expected.type = &tag_type;
@@ -1227,7 +1227,7 @@ struct IRBuilder {
 					case Token::BANG_EQUAL: op = &alloc<ExOpNe>(); break;
 					case Token::AND: op = &alloc<ExOpAnd>(); break;
 					case Token::OR: op = &alloc<ExOpOr>(); break;
-					default: ASSERT(false); break;
+					default: EX_ASSERT(false); break;
 				}
 				op->operand_type = be.lhs->resolved_type;
 				op->lhs = &lhs;
@@ -1244,7 +1244,7 @@ struct IRBuilder {
 				return op;
 			}
 		}
-		ASSERT(false);
+		EX_ASSERT(false);
 		static ExIrOp dummy(ExIrOpKind::RETURN);
 		return dummy;
 	}
@@ -1554,7 +1554,7 @@ struct IRBuilder {
 
 				ResolvedType* container_type = for_statement.begin->resolved_type;
 				const bool is_slice = container_type->kind == ResolvedTypeKind::SLICE;
-				ASSERT(is_slice || container_type->kind == ResolvedTypeKind::ARRAY);
+				EX_ASSERT(is_slice || container_type->kind == ResolvedTypeKind::ARRAY);
 				ResolvedType* element_type = is_slice
 					? static_cast<SliceResolvedType*>(container_type)->element_type
 					: static_cast<ArrayResolvedType*>(container_type)->element_type;
@@ -1711,7 +1711,7 @@ struct IRBuilder {
 			case Statement::MATCH: {
 				auto& match = static_cast<MatchStatement&>(st);
 				if (match.comptime_known) {
-					ASSERT(match.comptime_arm >= 0 && match.comptime_arm < match.arms.size());
+					EX_ASSERT(match.comptime_arm >= 0 && match.comptime_arm < match.arms.size());
 					buildStatementIR(*match.arms[match.comptime_arm].body, parent);
 					break;
 				}
@@ -1774,7 +1774,7 @@ struct IRBuilder {
 							condition = &equality;
 						} else if (subject.type->kind == ResolvedTypeKind::UNION) {
 							i32 member_index = pattern.union_member_index;
-							ASSERT(member_index >= 0);
+							EX_ASSERT(member_index >= 0);
 							auto& tag = alloc<ExOpExtractValue>();
 							tag.value = &subject_value;
 							tag.offset = 0;
@@ -1825,7 +1825,7 @@ struct IRBuilder {
 						}
 					}
 				}
-				ASSERT(target);
+				EX_ASSERT(target);
 				emitDefers(parent, target->defer_watermark);
 				auto& jump = alloc<ExOpJump>();
 				jump.target = is_break ? target->break_target : target->continue_target;
@@ -1840,7 +1840,7 @@ struct IRBuilder {
 					break;
 				}
 				if (ifs.nullable_binding) {
-					ASSERT(ifs.condition->resolved_type && ifs.condition->resolved_type->kind == ResolvedTypeKind::NULLABLE);
+					EX_ASSERT(ifs.condition->resolved_type && ifs.condition->resolved_type->kind == ResolvedTypeKind::NULLABLE);
 					auto& nullable = static_cast<NullableResolvedType&>(*ifs.condition->resolved_type);
 					auto& tmp = allocAlloca(ifs.condition->resolved_type, {}, &buildExpressionIR(*ifs.condition, true));
 					parent.ops.push(&tmp);
@@ -1926,7 +1926,7 @@ struct IRBuilder {
 					case Token::PLUS_EQUAL: op = &alloc<ExOpAdd>(); break;
 					case Token::MINUS_EQUAL: op = &alloc<ExOpSub>(); break;
 					case Token::SLASH_EQUAL: op = &alloc<ExOpDiv>(); break;
-					default: ASSERT(false); return;
+					default: EX_ASSERT(false); return;
 				}
 				op->operand_type = as.lhs->resolved_type;
 				op->lhs = lhs_value;
@@ -1942,7 +1942,7 @@ struct IRBuilder {
 				auto& vd = static_cast<VarDeclStatement&>(st);
 				if (vd.is_comptime) break;
 				if (vd.else_return) {
-					ASSERT(vd.expression->resolved_type);
+					EX_ASSERT(vd.expression->resolved_type);
 					if (vd.expression->resolved_type->kind == ResolvedTypeKind::NULLABLE) {
 						auto& nullable = static_cast<NullableResolvedType&>(*vd.expression->resolved_type);
 						auto& tmp = allocAlloca(vd.expression->resolved_type, {}, &buildExpressionIR(*vd.expression, true));
@@ -1978,10 +1978,10 @@ struct IRBuilder {
 					// var v : T = expr else return;
 					// Evaluate expr once. If its tag is in T, bind v (extract or remap).
 					// Otherwise return the residual U-T, converted to the function return type.
-					ASSERT(vd.expression->resolved_type);
-					ASSERT(vd.expression->resolved_type->kind == ResolvedTypeKind::UNION);
-					ASSERT(vd.else_return_type);
-					ASSERT(vd.resolved_type);
+					EX_ASSERT(vd.expression->resolved_type);
+					EX_ASSERT(vd.expression->resolved_type->kind == ResolvedTypeKind::UNION);
+					EX_ASSERT(vd.else_return_type);
+					EX_ASSERT(vd.resolved_type);
 					auto& source_union = static_cast<UnionResolvedType&>(*vd.expression->resolved_type);
 					auto& tmp = allocAlloca(vd.expression->resolved_type, {}, &buildExpressionIR(*vd.expression, true));
 					parent.ops.push(&tmp);
@@ -2012,7 +2012,7 @@ struct IRBuilder {
 						or_op.rhs = &eq;
 						condition = &or_op;
 					}
-					ASSERT(condition);
+					EX_ASSERT(condition);
 
 					auto& branch = alloc<ExOpConditionalJump>();
 					branch.condition = condition;
@@ -2048,7 +2048,7 @@ struct IRBuilder {
 			}
 			case Statement::RETURN: {
 				auto& ret = static_cast<ReturnStatement&>(st);
-				ASSERT(!ret.expression || return_type);
+				EX_ASSERT(!ret.expression || return_type);
 				ExIrOp* value = ret.expression ? &buildImplicitConversionIR(*ret.expression, *return_type) : nullptr;
 				buildReturnIR(parent, value);
 				break;
@@ -2064,13 +2064,13 @@ struct IRBuilder {
 				if (defer.statement) defers.push(defer.statement);
 				break;
 			}
-			default: ASSERT(false); break;
+			default: EX_ASSERT(false); break;
 		}
 	}
 
 	ExIrBlockData& buildFunctionIR(FunctionExpression& expr) {
-		ASSERT(locals.empty());
-		ASSERT(!return_type);
+		EX_ASSERT(locals.empty());
+		EX_ASSERT(!return_type);
 		return_type = static_cast<FunctionResolvedType*>(expr.resolved_type)->return_type;
 		current_src_loc = expr.token.src_loc;
 		stack_cursor = 0;
@@ -2384,7 +2384,7 @@ struct ByteArray {
 		if (count == capacity) {
 			const u32 new_capacity = capacity ? capacity * 2u : 64u;
 			u8* new_data = static_cast<u8*>(arena.allocate(arena.user_data, new_capacity, alignof(u8)));
-			ASSERT(new_data);
+			EX_ASSERT(new_data);
 			if (data) copyMemory(new_data, data, count);
 			data = new_data;
 			capacity = new_capacity;
@@ -2394,7 +2394,7 @@ struct ByteArray {
 
 	i32 size() const { return (i32)count; }
 	u8& operator[](u32 index) {
-		ASSERT(index < count);
+		EX_ASSERT(index < count);
 		return data[index];
 	}
 
@@ -2467,7 +2467,7 @@ struct BytecodeCompiler {
 			case ResolvedTypeKind::U64: return 7;
 			case ResolvedTypeKind::F32: return 8;
 			case ResolvedTypeKind::F64: return 9;
-			default: ASSERT(false); return -1;
+			default: EX_ASSERT(false); return -1;
 		}
 	}
 
@@ -2479,9 +2479,9 @@ struct BytecodeCompiler {
 			case ExIrOpKind::MUL: return ex_op(EX_OP_MUL_8_IMM + index);
 			case ExIrOpKind::DIV: return ex_op(EX_OP_DIV_I8_IMM + index);
 			case ExIrOpKind::MOD:
-				ASSERT(index < 8);
+				EX_ASSERT(index < 8);
 				return ex_op(EX_OP_MOD_I8_IMM + index);
-			default: ASSERT(false); return EX_OP_ADD_8_IMM;
+			default: EX_ASSERT(false); return EX_OP_ADD_8_IMM;
 		}
 	}
 
@@ -2491,7 +2491,7 @@ struct BytecodeCompiler {
 			case ExIrOpKind::ADD: return ex_op(EX_OP_ADD_8 + index);
 			case ExIrOpKind::SUB: return ex_op(EX_OP_SUB_8 + index);
 			case ExIrOpKind::MUL: return ex_op(EX_OP_MUL_8 + index);
-			default: ASSERT(false); return EX_OP_ADD_8;
+			default: EX_ASSERT(false); return EX_OP_ADD_8;
 		}
 	}
 
@@ -2525,7 +2525,7 @@ struct BytecodeCompiler {
 			case ExIrOpKind::LE: emitOp(EX_OP_LE); break;
 			case ExIrOpKind::GT: emitOp(EX_OP_GT); break;
 			case ExIrOpKind::GE: emitOp(EX_OP_GE); break;
-			default: ASSERT(false); break;
+			default: EX_ASSERT(false); break;
 		}
 		emit(stack_top);
 		u32 result = stack_top++;
@@ -2550,7 +2550,7 @@ struct BytecodeCompiler {
 
 	void patchI16(u32 position, u32 target) {
 		const i64 relative = (i64)target - (i64)(position + sizeof(i16));
-		ASSERT(relative >= -32768 && relative <= 32767);
+		EX_ASSERT(relative >= -32768 && relative <= 32767);
 		const i16 offset = (i16)relative;
 		memcpy(code.data + position, &offset, sizeof(offset));
 	}
@@ -2633,7 +2633,7 @@ struct BytecodeCompiler {
 		}
 
 		if (conditional.bottom_tested) {
-			ASSERT(conditional.body_start);
+			EX_ASSERT(conditional.body_start);
 			if (is_constant) {
 				if (constant_value) {
 					// Always taken: the back edge is an unconditional jump.
@@ -2793,7 +2793,7 @@ struct BytecodeCompiler {
 	}
 
 	u32 emitJump(ExOpJump& jump) {
-		ASSERT(jump.target);
+		EX_ASSERT(jump.target);
 		emitOp(EX_OP_JUMP);
 		jump.bytecode_patch_offset = code.size();
 		emit((i16)0);
@@ -2831,9 +2831,9 @@ struct BytecodeCompiler {
 		for (ExIrOp* op : block.ops) {
 			if (op->kind == ExIrOpKind::JUMP) {
 				auto& jump = static_cast<ExOpJump&>(*op);
-				ASSERT(jump.target);
-				ASSERT(jump.target->bytecode_offset != 0xffffffffu);
-				ASSERT(jump.bytecode_patch_offset != 0xffffffffu);
+				EX_ASSERT(jump.target);
+				EX_ASSERT(jump.target->bytecode_offset != 0xffffffffu);
+				EX_ASSERT(jump.bytecode_patch_offset != 0xffffffffu);
 				patchI16(jump.bytecode_patch_offset, jump.target->bytecode_offset);
 			} else if (op->kind == ExIrOpKind::CONDITIONAL_JUMP) {
 				auto& conditional = static_cast<ExOpConditionalJump&>(*op);
@@ -2995,7 +2995,7 @@ struct BytecodeCompiler {
 				return res;
 			}
 		}
-		ASSERT(false);
+		EX_ASSERT(false);
 		return 0xffFFffFF;
 	}
 
@@ -3017,14 +3017,14 @@ struct BytecodeCompiler {
 	}
 
 	u32 functionCodeOffset(u32 absolute_offset) const {
-		ASSERT(fn_bc);
+		EX_ASSERT(fn_bc);
 		const u32 function_start = (u32)(u64)fn_bc->code;
-		ASSERT(absolute_offset >= function_start);
+		EX_ASSERT(absolute_offset >= function_start);
 		return absolute_offset - function_start;
 	}
 
 	u32 emitAlloca(ExOpAlloca& alloca) {
-		ASSERT(alloca.stack_sp != 0xffFFffFF);
+		EX_ASSERT(alloca.stack_sp != 0xffFFffFF);
 		if (alloca.value->kind != ExIrOpKind::NOP) {
 			if (do_optimize && alloca.value->kind != ExIrOpKind::AGGREGATE_INIT) {
 				EmitDst dst = { .dst = alloca.stack_sp, .size = typeByteSize(*alloca.type) };
@@ -3068,7 +3068,7 @@ struct BytecodeCompiler {
 			case EX_TYPE_ENUM: return EX_OP_LOAD_INDEXED_32;
 			case EX_TYPE_I64:
 			case EX_TYPE_U64: return EX_OP_LOAD_INDEXED_64;
-			default: ASSERT(false); return EX_OP_LOAD_INDEXED_8;
+			default: EX_ASSERT(false); return EX_OP_LOAD_INDEXED_8;
 		}
 	}
 
@@ -3121,7 +3121,7 @@ struct BytecodeCompiler {
 			case ResolvedTypeKind::U64: return 3;
 			case ResolvedTypeKind::F32: return 4;
 			case ResolvedTypeKind::F64: return 5;
-			default: ASSERT(false); return -1;
+			default: EX_ASSERT(false); return -1;
 		}
 	}
 
@@ -3198,7 +3198,7 @@ struct BytecodeCompiler {
 		// length (compiler.cpp checkBracketExpr), so base, index and element
 		// size fold into a single frame offset with no bounds checking.
 		const u64 offset = address.base_slot + address.immediate_index * address.element_size;
-		ASSERT(offset <= 0xffFFffFFu);
+		EX_ASSERT(offset <= 0xffFFffFFu);
 		return (u32)offset;
 	}
 
@@ -3243,11 +3243,11 @@ struct BytecodeCompiler {
 				emit(indexed.element_size);
 			} else {
 				emitOp(indexedStoreOp(indexed.index_kind));
-				ASSERT(!indexed.index_immediate);
+				EX_ASSERT(!indexed.index_immediate);
 				// The runtime scales the bounds-checked index by element_size
 				// without an overflow check, so the whole array's scaled extent
 				// must stay within the u32 frame-offset space.
-				ASSERT((u64)indexed.length * indexed.element_size + indexed.base_slot <= 0xffFFffFFu);
+				EX_ASSERT((u64)indexed.length * indexed.element_size + indexed.base_slot <= 0xffFFffFFu);
 				emit(indexed.base_slot);
 				emit(indexed.index_slot);
 				emit(indexed.length);
@@ -3283,7 +3283,7 @@ struct BytecodeCompiler {
 				return dst;
 			}
 		}
-		ASSERT(false);
+		EX_ASSERT(false);
 		return 0xffFFffFF;
 	}
 
@@ -3392,7 +3392,7 @@ struct BytecodeCompiler {
 			case EX_TYPE_I16: case EX_TYPE_U16: return EX_OP_SLICE_LOAD_16;
 			case EX_TYPE_I32: case EX_TYPE_U32: case EX_TYPE_F32: case EX_TYPE_ENUM: return EX_OP_SLICE_LOAD_32;
 			case EX_TYPE_I64: case EX_TYPE_U64: case EX_TYPE_F64: return EX_OP_SLICE_LOAD_64;
-			default: ASSERT(false); return EX_OP_SLICE_LOAD_32;
+			default: EX_ASSERT(false); return EX_OP_SLICE_LOAD_32;
 		}
 	}
 
@@ -3402,7 +3402,7 @@ struct BytecodeCompiler {
 			case EX_TYPE_I16: case EX_TYPE_U16: return EX_OP_SLICE_STORE_16;
 			case EX_TYPE_I32: case EX_TYPE_U32: case EX_TYPE_F32: case EX_TYPE_ENUM: return EX_OP_SLICE_STORE_32;
 			case EX_TYPE_I64: case EX_TYPE_U64: case EX_TYPE_F64: return EX_OP_SLICE_STORE_64;
-			default: ASSERT(false); return EX_OP_SLICE_STORE_32;
+			default: EX_ASSERT(false); return EX_OP_SLICE_STORE_32;
 		}
 	}
 
@@ -3493,7 +3493,7 @@ struct BytecodeCompiler {
 	}
 
 	u32 emitPushLocalAddr(const ExOpPushLocalAddr& op) {
-		ASSERT(op.alloca->stack_sp != 0xffFFffFF);
+		EX_ASSERT(op.alloca->stack_sp != 0xffFFffFF);
 		emitOp(EX_OP_FRAME_PTR);
 		emit(stack_top);
 		emit(op.alloca->stack_sp);
@@ -3523,9 +3523,9 @@ struct BytecodeCompiler {
 			} else {
 				emitOp(indexedLoadOp(indexed.index_kind));
 				emit(ret);
-				ASSERT(!indexed.index_immediate);
+				EX_ASSERT(!indexed.index_immediate);
 				// Same invariant as the STORE_INDEXED site in emitCopy.
-				ASSERT((u64)indexed.length * indexed.element_size + indexed.base_slot <= 0xffFFffFFu);
+				EX_ASSERT((u64)indexed.length * indexed.element_size + indexed.base_slot <= 0xffFFffFFu);
 				emit(indexed.base_slot);
 				emit(indexed.index_slot);
 				emit(indexed.length);
@@ -3717,7 +3717,7 @@ struct BytecodeCompiler {
 			emit(op.source_length);
 			stack_top += sizeof(i64);
 		} else if (op.source_is_array) {
-			ASSERT(op.source->result_mode == ExIrOp::ADDRESS);
+			EX_ASSERT(op.source->result_mode == ExIrOp::ADDRESS);
 			result = emit(*op.source, nullptr);
 			emitOp(EX_OP_LOAD_CONST_8);
 			emit(stack_top);
@@ -3833,7 +3833,7 @@ struct BytecodeCompiler {
 	}
 
 	u32 emitFramePtr(ExOpFramePtr& frame) {
-		ASSERT(frame.alloca);
+		EX_ASSERT(frame.alloca);
 		return frame.alloca->stack_sp;
 	}
 
@@ -3904,7 +3904,7 @@ struct BytecodeCompiler {
 			case ExIrOpKind::UNION_CONVERT: result = emitUnionConvert(static_cast<ExOpUnionConvert&>(op)); break;
 			case ExIrOpKind::AGGREGATE_INIT: result = emitAggregateInit(static_cast<ExOpAggregateInit&>(op)); break;
 			case ExIrOpKind::RETURN: result = emitReturn(static_cast<ExOpReturn&>(op)); break;
-			default: ASSERT(false); break;
+			default: EX_ASSERT(false); break;
 		}
 		if (dst && dst->dst != result) {
 			emitOp(EX_OP_COPY);
@@ -4141,7 +4141,7 @@ struct BytecodeCompiler {
 	}
 
 	void beginFunction(ex_function_bc* fn, FunctionExpression& fn_expr, u32 alloca_region_size) {
-		ASSERT(fn);
+		EX_ASSERT(fn);
 		fn_bc = fn;
 		temp_base = alloca_region_size;
 		stack_top = temp_base;
@@ -4173,7 +4173,7 @@ struct BytecodeCompiler {
 	}
 
 	void endFunction() {
-		ASSERT(fn_bc);
+		EX_ASSERT(fn_bc);
 		fn_bc->code_size = u32(code.size() - (u64)fn_bc->code);
 		fn_bc->frame_size = stack_top > stack_high_water ? stack_top : stack_high_water;
 
@@ -4278,7 +4278,7 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 			for (u32 j = 0; j < bc->unit_count; ++j) {
 				if (import.unit == &module->units[j]) { target = j; break; }
 			}
-			ASSERT(target != EX_DEBUG_UNIT_NONE);
+			EX_ASSERT(target != EX_DEBUG_UNIT_NONE);
 			bc->unit_imports[import_index++] = target;
 		}
 	}
@@ -4475,7 +4475,7 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 			alignof(ex_bytecode_location));
 		for (i32 i = 0; i < (i32)location_count; ++i) {
 			const SourceLocTable::Entry& src = src_locs.entries[i];
-			ASSERT(src.unit_index < bc->unit_count);
+			EX_ASSERT(src.unit_index < bc->unit_count);
 			bc->locations[i].unit_index = src.unit_index;
 			bc->locations[i].line = src.line;
 			bc->locations[i].column = src.column;

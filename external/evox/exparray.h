@@ -52,7 +52,7 @@ struct ExpArray {
 		const i32 outter_index = binIndex(m_size);
 		const i32 inner_index = innerIndex(m_size);
 		T* bin = bins[outter_index];
-		ASSERT(bin);
+		EX_ASSERT(bin);
 		T* out = bin + inner_index;
 		::new (NewPlaceholder{}, (void*)out) T((Args&&)args...);
 		++m_size;
@@ -72,7 +72,7 @@ struct ExpArray {
 			const i32 outter_index = binIndex(m_size);
 			const i32 inner_index = innerIndex(m_size);
 			T* bin = bins[outter_index];
-			ASSERT(bin);
+			EX_ASSERT(bin);
 			::new (NewPlaceholder{}, (void*)(bin + inner_index)) T();
 			++m_size;
 		}
@@ -91,7 +91,7 @@ struct ExpArray {
 			const i32 outter_index = binIndex(m_size);
 			const i32 inner_index = innerIndex(m_size);
 			T* bin = bins[outter_index];
-			ASSERT(bin);
+			EX_ASSERT(bin);
 			::new (NewPlaceholder{}, (void*)(bin + inner_index)) T(value);
 			++m_size;
 		}
@@ -102,17 +102,17 @@ struct ExpArray {
 	}
 
 	void pop_back() {
-		ASSERT(m_size > 0);
+		EX_ASSERT(m_size > 0);
 		resize(m_size - 1);
 	}
 
 	T& back() {
-		ASSERT(m_size > 0);
+		EX_ASSERT(m_size > 0);
 		return (*this)[m_size - 1];
 	}
 
 	const T& back() const {
-		ASSERT(m_size > 0);
+		EX_ASSERT(m_size > 0);
 		return (*this)[m_size - 1];
 	}
 
@@ -174,20 +174,20 @@ struct ExpArray {
 	}
 
 	T& operator[](i32 index) {
-		ASSERT(index >= 0 && index < m_size);
+		EX_ASSERT(index >= 0 && index < m_size);
 		const i32 outter_index = binIndex(index);
 		const i32 inner_index = innerIndex(index);
 		return bins[outter_index][inner_index];
 	}
 
 	void allocateNextBin() {
-		ASSERT(m_num_bins < (i32)(sizeof(bins) / sizeof(bins[0])));
+		EX_ASSERT(m_num_bins < (i32)(sizeof(bins) / sizeof(bins[0])));
 		if (m_num_bins >= (i32)(sizeof(bins) / sizeof(bins[0]))) {
 			return;
 		}
 		const i32 bin_size = 4 << m_num_bins;
 		bins[m_num_bins] = static_cast<T*>(arena.allocate(arena.user_data, sizeof(T) * (size_t)bin_size, alignof(T)));
-		ASSERT(bins[m_num_bins]);
+		EX_ASSERT(bins[m_num_bins]);
 		m_capacity += bin_size;
 		++m_num_bins;
 	}
@@ -200,7 +200,7 @@ struct ExpArray {
 				break;
 			}
 		}
-		ASSERT(desired_size <= m_capacity);
+		EX_ASSERT(desired_size <= m_capacity);
 	}
 
 private:
@@ -219,15 +219,15 @@ private:
 	}
 
 	static i32 binIndex(i32 index) {
-		ASSERT(index >= 0);
+		EX_ASSERT(index >= 0);
 		const i32 msb = mostSignificantBit((u32)index + 4u);
-		ASSERT(msb >= 0);
+		EX_ASSERT(msb >= 0);
 		return msb - 2;
 	}
 
 	static i32 innerIndex(i32 index) {
 		const i32 msb = mostSignificantBit((u32)index + 4u);
-		ASSERT(msb >= 0);
+		EX_ASSERT(msb >= 0);
 		return index + 4 - (1 << msb);
 	}
 

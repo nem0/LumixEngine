@@ -91,12 +91,12 @@ ex_type_kind toExTypeKind(ResolvedTypeKind kind) {
 		case ResolvedTypeKind::UNION: return EX_TYPE_TAGGED_UNION;
 		case ResolvedTypeKind::TUPLE: return EX_TYPE_TUPLE;
 	}
-	ASSERT(false);
+	EX_ASSERT(false);
 	return EX_TYPE_INVALID;
 }
 
 static u32 alignTo(u32 offset, u32 alignment) {
-	ASSERT(alignment > 0);
+	EX_ASSERT(alignment > 0);
 	return (offset + alignment - 1) & ~(alignment - 1);
 }
 
@@ -139,12 +139,12 @@ u32 typeAlignment(const ResolvedType& t) {
 		case ResolvedTypeKind::UNTYPED_FLOAT:
 		case ResolvedTypeKind::UNTYPED_INT: return 8;
 		case ResolvedTypeKind::META: return static_cast<const MetaType&>(t).runtime ? 4 : alignof(ResolvedType*);
-		default: ASSERT(false); return 1;
+		default: EX_ASSERT(false); return 1;
 	}
 }
 
 u32 structFieldOffset(const StructResolvedType& st, i32 field_index) {
-	ASSERT(field_index >= 0 && (u32)field_index < st.fields.size());
+	EX_ASSERT(field_index >= 0 && (u32)field_index < st.fields.size());
 	return st.fields[(u32)field_index].offset;
 }
 
@@ -204,8 +204,8 @@ u32 typeByteSize(const ResolvedType& t) {
 		case ResolvedTypeKind::TUPLE: return static_cast<const TupleResolvedType&>(t).byte_size;
 		case ResolvedTypeKind::ARRAY: {
 			const ArrayResolvedType& arr = static_cast<const ArrayResolvedType&>(t);
-			ASSERT(arr.size > 0);
-			ASSERT(arr.size < 0xffFFffFF); // TODO
+			EX_ASSERT(arr.size > 0);
+			EX_ASSERT(arr.size < 0xffFFffFF); // TODO
 			return (u32)arr.size * typeByteSize(*arr.element_type);
 		}
 		case ResolvedTypeKind::STRUCT:
@@ -217,7 +217,7 @@ u32 typeByteSize(const ResolvedType& t) {
 			return static_cast<const MetaType&>(t).runtime ? sizeof(u32) : sizeof(ResolvedType*);
 		case ResolvedTypeKind::POINTER: return 8;
 		default:
-			ASSERT(false);
+			EX_ASSERT(false);
 			return 1;
 	}
 }
@@ -303,7 +303,7 @@ static u32 writeComptimeNumeric(u8* dst, const u8* src_bytes, ResolvedTypeKind s
 		case ResolvedTypeKind::F64: { double v = comptimeNumericToF64(src_bytes, src_kind); memcpy(dst, &v, 8); return 8; }
 		case ResolvedTypeKind::UNTYPED_FLOAT: { double v = comptimeNumericToF64(src_bytes, src_kind); memcpy(dst, &v, 8); return 8; }
 		case ResolvedTypeKind::UNTYPED_INT: { i64 v = comptimeNumericToI64(src_bytes, src_kind); memcpy(dst, &v, 8); return 8; }
-		default: ASSERT(false); return 0;
+		default: EX_ASSERT(false); return 0;
 	}
 }
 
@@ -321,11 +321,11 @@ struct TemplateBindings {
 static const char* primitiveTypeName(ResolvedTypeKind kind) {
 	for (const TypeKindInfo& info : TYPE_KIND_INFOS) {
 		if (info.kind == kind) {
-			ASSERT(info.primitive_name);
+			EX_ASSERT(info.primitive_name);
 			return info.primitive_name;
 		}
 	}
-	ASSERT(false);
+	EX_ASSERT(false);
 	return "<invalid>";
 }
 
@@ -537,7 +537,7 @@ struct Checker {
 	}
 
 	ResolvedType* primitiveType(ResolvedTypeKind kind) const {
-		ASSERT(kind >= ResolvedTypeKind::VOID && kind < ResolvedTypeKind::META);
+		EX_ASSERT(kind >= ResolvedTypeKind::VOID && kind < ResolvedTypeKind::META);
 		return &module.primitives[(i32)kind];
 	}
 
@@ -1043,7 +1043,7 @@ struct Checker {
 			SymbolRef imported;
 			for (const Import& imp : unit.imports) {
 				if (!empty(imp.alias)) continue;
-				ASSERT(imp.unit);
+				EX_ASSERT(imp.unit);
 				Unit* imported_unit = imp.unit;
 				if (Symbol* candidate = findSymbol(*imported_unit, name)) {
 					if (imported.symbol) {
@@ -1135,7 +1135,7 @@ struct Checker {
 			}
 		}
 
-		ASSERT(false);
+		EX_ASSERT(false);
 		return nullptr;
 	}
 
@@ -1679,7 +1679,7 @@ struct Checker {
 	}
 
 	static u8* getComptimeBytes(const IdentifierExpression& expr) {
-		ASSERT(expr.eval_stage != Expression::RUNTIME);
+		EX_ASSERT(expr.eval_stage != Expression::RUNTIME);
 		if (expr.comptime_bytes) return expr.comptime_bytes;
 		return expr.symbol->comptime_bytes;
 	}
@@ -1693,7 +1693,7 @@ struct Checker {
 		switch (expr.kind) {
 			case Expression::IDENTIFIER: {
 				auto& ie = static_cast<const IdentifierExpression&>(expr);
-				ASSERT(ie.eval_stage != Expression::RUNTIME);
+				EX_ASSERT(ie.eval_stage != Expression::RUNTIME);
 				if (ie.symbol && ie.symbol->expression && ie.symbol->expression->kind == Expression::TYPE_MEMBER) {
 					const TypeMemberExpression& member = static_cast<const TypeMemberExpression&>(*ie.symbol->expression);
 					if (member.kind == TypeMemberExpression::MIN || member.kind == TypeMemberExpression::MAX) {
@@ -1720,7 +1720,7 @@ struct Checker {
 					}
 					default: break;
 				}
-				ASSERT(false);
+				EX_ASSERT(false);
 				return false;
 			}
 			case Expression::INT_LITERAL:
@@ -1780,7 +1780,7 @@ struct Checker {
 	}
 
 	FunctionResolvedType* buildFunctionType(Unit& unit, FunctionExpression& fn) {
-		ASSERT(!fn.is_template);
+		EX_ASSERT(!fn.is_template);
 		if (fn.resolved_type) return static_cast<FunctionResolvedType*>(fn.resolved_type);
 
 		FunctionResolvedType* fn_type = makeType<FunctionResolvedType>(unit.arena, unit.arena);
@@ -1937,7 +1937,7 @@ struct Checker {
 		// Commit pass: pin untyped numeric operands to the winning signature.
 		for (i32 j = 0; j < arity; ++j) {
 			bool b = makeConcrete(*operands[j], matched_type->params[j].type);
-			ASSERT(b); // already checked in `operandMatchesParam`
+			EX_ASSERT(b); // already checked in `operandMatchesParam`
 		}
 		result_type = matched_type->return_type;
 		result_fn = matched_fn;
@@ -1969,7 +1969,7 @@ struct Checker {
 	}
 
 	bool comptimeValueMatchesExpected(const ComptimeValue& value, ResolvedType* expected) {
-		ASSERT(value.kind != ComptimeValue::FAILURE);
+		EX_ASSERT(value.kind != ComptimeValue::FAILURE);
 		if (!expected) return value.kind == ComptimeValue::TYPE;
 
 		if (expected->kind == ResolvedTypeKind::META) return value.kind == ComptimeValue::TYPE;
@@ -1999,7 +1999,7 @@ struct Checker {
 	}
 
 	ComptimeValue coerceComptimeValue(const ComptimeValue& value, ResolvedType* target) {
-		ASSERT(value.kind == ComptimeValue::VALUE && target);
+		EX_ASSERT(value.kind == ComptimeValue::VALUE && target);
 		if (value.type == target) return value;
 
 		if (target->kind == ResolvedTypeKind::NULLABLE) {
@@ -2470,7 +2470,7 @@ struct Checker {
 			annotation = asType(evalComptime(unit, *sym.type_expr), sym.type_expr->token);
 			if (!annotation) return EX_RESULT_FAILURE;
 		}
-		ASSERT(sym.expression);
+		EX_ASSERT(sym.expression);
 		Expression& expr = *sym.expression;
 
 		if (expr.kind == Expression::UNDEFINED) {
@@ -2521,7 +2521,7 @@ struct Checker {
 	}
 
 	FunctionExpression* instantiateAndCheckTemplate(Unit& unit, FunctionCheckContext* ctx, CallExpression& call, Unit& template_unit, FunctionExpression& fn, u32 ufcs_param_offset = 0) {
-		ASSERT(fn.is_template);
+		EX_ASSERT(fn.is_template);
 		TemplateBindings bindings(unit.arena); // TODO reuse?
 		if (!prepareCallArguments(unit, call, (u32)fn.params.size(), fn.is_variadic, ufcs_param_offset)) return nullptr;
 		if (ufcs_param_offset) {
@@ -2609,7 +2609,7 @@ struct Checker {
 		if (receiver_type->kind == ResolvedTypeKind::POINTER) {
 			receiver_type = static_cast<PointerResolvedType*>(receiver_type)->inner;
 		}
-		ASSERT(receiver_type->kind == ResolvedTypeKind::STRUCT || receiver_type->kind == ResolvedTypeKind::ENUM);
+		EX_ASSERT(receiver_type->kind == ResolvedTypeKind::STRUCT || receiver_type->kind == ResolvedTypeKind::ENUM);
 
 		// The receiver's namespace wins; lexical lookup is only a fallback.
 		SymbolRef ref;
@@ -2779,7 +2779,7 @@ struct Checker {
 			if (!target.fn) return nullptr;
 			target.type = asFunctionType(target.fn->resolved_type);
 		}
-		ASSERT(target.type);
+		EX_ASSERT(target.type);
 		return checkCallCandidate(unit, ctx, call, *target.type, target.fn, target.receiver_offset);
 	}
 
@@ -3166,7 +3166,7 @@ struct Checker {
 				result = primitiveType(ResolvedTypeKind::BOOL);
 				break;
 			default:
-				ASSERT(false); 
+				EX_ASSERT(false);
 				return nullptr;
 		}
 		
@@ -3404,7 +3404,7 @@ struct Checker {
 				return &expr;
 			}
 		}
-		ASSERT(false);
+		EX_ASSERT(false);
 		return {};
 	}
 
@@ -3827,7 +3827,7 @@ struct Checker {
 		}
 		for (i32 i = 0; i < lit.values.size(); ++i) {
 			ResolvedType* field_type = st->fields[i].type;
-			ASSERT(field_type);
+			EX_ASSERT(field_type);
 			ResolvedType* value_type = checkExprForTarget(unit, ctx, *lit.values[i], field_type);
 			if (!value_type) return nullptr;
 
@@ -4385,7 +4385,7 @@ struct Checker {
 	Unit* findImportedUnitByAlias(Unit& unit, ex_string_view alias) {
 		for (const Import& import : unit.imports) {
 			if (!equalStrings(import.alias, alias)) continue;
-			ASSERT(import.unit);
+			EX_ASSERT(import.unit);
 			return import.unit;
 		}
 		return nullptr;
@@ -4475,10 +4475,10 @@ struct Checker {
 
 	bool checkFunctionBody(Unit& unit, FunctionExpression& fn) {
 		if (!fn.body) return true;
-		ASSERT(fn.body->kind == Statement::BLOCK);
+		EX_ASSERT(fn.body->kind == Statement::BLOCK);
 
 		ResolvedType* return_type = static_cast<FunctionResolvedType*>(fn.resolved_type)->return_type;
-		ASSERT(return_type);
+		EX_ASSERT(return_type);
 		FunctionCheckContext ctx(unit.arena); // TODO reuse?
 		pushScope(ctx);
 		for (FunctionParam& param : fn.params) {
@@ -4529,7 +4529,7 @@ struct Checker {
 		// The parser always attaches an initializer (`var x = ...;`); there is no
 		// uninitialized local form. Unlike global symbols, this path may dereference
 		// it unconditionally.
-		ASSERT(var.expression);
+		EX_ASSERT(var.expression);
 		if (var.expression->kind == Expression::UNDEFINED) {
 			if (!annotation) {
 				errorLine(var.token, "Variable ", var.name, " must have a type annotation if initialized with undefined");
@@ -4757,7 +4757,7 @@ struct Checker {
 			}
 			default:
 			// parser rejects all other operators
-				ASSERT(false);
+				EX_ASSERT(false);
 				return false;
 		}
 	}
@@ -5520,7 +5520,7 @@ struct Checker {
 					errorLine(ret->token, "Defer statement cannot contain a return statement");
 					return false;
 				}
-				ASSERT(return_type);
+				EX_ASSERT(return_type);
 
 				if (return_type->kind == ResolvedTypeKind::VOID) {
 					if (ret->expression) {
@@ -5867,7 +5867,7 @@ struct Checker {
 				}
 				lhs /= rhs;
 				break;
-			default: ASSERT(false); return false;
+			default: EX_ASSERT(false); return false;
 		}
 		lhs_value = (Storage)lhs;
 		memcpy(lhs_bytes, &lhs_value, sizeof(lhs_value));
@@ -5887,7 +5887,7 @@ struct Checker {
 			}
 			case Statement::FOR: {
 				ForStatement& fs = static_cast<ForStatement&>(statement);
-				ASSERT(fs.begin);
+				EX_ASSERT(fs.begin);
 
 				// Array/slice unroll loops use the resolved source literal. Keep the
 				// loop bindings in the frame and overwrite their storage for each copy.
@@ -6010,7 +6010,7 @@ struct Checker {
 					errorLine(assign.token, "Comptime compound assignment requires numeric values");
 					return {};
 				}
-				ASSERT(typesEqual(lhs_type, value.type));
+				EX_ASSERT(typesEqual(lhs_type, value.type));
 				bool applied = false;
 				switch (lhs_type->kind) {
 					case ResolvedTypeKind::I8: applied = applyComptimeCompoundAssignment<i8, i64>(assign.token, assign.op, lhs_bytes, value.value); break;
@@ -6025,7 +6025,7 @@ struct Checker {
 					case ResolvedTypeKind::U64: applied = applyComptimeCompoundAssignment<u64, u64>(assign.token, assign.op, lhs_bytes, value.value); break;
 					case ResolvedTypeKind::F32: applied = applyComptimeCompoundAssignment<f32, f32>(assign.token, assign.op, lhs_bytes, value.value); break;
 					case ResolvedTypeKind::F64: applied = applyComptimeCompoundAssignment<f64, f64>(assign.token, assign.op, lhs_bytes, value.value); break;
-					default: ASSERT(false); return {};
+					default: EX_ASSERT(false); return {};
 				}
 				if (!applied) return {};
 				return {ComptimeValue::VOID};
@@ -6180,7 +6180,7 @@ struct Checker {
 			case Token::LT_EQUAL: return makeComptimeResult(lhs <= rhs, address);
 			case Token::GT: return makeComptimeResult(lhs > rhs, address);
 			case Token::GT_EQUAL: return makeComptimeResult(lhs >= rhs, address);
-			default: ASSERT(false); return {};
+			default: EX_ASSERT(false); return {};
 		}
 	}
 
@@ -6518,7 +6518,7 @@ struct Checker {
 							return makeComptimeEnumResult(en, comptimeNumericToI64(value.value, value.type->kind));
 						}
 					}
-					ASSERT(false);
+					EX_ASSERT(false);
 				}
 
 				if (member.expression->kind != Expression::IDENTIFIER) {
@@ -6574,7 +6574,7 @@ struct Checker {
 			}
 			case Expression::BRACKET: {
 				auto& be = static_cast<BracketExpression&>(expr);
-				ASSERT(be.base);
+				EX_ASSERT(be.base);
 
 				// A[i] - arary, slice, or struct["field"]
 				if (be.args.size() == 1) {
@@ -6809,7 +6809,7 @@ struct Checker {
 			}
 			case Expression::ARRAY_LITERAL: {
 				auto& al = static_cast<ArrayLiteralExpression&>(expr);
-				ASSERT(expr.resolved_type);
+				EX_ASSERT(expr.resolved_type);
 				if (expr.resolved_type->kind == ResolvedTypeKind::ARRAY) {
 					u8* data = comptime_stack_ptr;
 					const u32 size = typeByteSize(*expr.resolved_type);
@@ -6831,7 +6831,7 @@ struct Checker {
 			}
 			case Expression::STRUCT_LITERAL: {
 				auto& sl = static_cast<StructLiteralExpression&>(expr);
-				ASSERT (expr.resolved_type && expr.resolved_type->kind == ResolvedTypeKind::STRUCT);
+				EX_ASSERT (expr.resolved_type && expr.resolved_type->kind == ResolvedTypeKind::STRUCT);
 				auto* st = static_cast<StructResolvedType*>(expr.resolved_type);
 				u8* data = comptime_stack_ptr;
 				const u32 size = typeByteSize(*st);
@@ -7026,7 +7026,7 @@ struct Checker {
 					return {};
 				}
 				if (ref.symbol->resolved_type->kind == ResolvedTypeKind::META) {
-					ASSERT(ref.symbol->comptime_byte_size == 0);
+					EX_ASSERT(ref.symbol->comptime_byte_size == 0);
 					return {ComptimeValue::TYPE, static_cast<MetaType*>(ref.symbol->resolved_type)->inner};
 				}
 				return copyComptimeValue(ref.symbol->resolved_type, ref.symbol->comptime_bytes, ref.symbol->comptime_byte_size);
@@ -7077,7 +7077,7 @@ struct Checker {
 					return operand_type;
 				}
 
-				ASSERT(un.op == Token::MINUS);
+				EX_ASSERT(un.op == Token::MINUS);
 				auto negate = [&](auto value) {
 					memcpy(&value, operand_type.value, sizeof(value));
 					value = -value;
@@ -7096,7 +7096,7 @@ struct Checker {
 					case ResolvedTypeKind::UNTYPED_FLOAT: return negate(f64{});
 					default: break;
 				}
-				ASSERT(false);
+				EX_ASSERT(false);
 				return {};
 			}
 			case Expression::INT_LITERAL: {

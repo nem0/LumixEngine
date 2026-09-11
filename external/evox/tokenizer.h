@@ -67,7 +67,7 @@ struct Tokenizer {
 	}
 
 	char advance() {
-		ASSERT(m_current < data(m_document) + size(m_document));
+		EX_ASSERT(m_current < data(m_document) + size(m_document));
 		const char c = *m_current;
 		++m_current;
 		if (c == '\n') {
