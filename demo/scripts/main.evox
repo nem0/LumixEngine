@@ -1,28 +1,32 @@
 import "core:input"
-import "core:world"
 import "core:log"
 import "core:random"
 import "core:string"
 import "core:ui"
+import "core:world"
 
 import "scripts/player" as player
 import "maps/demo/demo" as demo
 import "maps/particles/lightning" as lightning
 import "maps/particles/move" as particle_move
 import "maps/particles/clutter_sphere" as clutter_sphere
+import "maps/navigation_stress_test/bot" as bot
+import "maps/navigation_stress_test/bot2" as bot2
 
 var g_input : InputSystem = undefined;
 var g_world : ?World = null;
 
 enum WorldType {
-	NONE,
-	MAIN,
-	DEMO,
-	LIGHTNING,
-	PARTICLES,
+	None,
+	Main,
+	Demo,
+	Lightning,
+	Particles,
+	NavigationStressTest,
+	NavigationStressTest2
 }
 
-var world_type : WorldType = .NONE;
+var world_type : WorldType = .None;
 fn await(r : LoadRequest) : void {
 	while r.getStatus() == .PENDING {
 		const dt : f32 = yield;
@@ -39,11 +43,11 @@ fn main(input : InputSystem, world : World) : void {
 		const handle = world.getPartitionHandle(i);
 		const name = world.getPartitionName(handle);
 		if endsWith(name, "main.unv") {
-			world_type = .MAIN;
+			world_type = .Main;
 			break;
 		}
 		if endsWith(name, "demo.unv") {
-			world_type = .DEMO;
+			world_type = .Demo;
 			demo.start(world);
 			player.init(world, g_input);
 			break;
@@ -51,9 +55,19 @@ fn main(input : InputSystem, world : World) : void {
 		if endsWith(name, "lightning.unv") {
 			const source_value = world.findByName("core");
 			if const source = source_value {
-				world_type = .LIGHTNING;
+				world_type = .Lightning;
 				lightning.start(world, source);
 			}
+			break;
+		}
+		if endsWith(name, "navigation_stress_test.unv") {
+			world_type = .NavigationStressTest;
+			bot.init(world);
+			break;
+		}
+		if endsWith(name, "navigation_stress_test2.unv") {
+			world_type = .NavigationStressTest2;
+			bot2.init(world);
 			break;
 		}
 		if endsWith(name, "particles.unv") {
@@ -62,7 +76,7 @@ fn main(input : InputSystem, world : World) : void {
 			if const moving_entity = moving {
 				if const clutter_entity = clutter {
 					if const clutter_child = clutter_entity.getFirstChild() {
-						world_type = .PARTICLES;
+						world_type = .Particles;
 						particle_move.start(moving_entity);
 						clutter_sphere.start(clutter_child, clutter_entity);
 					}
@@ -77,8 +91,8 @@ fn main(input : InputSystem, world : World) : void {
 		player.update(dt);
 
 		match world_type {
-			case .NONE:
-			case .MAIN:
+			case .None:
+			case .Main:
 				for event in g_input.getEvents() {
 					match event {
 						case ButtonEvent:
@@ -97,7 +111,7 @@ fn main(input : InputSystem, world : World) : void {
 									}
 									demo.start(world);
 									player.init(world, g_input);
-									world_type = .DEMO;
+									world_type = .Demo;
 								}
 								else {
 									logError(`Failed to load maps/demo/demo.unv: {request.getError()}`); 
@@ -106,11 +120,13 @@ fn main(input : InputSystem, world : World) : void {
 						case:
 					}
 				}
-			case .DEMO: demo.update(dt, g_input);
-			case .LIGHTNING: lightning.update(dt);
-			case .PARTICLES:
+			case .Demo: demo.update(dt, g_input);
+			case .Lightning: lightning.update(dt);
+			case .Particles:
 				particle_move.update(dt);
 				clutter_sphere.update(dt);
+			case .NavigationStressTest: bot.update();
+			case .NavigationStressTest2: bot2.update();
 		}
 	}
 }
