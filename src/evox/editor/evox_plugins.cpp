@@ -201,7 +201,6 @@ static const char* anyValueTypeName(ex_type_kind kind) {
 		case EX_TYPE_FUNCTION: return "function";
 		case EX_TYPE_ARRAY: return "array";
 		case EX_TYPE_SLICE: return "slice";
-		case EX_TYPE_NULL_VALUE: return "null";
 		case EX_TYPE_NULLABLE: return "nullable";
 		case EX_TYPE_ANY: return "any";
 		default: return "invalid";
@@ -233,7 +232,6 @@ static void drawAnyValue(const void* value) {
 		case EX_TYPE_CPTR:
 		case EX_TYPE_FUNCTION:
 		case EX_TYPE_ENUM:
-		case EX_TYPE_NULL_VALUE:
 			drawPrimitiveValue(kind, payload, nullptr);
 			break;
 		case EX_TYPE_SLICE: {
@@ -285,7 +283,6 @@ static void drawPrimitiveValue(ex_type_kind kind, const void* value, const ex_ty
 			break;
 		}
 		case EX_TYPE_FUNCTION: ImGui::TextUnformatted("<function>"); break;
-		case EX_TYPE_NULL_VALUE: ImGui::TextUnformatted("null"); break;
 		default:               ImGui::TextUnformatted("invalid"); break;
 	}
 }
