@@ -1356,6 +1356,13 @@ struct Checker {
 				out = mem;
 				break;
 			}
+			case Expression::UNPACK_TUPLE: {
+				UnpackTupleExpression* s = static_cast<UnpackTupleExpression*>(src);
+				UnpackTupleExpression* ut = makeType<UnpackTupleExpression>(unit.arena);
+				ut->tuple = cloneExpression(unit, s->tuple, bindings);
+				out = ut;
+				break;
+			}
 			case Expression::BRACKET: {
 				BracketExpression* s = static_cast<BracketExpression*>(src);
 				BracketExpression* br = makeType<BracketExpression>(unit.arena, unit.arena);
@@ -1363,6 +1370,7 @@ struct Checker {
 				for (Expression* arg : s->args) br->args.push(cloneExpression(unit, arg, bindings));
 				br->struct_field_name = s->struct_field_name;
 				br->tuple_index = s->tuple_index;
+				br->is_unpack_element = s->is_unpack_element;
 				out = br;
 				break;
 			}
@@ -2707,6 +2715,57 @@ struct Checker {
 
 	Expression* checkCallExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr) {
 		CallExpression& call = static_cast<CallExpression&>(expr);
+		// Expand unpacked arguments before target resolution and inference.
+		// Literal elements are spliced without checking, preserving parameter context.
+		bool has_unpack = false;
+		for (Expression* arg : call.args) {
+			if (arg->kind == Expression::UNPACK_TUPLE) { has_unpack = true; break; }
+		}
+		if (has_unpack) {
+			ExpArray<Expression*> normalized(unit.arena);
+			for (Expression* arg : call.args) {
+				if (arg->kind != Expression::UNPACK_TUPLE) {
+					normalized.push(arg);
+					continue;
+				}
+				UnpackTupleExpression* unpack = static_cast<UnpackTupleExpression*>(arg);
+				if (unpack->tuple->kind == Expression::TUPLE_LITERAL) {
+					TupleLiteralExpression* literal = static_cast<TupleLiteralExpression*>(unpack->tuple);
+					if (literal->values.empty()) {
+						errorLine(arg->token, "Cannot unpack an empty tuple");
+						return nullptr;
+					}
+					for (Expression* value : literal->values) normalized.push(value);
+					continue;
+				}
+
+				if (!checkExpr(unit, ctx, *unpack->tuple, nullptr)) return nullptr;
+				if (!unpack->tuple->resolved_type || unpack->tuple->resolved_type->kind != ResolvedTypeKind::TUPLE) {
+					errorLine(arg->token, "Cannot unpack a non-tuple expression");
+					return nullptr;
+				}
+				TupleResolvedType* tuple = static_cast<TupleResolvedType*>(unpack->tuple->resolved_type);
+				if (tuple->elements.empty()) {
+					errorLine(arg->token, "Cannot unpack an empty tuple");
+					return nullptr;
+				}
+				for (i32 i = 0; i < tuple->elements.size(); ++i) {
+					BracketExpression* element = makeType<BracketExpression>(unit.arena, unit.arena);
+					element->token = arg->token;
+					element->base = unpack->tuple;
+					element->tuple_index = i;
+					element->is_unpack_element = true;
+					IntLiteralExpression* index = makeType<IntLiteralExpression>(unit.arena);
+					index->token = arg->token;
+					index->value = (u64)i;
+					element->args.push(index);
+					element->resolved_type = tuple->elements[i];
+					normalized.push(element);
+				}
+			}
+			call.args.clear();
+			for (Expression* arg : normalized) call.args.push(arg);
+		}
 		// `t::attribute(T)` is a compiler intrinsic rather than a function call.
 		if (call.callee->kind == Expression::TYPE_MEMBER
 			&& static_cast<TypeMemberExpression*>(call.callee)->kind == TypeMemberExpression::ATTRIBUTE) {
@@ -4173,6 +4232,10 @@ struct Checker {
 				return &expr;
 			}
 			case Expression::ADDRESSOF: return checkAddressOfExpr(unit, ctx, expr);
+			case Expression::UNPACK_TUPLE: {
+				errorLine(expr.token, "Tuple unpacking only allowed as a function parameter");
+				return nullptr;
+			}
 			default:
 				errorLine(expr.token, "Cannot resolve expression of kind ", expr.kind);
 				return nullptr;
@@ -4186,6 +4249,10 @@ struct Checker {
 				if (ctx) {
 					if (SemanticLocalBinding* local = findLocal(*ctx, id.name); local && (!id.slot || local->slot == id.slot)) {
 						id.declaration_token = local->declaration_token;
+						if (local->is_comptime) {
+							is_writable = false;
+							return nullptr;
+						}
 						is_writable = !local->is_immutable;
 						id.slot = local->slot;
 						expr.resolved_type = local->type;
@@ -4595,18 +4662,6 @@ struct Checker {
 		binding.declaration_token = &var.name_token;
 		binding.is_immutable = var.is_immutable;
 		binding.slot = &var.slot;
-		const bool scalar_comptime = final_type->kind == ResolvedTypeKind::BOOL
-			|| final_type->kind == ResolvedTypeKind::ENUM
-			|| isNumericOrUntyped(*final_type);
-		if (var.is_immutable && scalar_comptime) {
-			// Immutable runtime locals can still be materialized at each use when
-			// their initializer depends only on compile-time values.
-			ComptimeValue value = foldRuntimeConstant(unit, *var.expression, &ctx);
-			if (value && value.kind == ComptimeValue::VALUE) {
-				binding.is_comptime = true;
-				binding.comptime_value = value;
-			}
-		}
 		return true;
 	}
 

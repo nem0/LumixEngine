@@ -576,6 +576,13 @@ struct Parser {
 	Expression* postfixSuffixes(Expression* expr, ExprMode mode) {
 		for (;;) {
 			switch (peekToken().type) {
+				case Token::ELLIPSIS: {
+					Token ellipsis = consumeToken();
+					UnpackTupleExpression* unpack = makeExpr<UnpackTupleExpression>(ellipsis);
+					unpack->tuple = expr;
+					expr = unpack;
+					break;
+				}
 				case Token::DOT: {
 					Token dot = consumeToken();
 					Token name = consumeToken();
@@ -1596,6 +1603,11 @@ struct Parser {
 	static bool isGeneric(const Expression& expr) {
 		switch (expr.kind) {
 			case Expression::GENERIC_IDENTIFIER: return true;
+			case Expression::UNPACK_TUPLE: {
+				const auto& unpack = static_cast<const UnpackTupleExpression&>(expr);
+				if (isGeneric(*unpack.tuple)) return true;
+				return false;
+			}
 			case Expression::BRACKET: {
 				const auto& br = static_cast<const BracketExpression&>(expr);
 				if (isGeneric(*br.base)) return true;
@@ -1664,6 +1676,7 @@ struct Parser {
 				names.push(name);
 				return true;
 			}
+			case Expression::UNPACK_TUPLE: return collectGenericParams(*static_cast<const UnpackTupleExpression&>(expr).tuple, names);
 			case Expression::ARRAY_TYPE: return collectGenericParams(*static_cast<const ArrayTypeExpression&>(expr).element_type, names);
 			case Expression::NULLABLE_TYPE: return collectGenericParams(*static_cast<const NullableTypeExpression&>(expr).inner, names);
 			case Expression::SLICE_TYPE: return collectGenericParams(*static_cast<const SliceTypeExpression&>(expr).element_type, names);

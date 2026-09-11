@@ -425,6 +425,33 @@ TEST(ConstScalarCanCreateReadOnlySlice) {
 	return true;
 }
 
+TEST(ComptimeScalarCannotCreateReadOnlySlice) {
+	const char* source = R"(
+		fn inspect(value : []const i32) : i32 {
+			return value[0];
+		}
+
+		fn main() : i32 {
+			comptime value : i32 = 7;
+			var view = value[:];
+			return inspect(view);
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
+TEST(ComptimeScalarCannotCreateMutableSlice) {
+	const char* source = R"(
+		fn main() : void {
+			comptime value : i32 = 7;
+			var view : []i32 = value[:];
+		}
+	)";
+	EXPECT_COMPILE_FAIL(source);
+	return true;
+}
+
 TEST(ScalarSliceViewSupportsPrimitiveTypes) {
 	const char* source = R"(
 		fn main() : i32 {
@@ -542,13 +569,13 @@ TEST(ScalarSliceViewRejectsNonAddressableSources) {
 	)";
 	EXPECT_COMPILE_FAIL(expression_source);
 
-	const char* const_source = R"(
+	const char* comptime_source = R"(
 		fn main() : void {
-			const value : i32 = 4;
+			comptime value : i32 = 4;
 			var view : []i32 = value[:];
 		}
 	)";
-	EXPECT_COMPILE_FAIL(const_source);
+	EXPECT_COMPILE_FAIL(comptime_source);
 
 	const char* parameter_source = R"(
 		fn view(value : i32) : []i32 {

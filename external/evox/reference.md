@@ -1376,6 +1376,50 @@ Element addressability follows the rules for struct fields:
   pointer and slice elements copy their descriptors, not the referenced data
 - taking an element's address does not extend the containing storage's lifetime
 
+#### Tuple argument unpacking
+
+Tuple argument unpacking is argument-list syntax sugar, written by placing
+`...` after a tuple expression. It follows two rules:
+
+1. An unpacked tuple literal is replaced directly by its element expressions:
+
+   ```cpp
+   f(x, .{ A, B, C }..., y)
+   // equivalent to:
+   f(x, A, B, C, y)
+   ```
+
+   Elements are ordinary call arguments, so parameter context and generic
+   inference apply directly; no intermediate tuple type is needed.
+
+2. Any other tuple expression is evaluated once, and its elements become
+   arguments in declaration order. For a two-element result:
+
+   ```cpp
+   f(make()...)
+   // conceptually:
+   const tmp = make();
+   f(tmp[0], tmp[1]);
+   ```
+
+   Unpacking adds no ordering guarantee between separate call arguments.
+
+A single-element tuple supplies one argument. An empty tuple cannot be unpacked;
+this is a compile-time error. Nested tuples remain single arguments, including
+nested empty tuples.
+
+Multiple expansions may be mixed with ordinary arguments, as in
+`f(1, first..., 2, last...)`. Each expands in place.
+
+Only tuples can be unpacked, and only in call argument lists. Tuple pointers
+require explicit dereferencing: `f(ptr.*...)`.
+
+After expansion, all ordinary call rules apply: argument count and types,
+literal range checks, value copying, constness, generic inference, comptime
+requirements, and variadic packing. Already-typed tuple elements keep their
+types. Unpacking works for direct calls, function values, and comptime calls;
+it does not make runtime values comptime.
+
 #### Comparison and layout
 
 Tuples have no built-in equality or ordering and do not support operator
@@ -3261,7 +3305,6 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 
 * tuple-specific operations (not yet specified):
 	- value-side `.length` and type-side `::length`
-	- destructuring declarations and assignment
 	- iteration, including heterogeneous `unroll for`
 	- slicing
 	- concatenation

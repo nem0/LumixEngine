@@ -1,9 +1,3 @@
-// Specification tests for reference.md: Tuples, plus the general rules for
-// numeric context, assignment, pointers, templates, and type introspection.
-// Positive tests intentionally remain red until tuples are implemented.
-// Rejection tests alone cannot establish support: an unsupported tuple parser
-// will reject their setup as well as the invalid operation being tested.
-
 TEST(TupleExplicitLiteralAndIndexing) {
 	EXPECT_COMPILE(R"(
 		fn main() : f32 {
@@ -1206,6 +1200,641 @@ TEST(BytecodeTupleComptimeMaterialization) {
 			copy[0] = 7;
 			if value[0] != 42 { return 2; }
 			return read(value);
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+
+TEST(TupleLocalComptimeElementRuntimeReturn) {
+	EXPECT_COMPILE(R"(
+		fn main() : bool {
+			comptime args : tuple { i32, bool } = .{ 42, true };
+			return args[1];
+		}
+	)");
+	return true;
+}
+
+TEST(TupleUnpackLiteralUsesParameterContext) {
+	EXPECT_COMPILE(R"(
+		fn accept(a : i8, b : u64, c : f32) : void {}
+		fn main() : void { accept(.{ -12, 18446744073709551615, 2.5 }...); }
+	)");
+	return true;
+}
+
+TEST(TupleUnpackLiteralContextAfterOrdinaryArgument) {
+	EXPECT_COMPILE(R"(
+		fn accept(a : bool, b : i16, c : f64) : void {}
+		fn main() : void { accept(true, .{ 12, 2.5 }...); }
+	)");
+	return true;
+}
+
+TEST(TupleUnpackLiteralSuppliesAggregateAndEnumContext) {
+	EXPECT_COMPILE(R"(
+		enum State { Idle, Running }
+		struct Point { x : i16; y : f32; }
+		fn accept(state : State, point : Point, pair : tuple { bool, i8 }) : void {}
+		fn main() : void { accept(.{ .Running, { 12, 2.5 }, .{ true, 7 } }...); }
+	)");
+	return true;
+}
+
+TEST(TupleUnpackGenericInfersEachElementType) {
+	EXPECT_COMPILE(R"(
+		fn accept(a : $A, b : $B, c : $C) : void {
+			if A != i16 { var impossible : MissingType = undefined; }
+			if B != f64 { var impossible : MissingType = undefined; }
+			if C != bool { var impossible : MissingType = undefined; }
+		}
+		fn main() : void {
+			const args : tuple { i16, f64, bool } = .{ 12, 2.5, true };
+			accept(args...);
+		}
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRepeatedGenericType) {
+	EXPECT_COMPILE(R"(
+		fn first(a : $T, b : T) : T { return a; }
+		fn main() : i32 {
+			const args : tuple { i32, i32 } = .{ 42, 7 };
+			return first(args...);
+		}
+	)");
+	return true;
+}
+
+TEST(TupleUnpackComptimeParameter) {
+	EXPECT_COMPILE(R"(
+		fn accept(size : comptime i32, flag : bool) : void {
+			if size != 42 { var impossible : MissingType = undefined; }
+		}
+		fn main() : void {
+			comptime args : tuple { i32, bool } = .{ 42, true };
+			accept(args...);
+		}
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRejectsTooFewArguments) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn accept(a : i32, b : i32) : void {}
+		fn main() : void {
+			const args : tuple { i32 } = .{ 1 };
+			accept(args...);
+		}
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRejectsTooManyArguments) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn accept(a : i32) : void {}
+		fn main() : void {
+			const args : tuple { i32, i32 } = .{ 1, 2 };
+			accept(args...);
+		}
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRejectsEmptyTupleForRequiredParameter) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn accept(a : i32) : void {}
+		fn main() : void {
+			const args : tuple {} = .{};
+			accept(args...);
+		}
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRejectsNonemptyTupleForNoParameters) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn accept() : void {}
+		fn main() : void {
+			const args : tuple { i32 } = .{ 1 };
+			accept(args...);
+		}
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRejectsExcessOrdinaryArgument) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn accept(a : i32, b : i32) : void {}
+		fn main() : void {
+			const args : tuple { i32, i32 } = .{ 1, 2 };
+			accept(0, args...);
+		}
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRejectsWrongElementType) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn accept(a : i32, b : bool) : void {}
+		fn main() : void {
+			const args : tuple { i32, i32 } = .{ 1, 2 };
+			accept(args...);
+		}
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRejectsReorderedElementTypes) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn accept(a : i32, b : bool) : void {}
+		fn main() : void {
+			const args : tuple { bool, i32 } = .{ true, 1 };
+			accept(args...);
+		}
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRejectsImplicitConcreteNumericConversion) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn accept(a : i64) : void {}
+		fn main() : void {
+			const args : tuple { i32 } = .{ 42 };
+			accept(args...);
+		}
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRejectsLiteralOverflow) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn accept(a : bool, b : i8) : void {}
+		fn main() : void { accept(true, .{ 128 }...); }
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRejectsNegativeUnsignedLiteral) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn accept(a : u8) : void {}
+		fn main() : void { accept(.{ -1 }...); }
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRejectsRecursiveFlattening) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn accept(a : i32, b : bool, c : f64) : void {}
+		fn main() : void {
+			const args : tuple { i32, tuple { bool, f64 } } = .{ 1, .{ true, 2.5 } };
+			accept(args...);
+		}
+	)");
+	return true;
+}
+
+TEST(TupleUnpackDoesNotDiscardNestedEmptyTuple) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn accept() : void {}
+		fn main() : void {
+			const args : tuple { tuple {} } = .{ .{} };
+			accept(args...);
+		}
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRejectsScalarOperand) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn accept(a : i32) : void {}
+		fn main() : void { const args : i32 = 42; accept(args...); }
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRejectsStructOperand) {
+	EXPECT_COMPILE_FAIL(R"(
+		struct Pair { a : i32; b : i32; }
+		fn accept(a : i32, b : i32) : void {}
+		fn main() : void { const args = Pair { 1, 2 }; accept(args...); }
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRejectsArrayOperand) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn accept(a : i32, b : i32) : void {}
+		fn main() : void { const args : [2]i32 = [1, 2]; accept(args...); }
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRejectsSliceOperand) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn accept(a : i32, b : i32) : void {}
+		fn main(args : []i32) : void { accept(args...); }
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRejectsPointerWithoutDereference) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn accept(a : i32) : void {}
+		fn main() : void {
+			var args : tuple { i32 } = .{ 42 };
+			const pointer = &args;
+			accept(pointer...);
+		}
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRejectsOutsideCall) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn main() : void {
+			const args : tuple { i32 } = .{ 42 };
+			const value = args...;
+		}
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRejectsRuntimeComptimeArgument) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn accept(a : comptime i32) : void {}
+		fn main(value : i32) : void {
+			const args : tuple { i32 } = .{ value };
+			accept(args...);
+		}
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRejectsConflictingGenericElements) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn accept(a : $T, b : T) : void {}
+		fn main() : void {
+			const args : tuple { i32, bool } = .{ 42, true };
+			accept(args...);
+		}
+	)");
+	return true;
+}
+
+TEST(TupleUnpackRejectsDroppingPointeeConst) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn accept(a : *i32) : void {}
+		fn main() : void {
+			const value : i32 = 42;
+			const args : tuple { *const i32 } = .{ &value };
+			accept(args...);
+		}
+	)");
+	return true;
+}
+
+TEST(BytecodeTupleUnpackDeclarationOrder) {
+	const char* source = R"(
+		fn digits(a : i32, b : i32, c : i32) : i32 { return 100 * a + 10 * b + c; }
+		fn main() : i32 {
+			const args : tuple { i32, i32, i32 } = .{ 1, 2, 3 };
+			if digits(args...) != 123 { return 1; }
+			return 42;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeTupleUnpackMixedWidths) {
+	const char* source = R"(
+		fn check(a : u8, b : i64, c : bool, d : f64, e : i16) : i32 {
+			if a != 7 or b != 10000000000 or not c or d != 2.5 or e != -12 { return 1; }
+			return 42;
+		}
+		fn main() : i32 {
+			const args : tuple { u8, i64, bool, f64, i16 } = .{ 7, 10000000000, true, 2.5, -12 };
+			return check(args...);
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeTupleUnpackMixedArgumentPositions) {
+	const char* source = R"(
+		fn digits(a : i32, b : i32, c : i32, d : i32) : i32 { return 1000 * a + 100 * b + 10 * c + d; }
+		fn main() : i32 {
+			const first : tuple { i32, i32 } = .{ 1, 2 };
+			const middle : tuple { i32, i32 } = .{ 2, 3 };
+			const last : tuple { i32, i32 } = .{ 3, 4 };
+			if digits(first..., 3, 4) != 1234 { return 1; }
+			if digits(1, middle..., 4) != 1234 { return 2; }
+			if digits(1, 2, last...) != 1234 { return 3; }
+			if digits(first..., last...) != 1234 { return 4; }
+			if digits(1, .{ 2, 3 }..., 4) != 1234 { return 5; }
+			return 42;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeTupleUnpackSingleElement) {
+	const char* source = R"(
+		fn identity(value : i32) : i32 { return value; }
+		fn main() : i32 {
+			const single : tuple { i32 } = .{ 42 };
+			return identity(single...);
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeTupleUnpackNestedElementsStayWhole) {
+	const char* source = R"(
+		fn check(empty : tuple {}, pair : tuple { i32, bool }, tail : i32) : i32 {
+			if not pair[1] { return 1; }
+			return pair[0] + tail;
+		}
+		fn main() : i32 {
+			const args : tuple { tuple {}, tuple { i32, bool }, i32 } = .{ .{}, .{ 10, true }, 32 };
+			return check(args...);
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeTupleUnpackTemporaryEvaluatedOnce) {
+	const char* source = R"(
+		var calls : i32 = 0;
+		fn make() : tuple { i32, i32 } { calls += 1; return .{ 10, 32 }; }
+		fn add(a : i32, b : i32) : i32 { return a + b; }
+		fn main() : i32 {
+			const result = add(make()...);
+			if calls != 1 { return 1; }
+			return result;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(TupleUnpackRejectsEmptyTemporary) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn make() : tuple {} { return .{}; }
+		fn answer() : i32 { return 42; }
+		fn main() : i32 { return answer(make()...); }
+	)");
+	return true;
+}
+
+TEST(BytecodeTupleUnpackIndexedOperandEvaluatedOnce) {
+	const char* source = R"(
+		var calls : i32 = 0;
+		fn index() : isize { calls += 1; return 1; }
+		fn add(a : i32, b : i32) : i32 { return a + b; }
+		fn main() : i32 {
+			const values : [2]tuple { i32, i32 } = [.{ 1, 2 }, .{ 10, 32 }];
+			const result = add(values[index()]...);
+			if calls != 1 { return 1; }
+			return result;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeTupleUnpackFieldDereferenceAndParameter) {
+	const char* source = R"(
+		struct Record { args : tuple { i32, i32 }; }
+		fn add(a : i32, b : i32) : i32 { return a + b; }
+		fn forward(args : tuple { i32, i32 }) : i32 { return add(args...); }
+		fn main() : i32 {
+			var record = Record { .{ 10, 32 } };
+			const pointer = &record.args;
+			if add(record.args...) != 42 { return 1; }
+			if add(pointer.*...) != 42 { return 2; }
+			record.args[0] = 20;
+			record.args[1] = 22;
+			return forward(record.args);
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeTupleUnpackIndirectCall) {
+	const char* source = R"(
+		fn add(a : i32, b : i32) : i32 { return a + b; }
+		fn apply(callback : fn(i32, i32) : i32, args : tuple { i32, i32 }) : i32 {
+			return callback(args...);
+		}
+		fn main() : i32 { return apply(add, .{ 10, 32 }); }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeTupleUnpackAggregateValueCopies) {
+	const char* source = R"(
+		struct Point { x : i32; y : f64; }
+		fn change(point : Point, array : [2]i32) : i32 {
+			var p = point;
+			var a = array;
+			p.x += 30;
+			a[0] = 99;
+			if p.y != 2.5 { return 1; }
+			return p.x + a[1];
+		}
+		fn main() : i32 {
+			var args : tuple { Point, [2]i32 } = .{ { 10, 2.5 }, [1, 2] };
+			const result = change(args...);
+			if args[0].x != 10 or args[1][0] != 1 { return 2; }
+			return result;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeTupleUnpackPointerAndSliceRetainAliasing) {
+	const char* source = R"(
+		fn change(number : *i32, values : []i32) : void { number.* += 30; values[1] = 7; }
+		fn main() : i32 {
+			var number : i32 = 10;
+			var values : [2]i32 = [1, 2];
+			const args : tuple { *i32, []i32 } = .{ &number, values[:] };
+			change(args...);
+			if values[1] != 7 or args[1][1] != 7 { return 1; }
+			return number + 2;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeTupleUnpackComptimeCall) {
+	const char* source = R"(
+		fn add(a : i32, b : i32) : i32 { return a + b; }
+		comptime args : tuple { i32, i32 } = .{ 10, 32 };
+		fn main() : i32 {
+			comptime result = add(args...);
+			if result != 42 { var impossible : MissingType = undefined; }
+			return result;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeTupleUnpackTemporaryOrderAndLifetime) {
+	const char* source = R"(
+		var trace : i32 = 0;
+		var calls : i32 = 0;
+		fn mark(value : i32) : i32 { trace = trace * 10 + value; return value; }
+		fn pair(a : i32, b : i32) : tuple { i32, i32 } {
+			calls += 1;
+			return .{ mark(a), mark(b) };
+		}
+		fn add(a : i32, b : i32) : i32 { return a + b; }
+		fn choose() : fn(i32, i32) : i32 { mark(1); return add; }
+		fn sum(start : i32, values : ...i32) : i32 {
+			var result = start;
+			for value in values { result += value; }
+			return result;
+		}
+		struct Receiver { value : i32; }
+		fn receiver() : Receiver { return { mark(1) }; }
+		fn combine(self : Receiver, a : i32, b : i32) : i32 { return self.value + a + b; }
+		fn forward(args : $T) : i32 { return add(args...); }
+		fn main() : i32 {
+			// Nested calls must neither reorder nor overwrite the preceding argument.
+			if add(mark(1), add(pair(2, 3)...)) != 6 { return 1; }
+			if trace != 123 or calls != 1 { return 2; }
+			trace = 0; calls = 0;
+			if sum(mark(1), pair(2, 3)..., mark(4), pair(5, 6)...) != 21 { return 3; }
+			if trace != 123456 or calls != 2 { return 4; }
+			trace = 0; calls = 0;
+			if choose()(pair(2, 3)...) != 5 { return 5; }
+			if trace != 123 or calls != 1 { return 6; }
+			trace = 0; calls = 0;
+			if receiver().combine(pair(2, 3)...) != 6 { return 7; }
+			if trace != 123 or calls != 1 { return 8; }
+			trace = 0; calls = 0;
+			unroll for i in 0..3 {
+				if sum(0, pair(1, 2)...) != 3 { return 9; }
+			}
+			if trace != 121212 or calls != 3 { return 10; }
+			trace = 0; calls = 0;
+			if forward(pair(1, 2)) != 3 or forward(pair(3, 4)) != 7 { return 11; }
+			if trace != 1234 or calls != 2 { return 12; }
+			return 42;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	for (bool optimize : {false, true}) {
+		ex_bytecode_compile_options options = {};
+		options.optimize = optimize;
+		ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, &options);
+		EXPECT_TRUE(bytecode != nullptr);
+		ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
+		EXPECT_TRUE(runtime != nullptr);
+		ex_task* task = ex_task_create(runtime);
+		EXPECT_TRUE(task != nullptr);
+		EXPECT_EQ(EX_CALL_RESULT_OK, ex_call(task, toLs("main"), nullptr, 0));
+		EXPECT_EQ(42, ex_task_to_i32(task, -1));
+		ex_task_destroy(task);
+		ex_runtime_destroy(runtime);
+		ex_bytecode_destroy(bytecode);
+	}
+	CAPI_END(module);
+	return true;
+}
+
+TEST(BytecodeTupleUnpackIntoVariadicParameters) {
+	const char* source = R"(
+		fn sum(start : i32, values : ...i32) : i32 {
+			var result = start;
+			for value in values { result += value; }
+			return result;
+		}
+		fn main() : i32 {
+			const args : tuple { i32, i32, i32 } = .{ 10, 12, 20 };
+			if sum(args...) != 42 { return 1; }
+			return sum(0, args...);
 		}
 	)";
 	CAPI_BEGIN(module, diagnostics);

@@ -87,11 +87,13 @@ ExIrOpKind invertCompare(ExIrOpKind kind) {
 	}
 }
 
-// Source locations for ExIrSourceLoc. IR ops store a u32 index into the
-// module's SourceLocTable (token.h); the BytecodeCompiler records it as-is and
-// ex_bytecode_compile copies the table verbatim into the bytecode.
 // AST to IR
 struct IRBuilder {
+	struct {
+		Expression* base = nullptr;
+		ExOpAlloca* storage = nullptr;
+	 } unpack_temporary;
+
 	IRBuilder(ex_host& host, TypeInfoBuilder& type_info)
 		: host(host)
 		, type_info(type_info)
@@ -370,6 +372,10 @@ struct IRBuilder {
 				for (Expression* arg : bracket.args) if (hasInliningBlocker(*arg, depth + 1)) return true;
 				return false;
 			}
+			case Expression::UNPACK_TUPLE: {
+				const auto& unpack = static_cast<const UnpackTupleExpression&>(expression);
+				return hasInliningBlocker(*unpack.tuple, depth + 1);
+			}
 			case Expression::SLICE: {
 				const auto& slice = static_cast<const SliceExpression&>(expression);
 				return hasInliningBlocker(*slice.base, depth + 1) ||
@@ -439,13 +445,17 @@ struct IRBuilder {
 
 	ExIrOp& buildExpressionIR(Expression& expr, bool as_rvalue) {
 		SourceScope scope(*this, expr.token);
-		if (as_rvalue && expr.comptime_value.kind == ComptimeValue::VALUE && expr.resolved_type) {
+		if (expr.comptime_value.kind == ComptimeValue::VALUE && expr.resolved_type) {
 			const u32 size = typeByteSize(*expr.resolved_type);
 			auto& constant = alloc<ExOpLoadBytes>();
 			constant.type = expr.resolved_type;
 			constant.value = expr.comptime_value.value;
 			constant.size = size;
-			return constant;
+			if (as_rvalue) return constant;
+
+			auto& address = alloc<ExOpMaterializeAddr>();
+			address.value = &constant;
+			return address;
 		}
 
 		// A runtime type is represented by the index of its descriptor in the
@@ -521,6 +531,31 @@ struct IRBuilder {
 			}
 			case Expression::BRACKET: {
 				auto& be = static_cast<BracketExpression&>(expr);
+				if (be.is_unpack_element) {
+					ASSERT(as_rvalue);
+					// Normalization keeps each unpack expansion contiguous.
+					ExIrOp* tuple_value = nullptr;
+					if (be.tuple_index == 0 || unpack_temporary.base != be.base) {
+						// Nested calls may overwrite the cache while building the tuple.
+						// Publish this expansion only after its initializer is built.
+						ExIrOp& value = buildExpressionIR(*be.base, true);
+						ExOpAlloca& storage = allocAlloca(be.base->resolved_type, {}, &value);
+						unpack_temporary = {be.base, &storage};
+						// The first extraction owns initialization, placing evaluation at
+						// this argument's position rather than at the start of the call.
+						tuple_value = unpack_temporary.storage;
+					} else {
+						tuple_value = &loadAllocaValue(*unpack_temporary.storage);
+					}
+
+					auto* tuple = static_cast<TupleResolvedType*>(be.base->resolved_type);
+					auto& extract = alloc<ExOpExtractValue>();
+					extract.value = tuple_value;
+					extract.offset = tuple->offsets[(i32)be.tuple_index];
+					extract.size = typeByteSize(*be.resolved_type);
+					return extract;
+				}
+
 				// struct["field"]
 				if (be.struct_field_name.begin) {
 					auto& struct_type = static_cast<StructResolvedType&>(*be.base->resolved_type);
@@ -823,6 +858,7 @@ struct IRBuilder {
 					return load;
 				}
 
+				ASSERT(false);
 				break;
 			}
 			case Expression::PANIC: {
@@ -2081,6 +2117,7 @@ struct IRBuilder {
 	ExpArray<ex_string_view> strings;
 	ExpArray<Statement*> defers;
 	ExpArray<Loop> loops;
+
 	ex_string_view pending_loop_label = {};
 	ResolvedType* return_type = nullptr;
 	ExIrSourceLoc current_src_loc = EX_IR_INVALID_SOURCE_LOC;

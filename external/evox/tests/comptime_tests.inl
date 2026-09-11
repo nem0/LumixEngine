@@ -10,6 +10,57 @@ TEST(ComptimeBasic) {
 }
 
 
+TEST(ComptimeLocalBoolRuntimeReturn) {
+	EXPECT_COMPILE(R"(
+		fn main() : bool {
+			comptime flag : bool = true;
+			return flag;
+		}
+	)");
+	return true;
+}
+
+TEST(ComptimeLocalStructFieldRuntimeReturn) {
+	EXPECT_COMPILE(R"(
+		struct Flags { enabled : bool; }
+		fn main() : bool {
+			comptime flags = Flags { true };
+			return flags.enabled;
+		}
+	)");
+	return true;
+}
+
+TEST(ComptimeLocalScalarArrayElementRuntimeReturn) {
+	EXPECT_COMPILE(R"(
+		fn main() : i32 {
+			comptime values : [2]i32 = [10, 42];
+			return values[1];
+		}
+	)");
+	return true;
+}
+
+TEST(BytecodeComptimeLocalScalarArrayRuntimeIndex) {
+	const char* source = R"(
+		fn get(index : i32) : i32 {
+			comptime values : [2]i32 = [10, 42];
+			return values[index];
+		}
+		fn first() : i32 { return get(0); }
+		fn second() : i32 { return get(1); }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("first")));
+	EXPECT_EQ(10, ex_task_to_i32(runtime, -1));
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("second")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(TopLevelComptimeRequiresSemicolon) {
 	EXPECT_COMPILE_FAIL(R"(
 		comptime value = 1

@@ -65,58 +65,39 @@ struct Expression {
 		STRING_LITERAL,
 		NULL_LITERAL,
 		TYPE_LITERAL,
-		// Runtime call: `foo(a, b)`.
 		CALL,
-		// Non-returning built-in panic(msg).
 		PANIC,
-		// Unary operator expression such as `-x`, `not x`, or `ref x` at a call site.
 		UNARY,
-		// Binary operator expression such as `a + b` or `x == y`.
 		BINARY,
-		// Explicit cast expression such as `x as f32`.
 		CAST,
-		// Field or namespace access such as `a.x` or `.Running`.
-		MEMBER,
-		// Compile-time reflection access such as `T::name`.
-		TYPE_MEMBER,
-		// Generic bracket postfix used before semantic disambiguation
-		// (indexing vs. template instantiation).
+		MEMBER,					// Field or namespace access such as `a.x` or `.Running`.
+		TYPE_MEMBER,			// Compile-time reflection access such as `T::name`.
 		BRACKET,
-		// Slice of an array or slice such as `a[b:e]`; either bound may be omitted.
 		SLICE,
-		// Struct literal such as `Vec3 { 1, 2, 3 }`.
 		STRUCT_LITERAL,
 		ARRAY_LITERAL,
 		TUPLE_LITERAL,
-		// `fn (...) ... { ... }` creates a function value. A named function is just a
-		// symbol bound to one of these expressions.
 		FUNCTION,
-		// `enum { ... }` creates a comptime type value.
 		ENUM,
-		// `struct { ... }` creates a comptime type value.
 		STRUCT,
 		UNDEFINED, // var a : i32 = undefined;
 		TYPEOF,
-		// `sizeof(T)` / `alignof(T)` - produces an untyped integer constant.
 		SIZEOF,
-		// $T
-		GENERIC_IDENTIFIER,
-		// Type-constructor syntax; these appear in type positions (annotations,
-		// casts, sizeof) and resolve to types in a comptime context.
-		ARRAY_TYPE,    // [N]T
-		SLICE_TYPE,    // []T
-		NULLABLE_TYPE, // ?T
-		FUNCTION_TYPE, // fn(A, B) : R used as a type
-		UNION_TYPE,    // A | B used as a type
+		
+		GENERIC_IDENTIFIER, 	// $T
+		ARRAY_TYPE,    			// [N]T
+		SLICE_TYPE,    			// []T
+		NULLABLE_TYPE, 			// ?T
+		FUNCTION_TYPE, 			// fn(A, B) : R used as a type
+		UNION_TYPE,    			// A | B used as a type
 		TUPLE_TYPE,
-		// A fully resolved type injected by template substitution during cloning.
-		RESOLVED_TYPE,
-		// Ternary conditional operator: `condition ? true_expr : false_expr`
-		TERNARY,
-		POINTER_TYPE, // *T
-		DEREFERENCE, // .*
-		ADDRESSOF, // &
-		YIELD, // yield expression; the resume value type is supplied by context
+		RESOLVED_TYPE, 			// A fully resolved type injected by template substitution during cloning.
+		TERNARY,				// Ternary conditional operator: `condition ? true_expr : false_expr`
+		POINTER_TYPE, 			// *T
+		DEREFERENCE, 			// .*
+		ADDRESSOF, 				// &
+		YIELD,
+		UNPACK_TUPLE,
 	};
 
 	Expression() = default;
@@ -129,6 +110,11 @@ struct Expression {
 	EvalStage eval_stage = RUNTIME;
 	Token token = {};
 	bool parenthesized = false;
+};
+
+struct UnpackTupleExpression : Expression {
+	UnpackTupleExpression() : Expression(UNPACK_TUPLE) {}
+	Expression* tuple = nullptr;
 };
 
 struct YieldExpression : Expression {
@@ -363,6 +349,9 @@ struct BracketExpression : Expression {
 	// the bracket is ordinary array/slice/template access.
 	ex_string_view struct_field_name = {};
 	i64 tuple_index = -1;
+	// Synthetic tuple element produced by call argument unpacking. All elements
+	// from one expansion share `base` and must evaluate it only once.
+	bool is_unpack_element = false;
 };
 
 struct SliceExpression : Expression {
