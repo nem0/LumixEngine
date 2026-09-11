@@ -988,7 +988,6 @@ u32 EvoxModuleImpl::EvoxTypeDesc::getSize() const {
 			return sum;
 		}
 		default:
-			ASSERT(false); // unsupported serialized type
 			return 0;
 	}
 }
