@@ -1298,7 +1298,6 @@ struct LuaScriptModuleImpl final : LuaScriptModule {
 	}
 
 	bool shouldSerialize() override {
-		if (!m_property_names.empty()) return true;
 		if (!m_inline_scripts.empty()) return true;
 		if (!m_scripts.empty()) return true;
 		return false;
