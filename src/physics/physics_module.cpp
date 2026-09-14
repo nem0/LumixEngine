@@ -47,7 +47,6 @@
 #include "engine/resource_manager.h"
 #include "engine/world.h"
 #include "imgui/IconsFontAwesome5.h"
-#include "lua/lua_script_system.h"
 #include "physics/physics_module.h"
 #include "physics/physics_resources.h"
 #include "physics/physics_system.h"
@@ -2208,8 +2207,6 @@ struct PhysicsModuleImpl final : PhysicsModule
 
 	void startGame() override
 	{
-		auto* module = m_world.getModule("lua_script");
-		m_script_module = static_cast<LuaScriptModule*>(module);
 		m_is_game_running = true;
 
 		initJoints();
@@ -3776,7 +3773,6 @@ struct PhysicsModuleImpl final : PhysicsModule
 	HitReport m_hit_report;
 	PhysxContactCallback m_contact_callback;
 	PxScene* m_scene;
-	LuaScriptModule* m_script_module;
 	PhysicsSystem* m_system;
 	PxRigidDynamic* m_dummy_actor;
 	PxControllerManager* m_controller_manager;
@@ -3821,7 +3817,6 @@ PhysicsModuleImpl::PhysicsModuleImpl(Engine& engine, World& world, PhysicsSystem
 	, m_is_game_running(false)
 	, m_contact_callback(*this, allocator)
 	, m_joints(m_allocator)
-	, m_script_module(nullptr)
 	, m_debug_visualization_flags(0)
 	, m_update_in_progress(nullptr)
 	, m_vehicle_batch_query(nullptr)
