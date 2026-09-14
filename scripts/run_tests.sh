@@ -20,7 +20,6 @@ fi
   --no-navigation \
   --no-animation \
   --no-audio \
-  --no-lua \
   gmake
 
 make -C "$BUILD_DIR" -j config=debug64 tests
