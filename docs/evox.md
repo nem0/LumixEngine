@@ -18,46 +18,29 @@ A minimal root script is:
 import "core:input"
 import "core:world"
 
-var game_world : ?World = null;
-
-fn addWorld(world : World) : void {
-	game_world = world;
-}
-
-fn start(input : InputSystem) : void {
-	// Called after the worlds have been supplied to addWorld.
-}
-
-fn update(dt : f32) : void {
-	// Called once per game frame.
+fn main(input : InputSystem, world : World) : void {
+	while true {
+		const dt : f32 = yield;
+		// Game logic for this frame.
+	}
 }
 ```
 
-All three functions are optional. There is no special `main` function.
+The Evox system calls `main` when game mode starts, passing the input system and the first registered world. The script owns the frame loop and should yield once per frame; the yielded `f32` is the frame delta time.
 
 The repository's working example is [`demo/scripts/main.evox`](../demo/scripts/main.evox).
 
 ### Lifecycle
 
-When game mode starts, the Evox system:
-
-1. calls `addWorld(world)` once for every currently registered world;
-2. calls `start(input)` once;
-3. calls `update(dt)` on each game frame.
-
-Use these exact signatures when the functions are present:
+When game mode starts, the Evox system calls:
 
 ```evox
-fn addWorld(world : World) : void
-fn start(input : InputSystem) : void
-fn update(dt : f32) : void
+fn main(input : InputSystem, world : World) : void
 ```
 
-A world created while the game is already running is passed to `addWorld` immediately. `update` is not called while execution is suspended in the debugger.
+The `main` function is resumed once per frame after it yields. It is not called in edit mode. A world created after `main` starts is not passed to the script automatically; retain and manage additional worlds through the engine's world/module integration as needed.
 
-There is one Evox runtime shared by the Evox system, not one runtime per world. Consequently, script globals are shared by all worlds. A single `g_world` global is sufficient for projects that run one world, but a multi-world project must decide how to retain and identify every `World` passed to `addWorld`.
-
-Stopping game mode destroys and recreates the runtime, resetting script globals and suspended execution state. Compiling the root again also creates a fresh runtime. If this happens during game mode, the engine repeats the `addWorld` calls and then `start`.
+There is one Evox runtime shared by the Evox system, not one runtime per world. Consequently, script globals are shared by all worlds. Stopping game mode destroys and recreates the runtime, resetting script globals and the suspended `main` task. Compiling the root again also creates a fresh runtime.
 
 ### Compilation and errors
 
@@ -94,7 +77,7 @@ An alias creates a namespace:
 ```evox
 import "scripts/player" as player
 
-fn start(input : InputSystem) : void {
+fn init(input : InputSystem) : void {
 	player.init(input);
 }
 ```
@@ -273,8 +256,8 @@ Debug source names use import names. Studio maps `core:name` to `engine/scripts/
 - Confirm the Evox plugin is built and loaded.
 - Confirm the root is exactly `scripts/main.evox`.
 - Check the Studio log for source or bytecode compilation errors.
-- Verify lifecycle names and signatures exactly.
-- Enter game mode; `start` and `update` do not run in edit mode.
+- Verify the `main(input, world)` signature exactly.
+- Enter game mode; `main` does not run in edit mode.
 
 ### An import cannot be found
 

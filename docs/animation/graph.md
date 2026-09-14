@@ -24,13 +24,6 @@ Each input have a name and one of the following types:
 * Boolean
 * Vector3
 
-To set value of an input from Lua script, use the following code:
-```lua
-local speed_input_idx = this.animator:getInputIndex("speed_y")
-local speed_y = 1.5
-this.animator:setFloatInput(speed_input_idx, speed_y)
-```
-
 ## Slots and sets
 
 Slots and sets are mechanisms used by the animation graph to access actual animations. An animation graph contains a collection of **slots**, which are essentially **strings**. Instead of referencing animations directly, nodes in the graph reference these slots. The actual **mapping between slots and animations is defined by a set**. A set does not necessarily contain mapping for every slot. Slots and sets can be managed on the left side of the animation graph editor.

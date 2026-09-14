@@ -8,7 +8,6 @@ local simple_options = {
 	{ "no-animation", "Do not build animation plugin." },
 	{ "no-renderer", "Do not build renderer plugin." },
 	{ "no-audio", "Do not build audio plugin." },
-	{ "no-lua", "Do not build lua plugin." },
 	{ "no-evox", "Do not build evox plugin." },
 	{ "no-ui", "Do not build UI plugin." },
 	{ "with-app", "Do build app." },
@@ -19,7 +18,6 @@ local simple_options = {
 	{ "debug-args", "Arguments passed to Studio in debug mode." },
 	{ "release-args", "Arguments passed to Studio in release mode." },
 	{ "no-studio", "Do not build Studio." },
-	{ "luau-dynamic", "Build luau as dynamic library. Only valid if Luau source code is available." },
 	-- Splitting in multiple project oversubsribes CPU threads when building with MSBuild.
 	-- MSBuild does cl invocation per project, with lots of threads in every invocation.
 	-- Splitting in projects also causes reporting by vcperf or Compile Score to be much less useful
@@ -51,16 +49,10 @@ local embed_resources = _OPTIONS["embed-resources"]
 local working_dir = _OPTIONS["working-dir"]
 local debug_args = _OPTIONS["debug-args"]
 local release_args = _OPTIONS["release-args"]
-local luau_dynamic = _OPTIONS["luau-dynamic"]
 local use_basisu =  _OPTIONS["with-basis-universal"]
 local dynamic_plugins = _OPTIONS["dynamic-plugins"]
 local split_projects = _OPTIONS["split-projects"] or dynamic_plugins
-local build_luau = os.isdir("../external/_repos/luau")
 local build_physx = os.isdir("../external/_repos/physx")
-
-if luau_dynamic and not build_luau then
-	printf("Luau source code not found, can't build Luau as dynamic library.")
-end
 
 local plugins = {}
 local base_plugins = {}
@@ -69,7 +61,7 @@ if _OPTIONS["plugins"] then
 	plugins = string.explode( _OPTIONS["plugins"], ",")
 end
 
-for	_, v in ipairs { "physics", "renderer", "audio", "ui", "animation", "navigation", "lua", "evox" } do
+for	_, v in ipairs { "physics", "renderer", "audio", "ui", "animation", "navigation", "evox" } do
 	if _OPTIONS["no-" .. v] == nil then
 		table.insert(plugins, v)
 		table.insert(base_plugins, v)
@@ -578,43 +570,6 @@ if plugin "ui" then
 	configuration { "vs*" }
 		links { "winmm", "psapi" }
 end
-	
-if plugin "lua" then
-	if build_luau and not luau_dynamic then
-		defines { "LUMIX_STATIC_LUAU" }
-	end
-
-	configuration { "vs20*" }
-		libdirs {  "../external/luau/lib/win" }
-		linkLib "Luau"
-		
-	configuration { "linux" }
-		libdirs {  "../external/luau/lib/linux" }
-		linkLib "Luau"
-
-	configuration {}
-
-	files { "../src/lua/**.h", "../src/lua/**.cpp" }
-	includedirs { "../external/luau/include"
-		, "../src"
-		, "../src/lua"
-	}
-	defines { "BUILDING_LUA" }
-	dynamic_link_plugin { "core", "engine" }
-
-	if hasPlugin "renderer" then
-		dynamic_link_plugin { "renderer" }
-	end
-
-	if build_luau and build_studio then
-		exe_project "studio"
-			linkLib "Luau"
-	end
-	if build_luau and build_app then
-		exe_project "app"
-			linkLib "Luau"
-	end
-end
 
 if plugin "evox" then
 	files { "../src/evox/**.h", "../src/evox/**.cpp", "../external/evox/**.cpp", "../external/evox/**.c", "../external/evox/**.h" }
@@ -663,7 +618,6 @@ if build_app then
 		buildPluginDefines()
 
 		if not dynamic_plugins then	
-			if hasPlugin "lua" then linkLib "Luau" end
 			if hasPlugin "physics" then linkPhysX() end
 			if use_basisu then linkLib "basisu" end
 			linkLib "freetype"
@@ -775,7 +729,6 @@ if build_studio then
 			linkLib "freetype"
 			if use_basisu then linkLib "basisu" end
 			if hasPlugin "physics" then linkPhysX() end
-			if hasPlugin "lua" then linkLib "Luau" end
 
 			configuration { "linux" }
 				links { "dl", "GL", "X11", "rt", "Xi" }
@@ -802,12 +755,6 @@ if build_studio then
 			callback()
 		end
 		
-		if not build_luau or luau_dynamic then
-			configuration { "windows" }
-				files { "../external/luau/lib/win/Luau.dll" }
-				copy { "../external/luau/lib/win/Luau.dll" }
-		end
-
 		configuration { "linux" }
 			links {"gtk-3", "gobject-2.0"}
 
@@ -955,76 +902,6 @@ else
 	printf("Using FreeType from external/freetype (prebuilt)")
 end
 
-if build_luau then
-	printf("Using Luau from external/_repos/luau (build from source code)")
-	project "Luau"
-		if luau_dynamic then
-			kind "SharedLib"
-		else
-			kind "StaticLib"
-		end
-		files { "../external/_repos/luau/Ast/src/**.cpp"
-			, "../external/_repos/luau/Ast/src/**.h"
-			, "../external/_repos/luau/CodeGen/src/**.cpp"
-			, "../external/_repos/luau/CodeGen/src/**.h"
-			, "../external/_repos/luau/Common/src/**.cpp"
-			, "../external/_repos/luau/Common/src/**.h"
-			, "../external/_repos/luau/Compiler/src/**.cpp"
-			, "../external/_repos/luau/Compiler/src/**.h"
-			, "../external/_repos/luau/VM/src/**.cpp"
-			, "../external/_repos/luau/VM/src/**.h"
-		}
-
-		if not luau_dynamic then
-			files { "../external/_repos/luau/Analysis/src/**.cpp"
-				, "../external/_repos/luau/Analysis/src/**.h"
-				, "../external/_repos/luau/Config/src/**.cpp"
-				, "../external/_repos/luau/Config/src/**.h"
-			}
-
-			includedirs { "../external/_repos/luau/Analysis/include/" 
-				, "../external/_repos/luau/Config/include/"
-			}
-		end
-
-		includedirs { "../external/_repos/luau/Ast/include/"
-			, "../external/_repos/luau/CodeGen/include/"
-			, "../external/_repos/luau/Common/include/"
-			, "../external/_repos/luau/Compiler/include/"
-			, "../external/_repos/luau/VM/include/"
-			, "../external/_repos/luau/VM/src/"
-		}
-
-		removeflags { "NoExceptions", "NoRTTI" }
-		configuration { "RelWithDebInfo" }
-			flags { "OptimizeSize", "ReleaseRuntime", "Symbols" }
-
-		configuration { "Debug" }
-			flags { "OptimizeSize", "ReleaseRuntime", "Symbols" }
-
-		configuration { "linux"}
-			targetdir "../external/luau/lib/linux"
-
-		configuration { "windows" }
-			targetdir "../external/luau/lib/win"
-			defines {
-				"_CRT_SECURE_NO_WARNINGS",
-				"LUA_API=__declspec(dllexport)",
-				"LUACODE_API=__declspec(dllexport)"
-			}
-			buildoptions_cpp { "/wd4267" }
-		configuration {}
-
-	if not luau_dynamic then
-		solution "LumixEngine"
-			configuration { "vs20*" }
-			defines { "LUMIX_LUAU_ANALYSIS" }
-			configuration {}
-	end
-else	
-	printf("Using Luau from external/luau (prebuilt)")
-end
-
 -- write plugins.inl
 local file = io.open("../src/engine/plugins.inl", "w")
 io.output(file)
@@ -1089,7 +966,6 @@ if build_tests then
 		linkLib "freetype"
 		if use_basisu then linkLib "basisu" end
 		if hasPlugin "physics" then linkPhysX() end
-		if hasPlugin "lua" then linkLib "Luau" end
 
 		libdirs { "../external/pix/bin/x64" }
 		

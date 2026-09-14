@@ -19,7 +19,6 @@ static_assert(sizeof(ExComponent) == 16);
 #include "audio/audio_module.h"
 #include "engine/core.h"
 #include "evox/evox_module.h"
-#include "lua/lua_script_system.h"
 #include "navigation/navigation_module.h"
 #include "physics/physics_module.h"
 #include "renderer/render_module.h"
@@ -76,18 +75,6 @@ namespace Lumix::Evox::generated {
 	static void evox_world_evox(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, World*, world);
 		IModule* module = world->getModule(reflection::getComponentType("evox"));
-		if (!module) {
-			EX_RESULT(frame, u8(0));
-			EX_RESULT(frame, (void*)nullptr);
-			return;
-		}
-		EX_RESULT(frame, u8(1));
-		EX_RESULT(frame, module);
-	}
-	
-	static void evox_world_lua_script(ex_runtime* runtime, ex_call_frame frame) {
-		EX_ARG(frame, World*, world);
-		IModule* module = world->getModule(reflection::getComponentType("lua_script"));
 		if (!module) {
 			EX_RESULT(frame, u8(0));
 			EX_RESULT(frame, (void*)nullptr);
@@ -275,34 +262,6 @@ namespace Lumix::Evox::generated {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("evox");
-		IModule* module = world ? world->getModule(component_type) : nullptr;
-		if (!world || entity.index < 0 || !world->hasEntity(EntityRef(entity.index)) || !module || !world->hasComponent(EntityRef(entity.index), component_type)) {
-			EX_RESULT(frame, u8(0));
-			EX_RESULT(frame, ExComponent(i32(0), (void*)nullptr));
-			return;
-		}
-		EX_RESULT(frame, u8(1));
-		EX_RESULT(frame, ExComponent(entity.index, module));
-	}
-	
-	static void evox_entity_lua_script(ex_runtime* runtime, ex_call_frame frame) {
-		EX_ARG(frame, ExEntity, entity);
-		World* world = entity.world;
-		const ComponentType component_type = reflection::getComponentType("lua_script");
-		IModule* module = world ? world->getModule(component_type) : nullptr;
-		if (!world || entity.index < 0 || !world->hasEntity(EntityRef(entity.index)) || !module || !world->hasComponent(EntityRef(entity.index), component_type)) {
-			EX_RESULT(frame, u8(0));
-			EX_RESULT(frame, ExComponent(i32(0), (void*)nullptr));
-			return;
-		}
-		EX_RESULT(frame, u8(1));
-		EX_RESULT(frame, ExComponent(entity.index, module));
-	}
-	
-	static void evox_entity_lua_script_inline(ex_runtime* runtime, ex_call_frame frame) {
-		EX_ARG(frame, ExEntity, entity);
-		World* world = entity.world;
-		const ComponentType component_type = reflection::getComponentType("lua_script_inline");
 		IModule* module = world ? world->getModule(component_type) : nullptr;
 		if (!world || entity.index < 0 || !world->hasEntity(EntityRef(entity.index)) || !module || !world->hasComponent(EntityRef(entity.index), component_type)) {
 			EX_RESULT(frame, u8(0));
@@ -893,50 +852,6 @@ namespace Lumix::Evox::generated {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("evox");
-		IModule* module = world ? world->getModule(component_type) : nullptr;
-		if (!world || entity.index < 0 || !world->hasEntity(EntityRef(entity.index)) || !module) {
-			EX_RESULT(frame, u8(0));
-			EX_RESULT(frame, ExComponent(i32(0), (void*)nullptr));
-			return;
-		}
-		if (!world->hasComponent(EntityRef(entity.index), component_type)) {
-			world->createComponent(component_type, EntityRef(entity.index));
-		}
-		if (!world->hasComponent(EntityRef(entity.index), component_type)) {
-			EX_RESULT(frame, u8(0));
-			EX_RESULT(frame, ExComponent(i32(0), (void*)nullptr));
-			return;
-		}
-		EX_RESULT(frame, u8(1));
-		EX_RESULT(frame, ExComponent(entity.index, module));
-	}
-	
-	static void evox_entity_createScript(ex_runtime* runtime, ex_call_frame frame) {
-		EX_ARG(frame, ExEntity, entity);
-		World* world = entity.world;
-		const ComponentType component_type = reflection::getComponentType("lua_script");
-		IModule* module = world ? world->getModule(component_type) : nullptr;
-		if (!world || entity.index < 0 || !world->hasEntity(EntityRef(entity.index)) || !module) {
-			EX_RESULT(frame, u8(0));
-			EX_RESULT(frame, ExComponent(i32(0), (void*)nullptr));
-			return;
-		}
-		if (!world->hasComponent(EntityRef(entity.index), component_type)) {
-			world->createComponent(component_type, EntityRef(entity.index));
-		}
-		if (!world->hasComponent(EntityRef(entity.index), component_type)) {
-			EX_RESULT(frame, u8(0));
-			EX_RESULT(frame, ExComponent(i32(0), (void*)nullptr));
-			return;
-		}
-		EX_RESULT(frame, u8(1));
-		EX_RESULT(frame, ExComponent(entity.index, module));
-	}
-	
-	static void evox_entity_createInlineScript(ex_runtime* runtime, ex_call_frame frame) {
-		EX_ARG(frame, ExEntity, entity);
-		World* world = entity.world;
-		const ComponentType component_type = reflection::getComponentType("lua_script_inline");
 		IModule* module = world ? world->getModule(component_type) : nullptr;
 		if (!world || entity.index < 0 || !world->hasEntity(EntityRef(entity.index)) || !module) {
 			EX_RESULT(frame, u8(0));
@@ -1985,72 +1900,6 @@ namespace Lumix::Evox::generated {
 		AudioModule* module = static_cast<AudioModule*>(entity.module);
 		EX_ARG(frame, bool, is_3d);
 		module->setAmbientSound3D(EntityRef(entity.index), is_3d);
-	}
-	
-	static void evox_lua_script_scripts_count_1969858549337313839(ex_runtime* runtime, ex_call_frame frame) {
-		EX_ARG(frame, ExComponent, component);
-		LuaScriptModule* module = static_cast<LuaScriptModule*>(component.module);
-		const i32 count = module->getScriptCount(EntityRef(component.index));
-		EX_RESULT(frame, count);
-	}
-	
-	static void evox_lua_script_scripts_item_14595206848404558398(ex_runtime* runtime, ex_call_frame frame) {
-		EX_ARG(frame, ExComponent, component);
-		LuaScriptModule* module = static_cast<LuaScriptModule*>(component.module);
-		EX_ARG(frame, i32, item_idx);
-		const i32 count = module->getScriptCount(EntityRef(component.index));
-		if (item_idx < 0 || item_idx >= count) {
-			EX_RESULT(frame, u8(0));
-			EX_RESULT(frame, i32(0));
-			EX_RESULT(frame, i32(0));
-			EX_RESULT(frame, (void*)nullptr);
-			return;
-		}
-		EX_RESULT(frame, u8(1));
-		EX_RESULT(frame, component.index);
-		EX_RESULT(frame, item_idx);
-		EX_RESULT(frame, module);
-	}
-	
-	static void evox_lua_script_scripts_isScriptEnabled_17964535321660095912(ex_runtime* runtime, ex_call_frame frame) {
-		EX_ARG(frame, i32, entity_idx);
-		EX_ARG(frame, i32, item_idx);
-		EX_ARG(frame, LuaScriptModule*, module);
-		auto ret = module->isScriptEnabled(EntityRef(entity_idx), item_idx);
-		EX_RESULT(frame, ret);
-	}
-	
-	static void evox_lua_script_scripts_enableScript_5627495313735532483(ex_runtime* runtime, ex_call_frame frame) {
-		EX_ARG(frame, i32, entity_idx);
-		EX_ARG(frame, i32, item_idx);
-		EX_ARG(frame, LuaScriptModule*, module);
-		EX_ARG(frame, bool, enable);
-		module->enableScript(EntityRef(entity_idx), item_idx, enable);
-	}
-	
-	static void evox_lua_script_scripts_getScriptPath_17603508703546419852(ex_runtime* runtime, ex_call_frame frame) {
-		EX_ARG(frame, i32, entity_idx);
-		EX_ARG(frame, i32, item_idx);
-		EX_ARG(frame, LuaScriptModule*, module);
-		auto ret = module->getScriptPath(EntityRef(entity_idx), item_idx);
-		ex_result_string(runtime, &frame, ex_string_view{ret.c_str(), (i64)ret.length()});
-	}
-	
-	static void evox_lua_script_scripts_setScriptPath_10019960863008180274(ex_runtime* runtime, ex_call_frame frame) {
-		EX_ARG(frame, i32, entity_idx);
-		EX_ARG(frame, i32, item_idx);
-		EX_ARG(frame, LuaScriptModule*, module);
-		EX_STRING_ARG(frame, path);
-		module->setScriptPath(EntityRef(entity_idx), item_idx, Path(StringView{path.begin, (u64)path.length}));
-	}
-	
-	static void evox_lua_script_inline_setInlineScriptCode_13127526837028390910(ex_runtime* runtime, ex_call_frame frame) {
-		EX_ARG(frame, ExComponent, entity);
-		LuaScriptModule* module = static_cast<LuaScriptModule*>(entity.module);
-		EX_STRING_ARG(frame, value);
-		char evox_string_arg_value[128];
-		copyString(Span(evox_string_arg_value), StringView{value.begin, (u64)value.length});
-		module->setInlineScriptCode(EntityRef(entity.index), evox_string_arg_value);
 	}
 	
 	static void evox_navmesh_zone_load_13918995704249104099(ex_runtime* runtime, ex_call_frame frame) {
@@ -5080,10 +4929,6 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:signal"), StringView("signal")}, &evox_entity_signal);
 		functions.insert({StringView("core:evox"), StringView("createEvox")}, &evox_entity_createEvox);
 		functions.insert({StringView("core:evox"), StringView("evox")}, &evox_entity_evox);
-		functions.insert({StringView("core:lua_script"), StringView("createScript")}, &evox_entity_createScript);
-		functions.insert({StringView("core:lua_script"), StringView("lua_script")}, &evox_entity_lua_script);
-		functions.insert({StringView("core:lua_script_inline"), StringView("createInlineScript")}, &evox_entity_createInlineScript);
-		functions.insert({StringView("core:lua_script_inline"), StringView("lua_script_inline")}, &evox_entity_lua_script_inline);
 		functions.insert({StringView("core:navmesh_zone"), StringView("createZone")}, &evox_entity_createZone);
 		functions.insert({StringView("core:navmesh_zone"), StringView("navmesh_zone")}, &evox_entity_navmesh_zone);
 		functions.insert({StringView("core:navmesh_agent"), StringView("createAgent")}, &evox_entity_createAgent);
@@ -5197,15 +5042,6 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:ambient_sound"), StringView("setClip")}, &evox_ambient_sound_setAmbientSoundClip_1977866805267527577);
 		functions.insert({StringView("core:ambient_sound"), StringView("getIs_3D")}, &evox_ambient_sound_isAmbientSound3D_6191921949559533236);
 		functions.insert({StringView("core:ambient_sound"), StringView("setIs_3D")}, &evox_ambient_sound_setAmbientSound3D_7682859713366114688);
-		functions.insert({StringView("core:lua_script"), StringView("scriptsCount")}, &
-		evox_lua_script_scripts_count_1969858549337313839);
-		functions.insert({StringView("core:lua_script"), StringView("scripts")}, &
-		evox_lua_script_scripts_item_14595206848404558398);
-		functions.insert({StringView("core:lua_script"), StringView("isScriptEnabled")}, &evox_lua_script_scripts_isScriptEnabled_17964535321660095912);
-		functions.insert({StringView("core:lua_script"), StringView("enableScript")}, &evox_lua_script_scripts_enableScript_5627495313735532483);
-		functions.insert({StringView("core:lua_script"), StringView("getScriptPath")}, &evox_lua_script_scripts_getScriptPath_17603508703546419852);
-		functions.insert({StringView("core:lua_script"), StringView("setScriptPath")}, &evox_lua_script_scripts_setScriptPath_10019960863008180274);
-		functions.insert({StringView("core:lua_script_inline"), StringView("setCode")}, &evox_lua_script_inline_setInlineScriptCode_13127526837028390910);
 		functions.insert({StringView("core:navmesh_zone"), StringView("load")}, &evox_navmesh_zone_load_13918995704249104099);
 		functions.insert({StringView("core:navmesh_zone"), StringView("drawNavmesh")}, &evox_navmesh_zone_drawNavmesh_5134955218642488807);
 		functions.insert({StringView("core:navmesh_zone"), StringView("drawCompactHeightfield")}, &evox_navmesh_zone_drawCompactHeightfield_5812805081547031182);

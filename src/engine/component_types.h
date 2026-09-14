@@ -11,8 +11,6 @@ LUMIX_ENGINE_API extern const ComponentType ambient_sound;
 LUMIX_ENGINE_API extern const ComponentType spline;
 LUMIX_ENGINE_API extern const ComponentType signal;
 LUMIX_ENGINE_API extern const ComponentType evox;
-LUMIX_ENGINE_API extern const ComponentType lua_script;
-LUMIX_ENGINE_API extern const ComponentType lua_script_inline;
 LUMIX_ENGINE_API extern const ComponentType navmesh_zone;
 LUMIX_ENGINE_API extern const ComponentType navmesh_agent;
 LUMIX_ENGINE_API extern const ComponentType physical_heightfield;

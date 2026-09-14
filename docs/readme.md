@@ -12,13 +12,6 @@
 * [Profiler](profiler.md)
 * [Crash Reporting](crash_reporting.md)
 
-# Lua
-* [Engine API](lua/engine_API.md)
-* [Type checking](lua/type_checking.md)
-* [Properties](lua/properties.md)
-* [Snippets](lua/snippets.md)
-* [Editor plugin](lua/editor_plugin.md)
-
 # Evox
 * [Evox overview](evox.md)
 * [Language reference](../external/evox/reference.md)

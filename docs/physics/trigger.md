@@ -7,24 +7,37 @@ Triggers are special collision shapes that detect when other objects enter or ex
 - Creating invisible boundaries or checkpoints
 - Implementing pickup detection for items
 
-Trigger events can be polled each frame using the physics module's polling functions. Call `getNumTriggerHits()` to get the number of trigger events for the current frame, then use `getTriggerHit()` to retrieve each event:
+## Evox API
 
-```lua
-import "core:physics" as physics
+Import `core:physics` to poll trigger events produced by the latest physics simulation step. `PhysicsModule.getTriggerHits` returns an iterator over `TriggerHitData` values:
 
-function update()
-	let num_hits = physics.getNumTriggerHits()
-	for i = 0..num_hits {
-		let hit = physics.getTriggerHit(i)
-		let entity1 = hit.e1
-		let entity2 = hit.e2
-		let touch_lost = hit.touch_lost
-		
-		if touch_lost {
-			-- Entity exited the trigger
-		} else {
-			-- Entity entered the trigger
+```evox
+import "core:physics"
+import "core:world"
+
+fn processTriggers(world : World) : void {
+	const physics = world.physics() else return;
+
+	for hit in physics.getTriggerHits() {
+		if hit.touch_lost {
+			// hit.e1 stopped overlapping hit.e2
+		}
+		else {
+			// hit.e1 started overlapping hit.e2
 		}
 	}
-end
+}
+```
+
+`hit.e1` is the entity configured as a trigger, `hit.e2` is the other entity, and `hit.touch_lost` distinguishes exit events from enter events. Consume the events each frame; do not retain the iterator.
+
+To enable or disable trigger behavior programmatically, use the rigid actor component:
+
+```evox
+import "core:rigid_actor"
+
+fn setTrigger(entity : Entity, enabled : bool) : void {
+	const actor = entity.rigid_actor() else return;
+	actor.setIsTrigger(enabled);
+}
 ```
