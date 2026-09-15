@@ -908,17 +908,48 @@ if const value = maybe_value() {
 ```
 
 Comparing a nullable value with `null` remains available as an ordinary boolean
-operation, but no longer narrows the value. A nullable value can also use the
-`else return` declaration form. The target annotation is optional and defaults
-to the nullable type's non-null inner type. The non-null value initializes the
-variable; the null case returns immediately:
+operation, but no longer narrows the value. A nullable value can also use an
+`else` guard on a declaration. The target annotation is optional and defaults to the
+nullable type's non-null inner type. The non-null value initializes the
+variable; the null case executes the guard:
 
 ```cpp
 fn load_entity() : void {
 	var e = find_entity() else return;
 	use_entity(e); // e is non-null here
 }
+
+fn require_entity() : entity.Entity {
+	var e = find_entity() else panic("entity not found");
+	return e;
+}
+
+fn load_or_default() : entity.Entity {
+	var e = find_entity() else return default_entity();
+	return e;
+}
 ```
+
+The general guard form is `else E`, where `E` must always terminate the
+current control-flow path. It may be `return;`, `return value;`,
+`panic(message);`, `break;`, `continue;`, or a block whose every path
+terminates:
+
+```cpp
+for item in items {
+	var e = find_entity(item) else continue;
+	use_entity(e);
+}
+
+var required = find_value() else {
+	log_error("value missing");
+	return;
+};
+```
+
+The return value must be implicitly convertible to the enclosing function's
+return type. The guard is executed only when the initializer is null.
+`panic(message)` is non-returning.
 
 Using a nullable value without a required null check is a compile-time error.
 
@@ -1607,15 +1638,17 @@ fn load() : IOError | SyntaxError | Warning | Result {
 The declaration
 
 ```cpp
-var v : T = expression else return;
+var v : T = expression else E;
 ```
 
-evaluates `expression` exactly once. Its static type must be a tagged union `U`. Treat a non-union `T` as the singleton member set `{T}`; a union `T` denotes all of its members. The member set denoted by `T` must be a nonempty proper subset of `U`'s member set.
+evaluates `expression` exactly once. Its static type must be a tagged union `U`.
+`E` must be an always-terminating guard as described for [nullable values](#nullable-values). Treat a non-union `T` as the singleton member set `{T}`; a union `T` denotes all of its members. The member set denoted by `T` must be a nonempty proper subset of `U`'s member set.
 
 - if the active member of the result belongs to `T`, the result narrowed to `T` initializes `v`
-- otherwise, the residual value (with the same active member and payload) is returned with type `U - T`; that residual type must be implicitly convertible to the enclosing function's return type
+- otherwise, `E` executes for the residual value; with `else return;`, the residual value is returned with type `U - T`, and that residual type must be implicitly convertible to the enclosing function's return type
+- `else return value;` returns the supplied value instead, which must be implicitly convertible to the enclosing function's return type; `else panic(message);` terminates execution with a panic
+- `break`, `continue`, and terminating blocks transfer control according to their ordinary statement semantics
 - when `T` is a union, `v` remains tagged and has static type `T`; the tag is remapped if needed, as with ordinary union widening
-- the failure path is an ordinary `return`, so applicable [`defer`](#defer) statements run
 - `T` equal to `U`, a `T` containing any member absent from `U`, and a non-union initializer are compile-time errors
 
 Subunion extraction can handle several members locally while propagating the rest:
@@ -3334,7 +3367,6 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 * contracts?
 	// #pre[player != null]
 	fn findClosestButton() : ClosestButton {
-* else break; else continue; else panic; else return foo;
 * type-safe c->evox function call
 
 * enum backing type

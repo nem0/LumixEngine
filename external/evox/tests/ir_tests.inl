@@ -109,18 +109,18 @@ TEST(ir_to_bytecode_array_bounds_check) {
 	// call (see DebugErrorSuspendsWhenEnabled); the host aborts to unwind.
 	ex_debug_event event;
 	EXPECT_EQ(test_call(runtime, toLs("negative")), EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS);
-	EXPECT_TRUE(ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) == EX_TASK_SUSPENDED);
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ((int)EX_DEBUG_PAUSE_ERROR, (int)event.reason);
 	test_abort(runtime);
-	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) != EX_TASK_SUSPENDED);
 
 	EXPECT_EQ(test_call(runtime, toLs("past_end")), EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS);
-	EXPECT_TRUE(ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) == EX_TASK_SUSPENDED);
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ((int)EX_DEBUG_PAUSE_ERROR, (int)event.reason);
 	test_abort(runtime);
-	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) != EX_TASK_SUSPENDED);
 	CAPI_END(module);
 	return true;
 }
@@ -154,32 +154,32 @@ TEST(ir_to_bytecode_array_index_kinds) {
 	test_diagnostics.output_enabled = false;
 	ex_debug_event event;
 	EXPECT_EQ(test_call(runtime, toLs("negative_i8")), EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS);
-	EXPECT_TRUE(ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) == EX_TASK_SUSPENDED);
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ((int)EX_DEBUG_PAUSE_ERROR, (int)event.reason);
 	test_abort(runtime);
-	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) != EX_TASK_SUSPENDED);
 
 	EXPECT_EQ(test_call(runtime, toLs("negative_i16")), EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS);
-	EXPECT_TRUE(ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) == EX_TASK_SUSPENDED);
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ((int)EX_DEBUG_PAUSE_ERROR, (int)event.reason);
 	test_abort(runtime);
-	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) != EX_TASK_SUSPENDED);
 
 	EXPECT_EQ(test_call(runtime, toLs("negative_i32")), EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS);
-	EXPECT_TRUE(ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) == EX_TASK_SUSPENDED);
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ((int)EX_DEBUG_PAUSE_ERROR, (int)event.reason);
 	test_abort(runtime);
-	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) != EX_TASK_SUSPENDED);
 
 	EXPECT_EQ(test_call(runtime, toLs("past_end_u8")), EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS);
-	EXPECT_TRUE(ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) == EX_TASK_SUSPENDED);
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
 	EXPECT_EQ((int)EX_DEBUG_PAUSE_ERROR, (int)event.reason);
 	test_abort(runtime);
-	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) != EX_TASK_SUSPENDED);
 	CAPI_END(module);
 	return true;
 }

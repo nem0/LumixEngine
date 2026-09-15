@@ -1185,9 +1185,10 @@ struct Parser {
 		if (!res->expression) return nullptr;
 		if (peekToken().type == Token::ELSE) {
 			consumeToken();
-			if (!consume(Token::RETURN)) return nullptr;
-			if (!consume(Token::SEMICOLON)) return nullptr;
-			res->else_return = true;
+			res->else_guard = statement();
+			if (!res->else_guard) return nullptr;
+
+			if (res->else_guard->kind == Statement::BLOCK && !consume(Token::SEMICOLON)) return nullptr;
 			return res;
 		}
 		if (!consume(Token::SEMICOLON)) return nullptr;

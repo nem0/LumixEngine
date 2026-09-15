@@ -131,7 +131,7 @@ TEST(YieldSuspendsAndResumes) {
 	RuntimeGuard runtime(module, &module_host);
 	EXPECT_TRUE(runtime);
 	EXPECT_EQ(EX_CALL_RESULT_SUSPENDED, test_call(runtime, toLs("main")));
-	EXPECT_EQ(1, ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) == EX_TASK_SUSPENDED);
 	EXPECT_EQ(EX_RESULT_FAILURE, ex_debug_pause_event(runtime, nullptr)); // invalid output is rejected
 	// The event itself is available and identifies a language-level yield.
 	ex_debug_event event = {};
@@ -139,7 +139,7 @@ TEST(YieldSuspendsAndResumes) {
 	EXPECT_EQ(EX_DEBUG_PAUSE_YIELD, event.reason);
 	EXPECT_EQ(EX_CALL_RESULT_OK, ex_task_resume(runtime, nullptr, nullptr, 0));
 	EXPECT_EQ(2, ex_task_to_i32(runtime, -1));
-	EXPECT_EQ(0, ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) != EX_TASK_SUSPENDED);
 	CAPI_END(module);
 	return true;
 }

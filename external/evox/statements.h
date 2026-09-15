@@ -57,14 +57,17 @@ struct VarDeclStatement : Statement {
 	Expression* type_expr = nullptr;
 	ResolvedType* resolved_type = nullptr;
 	Expression* expression = nullptr;
-	ResolvedType* else_return_type = nullptr;
-	bool else_return = false;
-	bool else_return_zero = false;
-	u64 else_return_target_mask = 0;
+	Statement* else_guard = nullptr;
+	ResolvedType* guard_residual_type = nullptr;
 	bool is_immutable = false;
 	bool is_comptime = false;
 	StorageSlot slot;
 };
+
+inline bool isResidualReturnGuard(const VarDeclStatement& declaration) {
+	if (!declaration.else_guard || declaration.else_guard->kind != Statement::RETURN) return false;
+	return !static_cast<const ReturnStatement*>(declaration.else_guard)->expression;
+}
 
 struct AssignStatement : Statement {
 	AssignStatement() : Statement(ASSIGN) {}

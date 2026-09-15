@@ -1474,9 +1474,7 @@ struct Checker {
 				st->name = s->name;
 				st->type_expr = cloneExpression(unit, s->type_expr, bindings);
 				st->expression = cloneExpression(unit, s->expression, bindings);
-				st->else_return = s->else_return;
-				st->else_return_zero = s->else_return_zero;
-				st->else_return_target_mask = s->else_return_target_mask;
+				st->else_guard = cloneStatement(unit, s->else_guard, bindings);
 				st->is_immutable = s->is_immutable;
 				st->is_comptime = s->is_comptime;
 				out = st;
@@ -4399,6 +4397,53 @@ struct Checker {
 		}
 	}
 
+	// A declaration guard must prevent execution from reaching the declaration
+	// on every path. Returns/panics leave the function, while break/continue
+	// leave the current loop iteration.
+	static bool statementAlwaysTerminates(Statement& st) {
+		switch (st.kind) {
+			case Statement::RETURN:
+			case Statement::BREAK:
+			case Statement::CONTINUE: return true;
+			case Statement::EXPRESSION: {
+				Expression* expression = static_cast<ExpressionStatement&>(st).expression;
+				return expression && expression->kind == Expression::PANIC;
+			}
+			case Statement::BLOCK: {
+				for (Statement* child : static_cast<BlockStatement&>(st).statements) {
+					if (statementAlwaysTerminates(*child)) return true;
+				}
+				return false;
+			}
+			case Statement::LABEL: return statementAlwaysTerminates(*static_cast<LabelStatement&>(st).statement);
+			case Statement::IF: {
+				IfStatement& ifst = static_cast<IfStatement&>(st);
+				if (ifst.comptime_known) {
+					Statement* selected = ifst.comptime_value ? static_cast<Statement*>(ifst.body) : ifst.else_branch;
+					return selected && statementAlwaysTerminates(*selected);
+				}
+				return ifst.else_branch
+					&& statementAlwaysTerminates(*ifst.body)
+					&& statementAlwaysTerminates(*ifst.else_branch);
+			}
+			case Statement::MATCH: {
+				MatchStatement& ms = static_cast<MatchStatement&>(st);
+				if (ms.comptime_known) {
+					return ms.comptime_arm >= 0 && statementAlwaysTerminates(*ms.arms[(u32)ms.comptime_arm].body);
+				}
+				bool exhaustive = ms.subject && ms.subject->resolved_type
+					&& (ms.subject->resolved_type->kind == ResolvedTypeKind::UNION
+						|| ms.subject->resolved_type->kind == ResolvedTypeKind::ENUM);
+				for (MatchArm& arm : ms.arms) {
+					if (arm.is_fallback) exhaustive = true;
+					if (!statementAlwaysTerminates(*arm.body)) return false;
+				}
+				return exhaustive;
+			}
+			default: return false;
+		}
+	}
+
 	// Conservative reachability check: true only if every path through `st`
 	// is guaranteed to hit a `return`. Loops are never credited (the body may
 	// run zero times) and `match` is only credited when it has a fallback arm
@@ -4541,6 +4586,11 @@ struct Checker {
 			}
 		}
 
+		if (var.is_comptime && var.else_guard) {
+			errorLine(var.token, "comptime declarations cannot have an else guard");
+			return false;
+		}
+
 		if (var.is_comptime) {
 			Expression* expr = checkExpr(unit, &ctx, *var.expression, annotation);
 			if (!expr) return false;
@@ -4579,7 +4629,9 @@ struct Checker {
 		if (!expr_type) return false;
 
 		if (!requireMaterializable(*var.expression, "a runtime variable initializer")) return false;
-		if (var.else_return) {
+		const bool has_else_guard = var.else_guard != nullptr;
+		const bool residual_return_guard = isResidualReturnGuard(var);
+		if (has_else_guard) {
 			if (expr_type->kind == ResolvedTypeKind::NULLABLE) {
 				ResolvedType* inner = static_cast<NullableResolvedType*>(expr_type)->inner;
 				if (annotation && !typesEqual(annotation, inner)) {
@@ -4587,7 +4639,7 @@ struct Checker {
 					return false;
 				}
 				if (!annotation) annotation = inner;
-				if (return_type->kind != ResolvedTypeKind::VOID) {
+				if (residual_return_guard && return_type->kind != ResolvedTypeKind::VOID) {
 					errorLine(var.token, "else return with a nullable initializer requires a void function");
 					return false;
 				}
@@ -4597,7 +4649,7 @@ struct Checker {
 				return false;
 			}
 			if (expr_type->kind != ResolvedTypeKind::UNION) {
-				var.else_return_type = nullptr;
+				var.guard_residual_type = nullptr;
 			}
 			else {
 			UnionResolvedType& source = static_cast<UnionResolvedType&>(*expr_type);
@@ -4630,17 +4682,23 @@ struct Checker {
 						if (typesEqual(member, target_member)) { selected = true; break; }
 					}
 				}
-				if (selected) var.else_return_target_mask |= 1ull << (u32)member_index;
 				if (!selected) residual.push(member);
 			}
-			var.else_return_type = residual.size() == 1 ? residual[0] : getUnionType(residual);
-			const bool checks_residual_return = return_type->kind == ResolvedTypeKind::STRUCT
-				|| return_type->kind == ResolvedTypeKind::UNION;
-			if (checks_residual_return && !canImplicitlyConvert(var.else_return_type, return_type)) {
-				errorLine(var.token, "else return residual type ", var.else_return_type,
+			if (residual_return_guard) var.guard_residual_type = residual.size() == 1 ? residual[0] : getUnionType(residual);
+			const bool checks_residual_return = residual_return_guard && (return_type->kind == ResolvedTypeKind::STRUCT
+				|| return_type->kind == ResolvedTypeKind::UNION);
+			if (checks_residual_return && !canImplicitlyConvert(var.guard_residual_type, return_type)) {
+				errorLine(var.token, "else return residual type ", var.guard_residual_type,
 					" cannot be returned from function returning ", return_type);
 				return false;
 			}
+			}
+		}
+		if (var.else_guard && !residual_return_guard) {
+			if (!checkStatement(unit, ctx, var.else_guard, return_type, {})) return false;
+			if (!statementAlwaysTerminates(*var.else_guard)) {
+				errorLine(var.else_guard->token, "else guard must terminate on every control-flow path");
+				return false;
 			}
 		}
 		if (annotation && annotation->kind == ResolvedTypeKind::ANY && var.slot.storage == StorageSlot::GLOBAL) {
@@ -4649,7 +4707,7 @@ struct Checker {
 			errorLine(var.token, "any value cannot reference a temporary or local storage in a global initializer");
 			return false;
 		}
-		if (!var.else_return && annotation && !canImplicitlyConvert(expr_type, annotation)) {
+		if (!has_else_guard && annotation && !canImplicitlyConvert(expr_type, annotation)) {
 			errorLine(var.token, "Cannot convert initializer expression of type ", expr_type, " to annotated type ", annotation);
 			return false;
 		}

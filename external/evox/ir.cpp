@@ -1941,7 +1941,8 @@ struct IRBuilder {
 			case Statement::VAR_DECL: {
 				auto& vd = static_cast<VarDeclStatement&>(st);
 				if (vd.is_comptime) break;
-				if (vd.else_return) {
+				if (vd.else_guard) {
+					const bool residual_return_guard = isResidualReturnGuard(vd);
 					EX_ASSERT(vd.expression->resolved_type);
 					if (vd.expression->resolved_type->kind == ResolvedTypeKind::NULLABLE) {
 						auto& nullable = static_cast<NullableResolvedType&>(*vd.expression->resolved_type);
@@ -1970,17 +1971,17 @@ struct IRBuilder {
 						payload.offset = 1;
 						payload.size = typeByteSize(*nullable.inner);
 						branch.false_block->ops.push(&dest);
+						if (residual_return_guard) buildReturnIR(*branch.true_block, nullptr);
+						else buildStatementIR(*vd.else_guard, *branch.true_block);
 						locals.push({vd.name, &dest});
-						buildReturnIR(*branch.true_block, nullptr);
 						parent.ops.push(&branch);
 						break;
 					}
-					// var v : T = expr else return;
-					// Evaluate expr once. If its tag is in T, bind v (extract or remap).
-					// Otherwise return the residual U-T, converted to the function return type.
+					// Evaluate the union once. If its tag is in T, bind v (extract or
+					// remap); otherwise execute the guard.
 					EX_ASSERT(vd.expression->resolved_type);
 					EX_ASSERT(vd.expression->resolved_type->kind == ResolvedTypeKind::UNION);
-					EX_ASSERT(vd.else_return_type);
+					EX_ASSERT(!residual_return_guard || vd.guard_residual_type);
 					EX_ASSERT(vd.resolved_type);
 					auto& source_union = static_cast<UnionResolvedType&>(*vd.expression->resolved_type);
 					auto& tmp = allocAlloca(vd.expression->resolved_type, {}, &buildExpressionIR(*vd.expression, true));
@@ -1994,7 +1995,12 @@ struct IRBuilder {
 					tag.size = sizeof(i32);
 					ExIrOp* condition = nullptr;
 					for (i32 i = 0; i < source_union.members.size(); ++i) {
-						if ((vd.else_return_target_mask & (1ull << (u32)i)) == 0) continue;
+						ResolvedType* member = source_union.members[i];
+						bool selected = typesEqual(member, vd.resolved_type);
+						if (!selected && vd.resolved_type->kind == ResolvedTypeKind::UNION) {
+							selected = unionMemberIndex(static_cast<UnionResolvedType&>(*vd.resolved_type), member) >= 0;
+						}
+						if (!selected) continue;
 						auto& expected = alloc<ExOpLoadConst>();
 						expected.type = &tag_type;
 						memcpy(expected.value, &i, sizeof(i));
@@ -2023,9 +2029,13 @@ struct IRBuilder {
 					branch.true_block->ops.push(&dest);
 					locals.push({vd.name, &dest});
 
-					ExIrOp* residual = &convertValue(loadAllocaValue(tmp), *tmp.type, *vd.else_return_type);
-					if (return_type) residual = &convertValue(*residual, *vd.else_return_type, *return_type);
-					buildReturnIR(*branch.false_block, residual);
+					if (residual_return_guard) {
+						ExIrOp* residual = &convertValue(loadAllocaValue(tmp), *tmp.type, *vd.guard_residual_type);
+						if (return_type) residual = &convertValue(*residual, *vd.guard_residual_type, *return_type);
+						buildReturnIR(*branch.false_block, residual);
+					} else {
+						buildStatementIR(*vd.else_guard, *branch.false_block);
+					}
 					parent.ops.push(&branch);
 					break;
 				}

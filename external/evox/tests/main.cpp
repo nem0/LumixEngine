@@ -338,7 +338,7 @@ TEST_TASK_ACCESSOR(ex_task_to_ptr, void*)
 #undef TEST_TASK_ACCESSOR
 static const void* ex_task_result(ex_runtime* runtime, u32* size) { return ex_task_result(test_task_for_runtime(runtime), size); }
 
-static int ex_debug_is_suspended(ex_runtime* runtime) { return ex_debug_is_suspended(test_task_for_runtime(runtime)); }
+static ex_task_state ex_task_get_state(ex_runtime* runtime) { return ex_task_get_state(test_task_for_runtime(runtime)); }
 static ex_result ex_debug_pause_event(ex_runtime* runtime, ex_debug_event* event) { return ex_debug_pause_event(test_task_for_runtime(runtime), event); }
 static ex_call_result ex_debug_resume(ex_runtime* runtime, ex_debug_action action) { return ex_debug_resume(test_task_for_runtime(runtime), action); }
 static u32 ex_debug_stack_depth(ex_runtime* runtime) { return ex_debug_stack_depth(test_task_for_runtime(runtime)); }
@@ -404,6 +404,7 @@ static void nativeReenter(ex_runtime* runtime, ex_call_frame) {
 #include "control_flow_tests.inl"
 #include "enum_tests.inl"
 #include "nullable_tests.inl"
+#include "else_guard_tests.inl"
 #include "union_tests.inl"
 #include "pointer_tests.inl"
 #include "match_tests.inl"

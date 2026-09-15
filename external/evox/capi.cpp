@@ -339,6 +339,7 @@ struct DefinitionQuery {
 				set(v->name_token, v->name_token, (u32)v->name_token.value.length);
 				visitExpression(v->type_expr);
 				visitExpression(v->expression);
+				visitStatement(v->else_guard);
 				break;
 			}
 			case Statement::ASSIGN: {

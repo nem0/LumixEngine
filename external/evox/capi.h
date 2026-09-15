@@ -609,8 +609,6 @@ typedef struct ex_debug_event {
 	ex_string_view message;
 } ex_debug_event;
 
-int ex_debug_is_suspended(ex_task* task);
-
 ex_result ex_debug_pause_event(ex_task* task, ex_debug_event* out_event);
 
 // Re-enter the task where it paused. Must be called on the script thread;

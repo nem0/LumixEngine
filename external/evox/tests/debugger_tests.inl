@@ -448,11 +448,11 @@ TEST(DebugBreakpointSuspendsWhenEnabled) {
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, &resolved_line));
 	EXPECT_EQ(4u, resolved_line);
 
-	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) != EX_TASK_SUSPENDED);
 
 	const ex_call_result call_result = test_call(runtime, toLs("main"));
 	EXPECT_EQ((int)EX_CALL_RESULT_SUSPENDED, (int)call_result);
-	EXPECT_TRUE(ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) == EX_TASK_SUSPENDED);
 
 	ex_debug_event event;
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
@@ -465,7 +465,7 @@ TEST(DebugBreakpointSuspendsWhenEnabled) {
 
 	const ex_call_result resume_result = ex_debug_resume(runtime, EX_DEBUG_CONTINUE);
 	EXPECT_EQ((int)EX_CALL_RESULT_OK, (int)resume_result);
-	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) != EX_TASK_SUSPENDED);
 	EXPECT_EQ(2, ex_task_to_i32(runtime, -1));
 
 	CAPI_END(module);
@@ -487,7 +487,7 @@ TEST(DebugBreakpointSuspendsByDefault) {
 
 	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 4u, nullptr));
 	EXPECT_EQ((int)EX_CALL_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
-	EXPECT_TRUE(ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) == EX_TASK_SUSPENDED);
 	EXPECT_EQ((int)EX_CALL_RESULT_OK, (int)ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
 	EXPECT_EQ(2, ex_task_to_i32(runtime, -1));
 
@@ -541,7 +541,7 @@ TEST(DebugErrorSuspendsWhenEnabled) {
 	test_diagnostics.output_enabled = false;
 
 	EXPECT_EQ((int)EX_CALL_RESULT_DIVISION_BY_ZERO, (int)test_call(runtime, toLs("main")));
-	EXPECT_TRUE(ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) == EX_TASK_SUSPENDED);
 
 	ex_debug_event event;
 	EXPECT_TRUE(ex_debug_pause_event(runtime, &event));
@@ -552,7 +552,7 @@ TEST(DebugErrorSuspendsWhenEnabled) {
 	EXPECT_TRUE(equalStrings(ex_debug_frame_function_name(runtime, 1), toLs("main")));
 
 	test_abort(runtime);
-	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) != EX_TASK_SUSPENDED);
 
 	CAPI_END(module);
 	return true;
@@ -575,7 +575,7 @@ TEST(DebugAbortingSuspendedRuntimeUnblocksCalls) {
 	EXPECT_EQ((int)EX_CALL_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
 
 	test_abort(runtime);
-	EXPECT_TRUE(!ex_debug_is_suspended(runtime));
+	EXPECT_TRUE(ex_task_get_state(runtime) != EX_TASK_SUSPENDED);
 
 	ex_debug_remove_all_breakpoints(runtime.bytecode);
 	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));

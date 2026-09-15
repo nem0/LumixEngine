@@ -1528,7 +1528,7 @@ ex_call_result ex_call(ex_task* task, ex_string_view function_name, const void* 
 	task->executing = true;
 	const ex_call_result result = runtime_execute_function(task, function, NULL);
 	task->executing = false;
-	if (result == EX_CALL_RESULT_SUSPENDED) task->state = EX_TASK_SUSPENDED;
+	if (task->is_suspended) task->state = EX_TASK_SUSPENDED;
 	else if (result == EX_CALL_RESULT_OK) task->state = EX_TASK_READY;
 	else task->state = EX_TASK_FAILED;
 	return result;
@@ -1593,7 +1593,7 @@ ex_call_result ex_task_resume(ex_task* task, const ex_type* type, const void* da
 	task->executing = true;
 	const ex_call_result result = ex_task_resume_suspended(task);
 	task->executing = false;
-	if (result == EX_CALL_RESULT_SUSPENDED) task->state = EX_TASK_SUSPENDED;
+	if (task->is_suspended) task->state = EX_TASK_SUSPENDED;
 	else if (result == EX_CALL_RESULT_OK) task->state = EX_TASK_READY;
 	else task->state = EX_TASK_FAILED;
 	return result;

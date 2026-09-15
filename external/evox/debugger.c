@@ -181,10 +181,6 @@ void ex_debug_remove_all_breakpoints(ex_bytecode* bytecode) {
 	bytecode->breakpoint_count = 0u;
 }
 
-int ex_debug_is_suspended(ex_task* task) {
-	return task && task->is_suspended ? 1 : 0;
-}
-
 ex_result ex_debug_pause_event(ex_task* task, ex_debug_event* out_event) {
 	if (!task || !out_event) return EX_RESULT_FAILURE;
 	if (!task->is_suspended) return EX_RESULT_FAILURE;
@@ -204,7 +200,7 @@ ex_call_result ex_debug_resume(ex_task* task, ex_debug_action action) {
 	task->executing = true;
 	const ex_call_result result = ex_task_resume_suspended(task);
 	task->executing = false;
-	if (result == EX_CALL_RESULT_SUSPENDED) task->state = EX_TASK_SUSPENDED;
+	if (task->is_suspended) task->state = EX_TASK_SUSPENDED;
 	else if (result == EX_CALL_RESULT_OK) task->state = EX_TASK_READY;
 	else task->state = EX_TASK_FAILED;
 	return result;
