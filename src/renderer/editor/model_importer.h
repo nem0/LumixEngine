@@ -60,9 +60,19 @@ struct ModelImporter {
 		{}
 
 		Matrix matrix = Matrix::IDENTITY;
+		u64 parent_id = 0;
 		u32 mesh_index = 0xFFffFFff;
 		u32 geometry_idx = 0xffFFffFF;
 		u32 lod = 0;
+		String name;
+	};
+
+	struct ImportObject {
+		ImportObject(IAllocator& allocator) : name(allocator) {}
+
+		u64 id = 0;
+		u64 parent_id = 0;
+		Matrix matrix = Matrix::IDENTITY;
 		String name;
 	};
 
@@ -172,6 +182,7 @@ protected:
 	Array<Bone> m_bones; // parent must be before children
 	Array<ImportMaterial> m_materials;
 	Array<ImportMesh> m_meshes;
+	Array<ImportObject> m_objects;
 	Array<ImportGeometry> m_geometries;
 	Array<ImportAnimation> m_animations;
 	Array<DVec3> m_lights;

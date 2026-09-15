@@ -49,6 +49,40 @@ static StringView fromEvox(ex_string_view value) {
 	return {value.begin, (u64)value.length};
 }
 
+static const char* evoxCallResultName(ex_call_result result) {
+	switch (result) {
+		case EX_CALL_RESULT_OK: return "ok";
+		case EX_CALL_RESULT_SUSPENDED: return "suspended";
+		case EX_CALL_RESULT_FUNCTION_NOT_FOUND: return "function not found";
+		case EX_CALL_RESULT_INVALID_ARGUMENT: return "invalid argument";
+		case EX_CALL_RESULT_INVALID_STATE: return "invalid state";
+		case EX_CALL_RESULT_ALREADY_EXECUTING: return "already executing";
+		case EX_CALL_RESULT_NOT_SUSPENDED: return "not suspended";
+		case EX_CALL_RESULT_NOT_RESUMABLE: return "not resumable";
+		case EX_CALL_RESULT_OUT_OF_MEMORY: return "out of memory";
+		case EX_CALL_RESULT_RUNTIME_ERROR: return "runtime error";
+		case EX_CALL_RESULT_DIVISION_BY_ZERO: return "division by zero";
+		case EX_CALL_RESULT_MODULO_BY_ZERO: return "modulo by zero";
+		case EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS: return "index out of bounds";
+		case EX_CALL_RESULT_INVALID_FUNCTION_CALL: return "invalid function call";
+		case EX_CALL_RESULT_PANIC: return "panic";
+		case EX_CALL_RESULT_INVALID_YIELD_VALUE: return "invalid yield value";
+		case EX_CALL_RESULT_STACK_OVERFLOW: return "stack overflow";
+		case EX_CALL_RESULT_CALL_DEPTH: return "call depth exceeded";
+	}
+	return "unknown error";
+}
+
+static void logEvoxMainFailure(ex_task* task, ex_call_result result) {
+	logError("Evox main failed: ", evoxCallResultName(result), " (result ", (int)result, ")");
+	for (u32 i = 0, count = ex_debug_stack_depth(task); i < count; ++i) {
+		ex_debug_location location;
+		if (ex_debug_frame_location(task, i, &location) != EX_RESULT_OK) continue;
+		logError("  at ", fromEvox(location.source_name), ":", location.line + 1, ":", location.column + 1,
+			" (", fromEvox(ex_debug_frame_function_name(task, i)), ")");
+	}
+}
+
 static bool isSerializableType(const ex_type& type) {
 	switch (ex_type_get_kind(&type)) {
 		case EX_TYPE_BOOL:
@@ -176,7 +210,7 @@ struct EvoxSystemImpl : EvoxSystem {
 
 		const ex_type* dt_type = ex_primitive_type_from_kind(m_runtime, EX_TYPE_F32);
 		const ex_call_result result = ex_task_resume(m_task, dt_type, &time_delta, sizeof(time_delta));
-		if (result != EX_CALL_RESULT_SUSPENDED && result != EX_CALL_RESULT_OK) logError("Evox main failed");
+		if (result != EX_CALL_RESULT_SUSPENDED && result != EX_CALL_RESULT_OK) logEvoxMainFailure(m_task, result);
 	}
 
 	void loadRoot() {
@@ -193,7 +227,7 @@ struct EvoxSystemImpl : EvoxSystem {
 			World* world;
 		} args{&m_engine.getInputSystem(), &m_modules[0]->getWorld()};
 		const ex_call_result result = ex_call(m_task, function_name, &args, sizeof(args));
-		if (result != EX_CALL_RESULT_SUSPENDED && result != EX_CALL_RESULT_OK && result != EX_CALL_RESULT_FUNCTION_NOT_FOUND) logError("Evox main failed");
+		if (result != EX_CALL_RESULT_SUSPENDED && result != EX_CALL_RESULT_OK && result != EX_CALL_RESULT_FUNCTION_NOT_FOUND) logEvoxMainFailure(m_task, result);
 	}
 
 	static bool isEvoxDataType(const ex_type& type) {

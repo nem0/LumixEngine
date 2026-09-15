@@ -25,6 +25,7 @@ struct AssetBrowser : StudioApp::GUIPlugin {
 		virtual void update() {}
 		virtual void openEditor(const struct Path& path) = 0;
 		virtual void openMultiEditor(Span<const Path> paths) {}
+		virtual void onContextMenu(Span<const Path> paths) {}
 		// Return true if the resource type is read-only, i.e., no editor window opens when double-clicked in the asset browser.
 		virtual bool isReadOnly() { return false; }
 	};

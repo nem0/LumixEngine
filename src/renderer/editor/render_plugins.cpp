@@ -2056,6 +2056,23 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		}
 		
 		void importGUI() {
+			auto split_ui = [this]() {
+				ImGuiEx::Label("Split");
+				saveUndo(ImGui::Checkbox("##split", &m_meta.split));
+				if (m_meta.split) {
+					ImGuiEx::Label("Import all objects");
+					saveUndo(ImGui::Checkbox("##importallobjects", &m_meta.import_all_objects));
+					if (ImGui::Button("Recreate prefab")) {
+						ModelImporter* fbx_importer = createFBXImporter(m_app, m_app.getAllocator());
+						if (fbx_importer->parseSimple(m_resource->getPath())) {
+							if (!fbx_importer->writePrefab(m_resource->getPath(), m_meta)) logError("Failed to write prefab for ", m_resource->getPath());
+						}
+						else logError("Failed to load ", m_resource->getPath());
+						destroyFBXImporter(*fbx_importer);
+					}
+				}
+			};
+
 			if (m_has_meshes) {
 				ImGuiEx::Label("Bake vertex AO");
 				saveUndo(ImGui::Checkbox("##vrtxao", &m_meta.bake_vertex_ao));
@@ -2075,21 +2092,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				saveUndo(ImGui::Checkbox("##recomputetangents", &m_meta.force_recompute_tangents));
 				ImGuiEx::Label("Force skinned");
 				saveUndo(ImGui::Checkbox("##frcskn", &m_meta.force_skin));
-				ImGuiEx::Label("Split");
-				saveUndo(ImGui::Checkbox("##split", &m_meta.split));
-				if (m_meta.split && ImGui::Button("Recreate prefab")) {
-					ModelImporter* fbx_importer = createFBXImporter(m_app, m_app.getAllocator());
-					if (fbx_importer->parseSimple(m_resource->getPath())) {
-						if (!fbx_importer->writePrefab(m_resource->getPath(), m_meta)) {
-							logError("Failed to write materials for ", m_resource->getPath());
-						}
-					}
-					else {
-						logError("Failed to load ", m_resource->getPath());
-					}
-					destroyFBXImporter(*fbx_importer);
-				}
-
 				ImGuiEx::Label("Ignore animations");
 				saveUndo(ImGui::Checkbox("##ignoreanim", &m_meta.ignore_animations));
 				ImGuiEx::Label("Ignore material colors");
@@ -2177,6 +2179,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 					}
 					ImGui::EndCombo();
 				}
+
+				split_ui();
 
 				if (m_meta.physics != ModelMeta::Physics::NONE) {
 					ImGuiEx::Label("Create prefab with physics");
@@ -2281,8 +2285,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				saveUndo(ImGui::DragFloat("##aert", &m_meta.anim_translation_error, 0.01f));
 				ImGuiEx::Label("Animation rotation error");
 				saveUndo(ImGui::DragFloat("##aerr", &m_meta.anim_rotation_error, 0.01f));
+				split_ui();
 			}
-
+			
 			if (m_meta.clips.empty()) {
 				if (ImGui::Button(ICON_FA_PLUS " Add subclip")) {
 					m_meta.clips.emplace();

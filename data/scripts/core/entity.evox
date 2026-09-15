@@ -8,6 +8,8 @@ struct Entity { index : i32; world : cptr; }
 
 extern fn destroy(e : Entity) : void;
 extern fn isValid(e : Entity) : bool;
+extern fn getName(e : Entity) : []const u8;
+extern fn setName(e : Entity, name : []const u8) : void;
 extern fn getPosition(e : Entity) : DVec3;
 extern fn getRotation(e : Entity) : Quat;
 extern fn getScale(e : Entity) : Vec3;

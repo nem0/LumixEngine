@@ -93,6 +93,7 @@ struct ModelMeta {
 		WRITE_BOOL(bake_vertex_ao, false);
 		WRITE_BOOL(bake_impostor_normals, false);
 		WRITE_BOOL(split, false);
+		WRITE_BOOL(import_all_objects, false);
 		WRITE_BOOL(use_specular_as_roughness, true);
 		WRITE_BOOL(use_specular_as_metallic, false);
 		WRITE_BOOL(import_vertex_colors, false);
@@ -162,6 +163,7 @@ struct ModelMeta {
 			{ "scale", &scene_scale },
 			{ "culling_scale", &culling_scale },
 			{ "split", &split },
+			{ "import_all_objects", &import_all_objects },
 			{ "bake_impostor_normals", &bake_impostor_normals },
 			{ "bake_vertex_ao", &bake_vertex_ao },
 			{ "min_bake_vertex_ao", &min_bake_vertex_ao },
@@ -311,6 +313,7 @@ struct ModelMeta {
 
 	bool bake_impostor_normals = false;
 	bool split = false;
+	bool import_all_objects = false;
 	bool force_skin = false;
 	bool ignore_animations = false;
 	bool ignore_material_colors = false;

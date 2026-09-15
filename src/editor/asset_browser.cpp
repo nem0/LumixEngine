@@ -845,6 +845,21 @@ struct AssetBrowserImpl : AssetBrowser {
 				}
 				ImGui::EndMenu();
 			}
+
+			// A plugin can extend the context menu for a selection of its resources.
+			if (!m_selected_resources.empty()) {
+				IPlugin* plugin = getPluginFor(m_selected_resources[0]);
+				bool same_plugin = plugin != nullptr;
+				for (const Path& path : m_selected_resources) {
+					if (getPluginFor(path) != plugin) {
+						same_plugin = false;
+						break;
+					}
+				}
+				if (same_plugin) {
+					plugin->onContextMenu(m_selected_resources);
+				}
+			}
 		};
 
 		if (ImGui::BeginPopup("item_ctx")) {

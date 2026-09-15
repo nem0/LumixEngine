@@ -1015,7 +1015,7 @@ import "core:world"
 
 fn main(input : InputSystem, world : World) : void {
 	while true {
-		yield;
+		var time_delta : f32 = yield;
 		// Update logic here
 	}
 }

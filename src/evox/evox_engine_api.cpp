@@ -303,6 +303,25 @@ static bool evox_entity_isValid(ExEntity entity) {
 	return entity.world && entity.index >= 0 && entity.world->hasEntity(EntityRef{entity.index});
 }
 
+static void evox_entity_getName(ex_runtime*, ex_call_frame frame) {
+	const ExEntity entity = readArg<ExEntity>(frame);
+	ex_slice result = {};
+	if (entity.world && entity.index >= 0 && entity.world->hasEntity(EntityRef{entity.index})) {
+		const char* name = entity.world->getEntityName(EntityRef{entity.index});
+		result.data = (u8*)name;
+		result.length = (i64)strlen(name);
+	}
+	EX_RESULT(frame, result);
+}
+
+static void evox_entity_setName(ex_runtime*, ex_call_frame frame) {
+	const ExEntity entity = readArg<ExEntity>(frame);
+	EX_STRING_ARG(frame, name);
+	if (entity.world && entity.index >= 0 && entity.world->hasEntity(EntityRef{entity.index})) {
+		entity.world->setEntityName(EntityRef{entity.index}, StringView{name.begin, (u64)name.length});
+	}
+}
+
 static void evox_entity_setPosition(ExEntity entity, double x, double y, double z) {
 	entity.world->setPosition(EntityRef{entity.index}, DVec3(x, y, z));
 }
@@ -348,6 +367,8 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	// entity
 	functions.insert({"core:entity", "destroy"}, &wrap<evox_entity_destroy>);
 	functions.insert({"core:entity", "isValid"}, &wrap<evox_entity_isValid>);
+	functions.insert({"core:entity", "getName"}, &evox_entity_getName);
+	functions.insert({"core:entity", "setName"}, &evox_entity_setName);
 	functions.insert({"core:entity", "getPosition"}, &wrap<evox_entity_getPosition>);
 	functions.insert({"core:entity", "getRotation"}, &wrap<evox_entity_getRotation>);
 	functions.insert({"core:entity", "getScale"}, &wrap<evox_entity_getScale>);
