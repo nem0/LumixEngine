@@ -56,18 +56,19 @@ struct UITokenizer {
 	static bool isIdentifierChar(char c) { return isIdentifierStart(c) || isDigit(c) || c == '-'; }
 
 	void skipWhitespaces() {
-		while (m_current != m_document.end && isWhitespace(*m_current)) ++m_current;
-		if (m_current >= m_document.end - 1 || m_current[0] != '/') return;
+		const char* document_end = m_document.end();
+		while (m_current != document_end && isWhitespace(*m_current)) ++m_current;
+		if (m_current >= document_end - 1 || m_current[0] != '/') return;
 
 		if (m_current[1] == '/') {
 			m_current += 2;
-			while (m_current != m_document.end && *m_current != '\n') ++m_current;
-			if (m_current != m_document.end) ++m_current; // consume \n
+			while (m_current != document_end && *m_current != '\n') ++m_current;
+			if (m_current != document_end) ++m_current; // consume \n
 			skipWhitespaces();
 		} else if (m_current[1] == '*') {
 			m_current += 2;
-			while (m_current < m_document.end) {
-				if (m_current[0] == '*' && m_current < m_document.end - 1 && m_current[1] == '/') {
+			while (m_current < document_end) {
+				if (m_current[0] == '*' && m_current < document_end - 1 && m_current[1] == '/') {
 					m_current += 2;
 					break;
 				}
@@ -80,29 +81,29 @@ struct UITokenizer {
 	Token makeToken(UIToken::Type type) {
 		Token res;
 		res.type = type;
-		res.value.begin = m_token_start;
-		res.value.end = m_current;
+		res.value.data = m_token_start;
+		res.value.length = m_current - res.value.data;
 		if (type == UIToken::STRING) {
-			++res.value.begin;
-			--res.value.end;
+			++res.value.data;
+			res.value.length -= 2;
 		}
 		return res;
 	}
 
 	char advance() {
-		ASSERT(m_current < m_document.end);
+		ASSERT(m_current < m_document.end());
 		char c = *m_current;
 		++m_current;
 		return c;
 	}
 
 	char peekChar() {
-		if (m_current == m_document.end) return 0;
+		if (m_current == m_document.end()) return 0;
 		return *m_current;
 	}
 
 	char peekNextChar() {
-		if (m_current + 1 >= m_document.end) return 0;
+		if (m_current + 1 >= m_document.end()) return 0;
 		return *(m_current + 1);
 	}
 
@@ -127,13 +128,14 @@ struct UITokenizer {
 	}
 
 	Token stringToken() {
-		while (m_current != m_document.end && *m_current != '"') {
-			if (*m_current == '\\' && m_current + 1 != m_document.end) {
+		const char* document_end = m_document.end();
+		while (m_current != document_end && *m_current != '"') {
+			if (*m_current == '\\' && m_current + 1 != document_end) {
 				advance(); // skip backslash
 			}
 			advance();
 		}
-		if (m_current == m_document.end) return makeToken(UIToken::ERROR);
+		if (m_current == document_end) return makeToken(UIToken::ERROR);
 		advance(); // skip closing "
 		return makeToken(UIToken::STRING);
 	}
@@ -144,6 +146,7 @@ struct UITokenizer {
 	}
 
 	Token colorToken() {
+		const char* document_end = m_document.end();
 		int digits = 0;
 		while (digits < 8 && isHexDigit(peekChar())) {
 			advance();
@@ -152,19 +155,20 @@ struct UITokenizer {
 
 		if (digits != 6 && digits != 8) return makeToken(UIToken::ERROR);
 
-		if (m_current != m_document.end && isHexDigit(*m_current)) {
-			while (m_current != m_document.end && isHexDigit(*m_current)) {
+		if (m_current != document_end && isHexDigit(*m_current)) {
+			while (m_current != document_end && isHexDigit(*m_current)) {
 				advance();
 			}
 			return makeToken(UIToken::ERROR);
 		}
-		if (m_current != m_document.end && !isWhitespace(*m_current) && *m_current != ';' && *m_current != ']') return makeToken(UIToken::ERROR);
+		if (m_current != document_end && !isWhitespace(*m_current) && *m_current != ';' && *m_current != ']') return makeToken(UIToken::ERROR);
 		return makeToken(UIToken::COLOR);
 	}
 
 	Token textToken() {
+		const char* document_end = m_document.end();
 		// Consume special characters as text until we hit a structural token or whitespace
-		while (m_current != m_document.end && !isWhitespace(*m_current)) {
+		while (m_current != document_end && !isWhitespace(*m_current)) {
 			char c = peekChar();
 			// Stop at structural tokens
 			if (c == '{' || c == '}' || c == '[' || c == ']' || c == '=' || c == ':' || c == ';' || c == '.' || c == '$' || c == '#' || c == '"') {
@@ -184,7 +188,7 @@ struct UITokenizer {
 	Token nextToken() {
 		skipWhitespaces();
 		m_token_start = m_current;
-		if (m_current == m_document.end) return makeToken(UIToken::EOF);
+		if (m_current == m_document.end()) return makeToken(UIToken::EOF);
 
 		char c = advance();
 		if (isIdentifierStart(c)) return identifierToken();
@@ -214,7 +218,7 @@ struct UITokenizer {
 
 	int getLine() const {
 		int line = 1;
-		const char* p = m_document.begin;
+		const char* p = m_document.data;
 		while (p < m_current) {
 			if (*p == '\n') ++line;
 			++p;
@@ -224,8 +228,8 @@ struct UITokenizer {
 
 	int getLine(StringView location) const {
 		int line = 1;
-		const char* p = m_document.begin;
-		while (p < location.begin) {
+		const char* p = m_document.data;
+		while (p < location.data) {
 			if (*p == '\n') ++line;
 			++p;
 		}

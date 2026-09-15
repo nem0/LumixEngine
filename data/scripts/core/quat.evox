@@ -1,0 +1,81 @@
+import "std:math" as math
+
+extern struct Quat {
+	x : f32;
+	y : f32;
+	z : f32;
+	w : f32;
+}
+
+operator +(a : Quat, b : Quat) : Quat {
+	return Quat {
+		a.x + b.x,
+		a.y + b.y,
+		a.z + b.z,
+		a.w + b.w
+	};
+}
+
+operator -(a : Quat, b : Quat) : Quat {
+	return Quat {
+		a.x - b.x,
+		a.y - b.y,
+		a.z - b.z,
+		a.w - b.w
+	};
+}
+
+operator -(a : Quat) : Quat {
+	return Quat {
+		-a.x,
+		-a.y,
+		-a.z,
+		-a.w
+	};
+}
+
+operator *(a : Quat, b : f32) : Quat {
+	return Quat {
+		a.x * b,
+		a.y * b,
+		a.z * b,
+		a.w * b
+	};
+}
+
+operator *(a : f32, b : Quat) : Quat {
+	return Quat {
+		a * b.x,
+		a * b.y,
+		a * b.z,
+		a * b.w
+	};
+}
+
+operator /(a : Quat, b : f32) : Quat {
+	return Quat {
+		a.x / b,
+		a.y / b,
+		a.z / b,
+		a.w / b
+	};
+}
+
+operator *(a : Quat, b : Quat) : Quat {
+	return Quat {
+		a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+		a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+		a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+		a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z
+	};
+}
+
+fn makeQuatFromYaw(value : f32) : Quat {
+	const half = value * 0.5;
+	return { 0.0, math.sin(half), 0.0, math.cos(half) };
+}
+
+fn makeQuatFromPitch(value : f32) : Quat {
+	const half = value * 0.5;
+	return { -math.sin(half), 0.0, 0.0, math.cos(half) };
+}

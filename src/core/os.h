@@ -273,6 +273,7 @@ LUMIX_CORE_API void showCursor(bool show);
 LUMIX_CORE_API u32 getMonitors(Span<Monitor> monitors);
 LUMIX_CORE_API Point clientToScreen(WindowHandle win, int x, int y);
 LUMIX_CORE_API WindowHandle createWindow(const InitWindowArgs& args);
+LUMIX_CORE_API void* getNativeDisplay();
 LUMIX_CORE_API void showWindow(WindowHandle wnd);
 LUMIX_CORE_API void hideWindow(WindowHandle wnd);
 LUMIX_CORE_API bool getEvent(Event& event);

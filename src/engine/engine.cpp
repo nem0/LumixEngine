@@ -99,7 +99,7 @@ struct EngineImpl final : Engine {
 
 		logInfo("Engine created.");
 
-		SystemManager::createAllStatic(*this);
+		SystemManager::createAllStatic(*this, init_data.static_plugins);
 
 		m_system_manager->addSystem(createCorePlugin(*this), nullptr);
 

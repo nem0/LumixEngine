@@ -52,7 +52,7 @@ struct TestableCompiler : ParticleScriptCompiler {
 	{}
 	
 	void initTokenizer(StringView code) {
-		m_tokenizer.m_current = code.begin;
+		m_tokenizer.m_current = code.data;
 		m_tokenizer.m_document = code;
 		m_tokenizer.m_current_token = m_tokenizer.nextToken();
 	}

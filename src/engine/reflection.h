@@ -453,7 +453,7 @@ struct VariantCaller<R (C::*)(Args...)> {
 			(inst->*f)(fromVariant(I, args, VariantTag<RemoveCVR<Args>>{})...);
 		}
 		else {
-			auto v = (inst->*f)(fromVariant(I, args, VariantTag<RemoveCVR<Args>>{})...);
+			auto&& v = (inst->*f)(fromVariant(I, args, VariantTag<RemoveCVR<Args>>{})...);
 			if (ret_mem.length() == sizeof(v)) {
 				memcpy(ret_mem.m_begin, &v, sizeof(v));
 			}
@@ -469,7 +469,7 @@ struct VariantCaller<R (C::*)(Args...) const> {
 			(inst->*f)(fromVariant(I, args, VariantTag<RemoveCVR<Args>>{})...);
 		}
 		else {
-			auto v = (inst->*f)(fromVariant(I, args, VariantTag<RemoveCVR<Args>>{})...);
+			auto&& v = (inst->*f)(fromVariant(I, args, VariantTag<RemoveCVR<Args>>{})...);
 			if (ret_mem.length() == sizeof(v)) {
 				memcpy(ret_mem.m_begin, &v, sizeof(v));
 			}

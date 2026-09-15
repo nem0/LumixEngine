@@ -1,0 +1,23 @@
+import "core:dvec3"
+import "core:entity"
+import "core:vec3"
+import "std:math" as math
+
+var g_entity : Entity = undefined;
+var g_position : DVec3 = undefined;
+var g_time : f32 = 0.0;
+
+fn start(entity : Entity) : void {
+	g_entity = entity;
+	g_position = entity.getPosition();
+	g_time = 0.0;
+}
+
+fn update(time_delta : f32) : void {
+	g_time += time_delta;
+	g_entity.setPosition({
+		g_position.x + (math.cos(g_time) * 3.0) as f64,
+		g_position.y,
+		g_position.z + (math.sin(g_time) * 3.0) as f64
+	});
+}

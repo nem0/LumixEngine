@@ -36,6 +36,7 @@ template <typename T> struct DelegateList;
 
 //@ struct
 struct RaycastHit {
+	bool hit;
 	Vec3 position;
 	Vec3 normal;
 	EntityPtr entity;
@@ -47,6 +48,26 @@ struct SweepHit {
 	Vec3 normal;
 	EntityPtr entity;
 	float distance;
+};
+
+//@ struct
+struct ControllerHitData {
+	EntityRef controller;
+	EntityRef hit_entity;
+};
+
+//@ struct
+struct TriggerHitData {
+	EntityRef e1;
+	EntityRef e2;
+	bool touch_lost;
+};
+
+//@ struct
+struct ContactHitData {
+	EntityRef e1;
+	EntityRef e2;
+	Vec3 position;
 };
 
 //@ module PhysicsModule physics "Physics"
@@ -85,13 +106,15 @@ struct PhysicsModule : IModule {
 	virtual ~PhysicsModule() {}
 	virtual void forceUpdateDynamicActors(float time_delta) = 0;
 	virtual const Array<EntityRef>& getDynamicActors() = 0;
-	virtual DelegateList<void(const ContactData&)>& onContact() = 0;
-	
+
 	//@ functions
 	virtual EntityPtr raycast(Vec3 origin, Vec3 dir, float distance, EntityPtr ignore_entity) = 0;
 	virtual void setGravity(Vec3 gravity) = 0;
+	virtual Span<const ControllerHitData> getControllerHits() = 0;
+	virtual Span<const TriggerHitData> getTriggerHits() = 0;
+	virtual Span<const ContactHitData> getContactHits() = 0;
+	virtual RaycastHit raycastEx(Vec3 origin, Vec3 dir, float distance, EntityPtr ignored, i32 layer) = 0;
 	//@ end
-	virtual bool raycastEx(Vec3 origin, Vec3 dir, float distance, RaycastHit& result, EntityPtr ignored, i32 layer) = 0;
 	virtual bool sweepSphere(DVec3 pos, float radius, Vec3 dir, float distance, SweepHit& result, EntityPtr ignored, i32 layer) = 0;
 
 	virtual void createInstancedMesh(EntityRef entity) = 0;

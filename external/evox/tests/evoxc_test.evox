@@ -1,0 +1,5 @@
+extern fn print(value : []const u8) : void;
+
+fn main() : void {
+	print("evoxc smoke test");
+}

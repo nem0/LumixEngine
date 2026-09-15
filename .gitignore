@@ -7,6 +7,9 @@ obj/
 *.user
 *.nvuser
 *.orig
+*.obj
+tcc/
+raylib/
 .vscode
 .lumix
 studio.ini
@@ -20,4 +23,6 @@ src/engine/plugins.inl
 .shader_cache_dx11
 scripts/itch_io/
 !data/editor/scripts/plugins/
+external/evox/build/
 *.dmp
+vc140.pdb

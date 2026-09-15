@@ -3127,7 +3127,7 @@ struct PipelineImpl final : Pipeline {
 							stream->useProgram(program);
 							stream->bindIndexBuffer(mesh.index_buffer_handle);
 							stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-							stream->bindVertexBuffer(1, slice.buffer, slice.offset, sizeof(Vec3) * 3);
+							stream->bindVertexBuffer(1, slice.buffer, slice.offset, instanced_decl.getStride());
 							stream->drawIndexedInstanced(mesh.indices_count, count, mesh.index_type);
 							--i;
 						}
@@ -3240,7 +3240,7 @@ struct PipelineImpl final : Pipeline {
 						const u32 nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
 						if (nonintersecting_count) {
 							stream->useProgram(material->getShader()->getProgram(state, m_decal_decl, define_mask | material->getDefineMask(), ""));
-							stream->bindVertexBuffer(1, slice.buffer, slice.offset, 48);
+							stream->bindVertexBuffer(1, slice.buffer, slice.offset, sizeof(DecalData));
 							stream->drawIndexedInstanced(36, nonintersecting_count, gpu::DataType::U16);
 						}
 
@@ -3249,8 +3249,8 @@ struct PipelineImpl final : Pipeline {
 							state = state & ~gpu::StateFlags::CULL_BACK;
 							state = state | gpu::StateFlags::CULL_FRONT;
 							stream->useProgram(material->getShader()->getProgram(state, m_decal_decl, define_mask | material->getDefineMask(), ""));
-							const u32 offs = slice.offset + sizeof(float) * 12 * nonintersecting_count;
-							stream->bindVertexBuffer(1, slice.buffer, offs, 48);
+							const u32 offs = slice.offset + sizeof(DecalData) * nonintersecting_count;
+							stream->bindVertexBuffer(1, slice.buffer, offs, sizeof(DecalData));
 							stream->drawIndexedInstanced(36, count - nonintersecting_count, gpu::DataType::U16);
 						}
 						--i;

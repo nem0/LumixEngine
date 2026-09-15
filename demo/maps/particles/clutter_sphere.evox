@@ -1,0 +1,40 @@
+import "core:dvec3"
+import "core:entity"
+import "core:particle_emitter"
+import "core:random"
+import "core:vec3"
+import "std:math" as math
+
+var g_entity : Entity = undefined;
+var g_clutter : Entity = undefined;
+var g_start_position : DVec3 = undefined;
+var g_velocity : Vec3 = {10.0, 0.0, 0.0};
+
+fn randomVelocity() : void {
+	const angle = randFloatRange(0.0, 6.29);
+	g_velocity = {math.cos(angle) * 10.0, 0.0, math.sin(angle) * 10.0};
+}
+
+fn start(entity : Entity, clutter : Entity) : void {
+	g_entity = entity;
+	g_clutter = clutter;
+	g_start_position = entity.getPosition();
+}
+
+fn update(time_delta : f32) : void {
+	var position = g_entity.getPosition();
+	position.z += (time_delta * g_velocity.z) as f64;
+	position.x += (time_delta * g_velocity.x) as f64;
+	g_entity.setPosition(position);
+
+	const p = position;
+	if p.x < g_start_position.x and g_velocity.x < 0.0 { randomVelocity(); }
+	if p.z < g_start_position.z and g_velocity.z < 0.0 { randomVelocity(); }
+	if p.x > g_start_position.x + 18.0 and g_velocity.x > 0.0 { randomVelocity(); }
+	if p.z > g_start_position.z + 18.0 and g_velocity.z > 0.0 { randomVelocity(); }
+
+	if const emitter = g_clutter.particle_emitter() {
+		const id = emitter.getGlobalID("effector_pos");
+		emitter.setVec3Global(id, {p.x as f32, p.y as f32, p.z as f32});
+	}
+}

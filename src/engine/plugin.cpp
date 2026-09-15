@@ -197,7 +197,15 @@ namespace Lumix
 		return UniquePtr<SystemManagerImpl>::create(engine.getAllocator(), engine, engine.getAllocator());
 	}
 
-	void SystemManager::createAllStatic(Engine& engine) {
+	static bool shouldCreateStaticPlugin(Span<const char*> plugins, const char* name) {
+		if (plugins.length() == 0) return true;
+		for (const char* plugin : plugins) {
+			if (equalStrings(plugin, name)) return true;
+		}
+		return false;
+	}
+
+	void SystemManager::createAllStatic(Engine& engine, Span<const char*> plugins) {
 		PROFILE_FUNCTION();
 		#include "plugins.inl"
 		for (ISystem* system : engine.getSystemManager().getSystems()) {

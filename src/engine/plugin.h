@@ -9,6 +9,7 @@ namespace Lumix
 
 template <typename T> struct Array;
 template <typename T> struct DelegateList;
+template <typename T> struct Span;
 template <typename T> struct UniquePtr;
 
 // manages engine systems/plugins
@@ -17,7 +18,7 @@ struct LUMIX_ENGINE_API SystemManager
 	virtual ~SystemManager() {}
 
 	static UniquePtr<SystemManager> create(struct Engine& engine);
-	static void createAllStatic(Engine& engine);
+	static void createAllStatic(Engine& engine, Span<const char*> plugins);
 	
 	virtual void initSystems() = 0;
 	virtual void unload(struct ISystem* system) = 0;

@@ -939,7 +939,7 @@ bool testSetWidthUpdatesPercentAndLayout() {
 }
 
 struct MockMouseDevice : InputSystem::Device {
-	MockMouseDevice() { type = InputSystem::Device::MOUSE; }
+	MockMouseDevice() { type = InputDeviceType::MOUSE; }
 	void update(float dt) override {}
 	const char* getName() const override { return "MockMouse"; }
 };
@@ -947,7 +947,7 @@ struct MockMouseDevice : InputSystem::Device {
 static void injectMouseButton(MockDocument& doc, MockMouseDevice& mouse, bool down, float x, float y) {
 	InputSystem::Event ev;
 	ev.device = &mouse;
-	ev.type = InputSystem::Event::BUTTON;
+	ev.type = InputEventType::BUTTON;
 	ev.data.button.down = down;
 	ev.data.button.key_id = 0;
 	ev.data.button.x = x;
@@ -1117,7 +1117,7 @@ bool testHoverEvents() {
 	MockMouseDevice mouse;
 	InputSystem::Event ev;
 	ev.device = &mouse;
-	ev.type = InputSystem::Event::AXIS;
+	ev.type = InputEventType::AXIS;
 	ev.data.axis.x_abs = 50;
 	ev.data.axis.y_abs = 50;
 

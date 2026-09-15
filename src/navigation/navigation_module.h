@@ -71,14 +71,14 @@ struct NavigationModule : IModule {
 	virtual bool getAgentMoveEntity(EntityRef entity) = 0;
 	virtual void setAgentMoveEntity(EntityRef entity, bool value) = 0;
 	virtual bool navigate(EntityRef entity, const struct DVec3& dest, float speed, float stop_distance) = 0;
+	virtual bool isAgentFinished(EntityRef entity) = 0;	//@ function alias isFinished
 	virtual void cancelNavigation(EntityRef entity) = 0;
 	virtual void debugDrawPath(EntityRef agent_entity, bool include_polygons) = 0;	//@ alias drawPath
 	virtual float getAgentSpeed(EntityRef entity) = 0;
 	//@ end
 	virtual void createAgent(EntityRef entity) = 0;
 	virtual void destroyAgent(EntityRef entity) = 0;
-	
-	virtual bool isFinished(EntityRef entity) = 0;
+
 	virtual float getAgentYawDiff(EntityRef entity) = 0;
 	virtual void free(NavmeshBuildJob* job) = 0;
 	virtual bool generateTileAt(EntityRef zone, const DVec3& pos, bool keep_data) = 0;

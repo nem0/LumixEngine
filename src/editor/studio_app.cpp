@@ -1301,6 +1301,7 @@ struct StudioAppImpl final : StudioApp {
 			}
 			
 			if (checkShortcut(m_command_palette_action, true)) m_open_commands_palette = true;
+			else if (checkShortcut(m_assets_palette_action, true)) m_open_assets_palette = true;
 			else if (checkShortcut(m_start_standalone_app, true)) startStandaloneApp();
 			else if (checkShortcut(m_next_frame, true)) m_engine->nextFrame();
 			else if (checkShortcut(m_pause_game, true)) m_engine->pause(!m_engine->isPaused());
@@ -1317,6 +1318,7 @@ struct StudioAppImpl final : StudioApp {
 
 			m_asset_compiler->onGUI();
 			commandPaletteUI();
+			assetsPaletteUI();
 			guiSaveAsDialog();
 			for (i32 i = m_gui_plugins.size() - 1; i >= 0; --i) {
 				GUIPlugin* win = m_gui_plugins[i];
@@ -2662,6 +2664,43 @@ struct StudioAppImpl final : StudioApp {
 		m_exit_code = exit_code;
 	}
 
+	u32 createEntityComponentCommandPaletteUI(u32 start_idx, bool insert_enter) {
+		const StringView query(m_all_actions_filter.filter + 4); // skip `cmp:`
+		if (query.empty()) return start_idx;
+
+		TextFilter component_filter;
+		copyString(Span(component_filter.filter), query);
+		component_filter.build();
+
+		WorldEditor& editor = *m_editor;
+		World* world = editor.getWorld();
+		// TODO optimize - do not iterate all entities and components
+		for (EntityPtr e = world->getFirstEntity(); e.isValid(); e = world->getNextEntity((EntityRef)e)) {
+			bool matches_component = false;
+			for (ComponentType type : world->getComponents((EntityRef)e)) {
+				const reflection::ComponentBase* cmp = reflection::getComponent(type);
+				if (cmp && (component_filter.pass(cmp->name) || component_filter.pass(cmp->label))) {
+					matches_component = true;
+					break;
+				}
+			}
+			if (!matches_component) continue;
+
+			const EntityRef entity = (EntityRef)e;
+			char buffer[1024];
+			getEntityListDisplayName(*this, *world, Span(buffer), entity);
+			const bool selected = start_idx == m_all_actions_selected;
+			if (selected) ImGui::SetScrollHereY();
+			if (ImGui::Selectable(buffer, selected, ImGuiSelectableFlags_SpanAvailWidth) || (selected && insert_enter)) {
+				editor.selectEntities(Span(&entity, 1), false);
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::Separator();
+			++start_idx;
+		}
+		return start_idx;
+	}
+
 	u32 createComponentCommandPaletteUI(u32 start_idx, bool insert_enter) {
 		Span<const reflection::RegisteredComponent> cmps = reflection::getComponents();
 		u32 idx = start_idx;
@@ -2688,6 +2727,67 @@ struct StudioAppImpl final : StudioApp {
 			++idx;
 		}
 		return idx;
+	}
+
+	void assetsPaletteUI() {
+		PROFILE_FUNCTION();
+		if (m_open_assets_palette) ImGui::OpenPopup("Assets palette");
+
+		const ImGuiViewport* viewport = ImGui::GetMainViewport();
+		ImVec2 size = viewport->Size;
+		size.x *= 0.45f;
+		size.y *= 0.8f;
+		ImVec2 pos = ImVec2(viewport->Pos.x + (viewport->Size.x - size.x) * 0.5f, viewport->Pos.y + (viewport->Size.y - size.y) * 0.5f);
+		ImGui::SetNextWindowPos(pos);
+		ImGui::SetNextWindowSize(size, ImGuiCond_Always);
+
+		if (ImGui::BeginPopup("Assets palette", ImGuiWindowFlags_NoNavInputs)) {
+			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+			if (m_open_assets_palette) m_assets_palette_selected = 0;
+			if (m_assets_palette_filter.gui("Search", -1, m_open_assets_palette, nullptr, false)) {
+				m_assets_palette_selected = 0;
+			}
+			const bool insert_enter = ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter);
+			bool moved = false;
+			if (ImGui::IsItemFocused()) {
+				if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && m_assets_palette_selected > 0) {
+					--m_assets_palette_selected;
+					moved = true;
+				}
+				if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
+					++m_assets_palette_selected;
+					moved = true;
+				}
+			}
+			ImGui::Separator();
+
+			Path asset_to_open;
+			const auto& resources = m_asset_compiler->lockResources();
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
+			if (ImGui::BeginChild("##asset_list", ImVec2(0, 0))) {
+				u32 idx = 0;
+				for (const AssetCompiler::ResourceItem& resource : resources) {
+					if (!m_assets_palette_filter.isActive() || !m_assets_palette_filter.pass(resource.path)) continue;
+					const bool selected = idx == m_assets_palette_selected;
+					ImGui::PushID(resource.path.c_str());
+					if (moved && selected) ImGui::SetScrollHereY();
+					if (ImGui::Selectable(resource.path.c_str(), selected, ImGuiSelectableFlags_SpanAvailWidth)
+						|| (selected && insert_enter)) {
+						asset_to_open = resource.path;
+						ImGui::CloseCurrentPopup();
+					}
+					ImGui::PopID();
+					++idx;
+				}
+				if (idx != 0) m_assets_palette_selected = m_assets_palette_selected > 0 ? m_assets_palette_selected % idx : 0;
+			}
+			ImGui::EndChild();
+			ImGui::PopStyleColor();
+			m_asset_compiler->unlockResources();
+			ImGui::EndPopup();
+			if (!asset_to_open.isEmpty()) m_asset_browser->openEditor(asset_to_open);
+		}
+		m_open_assets_palette = false;
 	}
 
 	void commandPaletteUI() {
@@ -2727,38 +2827,44 @@ struct StudioAppImpl final : StudioApp {
 				ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
 				if (ImGui::BeginChild("##list", ImVec2(0, 0))) {
 					u32 idx = 0;
-					for (Action* act = Action::first_action; act; act = act->next) {
-						if (!m_all_actions_filter.pass(act->label_long) && !m_all_actions_filter.pass(act->group)) continue;
-
-						ImGui::PushID(act);
-						defer { ImGui::PopID(); };
-
-						bool selected = idx == m_all_actions_selected;
-						if (moved && selected) ImGui::SetScrollHereY();
-						ImGui::Text("%s", act->group.data);
-						ImGui::SameLine(150);
-						ImGui::Text("> ");
-						ImGui::SameLine();
-						if (ImGui::Selectable(act->label_long, selected, ImGuiSelectableFlags_SpanAvailWidth) || (selected && insert_enter)) {
-							ImGui::CloseCurrentPopup();
-							act->request = true;
-							++idx;
-							break;
-						}
-						char buf[20];
-						getShortcut(*act, Span(buf, sizeof(buf)));
-						if (buf[0]) {
-							ImGui::SameLine();
-							alignGUIRight([&](){
-								ImGui::TextUnformatted(buf);
-							});
-						}
-						ImGui::Separator();
-						++idx;
+					const bool component_search = startsWithInsensitive(StringView(m_all_actions_filter.filter), "cmp:");
+					if (component_search) {
+						idx = createEntityComponentCommandPaletteUI(idx, insert_enter);
 					}
-					idx = createComponentCommandPaletteUI(idx, insert_enter);
-					if (m_command_palette_search_settings) {
-						m_settings.commandPaletteUI(m_all_actions_filter);
+					else {
+						for (Action* act = Action::first_action; act; act = act->next) {
+							if (!m_all_actions_filter.pass(act->label_long) && !m_all_actions_filter.pass(act->group)) continue;
+
+							ImGui::PushID(act);
+							defer { ImGui::PopID(); };
+
+							bool selected = idx == m_all_actions_selected;
+							if (moved && selected) ImGui::SetScrollHereY();
+							ImGui::Text("%s", act->group.data);
+							ImGui::SameLine(150);
+							ImGui::Text("> ");
+							ImGui::SameLine();
+							if (ImGui::Selectable(act->label_long, selected, ImGuiSelectableFlags_SpanAvailWidth) || (selected && insert_enter)) {
+								ImGui::CloseCurrentPopup();
+								act->request = true;
+								++idx;
+								break;
+							}
+							char buf[20];
+							getShortcut(*act, Span(buf, sizeof(buf)));
+							if (buf[0]) {
+								ImGui::SameLine();
+								alignGUIRight([&](){
+									ImGui::TextUnformatted(buf);
+								});
+							}
+							ImGui::Separator();
+							++idx;
+						}
+						idx = createComponentCommandPaletteUI(idx, insert_enter);
+						if (m_command_palette_search_settings) {
+							m_settings.commandPaletteUI(m_all_actions_filter);
+						}
 					}
 					if (idx != 0) m_all_actions_selected = m_all_actions_selected > 0 ? m_all_actions_selected % idx : 0;
 				}
@@ -3080,12 +3186,12 @@ struct StudioAppImpl final : StudioApp {
 		if (action.shortcut == os::Keycode::INVALID) return false;
 
 		ImGuiKeyChord chord = m_imgui_key_map[(u32)action.shortcut];
-		ASSERT(chord != 0 || action.shortcut == os::Keycode::INVALID);
+		if (chord == 0 && action.shortcut != os::Keycode::INVALID) return false;
 		if (action.modifiers & Action::Modifiers::CTRL) chord |= ImGuiMod_Ctrl;
 		if (action.modifiers & Action::Modifiers::SHIFT) chord |= ImGuiMod_Shift;
 		if (action.modifiers & Action::Modifiers::ALT) chord |= ImGuiMod_Alt;
 
-		return ImGui::Shortcut(chord, global ? ImGuiInputFlags_RouteGlobal : ImGuiInputFlags_RouteFocused);
+		return ImGui::Shortcut(chord, ImGuiInputFlags_Repeat | (global ? ImGuiInputFlags_RouteGlobal : ImGuiInputFlags_RouteFocused));
 	}
 
 	IAllocator& getAllocator() override { return m_allocator; }
@@ -3127,6 +3233,7 @@ struct StudioAppImpl final : StudioApp {
 
 	CommonActions m_common_actions;
 	Action m_command_palette_action{"Studio", "Commands palette", "Open commands palette lister", "show_all_commands", "", Action::WINDOW};
+	Action m_assets_palette_action{"Studio", "Assets palette", "Open assets palette", "show_all_assets", "", Action::WINDOW};
 	Action m_new_world_action{"Studio", "New", "New world", "world_new", ICON_FA_PLUS};
 	Action m_exit_action{"Studio", "Exit", "Exit Studio", "studio_exit", ICON_FA_SIGN_OUT_ALT};
 	Action m_show_export_action{"Studio", "Package game", "Package game", "package_game", ICON_FA_FILE_EXPORT};
@@ -3223,6 +3330,9 @@ struct StudioAppImpl final : StudioApp {
 	} m_watched_plugin;
 
 	bool m_open_commands_palette = false;
+	bool m_open_assets_palette = false;
+	i32 m_assets_palette_selected = 0;
+	TextFilter m_assets_palette_filter;
 	i32 m_all_actions_selected = 0;
 	TextFilter m_all_actions_filter;
 	bool m_sleep_when_inactive = true;

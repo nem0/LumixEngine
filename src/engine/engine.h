@@ -24,6 +24,8 @@ struct LUMIX_ENGINE_API Engine {
 	struct InitArgs {
 		const char* log_path = "engine/lumix.log";
 		Span<const char*> plugins;
+		// Empty means all statically linked plugins.
+		Span<const char*> static_plugins;
 		UniquePtr<struct FileSystem> file_system;
 		const char* engine_data_dir = nullptr;
 	};

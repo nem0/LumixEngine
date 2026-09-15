@@ -507,7 +507,7 @@ bool Material::load(Span<const u8> mem) {
 			StringView name;
 			Uniform u;
 			if (!tokenizer.consume(name, ",", u.int_value)) return false;
-			u.name_hash = RuntimeHash(name.begin, name.size());
+			u.name_hash = RuntimeHash(name.data, name.size());
 			m_uniforms.push(u);
 		}
 		else if (key == "uniform") {
@@ -515,7 +515,7 @@ bool Material::load(Span<const u8> mem) {
 			if (!tokenizer.consume(name, ",")) return false;
 
 			Uniform u;
-			u.name_hash = RuntimeHash(name.begin, name.size());
+			u.name_hash = RuntimeHash(name.data, name.size());
 
 			Tokenizer::Token token = tokenizer.nextToken();
 			if (!token) return false;
@@ -531,7 +531,7 @@ bool Material::load(Span<const u8> mem) {
 		}
 		else {
 			logError(getPath(), "(", tokenizer.getLine(), "): Unexpected token ", key);
-			tokenizer.logErrorPosition(key.value.begin);
+			tokenizer.logErrorPosition(key.value.data);
 			return false;
 		}
 	}

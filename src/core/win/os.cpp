@@ -71,12 +71,6 @@ struct EventQueue {
 	Rec* back = nullptr;
 };
 
-enum class CursorState {
-	DEFAULT,
-	HIDDEN,
-	SHOWN
-};
-
 struct GamepadState {
 	u16 buttons;
 	float left_x;
@@ -116,7 +110,7 @@ static struct {
 	u16 surrogate = 0;
 	bool key_states[256] = {};
 	bool is_cursor_shown = true;
-	CursorState prev_cursor_state = CursorState::DEFAULT;
+	bool is_window_active = true;
 	struct {
 		HCURSOR load;
 		HCURSOR size_ns;
@@ -128,6 +122,8 @@ static struct {
 	} cursors;
 	CursorType current_cursor = CursorType::DEFAULT;
 } G;
+
+static void setCursorVisibility(bool show);
 
 static GamepadDevice* createGamepad(HANDLE device_handle) {
 	RID_DEVICE_INFO info = {};
@@ -539,7 +535,8 @@ static void fromWChar(Span<char> out, Span<const WCHAR> in) {
 }
 
 template <int N> static void toWChar(WCHAR (&out)[N], StringView in) {
-	i32 written = MultiByteToWideChar(CP_UTF8, 0, in.begin, in.size(), out, N);
+	ASSERT(in.size() < 0x7fFFffFF);
+	i32 written = MultiByteToWideChar(CP_UTF8, 0, in.data, (int)in.size(), out, N);
 	FATAL_CHECK(written != N);
 	out[written] = 0;
 }
@@ -888,6 +885,8 @@ struct WindowData {
 	bool is_shown = false;
 };
 
+void* getNativeDisplay() { return nullptr; }
+
 void destroyWindow(WindowHandle window) {
 	WindowData* data = (WindowData*)GetWindowLongPtrW((HWND)window, GWLP_USERDATA);
 	if (data) LUMIX_DELETE(getGlobalAllocator(), data);
@@ -951,9 +950,9 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 					G.event_queue.pushBack(e);
 					return 0;
 				case WM_ACTIVATE: {
-					if (wParam == WA_INACTIVE) {
-						G.prev_cursor_state = G.is_cursor_shown ? CursorState::SHOWN : CursorState::HIDDEN;
-						showCursor(true);
+					if (LOWORD(wParam) == WA_INACTIVE) {
+						G.is_window_active = false;
+						setCursorVisibility(true);
 						G.key_states[(u32)os::Keycode::SHIFT] = false;
 						G.key_states[(u32)os::Keycode::CTRL] = false;
 						G.key_states[(u32)os::Keycode::ALT] = false;
@@ -962,15 +961,12 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 						G.key_states[(u32)os::Keycode::LALT] = false;
 					}
 					else {
-						switch (G.prev_cursor_state) {
-							case CursorState::DEFAULT: break;
-							case CursorState::HIDDEN: showCursor(false); break;
-							case CursorState::SHOWN: showCursor(true); break;
-						}
+						G.is_window_active = true;
+						setCursorVisibility(G.is_cursor_shown);
 					}
 
 					e.type = Event::Type::FOCUS;
-					e.focus.gained = wParam != WA_INACTIVE;
+					e.focus.gained = LOWORD(wParam) != WA_INACTIVE;
 					G.event_queue.pushBack(e);
 					break;
 				}
@@ -1165,15 +1161,20 @@ void getKeyName(Keycode keycode, Span<char> out)
 }
 
 
+static void setCursorVisibility(bool show)
+{
+	if (show) {
+		while(ShowCursor(TRUE) < 0);
+	}
+	else {
+		while(ShowCursor(FALSE) >= 0);
+	}
+}
+
 void showCursor(bool show)
 {
 	G.is_cursor_shown = show;
-	if (show) {
-		while(ShowCursor(show) < 0);
-	}
-	else {
-		while(ShowCursor(show) >= 0);
-	}
+	if (G.is_window_active) setCursorVisibility(show);
 }
 
 void abort() {

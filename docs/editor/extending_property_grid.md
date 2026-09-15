@@ -14,7 +14,7 @@ void IPlugin::onGUI(PropertyGrid& grid, Span<const EntityRef> entities, Componen
 
 ## Blob Properties
 
-While the reflection system does recognize blob properties, it treats them as an opaque block of data. The system doesn't attempt to understand or display their internal structure, leaving it entirely up to the plugin to interpret and render the content meaningfully. This is used in the Lua plugin to display [properties](../lua/properties.md) defined in Lua scripts.
+While the reflection system does recognize blob properties, it treats them as an opaque block of data. The system doesn't attempt to understand or display their internal structure, leaving it entirely up to the plugin to interpret and render the content meaningfully.
 
 ```cpp
 void IPlugin::blobGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, u32 array_index, const TextFilter& filter, WorldEditor& editor);

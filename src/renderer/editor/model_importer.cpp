@@ -242,6 +242,7 @@ ModelImporter::ModelImporter(struct StudioApp& app)
 	, m_out_file(app.getAllocator())
 	, m_bones(app.getAllocator())
 	, m_meshes(app.getAllocator())
+	, m_objects(app.getAllocator())
 	, m_animations(app.getAllocator())
 	, m_geometries(app.getAllocator())
 	, m_lights(app.getAllocator())
@@ -864,7 +865,32 @@ bool ModelImporter::writePrefab(const Path& src, const ModelMeta& meta) {
 	
 	const EntityRef root = world.createEntity({0, 0, 0}, Quat::IDENTITY);
 	if (meta.split) {
+		Array<EntityRef> object_entities(m_allocator);
+		if (meta.import_all_objects) {
+			object_entities.resize(m_objects.size());
+			for (int i = 0; i < m_objects.size(); ++i) {
+				const ImportObject& object = m_objects[i];
+				Vec3 pos;
+				Quat rot;
+				Vec3 scale;
+				object.matrix.decompose(pos, rot, scale);
+				const EntityRef e = world.createEntity(DVec3(pos), rot);
+				world.setScale(e, scale);
+				world.setEntityName(e, object.name);
+				object_entities[i] = e;
+			}
+			for (int i = 0; i < m_objects.size(); ++i) {
+				const u64 parent_id = m_objects[i].parent_id;
+				if (!parent_id) world.setParent(root, object_entities[i]);
+				else {
+					const int parent_idx = m_objects.find([&](const ImportObject& o) { return o.id == parent_id; });
+					world.setParent(parent_idx >= 0 ? object_entities[parent_idx] : root, object_entities[i]);
+				}
+			}
+		}
+
 		for(int i  = 0; i < m_meshes.size(); ++i) {
+			const ImportMesh& import_mesh = m_meshes[i];
 			Vec3 pos;
 			Quat rot;
 			Vec3 scale;
@@ -873,7 +899,13 @@ bool ModelImporter::writePrefab(const Path& src, const ModelMeta& meta) {
 			const EntityRef e = world.createEntity(DVec3(pos), rot);
 			world.setScale(e, scale);
 			world.createComponent(types::model_instance, e);
-			world.setParent(root, e);
+			if (meta.import_all_objects) {
+				const int parent_idx = m_objects.find([&](const ImportObject& o) { return o.id == import_mesh.parent_id; });
+				world.setParent(parent_idx >= 0 ? object_entities[parent_idx] : root, e);
+			}
+			else {
+				world.setParent(root, e);
+			}
 			const ImportGeometry& geom = m_geometries[m_meshes[i].geometry_idx];
 			Path mesh_path(geom.name, ".fbx:", src);
 			rmodule->setModelInstancePath(e, mesh_path);

@@ -1,0 +1,32 @@
+// Marsaglia's simple pseudo-random number generator.
+// This follows Lumix::RandomGenerator in core/math.cpp.
+
+var u : u32 = 521288629;
+var v : u32 = 362436069;
+
+fn seed(a : u32, b : u32) : void {
+	if a != 0 {
+		u = a;
+	}
+	if b != 0 {
+		v = b;
+	}
+}
+
+fn rand() : u32 {
+	u = 36969 * (u % 65536) + u / 65536;
+	v = 18000 * (v % 65536) + v / 65536;
+	return u * 65536 + v;
+}
+
+fn randRange(from : u32, to : u32) : u32 {
+	return from + rand() % (to - from + 1);
+}
+
+fn randFloat() : f32 {
+	return (rand() as f32) * 2.328306436996595e-10;
+}
+
+fn randFloatRange(from : f32, to : f32) : f32 {
+	return from + (to - from) * randFloat();
+}

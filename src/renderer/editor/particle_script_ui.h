@@ -134,9 +134,9 @@ struct ParticleScriptPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugi
 		}
 
 		ParticleScriptTokenizer tokenizer;
-		tokenizer.m_document.begin = (const char*)content.data();
-		tokenizer.m_document.end = tokenizer.m_document.begin + content.size();
-		tokenizer.m_current = tokenizer.m_document.begin;
+		tokenizer.m_document.data = (const char*)content.data();
+		tokenizer.m_document.length = content.size();
+		tokenizer.m_current = tokenizer.m_document.data;
 		tokenizer.m_current_token = tokenizer.nextToken();
 		
 		for (;;) {
@@ -402,7 +402,7 @@ struct ParticleScriptEditorWindow : AssetEditorWindow {
 		if (quote_pos) {
 			// import autocomplete
 			// Extract the path part after the quote
-			prefix = StringView(quote_pos + 1, prefix.end);
+			prefix = StringView(quote_pos + 1, prefix.end());
 
 			AssetCompiler& compiler = m_app.getAssetCompiler();
 			const auto& resources = compiler.lockResources();

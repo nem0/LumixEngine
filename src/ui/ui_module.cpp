@@ -116,12 +116,12 @@ struct UIModuleImpl : UIModule {
 		return UniquePtr<UIModuleImpl>::create(allocator, system, world, allocator);
 	}
 
-	UISystem* getSystemPtr() const override {
-		return &m_system;
+	UISystem& getSystemPtr() const override {
+		return m_system;
 	}
 
-	ui::Document* getDocument() override {
-		return &m_document;
+	ui::Document& getDocument() override {
+		return m_document;
 	}
 
 	Path getUI3DPath(EntityRef entity) override {
@@ -340,7 +340,7 @@ void UIFontManager::unloadFont(FontHandle font) {
 
 Vec2 UIFontManager::measureTextA(FontHandle font, StringView text) {
 	if (!font) return Vec2(text.size() * 8.0f, 16.0f);
-	return Lumix::measureTextA(*static_cast<Font*>(font), text.begin, text.end);
+	return Lumix::measureTextA(*static_cast<Font*>(font), text.data, text.end());
 }
 
 float UIFontManager::getHeight(FontHandle font) {

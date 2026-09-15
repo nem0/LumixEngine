@@ -1,0 +1,84 @@
+import "std:mem" as mem
+
+// Owning dynamic array. Copying it aliases the allocation; only one owner may
+// grow or deinitialize it. Element pointers and slices are invalidated by growth.
+// Use init(T), and pass &array to operations that modify the container.
+fn Array(T : comptime type) : type {
+	return struct {
+		values : []T;
+		size : isize;
+	};
+}
+
+fn init(T : comptime type) : Array(T) {
+	return { null, 0 };
+}
+
+// Does not deinitialize resources owned by individual elements.
+fn deinit(array : *Array($T)) : void {
+	if array.values.length > 0 {
+		mem.free(array.values as []byte);
+	}
+	array.values = null;
+	array.size = 0;
+}
+
+fn reserve(array : *Array($T), capacity : isize) : void {
+	if capacity < 0 { panic("Negative array capacity"); }
+	if capacity <= array.values.length { return; }
+	if sizeof(T) == 0 { panic("Array elements must have nonzero size"); }
+	if capacity > isize::max / sizeof(T) { panic("Array capacity overflow"); }
+
+	var values = mem.alloc(capacity * sizeof(T), alignof(T)) as []T;
+	for i in 0..array.size {
+		values[i] = array.values[i];
+	}
+	if array.values.length > 0 {
+		mem.free(array.values as []byte);
+	}
+	array.values = values;
+}
+
+fn push(array : *Array($T), value : T) : void {
+	if array.size == array.values.length {
+		if sizeof(T) == 0 { panic("Array elements must have nonzero size"); }
+		const max_capacity : isize = isize::max / sizeof(T);
+		if array.size == max_capacity { panic("Array capacity overflow"); }
+		var capacity : isize = array.values.length;
+		if capacity == 0 {
+			capacity = max_capacity < 8 ? max_capacity : 8;
+		} else {
+			capacity = capacity > max_capacity / 2 ? max_capacity : capacity * 2;
+		}
+		reserve(array, capacity);
+	}
+	array.values[array.size] = value;
+	array.size += 1;
+}
+
+fn pop(array : *Array($T), out : *T) : bool {
+	if array.size == 0 { return false; }
+	array.size -= 1;
+	out.* = array.values[array.size];
+	return true;
+}
+
+// Keeps the allocation for reuse; does not deinitialize elements.
+fn clear(array : *Array($T)) : void {
+	array.size = 0;
+}
+
+fn get(array : Array($T), index : isize) : T {
+	if index < 0 or index >= array.size { panic("Array index out of bounds"); }
+	return array.values[index];
+}
+
+fn set(array : *Array($T), index : isize, value : T) : void {
+	if index < 0 or index >= array.size { panic("Array index out of bounds"); }
+	array.values[index] = value;
+}
+
+// Mutable view of live elements only, excluding spare capacity.
+fn slice(array : Array($T)) : []T {
+	return array.values[:array.size];
+}

@@ -11,7 +11,7 @@ bool testSimpleTokens() {
 	const char* source = "( ) { } ; : , . + - * / % = < >";
 	ParticleScriptTokenizer tokenizer;
 	tokenizer.m_document = StringView(source);
-	tokenizer.m_current = tokenizer.m_document.begin;
+	tokenizer.m_current = tokenizer.m_document.data;
 	
 	using Token = ParticleScriptToken;
 	
@@ -73,7 +73,7 @@ bool testNumbers() {
 	const char* source = "123 456.789 0 1.0";
 	ParticleScriptTokenizer tokenizer;
 	tokenizer.m_document = StringView(source);
-	tokenizer.m_current = tokenizer.m_document.begin;
+	tokenizer.m_current = tokenizer.m_document.data;
 	
 	using Token = ParticleScriptToken;
 	
@@ -100,7 +100,7 @@ bool testInvalidNumber() {
 	const char* source = "123.";
 	ParticleScriptTokenizer tokenizer;
 	tokenizer.m_document = StringView(source);
-	tokenizer.m_current = tokenizer.m_document.begin;
+	tokenizer.m_current = tokenizer.m_document.data;
 	
 	using Token = ParticleScriptToken;
 	
@@ -114,7 +114,7 @@ bool testStrings() {
 	const char* source = "\"hello\" \"world with spaces\" \"\"";
 	ParticleScriptTokenizer tokenizer;
 	tokenizer.m_document = StringView(source);
-	tokenizer.m_current = tokenizer.m_document.begin;
+	tokenizer.m_current = tokenizer.m_document.data;
 	
 	using Token = ParticleScriptToken;
 	
@@ -137,7 +137,7 @@ bool testUnterminatedString() {
 	const char* source = "\"unterminated";
 	ParticleScriptTokenizer tokenizer;
 	tokenizer.m_document = StringView(source);
-	tokenizer.m_current = tokenizer.m_document.begin;
+	tokenizer.m_current = tokenizer.m_document.data;
 	
 	using Token = ParticleScriptToken;
 	
@@ -151,7 +151,7 @@ bool testIdentifiers() {
 	const char* source = "foo bar _test test123 _123";
 	ParticleScriptTokenizer tokenizer;
 	tokenizer.m_document = StringView(source);
-	tokenizer.m_current = tokenizer.m_document.begin;
+	tokenizer.m_current = tokenizer.m_document.data;
 	
 	using Token = ParticleScriptToken;
 	
@@ -182,7 +182,7 @@ bool testKeywords() {
 	const char* source = "const global emitter fn var out in let import if else and or not";
 	ParticleScriptTokenizer tokenizer;
 	tokenizer.m_document = StringView(source);
-	tokenizer.m_current = tokenizer.m_document.begin;
+	tokenizer.m_current = tokenizer.m_document.data;
 	
 	using Token = ParticleScriptToken;
 	
@@ -235,7 +235,7 @@ bool testKeywordPrefixes() {
 	const char* source = "cons constants emi emitters fnn global2 vary output input lets returns importing iff elses an andd orr nott";
 	ParticleScriptTokenizer tokenizer;
 	tokenizer.m_document = StringView(source);
-	tokenizer.m_current = tokenizer.m_document.begin;
+	tokenizer.m_current = tokenizer.m_document.data;
 	
 	using Token = ParticleScriptToken;
 	
@@ -300,7 +300,7 @@ bool testWhitespace() {
 	const char* source = "  \t\n\r  123  \t\n  foo  ";
 	ParticleScriptTokenizer tokenizer;
 	tokenizer.m_document = StringView(source);
-	tokenizer.m_current = tokenizer.m_document.begin;
+	tokenizer.m_current = tokenizer.m_document.data;
 	
 	using Token = ParticleScriptToken;
 	
@@ -322,7 +322,7 @@ bool testComments() {
 	const char* source = "123 // this is a comment\n456";
 	ParticleScriptTokenizer tokenizer;
 	tokenizer.m_document = StringView(source);
-	tokenizer.m_current = tokenizer.m_document.begin;
+	tokenizer.m_current = tokenizer.m_document.data;
 	
 	using Token = ParticleScriptToken;
 	
@@ -341,7 +341,7 @@ bool testCommentAtEnd() {
 	const char* source = "123 // comment at end";
 	ParticleScriptTokenizer tokenizer;
 	tokenizer.m_document = StringView(source);
-	tokenizer.m_current = tokenizer.m_document.begin;
+	tokenizer.m_current = tokenizer.m_document.data;
 	
 	using Token = ParticleScriptToken;
 	
@@ -358,7 +358,7 @@ bool testComplexExpression() {
 	const char* source = "let x = 3.14 * radius;";
 	ParticleScriptTokenizer tokenizer;
 	tokenizer.m_document = StringView(source);
-	tokenizer.m_current = tokenizer.m_document.begin;
+	tokenizer.m_current = tokenizer.m_document.data;
 	
 	using Token = ParticleScriptToken;
 	
@@ -393,7 +393,7 @@ bool testFunctionDefinition() {
 	const char* source = "fn update() { }";
 	ParticleScriptTokenizer tokenizer;
 	tokenizer.m_document = StringView(source);
-	tokenizer.m_current = tokenizer.m_document.begin;
+	tokenizer.m_current = tokenizer.m_document.data;
 	
 	using Token = ParticleScriptToken;
 	
@@ -423,7 +423,7 @@ bool testMultipleComments() {
 	const char* source = "// comment 1\n123 // comment 2\n// comment 3\n456";
 	ParticleScriptTokenizer tokenizer;
 	tokenizer.m_document = StringView(source);
-	tokenizer.m_current = tokenizer.m_document.begin;
+	tokenizer.m_current = tokenizer.m_document.data;
 	
 	using Token = ParticleScriptToken;
 	
@@ -442,7 +442,7 @@ bool testEmptyInput() {
 	const char* source = "";
 	ParticleScriptTokenizer tokenizer;
 	tokenizer.m_document = StringView(source);
-	tokenizer.m_current = tokenizer.m_document.begin;
+	tokenizer.m_current = tokenizer.m_document.data;
 	
 	using Token = ParticleScriptToken;
 	
@@ -456,7 +456,7 @@ bool testOnlyWhitespace() {
 	const char* source = "   \t\n\r   ";
 	ParticleScriptTokenizer tokenizer;
 	tokenizer.m_document = StringView(source);
-	tokenizer.m_current = tokenizer.m_document.begin;
+	tokenizer.m_current = tokenizer.m_document.data;
 	
 	using Token = ParticleScriptToken;
 	
@@ -470,7 +470,7 @@ bool testDotAfterIdentifier() {
 	const char* source = "position.x";
 	ParticleScriptTokenizer tokenizer;
 	tokenizer.m_document = StringView(source);
-	tokenizer.m_current = tokenizer.m_document.begin;
+	tokenizer.m_current = tokenizer.m_document.data;
 	
 	using Token = ParticleScriptToken;
 	

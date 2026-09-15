@@ -193,12 +193,12 @@ void Draw2D::addText(const Font& font, const Vec2& pos, Color color, StringView 
 	p.y = float(int(p.y));
 
 	bool prev_was_space = false;
-	for (const char* c = str.begin; c != str.end; ++c) {
-		if (*c == '\r') continue;
-		bool is_whitespace = isWhitespace(*c);
+	for (const char c : str) {
+		if (c == '\r') continue;
+		bool is_whitespace = isWhitespace(c);
 		if (is_whitespace && prev_was_space) continue;
 	
-		const Glyph* glyph = findGlyph(font, *c);
+		const Glyph* glyph = findGlyph(font, c);
 		if (!glyph) {
 			p.x += 16;
 			continue;

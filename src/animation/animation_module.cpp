@@ -119,6 +119,7 @@ struct AnimationModuleImpl final : AnimationModule {
 
 	i32 getAnimatorInputIndex(EntityRef entity, const char* name) const override {
 		const Animator& animator = m_animators[m_animator_map[entity]];
+		if (!animator.resource || !animator.resource->isReady() || !animator.ctx) return -1;
 		for (anim::Controller::Input& input : animator.resource->m_inputs) {
 			if (input.name ==  name) return i32(&input - animator.resource->m_inputs.begin());
 		}

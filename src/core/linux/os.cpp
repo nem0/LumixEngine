@@ -604,6 +604,8 @@ next:
 }
 
 
+void* getNativeDisplay() { return G.display; }
+
 void destroyWindow(WindowHandle window) {
 	XUnmapWindow(G.display, (Window)window);
 	XDestroyWindow(G.display, (Window)window);
@@ -1353,7 +1355,7 @@ bool initNetwork() {
 void shutdownNetwork() {}
 struct NetworkStream* listen(const char* ip, u16 port, IAllocator& allocator) { ASSERT(false); return nullptr; }
 NetworkStream* connect(const char* ip, u16 port, IAllocator& allocator) { ASSERT(false); return nullptr; }
-bool read(NetworkStream& stream, void* mem, u32 size) { ASSERT(false); return false; }
+NetworkReadResult read(NetworkStream& stream, void* mem, u32 size) { ASSERT(false); return NetworkReadResult::FAILED; }
 bool write(NetworkStream& stream, const void* data, u32 size) { ASSERT(false); return false; }
 void close(NetworkStream& stream) {}
 

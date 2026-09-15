@@ -7,11 +7,37 @@ Triggers are special collision shapes that detect when other objects enter or ex
 - Creating invisible boundaries or checkpoints
 - Implementing pickup detection for items
 
-When an object enters or exits a trigger, the `onTrigger` function is called with the entity that triggered the event and a boolean indicating whether contact was lost.
+## Evox API
 
-```lua
-function onTrigger(entity, touch_lost)
-	LumixAPI.logError("trigger")
-	LumixAPI.logError(entity.name)
-end
+Import `core:physics` to poll trigger events produced by the latest physics simulation step. `PhysicsModule.getTriggerHits` returns an iterator over `TriggerHitData` values:
+
+```evox
+import "core:physics"
+import "core:world"
+
+fn processTriggers(world : World) : void {
+	const physics = world.physics() else return;
+
+	for hit in physics.getTriggerHits() {
+		if hit.touch_lost {
+			// hit.e1 stopped overlapping hit.e2
+		}
+		else {
+			// hit.e1 started overlapping hit.e2
+		}
+	}
+}
+```
+
+`hit.e1` is the entity configured as a trigger, `hit.e2` is the other entity, and `hit.touch_lost` distinguishes exit events from enter events. Consume the events each frame; do not retain the iterator.
+
+To enable or disable trigger behavior programmatically, use the rigid actor component:
+
+```evox
+import "core:rigid_actor"
+
+fn setTrigger(entity : Entity, enabled : bool) : void {
+	const actor = entity.rigid_actor() else return;
+	actor.setIsTrigger(enabled);
+}
 ```

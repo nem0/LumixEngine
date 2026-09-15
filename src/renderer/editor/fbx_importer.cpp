@@ -1085,6 +1085,26 @@ struct FBXImporter : ModelImporter {
 		}
 	}
 
+	void gatherObjects() {
+		m_objects.clear();
+		const ofbx::Object* root = m_scene->getRoot();
+		const ofbx::Object* const* objects = m_scene->getAllObjects();
+		for (int i = 0, c = m_scene->getAllObjectCount(); i < c; ++i) {
+			const ofbx::Object* object = objects[i];
+			// Meshes are represented by model entities. Other FBX nodes become
+			// empty entities when the corresponding option is enabled.
+			if (!object->isNode() || object == root || object->getType() == ofbx::Object::Type::MESH) continue;
+
+			ImportObject& out = m_objects.emplace(m_allocator);
+			out.id = u64(object);
+			out.parent_id = object->getParent() ? u64(object->getParent()) : 0;
+			Matrix transform = toLumix(object->getGlobalTransform());
+			transform.setTranslation(transform.getTranslation() * m_scene_scale);
+			out.matrix = fixOrientation(transform);
+			out.name = object->name[0] ? object->name : "object";
+		}
+	}
+
 	void gatherMeshes(StringView fbx_filename, StringView src_dir, const ModelMeta* meta, bool ignore_geometry) {
 		PROFILE_FUNCTION();
 		const i32 c = m_scene->getMeshCount();
@@ -1144,6 +1164,7 @@ struct FBXImporter : ModelImporter {
 
 				ImportMesh& mesh = m_meshes.emplace(m_allocator);
 				mesh.mesh_index = m_meshes.size() - 1;
+				mesh.parent_id = fbx_mesh->getParent() ? u64(fbx_mesh->getParent()) : 0;
 				m_fbx_meshes.push(fbx_mesh);
 
 				i32 mat_idx = materials.indexOf(fbx_mat);
@@ -1431,6 +1452,7 @@ struct FBXImporter : ModelImporter {
 		StringView src_dir = Path::getDir(filename);
 		if (!ignore_geometry) extractEmbedded(*m_scene, src_dir, m_allocator);
 
+		gatherObjects();
 		gatherMeshes(filename, src_dir, meta, ignore_geometry);
 		if(!meta || !meta->ignore_animations) gatherAnimations(filename);
 		if (meta) gatherLights(*meta);
@@ -1442,7 +1464,7 @@ struct FBXImporter : ModelImporter {
 			gatherBones(meta->force_skin || any_skinned);
 		}
 
-		if (m_bones.empty() && m_meshes.empty() && m_animations.empty()) {
+		if (m_bones.empty() && m_meshes.empty() && m_objects.empty() && m_animations.empty()) {
 			logError(filename, ": found nothing to import");
 			return false;
 		}
