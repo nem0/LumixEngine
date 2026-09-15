@@ -27,7 +27,7 @@
 namespace Lumix {
 
 static bool isDebuggerSuspended(ex_task& task) {
-	if (!ex_debug_is_suspended(&task)) return false;
+	if (ex_task_get_state(&task) != EX_TASK_SUSPENDED) return false;
 	ex_debug_event event = {};
 	return ex_debug_pause_event(&task, &event) == EX_RESULT_OK && event.reason != EX_DEBUG_PAUSE_YIELD;
 }
