@@ -1690,8 +1690,9 @@ struct EvoxPlugin : StudioApp::IPlugin {
 		, m_debugger(app)
 		, m_variables_window(app)
 		, m_symbols_popup(app)
-		, m_add_data_plugin(app)
+		, m_add_data_plugin(nullptr)
 	{
+		m_add_data_plugin = LUMIX_NEW(app.getAllocator(), EvoxDataAddComponentPlugin)(app);
 	}
 
 	const char* getName() const override { return "evox"; }
@@ -1706,7 +1707,7 @@ struct EvoxPlugin : StudioApp::IPlugin {
 		g_show_evox_symbols.shortcut = os::Keycode::CTRL | os::Keycode::Q;
 		m_app.getAssetBrowser().addPlugin(m_asset_plugin, Span(evox_exts));
 		m_app.getAssetCompiler().addPlugin(m_asset_plugin, Span(evox_exts));
-		m_app.registerComponent("", "evox", m_add_data_plugin);
+		m_app.registerComponent("", "evox", *m_add_data_plugin);
 		m_app.getPropertyGrid().addPlugin(m_property_grid_plugin);
 		m_app.addPlugin(m_debugger);
 		m_app.addPlugin(m_variables_window);
@@ -1759,7 +1760,7 @@ private:
 	EvoxDebuggerWindow m_debugger;
 	EvoxVariablesWindow m_variables_window;
 	EvoxSymbolsPopup m_symbols_popup;
-	EvoxDataAddComponentPlugin m_add_data_plugin;
+	EvoxDataAddComponentPlugin* m_add_data_plugin;
 	EvoxPropertyGridPlugin m_property_grid_plugin;
 	Action m_debugger_action{"Evox", "Debugger", "Evox Debugger", "evox_debugger", ICON_FA_BUG, Action::Type::TOOL};
 };
