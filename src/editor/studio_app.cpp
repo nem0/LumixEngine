@@ -1865,14 +1865,54 @@ struct StudioAppImpl final : StudioApp {
 			}
 		};
 		open_ui("Open", false);
-		if (can_load_additive) {
-			open_ui("Open additive", true);
-		}
-		else {
-			if (ImGui::BeginMenu("Open additive")) {
+		if (ImGui::BeginMenu("Open additive")) {
+			if (!can_load_additive) {
 				ImGui::TextUnformatted("Please save current partition first");
-				ImGui::EndMenu();
 			}
+			else {
+				m_open_filter.gui("Filter", 150);
+				forEachWorld([&](const Path& path){
+					ImGui::PushID(path.c_str());
+					StringView basename = Path::getBasename(path);
+					StaticString<MAX_PATH> tmp(basename);
+					const i32 partition_idx = m_editor->getWorld()->getPartitions().find([&](const World::Partition& p){
+						return equalStrings(p.name, path.c_str());
+					});
+					bool selected = partition_idx >= 0;
+					if (m_open_filter.pass(path.c_str()) && ImGui::Checkbox(tmp, &selected)) {
+						World& world = *m_editor->getWorld();
+						if (selected) {
+							tryLoadWorld(path, true);
+						}
+						else {
+							const i32 idx = world.getPartitions().find([&](const World::Partition& p){
+								return equalStrings(p.name, path.c_str());
+							});
+							if (idx < 0) return;
+
+							const World::PartitionHandle partition = world.getPartitions()[idx].handle;
+							if (world.getPartitions().size() == 1) {
+								// Keep the world valid; unloading its only partition
+								// creates a new empty world instead.
+								m_editor->newWorld();
+							}
+							else {
+								if (world.getActivePartition() == partition) {
+									for (const World::Partition& p : world.getPartitions()) {
+										if (p.handle != partition) {
+											world.setActivePartition(p.handle);
+											break;
+										}
+									}
+								}
+								m_editor->destroyWorldPartition(partition);
+							}
+						}
+					}
+					ImGui::PopID();
+				});
+			}
+			ImGui::EndMenu();
 		}
 		menuItem("save", !m_editor->isGameMode());
 		menuItem("studio_exit", true);
