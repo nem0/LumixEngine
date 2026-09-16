@@ -176,16 +176,20 @@ void EntityFolders::destroyPartitionFolders(World::PartitionHandle partition) {
 
 void EntityFolders::cloneTo(EntityFolders& dst, World::PartitionHandle partition, HashMap<EntityPtr, EntityPtr>& entity_map) {
 	dst.m_entities.clear();
+	dst.m_folders.clear();
 	auto get_mapped = [&](EntityPtr e){
 		if (!e.isValid()) return e;
 		auto iter = entity_map.find(e);
-		if (iter.isValid()) return iter.value();
-		return INVALID_ENTITY;
+		ASSERT(iter.isValid());
+		return iter.isValid() ? iter.value() : INVALID_ENTITY;
 	};
 	
 	for (const Folder& f : m_folders) {
 		if (f.partition == partition) {
-			dst.m_folders.push(f);
+			Folder& dst_folder = dst.m_folders.emplace(f);
+			dst_folder.partition = dst.m_world.getActivePartition();
+			dst_folder.first_entity = get_mapped(f.first_entity);
+			if (dst_folder.parent == INVALID_FOLDER) dst.m_selected_folder = dst_folder.id;
 		}
 	}
 
@@ -193,8 +197,19 @@ void EntityFolders::cloneTo(EntityFolders& dst, World::PartitionHandle partition
 		EntityPtr src_e = iter.key();
 		EntityPtr dst_e = iter.value();
 		if (dst.m_entities.size() <= dst_e.index) dst.m_entities.resize(dst_e.index + 1);
-		dst.m_entities[dst_e.index].next = get_mapped(m_entities[src_e.index].next);
-		dst.m_entities[dst_e.index].prev = get_mapped(m_entities[src_e.index].prev);
+		Entity& dst_entity = dst.m_entities[dst_e.index];
+		dst_entity.folder = m_entities[src_e.index].folder;
+		dst_entity.next = get_mapped(m_entities[src_e.index].next);
+		dst_entity.prev = get_mapped(m_entities[src_e.index].prev);
+
+		bool folder_found = false;
+		for (const Folder& folder : dst.m_folders) {
+			if (folder.id == dst_entity.folder) {
+				folder_found = true;
+				break;
+			}
+		}
+		ASSERT(folder_found);
 	}
 }
 
