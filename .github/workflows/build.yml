@@ -19,10 +19,11 @@ jobs:
               working-directory: plugins
               run: |
                 git.exe clone --depth=1 https://github.com/nem0/lumixengine_shader_editor.git shader_editor
-            - name: fetch network plugin
-              working-directory: plugins
-              run: |
-                git.exe clone --depth=1 https://github.com/nem0/lumixengine_net.git net
+            # need to port from lua to evox
+            #- name: fetch network plugin
+            #  working-directory: plugins
+            #  run: |
+            #    git.exe clone --depth=1 https://github.com/nem0/lumixengine_net.git net
             - name: fetch jolt plugin
               working-directory: plugins
               run: |
