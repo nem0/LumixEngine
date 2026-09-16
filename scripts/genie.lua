@@ -967,7 +967,11 @@ if build_tests then
 		if use_basisu then linkLib "basisu" end
 		if hasPlugin "physics" then linkPhysX() end
 
-		libdirs { "../external/pix/bin/x64" }
+		configuration { "vs*" }
+			libdirs { "../external/pix/bin/x64" }
+			files { "../external/pix/bin/x64/WinPixEventRuntime.dll" }
+			copy { "../external/pix/bin/x64/WinPixEventRuntime.dll" }
+		configuration {}
 		
 		debugdir "../data"
 		
