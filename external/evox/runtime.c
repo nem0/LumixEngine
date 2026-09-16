@@ -7,6 +7,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(_MSC_VER)
+	#define EX_FORCE_INLINE __forceinline
+#elif defined(__GNUC__) || defined(__clang__)
+	#define EX_FORCE_INLINE inline __attribute__((always_inline))
+#else
+	#define EX_FORCE_INLINE inline
+#endif
+
 typedef struct ex_string_box {
 	ex_string_view value;
 } ex_string_box;
@@ -210,7 +218,7 @@ static void runtime_clear_step_traps(ex_task* task) {
 	task->step_trap_count = 0u;
 }
 
-static __forceinline ex_call_result runtime_enter_script_call(
+static EX_FORCE_INLINE ex_call_result runtime_enter_script_call(
 	ex_task* task,
 	const ex_function_bc** function,
 	const u8** ip,
@@ -231,7 +239,7 @@ static __forceinline ex_call_result runtime_enter_script_call(
 	return EX_CALL_RESULT_OK;
 }
 
-static __forceinline bool runtime_invoke_native(ex_task* task, u32 function_index, const ex_function_bc* function, u8* args, u8** result_stack_top) {
+static EX_FORCE_INLINE bool runtime_invoke_native(ex_task* task, u32 function_index, const ex_function_bc* function, u8* args, u8** result_stack_top) {
 	ex_runtime* owner = task->runtime;
 	if (function_index >= owner->native_callback_count) return false; // TODO can this even happen?
 	ex_native_fn callback = owner->native_callbacks[function_index];

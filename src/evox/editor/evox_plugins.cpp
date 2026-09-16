@@ -261,8 +261,8 @@ static void drawPrimitiveValue(ex_type_kind kind, const void* value, const ex_ty
 		case EX_TYPE_U16:  ImGui::Text("%u", *(const u16*)value); break;
 		case EX_TYPE_I32:  ImGui::Text("%d", *(const i32*)value); break;
 		case EX_TYPE_U32:  ImGui::Text("%u", *(const u32*)value); break;
-		case EX_TYPE_I64:  ImGui::Text("%lld", *(const i64*)value); break;
-		case EX_TYPE_U64:  ImGui::Text("%llu", *(const u64*)value); break;
+		case EX_TYPE_I64:  ImGui::Text("%lld", (long long)*(const i64*)value); break;
+		case EX_TYPE_U64:  ImGui::Text("%llu", (unsigned long long)*(const u64*)value); break;
 		case EX_TYPE_F32:  ImGui::Text("%g", *(const f32*)value); break;
 		case EX_TYPE_F64:  ImGui::Text("%g", *(const f64*)value); break;
 		case EX_TYPE_CPTR: ImGui::Text("0x%p", *(const void* const*)value); break;
@@ -449,7 +449,7 @@ static void drawVariable(ex_string_view name, const ex_type* type, void* value, 
 
 		const bool open = ImGui::TreeNodeEx(value, ImGuiTreeNodeFlags_SpanAvailWidth, "%.*s", int(name.length), name.begin);
 		ImGui::TableNextColumn();
-		ImGui::Text("[%llu]", count);
+		ImGui::Text("[%llu]", (unsigned long long)count);
 		if (open) {
 			if (data) {
 				for (u64 i = 0; i < count; ++i) {
