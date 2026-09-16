@@ -1,0 +1,87 @@
+// In-place quicksort for mutable slices.
+
+fn insertSort(values : []$T) : void {
+	for i in 1..values.length {
+		var key = values[i];
+		var j = i;
+		while j > 0 and key < values[j - 1] {
+			values[j] = values[j - 1];
+			j -= 1;
+		}
+		values[j] = key;
+	}
+}
+
+fn quickSort(values : []$T) : void {
+	if values.length < 2 { return; }
+	if values.length <= 32 {
+		insertSort(values);
+		return;
+	}
+
+	const last = values.length - 1;
+	const pivot_value = values[last];
+	var pivot : isize = 0;
+	for i in 0..last {
+		if values[i] < pivot_value {
+			var tmp = values[pivot];
+			values[pivot] = values[i];
+			values[i] = tmp;
+			pivot += 1;
+		}
+	}
+
+	var tmp = values[pivot];
+	values[pivot] = values[last];
+	values[last] = tmp;
+
+	quickSort(values[:pivot]);
+	quickSort(values[pivot + 1:]);
+}
+
+fn sort(values : []$T) : void {
+	quickSort(values);
+}
+
+fn insertSortBy(values : []$T, less : fn(T, T) : bool) : void {
+	for i in 1..values.length {
+		var key = values[i];
+		var j = i;
+		while j > 0 and less(key, values[j - 1]) {
+			values[j] = values[j - 1];
+			j -= 1;
+		}
+		values[j] = key;
+	}
+}
+
+fn quickSortBy(values : []$T, less : fn(T, T) : bool) : void {
+	if values.length < 2 { return; }
+	if values.length <= 32 {
+		insertSortBy(values, less);
+		return;
+	}
+
+	const last = values.length - 1;
+	const pivot_value = values[last];
+	var pivot : isize = 0;
+	for i in 0..last {
+		if less(values[i], pivot_value) {
+			var tmp = values[pivot];
+			values[pivot] = values[i];
+			values[i] = tmp;
+			pivot += 1;
+		}
+	}
+
+	var tmp = values[pivot];
+	values[pivot] = values[last];
+	values[last] = tmp;
+
+	quickSortBy(values[:pivot], less);
+	quickSortBy(values[pivot + 1:], less);
+}
+
+fn sortBy(values : []$T, less : fn(T, T) : bool) : void {
+	quickSortBy(values, less);
+}

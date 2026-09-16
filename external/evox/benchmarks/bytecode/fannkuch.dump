@@ -1,0 +1,83 @@
+function 0 main (script, params=0, frame=297, returns=4)
+  0000: LOAD_CONST_4         dst=0, value= 09 00 00 00                                                                   // 	const n = 9;
+  0009: COPY                 dst=40, src=4, size=36                                                                      // 	var perm1 : [9]i32 = undefined;
+  0022: COPY                 dst=112, src=76, size=36                                                                    // 	var perm : [9]i32 = undefined;
+  0035: COPY                 dst=184, src=148, size=36                                                                   // 	var count : [9]i32 = undefined;
+  0048: LOAD_CONST_4         dst=220, value= 00 00 00 00                                                                 // 	for i in 0..n {
+  0057: LOAD_CONST_4         dst=224, value= 09 00 00 00                                                                 // 	for i in 0..n {
+  0066: JGE_I32              lhs=220, rhs=224, offset=41, target=118                                                     // 	for i in 0..n {
+  0077: STORE_INDEXED_32     base=40, index=220, length=9, size=4, src=220                                               // 		perm1[i] = i;
+  0102: INC_I32              dst=220                                                                                     // 	for i in 0..n {
+  0107: JLT_I32              lhs=220, rhs=224, offset=-41, target=77                                                     // 	for i in 0..n {
+  0118: LOAD_CONST_4         dst=228, value= 00 00 00 00                                                                 // 	var flips = 0;
+  0127: LOAD_CONST_4         dst=232, value= 00 00 00 00                                                                 // 	var nperm = 0;
+  0136: LOAD_CONST_4         dst=236, value= 00 00 00 00                                                                 // 	var checksum = 0;
+  0145: LOAD_CONST_4         dst=240, value= 09 00 00 00                                                                 // 	var r = n;
+  0154: JLEZ_I32             reg=240, offset=797, target=958                                                             // 	while r > 0 {
+  0161: COPY                 dst=244, src=240, size=4                                                                    // 		var i = r;
+  0174: JLEZ_I32             reg=244, offset=50, target=231                                                              // 		while i > 0 {
+  0181: SUB_32_IMM           dst=289, lhs=244, imm=0x01000000                                                            // 			count[i - 1] = i;
+  0194: STORE_INDEXED_32     base=184, index=289, length=9, size=4, src=244                                              // 			count[i - 1] = i;
+  0219: DEC_I32              dst=244                                                                                     // 			i -= 1;
+  0224: JGZ_I32              reg=244, offset=-50, target=181                                                             // 		while i > 0 {
+  0231: LOAD_CONST_4         dst=248, value= 00 00 00 00                                                                 // 		for j in 0..n {
+  0240: LOAD_CONST_4         dst=252, value= 09 00 00 00                                                                 // 		for j in 0..n {
+  0249: JGE_I32              lhs=248, rhs=252, offset=66, target=326                                                     // 		for j in 0..n {
+  0260: LOAD_INDEXED_32      dst=289, base=40, index=248, length=9, size=4                                               // 			perm[j] = perm1[j];
+  0285: STORE_INDEXED_32     base=112, index=248, length=9, size=4, src=289                                              // 			perm[j] = perm1[j];
+  0310: INC_I32              dst=248                                                                                     // 		for j in 0..n {
+  0315: JLT_I32              lhs=248, rhs=252, offset=-66, target=260                                                    // 		for j in 0..n {
+  0326: LOAD_CONST_4         dst=256, value= 00 00 00 00                                                                 // 		var f = 0;
+  0335: COPY                 dst=260, src=112, size=4                                                                    // 		var k = perm[0];
+  0348: JZ_I32               reg=260, offset=213, target=568                                                             // 		while k != 0 {
+  0355: LOAD_CONST_4         dst=264, value= 00 00 00 00                                                                 // 			for j in 0..(k + 1) / 2 {
+  0364: ADD_32_IMM           dst=289, lhs=260, imm=0x01000000                                                            // 			for j in 0..(k + 1) / 2 {
+  0377: DIV_I32_IMM          dst=268, lhs=289, imm=0x02000000                                                            // 			for j in 0..(k + 1) / 2 {
+  0390: JGE_I32              lhs=264, rhs=268, offset=142, target=543                                                    // 			for j in 0..(k + 1) / 2 {
+  0401: LOAD_INDEXED_32      dst=272, base=112, index=264, length=9, size=4                                              // 				const t = perm[j];
+  0426: SUB_32               dst=289, lhs=260, rhs=264                                                                   // 				perm[j] = perm[k - j];
+  0439: LOAD_INDEXED_32      dst=289, base=112, index=289, length=9, size=4                                              // 				perm[j] = perm[k - j];
+  0464: STORE_INDEXED_32     base=112, index=264, length=9, size=4, src=289                                              // 				perm[j] = perm[k - j];
+  0489: SUB_32               dst=289, lhs=260, rhs=264                                                                   // 				perm[k - j] = t;
+  0502: STORE_INDEXED_32     base=112, index=289, length=9, size=4, src=272                                              // 				perm[k - j] = t;
+  0527: INC_I32              dst=264                                                                                     // 			for j in 0..(k + 1) / 2 {
+  0532: JLT_I32              lhs=264, rhs=268, offset=-142, target=401                                                   // 			for j in 0..(k + 1) / 2 {
+  0543: COPY                 dst=260, src=112, size=4                                                                    // 			k = perm[0];
+  0556: INC_I32              dst=256                                                                                     // 			f += 1;
+  0561: JNZ_I32              reg=260, offset=-213, target=355                                                            // 		while k != 0 {
+  0568: JLE_I32              lhs=256, rhs=228, offset=13, target=592                                                     // 		if f > flips {
+  0579: COPY                 dst=228, src=256, size=4                                                                    // 			flips = f;
+  0592: MOD_I32_IMM          dst=289, lhs=232, imm=0x02000000                                                            // 		if nperm % 2 == 0 {
+  0605: JNZ_I32              reg=289, offset=16, target=628                                                              // 		if nperm % 2 == 0 {
+  0612: ADD_32               dst=236, lhs=236, rhs=256                                                                   // 			checksum += f;
+  0625: JUMP                 offset=13, target=641                                                                       // 		if nperm % 2 == 0 {
+  0628: SUB_32               dst=236, lhs=236, rhs=256                                                                   // 			checksum -= f;
+  0641: LOAD_CONST_4         dst=240, value= 01 00 00 00                                                                 // 		r = 1;
+  0650: LOAD_CONST_1         dst=276, value= 01                                                                          // 		while true {
+  0656: LOAD_CONST_4         dst=289, value= 09 00 00 00                                                                 // 			if r == n {
+  0665: JNE_I32              lhs=240, rhs=289, offset=14, target=690                                                     // 			if r == n {
+  0676: COPY                 dst=0, src=228, size=4                                                                      // 				return flips;
+  0689: RETURN_BASE                                                                                                      // 				return flips;
+  0690: COPY                 dst=277, src=40, size=4                                                                     // 			const p0 = perm1[0];
+  0703: LOAD_CONST_4         dst=281, value= 00 00 00 00                                                                 // 			for j in 0..r {
+  0712: COPY                 dst=285, src=240, size=4                                                                    // 			for j in 0..r {
+  0725: JGE_I32              lhs=281, rhs=285, offset=79, target=815                                                     // 			for j in 0..r {
+  0736: ADD_32_IMM           dst=289, lhs=281, imm=0x01000000                                                            // 				perm1[j] = perm1[j + 1];
+  0749: LOAD_INDEXED_32      dst=289, base=40, index=289, length=9, size=4                                               // 				perm1[j] = perm1[j + 1];
+  0774: STORE_INDEXED_32     base=40, index=281, length=9, size=4, src=289                                               // 				perm1[j] = perm1[j + 1];
+  0799: INC_I32              dst=281                                                                                     // 			for j in 0..r {
+  0804: JLT_I32              lhs=281, rhs=285, offset=-79, target=736                                                    // 			for j in 0..r {
+  0815: STORE_INDEXED_32     base=40, index=240, length=9, size=4, src=277                                               // 			perm1[r] = p0;
+  0840: LOAD_INDEXED_32      dst=289, base=184, index=240, length=9, size=4                                              // 			count[r] -= 1;
+  0865: SUB_32_IMM           dst=293, lhs=289, imm=0x01000000                                                            // 			count[r] -= 1;
+  0878: STORE_INDEXED_32     base=184, index=240, length=9, size=4, src=293                                              // 			count[r] -= 1;
+  0903: LOAD_INDEXED_32      dst=289, base=184, index=240, length=9, size=4                                              // 			if count[r] > 0 {
+  0928: JLEZ_I32             reg=289, offset=3, target=938                                                               // 			if count[r] > 0 {
+  0935: JUMP                 offset=8, target=946                                                                        // 				break;
+  0938: INC_I32              dst=240                                                                                     // 			r += 1;
+  0943: JUMP                 offset=-290, target=656                                                                     // 		while true {
+  0946: INC_I32              dst=232                                                                                     // 		nperm += 1;
+  0951: JGZ_I32              reg=240, offset=-797, target=161                                                            // 	while r > 0 {
+  0958: COPY                 dst=0, src=228, size=4                                                                      // 	return flips;
+  0971: RETURN_BASE                                                                                                      // 	return flips;
+  0972: RETURN_BASE                                                                                                      // fn main() : i32 {

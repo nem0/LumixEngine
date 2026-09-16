@@ -1,0 +1,39 @@
+// import core:entity as entity
+
+import "core:dvec3"
+import "core:vec3"
+import "core:quat"
+
+struct Entity { index : i32; world : cptr; }
+
+extern fn destroy(e : Entity) : void;
+extern fn isValid(e : Entity) : bool;
+extern fn getName(e : Entity) : []const u8;
+extern fn setName(e : Entity, name : []const u8) : void;
+extern fn getPosition(e : Entity) : DVec3;
+extern fn getRotation(e : Entity) : Quat;
+extern fn getScale(e : Entity) : Vec3;
+extern fn setPosition(e : Entity, position : DVec3) : void;
+extern fn setScale(e : Entity, scale : Vec3) : void;
+extern fn setRotation(e : Entity, rotation : Quat) : void;
+extern fn findChildByName(e: Entity, child_name : []const u8) : ?Entity;
+extern fn getFirstChild(e : Entity) : ?Entity;
+extern fn getNextSibling(e : Entity) : ?Entity;
+
+struct ChildrenIterator {
+	next : fn(iter : *ChildrenIterator, out : *Entity) : bool;
+	current : ?Entity;
+}
+
+fn childrenNext(iter : *ChildrenIterator, out : *Entity) : bool {
+	if const child = iter.current {
+		out.* = child;
+		iter.current = child.getNextSibling();
+		return true;
+	}
+	return false;
+}
+
+fn children(entity : Entity) : ChildrenIterator {
+	return {childrenNext, entity.getFirstChild()};
+}

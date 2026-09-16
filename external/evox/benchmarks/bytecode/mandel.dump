@@ -1,0 +1,76 @@
+function 0 norm2 (script, params=16, frame=24, returns=8)
+  0000: MUL_F64              dst=16, lhs=8, rhs=8                                                                        // 	return re * re - im * (-im);
+  0013: MADD_F64             dst=0, lhs=0, rhs=0, addend=16                                                              // 	return re * re - im * (-im);
+  0030: RETURN_BASE                                                                                                      // 	return re * re - im * (-im);
+  0031: RETURN_BASE                                                                                                      // fn norm2(re : f64, im : f64) : f64 {
+function 1 cabs (script, params=16, frame=32, returns=8)
+  0000: MUL_F64              dst=24, lhs=8, rhs=8                                                                        // 	return re * re - im * (-im);
+  0013: MADD_F64             dst=16, lhs=0, rhs=0, addend=24                                                             // 	return re * re - im * (-im);
+  0030: CALL_NATIVE          function=9, arg_base=16                                                                     // 	return math.sqrt_f64(norm2(re, im));
+  0039: COPY                 dst=0, src=16, size=8                                                                       // 	return math.sqrt_f64(norm2(re, im));
+  0052: RETURN_BASE                                                                                                      // 	return math.sqrt_f64(norm2(re, im));
+  0053: RETURN_BASE                                                                                                      // fn cabs(re : f64, im : f64) : f64 {
+function 2 level (script, params=16, frame=72, returns=4)
+  0000: COPY                 dst=16, src=0, size=8                                                                       // 	var zre = x;
+  0013: COPY                 dst=24, src=8, size=8                                                                       // 	var zim = y;
+  0026: LOAD_CONST_4         dst=32, value= 00 00 00 00                                                                  // 	for l in 0..255 {
+  0035: LOAD_CONST_4         dst=36, value= ff 00 00 00                                                                  // 	for l in 0..255 {
+  0044: JGE_I32              lhs=32, rhs=36, offset=179, target=234                                                      // 	for l in 0..255 {
+  0055: MUL_F64              dst=56, lhs=24, rhs=24                                                                      // 		const tre = zre * zre - zim * zim;
+  0068: MSUB_F64             dst=40, lhs=16, rhs=16, addend=56                                                           // 		const tre = zre * zre - zim * zim;
+  0085: MUL_F64              dst=56, lhs=24, rhs=16                                                                      // 		const tim = zre * zim + zim * zre;
+  0098: MADD_F64             dst=48, lhs=16, rhs=24, addend=56                                                           // 		const tim = zre * zim + zim * zre;
+  0115: ADD_F64              dst=16, lhs=40, rhs=0                                                                       // 		zre = tre + x;
+  0128: ADD_F64              dst=24, lhs=48, rhs=8                                                                       // 		zim = tim + y;
+  0141: MUL_F64              dst=64, lhs=24, rhs=24                                                                      // 	return re * re - im * (-im);
+  0154: MADD_F64             dst=56, lhs=16, rhs=16, addend=64                                                           // 	return re * re - im * (-im);
+  0171: CALL_NATIVE          function=9, arg_base=56                                                                     // 	return math.sqrt_f64(norm2(re, im));
+  0180: LOAD_CONST_8         dst=64, value= 00 00 00 00 00 00 00 40                                                      // 		if cabs(zre, zim) > 2.0 {
+  0193: JLE_F64              lhs=56, rhs=64, offset=14, target=218                                                       // 		if cabs(zre, zim) > 2.0 {
+  0204: COPY                 dst=0, src=32, size=4                                                                       // 			return l;
+  0217: RETURN_BASE                                                                                                      // 			return l;
+  0218: INC_I32              dst=32                                                                                      // 	for l in 0..255 {
+  0223: JLT_I32              lhs=32, rhs=36, offset=-179, target=55                                                      // 	for l in 0..255 {
+  0234: LOAD_CONST_4         dst=0, value= ff 00 00 00                                                                   // 	return 255;
+  0243: RETURN_BASE                                                                                                      // 	return 255;
+  0244: RETURN_BASE                                                                                                      // fn level(x : f64, y : f64) : i32 {
+function 3 main (script, params=0, frame=96, returns=4)
+  0000: LOAD_CONST_8         dst=0, value= 00 00 00 00 00 00 00 c0                                                       // 	const xmin = -2.0;
+  0013: LOAD_CONST_8         dst=8, value= 00 00 00 00 00 00 00 c0                                                       // 	const ymin = -2.0;
+  0026: LOAD_CONST_4         dst=16, value= 00 01 00 00                                                                  // 	const n = 256;
+  0035: LOAD_CONST_8         dst=20, value= 00 00 00 00 00 00 90 3f                                                      // 	const dx = 4.0 / (n as f64);
+  0048: LOAD_CONST_8         dst=28, value= 00 00 00 00 00 00 90 3f                                                      // 	const dy = 4.0 / (n as f64);
+  0061: LOAD_CONST_4         dst=36, value= 00 00 00 00                                                                  // 	var result : i32 = 0;
+  0070: LOAD_CONST_4         dst=40, value= 00 00 00 00                                                                  // 	for i in 0..n {
+  0079: LOAD_CONST_4         dst=44, value= 00 01 00 00                                                                  // 	for i in 0..n {
+  0088: JGE_I32              lhs=40, rhs=44, offset=217, target=316                                                      // 	for i in 0..n {
+  0099: LOAD_CONST_8         dst=72, value= 00 00 00 00 00 00 00 c0                                                      // 		const x = xmin + (i as f64) * dx;
+  0112: CAST                 dst=80, src=40, i32 -> f64                                                                  // 		const x = xmin + (i as f64) * dx;
+  0123: LOAD_CONST_8         dst=88, value= 00 00 00 00 00 00 90 3f                                                      // 		const x = xmin + (i as f64) * dx;
+  0136: MADD_F64             dst=48, lhs=80, rhs=88, addend=72                                                           // 		const x = xmin + (i as f64) * dx;
+  0153: LOAD_CONST_4         dst=56, value= 00 00 00 00                                                                  // 		for j in 0..n {
+  0162: LOAD_CONST_4         dst=60, value= 00 01 00 00                                                                  // 		for j in 0..n {
+  0171: JGE_I32              lhs=56, rhs=60, offset=118, target=300                                                      // 		for j in 0..n {
+  0182: LOAD_CONST_8         dst=72, value= 00 00 00 00 00 00 00 c0                                                      // 			const y = ymin + (j as f64) * dy;
+  0195: CAST                 dst=80, src=56, i32 -> f64                                                                  // 			const y = ymin + (j as f64) * dy;
+  0206: LOAD_CONST_8         dst=88, value= 00 00 00 00 00 00 90 3f                                                      // 			const y = ymin + (j as f64) * dy;
+  0219: MADD_F64             dst=64, lhs=80, rhs=88, addend=72                                                           // 			const y = ymin + (j as f64) * dy;
+  0236: COPY                 dst=72, src=48, size=8                                                                      // 			result += level(x, y);
+  0249: COPY                 dst=80, src=64, size=8                                                                      // 			result += level(x, y);
+  0262: CALL_DIRECT          function=2, arg_base=72                                                                     // 			result += level(x, y);
+  0271: ADD_32               dst=36, lhs=36, rhs=72                                                                      // 			result += level(x, y);
+  0284: INC_I32              dst=56                                                                                      // 		for j in 0..n {
+  0289: JLT_I32              lhs=56, rhs=60, offset=-118, target=182                                                     // 		for j in 0..n {
+  0300: INC_I32              dst=40                                                                                      // 	for i in 0..n {
+  0305: JLT_I32              lhs=40, rhs=44, offset=-217, target=99                                                      // 	for i in 0..n {
+  0316: COPY                 dst=0, src=36, size=4                                                                       // 	return result;
+  0329: RETURN_BASE                                                                                                      // 	return result;
+  0330: RETURN_BASE                                                                                                      // fn main() : i32 {
+function 4 sin (native, params=4, frame=0, returns=4)
+function 5 cos (native, params=4, frame=0, returns=4)
+function 6 sqrt (native, params=4, frame=0, returns=4)
+function 7 sin_f64 (native, params=8, frame=0, returns=8)
+function 8 cos_f64 (native, params=8, frame=0, returns=8)
+function 9 sqrt_f64 (native, params=8, frame=0, returns=8)
+function 10 pow (native, params=8, frame=0, returns=4)
+function 11 pow_f64 (native, params=16, frame=0, returns=8)

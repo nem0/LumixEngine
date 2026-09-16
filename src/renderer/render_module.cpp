@@ -195,6 +195,7 @@ struct RenderModuleImpl final : RenderModule {
 			
 			if (r.model) r.model->decRefCount();
 			LUMIX_DELETE(m_allocator, r.pose);
+			r.pose = nullptr;
 		}
 		
 		for(auto iter : m_model_entity_map.iterated()) {

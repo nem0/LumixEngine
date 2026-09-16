@@ -1,0 +1,176 @@
+import "core:world"
+import "core:log"
+import "core:input"
+import "core:entity"
+import "core:animator"
+import "core:physical_controller"
+import "core:rigid_actor"
+import "core:physics"
+import "core:Keycode"
+import "core:quat"
+import "core:vec3"
+import "std:math"
+
+import "core:attributes" as attributes
+
+#[attributes.Data {}]
+struct Player {
+	#[attributes.Owner {}]
+	entity : Entity;
+	camera_pivot : ?Entity;
+	handle_input : bool;
+	forward : bool;
+	backward : bool;
+	left : bool;
+	right : bool;
+	yaw : f32;
+	pitch : f32;
+	sprint : bool;
+	speed_input_idx : i32;
+	falling_input_idx : i32;
+	aiming_input_idx : i32;
+	dir_input_idx : i32;
+	stance_input_idx : i32;
+	crouched : bool;
+	aiming : bool;
+	input_system : InputSystem;
+	physics_module : ?PhysicsModule;
+}
+
+var g_world : World = undefined;
+var g_input_system : InputSystem = undefined;
+
+fn getPlayer() : ?*Player {
+	var players = g_world.getEvoxData(Player);
+	if players.length == 0 { return null; }
+	return &players[0];
+}
+
+
+fn processInputEvents() : void {
+	var pl = getPlayer() else return;
+
+	if not pl.handle_input { return; }
+
+	for event in g_input_system.getEvents() {
+		match event {
+			case AxisEvent:
+				if event.device_type == .MOUSE {
+					pl.yaw = pl.yaw + event.x * -0.01;
+					pl.pitch = pl.pitch + event.y * -0.01;
+				}
+			case ButtonEvent:
+				match event.device_type {
+					case:
+					case .MOUSE:
+						pl.aiming = event.down and event.key_id == 1;
+					case .KEYBOARD:
+						match event.key_id as Keycode {
+							case:
+							case .W: pl.forward = event.down;
+							case .S: pl.backward = event.down;
+							case .A: pl.left = event.down;
+							case .D: pl.right = event.down;
+							case .SHIFT: pl.sprint = event.down;
+							case .C: {
+								if event.down {
+									pl.crouched = not pl.crouched;
+								}
+							}
+						}
+				}
+			case:
+		}
+	}
+}
+
+fn init(w : World, inp : InputSystem) : void {
+	g_world = w;
+	g_input_system = inp;
+
+	var pl = getPlayer() else return;
+
+	pl.physics_module = w.physics();
+	pl.camera_pivot = pl.entity.findChildByName("camera_pivot");
+	pl.speed_input_idx = -1;
+}
+
+fn enableInput(enable : bool) : void {
+	var players = g_world.getEvoxData(Player);
+	for &pl in players {
+		pl.handle_input = enable;
+	}
+}
+
+fn safeSetFloatInput(anim : Animator, idx : i32, val : f32) : void {
+	if idx >= 0 {
+		anim.setFloatInput(idx as u32, val);
+	}
+}
+
+fn safeSetBoolInput(anim : Animator, idx : i32, val : bool) : void {
+	if idx >= 0 {
+		anim.setBoolInput(idx as u32, val);
+	}
+}
+
+fn update(dt : f32) : void {
+	processInputEvents();
+
+	var pl = getPlayer() else return;
+	if const pm = pl.physics_module {
+		for hit in pm.getControllerHits() {
+			const obj = hit.hit_entity;
+			if const a = obj.rigid_actor() {
+				const force = yawToDir(pl.yaw) * 50.0;
+				a.applyForce(force);
+			}
+		}
+	}
+
+	const anim = pl.entity.animator() else return;
+
+	if pl.pitch < -0.9 { pl.pitch = -0.9; }
+	if pl.pitch > 0.9 { pl.pitch = 0.9; }
+
+	var gravity_speed : f32 = 0.0;
+	if const pc = pl.entity.physical_controller() {
+		gravity_speed = pc.getGravitySpeed();
+	}
+
+	var speed_y : f32 = pl.forward ? 3.0 :
+						pl.backward ? -3.0 :
+						0;
+
+	var speed_x : f32 = pl.left ? -3.0 :
+						pl.right ? 3.0 :
+						0;
+	if pl.sprint {
+		speed_x = speed_x * 2.0;
+		speed_y = speed_y * 2.0;
+	}
+
+	if pl.speed_input_idx < 0 {
+		pl.speed_input_idx = anim.getInputIndex("speed_y");
+		pl.dir_input_idx = anim.getInputIndex("speed_x");
+		pl.stance_input_idx = anim.getInputIndex("stance");
+		pl.falling_input_idx = anim.getInputIndex("is_falling");
+		pl.aiming_input_idx = anim.getInputIndex("is_aiming");
+	}
+
+	safeSetFloatInput(anim, pl.speed_input_idx, speed_y);
+	safeSetFloatInput(anim, pl.dir_input_idx, speed_x);
+
+	safeSetFloatInput(anim, pl.stance_input_idx, pl.crouched ? 1.0 : 0.0);
+
+	safeSetBoolInput(anim, pl.falling_input_idx, gravity_speed < -4.0);
+	safeSetBoolInput(anim, pl.aiming_input_idx, pl.aiming);
+
+	const yaw_rot = makeQuatFromYaw(pl.yaw);
+	const pitch_rot = makeQuatFromPitch(pl.pitch);
+	pl.entity.setRotation(yaw_rot);
+
+	if const cp = pl.camera_pivot {
+		cp.setRotation(yaw_rot * pitch_rot);
+	}
+}

@@ -104,21 +104,22 @@ void String::operator=(const String& rhs)
 
 void String::operator=(StringView rhs) {
 	if (!isSmall()) {
-		ASSERT(rhs.begin > m_big + m_size || rhs.end < m_big);
+		ASSERT(rhs.data > m_big + m_size || rhs.end() < m_big);
 		m_allocator.deallocate(m_big);
 	}
 		
 	if (rhs.size() < sizeof(m_small)) {
-		ASSERT(rhs.begin > m_small + m_size || rhs.end < m_small);
-		memcpy(m_small, rhs.begin, rhs.size());
+		ASSERT(rhs.data > m_small + m_size || rhs.end() < m_small);
+		memcpy(m_small, rhs.data, rhs.size());
 		m_small[rhs.size()] = '\0';
 	}
 	else {
 		m_big = (char*)m_allocator.allocate(rhs.size() + 1, 1);
-		memcpy(m_big, rhs.begin, rhs.size());
+		memcpy(m_big, rhs.data, rhs.size());
 		m_big[rhs.size()] = '\0';
 	}
-	m_size = rhs.size();
+	ASSERT(rhs.size() < 0xffFFffFF);
+	m_size = (u32)rhs.size();
 }
 
 
@@ -163,12 +164,13 @@ void String::resize(u32 size) {
 
 
 String& String::add(StringView value) {
-	ASSERT(value.begin < c_str() || value.begin >= c_str() + m_size);
+	ASSERT(value.data < c_str() || value.data >= c_str() + m_size);
+	ASSERT(value.size() < 0xffFFffFF);
 
 	const int old_s = m_size;
-	resize(m_size + value.size());
+	resize(m_size + (u32)value.size());
 	char* data = getMutableData();
-	memcpy(data + old_s, value.begin, value.size());
+	memcpy(data + old_s, value.data, value.size());
 	data[old_s + value.size()] = '\0';
 	return *this;
 }
@@ -202,15 +204,16 @@ void String::eraseAt(u32 position)
 
 void String::insert(u32 position, StringView value)
 {
-	ASSERT(value.end <= c_str() || value.begin >= c_str() + m_size);
+	ASSERT(value.end() <= c_str() || value.data >= c_str() + m_size);
 	
-	const int old_size = m_size;
-	const int len = value.size();
+	const u32 old_size = m_size;
+	ASSERT(value.size() < 0xffFFffFF);
+	const u32 len = (u32)value.size();
 	resize(old_size + len);
 
 	char* tmp = getMutableData();
 	memmove(tmp + position + len, tmp + position, old_size - position);
-	memcpy(tmp + position, value.begin, len);
+	memcpy(tmp + position, value.data, len);
 }
 
 void String::insert(u32 position, const char* value)
@@ -232,10 +235,12 @@ static char makeLowercase(char c) {
 }
 
 int compareStringInsensitive(StringView lhs, StringView rhs) {
-	const char* a = lhs.begin;
-	const char* b = rhs.begin;
+	const char* a = lhs.data;
+	const char* b = rhs.data;
+	const char* lhs_end = lhs.end();
+	const char* rhs_end = rhs.end();
 
-	while (a != lhs.end && b != rhs.end) {
+	while (a != lhs_end && b != rhs_end) {
 		char lower_a = makeLowercase(*a);
 		char lower_b = makeLowercase(*b);
 		if (lower_a != lower_b) {
@@ -245,30 +250,32 @@ int compareStringInsensitive(StringView lhs, StringView rhs) {
 		++b;
 	}
 
-	i32 ac = a == lhs.end ? 0 : makeLowercase(*a);
-	i32 bc = b == rhs.end ? 0 : makeLowercase(*b);
+	i32 ac = a == lhs_end ? 0 : makeLowercase(*a);
+	i32 bc = b == rhs_end ? 0 : makeLowercase(*b);
 
 	return ac - bc;
 }
 
 int compareString(StringView lhs, StringView rhs) {
-	const char* a = lhs.begin;
-	const char* b = rhs.begin;
+	const char* a = lhs.data;
+	const char* b = rhs.data;
+	const char* lhs_end = lhs.end();
+	const char* rhs_end = rhs.end();
 
-	while (a != lhs.end && b != lhs.end && *a == *b) {
+	while (a != lhs_end && b != rhs_end && *a == *b) {
 		++a;
 		++b;
 	}
 
-	i32 ac = a == lhs.end ? 0 : *a;
-	i32 bc = b == rhs.end ? 0 : *b;
+	i32 ac = a == lhs_end ? 0 : *a;
+	i32 bc = b == rhs_end ? 0 : *b;
 
 	return ac - bc;
 }
 
 bool equalStrings(StringView lhs, StringView rhs) {
 	if (rhs.size() != lhs.size()) return false;
-	return strncmp(lhs.begin, rhs.begin, lhs.size()) == 0;
+	return strncmp(lhs.data, rhs.data, lhs.size()) == 0;
 }
 
 bool equalStrings(const char* lhs, const char* rhs) {
@@ -278,7 +285,7 @@ bool equalStrings(const char* lhs, const char* rhs) {
 bool equalIStrings(StringView lhs, StringView rhs) {
 	if (lhs.size() != rhs.size()) return false;
 
-	for (u32 i = 0, c = lhs.size(); i < c; ++i) {
+	for (u64 i = 0, c = lhs.size(); i < c; ++i) {
 		if (toLower(lhs[i]) != toLower(rhs[i])) return false;
 	}
 	return true;
@@ -291,13 +298,13 @@ int stringLength(const char* str)
 
 bool endsWithInsensitive(StringView str, StringView suffix) {
 	if (str.size() < suffix.size()) return false;
-	str.begin = str.end - suffix.size();
+	str.removePrefix(str.length - suffix.length);
 	return equalIStrings(str, suffix);
 }
 
 bool endsWith(StringView str, StringView suffix) {
 	if (str.size() < suffix.size()) return false;
-	str.begin = str.end - suffix.size();
+	str.removePrefix(str.length - suffix.length);
 	return equalStrings(str, suffix);
 }
 
@@ -305,20 +312,22 @@ const char* findInsensitive(StringView haystack, StringView needle) {
 	ASSERT(!needle.empty());
 	if (needle.size() > haystack.size()) return nullptr;
 
-	const char* search_end = haystack.end - needle.size() + 1;
+	const char* haystack_end = haystack.end();
+	const char* needle_end = needle.end();
+	const char* search_end = haystack_end - needle.size() + 1;
 	const char needle0 = makeLowercase(needle[0]);
 
-	const char* c = haystack.begin;
+	const char* c = haystack.data;
 	while (c != search_end) {
 		if (makeLowercase(*c) == needle0) {
-			const char* n = needle.begin + 1;
+			const char* n = needle.data + 1;
 			const char* c2 = c + 1;
-			while (n != needle.end && c2 != haystack.end) {
+			while (n != needle_end && c2 != haystack_end) {
 				if (makeLowercase(*n) != makeLowercase(*c2)) break;
 				++n;
 				++c2;
 			}
-			if (n == needle.end) return c;
+			if (n == needle_end) return c;
 		}
 		++c;
 	}
@@ -329,8 +338,9 @@ bool makeLowercase(Span<char> output, StringView src) {
 	char* destination = output.begin();
 	if (src.size() + 1 > output.length()) return false;
 
-	const char* source = src.begin;
-	while (source != src.end) {
+	const char* source = src.data;
+	const char* src_end = src.end();
+	while (source != src_end) {
 		*destination = makeLowercase(*source);
 		++destination;
 		++source;
@@ -340,10 +350,8 @@ bool makeLowercase(Span<char> output, StringView src) {
 }
 
 const char* find(StringView haystack, char needle) {
-	const char* c = haystack.begin;
-	while (c != haystack.end) {
-		if (*c == needle) return c;
-		++c;
+	for (const char& c : haystack) {
+		if (c == needle) return &c;
 	}
 	return nullptr;
 }
@@ -352,20 +360,22 @@ const char* find(StringView haystack, StringView needle) {
 	ASSERT(!needle.empty());
 	if (needle.size() > haystack.size()) return nullptr;
 
-	const char* search_end = haystack.end - needle.size() + 1;
+	const char* haystack_end = haystack.end();
+	const char* needle_end = needle.end();
+	const char* search_end = haystack_end - needle.size() + 1;
 	const char needle0 = needle[0];
 
-	const char* c = haystack.begin;
+	const char* c = haystack.data;
 	while (c != search_end) {
 		if (*c == needle0) {
-			const char* n = needle.begin + 1;
+			const char* n = needle.data + 1;
 			const char* c2 = c + 1;
-			while (n != needle.end && c2 != haystack.end) {
+			while (n != needle_end && c2 != haystack_end) {
 				if (*n != *c2) break;
 				++n;
 				++c2;
 			}
-			if (n == needle.end) return c;
+			if (n == needle_end) return c;
 		}
 		++c;
 	}
@@ -379,12 +389,13 @@ bool contains(StringView haystack, char needle) {
 char* copyString(Span<char> dst, StringView src) {
 	if (dst.length() < 1) return dst.begin();
 
-	ASSERT(dst.begin() >= src.end || dst.begin() <= src.begin);
+	ASSERT(dst.begin() >= src.end() || dst.begin() <= src.data);
 
 	u32 length = dst.length();
 	char* tmp = dst.begin();
-	const char* srcp = src.begin;
-	while (srcp != src.end && length > 1) {
+	const char* srcp = src.data;
+	const char* src_end = src.end();
+	while (srcp != src_end && length > 1) {
 		*tmp = *srcp;
 		--length;
 		++tmp;
@@ -397,8 +408,8 @@ char* copyString(Span<char> dst, StringView src) {
 const char* reverseFind(StringView haystack, char c) {
 	if (haystack.size() == 0) return nullptr;
 
-	const char* tmp = haystack.end - 1;
-	while (tmp >= haystack.begin) {
+	const char* tmp = haystack.end() - 1;
+	while (tmp >= haystack.data) {
 		if (*tmp == c) return tmp;
 		--tmp;
 	}
@@ -439,11 +450,11 @@ const char* fromCString(StringView input, i32& value) {
 const char* fromCString(StringView input, i64& value) {
 	if (input.empty()) return nullptr;
 
-	const char* c = input.begin;
+	const char* c = input.data;
 	if (*c == '-') ++c;
 
 	u64 tmp;
-	const char* res = fromCString(StringView(c, input.end), tmp);
+	const char* res = fromCString(StringView(c, input.end()), tmp);
 	if (!res) return nullptr;
 
 	value = input[0] == '-' ? -i64(tmp) : i64(tmp);
@@ -454,21 +465,22 @@ const char* fromCString(StringView input, i64& value) {
 const char* fromCString(StringView input, float& value) {
 	if (input.empty()) return nullptr;
 	
-	const char* c = input.begin;
+	const char* c = input.data;
 	if (*c == '-') ++c;
 	
 	if (*c < '0' || *c > '9') return nullptr;
 
 	value = 0;
-	while (c != input.end && *c >= '0' && *c <= '9') {
+	const char* input_end = input.end();
+	while (c != input_end && *c >= '0' && *c <= '9') {
 		value *= 10;
 		value += *c - '0';
 		++c;
 	}
-	if (c != input.end && *c == '.') {
+	if (c != input_end && *c == '.') {
 		++c;
 		float d = 0.1f;
-		while (c != input.end && *c >= '0' && *c <= '9') {
+		while (c != input_end && *c >= '0' && *c <= '9') {
 			value += d * (*c - '0');
 			d *= 0.1f;
 			++c;
@@ -497,11 +509,12 @@ const char* fromCString(StringView input, u32& value) {
 const char* fromCStringOctal(StringView input, u32& value) {
 	if (input.empty()) return nullptr;
 
-	const char* c = input.begin;
+	const char* c = input.data;
 	value = 0;
 	if (*c < '0' || *c > '7') return nullptr;
 
-	while (c != input.end && *c >= '0' && *c <= '7') {
+	const char* input_end = input.end();
+	while (c != input_end && *c >= '0' && *c <= '7') {
 		value *= 8;
 		value += *c - '0';
 		++c;
@@ -512,11 +525,12 @@ const char* fromCStringOctal(StringView input, u32& value) {
 const char* fromCString(StringView input, u64& value) {
 	if (input.empty()) return nullptr;
 	
-	const char* c = input.begin;
+	const char* c = input.data;
 	value = 0;
 	if (*c < '0' || *c > '9') return nullptr;
 
-	while (c != input.end && *c >= '0' && *c <= '9') {
+	const char* input_end = input.end();
+	while (c != input_end && *c >= '0' && *c <= '9') {
 		value *= 10;
 		value += *c - '0';
 		++c;
@@ -857,13 +871,13 @@ char* toCString(double value, Span<char> out, int after_point) {
 
 bool startsWith(StringView str, StringView prefix) {
 	if (str.size() < prefix.size()) return false;
-	str.end = str.begin + prefix.size();
+	str.length = prefix.length;
 	return equalStrings(str, prefix);
 }
 
 bool startsWithInsensitive(StringView str, StringView prefix) {
 	if (str.size() < prefix.size()) return false;
-	str.end = str.begin + prefix.size();
+	str.length = prefix.length;
 	return equalIStrings(str, prefix);
 }
 

@@ -1,6 +1,6 @@
 # Meta
 
-Meta scans the source code for lines containing `//@` and generates artifacts such as reflection data and the Lua C API. It's used to mark modules, components, properties, functions, etc. To keep Meta simple and fast, it works using basic string operations. Meta does not preprocess C++ nor does it parse C++. This means valid C++ code can break Meta, if it's not exactly as Meta expects it.
+Meta scans the source code for lines containing `//@` and generates reflection data and scripting APIs. It's used to mark modules, components, properties, functions, and types. To keep Meta simple and fast, it works using basic string operations. Meta does not preprocess C++ nor does it fully parse C++. This means valid C++ can break Meta if it is not written in the form Meta expects.
 
 ## Running Meta
 
@@ -16,11 +16,43 @@ This script will:
 3. Build the meta project
 4. Run meta.exe from the project root directory
 
-Meta scans `src/` and `plugins/` directories and generates:
+Meta scans `src/` and `plugins/` and generates:
+
 - Reflection headers (`*.gen.h`) alongside module source files
-- `src/lua/lua_capi.gen.h` - Lua C API bindings
-- `data/scripts/lumix.d.lua` - Lua type definitions
-- `src/engine/component_types.h` and `src/engine/component_types.cpp` - component type declarations and definitions used by the engine
+- `src/engine/component_types.h` and `src/engine/component_types.cpp` - component type declarations and definitions
+- Backend-specific scripting files; see [Evox](evox.md)
+
+Generated files must not be edited directly. Change the annotated C++ declaration or the relevant generator and run Meta again.
+
+## Generator plugins
+
+`src/meta/meta.cpp` owns source scanning, parsing, reflection generation, and the shared component type files. Scripting backends and other optional generators use the Meta plugin flow instead of being called specially by `main`:
+
+The current generators use this flow for [Evox](evox.md).
+
+A generator receives the parsed declarations through `MetaData` and registers a callback with `META_PLUGIN`:
+
+```cpp
+#include "meta.h"
+
+namespace {
+
+void generateExample(MetaData& data) {
+	OutputStream out;
+	for (Module& module : data.modules) {
+		// Generate output from the parsed module.
+	}
+	writeFile("path/to/output.gen.h", out);
+}
+
+} // namespace
+
+META_PLUGIN(generateExample)
+```
+
+`MetaData` provides the parsed modules, structs, objects, and global enums. Generator source files placed in `src/meta/` are included in the `meta` project by the build wildcard. Shared helpers such as `writeFile`, `formatCPP`, `consumeArg`, and `forEachArg` are declared in `src/meta/meta.h`.
+
+All registered callbacks run after parsing and core reflection generation. A backend decides which declarations and C++ types it supports; for example, Evox skips unsupported signatures and prints a diagnostic during generation.
 
 # Modules
 
@@ -63,16 +95,9 @@ nested in other structs or namespaces.
 
 Values inside enums are automatically parsed by Meta.
 
-### Lua exposure
+### Script exposure
 
-Enums marked with `//@ enum` are automatically exposed to Lua under the `LumixAPI` namespace. Each enum becomes a table with its enumerator names as keys and their integer values as values.
-
-```lua
--- Access enum values in Lua
-local align = LumixAPI.TextVAlign.MIDDLE    -- 1
-local motion = LumixAPI.D6Motion.FREE       -- 2
-local cursor = LumixAPI.CursorType.HAND     -- 6
-```
+Enums marked with `//@ enum` are available to binding generators. Evox emits strongly typed enum declarations and imports them into generated `core:` units that use the enum.
 
 Examples:
 ```cpp
@@ -107,26 +132,21 @@ virtual void setGravity(const Vec3& gravity) = 0;
 //@ end
 ```
 
-### Lua return values and in/out parameters
+### Evox functions
 
-For functions that end up in the generated Lua bindings (`src/lua/lua_capi.gen.h`):
+The Evox generator emits supported module functions into the module's `core:` unit. Native `Span<T>` return values are represented by generated iterators, so callers can use a `for` loop without retaining the native span:
 
-- A non-`void` return value is returned to Lua as the first result.
-- If the return type is a `//@ struct`, it is returned as a Lua table with its fields.
-- If the return type is a pointer to a `//@ object`, it is returned as a Lua object (via `LuaWrapper::pushObject`).
+```evox
+import "core:physics"
 
-In addition, **non-const reference parameters** (`T&`, but not `const T&`) are treated as *in/out* parameters and are returned to Lua as additional results, in declaration order, after the main return value (if any). If the function returns `void`, Lua returns only these in/out values.
-
-Example:
-```cpp
-//@ function
-virtual bool getBounds(EntityRef entity, Vec3& out_min, Vec3& out_max) = 0;
+fn processPhysics(module : PhysicsModule) : void {
+	for hit in module.getTriggerHits() {
+		// use hit
+	}
+}
 ```
 
-Lua usage:
-```lua
-local ok, min, max = this.world:getModule("renderer"):getBounds(entity)
-```
+Consult the generated file in `data/scripts/core/` for the exact Evox name and signature. A declaration is omitted if its types cannot be marshalled by the Evox backend.
 
 ## `//@ include`
 
@@ -174,7 +194,7 @@ virtual void enablePropertyAnimator(EntityRef entity, bool enabled) = 0;
 ```
 
 `//@ component` has 1 parameter - Name - used to autodetect properties from method names. 
-ID and label are generated from name and can be overriden with attributes `//@ component Listener id audio_listener`, `//@ component Script id lua_script label "File"`.
+ID and label are generated from name and can be overridden with attributes such as `//@ component Listener id audio_listener` or `//@ component Zone id trigger_zone label "Trigger zone"`.
 
 ### Properties
 
@@ -413,9 +433,9 @@ virtual GrassRotationMode getGrassRotationMode(EntityRef entity, int index) = 0;
 
 # Objects
 
-`//@ object` marks a struct or class whose methods should be exposed to Lua scripting. Unlike modules and components (which represent game world systems), objects are standalone types that exist outside the ECS-such as editor plugins, utility classes, or system interfaces.
+`//@ object` marks a struct or class whose methods should be exposed to scripting backends. Unlike modules and components, which represent game-world systems, objects are standalone types outside the ECS, such as editor plugins, utility classes, or system interfaces.
 
-Methods marked with `//@ function` inside the object block are emitted in the generated Lua bindings.
+Methods marked with `//@ function` inside the object block are considered for generated bindings. Each backend emits only signatures it supports.
 
 Example:
 ```cpp
@@ -428,59 +448,15 @@ struct GUISystem : ISystem {
 };
 ```
 
-In this example only `enableCursor` is exposed to Lua.
-
-## Accessing objects from Lua
-
-Objects are accessed through module functions or global tables. For example, `UISystem` is obtained via `ui_module:getSystem()`:
-
-```lua
--- Get UISystem through the UIModule and enable the cursor
-this.world.ui:getSystem():enableCursor(true)
-```
-
-Editor objects like `SceneView` and `AssetBrowser` are accessed through the global `Editor` table:
-
-```lua
-Editor.scene_view:setViewportPosition(pos)
-Editor.asset_browser:openEditor("models/cube.fbx")
-```
-
-## Binding objects in C++
-
-Objects are bound to Lua using `LuaWrapper::pushObject`. The type name passed must match the name used in `//@ object`. Example from the editor:
-
-```cpp
-lua_getglobal(L, "Editor");
-StudioApp::GUIPlugin* scene_view = m_app.getGUIPlugin("scene_view");
-LuaWrapper::pushObject(L, scene_view, "SceneView");
-lua_setfield(L, -2, "scene_view");
-
-LuaWrapper::pushObject(L, &m_app.getAssetBrowser(), "AssetBrowser");
-lua_setfield(L, -2, "asset_browser");
-lua_pop(L, 1);
-```
-
-This binds `scene_view` and `asset_browser` as fields on the global `Editor` table. The third argument to `pushObject` (e.g., `"SceneView"`) must match the struct name marked with `//@ object` so Meta's generated bindings are used.
+In this example only `enableCursor` is available to scripting generators. See the backend documentation for supported signatures and object representation.
 
 # Structs
 
-`//@ struct` marks a plain data struct to be exposed to Lua. Unlike `//@ component_struct` (which defines ECS components), `//@ struct` is for standalone types used as function parameters or return values-such as raycast results or geometric primitives.
+`//@ struct` marks a plain data struct for use by scripting backends. Unlike `//@ component_struct` (which defines ECS components), `//@ struct` is for standalone types used as function parameters or return values, such as raycast results or geometric primitives.
 
 The struct must immediately follow on the next line. All fields are automatically parsed until the closing `}`. Each field must be on its own line with the format `Type name;`. Lines starting with `using` are skipped. No explicit `//@ property` marker is needed-all fields are exposed.
 
-**Difference from `//@ object`:** Use `//@ struct` for plain data containers (POD-like types with public fields, passed by value or as results). Use `//@ object` for service/interface types with methods that need to be called from Lua. Structs expose fields; objects expose functions. Structs are passed by value, objects are passed by reference.
-
-Usage in Lua:
-```lua
--- getRay returns a Ray struct, castRay accepts it and returns RayCastModelHit struct
-local ray = camera.camera:getRay(screen_pos)
-local hit = this.world.renderer:castRay(ray, nil)
-if hit.is_hit then
-    -- access struct fields
-    local pos = hit.origin + hit.dir * hit.t
-end
-```
+**Difference from `//@ object`:** Use `//@ struct` for plain data containers (POD-like types with public fields, passed by value or as results). Use `//@ object` for service/interface types with callable methods. Structs expose fields; objects expose functions. Structs are passed by value, while objects wrap references or pointers according to the scripting backend.
 
 Examples:
 ```cpp
@@ -505,25 +481,6 @@ struct LUMIX_RENDERER_API RayCastModelHit {
 };
 ```
 
-### Note on fields and pointers
-
-Pointer and handle fields (e.g., `Mesh*`) are represented in Lua as tables containing lightuserdata (not raw userdata). A pointer field may be `nil` in Lua if it represents a null pointer in C++. When using pointer fields from Lua, check for `nil` before accessing or calling methods on them.
-
-Example:
-```lua
-local ray = camera.camera:getRay(screen_pos)
-local hit = this.world.renderer:castRay(ray, nil)
-if hit.is_hit then
-	if hit.mesh ~= nil then
-		-- mesh is an opaque handle; use it only with API functions that accept Mesh
-	end
-end
-```
-
-### Lifetime and ownership
-
-Objects pushed to Lua with `LuaWrapper::pushObject` are raw pointers; C++ must guarantee their lifetime while Lua may hold references. Do not let Lua retain pointers to objects that may be destroyed by C++ without proper synchronization.
-
 ### Caveats & Troubleshooting
 
 Common issues:
@@ -531,7 +488,6 @@ Common issues:
 - `//@ struct` or `//@ component_struct` must be immediately followed by the `struct` declaration on the next line.
 - Combined declarations (e.g., `float a, b;`) are not supported; keep one field per line.
 - Templates, macros that alter declaration shape, conditional compilation, or non-trivial field declarations may confuse the simple string-based parser.
-- When binding objects, ensure the type name passed to `LuaWrapper::pushObject` matches the `//@ object` name used in headers.
 
 # Comparison Table
 
@@ -543,4 +499,4 @@ Common issues:
 | Field handling | All fields auto-exposed | N/A | Fields need `//@ property` |
 | Method handling | N/A | Explicit `//@ function` | Auto-detected from names |
 | Typical use | Function params/returns | Editor plugins, systems | Game world data |
-| Lua access | Returned from functions | Via modules or globals | Via entity components |
+| Script access | Returned from functions | Via generated object handles | Via module/entity component handles |

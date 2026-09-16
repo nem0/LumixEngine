@@ -151,14 +151,18 @@ struct CodeEditor {
 	virtual void selectWord() = 0;
 	virtual bool canHandleInput() = 0;
 	virtual void underlineTokens(u32 line, u32 col_from, u32 col_to, const char* msg) = 0;
+	virtual void clearUnderlines() = 0;
 	virtual void insertText(const char* text) = 0;
 	virtual u32 getNumCursors() = 0;
 	virtual ImVec2 getCursorScreenPosition(u32 cursor_index = 0) = 0;
 	virtual void focus() = 0;
 	// get part of word left of cursor, usable for example for autocomplete
 	virtual StringView getPrefix() = 0;
-	
+
 	virtual void setReadOnly(bool readonly) = 0;
+	virtual void setBreakpoint(u32 line, bool enabled) = 0;
+	virtual void setCurrentDebugLine(u32 line) = 0;
+	virtual void clearCurrentDebugLine() = 0;
 	virtual void setText(StringView text) = 0;
 	virtual void serializeText(OutputMemoryStream& blob) = 0;
 	virtual void setTokenColors(Span<const u32> colors) = 0; // keep colors alive while CodeEditor uses them

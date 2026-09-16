@@ -20,15 +20,15 @@ if "%msbuild_cmd%"=="" (
 )
 :msbuild_found
 
-genie.exe --with-tests vs2022
+.\genie.exe --with-tests vs2022
 if not %errorlevel%==0 (
   echo Failed to generate solution.
   popd
   exit /b 1
 )
 
-REM Build solution
-echo Building solution...
+REM Build the combined headless test project
+echo Building tests...
 REM Initialize Visual Studio developer environment if available
 if exist "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" (
   for /f "usebackq delims=" %%I in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -property installationPath`) do set VSINSTALL=%%I
@@ -40,7 +40,7 @@ if defined VSINSTALL (
 )
 
 echo Using MSBuild: %msbuild_cmd%
-"%msbuild_cmd%" "tmp\vs2022\LumixEngine.sln" /p:Configuration=Debug /p:Platform=x64 /verbosity:minimal
+"%msbuild_cmd%" "tmp\vs2022\tests.vcxproj" /p:Configuration=Debug /p:Platform=x64 /verbosity:minimal
 if not %errorlevel%==0 (
   echo Build failed.
   popd

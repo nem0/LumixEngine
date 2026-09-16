@@ -1,5 +1,7 @@
-#define INITGUID
-#include "core/win/simple_win.h"
+#ifdef _WIN32
+	#define INITGUID
+	#include "core/win/simple_win.h"
+#endif
 #include <string.h>
 
 #include "core/atomic.h"

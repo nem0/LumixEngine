@@ -1,0 +1,16 @@
+function 0 fib (script, params=4, frame=12, returns=4)
+  0000: LOAD_CONST_4         dst=4, value= 01 00 00 00                                                                   // 	if n <= 1 {
+  0009: JGT_I32              lhs=0, rhs=4, offset=1, target=21                                                           // 	if n <= 1 {
+  0020: RETURN_BASE                                                                                                      // 		return n;
+  0021: SUB_32_IMM           dst=4, lhs=0, imm=0x01000000                                                                // 	return fib(n - 1) + fib(n - 2);
+  0034: CALL_DIRECT          function=0, arg_base=4                                                                      // 	return fib(n - 1) + fib(n - 2);
+  0043: SUB_32_IMM           dst=8, lhs=0, imm=0x02000000                                                                // 	return fib(n - 1) + fib(n - 2);
+  0056: CALL_DIRECT          function=0, arg_base=8                                                                      // 	return fib(n - 1) + fib(n - 2);
+  0065: ADD_32               dst=0, lhs=4, rhs=8                                                                         // 	return fib(n - 1) + fib(n - 2);
+  0078: RETURN_BASE                                                                                                      // 	return fib(n - 1) + fib(n - 2);
+  0079: RETURN_BASE                                                                                                      // fn fib(n : i32) : i32 {
+function 1 main (script, params=0, frame=4, returns=4)
+  0000: LOAD_CONST_4         dst=0, value= 1e 00 00 00                                                                   // 	return fib(30);
+  0009: CALL_DIRECT          function=0, arg_base=0                                                                      // 	return fib(30);
+  0018: RETURN_BASE                                                                                                      // 	return fib(30);
+  0019: RETURN_BASE                                                                                                      // fn main() : i32 {

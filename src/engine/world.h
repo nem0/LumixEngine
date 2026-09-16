@@ -62,6 +62,7 @@ struct LUMIX_ENGINE_API World {
 	~World();
 
 	IAllocator& getAllocator() { return m_allocator; }
+	Engine& getEngine() { return m_engine; }
 	const Transform* getTransforms() const { return m_transforms.begin(); }
 	void emplaceEntity(EntityRef entity);
 	EntityRef createEntity(const DVec3& position, const Quat& rotation);

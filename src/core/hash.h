@@ -11,7 +11,7 @@ struct LUMIX_CORE_API RuntimeHash {
 	static RuntimeHash fromU64(u64 hash);
 	RuntimeHash() {}
 	explicit RuntimeHash(const char* string);
-	RuntimeHash(const void* data, u32 len);
+	RuntimeHash(const void* data, u64 len);
 
 	bool operator != (RuntimeHash rhs) const { return hash != rhs.hash; }
 	bool operator == (RuntimeHash rhs) const { return hash == rhs.hash; }
@@ -29,7 +29,7 @@ struct LUMIX_CORE_API RuntimeHash32 {
 	static RuntimeHash32 fromU32(u32 hash);
 	RuntimeHash32() {}
 	explicit RuntimeHash32(const char* string);
-	RuntimeHash32(const void* data, u32 len);
+	RuntimeHash32(const void* data, u64 len);
 
 	bool operator != (RuntimeHash32 rhs) const { return hash != rhs.hash; }
 	bool operator == (RuntimeHash32 rhs) const { return hash == rhs.hash; }
@@ -45,7 +45,7 @@ struct LUMIX_CORE_API StableHash {
 	static StableHash fromU64(u64 hash);
 	StableHash() {}
 	explicit StableHash(const char* str);
-	StableHash(const void* data, u32 len);
+	StableHash(const void* data, u64 len);
 
 	bool operator != (StableHash rhs) const { return hash != rhs.hash; }
 	bool operator == (StableHash rhs) const { return hash == rhs.hash; }
@@ -61,7 +61,7 @@ struct LUMIX_CORE_API StableHash32 {
 	static StableHash32 fromU32(u32 hash);
 	StableHash32() {}
 	explicit StableHash32(const char* string);
-	StableHash32(const void* data, u32 len);
+	StableHash32(const void* data, u64 len);
 
 	bool operator != (StableHash32 rhs) const { return hash != rhs.hash; }
 	bool operator == (StableHash32 rhs) const { return hash == rhs.hash; }

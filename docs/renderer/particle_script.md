@@ -56,7 +56,7 @@ emitter EmitterName {
 - `var` - Declares per-particle data.
 - `let` - Declares block-local variables.
 - `const` - Declares global constants.
-- `global` - Declares global variables. This can be set from outside the particle system, e.g., by a lua script.
+- `global` - Declares global variables. This can be set from outside the particle system, e.g., by a Evox script.
 - `fn` - Defines a function.
 
 ## Global Constants

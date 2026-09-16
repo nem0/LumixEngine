@@ -93,6 +93,7 @@ struct ModelMeta {
 		WRITE_BOOL(bake_vertex_ao, false);
 		WRITE_BOOL(bake_impostor_normals, false);
 		WRITE_BOOL(split, false);
+		WRITE_BOOL(import_all_objects, false);
 		WRITE_BOOL(use_specular_as_roughness, true);
 		WRITE_BOOL(use_specular_as_metallic, false);
 		WRITE_BOOL(import_vertex_colors, false);
@@ -162,6 +163,7 @@ struct ModelMeta {
 			{ "scale", &scene_scale },
 			{ "culling_scale", &culling_scale },
 			{ "split", &split },
+			{ "import_all_objects", &import_all_objects },
 			{ "bake_impostor_normals", &bake_impostor_normals },
 			{ "bake_vertex_ao", &bake_vertex_ao },
 			{ "min_bake_vertex_ao", &min_bake_vertex_ao },
@@ -217,8 +219,8 @@ struct ModelMeta {
 
 		clips.clear();	
 		if (!tmp_clips.empty()) {
-			Tokenizer t(StringView(content.begin, tmp_clips.end), path.c_str());
-			t.cursor = tmp_clips.begin;
+			Tokenizer t(StringView(content.data, tmp_clips.end()), path.c_str());
+			t.cursor = tmp_clips.data;
 			Tokenizer::Token token = t.nextToken();
 			ASSERT(token && token.value[0] == '[');
 			for (;;) {
@@ -227,7 +229,7 @@ struct ModelMeta {
 				if (token == "]") break;
 				if (token != "{") {
 					logError(t.filename, "(", t.getLine(), "): expected ']' or '{', got ", token.value);
-					t.logErrorPosition(token.value.begin);
+					t.logErrorPosition(token.value.data);
 					return;
 				}
 
@@ -250,7 +252,7 @@ struct ModelMeta {
 					}
 					else {
 						logError(t.filename, "(", t.getLine(), "): unknown token ", token.value);
-						t.logErrorPosition(token.value.begin);
+						t.logErrorPosition(token.value.data);
 						return;
 					}
 					token = t.nextToken();
@@ -258,7 +260,7 @@ struct ModelMeta {
 					if (token == "}") break;
 					if (token != ",") {
 						logError(t.filename, "(", t.getLine(), "): expected '}' or ',', got ", token.value);
-						t.logErrorPosition(token.value.begin);
+						t.logErrorPosition(token.value.data);
 						return;
 					}
 				}
@@ -268,7 +270,7 @@ struct ModelMeta {
 				if (token == "]") break;
 				if (token != ",") {
 					logError(t.filename, "(", t.getLine(), "): expected ']' or ',', got ", token.value);
-					t.logErrorPosition(token.value.begin);
+					t.logErrorPosition(token.value.data);
 					return;
 				}
 			}
@@ -311,6 +313,7 @@ struct ModelMeta {
 
 	bool bake_impostor_normals = false;
 	bool split = false;
+	bool import_all_objects = false;
 	bool force_skin = false;
 	bool ignore_animations = false;
 	bool ignore_material_colors = false;

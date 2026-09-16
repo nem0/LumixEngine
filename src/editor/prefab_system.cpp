@@ -310,7 +310,12 @@ public:
 
 
 	void breakPrefabRecursive(EntityRef e) {
-		m_entity_to_prefab[e.index] = FilePathHash();
+		// A prefab instance can contain entities added after it was instantiated.
+		// Such entities do not have an entry in m_entity_to_prefab, so do not
+		// index the array unconditionally while walking the whole hierarchy.
+		if (e.index >= 0 && e.index < m_entity_to_prefab.size()) {
+			m_entity_to_prefab[e.index] = FilePathHash();
+		}
 		const EntityPtr child = m_world->getFirstChild(e);
 		if (child.isValid()) {
 			breakPrefabRecursive((EntityRef)child);

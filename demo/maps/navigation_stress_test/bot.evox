@@ -1,0 +1,53 @@
+import "core:animator"
+import "core:entity"
+import "core:model_instance"
+import "core:navmesh_agent"
+import "core:world"
+import "core:random"
+import "core:dvec3"
+
+var g_bots : [19*19]Entity = undefined;
+var g_world : World = undefined;
+
+fn goToRandomPoint(e : Entity) : void {
+	var speed = randFloatRange(2, 5);
+	var dst = DVec3 {
+		randFloatRange(-100, 100) as f64,
+		0, 
+		randFloatRange(-100, 100) as f64
+	};
+	var anim = e.animator() else return;
+	var agent = e.navmesh_agent() else return;
+
+	agent.navigate(dst, speed, 0.5);
+	var speed_input = anim.getInputIndex("speed_y");
+	if speed_input >= 0 {
+		anim.setFloatInput(speed_input as u32, speed);
+	}
+}
+
+fn init(world : World) : void {
+	g_world = world;
+	for i in -9 .. 10 {
+		for j in -9 .. 10 {
+			var e = world.createEntity();
+			e.setPosition({(i * 10) as f64, 0, (j * 10) as f64});
+			var mi = e.createModelInstance() else return;
+			var anim = e.createAnimator() else return;
+			var agent = e.createAgent() else return;
+			mi.setPath("models/ybot/ybot.fbx");
+			anim.setSource("models/ybot/ybot.act");
+			goToRandomPoint(e);
+			g_bots[(i + 9) + (j + 9) * 19] = e;
+		}
+	}
+}
+
+fn update() : void {
+	for b in g_bots {
+		var agent = b.navmesh_agent() else return;
+		if agent.isFinished() {
+			goToRandomPoint(b);
+		}
+	}
+}

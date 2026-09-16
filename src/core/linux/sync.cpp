@@ -12,6 +12,36 @@
 namespace Lumix
 {
 
+SRWLock::SRWLock() {
+	const int res = pthread_rwlock_init(&rwlock, nullptr);
+	ASSERT(res == 0);
+}
+
+SRWLock::~SRWLock() {
+	const int res = pthread_rwlock_destroy(&rwlock);
+	ASSERT(res == 0);
+}
+
+void SRWLock::enterExclusive() {
+	const int res = pthread_rwlock_wrlock(&rwlock);
+	ASSERT(res == 0);
+}
+
+void SRWLock::exitExclusive() {
+	const int res = pthread_rwlock_unlock(&rwlock);
+	ASSERT(res == 0);
+}
+
+void SRWLock::enterShared() {
+	const int res = pthread_rwlock_rdlock(&rwlock);
+	ASSERT(res == 0);
+}
+
+void SRWLock::exitShared() {
+	const int res = pthread_rwlock_unlock(&rwlock);
+	ASSERT(res == 0);
+}
+
 ConditionVariable::ConditionVariable() {
 	const int res = pthread_cond_init(&cv, nullptr);
 	ASSERT(res == 0);
@@ -49,13 +79,13 @@ Semaphore::~Semaphore()
 	ASSERT(res == 0);
 }
 
-void Semaphore::signal()
+void Semaphore::signal(u32 count)
 {
 	int res = pthread_mutex_lock(&m_id.mutex);
 	ASSERT(res == 0);
-	res = pthread_cond_signal(&m_id.cond);
+	m_id.count += count;
+	res = pthread_cond_broadcast(&m_id.cond);
 	ASSERT(res == 0);
-	m_id.count = m_id.count + 1;
 	res = pthread_mutex_unlock(&m_id.mutex);
 	ASSERT(res == 0);
 }

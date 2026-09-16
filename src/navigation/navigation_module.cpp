@@ -12,7 +12,6 @@
 #include "engine/reflection.h"
 #include "engine/world.h"
 #include "imgui/IconsFontAwesome5.h"
-#include "lua/lua_script_system.h"
 #include "navigation_module.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -93,7 +92,6 @@ struct NavigationModuleImpl final : NavigationModule
 		, m_engine(engine)
 		, m_agents(m_allocator)
 		, m_zones(m_allocator)
-		, m_script_module(nullptr)
 	{
 		m_world.componentTransformed(types::navmesh_agent).bind<&NavigationModuleImpl::onAgentMoved>(this);
 	}
@@ -328,6 +326,7 @@ struct NavigationModuleImpl final : NavigationModule
 		}
 	}
 
+	/*
 	// TODO move to lua plugin
 	void onPathFinished(const Agent& agent)
 	{
@@ -343,9 +342,9 @@ struct NavigationModuleImpl final : NavigationModule
 			m_script_module->endFunctionCall();
 		}
 	}
+	*/
 
-
-	bool isFinished(EntityRef entity) override
+	bool isAgentFinished(EntityRef entity) override
 	{
 		return m_agents[entity].is_finished;
 	}
@@ -444,7 +443,7 @@ struct NavigationModuleImpl final : NavigationModule
 				if (!agent.is_finished) {
 					zone.crowd->resetMoveTarget(agent.agent);
 					agent.is_finished = true;
-					onPathFinished(agent);
+					//onPathFinished(agent);
 				}
 			}
 			else if (dt_agent->ncorners == 1 && agent.stop_distance > 0) {
@@ -454,7 +453,7 @@ struct NavigationModuleImpl final : NavigationModule
 				if (dist_squared < agent.stop_distance * agent.stop_distance) {
 					zone.crowd->resetMoveTarget(agent.agent);
 					agent.is_finished = true;
-					onPathFinished(agent);
+					//onPathFinished(agent);
 				}
 			}
 			else {
@@ -1029,8 +1028,6 @@ struct NavigationModuleImpl final : NavigationModule
 	void startGame() override
 	{
 		m_is_game_running = true;
-		auto* module = m_world.getModule("lua_script");
-		m_script_module = static_cast<LuaScriptModule*>(module);
 		
 		for (RecastZone& zone : m_zones) {
 			if (zone.navmesh && !zone.crowd) initCrowd(zone);
@@ -1702,7 +1699,6 @@ struct NavigationModuleImpl final : NavigationModule
 	bool m_is_game_running = false;
 	
 	Vec3 m_debug_tile_origin;
-	LuaScriptModule* m_script_module;
 };
 
 

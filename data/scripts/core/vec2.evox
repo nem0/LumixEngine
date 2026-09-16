@@ -1,0 +1,46 @@
+extern struct Vec2 {
+	x : f32;
+	y : f32;
+}
+
+operator +(a : Vec2, b : Vec2) : Vec2 {
+	return Vec2 {
+		a.x + b.x,
+		a.y + b.y
+	};
+}
+
+operator -(a : Vec2, b : Vec2) : Vec2 {
+	return Vec2 {
+		a.x - b.x,
+		a.y - b.y
+	};
+}
+
+operator -(a : Vec2) : Vec2 {
+	return Vec2 {
+		-a.x,
+		-a.y
+	};
+}
+
+operator *(a : Vec2, b : f32) : Vec2 {
+	return Vec2 {
+		a.x * b,
+		a.y * b
+	};
+}
+
+operator *(a : f32, b : Vec2) : Vec2 {
+	return Vec2 {
+		a * b.x,
+		a * b.y
+	};
+}
+
+operator /(a : Vec2, b : f32) : Vec2 {
+	return Vec2 {
+		a.x / b,
+		a.y / b
+	};
+}

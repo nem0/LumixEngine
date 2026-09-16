@@ -272,7 +272,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	static RuntimeHash dirHash(const Path& path) {
 		StringView dir = Path::getDir(ResourcePath::getResource(path));
 		if (!dir.empty() && (dir.back() == '\\' || dir.back() == '/')) dir.removeSuffix(1);
-		return RuntimeHash(dir.begin, dir.size());
+		return RuntimeHash(dir.data, dir.size());
 	}
 
 	void addResource(ResourceType type, const Path& path) override {
@@ -401,7 +401,7 @@ struct AssetCompilerImpl : AssetCompiler {
 						if (t == "]") break;
 						if (t.type != Tokenizer::Token::STRING) {
 							logError(tokenizer.filename, "(", tokenizer.getLine(), "): string expected, got ", t.value);
-							tokenizer.logErrorPosition(t.value.begin);
+							tokenizer.logErrorPosition(t.value.data);
 							goto end_tokenizing;
 						}
 						const Path path(t.value);
@@ -420,7 +420,7 @@ struct AssetCompilerImpl : AssetCompiler {
 						if (t == "]") break;
 						if (t != ",") {
 							logError(tokenizer.filename, "(", tokenizer.getLine(), "): expected ',' or ']', got ", t.value);
-							tokenizer.logErrorPosition(t.value.begin);
+							tokenizer.logErrorPosition(t.value.data);
 							goto end_tokenizing;
 						}
 					}
@@ -434,7 +434,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 						if (t.type != Tokenizer::Token::STRING) {
 							logError(tokenizer.filename, "(", tokenizer.getLine(), "): string expected, got ", t.value);
-							tokenizer.logErrorPosition(t.value.begin);
+							tokenizer.logErrorPosition(t.value.data);
 							goto end_tokenizing;
 						}
 						if (!tokenizer.consume("=", "[")) goto end_tokenizing;
@@ -452,7 +452,7 @@ struct AssetCompilerImpl : AssetCompiler {
 							if (t == "]") break;
 							if (t.type != Tokenizer::Token::STRING) {
 								logError(tokenizer.filename, "(", tokenizer.getLine(), "): string expected, got ", t.value);
-								tokenizer.logErrorPosition(t.value.begin);
+								tokenizer.logErrorPosition(t.value.data);
 								goto end_tokenizing;
 							}
 							iter.value().push(Path(t.value));
@@ -461,7 +461,7 @@ struct AssetCompilerImpl : AssetCompiler {
 							if (t == "]") break;
 							if (t != ",") {
 								logError(tokenizer.filename, "(", tokenizer.getLine(), "): expected ',' or ']', got ", t.value);
-								tokenizer.logErrorPosition(t.value.begin);
+								tokenizer.logErrorPosition(t.value.data);
 								goto end_tokenizing;
 							}
 						}
@@ -471,14 +471,14 @@ struct AssetCompilerImpl : AssetCompiler {
 						if (t == "}") break;
 						if (t != ",") {
 							logError(tokenizer.filename, "(", tokenizer.getLine(), "): expected ',' or '}', got ", t.value);
-							tokenizer.logErrorPosition(t.value.begin);
+							tokenizer.logErrorPosition(t.value.data);
 							goto end_tokenizing;
 						}
 					}
 				}
 				else {
 					logError(tokenizer.filename, "(", tokenizer.getLine(), "): unknown token ", t.value);
-					tokenizer.logErrorPosition(t.value.begin);
+					tokenizer.logErrorPosition(t.value.data);
 					goto end_tokenizing;
 				}
 			}
