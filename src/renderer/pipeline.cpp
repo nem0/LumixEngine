@@ -1040,9 +1040,12 @@ struct PipelineImpl final : Pipeline {
 
 			view_ptr->renderables = m_module->getRenderables(view_ptr->cp.frustum);
 
-			if (view_ptr->renderables && (view_ptr->renderables->header.count != 0 || view_ptr->renderables->header.next)) {
-				createSortKeys(*view_ptr);
+			if (view_ptr->renderables) {
+				if (view_ptr->renderables->header.count != 0 || view_ptr->renderables->header.next) {
+					createSortKeys(*view_ptr);
+				}
 				view_ptr->renderables->free(m_renderer.getEngine().getPageAllocator());
+				view_ptr->renderables = nullptr;
 			}
 			m_sort_keys_group.endJob();
 			view_ptr->sorter.pack();
