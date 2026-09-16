@@ -1,3 +1,0 @@
-[box font="/engine/editor/fonts/JetBrainsMono-Regular.ttf" font-size=60 color=#ffFFff] { 
-	[span text="Score: 0" $score]
-}
