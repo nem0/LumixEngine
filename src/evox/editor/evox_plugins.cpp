@@ -618,6 +618,8 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 	}
 
 	void save() {
+		check();
+
 		OutputMemoryStream blob(m_app.getAllocator());
 		m_editor->serializeText(blob);
 		m_app.getAssetBrowser().saveResource(m_path, blob);

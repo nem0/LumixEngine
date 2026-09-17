@@ -230,14 +230,22 @@ typedef struct ex_arena {
 
 // Host bridge shared by module creation, parsing, compilation, and runtime.
 //
-// - `arena` is used for every object created with this host
+// - `arena` is used for compiler and bytecode-owned objects
+// - `allocator`, when provided, is used for runtime-owned objects and std:mem
 // - diagnostics hooks are used for error output
+typedef struct ex_allocator {
+	void* user_data;
+	void* (*allocate)(void* user_data, size_t size, size_t align);
+	void (*deallocate)(void* user_data, void* ptr);
+} ex_allocator;
+
 typedef struct ex_host {
 	ex_arena arena;
 
 	void* diagnostics_userdata;
 	ex_print_fn print;
 	ex_diagnostic_fn diagnostic;
+	ex_allocator allocator;
 } ex_host;
 
 // Opaque module/runtime handles.

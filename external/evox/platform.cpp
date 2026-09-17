@@ -1,4 +1,27 @@
 #include "platform.h"
+#include <stdlib.h>
+
+#if defined(_MSC_VER)
+#include <malloc.h>
+#endif
+
+void* ex_platform_allocate(size_t size, size_t align) {
+	if (align < sizeof(void*)) align = sizeof(void*);
+#if defined(_MSC_VER)
+	return _aligned_malloc(size, align);
+#else
+	void* ptr = NULL;
+	return posix_memalign(&ptr, align, size) == 0 ? ptr : NULL;
+#endif
+}
+
+void ex_platform_deallocate(void* ptr) {
+#if defined(_MSC_VER)
+	_aligned_free(ptr);
+#else
+	free(ptr);
+#endif
+}
 
 #ifdef _WIN32
 #include <windows.h>

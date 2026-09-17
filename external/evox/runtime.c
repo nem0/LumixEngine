@@ -1,10 +1,10 @@
 ﻿#include "bytecode.h"
+#include "platform.h"
 
  // TODO lot of silent failures here, should be handled better
 
 #include <math.h>
 #include <stddef.h>
-#include <stdlib.h>
 #include <string.h>
 
 #if defined(_MSC_VER)
@@ -23,6 +23,20 @@ typedef struct ex_runtime_slice {
 	const void* data;
 	i64 length;
 } ex_runtime_slice;
+
+static void* runtime_allocate_host(ex_host* host, size_t size, size_t align) {
+	if (host->allocator.allocate) return host->allocator.allocate(host->allocator.user_data, size, align);
+	return ex_platform_allocate(size, align);
+}
+
+static void runtime_deallocate_host(ex_host* host, void* ptr) {
+	if (!ptr) return;
+	if (host->allocator.allocate) {
+		if (host->allocator.deallocate) host->allocator.deallocate(host->allocator.user_data, ptr);
+	} else {
+		ex_platform_deallocate(ptr);
+	}
+}
 
 ex_string_view ex_arg_read_string(ex_call_frame* frame) {
 	ex_runtime_slice slice = {NULL, 0};
@@ -92,9 +106,7 @@ void ex_result_string(ex_runtime* runtime, ex_call_frame* frame, ex_string_view 
 	if (size > 0) memcpy(copy, value.begin, (size_t)size);
 	copy[size] = '\0';
 
-	ex_string_box* box = runtime->arena && runtime->arena->allocate
-		? (ex_string_box*)runtime->arena->allocate(runtime->arena->user_data, sizeof(ex_string_box), sizeof(void*))
-		: (ex_string_box*)malloc(sizeof(ex_string_box));
+	ex_string_box* box = (ex_string_box*)runtime->arena->allocate(runtime->arena->user_data, sizeof(ex_string_box), sizeof(void*));
 	if (!box) return;
 	box->value = (ex_string_view){size > 0 ? copy : empty, size};
 	ex_runtime_slice slice = {box->value.begin, (i64)(box->value.length)};
@@ -123,8 +135,7 @@ static void runtime_native_alloc(ex_runtime* runtime, ex_call_frame frame) {
 	(void)runtime;
 	EX_ARG(frame, i64, size);
 	EX_ARG(frame, i64, align);
-	(void)align;
-	void* ptr = size > 0 ? malloc((size_t)size) : NULL;
+	void* ptr = size > 0 ? runtime_allocate_host(runtime->host, (size_t)size, (size_t)align) : NULL;
 	i64 actual = ptr ? size : 0;
 	memcpy(frame.result, &ptr, sizeof(ptr));
 	memcpy(frame.result + sizeof(ptr), &actual, sizeof(actual));
@@ -136,11 +147,13 @@ static void runtime_native_free(ex_runtime* runtime, ex_call_frame frame) {
 	EX_ARG(frame, void*, ptr);
 	EX_ARG(frame, i64, size);
 	(void)size;
-	free(ptr);
+	runtime_deallocate_host(runtime->host, ptr);
 }
 
 static void runtime_bind_builtin_callbacks(ex_runtime* runtime) {
-	// TODO shouldn't we check import path?
+	// The compiler marks only extern functions from std:math and std:mem as
+	// builtins, so checking is_builtin_native here excludes same-named user
+	// functions from other units.
 	for (u32 i = 0; i < runtime->bytecode->function_count; ++i) {
 		const ex_function_bc* fn = &runtime->bytecode->functions[i];
 		if (fn->kind != EX_FUNCTION_NATIVE || !fn->is_builtin_native) continue;
@@ -601,7 +614,6 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 
 	runtime_execute_function_dispatch:
 		switch (op) {
-			// TODO const table?
 			case EX_OP_LOAD_CONST_1: {
 				const u32 dst = runtime_read_u32();
 				u8 value = *ip++;
@@ -1363,23 +1375,26 @@ ex_runtime* ex_runtime_create(ex_bytecode* bytecode, ex_host* host) {
 	if (!host) host = bytecode->host;
 	if (!host || !host->arena.allocate) return NULL;
 
-	ex_runtime* runtime = (ex_runtime*)calloc(1, sizeof(ex_runtime));
+	ex_runtime* runtime = (ex_runtime*)runtime_allocate_host(host, sizeof(ex_runtime), sizeof(void*));
+	if (runtime) memset(runtime, 0, sizeof(ex_runtime));
 	if (!runtime) return NULL;
 
 	runtime->bytecode = bytecode;
 	runtime->host = host;
 	runtime->arena = &host->arena;
 	runtime->global_size = bytecode->global_size;
-	runtime->globals = (u8*)calloc(bytecode->global_size ? bytecode->global_size : 1u, 1u);
+	runtime->globals = (u8*)runtime_allocate_host(runtime->host, bytecode->global_size ? bytecode->global_size : 1u, 1u);
+	if (runtime->globals) memset(runtime->globals, 0, bytecode->global_size ? bytecode->global_size : 1u);
 	if (!runtime->globals) {
-		free(runtime);
+		runtime_deallocate_host(host, runtime);
 		return NULL;
 	}
 	if (bytecode->function_count > 0u) {
-		runtime->native_callbacks = (ex_native_fn*)calloc((size_t)bytecode->function_count, sizeof(ex_native_fn));
+		runtime->native_callbacks = (ex_native_fn*)runtime_allocate_host(runtime->host, sizeof(ex_native_fn) * (size_t)bytecode->function_count, sizeof(void*));
+		if (runtime->native_callbacks) memset(runtime->native_callbacks, 0, sizeof(ex_native_fn) * (size_t)bytecode->function_count);
 		if (!runtime->native_callbacks) {
-			free(runtime->globals);
-			free(runtime);
+			runtime_deallocate_host(runtime->host, runtime->globals);
+			runtime_deallocate_host(runtime->host, runtime);
 			return NULL;
 		}
 		runtime->native_callback_count = bytecode->function_count;
@@ -1403,23 +1418,25 @@ ex_runtime* ex_runtime_create(ex_bytecode* bytecode, ex_host* host) {
 
 void ex_runtime_destroy(ex_runtime* runtime) {
 	if (!runtime) return;
-	free(runtime->globals);
-	free(runtime->native_callbacks);
-	free(runtime);
+	runtime_deallocate_host(runtime->host, runtime->globals);
+	runtime_deallocate_host(runtime->host, runtime->native_callbacks);
+	runtime_deallocate_host(runtime->host, runtime);
 }
 
 ex_task* ex_task_create(ex_runtime* runtime) {
 	if (!runtime || !runtime->bytecode) return NULL;
-	ex_task* task = (ex_task*)calloc(1, sizeof(ex_task));
+	ex_task* task = (ex_task*)runtime_allocate_host(runtime->host, sizeof(ex_task), sizeof(void*));
+	if (task) memset(task, 0, sizeof(ex_task));
 	if (!task) return NULL;
 
 	task->runtime = runtime;
 	task->host = runtime->host;
 	task->bytecode = runtime->bytecode;
 	task->globals = runtime->globals;
-	task->stack = (u8*)calloc(EX_STACK_CAPACITY_BYTES, 1u);
+	task->stack = (u8*)runtime_allocate_host(runtime->host, EX_STACK_CAPACITY_BYTES, sizeof(void*));
+	if (task->stack) memset(task->stack, 0, EX_STACK_CAPACITY_BYTES);
 	if (!task->stack) {
-		free(task);
+		runtime_deallocate_host(runtime->host, task);
 		return NULL;
 	}
 	task->stack_end = task->stack + EX_STACK_CAPACITY_BYTES;
@@ -1441,9 +1458,9 @@ ex_task* ex_task_create(ex_runtime* runtime) {
 void ex_task_destroy(ex_task* task) {
 	if (!task) return;
 	runtime_clear_step_traps(task);
-	free(task->stack);
-	free(task->step_traps);
-	free(task);
+runtime_deallocate_host(task->runtime->host, task->stack);
+	runtime_deallocate_host(task->runtime->host, task->step_traps);
+	runtime_deallocate_host(task->runtime->host, task);
 }
 
 ex_task_state ex_task_get_state(const ex_task* task) {
@@ -1557,8 +1574,12 @@ ex_call_result ex_task_resume_suspended(ex_task* task) {
 			}
 		}
 		if (count > task->step_trap_capacity) {
-			runtime_step_trap* traps = (runtime_step_trap*)realloc(task->step_traps, sizeof(runtime_step_trap) * count);
+			runtime_step_trap* traps = (runtime_step_trap*)runtime_allocate_host(task->runtime->host, sizeof(runtime_step_trap) * count, sizeof(void*));
 			if (!traps) return EX_CALL_RESULT_OUT_OF_MEMORY;
+			if (task->step_traps) {
+				memcpy(traps, task->step_traps, sizeof(runtime_step_trap) * task->step_trap_count);
+				runtime_deallocate_host(task->runtime->host, task->step_traps);
+			}
 			task->step_traps = traps;
 			task->step_trap_capacity = count;
 		}

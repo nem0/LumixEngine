@@ -28,9 +28,11 @@ typedef struct evoxc_context {
 } evoxc_context;
 
 static const ex_host g_host_template = {
-	{NULL, NULL, NULL},
-	NULL,
-	NULL
+	.arena = {NULL, NULL, NULL},
+	.diagnostics_userdata = NULL,
+	.print = NULL,
+	.diagnostic = NULL,
+	.allocator = {NULL, NULL, NULL}
 };
 
 static ex_string_view ex_from_cstr(const char* str) {
@@ -144,7 +146,9 @@ static void evoxc_native_print(ex_runtime* runtime, ex_call_frame frame) {
 static ex_native_fn evoxc_native_resolver(ex_runtime* runtime, ex_native_function_desc function, void* userdata) {
 	(void)runtime;
 	(void)userdata;
-	return equalStrings(function.name, "print") ? &evoxc_native_print : NULL;
+	return function.name.length == 5 && memcmp(function.name.begin, "print", 5) == 0
+		? &evoxc_native_print
+		: NULL;
 }
 
 static const char* evoxc_type_name(ex_type_kind kind) {
@@ -840,7 +844,7 @@ int main(int argc, char** argv) {
 		// Bytecode compilation and runtime setup are intentionally outside the benchmark.
 		double start = ex_platform_now_ms();
 		ex_call_result call_result = ex_call(ctx.task, ex_from_cstr(function_name), call_args, call_args_size);
-		if (call_result != EX_RESULT_OK) {
+		if (call_result != EX_CALL_RESULT_OK) {
 			fprintf(stderr, "Error: Failed to call '%s': %s\n", function_name, evoxc_result_name(call_result));
 			goto cleanup;
 		}
