@@ -608,6 +608,7 @@ next:
 void* getNativeDisplay() { return G.display; }
 
 void destroyWindow(WindowHandle window) {
+	if (!G.display || window == INVALID_WINDOW) return;
 	XUnmapWindow(G.display, (Window)window);
 	XDestroyWindow(G.display, (Window)window);
 }
