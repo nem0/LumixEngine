@@ -43,7 +43,8 @@ newoption {
 -- process _OPTIONS
 build_studio = not _OPTIONS["no-studio"]
 build_app = _OPTIONS["with-app"] or false
-build_vulkan = _OPTIONS["with-vulkan"] or false
+-- Linux uses the Vulkan renderer backend; the DX12 backend is Windows-only.
+build_vulkan = _OPTIONS["with-vulkan"] or os.is("linux")
 build_tests = _OPTIONS["with-tests"] or false
 local embed_resources = _OPTIONS["embed-resources"]
 local working_dir = _OPTIONS["working-dir"]
@@ -475,11 +476,8 @@ if plugin "renderer" then
 	linkLib "freetype"
 
 	configuration { "linux" }
-		links { "GL", "X11", "Xi" }
-		if build_vulkan then links { "vulkan" } end
-		-- TODO pipeline
-		removefiles { "../src/renderer/gpu/gpu_dx12.cpp", "../src/renderer/pipeline.cpp", "../src/renderer/pose.cpp", "../src/renderer/render_module.cpp" }
-		if not build_vulkan then removefiles { "../src/renderer/gpu/gpu_vulkan.cpp" } end
+		links { "GL", "X11", "Xi", "vulkan" }
+	removefiles { "../src/renderer/gpu/gpu_dx12.cpp" }
 	
 	configuration { "windows" }
 		links { "psapi", "dxguid" }

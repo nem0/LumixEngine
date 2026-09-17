@@ -17,7 +17,6 @@ fi
 
 ./genie --with-tests \
   --no-physics \
-  --no-renderer \
   --no-navigation \
   --no-animation \
   --no-audio \
