@@ -15,15 +15,6 @@ We utilize [FreeType2](https://github.com/nem0/freetype2.git) for text rendering
 2. Regenerate the project using *GENie*.
 3. Build the project.
 
-## Luau
-
-We utilize [Luau](https://github.com/luau-lang/luau) for scripting. On Windows, the prebuilt *dynamic* library is included in [external/luau/lib/win](../external/luau/lib/win/) and is used by default. We use the dynamic library because it's much smaller (~100x on Windows) than a static library. If you want to build Luau from source code, use the following steps:
-1. Run [download_luau.bat](../scripts/download_luau.bat) to download the Luau source code.
-2. Regenerate the project using *GENie*.
-3. Build the project.
-
-If you build Luau from source code like this, it's built as a static library by default. To build a dynamic library, pass `--luau-dynamic` to GENie. The static library version of Luau includes Luau analysis, which is used by Studio to report type errors in Luau scripts. The dynamic library does not include this analysis.
-
 ## PhysX
 
 We utilize [PhysX](https://github.com/nem0/PhysX.git) for physical simulation. On Windows, the prebuilt static library is included in [external/physx/lib/win](../external/physx/lib/win) and is used by default. If you want to build PhysX from source code, use the following steps:

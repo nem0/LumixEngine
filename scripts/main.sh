@@ -117,7 +117,6 @@ project_menu()
 init_3rdparty()
 {
 	download_project "freetype" "https://github.com/nem0/freetype2.git"
-	download_project "luau" "https://github.com/nem0/luau.git"
 	download_project "physx" "https://github.com/nem0/PhysX.git"
 	download_project "recast" "https://github.com/nem0/recastnavigation.git"
 
@@ -154,16 +153,15 @@ thirdparty_menu()
 	while :; do
 		clear;
 		echo "third party"
-		options=("freetype" "luau" "physx" "recast" "init all" "back")
+		options=("freetype" "physx" "recast" "init all" "back")
 		select opt in "${options[@]}"
 		do
 			case "$REPLY" in
 				1 ) project_menu "freetype" "https://github.com/nem0/freetype2.git"; break;;
-				2 ) download_project "luau" "https://github.com/nem0/luau.git"; break;;
-				3 ) project_menu "physx" "https://github.com/nem0/PhysX.git"; break;;
-				4 ) project_menu "recast" "https://github.com/nem0/recastnavigation.git"; break;;
-				5 ) init_3rdparty; break;;
-				6 ) break 2;;
+				2 ) project_menu "physx" "https://github.com/nem0/PhysX.git"; break;;
+				3 ) project_menu "recast" "https://github.com/nem0/recastnavigation.git"; break;;
+				4 ) init_3rdparty; break;;
+				5 ) break 2;;
 			esac
 		done
 	done

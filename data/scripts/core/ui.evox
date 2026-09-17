@@ -3,7 +3,6 @@
 
 import "core:world"
 
-import "core:world"
 import "core:document"
 import "core:uisystem"
 struct UIModule { module : cptr; }

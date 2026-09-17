@@ -40,12 +40,7 @@ jobs:
               working-directory: external\_repos
               run: |
                 git.exe clone --depth=1 https://github.com/nem0/PhysX.git physx
-
-            - name: download Luau
-              working-directory: external\_repos
-              run: |
-                git.exe clone --depth=1 https://github.com/nem0/luau.git luau
-            
+          
             - name: make VS project
               working-directory: scripts
               run: |
