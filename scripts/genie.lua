@@ -92,6 +92,7 @@ local BINARY_DIR = LOCATION .. "/bin/"
 local plugin_creators = {}
 build_studio_callbacks = {}
 build_app_callbacks = {}
+build_tests_callbacks = {}
 
 function hasPlugin(plugin)
 	for _, v in ipairs(plugins) do
@@ -974,6 +975,10 @@ if build_tests then
 		debugdir "../data"
 		
 		linkPlatformLibs()
+
+		for _, callback in ipairs(build_tests_callbacks) do
+			callback()
+		end
 		configuration "linux"
 			links { "vulkan" }
 		configuration {}
