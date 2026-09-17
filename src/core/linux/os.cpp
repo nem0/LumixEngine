@@ -105,6 +105,7 @@ void init() {
 
 	XInitThreads();
 	G.display = XOpenDisplay(nullptr);
+	if (!G.display) return;
 	G.im = XOpenIM(G.display, nullptr, nullptr, nullptr);
 
 	struct {
