@@ -991,7 +991,7 @@ void emitGeneratedComponentEntityAccessors(OutputStream& out, MetaData& data) {
 void emitGeneratedComponentCreators(OutputStream& out, MetaData& data) {
 	for (Module& m : data.modules) {
 		for (Component& c : m.components) {
-			L("static void evox_entity_create", c.name, "(ex_runtime* runtime, ex_call_frame frame) {");
+			L("static void evox_entity_create_", c.id, "(ex_runtime* runtime, ex_call_frame frame) {");
 			L("EX_ARG(frame, ExEntity, entity);");
 			L("World* world = entity.world;");
 			L("const ComponentType component_type = reflection::getComponentType(\"", c.id, "\");");
@@ -1710,7 +1710,7 @@ void serializeEvoxMeta(MetaData& data) {
 	L("static void registerGeneratedEngineImport(HashMap<NativeFunctionKey, ex_native_fn, NativeFunctionKeyHash>& functions) {");
 	for (Module& m : data.modules) {
 		for (Component& c : m.components) {
-			L("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"create", c.name, "\")}, &evox_entity_create", c.name, ");");
+			L("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"create", c.name, "\")}, &evox_entity_create_", c.id, ");");
 			L("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", c.id, "\")}, &evox_entity_", c.id, ");");
 		}
 	}
