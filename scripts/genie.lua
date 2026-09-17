@@ -974,4 +974,7 @@ if build_tests then
 		debugdir "../data"
 		
 		linkPlatformLibs()
+		configuration "linux"
+			links { "vulkan" }
+		configuration {}
 end

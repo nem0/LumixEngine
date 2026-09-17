@@ -39,8 +39,10 @@ bool RenderPlugin::tonemap(RenderBufferHandle input, RenderBufferHandle& output,
 bool RenderPlugin::debugOutput(RenderBufferHandle input, Pipeline& pipeline) { return false; }
 RenderBufferHandle RenderPlugin::renderAA(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) { return INVALID_RENDERBUFFER; }
 
+#ifdef _WIN32
 void initFSR3(Renderer& renderer, IAllocator& allocator);
 bool initDLSS(Renderer& renderer, IAllocator& allocator);
+#endif
 
 struct Renderbuffer {
 	// The buffer is created in the ACTIVE state.
@@ -665,9 +667,11 @@ struct RendererImpl final : Renderer {
 		m_font_manager->create(FontResource::TYPE, manager);
 		m_layers.emplace("default");
 
+#ifdef _WIN32
 		if (!initDLSS(*this, m_allocator)) {
 			initFSR3(*this, m_allocator);
 		}
+#endif
 	}
 
 

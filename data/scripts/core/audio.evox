@@ -3,6 +3,7 @@
 
 import "core:world"
 
+import "core:world"
 struct AudioModule { module : cptr; }
 
 extern fn audio(w : World) : ?AudioModule;

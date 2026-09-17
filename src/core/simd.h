@@ -206,6 +206,14 @@ namespace Lumix
 		float x, y, z, w;
 	};
 
+	struct int4 {
+		int x, y, z, w;
+	};
+
+	LUMIX_FORCE_INLINE int4 i4Load(const void* src) { return *(const int4*)src; }
+	LUMIX_FORCE_INLINE int4 i4Add(int4 a, int4 b) { return {a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w}; }
+	LUMIX_FORCE_INLINE void i4Store(void* dest, int4 src) { *(int4*)dest = src; }
+
 	LUMIX_FORCE_INLINE float4 f4Init(float x, float y, float z, float w)
 	{
 		return {x, y, z, w};
@@ -256,6 +264,21 @@ namespace Lumix
 	LUMIX_FORCE_INLINE void f4Store(void* dest, float4 src)
 	{
 		(*(float4*)dest) = src;
+	}
+
+	LUMIX_FORCE_INLINE void f4Stream(void* dest, float4 src) { f4Store(dest, src); }
+
+	LUMIX_FORCE_INLINE void f4StoreUnaligned(void* dest, float4 src) { f4Store(dest, src); }
+
+	LUMIX_FORCE_INLINE void f4Transpose(float4& row0, float4& row1, float4& row2, float4& row3) {
+		const float4 tmp0 = {row0.x, row1.x, row2.x, row3.x};
+		const float4 tmp1 = {row0.y, row1.y, row2.y, row3.y};
+		const float4 tmp2 = {row0.z, row1.z, row2.z, row3.z};
+		const float4 tmp3 = {row0.w, row1.w, row2.w, row3.w};
+		row0 = tmp0;
+		row1 = tmp1;
+		row2 = tmp2;
+		row3 = tmp3;
 	}
 
 	LUMIX_FORCE_INLINE float4 f4And(float4 a, float4 b)
@@ -450,6 +473,14 @@ namespace Lumix
 
 	LUMIX_FORCE_INLINE float4 operator *(float4 a, float4 b) {
 		return f4Mul(a, b);
+	}
+
+	LUMIX_FORCE_INLINE float4 operator *(float4 a, float b) {
+		return f4Mul(a, f4Splat(b));
+	}
+
+	LUMIX_FORCE_INLINE float4 operator -(float4 a) {
+		return {-a.x, -a.y, -a.z, -a.w};
 	}
 
 #endif

@@ -181,12 +181,6 @@ struct FormatDesc {
 	}
 };
 
-u32 getSize(TextureFormat format, u32 w, u32 h) {
-	const FormatDesc& desc = FormatDesc::get(format);
-	if (desc.compressed) return sizeDXTC(w, h, desc.internal);
-	return desc.block_bytes * w * h;
-}
-
 static u32 getSize(DXGI_FORMAT format) {
 	switch(format) {
 		case DXGI_FORMAT_R8_UNORM: return 1;

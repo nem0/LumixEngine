@@ -104,19 +104,24 @@ LUMIX_FORCE_INLINE SIMDDualQuat toDualQuat(const SIMDLocalRigidTransform& t) {
 }
 
 
+LUMIX_FORCE_INLINE float4 simdHorizontalAdd(float4 q) {
+#if defined _WIN32 && !defined __clang__
+	q = _mm_hadd_ps(q, q);
+	return _mm_hadd_ps(q, q);
+#else
+	const float sum = q.x + q.y + q.z + q.w;
+	return f4Splat(sum);
+#endif
+}
+
 LUMIX_FORCE_INLINE float4 simd_nlerp(float4 q1, float4 q2, float t) {
-	Quat res;
 	float inv = 1.0f - t;
-	float4 q = q1 * q2;
-	q = _mm_hadd_ps(q, q);
-	q = _mm_hadd_ps(q, q);
+	float4 q = simdHorizontalAdd(q1 * q2);
 	float d = f4GetX(q);
 	if (d < 0) t = -t;
 	q = q1 * inv + q2 * t;
 	
-	float4 qtmp = q * q;
-	qtmp = _mm_hadd_ps(qtmp, qtmp);
-	qtmp = _mm_hadd_ps(qtmp, qtmp);
+	float4 qtmp = simdHorizontalAdd(q * q);
 	float l = 1 / f4GetX(f4Sqrt(qtmp));
 	q = q * l;
 	return q;

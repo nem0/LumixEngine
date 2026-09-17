@@ -100,7 +100,7 @@ static Keycode getKeycode(KeySym keysym) {
 
 void init() {
 	static bool once = true;
-	ASSERT(once);
+	if (!once) return;
 	once = false;
 
 	XInitThreads();
