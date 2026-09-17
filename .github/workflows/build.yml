@@ -32,6 +32,10 @@ jobs:
               working-directory: plugins
               run: |
                 git.exe clone --depth=1 https://github.com/nem0/lumixengine_js.git js
+            - name: fetch lua plugin
+              working-directory: plugins
+              run: |
+                git.exe clone --depth=1 https://github.com/nem0/lumixengine_lua.git lua
             - name: fetch marketplace plugin
               working-directory: plugins
               run: |
