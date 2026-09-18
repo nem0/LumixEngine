@@ -19,6 +19,7 @@ extern fn setRotation(e : Entity, rotation : Quat) : void;
 extern fn findChildByName(e: Entity, child_name : []const u8) : ?Entity;
 extern fn getFirstChild(e : Entity) : ?Entity;
 extern fn getNextSibling(e : Entity) : ?Entity;
+extern fn getParent(e : Entity) : ?Entity;
 
 struct ChildrenIterator {
 	next : fn(iter : *ChildrenIterator, out : *Entity) : bool;

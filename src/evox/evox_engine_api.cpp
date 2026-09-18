@@ -295,6 +295,18 @@ static void evox_entity_getNextSibling(ex_runtime*, ex_call_frame frame) {
 	EX_RESULT(frame, ExEntity(sibling.index, entity.world));
 }
 
+static void evox_entity_getParent(ex_runtime*, ex_call_frame frame) {
+	const ExEntity entity = readArg<ExEntity>(frame);
+	const EntityPtr parent = entity.world->getParent(EntityRef{entity.index});
+	if (!parent.isValid()) {
+		EX_RESULT(frame, u8(0));
+		EX_RESULT(frame, ExEntity(i32(0), nullptr));
+		return;
+	}
+	EX_RESULT(frame, u8(1));
+	EX_RESULT(frame, ExEntity(parent.index, entity.world));
+}
+
 static void evox_entity_destroy(ExEntity entity) {
 	entity.world->destroyEntity(EntityRef{entity.index});
 }
@@ -378,6 +390,7 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	functions.insert({"core:entity", "findChildByName"}, &evox_entity_findChildByName);
 	functions.insert({"core:entity", "getFirstChild"}, &evox_entity_getFirstChild);
 	functions.insert({"core:entity", "getNextSibling"}, &evox_entity_getNextSibling);
+	functions.insert({"core:entity", "getParent"}, &evox_entity_getParent);
 	// world
 	functions.insert({"core:world", "createEntity"}, &wrap<evox_world_createEntity>);
 	functions.insert({"core:world", "destroyEntity"}, &wrap<evox_world_destroyEntity>);
