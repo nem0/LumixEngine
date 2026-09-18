@@ -293,7 +293,8 @@ static void drawVariableName(ex_string_view name) {
 	ImGui::Unindent(ImGui::GetTreeNodeToLabelSpacing());
 }
 
-static void drawEntityValue(const ExEntity& entity, WorldEditor* editor) {
+static void drawEntityValue(ExEntity& entity, WorldEditor* editor) {
+	ImGui::PushID(&entity);
 	// Runtime values can retain pointers to the game world after game mode has
 	// stopped and that world has been destroyed. Do not inspect those pointers
 	// outside game mode; pointer equality alone cannot prove that a pointer is
@@ -313,20 +314,48 @@ static void drawEntityValue(const ExEntity& entity, WorldEditor* editor) {
 		label.append("<invalid entity>");
 	}
 
-	if (editor && valid && entity.world == editor->getWorld()) {
+	if (editor) {
 		ImGui::Selectable(label, false, ImGuiSelectableFlags_DontClosePopups);
-		if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
 		if (ImGui::IsItemClicked()) {
-			const EntityRef ref(entity.index);
-			editor->selectEntities(Span(&ref, 1), false);
+			if (valid && entity.world == editor->getWorld()) {
+				const EntityRef ref(entity.index);
+				editor->selectEntities(Span(&ref, 1), false);
+			}
+			ImGui::OpenPopup("entity_popup");
+		}
+		if (ImGui::BeginDragDropTarget()) {
+			if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
+				const EntityRef dropped = *(const EntityRef*)payload->Data;
+				if (editor->getWorld() && editor->getWorld()->hasEntity(dropped)) {
+					entity = ExEntity(dropped.index, editor->getWorld());
+				}
+			}
+			ImGui::EndDragDropTarget();
+		}
+		if (ImGui::BeginPopup("entity_popup")) {
+			World* world = editor->getWorld();
+			if (ImGui::MenuItem("Clear")) entity = ExEntity(-1, nullptr);
+			ImGui::Separator();
+			if (world) {
+				for (EntityPtr e = world->getFirstEntity(); e.isValid(); e = world->getNextEntity(*e)) {
+					const char* name = world->getEntityName(EntityRef(e.index));
+					StaticString<256> item(name && name[0] ? name : "Entity", " (", e.index, ")");
+					if (ImGui::Selectable(item, entity.world == world && entity.index == e.index)) {
+						entity = ExEntity(e.index, world);
+						ImGui::CloseCurrentPopup();
+					}
+				}
+			}
+			ImGui::EndPopup();
 		}
 	}
 	else {
 		ImGui::TextUnformatted(label);
 	}
+	ImGui::PopID();
 }
 
-static void drawVariable(ex_string_view name, const ex_type* type, void* value, bool editable = false, WorldEditor* editor = nullptr) {
+static void drawVariable(ex_string_view name, const ex_type* type, void* value, bool editable = false, WorldEditor* editor = nullptr, PropertyGrid* grid = nullptr) {
 	if (!type || !value) {
 		ImGui::TableNextRow();
 		ImGui::TableNextColumn();
@@ -362,7 +391,8 @@ static void drawVariable(ex_string_view name, const ex_type* type, void* value, 
 				, inner
 				, (void*)ex_type_nullable_value_ptr(type, value)
 				, editable
-				, editor);
+				, editor
+				, grid);
 			return;
 		}
 	}
@@ -376,7 +406,17 @@ static void drawVariable(ex_string_view name, const ex_type* type, void* value, 
 			&& ex_type_get_size(type) >= sizeof(ExEntity)) {
 			drawVariableName(name);
 			ImGui::TableNextColumn();
-			drawEntityValue(*(const ExEntity*)value, editor);
+			if (grid && editor) {
+				ImGui::PushID(value);
+				EntityPtr selected(((ExEntity*)value)->index);
+				if (grid->entityInput("##entity", &selected)) {
+					*(ExEntity*)value = selected.isValid() ? ExEntity(selected.index, editor->getWorld()) : ExEntity(-1, nullptr);
+				}
+				ImGui::PopID();
+			}
+			else {
+				drawEntityValue(*(ExEntity*)value, editor);
+			}
 			return;
 		}
 
@@ -390,7 +430,8 @@ static void drawVariable(ex_string_view name, const ex_type* type, void* value, 
 					, field_type
 					, (u8*)value + ex_type_struct_field_offset(type, i)
 					, editable
-					, editor);
+					, editor
+					, grid);
 			}
 			ImGui::TreePop();
 		}
@@ -417,7 +458,8 @@ static void drawVariable(ex_string_view name, const ex_type* type, void* value, 
 							, field_type
 							, (u8*)payload + ex_type_struct_field_offset(member_type, i)
 							, editable
-							, editor);
+							, editor
+							, grid);
 					}
 				} else {
 					static const char value_name[] = "value";
@@ -425,7 +467,8 @@ static void drawVariable(ex_string_view name, const ex_type* type, void* value, 
 						, member_type
 						, payload
 						, editable
-						, editor);
+						, editor
+						, grid);
 				}
 			}
 			ImGui::TreePop();
@@ -463,7 +506,8 @@ static void drawVariable(ex_string_view name, const ex_type* type, void* value, 
 						, element_type
 						, (u8*)data + i * element_size
 						, editable
-						, editor);
+						, editor
+						, grid);
 				}
 			}
 			ImGui::TreePop();
@@ -1577,7 +1621,7 @@ struct EvoxDataCommand final : IEditorCommand {
 };
 
 struct EvoxPropertyGridPlugin final : PropertyGrid::IPlugin {
-	void onGUI(PropertyGrid&, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
+	void onGUI(PropertyGrid& grid, Span<const EntityRef> entities, ComponentType cmp_type, const TextFilter& filter, WorldEditor& editor) override {
 		if (entities.length() != 1) return;
 		World* world = editor.getWorld();
 		IModule* base_module = world ? world->getModule(cmp_type) : nullptr;
@@ -1616,12 +1660,14 @@ struct EvoxPropertyGridPlugin final : PropertyGrid::IPlugin {
 							drawVariable(field_name
 								, field_type
 								, value ? (void*)((const u8*)value + offset) : nullptr
-								, true);
+								, true
+								, &editor
+								, &grid);
 						}
 					}
 					else {
 						static const char value_name[] = "value";
-						drawVariable({value_name, lengthOf(value_name) - 1}, type, (void*)value, true);
+						drawVariable({value_name, lengthOf(value_name) - 1}, type, (void*)value, true, &editor, &grid);
 					}
 					ImGui::EndTable();
 				}
