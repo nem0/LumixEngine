@@ -27,6 +27,7 @@
 #include "renderer/postprocess.h"
 #include "renderer/render_module.h"
 #include "renderer/shader.h"
+#include "renderer/sprite.h"
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
 
@@ -221,6 +222,23 @@ struct RenderResourceManager : ResourceManager
 	}
 
 	Renderer& m_renderer;
+	TagAllocator m_allocator;
+};
+
+struct SpriteResourceManager final : ResourceManager {
+	SpriteResourceManager(IAllocator& allocator)
+		: ResourceManager(allocator)
+		, m_allocator(allocator, "sprites")
+	{}
+
+	Resource* createResource(const Path& path) override {
+		return LUMIX_NEW(m_allocator, Sprite)(path, *this, m_allocator);
+	}
+
+	void destroyResource(Resource& resource) override {
+		LUMIX_DELETE(m_allocator, &resource);
+	}
+
 	TagAllocator m_allocator;
 };
 
@@ -421,6 +439,7 @@ struct RendererImpl final : Renderer {
 		, m_particle_emitter_manager("particle emitters", *this, m_allocator)
 		, m_material_manager("materials", *this, m_allocator)
 		, m_shader_manager("shaders", *this, m_allocator)
+		, m_sprite_manager(m_allocator)
 		, m_font_manager(nullptr)
 		, m_shader_defines(m_allocator)
 		, m_profiler(m_allocator)
@@ -663,6 +682,7 @@ struct RendererImpl final : Renderer {
 		m_material_manager.create(Material::TYPE, manager);
 		m_particle_emitter_manager.create(ParticleSystemResource::TYPE, manager);
 		m_shader_manager.create(Shader::TYPE, manager);
+		m_sprite_manager.create(Sprite::TYPE, manager);
 		m_font_manager = LUMIX_NEW(m_allocator, FontManager)(*this, m_allocator);
 		m_font_manager->create(FontResource::TYPE, manager);
 		m_layers.emplace("default");
@@ -1338,6 +1358,7 @@ struct RendererImpl final : Renderer {
 	RenderResourceManager<Model> m_model_manager;
 	RenderResourceManager<ParticleSystemResource> m_particle_emitter_manager;
 	RenderResourceManager<Shader> m_shader_manager;
+	SpriteResourceManager m_sprite_manager;
 	RenderResourceManager<Texture> m_texture_manager;
 	RenderResourceManager<Material> m_material_manager;
 	u32 m_frame_number = 0;
