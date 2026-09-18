@@ -650,7 +650,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createPropertyAnimator(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_property_animator(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("property_animator");
@@ -672,7 +672,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createAnimator(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_animator(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("animator");
@@ -694,7 +694,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createAnimable(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_animable(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("animable");
@@ -716,7 +716,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createEchoZone(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_echo_zone(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("echo_zone");
@@ -738,7 +738,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createChorusZone(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_chorus_zone(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("chorus_zone");
@@ -760,7 +760,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createListener(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_audio_listener(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("audio_listener");
@@ -782,7 +782,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createAmbientSound(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_ambient_sound(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("ambient_sound");
@@ -804,7 +804,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createSpline(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_spline(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("spline");
@@ -826,7 +826,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createSignal(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_signal(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("signal");
@@ -848,7 +848,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createEvox(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_evox(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("evox");
@@ -870,7 +870,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createZone(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_navmesh_zone(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("navmesh_zone");
@@ -892,7 +892,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createAgent(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_navmesh_agent(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("navmesh_agent");
@@ -914,7 +914,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createHeightfield(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_physical_heightfield(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("physical_heightfield");
@@ -936,7 +936,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createD6Joint(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_d6_joint(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("d6_joint");
@@ -958,7 +958,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createDistanceJoint(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_distance_joint(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("distance_joint");
@@ -980,7 +980,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createHingeJoint(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_hinge_joint(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("hinge_joint");
@@ -1002,7 +1002,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createSphericalJoint(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_spherical_joint(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("spherical_joint");
@@ -1024,7 +1024,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createController(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_physical_controller(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("physical_controller");
@@ -1046,7 +1046,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createActor(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_rigid_actor(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("rigid_actor");
@@ -1068,7 +1068,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createWheel(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_wheel(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("wheel");
@@ -1090,7 +1090,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createVehicle(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_vehicle(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("vehicle");
@@ -1112,7 +1112,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createInstancedCube(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_physical_instanced_cube(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("physical_instanced_cube");
@@ -1134,7 +1134,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createInstancedMesh(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_physical_instanced_mesh(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("physical_instanced_mesh");
@@ -1156,7 +1156,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createCamera(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_camera(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("camera");
@@ -1178,7 +1178,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createDecal(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_decal(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("decal");
@@ -1200,7 +1200,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createEnvironment(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_environment(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("environment");
@@ -1222,7 +1222,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createPointLight(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_point_light(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("point_light");
@@ -1244,7 +1244,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createReflectionProbe(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_reflection_probe(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("reflection_probe");
@@ -1266,7 +1266,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createEnvironmentProbe(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_environment_probe(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("environment_probe");
@@ -1288,7 +1288,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createBoneAttachment(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_bone_attachment(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("bone_attachment");
@@ -1310,7 +1310,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createParticleEmitter(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_particle_emitter(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("particle_emitter");
@@ -1332,7 +1332,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createInstancedModel(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_instanced_model(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("instanced_model");
@@ -1354,7 +1354,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createModelInstance(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_model_instance(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("model_instance");
@@ -1376,7 +1376,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createCurveDecal(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_curve_decal(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("curve_decal");
@@ -1398,7 +1398,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createTerrain(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_terrain(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("terrain");
@@ -1420,7 +1420,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createProceduralGeometry(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_procedural_geom(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("procedural_geom");
@@ -1442,7 +1442,7 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_entity_createUI3D(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_entity_create_ui_3d(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExEntity, entity);
 		World* world = entity.world;
 		const ComponentType component_type = reflection::getComponentType("ui_3d");
@@ -4909,79 +4909,79 @@ namespace Lumix::Evox::generated {
 	}
 	
 	static void registerGeneratedEngineImport(HashMap<NativeFunctionKey, ex_native_fn, NativeFunctionKeyHash>& functions) {
-		functions.insert({StringView("core:property_animator"), StringView("createPropertyAnimator")}, &evox_entity_createPropertyAnimator);
+		functions.insert({StringView("core:property_animator"), StringView("createPropertyAnimator")}, &evox_entity_create_property_animator);
 		functions.insert({StringView("core:property_animator"), StringView("property_animator")}, &evox_entity_property_animator);
-		functions.insert({StringView("core:animator"), StringView("createAnimator")}, &evox_entity_createAnimator);
+		functions.insert({StringView("core:animator"), StringView("createAnimator")}, &evox_entity_create_animator);
 		functions.insert({StringView("core:animator"), StringView("animator")}, &evox_entity_animator);
-		functions.insert({StringView("core:animable"), StringView("createAnimable")}, &evox_entity_createAnimable);
+		functions.insert({StringView("core:animable"), StringView("createAnimable")}, &evox_entity_create_animable);
 		functions.insert({StringView("core:animable"), StringView("animable")}, &evox_entity_animable);
-		functions.insert({StringView("core:echo_zone"), StringView("createEchoZone")}, &evox_entity_createEchoZone);
+		functions.insert({StringView("core:echo_zone"), StringView("createEchoZone")}, &evox_entity_create_echo_zone);
 		functions.insert({StringView("core:echo_zone"), StringView("echo_zone")}, &evox_entity_echo_zone);
-		functions.insert({StringView("core:chorus_zone"), StringView("createChorusZone")}, &evox_entity_createChorusZone);
+		functions.insert({StringView("core:chorus_zone"), StringView("createChorusZone")}, &evox_entity_create_chorus_zone);
 		functions.insert({StringView("core:chorus_zone"), StringView("chorus_zone")}, &evox_entity_chorus_zone);
-		functions.insert({StringView("core:audio_listener"), StringView("createListener")}, &evox_entity_createListener);
+		functions.insert({StringView("core:audio_listener"), StringView("createListener")}, &evox_entity_create_audio_listener);
 		functions.insert({StringView("core:audio_listener"), StringView("audio_listener")}, &evox_entity_audio_listener);
-		functions.insert({StringView("core:ambient_sound"), StringView("createAmbientSound")}, &evox_entity_createAmbientSound);
+		functions.insert({StringView("core:ambient_sound"), StringView("createAmbientSound")}, &evox_entity_create_ambient_sound);
 		functions.insert({StringView("core:ambient_sound"), StringView("ambient_sound")}, &evox_entity_ambient_sound);
-		functions.insert({StringView("core:spline"), StringView("createSpline")}, &evox_entity_createSpline);
+		functions.insert({StringView("core:spline"), StringView("createSpline")}, &evox_entity_create_spline);
 		functions.insert({StringView("core:spline"), StringView("spline")}, &evox_entity_spline);
-		functions.insert({StringView("core:signal"), StringView("createSignal")}, &evox_entity_createSignal);
+		functions.insert({StringView("core:signal"), StringView("createSignal")}, &evox_entity_create_signal);
 		functions.insert({StringView("core:signal"), StringView("signal")}, &evox_entity_signal);
-		functions.insert({StringView("core:evox"), StringView("createEvox")}, &evox_entity_createEvox);
+		functions.insert({StringView("core:evox"), StringView("createEvox")}, &evox_entity_create_evox);
 		functions.insert({StringView("core:evox"), StringView("evox")}, &evox_entity_evox);
-		functions.insert({StringView("core:navmesh_zone"), StringView("createZone")}, &evox_entity_createZone);
+		functions.insert({StringView("core:navmesh_zone"), StringView("createZone")}, &evox_entity_create_navmesh_zone);
 		functions.insert({StringView("core:navmesh_zone"), StringView("navmesh_zone")}, &evox_entity_navmesh_zone);
-		functions.insert({StringView("core:navmesh_agent"), StringView("createAgent")}, &evox_entity_createAgent);
+		functions.insert({StringView("core:navmesh_agent"), StringView("createAgent")}, &evox_entity_create_navmesh_agent);
 		functions.insert({StringView("core:navmesh_agent"), StringView("navmesh_agent")}, &evox_entity_navmesh_agent);
-		functions.insert({StringView("core:physical_heightfield"), StringView("createHeightfield")}, &evox_entity_createHeightfield);
+		functions.insert({StringView("core:physical_heightfield"), StringView("createHeightfield")}, &evox_entity_create_physical_heightfield);
 		functions.insert({StringView("core:physical_heightfield"), StringView("physical_heightfield")}, &evox_entity_physical_heightfield);
-		functions.insert({StringView("core:d6_joint"), StringView("createD6Joint")}, &evox_entity_createD6Joint);
+		functions.insert({StringView("core:d6_joint"), StringView("createD6Joint")}, &evox_entity_create_d6_joint);
 		functions.insert({StringView("core:d6_joint"), StringView("d6_joint")}, &evox_entity_d6_joint);
-		functions.insert({StringView("core:distance_joint"), StringView("createDistanceJoint")}, &evox_entity_createDistanceJoint);
+		functions.insert({StringView("core:distance_joint"), StringView("createDistanceJoint")}, &evox_entity_create_distance_joint);
 		functions.insert({StringView("core:distance_joint"), StringView("distance_joint")}, &evox_entity_distance_joint);
-		functions.insert({StringView("core:hinge_joint"), StringView("createHingeJoint")}, &evox_entity_createHingeJoint);
+		functions.insert({StringView("core:hinge_joint"), StringView("createHingeJoint")}, &evox_entity_create_hinge_joint);
 		functions.insert({StringView("core:hinge_joint"), StringView("hinge_joint")}, &evox_entity_hinge_joint);
-		functions.insert({StringView("core:spherical_joint"), StringView("createSphericalJoint")}, &evox_entity_createSphericalJoint);
+		functions.insert({StringView("core:spherical_joint"), StringView("createSphericalJoint")}, &evox_entity_create_spherical_joint);
 		functions.insert({StringView("core:spherical_joint"), StringView("spherical_joint")}, &evox_entity_spherical_joint);
-		functions.insert({StringView("core:physical_controller"), StringView("createController")}, &evox_entity_createController);
+		functions.insert({StringView("core:physical_controller"), StringView("createController")}, &evox_entity_create_physical_controller);
 		functions.insert({StringView("core:physical_controller"), StringView("physical_controller")}, &evox_entity_physical_controller);
-		functions.insert({StringView("core:rigid_actor"), StringView("createActor")}, &evox_entity_createActor);
+		functions.insert({StringView("core:rigid_actor"), StringView("createActor")}, &evox_entity_create_rigid_actor);
 		functions.insert({StringView("core:rigid_actor"), StringView("rigid_actor")}, &evox_entity_rigid_actor);
-		functions.insert({StringView("core:wheel"), StringView("createWheel")}, &evox_entity_createWheel);
+		functions.insert({StringView("core:wheel"), StringView("createWheel")}, &evox_entity_create_wheel);
 		functions.insert({StringView("core:wheel"), StringView("wheel")}, &evox_entity_wheel);
-		functions.insert({StringView("core:vehicle"), StringView("createVehicle")}, &evox_entity_createVehicle);
+		functions.insert({StringView("core:vehicle"), StringView("createVehicle")}, &evox_entity_create_vehicle);
 		functions.insert({StringView("core:vehicle"), StringView("vehicle")}, &evox_entity_vehicle);
-		functions.insert({StringView("core:physical_instanced_cube"), StringView("createInstancedCube")}, &evox_entity_createInstancedCube);
+		functions.insert({StringView("core:physical_instanced_cube"), StringView("createInstancedCube")}, &evox_entity_create_physical_instanced_cube);
 		functions.insert({StringView("core:physical_instanced_cube"), StringView("physical_instanced_cube")}, &evox_entity_physical_instanced_cube);
-		functions.insert({StringView("core:physical_instanced_mesh"), StringView("createInstancedMesh")}, &evox_entity_createInstancedMesh);
+		functions.insert({StringView("core:physical_instanced_mesh"), StringView("createInstancedMesh")}, &evox_entity_create_physical_instanced_mesh);
 		functions.insert({StringView("core:physical_instanced_mesh"), StringView("physical_instanced_mesh")}, &evox_entity_physical_instanced_mesh);
-		functions.insert({StringView("core:camera"), StringView("createCamera")}, &evox_entity_createCamera);
+		functions.insert({StringView("core:camera"), StringView("createCamera")}, &evox_entity_create_camera);
 		functions.insert({StringView("core:camera"), StringView("camera")}, &evox_entity_camera);
-		functions.insert({StringView("core:decal"), StringView("createDecal")}, &evox_entity_createDecal);
+		functions.insert({StringView("core:decal"), StringView("createDecal")}, &evox_entity_create_decal);
 		functions.insert({StringView("core:decal"), StringView("decal")}, &evox_entity_decal);
-		functions.insert({StringView("core:environment"), StringView("createEnvironment")}, &evox_entity_createEnvironment);
+		functions.insert({StringView("core:environment"), StringView("createEnvironment")}, &evox_entity_create_environment);
 		functions.insert({StringView("core:environment"), StringView("environment")}, &evox_entity_environment);
-		functions.insert({StringView("core:point_light"), StringView("createPointLight")}, &evox_entity_createPointLight);
+		functions.insert({StringView("core:point_light"), StringView("createPointLight")}, &evox_entity_create_point_light);
 		functions.insert({StringView("core:point_light"), StringView("point_light")}, &evox_entity_point_light);
-		functions.insert({StringView("core:reflection_probe"), StringView("createReflectionProbe")}, &evox_entity_createReflectionProbe);
+		functions.insert({StringView("core:reflection_probe"), StringView("createReflectionProbe")}, &evox_entity_create_reflection_probe);
 		functions.insert({StringView("core:reflection_probe"), StringView("reflection_probe")}, &evox_entity_reflection_probe);
-		functions.insert({StringView("core:environment_probe"), StringView("createEnvironmentProbe")}, &evox_entity_createEnvironmentProbe);
+		functions.insert({StringView("core:environment_probe"), StringView("createEnvironmentProbe")}, &evox_entity_create_environment_probe);
 		functions.insert({StringView("core:environment_probe"), StringView("environment_probe")}, &evox_entity_environment_probe);
-		functions.insert({StringView("core:bone_attachment"), StringView("createBoneAttachment")}, &evox_entity_createBoneAttachment);
+		functions.insert({StringView("core:bone_attachment"), StringView("createBoneAttachment")}, &evox_entity_create_bone_attachment);
 		functions.insert({StringView("core:bone_attachment"), StringView("bone_attachment")}, &evox_entity_bone_attachment);
-		functions.insert({StringView("core:particle_emitter"), StringView("createParticleEmitter")}, &evox_entity_createParticleEmitter);
+		functions.insert({StringView("core:particle_emitter"), StringView("createParticleEmitter")}, &evox_entity_create_particle_emitter);
 		functions.insert({StringView("core:particle_emitter"), StringView("particle_emitter")}, &evox_entity_particle_emitter);
-		functions.insert({StringView("core:instanced_model"), StringView("createInstancedModel")}, &evox_entity_createInstancedModel);
+		functions.insert({StringView("core:instanced_model"), StringView("createInstancedModel")}, &evox_entity_create_instanced_model);
 		functions.insert({StringView("core:instanced_model"), StringView("instanced_model")}, &evox_entity_instanced_model);
-		functions.insert({StringView("core:model_instance"), StringView("createModelInstance")}, &evox_entity_createModelInstance);
+		functions.insert({StringView("core:model_instance"), StringView("createModelInstance")}, &evox_entity_create_model_instance);
 		functions.insert({StringView("core:model_instance"), StringView("model_instance")}, &evox_entity_model_instance);
-		functions.insert({StringView("core:curve_decal"), StringView("createCurveDecal")}, &evox_entity_createCurveDecal);
+		functions.insert({StringView("core:curve_decal"), StringView("createCurveDecal")}, &evox_entity_create_curve_decal);
 		functions.insert({StringView("core:curve_decal"), StringView("curve_decal")}, &evox_entity_curve_decal);
-		functions.insert({StringView("core:terrain"), StringView("createTerrain")}, &evox_entity_createTerrain);
+		functions.insert({StringView("core:terrain"), StringView("createTerrain")}, &evox_entity_create_terrain);
 		functions.insert({StringView("core:terrain"), StringView("terrain")}, &evox_entity_terrain);
-		functions.insert({StringView("core:procedural_geom"), StringView("createProceduralGeometry")}, &evox_entity_createProceduralGeometry);
+		functions.insert({StringView("core:procedural_geom"), StringView("createProceduralGeometry")}, &evox_entity_create_procedural_geom);
 		functions.insert({StringView("core:procedural_geom"), StringView("procedural_geom")}, &evox_entity_procedural_geom);
-		functions.insert({StringView("core:ui_3d"), StringView("createUI3D")}, &evox_entity_createUI3D);
+		functions.insert({StringView("core:ui_3d"), StringView("createUI3D")}, &evox_entity_create_ui_3d);
 		functions.insert({StringView("core:ui_3d"), StringView("ui_3d")}, &evox_entity_ui_3d);
 		functions.insert({StringView("core:audio"), StringView("setMasterVolume")}, &evox_audio_setMasterVolume_14804945310456614025);
 		functions.insert({StringView("core:audio"), StringView("audio")}, &evox_world_audio);
