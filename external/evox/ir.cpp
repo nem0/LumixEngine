@@ -364,8 +364,10 @@ struct IRBuilder {
 			}
 			case Expression::CAST:
 				return hasInliningBlocker(*static_cast<const CastExpression&>(expression).expression, depth + 1);
-			case Expression::MEMBER:
-				return hasInliningBlocker(*static_cast<const MemberExpression&>(expression).expression, depth + 1);
+			case Expression::MEMBER: {
+				const auto& member = static_cast<const MemberExpression&>(expression);
+				return member.expression && hasInliningBlocker(*member.expression, depth + 1);
+			}
 			case Expression::BRACKET: {
 				const auto& bracket = static_cast<const BracketExpression&>(expression);
 				if (hasInliningBlocker(*bracket.base, depth + 1)) return true;
@@ -2638,7 +2640,7 @@ struct BytecodeCompiler {
 			constant = static_cast<const ExOpLoadConst*>(condition);
 		} else if (condition->kind == ExIrOpKind::FRAME_PTR) {
 			auto& ref = static_cast<const ExOpFramePtr&>(*condition);
-			if (ref.alloca->value->kind == ExIrOpKind::LOAD_CONST)
+			if (ref.alloca->value && ref.alloca->value->kind == ExIrOpKind::LOAD_CONST)
 				constant = static_cast<const ExOpLoadConst*>(ref.alloca->value);
 		}
 		bool is_constant = constant != nullptr;

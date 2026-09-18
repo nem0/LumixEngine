@@ -29,6 +29,43 @@ TEST(CallFunctionFieldWinsOverUFCS) {
 	return true;
 }
 
+TEST(NestedCallArgumentReturningEnum) {
+	const char* source = R"(
+		enum Color { WHITE, BLACK }
+		fn enemy(color : Color) : Color { return color == .WHITE ? .BLACK : .WHITE; }
+		fn attacked(x : i32, z : i32, color : Color) : bool { return color == .BLACK and x == 1 and z == 1; }
+		fn check(color : Color) : bool { return attacked(1, 1, enemy(color)); }
+		fn main() : bool { return check(.WHITE); }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	RuntimeGuard runtime(module, &module_host, true);
+	EXPECT_TRUE(runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_TRUE(ex_task_to_bool(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(OptimizedConditionalOnParameter) {
+	const char* source = R"(
+		fn choose(condition : bool) : i32 {
+			var value : i32 = condition ? 1 : 2;
+			if condition { value = 3; }
+			return value;
+		}
+		fn main() : i32 { return choose(true); }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	RuntimeGuard runtime(module, &module_host, true);
+	EXPECT_TRUE(runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(3, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(CallNonFunctionFieldDoesNotFallBackToUFCS) {
 	EXPECT_COMPILE_FAIL(R"(
 		struct Handler { invoke : i32; }
