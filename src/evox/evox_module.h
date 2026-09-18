@@ -33,7 +33,6 @@ struct EvoxSystem : ISystem {
 	virtual Span<const ex_type*> getEvoxDataTypes() const = 0;
 	virtual ex_task* getTask() = 0;
 	virtual ex_module* getDebugModule() = 0;
-	virtual const Path& getDebugPath() const = 0;
 	virtual bool setDebugBreakpoint(const Path& source, u32 line) = 0;
 	virtual bool removeDebugBreakpoint(const Path& source, u32 line) = 0;
 };
@@ -60,7 +59,6 @@ struct EvoxModule : IModule {
 	virtual ex_runtime* getDebugRuntime() = 0;
 	virtual ex_task* getTask() = 0;
 	virtual ex_module* getDebugModule() = 0;
-	virtual const Path& getDebugPath() const = 0;
 	virtual bool setDebugBreakpoint(const Path& source, u32 line) = 0;
 	virtual bool removeDebugBreakpoint(const Path& source, u32 line) = 0;
 };

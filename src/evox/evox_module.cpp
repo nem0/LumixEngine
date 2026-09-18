@@ -20,12 +20,13 @@
 namespace Lumix {
 
 namespace Evox {
-void gatherCoreFunctions(HashMap<NativeFunctionKey, ex_native_fn, NativeFunctionKeyHash>& functions);
+	void gatherCoreFunctions(HashMap<NativeFunctionKey, ex_native_fn, NativeFunctionKeyHash>& functions);
 }
 
 static constexpr const char* EVOX_DATA_ATTRIBUTE_TYPE = "core:attributes.Data";
 static constexpr const char* EVOX_OWNER_ATTRIBUTE_TYPE = "core:attributes.Owner";
 static constexpr const char* EVOX_ENTITY_TYPE = "core:entity.Entity";
+static constexpr const char* MAIN_PATH = "main.evox";
 
 struct EvoxDiagnosticsContext {
 	String* message = nullptr;
@@ -170,7 +171,6 @@ struct EvoxSystemImpl : EvoxSystem {
 	Span<const ex_type*> getEvoxDataTypes() const override { return m_data_types; }
 	ex_task* getTask() override { return m_task; }
 	ex_module* getDebugModule() override { return m_module; }
-	const Path& getDebugPath() const override { return m_path; }
 
 	ex_string_view debugSourceName(const Path& source) {
 		// Debug locations retain import names, while the editor uses filesystem paths.
@@ -215,7 +215,8 @@ struct EvoxSystemImpl : EvoxSystem {
 
 	void loadRoot() {
 		if (m_resource) return;
-		m_resource = m_engine.getResourceManager().load<EvoxResource>(m_path);
+
+		m_resource = m_engine.getResourceManager().load<EvoxResource>(Path(MAIN_PATH));
 		if (m_resource) m_resource->onLoaded<&EvoxSystemImpl::onResourceChanged>(this);
 	}
 
@@ -296,6 +297,7 @@ struct EvoxSystemImpl : EvoxSystem {
 
 	bool compileAndRun() {
 		if (!m_resource) return false;
+
 		destroyScript();
 		String diagnostics(m_allocator);
 		EvoxDiagnosticsContext diagnostics_context = {&diagnostics, &m_host};
@@ -304,7 +306,7 @@ struct EvoxSystemImpl : EvoxSystem {
 		ex_default_arena_create(&m_host.arena);
 		m_module = ex_module_create(&m_host);
 		ImportContext imports(m_engine.getFileSystem(), m_allocator);
-		if (!m_module || !ex_module_compile(m_module, toEvox(m_resource->getSourceCode()), toEvox(m_path.c_str()), &resolveImport, &imports)) {
+		if (!m_module || !ex_module_compile(m_module, toEvox(m_resource->getSourceCode()), toEvox(MAIN_PATH), &resolveImport, &imports)) {
 			m_host.diagnostics_userdata = nullptr;
 			m_host.print = nullptr;
 			logError("Evox compilation failed: ", diagnostics);
@@ -333,7 +335,6 @@ struct EvoxSystemImpl : EvoxSystem {
 	Engine& m_engine;
 	TagAllocator m_allocator;
 	EvoxResourceManager m_evox_resource_manager;
-	Path m_path;
 	EvoxResource* m_resource = nullptr;
 	ex_host m_host;
 	ex_module* m_module = nullptr;
@@ -676,7 +677,6 @@ struct EvoxModuleImpl : EvoxModule {
 	ex_runtime* getDebugRuntime() override { return m_system.m_runtime; }
 	ex_task* getTask() override { return m_system.getTask(); }
 	ex_module* getDebugModule() override { return m_system.getDebugModule(); }
-	const Path& getDebugPath() const override { return m_system.getDebugPath(); }
 	bool setDebugBreakpoint(const Path& source, u32 line) override { return m_system.setDebugBreakpoint(source, line); }
 	bool removeDebugBreakpoint(const Path& source, u32 line) override { return m_system.removeDebugBreakpoint(source, line); }
 
@@ -988,7 +988,6 @@ EvoxSystemImpl::EvoxSystemImpl(Engine& engine)
 	: m_engine(engine)
 	, m_allocator(engine.getAllocator(), "evox")
 	, m_evox_resource_manager(m_allocator)
-	, m_path("scripts/main.evox")
 	, m_native_functions(m_allocator)
 	, m_data_types(m_allocator)
 	, m_modules(m_allocator)
