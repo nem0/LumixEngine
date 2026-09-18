@@ -1,3 +1,38 @@
+// Regression: inlined by-value aggregate parameters have no local alloca.
+// Field/index lowering requests an address, which used to assert in IDENTIFIER.
+TEST(ir_inline_aggregate_parameter_address) {
+	const char* source = R"(
+		struct Vec { x : i32; y : i32; }
+		struct Nested { value : Vec; }
+		var input : i32 = 3;
+		fn squared(v : Vec) : i32 { return v.x * v.x + v.y * v.y; }
+		fn nested(v : Nested) : i32 { return v.value.x + v.value.y; }
+		fn indexed(v : [2]i32) : i32 { return v[0] + v[1]; }
+		fn main() : i32 {
+			var vector_arg : Vec = {input, 4};
+			var nested_arg : Nested = {vector_arg};
+			var array_arg : [2]i32 = [input, 4];
+			return squared(vector_arg) + nested(nested_arg) + indexed(array_arg);
+		}
+	)";
+	for (bool optimize : {false, true}) {
+		CAPI_BEGIN(module, diagnostics);
+		EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+		ex_bytecode_compile_options options = {};
+		options.optimize = optimize;
+		ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, &options);
+		EXPECT_TRUE(bytecode != nullptr);
+		ex_runtime* runtime = ex_runtime_create(bytecode, &module_host);
+		EXPECT_TRUE(runtime != nullptr);
+		EXPECT_EQ(test_call(runtime, toLs("main")), EX_CALL_RESULT_OK);
+		EXPECT_EQ(ex_task_to_i32(runtime, -1), 39);
+		test_runtime_destroy(runtime);
+		ex_bytecode_destroy(bytecode);
+		CAPI_END(module);
+	}
+	return true;
+}
+
 TEST(ir_to_bytecode_basic) {
 	CAPI_BEGIN(module, diagnostics);
 	EXPECT_TRUE(ex_module_compile(module, toLs("fn main() : i32 { return 2 + 3; }"), makeStringView(__func__), nullptr, nullptr));

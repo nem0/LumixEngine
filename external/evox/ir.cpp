@@ -803,7 +803,14 @@ struct IRBuilder {
 				
 				for (i32 i = locals.size() - 1; i >= 0; --i) {
 					if (!equalStrings(locals[i].name, ie.name)) continue;
-					if (as_rvalue && locals[i].inline_value) return *locals[i].inline_value;
+					if (locals[i].inline_value) {
+						if (as_rvalue) return *locals[i].inline_value;
+						// Inlined parameters have values but no local storage slot.
+						// Member/index access may still request an address for them.
+						auto& address = alloc<ExOpMaterializeAddr>();
+						address.value = locals[i].inline_value;
+						return address;
+					}
 					if (!locals[i].alloca) continue;
 
 					// A narrowed any binding reads through its erased payload pointer.
