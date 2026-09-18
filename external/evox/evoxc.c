@@ -1,6 +1,6 @@
 /*
  * evoxc.c - Standalone Evox runner/compiler
- * Usage: evoxc [--dump-bytecode] <script.evox> [function_name] [args...]
+ * Usage: evoxc [--import-dir DIR] [--dump-bytecode] <script.evox> [function_name] [args...]
  *
  * Compiles and runs a Evox file. If function_name is provided,
  * calls that function with the remaining arguments. Otherwise, calls main().
@@ -37,6 +37,43 @@ static const ex_host g_host_template = {
 
 static ex_string_view ex_from_cstr(const char* str) {
 	return (ex_string_view){str, str ? (i64)strlen(str) : 0};
+}
+
+typedef struct evoxc_import_context { const char* directory; } evoxc_import_context;
+
+static int evoxc_import_resolver(void* userdata, ex_string_view path, ex_string_view alias, ex_string_view* source) {
+	(void)alias;
+	evoxc_import_context* ctx = (evoxc_import_context*)userdata;
+	if (!ctx || !ctx->directory || !source) return 0;
+	const char* prefix = "";
+	size_t prefix_len = 0;
+	if (path.length >= 5 && memcmp(path.begin, "core:", 5) == 0) {
+		prefix = "core"; prefix_len = 4; path.begin += 5; path.length -= 5;
+	} else if (path.length >= 4 && memcmp(path.begin, "std:", 4) == 0) {
+		prefix = "std"; prefix_len = 3; path.begin += 4; path.length -= 4;
+	}
+	const size_t root_len = strlen(ctx->directory);
+	const int has_extension = path.length >= 5 && memcmp(path.begin + path.length - 5, ".evox", 5) == 0;
+	const size_t capacity = root_len + 1 + prefix_len + (prefix_len ? 1 : 0) + (size_t)path.length + (has_extension ? 0 : 5) + 1;
+	char* filename = (char*)malloc(capacity);
+	if (!filename) return 0;
+	int written = prefix_len
+		? snprintf(filename, capacity, "%s/%.*s/%.*s%s", ctx->directory, (int)prefix_len, prefix, (int)path.length, path.begin, has_extension ? "" : ".evox")
+		: snprintf(filename, capacity, "%s/%.*s%s", ctx->directory, (int)path.length, path.begin, has_extension ? "" : ".evox");
+	if (written < 0 || (size_t)written >= capacity) { free(filename); return 0; }
+	FILE* file = fopen(filename, "rb");
+	if (!file) { fprintf(stderr, "Cannot resolve import '%.*s' at %s\n", (int)path.length, path.begin, filename); free(filename); return 0; }
+	free(filename);
+	if (fseek(file, 0, SEEK_END) != 0) { fclose(file); return 0; }
+	long size = ftell(file);
+	if (size < 0 || fseek(file, 0, SEEK_SET) != 0) { fclose(file); return 0; }
+	char* contents = (char*)malloc((size_t)size + 1);
+	if (!contents) { fclose(file); return 0; }
+	size_t read = fread(contents, 1, (size_t)size, file);
+	fclose(file);
+	contents[read] = '\0';
+	*source = (ex_string_view){contents, (i64)read};
+	return 1;
 }
 
 static const char* evoxc_result_name(ex_call_result result) {
@@ -708,9 +745,10 @@ static void evoxc_dump_bytecode(const ex_bytecode* bytecode, const char* source_
 
 int main(int argc, char** argv) {
 	if (argc < 2) {
-		fputs("Usage: evoxc [--dump-bytecode] <script.evox> [function_name] [args...]\n"
-			"  --dump-bytecode  Compile and print human-readable bytecode\n"
-			"  script.evox     - Path to Evox source file\n"
+		fputs("Usage: evoxc [--import-dir DIR] [--dump-bytecode] <script.evox> [function_name] [args...]\n"
+			"  --import-dir DIR  Root directory for Evox imports\n"
+			"  --dump-bytecode   Compile and print human-readable bytecode\n"
+			"  script.evox      - Path to Evox source file\n"
 			"  function_name  - Function to call (default: main)\n"
 			"  args           - Arguments passed to the function\n", stderr);
 		return 1;
@@ -726,11 +764,16 @@ int main(int argc, char** argv) {
 	ctx.host.print = &evoxc_diagnostics_print;
 
 	int dump_bytecode = 0;
+	const char* import_directory = ".";
 	int script_arg = 1;
 	while (script_arg < argc) {
 		if (strcmp(argv[script_arg], "--dump-bytecode") == 0) {
 			dump_bytecode = 1;
 			++script_arg;
+		} else if (strcmp(argv[script_arg], "--import-dir") == 0) {
+			if (script_arg + 1 >= argc) { fputs("Error: --import-dir requires a directory\n", stderr); return 1; }
+			import_directory = argv[script_arg + 1];
+			script_arg += 2;
 		} else {
 			break;
 		}
@@ -773,12 +816,13 @@ int main(int argc, char** argv) {
 		goto cleanup;
 	}
 
+	evoxc_import_context import_context = {import_directory};
 	if (!ex_module_compile(
 		ctx.module,
 		ex_from_cstr(ctx.source),
 		ex_from_cstr(script_path),
-		NULL,
-		NULL
+		&evoxc_import_resolver,
+		&import_context
 	)) {
 		fprintf(stderr, "Compile error\n");
 		goto cleanup;
