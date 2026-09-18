@@ -31,6 +31,7 @@ compile_cpp() { "$CXX" "${CXXFLAGS[@]}" -c "$1" -o "$2"; }
 compile_c "$ROOT/runtime.c" "$OUT/runtime.o"
 compile_c "$ROOT/debugger.c" "$OUT/debugger.o"
 compile_cpp "$ROOT/parser.cpp" "$OUT/parser.o"
+compile_cpp "$ROOT/formatter.cpp" "$OUT/formatter.o"
 compile_cpp "$ROOT/compiler.cpp" "$OUT/compiler.o"
 compile_cpp "$ROOT/ir.cpp" "$OUT/ir.o"
 compile_cpp "$ROOT/capi.cpp" "$OUT/capi.o"
@@ -38,11 +39,11 @@ compile_cpp "$ROOT/platform.cpp" "$OUT/platform.o"
 
 if [[ "$MODE" == tests ]]; then
     compile_cpp "$ROOT/tests/main.cpp" "$OUT/tests_main.o"
-    "$CXX" "$OUT/tests_main.o" "$OUT/parser.o" "$OUT/compiler.o" "$OUT/ir.o" \
+    "$CXX" "$OUT/tests_main.o" "$OUT/parser.o" "$OUT/formatter.o" "$OUT/compiler.o" "$OUT/ir.o" \
         "$OUT/capi.o" "$OUT/platform.o" "$OUT/runtime.o" "$OUT/debugger.o" -lm -o "$OUT/tests"
 else
     compile_c "$ROOT/evoxc.c" "$OUT/evoxc.o"
-    "$CXX" "$OUT/evoxc.o" "$OUT/parser.o" "$OUT/compiler.o" "$OUT/ir.o" \
+    "$CXX" "$OUT/evoxc.o" "$OUT/parser.o" "$OUT/formatter.o" "$OUT/compiler.o" "$OUT/ir.o" \
         "$OUT/capi.o" "$OUT/platform.o" "$OUT/runtime.o" "$OUT/debugger.o" -lm -o "$OUT/evoxc"
 fi
 

@@ -16,6 +16,9 @@
 #include <stdarg.h>
 #include "arena.h"
 #include "bytecode.h"
+
+/* Private formatter entry point; intentionally not part of the public API. */
+extern ex_result evoxc_format_source(ex_string_view source, ex_arena* arena, ex_string_view* formatted);
 #include "capi.h"
 
 typedef struct evoxc_context {
@@ -744,10 +747,29 @@ static void evoxc_dump_bytecode(const ex_bytecode* bytecode, const char* source_
 #undef printf
 
 int main(int argc, char** argv) {
+	if (argc >= 2 && strcmp(argv[1], "fmt") == 0) {
+		if (argc != 3) { fputs("Usage: evoxc fmt <script.evox>\n", stderr); return 1; }
+		FILE* input = fopen(argv[2], "rb");
+		if (!input) { fprintf(stderr, "Error: Cannot read file '%s'\n", argv[2]); return 1; }
+		fseek(input, 0, SEEK_END); long input_size = ftell(input); fseek(input, 0, SEEK_SET);
+		char* input_source = input_size >= 0 ? (char*)malloc((size_t)input_size + 1) : NULL;
+		if (!input_source) { fclose(input); return 1; }
+		size_t input_read = fread(input_source, 1, (size_t)input_size, input); fclose(input);
+		ex_default_arena format_arena_storage;
+		ex_arena format_arena;
+		ex_default_arena_create(&format_arena);
+		ex_string_view formatted = {0};
+		ex_result format_result = evoxc_format_source((ex_string_view){input_source, (i64)input_read}, &format_arena, &formatted);
+		if (format_result != EX_RESULT_OK) { free(input_source); return 1; }
+		fwrite(formatted.begin, 1, (size_t)formatted.length, stdout);
+		free(input_source);
+		return 0;
+	}
 	if (argc < 2) {
 		fputs("Usage: evoxc [--import-dir DIR] [--dump-bytecode] <script.evox> [function_name] [args...]\n"
 			"  --import-dir DIR  Root directory for Evox imports\n"
 			"  --dump-bytecode   Compile and print human-readable bytecode\n"
+			"  evoxc fmt FILE     Format source and write it to stdout\n"
 			"  script.evox      - Path to Evox source file\n"
 			"  function_name  - Function to call (default: main)\n"
 			"  args           - Arguments passed to the function\n", stderr);
