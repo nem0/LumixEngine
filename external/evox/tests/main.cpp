@@ -168,8 +168,8 @@ static std::unordered_map<ex_task*, std::vector<u8>>& test_task_args() {
 }
 
 struct RuntimeGuard {
-	explicit RuntimeGuard(ex_module* module, ex_host* host)
-		: bytecode(ex_bytecode_compile(module, host, nullptr))
+	explicit RuntimeGuard(ex_module* module, ex_host* host, bool optimize = false)
+		: bytecode(compile(module, host, optimize))
 		, runtime(bytecode ? ex_runtime_create(bytecode, nullptr) : nullptr)
 		, task(runtime ? ex_task_create(runtime) : nullptr) {
 		if (runtime && task) test_tasks()[runtime] = task;
@@ -187,6 +187,11 @@ struct RuntimeGuard {
 		}
 		if (runtime) ex_runtime_destroy(runtime);
 		if (bytecode) ex_bytecode_destroy(bytecode);
+	}
+
+	static ex_bytecode* compile(ex_module* module, ex_host* host, bool optimize) {
+		ex_bytecode_compile_options options = { optimize };
+		return ex_bytecode_compile(module, host, optimize ? &options : nullptr);
 	}
 
 	RuntimeGuard(const RuntimeGuard&) = delete;

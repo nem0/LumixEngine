@@ -65,6 +65,64 @@ TEST(ArrayLiteralConvertsToSlice) {
 	return true;
 }
 
+TEST(GlobalStructSliceLiteralRetainsNestedStringSlices) {
+	const char* source = R"(
+		struct TowerType {
+			model : []const u8;
+			weapon : []const u8;
+			range : f32;
+			damage : f32;
+			fire_rate : f32;
+			ammo : []const u8;
+			speed : f32;
+			rotation_speed : f32;
+			cost : i32;
+		}
+
+		const TOWERS : []TowerType = [
+			{"tower_defense/models/tower-round-build-c.fbx", "tower_defense/models/weapon-cannon.fbx", 10, 20, 1, "tower_defense/models/weapon-ammo-cannonball.fbx", 5, 1, 100},
+			{"tower_defense/models/tower-round-build-a.fbx", "tower_defense/models/weapon-turret.fbx", 12, 25, 0.8, "tower_defense/models/weapon-ammo-bullet.fbx", 8, 2, 150}
+		];
+
+		fn main() : i32 {
+			const tower = TOWERS[1];
+			return tower.model[0] as i32
+				+ tower.weapon[21] as i32
+				+ tower.ammo[21] as i32
+				+ tower.cost;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	// 't' + 'w' + 'w' + 150
+	EXPECT_EQ(504, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(GlobalSliceInitializerRetainsReturnedArray) {
+	const char* source = R"(
+		fn makeValues() : [3]i32 {
+			return [10, 20, 12];
+		}
+
+		const values : []i32 = makeValues();
+
+		fn main() : i32 {
+			return values[0] + values[1] + values[2];
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(ArrayLiteralInfersNestedArrays) {
 	const char* source = R"(
 		fn main() : i32 {

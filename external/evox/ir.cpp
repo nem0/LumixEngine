@@ -4331,6 +4331,13 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 			alignof(ex_bytecode_global_debug_entry));
 	}
 
+	struct GlobalSliceBacking {
+		Symbol* symbol;
+		u32 offset;
+		ArrayResolvedType* array_type;
+	};
+	ExpArray<GlobalSliceBacking> global_slice_backings(host->arena);
+
 	u32 global_debug_index = 0;
 	for (u32 unit_index = 0; unit_index < bc->unit_count; ++unit_index) {
 		Unit& u = module->units[unit_index];
@@ -4341,6 +4348,18 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 			s.slot.type = s.resolved_type;
 			const u32 byte_size = typeByteSize(*s.resolved_type);
 			bc->global_size += byte_size;
+			// A global slice initialized from an array literal needs persistent backing
+			// storage. Materializing the array in the global initializer's frame would
+			// leave the slice pointing at that frame after the initializer returns.
+			if (s.resolved_type->kind == ResolvedTypeKind::SLICE
+				&& s.expression
+				&& s.expression->resolved_type
+				&& s.expression->resolved_type->kind == ResolvedTypeKind::ARRAY)
+			{
+				auto* array_type = static_cast<ArrayResolvedType*>(s.expression->resolved_type);
+				global_slice_backings.push({&s, bc->global_size, array_type});
+				bc->global_size += typeByteSize(*array_type);
+			}
 
 			ex_bytecode_global_debug_entry& entry = bc->global_debug[global_debug_index++];
 			entry.name = copyStringViewToArena(host->arena, s.name);
@@ -4463,8 +4482,40 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 		for (Unit& u : module->units) {
 			for (Symbol& s : u.symbols) {
 				if (!symbolHasGlobalStorage(s) || s.expression->kind == Expression::UNDEFINED) continue;
-				ExIrOp& value = builder.buildExpressionIR(*s.expression, true);
-				u32 src = bc_compiler.emit(value, nullptr);
+				u32 src;
+				GlobalSliceBacking* slice_backing = nullptr;
+				for (GlobalSliceBacking& candidate : global_slice_backings) {
+					if (candidate.symbol == &s) { slice_backing = &candidate; break; }
+				}
+				if (slice_backing) {
+					// Initialize the hidden backing array in global storage first.
+					ExIrOp& array_value = builder.buildExpressionIR(*s.expression, true);
+					const u32 array_src = bc_compiler.emit(array_value, nullptr);
+					const u32 backing_dst = bc_compiler.stack_top;
+					bc_compiler.emitOp(EX_OP_GLOBAL_PTR);
+					bc_compiler.emit(backing_dst);
+					bc_compiler.emit(slice_backing->offset);
+					bc_compiler.stack_top += sizeof(void*);
+					bc_compiler.emitOp(EX_OP_STORE_PTR);
+					bc_compiler.emit(backing_dst);
+					bc_compiler.emit(0u);
+					bc_compiler.emit(array_src);
+					bc_compiler.emit(typeByteSize(*slice_backing->array_type));
+
+					// Build the public slice from the persistent global address.
+					ExOpPushGlobalAddr backing_addr;
+					backing_addr.offset = slice_backing->offset;
+					ExOpSlice slice;
+					slice.source = &backing_addr;
+					slice.source_is_array = true;
+					slice.source_length = slice_backing->array_type->size;
+					slice.element_size = typeByteSize(*slice_backing->array_type->element_type);
+					src = bc_compiler.emit(slice, nullptr);
+				}
+				else {
+					ExIrOp& value = builder.buildImplicitConversionIR(*s.expression, *s.resolved_type);
+					src = bc_compiler.emit(value, nullptr);
+				}
 				const u32 dst = bc_compiler.stack_top;
 				bc_compiler.emitOp(EX_OP_GLOBAL_PTR);
 				bc_compiler.emit(dst);
