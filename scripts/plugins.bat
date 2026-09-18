@@ -30,8 +30,9 @@ setlocal
 	echo  A. LiveCode 
 	echo  B. Basis Universal
 	echo  C. Jolt
+	echo  D. Lua
 	echo ===============================
-	choice /C 123456789ABC /N /M "Your choice:"
+	choice /C 123456789ABCD /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :empty_plugin
@@ -45,6 +46,7 @@ setlocal
 	if %errorlevel%==10 call :livecode_plugin
 	if %errorlevel%==11 call :basisu
 	if %errorlevel%==12 call :jolt_plugin
+	if %errorlevel%==13 call :lua_plugin
 goto :begin
 
 :glft_import_plugin
@@ -177,6 +179,21 @@ exit /B 0
 		popd
 	) else (
 		cd jolt
+		git pull
+	)
+	popd
+exit /B 0
+
+:lua_plugin
+	if not exist ..\plugins mkdir ..\plugins
+	pushd ..\plugins
+	if not exist lua (
+		git.exe clone https://github.com/nem0/lumixengine_lua.git lua
+		pushd lua
+		git remote add origin2 git@github.com:nem0/lumixengine_lua.git
+		popd
+	) else (
+		cd lua
 		git pull
 	)
 	popd
