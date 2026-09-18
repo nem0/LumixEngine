@@ -110,8 +110,8 @@ static void blit(FT_Bitmap* bitmap,  Array<u8>* out) {
 	const u32 offset = out->size();
 	const u32 src_pitch = bitmap->pitch;
 	const u8* src = bitmap->buffer;
-	u8* dst = out->begin() + offset;
 	out->resize(out->size() + bitmap->width * bitmap->rows);
+	u8* dst = out->begin() + offset;
 	for (u32 y = 0; y < bitmap->rows; ++y, src += src_pitch, dst += bitmap->width) {
 		memcpy(dst, src, bitmap->width);
 	}
