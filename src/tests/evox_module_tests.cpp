@@ -77,7 +77,7 @@ bool testEvoxCustomChildIterator() {
 struct EvoxDiscoveryFileSystem : FileSystem {
 	explicit EvoxDiscoveryFileSystem(const char* source)
 		: content(getGlobalAllocator())
-		, resource_path(".lumix/resources/", Path("scripts/main.evox").getHash(), ".res")
+		, resource_path(".lumix/resources/", Path("main.evox").getHash(), ".res")
 	{
 		content.write(CompiledResourceHeader{});
 		content.write(source, stringLength(source));
@@ -157,11 +157,11 @@ bool testEvoxDataTypeDiscovery() {
 	for (const ex_type* type : types) {
 		const ex_string_view ex_name = ex_type_get_name(type);
 		const StringView name(ex_name.begin, (u64)ex_name.length);
-		ASSERT_TRUE(name != "scripts/main.evox.Unmarked" && name != "core:attributes.Data" && name != "scripts/main.evox.Nested");
-		if (name == "scripts/main.evox.Supported") supported = true;
-		if (name == "scripts/main.evox.Mixed") mixed = true;
-		if (name == "scripts/main.evox.NestedData") nested = true;
-		if (name == "scripts/main.evox.Unsupported") unsupported = true;
+		ASSERT_TRUE(name != "main.evox.Unmarked" && name != "core:attributes.Data" && name != "main.evox.Nested");
+		if (name == "main.evox.Supported") supported = true;
+		if (name == "main.evox.Mixed") mixed = true;
+		if (name == "main.evox.NestedData") nested = true;
+		if (name == "main.evox.Unsupported") unsupported = true;
 		ASSERT_TRUE(module->addEvoxData(entity, type));
 	}
 	ASSERT_TRUE(supported && mixed && nested && unsupported);
