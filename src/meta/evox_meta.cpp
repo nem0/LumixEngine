@@ -782,6 +782,12 @@ void appendModuleUnitName(StaticString<256>& out, const Module& m) {
 	appendSourceUnitPath(out, m.filename, StringView{"module", "module" + 6});
 }
 
+template <int CAPACITY> void writeEvoxFile(const StaticString<CAPACITY>& path, OutputStream& out) {
+	char filename[CAPACITY];
+	snprintf(filename, sizeof(filename), "%s.evox", path.buffer);
+	writeFile(filename, out);
+}
+
 void appendObjectUnitName(StaticString<256>& out, const Object& o) {
 	appendSourceUnitPath(out, o.filename, o.name);
 }
@@ -1283,6 +1289,16 @@ void appendEvoxDeclArgType(OutputStream& out, const Arg& arg) {
 void appendEvoxImportType(OutputStream& out, StringView type) {
 	if (isSpanType(type)) type = spanElementBaseType(type);
 	if (isWrappedAlias(type)) {
+		// Wrapped aliases are emitted alongside their declaring source unit.
+		// Keep imports consistent with that location (e.g. SoundHandle is
+		// generated as core:audio/soundhandle, not core:soundhandle).
+		for (const TypeAlias& alias : g_meta_data->aliases) {
+			if (!equal(alias.name, type)) continue;
+			StaticString<256> name("");
+			appendSourceUnitPath(name, alias.filename, alias.name);
+			out.add(name.buffer);
+			return;
+		}
 		StaticString<256> name("");
 		appendLowercase(name, type);
 		out.add(name.buffer);
@@ -1418,8 +1434,7 @@ void serializeCoreImports(MetaData& data) {
 		L("; }" OUT_ENDL);
 		StaticString<256> path("data/scripts/core/");
 		appendSourceUnitPath(path, alias.filename, alias.name);
-		path.append(StringView{".evox", ".evox" + 5});
-		writeFile(path, out);
+		writeEvoxFile(path, out);
 	}
 
 	auto output_enum = [&](Enum& e) {
@@ -1437,8 +1452,7 @@ void serializeCoreImports(MetaData& data) {
 		L("}" OUT_ENDL);
 		StaticString<256> path("data/scripts/core/");
 		appendSourceUnitPath(path, e.filename, e.name);
-		path.append(StringView{".evox", ".evox" + 5});
-		writeFile(path, out);
+		writeEvoxFile(path, out);
 	};
 
 	for (Enum& e : data.enums) output_enum(e);
@@ -1480,8 +1494,7 @@ void serializeCoreImports(MetaData& data) {
 		L("}" OUT_ENDL);
 		StaticString<256> path("data/scripts/core/");
 		appendSourceUnitPath(path, s.filename, s.name);
-		path.append(StringView{".evox", ".evox" + 5});
-		writeFile(path, out);
+		writeEvoxFile(path, out);
 	};
 
 	for (Struct& s : data.structs) output_struct(s);
@@ -1545,8 +1558,7 @@ void serializeCoreImports(MetaData& data) {
 		out.add(OUT_ENDL);
 		StaticString<256> path("data/scripts/core/");
 		appendObjectUnitName(path, o);
-		path.append(StringView{".evox", ".evox" + 5});
-		writeFile(path, out);
+		writeEvoxFile(path, out);
 	}
 
 	for (Module& m : data.modules) {
@@ -1634,8 +1646,7 @@ void serializeCoreImports(MetaData& data) {
 		out.add(OUT_ENDL);
 		StaticString<256> path("data/scripts/core/");
 		appendModuleUnitName(path, m);
-		path.append(StringView{".evox", ".evox" + 5});
-		writeFile(path, out);
+		writeEvoxFile(path, out);
 	}
 
 	for (Module& m : data.modules) {
@@ -1765,8 +1776,7 @@ void serializeCoreImports(MetaData& data) {
 			out.add(OUT_ENDL);
 			StaticString<256> path("data/scripts/core/");
 			appendSourceUnitPath(path, m.filename, c.id);
-			path.append(StringView{".evox", ".evox" + 5});
-			writeFile(path, out);
+			writeEvoxFile(path, out);
 		}
 	}
 }

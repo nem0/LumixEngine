@@ -3,7 +3,7 @@
 
 import "core:world"
 
-import "core:soundhandle"
+import "core:audio/soundhandle"
 import "core:entity"
 struct AudioModule { module : cptr; }
 
