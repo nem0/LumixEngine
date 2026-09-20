@@ -43,6 +43,7 @@ struct ChorusZone {
 };
 //@ end
 
+//@alias
 using SoundHandle = i32;
 
 struct AudioModule : IModule {

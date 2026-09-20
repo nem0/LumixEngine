@@ -431,6 +431,39 @@ virtual u32 getInstancedCubeLayer(EntityRef entity) = 0;				//@ dynenum Layer
 virtual GrassRotationMode getGrassRotationMode(EntityRef entity, int index) = 0;	//@ enum
 ```
 
+# Type aliases
+
+Mark a simple C++ `using` declaration at the top level or inside a module
+metadata block (outside object/struct/function blocks):
+
+```cpp
+//@alias
+using SoundHandle = i32;
+```
+
+The declaration must be on the next line. `MetaData::aliases` exposes these
+names and underlying types to generators. Evox currently supports aliases
+(including chains) of `bool`, `u8`, `i32`, `int`, `u32`, and `float`. Every supported
+alias becomes a distinct single-field `extern struct` in its own lowercase
+`core:` unit, and generated signatures use that wrapper:
+
+```evox
+// core:soundhandle
+extern struct SoundHandle { value : i32; }
+```
+
+Use `.value` to access the scalar, or a typed struct literal to construct a handle.
+Alias chains each get their own distinct wrapper with the resolved scalar field
+(not nested wrappers). Imports are generated wherever aliases are used, including
+struct fields. The wrapper has the same size/alignment and call-frame representation
+as the scalar, so native values, mutable references, and spans retain their existing
+marshalling. Native C++ signatures retain their aliases.
+Alias names must be globally unique; ambiguous names, cycles, and unsupported
+underlying types remain unsupported. Pointer/reference aliases, templates,
+`typedef`, and scope inference are not supported.
+
+This is separate from the `alias` function attribute, which renames a method.
+
 # Objects
 
 `//@ object` marks a struct or class whose methods should be exposed to scripting backends. Unlike modules and components, which represent game-world systems, objects are standalone types outside the ECS, such as editor plugins, utility classes, or system interfaces.

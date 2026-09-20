@@ -532,6 +532,7 @@ struct Parser {
 		, structs(allocator)
 		, objects(allocator)
 		, enums(allocator)
+		, aliases(allocator)
 	{}
 
 	bool readLine(StringView& line) {
@@ -1040,6 +1041,9 @@ struct Parser {
 			else if (equal(word, "enum")) {
 				parseEnum(line, current_module->enums);
 			}
+			else if (equal(word, "alias")) {
+				parseAlias();
+			}
 			else if (equal(word, "include")) {
 				StringView path = consumeString(line);
 				m.includes.emplace(path);
@@ -1201,6 +1205,27 @@ struct Parser {
 		}
 	}
 
+	void parseAlias() {
+		StringView line;
+		if (!readLine(line) || !equal(consumeWord(line), "using")) {
+			logError("Expected using Name = Type; after //@alias");
+			return;
+		}
+		const StringView name = consumeIdentifier(line);
+		if (name.size() == 0 || !equal(consumeWord(line), "=")) {
+			logError("Expected using Name = Type; after //@alias");
+			return;
+		}
+		const StringView type = consumeType(line);
+		if (type.size() == 0 || !equal(consumeWord(line), ";")) {
+			logError("Expected a simple type alias");
+			return;
+		}
+		TypeAlias& alias = aliases.emplace();
+		alias.name = name;
+		alias.type = type;
+	}
+
 	void parse() {
 		line_idx = 0;
 		StringView line;
@@ -1223,6 +1248,9 @@ struct Parser {
 			}
 			else if (equal(word, "object")) {
 				parseObject(line);
+			}
+			else if (equal(word, "alias")) {
+				parseAlias();
 			}
 			else {
 				logError("Unexpected \"", word, "\"");
@@ -1311,6 +1339,7 @@ struct Parser {
 	ExpArray<Struct> structs;
 	ExpArray<Object> objects;
 	ExpArray<Enum> enums;
+	ExpArray<TypeAlias> aliases;
 	StringView content;
 	i32 line_idx = 0;
 };
@@ -1681,7 +1710,8 @@ int main() {
 		parser.modules,
 		parser.structs,
 		parser.objects,
-		parser.enums
+		parser.enums,
+		parser.aliases
 	};
 
 	for (MetaPluginRegister* r = MetaPluginRegister::first; r; r = r->next) {

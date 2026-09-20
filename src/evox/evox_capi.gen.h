@@ -1464,10 +1464,56 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
+	static void evox_audio_play_5652765430669833591(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, AudioModule*, module);
+		EX_ARG(frame, ExEntity, entity);
+		EX_STRING_ARG(frame, clip);
+		EX_ARG(frame, bool, is_3d);
+		auto ret = module->play(EntityRef(entity.index), Path(StringView{clip.begin, (u64)clip.length}), is_3d);
+		EX_RESULT(frame, (i32)ret);
+	}
+	
 	static void evox_audio_setMasterVolume_14804945310456614025(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, AudioModule*, module);
 		EX_ARG(frame, float, volume);
 		module->setMasterVolume(volume);
+	}
+	
+	static void evox_audio_stop_8152740666800520021(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, AudioModule*, module);
+		EX_ARG(frame, SoundHandle, sound_id);
+		module->stop(sound_id);
+	}
+	
+	static void evox_audio_isEnd_454624687738344299(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, AudioModule*, module);
+		EX_ARG(frame, SoundHandle, sound_id);
+		auto ret = module->isEnd(sound_id);
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_audio_setFrequency_15834803467169398455(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, AudioModule*, module);
+		EX_ARG(frame, SoundHandle, sound_id);
+		EX_ARG(frame, u32, frequency_hz);
+		module->setFrequency(sound_id, frequency_hz);
+	}
+	
+	static void evox_audio_setVolume_8883025250796904683(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, AudioModule*, module);
+		EX_ARG(frame, SoundHandle, sound_id);
+		EX_ARG(frame, float, volume);
+		module->setVolume(sound_id, volume);
+	}
+	
+	static void evox_audio_setEcho_14540264062938513669(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, AudioModule*, module);
+		EX_ARG(frame, SoundHandle, sound_id);
+		EX_ARG(frame, float, wet_dry_mix);
+		EX_ARG(frame, float, feedback);
+		EX_ARG(frame, float, left_delay);
+		EX_ARG(frame, float, right_delay);
+		module->setEcho(sound_id, wet_dry_mix, feedback, left_delay, right_delay);
 	}
 	
 	static void evox_physics_raycast_3415175403905315551(ex_runtime* runtime, ex_call_frame frame) {
@@ -4983,7 +5029,13 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:procedural_geom"), StringView("procedural_geom")}, &evox_entity_procedural_geom);
 		functions.insert({StringView("core:ui_3d"), StringView("createUI3D")}, &evox_entity_create_ui_3d);
 		functions.insert({StringView("core:ui_3d"), StringView("ui_3d")}, &evox_entity_ui_3d);
+		functions.insert({StringView("core:audio"), StringView("play")}, &evox_audio_play_5652765430669833591);
 		functions.insert({StringView("core:audio"), StringView("setMasterVolume")}, &evox_audio_setMasterVolume_14804945310456614025);
+		functions.insert({StringView("core:audio"), StringView("stop")}, &evox_audio_stop_8152740666800520021);
+		functions.insert({StringView("core:audio"), StringView("isEnd")}, &evox_audio_isEnd_454624687738344299);
+		functions.insert({StringView("core:audio"), StringView("setFrequency")}, &evox_audio_setFrequency_15834803467169398455);
+		functions.insert({StringView("core:audio"), StringView("setVolume")}, &evox_audio_setVolume_8883025250796904683);
+		functions.insert({StringView("core:audio"), StringView("setEcho")}, &evox_audio_setEcho_14540264062938513669);
 		functions.insert({StringView("core:audio"), StringView("audio")}, &evox_world_audio);
 		functions.insert({StringView("core:physics"), StringView("raycast")}, &evox_physics_raycast_3415175403905315551);
 		functions.insert({StringView("core:physics"), StringView("setGravity")}, &evox_physics_setGravity_15380368834725248530);

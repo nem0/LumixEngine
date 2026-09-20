@@ -252,11 +252,17 @@ struct Arg {
 	bool is_ptr = false;
 };
 
+struct TypeAlias {
+	StringView name;
+	StringView type;
+};
+
 struct MetaData {
 	ExpArray<Module>& modules;
 	ExpArray<Struct>& structs;
 	ExpArray<Object>& objects;
 	ExpArray<Enum>& enums;
+	ExpArray<TypeAlias>& aliases;
 };
 
 struct MetaPluginRegister {
