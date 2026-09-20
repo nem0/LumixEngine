@@ -8,7 +8,8 @@ import "core:entity"
 struct AudioModule { module : cptr; }
 
 extern fn audio(w : World) : ?AudioModule;
-extern fn play(module : AudioModule, entity : Entity, clip : []const u8, is_3d : bool) : SoundHandle;
+extern fn play3D(module : AudioModule, entity : Entity, clip : []const u8) : SoundHandle;
+extern fn play2D(module : AudioModule, clip : []const u8) : SoundHandle;
 extern fn setMasterVolume(module : AudioModule, volume : f32) : void;
 extern fn stop(module : AudioModule, sound_id : SoundHandle) : void;
 extern fn isEnd(module : AudioModule, sound_id : SoundHandle) : bool;

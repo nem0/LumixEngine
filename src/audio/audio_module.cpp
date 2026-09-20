@@ -98,7 +98,7 @@ struct AudioModuleImpl final : AudioModule
 				ClipInfo* clip = getClipInfo(event.clip);
 				if (clip)
 				{
-					play(entity, clip, event.is_3d);
+					playInternal(entity, clip, event.is_3d);
 				}
 			}
 			else
@@ -172,7 +172,7 @@ struct AudioModuleImpl final : AudioModule
 		m_animation_module = (AnimationModule*)m_world.getModule("animation");
 		for (AmbientSound& sound : m_ambient_sounds)
 		{
-			if (sound.clip) sound.playing_sound = play(sound.entity, sound.clip, sound.is_3d);
+			if (sound.clip) sound.playing_sound = playInternal(sound.entity, sound.clip, sound.is_3d);
 		}
 	}
 
@@ -377,13 +377,19 @@ struct AudioModuleImpl final : AudioModule
 		}
 	}
 
-	SoundHandle play(EntityRef entity, const Path& clip, bool is_3d) override {
+	SoundHandle play3D(EntityRef entity, const Path& clip) override {
 		if (clip.isEmpty()) return INVALID_SOUND_HANDLE;
 		Clip* res = m_system.getEngine().getResourceManager().load<Clip>(clip);
-		return play(entity, res, is_3d);
+		return playInternal(entity, res, true);
+	}
+
+	SoundHandle play2D(const Path& clip) override {
+		if (clip.isEmpty()) return INVALID_SOUND_HANDLE;
+		Clip* res = m_system.getEngine().getResourceManager().load<Clip>(clip);
+		return playInternal(EntityPtr(), res, false);
 	}
 	
-	SoundHandle play(EntityRef entity, Clip* clip, bool is_3d) override {
+	SoundHandle playInternal(EntityPtr entity, Clip* clip, bool is_3d) {
 		for (PlayingSound& sound : m_playing_sounds) {
 			if (sound.buffer_id == AudioDevice::INVALID_BUFFER_HANDLE) {
 				if (!clip->isReady()) return INVALID_SOUND_HANDLE;
@@ -399,8 +405,11 @@ struct AudioModuleImpl final : AudioModule
 				m_device.play(buffer, clip->m_looped);
 				m_device.setVolume(buffer, clip->m_volume);
 
-				const DVec3 pos = m_world.getPosition(entity);
-				m_device.setSourcePosition(buffer, pos);
+				DVec3 pos {0, 0, 0};
+				if (is_3d) {
+					pos = m_world.getPosition(EntityRef(entity));
+					m_device.setSourcePosition(buffer, pos);
+				}
 
 				sound.is_3d = is_3d;
 				sound.buffer_id = buffer;
@@ -408,7 +417,7 @@ struct AudioModuleImpl final : AudioModule
 				clip->incRefCount();
 				sound.clip = clip;
 
-				for (const EchoZone& zone : m_echo_zones) {
+				if (is_3d) for (const EchoZone& zone : m_echo_zones) {
 					const double dist2 = squaredLength(pos - m_world.getPosition(zone.entity));
 					const double r2 = zone.radius * zone.radius;
 					if (dist2 > r2) continue;
@@ -418,7 +427,7 @@ struct AudioModuleImpl final : AudioModule
 					break;
 				}
 
-				for (const ChorusZone& zone : m_chorus_zones) {
+				if (is_3d) for (const ChorusZone& zone : m_chorus_zones) {
 					const double dist2 = squaredLength(pos - m_world.getPosition(zone.entity));
 					double r2 = zone.radius * zone.radius;
 					if (dist2 > r2) continue;

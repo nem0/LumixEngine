@@ -53,10 +53,10 @@ struct AudioModule : IModule {
 		World& world,
 		struct IAllocator& allocator);
 	static void reflect(struct Engine& engine);
-	virtual SoundHandle play(EntityRef entity, Clip* clip, bool is_3d) = 0;
 
 	//@ functions
-	virtual SoundHandle play(EntityRef entity, const Path& clip, bool is_3d) = 0;
+	virtual SoundHandle play3D(EntityRef entity, const Path& clip) = 0;
+	virtual SoundHandle play2D(const Path& clip) = 0;
 	virtual void setMasterVolume(float volume) = 0;
 	virtual void stop(SoundHandle sound_id) = 0;
 	virtual bool isEnd(SoundHandle sound_id) = 0;

@@ -1464,12 +1464,18 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ExComponent(entity.index, module));
 	}
 	
-	static void evox_audio_play_5652765430669833591(ex_runtime* runtime, ex_call_frame frame) {
+	static void evox_audio_play3D_4659259411700113465(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, AudioModule*, module);
 		EX_ARG(frame, ExEntity, entity);
 		EX_STRING_ARG(frame, clip);
-		EX_ARG(frame, bool, is_3d);
-		auto ret = module->play(EntityRef(entity.index), Path(StringView{clip.begin, (u64)clip.length}), is_3d);
+		auto ret = module->play3D(EntityRef(entity.index), Path(StringView{clip.begin, (u64)clip.length}));
+		EX_RESULT(frame, (i32)ret);
+	}
+	
+	static void evox_audio_play2D_10679023369668577871(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, AudioModule*, module);
+		EX_STRING_ARG(frame, clip);
+		auto ret = module->play2D(Path(StringView{clip.begin, (u64)clip.length}));
 		EX_RESULT(frame, (i32)ret);
 	}
 	
@@ -5029,7 +5035,8 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:procedural_geom"), StringView("procedural_geom")}, &evox_entity_procedural_geom);
 		functions.insert({StringView("core:ui_3d"), StringView("createUI3D")}, &evox_entity_create_ui_3d);
 		functions.insert({StringView("core:ui_3d"), StringView("ui_3d")}, &evox_entity_ui_3d);
-		functions.insert({StringView("core:audio"), StringView("play")}, &evox_audio_play_5652765430669833591);
+		functions.insert({StringView("core:audio"), StringView("play3D")}, &evox_audio_play3D_4659259411700113465);
+		functions.insert({StringView("core:audio"), StringView("play2D")}, &evox_audio_play2D_10679023369668577871);
 		functions.insert({StringView("core:audio"), StringView("setMasterVolume")}, &evox_audio_setMasterVolume_14804945310456614025);
 		functions.insert({StringView("core:audio"), StringView("stop")}, &evox_audio_stop_8152740666800520021);
 		functions.insert({StringView("core:audio"), StringView("isEnd")}, &evox_audio_isEnd_454624687738344299);
