@@ -949,6 +949,8 @@ struct Parser {
 		if (equal(enum_name, "class")) enum_name = consumeWord(line);
 
 		Enum& e = enums.emplace(allocator);
+		e.filename = (char*)allocator.allocate(filename.size() + 1);
+		strncpy_s(e.filename, filename.size() + 1, filename.begin, filename.size());
 		e.full = full.size() > 0 ? full : enum_name;
 		e.name = enum_name;
 		last_enumerator_value = -1;
@@ -1170,6 +1172,8 @@ struct Parser {
 			return;
 		}
 		Struct& s = structs.emplace(allocator);
+		s.filename = (char*)allocator.allocate(filename.size() + 1);
+		strncpy_s(s.filename, filename.size() + 1, filename.begin, filename.size());
 		s.name = name;
 		s.full = full.size() > 0 ? full : name;
 
@@ -1222,6 +1226,8 @@ struct Parser {
 			return;
 		}
 		TypeAlias& alias = aliases.emplace();
+		alias.filename = (char*)allocator.allocate(filename.size() + 1);
+		strncpy_s(alias.filename, filename.size() + 1, filename.begin, filename.size());
 		alias.name = name;
 		alias.type = type;
 	}
@@ -1632,6 +1638,25 @@ void serializeReflection(OutputStream& out, Module& m) {
 }
 
 void writeFile(const char* out_path, OutputStream& stream) {
+	char directory[MAX_PATH];
+	strncpy_s(directory, sizeof(directory), out_path, strlen(out_path));
+	char* slash = strrchr(directory, '/');
+	if (!slash) slash = strrchr(directory, '\\');
+	if (slash) {
+		*slash = 0;
+		#ifdef _WIN32
+				for (char* p = directory; *p; ++p) {
+					if (*p != '/' && *p != '\\') continue;
+					const char separator = *p;
+					*p = 0;
+					CreateDirectoryA(directory, nullptr);
+					*p = separator;
+				}
+				CreateDirectoryA(directory, nullptr);
+		#else
+				mkdir(directory, 0777);
+		#endif
+	}
 #ifdef _WIN32
 	HANDLE h_existing = CreateFileA(out_path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 	if (h_existing != INVALID_HANDLE_VALUE) {

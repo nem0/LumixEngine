@@ -2,7 +2,7 @@ import "core:input"
 import "core:log"
 import "core:random"
 import "core:string"
-import "core:ui"
+import "core:ui/module"
 import "core:world"
 
 import "scripts/player" as player

@@ -1,15 +1,15 @@
-import "core:animator"
+import "core:animation/animator"
 import "core:dvec3"
 import "core:entity"
-import "core:keycode"
+import "core:core/keycode"
 import "core:input"
 import "core:log"
-import "core:model_instance"
-import "core:navmesh_agent"
+import "core:renderer/model_instance"
+import "core:navigation/navmesh_agent"
 import "core:quat"
 import "core:random"
 import "core:world"
-import "core:ui"
+import "core:ui/module"
 import "core:attributes" as attr
 import "scripts/player" as player
 import "std:math" as math

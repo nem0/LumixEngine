@@ -179,6 +179,7 @@ struct Enumerator {
 struct Enum {
 	Enum(IAllocator& allocator) : values(allocator) {}
 	StringView name;
+	char* filename = nullptr;
 	StringView full;
 	ExpArray<Enumerator> values;
 };
@@ -241,6 +242,7 @@ struct Struct {
 	Struct(IAllocator& allocator) : vars(allocator) {}
 	StringView name;
 	StringView full;
+	char* filename = nullptr;
 	ExpArray<StructVar> vars;
 };
 
@@ -255,6 +257,7 @@ struct Arg {
 struct TypeAlias {
 	StringView name;
 	StringView type;
+	char* filename = nullptr;
 };
 
 struct MetaData {

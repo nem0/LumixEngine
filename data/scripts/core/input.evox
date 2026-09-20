@@ -1,4 +1,4 @@
-import "core:inputdevicetype"
+import "core:engine/inputdevicetype"
 
 struct InputSystem { system : cptr; }
 

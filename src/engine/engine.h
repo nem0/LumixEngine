@@ -20,6 +20,7 @@ enum class DeserializeProjectResult {
 	PLUGIN_VERSION_NOT_SUPPORTED
 };
 
+//@ object
 struct LUMIX_ENGINE_API Engine {
 	struct InitArgs {
 		const char* log_path = "engine/lumix.log";

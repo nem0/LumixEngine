@@ -764,6 +764,28 @@ void appendObjectWrapperName(OutputStream& out, Object& o, Function& f) {
 	out.add("evox_object_", o.name, "_", functionScriptName(f)); appendStableWrapperHash(out, s);
 }
 
+void appendSourceUnitPath(StaticString<256>& out, const char* filename, StringView leaf) {
+	const char* begin = filename;
+	if (begin[0] == 's' && begin[1] == 'r' && begin[2] == 'c' && begin[3] == '/') begin += 4;
+	const char* end = filename;
+	while (*end) ++end;
+	const char* slash = end;
+	while (slash > begin && slash[-1] != '/') --slash;
+	if (slash > begin) {
+		out.append(StringView{begin, slash - 1});
+		out.append("/");
+	}
+	appendLowercase(out, leaf);
+}
+
+void appendModuleUnitName(StaticString<256>& out, const Module& m) {
+	appendSourceUnitPath(out, m.filename, StringView{"module", "module" + 6});
+}
+
+void appendObjectUnitName(StaticString<256>& out, const Object& o) {
+	appendSourceUnitPath(out, o.filename, o.name);
+}
+
 void appendSpanIteratorCountName(OutputStream& out, Module& m, Function& f) {
 	StaticString<2048> s(m.id, "::", functionScriptName(f), "(", f.args, ")->", f.return_type, "::count");
 	out.add("evox_", m.id, "_", functionScriptName(f), "_count"); appendStableWrapperHash(out, s);
@@ -1100,7 +1122,16 @@ void emitGeneratedComponentWrappers(OutputStream& out, MetaData& data) {
 
 void emitGeneratedComponentImportRegistrations(OutputStream& out, MetaData& data) {
 	for (Module& m : data.modules) {
+		StaticString<256> module_unit("core:");
+		StaticString<256> module_path("");
+		appendModuleUnitName(module_path, m);
+		module_unit.append(module_path.buffer);
+		module_unit.length -= 7; // remove /module; components live beside the module script
+		module_unit.buffer[module_unit.length] = 0;
 		for (Component& c : m.components) {
+			const int module_unit_length = module_unit.length;
+			module_unit.append("/");
+			appendLowercase(module_unit, c.id);
 			bool has_supported_function = false;
 			for (Function& f : c.functions) {
 				if (isSupportedEvoxFunction(f)) {
@@ -1133,20 +1164,20 @@ void emitGeneratedComponentImportRegistrations(OutputStream& out, MetaData& data
 
 			for (Function& f : c.functions) {
 				if (!isSupportedEvoxFunction(f)) continue;
-				out.add("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", functionScriptName(f), "\")}, &");
+				out.add("functions.insert({StringView(\"", module_unit.buffer, "\"), StringView(\"", functionScriptName(f), "\")}, &");
 				appendWrapperName(out, c, f);
 				L(");");
 			}
 			for (Property& p : c.properties) {
 				if (isSupportedEvoxPropertyGetter(p)) {
-					out.add("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"");
+					out.add("functions.insert({StringView(\"", module_unit.buffer, "\"), StringView(\"");
 					appendPropertyScriptName(out, p, false);
 					out.add("\")}, &");
 					appendPropertyWrapperName(out, c, p, false);
 					L(");");
 				}
 				if (isSupportedEvoxPropertySetter(p)) {
-					out.add("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"");
+					out.add("functions.insert({StringView(\"", module_unit.buffer, "\"), StringView(\"");
 					appendPropertyScriptName(out, p, true);
 					out.add("\")}, &");
 					appendPropertyWrapperName(out, c, p, true);
@@ -1154,25 +1185,27 @@ void emitGeneratedComponentImportRegistrations(OutputStream& out, MetaData& data
 				}
 			}
 			for (ArrayProperty& a : c.arrays) {
-				L("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", a.id, "Count\")}, &");
+				L("functions.insert({StringView(\"", module_unit.buffer, "\"), StringView(\"", a.id, "Count\")}, &");
 				appendArrayCountWrapperName(out, c, a);
 				L(");");
-				L("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", a.id, "\")}, &");
+				L("functions.insert({StringView(\"", module_unit.buffer, "\"), StringView(\"", a.id, "\")}, &");
 				appendArrayItemWrapperName(out, c, a);
 				L(");");
 				for (Property& p : a.children) {
 					if (isSupportedEvoxArrayChildGetter(p)) {
-						out.add("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", p.getter_name, "\")}, &");
+						out.add("functions.insert({StringView(\"", module_unit.buffer, "\"), StringView(\"", p.getter_name, "\")}, &");
 						appendArrayChildWrapperName(out, c, a, p, false);
 						L(");");
 					}
 					if (isSupportedEvoxArrayChildSetter(p)) {
-						out.add("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", p.setter_name, "\")}, &");
+						out.add("functions.insert({StringView(\"", module_unit.buffer, "\"), StringView(\"", p.setter_name, "\")}, &");
 						appendArrayChildWrapperName(out, c, a, p, true);
 						L(");");
 					}
 				}
 			}
+			module_unit.length = module_unit_length;
+			module_unit.buffer[module_unit.length] = 0;
 		}
 	}
 }
@@ -1180,7 +1213,7 @@ void emitGeneratedComponentImportRegistrations(OutputStream& out, MetaData& data
 void emitGeneratedObjectImportRegistrations(OutputStream& out, MetaData& data) {
 	for (Object& o : data.objects) {
 		StaticString<256> unit("core:");
-		appendLowercase(unit, o.name);
+		appendObjectUnitName(unit, o);
 		for (Function& f : o.functions) {
 			if (!isSupportedEvoxFunction(f)) continue;
 			out.add("functions.insert({StringView(\"", unit.buffer, "\"), StringView(\"", functionScriptName(f), "\")}, &");
@@ -1269,19 +1302,29 @@ void appendEvoxImportType(OutputStream& out, StringView type) {
 		case EvoxType::ENTITY_T: out.add("entity"); break;
 		case EvoxType::ENUM_T: {
 			const Enum* e = findEnumByTypeName(type);
-			out.add(e ? e->name : type);
+			if (e) {
+				StaticString<256> name("");
+				appendSourceUnitPath(name, e->filename, e->name);
+				out.add(name.buffer);
+			} else out.add(type);
 			break;
 		}
 		case EvoxType::STRUCT_T: {
 			const Struct* s = findStructByTypeName(type);
-			out.add(s ? s->name : type);
+			if (s) {
+				StaticString<256> name("");
+				appendSourceUnitPath(name, s->filename, s->name);
+				out.add(name.buffer);
+			} else out.add(type);
 			break;
 		}
 		case EvoxType::OBJECT_T: {
 			const Object* o = findObjectByTypeName(type);
-			StaticString<256> name("");
-			if (o) appendLowercase(name, o->name);
-			out.add(name.buffer);
+			if (o) {
+				StaticString<256> name("");
+				appendObjectUnitName(name, *o);
+				out.add(name.buffer);
+			}
 			break;
 		}
 		default: out.add(type); break;
@@ -1374,8 +1417,8 @@ void serializeCoreImports(MetaData& data) {
 		appendEvoxDeclType(out, resolveScalarAlias(alias.name));
 		L("; }" OUT_ENDL);
 		StaticString<256> path("data/scripts/core/");
-		appendLowercase(path, alias.name);
-		path.append(".evox");
+		appendSourceUnitPath(path, alias.filename, alias.name);
+		path.append(StringView{".evox", ".evox" + 5});
 		writeFile(path, out);
 	}
 
@@ -1393,8 +1436,8 @@ void serializeCoreImports(MetaData& data) {
 		}
 		L("}" OUT_ENDL);
 		StaticString<256> path("data/scripts/core/");
-		appendLowercase(path, e.name);
-		path.append(".evox");
+		appendSourceUnitPath(path, e.filename, e.name);
+		path.append(StringView{".evox", ".evox" + 5});
 		writeFile(path, out);
 	};
 
@@ -1436,8 +1479,8 @@ void serializeCoreImports(MetaData& data) {
 		}
 		L("}" OUT_ENDL);
 		StaticString<256> path("data/scripts/core/");
-		appendLowercase(path, s.name);
-		path.append(".evox");
+		appendSourceUnitPath(path, s.filename, s.name);
+		path.append(StringView{".evox", ".evox" + 5});
 		writeFile(path, out);
 	};
 
@@ -1456,7 +1499,7 @@ void serializeCoreImports(MetaData& data) {
 		out.length = 0;
 		L("// Generated by meta.cpp");
 		StaticString<256> object_unit("");
-		appendLowercase(object_unit, o.name);
+		appendObjectUnitName(object_unit, o);
 		out.add("// import core:", object_unit.buffer, " as ", o.name, OUT_ENDL OUT_ENDL);
 
 		StringView imported_types[32];
@@ -1501,8 +1544,8 @@ void serializeCoreImports(MetaData& data) {
 		}
 		out.add(OUT_ENDL);
 		StaticString<256> path("data/scripts/core/");
-		appendLowercase(path, o.name);
-		path.append(".evox");
+		appendObjectUnitName(path, o);
+		path.append(StringView{".evox", ".evox" + 5});
 		writeFile(path, out);
 	}
 
@@ -1518,7 +1561,7 @@ void serializeCoreImports(MetaData& data) {
 
 		out.length = 0;
 		L("// Generated by meta.cpp");
-		L("// import core:", m.id, " as ", m.id, OUT_ENDL);
+		L("// import core:", m.id, "/module as ", m.id, OUT_ENDL);
 		L("import \"core:world\"", OUT_ENDL);
 
 		StringView imported_types[32];
@@ -1590,8 +1633,8 @@ void serializeCoreImports(MetaData& data) {
 		}
 		out.add(OUT_ENDL);
 		StaticString<256> path("data/scripts/core/");
-		appendLowercase(path, m.id);
-		path.append(".evox");
+		appendModuleUnitName(path, m);
+		path.append(StringView{".evox", ".evox" + 5});
 		writeFile(path, out);
 	}
 
@@ -1622,7 +1665,9 @@ void serializeCoreImports(MetaData& data) {
 			}
 			out.length = 0;
 			L("// Generated by meta.cpp");
-			L("// import core:", c.id, " as ", c.id, OUT_ENDL);
+						StaticString<256> component_unit("core:");
+			appendSourceUnitPath(component_unit, m.filename, c.id);
+			L("// import ", component_unit.buffer, " as ", c.id, OUT_ENDL);
 
 			StringView imported_types[32];
 			i32 imported_types_count = 0;
@@ -1719,8 +1764,8 @@ void serializeCoreImports(MetaData& data) {
 			}
 			out.add(OUT_ENDL);
 			StaticString<256> path("data/scripts/core/");
-			appendLowercase(path, c.id);
-			path.append(".evox");
+			appendSourceUnitPath(path, m.filename, c.id);
+			path.append(StringView{".evox", ".evox" + 5});
 			writeFile(path, out);
 		}
 	}
@@ -1763,30 +1808,44 @@ void serializeEvoxMeta(MetaData& data) {
 
 	L("static void registerGeneratedEngineImport(HashMap<NativeFunctionKey, ex_native_fn, NativeFunctionKeyHash>& functions) {");
 	for (Module& m : data.modules) {
+		StaticString<256> module_unit("core:");
+		StaticString<256> module_path("");
+		appendModuleUnitName(module_path, m);
+		module_unit.append(module_path.buffer);
+		module_unit.length -= 7; // remove /module; component units are sibling scripts
+		module_unit.buffer[module_unit.length] = 0;
 		for (Component& c : m.components) {
-			L("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"create", c.name, "\")}, &evox_entity_create_", c.id, ");");
-			L("functions.insert({StringView(\"core:", c.id, "\"), StringView(\"", c.id, "\")}, &evox_entity_", c.id, ");");
+			StaticString<256> component_unit("");
+			component_unit.append(module_unit.buffer);
+			component_unit.append("/");
+			appendLowercase(component_unit, c.id);
+			L("functions.insert({StringView(\"", component_unit.buffer, "\"), StringView(\"create", c.name, "\")}, &evox_entity_create_", c.id, ");");
+			L("functions.insert({StringView(\"", component_unit.buffer, "\"), StringView(\"", c.id, "\")}, &evox_entity_", c.id, ");");
 		}
 	}
 	for (Module& m : data.modules) {
 		if (m.components.size == 0) continue;
+		StaticString<256> module_unit("core:");
+		StaticString<256> module_path("");
+		appendModuleUnitName(module_path, m);
+		module_unit.append(module_path.buffer);
 
 		bool any_function = false;
 		for (Function& f : m.functions) {
 			if (!isSupportedEvoxFunction(f)) continue;
 			if (isSpanType(f.return_type)) {
-				out.add("functions.insert({StringView(\"core:", m.id, "\"), StringView(\"", functionScriptName(f), "Count\")}, &"); appendSpanIteratorCountName(out, m, f); L(");");
-				out.add("functions.insert({StringView(\"core:", m.id, "\"), StringView(\"", functionScriptName(f), "Get\")}, &"); appendSpanIteratorGetName(out, m, f); L(");");
+				out.add("functions.insert({StringView(\"", module_unit.buffer, "\"), StringView(\"", functionScriptName(f), "Count\")}, &"); appendSpanIteratorCountName(out, m, f); L(");");
+				out.add("functions.insert({StringView(\"", module_unit.buffer, "\"), StringView(\"", functionScriptName(f), "Get\")}, &"); appendSpanIteratorGetName(out, m, f); L(");");
 			}
 			else {
-				out.add("functions.insert({StringView(\"core:", m.id, "\"), StringView(\"", functionScriptName(f), "\")}, &");
+				out.add("functions.insert({StringView(\"", module_unit.buffer, "\"), StringView(\"", functionScriptName(f), "\")}, &");
 				appendModuleWrapperName(out, m, f);
 				L(");");
 			}
 			any_function = true;
 		}
 		if (any_function) {
-			L("functions.insert({StringView(\"core:", m.id, "\"), StringView(\"", m.id, "\")}, &evox_world_", m.id, ");");
+			L("functions.insert({StringView(\"", module_unit.buffer, "\"), StringView(\"", m.id, "\")}, &evox_world_", m.id, ");");
 		}
 	}
 	emitGeneratedComponentImportRegistrations(out, data);

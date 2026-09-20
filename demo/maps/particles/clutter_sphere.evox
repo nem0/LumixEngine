@@ -1,6 +1,6 @@
 import "core:dvec3"
 import "core:entity"
-import "core:particle_emitter"
+import "core:renderer/particle_emitter"
 import "core:random"
 import "core:vec3"
 import "std:math" as math
