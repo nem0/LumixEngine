@@ -5096,12 +5096,12 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:audio/chorus_zone"), StringView("setRadius")}, &evox_chorus_zone_setRadius_16121929089403981875);
 		functions.insert({StringView("core:audio/chorus_zone"), StringView("getDelay")}, &evox_chorus_zone_getDelay_6740423318750549255);
 		functions.insert({StringView("core:audio/chorus_zone"), StringView("setDelay")}, &evox_chorus_zone_setDelay_12142100524772977810);
-		functions.insert({StringView("core:audio/audio_listener/ambient_sound"), StringView("pause")}, &evox_ambient_sound_pause_7564319632766837034);
-		functions.insert({StringView("core:audio/audio_listener/ambient_sound"), StringView("resume")}, &evox_ambient_sound_resume_15147770483073356605);
-		functions.insert({StringView("core:audio/audio_listener/ambient_sound"), StringView("getClip")}, &evox_ambient_sound_getAmbientSoundClip_18285036400960618982);
-		functions.insert({StringView("core:audio/audio_listener/ambient_sound"), StringView("setClip")}, &evox_ambient_sound_setAmbientSoundClip_1977866805267527577);
-		functions.insert({StringView("core:audio/audio_listener/ambient_sound"), StringView("getIs_3D")}, &evox_ambient_sound_isAmbientSound3D_6191921949559533236);
-		functions.insert({StringView("core:audio/audio_listener/ambient_sound"), StringView("setIs_3D")}, &evox_ambient_sound_setAmbientSound3D_7682859713366114688);
+		functions.insert({StringView("core:audio/ambient_sound"), StringView("pause")}, &evox_ambient_sound_pause_7564319632766837034);
+		functions.insert({StringView("core:audio/ambient_sound"), StringView("resume")}, &evox_ambient_sound_resume_15147770483073356605);
+		functions.insert({StringView("core:audio/ambient_sound"), StringView("getClip")}, &evox_ambient_sound_getAmbientSoundClip_18285036400960618982);
+		functions.insert({StringView("core:audio/ambient_sound"), StringView("setClip")}, &evox_ambient_sound_setAmbientSoundClip_1977866805267527577);
+		functions.insert({StringView("core:audio/ambient_sound"), StringView("getIs_3D")}, &evox_ambient_sound_isAmbientSound3D_6191921949559533236);
+		functions.insert({StringView("core:audio/ambient_sound"), StringView("setIs_3D")}, &evox_ambient_sound_setAmbientSound3D_7682859713366114688);
 		functions.insert({StringView("core:navigation/navmesh_zone"), StringView("load")}, &evox_navmesh_zone_load_13918995704249104099);
 		functions.insert({StringView("core:navigation/navmesh_zone"), StringView("drawNavmesh")}, &evox_navmesh_zone_drawNavmesh_5134955218642488807);
 		functions.insert({StringView("core:navigation/navmesh_zone"), StringView("drawCompactHeightfield")}, &evox_navmesh_zone_drawCompactHeightfield_5812805081547031182);

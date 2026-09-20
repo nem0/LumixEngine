@@ -1166,7 +1166,14 @@ void emitGeneratedComponentImportRegistrations(OutputStream& out, MetaData& data
 					break;
 				}
 			}
-			if (!has_supported_function && !has_supported_property && !has_supported_array) continue;
+			if (!has_supported_function && !has_supported_property && !has_supported_array) {
+				// Restore the module path before skipping components without
+				// script-visible members; otherwise the next component inherits
+				// this component's name.
+				module_unit.length = module_unit_length;
+				module_unit.buffer[module_unit.length] = 0;
+				continue;
+			}
 
 			for (Function& f : c.functions) {
 				if (!isSupportedEvoxFunction(f)) continue;
