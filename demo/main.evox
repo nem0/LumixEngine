@@ -4,6 +4,7 @@ import "core:random"
 import "core:string"
 import "core:ui/module"
 import "core:world"
+import "core:engine/engine"
 
 import "scripts/player" as player
 import "maps/demo/demo" as demo
@@ -33,7 +34,8 @@ fn await(r : LoadRequest) : void {
 	}
 }
 
-fn main(input : InputSystem, world : World) : void {
+fn main(engine : Engine, world : World) : void {
+	var input = engine.input();
 	g_input = input;
 	g_world = world;
 

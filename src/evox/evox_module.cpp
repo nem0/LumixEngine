@@ -224,9 +224,9 @@ struct EvoxSystemImpl : EvoxSystem {
 		if (!m_runtime || m_modules.empty()) return;
 		const ex_string_view function_name = toEvox("main");
 		struct Args {
-			InputSystem* input;
+			Engine* engine;
 			World* world;
-		} args{&m_engine.getInputSystem(), &m_modules[0]->getWorld()};
+		} args{&m_engine, &m_modules[0]->getWorld()};
 		const ex_call_result result = ex_call(m_task, function_name, &args, sizeof(args));
 		if (result != EX_CALL_RESULT_SUSPENDED && result != EX_CALL_RESULT_OK && result != EX_CALL_RESULT_FUNCTION_NOT_FOUND) logEvoxMainFailure(m_task, result);
 	}

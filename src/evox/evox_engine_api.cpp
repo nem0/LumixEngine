@@ -1,4 +1,5 @@
 #include "core/log.h"
+#include "engine/engine.h"
 #include "engine/input_system.h"
 #include "engine/reflection.h"
 #include "engine/world.h"
@@ -83,6 +84,10 @@ static void logErrorString(ex_string_view v) {
 
 static void logInfoString(ex_string_view v) {
 	logInfo(StringView(v.begin, (u64)v.length));
+}
+
+static InputSystem* inputGetInput(Engine* engine) {
+	return engine ? &engine->getInputSystem() : nullptr;
 }
 
 static i32 inputGetEventCount(InputSystem* input) {
@@ -371,6 +376,7 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	generated::registerGeneratedEngineImport(functions);
 	registerImguiModule(functions);
 	// input
+	functions.insert({"core:input", "input"}, &wrap<inputGetInput>);
 	functions.insert({"core:input", "getEventCount"}, &wrap<inputGetEventCount>);
 	functions.insert({"core:input", "getEvent"}, &inputGetEvent);
 	// log

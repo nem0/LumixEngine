@@ -1,3 +1,4 @@
+import "core:engine/engine"
 import "core:engine/inputdevicetype"
 
 struct InputSystem { system : cptr; }
@@ -47,6 +48,7 @@ struct DeviceRemovedEvent {
 
 comptime InputEvent = ButtonEvent | AxisEvent | MouseWheelEvent | TextEvent | DeviceAddedEvent | DeviceRemovedEvent;
 
+extern fn input(engine : Engine) : InputSystem;
 extern fn getEventCount(system : InputSystem) : i32;
 extern fn getEvent(system: InputSystem, index : i32) : InputEvent;
 
