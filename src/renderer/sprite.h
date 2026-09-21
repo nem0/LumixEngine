@@ -7,6 +7,7 @@
 namespace Lumix
 {
 
+//@ object
 struct Sprite final : Resource {
 	struct Header {
 		static const u32 MAGIC = '_SPR';

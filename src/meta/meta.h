@@ -234,6 +234,7 @@ struct Object {
 	Object(IAllocator& allocator) : functions(allocator) {}
 	StringView name;
 	StringView full;
+	StringView base;
 	char* filename;
 	ExpArray<Function> functions;
 };

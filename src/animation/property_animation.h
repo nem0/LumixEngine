@@ -7,6 +7,7 @@ namespace Lumix {
 
 namespace reflection { template <typename T> struct Property; }
 
+//@ object
 struct PropertyAnimation final : Resource {
 	enum class Version {
 		TRANSFORM,

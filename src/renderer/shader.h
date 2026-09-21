@@ -24,6 +24,7 @@ struct ShaderKey {
 	const char* semantic_defines;
 };
 
+//@ object
 struct LUMIX_RENDERER_API Shader final : Resource {
 	struct Header {
 		static const u32 MAGIC = '_SHD';

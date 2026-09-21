@@ -61,6 +61,7 @@ struct LUMIX_ENGINE_API Engine {
 	[[nodiscard]] virtual DeserializeProjectResult deserializeProject(struct InputMemoryStream& serializer, Path& startup_world) = 0;
 	virtual void serializeProject(struct OutputMemoryStream& serializer, const Path& startup_world) const = 0;
 	virtual float getLastTimeDelta() const = 0;
+	//@ function
 	virtual void setTimeMultiplier(float multiplier) = 0;
 	virtual void pause(bool pause) = 0;
 	virtual bool isPaused() const = 0;

@@ -70,7 +70,7 @@ struct RawTextureHeader {
 static_assert(sizeof(LBCHeader) == 32);
 static_assert(sizeof(RawTextureHeader) == 32);
 
-
+//@ object
 struct LUMIX_RENDERER_API Texture final : Resource {
 	enum class Flags : u32 {
 		SRGB = 1 << 0,

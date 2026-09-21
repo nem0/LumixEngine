@@ -18,6 +18,7 @@ struct Material;
 struct Model;
 struct Renderer;
 
+//@ object
 struct ParticleSystemResource final : Resource {
 	enum class Version : u32 {
 		NOT_SUPPORTED_BEFORE = 17,

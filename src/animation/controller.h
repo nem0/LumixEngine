@@ -70,6 +70,7 @@ enum class ControllerVersion : u32 {
 
 void evalBlendStack(const anim::RuntimeContext& ctx, Pose& pose);
 
+//@ object full anim::Controller
 struct Controller final : Resource {
 	Controller(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 	~Controller();

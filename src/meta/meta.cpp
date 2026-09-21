@@ -1069,19 +1069,34 @@ struct Parser {
 		}
 	}
 
-	static StringView parseStructName(StringView line) {
+	static StringView parseStructName(StringView line, StringView* base = nullptr) {
     	StringView word = consumeWord(line);
     	if (!equal(word, "struct")) return {};
+
+		auto parse_base = [](StringView rest) {
+			if (peekChar(rest) == ':') consumeWord(rest);
+			return consumeWord(rest);
+		};
 		
 		StringView last_ident;
 		for (;;) {
 			StringView w = consumeWord(line);
 			if (w.size() == 0) return last_ident;
-			if (equal(w, "final")) return last_ident;
+			if (equal(w, "final")) {
+				if (base && peekChar(line) == ':') *base = parse_base(line);
+				return last_ident;
+			}
+
+			if (w.size() > 0 && w[w.size() - 1] == ':') {
+				--w.end;
+				if (base) *base = parse_base(line);
+				return w;
+			}
 			
 			// stop on inheritance or block start
 			char c = peekChar(line);
 			if (c == ':' || c == '{' || c == ';') {
+				if (base && c == ':') *base = parse_base(line);
 				return w;
 			}
 
@@ -1107,7 +1122,8 @@ struct Parser {
 			logError("Expected struct");
 			return;
 		}
-		StringView struct_name = parseStructName(line);
+		StringView base;
+		StringView struct_name = parseStructName(line, &base);
 		if (struct_name.size() == 0) {
 			logError("Expected struct");
 			return;
@@ -1116,6 +1132,7 @@ struct Parser {
 		Object& o = objects.emplace(allocator);
 		o.full = full.size() > 0 ? full : struct_name;
 		o.name = struct_name;
+		o.base = base;
 		o.filename = (char*)allocator.allocate(filename.size() + 1);
 		strncpy_s(o.filename, filename.size() + 1, filename.begin, filename.size());
 

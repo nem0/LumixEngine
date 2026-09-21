@@ -50,7 +50,7 @@ struct BoneMask
 	HashMap<BoneNameHash, u8> bones;
 };
 
-
+//@ object
 struct Animation final : Resource {
 	friend struct AnimationSampler;
 	static const u32 HEADER_MAGIC = 0x5f4c4146; // '_LAF'
