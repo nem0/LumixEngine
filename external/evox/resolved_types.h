@@ -60,6 +60,7 @@ struct EnumResolvedType : ResolvedType {
 	EnumResolvedType() : ResolvedType(ResolvedTypeKind::ENUM) {}
 
 	EnumExpression* decl = nullptr;
+	ResolvedType* backing_type = nullptr;
 };
 
 struct ResolvedStructField {

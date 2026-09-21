@@ -265,8 +265,9 @@ Rules:
 
 #### Values
 
-Struct values are constructed with positional literals. The values correspond
-to fields in declaration order, and every field must be supplied:
+Struct values can be constructed with positional or designated literals. A
+positional literal supplies values in declaration order, and every field must
+be supplied:
 
 ```cpp
 const t : Transform = { 1.0, 2.0, true };
@@ -274,12 +275,23 @@ const u = Transform { 3.0, 4.0, false };
 var empty : Transform = undefined;
 ```
 
+A designated literal names each field explicitly with `.field = value`. Fields
+may be supplied in any order, but every field must be supplied exactly once:
+
+```cpp
+const t : Transform = { .visible = true, .x = 1.0, .y = 2.0 };
+const u = Transform { .y = 4.0, .x = 3.0, .visible = false };
+```
+
 - `{ ... }` requires an expected struct type from its context
 - `Type { ... }` supplies the struct type explicitly
-- the literal must contain exactly one value per field
+- a positional literal must contain exactly one value per field, in declaration
+  order
+- a designated literal must contain exactly one value for every field; its
+  entries may appear in any order
+- designated and positional entries cannot be mixed in the same literal
 - each value is checked against its field type; untyped numeric literals may
   be concretized to that type
-- named-field literals are not supported
 
 #### Access and assignment
 
@@ -359,35 +371,60 @@ is the current runtime consumer.
 
 ### Enums
 
-Enums define a named set of integer-like constants:
+Enums define a named set of strongly typed integer constants. An optional
+backing type follows the enum name after `:`:
 
 ```cpp
-enum State {
-	Idle,
-	Running,
-	Paused = 42, // explicit values are allowed
-	Done // == 43
+enum State : u8 {
+	Idle,       // 0
+	Running,    // 1
+	Paused = 42,
+	Done        // 43
 }
 
-// const fail : i32 = Keycode.W; // compile-time error, no implicit conversion
-const key_code : i32 = Keycode.W as i32;
-
+// const fail : u8 = State.Running; // no implicit conversion
+const key_code : u8 = State.Running as u8;
 ```
 
-* Enums are strongly typed 
-	- no implicit conversion between enums and integers
-	- use explicit `as` casts when needed
-* a trailing semicolon after the closing `}` is a compile-time error
-* Shorthand member syntax works when enum type is unambiguous:
-	```cpp
-	fn handle_state(state : State) : void {
-		if state == .Running {
-			// equivalent to state == State.Running
-		}
-	}
+If the backing type is omitted, it is `i32`:
 
-	var priority : Priority = .High;
-	```
+```cpp
+enum Direction { North, East, South, West }
+comptime Result = enum : i16 { Ok, NotFound = -1 };
+```
+
+Rules:
+
+- the backing type must be one of `i8`, `i16`, `i32`, `i64`, `u8`, `u16`,
+  `u32`, `u64`, or `isize`; `bool`, `byte`, and floating-point types are not
+  valid enum backing types
+- the default backing type is always `i32`; it is not inferred from the members
+- the first implicit member has value zero; each later implicit member is one
+  greater than the preceding member, including when that member has an explicit
+  value
+- an explicit member value must be a compile-time integer representable by the
+  backing type
+- an implicit value that overflows the backing type is a compile-time error
+- two members cannot have the same integer value
+- the backing type determines the enum's size, alignment, signedness during
+  integer conversion, and native layout
+- enums remain nominal, strongly typed values regardless of their backing type:
+  there is no implicit conversion between an enum and an integer, or between
+  two different enum types
+- use explicit `as` casts to convert between an enum and an integer
+
+
+Shorthand member syntax works when the enum type is unambiguous:
+
+```cpp
+fn handle_state(state : State) : void {
+	if state == .Running {
+		// equivalent to state == State.Running
+	}
+}
+
+var priority : State = .Paused;
+```
 
 ### Functions
 
@@ -2232,14 +2269,21 @@ types:
 const value : i64 = 2147483648 as i64;
 ```
 
-Enums can cast to integers, and integers can cast to enums. Enum and floating-point casts are invalid:
+Enums can cast to integers, and integers can cast to enums. Enum and
+floating-point casts are invalid:
 
 ```cpp
-const numeric : i32 = State.Running as i32;
+enum State : u8 { Idle, Running }
+
+const numeric : u8 = State.Running as u8;
 const state : State = numeric as State;
 ```
 
-Integer-to-enum cast does not validate membership.
+An enum-to-integer cast converts from the enum's backing type, including its
+signedness. An integer-to-enum cast converts to the backing representation and
+does not validate that the result names a declared member. Unlike enum member
+declarations, ordinary explicit casts use the normal integer-cast truncation
+rules when the source does not fit the backing type.
 
 Struct casts are not supported.
 
@@ -2302,7 +2346,7 @@ Rules:
 - the operand is a type, not a value
 - the operand must be a concrete type. Untyped integer and float values have no size or alignment, and `sizeof`/`alignof` do not default them; use a concrete type such as `sizeof(i32)`, or cast or annotate the value before obtaining its type
 - both produce an untyped integer constant, usable wherever a compile-time integer is required (array sizes, type-factory value arguments, `comptime` parameters, other comptime expressions)
-- `sizeof(T)` is the size of `T` measured in `byte` units: `byte`, `bool`, `i8`, and `u8` are 1 byte; `i16`/`u16` are 2; `i32`/`u32`/`f32`/enums/function values are 4; `i64`/`u64`/`isize`/`f64`/pointers are 8; a slice is a pointer followed by an `i64` element length (16 bytes on supported targets); an array is `size * sizeof(element)`; a tuple and struct contain their elements or fields in declaration order; and a tagged union is `sizeof(i32)` for the tag plus the size of its largest member
+- `sizeof(T)` is the size of `T` measured in `byte` units: `byte`, `bool`, `i8`, and `u8` are 1 byte; `i16`/`u16` are 2; `i32`/`u32`/`f32`/function values are 4; `i64`/`u64`/`isize`/`f64`/pointers are 8; an enum has the size of its backing integer type; a slice is a pointer followed by an `i64` element length (16 bytes on supported targets); an array is `size * sizeof(element)`; a tuple and struct contain their elements or fields in declaration order; and a tagged union is `sizeof(i32)` for the tag plus the size of its largest member
 - `alignof(T)` is derived from the byte size and capped at pointer alignment
 - they are most commonly used with the raw-memory allocator and slice reinterpret casts, for example `alloc(n * sizeof(i32), alignof(i32))`
 
@@ -3369,7 +3413,6 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 	fn findClosestButton() : ClosestButton {
 * type-safe c->evox function call
 
-* enum backing type
 * do temporaries survive until the end of statement? e.g. foo(bar().view())
 * jit/llvm/AOT?
 * AST API in evox?

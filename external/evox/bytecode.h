@@ -337,7 +337,7 @@ typedef struct ex_type_attribute_info {
 // enum value names and their integer values.
 typedef struct ex_type_enum_value_info {
 	ex_string_view name;
-	i32 value;
+	u64 value_bits; // Raw bits in the enum's backing representation.
 } ex_type_enum_value_info;
 
 // The `const ex_type*` handle returned by the C API (capi.h) points directly
@@ -357,6 +357,7 @@ typedef struct ex_type {
 	u32 first_member_index;      // index into bytecode->type_member_indices[]; unused when member_count == 0
 	u32 value_count;             // 0 when kind != EX_TYPE_ENUM
 	u32 first_value_index;       // index into bytecode->type_enum_values[]; unused when value_count == 0
+	ex_type_kind enum_backing_kind; // EX_TYPE_INVALID when kind != EX_TYPE_ENUM
 	u32 element_type_index;      // EX_TYPE_INDEX_NONE when kind is not ARRAY, SLICE, NULLABLE or POINTER
 	u32 array_length;            // EX_TYPE_INDEX_NONE when not ARRAY or SLICE; 0 for SLICE (dynamic length)
 	bool is_const;                // true for const slices

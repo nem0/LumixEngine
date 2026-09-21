@@ -403,6 +403,7 @@ static void nativeReenter(ex_runtime* runtime, ex_call_frame) {
 #include "variadic_tests.inl"
 #include "shadowing_tests.inl"
 #include "declaration_tests.inl"
+#include "designated_initializer_tests.inl"
 #include "comptime_tests.inl"
 #include "introspection_tests.inl"
 #include "attributes_tests.inl"

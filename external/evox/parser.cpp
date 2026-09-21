@@ -724,15 +724,42 @@ struct Parser {
 	StructLiteralExpression* structLiteralBody(Expression* type, Token start_token = {}) {
 		StructLiteralExpression* res = makeExpr<StructLiteralExpression>(start_token, m_unit.arena);
 		res->type = type;
+		bool has_entry_kind = false;
 		while (peekToken().type != Token::RIGHT_BRACE) {
 			if (peekToken().type == Token::END_OF_FILE) {
 				m_output.error("Unexpected end of file");
 				return nullptr;
 			}
 
-			Expression* value = expression();
-			if (!value) return nullptr;
-			res->values.push(value);
+			Expression* expression_or_designator = expression();
+			if (!expression_or_designator) return nullptr;
+			const bool designated = peekToken().type == Token::EQUAL;
+			StructLiteralEntry entry;
+			if (designated) {
+				if (expression_or_designator->kind != Expression::MEMBER
+					|| static_cast<MemberExpression*>(expression_or_designator)->expression) {
+					m_output.errorAt(peekToken(), "Expected .field before = in designated initializer");
+					return nullptr;
+				}
+				if (has_entry_kind && !res->is_designated) {
+					m_output.errorAt(expression_or_designator->token, "Cannot mix positional and designated struct literal entries");
+					return nullptr;
+				}
+				res->is_designated = true;
+				entry.name = static_cast<MemberExpression*>(expression_or_designator)->name;
+				consumeToken(); // '='
+				entry.value = expression();
+				if (!entry.value) return nullptr;
+			}
+			else {
+				if (has_entry_kind && res->is_designated) {
+					m_output.errorAt(expression_or_designator->token, "Cannot mix designated and positional struct literal entries");
+					return nullptr;
+				}
+				entry.value = expression_or_designator;
+			}
+			has_entry_kind = true;
+			res->entries.push(entry);
 			if (peekToken().type != Token::COMMA) break;
 			consumeToken();
 		}
@@ -1644,8 +1671,8 @@ struct Parser {
 			case Expression::STRUCT_LITERAL: {
 				const auto& lit = static_cast<const StructLiteralExpression&>(expr);
 				if (lit.type && isGeneric(*lit.type)) return true;
-				for (Expression* val : lit.values) {
-					if (isGeneric(*val)) return true;
+				for (const StructLiteralEntry& entry : lit.entries) {
+					if (isGeneric(*entry.value)) return true;
 				}
 				return false;
 			}
@@ -1786,6 +1813,11 @@ struct Parser {
 
 	EnumExpression* enumExpression() {
 		EnumExpression* en = make<EnumExpression>(m_unit.arena);
+		if (peekToken().type == Token::COLON) {
+			consumeToken();
+			en->backing_type_expr = type();
+			if (!en->backing_type_expr) return nullptr;
+		}
 		if (!consume(Token::LEFT_BRACE)) return nullptr;
 		while (peekToken().type != Token::RIGHT_BRACE) {
 			if (peekToken().type == Token::END_OF_FILE) {

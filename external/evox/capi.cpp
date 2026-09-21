@@ -246,7 +246,15 @@ struct DefinitionQuery {
 			case Expression::STRUCT_LITERAL: {
 				auto* x = static_cast<StructLiteralExpression*>(e);
 				visitExpression(x->type);
-				for (Expression* a : x->values) visitExpression(a);
+				for (StructLiteralEntry& entry : x->entries) {
+					if (entry.resolved_field_index >= 0 && x->resolved_type
+						&& x->resolved_type->kind == ResolvedTypeKind::STRUCT && entry.name.type == Token::IDENTIFIER) {
+						auto* st = static_cast<StructResolvedType*>(x->resolved_type);
+						set(entry.name, st->decl->fields[entry.resolved_field_index].name,
+							(u32)st->decl->fields[entry.resolved_field_index].name.value.length);
+					}
+					visitExpression(entry.value);
+				}
 				break;
 			}
 			case Expression::ARRAY_LITERAL:
@@ -264,6 +272,7 @@ struct DefinitionQuery {
 			}
 			case Expression::ENUM: {
 				auto* x = static_cast<EnumExpression*>(e);
+				visitExpression(x->backing_type_expr);
 				for (EnumMember& m : x->members) {
 					set(m.name, m.name, (u32)m.name.value.length);
 					visitExpression(m.value);

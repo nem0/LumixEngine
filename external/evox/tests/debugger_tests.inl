@@ -1653,15 +1653,15 @@ TEST(TypeEnumValueIntrospectionImplicit) {
 
 	EXPECT_EQ(3u, ex_type_enum_value_count(type));
 	EXPECT_TRUE(equalStrings(ex_type_enum_value_name(type, 0), toLs("Red")));
-	EXPECT_EQ(0, ex_type_enum_value_value(type, 0));
+	EXPECT_EQ(0, ex_type_enum_value_bits(type, 0));
 	EXPECT_TRUE(equalStrings(ex_type_enum_value_name(type, 1), toLs("Green")));
-	EXPECT_EQ(1, ex_type_enum_value_value(type, 1));
+	EXPECT_EQ(1, ex_type_enum_value_bits(type, 1));
 	EXPECT_TRUE(equalStrings(ex_type_enum_value_name(type, 2), toLs("Blue")));
-	EXPECT_EQ(2, ex_type_enum_value_value(type, 2));
+	EXPECT_EQ(2, ex_type_enum_value_bits(type, 2));
 
 	// Out-of-bounds safety
 	EXPECT_EQ(0u, size(ex_type_enum_value_name(type, 99)));
-	EXPECT_EQ(0, ex_type_enum_value_value(type, 99));
+	EXPECT_EQ(0, ex_type_enum_value_bits(type, 99));
 
 	EXPECT_EQ((int)EX_CALL_RESULT_OK, (int)ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
 	CAPI_END(module);
@@ -1694,11 +1694,11 @@ TEST(TypeEnumValueIntrospectionExplicit) {
 
 	EXPECT_EQ(3u, ex_type_enum_value_count(type));
 	EXPECT_TRUE(equalStrings(ex_type_enum_value_name(type, 0), toLs("Idle")));
-	EXPECT_EQ(10, ex_type_enum_value_value(type, 0));
+	EXPECT_EQ(10, ex_type_enum_value_bits(type, 0));
 	EXPECT_TRUE(equalStrings(ex_type_enum_value_name(type, 1), toLs("Running")));
-	EXPECT_EQ(20, ex_type_enum_value_value(type, 1));
+	EXPECT_EQ(20, ex_type_enum_value_bits(type, 1));
 	EXPECT_TRUE(equalStrings(ex_type_enum_value_name(type, 2), toLs("Error")));
-	EXPECT_EQ(30, ex_type_enum_value_value(type, 2));
+	EXPECT_EQ(30, ex_type_enum_value_bits(type, 2));
 
 	EXPECT_EQ((int)EX_CALL_RESULT_OK, (int)ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
 	CAPI_END(module);
@@ -1732,11 +1732,43 @@ TEST(TypeEnumValueIntrospectionMixed) {
 	EXPECT_EQ((int)EX_TYPE_ENUM, (int)ex_type_get_kind(type));
 
 	EXPECT_EQ(5u, ex_type_enum_value_count(type));
-	EXPECT_EQ(0, ex_type_enum_value_value(type, 0));
-	EXPECT_EQ(5, ex_type_enum_value_value(type, 1));
-	EXPECT_EQ(2, ex_type_enum_value_value(type, 2));
-	EXPECT_EQ(10, ex_type_enum_value_value(type, 3));
-	EXPECT_EQ(4, ex_type_enum_value_value(type, 4));
+	EXPECT_EQ(0, ex_type_enum_value_bits(type, 0));
+	EXPECT_EQ(5, ex_type_enum_value_bits(type, 1));
+	EXPECT_EQ(6, ex_type_enum_value_bits(type, 2));
+	EXPECT_EQ(10, ex_type_enum_value_bits(type, 3));
+	EXPECT_EQ(11, ex_type_enum_value_bits(type, 4));
+
+	EXPECT_EQ((int)EX_CALL_RESULT_OK, (int)ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(TypeBackedEnumValueIntrospection) {
+	const char* source = R"(
+		enum Wide : u64 {
+			Small = 42,
+			Largest = 18446744073709551615
+		}
+
+		fn main() : i32 {
+			var value : Wide = .Largest;
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+
+	EXPECT_TRUE(ex_debug_set_breakpoint(runtime.bytecode, makeStringView(__func__), 9u, nullptr));
+	EXPECT_EQ((int)EX_CALL_RESULT_SUSPENDED, (int)test_call(runtime, toLs("main")));
+
+	const ex_type* type = ex_debug_local_type(runtime, 0, 0);
+	EXPECT_TRUE(type != nullptr);
+	EXPECT_EQ((int)EX_TYPE_ENUM, (int)ex_type_get_kind(type));
+	EXPECT_EQ((int)EX_TYPE_U64, (int)ex_type_enum_backing_kind(type));
+	EXPECT_EQ(2u, ex_type_enum_value_count(type));
+	EXPECT_TRUE(ex_type_enum_value_bits(type, 0) == 42ull);
+	EXPECT_TRUE(ex_type_enum_value_bits(type, 1) == 18446744073709551615ull);
 
 	EXPECT_EQ((int)EX_CALL_RESULT_OK, (int)ex_debug_resume(runtime, EX_DEBUG_CONTINUE));
 	CAPI_END(module);
@@ -1746,7 +1778,8 @@ TEST(TypeEnumValueIntrospectionMixed) {
 TEST(TypeEnumValueIntrospectionNullSafety) {
 	EXPECT_EQ(0u, ex_type_enum_value_count(nullptr));
 	EXPECT_EQ(0u, size(ex_type_enum_value_name(nullptr, 0)));
-	EXPECT_EQ(0, ex_type_enum_value_value(nullptr, 0));
+	EXPECT_TRUE(ex_type_enum_value_bits(nullptr, 0) == 0ull);
+	EXPECT_EQ((int)EX_TYPE_INVALID, (int)ex_type_enum_backing_kind(nullptr));
 	return true;
 }
 

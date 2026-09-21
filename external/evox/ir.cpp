@@ -386,7 +386,7 @@ struct IRBuilder {
 			}
 			case Expression::STRUCT_LITERAL: {
 				const auto& literal = static_cast<const StructLiteralExpression&>(expression);
-				for (Expression* value : literal.values) if (hasInliningBlocker(*value, depth + 1)) return true;
+				for (const StructLiteralEntry& entry : literal.entries) if (hasInliningBlocker(*entry.value, depth + 1)) return true;
 				return false;
 			}
 			case Expression::ARRAY_LITERAL: {
@@ -741,8 +741,7 @@ struct IRBuilder {
 					EX_ASSERT(me.enum_member_index >= 0);
 					auto& op = alloc<ExOpLoadConst>();
 					op.type = expr.resolved_type;
-					const u32 value = (u32)me.enum_member_value;
-					memcpy(op.value, &value, sizeof(value));
+					memcpy(op.value, &me.enum_member_value, typeByteSize(*enum_type));
 					return op;
 				}
 
@@ -987,19 +986,21 @@ struct IRBuilder {
 				auto& sle = static_cast<StructLiteralExpression&>(expr);
 				auto& op = alloc<ExOpAggregateInit>();
 				op.type = sle.resolved_type;
-				op.value_count = sle.values.size();
+				op.value_count = sle.entries.size();
 				op.values = static_cast<ExIrOp**>(host.arena.allocate(host.arena.user_data, sizeof(ExIrOp*) * op.value_count, alignof(ExIrOp*)));
 				if (op.type->kind == ResolvedTypeKind::STRUCT) {
 					StructResolvedType* st = static_cast<StructResolvedType*>(op.type);
 					op.offsets = static_cast<u32*>(host.arena.allocate(host.arena.user_data, sizeof(u32) * op.value_count, alignof(u32)));
 					op.sizes = static_cast<u32*>(host.arena.allocate(host.arena.user_data, sizeof(u32) * op.value_count, alignof(u32)));
 					for (u32 i = 0; i < op.value_count; ++i) {
-						ResolvedType* field_type = st->fields[i].type;
-						op.offsets[i] = structFieldOffset(*st, (i32)i);
+						const i32 field_index = sle.entries[i].resolved_field_index;
+						EX_ASSERT(field_index >= 0);
+						ResolvedType* field_type = st->fields[field_index].type;
+						op.offsets[i] = structFieldOffset(*st, field_index);
 						op.sizes[i] = typeByteSize(*field_type);
 					}
 				}
-				for (u32 i = 0; i < op.value_count; ++i) op.values[i] = &buildExpressionIR(*sle.values[i], true);
+				for (u32 i = 0; i < op.value_count; ++i) op.values[i] = &buildExpressionIR(*sle.entries[i].value, true);
 				return op;
 			}
 			case Expression::CAST: {
@@ -2234,6 +2235,7 @@ struct TypeInfoBuilder {
 		entry.member_count = 0;
 		entry.first_member_index = first_member;
 		entry.first_value_index = first_value;
+		entry.enum_backing_kind = EX_TYPE_INVALID;
 		entry.element_type_index = EX_TYPE_INDEX_NONE;
 		entry.array_length = EX_TYPE_INDEX_NONE;
 
@@ -2305,12 +2307,13 @@ struct TypeInfoBuilder {
 			}
 			case ResolvedTypeKind::ENUM: {
 				const EnumResolvedType& en = static_cast<const EnumResolvedType&>(type);
+				entry.enum_backing_kind = en.backing_type ? toExTypeKind(en.backing_type->kind) : EX_TYPE_I32;
 				if (en.decl) {
 					entry.name = copyQualifiedTypeNameToArena(host.arena, en.decl->cached_owner ? en.decl->cached_owner->path : ex_string_view{}, en.decl->cached_name);
 					for (i32 i = 0; i < en.decl->members.size(); ++i) {
 						ex_type_enum_value_info& value = enum_values.emplace_back();
 						value.name = copyStringViewToArena(host.arena, en.decl->members[i].name.value);
-						value.value = (i32)enumMemberValue(en, i);
+						value.value_bits = enumMemberValue(en, i);
 					}
 					entry.value_count = (u32)enum_values.size() - first_value;
 				}
@@ -3397,10 +3400,15 @@ struct BytecodeCompiler {
 
 	static ex_type_kind toTypeKind(const ResolvedType& type) {
 		// Untyped values have already been materialized as their default numeric
-		// types; all declared types use the shared mapping below.
+		// types. Enum operations use the integer backing type while metadata keeps
+		// the nominal EX_TYPE_ENUM kind.
 		switch (type.kind) {
 			case ResolvedTypeKind::UNTYPED_INT: return EX_TYPE_I64;
 			case ResolvedTypeKind::UNTYPED_FLOAT: return EX_TYPE_F64;
+			case ResolvedTypeKind::ENUM: {
+				ResolvedType* backing = static_cast<const EnumResolvedType&>(type).backing_type;
+				return backing ? toTypeKind(*backing) : EX_TYPE_I32;
+			}
 			default: return toExTypeKind(type.kind);
 		}
 	}

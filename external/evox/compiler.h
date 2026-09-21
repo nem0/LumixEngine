@@ -169,4 +169,4 @@ struct ex_module {
 // semantics: implicit members use their index, explicit members their evaluated
 // constant. Values are cached on the enum expression by the checker after
 // typechecking; falls back to `index` when the cache is unavailable.
-i64 enumMemberValue(const EnumResolvedType& en, i32 index);
+u64 enumMemberValue(const EnumResolvedType& en, i32 index);

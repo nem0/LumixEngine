@@ -113,8 +113,11 @@ u32 typeAlignment(const ResolvedType& t) {
 		case ResolvedTypeKind::I32:
 		case ResolvedTypeKind::U32:
 		case ResolvedTypeKind::F32:
-		case ResolvedTypeKind::ENUM:
 		case ResolvedTypeKind::FUNCTION: return 4;
+		case ResolvedTypeKind::ENUM: {
+			ResolvedType* backing = static_cast<const EnumResolvedType&>(t).backing_type;
+			return backing ? typeAlignment(*backing) : 4;
+		}
 		case ResolvedTypeKind::I64:
 		case ResolvedTypeKind::U64:
 		case ResolvedTypeKind::ISIZE:
@@ -183,9 +186,12 @@ u32 typeByteSize(const ResolvedType& t) {
 		case ResolvedTypeKind::I32:
 		case ResolvedTypeKind::U32:
 		case ResolvedTypeKind::F32:
-		case ResolvedTypeKind::ENUM:
 		case ResolvedTypeKind::FUNCTION:
 			return 4;
+		case ResolvedTypeKind::ENUM: {
+			ResolvedType* backing = static_cast<const EnumResolvedType&>(t).backing_type;
+			return backing ? typeByteSize(*backing) : 4;
+		}
 		case ResolvedTypeKind::I64:
 		case ResolvedTypeKind::U64:
 		case ResolvedTypeKind::ISIZE:
@@ -220,6 +226,12 @@ u32 typeByteSize(const ResolvedType& t) {
 			EX_ASSERT(false);
 			return 1;
 	}
+}
+
+static ResolvedTypeKind numericStorageKind(const ResolvedType& type) {
+	if (type.kind != ResolvedTypeKind::ENUM) return type.kind;
+	ResolvedType* backing = static_cast<const EnumResolvedType&>(type).backing_type;
+	return backing ? backing->kind : ResolvedTypeKind::I32;
 }
 
 // Mirrors runtime_numeric_to_{i64,u64,double} in runtime.c so `comptime` casts fold to the
@@ -1387,7 +1399,14 @@ struct Checker {
 				StructLiteralExpression* s = static_cast<StructLiteralExpression*>(src);
 				StructLiteralExpression* lit = makeType<StructLiteralExpression>(unit.arena, unit.arena);
 				lit->type = cloneExpression(unit, s->type, bindings);
-				for (Expression* value : s->values) lit->values.push(cloneExpression(unit, value, bindings));
+				lit->is_designated = s->is_designated;
+				for (const StructLiteralEntry& entry : s->entries) {
+					StructLiteralEntry cloned;
+					cloned.name = entry.name;
+					cloned.value = cloneExpression(unit, entry.value, bindings);
+					cloned.resolved_field_index = entry.resolved_field_index;
+					lit->entries.push(cloned);
+				}
 				out = lit;
 				break;
 			}
@@ -2380,6 +2399,88 @@ struct Checker {
 		return EX_RESULT_OK;
 	}
 
+	static bool isUnsignedEnumBacking(ResolvedTypeKind kind) {
+		return kind == ResolvedTypeKind::U8 || kind == ResolvedTypeKind::U16
+			|| kind == ResolvedTypeKind::U32 || kind == ResolvedTypeKind::U64;
+	}
+
+	static u32 enumBackingBits(ResolvedTypeKind kind) {
+		switch (kind) {
+			case ResolvedTypeKind::I8: case ResolvedTypeKind::U8: return 8;
+			case ResolvedTypeKind::I16: case ResolvedTypeKind::U16: return 16;
+			case ResolvedTypeKind::I32: case ResolvedTypeKind::U32: return 32;
+			default: return 64;
+		}
+	}
+
+	static u64 maskEnumBits(u64 value, ResolvedTypeKind kind) {
+		const u32 bits = enumBackingBits(kind);
+		return bits == 64 ? value : value & ((1ull << bits) - 1);
+	}
+
+	bool resolveEnumValues(Unit& unit, EnumResolvedType& type) {
+		EnumExpression& en = *type.decl;
+		en.cached_values.clear();
+		const ResolvedTypeKind backing_kind = type.backing_type->kind;
+		const bool backing_unsigned = isUnsignedEnumBacking(backing_kind);
+		const u32 bits = enumBackingBits(backing_kind);
+		const u64 unsigned_max = bits == 64 ? ~0ull : (1ull << bits) - 1;
+		const i64 signed_min = bits == 64 ? (-9223372036854775807ll - 1) : -(1ll << (bits - 1));
+		const i64 signed_max = bits == 64 ? 9223372036854775807ll : (1ll << (bits - 1)) - 1;
+
+		for (i32 i = 0; i < en.members.size(); ++i) {
+			EnumMember& member = en.members[i];
+			u64 bits_value = 0;
+			if (member.value) {
+				Expression* checked = checkExpr(unit, nullptr, *member.value, nullptr);
+				if (!checked) return false;
+
+				if (!isIntegerType(*checked->resolved_type) && checked->resolved_type->kind != ResolvedTypeKind::UNTYPED_INT) {
+					errorLine(member.name, "Enum member value must be a compile-time integer");
+					return false;
+				}
+
+				ComptimeValue value = evalComptime(unit, *member.value);
+				if (!value || value.kind != ComptimeValue::VALUE) {
+					errorLine(member.name, "Enum member value must be known at compile time");
+					return false;
+				}
+				const bool source_unsigned = isUnsignedEnumBacking(value.type->kind) || (value.type->kind == ResolvedTypeKind::UNTYPED_INT && member.value->kind == Expression::INT_LITERAL);
+				const u64 unsigned_value = comptimeNumericToU64(value.value, value.type->kind);
+				const i64 signed_value = comptimeNumericToI64(value.value, value.type->kind);
+				const bool negative = !source_unsigned && signed_value < 0;
+				const bool fits = negative ? !backing_unsigned && signed_value >= signed_min
+					: unsigned_value <= (backing_unsigned ? unsigned_max : (u64)signed_max);
+				bits_value = negative ? (u64)signed_value : unsigned_value;
+				if (!fits) {
+					errorLine(member.name, "Enum member value is not representable by backing type ", type.backing_type);
+					return false;
+				}
+				bits_value = maskEnumBits(bits_value, backing_kind);
+			}
+			else if (i > 0) {
+				const u64 previous = en.cached_values[i - 1];
+				const i64 previous_signed = bits == 64 ? (i64)previous
+					: (i64)((previous ^ (1ull << (bits - 1))) - (1ull << (bits - 1)));
+				const bool overflow = backing_unsigned ? previous == unsigned_max : previous_signed == signed_max;
+				bits_value = backing_unsigned ? maskEnumBits(previous + 1, backing_kind)
+					: maskEnumBits((u64)(previous_signed + !overflow), backing_kind);
+				if (overflow) {
+					errorLine(member.name, "Implicit enum member value overflows backing type ", type.backing_type);
+					return false;
+				}
+			}
+
+			for (u64 existing : en.cached_values) {
+				if (existing != bits_value) continue;
+				errorLine(member.name, "Duplicate enum discriminant");
+				return false;
+			}
+			en.cached_values.push(bits_value);
+		}
+		return true;
+	}
+
 	ex_result checkComptimeEnumSymbol(Unit& unit, Symbol& sym) {
 		EnumExpression& en = static_cast<EnumExpression&>(*sym.expression);
 		en.cached_name = sym.name;
@@ -2389,6 +2490,28 @@ struct Checker {
 		MetaType* meta = makeType<MetaType>(unit.arena);
 		meta->inner = en_type;
 		sym.resolved_type = meta;
+		en_type->backing_type = primitiveType(ResolvedTypeKind::I32);
+		if (en.backing_type_expr) {
+			ResolvedType* backing = asType(evalComptime(unit, *en.backing_type_expr), en.backing_type_expr->token);
+			if (!backing) return EX_RESULT_FAILURE;
+			switch (backing->kind) {
+				case ResolvedTypeKind::I8:
+				case ResolvedTypeKind::I16:
+				case ResolvedTypeKind::I32:
+				case ResolvedTypeKind::I64:
+				case ResolvedTypeKind::U8:
+				case ResolvedTypeKind::U16:
+				case ResolvedTypeKind::U32:
+				case ResolvedTypeKind::U64:
+				case ResolvedTypeKind::ISIZE:
+					en_type->backing_type = backing;
+					break;
+				default:
+					errorLine(en.backing_type_expr->token, "Enum backing type must be an integer type, got ", backing);
+					return EX_RESULT_FAILURE;
+			}
+		}
+		if (!resolveEnumValues(unit, *en_type)) return EX_RESULT_FAILURE;
 		return EX_RESULT_OK;
 	}
 
@@ -3427,12 +3550,7 @@ struct Checker {
 			for (i32 i = 0; i < en->decl->members.size(); ++i) {
 				if (!equalStrings(en->decl->members[i].name.value, member.name.value)) continue;
 				member.enum_member_index = i;
-				member.enum_member_value = i;
-				if (en->decl->members[i].value) {
-					ComptimeValue value = evalComptime(unit, *en->decl->members[i].value, ctx);
-					if (!value) return nullptr;
-					member.enum_member_value = comptimeNumericToI64(value.value, value.type->kind);
-				}
+				member.enum_member_value = enumMemberValue(*en, i);
 				expr.resolved_type = en;
 				expr.eval_stage = hint == &module.type_kind ? Expression::COMPTIME_ONLY : Expression::COMPTIME_VALUE;
 				return &expr;
@@ -3528,12 +3646,7 @@ struct Checker {
 					for (i32 i = 0; i < en->decl->members.size(); ++i) {
 						if (!equalStrings(en->decl->members[i].name.value, member.name.value)) continue;
 						member.enum_member_index = i;
-						member.enum_member_value = i;
-						if (en->decl->members[i].value) {
-							ComptimeValue value = evalComptime(unit, *en->decl->members[i].value, ctx);
-							if (!value) return nullptr;
-							member.enum_member_value = comptimeNumericToI64(value.value, value.type->kind);
-						}
+						member.enum_member_value = enumMemberValue(*en, i);
 						expr.resolved_type = inner;
 						expr.eval_stage = Expression::COMPTIME_VALUE;
 						return &expr;
@@ -3819,24 +3932,61 @@ struct Checker {
 		}
 		if (lit.type) lit.type->resolved_type = type;
 		StructResolvedType* st = static_cast<StructResolvedType*>(type);
-		if (st->decl->fields.size() != lit.values.size()) {
-			errorLine(expr.token, "Struct literal has ", lit.values.size(), " values, but struct type has ", st->decl->fields.size(), " fields");
+		if (!lit.is_designated && st->decl->fields.size() != lit.entries.size()) {
+			errorLine(expr.token, "Struct literal has ", lit.entries.size(), " values, but struct type has ", st->decl->fields.size(), " fields");
 			return nullptr;
 		}
-		for (i32 i = 0; i < lit.values.size(); ++i) {
-			ResolvedType* field_type = st->fields[i].type;
+		for (i32 i = 0; i < lit.entries.size(); ++i) {
+			StructLiteralEntry& entry = lit.entries[i];
+			i32 field_index = i;
+			if (lit.is_designated) {
+				field_index = -1;
+				for (i32 j = 0; j < st->decl->fields.size(); ++j) {
+					if (equalStrings(st->decl->fields[j].name.value, entry.name.value)) {
+						field_index = j;
+						break;
+					}
+				}
+				if (field_index < 0) {
+					errorLine(entry.name, "Unknown field ", entry.name.value, " in ", type);
+					return nullptr;
+				}
+				for (i32 j = 0; j < i; ++j) {
+					if (lit.entries[j].resolved_field_index != field_index) continue;
+					errorLine(entry.name, "Duplicate initializer for field ", entry.name.value);
+					return nullptr;
+				}
+			}
+			entry.resolved_field_index = field_index;
+			ResolvedType* field_type = st->fields[field_index].type;
 			EX_ASSERT(field_type);
-			ResolvedType* value_type = checkExprForTarget(unit, ctx, *lit.values[i], field_type);
+			ResolvedType* value_type = checkExprForTarget(unit, ctx, *entry.value, field_type);
 			if (!value_type) return nullptr;
 
 			if (!canImplicitlyConvert(value_type, field_type)) {
-				errorLine(expr.token, "Cannot convert struct literal value ", i, " from ", value_type, " to ", field_type);
+				errorLine(entry.value->token, "Cannot convert initializer for field ", st->decl->fields[field_index].name.value,
+					" from ", value_type, " to ", field_type);
 				return nullptr;
+			}
+		}
+		if (lit.is_designated) {
+			for (i32 field_index = 0; field_index < st->decl->fields.size(); ++field_index) {
+				bool found = false;
+				for (const StructLiteralEntry& entry : lit.entries) {
+					if (entry.resolved_field_index == field_index) {
+						found = true;
+						break;
+					}
+				}
+				if (!found) {
+					errorLine(expr.token, "Missing initializer for field ", st->decl->fields[field_index].name.value);
+					return nullptr;
+				}
 			}
 		}
 		expr.resolved_type = type;
 		expr.eval_stage = comptimeStageForType(type);
-		for (Expression* value : lit.values) if (value->eval_stage == Expression::RUNTIME) expr.eval_stage = Expression::RUNTIME;
+		for (const StructLiteralEntry& entry : lit.entries) if (entry.value->eval_stage == Expression::RUNTIME) expr.eval_stage = Expression::RUNTIME;
 		return &expr;
 	}
 
@@ -5324,14 +5474,7 @@ struct Checker {
 					for (i32 i = 0; i < en->decl->members.size(); ++i) {
 						const EnumMember& member = en->decl->members[i];
 						if (!equalStrings(member.name.value, name)) continue;
-						ComptimeValue value = member.value
-							? evalComptime(unit, *member.value, &ctx)
-							: makeComptimeEnumResult(const_cast<EnumResolvedType*>(en), (i64)i);
-						if (!value) return false;
-						if (value.type != subject) {
-							i64 numeric = comptimeNumericToI64(value.value, value.type->kind);
-							value = makeComptimeEnumResult(const_cast<EnumResolvedType*>(en), numeric);
-						}
+						ComptimeValue value = makeComptimeEnumResult(const_cast<EnumResolvedType*>(en), enumMemberValue(*en, i));
 						return comptimeValuesEqual(comptime_subject, value);
 					}
 					return false;
@@ -5484,12 +5627,7 @@ struct Checker {
 						covered_enum_members[i] = true;
 						++covered_enum_count;
 						mem->enum_member_index = i;
-						mem->enum_member_value = i;
-						if (subject_enum->decl->members[i].value) {
-							ComptimeValue value = evalComptime(unit, *subject_enum->decl->members[i].value, &ctx);
-							if (!value) return false;
-							mem->enum_member_value = comptimeNumericToI64(value.value, value.type->kind);
-						}
+						mem->enum_member_value = enumMemberValue(*subject_enum, i);
 						break;
 					}
 				}
@@ -5901,9 +6039,9 @@ struct Checker {
 		return copyComptimeValue(primitiveType(ResolvedTypeKind::UNTYPED_FLOAT), &value);
 	}
 
-	ComptimeValue makeComptimeEnumResult(ResolvedType* type, i64 value) {
-		i32 enum_value = (i32)value;
-		return copyComptimeValue(type, &enum_value, sizeof(enum_value));
+	ComptimeValue makeComptimeEnumResult(ResolvedType* type, u64 value) {
+		const u32 size = typeByteSize(*type);
+		return copyComptimeValue(type, &value, size);
 	}
 
 	template <typename Storage, typename Arithmetic>
@@ -6292,14 +6430,9 @@ struct Checker {
 
 						const u32 descriptor_size = typeByteSize(descriptor_type);
 						for (i32 i = 0; i < en.decl->members.size(); ++i) {
-							i32 enum_value = i;
-							if (en.decl->members[i].value) {
-								ComptimeValue value = evalComptime(unit, *en.decl->members[i].value, ctx, bindings, frame);
-								if (!value || value.kind != ComptimeValue::VALUE) return {};
-								enum_value = (i32)comptimeNumericToI64(value.value, value.type->kind);
-							}
+							const u64 enum_value = enumMemberValue(en, i);
 							writeReflectionDescriptor(slice.data + descriptor_size * i, descriptor_type,
-								en.decl->members[i].name.value, &enum_value, sizeof(enum_value));
+								en.decl->members[i].name.value, &enum_value, typeByteSize(en));
 						}
 						return expr.comptime_value;
 					}
@@ -6569,11 +6702,7 @@ struct Checker {
 							const EnumMember& enum_member = en->decl->members[i];
 							if (!equalStrings(enum_member.name.value, member.name.value)) continue;
 
-							if (!enum_member.value) return makeComptimeEnumResult(en, (i64)i);
-							ComptimeValue value = evalComptime(unit, *enum_member.value, ctx, bindings, frame);
-							if (!value) return {};
-
-							return makeComptimeEnumResult(en, comptimeNumericToI64(value.value, value.type->kind));
+							return makeComptimeEnumResult(en, enumMemberValue(*en, i));
 						}
 					}
 					EX_ASSERT(false);
@@ -6595,13 +6724,7 @@ struct Checker {
 							const EnumMember& enum_member = en->decl->members[i];
 							if (!equalStrings(enum_member.name.value, member.name.value)) continue;
 
-							if (!enum_member.value) return makeComptimeEnumResult(inner, (i64)i);
-
-							ComptimeValue value = evalComptime(unit, *enum_member.value, ctx, bindings, frame);
-							if (!value) return {};
-
-							i64 numeric = comptimeNumericToI64(value.value, value.type->kind);
-							return makeComptimeEnumResult(inner, numeric);
+							return makeComptimeEnumResult(inner, enumMemberValue(*en, i));
 						}
 					}
 				}
@@ -6894,10 +7017,12 @@ struct Checker {
 				u8* data = comptime_stack_ptr;
 				const u32 size = typeByteSize(*st);
 				comptime_stack_ptr += size;
-				for (i32 i = 0; i < sl.values.size(); ++i) {
-					ComptimeValue field = evalComptime(unit, *sl.values[i], ctx, bindings, frame);
+				for (StructLiteralEntry& entry : sl.entries) {
+					EX_ASSERT(entry.resolved_field_index >= 0);
+					const i32 field_index = entry.resolved_field_index;
+					ComptimeValue field = evalComptime(unit, *entry.value, ctx, bindings, frame);
 					if (!field) return {};
-					writeComptimeValue(data + st->fields[i].offset, *st->fields[i].type, field);
+					writeComptimeValue(data + st->fields[field_index].offset, *st->fields[field_index].type, field);
 				}
 				return {ComptimeValue::VALUE, expr.resolved_type, data};
 			}
@@ -6917,8 +7042,8 @@ struct Checker {
 				u8* src_bytes = comptime_stack_ptr;
 				copyMemory(src_bytes, lhs.value, src_size);
 
-				const u32 dst_size = writeComptimeNumeric(src_bytes, src_bytes, lhs.type->kind, rhs->kind);
-			u8* value = src_bytes;
+				const u32 dst_size = writeComptimeNumeric(src_bytes, src_bytes, numericStorageKind(*lhs.type), numericStorageKind(*rhs));
+				u8* value = src_bytes;
 				comptime_stack_ptr += dst_size;
 
 				return {ComptimeValue::VALUE, rhs, value};
@@ -7205,33 +7330,6 @@ struct Checker {
 		u8* comptime_stack_ptr = nullptr;
 		bool allow_runtime_const = false;
 
-	// Evaluates and caches every enum member's integer discriminant on its
-	// EnumExpression (`cached_values`), matching runtime member-access
-	// semantics: implicit members take their index, explicit members take
-	// their evaluated constant. Called after typechecking so referenced
-	// comptime symbols are already folded; un-evaluable members fall back to
-	// their index. The bytecode's type metadata reads these through
-	// `enumMemberValue`.
-	void cacheEnumValues(Unit& unit) {
-		for (Symbol& sym : unit.symbols) {
-			if (!sym.expression || sym.expression->kind != Expression::ENUM) continue;
-			EnumExpression& en = static_cast<EnumExpression&>(*sym.expression);
-			en.cached_values.clear();
-			++suppress_errors;
-			for (i32 i = 0; i < en.members.size(); ++i) {
-				i64 value = i;
-				if (en.members[i].value) {
-					ComptimeValue resolved = evalComptime(unit, *en.members[i].value, nullptr, nullptr, nullptr);
-					if (resolved && resolved.kind == ComptimeValue::VALUE && resolved.type) {
-						value = comptimeNumericToI64(resolved.value, resolved.type->kind);
-					}
-				}
-				en.cached_values.emplace_back(value);
-			}
-			--suppress_errors;
-		}
-	}
-
 }; // struct Checker
 
 template <> inline ResolvedType* Checker::getPrimitiveType<i8>() { return primitiveType(ResolvedTypeKind::I8); }
@@ -7256,11 +7354,11 @@ template <> inline double Checker::modulo(double lhs, double rhs) {
 	return 0;
 }
 
-i64 enumMemberValue(const EnumResolvedType& en, i32 index) {
+u64 enumMemberValue(const EnumResolvedType& en, i32 index) {
 	if (en.decl && index >= 0 && index < en.decl->cached_values.size()) {
 		return en.decl->cached_values[index];
 	}
-	return index;
+	return (u64)index;
 }
 
 ex_result ex_module_typecheck(ex_module* module) {
@@ -7268,7 +7366,6 @@ ex_result ex_module_typecheck(ex_module* module) {
 	Checker checker(*module);
 	if (checker.typecheck() == EX_RESULT_FAILURE) return EX_RESULT_FAILURE;
 	for (Unit& unit : module->units) {
-		checker.cacheEnumValues(unit);
 		unit.native_symbols.clear();
 		for (Symbol& sym : unit.symbols) {
 			if (!sym.expression || sym.expression->kind != Expression::FUNCTION) continue;

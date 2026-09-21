@@ -410,12 +410,16 @@ ex_string_view ex_type_enum_value_name(const ex_type* type, u32 value_index) {
 	return type->bytecode->type_enum_values[vi].name;
 }
 
-i32 ex_type_enum_value_value(const ex_type* type, u32 value_index) {
+u64 ex_type_enum_value_bits(const ex_type* type, u32 value_index) {
 	if (!type || type->kind != EX_TYPE_ENUM || !type->bytecode) return 0;
 	if (value_index >= type->value_count) return 0;
 	const u32 vi = type->first_value_index + value_index;
 	if (vi >= type->bytecode->type_enum_value_count) return 0;
-	return type->bytecode->type_enum_values[vi].value;
+	return type->bytecode->type_enum_values[vi].value_bits;
+}
+
+ex_type_kind ex_type_enum_backing_kind(const ex_type* type) {
+	return type && type->kind == EX_TYPE_ENUM ? type->enum_backing_kind : EX_TYPE_INVALID;
 }
 
 const ex_type* ex_type_array_element_type(const ex_type* type) {

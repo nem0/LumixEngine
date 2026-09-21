@@ -312,7 +312,7 @@ struct MemberExpression : Expression {
 	struct Symbol* resolved_symbol = nullptr;
 	// Set during semantic checking for enum member expressions.
 	i32 enum_member_index = -1;
-	i64 enum_member_value = 0;
+	u64 enum_member_value = 0;
 	i32 struct_field_index = -1;
 };
 
@@ -362,11 +362,19 @@ struct SliceExpression : Expression {
 	Expression* end = nullptr; // null means base length
 };
 
+struct StructLiteralEntry {
+	Token name = {}; // Empty for positional entries.
+	Expression* value = nullptr;
+	// Set by type checking. Positional entries use their declaration-order index.
+	i32 resolved_field_index = -1;
+};
+
 struct StructLiteralExpression : Expression {
-	StructLiteralExpression(ex_arena& arena) : Expression(STRUCT_LITERAL), values(arena) {}
+	StructLiteralExpression(ex_arena& arena) : Expression(STRUCT_LITERAL), entries(arena) {}
 
 	Expression* type = nullptr;
-	ExpArray<Expression*> values;
+	ExpArray<StructLiteralEntry> entries;
+	bool is_designated = false;
 };
 
 // A typed attribute such as `tag { 42 }` in `#[tag { 42 }]`.
@@ -442,15 +450,12 @@ struct EnumMember {
 struct EnumExpression : Expression {
 	EnumExpression(ex_arena& arena) : Expression(ENUM), members(arena), cached_values(arena) {}
 
+	Expression* backing_type_expr = nullptr;
 	ExpArray<EnumMember> members;
 	// Cached by symbol checking: name and owner unit for fast type printing.
 	ex_string_view cached_name = {};
 	struct Unit* cached_owner = nullptr;
-	// Integer discriminant of each member in declaration order, filled by the
-	// checker after typechecking. Implicit members use their index (matching
-	// runtime member-access semantics); explicit members use their evaluated
-	// constant. Consumed by bytecode type metadata.
-	ExpArray<i64> cached_values;
+	ExpArray<u64> cached_values;
 };
 
 struct TernaryExpression : Expression {

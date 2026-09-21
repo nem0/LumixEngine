@@ -540,8 +540,11 @@ u32 ex_type_enum_value_count(const ex_type* type);
 // Name of the enum value at `value_index`.
 ex_string_view ex_type_enum_value_name(const ex_type* type, u32 value_index);
 
-// Integer value of the enum value at `value_index`.
-i32 ex_type_enum_value_value(const ex_type* type, u32 value_index);
+// Raw discriminant bits in the enum's backing representation.
+u64 ex_type_enum_value_bits(const ex_type* type, u32 value_index);
+
+// Integer kind used to store the enum, or EX_TYPE_INVALID for a non-enum type.
+ex_type_kind ex_type_enum_backing_kind(const ex_type* type);
 
 // Introspect an array or slice type (valid when kind is EX_TYPE_ARRAY
 // or EX_TYPE_SLICE).
