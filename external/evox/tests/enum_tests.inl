@@ -19,6 +19,22 @@ TEST(ImportEnumMemberWithoutAliasCompiles) {
 	return true;
 }
 
+TEST(EnumAllowsDuplicateDiscriminants) {
+	const char* source = R"(
+		enum Keycode {
+			KANA = 21,
+			HANGEUL = 21,
+			HANGUL = 21
+		}
+
+		fn main() : i32 {
+			return Keycode.HANGUL as i32;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(ImportedEnumShorthandWithoutHintCompiles) {
 	const char* main_source = R"(
 		import "state"
@@ -662,8 +678,8 @@ TEST(EnumMemberValueMustBeComptimeInteger) {
 	return true;
 }
 
-TEST(EnumDuplicateExplicitDiscriminantFails) {
-	EXPECT_COMPILE_FAIL(R"(
+TEST(EnumDuplicateExplicitDiscriminantIsAllowed) {
+	EXPECT_COMPILE(R"(
 		enum Duplicate : u8 {
 			First = 10,
 			Second = 10
@@ -672,8 +688,8 @@ TEST(EnumDuplicateExplicitDiscriminantFails) {
 	return true;
 }
 
-TEST(EnumDuplicateImplicitDiscriminantFails) {
-	EXPECT_COMPILE_FAIL(R"(
+TEST(EnumDuplicateImplicitDiscriminantIsAllowed) {
+	EXPECT_COMPILE(R"(
 		enum Duplicate : u8 {
 			First = 1,
 			Second = 0,

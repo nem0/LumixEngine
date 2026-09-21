@@ -2471,11 +2471,8 @@ struct Checker {
 				}
 			}
 
-			for (u64 existing : en.cached_values) {
-				if (existing != bits_value) continue;
-				errorLine(member.name, "Duplicate enum discriminant");
-				return false;
-			}
+			// Multiple enum members may intentionally share a discriminant. This is
+			// needed for aliases such as KANA/HANGEUL/HANGUL in Keycode.
 			en.cached_values.push(bits_value);
 		}
 		return true;
