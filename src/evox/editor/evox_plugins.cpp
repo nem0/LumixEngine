@@ -252,6 +252,38 @@ static void drawAnyValue(const void* value) {
 	}
 }
 
+static u64 enumValueBits(const ex_type* type, const void* value) {
+	u64 result = 0;
+	switch (ex_type_enum_backing_kind(type)) {
+		case EX_TYPE_I8: case EX_TYPE_U8: memcpy(&result, value, 1); break;
+		case EX_TYPE_I16: case EX_TYPE_U16: memcpy(&result, value, 2); break;
+		case EX_TYPE_I32: case EX_TYPE_U32: memcpy(&result, value, 4); break;
+		case EX_TYPE_I64: case EX_TYPE_U64: memcpy(&result, value, 8); break;
+		default: break;
+	}
+	return result;
+}
+
+static void setEnumValueBits(const ex_type* type, void* value, u64 bits) {
+	switch (ex_type_enum_backing_kind(type)) {
+		case EX_TYPE_I8: case EX_TYPE_U8: memcpy(value, &bits, 1); break;
+		case EX_TYPE_I16: case EX_TYPE_U16: memcpy(value, &bits, 2); break;
+		case EX_TYPE_I32: case EX_TYPE_U32: memcpy(value, &bits, 4); break;
+		case EX_TYPE_I64: case EX_TYPE_U64: memcpy(value, &bits, 8); break;
+		default: break;
+	}
+}
+
+static i64 enumValueSigned(const ex_type* type, u64 bits) {
+	switch (ex_type_enum_backing_kind(type)) {
+		case EX_TYPE_I8: return (i8)bits;
+		case EX_TYPE_I16: return (i16)bits;
+		case EX_TYPE_I32: return (i32)bits;
+		case EX_TYPE_I64: return (i64)bits;
+		default: return (i64)bits;
+	}
+}
+
 static void drawPrimitiveValue(ex_type_kind kind, const void* value, const ex_type* type) {
 	switch (kind) {
 		case EX_TYPE_BOOL: ImGui::TextUnformatted(*(const bool*)value ? "true" : "false"); break;
@@ -267,18 +299,19 @@ static void drawPrimitiveValue(ex_type_kind kind, const void* value, const ex_ty
 		case EX_TYPE_F64:  ImGui::Text("%g", *(const f64*)value); break;
 		case EX_TYPE_CPTR: ImGui::Text("0x%p", *(const void* const*)value); break;
 		case EX_TYPE_ENUM: {
-			const i32 v = *(const i32*)value;
+			const u64 v = enumValueBits(type, value);
 			if (type) {
 				const u32 count = ex_type_enum_value_count(type);
 				for (u32 i = 0; i < count; ++i) {
-					if (ex_type_enum_value_value(type, i) == v) {
+					if (ex_type_enum_value_bits(type, i) == v) {
 						const ex_string_view ev_name = ex_type_enum_value_name(type, i);
-						ImGui::Text("%.*s (%d)", int(ev_name.length), ev_name.begin, v);
+						if (ex_type_enum_backing_kind(type) == EX_TYPE_U8 || ex_type_enum_backing_kind(type) == EX_TYPE_U16 || ex_type_enum_backing_kind(type) == EX_TYPE_U32 || ex_type_enum_backing_kind(type) == EX_TYPE_U64) ImGui::Text("%.*s (%llu)", int(ev_name.length), ev_name.begin, (unsigned long long)v);
+						else ImGui::Text("%.*s (%lld)", int(ev_name.length), ev_name.begin, (long long)enumValueSigned(type, v));
 						break;
 					}
 				}
 			} else {
-				ImGui::Text("%d", v);
+				ImGui::Text("%llu", (unsigned long long)v);
 			}
 			break;
 		}
@@ -544,12 +577,12 @@ static void drawVariable(ex_string_view name, const ex_type* type, void* value, 
 			case EX_TYPE_F32: ImGui::InputFloat("##value", (f32*)value); break;
 			case EX_TYPE_F64: ImGui::InputDouble("##value", (f64*)value); break;
 			case EX_TYPE_ENUM: {
-				const i32 current = *(const i32*)value;
+				const u64 current = enumValueBits(type, value);
 				const u32 count = ex_type_enum_value_count(type);
 				StaticString<64> preview;
 				bool has_current = false;
 				for (u32 i = 0; i < count; ++i) {
-					if (ex_type_enum_value_value(type, i) == current) {
+					if (ex_type_enum_value_bits(type, i) == current) {
 						const ex_string_view enum_name = ex_type_enum_value_name(type, i);
 						preview.append(StringView(enum_name.begin, enum_name.length));
 						has_current = true;
@@ -560,11 +593,11 @@ static void drawVariable(ex_string_view name, const ex_type* type, void* value, 
 
 				if (ImGui::BeginCombo("##value", preview.data)) {
 					for (u32 i = 0; i < count; ++i) {
-						const i32 enum_value = ex_type_enum_value_value(type, i);
+						const u64 enum_value = ex_type_enum_value_bits(type, i);
 						const ex_string_view enum_name = ex_type_enum_value_name(type, i);
 						StaticString<256> label(StringView(enum_name.begin, enum_name.length));
 						if (ImGui::Selectable(label.data, enum_value == current)) {
-							*(i32*)value = enum_value;
+							setEnumValueBits(type, value, enum_value);
 						}
 						if (enum_value == current) ImGui::SetItemDefaultFocus();
 					}

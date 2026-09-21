@@ -783,7 +783,7 @@ void appendModuleUnitName(StaticString<256>& out, const Module& m) {
 }
 
 template <int CAPACITY> void writeEvoxFile(const StaticString<CAPACITY>& path, OutputStream& out) {
-	char filename[CAPACITY];
+	char filename[CAPACITY + sizeof(".evox") - 1];
 	snprintf(filename, sizeof(filename), "%s.evox", path.buffer);
 	writeFile(filename, out);
 }
