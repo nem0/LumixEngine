@@ -167,7 +167,7 @@ The `std:` prefix is reserved for builtin modules and cannot be used for user-de
 Rules:
 
 - alias collisions are compile-time errors
-- import cycles are compile-time errors
+- import cycles are allowed; all imported units are typechecked after the complete import graph has been discovered
 - imports are not transitive for symbol visibility
 - an alias-qualified name resolves only through that alias
 - a bare name resolves against the current module and then unaliased imports
@@ -185,7 +185,7 @@ import "core:quat" as core // compile-time error: alias collision
 import "b"
 
 // b.evox
-import "a" // compile-time error: import cycle
+import "a" // cyclic imports are allowed
 ```
 
 ### Structs

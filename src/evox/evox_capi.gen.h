@@ -4913,6 +4913,17 @@ namespace Lumix::Evox::generated {
 		object->destroyWorld(*world);
 	}
 	
+	static void evox_object_Engine_instantiatePrefab_17117969483096900978(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Engine*, object);
+		EX_ARG(frame, World*, world);
+		EX_ARG(frame, PrefabResource*, prefab);
+		EX_ARG(frame, DVec3, pos);
+		EX_ARG(frame, Quat, rot);
+		EX_ARG(frame, Vec3, scale);
+		auto ret = object->instantiatePrefab(*world, *prefab, pos, rot, scale);
+		EX_RESULT(frame, ExEntity(ret.index, nullptr));
+	}
+	
 	static void evox_object_Engine_setTimeMultiplier_4469831530226950084(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, Engine*, object);
 		EX_ARG(frame, float, multiplier);
@@ -5796,6 +5807,7 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:editor/studioapp"), StringView("newWorld")}, &evox_object_StudioApp_newWorld_6688068326512970617);
 		functions.insert({StringView("core:engine/engine"), StringView("createWorld")}, &evox_object_Engine_createWorld_9620427070019288589);
 		functions.insert({StringView("core:engine/engine"), StringView("destroyWorld")}, &evox_object_Engine_destroyWorld_4167552932825757200);
+		functions.insert({StringView("core:engine/engine"), StringView("instantiatePrefab")}, &evox_object_Engine_instantiatePrefab_17117969483096900978);
 		functions.insert({StringView("core:engine/engine"), StringView("setTimeMultiplier")}, &evox_object_Engine_setTimeMultiplier_4469831530226950084);
 		functions.insert({StringView("core:engine/prefabresource"), StringView("load")}, &evox_resource_load_PrefabResource);
 		functions.insert({StringView("core:engine/prefabresource"), StringView("unload")}, &evox_resource_unload_PrefabResource);

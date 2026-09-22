@@ -558,19 +558,19 @@ TEST(AliasedImportCollisionFails) {
 	return true;
 }
 
-TEST(ImportCycleFails) {
+TEST(ImportCycleIsAllowed) {
 	const char* source = R"(
 		import "a"
 
 		fn main() : i32 {
-			return 0;
+			return in_a();
 		}
 	)";
 	const char* a_source = R"(
-		import "b"
+		import "b" as b
 
 		fn in_a() : i32 {
-			return 1;
+			return b.in_b();
 		}
 	)";
 	const char* b_source = R"(
@@ -579,6 +579,115 @@ TEST(ImportCycleFails) {
 		fn in_b() : i32 {
 			return 2;
 		}
+	)";
+	EvoxImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) }
+	};
+	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_RUNTIME_WITH_IMPORTS(source, files, runtime,
+		EXPECT_EQ(test_call(runtime, toLs("main")), EX_CALL_RESULT_OK);
+		EXPECT_EQ(ex_task_to_i32(runtime, -1), 2);
+	);
+	return true;
+}
+
+TEST(ThreeModuleImportCycleIsAllowed) {
+	const char* source = R"(
+		import "a" as a
+
+		fn main() : i32 {
+			return a.value();
+		}
+	)";
+	const char* a_source = R"(
+		import "b" as b
+
+		fn value() : i32 {
+			return b.value();
+		}
+	)";
+	const char* b_source = R"(
+		import "c" as c
+
+		fn value() : i32 {
+			return c.value();
+		}
+	)";
+	const char* c_source = R"(
+		import "a" as a
+
+		fn value() : i32 {
+			return 3;
+		}
+	)";
+	EvoxImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) },
+		{ toLs("c"), toLs(c_source) }
+	};
+	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_RUNTIME_WITH_IMPORTS(source, files, runtime,
+		EXPECT_EQ(test_call(runtime, toLs("main")), EX_CALL_RESULT_OK);
+		EXPECT_EQ(ex_task_to_i32(runtime, -1), 3);
+	);
+	return true;
+}
+
+TEST(CyclicImportsResolveTypesAndValues) {
+	const char* source = R"(
+		import "a" as a
+
+		fn main() : i32 {
+			return a.read().value;
+		}
+	)";
+	const char* a_source = R"(
+		import "b" as b
+
+		struct AValue {
+			value : i32;
+		}
+
+		fn read() : AValue {
+			return AValue { b.value };
+		}
+	)";
+	const char* b_source = R"(
+		import "a" as a
+
+		const value : i32 = 7;
+		fn read_a(v : a.AValue) : i32 {
+			return v.value;
+		}
+	)";
+	EvoxImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) }
+	};
+	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_RUNTIME_WITH_IMPORTS(source, files, runtime,
+		EXPECT_EQ(test_call(runtime, toLs("main")), EX_CALL_RESULT_OK);
+		EXPECT_EQ(ex_task_to_i32(runtime, -1), 7);
+	);
+	return true;
+}
+
+TEST(CyclicComptimeDefinitionStillFails) {
+	const char* source = R"(
+		import "a"
+
+		fn main() : i32 {
+			return 0;
+		}
+	)";
+	const char* a_source = R"(
+		import "b" as b
+		comptime value : i32 = b.value;
+	)";
+	const char* b_source = R"(
+		import "a" as a
+		comptime value : i32 = a.value;
 	)";
 	EvoxImportFile files_storage[] = {
 		{ toLs("a"), toLs(a_source) },

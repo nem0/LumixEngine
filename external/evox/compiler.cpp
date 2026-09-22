@@ -5775,11 +5775,12 @@ struct Checker {
 	bool resolveImportsForUnit(Unit& unit, ex_import_resolver_fn import_resolver, void* import_resolver_userdata) {
 		if (unit.import_state == Unit::IMPORT_DONE) return true;
 		if (unit.import_state == Unit::IMPORT_RESOLVING) {
-			errorLine({}, "Import cycle detected: ", unit.path);
-			return false;
+			// The unit is already on the import traversal stack. Its declarations will
+			// be typechecked after the complete import graph has been discovered.
+			return true;
 		}
-		// This is the gray state of a depth-first traversal; reaching it again through
-		// an import edge identifies a cycle, while IMPORT_DONE permits shared imports.
+		// IMPORT_RESOLVING is the gray state of a depth-first traversal. Reaching it
+		// again is a cyclic import, which is allowed; IMPORT_DONE permits shared imports.
 		unit.import_state = Unit::IMPORT_RESOLVING;
 
 		// Check for duplicate aliases within this unit.

@@ -2787,12 +2787,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		if (!m_tile.world) createTileWorld();
 		Engine& engine = m_app.getEngine();
 
-		EntityMap entity_map(m_app.getAllocator());
-		if (!engine.instantiatePrefab(*m_tile.world, *prefab, DVec3(0), Quat::IDENTITY, Vec3(1), entity_map)) return;
-		if (entity_map.m_map.empty() || !entity_map.m_map[0].isValid()) return;
+		const EntityPtr root = engine.instantiatePrefab(*m_tile.world, *prefab, DVec3(0), Quat::IDENTITY, Vec3(1));
+		if (!root.isValid()) return;
 
 		m_tile.out_path_hash = prefab->getPath().getHash();
-		m_tile.entity = entity_map.m_map[0];
+		m_tile.entity = root;
 		m_tile.waiting = true;
 	}
 

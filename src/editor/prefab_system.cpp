@@ -194,6 +194,13 @@ public:
 	}
 	
 
+	void setPrefabRecursive(EntityRef entity, PrefabHandle prefab) {
+		setPrefab(entity, prefab);
+		for (EntityRef child : m_world->childrenOf(entity)) {
+			setPrefabRecursive(child, prefab);
+		}
+	}
+
 	void doInstantiatePrefabs(PrefabResource& prefab_res, const Array<Transform>& transforms, Array<EntityRef>& entities)
 	{
 		ASSERT(prefab_res.isReady());
@@ -204,22 +211,18 @@ public:
 		}
 		
 		Engine& engine = m_editor.getEngine();
-		EntityMap entity_map(m_editor.getAllocator());
 		const PrefabHandle prefab = prefab_res.getPath().getHash();
 		m_roots.reserve(m_roots.size() + transforms.size());
 		
 		for (const Transform& tr : transforms) {
-			entity_map.m_map.clear();
-			if (!engine.instantiatePrefab(*m_world, prefab_res, tr.pos, tr.rot, tr.scale, entity_map)) {
+			const EntityPtr entity = engine.instantiatePrefab(*m_world, prefab_res, tr.pos, tr.rot, tr.scale);
+			if (!entity.isValid()) {
 				logError("Failed to instantiate prefab ", prefab_res.getPath());
 				return;
 			}
 
-			for (const EntityPtr& e : entity_map.m_map) {
-				setPrefab((EntityRef)e, prefab);
-			}
-
-			const EntityRef root = (EntityRef)entity_map.m_map[0];
+			const EntityRef root = (EntityRef)entity;
+			setPrefabRecursive(root, prefab);
 			m_roots.insert(root, prefab);
 			entities.push(root);
 		}
@@ -235,18 +238,15 @@ public:
 			prefab_res.incRefCount();
 		}
 		
-		EntityMap entity_map(m_editor.getAllocator());
-		if (!m_editor.getEngine().instantiatePrefab(*m_world, prefab_res, pos, rot, scale, entity_map)) {
+		const EntityPtr entity = m_editor.getEngine().instantiatePrefab(*m_world, prefab_res, pos, rot, scale);
+		if (!entity.isValid()) {
 			logError("Failed to instantiate prefab ", prefab_res.getPath());
 			return INVALID_ENTITY;
 		}
 
 		const PrefabHandle prefab = prefab_res.getPath().getHash();
-		for (const EntityPtr& e : entity_map.m_map) {
-			setPrefab((EntityRef)e, prefab);
-		}
-
-		const EntityRef root = (EntityRef)entity_map.m_map[0];
+		const EntityRef root = (EntityRef)entity;
+		setPrefabRecursive(root, prefab);
 		m_roots.insert(root, prefab);
 		return root;
 	}

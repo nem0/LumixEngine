@@ -180,10 +180,10 @@ struct EngineImpl final : Engine {
 		const struct PrefabResource& prefab,
 		const struct DVec3& pos,
 		const struct Quat& rot,
-		const Vec3& scale,
-		EntityMap& entity_map) override
+		const Vec3& scale) override
 	{
 		ASSERT(prefab.isReady());
+		EntityMap entity_map(m_allocator);
 		InputMemoryStream blob(prefab.data);
 		WorldVersion editor_header_version;
 		if (!world.deserialize(blob, entity_map, editor_header_version)) {
