@@ -3,6 +3,6 @@
 
 struct Listener { entity : i32; module : cptr; }
 
-extern fn audio_listener(e : Entity) : ?Listener;
+extern fn audioListener(e : Entity) : ?Listener;
 extern fn createListener(e : Entity) : ?Listener;
 

@@ -36,7 +36,9 @@ struct LUMIX_ENGINE_API Engine {
 	static UniquePtr<Engine> create(InitArgs&& init_data, struct IAllocator& allocator);
 
 	virtual void init() = 0;
+	//@ function
 	virtual struct World& createWorld() = 0;
+	//@ function
 	virtual void destroyWorld(World& world) = 0;
 	virtual void setMainWindow(os::WindowHandle win) = 0;
 	virtual os::WindowHandle getMainWindow() = 0;
@@ -47,6 +49,7 @@ struct LUMIX_ENGINE_API Engine {
 	virtual struct ResourceManagerHub& getResourceManager() = 0;
 	virtual struct PageAllocator& getPageAllocator() = 0;
 	virtual IAllocator& getAllocator() = 0;
+	//@ function
 	virtual EntityPtr instantiatePrefab(World& world,
 		const struct PrefabResource& prefab,
 		const struct DVec3& pos,

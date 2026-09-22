@@ -6,10 +6,10 @@ For the language itself—types, declarations, control flow, pointers, slices, t
 
 ## Getting started
 
-The Evox plugin loads one root script from the project:
+The Evox plugin loads one root script from the project root:
 
 ```text
-scripts/main.evox
+main.evox
 ```
 
 A minimal root script is:
@@ -28,7 +28,7 @@ fn main(input : InputSystem, world : World) : void {
 
 The Evox system calls `main` when game mode starts, passing the input system and the first registered world. The script owns the frame loop and should yield once per frame; the yielded `f32` is the frame delta time.
 
-The repository's working example is [`demo/scripts/main.evox`](../demo/scripts/main.evox).
+The repository's working example is [`demo/main.evox`](../demo/main.evox).
 
 ### Lifecycle
 
@@ -48,7 +48,7 @@ There is one Evox runtime shared by the Evox system, not one runtime per world. 
 
 Saving a changed script causes the asset compiler to process it. Imports are registered as asset dependencies, so changes can propagate to dependent script resources. The active root resource is rebuilt into a new Evox module/runtime when its resource-change notification arrives.
 
-The system is not ready until `scripts/main.evox` has loaded and both source and bytecode compilation have succeeded. If compilation fails, no lifecycle function runs and no script data types are available to worlds.
+The system is not ready until `main.evox` has loaded and both source and bytecode compilation have succeeded. If compilation fails, no lifecycle function runs and no script data types are available to worlds.
 
 ## Imports and source paths
 
@@ -70,7 +70,7 @@ Lumix resolves imports as follows:
 | `some/path` | `some/path.evox` in the project filesystem |
 | `std:name` | Built into Evox; no project file |
 
-Non-core paths are project-root paths; they are **not relative to the importing file**. For example, code in `scripts/main.evox` imports `scripts/player`, not just `player`.
+Non-core paths are project-root paths; they are **not relative to the importing file**. For example, code in `main.evox` imports `scripts/player`, not just `player`.
 
 An alias creates a namespace:
 
@@ -254,7 +254,7 @@ Debug source names use import names. Studio maps `core:name` to `engine/scripts/
 ### Nothing runs
 
 - Confirm the Evox plugin is built and loaded.
-- Confirm the root is exactly `scripts/main.evox`.
+- Confirm the root is exactly `main.evox` in the project root.
 - Check the Studio log for source or bytecode compilation errors.
 - Verify the `main(input, world)` signature exactly.
 - Enter game mode; `main` does not run in edit mode.

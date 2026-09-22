@@ -4,7 +4,7 @@
 import "core:entity"
 struct ProceduralGeometry { entity : i32; module : cptr; }
 
-extern fn procedural_geom(e : Entity) : ?ProceduralGeometry;
+extern fn proceduralGeom(e : Entity) : ?ProceduralGeometry;
 extern fn createProceduralGeometry(e : Entity) : ?ProceduralGeometry;
 extern fn getMaterial(entity : ProceduralGeometry) : []const u8;
 extern fn setMaterial(entity : ProceduralGeometry, path : []const u8) : void;

@@ -539,6 +539,57 @@ TEST(UnsignedEnumBackingSupportsU64Maximum) {
 	return true;
 }
 
+TEST(EnumU64ComptimeArgumentPreservesHighBits) {
+	const char* source = R"(
+		enum Wide : u64 { Value = 4294967297 }
+		fn get(value : comptime Wide) : u64 { return value as u64; }
+		fn main() : u64 { return get(Wide.Value); }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_TRUE(ex_task_to_u64(runtime, -1) == 4294967297ull);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(EnumComptimeArgumentsPreserveSignedAndUnsignedValues) {
+	const char* source = R"(
+		enum Small : i8 { Negative = -128 }
+		enum Large : u64 { Maximum = 18446744073709551615 }
+		fn signed_value(v : comptime Small) : i64 { return v as i64; }
+		fn unsigned_value(v : comptime Large) : u64 { return v as u64; }
+		fn main() : i32 {
+			if signed_value(Small.Negative) != -128 { return 1; }
+			if unsigned_value(Large.Maximum) != 18446744073709551615 { return 2; }
+			return 42;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(EnumU64DiscriminantAcceptsUntypedComptimeConstant) {
+	const char* source = R"(
+		comptime Maximum = 18446744073709551615;
+		enum Wide : u64 { Value = Maximum }
+		fn main() : u64 { return Wide.Value as u64; }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_TRUE(ex_task_to_u64(runtime, -1) == 18446744073709551615ull);
+	CAPI_END(module);
+	return true;
+}
+
 TEST(EnumValuesPreserveUntypedIntegerSign) {
 	const char* source = R"(
 		comptime UnsignedValue = 18446744073709551615;

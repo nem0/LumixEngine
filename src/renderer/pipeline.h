@@ -64,6 +64,7 @@ struct BucketDesc {
 	gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FUNCTION;
 };
 
+//@ enum
 enum class PipelineType {
 	SCENE_VIEW,
 	GAME_VIEW,

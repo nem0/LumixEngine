@@ -13,6 +13,7 @@ enum class PrefabVersion : u32 {
 	LAST
 };
 
+//@ object
 struct LUMIX_ENGINE_API PrefabResource final : Resource {
 	PrefabResource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 	ResourceType getType() const override;

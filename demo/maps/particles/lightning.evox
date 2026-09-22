@@ -37,7 +37,7 @@ fn moveRibbon(bolt : *Bolt) : void {
 	if hit.hit and distanceSquared(hit.position, origin) < 25.0 {
 		bolt.entity.setPosition(toDVec3(hit.position + hit.normal * 0.15));
 		bolt.timeout = randFloatRange(0.2, 0.9);
-		if const emitter = bolt.entity.particle_emitter() {
+		if const emitter = bolt.entity.particleEmitter() {
 			emitter.killRibbon(0, 0);
 			emitter.emitRibbons(0, 1);
 		}
@@ -68,11 +68,11 @@ fn start(world : World, source : Entity) : void {
 fn update(td : f32) : void {
 	const source_position = toVec3(g_source.getPosition());
 	for &bolt in g_bolts {
-		const emitter = bolt.entity.particle_emitter() else return;
+		const emitter = bolt.entity.particleEmitter() else return;
 		const target_id = emitter.getGlobalID("g_target");
 		emitter.setVec3Global(target_id, source_position);
 
-		const light = bolt.entity.point_light() else return;
+		const light = bolt.entity.pointLight() else return;
 		light.setIntensity(randFloatRange(0.5, 1.0));
 
 		bolt.timeout -= td;

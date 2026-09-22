@@ -486,6 +486,15 @@ struct RendererImpl final : Renderer {
 		addPlugin(m_taa);
 	}
 
+	Pipeline& createPipeline(PipelineType type) override {
+		return *Pipeline::create(*this, type).detach();
+	}
+
+	void destroyPipeline(Pipeline& pipeline) override {
+		ASSERT(&pipeline.getRenderer() == this);
+		LUMIX_DELETE(m_allocator, &pipeline);
+	}
+
 	float getLODMultiplier() const override { return m_lod_multiplier; }
 	void setLODMultiplier(float value) override { m_lod_multiplier = maximum(0.f, value); }
 

@@ -5,7 +5,7 @@ import "core:entity"
 import "core:vec2"
 struct CurveDecal { entity : i32; module : cptr; }
 
-extern fn curve_decal(e : Entity) : ?CurveDecal;
+extern fn curveDecal(e : Entity) : ?CurveDecal;
 extern fn createCurveDecal(e : Entity) : ?CurveDecal;
 extern fn getMaterialPath(entity : CurveDecal) : []const u8;
 extern fn setMaterialPath(entity : CurveDecal, path : []const u8) : void;

@@ -121,7 +121,7 @@ fn update(dt : f32) : void {
 	if const pm = pl.physics_module {
 		for hit in pm.getControllerHits() {
 			const obj = hit.hit_entity;
-			if const a = obj.rigid_actor() {
+			if const a = obj.rigidActor() {
 				const force = yawToDir(pl.yaw) * 50.0;
 				a.applyForce(force);
 			}
@@ -134,7 +134,7 @@ fn update(dt : f32) : void {
 	if pl.pitch > 0.9 { pl.pitch = 0.9; }
 
 	var gravity_speed : f32 = 0.0;
-	if const pc = pl.entity.physical_controller() {
+	if const pc = pl.entity.physicalController() {
 		gravity_speed = pc.getGravitySpeed();
 	}
 

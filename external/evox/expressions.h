@@ -92,6 +92,7 @@ struct Expression {
 		UNION_TYPE,    			// A | B used as a type
 		TUPLE_TYPE,
 		RESOLVED_TYPE, 			// A fully resolved type injected by template substitution during cloning.
+		CONSTANT,               // A frozen ComptimeValue injected by template substitution.
 		TERNARY,				// Ternary conditional operator: `condition ? true_expr : false_expr`
 		POINTER_TYPE, 			// *T
 		DEREFERENCE, 			// .*

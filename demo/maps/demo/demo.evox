@@ -85,7 +85,7 @@ fn start(world : World) : void {
 	var random_color_components = world.getEvoxData(RandomColorComponent);
 
 	for c in random_color_components {
-		var mi = c.entity.model_instance() else return;
+		var mi = c.entity.modelInstance() else return;
 		mi.overrideMaterialVec4(0, "Material color", {0, randFloat(), randFloat(), 1});
 	}
 
@@ -186,7 +186,7 @@ fn resetPhysicsTest() : void {
 
 fn update(td : f32, input : InputSystem) : void {
 	for entity in g_nav_agents.slice() {
-		if const agent = entity.navmesh_agent() {
+		if const agent = entity.navmeshAgent() {
 			if agent.isFinished() {
 				goToRandomPoint(agent);
 			}
@@ -203,7 +203,7 @@ fn update(td : f32, input : InputSystem) : void {
 	const rnd_col = g_world.getEvoxData(RandomColorTickComponent);
 	for &c in rnd_col {
 		c.t = c.t + td * 3;
-		var mi = c.entity.model_instance() else return;
+		var mi = c.entity.modelInstance() else return;
 		mi.overrideMaterialVec4(0, "Material color", {0, c.green, abs(math.cos(c.t)), 1});	
 	}
 

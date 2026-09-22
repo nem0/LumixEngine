@@ -6,6 +6,7 @@
 #include <string.h>
 #include "core/stream.h"
 #include "engine/reflection.h"
+#include "engine/resource_manager.h"
 #include "engine/world.h"
 
 struct ExEntity { i32 index; u32 padding; Lumix::World* world; ExEntity() = default; explicit ExEntity(i32 index, Lumix::World* world) : index(index), padding(0), world(world) {} };
@@ -23,14 +24,23 @@ static_assert(sizeof(ExComponent) == 16);
 #include "physics/physics_module.h"
 #include "renderer/render_module.h"
 #include "ui/ui_module.h"
+#include "animation/animation.h"
+#include "animation/controller.h"
+#include "animation/property_animation.h"
+#include "audio/clip.h"
 #include "editor/asset_browser.h"
 #include "editor/studio_app.h"
 #include "engine/engine.h"
+#include "engine/prefab.h"
 #include "renderer/editor/game_view.h"
 #include "renderer/editor/scene_view.h"
 #include "renderer/model.h"
+#include "renderer/particle_system.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
+#include "renderer/shader.h"
+#include "renderer/sprite.h"
+#include "renderer/texture.h"
 #include "ui/ui.h"
 #include "ui/ui_system.h"
 
@@ -1470,14 +1480,14 @@ namespace Lumix::Evox::generated {
 		EX_ARG(frame, ExEntity, entity);
 		EX_STRING_ARG(frame, clip);
 		auto ret = module->play3D(EntityRef(entity.index), Path(StringView{clip.begin, (u64)clip.length}));
-		EX_RESULT(frame, (i32)ret);
+		EX_RESULT(frame, ret);
 	}
 	
 	static void evox_audio_play2D_10679023369668577871(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, AudioModule*, module);
 		EX_STRING_ARG(frame, clip);
 		auto ret = module->play2D(Path(StringView{clip.begin, (u64)clip.length}));
-		EX_RESULT(frame, (i32)ret);
+		EX_RESULT(frame, ret);
 	}
 	
 	static void evox_audio_setMasterVolume_14804945310456614025(ex_runtime* runtime, ex_call_frame frame) {
@@ -1611,6 +1621,12 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret.normal);
 		frame.result += 4;
 		EX_RESULT(frame, ExEntity(ret.entity.index, &module->getWorld()));
+	}
+	
+	static void evox_renderer_getRenderer_743583755130421523(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, RenderModule*, module);
+		auto& ret = module->getRenderer();
+		EX_RESULT(frame, &ret);
 	}
 	
 	static void evox_renderer_addDebugTriangle_9051351881586580716(ex_runtime* runtime, ex_call_frame frame) {
@@ -1800,7 +1816,7 @@ namespace Lumix::Evox::generated {
 		char evox_string_arg_name[128];
 		copyString(Span(evox_string_arg_name), StringView{name.begin, (u64)name.length});
 		auto ret = module->getAnimatorInputIndex(EntityRef(entity.index), evox_string_arg_name);
-		EX_RESULT(frame, (i32)ret);
+		EX_RESULT(frame, ret);
 	}
 	
 	static void evox_animator_getAnimatorSource_11155504970444435899(ex_runtime* runtime, ex_call_frame frame) {
@@ -3267,7 +3283,7 @@ namespace Lumix::Evox::generated {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getVehicleCurrentGear(EntityRef(entity.index));
-		EX_RESULT(frame, (i32)ret);
+		EX_RESULT(frame, ret);
 	}
 	
 	static void evox_vehicle_getVehicleSpeed_7397302492130099443(ex_runtime* runtime, ex_call_frame frame) {
@@ -4271,7 +4287,7 @@ namespace Lumix::Evox::generated {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getBoneAttachmentBone(EntityRef(entity.index));
-		EX_RESULT(frame, (i32)ret);
+		EX_RESULT(frame, ret);
 	}
 	
 	static void evox_bone_attachment_setBoneAttachmentBone_4742134950152804761(ex_runtime* runtime, ex_call_frame frame) {
@@ -4316,7 +4332,7 @@ namespace Lumix::Evox::generated {
 		char evox_string_arg_name[128];
 		copyString(Span(evox_string_arg_name), StringView{name.begin, (u64)name.length});
 		auto ret = module->getParticleEmitterGlobalID(EntityRef(entity.index), evox_string_arg_name);
-		EX_RESULT(frame, (i32)ret);
+		EX_RESULT(frame, ret);
 	}
 	
 	static void evox_particle_emitter_setFloatGlobal_8048456309304325320(ex_runtime* runtime, ex_call_frame frame) {
@@ -4775,6 +4791,94 @@ namespace Lumix::Evox::generated {
 		module->setUI3DOrientToCamera(EntityRef(entity.index), value);
 	}
 	
+	static void evox_resource_load_Animation(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Engine*, engine);
+		EX_STRING_ARG(frame, path);
+		Animation* resource = engine->getResourceManager().load<Animation>(Path(StringView{path.begin, (u64)path.length}));
+		EX_RESULT(frame, resource);
+	}
+	
+	static void evox_resource_unload_Animation(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Animation*, resource);
+		if (resource) resource->decRefCount();
+	}
+	
+	static void evox_resource_isReady_Animation(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Animation*, resource);
+		EX_RESULT(frame, resource && resource->isReady());
+	}
+	
+	static void evox_resource_isFailure_Animation(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Animation*, resource);
+		EX_RESULT(frame, resource && resource->isFailure());
+	}
+	
+	static void evox_resource_load_Controller(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Engine*, engine);
+		EX_STRING_ARG(frame, path);
+		anim::Controller* resource = engine->getResourceManager().load<anim::Controller>(Path(StringView{path.begin, (u64)path.length}));
+		EX_RESULT(frame, resource);
+	}
+	
+	static void evox_resource_unload_Controller(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, anim::Controller*, resource);
+		if (resource) resource->decRefCount();
+	}
+	
+	static void evox_resource_isReady_Controller(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, anim::Controller*, resource);
+		EX_RESULT(frame, resource && resource->isReady());
+	}
+	
+	static void evox_resource_isFailure_Controller(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, anim::Controller*, resource);
+		EX_RESULT(frame, resource && resource->isFailure());
+	}
+	
+	static void evox_resource_load_PropertyAnimation(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Engine*, engine);
+		EX_STRING_ARG(frame, path);
+		PropertyAnimation* resource = engine->getResourceManager().load<PropertyAnimation>(Path(StringView{path.begin, (u64)path.length}));
+		EX_RESULT(frame, resource);
+	}
+	
+	static void evox_resource_unload_PropertyAnimation(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, PropertyAnimation*, resource);
+		if (resource) resource->decRefCount();
+	}
+	
+	static void evox_resource_isReady_PropertyAnimation(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, PropertyAnimation*, resource);
+		EX_RESULT(frame, resource && resource->isReady());
+	}
+	
+	static void evox_resource_isFailure_PropertyAnimation(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, PropertyAnimation*, resource);
+		EX_RESULT(frame, resource && resource->isFailure());
+	}
+	
+	static void evox_resource_load_Clip(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Engine*, engine);
+		EX_STRING_ARG(frame, path);
+		Clip* resource = engine->getResourceManager().load<Clip>(Path(StringView{path.begin, (u64)path.length}));
+		EX_RESULT(frame, resource);
+	}
+	
+	static void evox_resource_unload_Clip(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Clip*, resource);
+		if (resource) resource->decRefCount();
+	}
+	
+	static void evox_resource_isReady_Clip(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Clip*, resource);
+		EX_RESULT(frame, resource && resource->isReady());
+	}
+	
+	static void evox_resource_isFailure_Clip(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Clip*, resource);
+		EX_RESULT(frame, resource && resource->isFailure());
+	}
+	
 	static void evox_object_AssetBrowser_openEditor_11783148113040368601(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, AssetBrowser*, object);
 		EX_STRING_ARG(frame, resource);
@@ -4795,6 +4899,46 @@ namespace Lumix::Evox::generated {
 	static void evox_object_StudioApp_newWorld_6688068326512970617(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, StudioApp*, object);
 		object->newWorld();
+	}
+	
+	static void evox_object_Engine_createWorld_9620427070019288589(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Engine*, object);
+		auto& ret = object->createWorld();
+		EX_RESULT(frame, &ret);
+	}
+	
+	static void evox_object_Engine_destroyWorld_4167552932825757200(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Engine*, object);
+		EX_ARG(frame, World*, world);
+		object->destroyWorld(*world);
+	}
+	
+	static void evox_object_Engine_setTimeMultiplier_4469831530226950084(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Engine*, object);
+		EX_ARG(frame, float, multiplier);
+		object->setTimeMultiplier(multiplier);
+	}
+	
+	static void evox_resource_load_PrefabResource(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Engine*, engine);
+		EX_STRING_ARG(frame, path);
+		PrefabResource* resource = engine->getResourceManager().load<PrefabResource>(Path(StringView{path.begin, (u64)path.length}));
+		EX_RESULT(frame, resource);
+	}
+	
+	static void evox_resource_unload_PrefabResource(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, PrefabResource*, resource);
+		if (resource) resource->decRefCount();
+	}
+	
+	static void evox_resource_isReady_PrefabResource(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, PrefabResource*, resource);
+		EX_RESULT(frame, resource && resource->isReady());
+	}
+	
+	static void evox_resource_isFailure_PrefabResource(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, PrefabResource*, resource);
+		EX_RESULT(frame, resource && resource->isFailure());
 	}
 	
 	static void evox_object_GameView_forceViewport_14906880937046627925(ex_runtime* runtime, ex_call_frame frame) {
@@ -4837,6 +4981,28 @@ namespace Lumix::Evox::generated {
 		object->makeScreenshot(StringView{path.begin, (u64)path.length});
 	}
 	
+	static void evox_resource_load_Model(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Engine*, engine);
+		EX_STRING_ARG(frame, path);
+		Model* resource = engine->getResourceManager().load<Model>(Path(StringView{path.begin, (u64)path.length}));
+		EX_RESULT(frame, resource);
+	}
+	
+	static void evox_resource_unload_Model(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Model*, resource);
+		if (resource) resource->decRefCount();
+	}
+	
+	static void evox_resource_isReady_Model(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Model*, resource);
+		EX_RESULT(frame, resource && resource->isReady());
+	}
+	
+	static void evox_resource_isFailure_Model(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Model*, resource);
+		EX_RESULT(frame, resource && resource->isFailure());
+	}
+	
 	static void evox_object_Model_getOriginBoundingRadius_10043197175785696766(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, Model*, object);
 		auto ret = object->getOriginBoundingRadius();
@@ -4849,11 +5015,39 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret);
 	}
 	
+	static void evox_resource_load_ParticleSystemResource(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Engine*, engine);
+		EX_STRING_ARG(frame, path);
+		ParticleSystemResource* resource = engine->getResourceManager().load<ParticleSystemResource>(Path(StringView{path.begin, (u64)path.length}));
+		EX_RESULT(frame, resource);
+	}
+	
+	static void evox_resource_unload_ParticleSystemResource(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ParticleSystemResource*, resource);
+		if (resource) resource->decRefCount();
+	}
+	
+	static void evox_resource_isReady_ParticleSystemResource(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ParticleSystemResource*, resource);
+		EX_RESULT(frame, resource && resource->isReady());
+	}
+	
+	static void evox_resource_isFailure_ParticleSystemResource(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ParticleSystemResource*, resource);
+		EX_RESULT(frame, resource && resource->isFailure());
+	}
+	
 	static void evox_object_Pipeline_render_16077624984126946320(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, Pipeline*, object);
 		EX_ARG(frame, bool, only_2d);
 		auto ret = object->render(only_2d);
 		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Pipeline_setWorld_13377122951349431282(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Pipeline*, object);
+		EX_ARG(frame, World*, world);
+		object->setWorld(world);
 	}
 	
 	static void evox_object_Pipeline_setViewport_10887991775244494685(ex_runtime* runtime, ex_call_frame frame) {
@@ -4888,6 +5082,19 @@ namespace Lumix::Evox::generated {
 		object->setClearColor(color);
 	}
 	
+	static void evox_object_Renderer_createPipeline_8820418171601115625(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Renderer*, object);
+		EX_ARG(frame, int, type_value);
+		auto& ret = object->createPipeline((PipelineType)type_value);
+		EX_RESULT(frame, &ret);
+	}
+	
+	static void evox_object_Renderer_destroyPipeline_10417378349737653994(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Renderer*, object);
+		EX_ARG(frame, Pipeline*, pipeline);
+		object->destroyPipeline(*pipeline);
+	}
+	
 	static void evox_object_Renderer_getLODMultiplier_14506703837845548734(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, Renderer*, object);
 		auto ret = object->getLODMultiplier();
@@ -4898,6 +5105,72 @@ namespace Lumix::Evox::generated {
 		EX_ARG(frame, Renderer*, object);
 		EX_ARG(frame, float, value);
 		object->setLODMultiplier(value);
+	}
+	
+	static void evox_resource_load_Shader(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Engine*, engine);
+		EX_STRING_ARG(frame, path);
+		Shader* resource = engine->getResourceManager().load<Shader>(Path(StringView{path.begin, (u64)path.length}));
+		EX_RESULT(frame, resource);
+	}
+	
+	static void evox_resource_unload_Shader(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Shader*, resource);
+		if (resource) resource->decRefCount();
+	}
+	
+	static void evox_resource_isReady_Shader(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Shader*, resource);
+		EX_RESULT(frame, resource && resource->isReady());
+	}
+	
+	static void evox_resource_isFailure_Shader(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Shader*, resource);
+		EX_RESULT(frame, resource && resource->isFailure());
+	}
+	
+	static void evox_resource_load_Sprite(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Engine*, engine);
+		EX_STRING_ARG(frame, path);
+		Sprite* resource = engine->getResourceManager().load<Sprite>(Path(StringView{path.begin, (u64)path.length}));
+		EX_RESULT(frame, resource);
+	}
+	
+	static void evox_resource_unload_Sprite(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Sprite*, resource);
+		if (resource) resource->decRefCount();
+	}
+	
+	static void evox_resource_isReady_Sprite(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Sprite*, resource);
+		EX_RESULT(frame, resource && resource->isReady());
+	}
+	
+	static void evox_resource_isFailure_Sprite(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Sprite*, resource);
+		EX_RESULT(frame, resource && resource->isFailure());
+	}
+	
+	static void evox_resource_load_Texture(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Engine*, engine);
+		EX_STRING_ARG(frame, path);
+		Texture* resource = engine->getResourceManager().load<Texture>(Path(StringView{path.begin, (u64)path.length}));
+		EX_RESULT(frame, resource);
+	}
+	
+	static void evox_resource_unload_Texture(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Texture*, resource);
+		if (resource) resource->decRefCount();
+	}
+	
+	static void evox_resource_isReady_Texture(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Texture*, resource);
+		EX_RESULT(frame, resource && resource->isReady());
+	}
+	
+	static void evox_resource_isFailure_Texture(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Texture*, resource);
+		EX_RESULT(frame, resource && resource->isFailure());
 	}
 	
 	static void evox_object_Element_getID_5043487033988361637(ex_runtime* runtime, ex_call_frame frame) {
@@ -4963,19 +5236,19 @@ namespace Lumix::Evox::generated {
 	
 	static void registerGeneratedEngineImport(HashMap<NativeFunctionKey, ex_native_fn, NativeFunctionKeyHash>& functions) {
 		functions.insert({StringView("core:animation/property_animator"), StringView("createPropertyAnimator")}, &evox_entity_create_property_animator);
-		functions.insert({StringView("core:animation/property_animator"), StringView("property_animator")}, &evox_entity_property_animator);
+		functions.insert({StringView("core:animation/property_animator"), StringView("propertyAnimator")}, &evox_entity_property_animator);
 		functions.insert({StringView("core:animation/animator"), StringView("createAnimator")}, &evox_entity_create_animator);
 		functions.insert({StringView("core:animation/animator"), StringView("animator")}, &evox_entity_animator);
 		functions.insert({StringView("core:animation/animable"), StringView("createAnimable")}, &evox_entity_create_animable);
 		functions.insert({StringView("core:animation/animable"), StringView("animable")}, &evox_entity_animable);
 		functions.insert({StringView("core:audio/echo_zone"), StringView("createEchoZone")}, &evox_entity_create_echo_zone);
-		functions.insert({StringView("core:audio/echo_zone"), StringView("echo_zone")}, &evox_entity_echo_zone);
+		functions.insert({StringView("core:audio/echo_zone"), StringView("echoZone")}, &evox_entity_echo_zone);
 		functions.insert({StringView("core:audio/chorus_zone"), StringView("createChorusZone")}, &evox_entity_create_chorus_zone);
-		functions.insert({StringView("core:audio/chorus_zone"), StringView("chorus_zone")}, &evox_entity_chorus_zone);
+		functions.insert({StringView("core:audio/chorus_zone"), StringView("chorusZone")}, &evox_entity_chorus_zone);
 		functions.insert({StringView("core:audio/audio_listener"), StringView("createListener")}, &evox_entity_create_audio_listener);
-		functions.insert({StringView("core:audio/audio_listener"), StringView("audio_listener")}, &evox_entity_audio_listener);
+		functions.insert({StringView("core:audio/audio_listener"), StringView("audioListener")}, &evox_entity_audio_listener);
 		functions.insert({StringView("core:audio/ambient_sound"), StringView("createAmbientSound")}, &evox_entity_create_ambient_sound);
-		functions.insert({StringView("core:audio/ambient_sound"), StringView("ambient_sound")}, &evox_entity_ambient_sound);
+		functions.insert({StringView("core:audio/ambient_sound"), StringView("ambientSound")}, &evox_entity_ambient_sound);
 		functions.insert({StringView("core:engine/spline"), StringView("createSpline")}, &evox_entity_create_spline);
 		functions.insert({StringView("core:engine/spline"), StringView("spline")}, &evox_entity_spline);
 		functions.insert({StringView("core:engine/signal"), StringView("createSignal")}, &evox_entity_create_signal);
@@ -4983,31 +5256,31 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:evox/evox"), StringView("createEvox")}, &evox_entity_create_evox);
 		functions.insert({StringView("core:evox/evox"), StringView("evox")}, &evox_entity_evox);
 		functions.insert({StringView("core:navigation/navmesh_zone"), StringView("createZone")}, &evox_entity_create_navmesh_zone);
-		functions.insert({StringView("core:navigation/navmesh_zone"), StringView("navmesh_zone")}, &evox_entity_navmesh_zone);
+		functions.insert({StringView("core:navigation/navmesh_zone"), StringView("navmeshZone")}, &evox_entity_navmesh_zone);
 		functions.insert({StringView("core:navigation/navmesh_agent"), StringView("createAgent")}, &evox_entity_create_navmesh_agent);
-		functions.insert({StringView("core:navigation/navmesh_agent"), StringView("navmesh_agent")}, &evox_entity_navmesh_agent);
+		functions.insert({StringView("core:navigation/navmesh_agent"), StringView("navmeshAgent")}, &evox_entity_navmesh_agent);
 		functions.insert({StringView("core:physics/physical_heightfield"), StringView("createHeightfield")}, &evox_entity_create_physical_heightfield);
-		functions.insert({StringView("core:physics/physical_heightfield"), StringView("physical_heightfield")}, &evox_entity_physical_heightfield);
+		functions.insert({StringView("core:physics/physical_heightfield"), StringView("physicalHeightfield")}, &evox_entity_physical_heightfield);
 		functions.insert({StringView("core:physics/d6_joint"), StringView("createD6Joint")}, &evox_entity_create_d6_joint);
-		functions.insert({StringView("core:physics/d6_joint"), StringView("d6_joint")}, &evox_entity_d6_joint);
+		functions.insert({StringView("core:physics/d6_joint"), StringView("d6Joint")}, &evox_entity_d6_joint);
 		functions.insert({StringView("core:physics/distance_joint"), StringView("createDistanceJoint")}, &evox_entity_create_distance_joint);
-		functions.insert({StringView("core:physics/distance_joint"), StringView("distance_joint")}, &evox_entity_distance_joint);
+		functions.insert({StringView("core:physics/distance_joint"), StringView("distanceJoint")}, &evox_entity_distance_joint);
 		functions.insert({StringView("core:physics/hinge_joint"), StringView("createHingeJoint")}, &evox_entity_create_hinge_joint);
-		functions.insert({StringView("core:physics/hinge_joint"), StringView("hinge_joint")}, &evox_entity_hinge_joint);
+		functions.insert({StringView("core:physics/hinge_joint"), StringView("hingeJoint")}, &evox_entity_hinge_joint);
 		functions.insert({StringView("core:physics/spherical_joint"), StringView("createSphericalJoint")}, &evox_entity_create_spherical_joint);
-		functions.insert({StringView("core:physics/spherical_joint"), StringView("spherical_joint")}, &evox_entity_spherical_joint);
+		functions.insert({StringView("core:physics/spherical_joint"), StringView("sphericalJoint")}, &evox_entity_spherical_joint);
 		functions.insert({StringView("core:physics/physical_controller"), StringView("createController")}, &evox_entity_create_physical_controller);
-		functions.insert({StringView("core:physics/physical_controller"), StringView("physical_controller")}, &evox_entity_physical_controller);
+		functions.insert({StringView("core:physics/physical_controller"), StringView("physicalController")}, &evox_entity_physical_controller);
 		functions.insert({StringView("core:physics/rigid_actor"), StringView("createActor")}, &evox_entity_create_rigid_actor);
-		functions.insert({StringView("core:physics/rigid_actor"), StringView("rigid_actor")}, &evox_entity_rigid_actor);
+		functions.insert({StringView("core:physics/rigid_actor"), StringView("rigidActor")}, &evox_entity_rigid_actor);
 		functions.insert({StringView("core:physics/wheel"), StringView("createWheel")}, &evox_entity_create_wheel);
 		functions.insert({StringView("core:physics/wheel"), StringView("wheel")}, &evox_entity_wheel);
 		functions.insert({StringView("core:physics/vehicle"), StringView("createVehicle")}, &evox_entity_create_vehicle);
 		functions.insert({StringView("core:physics/vehicle"), StringView("vehicle")}, &evox_entity_vehicle);
 		functions.insert({StringView("core:physics/physical_instanced_cube"), StringView("createInstancedCube")}, &evox_entity_create_physical_instanced_cube);
-		functions.insert({StringView("core:physics/physical_instanced_cube"), StringView("physical_instanced_cube")}, &evox_entity_physical_instanced_cube);
+		functions.insert({StringView("core:physics/physical_instanced_cube"), StringView("physicalInstancedCube")}, &evox_entity_physical_instanced_cube);
 		functions.insert({StringView("core:physics/physical_instanced_mesh"), StringView("createInstancedMesh")}, &evox_entity_create_physical_instanced_mesh);
-		functions.insert({StringView("core:physics/physical_instanced_mesh"), StringView("physical_instanced_mesh")}, &evox_entity_physical_instanced_mesh);
+		functions.insert({StringView("core:physics/physical_instanced_mesh"), StringView("physicalInstancedMesh")}, &evox_entity_physical_instanced_mesh);
 		functions.insert({StringView("core:renderer/camera"), StringView("createCamera")}, &evox_entity_create_camera);
 		functions.insert({StringView("core:renderer/camera"), StringView("camera")}, &evox_entity_camera);
 		functions.insert({StringView("core:renderer/decal"), StringView("createDecal")}, &evox_entity_create_decal);
@@ -5015,27 +5288,27 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:renderer/environment"), StringView("createEnvironment")}, &evox_entity_create_environment);
 		functions.insert({StringView("core:renderer/environment"), StringView("environment")}, &evox_entity_environment);
 		functions.insert({StringView("core:renderer/point_light"), StringView("createPointLight")}, &evox_entity_create_point_light);
-		functions.insert({StringView("core:renderer/point_light"), StringView("point_light")}, &evox_entity_point_light);
+		functions.insert({StringView("core:renderer/point_light"), StringView("pointLight")}, &evox_entity_point_light);
 		functions.insert({StringView("core:renderer/reflection_probe"), StringView("createReflectionProbe")}, &evox_entity_create_reflection_probe);
-		functions.insert({StringView("core:renderer/reflection_probe"), StringView("reflection_probe")}, &evox_entity_reflection_probe);
+		functions.insert({StringView("core:renderer/reflection_probe"), StringView("reflectionProbe")}, &evox_entity_reflection_probe);
 		functions.insert({StringView("core:renderer/environment_probe"), StringView("createEnvironmentProbe")}, &evox_entity_create_environment_probe);
-		functions.insert({StringView("core:renderer/environment_probe"), StringView("environment_probe")}, &evox_entity_environment_probe);
+		functions.insert({StringView("core:renderer/environment_probe"), StringView("environmentProbe")}, &evox_entity_environment_probe);
 		functions.insert({StringView("core:renderer/bone_attachment"), StringView("createBoneAttachment")}, &evox_entity_create_bone_attachment);
-		functions.insert({StringView("core:renderer/bone_attachment"), StringView("bone_attachment")}, &evox_entity_bone_attachment);
+		functions.insert({StringView("core:renderer/bone_attachment"), StringView("boneAttachment")}, &evox_entity_bone_attachment);
 		functions.insert({StringView("core:renderer/particle_emitter"), StringView("createParticleEmitter")}, &evox_entity_create_particle_emitter);
-		functions.insert({StringView("core:renderer/particle_emitter"), StringView("particle_emitter")}, &evox_entity_particle_emitter);
+		functions.insert({StringView("core:renderer/particle_emitter"), StringView("particleEmitter")}, &evox_entity_particle_emitter);
 		functions.insert({StringView("core:renderer/instanced_model"), StringView("createInstancedModel")}, &evox_entity_create_instanced_model);
-		functions.insert({StringView("core:renderer/instanced_model"), StringView("instanced_model")}, &evox_entity_instanced_model);
+		functions.insert({StringView("core:renderer/instanced_model"), StringView("instancedModel")}, &evox_entity_instanced_model);
 		functions.insert({StringView("core:renderer/model_instance"), StringView("createModelInstance")}, &evox_entity_create_model_instance);
-		functions.insert({StringView("core:renderer/model_instance"), StringView("model_instance")}, &evox_entity_model_instance);
+		functions.insert({StringView("core:renderer/model_instance"), StringView("modelInstance")}, &evox_entity_model_instance);
 		functions.insert({StringView("core:renderer/curve_decal"), StringView("createCurveDecal")}, &evox_entity_create_curve_decal);
-		functions.insert({StringView("core:renderer/curve_decal"), StringView("curve_decal")}, &evox_entity_curve_decal);
+		functions.insert({StringView("core:renderer/curve_decal"), StringView("curveDecal")}, &evox_entity_curve_decal);
 		functions.insert({StringView("core:renderer/terrain"), StringView("createTerrain")}, &evox_entity_create_terrain);
 		functions.insert({StringView("core:renderer/terrain"), StringView("terrain")}, &evox_entity_terrain);
 		functions.insert({StringView("core:renderer/procedural_geom"), StringView("createProceduralGeometry")}, &evox_entity_create_procedural_geom);
-		functions.insert({StringView("core:renderer/procedural_geom"), StringView("procedural_geom")}, &evox_entity_procedural_geom);
+		functions.insert({StringView("core:renderer/procedural_geom"), StringView("proceduralGeom")}, &evox_entity_procedural_geom);
 		functions.insert({StringView("core:ui/ui_3d"), StringView("createUI3D")}, &evox_entity_create_ui_3d);
-		functions.insert({StringView("core:ui/ui_3d"), StringView("ui_3d")}, &evox_entity_ui_3d);
+		functions.insert({StringView("core:ui/ui_3d"), StringView("ui3d")}, &evox_entity_ui_3d);
 		functions.insert({StringView("core:audio/module"), StringView("play3D")}, &evox_audio_play3D_4659259411700113465);
 		functions.insert({StringView("core:audio/module"), StringView("play2D")}, &evox_audio_play2D_10679023369668577871);
 		functions.insert({StringView("core:audio/module"), StringView("setMasterVolume")}, &evox_audio_setMasterVolume_14804945310456614025);
@@ -5055,6 +5328,7 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:physics/module"), StringView("getContactHitsGet")}, &evox_physics_getContactHits_get_1259599258055043497);
 		functions.insert({StringView("core:physics/module"), StringView("raycastEx")}, &evox_physics_raycastEx_5324446236776470796);
 		functions.insert({StringView("core:physics/module"), StringView("physics")}, &evox_world_physics);
+		functions.insert({StringView("core:renderer/module"), StringView("getRenderer")}, &evox_renderer_getRenderer_743583755130421523);
 		functions.insert({StringView("core:renderer/module"), StringView("addDebugTriangle")}, &evox_renderer_addDebugTriangle_9051351881586580716);
 		functions.insert({StringView("core:renderer/module"), StringView("addDebugLine")}, &evox_renderer_addDebugLine_11999449654256854668);
 		functions.insert({StringView("core:renderer/module"), StringView("addDebugCross")}, &evox_renderer_addDebugCross_12225788651207943196);
@@ -5500,20 +5774,66 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:ui/ui_3d"), StringView("setVirtualSize")}, &evox_ui_3d_setUI3DVirtualSize_3443593634112763421);
 		functions.insert({StringView("core:ui/ui_3d"), StringView("getOrientToCamera")}, &evox_ui_3d_getUI3DOrientToCamera_2472985916441962820);
 		functions.insert({StringView("core:ui/ui_3d"), StringView("setOrientToCamera")}, &evox_ui_3d_setUI3DOrientToCamera_10517850954275228651);
+		functions.insert({StringView("core:animation/animation"), StringView("load")}, &evox_resource_load_Animation);
+		functions.insert({StringView("core:animation/animation"), StringView("unload")}, &evox_resource_unload_Animation);
+		functions.insert({StringView("core:animation/animation"), StringView("isReady")}, &evox_resource_isReady_Animation);
+		functions.insert({StringView("core:animation/animation"), StringView("isFailure")}, &evox_resource_isFailure_Animation);
+		functions.insert({StringView("core:animation/controller"), StringView("load")}, &evox_resource_load_Controller);
+		functions.insert({StringView("core:animation/controller"), StringView("unload")}, &evox_resource_unload_Controller);
+		functions.insert({StringView("core:animation/controller"), StringView("isReady")}, &evox_resource_isReady_Controller);
+		functions.insert({StringView("core:animation/controller"), StringView("isFailure")}, &evox_resource_isFailure_Controller);
+		functions.insert({StringView("core:animation/propertyanimation"), StringView("load")}, &evox_resource_load_PropertyAnimation);
+		functions.insert({StringView("core:animation/propertyanimation"), StringView("unload")}, &evox_resource_unload_PropertyAnimation);
+		functions.insert({StringView("core:animation/propertyanimation"), StringView("isReady")}, &evox_resource_isReady_PropertyAnimation);
+		functions.insert({StringView("core:animation/propertyanimation"), StringView("isFailure")}, &evox_resource_isFailure_PropertyAnimation);
+		functions.insert({StringView("core:audio/clip"), StringView("load")}, &evox_resource_load_Clip);
+		functions.insert({StringView("core:audio/clip"), StringView("unload")}, &evox_resource_unload_Clip);
+		functions.insert({StringView("core:audio/clip"), StringView("isReady")}, &evox_resource_isReady_Clip);
+		functions.insert({StringView("core:audio/clip"), StringView("isFailure")}, &evox_resource_isFailure_Clip);
 		functions.insert({StringView("core:editor/assetbrowser"), StringView("openEditor")}, &evox_object_AssetBrowser_openEditor_11783148113040368601);
 		functions.insert({StringView("core:editor/studioapp"), StringView("exitWithCode")}, &evox_object_StudioApp_exitWithCode_758235736626335650);
 		functions.insert({StringView("core:editor/studioapp"), StringView("exitGameMode")}, &evox_object_StudioApp_exitGameMode_3617391861646806333);
 		functions.insert({StringView("core:editor/studioapp"), StringView("newWorld")}, &evox_object_StudioApp_newWorld_6688068326512970617);
+		functions.insert({StringView("core:engine/engine"), StringView("createWorld")}, &evox_object_Engine_createWorld_9620427070019288589);
+		functions.insert({StringView("core:engine/engine"), StringView("destroyWorld")}, &evox_object_Engine_destroyWorld_4167552932825757200);
+		functions.insert({StringView("core:engine/engine"), StringView("setTimeMultiplier")}, &evox_object_Engine_setTimeMultiplier_4469831530226950084);
+		functions.insert({StringView("core:engine/prefabresource"), StringView("load")}, &evox_resource_load_PrefabResource);
+		functions.insert({StringView("core:engine/prefabresource"), StringView("unload")}, &evox_resource_unload_PrefabResource);
+		functions.insert({StringView("core:engine/prefabresource"), StringView("isReady")}, &evox_resource_isReady_PrefabResource);
+		functions.insert({StringView("core:engine/prefabresource"), StringView("isFailure")}, &evox_resource_isFailure_PrefabResource);
 		functions.insert({StringView("core:renderer/editor/gameview"), StringView("forceViewport")}, &evox_object_GameView_forceViewport_14906880937046627925);
 		functions.insert({StringView("core:renderer/editor/sceneview"), StringView("setViewport")}, &evox_object_SceneView_setViewport_14548538436635539605);
 		functions.insert({StringView("core:renderer/editor/sceneview"), StringView("makeScreenshot")}, &evox_object_SceneView_makeScreenshot_13676003394318764375);
+		functions.insert({StringView("core:renderer/model"), StringView("load")}, &evox_resource_load_Model);
+		functions.insert({StringView("core:renderer/model"), StringView("unload")}, &evox_resource_unload_Model);
+		functions.insert({StringView("core:renderer/model"), StringView("isReady")}, &evox_resource_isReady_Model);
+		functions.insert({StringView("core:renderer/model"), StringView("isFailure")}, &evox_resource_isFailure_Model);
 		functions.insert({StringView("core:renderer/model"), StringView("getOriginBoundingRadius")}, &evox_object_Model_getOriginBoundingRadius_10043197175785696766);
 		functions.insert({StringView("core:renderer/model"), StringView("getCenterBoundingRadius")}, &evox_object_Model_getCenterBoundingRadius_6203163798800546562);
+		functions.insert({StringView("core:renderer/particlesystemresource"), StringView("load")}, &evox_resource_load_ParticleSystemResource);
+		functions.insert({StringView("core:renderer/particlesystemresource"), StringView("unload")}, &evox_resource_unload_ParticleSystemResource);
+		functions.insert({StringView("core:renderer/particlesystemresource"), StringView("isReady")}, &evox_resource_isReady_ParticleSystemResource);
+		functions.insert({StringView("core:renderer/particlesystemresource"), StringView("isFailure")}, &evox_resource_isFailure_ParticleSystemResource);
 		functions.insert({StringView("core:renderer/pipeline"), StringView("render")}, &evox_object_Pipeline_render_16077624984126946320);
+		functions.insert({StringView("core:renderer/pipeline"), StringView("setWorld")}, &evox_object_Pipeline_setWorld_13377122951349431282);
 		functions.insert({StringView("core:renderer/pipeline"), StringView("setViewport")}, &evox_object_Pipeline_setViewport_10887991775244494685);
 		functions.insert({StringView("core:renderer/pipeline"), StringView("setClearColor")}, &evox_object_Pipeline_setClearColor_1198735756463553615);
+		functions.insert({StringView("core:renderer/renderer"), StringView("createPipeline")}, &evox_object_Renderer_createPipeline_8820418171601115625);
+		functions.insert({StringView("core:renderer/renderer"), StringView("destroyPipeline")}, &evox_object_Renderer_destroyPipeline_10417378349737653994);
 		functions.insert({StringView("core:renderer/renderer"), StringView("getLODMultiplier")}, &evox_object_Renderer_getLODMultiplier_14506703837845548734);
 		functions.insert({StringView("core:renderer/renderer"), StringView("setLODMultiplier")}, &evox_object_Renderer_setLODMultiplier_2531530158563778094);
+		functions.insert({StringView("core:renderer/shader"), StringView("load")}, &evox_resource_load_Shader);
+		functions.insert({StringView("core:renderer/shader"), StringView("unload")}, &evox_resource_unload_Shader);
+		functions.insert({StringView("core:renderer/shader"), StringView("isReady")}, &evox_resource_isReady_Shader);
+		functions.insert({StringView("core:renderer/shader"), StringView("isFailure")}, &evox_resource_isFailure_Shader);
+		functions.insert({StringView("core:renderer/sprite"), StringView("load")}, &evox_resource_load_Sprite);
+		functions.insert({StringView("core:renderer/sprite"), StringView("unload")}, &evox_resource_unload_Sprite);
+		functions.insert({StringView("core:renderer/sprite"), StringView("isReady")}, &evox_resource_isReady_Sprite);
+		functions.insert({StringView("core:renderer/sprite"), StringView("isFailure")}, &evox_resource_isFailure_Sprite);
+		functions.insert({StringView("core:renderer/texture"), StringView("load")}, &evox_resource_load_Texture);
+		functions.insert({StringView("core:renderer/texture"), StringView("unload")}, &evox_resource_unload_Texture);
+		functions.insert({StringView("core:renderer/texture"), StringView("isReady")}, &evox_resource_isReady_Texture);
+		functions.insert({StringView("core:renderer/texture"), StringView("isFailure")}, &evox_resource_isFailure_Texture);
 		functions.insert({StringView("core:ui/element"), StringView("getID")}, &evox_object_Element_getID_5043487033988361637);
 		functions.insert({StringView("core:ui/element"), StringView("setVisible")}, &evox_object_Element_setVisible_10775676013963828726);
 		functions.insert({StringView("core:ui/element"), StringView("setText")}, &evox_object_Element_setText_16123516204308000926);

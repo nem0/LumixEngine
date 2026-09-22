@@ -6,7 +6,7 @@ import "core:vec4"
 import "core:renderer/model"
 struct ModelInstance { entity : i32; module : cptr; }
 
-extern fn model_instance(e : Entity) : ?ModelInstance;
+extern fn modelInstance(e : Entity) : ?ModelInstance;
 extern fn createModelInstance(e : Entity) : ?ModelInstance;
 extern fn overrideMaterialVec4(entity : ModelInstance, mesh_index : u32, uniform_name : []const u8, value : Vec4) : bool;
 extern fn getModel(entity : ModelInstance) : ?Model;

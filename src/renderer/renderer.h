@@ -19,6 +19,7 @@ namespace Lumix {
 enum class AttributeSemantic : u8;
 struct GBuffer;
 enum class MaterialIndex : u32;
+enum class PipelineType;
 
 struct RenderbufferDesc {
 	IVec2 size;
@@ -74,6 +75,13 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual void waitForCommandSetup() = 0;
 	virtual void waitCanSetup() = 0;
 	virtual struct Engine& getEngine() = 0;
+
+
+	// Caller owns the pipeline and must destroy it before the renderer.
+	//@ function
+	virtual Pipeline& createPipeline(PipelineType type) = 0;
+	//@ function
+	virtual void destroyPipeline(Pipeline& pipeline) = 0;
 	//@ function
 	virtual float getLODMultiplier() const = 0;
 	//@ function

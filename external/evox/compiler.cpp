@@ -1096,54 +1096,12 @@ struct Checker {
 			}
 			case ComptimeValue::VALUE: {
 				if (!arg.type || !arg.value) return nullptr;
-				switch (arg.type->kind) {
-					case ResolvedTypeKind::BOOL: {
-						bool value;
-						memcpy(&value, arg.value, sizeof(value));
-						BoolLiteralExpression* expr = makeType<BoolLiteralExpression>(unit.arena, value);
-						expr->resolved_type = arg.type;
-						return expr;
-					}
-					case ResolvedTypeKind::SLICE: {
-						if (!typesEqual(arg.type, const_u8_slice)) return nullptr;
-						StringLiteralExpression* expr = makeType<StringLiteralExpression>(unit.arena);
-						ex_slice value;
-						memcpy(&value, arg.value, sizeof(value));
-						expr->value = {(const char*)value.data, value.length};
-						expr->resolved_type = arg.type;
-						return expr;
-					}
-					case ResolvedTypeKind::F32:
-					case ResolvedTypeKind::F64: {
-						FloatLiteralExpression* expr = makeType<FloatLiteralExpression>(unit.arena);
-						expr->value = comptimeNumericToF64(arg.value, arg.type->kind);
-						expr->resolved_type = arg.type;
-						return expr;
-					}
-					case ResolvedTypeKind::ENUM:
-					default:
-						if (!isIntegerType(*arg.type) && arg.type->kind != ResolvedTypeKind::ENUM) return nullptr;
-						if (arg.type->kind >= ResolvedTypeKind::U8 && arg.type->kind <= ResolvedTypeKind::U64) {
-							IntLiteralExpression* expr = makeType<IntLiteralExpression>(unit.arena);
-							expr->value = comptimeNumericToU64(arg.value, arg.type->kind);
-							expr->resolved_type = arg.type;
-							return expr;
-						}
-						const i64 value = comptimeNumericToI64(arg.value, arg.type->kind);
-						if (value >= 0) {
-							IntLiteralExpression* expr = makeType<IntLiteralExpression>(unit.arena);
-							expr->value = (u64)value;
-							expr->resolved_type = arg.type;
-							return expr;
-						}
-						UnaryExpression* neg = makeType<UnaryExpression>(unit.arena);
-						IntLiteralExpression* magnitude = makeType<IntLiteralExpression>(unit.arena);
-						magnitude->value = (u64)(-(value + 1)) + 1u;
-						neg->expression = magnitude;
-						neg->op = Token::MINUS;
-						neg->resolved_type = arg.type;
-						return neg;
-				}
+				Expression* expr = makeType<Expression>(unit.arena, Expression::CONSTANT);
+				expr->resolved_type = arg.type;
+				expr->eval_stage = comptimeStageForType(arg.type);
+				// Freeze the existing value instead of decoding it into literal syntax.
+				expr->comptime_value = makePersistentValue(unit, arg.type, arg.value, typeByteSize(*arg.type));
+				return expr;
 			}
 		}
 
@@ -1155,6 +1113,9 @@ struct Checker {
 		if (!src) return nullptr;
 		Expression* out = nullptr;
 		switch (src->kind) {
+			case Expression::CONSTANT:
+				out = makeComptimeValueExpression(unit, src->comptime_value);
+				break;
 			case Expression::IDENTIFIER: {
 				IdentifierExpression* s = static_cast<IdentifierExpression*>(src);
 				if (const TemplateBinding* binding = findTemplateBinding(bindings, s->name)) {
@@ -2445,7 +2406,8 @@ struct Checker {
 					errorLine(member.name, "Enum member value must be known at compile time");
 					return false;
 				}
-				const bool source_unsigned = isUnsignedEnumBacking(value.type->kind) || (value.type->kind == ResolvedTypeKind::UNTYPED_INT && member.value->kind == Expression::INT_LITERAL);
+				const bool source_unsigned = isUnsignedEnumBacking(value.type->kind)
+					|| (value.type->kind == ResolvedTypeKind::UNTYPED_INT && untypedIntIsUnsigned(*member.value));
 				const u64 unsigned_value = comptimeNumericToU64(value.value, value.type->kind);
 				const i64 signed_value = comptimeNumericToI64(value.value, value.type->kind);
 				const bool negative = !source_unsigned && signed_value < 0;
@@ -4176,6 +4138,7 @@ struct Checker {
 
 	Expression* checkExpr(Unit& unit, FunctionCheckContext* ctx, Expression& expr, ResolvedType* hint, ResolvedType* first_arg_type = nullptr) {
 		switch (expr.kind) {
+			case Expression::CONSTANT: return &expr;
 			case Expression::INT_LITERAL: {
 				expr.resolved_type = primitiveType(ResolvedTypeKind::UNTYPED_INT);
 				expr.eval_stage = Expression::COMPTIME_VALUE;
@@ -6384,6 +6347,8 @@ struct Checker {
 			comptime_stack_ptr = comptime_stack;
 		}
 		switch (expr.kind) {
+			case Expression::CONSTANT:
+				return copyComptimeValue(expr.comptime_value.type, expr.comptime_value.value);
 			case Expression::TYPE_MEMBER: {
 				if (expr.comptime_value) return expr.comptime_value;
 				auto& tme = static_cast<TypeMemberExpression&>(expr);

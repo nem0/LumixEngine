@@ -5,7 +5,7 @@ import "core:entity"
 import "core:vec2"
 struct UI3D { entity : i32; module : cptr; }
 
-extern fn ui_3d(e : Entity) : ?UI3D;
+extern fn ui3d(e : Entity) : ?UI3D;
 extern fn createUI3D(e : Entity) : ?UI3D;
 extern fn getPath(entity : UI3D) : []const u8;
 extern fn setPath(entity : UI3D, path : []const u8) : void;

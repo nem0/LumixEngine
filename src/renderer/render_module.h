@@ -365,6 +365,7 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual RayCastModelHit castRayInstancedModels(const Ray& ray, const Delegate<bool (const RayCastModelHit&)>& filter) = 0;
 
 	//@ functions
+	virtual Renderer& getRenderer() const = 0;
 	virtual RayCastModelHit castRay(const Ray& ray, EntityPtr ignore) = 0;
 	virtual RayCastModelHit castRayTerrain(const Ray& ray) = 0;
 	virtual void addDebugTriangle(const DVec3& p0, const DVec3& p1, const DVec3& p2, Color color) = 0;

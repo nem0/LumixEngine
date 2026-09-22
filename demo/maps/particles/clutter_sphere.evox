@@ -33,7 +33,7 @@ fn update(time_delta : f32) : void {
 	if p.x > g_start_position.x + 18.0 and g_velocity.x > 0.0 { randomVelocity(); }
 	if p.z > g_start_position.z + 18.0 and g_velocity.z > 0.0 { randomVelocity(); }
 
-	if const emitter = g_clutter.particle_emitter() {
+	if const emitter = g_clutter.particleEmitter() {
 		const id = emitter.getGlobalID("effector_pos");
 		emitter.setVec3Global(id, {p.x as f32, p.y as f32, p.z as f32});
 	}

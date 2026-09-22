@@ -7,7 +7,7 @@ import "core:vec3"
 import "core:vec2"
 struct SphericalJoint { entity : i32; module : cptr; }
 
-extern fn spherical_joint(e : Entity) : ?SphericalJoint;
+extern fn sphericalJoint(e : Entity) : ?SphericalJoint;
 extern fn createSphericalJoint(e : Entity) : ?SphericalJoint;
 extern fn getConnectedBody(entity : SphericalJoint) : Entity;
 extern fn setConnectedBody(entity : SphericalJoint, connected_body : Entity) : void;

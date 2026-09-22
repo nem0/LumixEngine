@@ -7,7 +7,7 @@ import "core:vec3"
 import "core:vec2"
 struct DistanceJoint { entity : i32; module : cptr; }
 
-extern fn distance_joint(e : Entity) : ?DistanceJoint;
+extern fn distanceJoint(e : Entity) : ?DistanceJoint;
 extern fn createDistanceJoint(e : Entity) : ?DistanceJoint;
 extern fn getConnectedBody(entity : DistanceJoint) : Entity;
 extern fn setConnectedBody(entity : DistanceJoint, connected_body : Entity) : void;

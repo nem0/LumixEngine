@@ -7,7 +7,7 @@ import "core:entity"
 import "core:vec3"
 struct BoneAttachment { entity : i32; module : cptr; }
 
-extern fn bone_attachment(e : Entity) : ?BoneAttachment;
+extern fn boneAttachment(e : Entity) : ?BoneAttachment;
 extern fn createBoneAttachment(e : Entity) : ?BoneAttachment;
 extern fn setRotation(entity : BoneAttachment, rot : Quat) : void;
 extern fn getParent(entity : BoneAttachment) : Entity;

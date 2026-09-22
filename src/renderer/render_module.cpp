@@ -227,6 +227,7 @@ struct RenderModuleImpl final : RenderModule {
 
 
 	ISystem& getSystem() const override { return m_renderer; }
+	Renderer& getRenderer() const override { return m_renderer; }
 
 	float getCameraScreenWidth(EntityRef entity) override {
 		return m_cameras[entity].screen_width;

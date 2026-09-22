@@ -4,7 +4,7 @@
 import "core:entity"
 struct InstancedMesh { entity : i32; module : cptr; }
 
-extern fn physical_instanced_mesh(e : Entity) : ?InstancedMesh;
+extern fn physicalInstancedMesh(e : Entity) : ?InstancedMesh;
 extern fn createInstancedMesh(e : Entity) : ?InstancedMesh;
 extern fn getLayer(entity : InstancedMesh) : u32;
 extern fn setLayer(entity : InstancedMesh, layer : u32) : void;

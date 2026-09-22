@@ -369,25 +369,6 @@ StringView withoutSuffix(StringView str, i32 suffix_len) {
 	return res;
 }
 
-StringView consumeArgs(StringView& str) {
-	str = skipWhitespaces(str);
-	StringView args;
-	args.begin = str.begin;
-	args.end = args.begin;
-	if (args.begin == str.end) return args;
-	if (*args.begin != '(') return args;
-	while (args.end != str.end && *args.end != ')') ++args.end;
-	if (args.end != str.end) ++args.end; // include ')'
-	str.begin = args.end;
-
-	// trim "()"
-	if (args.size() > 1) {
-		++args.begin;
-		--args.end;
-	}
-	return args;
-}
-
 OutputStream::OutputStream() {
 	data = new char[capacity];
 }
@@ -603,11 +584,64 @@ struct Parser {
 		return true;
 	}
 
+	bool readFunctionDeclaration(StringView& str) {
+		const char* cursor = str.begin;
+		i32 depth = 0;
+		bool opened = false;
+		for (;;) {
+			while (cursor != str.end) {
+				const char c = *cursor++;
+				if (c == '(') {
+					opened = true;
+					++depth;
+				}
+				else if (c == ')' && opened) {
+					if (--depth == 0) return true;
+				}
+				else if (c == ';' || c == '{' || c == '}') {
+					logError("Incomplete function declaration");
+					return false;
+				}
+			}
+			StringView next;
+			if (!readLine(next)) {
+				logError("Unterminated function argument list");
+				return false;
+			}
+			// Lines share a source buffer; retain their intervening whitespace.
+			str.end = next.end;
+		}
+	}
+
+	bool consumeArgs(StringView& str, StringView& args) {
+		str = skipWhitespaces(str);
+		args = {};
+		if (str.size() == 0 || *str.begin != '(') {
+			logError("Expected '(' at start of function argument list");
+			return false;
+		}
+		const char* end = str.begin;
+		i32 depth = 0;
+		do {
+			if (*end == '(') ++depth;
+			else if (*end == ')') --depth;
+			++end;
+		} while (end != str.end && depth > 0);
+		if (depth != 0) {
+			logError("Unterminated function argument list: expected ')'");
+			return false;
+		}
+		args = {str.begin + 1, end - 1};
+		str.begin = end;
+		return true;
+	}
+
 	Function consumeCPPFunction(StringView& str) {
 		Function res;
+		if (!readFunctionDeclaration(str)) return res;
 		res.return_type = consumeType(str);
 		res.name = consumeIdentifier(str);
-		res.args = consumeArgs(str);
+		if (!consumeArgs(str, res.args)) return {};
 		StringView suffix = skipWhitespaces(str);
 		res.is_const = suffix.size() >= 5
 			&& suffix.begin[0] == 'c' && suffix.begin[1] == 'o' && suffix.begin[2] == 'n'
@@ -752,6 +786,7 @@ struct Parser {
 			}
 			else if (equal(word, "virtual")) {
 				Function fn = consumeCPPFunction(line);
+				if (fn.name.size() == 0) continue;
 
 				StringView property_name = fn.name;
 				if (consumePrefix(property_name, "get") || consumePrefix(property_name, "is")) {
@@ -854,6 +889,7 @@ struct Parser {
 			}
 			else if (equal(word, "virtual")) {
 				Function fn = consumeCPPFunction(line);
+				if (fn.name.size() == 0) continue;
 
 				StringView property_name = fn.name;
 				if (fn.attributes.force_function) {
@@ -914,6 +950,7 @@ struct Parser {
 			StringView word = consumeWord(line);
 			if (equal(word, "virtual")) {
 				Function fn = consumeCPPFunction(line);
+				if (fn.name.size() == 0) continue;
 				current_module->functions.emplace(fn);
 			}
 			else if (equal(word, "//@")) {
@@ -953,7 +990,15 @@ struct Parser {
 		strncpy_s(e.filename, filename.size() + 1, filename.begin, filename.size());
 		e.full = full.size() > 0 ? full : enum_name;
 		e.name = enum_name;
-		last_enumerator_value = -1;
+		e.underlying_type = makeStringView("int");
+		if (equal(consumeWord(line), ":")) {
+			line = skipWhitespaces(line);
+			e.underlying_type = line;
+			while (line.size() > 0 && line[0] != '{' && line[0] != ';') ++line.begin;
+			e.underlying_type.end = line.begin;
+			while (e.underlying_type.size() > 0 && (e.underlying_type[e.underlying_type.size() - 1] == ' ' || e.underlying_type[e.underlying_type.size() - 1] == '\t')) --e.underlying_type.end;
+		}
+		last_enumerator_value = ~u64(0);
 
 		if (find(line, ";").size() > 0) {
 			// one line enum or forward decl - e.g. enum Handle : i32;
@@ -1010,7 +1055,7 @@ struct Parser {
 					last_enumerator_value = e.value;
 				}
 				else {
-					e.value = (i32)strtol(tmp, nullptr, 0);
+					e.value = strtoull(tmp, nullptr, 0);
 					last_enumerator_value = e.value;
 				}
 			}
@@ -1148,14 +1193,12 @@ struct Parser {
 						logError("Expected new line with function");
 						continue;
 					}
-					Function& func = o.functions.emplace();
 					word = peekWord(line);
 					if (equal(word, "virtual")) {
 						consumeWord(line);
 					}
-					func.return_type = consumeType(line);
-					func.name = consumeIdentifier(line);
-					func.args = consumeArgs(line);
+					Function func = consumeCPPFunction(line);
+					if (func.name.size() != 0) o.functions.emplace(func);
 				}
 				else {
 					logError("Unexpected ", word);
@@ -1355,7 +1398,7 @@ struct Parser {
 
 	IAllocator& allocator;
 	StringView filename;
-	i32 last_enumerator_value = -1;
+	u64 last_enumerator_value = ~u64(0);
 	Component* current_component = nullptr;
 	Module* current_module = nullptr;
 	ExpArray<Module> modules;

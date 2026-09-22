@@ -17,7 +17,7 @@ fn goToRandomPoint(e : Entity) : void {
 		randFloatRange(10, 20) as f64
 	};
 	var anim = e.animator() else return;
-	var agent = e.navmesh_agent() else return;
+	var agent = e.navmeshAgent() else return;
 
 	agent.navigate(dst, speed, 0.5);
 	var speed_input = anim.getInputIndex("speed_y");
@@ -45,7 +45,7 @@ fn init(world : World) : void {
 
 fn update() : void {
 	for b in g_bots {
-		var agent = b.navmesh_agent() else return;
+		var agent = b.navmeshAgent() else return;
 		if agent.isFinished() {
 			goToRandomPoint(b);
 		}

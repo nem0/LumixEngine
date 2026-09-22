@@ -4,6 +4,7 @@
 #include "xxhash/xxhash.h"
 
 using i32 = int;
+using u64 = unsigned long long;
 
 #if defined(_MSC_VER)
 	#define bitScanReverse(value) ([](unsigned long v) { unsigned long result; _BitScanReverse(&result, v); return result; }(value))
@@ -173,12 +174,13 @@ struct StructVar {
 
 struct Enumerator {
 	StringView name;
-	i32 value;
+	u64 value;
 };
 
 struct Enum {
 	Enum(IAllocator& allocator) : values(allocator) {}
 	StringView name;
+	StringView underlying_type;
 	char* filename = nullptr;
 	StringView full;
 	ExpArray<Enumerator> values;

@@ -3,7 +3,7 @@
 
 struct EchoZone { entity : i32; module : cptr; }
 
-extern fn echo_zone(e : Entity) : ?EchoZone;
+extern fn echoZone(e : Entity) : ?EchoZone;
 extern fn createEchoZone(e : Entity) : ?EchoZone;
 extern fn getRadius(entity : EchoZone) : f32;
 extern fn setRadius(entity : EchoZone, value : f32) : void;
