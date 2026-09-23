@@ -4921,7 +4921,7 @@ namespace Lumix::Evox::generated {
 		EX_ARG(frame, Quat, rot);
 		EX_ARG(frame, Vec3, scale);
 		auto ret = object->instantiatePrefab(*world, *prefab, pos, rot, scale);
-		EX_RESULT(frame, ExEntity(ret.index, nullptr));
+		EX_RESULT(frame, ExEntity(ret.index, world));
 	}
 	
 	static void evox_object_Engine_setTimeMultiplier_4469831530226950084(ex_runtime* runtime, ex_call_frame frame) {

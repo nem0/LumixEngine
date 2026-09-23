@@ -894,7 +894,13 @@ void serializeEvoxObjectWrapper(OutputStream& out, Object& o, Function& f) {
 		appendArgExpression(out, arg);
 	});
 	L(");");
-	appendReturnValue(out, f.return_type, "ret");
+	const char* return_world_expr = nullptr;
+	if (isEvoxEntityType(f.return_type)) {
+		forEachArg(f.args, [&](const Arg& arg, bool) {
+			if (equal(arg.type, "World") && equal(arg.name, "world")) return_world_expr = "world";
+		});
+	}
+	appendReturnValue(out, f.return_type, "ret", return_world_expr);
 	L("}" OUT_ENDL);
 }
 
