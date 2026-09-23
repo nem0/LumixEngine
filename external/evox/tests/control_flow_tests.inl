@@ -64,6 +64,15 @@ TEST(IfConditionMustBeBoolFails) {
 	return true;
 }
 
+TEST(WhileUnknownConditionFailsGracefully) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn main() : void {
+			while missing_condition {}
+		}
+	)");
+	return true;
+}
+
 TEST(VoidFunctionCanNotReturnValue) {
 	const char* source = R"(
 		fn main() : void {

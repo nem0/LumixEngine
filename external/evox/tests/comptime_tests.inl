@@ -79,6 +79,37 @@ TEST(ComptimeUntypedIntNarrowParameterMustFail) {
 	return true;
 }
 
+TEST(ComptimeValueParameterRejectsRuntimeExpression) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn takes(value : comptime i32) : void {}
+		fn main() : void {
+			var value : i32 = 1;
+			takes(value);
+		}
+	)");
+	return true;
+}
+
+TEST(ComptimeParameterPrunesInvalidBranch) {
+	const char* source = R"(
+		fn choose(flag : comptime bool) : i32 {
+			if flag {
+				return 7;
+			} else {
+				var invalid : MissingType = undefined;
+			}
+		}
+		fn main() : i32 { return choose(true); }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(7, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
 TEST(ComptimeUntypedU64NarrowingMustFail) {
 	EXPECT_COMPILE_FAIL(R"(
 		comptime value = 18446744073709551615;
@@ -332,6 +363,32 @@ TEST(ComptimeBinaryExpressionU64EdgeCases) {
 	return true;
 }
 
+// Unreachable division by zero must not be evaluated by the comptime interpreter.
+TEST(ComptimeAndShortCircuits) {
+	EXPECT_COMPILE(R"(
+		comptime value = false and (1 / 0 == 0);
+		fn main() : bool { return value; }
+	)");
+	return true;
+}
+
+TEST(ComptimeOrShortCircuits) {
+	EXPECT_COMPILE(R"(
+		comptime value = true or (1 / 0 == 0);
+		fn main() : bool { return value; }
+	)");
+	return true;
+}
+
+// An array's element count may fit in u32 even though its size in bytes does not.
+// This uses sizeof only: no giant array should be allocated to diagnose the overflow.
+TEST(ComptimeArrayByteSizeOverflowRejected) {
+	EXPECT_COMPILE_FAIL(R"(
+		comptime bytes = sizeof([536870912]u64);
+	)");
+	return true;
+}
+
 TEST(ComptimeBinaryExpressionDivisionByZeroFails) {
 	EXPECT_COMPILE_FAIL(R"(
 		comptime value = 1 / 0;
@@ -342,6 +399,24 @@ TEST(ComptimeBinaryExpressionDivisionByZeroFails) {
 	EXPECT_COMPILE_FAIL(R"(
 		comptime value = 1.0 / 0.0;
 	)");
+	return true;
+}
+
+// A field read returns a pointer into an aggregate, not the last byte on the
+// interpreter's scratch stack. The true condition must select the first arm.
+TEST(ComptimeTernaryReadsConditionValue) {
+	const char* source = R"(
+		struct Info { flag : bool; tail : i32; }
+		comptime info = Info { true, 0 };
+		comptime choice = info.flag ? 42 : 0;
+		fn main() : i32 { return choice; }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
 
@@ -2222,6 +2297,69 @@ TEST(ComptimeNestedAggregateFolds) {
 	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
 	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
 	CAPI_END(module);
+	return true;
+}
+
+// A return from inside a while body must escape the whole comptime call.
+TEST(ComptimeWhilePropagatesReturn) {
+	const char* source = R"(
+		fn choose() : i32 {
+			var i : i32 = 0;
+			while i < 2 {
+				i += 1;
+				return 42;
+			}
+			return 0;
+		}
+		comptime answer = choose();
+		fn main() : i32 { return answer; }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+// The checker permits a name to be reused in disjoint blocks. The interpreter
+// should retire the first binding before evaluating the second block.
+TEST(ComptimeSiblingBlocksReuseLocalName) {
+	const char* source = R"(
+		fn choose() : i32 {
+			var answer : i32 = 0;
+			if true {
+				var value : i32 = 1;
+				answer += value;
+			}
+			if true {
+				var value : i32 = 41;
+				answer += value;
+			}
+			return answer;
+		}
+		comptime result = choose();
+		fn main() : i32 { return result; }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ComptimeScratchStackBounded) {
+	EXPECT_COMPILE_FAIL(R"(
+		fn count() : i32 {
+			var i : i32 = 0;
+			while i < 300000 { i += 1; }
+			return i;
+		}
+		comptime answer = count();
+	)");
 	return true;
 }
 

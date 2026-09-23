@@ -1,3 +1,13 @@
+TEST(ComptimeSameTypeBoolCast) {
+	const char* source = R"(
+		fn main() : bool {
+			return true as bool;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(BytecodeExplicitCastNumeric) {
 	const char* source = R"(
 		fn main() : f32 {

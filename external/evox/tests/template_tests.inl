@@ -64,6 +64,21 @@ TEST(TemplateFunctionPointerArgumentRejectsUnassignableExpression) {
 	return true;
 }
 
+TEST(TemplateFunctionAddressOfExpressionIsCloned) {
+	const char* source = R"(
+		fn address(value : $T) : *const T {
+			return &value;
+		}
+		fn main() : i32 {
+			var value : i32 = 41;
+			var pointer : *const i32 = address(value);
+			return pointer.* + 1;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
+
 TEST(TemplateFunctionNullablePointerParameterInstantiates) {
 	const char* source = R"(
 		fn clear(v : ?*$T) : void {
