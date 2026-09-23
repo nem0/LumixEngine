@@ -2925,6 +2925,20 @@ namespace Lumix::Evox::generated {
 		module->setActorDynamicType(EntityRef(entity.index), (PhysicsModule::DynamicType)_value);
 	}
 	
+	static void evox_rigid_actor_getActorMass_12542904281686005635(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, entity);
+		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
+		auto ret = module->getActorMass(EntityRef(entity.index));
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_rigid_actor_setActorMass_11936772747892764600(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, entity);
+		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
+		EX_ARG(frame, float, mass);
+		module->setActorMass(EntityRef(entity.index), mass);
+	}
+	
 	static void evox_rigid_actor_getActorIsTrigger_4548474388385742385(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
@@ -5523,6 +5537,8 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:physics/rigid_actor"), StringView("setLayer")}, &evox_rigid_actor_setActorLayer_13867100007697589713);
 		functions.insert({StringView("core:physics/rigid_actor"), StringView("getDynamicType")}, &evox_rigid_actor_getActorDynamicType_4405303283298304035);
 		functions.insert({StringView("core:physics/rigid_actor"), StringView("setDynamicType")}, &evox_rigid_actor_setActorDynamicType_1282153940877898376);
+		functions.insert({StringView("core:physics/rigid_actor"), StringView("getMass")}, &evox_rigid_actor_getActorMass_12542904281686005635);
+		functions.insert({StringView("core:physics/rigid_actor"), StringView("setMass")}, &evox_rigid_actor_setActorMass_11936772747892764600);
 		functions.insert({StringView("core:physics/rigid_actor"), StringView("getIsTrigger")}, &evox_rigid_actor_getActorIsTrigger_4548474388385742385);
 		functions.insert({StringView("core:physics/rigid_actor"), StringView("setIsTrigger")}, &evox_rigid_actor_setActorIsTrigger_7337888994561917648);
 		functions.insert({StringView("core:physics/rigid_actor"), StringView("getMesh")}, &evox_rigid_actor_getActorMesh_6841595999302178306);

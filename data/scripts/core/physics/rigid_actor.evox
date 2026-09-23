@@ -22,6 +22,8 @@ extern fn getLayer(entity : Actor) : u32;
 extern fn setLayer(entity : Actor, layer : u32) : void;
 extern fn getDynamicType(entity : Actor) : DynamicType;
 extern fn setDynamicType(entity : Actor, arg2 : DynamicType) : void;
+extern fn getMass(entity : Actor) : f32;
+extern fn setMass(entity : Actor, mass : f32) : void;
 extern fn getIsTrigger(entity : Actor) : bool;
 extern fn setIsTrigger(entity : Actor, is_trigger : bool) : void;
 extern fn getMesh(entity : Actor) : []const u8;

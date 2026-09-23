@@ -281,6 +281,8 @@ struct PhysicsModule : IModule {
 	virtual void setActorLayer(EntityRef entity, u32 layer) = 0;
 	virtual DynamicType getActorDynamicType(EntityRef entity) = 0;			//@ label "Dynamic"
 	virtual void setActorDynamicType(EntityRef entity, DynamicType) = 0;
+	virtual float getActorMass(EntityRef entity) = 0;
+	virtual void setActorMass(EntityRef entity, float mass) = 0;
 	virtual bool getActorIsTrigger(EntityRef entity) = 0;
 	virtual void setActorIsTrigger(EntityRef entity, bool is_trigger) = 0;
 	virtual Path getActorMesh(EntityRef entity) = 0;						//@ resource_type PhysicsGeometry::TYPE

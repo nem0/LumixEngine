@@ -72,6 +72,7 @@ enum class PhysicsModuleVersion
 	INSTANCED_MESH,
 	MATERIAL,
 	CCD,
+	ACTOR_MASS,
 
 	LATEST,
 };
@@ -328,6 +329,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 			, prev_with_mesh(rhs.prev_with_mesh)
 			, next_with_mesh(rhs.next_with_mesh)
 			, dynamic_type(rhs.dynamic_type)
+			, mass(rhs.mass)
 			, is_trigger(rhs.is_trigger)
 			, ccd(rhs.ccd)
 		{
@@ -359,6 +361,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		EntityPtr prev_with_mesh = INVALID_ENTITY;
 		EntityPtr next_with_mesh = INVALID_ENTITY;
 		DynamicType dynamic_type = DynamicType::STATIC;
+		float mass = 1.f;
 		bool is_trigger = false;
 		bool ccd = false;
 	};
@@ -2986,11 +2989,23 @@ struct PhysicsModuleImpl final : PhysicsModule
 		}
 		PxRigidBody* rigid_body = new_physx_actor->is<PxRigidBody>();
 		if (rigid_body) {
-			PxRigidBodyExt::updateMassAndInertia(*rigid_body, 1);
+			PxRigidBodyExt::setMassAndUpdateInertia(*rigid_body, actor.mass);
 		}
 		actor.setPhysxActor(new_physx_actor);
 	}
 
+
+	float getActorMass(EntityRef entity) override {
+		return m_actors[entity].mass;
+	}
+
+	void setActorMass(EntityRef entity, float mass) override {
+		RigidActor& actor = m_actors[entity];
+		actor.mass = maximum(0.001f, mass);
+		if (PxRigidBody* body = actor.physx_actor ? actor.physx_actor->is<PxRigidBody>() : nullptr) {
+			PxRigidBodyExt::setMassAndUpdateInertia(*body, actor.mass);
+		}
+	}
 
 	void duplicateShape(PxShape* shape, PxRigidActor* actor, physx::PxMaterial* material)
 	{
@@ -3078,6 +3093,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 				default: ASSERT(false); break;
 			}
 		}
+		serializer.write(actor.mass);
 	}
 
 
@@ -3294,6 +3310,10 @@ struct PhysicsModuleImpl final : PhysicsModule
 						shape->setFlag(PxShapeFlag::eTRIGGER_SHAPE, true);
 					}
 				}
+			}
+			if (version > (i32)PhysicsModuleVersion::ACTOR_MASS) serializer.read(actor.mass);
+			if (PxRigidBody* body = physx_actor->is<PxRigidBody>()) {
+				PxRigidBodyExt::setMassAndUpdateInertia(*body, actor.mass);
 			}
 			actor.setPhysxActor(physx_actor);
 			m_actors.insert(entity, static_cast<RigidActor&&>(actor));
