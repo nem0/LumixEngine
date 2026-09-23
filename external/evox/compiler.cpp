@@ -212,7 +212,7 @@ u32 typeByteSize(const ResolvedType& t) {
 			const ArrayResolvedType& arr = static_cast<const ArrayResolvedType&>(t);
 			EX_ASSERT(arr.size > 0);
 			const u32 element_size = typeByteSize(*arr.element_type);
-			if (arr.size > 0xffffffffull / element_size) return 0xffffffffu;
+			if (arr.size > static_cast<i64>(0xffffffffu / element_size)) return 0xffffffffu;
 			return (u32)arr.size * element_size;
 		}
 		case ResolvedTypeKind::STRUCT:
@@ -3563,7 +3563,7 @@ struct Checker {
 			IdentifierExpression* id = static_cast<IdentifierExpression*>(member.expression);
 			if (Unit* imported_unit = findImportedUnitByAlias(unit, id->name)) {
 				id->symbol = findSymbol(unit, id->name);
-				SymbolRef sym = resolveSymbol(*imported_unit, {}, member.name.value, LookupPolicy::Checked);
+				SymbolRef sym = resolveSymbol(unit, id->name, member.name.value, LookupPolicy::Checked);
 				if (!sym.symbol) {
 					errorLine(expr.token, member.name.value, " not found in ", id->name);
 					return nullptr;

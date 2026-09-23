@@ -266,6 +266,31 @@ TEST(ImportsAreNotTransitiveAcrossModules) {
 	return true;
 }
 
+TEST(ImportAliasDoesNotReExportImportedSymbols) {
+	const char* main_source = R"(
+		import "a" as a
+
+		fn main() : i32 {
+			return a.load();
+		}
+	)";
+	const char* a_source = R"(
+		import "b"
+
+		fn load() : i32 { return 1; }
+	)";
+	const char* b_source = R"(
+		fn load() : i32 { return 2; }
+	)";
+	EvoxImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) }
+	};
+	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
 TEST(ImportSymbolCollisionFails) {
 	const char* main_source = R"(
 		import "a"
