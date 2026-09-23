@@ -5,7 +5,7 @@ import "core:renderer/pipeline"
 import "core:renderer/pipelinetype"
 struct Renderer { ptr : cptr; }
 
-extern fn createPipeline(object : Renderer, type : PipelineType) : Pipeline;
+extern fn createPipeline(object : Renderer, type_ : PipelineType) : Pipeline;
 extern fn destroyPipeline(object : Renderer, pipeline : Pipeline) : void;
 extern fn getLODMultiplier(object : Renderer) : f32;
 extern fn setLODMultiplier(object : Renderer, value : f32) : void;

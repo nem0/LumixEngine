@@ -1477,6 +1477,10 @@ void appendEvoxImportType(OutputStream& out, StringView type) {
 }
 
 void appendEvoxDeclArgName(OutputStream& out, StringView name, i32 idx) {
+	if (equal(name, "type")) {
+		out.add("type_");
+		return;
+	}
 	if (name.size() > 0) {
 		out.add(name);
 		return;
@@ -1783,8 +1787,11 @@ void serializeCoreImports(MetaData& data) {
 				continue;
 			}
 			out.add("extern fn ", functionScriptName(f), "(module : ", m.name);
+			i32 arg_idx = 0;
 			forEachArg(f.args, [&](const Arg& arg, bool) {
-				out.add(", ", arg.name, " : ");
+				out.add(", ");
+				appendEvoxDeclArgName(out, arg.name, arg_idx++);
+				out.add(" : ");
 				appendEvoxDeclArgType(out, arg);
 			});
 			out.add(") : ");
