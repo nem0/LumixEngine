@@ -9,8 +9,8 @@ struct HingeJoint { entity : i32; module : cptr; }
 
 extern fn hingeJoint(e : Entity) : ?HingeJoint;
 extern fn createHingeJoint(e : Entity) : ?HingeJoint;
-extern fn getConnectedBody(entity : HingeJoint) : Entity;
-extern fn setConnectedBody(entity : HingeJoint, connected_body : Entity) : void;
+extern fn getConnectedBody(entity : HingeJoint) : ?Entity;
+extern fn setConnectedBody(entity : HingeJoint, connected_body : ?Entity) : void;
 extern fn getAxisPosition(entity : HingeJoint) : Vec3;
 extern fn setAxisPosition(entity : HingeJoint, value : Vec3) : void;
 extern fn getAxisDirection(entity : HingeJoint) : Vec3;

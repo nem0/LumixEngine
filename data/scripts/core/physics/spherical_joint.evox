@@ -9,8 +9,8 @@ struct SphericalJoint { entity : i32; module : cptr; }
 
 extern fn sphericalJoint(e : Entity) : ?SphericalJoint;
 extern fn createSphericalJoint(e : Entity) : ?SphericalJoint;
-extern fn getConnectedBody(entity : SphericalJoint) : Entity;
-extern fn setConnectedBody(entity : SphericalJoint, connected_body : Entity) : void;
+extern fn getConnectedBody(entity : SphericalJoint) : ?Entity;
+extern fn setConnectedBody(entity : SphericalJoint, connected_body : ?Entity) : void;
 extern fn getAxisPosition(entity : SphericalJoint) : Vec3;
 extern fn setAxisPosition(entity : SphericalJoint, value : Vec3) : void;
 extern fn getAxisDirection(entity : SphericalJoint) : Vec3;

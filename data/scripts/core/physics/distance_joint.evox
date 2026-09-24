@@ -9,8 +9,8 @@ struct DistanceJoint { entity : i32; module : cptr; }
 
 extern fn distanceJoint(e : Entity) : ?DistanceJoint;
 extern fn createDistanceJoint(e : Entity) : ?DistanceJoint;
-extern fn getConnectedBody(entity : DistanceJoint) : Entity;
-extern fn setConnectedBody(entity : DistanceJoint, connected_body : Entity) : void;
+extern fn getConnectedBody(entity : DistanceJoint) : ?Entity;
+extern fn setConnectedBody(entity : DistanceJoint, connected_body : ?Entity) : void;
 extern fn getAxisPosition(entity : DistanceJoint) : Vec3;
 extern fn setAxisPosition(entity : DistanceJoint, value : Vec3) : void;
 extern fn getDamping(entity : DistanceJoint) : f32;

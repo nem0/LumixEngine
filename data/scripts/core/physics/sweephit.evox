@@ -5,7 +5,7 @@ import "core:entity"
 struct SweepHit {
 	position : Vec3;
 	normal : Vec3;
-	entity : Entity;
+	entity : ?Entity;
 	distance : f32;
 }
 

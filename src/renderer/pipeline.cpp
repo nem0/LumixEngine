@@ -1988,6 +1988,7 @@ struct PipelineImpl final : Pipeline {
 			gpu::TextureHandle texture_id = atlas_texture->handle;
 			if (cmd.texture != gpu::INVALID_TEXTURE) texture_id = cmd.texture;
 			if (!texture_id) texture_id = atlas_texture->handle;
+			if (cmd.texture != gpu::INVALID_TEXTURE) stream.barrier(texture_id, gpu::BarrierType::READ);
 
 			ubdata.texture = gpu::getBindlessHandle(texture_id);
 			setUniform(ubdata);

@@ -151,7 +151,7 @@ Notable mapping details:
 - `float` appears as `f32`.
 - `StringView`, paths, and supported C strings appear as `[]const u8`.
 - object pointers become nullable object handles;
-- `EntityRef` and `EntityPtr` become `Entity` values associated with the module's world;
+- `EntityRef` becomes an `Entity`; `EntityPtr` becomes a nullable `?Entity`. Both are associated with the module's world;
 - native enums are strongly typed Evox enums.
 
 The declaration's unit and function name must exactly match the native registration. A declaration alone does not implement a native function.

@@ -10,8 +10,8 @@ struct BoneAttachment { entity : i32; module : cptr; }
 extern fn boneAttachment(e : Entity) : ?BoneAttachment;
 extern fn createBoneAttachment(e : Entity) : ?BoneAttachment;
 extern fn setRotation(entity : BoneAttachment, rot : Quat) : void;
-extern fn getParent(entity : BoneAttachment) : Entity;
-extern fn setParent(entity : BoneAttachment, parent : Entity) : void;
+extern fn getParent(entity : BoneAttachment) : ?Entity;
+extern fn setParent(entity : BoneAttachment, parent : ?Entity) : void;
 extern fn getBone(entity : BoneAttachment) : i32;
 extern fn setBone(entity : BoneAttachment, value : i32) : void;
 extern fn getPosition(entity : BoneAttachment) : Vec3;

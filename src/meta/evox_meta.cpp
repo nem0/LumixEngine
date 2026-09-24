@@ -336,7 +336,8 @@ void logUnsupportedEvoxFunctionArgs(const char* scope, StringView owner, Functio
 void appendValueExpression(OutputStream& out, StringView type, StringView name) {
 	switch (getEvoxType(type)) {
 		case EvoxType::ENTITY_T:
-			out.add(equal(type, "EntityRef") ? "EntityRef(" : "EntityPtr(", name, ".index)");
+			if (equal(type, "EntityRef")) out.add("EntityRef(", name, ".index)");
+			else out.add("EntityPtr(", name, "_has_value ? ", name, ".index : -1)");
 			break;
 		case EvoxType::COLOR_T:
 			out.add("Color(u8(", name, "_r), u8(", name, "_g), u8(", name, "_b), u8(", name, "_a))");
@@ -356,7 +357,11 @@ void appendValueExpression(OutputStream& out, StringView type, StringView name) 
 void emitFrameValueRead(OutputStream& out, StringView type, StringView name) {
 	switch (getEvoxType(type)) {
 		case EvoxType::ENTITY_T:
-			L("EX_ARG(frame, ExEntity, ", name, ");");
+			if (equal(type, "EntityPtr")) {
+				L("EX_ARG(frame, u8, ", name, "_has_value);");
+				L("EX_ARG(frame, ExEntity, ", name, ");");
+			}
+			else L("EX_ARG(frame, ExEntity, ", name, ");");
 			break;
 		case EvoxType::COLOR_T:
 			L("EX_ARG(frame, i32, ", name, "_r);");
@@ -590,6 +595,10 @@ void appendReturnValue(OutputStream& out, StringView type, const char* value, co
 		case EvoxType::QUAT_T: emitResult(out, value); break;
 		case EvoxType::ENTITY_T: {
 			StaticString<256> index(value, ".index");
+			if (equal(type, "EntityPtr")) {
+				StaticString<256> valid(value, ".isValid()");
+				L("EX_RESULT(frame, u8(", valid.buffer, ")); ");
+			}
 			L("EX_RESULT(frame, ExEntity(", index.buffer, ", ", world_expr ? world_expr : "nullptr", "));");
 			break;
 		}
@@ -1383,7 +1392,10 @@ void appendEvoxDeclType(OutputStream& out, StringView type) {
 		case EvoxType::VEC4_T: out.add("Vec4"); break;
 		case EvoxType::COLOR_T: out.add("Color"); break;
 		case EvoxType::QUAT_T: out.add("Quat"); break;
-		case EvoxType::ENTITY_T: out.add("Entity"); break;
+		case EvoxType::ENTITY_T:
+			if (equal(type, "EntityPtr")) out.add("?Entity");
+			else out.add("Entity");
+			break;
 		case EvoxType::ENUM_T: {
 			const Enum* e = findEnumByTypeName(type);
 			out.add(e ? e->name : type);

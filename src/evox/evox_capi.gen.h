@@ -1538,8 +1538,10 @@ namespace Lumix::Evox::generated {
 		EX_ARG(frame, Vec3, origin);
 		EX_ARG(frame, Vec3, dir);
 		EX_ARG(frame, float, distance);
+		EX_ARG(frame, u8, ignore_entity_has_value);
 		EX_ARG(frame, ExEntity, ignore_entity);
-		auto ret = module->raycast(origin, dir, distance, EntityPtr(ignore_entity.index));
+		auto ret = module->raycast(origin, dir, distance, EntityPtr(ignore_entity_has_value ? ignore_entity.index : -1));
+		EX_RESULT(frame, u8(ret.isValid())); 
 		EX_RESULT(frame, ExEntity(ret.index, &module->getWorld()));
 	}
 	
@@ -1612,14 +1614,16 @@ namespace Lumix::Evox::generated {
 		EX_ARG(frame, Vec3, origin);
 		EX_ARG(frame, Vec3, dir);
 		EX_ARG(frame, float, distance);
+		EX_ARG(frame, u8, ignored_has_value);
 		EX_ARG(frame, ExEntity, ignored);
 		EX_ARG(frame, i32, layer);
-		auto ret = module->raycastEx(origin, dir, distance, EntityPtr(ignored.index), layer);
+		auto ret = module->raycastEx(origin, dir, distance, EntityPtr(ignored_has_value ? ignored.index : -1), layer);
 		EX_RESULT(frame, ret.hit);
 		frame.result += 3;
 		EX_RESULT(frame, ret.position);
 		EX_RESULT(frame, ret.normal);
 		frame.result += 4;
+		EX_RESULT(frame, u8(ret.entity.isValid())); 
 		EX_RESULT(frame, ExEntity(ret.entity.index, &module->getWorld()));
 	}
 	
@@ -2446,14 +2450,16 @@ namespace Lumix::Evox::generated {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getD6JointConnectedBody(EntityRef(entity.index));
+		EX_RESULT(frame, u8(ret.isValid())); 
 		EX_RESULT(frame, ExEntity(ret.index, &module->getWorld()));
 	}
 	
 	static void evox_d6_joint_setD6JointConnectedBody_9997699774107214785(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
+		EX_ARG(frame, u8, connected_body_has_value);
 		EX_ARG(frame, ExEntity, connected_body);
-		module->setD6JointConnectedBody(EntityRef(entity.index), EntityPtr(connected_body.index));
+		module->setD6JointConnectedBody(EntityRef(entity.index), EntityPtr(connected_body_has_value ? connected_body.index : -1));
 	}
 	
 	static void evox_d6_joint_getD6JointAxisPosition_14718916932756373104(ex_runtime* runtime, ex_call_frame frame) {
@@ -2488,14 +2494,16 @@ namespace Lumix::Evox::generated {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getDistanceJointConnectedBody(EntityRef(entity.index));
+		EX_RESULT(frame, u8(ret.isValid())); 
 		EX_RESULT(frame, ExEntity(ret.index, &module->getWorld()));
 	}
 	
 	static void evox_distance_joint_setDistanceJointConnectedBody_12657534439748792502(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
+		EX_ARG(frame, u8, connected_body_has_value);
 		EX_ARG(frame, ExEntity, connected_body);
-		module->setDistanceJointConnectedBody(EntityRef(entity.index), EntityPtr(connected_body.index));
+		module->setDistanceJointConnectedBody(EntityRef(entity.index), EntityPtr(connected_body_has_value ? connected_body.index : -1));
 	}
 	
 	static void evox_distance_joint_getDistanceJointAxisPosition_11515033595383308468(ex_runtime* runtime, ex_call_frame frame) {
@@ -2579,14 +2587,16 @@ namespace Lumix::Evox::generated {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getHingeJointConnectedBody(EntityRef(entity.index));
+		EX_RESULT(frame, u8(ret.isValid())); 
 		EX_RESULT(frame, ExEntity(ret.index, &module->getWorld()));
 	}
 	
 	static void evox_hinge_joint_setHingeJointConnectedBody_7875556491297733746(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
+		EX_ARG(frame, u8, connected_body_has_value);
 		EX_ARG(frame, ExEntity, connected_body);
-		module->setHingeJointConnectedBody(EntityRef(entity.index), EntityPtr(connected_body.index));
+		module->setHingeJointConnectedBody(EntityRef(entity.index), EntityPtr(connected_body_has_value ? connected_body.index : -1));
 	}
 	
 	static void evox_hinge_joint_getHingeJointAxisPosition_9333331314296799913(ex_runtime* runtime, ex_call_frame frame) {
@@ -2677,14 +2687,16 @@ namespace Lumix::Evox::generated {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
 		auto ret = module->getSphericalJointConnectedBody(EntityRef(entity.index));
+		EX_RESULT(frame, u8(ret.isValid())); 
 		EX_RESULT(frame, ExEntity(ret.index, &module->getWorld()));
 	}
 	
 	static void evox_spherical_joint_setSphericalJointConnectedBody_10647608810307015114(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		PhysicsModule* module = static_cast<PhysicsModule*>(entity.module);
+		EX_ARG(frame, u8, connected_body_has_value);
 		EX_ARG(frame, ExEntity, connected_body);
-		module->setSphericalJointConnectedBody(EntityRef(entity.index), EntityPtr(connected_body.index));
+		module->setSphericalJointConnectedBody(EntityRef(entity.index), EntityPtr(connected_body_has_value ? connected_body.index : -1));
 	}
 	
 	static void evox_spherical_joint_getSphericalJointAxisPosition_9077846389983423491(ex_runtime* runtime, ex_call_frame frame) {
@@ -4287,14 +4299,16 @@ namespace Lumix::Evox::generated {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getBoneAttachmentParent(EntityRef(entity.index));
+		EX_RESULT(frame, u8(ret.isValid())); 
 		EX_RESULT(frame, ExEntity(ret.index, &module->getWorld()));
 	}
 	
 	static void evox_bone_attachment_setBoneAttachmentParent_3779313276891743601(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
+		EX_ARG(frame, u8, parent_has_value);
 		EX_ARG(frame, ExEntity, parent);
-		module->setBoneAttachmentParent(EntityRef(entity.index), EntityPtr(parent.index));
+		module->setBoneAttachmentParent(EntityRef(entity.index), EntityPtr(parent_has_value ? parent.index : -1));
 	}
 	
 	static void evox_bone_attachment_getBoneAttachmentBone_2784195155658238731(ex_runtime* runtime, ex_call_frame frame) {
@@ -4935,6 +4949,7 @@ namespace Lumix::Evox::generated {
 		EX_ARG(frame, Quat, rot);
 		EX_ARG(frame, Vec3, scale);
 		auto ret = object->instantiatePrefab(*world, *prefab, pos, rot, scale);
+		EX_RESULT(frame, u8(ret.isValid())); 
 		EX_RESULT(frame, ExEntity(ret.index, world));
 	}
 	

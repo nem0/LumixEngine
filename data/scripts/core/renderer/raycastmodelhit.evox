@@ -9,7 +9,7 @@ struct RayCastModelHit {
 	origin : DVec3;
 	dir : Vec3;
 	mesh : void;
-	entity : Entity;
+	entity : ?Entity;
 	component_type : void;
 	subindex : u32;
 }
