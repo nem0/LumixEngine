@@ -1089,10 +1089,10 @@ struct EvoxAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	const char* getDefaultExtension() const override { return "evox"; }
 	
 	void createResource(OutputMemoryStream& content) override {
-		const char* template_str = R"(import "core:input"
-import "core:world"
+		const char* template_str = R"(import "core:world"
+import "core:engine"
 
-fn main(input : InputSystem, world : World) : void {
+fn main(engine : Engine, world : World) : void {
 	while true {
 		var time_delta : f32 = yield;
 		// Update logic here
