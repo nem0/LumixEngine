@@ -2314,13 +2314,23 @@ void Document::recomputeStyles() {
 	}
 }
 
+InternTable::~InternTable() {
+	map.clear();
+	strings.clear();
+	arena.reset();
+}
+
 InternString InternTable::intern(StringView s) {
 	auto iter = map.find(s);
 	if (iter.isValid()) return (InternString)iter.value();
 	
 	InternString id = (InternString)(strings.size() + 1); // 0 is reserved for invalid
-	strings.emplace(s, allocator);
-	map.insert(strings.back(), (u32)id);
+	char* data = (char*)arena.allocate(s.length + 1, alignof(char));
+	memcpy(data, s.data, s.length);
+	data[s.length] = '\0';
+	StringView stable(data, s.length);
+	strings.push(stable);
+	map.insert(stable, (u32)id);
 	return id;
 }
 

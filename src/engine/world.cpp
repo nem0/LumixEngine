@@ -715,7 +715,7 @@ void World::updateGlobalTransform(EntityRef entity)
 void World::setLocalPosition(EntityRef entity, const DVec3& pos)
 {
 	int hierarchy_idx = m_entities[entity.index].hierarchy;
-	if (hierarchy_idx < 0)
+	if (hierarchy_idx < 0 || !m_hierarchy[hierarchy_idx].parent.isValid())
 	{
 		setPosition(entity, pos);
 		return;
@@ -729,7 +729,7 @@ void World::setLocalPosition(EntityRef entity, const DVec3& pos)
 void World::setLocalRotation(EntityRef entity, const Quat& rot)
 {
 	int hierarchy_idx = m_entities[entity.index].hierarchy;
-	if (hierarchy_idx < 0)
+	if (hierarchy_idx < 0 || !m_hierarchy[hierarchy_idx].parent.isValid())
 	{
 		setRotation(entity, rot);
 		return;
@@ -742,7 +742,7 @@ void World::setLocalRotation(EntityRef entity, const Quat& rot)
 void World::setLocalTransform(EntityRef entity, const Transform& transform)
 {
 	int hierarchy_idx = m_entities[entity.index].hierarchy;
-	if (hierarchy_idx < 0)
+	if (hierarchy_idx < 0 || !m_hierarchy[hierarchy_idx].parent.isValid())
 	{
 		setTransform(entity, transform);
 		return;
@@ -757,7 +757,7 @@ void World::setLocalTransform(EntityRef entity, const Transform& transform)
 Transform World::getLocalTransform(EntityRef entity) const
 {
 	int hierarchy_idx = m_entities[entity.index].hierarchy;
-	if (hierarchy_idx < 0)
+	if (hierarchy_idx < 0 || !m_hierarchy[hierarchy_idx].parent.isValid())
 	{
 		return getTransform(entity);
 	}
@@ -769,7 +769,7 @@ Transform World::getLocalTransform(EntityRef entity) const
 Vec3 World::getLocalScale(EntityRef entity) const
 {
 	int hierarchy_idx = m_entities[entity.index].hierarchy;
-	if (hierarchy_idx < 0)
+	if (hierarchy_idx < 0 || !m_hierarchy[hierarchy_idx].parent.isValid())
 	{
 		return getScale(entity);
 	}

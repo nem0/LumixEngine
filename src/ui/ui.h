@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/arena_allocator.h"
 #include "core/array.h"
 #include "core/color.h"
 #include "core/hash_map.h"
@@ -156,11 +157,18 @@ struct ISpriteManager {
 enum class InternString : u16 { INVALID = 0 };
 
 struct InternTable {
-	Array<String> strings;
-	HashMap<StringView, u32> map;
 	IAllocator& allocator;
+	ArenaAllocator arena;
+	Array<StringView> strings;
+	HashMap<StringView, u32> map;
 
-	InternTable(IAllocator& allocator) : strings(allocator), map(allocator), allocator(allocator) {}
+	InternTable(IAllocator& allocator)
+		: allocator(allocator)
+		, arena(16 * 1024 * 1024, allocator, "UI intern table")
+		, strings(allocator)
+		, map(allocator)
+	{}
+	~InternTable();
 
 	InternString intern(StringView s);
 	StringView resolve(InternString id) const;
