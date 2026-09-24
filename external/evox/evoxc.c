@@ -42,7 +42,7 @@ static ex_string_view ex_from_cstr(const char* str) {
 	return (ex_string_view){str, str ? (i64)strlen(str) : 0};
 }
 
-typedef struct evoxc_import_context { const char* directory; } evoxc_import_context;
+typedef struct evoxc_import_context { const char* directory; const char* core_directory; } evoxc_import_context;
 
 static int evoxc_import_resolver(void* userdata, ex_string_view path, ex_string_view alias, ex_string_view* source) {
 	(void)alias;
@@ -55,14 +55,15 @@ static int evoxc_import_resolver(void* userdata, ex_string_view path, ex_string_
 	} else if (path.length >= 4 && memcmp(path.begin, "std:", 4) == 0) {
 		prefix = "std"; prefix_len = 3; path.begin += 4; path.length -= 4;
 	}
-	const size_t root_len = strlen(ctx->directory);
+	const char* root = prefix_len && ctx->core_directory ? ctx->core_directory : ctx->directory;
+	const size_t root_len = strlen(root);
 	const int has_extension = path.length >= 5 && memcmp(path.begin + path.length - 5, ".evox", 5) == 0;
 	const size_t capacity = root_len + 1 + prefix_len + (prefix_len ? 1 : 0) + (size_t)path.length + (has_extension ? 0 : 5) + 1;
 	char* filename = (char*)malloc(capacity);
 	if (!filename) return 0;
 	int written = prefix_len
-		? snprintf(filename, capacity, "%s/%.*s/%.*s%s", ctx->directory, (int)prefix_len, prefix, (int)path.length, path.begin, has_extension ? "" : ".evox")
-		: snprintf(filename, capacity, "%s/%.*s%s", ctx->directory, (int)path.length, path.begin, has_extension ? "" : ".evox");
+		? snprintf(filename, capacity, "%s/%.*s/%.*s%s", root, (int)prefix_len, prefix, (int)path.length, path.begin, has_extension ? "" : ".evox")
+		: snprintf(filename, capacity, "%s/%.*s%s", root, (int)path.length, path.begin, has_extension ? "" : ".evox");
 	if (written < 0 || (size_t)written >= capacity) { free(filename); return 0; }
 	FILE* file = fopen(filename, "rb");
 	if (!file) { fprintf(stderr, "Cannot resolve import '%.*s' at %s\n", (int)path.length, path.begin, filename); free(filename); return 0; }
@@ -766,8 +767,10 @@ int main(int argc, char** argv) {
 		return 0;
 	}
 	if (argc < 2) {
-		fputs("Usage: evoxc [--import-dir DIR] [--dump-bytecode] <script.evox> [function_name] [args...]\n"
-			"  --import-dir DIR  Root directory for Evox imports\n"
+		fputs("Usage: evoxc [--import-dir DIR] [--core-dir DIR] [--typecheck-only] [--dump-bytecode] <script.evox> [function_name] [args...]\n"
+			"  --import-dir DIR  Root directory for ordinary Evox imports\n"
+			"  --core-dir DIR    Root containing core/ and std/ import directories\n"
+			"  --typecheck-only  Typecheck without generating bytecode or running the script\n"
 			"  --dump-bytecode   Compile and print human-readable bytecode\n"
 			"  evoxc fmt FILE     Format source and write it to stdout\n"
 			"  script.evox      - Path to Evox source file\n"
@@ -786,15 +789,24 @@ int main(int argc, char** argv) {
 	ctx.host.print = &evoxc_diagnostics_print;
 
 	int dump_bytecode = 0;
+	int typecheck_only = 0;
 	const char* import_directory = ".";
+	const char* core_directory = NULL;
 	int script_arg = 1;
 	while (script_arg < argc) {
 		if (strcmp(argv[script_arg], "--dump-bytecode") == 0) {
 			dump_bytecode = 1;
 			++script_arg;
+		} else if (strcmp(argv[script_arg], "--typecheck-only") == 0) {
+			typecheck_only = 1;
+			++script_arg;
 		} else if (strcmp(argv[script_arg], "--import-dir") == 0) {
 			if (script_arg + 1 >= argc) { fputs("Error: --import-dir requires a directory\n", stderr); return 1; }
 			import_directory = argv[script_arg + 1];
+			script_arg += 2;
+		} else if (strcmp(argv[script_arg], "--core-dir") == 0) {
+			if (script_arg + 1 >= argc) { fputs("Error: --core-dir requires a directory\n", stderr); return 1; }
+			core_directory = argv[script_arg + 1];
 			script_arg += 2;
 		} else {
 			break;
@@ -838,7 +850,7 @@ int main(int argc, char** argv) {
 		goto cleanup;
 	}
 
-	evoxc_import_context import_context = {import_directory};
+	evoxc_import_context import_context = {import_directory, core_directory};
 	if (!ex_module_compile(
 		ctx.module,
 		ex_from_cstr(ctx.source),
@@ -854,6 +866,10 @@ int main(int argc, char** argv) {
 	ctx.bytecode = ex_bytecode_compile(ctx.module, &ctx.host, &opts);
 	if (!ctx.bytecode) {
 		fputs("Error: Failed to compile IR bytecode\n", stderr);
+		goto cleanup;
+	}
+	if (typecheck_only) {
+		rc = 0;
 		goto cleanup;
 	}
 	if (dump_bytecode) {
