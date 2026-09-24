@@ -1643,17 +1643,6 @@ struct CodeEditorImpl final : CodeEditor {
 		return TextPoint{ i32(c - line_begin), point.line };
 	}
 
-	TextPoint getNextTokenEndPoint(TextPoint point) {
-		TextPoint p = getRight(point);
-		const Line& line = m_lines[p.line];
-		for (const Token& token : line.tokens) {
-			const i32 token_end = i32(token.from + token.len);
-			if (p.col < i32(token.from)) return TextPoint(token_end, i32(p.line));
-			if (p.col < token_end) return TextPoint(i32(token.from + token.len), i32(p.line));
-		}
-		return p;
-	}
-
 	TextPoint getLeft(TextPoint point) {
 		TextPoint p = point;
 		--p.col;
@@ -1685,8 +1674,8 @@ struct CodeEditorImpl final : CodeEditor {
 
 	void selectToLeft(Cursor& c, bool word) {
 		if (word) {
-			if (c.sel < c) c.sel = getPrevTokenStartPoint(c.sel);
-			else c = getPrevTokenStartPoint(c);
+			if (c.sel < c) c.sel = getPrevBoundary(c.sel);
+			else c = getPrevBoundary(c);
 		}
 		else {
 			if (c.sel < c) c.sel = getLeft(c.sel);
@@ -1696,8 +1685,8 @@ struct CodeEditorImpl final : CodeEditor {
 
 	void selectToRight(Cursor& c, bool word) {
 		if (word) {
-			if (c.sel > c) c.sel = getNextTokenEndPoint(c.sel);
-			else c = getNextTokenEndPoint(c);
+			if (c.sel > c) c.sel = getNextBoundary(c.sel);
+			else c = getNextBoundary(c);
 		}
 		else {
 			if (c.sel > c) c.sel = getRight(c.sel);
@@ -1735,6 +1724,11 @@ struct CodeEditorImpl final : CodeEditor {
 
 		TextPoint from = m_cursors[0];
 		TextPoint to = m_cursors[0].sel;
+		if (!m_cursors[0].hasSelection()) {
+			from = TextPoint(0, m_cursors[0].line);
+			if (from.line + 1 < m_lines.size()) to = TextPoint(0, from.line + 1);
+			else to = TextPoint(m_lines[from.line].length(), from.line);
+		}
 		if (from > to) swap(from, to);
 		OutputMemoryStream blob(m_allocator);
 		serializeText(from, to, blob);
