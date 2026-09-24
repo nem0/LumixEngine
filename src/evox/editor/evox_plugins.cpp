@@ -1090,7 +1090,7 @@ struct EvoxAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 	
 	void createResource(OutputMemoryStream& content) override {
 		const char* template_str = R"(import "core:world"
-import "core:engine"
+import "core:engine/engine"
 
 fn main(engine : Engine, world : World) : void {
 	while true {
