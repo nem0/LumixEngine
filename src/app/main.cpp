@@ -12,7 +12,6 @@
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/thread.h"
-#include "engine/component_types.h"
 #include "engine/engine.h"
 #include "engine/input_system.h"
 #include "engine/plugin.h"
@@ -80,19 +79,6 @@ struct Runner final
 		m_pipeline->setWorld(m_world);
 	}
 
-	void initDemoScene() {
-		const EntityRef env = m_world->createEntity({0, 0, 0}, Quat::IDENTITY);
-		m_world->createComponent(types::environment, env);
-		
-		RenderModule* render_module = (RenderModule*)m_world->getModule("renderer");
-		Environment& environment = render_module->getEnvironment(env);
-		environment.direct_intensity = 3;
-		
-		Quat rot;
-		rot.fromEuler(Vec3(degreesToRadians(45.f), 0, 0));
-		m_world->setRotation(env, rot);
-	}
-
 	bool loadWorld() {
 		FileSystem& fs = m_engine->getFileSystem();
 		OutputMemoryStream data(m_allocator);
@@ -111,39 +97,44 @@ struct Runner final
 	}
 
 	void loadProject() {
-		auto parse_world_cmd_line = [&](){
-			char cmd_line[4096];
-			if (os::getCommandLine(cmd_line)) {
-				CommandLineParser parser(cmd_line);
-				while (parser.next()) {
-					if (!parser.currentEquals("-world")) continue;
-					if (!parser.next()) break;
-
-					char src[MAX_PATH];
-					parser.getCurrent(src, lengthOf(src));
-					m_startup_world = src;
-					break;
-				}
-			}
-		};
-
 		FileSystem& fs = m_engine->getFileSystem();
 		OutputMemoryStream data(m_allocator);
-		if (!fs.getContentSync(Path("lumix.prj"), data)) {
-			parse_world_cmd_line();
-			return;
+		if (fs.getContentSync(Path("lumix.prj"), data)) {
+			InputMemoryStream tmp(data);
+			if (m_engine->deserializeProject(tmp) != DeserializeProjectResult::SUCCESS) {
+				logError("Failed to deserialize project file");
+			}
 		}
 
-		InputMemoryStream tmp(data);
-		const DeserializeProjectResult res = m_engine->deserializeProject(tmp, m_startup_world);
-		if (DeserializeProjectResult::SUCCESS != res) {
-			logError("Failed to deserialize project file");
+		char cmd_line[4096];
+		if (os::getCommandLine(cmd_line)) {
+			CommandLineParser parser(cmd_line);
+			while (parser.next()) {
+				if (!parser.currentEquals("-world")) continue;
+				if (!parser.next()) break;
+
+				char src[MAX_PATH];
+				parser.getCurrent(src, lengthOf(src));
+				m_startup_world = src;
+				break;
+			}
 		}
-		parse_world_cmd_line();
 	}
 
 	void onInit() {
 		Engine::InitArgs init_data;
+		if (os::dirExists("../data")) init_data.engine_data_dir = "../data";
+		char data_dir[MAX_PATH] = "";
+		char cmd_line[2048] = "";
+		if (os::getCommandLine(Span(cmd_line))) {
+			CommandLineParser parser(cmd_line);
+			while (parser.next()) {
+				if (parser.currentEquals("--data_dir") || parser.currentEquals("-data_dir")) {
+					if (!parser.next()) break;
+					parser.getCurrent(data_dir, lengthOf(data_dir));
+				}
+			}
+		}
 
 		if (os::fileExists("main.pak")) {
 			init_data.file_system = FileSystem::createPacked("main.pak", m_allocator);
@@ -151,9 +142,8 @@ struct Runner final
 		init_data.log_path = "engine/lumix_app.log";
 
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
-		char current_dir[MAX_PATH];
-		os::getCurrentDirectory(Span(current_dir));
-		m_engine->getFileSystem().mount(current_dir, "");
+		if (!data_dir[0]) os::getCurrentDirectory(Span(data_dir));
+		m_engine->getFileSystem().mount(data_dir, "");
 		m_imgui.m_engine = m_engine.get();
 
 		os::InitWindowArgs init_window_args;
@@ -173,9 +163,7 @@ struct Runner final
 		
 		loadProject();
 
-		if (!loadWorld()) {
-			initDemoScene();
-		}
+		if (!m_startup_world.isEmpty()) loadWorld();
 		
 		os::showCursor(false);
 		while (m_engine->getFileSystem().hasWork()) {

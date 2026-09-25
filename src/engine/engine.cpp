@@ -343,8 +343,10 @@ struct EngineImpl final : Engine {
 	enum class ProjectVersion : u32 {
 		FIRST,
 		HASH64,
+		STARTUP_WORLD,
+		NO_STARTUP_WORLD,
 
-		LAST,
+		LAST = NO_STARTUP_WORLD,
 	};
 
 	struct ProjectHeader {
@@ -352,13 +354,14 @@ struct EngineImpl final : Engine {
 		ProjectVersion version;
 	};
 
-	DeserializeProjectResult deserializeProject(InputMemoryStream& serializer, Path& startup_world) override {
+	DeserializeProjectResult deserializeProject(InputMemoryStream& serializer) override {
 		ProjectHeader header;
 		serializer.read(header);
 		if (header.magic != SERIALIZED_PROJECT_MAGIC) return DeserializeProjectResult::CORRUPTED_FILE;
 		if (header.version > ProjectVersion::LAST) return DeserializeProjectResult::VERSION_NOT_SUPPORTED;
 		if (header.version <= ProjectVersion::HASH64) return DeserializeProjectResult::VERSION_NOT_SUPPORTED;
-		startup_world = serializer.readString();
+		// Older project files included a startup world before the system data.
+		if (header.version == ProjectVersion::STARTUP_WORLD) serializer.readString();
 		i32 count = 0;
 		serializer.read(count);
 		const Array<ISystem*>& systems = m_system_manager->getSystems();
@@ -379,12 +382,11 @@ struct EngineImpl final : Engine {
 		return DeserializeProjectResult::SUCCESS;
 	}
 
-	void serializeProject(OutputMemoryStream& serializer, const Path& startup_world) const override {
+	void serializeProject(OutputMemoryStream& serializer) const override {
 		ProjectHeader header;
 		header.magic = SERIALIZED_PROJECT_MAGIC;
 		header.version = ProjectVersion::LAST;
 		serializer.write(header);
-		serializer.writeString(startup_world.c_str());
 		const Array<ISystem*>& systems = m_system_manager->getSystems();
 		serializer.write((i32)systems.size());
 		for (ISystem* system : systems) {

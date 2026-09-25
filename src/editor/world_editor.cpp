@@ -2439,7 +2439,7 @@ public:
 	void saveProject() {
 		FileSystem& fs = m_engine.getFileSystem();
 		OutputMemoryStream blob(m_allocator);
-		m_engine.serializeProject(blob, Path("main.unv"));
+		m_engine.serializeProject(blob);
 
 		if (!fs.saveContentSync(Path("lumix.prj"), blob)) {
 			logError("Failed to save lumix.prj");
@@ -2454,9 +2454,7 @@ public:
 		}
 		
 		InputMemoryStream stream(data);
-		Path dummy;
-		
-		const DeserializeProjectResult res = m_engine.deserializeProject(stream, dummy);
+		const DeserializeProjectResult res = m_engine.deserializeProject(stream);
 		switch (res) {
 			case DeserializeProjectResult::SUCCESS: break;
 			case DeserializeProjectResult::PLUGIN_DESERIALIZATION_FAILED: logError("Project file: Plugin deserialization failed"); break;

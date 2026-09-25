@@ -41,38 +41,27 @@ fn main(engine : Engine, world : World) : void {
 
 	player.init(world, input);
 
-	for i in 0..world.getPartitionCount() {
-		const handle = world.getPartitionHandle(i);
-		const name = world.getPartitionName(handle);
-		if endsWith(name, "main.unv") {
-			world_type = .Main;
-			break;
-		}
-		if endsWith(name, "demo.unv") {
+	const name = world.getPartitionName(world.getPartitionHandle(0));
+	match name {
+		case: world_type = .Main;
+		case "maps/demo/main.unv": world_type = .Main;
+		case "maps/demo/demo.unv":
 			world_type = .Demo;
 			demo.start(world);
 			player.init(world, g_input);
-			break;
-		}
-		if endsWith(name, "lightning.unv") {
+		case "maps/demo/lightning.unv":
 			const source_value = world.findByName("core");
 			if const source = source_value {
 				world_type = .Lightning;
 				lightning.start(world, source);
 			}
-			break;
-		}
-		if endsWith(name, "navigation_stress_test.unv") {
+		case "maps/demo/navigation_stress_test.unv":
 			world_type = .NavigationStressTest;
 			bot.init(world);
-			break;
-		}
-		if endsWith(name, "navigation_stress_test2.unv") {
+		case "maps/demo/navigation_stress_test2.unv":
 			world_type = .NavigationStressTest2;
 			bot2.init(world);
-			break;
-		}
-		if endsWith(name, "particles.unv") {
+		case "maps/demo/particles.unv":
 			const moving = world.findByName("world_space_particle");
 			const clutter = world.findByName("clutter");
 			if const moving_entity = moving {
@@ -84,8 +73,6 @@ fn main(engine : Engine, world : World) : void {
 					}
 				}
 			}
-			break;
-		}
 	}
 
 	while true {

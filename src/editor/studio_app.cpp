@@ -2377,7 +2377,7 @@ struct StudioAppImpl final : StudioApp {
 			StaticString<MAX_PATH> exe_path(dir, "app");
 		#endif
 		const char* working_dir = m_project_dir.c_str();
-		StaticString<MAX_PATH + 64> args("-window -world ", m_editor->getWorld()->getPartitions()[0].name);
+		StaticString<2 * MAX_PATH + 64> args("-window -world \"", m_editor->getWorld()->getPartitions()[0].name, "\" --data_dir \"", working_dir, "\"");
 		if (os::shellExecuteOpen(exe_path, args, working_dir, false) != os::ExecuteOpenResult::SUCCESS) {
 			logError("Failed to run ", exe_path, " ", args);
 		}
@@ -3070,21 +3070,6 @@ struct StudioAppImpl final : StudioApp {
 			ImGuiEx::Label("Mode");
 			ImGui::Combo("##mode", (int*)&m_export.mode, "All files\0Loaded world\0");
 
-			ImGuiEx::Label("Startup world");
-			if (ImGui::BeginCombo("##startunv", m_export.startup_world.c_str())) {
-				forEachWorld([&](const Path& path){
-					if (ImGui::Selectable(path.c_str())) m_export.startup_world = path;
-				});
-				ImGui::EndCombo();
-			}
-			if (m_export.startup_world.isEmpty()) {
-				forEachWorld([&](const Path& path){
-					if (m_export.startup_world.isEmpty()) {
-						m_export.startup_world = path;
-					}
-				});
-			}
-
 			if (m_export_msg_timer > 0) {
 				m_export_msg_timer -= m_engine->getLastTimeDelta();
 				if (ImGui::Button("Export finished")) m_export_msg_timer = -1;
@@ -3105,7 +3090,7 @@ struct StudioAppImpl final : StudioApp {
 		FileSystem& fs = m_engine->getFileSystem(); 
 		{
 			OutputMemoryStream prj_blob(m_allocator);
-			m_engine->serializeProject(prj_blob, m_export.startup_world);
+			m_engine->serializeProject(prj_blob);
 
 			const Path prj_file("lumix.prj");
 			if (!fs.saveContentSync(prj_file, prj_blob)) {
@@ -3340,7 +3325,6 @@ struct StudioAppImpl final : StudioApp {
 		Mode mode = Mode::ALL_FILES;
 
 		bool pack = false;
-		Path startup_world;
 		String dest_dir;
 	};
 
