@@ -2717,6 +2717,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		geom.halfExtents.z = 1;
 		PxShape* shape = PxRigidActorExt::createExclusiveShape(*actor, geom, mat ? *mat->material : *m_default_material);
 		shape->userData = (void*)(intptr_t)index;
+		updateFilterData(actor, m_actors[entity].layer);
 	}
 
 
@@ -2924,6 +2925,7 @@ struct PhysicsModuleImpl final : PhysicsModule
 		PhysicsMaterial* mat = m_actors[entity].material;
 		PxShape* shape = PxRigidActorExt::createExclusiveShape(*actor, geom, mat ? *mat->material : *m_default_material);
 		shape->userData = (void*)(intptr_t)index;
+		updateFilterData(actor, m_actors[entity].layer);
 	}
 
 	void removeSphere(EntityRef entity, int index) override {
