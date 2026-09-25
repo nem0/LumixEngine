@@ -3032,6 +3032,20 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, module);
 	}
 	
+	static void evox_rigid_actor_boxes_add_5747167117491692756(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		PhysicsModule* module = static_cast<PhysicsModule*>(component.module);
+		EX_ARG(frame, i32, item_idx);
+		module->addBox(EntityRef(component.index), item_idx);
+	}
+	
+	static void evox_rigid_actor_boxes_remove_14118707744442624626(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		PhysicsModule* module = static_cast<PhysicsModule*>(component.module);
+		EX_ARG(frame, i32, item_idx);
+		module->removeBox(EntityRef(component.index), item_idx);
+	}
+	
 	static void evox_rigid_actor_boxes_getBoxHalfExtents_11149060149111658776(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
@@ -3103,6 +3117,20 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, component.index);
 		EX_RESULT(frame, item_idx);
 		EX_RESULT(frame, module);
+	}
+	
+	static void evox_rigid_actor_spheres_add_13908027873658803002(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		PhysicsModule* module = static_cast<PhysicsModule*>(component.module);
+		EX_ARG(frame, i32, item_idx);
+		module->addSphere(EntityRef(component.index), item_idx);
+	}
+	
+	static void evox_rigid_actor_spheres_remove_2674610984674455386(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		PhysicsModule* module = static_cast<PhysicsModule*>(component.module);
+		EX_ARG(frame, i32, item_idx);
+		module->removeSphere(EntityRef(component.index), item_idx);
 	}
 	
 	static void evox_rigid_actor_spheres_getSphereRadius_6397635657662839133(ex_runtime* runtime, ex_call_frame frame) {
@@ -4699,6 +4727,20 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, module);
 	}
 	
+	static void evox_terrain_grass_add_12442567954595593732(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, i32, item_idx);
+		module->addGrass(EntityRef(component.index), item_idx);
+	}
+	
+	static void evox_terrain_grass_remove_703935105122394766(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, component);
+		RenderModule* module = static_cast<RenderModule*>(component.module);
+		EX_ARG(frame, i32, item_idx);
+		module->removeGrass(EntityRef(component.index), item_idx);
+	}
+	
 	static void evox_terrain_grass_getGrassRotationMode_14468789118457816776(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, i32, entity_idx);
 		EX_ARG(frame, i32, item_idx);
@@ -5566,6 +5608,10 @@ namespace Lumix::Evox::generated {
 		evox_rigid_actor_boxes_count_1859103441161182793);
 		functions.insert({StringView("core:physics/rigid_actor"), StringView("boxes")}, &
 		evox_rigid_actor_boxes_item_5914938366404223461);
+		functions.insert({StringView("core:physics/rigid_actor"), StringView("addBox")}, &
+		evox_rigid_actor_boxes_add_5747167117491692756);
+		functions.insert({StringView("core:physics/rigid_actor"), StringView("removeBox")}, &
+		evox_rigid_actor_boxes_remove_14118707744442624626);
 		functions.insert({StringView("core:physics/rigid_actor"), StringView("getBoxHalfExtents")}, &evox_rigid_actor_boxes_getBoxHalfExtents_11149060149111658776);
 		functions.insert({StringView("core:physics/rigid_actor"), StringView("setBoxHalfExtents")}, &evox_rigid_actor_boxes_setBoxHalfExtents_4611497608357626578);
 		functions.insert({StringView("core:physics/rigid_actor"), StringView("getBoxOffsetPosition")}, &evox_rigid_actor_boxes_getBoxOffsetPosition_9223472868671538271);
@@ -5576,6 +5622,10 @@ namespace Lumix::Evox::generated {
 		evox_rigid_actor_spheres_count_17182790551130778759);
 		functions.insert({StringView("core:physics/rigid_actor"), StringView("spheres")}, &
 		evox_rigid_actor_spheres_item_17607561480211165310);
+		functions.insert({StringView("core:physics/rigid_actor"), StringView("addSphere")}, &
+		evox_rigid_actor_spheres_add_13908027873658803002);
+		functions.insert({StringView("core:physics/rigid_actor"), StringView("removeSphere")}, &
+		evox_rigid_actor_spheres_remove_2674610984674455386);
 		functions.insert({StringView("core:physics/rigid_actor"), StringView("getSphereRadius")}, &evox_rigid_actor_spheres_getSphereRadius_6397635657662839133);
 		functions.insert({StringView("core:physics/rigid_actor"), StringView("setSphereRadius")}, &evox_rigid_actor_spheres_setSphereRadius_7307604915894409717);
 		functions.insert({StringView("core:physics/rigid_actor"), StringView("getSphereOffsetPosition")}, &evox_rigid_actor_spheres_getSphereOffsetPosition_16116986349188912276);
@@ -5800,6 +5850,10 @@ namespace Lumix::Evox::generated {
 		evox_terrain_grass_count_14741352061571450574);
 		functions.insert({StringView("core:renderer/terrain"), StringView("grass")}, &
 		evox_terrain_grass_item_5892846808699301772);
+		functions.insert({StringView("core:renderer/terrain"), StringView("addGrass")}, &
+		evox_terrain_grass_add_12442567954595593732);
+		functions.insert({StringView("core:renderer/terrain"), StringView("removeGrass")}, &
+		evox_terrain_grass_remove_703935105122394766);
 		functions.insert({StringView("core:renderer/terrain"), StringView("getGrassRotationMode")}, &evox_terrain_grass_getGrassRotationMode_14468789118457816776);
 		functions.insert({StringView("core:renderer/terrain"), StringView("setGrassRotationMode")}, &evox_terrain_grass_setGrassRotationMode_1328757637365446366);
 		functions.insert({StringView("core:renderer/terrain"), StringView("getGrassDistance")}, &evox_terrain_grass_getGrassDistance_6527065972178915904);

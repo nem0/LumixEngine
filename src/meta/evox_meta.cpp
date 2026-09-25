@@ -835,6 +835,12 @@ void appendArrayItemWrapperName(OutputStream& out, Component& c, ArrayProperty& 
 	out.add("evox_", c.id, "_", a.id, "_item"); appendStableWrapperHash(out, s);
 }
 
+void appendArrayMutationWrapperName(OutputStream& out, Component& c, ArrayProperty& a, bool is_add) {
+	const char* op = is_add ? "add" : "remove";
+	StaticString<2048> s(c.id, "::", a.id, "::", op, "(i32)->void");
+	out.add("evox_", c.id, "_", a.id, "_", op); appendStableWrapperHash(out, s);
+}
+
 void appendArrayChildWrapperName(OutputStream& out, Component& c, ArrayProperty& a, Property& p, bool is_setter) {
 	const StringView name = is_setter ? p.setter_name : p.getter_name;
 	const StringView args = is_setter ? p.setter_args : p.getter_args;
@@ -993,6 +999,18 @@ void serializeEvoxArrayCountWrapper(OutputStream& out, Module& m, Component& c, 
 	L(m.name, "* module = static_cast<", m.name, "*>(component.module);");
 	L("const i32 count = module->get", a.name, "Count(EntityRef(component.index));");
 	L("EX_RESULT(frame, count);");
+	L("}" OUT_ENDL);
+}
+
+void serializeEvoxArrayMutationWrapper(OutputStream& out, Module& m, Component& c, ArrayProperty& a, bool is_add) {
+	const char* op = is_add ? "add" : "remove";
+	out.add("static void ");
+	appendArrayMutationWrapperName(out, c, a, is_add);
+	L("(ex_runtime* runtime, ex_call_frame frame) {");
+	L("EX_ARG(frame, ExComponent, component);");
+	L(m.name, "* module = static_cast<", m.name, "*>(component.module);");
+	L("EX_ARG(frame, i32, item_idx);");
+	L("module->", op, a.name, "(EntityRef(component.index), item_idx);");
 	L("}" OUT_ENDL);
 }
 
@@ -1233,6 +1251,8 @@ void emitGeneratedComponentWrappers(OutputStream& out, MetaData& data) {
 			for (ArrayProperty& a : c.arrays) {
 				serializeEvoxArrayCountWrapper(out, m, c, a);
 				serializeEvoxArrayItemWrapper(out, m, c, a);
+				serializeEvoxArrayMutationWrapper(out, m, c, a, true);
+				serializeEvoxArrayMutationWrapper(out, m, c, a, false);
 				for (Property& p : a.children) {
 					if (isSupportedEvoxArrayChildGetter(p)) {
 						serializeEvoxArrayChildWrapper(out, m, c, a, p, false);
@@ -1323,6 +1343,12 @@ void emitGeneratedComponentImportRegistrations(OutputStream& out, MetaData& data
 				L(");");
 				L("functions.insert({StringView(\"", module_unit.buffer, "\"), StringView(\"", a.id, "\")}, &");
 				appendArrayItemWrapperName(out, c, a);
+				L(");");
+				L("functions.insert({StringView(\"", module_unit.buffer, "\"), StringView(\"add", a.name, "\")}, &");
+				appendArrayMutationWrapperName(out, c, a, true);
+				L(");");
+				L("functions.insert({StringView(\"", module_unit.buffer, "\"), StringView(\"remove", a.name, "\")}, &");
+				appendArrayMutationWrapperName(out, c, a, false);
 				L(");");
 				for (Property& p : a.children) {
 					if (isSupportedEvoxArrayChildGetter(p)) {
@@ -1937,6 +1963,8 @@ void serializeCoreImports(MetaData& data) {
 				if (!has_array_child) continue;
 				L("extern fn ", a.id, "Count(component : ", c.name, ") : i32;");
 				L("extern fn ", a.id, "(component : ", c.name, ", idx : i32) : ?", c.name, a.name, "ArrayItem;");
+				L("extern fn add", a.name, "(component : ", c.name, ", idx : i32) : void;");
+				L("extern fn remove", a.name, "(component : ", c.name, ", idx : i32) : void;");
 				for (Property& p : a.children) {
 					if (isSupportedEvoxArrayChildGetter(p)) emitArrayChildPropertyDecl(out, c, a, p, false);
 					if (isSupportedEvoxArrayChildSetter(p)) emitArrayChildPropertyDecl(out, c, a, p, true);

@@ -26,6 +26,8 @@ extern fn getYScale(entity : Terrain) : f32;
 extern fn setYScale(entity : Terrain, scale : f32) : void;
 extern fn grassCount(component : Terrain) : i32;
 extern fn grass(component : Terrain, idx : i32) : ?TerrainGrassArrayItem;
+extern fn addGrass(component : Terrain, idx : i32) : void;
+extern fn removeGrass(component : Terrain, idx : i32) : void;
 extern fn getGrassRotationMode(item : TerrainGrassArrayItem) : GrassRotationMode;
 extern fn setGrassRotationMode(item : TerrainGrassArrayItem, value : GrassRotationMode) : void;
 extern fn getGrassDistance(item : TerrainGrassArrayItem) : f32;
