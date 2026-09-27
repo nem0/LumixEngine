@@ -1396,6 +1396,9 @@ namespace ImGuiEx {
 		const ImGuiStyle& orig_style = GetStyle();
 		if (!m_ctx) m_ctx = CreateContext(GetIO().Fonts);
 		SetCurrentContext(m_ctx);
+		// This context shares the primary renderer's capabilities and font atlas.
+		const ImGuiBackendFlags renderer_flags = ImGuiBackendFlags_RendererHasTextures | ImGuiBackendFlags_RendererHasVtxOffset;
+		GetIO().BackendFlags = (GetIO().BackendFlags & ~renderer_flags) | (m_original_ctx->IO.BackendFlags & renderer_flags);
 		ImGuiStyle& new_style = GetStyle();
 		new_style = orig_style;
 
