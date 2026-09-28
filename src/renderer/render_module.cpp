@@ -1382,13 +1382,14 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 	void destroyEnvironment(EntityRef entity) override {
-		if ((EntityPtr)entity == m_active_global_light_entity) {
-			m_active_global_light_entity = INVALID_ENTITY;
-		}
-
+		const bool was_active = (EntityPtr)entity == m_active_global_light_entity;
 		Environment& env = m_environments[entity];
 		if (env.cubemap_sky) env.cubemap_sky->decRefCount();
 		m_environments.erase(entity);
+		if (was_active) {
+			auto next = m_environments.begin();
+			m_active_global_light_entity = next != m_environments.end() ? (EntityPtr)next.key() : INVALID_ENTITY;
+		}
 
 		m_world.onComponentDestroyed(entity, types::environment, this);
 	}
