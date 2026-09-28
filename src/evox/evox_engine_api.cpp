@@ -9,6 +9,8 @@
 #include "evox/evox_module.h"
 #include "evox/evox_capi.gen.h"
 #include "evox/evox_wrapper.h"
+#include "renderer/render_module.h"
+#include <stddef.h>
 #include <string.h>
 
 namespace Lumix::Evox {
@@ -76,6 +78,59 @@ static void evox_load_getError(ex_runtime* runtime, ex_call_frame frame) {
 static void evox_load_destroy(EvoxLoadRequest* request) {
 	if (!request) return;
 	LUMIX_DELETE(request->world->getAllocator(), request);
+}
+
+// Matches core:procedural_geom.Vertex and shaders/procedural_geom.hlsl.
+struct MeshVertex {
+	Vec3 position;
+	Vec2 uv;
+	Vec3 normal;
+	Vec3 tangent;
+};
+static_assert(sizeof(MeshVertex) == 44);
+static_assert(offsetof(MeshVertex, uv) == 12);
+static_assert(offsetof(MeshVertex, normal) == 20);
+static_assert(offsetof(MeshVertex, tangent) == 32);
+
+static void setMesh(ex_runtime*, ex_call_frame frame) {
+	EX_ARG(frame, i32, entity_index);
+	EX_ARG(frame, u32, entity_padding);
+	EX_ARG(frame, World*, world);
+	EX_ARG(frame, ex_slice, vertices);
+	EX_ARG(frame, ex_slice, indices);
+
+	bool valid = world && entity_index >= 0 && vertices.data && indices.data
+		&& vertices.length > 0 && vertices.length <= 1'000'000
+		&& indices.length > 0 && indices.length <= 3'000'000
+		&& indices.length % 3 == 0;
+	if (valid) {
+		const EntityRef entity(entity_index);
+		const u32 vertex_count = u32(vertices.length);
+		valid = world->hasEntity(entity) && world->hasComponent(entity, reflection::getComponentType("procedural_geom"));
+		if (valid) {
+			const u32* index_data = (const u32*)indices.data;
+			for (i64 i = 0; i < indices.length; ++i) {
+				if (index_data[i] >= vertex_count) { valid = false; break; }
+			}
+		}
+		if (valid) {
+			RenderModule* renderer = (RenderModule*)world->getModule("renderer");
+			valid = renderer != nullptr;
+			if (renderer) {
+				gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
+				decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
+				decl.addAttribute(12, 2, gpu::AttributeType::FLOAT, 0);
+				decl.addAttribute(20, 3, gpu::AttributeType::FLOAT, 0);
+				decl.addAttribute(32, 3, gpu::AttributeType::FLOAT, 0);
+				renderer->setProceduralGeometry(entity
+					, Span<const u8>(vertices.data, vertex_count * sizeof(MeshVertex))
+					, decl
+					, Span<const u8>(indices.data, u32(indices.length) * sizeof(u32))
+					, gpu::DataType::U32);
+			}
+		}
+	}
+	EX_RESULT(frame, u8(valid));
 }
 
 static void logErrorString(ex_string_view v) {
@@ -375,6 +430,7 @@ void registerImguiModule(NativeFunctionMap& functions) {
 void gatherCoreFunctions(NativeFunctionMap& functions) {
 	generated::registerGeneratedEngineImport(functions);
 	registerImguiModule(functions);
+	functions.insert({"core:procedural_geom", "setMeshRaw"}, &setMesh);
 	// input
 	functions.insert({"core:input", "input"}, &wrap<inputGetInput>);
 	functions.insert({"core:input", "getEventCount"}, &wrap<inputGetEventCount>);

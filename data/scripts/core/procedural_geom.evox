@@ -1,0 +1,547 @@
+// Script-side mesh construction. The only native operation is setMesh(), at upload time.
+import "core:array" as array
+import "core:entity"
+import "core:random" as random
+import "core:vec2" as vec2
+import "core:vec3" as vec3
+import "std:math" as math
+
+// TODO access to meshes, splines and terrains
+
+// Matches the native renderer vertex layout (position, UV, normal, tangent).
+struct Vertex {
+    position : vec3.Vec3;
+    uv : vec2.Vec2;
+    normal : vec3.Vec3;
+    tangent : vec3.Vec3;
+}
+
+// Low-level upload; the entity must already have a procedural geometry component.
+extern fn setMeshRaw(entity : Entity, vertices : []const Vertex, indices : []const u32) : bool;
+
+// topology: 0 = triangles (uploadable), 1 = polyline, 2 = points (path sources).
+struct Mesh {
+    vertices : array.Array(Vertex);
+    indices : array.Array(u32);
+    topology : i32;
+}
+
+fn empty() : Mesh {
+    return { array.init(Vertex), array.init(u32), 0 };
+}
+
+// Mesh owns its arrays. Do not copy or reuse it after passing it to merge().
+fn deinit(mesh : *Mesh) : void {
+    array.deinit(&mesh.vertices);
+    array.deinit(&mesh.indices);
+}
+
+fn vertex(mesh : *Mesh, position : vec3.Vec3, normal : vec3.Vec3, tangent : vec3.Vec3, u : f32, v : f32) : void {
+    array.push(&mesh.vertices, { position, {u, v}, normal, tangent });
+}
+
+fn triangle(mesh : *Mesh, a : u32, b : u32, c : u32) : void {
+    array.push(&mesh.indices, a);
+    array.push(&mesh.indices, b);
+    array.push(&mesh.indices, c);
+}
+
+// Dimensions are in world units. Cube is centered at the origin, with separate
+// vertices per face so edges have flat normals and independent UV coordinates.
+fn cube(width : f32, height : f32, depth : f32) : Mesh {
+    if width <= 0.0 or height <= 0.0 or depth <= 0.0 { panic("Cube dimensions must be positive"); }
+    var result = empty();
+    const hx = width * 0.5;
+    const hy = height * 0.5;
+    const hz = depth * 0.5;
+    // Each face: lower left, lower right, upper left, upper right when viewed from outside.
+    quad(&result, {-hx, -hy, hz}, {hx, -hy, hz}, {-hx, hy, hz}, {hx, hy, hz}, {0.0, 0.0, 1.0}, {1.0, 0.0, 0.0});
+    quad(&result, {hx, -hy, -hz}, {-hx, -hy, -hz}, {hx, hy, -hz}, {-hx, hy, -hz}, {0.0, 0.0, -1.0}, {-1.0, 0.0, 0.0});
+    quad(&result, {hx, -hy, hz}, {hx, -hy, -hz}, {hx, hy, hz}, {hx, hy, -hz}, {1.0, 0.0, 0.0}, {0.0, 0.0, -1.0});
+    quad(&result, {-hx, -hy, -hz}, {-hx, -hy, hz}, {-hx, hy, -hz}, {-hx, hy, hz}, {-1.0, 0.0, 0.0}, {0.0, 0.0, 1.0});
+    quad(&result, {-hx, hy, hz}, {hx, hy, hz}, {-hx, hy, -hz}, {hx, hy, -hz}, {0.0, 1.0, 0.0}, {1.0, 0.0, 0.0});
+    quad(&result, {-hx, -hy, -hz}, {hx, -hy, -hz}, {-hx, -hy, hz}, {hx, -hy, hz}, {0.0, -1.0, 0.0}, {1.0, 0.0, 0.0});
+    return result;
+}
+
+fn quad(mesh : *Mesh, a : vec3.Vec3, b : vec3.Vec3, c : vec3.Vec3, d : vec3.Vec3, normal : vec3.Vec3, tangent : vec3.Vec3) : void {
+    const start = mesh.vertices.size as u32;
+    vertex(mesh, a, normal, tangent, 0.0, 0.0);
+    vertex(mesh, b, normal, tangent, 1.0, 0.0);
+    vertex(mesh, c, normal, tangent, 0.0, 1.0);
+    vertex(mesh, d, normal, tangent, 1.0, 1.0);
+    triangle(mesh, start, start + 1, start + 2);
+    triangle(mesh, start + 2, start + 1, start + 3);
+}
+
+// latitude rings × longitude segments. The poles are duplicated for simple UVs.
+fn sphere(radius : f32, segments : i32, rings : i32) : Mesh {
+    if radius <= 0.0 or segments < 3 or rings < 2 or segments > 512 or rings > 512 { panic("Invalid sphere parameters"); }
+    var result = empty();
+    const pi : f32 = 3.141592653589793;
+    for y in 0..(rings + 1) {
+        const v = (y as f32) / (rings as f32);
+        const phi = v * pi;
+        for x in 0..(segments + 1) {
+            const u = (x as f32) / (segments as f32);
+            const theta = u * (2.0 * pi);
+            const normal : vec3.Vec3 = { math.sin(phi) * math.cos(theta), math.cos(phi), math.sin(phi) * math.sin(theta) };
+            const tangent : vec3.Vec3 = { -math.sin(theta), 0.0, math.cos(theta) };
+            vertex(&result, normal * radius, normal, tangent, u, v);
+        }
+    }
+    for y in 0..rings {
+        for x in 0..segments {
+            const a = (y * (segments + 1) + x) as u32;
+            const b = a + (segments + 1) as u32;
+            if y > 0 { triangle(&result, a, a + 1, b); }
+            if y < rings - 1 { triangle(&result, a + 1, b + 1, b); }
+        }
+    }
+    return result;
+}
+
+// Unit grid in the XY plane, spanning [-1, 1] on both axes.
+fn grid(columns : i32, rows : i32) : Mesh {
+    if columns < 1 or rows < 1 or columns > 512 or rows > 512 { panic("Invalid grid dimensions"); }
+    var result = empty();
+    for y in 0..(rows + 1) {
+        for x in 0..(columns + 1) {
+            const u = (x as f32) / (columns as f32);
+            const v = (y as f32) / (rows as f32);
+            vertex(&result, {u * 2.0 - 1.0, v * 2.0 - 1.0, 0.0}, {0.0, 0.0, 1.0}, {1.0, 0.0, 0.0}, u, v);
+        }
+    }
+    for y in 0..rows {
+        for x in 0..columns {
+            const a = (y * (columns + 1) + x) as u32;
+            const b = a + (columns + 1) as u32;
+            triangle(&result, a, a + 1, b);
+            triangle(&result, b, a + 1, b + 1);
+        }
+    }
+    return result;
+}
+
+// A closed cone along +Z. The base is at z=0 and the tip is at z=height.
+fn cone(radius : f32, height : f32, segments : i32) : Mesh {
+    if radius <= 0.0 or height <= 0.0 or segments < 3 or segments > 512 { panic("Invalid cone parameters"); }
+    var result = empty();
+    const pi : f32 = 3.141592653589793;
+    for i in 0..segments {
+        const u = (i as f32) / (segments as f32);
+        const a = u * 2.0 * pi;
+        const c = math.cos(a);
+        const s = math.sin(a);
+        const normal = vec3.normalize(vec3.Vec3 {c * height, s * height, radius});
+        const tangent : vec3.Vec3 = {-s, c, 0.0};
+        vertex(&result, {c * radius, s * radius, 0.0}, normal, tangent, u, 0.0);
+        vertex(&result, {0.0, 0.0, height}, normal, tangent, u, 1.0);
+    }
+    for i in 0..segments {
+        const next = (i + 1) % segments;
+        triangle(&result, (i * 2) as u32, (next * 2) as u32, (i * 2 + 1) as u32);
+    }
+    const start = result.vertices.size as u32;
+    vertex(&result, {0.0, 0.0, 0.0}, {0.0, 0.0, -1.0}, {1.0, 0.0, 0.0}, 0.5, 0.5);
+    for i in 0..segments {
+        const a = (i as f32) / (segments as f32) * 2.0 * pi;
+        const c = math.cos(a);
+        const s = math.sin(a);
+        vertex(&result, {c * radius, s * radius, 0.0}, {0.0, 0.0, -1.0}, {1.0, 0.0, 0.0}, (c + 1.0) * 0.5, (s + 1.0) * 0.5);
+    }
+    for i in 0..segments {
+        triangle(&result, start, start + 1 + ((i + 1) % segments) as u32, start + 1 + i as u32);
+    }
+    return result;
+}
+
+// Closed cylinder centered at the origin along Z.
+fn cylinder(radius : f32, height : f32, segments : i32) : Mesh {
+    if radius <= 0.0 or height <= 0.0 or segments < 3 or segments > 512 { panic("Invalid cylinder parameters"); }
+    var result = empty();
+    const pi : f32 = 3.141592653589793;
+    for i in 0..(segments + 1) {
+        const u = (i as f32) / (segments as f32);
+        const a = u * 2.0 * pi;
+        const c = math.cos(a);
+        const s = math.sin(a);
+        const normal : vec3.Vec3 = {c, s, 0.0};
+        const tangent : vec3.Vec3 = {-s, c, 0.0};
+        vertex(&result, {c * radius, s * radius, -height * 0.5}, normal, tangent, u, 0.0);
+        vertex(&result, {c * radius, s * radius, height * 0.5}, normal, tangent, u, 1.0);
+    }
+    for i in 0..segments {
+        const a = (i * 2) as u32;
+        triangle(&result, a + 1, a, a + 3);
+        triangle(&result, a + 3, a, a + 2);
+    }
+    for cap in 0..2 {
+        const z = cap == 0 ? height * 0.5 : -height * 0.5;
+        const nz : f32 = cap == 0 ? 1.0 : -1.0;
+        const center = result.vertices.size as u32;
+        vertex(&result, {0.0, 0.0, z}, {0.0, 0.0, nz}, {1.0, 0.0, 0.0}, 0.5, 0.5);
+        for i in 0..segments {
+            const a = (i as f32) / (segments as f32) * 2.0 * pi;
+            const c = math.cos(a);
+            const s = math.sin(a);
+            vertex(&result, {c * radius, s * radius, z}, {0.0, 0.0, nz}, {1.0, 0.0, 0.0}, (c + 1.0) * 0.5, (s + 1.0) * 0.5);
+        }
+        for i in 0..segments {
+            const a = center + 1 + i as u32;
+            const b = center + 1 + ((i + 1) % segments) as u32;
+            if cap == 0 { triangle(&result, center, a, b); }
+            else { triangle(&result, center, b, a); }
+        }
+    }
+    return result;
+}
+
+// The remaining sources are paths/points, not renderable triangle meshes.
+// Use their vertices for extrusion or instancing; setMesh intentionally rejects them.
+fn point(position : vec3.Vec3) : Mesh {
+    var result = empty();
+    result.topology = 2;
+    vertex(&result, position, {0.0, 1.0, 0.0}, {1.0, 0.0, 0.0}, 0.0, 0.0);
+    return result;
+}
+
+fn line(length : f32, segments : i32) : Mesh {
+    if length <= 0.0 or segments < 1 or segments > 512 { panic("Invalid line parameters"); }
+    var result = empty();
+    result.topology = 1;
+    for i in 0..(segments + 1) {
+        const u = (i as f32) / (segments as f32);
+        vertex(&result, {length * (u - 0.5), 0.0, 0.0}, {0.0, 1.0, 0.0}, {1.0, 0.0, 0.0}, u, 0.0);
+    }
+    return result;
+}
+
+fn circle(radius : f32, segments : i32) : Mesh {
+    if radius <= 0.0 or segments < 3 or segments > 512 { panic("Invalid circle parameters"); }
+    var result = empty();
+    result.topology = 1;
+    const pi : f32 = 3.141592653589793;
+    for i in 0..(segments + 1) {
+        const u = (i as f32) / (segments as f32);
+        const angle = u * 2.0 * pi;
+        const c = math.cos(angle);
+        const s = math.sin(angle);
+        vertex(&result, {c * radius, s * radius, 0.0}, {c, s, 0.0}, {-s, c, 0.0}, u, 0.0);
+    }
+    return result;
+}
+
+fn spiral(height : f32, start_radius : f32, end_radius : f32, turns : f32, resolution : i32) : Mesh {
+    if resolution < 2 or resolution > 512 or turns <= 0.0 or turns > 512.0 or start_radius <= 0.0 or end_radius <= 0.0 {
+        panic("Invalid spiral parameters");
+    }
+    const count = (turns * (resolution as f32) + 0.5) as i32;
+    if count < 2 or count > 262144 { panic("Invalid spiral point count"); }
+    var result = empty();
+    result.topology = 2;
+    const pi : f32 = 3.141592653589793;
+    for i in 0..count {
+        const t = (i as f32) / ((count - 1) as f32);
+        const radius = start_radius + (end_radius - start_radius) * t;
+        const a = turns * t * 2.0 * pi;
+        const c = math.cos(a);
+        const s = math.sin(a);
+        const dr = end_radius - start_radius;
+        const angular_speed = turns * 2.0 * pi;
+        const tangent = vec3.normalizeSafe(vec3.Vec3 {dr * c - radius * s * angular_speed, dr * s + radius * c * angular_speed, height});
+        vertex(&result, {radius * c, radius * s, height * t}, {c, s, 0.0}, tangent, height * t, 0.0);
+    }
+    return result;
+}
+
+// A path through explicit control points. The old node reads a world spline
+// component, whose points are not currently exposed to Evox; this uses linear samples.
+fn spline(points : []const vec3.Vec3, steps_per_segment : i32) : Mesh {
+    if points.length < 2 or points.length > 4096 or steps_per_segment < 1 or steps_per_segment > 512
+        or points.length * (steps_per_segment as isize) > 262144 { panic("Invalid spline parameters"); }
+    var result = empty();
+    result.topology = 2;
+    for i in 0..(points.length - 1) {
+        const tangent = vec3.normalizeSafe(points[i + 1] - points[i]);
+        for j in 0..steps_per_segment {
+            const t = (j as f32) / (steps_per_segment as f32);
+            vertex(&result, vec3.lerp(points[i], points[i + 1], t), {0.0, 1.0, 0.0}, tangent, t, 0.0);
+        }
+    }
+    const last = points.length - 1;
+    vertex(&result, points[last], {0.0, 1.0, 0.0}, vec3.normalizeSafe(points[last] - points[last - 1]), 1.0, 0.0);
+    return result;
+}
+
+// Density is points per square world unit. Consumes the triangle mesh and
+// returns a point source (topology 2), not directly uploadable via setMesh.
+fn distributePointsOnFaces(surface : Mesh, density : f32, seed : u32) : Mesh {
+    if surface.topology != 0 or surface.indices.size % 3 != 0 or not (density >= 0.0) {
+        panic("Distribute requires a triangle mesh and nonnegative density");
+    }
+    var result = empty();
+    result.topology = 2;
+    var cumulative = array.init(f32);
+    var total : f32 = 0.0;
+    for i in 0..(surface.indices.size / 3) {
+        const ia = surface.indices.values[i * 3] as isize;
+        const ib = surface.indices.values[i * 3 + 1] as isize;
+        const ic = surface.indices.values[i * 3 + 2] as isize;
+        if ia >= surface.vertices.size or ib >= surface.vertices.size or ic >= surface.vertices.size { panic("Invalid triangle index"); }
+        const a = surface.vertices.values[ia].position;
+        const b = surface.vertices.values[ib].position;
+        const c = surface.vertices.values[ic].position;
+        total += vec3.length(vec3.cross(b - a, c - a)) * 0.5;
+        array.push(&cumulative, total);
+    }
+    if not (total >= 0.0) or not (total * density >= 0.0) or total * density > 1000000.0 {
+        panic("Too many distributed points");
+    }
+    const count = (total * density) as isize;
+    array.reserve(&result.vertices, count);
+    // Reset both halves of core:random's module-global generator each call.
+    // This makes a given seed reproducible, but changes the shared RNG state.
+    random.seed(seed == 0 ? 521288629 : seed, 362436069);
+    for j in 0..count {
+        const target = random.randFloat() * total;
+        var lo : isize = 0;
+        var hi = cumulative.size;
+        while lo < hi {
+            const mid = lo + (hi - lo) / 2;
+            if cumulative.values[mid] <= target { lo = mid + 1; }
+            else { hi = mid; }
+        }
+        // randFloat may round to 1.0 in f32; skip trailing zero-area faces.
+        if lo == cumulative.size {
+            lo = cumulative.size - 1;
+            while lo > 0 and cumulative.values[lo] == cumulative.values[lo - 1] { lo -= 1; }
+        }
+        const a = surface.vertices.values[surface.indices.values[lo * 3] as isize];
+        const b = surface.vertices.values[surface.indices.values[lo * 3 + 1] as isize];
+        const c = surface.vertices.values[surface.indices.values[lo * 3 + 2] as isize];
+        // Reflect into the unit triangle for uniform barycentric sampling.
+        var u = random.randFloat();
+        var v = random.randFloat();
+        if u + v > 1.0 { u = 1.0 - u; v = 1.0 - v; }
+        const w = 1.0 - u - v;
+        const position = a.position * w + b.position * u + c.position * v;
+        const face_normal = vec3.normalizeSafe(vec3.cross(b.position - a.position, c.position - a.position));
+        var normal = vec3.normalizeSafe(a.normal * w + b.normal * u + c.normal * v);
+        if vec3.lengthSquared(normal) < 0.5 { normal = face_normal; }
+        var tangent = a.tangent * w + b.tangent * u + c.tangent * v;
+        tangent = vec3.normalizeSafe(tangent - normal * vec3.dot(tangent, normal));
+        if vec3.lengthSquared(tangent) < 0.5 {
+            tangent = vec3.normalizeSafe((b.position - a.position) - normal * vec3.dot(b.position - a.position, normal));
+        }
+        const uv = a.uv * w + b.uv * u + c.uv * v;
+        vertex(&result, position, normal, tangent, uv.x, uv.y);
+    }
+    array.deinit(&cumulative);
+    var owned = surface;
+    deinit(&owned);
+    return result;
+}
+
+// Copy the triangle mesh once per point. Local X follows the point tangent,
+// local Y follows its normal and local Z completes a right-handed basis.
+// Consumes both inputs and returns uploadable triangle geometry.
+fn placeInstancesAtPoints(points : Mesh, instance : Mesh) : Mesh {
+    if instance.topology != 0 or instance.vertices.size == 0 or instance.indices.size == 0 or instance.indices.size % 3 != 0 {
+        panic("Instance must be a triangle mesh");
+    }
+    if points.vertices.size > 1000000 / instance.vertices.size
+        or (instance.indices.size > 0 and points.vertices.size > 3000000 / instance.indices.size) {
+        panic("Too many instance vertices or indices");
+    }
+    var result = empty();
+    array.reserve(&result.vertices, points.vertices.size * instance.vertices.size);
+    array.reserve(&result.indices, points.vertices.size * instance.indices.size);
+    for i in 0..points.vertices.size {
+        const p = points.vertices.values[i];
+        const up = vec3.normalizeSafe(p.normal);
+        if vec3.lengthSquared(up) < 0.5 { panic("Point normal is zero"); }
+        var x = p.tangent - up * vec3.dot(p.tangent, up);
+        if vec3.lengthSquared(x) < 0.000001 {
+            const fallback : vec3.Vec3 = (up.x > -0.9 and up.x < 0.9) ? vec3.Vec3 {1.0, 0.0, 0.0} : vec3.Vec3 {0.0, 0.0, 1.0};
+            x = fallback - up * vec3.dot(fallback, up);
+        }
+        x = vec3.normalizeSafe(x);
+        const z = vec3.cross(x, up);
+        const offset = result.vertices.size as u32;
+        for j in 0..instance.vertices.size {
+            const v = instance.vertices.values[j];
+            const position = p.position + x * v.position.x + up * v.position.y + z * v.position.z;
+            const normal = vec3.normalizeSafe(x * v.normal.x + up * v.normal.y + z * v.normal.z);
+            const tangent = vec3.normalizeSafe(x * v.tangent.x + up * v.tangent.y + z * v.tangent.z);
+            vertex(&result, position, normal, tangent, v.uv.x, v.uv.y);
+        }
+        for j in 0..instance.indices.size {
+            if instance.indices.values[j] >= instance.vertices.size as u32 { panic("Invalid instance index"); }
+            array.push(&result.indices, offset + instance.indices.values[j]);
+        }
+    }
+    var owned_points = points;
+    var owned_instance = instance;
+    deinit(&owned_points);
+    deinit(&owned_instance);
+    return result;
+}
+
+// Sweep a profile (its local XY coordinates) along a path. Both inputs must
+// contain at least two ordered points. The profile's normals/tangents are
+// transformed into the moving frame: X=side, Y=up, Z=direction.
+// Consumes both inputs; the result is a triangle mesh without end caps.
+fn extrude(profile : Mesh, path : Mesh) : Mesh {
+    if profile.topology == 0 or path.topology == 0 or profile.vertices.size < 2 or path.vertices.size < 2 {
+        panic("Extrude requires a profile and path with at least two points each");
+    }
+    const width = profile.vertices.size;
+    const rows = path.vertices.size;
+    if width > 1000000 / rows or (width - 1) > 3000000 / (6 * (rows - 1)) {
+        panic("Extruded mesh is too large");
+    }
+    var result = empty();
+    array.reserve(&result.vertices, width * rows);
+    array.reserve(&result.indices, (width - 1) * (rows - 1) * 6);
+    var distance : f32 = 0.0;
+    for row in 0..rows {
+        const p = path.vertices.values[row];
+        if row > 0 { distance += vec3.length(p.position - path.vertices.values[row - 1].position); }
+        const dir = vec3.normalizeSafe(p.tangent);
+        const side = vec3.normalizeSafe(vec3.cross(p.normal, dir));
+        if vec3.lengthSquared(dir) < 0.5 or vec3.lengthSquared(side) < 0.5 {
+            panic("Extrude path needs nonparallel normal and tangent");
+        }
+        const up = vec3.cross(dir, side);
+        for col in 0..width {
+            const v = profile.vertices.values[col];
+            const position = p.position + side * v.position.x + up * v.position.y;
+            const normal = vec3.normalizeSafe(side * v.normal.x + up * v.normal.y + dir * v.normal.z);
+            const tangent = vec3.normalizeSafe(side * v.tangent.x + up * v.tangent.y + dir * v.tangent.z);
+            vertex(&result, position, normal, tangent, v.uv.x, distance);
+        }
+        if row > 0 {
+            const prev = ((row - 1) * width) as u32;
+            const next = (row * width) as u32;
+            for col in 0..(width - 1) {
+                const j = col as u32;
+                const a = result.vertices.values[(prev + j) as isize];
+                const b = result.vertices.values[(next + j) as isize];
+                const c = result.vertices.values[(prev + j + 1) as isize];
+                const face = vec3.cross(b.position - a.position, c.position - a.position);
+                if vec3.dot(face, a.normal + b.normal + c.normal) < 0.0 {
+                    triangle(&result, prev + j, prev + j + 1, next + j);
+                    triangle(&result, prev + j + 1, next + j + 1, next + j);
+                } else {
+                    triangle(&result, prev + j, next + j, prev + j + 1);
+                    triangle(&result, prev + j + 1, next + j, next + j + 1);
+                }
+            }
+        }
+    }
+    var owned_profile = profile;
+    var owned_path = path;
+    deinit(&owned_profile);
+    deinit(&owned_path);
+    return result;
+}
+
+// Consumes both arguments; do not deinit or reuse them after merging.
+fn merge(a : Mesh, b : Mesh) : Mesh {
+    if a.topology != 0 or b.topology != 0 { panic("Only triangle meshes can be merged"); }
+    var result = empty();
+    array.reserve(&result.vertices, a.vertices.size + b.vertices.size);
+    array.reserve(&result.indices, a.indices.size + b.indices.size);
+    for i in 0..a.vertices.size { array.push(&result.vertices, a.vertices.values[i]); }
+    for i in 0..b.vertices.size { array.push(&result.vertices, b.vertices.values[i]); }
+    for i in 0..a.indices.size { array.push(&result.indices, a.indices.values[i]); }
+    const offset = a.vertices.size as u32;
+    for i in 0..b.indices.size { array.push(&result.indices, b.indices.values[i] + offset); }
+    var owned_a = a;
+    var owned_b = b;
+    deinit(&owned_a);
+    deinit(&owned_b);
+    return result;
+}
+
+// Mutates the mesh in place; returns it for use in nested expressions.
+fn translate(mesh : Mesh, offset : vec3.Vec3) : Mesh {
+    for i in 0..mesh.vertices.size {
+        mesh.vertices.values[i].position = mesh.vertices.values[i].position + offset;
+    }
+    return mesh;
+}
+
+// Apply a callback to every vertex, including path/point meshes. The four
+// pointers refer to this vertex's position, normal, tangent and UV, in order.
+// Mutates and returns the same owned mesh; indices and topology are unchanged.
+fn map(mesh : Mesh, mapping : fn(*vec3.Vec3, *vec3.Vec3, *vec3.Vec3, *vec2.Vec2) : void) : Mesh {
+    for i in 0..mesh.vertices.size {
+        mapping(&mesh.vertices.values[i].position, &mesh.vertices.values[i].normal, &mesh.vertices.values[i].tangent, &mesh.vertices.values[i].uv);
+    }
+    return mesh;
+}
+
+// Apply a position mapping to every vertex, including path/point meshes.
+// The callback receives the original position and its zero-based vertex index.
+// Mutates and returns the same owned mesh; UVs, normals, tangents, indices and
+// topology are unchanged. Recompute normals separately after nonrigid deformations.
+fn mapPositions(mesh : Mesh, mapping : fn(vec3.Vec3, i32) : vec3.Vec3) : Mesh {
+    for i in 0..mesh.vertices.size {
+        mesh.vertices.values[i].position = mapping(mesh.vertices.values[i].position, i as i32);
+    }
+    return mesh;
+}
+
+// Euler angles in radians, applied X then Y then Z about the origin.
+fn rotateVector(v : vec3.Vec3, angles : vec3.Vec3) : vec3.Vec3 {
+    const cx = math.cos(angles.x);
+    const sx = math.sin(angles.x);
+    const cy = math.cos(angles.y);
+    const sy = math.sin(angles.y);
+    const cz = math.cos(angles.z);
+    const sz = math.sin(angles.z);
+    const x : vec3.Vec3 = {v.x, v.y * cx - v.z * sx, v.y * sx + v.z * cx};
+    const y : vec3.Vec3 = {x.x * cy + x.z * sy, x.y, -x.x * sy + x.z * cy};
+    return {y.x * cz - y.y * sz, y.x * sz + y.y * cz, y.z};
+}
+
+// Mutates and returns the same owned mesh. Do not use a previous copy of it.
+fn rotate(mesh : Mesh, angles : vec3.Vec3) : Mesh {
+    for i in 0..mesh.vertices.size {
+        mesh.vertices.values[i].position = rotateVector(mesh.vertices.values[i].position, angles);
+        mesh.vertices.values[i].normal = vec3.normalizeSafe(rotateVector(mesh.vertices.values[i].normal, angles));
+        mesh.vertices.values[i].tangent = vec3.normalizeSafe(rotateVector(mesh.vertices.values[i].tangent, angles));
+    }
+    return mesh;
+}
+
+// Scale about the origin. Inverse scaling keeps normals correct for nonuniform
+// scale; reflecting one or three axes also reverses triangle winding.
+fn scale(mesh : Mesh, factors : vec3.Vec3) : Mesh {
+    if factors.x == 0.0 or factors.y == 0.0 or factors.z == 0.0 { panic("Scale factors must be nonzero"); }
+    for i in 0..mesh.vertices.size {
+        const v = mesh.vertices.values[i];
+        mesh.vertices.values[i].position = {v.position.x * factors.x, v.position.y * factors.y, v.position.z * factors.z};
+        const normal = vec3.normalizeSafe(vec3.Vec3 {v.normal.x / factors.x, v.normal.y / factors.y, v.normal.z / factors.z});
+        const tangent : vec3.Vec3 = {v.tangent.x * factors.x, v.tangent.y * factors.y, v.tangent.z * factors.z};
+        mesh.vertices.values[i].normal = normal;
+        mesh.vertices.values[i].tangent = vec3.normalizeSafe(tangent - normal * vec3.dot(tangent, normal));
+    }
+    if mesh.topology == 0 and (factors.x * factors.y * factors.z < 0.0) {
+        for i in 0..(mesh.indices.size / 3) {
+            const a = i * 3 + 1;
+            const b = i * 3 + 2;
+            const tmp = mesh.indices.values[a];
+            mesh.indices.values[a] = mesh.indices.values[b];
+            mesh.indices.values[b] = tmp;
+        }
+    }
+    return mesh;
+}
+
+fn setMesh(entity : Entity, mesh : Mesh) : bool {
+    if mesh.topology != 0 { return false; }
+    return setMeshRaw(entity, array.slice(mesh.vertices), array.slice(mesh.indices));
+}

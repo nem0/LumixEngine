@@ -47,7 +47,7 @@ VSOutput mainVS(VSInput input) {
 Surface getSurface(VSOutput input) {
 	MaterialData material = getMaterialData(u_material_index);
 	Surface surface;
-	surface.albedo = sampleBindless(LinearSampler, material.t_albedo, input.uv).rgb;
+	surface.albedo = sampleBindless(LinearSampler, material.t_albedo, input.uv).rgb * material.u_material_color.rgb;
 
 	float3x3 tbn = float3x3(
 		input.tangent, 
