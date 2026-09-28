@@ -156,6 +156,14 @@ struct EvoxSystemImpl : EvoxSystem {
 	const char* getName() const override { return "evox_system"; }
 	Engine& getEngine() override { return m_engine; }
 
+	bool registerNativeFunction(StringView unit_path, StringView name, ex_native_fn function) override {
+		if (unit_path.empty() || name.empty() || !function) return false;
+		const NativeFunctionKey key{unit_path, name};
+		if (m_native_functions.find(key).isValid()) return false;
+		m_native_functions.insert(key, function);
+		return true;
+	}
+
 	void serialize(OutputMemoryStream& out) const override {}
 
 	bool deserialize(i32, InputMemoryStream&) override { return true; }

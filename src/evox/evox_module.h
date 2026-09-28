@@ -29,6 +29,7 @@ struct EvoxSystem : ISystem {
 	// Compile and execute a standalone script against the given world. Runs synchronously.
 	virtual bool executeSource(StringView source, World& world, String& output) = 0;
 	virtual Engine& getEngine() = 0;
+	virtual bool registerNativeFunction(StringView unit_path, StringView name, ex_native_fn function) = 0;
 	virtual void registerModule(EvoxModule& module) = 0;
 	virtual void unregisterModule(EvoxModule& module) = 0;
 	virtual bool isReady() const = 0;
