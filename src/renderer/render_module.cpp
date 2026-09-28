@@ -2724,7 +2724,7 @@ struct RenderModuleImpl final : RenderModule {
 		const World& world = getWorld();
 		for (int i = 0; i < m_model_instances.size(); ++i) {
 			auto& r = m_model_instances[i];
-			if ((r.flags & (ModelInstance::ENABLED | ModelInstance::VALID)) == 0) continue;
+			if ((r.flags & (ModelInstance::ENABLED | ModelInstance::VALID)) != (ModelInstance::ENABLED | ModelInstance::VALID)) continue;
 			if (!r.model) continue;
 
 			const EntityRef entity{i};

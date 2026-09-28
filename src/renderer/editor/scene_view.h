@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "editor/action.h"
 #include "editor/render_interface.h"
 #include "editor/studio_app.h"
@@ -23,7 +22,7 @@ struct Shader;
 struct World;
 
 //@ object
-struct SceneView : StudioApp::GUIPlugin
+struct LUMIX_RENDERER_API SceneView : StudioApp::GUIPlugin
 {
 	friend struct WorldViewImpl;
 	explicit SceneView(StudioApp& app);
@@ -62,7 +61,7 @@ private:
 private:
 	StudioApp& m_app;
 	Local<Action> m_debug_show_actions[(u32)Pipeline::DebugShow::BUILTIN_COUNT];
-	Action m_insert_model_action{"Studio", "Insert model or prefab", "Insert model or prefab", "insert_model", ICON_FA_SEARCH};
+	Action m_insert_model_action;
 	Action m_wireframe_action{"Studio", "Wireframe", "wireframe", "wireframe", "", Action::TOOL};
 	
 	Action m_top_view_action{"Camera", "Top", "Top view", "view_top", ""};
@@ -75,32 +74,32 @@ private:
 	Action m_set_pivot_action{"Gizmo", "Set custom pivot", "Set custom pivot", "set_custom_pivot", ""};
 	Action m_reset_pivot_action{"Gizmo", "Reset pivot", "Reset pivot", "reset_pivot", ""};
 	Action m_anisotropic_scale_action{"Gizmo", "Enable/disable anisotropic scale", "Enable/disable anisotropic gizmo scale", "toggle_gizmo_anisotropic_scale", ""};
-	Action m_use_grid_snapping_action{"Gizmo", "Transform snapping", "Snap position, rotation or scale to configured multiples", "gizmo_snap_transform", ICON_FA_MAGNET};
+	Action m_use_grid_snapping_action;
 	Action m_copy_move_action{"Gizmo", "Duplicate move", "Duplicate entity when moving with gizmo", "duplicate_entity_move", ""};
-	Action m_translate_gizmo_mode{"Gizmo", "Translate", "Translate mode", "gizmo_translate_mode", ICON_FA_ARROWS_ALT};
-	Action m_rotate_gizmo_mode{"Gizmo", "Rotate", "Rotate mode", "gizmo_rotate_mode", ICON_FA_UNDO};
-	Action m_scale_gizmo_mode{"Gizmo", "Scale", "Scale mode", "gizmo_scale_mode", ICON_FA_EXPAND_ALT};
-	Action m_grab_action{"Gizmo", "Grab", "Grab mode", "gizmo_grab_mode", ICON_FA_HAND_PAPER};
+	Action m_translate_gizmo_mode;
+	Action m_rotate_gizmo_mode;
+	Action m_scale_gizmo_mode;
+	Action m_grab_action;
 	Action m_grab_x{"Gizmo", "X", "Grab X axis", "gizmo_grab_x", ""};
 	Action m_grab_y{"Gizmo", "Y", "Grab Y axis", "gizmo_grab_y", ""};
 	Action m_grab_z{"Gizmo", "Z", "Grab Z axis", "gizmo_grab_z", ""};
-	Action m_local_coord_gizmo{"Gizmo", "Local", "Local transform system", "gizmo_local_coord", ICON_FA_HOME};
-	Action m_global_coord_gizmo{"Gizmo", "Global", "Global transform system", "gizmo_global_coord", ICON_FA_GLOBE};
+	Action m_local_coord_gizmo;
+	Action m_global_coord_gizmo;
 	
 	Action m_rotate_entity_90_action{"Entity", "Rotate 90 degrees", "Rotate by 90 degrees", "rotate_90_deg", ""};
 	Action m_move_entity_E_action{"Entity", "Move entity east", "Move east", "move_entity_E", ""};
 	Action m_move_entity_N_action{"Entity", "Move entity north", "Move north", "move_entity_N", ""};
 	Action m_move_entity_S_action{"Entity", "Move entity south", "Move south", "move_entity_S", ""};
 	Action m_move_entity_W_action{"Entity", "Move entity west", "Move west", "move_entity_W", ""};
-	Action m_create_entity{"Entity", "Create empty", "Create new", "entity_create", ICON_FA_PLUS_SQUARE};
-	Action m_make_parent{"Entity", "Make parent", "Make parent", "entity_parent", ICON_FA_OBJECT_GROUP};
-	Action m_unparent{"Entity", "Unparent", "Unparent", "entity_unparent", ICON_FA_OBJECT_UNGROUP};
+	Action m_create_entity;
+	Action m_make_parent;
+	Action m_unparent;
 	Action m_autosnap_down{"Entity", "Autosnap down", "Toggle autosnap down", "autosnap_down", ""};
 	Action m_snap_down{"Entity", "Snap down", "Snap down", "entity_snap_down", ""};
-	Action m_select_parent{"Entity", "Select parent", "Select parent", "entity_select_parent", ICON_FA_ARROW_UP};
-	Action m_select_child{"Entity", "Select first child", "Select first child", "entity_select_first_child", ICON_FA_ARROW_DOWN};
-	Action m_select_next_sibling{"Entity", "Select next sibling", "Select next sibling", "entity_select_next_sibling", ICON_FA_ARROW_RIGHT};
-	Action m_select_prev_sibling{"Entity", "Select previous sibling", "Select previous sibling", "entity_select_prev_sibling", ICON_FA_ARROW_LEFT};
+	Action m_select_parent;
+	Action m_select_child;
+	Action m_select_next_sibling;
+	Action m_select_prev_sibling;
 
 	bool m_is_mouse_captured = false;
 	bool m_copy_moved = false;

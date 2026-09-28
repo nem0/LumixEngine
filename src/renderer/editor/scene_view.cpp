@@ -1,4 +1,5 @@
 #include <imgui/imgui.h>
+#include <imgui/IconsFontAwesome5.h>
 
 #include "core/delegate.h"
 #include "core/delegate_list.h"
@@ -910,6 +911,21 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 
 SceneView::SceneView(StudioApp& app)
 	: m_app(app)
+	, m_insert_model_action("Studio", "Insert model or prefab", "Insert model or prefab", "insert_model", ICON_FA_SEARCH)
+	, m_use_grid_snapping_action("Gizmo", "Transform snapping", "Snap position, rotation or scale to configured multiples", "gizmo_snap_transform", ICON_FA_MAGNET)
+	, m_translate_gizmo_mode("Gizmo", "Translate", "Translate mode", "gizmo_translate_mode", ICON_FA_ARROWS_ALT)
+	, m_rotate_gizmo_mode("Gizmo", "Rotate", "Rotate mode", "gizmo_rotate_mode", ICON_FA_UNDO)
+	, m_scale_gizmo_mode("Gizmo", "Scale", "Scale mode", "gizmo_scale_mode", ICON_FA_EXPAND_ALT)
+	, m_grab_action("Gizmo", "Grab", "Grab mode", "gizmo_grab_mode", ICON_FA_HAND_PAPER)
+	, m_local_coord_gizmo("Gizmo", "Local", "Local transform system", "gizmo_local_coord", ICON_FA_HOME)
+	, m_global_coord_gizmo("Gizmo", "Global", "Global transform system", "gizmo_global_coord", ICON_FA_GLOBE)
+	, m_create_entity("Entity", "Create empty", "Create new", "entity_create", ICON_FA_PLUS_SQUARE)
+	, m_make_parent("Entity", "Make parent", "Make parent", "entity_parent", ICON_FA_OBJECT_GROUP)
+	, m_unparent("Entity", "Unparent", "Unparent", "entity_unparent", ICON_FA_OBJECT_UNGROUP)
+	, m_select_parent("Entity", "Select parent", "Select parent", "entity_select_parent", ICON_FA_ARROW_UP)
+	, m_select_child("Entity", "Select first child", "Select first child", "entity_select_first_child", ICON_FA_ARROW_DOWN)
+	, m_select_next_sibling("Entity", "Select next sibling", "Select next sibling", "entity_select_next_sibling", ICON_FA_ARROW_RIGHT)
+	, m_select_prev_sibling("Entity", "Select previous sibling", "Select previous sibling", "entity_select_prev_sibling", ICON_FA_ARROW_LEFT)
 	, m_log_ui(app.getLogUI())
 	, m_editor(m_app.getWorldEditor())
 {
