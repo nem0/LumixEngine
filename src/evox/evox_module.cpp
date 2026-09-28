@@ -199,6 +199,70 @@ struct EvoxSystemImpl : EvoxSystem {
 
 	void createModules(World& world) override;
 
+	bool executeSource(StringView source, World& world, String& output) override {
+		// Keep every object alive until the task finishes: bytecode owns types, runtime owns globals.
+		ex_host host = {};
+		EvoxDiagnosticsContext diagnostics = {&output, &host};
+		host.diagnostics_userdata = &diagnostics;
+		host.print = &printEvoxMessage;
+		ex_default_arena_create(&host.arena);
+		ex_module* module = ex_module_create(&host);
+		ex_bytecode* bytecode = nullptr;
+		ex_runtime* runtime = nullptr;
+		ex_task* task = nullptr;
+		bool success = false;
+		if (!module) {
+			output.append("Could not create Evox module");
+			goto cleanup;
+		}
+		{
+			ImportContext imports(m_engine.getFileSystem(), m_allocator);
+			if (!ex_module_compile(module, toEvox(source), toEvox("<mcp>"), &resolveImport, &imports)) {
+				if (output.length() == 0) output.append("Evox compilation failed");
+				goto cleanup;
+			}
+		}
+		bytecode = ex_bytecode_compile(module, &host, nullptr);
+		if (!bytecode) {
+			if (output.length() == 0) output.append("Evox bytecode compilation failed");
+			goto cleanup;
+		}
+		runtime = ex_runtime_create(bytecode, &host);
+		if (!runtime || ex_runtime_set_native_resolver(runtime, &resolveCoreFunction, &m_native_functions) != EX_RESULT_OK) {
+			output.append("Could not initialize Evox runtime");
+			goto cleanup;
+		}
+		task = ex_task_create(runtime);
+		if (!task) {
+			output.append("Could not create Evox task");
+			goto cleanup;
+		}
+		{
+			// The Evox World handle is a native World* (same ABI as the regular main call).
+			World* arg = &world;
+			const ex_call_result result = ex_call(task, toEvox("main"), &arg, sizeof(arg));
+			if (result != EX_CALL_RESULT_OK) {
+				output.append("Evox main failed: ", evoxCallResultName(result));
+				for (u32 i = 0, count = ex_debug_stack_depth(task); i < count; ++i) {
+					ex_debug_location loc = {};
+					if (ex_debug_frame_location(task, i, &loc) == EX_RESULT_OK) {
+						StaticString<32> line(loc.line + 1);
+						output.append("\n  at ", fromEvox(loc.source_name), ":", (const char*)line);
+					}
+				}
+				goto cleanup;
+			}
+		}
+		success = true;
+	cleanup:
+		if (task) ex_task_destroy(task);
+		if (runtime) ex_runtime_destroy(runtime);
+		if (bytecode) ex_bytecode_destroy(bytecode);
+		if (module) ex_module_destroy(module);
+		ex_default_arena_destroy(&host.arena);
+		return success;
+	}
+
 	void update(float time_delta) override {
 		if (!m_is_ready || !m_runtime || !m_task || !m_is_game_running) return;
 		if (ex_task_get_state(m_task) != EX_TASK_SUSPENDED) return;
