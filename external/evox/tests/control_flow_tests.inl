@@ -1,3 +1,17 @@
+TEST(MatchPatternTypeMismatchReportsDiagnostic) {
+	TestContext context;
+	context.diagnostics.output_enabled = false;
+	ex_module* module = ex_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const bool compiled = ex_module_compile(module,
+		toLs("fn main() : void { match \"hello\" { case true: {} } }"),
+		makeStringView(__func__), nullptr, nullptr);
+	ex_module_destroy(module);
+	EXPECT_TRUE(!compiled);
+	EXPECT_TRUE(context.diagnostics.size > 0);
+	return true;
+}
+
 TEST(DeferTypechecks) {
 	const char* source = R"(
 		fn cleanup(v : *i32) : void {

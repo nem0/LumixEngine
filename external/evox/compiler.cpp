@@ -5589,7 +5589,11 @@ struct Checker {
 					continue;
 				}
 				ResolvedType* begin = checkExprForTarget(unit, &ctx, *pattern.begin, subject);
-				if (!begin || !typesEqual(begin, subject)) return false;
+				if (!begin) return false;
+				if (!typesEqual(begin, subject)) {
+					errorLine(pattern.begin->token, "Match pattern type ", begin, " does not match subject type ", subject);
+					return false;
+				}
 				if (pattern.end) {
 					// Range patterns are only valid for numeric types.
 					if (!subject_is_numeric) {
@@ -5597,7 +5601,11 @@ struct Checker {
 						return false;
 					}
 					ResolvedType* end = checkExprForTarget(unit, &ctx, *pattern.end, subject);
-					if (!end || !typesEqual(end, subject)) return false;
+					if (!end) return false;
+					if (!typesEqual(end, subject)) {
+						errorLine(pattern.end->token, "Match range endpoint type ", end, " does not match subject type ", subject);
+						return false;
+					}
 				}
 				// Track enum coverage and detect duplicates.
 				if (subject_is_string) {
