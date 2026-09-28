@@ -95,6 +95,9 @@ struct LUMIX_CORE_API Tokenizer {
 	// otherwise prints error and returns false
 	[[nodiscard]] bool consume(u32& out);
 
+	// if token is an unsigned integer, put it in `out` and return true
+	[[nodiscard]] bool consume(u64& out);
+
 	// if token is a number, put it in `out` and returns true
 	// otherwise prints error and returns false
 	[[nodiscard]] bool consume(float& out);

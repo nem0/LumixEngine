@@ -31,6 +31,29 @@ bool testBoundedTokenization() {
 	return true;
 }
 
+bool testUnsignedConsumption() {
+	Tokenizer max64("18446744073709551615", "test");
+	u64 value64 = 0;
+	ASSERT_TRUE(max64.consume(value64));
+	ASSERT_EQ(value64, ~u64(0));
+	Tokenizer overflow64("18446744073709551616", "test");
+	ASSERT_TRUE(!overflow64.consume(value64));
+	ASSERT_EQ(value64, ~u64(0));
+
+	Tokenizer max32("4294967295", "test");
+	u32 value32 = 0;
+	ASSERT_TRUE(max32.consume(value32));
+	ASSERT_EQ(value32, ~u32(0));
+	Tokenizer overflow32("4294967296", "test");
+	ASSERT_TRUE(!overflow32.consume(value32));
+	ASSERT_EQ(value32, ~u32(0));
+	Tokenizer negative("-1", "test");
+	ASSERT_TRUE(!negative.consume(value32));
+	Tokenizer fractional("1.5", "test");
+	ASSERT_TRUE(!fractional.consume(value64));
+	return true;
+}
+
 bool testBoundedTokenizerConsumptionAndParse() {
 	const char vector_source[] = "{1,2.5,-3}";
 	Tokenizer vector_tokenizer(StringView(vector_source, sizeof(vector_source) - 1), "test");
@@ -82,6 +105,7 @@ bool testBoundedTokenizerErrors() {
 
 void runTokenizerTests() {
 	RUN_TEST(testBoundedTokenization);
+	RUN_TEST(testUnsignedConsumption);
 	RUN_TEST(testBoundedTokenizerConsumptionAndParse);
 	RUN_TEST(testBoundedTokenizerErrors);
 }

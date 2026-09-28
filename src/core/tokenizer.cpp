@@ -222,18 +222,46 @@ bool Tokenizer::consume(i32& out) {
 	return false;
 }
 
-bool Tokenizer::consume(u32& out) {
-	Token token = nextToken();
+bool Tokenizer::consume(u64& out) {
+	const Token token = nextToken();
 	if (!token) return false;
-	
-	if (token.type == Token::NUMBER) {
-		fromCString(token.value, out);
-		return true;
-	}
-
+	if (token.type != Token::NUMBER) {
 	logError(filename, "(", getLine(), "): number expected.");
 	logErrorPosition(token.value.data);
 	return false;
+}
+
+	u64 value = 0;
+	for (char c : token.value) {
+		if (c < '0' || c > '9') {
+			logError(filename, "(", getLine(), "): invalid unsigned integer.");
+			logErrorPosition(token.value.data);
+			return false;
+		}
+		const u32 digit = c - '0';
+		if (value > (~u64(0) - digit) / 10) {
+			logError(filename, "(", getLine(), "): unsigned integer out of range.");
+			logErrorPosition(token.value.data);
+			return false;
+		}
+		value = value * 10 + digit;
+	}
+	out = value;
+	return true;
+}
+
+bool Tokenizer::consume(u32& out) {
+	const char* start = cursor;
+	while (start < content.end() && isSpace(*start)) ++start;
+	u64 value;
+	if (!consume(value)) return false;
+	if (value > ~u32(0)) {
+		logError(filename, "(", getLine(), "): unsigned integer out of range.");
+		logErrorPosition(start);
+		return false;
+	}
+	out = (u32)value;
+	return true;
 }
 
 bool Tokenizer::consume(float& out) {
