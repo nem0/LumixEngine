@@ -2071,34 +2071,51 @@ struct NetworkStream {
 	SOCKET socket;
 };
 
-struct NetworkStream* listen(const char* ip, u16 port, IAllocator& allocator) {
-	SOCKET listen_socket = ::socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (listen_socket == INVALID_SOCKET) return nullptr;
+struct NetworkListener {
+	IAllocator* allocator;
+	SOCKET socket;
+};
+
+NetworkListener* createListener(const char* ip, u16 port, IAllocator& allocator) {
+	SOCKET socket = ::socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (socket == INVALID_SOCKET) return nullptr;
 
 	SOCKADDR_IN sin = {};
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(port);
 	sin.sin_addr.s_addr = ::inet_addr(ip);
 
-	int retVal = ::bind(listen_socket, (LPSOCKADDR)&sin, sizeof(sin));
-	if (retVal == SOCKET_ERROR) {
-		closesocket(listen_socket);
+	if (::bind(socket, (LPSOCKADDR)&sin, sizeof(sin)) == SOCKET_ERROR || ::listen(socket, 10) != 0) {
+		closesocket(socket);
 		return nullptr;
 	}
 
-	i32 res = ::listen(listen_socket, 10);
-	if (res != 0) {
-		closesocket(listen_socket);
-		return nullptr;
-	}
+	auto* listener = LUMIX_NEW(allocator, NetworkListener);
+	listener->socket = socket;
+	listener->allocator = &allocator;
+	return listener;
+}
 
-	SOCKET socket = ::accept(listen_socket, nullptr, nullptr);
-	closesocket(listen_socket);
+NetworkStream* accept(NetworkListener& listener) {
+	SOCKET socket = ::accept(listener.socket, nullptr, nullptr);
 	if (socket == INVALID_SOCKET) return nullptr;
 
-	auto* stream = LUMIX_NEW(allocator, NetworkStream);
+	auto* stream = LUMIX_NEW(*listener.allocator, NetworkStream);
 	stream->socket = socket;
-	stream->allocator = &allocator;
+	stream->allocator = listener.allocator;
+	return stream;
+}
+
+void close(NetworkListener& listener) {
+	closesocket(listener.socket);
+	LUMIX_DELETE(*listener.allocator, &listener);
+}
+
+NetworkStream* listen(const char* ip, u16 port, IAllocator& allocator) {
+	NetworkListener* listener = createListener(ip, port, allocator);
+	if (!listener) return nullptr;
+	NetworkStream* stream = accept(*listener);
+	close(*listener);
 	return stream;
 }
 

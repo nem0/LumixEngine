@@ -316,6 +316,10 @@ enum class NetworkReadResult {
 
 LUMIX_CORE_API bool initNetwork();
 LUMIX_CORE_API void shutdownNetwork();
+// Keep the listener alive while accepting multiple connections; close it after the last accept.
+LUMIX_CORE_API struct NetworkListener* createListener(const char* ip, u16 port, IAllocator& allocator);
+LUMIX_CORE_API struct NetworkStream* accept(NetworkListener& listener);
+LUMIX_CORE_API void close(NetworkListener& listener);
 LUMIX_CORE_API struct NetworkStream* listen(const char* ip, u16 port, IAllocator& allocator);
 LUMIX_CORE_API NetworkStream* connect(const char* ip, u16 port, IAllocator& allocator);
 LUMIX_CORE_API NetworkReadResult read(NetworkStream& stream, void* mem, u32 size);

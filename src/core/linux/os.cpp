@@ -1355,6 +1355,9 @@ bool initNetwork() {
 }
 
 void shutdownNetwork() {}
+NetworkListener* createListener(const char* ip, u16 port, IAllocator& allocator) { ASSERT(false); return nullptr; }
+NetworkStream* accept(NetworkListener& listener) { ASSERT(false); return nullptr; }
+void close(NetworkListener& listener) {}
 struct NetworkStream* listen(const char* ip, u16 port, IAllocator& allocator) { ASSERT(false); return nullptr; }
 NetworkStream* connect(const char* ip, u16 port, IAllocator& allocator) { ASSERT(false); return nullptr; }
 NetworkReadResult read(NetworkStream& stream, void* mem, u32 size) { ASSERT(false); return NetworkReadResult::FAILED; }
