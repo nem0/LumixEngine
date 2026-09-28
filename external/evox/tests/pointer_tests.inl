@@ -231,6 +231,70 @@ TEST(BytecodePointerParameterCall) {
 	return true;
 }
 
+TEST(OptimizedPointerParameterWrite) {
+	const char* source = R"(
+		fn change(v : *i32) : void { v.* = 3; }
+		fn main() : i32 { var value : i32 = 0; change(&value); return value; }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	ex_bytecode_compile_options options = {};
+	options.optimize = true;
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, &options);
+	EXPECT_TRUE(bytecode != nullptr);
+	ex_runtime* runtime = ex_runtime_create(bytecode, &module_host);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(3, ex_task_to_i32(runtime, -1));
+	test_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(OptimizedVertexMapPointerCallback) {
+	const char* source = R"(
+		struct Vec3 { x : f32; y : f32; z : f32; }
+		struct Vec2 { x : f32; y : f32; }
+		struct Vertex { position : Vec3; normal : Vec3; tangent : Vec3; uv : Vec2; }
+		fn modify(p : *Vec3, n : *Vec3, t : *Vec3, uv : *Vec2) : void {
+			p.* = {p.x + 1.0, p.y + 2.0, p.z + 3.0};
+			n.* = {0.0, 1.0, 0.0};
+			t.* = {0.0, 0.0, 1.0};
+			uv.* = {uv.x * 2.0, uv.y + 0.75};
+		}
+		fn map(vertices : []Vertex, callback : fn(*Vec3, *Vec3, *Vec3, *Vec2) : void) : void {
+			for i in 0..vertices.length {
+				callback(&vertices[i].position, &vertices[i].normal, &vertices[i].tangent, &vertices[i].uv);
+			}
+		}
+		fn main() : i32 {
+			var vertices : [2]Vertex = [
+				{{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0}},
+				{{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0}}
+			];
+			map(vertices[:], modify);
+			if vertices[0].position.x != 1.0 or vertices[0].normal.y != 1.0
+				or vertices[1].tangent.z != 1.0 or vertices[1].uv.y != 0.75 { return 0; }
+			return 42;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	ex_bytecode_compile_options options = {};
+	options.optimize = true;
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, &options);
+	EXPECT_TRUE(bytecode != nullptr);
+	ex_runtime* runtime = ex_runtime_create(bytecode, &module_host);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(runtime, -1));
+	test_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	CAPI_END(module);
+	return true;
+}
+
 TEST(BytecodePointerParameterForwarding) {
 	const char* source = R"(
 		fn increment(v : *i32) : void {

@@ -575,7 +575,7 @@ if plugin "evox" then
 	excludes { "../external/evox/evoxc.c", "../external/evox/tests/*.cpp", "../external/evox/c_compiler/**.*", "../external/evox/benchmarks/**.*" }
 	includedirs { "../src", "../src/evox" }
 	defines { "BUILDING_EVOX" }
-	dynamic_link_plugin { "core", "engine" }
+	dynamic_link_plugin { "core", "engine", "renderer" }
 end
 
 if _OPTIONS["with-game"] ~= nil then

@@ -4111,6 +4111,10 @@ struct BytecodeCompiler {
 					auto& ref = alloc<ExOpFramePtr>();
 					ref.alloca = addr.alloca;
 					ref.src_loc = load->src_loc;
+					// A pointer loaded from a local may itself be an lvalue (v.*).
+					// Preserve that mode: otherwise emitCopy writes into the pointer
+					// parameter's frame slot instead of through the pointer.
+					ref.result_mode = load->result_mode;
 					op = &ref;
 				}
 				break;
