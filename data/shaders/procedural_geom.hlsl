@@ -90,7 +90,7 @@ Surface getSurface(VSOutput input) {
 	}
 #else 
 	float4 mainPS(VSOutput input) : SV_TARGET {
-		Surface surface = getSurface();
+		Surface surface = getSurface(input);
 
 		float linear_depth = dot(surface.pos_ws.xyz, Pass_view_dir.xyz);
 		Cluster cluster = getClusterLinearDepth(linear_depth, input.position.xy);
