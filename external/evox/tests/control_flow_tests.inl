@@ -4,7 +4,7 @@ TEST(MatchPatternTypeMismatchReportsDiagnostic) {
 	ex_module* module = ex_module_create(&context.host);
 	EXPECT_TRUE(module != nullptr);
 	const bool compiled = ex_module_compile(module,
-		toLs("fn main() : void { match \"hello\" { case true: {} } }"),
+		toLs("fn main(value : []const u8) : void { match value { case true: {} } }"),
 		makeStringView(__func__), nullptr, nullptr);
 	ex_module_destroy(module);
 	EXPECT_TRUE(!compiled);
