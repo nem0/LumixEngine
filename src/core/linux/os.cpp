@@ -1359,6 +1359,7 @@ struct NetworkStream* listen(const char* ip, u16 port, IAllocator& allocator) { 
 NetworkStream* connect(const char* ip, u16 port, IAllocator& allocator) { ASSERT(false); return nullptr; }
 NetworkReadResult read(NetworkStream& stream, void* mem, u32 size) { ASSERT(false); return NetworkReadResult::FAILED; }
 bool write(NetworkStream& stream, const void* data, u32 size) { ASSERT(false); return false; }
+void interrupt(NetworkStream& stream) {}
 void close(NetworkStream& stream) {}
 
 

@@ -2081,11 +2081,17 @@ struct NetworkStream* listen(const char* ip, u16 port, IAllocator& allocator) {
 	sin.sin_addr.s_addr = ::inet_addr(ip);
 
 	int retVal = ::bind(listen_socket, (LPSOCKADDR)&sin, sizeof(sin));
-	if (retVal == SOCKET_ERROR) return nullptr;
-			
+	if (retVal == SOCKET_ERROR) {
+		closesocket(listen_socket);
+		return nullptr;
+	}
+
 	i32 res = ::listen(listen_socket, 10);
-	if (res != 0) return nullptr;
-			
+	if (res != 0) {
+		closesocket(listen_socket);
+		return nullptr;
+	}
+
 	SOCKET socket = ::accept(listen_socket, nullptr, nullptr);
 	closesocket(listen_socket);
 	if (socket == INVALID_SOCKET) return nullptr;
@@ -2105,7 +2111,10 @@ NetworkStream* connect(const char* ip, u16 port, IAllocator& allocator) {
 	sin.sin_port = htons(port);
 	sin.sin_addr.s_addr = ::inet_addr(ip);
 
-	if (::connect(socket, (LPSOCKADDR)&sin, sizeof(sin)) != 0) return nullptr;
+	if (::connect(socket, (LPSOCKADDR)&sin, sizeof(sin)) != 0) {
+		closesocket(socket);
+		return nullptr;
+	}
 
 	auto* stream = LUMIX_NEW(allocator, NetworkStream);
 	stream->socket = socket;
@@ -2138,8 +2147,18 @@ NetworkReadResult read(NetworkStream& stream, void* mem, u32 size) {
 }
 
 bool write(NetworkStream& stream, const void* data, u32 size) {
-	i32 send = ::send(stream.socket, (const char*)data, size, 0);
-	return send == size;
+	const char* bytes = (const char*)data;
+	while (size > 0) {
+		const i32 sent = ::send(stream.socket, bytes, size, 0);
+		if (sent <= 0) return false;
+		bytes += sent;
+		size -= sent;
+	}
+	return true;
+}
+
+void interrupt(NetworkStream& stream) {
+	::shutdown(stream.socket, 2); // 2 = shut down send and receive (Winsock SD_BOTH)
 }
 
 void close(NetworkStream& stream) {

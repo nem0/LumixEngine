@@ -320,6 +320,8 @@ LUMIX_CORE_API struct NetworkStream* listen(const char* ip, u16 port, IAllocator
 LUMIX_CORE_API NetworkStream* connect(const char* ip, u16 port, IAllocator& allocator);
 LUMIX_CORE_API NetworkReadResult read(NetworkStream& stream, void* mem, u32 size);
 LUMIX_CORE_API bool write(NetworkStream& stream, const void* data, u32 size);
+// Interrupt a blocked network read without releasing the stream's memory.
+LUMIX_CORE_API void interrupt(NetworkStream& stream);
 LUMIX_CORE_API void close(NetworkStream& stream);
 
 struct LUMIX_CORE_API Timer {
