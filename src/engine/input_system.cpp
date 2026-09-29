@@ -149,14 +149,13 @@ struct InputSystemImpl final : InputSystem {
 			}
 			case os::Event::Type::MOUSE_BUTTON: {
 				Event input_event;
-				input_event.type = InputEventType::BUTTON;
+				input_event.type = InputEventType::MOUSE_BUTTON;
 				input_event.device = m_mouse_device;
-				input_event.data.button.key_id = (int)event.mouse_button.button;
-				input_event.data.button.is_repeat = false;
-				input_event.data.button.down = event.mouse_button.down;
+				input_event.data.mouse_button.button = event.mouse_button.button;
+				input_event.data.mouse_button.down = event.mouse_button.down;
 				const os::Point cp = os::getMouseScreenPos();
-				input_event.data.button.x = (float)cp.x - mouse_base_x;
-				input_event.data.button.y = (float)cp.y - mouse_base_y;
+				input_event.data.mouse_button.x = (float)cp.x - mouse_base_x;
+				input_event.data.mouse_button.y = (float)cp.y - mouse_base_y;
 				injectEvent(input_event);
 				break;
 			}
@@ -183,17 +182,17 @@ struct InputSystemImpl final : InputSystem {
 			}
 			case os::Event::Type::KEY: {
 				Event input_event;
-				input_event.type = InputEventType::BUTTON;
+				input_event.type = InputEventType::KEYBOARD;
 				input_event.device = m_keyboard_device;
-				input_event.data.button.down = event.key.down;
-				input_event.data.button.key_id = (int)event.key.keycode;
-				input_event.data.button.is_repeat = (int)event.key.is_repeat;
+				input_event.data.keyboard.down = event.key.down;
+				input_event.data.keyboard.keycode = event.key.keycode;
+				input_event.data.keyboard.is_repeat = event.key.is_repeat;
 				injectEvent(input_event);
 				if (event.key.down) {
-					m_down_keys.push(input_event.data.button);
+					m_down_keys.push(input_event.data.keyboard);
 				} else {
 					for (i32 i = m_down_keys.size() - 1; i >= 0; --i) {
-						if (m_down_keys[i].key_id == input_event.data.button.key_id) {
+						if (m_down_keys[i].keycode == input_event.data.keyboard.keycode) {
 							m_down_keys.swapAndPop(i);
 						}
 					}
@@ -213,15 +212,13 @@ struct InputSystemImpl final : InputSystem {
 	}
 
 	void resetDownKeys() override {
-		for (const ButtonEvent& e : m_down_keys) {
+		for (const KeyboardEvent& e : m_down_keys) {
 			Event event;
-			event.type = InputEventType::BUTTON;
+			event.type = InputEventType::KEYBOARD;
 			event.device = m_keyboard_device;
-			event.data.button.down = false;
-			event.data.button.x = e.x;
-			event.data.button.y = e.y;
-			event.data.button.key_id = e.key_id;
-			event.data.button.is_repeat = false;
+			event.data.keyboard.down = false;
+			event.data.keyboard.keycode = e.keycode;
+			event.data.keyboard.is_repeat = false;
 			injectEvent(event);
 		}
 	}
@@ -240,7 +237,7 @@ private:
 	Array<Event> m_events;
 	Array<Device*> m_devices;
 	Array<Device*> m_to_remove;
-	Array<ButtonEvent> m_down_keys;
+	Array<KeyboardEvent> m_down_keys;
 	Array<GamepadDevice*> m_gamepad_devices;
 
 	GamepadDevice* findGamepadDevice(os::GamepadUID uid) {

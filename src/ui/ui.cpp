@@ -2152,37 +2152,38 @@ void Document::clearEvents() {
 
 void Document::injectEvent(const InputSystem::Event& event) {
 	switch (event.type) {
-		case InputEventType::BUTTON: {
-			const auto& btn = event.data.button;
-			if (event.device->type == InputDeviceType::MOUSE) {
-				Event ui_event;
-				ui_event.type = btn.down ? EventType::MOUSE_DOWN : EventType::MOUSE_UP;
-				ui_event.position = Vec2(btn.x, btn.y);
-				ui_event.key_code = btn.key_id;
-				Element* elem = getElementAt(ui_event.position);
-				ui_event.element_index = elem ? u32(elem - m_elements.begin()) : Event::INVALID_ELEMENT_INDEX;
-				m_events.push(ui_event);
-				if (!btn.down) {
-					Element* action_elem = getActionTargetAt(*this, ui_event.position);
-					const StringView action = action_elem ? getAttributeValue(*action_elem, AttributeName::ON_CLICK) : StringView();
-					if (!action.empty()) {
-						Event action_event;
-						action_event.type = EventType::ACTION;
-						action_event.position = ui_event.position;
-						action_event.element_index = action_elem ? u32(action_elem - m_elements.begin()) : Event::INVALID_ELEMENT_INDEX;
-						action_event.key_code = ui_event.key_code;
-						action_event.action = action;
-						m_events.push(action_event);
-					}
+		case InputEventType::MOUSE_BUTTON: {
+			const auto& btn = event.data.mouse_button;
+			Event ui_event;
+			ui_event.type = btn.down ? EventType::MOUSE_DOWN : EventType::MOUSE_UP;
+			ui_event.position = Vec2(btn.x, btn.y);
+			ui_event.key_code = (i32)btn.button;
+			Element* elem = getElementAt(ui_event.position);
+			ui_event.element_index = elem ? u32(elem - m_elements.begin()) : Event::INVALID_ELEMENT_INDEX;
+			m_events.push(ui_event);
+			if (!btn.down) {
+				Element* action_elem = getActionTargetAt(*this, ui_event.position);
+				const StringView action = action_elem ? getAttributeValue(*action_elem, AttributeName::ON_CLICK) : StringView();
+				if (!action.empty()) {
+					Event action_event;
+					action_event.type = EventType::ACTION;
+					action_event.position = ui_event.position;
+					action_event.element_index = action_elem ? u32(action_elem - m_elements.begin()) : Event::INVALID_ELEMENT_INDEX;
+					action_event.key_code = ui_event.key_code;
+					action_event.action = action;
+					m_events.push(action_event);
 				}
-			} else if (event.device->type == InputDeviceType::KEYBOARD) {
-				Event ui_event;
-				ui_event.type = btn.down ? EventType::KEY_DOWN : EventType::KEY_UP;
-				ui_event.key_code = btn.key_id;
-				ui_event.position = Vec2(0, 0);
-				ui_event.element_index = Event::INVALID_ELEMENT_INDEX; // TODO: focused element
-				m_events.push(ui_event);
 			}
+			break;
+		}
+		case InputEventType::KEYBOARD: {
+			const auto& key = event.data.keyboard;
+			Event ui_event;
+			ui_event.type = key.down ? EventType::KEY_DOWN : EventType::KEY_UP;
+			ui_event.key_code = (i32)key.keycode;
+			ui_event.position = Vec2(0, 0);
+			ui_event.element_index = Event::INVALID_ELEMENT_INDEX; // TODO: focused element
+			m_events.push(ui_event);
 			break;
 		}
 		case InputEventType::AXIS: {

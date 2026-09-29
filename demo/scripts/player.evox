@@ -59,25 +59,23 @@ fn processInputEvents() : void {
 					pl.yaw = pl.yaw + event.x * -0.01;
 					pl.pitch = pl.pitch + event.y * -0.01;
 				}
-			case ButtonEvent:
-				match event.device_type {
+			case MouseButtonEvent:
+				if event.button == .RIGHT {
+					pl.aiming = event.down;
+				}
+			case KeyboardEvent:
+				match event.keycode {
 					case:
-					case .MOUSE:
-						pl.aiming = event.down and event.key_id == 1;
-					case .KEYBOARD:
-						match event.key_id as Keycode {
-							case:
-							case .W: pl.forward = event.down;
-							case .S: pl.backward = event.down;
-							case .A: pl.left = event.down;
-							case .D: pl.right = event.down;
-							case .SHIFT: pl.sprint = event.down;
-							case .C: {
-								if event.down {
-									pl.crouched = not pl.crouched;
-								}
-							}
+					case .W: pl.forward = event.down;
+					case .S: pl.backward = event.down;
+					case .A: pl.left = event.down;
+					case .D: pl.right = event.down;
+					case .SHIFT: pl.sprint = event.down;
+					case .C: {
+						if event.down {
+							pl.crouched = not pl.crouched;
 						}
+					}
 				}
 			case:
 		}

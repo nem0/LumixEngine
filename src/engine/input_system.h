@@ -7,7 +7,7 @@
 namespace Lumix {
 
 template <typename T> struct UniquePtr;
-namespace os { struct Event; }
+namespace os { struct Event; enum class Keycode : u8; enum class MouseButton : i32; }
 
 //@ enum
 enum class InputDeviceType : u32 {
@@ -23,7 +23,9 @@ enum InputEventType : u32 {
 	MOUSE_WHEEL,
 	TEXT_INPUT,
 	DEVICE_ADDED,
-	DEVICE_REMOVED
+	DEVICE_REMOVED,
+	KEYBOARD,
+	MOUSE_BUTTON
 };
 
 struct LUMIX_ENGINE_API InputSystem {
@@ -42,6 +44,19 @@ struct LUMIX_ENGINE_API InputSystem {
 		float y;
 		bool down;
 		bool is_repeat;
+	};
+
+	struct KeyboardEvent {
+		os::Keycode keycode;
+		bool down;
+		bool is_repeat;
+	};
+
+	struct MouseButtonEvent {
+		os::MouseButton button;
+		float x;
+		float y;
+		bool down;
 	};
 
 	struct AxisEvent {
@@ -72,6 +87,8 @@ struct LUMIX_ENGINE_API InputSystem {
 		Device* device;
 		union EventData {
 			ButtonEvent button;
+			KeyboardEvent keyboard;
+			MouseButtonEvent mouse_button;
 			AxisEvent axis;
 			TextEvent text;
 			MouseWheelEvent mouse_wheel;

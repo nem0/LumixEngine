@@ -84,27 +84,25 @@ fn main(engine : Engine, world : World) : void {
 			case .Main:
 				for event in g_input.getEvents() {
 					match event {
-						case ButtonEvent:
-							if event.device_type == .KEYBOARD {
-								var request = world.load("maps/demo/demo.unv");
-								defer request.destroy();
+						case KeyboardEvent:
+							var request = world.load("maps/demo/demo.unv");
+							defer request.destroy();
 
-								await(request);
+							await(request);
 
-								if request.getStatus() == .SUCCESS {
-									if const ui = world.ui() {
-										ui.load("maps/demo/demo.ui");
-									}
-									else {
-										panic("Missing UI");
-									}
-									demo.start(world);
-									player.init(world, g_input);
-									world_type = .Demo;
+							if request.getStatus() == .SUCCESS {
+								if const ui = world.ui() {
+									ui.load("maps/demo/demo.ui");
 								}
 								else {
-									logError(`Failed to load maps/demo/demo.unv: {request.getError()}`); 
+									panic("Missing UI");
 								}
+								demo.start(world);
+								player.init(world, g_input);
+								world_type = .Demo;
+							}
+							else {
+								logError(`Failed to load maps/demo/demo.unv: {request.getError()}`); 
 							}
 						case:
 					}

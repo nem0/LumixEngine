@@ -947,12 +947,39 @@ struct MockMouseDevice : InputSystem::Device {
 static void injectMouseButton(MockDocument& doc, MockMouseDevice& mouse, bool down, float x, float y) {
 	InputSystem::Event ev;
 	ev.device = &mouse;
-	ev.type = InputEventType::BUTTON;
-	ev.data.button.down = down;
-	ev.data.button.key_id = 0;
-	ev.data.button.x = x;
-	ev.data.button.y = y;
+	ev.type = InputEventType::MOUSE_BUTTON;
+	ev.data.mouse_button.down = down;
+	ev.data.mouse_button.button = (os::MouseButton)0;
+	ev.data.mouse_button.x = x;
+	ev.data.mouse_button.y = y;
 	doc.injectEvent(ev);
+}
+
+bool testKeyboardInputEvent() {
+	MockDocument doc;
+	struct MockKeyboardDevice : InputSystem::Device {
+		MockKeyboardDevice() { type = InputDeviceType::KEYBOARD; }
+		void update(float dt) override {}
+		const char* getName() const override { return "MockKeyboard"; }
+	} keyboard;
+
+	InputSystem::Event event;
+	event.type = InputEventType::KEYBOARD;
+	event.device = &keyboard;
+	event.data.keyboard.keycode = (os::Keycode)65;
+	event.data.keyboard.down = true;
+	event.data.keyboard.is_repeat = false;
+	doc.injectEvent(event);
+	event.data.keyboard.down = false;
+	doc.injectEvent(event);
+
+	const auto events = doc.getEvents();
+	ASSERT_EQ(2, events.length());
+	ASSERT_EQ((int)ui::EventType::KEY_DOWN, (int)events[0].type);
+	ASSERT_EQ((int)ui::EventType::KEY_UP, (int)events[1].type);
+	ASSERT_EQ(65, (int)events[0].key_code);
+	ASSERT_EQ(65, (int)events[1].key_code);
+	return true;
 }
 
 bool testOnClickAttributeParseOnBox() {
@@ -1315,6 +1342,7 @@ void runUITests() {
 	RUN_TEST(testComplexMutationSequence);
 	RUN_TEST(testSetWidthUpdatesPixelsAndLayout);
 	RUN_TEST(testSetWidthUpdatesPercentAndLayout);
+	RUN_TEST(testKeyboardInputEvent);
 	RUN_TEST(testOnClickAttributeParseOnBox);
 	RUN_TEST(testOnClickAttributeRejectedOnNonBox);
 	RUN_TEST(testActionEventEmittedOnReleaseOverClickableBox);

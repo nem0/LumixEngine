@@ -19,8 +19,8 @@ By default, ImGui is not enabled in packaged game. To enable ImGui integration, 
 			const time_delta : f32 = yield;
 			for event in input.getEvents() {
 				match event {
-					case ButtonEvent:
-						if event.device_type == .KEYBOARD and event.key_id as Keycode == .F11 and event.down and not event.is_repeat {
+					case KeyboardEvent:
+						if event.keycode == .F11 and event.down and not event.is_repeat {
 							show_imgui = not show_imgui;
 						}
 					case:

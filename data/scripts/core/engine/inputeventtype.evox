@@ -6,6 +6,8 @@ enum InputEventType : u32 {
 	MOUSE_WHEEL = 2,
 	TEXT_INPUT = 3,
 	DEVICE_ADDED = 4,
-	DEVICE_REMOVED = 5
+	DEVICE_REMOVED = 5,
+	KEYBOARD = 6,
+	MOUSE_BUTTON = 7
 }
 

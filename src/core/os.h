@@ -42,13 +42,14 @@ enum class ExecuteOpenResult : i32 {
 	OTHER_ERROR
 };
 
+//@ enum full os::MouseButton
 enum class MouseButton : i32 {
 	LEFT = 0,
 	RIGHT = 1,
 	MIDDLE = 2,
 	EXTENDED = 3, // 3 and higher
-	EXTENDED1 = EXTENDED,
-	EXTENDED2 = EXTENDED + 1,
+	EXTENDED1 = 3,
+	EXTENDED2 = 4,
 
 	MAX = 16
 };

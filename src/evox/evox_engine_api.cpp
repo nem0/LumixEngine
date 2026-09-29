@@ -165,6 +165,17 @@ static void inputGetEvent(ex_runtime*, ex_call_frame frame) {
 			EX_RESULT(frame, event.data.button.x);
 			EX_RESULT(frame, event.data.button.y);
 			break;
+		case InputEventType::KEYBOARD:
+			EX_RESULT(frame, (u8)event.data.keyboard.keycode);
+			EX_RESULT(frame, event.data.keyboard.down);
+			EX_RESULT(frame, event.data.keyboard.is_repeat);
+			break;
+		case InputEventType::MOUSE_BUTTON:
+			EX_RESULT(frame, (i32)event.data.mouse_button.button);
+			EX_RESULT(frame, event.data.mouse_button.down);
+			EX_RESULT(frame, event.data.mouse_button.x);
+			EX_RESULT(frame, event.data.mouse_button.y);
+			break;
 		case InputEventType::AXIS:
 			EX_RESULT(frame, event.data.axis.x);
 			EX_RESULT(frame, event.data.axis.y);

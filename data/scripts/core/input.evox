@@ -1,5 +1,7 @@
 import "core:engine/engine"
 import "core:engine/inputdevicetype"
+import "core:core/keycode"
+import "core:core/mousebutton"
 
 struct InputSystem { system : cptr; }
 
@@ -9,6 +11,23 @@ struct ButtonEvent {
 	key_id : i32;
 	down : bool;
 	is_repeat : bool;
+	x : f32;
+	y : f32;
+}
+
+struct KeyboardEvent {
+	device_type : InputDeviceType;
+	device_index : i32;
+	keycode : Keycode;
+	down : bool;
+	is_repeat : bool;
+}
+
+struct MouseButtonEvent {
+	device_type : InputDeviceType;
+	device_index : i32;
+	button : MouseButton;
+	down : bool;
 	x : f32;
 	y : f32;
 }
@@ -46,7 +65,7 @@ struct DeviceRemovedEvent {
 	device_index : i32;
 }
 
-comptime InputEvent = ButtonEvent | AxisEvent | MouseWheelEvent | TextEvent | DeviceAddedEvent | DeviceRemovedEvent;
+comptime InputEvent = ButtonEvent | AxisEvent | MouseWheelEvent | TextEvent | DeviceAddedEvent | DeviceRemovedEvent | KeyboardEvent | MouseButtonEvent;
 
 extern fn input(engine : Engine) : InputSystem;
 extern fn getEventCount(system : InputSystem) : i32;

@@ -230,8 +230,8 @@ fn update(td : f32, input : InputSystem) : void {
 	// input
 	for event in getEvents(input) {
 		match event {
-			case ButtonEvent:
-				if event.device_type == .KEYBOARD and event.key_id as Keycode == .F and event.down and not event.is_repeat {
+			case KeyboardEvent:
+				if event.keycode == .F and event.down and not event.is_repeat {
 					const closest = findClosestButton();
 					if closest.dist < INTERACTION_DIST {
 						match closest.button.action {
@@ -292,7 +292,7 @@ fn update(td : f32, input : InputSystem) : void {
 // 			return
 // 		end
 // 		
-// 		if event.key_id ~= string.byte("F") or not event.down then
+// 		if event.keycode ~= string.byte("F") or not event.down then
 // 			return
 // 		end
 // 		
