@@ -927,30 +927,37 @@ struct AssetBrowserImpl : AssetBrowser {
 
 		// rename
 		if (open_rename_popup || m_request_rename) {
-			if (m_request_rename) copyString(tmp, Path::getBasename(m_selected_resources[0]));
-			openCenterStrip("rename");
+			if (m_selected_resources.size() == 1) {
+				if (m_request_rename) copyString(tmp, Path::getBasename(m_selected_resources[0]));
+				openCenterStrip("rename");
+			}
 			m_request_rename = false;
 		}
 		if (beginCenterStrip("rename")) {
-			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
-			ImGui::NewLine();
-			alignGUICenter([](){
-				if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
-				ImGui::InputTextWithHint("##name", "New name", tmp, sizeof(tmp), ImGuiInputTextFlags_AutoSelectAll);
-			});
-			bool rename_submit = ImGui::IsKeyPressed(ImGuiKey_Enter);
-			alignGUICenter([&](){
-				if (ImGui::Button("Rename")) rename_submit = true;
-				ImGui::SameLine();
-				if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
-			});
-			if (rename_submit) {
-				PathInfo fi(m_selected_resources[0]);
-				const Path new_path(fi.dir, tmp, ".", fi.extension);
-				if (!fs.moveFile(m_selected_resources[0], new_path)) {
-					logError("Failed to rename ", m_selected_resources[0], " to ", new_path);
-				}
+			if (m_selected_resources.size() != 1) {
 				ImGui::CloseCurrentPopup();
+			}
+			else {
+				if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+				ImGui::NewLine();
+				alignGUICenter([](){
+					if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+					ImGui::InputTextWithHint("##name", "New name", tmp, sizeof(tmp), ImGuiInputTextFlags_AutoSelectAll);
+				});
+				bool rename_submit = ImGui::IsKeyPressed(ImGuiKey_Enter);
+				alignGUICenter([&](){
+					if (ImGui::Button("Rename")) rename_submit = true;
+					ImGui::SameLine();
+					if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+				});
+				if (rename_submit) {
+					PathInfo fi(m_selected_resources[0]);
+					const Path new_path(fi.dir, tmp, ".", fi.extension);
+					if (!fs.moveFile(m_selected_resources[0], new_path)) {
+						logError("Failed to rename ", m_selected_resources[0], " to ", new_path);
+					}
+					ImGui::CloseCurrentPopup();
+				}
 			}
 			endCenterStrip();
 		}
@@ -984,31 +991,36 @@ struct AssetBrowserImpl : AssetBrowser {
 
 		// delete
 		if (open_delete_popup || m_request_delete) {
-			openCenterStrip("Delete file");
+			if (!m_selected_resources.empty()) openCenterStrip("Delete file");
 			m_request_delete = false;
 		}
 
 		if (beginCenterStrip("Delete file", 7)) {
-			ImGui::NewLine();
-			if (m_selected_resources.size() > 1) {
-				StaticString<128> txt(m_selected_resources.size(), " files will be deleted.");
-				ImGuiEx::TextCentered(txt);
+			if (m_selected_resources.empty()) {
+				ImGui::CloseCurrentPopup();
 			}
 			else {
-				ImGuiEx::TextCentered(m_selected_resources[0].c_str());
+				ImGui::NewLine();
+				if (m_selected_resources.size() > 1) {
+					StaticString<128> txt(m_selected_resources.size(), " files will be deleted.");
+					ImGuiEx::TextCentered(txt);
+				}
+				else {
+					ImGuiEx::TextCentered(m_selected_resources[0].c_str());
+				}
+				ImGuiEx::TextCentered("Are you sure? This can not be undone.");
+				ImGui::NewLine();
+				alignGUICenter([&](){
+					if (ImGui::Button("Delete", ImVec2(100, 0))) {
+						deleteSelectedFiles();
+						ImGui::CloseCurrentPopup();
+					}
+					ImGui::SameLine();
+					if (ImGui::Button("Cancel", ImVec2(100, 0))) {
+						ImGui::CloseCurrentPopup();
+					}
+				});
 			}
-			ImGuiEx::TextCentered("Are you sure? This can not be undone.");
-			ImGui::NewLine();
-			alignGUICenter([&](){
-				if (ImGui::Button("Delete", ImVec2(100, 0))) {
-					deleteSelectedFiles();
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("Cancel", ImVec2(100, 0))) {
-					ImGui::CloseCurrentPopup();
-				}
-			});
 			endCenterStrip();
 		}
 		ImGui::EndChild();
