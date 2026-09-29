@@ -15,6 +15,7 @@ struct Path;
 struct Pipeline;
 struct PlatformData;
 struct RenderModule;
+struct StringView;
 struct StudioApp;
 
 //@ object
@@ -26,6 +27,9 @@ struct LUMIX_RENDERER_API GameView : StudioApp::GUIPlugin {
 	void setCursor(os::CursorType type);
 	//@ function
 	void forceViewport(bool enable, int w, int h);
+	// Queues a TGA screenshot of the game view (including the in-game UI) to a project-relative path. Returns false if the game view has no size yet
+	// (e.g. its window has never been visible). The file is written asynchronously after the GPU read-back.
+	bool makeScreenshot(StringView path);
 	const char* getName() const override { return "game_view"; }
 	bool isOpen() const { return m_is_open; }
 	void onToggleOpen() { m_is_open = !m_is_open; }

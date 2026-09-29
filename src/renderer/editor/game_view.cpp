@@ -1,6 +1,11 @@
 #include <imgui/imgui.h>
 
+#include "core/delegate.h"
 #include "core/geometry.h"
+#include "core/log.h"
+#include "core/os.h"
+#include "core/path.h"
+#include "core/string.h"
 #include "core/profiler.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
@@ -8,10 +13,12 @@
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "engine/file_system.h"
 #include "engine/input_system.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
 #include "game_view.h"
+#include "renderer/draw_stream.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_module.h"
@@ -45,6 +52,51 @@ void GameView::init() {
 	auto* renderer = (Renderer*)engine.getSystemManager().getSystem("renderer");
 	m_pipeline = Pipeline::create(*renderer, PipelineType::GAME_VIEW);
 }
+
+bool GameView::makeScreenshot(StringView path) {
+	const IVec2 size = m_pipeline->getDisplaySize();
+	if (size.x <= 0 || size.y <= 0) return false;
+
+	m_pipeline->render(false);
+	const gpu::TextureHandle texture = m_pipeline->getOutput();
+	if (!texture) {
+		logError("Failed to get the game view pipeline output when trying to make a screenshot.");
+		return false;
+	}
+
+	struct Callback {
+		StaticString<MAX_PATH> path;
+		StudioApp* app;
+		IVec2 size;
+		IAllocator* allocator;
+
+		void callback(Span<const u8> data) {
+			FileSystem& fs = app->getEngine().getFileSystem();
+			os::OutputFile file;
+			if (!fs.open(path, file)) {
+				logError("Could not save ", path);
+				LUMIX_DELETE(*allocator, this);
+				return;
+			}
+
+			const bool res = Texture::saveTGA(&file, size.x, size.y, gpu::TextureFormat::RGBA8, data.begin(), true, Path(path), *allocator);
+			file.close();
+			if (!res) logError("Could not save ", path);
+			LUMIX_DELETE(*allocator, this);
+		}
+	};
+
+	Callback* cb = LUMIX_NEW(m_app.getAllocator(), Callback);
+	cb->allocator = &m_app.getAllocator();
+	cb->path = path;
+	cb->size = size;
+	cb->app = &m_app;
+
+	auto delegate = makeDelegate<&Callback::callback>(cb);
+	m_pipeline->getRenderer().getDrawStream().readTexture(texture, delegate);
+	return true;
+}
+
 
 void GameView::setCursor(os::CursorType type)
 {
