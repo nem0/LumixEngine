@@ -3176,6 +3176,19 @@ fn main() : i32 {
 
 `extern` declarations inform the compiler about a function's name and signature but do not provide an implementation. The runtime invokes the configured lazy resolver on first use, passing the declaration name, unit path, and bytecode index. Returning the callback binds it for subsequent calls.
 
+A native callback can panic by setting `*frame.panic` and returning without
+writing a result:
+
+```cpp
+static void native_fail(ex_runtime*, ex_call_frame frame) {
+	*frame.panic = {"native failure", 14};
+}
+```
+
+This returns `EX_CALL_RESULT_PANIC`, reports the message, and pauses the task
+with `EX_DEBUG_PAUSE_ERROR`. The message bytes must remain valid while the
+failed task may be inspected (use static storage or storage owned by the task).
+A null `begin` means no panic. For an empty panic message, use `{"", 0}`.
 
 ## Diagnostic
 

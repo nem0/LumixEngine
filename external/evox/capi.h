@@ -169,6 +169,10 @@ typedef enum ex_task_state {
 typedef struct ex_call_frame {
 	const u8* args;
 	u8* result;
+	// Set *panic to a message to abort the call. A null begin means success;
+	// for an empty panic message use {"", 0}. Message bytes must remain valid
+	// while the failed task is inspected.
+	ex_string_view* panic;
 } ex_call_frame;
 
 ex_string_view ex_arg_read_string(ex_call_frame* frame);

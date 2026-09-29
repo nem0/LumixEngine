@@ -252,7 +252,7 @@ static EX_FORCE_INLINE ex_call_result runtime_enter_script_call(
 	return EX_CALL_RESULT_OK;
 }
 
-static EX_FORCE_INLINE bool runtime_invoke_native(ex_task* task, u32 function_index, const ex_function_bc* function, u8* args, u8** result_stack_top) {
+static EX_FORCE_INLINE bool runtime_invoke_native(ex_task* task, u32 function_index, const ex_function_bc* function, u8* args, u8** result_stack_top, ex_string_view* panic_message) {
 	ex_runtime* owner = task->runtime;
 	if (function_index >= owner->native_callback_count) return false; // TODO can this even happen?
 	ex_native_fn callback = owner->native_callbacks[function_index];
@@ -274,8 +274,9 @@ static EX_FORCE_INLINE bool runtime_invoke_native(ex_task* task, u32 function_in
 	u8* stack_top = args + function->return_size;
 	if (stack_top > task->stack_end) return false;
 
-	const ex_call_frame frame = { args, args };
+	const ex_call_frame frame = { args, args, panic_message };
 	callback(owner, frame);
+	if (panic_message->begin) return false;
 	if (result_stack_top) *result_stack_top = stack_top;
 	return true;
 }
@@ -539,7 +540,6 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 	u8* frame = NULL;
 	ex_op op = (ex_op)0;
 	ex_string_view panic_message = {NULL, 0};
-	bool is_panic = false;
 	ex_call_result call_result = EX_CALL_RESULT_SUSPENDED;
 	ex_call_result failure_result = EX_CALL_RESULT_RUNTIME_ERROR;
 	// Restore point for the whole host call, retained across suspend/resume.
@@ -590,7 +590,7 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 		if (fn->kind == EX_FUNCTION_NATIVE) {
 			task->result_size = 0u;
 			u8* result_stack_top = NULL;
-			if (!runtime_invoke_native(task, (u32)(fn - task->bytecode->functions), fn, args, &result_stack_top)) goto runtime_execute_function_fail;
+			if (!runtime_invoke_native(task, (u32)(fn - task->bytecode->functions), fn, args, &result_stack_top, &panic_message)) goto runtime_execute_function_fail;
 
 			task->stack_top = result_stack_top;
 			task->result_size = fn->return_size;
@@ -792,7 +792,7 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 				memcpy(&message, frame + message_reg, sizeof(message));
 				panic_message.begin = (const char*)message.data;
 				panic_message.length = message.length > 0 ? (u64)message.length : 0;
-				is_panic = true;
+				failure_result = EX_CALL_RESULT_PANIC;
 				goto runtime_execute_function_fail;
 			}
 			case EX_OP_RETURN: {
@@ -842,7 +842,7 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 				u8* caller_top = task->stack_top;
 				const ex_function_bc* callee = &task->bytecode->functions[callee_index];
 				task->frame = frame;
-				if (!runtime_invoke_native(task, callee_index, callee, frame + arg_base, NULL)) goto runtime_execute_function_fail;
+				if (!runtime_invoke_native(task, callee_index, callee, frame + arg_base, NULL, &panic_message)) goto runtime_execute_function_fail;
 				frame = task->frame;
 				task->stack_top = caller_top;
 				break;
@@ -873,7 +873,7 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 
 				if (callee->kind == EX_FUNCTION_NATIVE) {
 					task->frame = frame;
-					if (!runtime_invoke_native(task, callee_index, callee, frame + dst, NULL)) goto runtime_execute_function_fail;
+					if (!runtime_invoke_native(task, callee_index, callee, frame + dst, NULL, &panic_message)) goto runtime_execute_function_fail;
 					frame = task->frame;
 					task->stack_top = caller_top;
 					break;
@@ -1310,8 +1310,7 @@ runtime_execute_function_fail:
 		}
 		ip = entry ? fn->code + entry->code_offset : fn->code;
 	}
-	call_result = 	is_panic 													? EX_CALL_RESULT_PANIC
-					: op >= EX_OP_DIV_I8 && op <= EX_OP_DIV_F64 				? EX_CALL_RESULT_DIVISION_BY_ZERO
+	call_result = 	op >= EX_OP_DIV_I8 && op <= EX_OP_DIV_F64 				? EX_CALL_RESULT_DIVISION_BY_ZERO
 					: op >= EX_OP_DIV_I8_IMM && op <= EX_OP_DIV_F64_IMM 		? EX_CALL_RESULT_DIVISION_BY_ZERO
 					: op >= EX_OP_MOD_I8 && op <= EX_OP_MOD_U64 				? EX_CALL_RESULT_MODULO_BY_ZERO
 					: op >= EX_OP_MOD_I8_IMM && op <= EX_OP_MOD_U64_IMM			? EX_CALL_RESULT_MODULO_BY_ZERO
@@ -1320,12 +1319,13 @@ runtime_execute_function_fail:
 					: op == EX_OP_CALL_NATIVE									? EX_CALL_RESULT_INVALID_FUNCTION_CALL
 					: op == EX_OP_CALL_INDIRECT 								? EX_CALL_RESULT_INVALID_FUNCTION_CALL
 					: EX_CALL_RESULT_RUNTIME_ERROR;
+	if (panic_message.begin) failure_result = EX_CALL_RESULT_PANIC;
 	if (failure_result != EX_CALL_RESULT_RUNTIME_ERROR) call_result = failure_result;
-	if (is_panic) runtime_report_error(task, fn, ip, panic_message);
+	if (call_result == EX_CALL_RESULT_PANIC) runtime_report_error(task, fn, ip, panic_message);
 	// A task error suspends using the same reified frame as EX_OP_BREAK;
 	// state is left exactly as-is instead of being unwound.
 	task->pause_event.reason = EX_DEBUG_PAUSE_ERROR;
-	task->pause_event.message = is_panic ? panic_message : (ex_string_view){NULL, 0};
+	task->pause_event.message = call_result == EX_CALL_RESULT_PANIC ? panic_message : (ex_string_view){NULL, 0};
 
 runtime_execute_function_suspend:
 	runtime_clear_step_traps(task);

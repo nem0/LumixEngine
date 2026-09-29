@@ -65,6 +65,43 @@ TEST(CallReturnsSuspended) {
 	return true;
 }
 
+TEST(NativePanicPropagatesFromAllCallPaths) {
+	TestContext context;
+	ex_module* module = ex_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const ex_string_view source = makeStringView(
+		"extern fn fail() : void;\n"
+		"extern fn fail_empty() : void;\n"
+		"fn direct() : void { fail(); }\n"
+		"fn indirect(f : fn() : void) : void { f(); }\n"
+		"fn via_indirect() : void { indirect(fail); }\n");
+	EXPECT_EQ(EX_RESULT_OK, ex_module_compile(module, source, makeStringView(__func__), nullptr, nullptr));
+	RuntimeGuard runtime(module, &context.host);
+	EXPECT_TRUE(runtime);
+	EXPECT_EQ(EX_RESULT_OK, ex_runtime_set_native_resolver(test_vm(runtime), [](ex_runtime*, ex_native_function_desc desc, void*) -> ex_native_fn {
+		if (equalStrings(desc.name, "fail_empty")) return [](ex_runtime*, ex_call_frame frame) {
+			*frame.panic = makeStringView("");
+		};
+		return [](ex_runtime*, ex_call_frame frame) {
+			*frame.panic = makeStringView("native boom");
+		};
+	}, nullptr));
+	for (const char* name : {"fail", "direct", "via_indirect", "fail_empty"}) {
+		// A failed task remains suspended; use a fresh task for each call.
+		ex_task* task = ex_task_create(test_vm(runtime));
+		EXPECT_TRUE(task != nullptr);
+		EXPECT_EQ(EX_CALL_RESULT_PANIC, ex_call(task, makeStringView(name), nullptr, 0));
+		ex_debug_event event = {};
+		EXPECT_EQ(EX_RESULT_OK, ex_debug_pause_event(task, &event));
+		EXPECT_EQ(EX_DEBUG_PAUSE_ERROR, event.reason);
+		EXPECT_TRUE(equalStrings(event.message, equalStrings(makeStringView(name), "fail_empty") ? "" : "native boom"));
+		EXPECT_EQ(EX_CALL_RESULT_NOT_RESUMABLE, ex_task_resume(task, nullptr, nullptr, 0));
+		ex_task_destroy(task);
+	}
+	ex_module_destroy(module);
+	return true;
+}
+
 TEST(CallReturnsRuntimeError) {
 	TestContext context;
 	ex_module* module = ex_module_create(&context.host);
