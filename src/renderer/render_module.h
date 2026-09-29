@@ -375,6 +375,7 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual void addDebugCube(DVec3 pos, Vec3 dir, Vec3 up, Vec3 right, Color color) = 0;
 	virtual void addDebugCubeSolid(DVec3 from, DVec3 max, Color color) = 0;
 	virtual void setActiveCamera(EntityRef camera) = 0;
+	virtual EntityPtr getActiveCamera() const = 0;
 	virtual void setActiveEnvironment(EntityRef entity) = 0;
 	//@ end
 	virtual void addDebugCube(DVec3 from, DVec3 to, Color color) = 0;
@@ -390,7 +391,6 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual void setCameraScreenSize(EntityRef entity, int w, int h) = 0;
 	virtual Vec2 getCameraScreenSize(EntityRef entity) = 0;
 	
-	virtual EntityPtr getActiveCamera() const = 0;
 	virtual	struct Viewport getCameraViewport(EntityRef camera) const = 0;
 	virtual float getCameraLODMultiplier(float fov, bool is_ortho) const = 0;
 	virtual float getCameraLODMultiplier(EntityRef entity) const = 0;

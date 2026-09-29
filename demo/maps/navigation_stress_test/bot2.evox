@@ -49,5 +49,13 @@ fn update() : void {
 		if agent.isFinished() {
 			goToRandomPoint(b);
 		}
+		// The shared controller can finish loading after init(). getInputIndex
+		// also checks that this bot's runtime context is ready.
+		if const anim = b.animator() {
+			const speed_input = anim.getInputIndex("speed_y");
+			if speed_input >= 0 {
+				anim.setFloatInput(speed_input as u32, agent.getSpeed());
+			}
+		}
 	}
 }

@@ -217,7 +217,7 @@ fn update(td : f32, input : InputSystem) : void {
 			case "start":
 				player.enableInput(true);
 				enableCursor(ui, false);
-				var elem = doc.getElement(0) else return;
+				var elem = doc.getElementByID("demo_welcome") else return;
 				elem.setVisible(false);
 			case "close":
 				player.enableInput(true);

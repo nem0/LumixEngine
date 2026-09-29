@@ -1773,6 +1773,8 @@ void serializeCoreImports(MetaData& data) {
 			if (type.begin[0] == '?') type = {type.begin + 1, type.end};
 			if (isSpanType(type)) type = spanElementBaseType(type);
 			const EvoxType import_type = getEvoxType(type);
+			// EntityRef and EntityPtr both import core:entity.
+			if (import_type == EvoxType::ENTITY_T) type = StringView{"EntityRef", "EntityRef" + 9};
 			if (import_type != EvoxType::VEC2_T && import_type != EvoxType::VEC3_T && import_type != EvoxType::DVEC3_T && import_type != EvoxType::VEC4_T &&
 				import_type != EvoxType::COLOR_T && import_type != EvoxType::QUAT_T && import_type != EvoxType::ENTITY_T && import_type != EvoxType::ENUM_T &&
 				import_type != EvoxType::STRUCT_T && import_type != EvoxType::OBJECT_T && !isWrappedAlias(type) && !equal(type, "World")) {

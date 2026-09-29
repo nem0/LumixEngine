@@ -1,12 +1,11 @@
 import "core:input"
 import "core:log"
-import "core:random"
-import "core:string"
 import "core:ui/module"
 import "core:world"
 import "core:engine/engine"
 
 import "scripts/player" as player
+import "scripts/free_camera" as free_camera
 import "maps/demo/demo" as demo
 import "maps/particles/lightning" as lightning
 import "maps/particles/move" as particle_move
@@ -15,98 +14,168 @@ import "maps/navigation_stress_test/bot" as bot
 import "maps/navigation_stress_test/bot2" as bot2
 
 var g_input : InputSystem = undefined;
-var g_world : ?World = null;
 
 enum WorldType {
-	None,
 	Main,
 	Demo,
 	Lightning,
 	Particles,
 	NavigationStressTest,
-	NavigationStressTest2
+	NavigationStressTest2,
+	Other
 }
 
-var world_type : WorldType = .None;
+var world_type : WorldType = .Main;
 fn await(r : LoadRequest) : void {
 	while r.getStatus() == .PENDING {
 		const dt : f32 = yield;
 	}
 }
 
-fn main(engine : Engine, world : World) : void {
-	var input = engine.input();
-	g_input = input;
-	g_world = world;
+fn startWorld(world : World, kind : WorldType) : void {
+	match kind {
+		case .Demo:
+			demo.start(world);
+			player.init(world, g_input);
+		case .Lightning:
+			if const source = world.findByName("core") {
+				lightning.start(world, source);
+			}
+		case .NavigationStressTest: bot.init(world);
+		case .NavigationStressTest2: bot2.init(world);
+		case .Particles:
+			if const moving = world.findByName("world_space_particle") {
+				if const clutter = world.findByName("clutter") {
+					if const child = clutter.getFirstChild() {
+						particle_move.start(moving);
+						clutter_sphere.start(child, clutter);
+					}
+				}
+			}
+		case:
+	}
+}
 
-	player.init(world, input);
+fn loadSelectedWorld(world : World, path : []const u8, kind : WorldType) : void {
+	player.enableInput(false);
+	// Remove the previous scene before deserializing the selected world.
+	while world.getPartitionCount() > 0 {
+		world.destroyPartition(world.getPartitionHandle(0));
+	}
+	const empty = world.createPartition("");
+	world.setActivePartition(empty);
+
+	var request = world.load(path);
+	defer request.destroy();
+	await(request);
+
+	if request.getStatus() != .SUCCESS {
+		logError(`Failed to load {path}: {request.getError()}`);
+		world_type = .Main;
+		if const ui = world.ui() {
+			ui.load("maps/main/main.ui");
+			ui.getSystem().enableCursor(true);
+		}
+		return;
+	}
+
+	if const ui = world.ui() {
+		if kind == .Demo {
+			ui.load("maps/demo/demo.ui");
+		}
+		else {
+			ui.load("maps/main/main.ui");
+			ui.getSystem().enableCursor(true);
+		}
+	}
+	startWorld(world, kind);
+	if kind != .Demo { free_camera.init(world); }
+	player.enableInput(false);
+	world_type = kind;
+}
+
+fn handleMenu(world : World) : void {
+	var ui = world.ui() else return;
+	if world_type == .Demo {
+		for event in g_input.getEvents() {
+			match event {
+				case KeyboardEvent:
+					if event.keycode == .ESCAPE and event.down and not event.is_repeat {
+						ui.getSystem().enableCursor(true);
+						player.enableInput(false);
+					}
+				case:
+			}
+		}
+	}
+	if not ui.isReady() { return; }
+
+	var selected : []const u8 = "";
+	var kind : WorldType = .Other;
+	var show_main = false;
+	for event in ui.getDocument().getEvents() {
+		match event.action {
+			case "main": show_main = true;
+			case "resume":
+				if world_type == .Demo {
+					player.enableInput(true);
+					ui.getSystem().enableCursor(false);
+				}
+			case "demo": selected = "maps/demo/demo.unv"; kind = .Demo;
+			case "lightning": selected = "maps/particles/lightning.unv"; kind = .Lightning;
+			case "particles": selected = "maps/particles/particles.unv"; kind = .Particles;
+			case "navigation_stress_test": selected = "maps/navigation_stress_test/navigation_stress_test.unv"; kind = .NavigationStressTest;
+			case "navigation_stress_test2": selected = "maps/navigation_stress_test/navigation_stress_test2.unv"; kind = .NavigationStressTest2;
+			case "terrain_test": selected = "maps/terrain_test/terrain_test.unv";
+			case "point_light_shadows": selected = "maps/point_light_shadows/point_light_shadows.unv";
+			case "physics_stress_test": selected = "maps/physics_stress_test/physics_stress_test.unv";
+			case "instanced_models": selected = "maps/instanced_models/instanced_models.unv";
+			case "anim_stress_test": selected = "maps/anim_stress_test/anim_stress_test.unv";
+			case:
+		}
+	}
+	// Change the document only after iterating its events.
+	if show_main and world_type != .Main {
+		loadSelectedWorld(world, "maps/main/main.unv", .Main);
+	}
+	else if selected != "" { loadSelectedWorld(world, selected, kind); }
+}
+
+fn main(engine : Engine, world : World) : void {
+	g_input = engine.input();
+	player.init(world, g_input);
 
 	const name = world.getPartitionName(world.getPartitionHandle(0));
 	match name {
-		case: world_type = .Main;
+		case "": world_type = .Main;
+		case "maps/main/main.unv":
 		case "maps/demo/main.unv": world_type = .Main;
-		case "maps/demo/demo.unv":
-			world_type = .Demo;
-			demo.start(world);
-			player.init(world, g_input);
-		case "maps/demo/lightning.unv":
-			const source_value = world.findByName("core");
-			if const source = source_value {
-				world_type = .Lightning;
-				lightning.start(world, source);
-			}
-		case "maps/demo/navigation_stress_test.unv":
-			world_type = .NavigationStressTest;
-			bot.init(world);
-		case "maps/demo/navigation_stress_test2.unv":
-			world_type = .NavigationStressTest2;
-			bot2.init(world);
-		case "maps/demo/particles.unv":
-			const moving = world.findByName("world_space_particle");
-			const clutter = world.findByName("clutter");
-			if const moving_entity = moving {
-				if const clutter_entity = clutter {
-					if const clutter_child = clutter_entity.getFirstChild() {
-						world_type = .Particles;
-						particle_move.start(moving_entity);
-						clutter_sphere.start(clutter_child, clutter_entity);
-					}
-				}
-			}
+		case "maps/demo/demo.unv": world_type = .Demo;
+		case "maps/particles/lightning.unv": world_type = .Lightning;
+		case "maps/particles/particles.unv": world_type = .Particles;
+		case "maps/navigation_stress_test/navigation_stress_test.unv": world_type = .NavigationStressTest;
+		case "maps/navigation_stress_test/navigation_stress_test2.unv": world_type = .NavigationStressTest2;
+		case: world_type = .Other;
 	}
+
+	if const ui = world.ui() {
+		if world_type == .Demo { ui.load("maps/demo/demo.ui"); }
+		else { ui.load("maps/main/main.ui"); }
+		ui.getSystem().enableCursor(true);
+	}
+	if world_type != .Main {
+		startWorld(world, world_type);
+	}
+	if world_type != .Demo { free_camera.init(world); }
 
 	while true {
 		const dt : f32 = yield;
-		player.update(dt);
+		handleMenu(world);
+		if world_type == .Demo { player.update(dt); }
+		else { free_camera.update(dt, g_input); }
 
 		match world_type {
-			case .None:
 			case .Main:
-				for event in g_input.getEvents() {
-					match event {
-						case KeyboardEvent:
-							var request = world.load("maps/demo/demo.unv");
-							defer request.destroy();
-
-							await(request);
-
-							if request.getStatus() == .SUCCESS {
-								if const ui = world.ui() {
-									ui.load("maps/demo/demo.ui");
-								}
-								else {
-									panic("Missing UI");
-								}
-								demo.start(world);
-								player.init(world, g_input);
-								world_type = .Demo;
-							}
-							else {
-								logError(`Failed to load maps/demo/demo.unv: {request.getError()}`); 
-							}
-						case:
-					}
-				}
 			case .Demo: demo.update(dt, g_input);
 			case .Lightning: lightning.update(dt);
 			case .Particles:
@@ -114,7 +183,7 @@ fn main(engine : Engine, world : World) : void {
 				clutter_sphere.update(dt);
 			case .NavigationStressTest: bot.update();
 			case .NavigationStressTest2: bot2.update();
+			case .Other:
 		}
 	}
 }
-

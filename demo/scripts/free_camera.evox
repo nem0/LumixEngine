@@ -1,0 +1,96 @@
+import "core:world"
+import "core:entity"
+import "core:input"
+import "core:quat" as quat
+import "core:vec3" as vec3
+import "core:dvec3"
+import "core:renderer/module"
+import "core:renderer/camera"
+
+var g_camera : ?Entity = null;
+var g_forward = false;
+var g_backward = false;
+var g_left = false;
+var g_right = false;
+var g_up = false;
+var g_down = false;
+var g_sprint = false;
+var g_look = false;
+
+fn rotate(q : quat.Quat, v : vec3.Vec3) : vec3.Vec3 {
+	const xyz : vec3.Vec3 = {q.x, q.y, q.z};
+	const t = vec3.cross(xyz, v) * 2.0;
+	return v + t * q.w + vec3.cross(xyz, t);
+}
+
+fn init(world : World) : void {
+	g_camera = null;
+	g_forward = false;
+	g_backward = false;
+	g_left = false;
+	g_right = false;
+	g_up = false;
+	g_down = false;
+	g_sprint = false;
+	g_look = false;
+
+	var renderer = world.renderer() else return;
+	if const active = renderer.getActiveCamera() {
+		g_camera = active;
+	}
+	else {
+		const camera = world.createEntity();
+		camera.setName("Free camera");
+		camera.setPosition(DVec3{0, 2, 6});
+		if const component = camera.createCamera() {
+			renderer.setActiveCamera(camera);
+			g_camera = camera;
+		}
+	}
+}
+
+fn update(dt : f32, input : InputSystem) : void {
+	const camera = g_camera else return;
+	for event in input.getEvents() {
+		match event {
+			case KeyboardEvent:
+				match event.keycode {
+					case .W: g_forward = event.down;
+					case .S: g_backward = event.down;
+					case .A: g_left = event.down;
+					case .D: g_right = event.down;
+					case .Q: g_down = event.down;
+					case .E: g_up = event.down;
+					case .SHIFT: g_sprint = event.down;
+					case:
+				}
+			case MouseButtonEvent:
+				if event.button == .RIGHT { g_look = event.down; }
+			case AxisEvent:
+				if event.device_type == .MOUSE and g_look {
+					var rotation = quat.makeQuatFromYaw(-event.x * 0.008) * camera.getRotation();
+					const pitched = rotation * quat.makeQuatFromPitch(event.y * 0.008);
+					const facing = rotate(pitched, {0, 0, -1});
+					if facing.y > -0.96 and facing.y < 0.96 { rotation = pitched; }
+					camera.setRotation(rotation);
+				}
+			case:
+		}
+	}
+
+	var direction : vec3.Vec3 = {0, 0, 0};
+	const rotation = camera.getRotation();
+	const forward = rotate(rotation, {0, 0, -1});
+	const right = rotate(rotation, {1, 0, 0});
+	if g_forward { direction = direction + forward; }
+	if g_backward { direction = direction - forward; }
+	if g_left { direction = direction - right; }
+	if g_right { direction = direction + right; }
+	if g_up { direction.y += 1; }
+	if g_down { direction.y -= 1; }
+	if vec3.lengthSquared(direction) < 0.001 { return; }
+	direction = vec3.normalizeSafe(direction);
+	const speed : f32 = g_sprint ? 15 : 5;
+	const step = direction * speed * dt;
+	camera.setPosition(camera.getPosition() + DVec3{step.x as f64, step.y as f64, step.z as f64});
+}

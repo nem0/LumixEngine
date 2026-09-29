@@ -9,9 +9,35 @@
 	.button:hover {
 		bg-color: #cccccc;
 	}
+	.world {
+		bg-color: #343d51;
+		width: 15em;
+		padding: 0.25em;
+		margin: 0.07em;
+		align: center;
+	}
+	.world:hover { bg-color: #637ba0; }
 }
 
-[box width=100% height=100% align-items=center justify-content=center] {
+[box $world_menu position=top-right left=100% top=0 direction=column width=17em
+	padding=0.5em bg-color=#242d40 color=#ffffff
+	font="/engine/editor/fonts/JetBrainsMono-Regular.ttf" font-size=20] {
+	[box padding=0.3em font-size=26] { Main menu }
+	[box .world on-click=main] { Main menu }
+	[box .world on-click=resume] { Resume game }
+	[box .world on-click=demo] { Demo }
+	[box .world on-click=lightning] { Lightning }
+	[box .world on-click=particles] { Particles }
+	[box .world on-click=navigation_stress_test] { Navigation stress test }
+	[box .world on-click=navigation_stress_test2] { Navigation stress test 2 }
+	[box .world on-click=terrain_test] { Terrain test }
+	[box .world on-click=point_light_shadows] { Point light shadows }
+	[box .world on-click=physics_stress_test] { Physics stress test }
+	[box .world on-click=instanced_models] { Instanced models }
+	[box .world on-click=anim_stress_test] { Animation stress test }
+}
+
+[box $demo_welcome width=100% height=100% align-items=center justify-content=center] {
 	[box direction=column width=30em 
 		bg-color=#f0f0f0 
 		font="/engine/editor/fonts/JetBrainsMono-Regular.ttf" 

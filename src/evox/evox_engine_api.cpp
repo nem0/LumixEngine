@@ -277,6 +277,16 @@ static void evox_world_setActivePartition(World* world, u32 handle) {
 	if (world) world->setActivePartition(World::PartitionHandle(handle));
 }
 
+static void evox_world_destroyPartition(World* world, u32 handle) {
+	if (!world) return;
+	for (const World::Partition& partition : world->getPartitions()) {
+		if (partition.handle == handle) {
+			world->destroyPartition(World::PartitionHandle(handle));
+			return;
+		}
+	}
+}
+
 static void evox_world_getPartitionName(ex_runtime* runtime, ex_call_frame frame) {
 	EX_ARG(frame, World*, world);
 	EX_ARG(frame, u32, handle);
@@ -474,6 +484,7 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	functions.insert({"core:world", "getActivePartition"}, &wrap<evox_world_getActivePartition>);
 	functions.insert({"core:world", "createPartition"}, &evox_world_createPartition);
 	functions.insert({"core:world", "setActivePartition"}, &wrap<evox_world_setActivePartition>);
+	functions.insert({"core:world", "destroyPartition"}, &wrap<evox_world_destroyPartition>);
 	functions.insert({"core:world", "load"}, &wrap<evox_world_load>);
 	functions.insert({"core:world", "getStatus"}, &wrap<evox_load_getStatus>);
 	functions.insert({"core:world", "getError"}, &evox_load_getError);
