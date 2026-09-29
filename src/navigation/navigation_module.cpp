@@ -48,6 +48,7 @@ static const int CELLS_PER_TILE_SIDE = 256;
 struct RecastZone {
 	EntityRef entity;
 	NavmeshZone zone;
+	u64 load_id = 0;
 
 	u32 m_num_tiles_x = 0;
 	u32 m_num_tiles_z = 0;
@@ -137,6 +138,14 @@ struct NavigationModuleImpl final : NavigationModule
 
 
 	void clearNavmesh(RecastZone& zone) {
+		// Crowd indices belong to this particular crowd; they cannot survive a reload.
+		for (Agent& agent : m_agents) {
+			if (agent.zone == zone.entity) {
+				agent.agent = -1;
+				agent.is_finished = true;
+				agent.speed = 0;
+			}
+		}
 		dtFreeNavMeshQuery(zone.navquery);
 		dtFreeNavMesh(zone.navmesh);
 		rcFreeCompactHeightfield(zone.debug_compact_heightfield);
@@ -634,14 +643,16 @@ struct NavigationModuleImpl final : NavigationModule
 	bool isNavmeshReady(EntityRef zone) const override { return m_zones[zone].navmesh != nullptr; }
 
 	struct LoadCallback {
-		LoadCallback(NavigationModuleImpl& module, EntityRef entity)
+		LoadCallback(NavigationModuleImpl& module, EntityRef entity, u64 load_id)
 			: module(module)
 			, entity(entity)
+			, load_id(load_id)
 		{}
 
 		void fileLoaded(Span<const u8> mem, bool success) {	
 			auto iter = module.m_zones.find(entity);
-			if (!iter.isValid()) {
+			if (!iter.isValid() || iter.value().load_id != load_id) {
+				// The zone was destroyed, reused, or a newer load superseded this one.
 				LUMIX_DELETE(module.m_allocator, this);
 				return;
 			}
@@ -683,32 +694,46 @@ struct NavigationModuleImpl final : NavigationModule
 					i32 data_size;
 					u32 compressed_size;
 					file.read(data_size);
-					u8* data = (u8*)dtAlloc(data_size, DT_ALLOC_PERM);
+					if (data_size < 0) {
+						logError("Invalid navmesh tile size");
+						LUMIX_DELETE(module.m_allocator, this);
+						return;
+					}
 
 					if (has_header) {
 						file.read(compressed_size);
 						const u8* tmp = (const u8*)file.skip(compressed_size);
-
-						if (data_size != 0 && compressed_size == 0) {
+						// Empty tiles are valid (e.g. outside the walkable geometry).
+						if (data_size == 0 && compressed_size == 0) continue;
+						if (data_size == 0 || compressed_size == 0) {
 							LUMIX_DELETE(module.m_allocator, this);
 							logError("Invalid navmesh");
 							return;
 						}
 
-						if (data_size > 0 && !module.m_engine.decompress(Span<const u8>(tmp, compressed_size), Span<u8>(data, data_size))) {
+						u8* data = (u8*)dtAlloc(data_size, DT_ALLOC_PERM);
+						if (!module.m_engine.decompress(Span<const u8>(tmp, compressed_size), Span<u8>(data, data_size))) {
+							dtFree(data);
 							LUMIX_DELETE(module.m_allocator, this);
 							logError("Failed to decompress navmesh");
 							return;
 						}
+						if (dtStatusFailed(zone.navmesh->addTile(data, data_size, DT_TILE_FREE_DATA, 0, 0))) {
+							logError("Could not add navmesh tile ", i, ", ", j);
+							dtFree(data);
+							LUMIX_DELETE(module.m_allocator, this);
+							return;
+						}
 					}
 					else {
+						if (data_size == 0) continue;
+						u8* data = (u8*)dtAlloc(data_size, DT_ALLOC_PERM);
 						file.read(data, data_size);
-					}
-
-					if (dtStatusFailed(zone.navmesh->addTile(data, data_size, DT_TILE_FREE_DATA, 0, 0))) {
-						dtFree(data);
-						LUMIX_DELETE(module.m_allocator, this);
-						return; // TODO error message
+						if (dtStatusFailed(zone.navmesh->addTile(data, data_size, DT_TILE_FREE_DATA, 0, 0))) {
+							dtFree(data);
+							LUMIX_DELETE(module.m_allocator, this);
+							return; // TODO error message
+						}
 					}
 				}
 			}
@@ -720,13 +745,15 @@ struct NavigationModuleImpl final : NavigationModule
 
 		NavigationModuleImpl& module;
 		EntityRef entity;
+		u64 load_id;
 	};
 
 	bool loadZone(EntityRef zone_entity) override {
 		RecastZone& zone = m_zones[zone_entity];
+		zone.load_id = ++m_next_load_id;
 		clearNavmesh(zone);
 
-		LoadCallback* lcb = LUMIX_NEW(m_allocator, LoadCallback)(*this, zone_entity);
+		LoadCallback* lcb = LUMIX_NEW(m_allocator, LoadCallback)(*this, zone_entity, zone.load_id);
 
 		const Path path("navzones/", zone.zone.guid, ".nav");
 		FileSystem& fs = m_engine.getFileSystem();
@@ -1399,6 +1426,7 @@ struct NavigationModuleImpl final : NavigationModule
 	NavmeshBuildJob* generateNavmesh(EntityRef zone_entity) override {
 		PROFILE_FUNCTION();
 		RecastZone& zone =  m_zones[zone_entity];
+		zone.load_id = ++m_next_load_id;
 		clearNavmesh(zone);
 
 		if (!initNavmesh(zone)) return nullptr;
@@ -1697,6 +1725,7 @@ struct NavigationModuleImpl final : NavigationModule
 	HashMap<EntityRef, Agent> m_agents;
 	EntityPtr m_moving_agent = INVALID_ENTITY;
 	bool m_is_game_running = false;
+	u64 m_next_load_id = 0;
 	
 	Vec3 m_debug_tile_origin;
 };

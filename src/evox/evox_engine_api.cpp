@@ -198,7 +198,7 @@ static void inputGetEvent(ex_runtime*, ex_call_frame frame) {
 		panic(frame, "Invalid input system");
 		return;
 	}
-	if (idx < 0 || idx >= input->getEvents().length()) {
+	if (idx < 0 || (u32)idx >= input->getEvents().length()) {
 		panic(frame, "Invalid input event index");
 		return;
 	}
