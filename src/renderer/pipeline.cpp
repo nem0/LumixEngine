@@ -3895,6 +3895,7 @@ struct PipelineImpl final : Pipeline {
 									const MeshMaterial& mesh_mat = mi.mesh_materials[mesh_idx];
 									const u32 bucket = bucket_map[mesh_mat.material->getLayer()];
 									const u32 mesh_sort_key = mesh_mat.sort_key;
+									if (bucket == 0xffFFffFF) continue; // layer is not drawn in this view
 									if (mi.meshes[mesh_idx].type == Mesh::SKINNED) {
 										// TODO do this only once per model, not for each mesh
 										for (;;) {
