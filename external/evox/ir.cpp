@@ -1663,7 +1663,18 @@ struct IRBuilder {
 					}
 				}
 				else {
-					auto& base = buildExpressionIR(*for_statement.begin, false);
+					// The element address is computed from the array's storage. An rvalue (array literal, call result, ...) has no address
+					// of its own: building it in address mode yields the aggregate itself, not a pointer, so iterate the copy kept in `container`.
+					const Expression::Kind begin_kind = for_statement.begin->kind;
+					const bool begin_addressable = begin_kind == Expression::IDENTIFIER || begin_kind == Expression::MEMBER || begin_kind == Expression::BRACKET || begin_kind == Expression::DEREFERENCE;
+					ExIrOp* base_ptr = nullptr;
+					if (begin_addressable) base_ptr = &buildExpressionIR(*for_statement.begin, false);
+					else {
+						auto& container_base = alloc<ExOpPushLocalAddr>();
+						container_base.alloca = &container;
+						base_ptr = &container_base;
+					}
+					ExIrOp& base = *base_ptr;
 					auto& byte_size = alloc<ExOpLoadConst>();
 					static ResolvedType offset_type(ResolvedTypeKind::U64);
 					byte_size.type = &offset_type;

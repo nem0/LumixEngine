@@ -820,3 +820,25 @@ TEST(ArrayLengthInArithmeticRuntime) {
 	return true;
 }
 
+
+// Iterating an rvalue array (a literal or a call result) used to read garbage: the element address was built from the rvalue itself.
+TEST(ForOverArrayRvalue) {
+	const char* source = R"(
+		fn len(s : []const u8) : i32 { return s.length as i32; }
+		fn arr() : [3]i32 { return [4, 5, 6]; }
+		fn main() : i32 {
+			var total : i32 = 0;
+			for id in ["topbar", "nav", "crewbar"] { total += len(id); }      // 6 + 3 + 7
+			for v in arr() { total += v; }                                    // 15
+			for i, v in [10, 20] { total += v + (i as i32); }                 // 31
+			return total;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(16 + 15 + 31, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
