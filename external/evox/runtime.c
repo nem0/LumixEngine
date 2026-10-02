@@ -1632,3 +1632,8 @@ ex_type_kind ex_bytecode_runtime_result_kind(ex_runtime* runtime, ex_string_view
 	const ex_function_bc* fn = runtime_find_function_by_name(runtime->bytecode, function_name, NULL);
 	return fn ? fn->return_kind : EX_TYPE_INVALID;
 }
+
+const ex_type* ex_bytecode_runtime_result_type(ex_runtime* runtime, ex_string_view function_name) {
+	const ex_function_bc* fn = runtime_find_function_by_name(runtime->bytecode, function_name, NULL);
+	return fn ? ex_bytecode_type(runtime->bytecode, fn->return_type_index) : NULL;
+}

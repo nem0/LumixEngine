@@ -1,4 +1,7 @@
 #include "composite_texture.h"
+#include "editor/asset_compiler.h"
+#include "../../../external/evox/capi.h"
+#include "../../../external/evox/arena.h"
 #include "core/crt.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
@@ -95,6 +98,42 @@ void CompositeTexture::Image::init(u32 _w, u32 _h, u32 _channels) {
 	pixels.resize(w * h * channels);
 }
 
+
+bool CompositeTexture::Image::load(Span<const u8> bytes) {
+	int width, height, count;
+	if (bytes.length() > 0x7fffffff || !stbi_info_from_memory(bytes.begin(), (int)bytes.length(), &width, &height, &count)
+		|| width <= 0 || height <= 0 || width > 16384 || height > 16384 || u64(width) * height > 16 * 1024 * 1024) return false;
+	stbi_uc* data = stbi_load_from_memory(bytes.begin(), (int)bytes.length(), &width, &height, &count, 0);
+	if (!data) return false;
+	init(width, height, count);
+	for (i32 i = 0; i < pixels.size(); ++i) pixels[i] = data[i] / 255.f;
+	stbi_image_free(data);
+	return true;
+}
+
+bool CompositeTexture::Image::resize(const Image& source, u32 width, u32 height) {
+	if (this == &source || !width || !height || !source.w || !source.h || source.channels < 1 || source.channels > 4 || width > 16384 || height > 16384
+		|| u64(width) * height > 16 * 1024 * 1024) return false;
+	init(width, height, source.channels);
+	return stbir_resize_float_linear(source.pixels.data(), source.w, source.h, 0, pixels.data(), width, height, 0, (stbir_pixel_layout)channels) != nullptr;
+}
+
+void CompositeTexture::Image::fill(const Vec4& value) {
+	for (u32 i = 0; i < w * h; ++i) memcpy(&pixels[i * channels], &value, channels * sizeof(float));
+}
+
+void CompositeTexture::Image::convertChannels(u32 count) {
+	ASSERT(count >= 1 && count <= 4);
+	if (channels == count) return;
+	Array<float> converted(pixels.getAllocator());
+	converted.resize(w * h * count);
+	for (u32 i = 0; i < w * h; ++i) for (u32 ch = 0; ch < count; ++ch) {
+		converted[i * count + ch] = ch < channels ? pixels[i * channels + ch]
+			: channels == 1 && ch < 3 ? pixels[i] : 1.f;
+	}
+	pixels = converted.move();
+	channels = count;
+}
 
 Vec4 CompositeTexture::Image::sample(i32 x, i32 y) {
 	x = clamp(x, 0, w - 1);
@@ -487,9 +526,7 @@ struct ColorNode final : CompositeTexture::Node {
 
 	bool generateInternal() override {
 		CompositeTexture::Image& out = m_outputs.emplace(4, 4, 4, m_allocator);
-		for (u32 i = 0; i < 16; ++i) {
-			memcpy(&out.pixels[i * 4], &color, sizeof(color));
-		}
+		out.fill(color);
 		return true;
 	}
 
@@ -886,9 +923,8 @@ struct ResizeNode final : CompositeTexture::Node {
 		
 		const u32 w = type == Type::PIXELS ? size.x : u32(in.w * scale.x * 0.01f + 0.5f);
 		const u32 h = type == Type::PIXELS ? size.y : u32(in.h * scale.y * 0.01f + 0.5f);
-		CompositeTexture::Image& out = m_outputs.emplace(w, h, in.channels, m_allocator); 
-		
-		return nullptr != stbir_resize_float_linear(in.pixels.data(), in.w, in.h, 0, out.pixels.data(), w, h, 0, (stbir_pixel_layout)out.channels);
+		CompositeTexture::Image& out = m_outputs.emplace(m_allocator);
+		return out.resize(in, w, h);
 	}	
 
 	bool gui() override {
@@ -2701,21 +2737,13 @@ struct InputNode final : CompositeTexture::Node {
 
 	bool generateInternal() override {
 		if (m_texture.isEmpty()) return error("Missing texture");
-		i32 w, h, cmp;
 		OutputMemoryStream file_content(m_resource->m_allocator);
 		FileSystem& fs = m_resource->m_app.getEngine().getFileSystem();
 		file_content.clear();
 		if (!fs.getContentSync(m_texture, file_content)) return error("Failed to read file");
 
-		stbi_uc* pixels = stbi_load_from_memory(file_content.data(), (i32)file_content.size(), &w, &h, &cmp, 0);
-		if (!pixels) return error("Failed to load file");
-
-		CompositeTexture::Image& out = m_outputs.emplace(w, h, cmp, m_allocator); 
-		for (u32 i = 0; i < u32(w * h * cmp); ++i) {
-			out.pixels[i] = pixels[i] / 255.f;
-		}
-		free(pixels);
-		return true;
+		CompositeTexture::Image& out = m_outputs.emplace(m_allocator);
+		return out.load(file_content) || error("Failed to load file");
 	}
 
 	bool gui() override {
@@ -3072,20 +3100,8 @@ bool CompositeTexture::generate(Result* result) {
 		}
 	}
 
-	for (Image& pd : result->layers) {
-		if (pd.channels != node->m_channels_count) {
-			Array<float> tmp(m_allocator);
-			const u32 n = node->m_channels_count;
-			tmp.resize(pd.w * pd.h * n);
-			for (u32 i = 0; i < pd.w * pd.h; ++i) {
-				for (u32 ch = 0; ch < n; ++ch) {
-					tmp[i * n + ch] = ch < pd.channels ? pd.pixels[i * pd.channels + ch] : ((pd.channels == 1 && ch < 3) ? pd.pixels[i * pd.channels] : 1.f);
-				}
-			}
-			pd.pixels = tmp.move();
-			pd.channels = n;
-		}
-	}
+	if (node->m_channels_count < 1 || node->m_channels_count > 4) return false;
+	for (Image& pd : result->layers) pd.convertChannels(node->m_channels_count);
 
 	colorLinks(m_links);
 	markReachable(*this);
@@ -3515,6 +3531,492 @@ struct CompositeTextureEditorImpl : CompositeTextureEditor, NodeEditor {
 
 UniquePtr<CompositeTextureEditor> CompositeTextureEditor::open(const Path& path, StudioApp& app, IAllocator& allocator) {
 	return UniquePtr<CompositeTextureEditorImpl>::create(allocator, Path(path), app, allocator);
+}
+
+namespace {
+
+struct ImageHandle {
+	u32 handle, width, height, channels;
+};
+
+struct TextureOutput {
+	ImageHandle image;
+};
+
+struct TextureArrayOutput {
+	ex_slice layers;
+};
+
+struct TextureCubeOutput {
+	ImageHandle faces[6];
+};
+
+static_assert(sizeof(ImageHandle) == 16 && sizeof(TextureOutput) == 16 && sizeof(Vec4) == 16);
+static_assert(sizeof(TextureArrayOutput) == 16);
+static_assert(sizeof(TextureCubeOutput) == 96);
+
+// Budget for build-local images (float pixels) and, separately, for the output built from them.
+static constexpr u64 MAX_RECIPE_BYTES = 256ull * 1024 * 1024;
+
+static bool finite(float value) {
+	u32 bits;
+	memcpy(&bits, &value, sizeof(bits));
+	return (bits & 0x7f800000) != 0x7f800000;
+}
+
+static bool relativePath(StringView path) {
+	if (path.empty() || path.size() >= MAX_PATH || path[0] == '/' || path[0] == '\\') return false;
+	for (u32 i = 0; i < path.size(); ++i) {
+		if (!path[i] || path[i] == ':') return false;
+		if (path[i] == '.' && i + 1 < path.size() && path[i + 1] == '.' && (!i || path[i - 1] == '/' || path[i - 1] == '\\') && (i + 2 == path.size() || path[i + 2] == '/' || path[i + 2] == '\\'))
+			return false;
+	}
+	return true;
+}
+
+static void panic(ex_call_frame frame, const char* message) {
+	*frame.panic = {message, (i64)stringLength(message)};
+}
+
+static const char* recipeCallResultName(ex_call_result result) {
+	switch (result) {
+		case EX_CALL_RESULT_OK: return "ok";
+		case EX_CALL_RESULT_SUSPENDED: return "suspended";
+		case EX_CALL_RESULT_FUNCTION_NOT_FOUND: return "function not found";
+		case EX_CALL_RESULT_INVALID_ARGUMENT: return "invalid argument";
+		case EX_CALL_RESULT_INVALID_STATE: return "invalid state";
+		case EX_CALL_RESULT_ALREADY_EXECUTING: return "already executing";
+		case EX_CALL_RESULT_NOT_SUSPENDED: return "not suspended";
+		case EX_CALL_RESULT_NOT_RESUMABLE: return "not resumable";
+		case EX_CALL_RESULT_OUT_OF_MEMORY: return "out of memory";
+		case EX_CALL_RESULT_RUNTIME_ERROR: return "runtime error";
+		case EX_CALL_RESULT_DIVISION_BY_ZERO: return "division by zero";
+		case EX_CALL_RESULT_MODULO_BY_ZERO: return "modulo by zero";
+		case EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS: return "index out of bounds";
+		case EX_CALL_RESULT_INVALID_FUNCTION_CALL: return "invalid function call";
+		case EX_CALL_RESULT_PANIC: return "panic";
+		case EX_CALL_RESULT_INVALID_YIELD_VALUE: return "invalid yield value";
+		case EX_CALL_RESULT_STACK_OVERFLOW: return "stack overflow";
+		case EX_CALL_RESULT_CALL_DEPTH: return "call depth exceeded";
+	}
+	return "unknown error";
+}
+
+struct Recipe;
+thread_local Recipe* current_recipe = nullptr;
+
+struct Recipe {
+	Recipe(FileSystem& fs, const Path& path, CompositeTexture::Result& result, String& error, IAllocator& allocator, AssetCompiler* dependencies)
+		: fs(fs)
+		, path(path)
+		, result(result)
+		, error(error)
+		, allocator(allocator)
+		, dependencies(dependencies)
+		, images(allocator)
+		, sources(allocator) {
+		ex_default_arena_create(&host.arena);
+		host.print = [](void* userdata, ex_string_view message) { ((String*)userdata)->append(StringView(message.begin, message.length)); };
+		host.diagnostics_userdata = &error;
+	}
+
+	~Recipe() {
+		if (task) ex_task_destroy(task);
+		if (runtime) ex_runtime_destroy(runtime);
+		if (bytecode) ex_bytecode_destroy(bytecode);
+		if (module) ex_module_destroy(module);
+		ex_default_arena_destroy(&host.arena);
+	}
+
+	bool readFile(const Path& file, OutputMemoryStream& bytes) {
+		if (!relativePath(file) || !fs.getContentSync(file, bytes)) {
+			error.append("Could not read recipe input (invalid path or missing file): ", file, "\n");
+			return false;
+		}
+
+		if (dependencies) dependencies->registerDependency(path, file);
+		return true;
+	}
+
+	static int resolveImport(void* userdata, ex_string_view name, ex_string_view, ex_string_view* source) {
+		Recipe& self = *(Recipe*)userdata;
+		const StringView requested(name.begin, name.length);
+		Path file;
+		if (startsWith(requested, "core:")) {
+			const StringView unit = requested.withoutLeft(5);
+			file = endsWith(unit, ".evox") ? Path("engine/scripts/core/", unit) : Path("engine/scripts/core/", unit, ".evox");
+		} else {
+			file = endsWith(requested, ".evox") ? Path(requested) : Path(requested, ".evox");
+		}
+		OutputMemoryStream& bytes = self.sources.emplace(self.allocator);
+		if (!self.readFile(file, bytes)) {
+			self.sources.pop();
+			return 0;
+		}
+
+		*source = {(const char*)bytes.data(), (i64)bytes.size()};
+		return 1;
+	}
+
+	static ex_native_fn resolveNativeFunction(ex_runtime*, ex_native_function_desc function, void* userdata) {
+		return ((Recipe*)userdata)->resolveNative(function);
+	}
+
+	bool execute(StringView source) {
+		module = ex_module_create(&host);
+		if (!module) return false;
+		if (ex_module_compile(module, {source.data, (i64)source.size()}, {path.c_str(), (i64)stringLength(path.c_str())}, &resolveImport, this) != EX_RESULT_OK) return false;
+
+		bytecode = ex_bytecode_compile(module, &host, nullptr);
+		if (!bytecode) {
+			error.append("Could not compile texture recipe bytecode");
+			return false;
+		}
+
+		runtime = ex_runtime_create(bytecode, &host);
+		if (!runtime) return false;
+		if (ex_runtime_set_native_resolver(runtime, &resolveNativeFunction, this) != EX_RESULT_OK) return false;
+
+		task = ex_task_create(runtime);
+		if (!task) {
+			error.append("Could not create texture recipe task");
+			return false;
+		}
+
+		const ex_call_result status = ex_call(task, {"main", 4}, nullptr, 0);
+		if (status != EX_CALL_RESULT_OK) {
+			error.append("Texture recipe main failed: ", recipeCallResultName(status));
+			for (u32 i = 0; i < ex_debug_stack_depth(task); ++i) {
+				ex_debug_location location = {};
+				if (ex_debug_frame_location(task, i, &location) != EX_RESULT_OK) continue;
+
+				const StaticString<32> line(location.line + 1);
+				error.append("\n  at ", StringView(location.source_name.begin, location.source_name.length), ":", line);
+			}
+			return false;
+		}
+		u32 size = 0;
+		const void* output = ex_task_result(task, &size);
+		return acceptResult(output, size);
+	}
+
+	bool reserve(u32 width, u32 height, u32 channels, ex_call_frame frame) {
+		const u64 count = u64(width) * height;
+		if (!width || !height || width > 16384 || height > 16384) {
+			panic(frame, "Texture recipe image dimensions exceeded");
+			return false;
+		}
+		if (channels < 1 || channels > 4) {
+			panic(frame, "Texture recipe image channels exceeded");
+			return false;
+		}
+		const u64 bytes = count * channels * sizeof(float);
+		if (bytes > MAX_RECIPE_BYTES
+			|| bytes + generated_bytes > MAX_RECIPE_BYTES
+			|| images.size() >= 256)
+		{
+			panic(frame, "Texture recipe image dimensions/channels or allocation budget exceeded");
+			return false;
+		}
+		generated_bytes += bytes;
+		return true;
+	}
+
+	CompositeTexture::Image* lookup(ImageHandle handle) {
+		if (!handle.handle || handle.handle > (u32)images.size()) return nullptr;
+		auto& image = images[handle.handle - 1];
+		return image.w == handle.width && image.h == handle.height && image.channels == handle.channels ? &image : nullptr;
+	}
+
+	void store(CompositeTexture::Image&& image, ex_call_frame frame) {
+		images.push(static_cast<CompositeTexture::Image&&>(image));
+		const auto& stored = images.back();
+		EX_RESULT(frame, (ImageHandle{(u32)images.size(), stored.w, stored.h, stored.channels}));
+	}
+
+	static void load(ex_runtime*, ex_call_frame frame) {
+		Recipe& self = *current_recipe;
+		EX_ARG(frame, ex_slice, name);
+		if (name.length <= 0 || name.length >= MAX_PATH || !name.data || !relativePath(StringView((const char*)name.data, name.length))) {
+			panic(frame, "Image path must be project-relative");
+			return;
+		}
+
+		OutputMemoryStream bytes(self.allocator);
+		const Path file(StringView((const char*)name.data, name.length));
+		if (!self.readFile(file, bytes)) {
+			panic(frame, "Could not read image");
+			return;
+		}
+
+		CompositeTexture::Image image(self.allocator);
+		if (!image.load(bytes)) {
+			panic(frame, "Could not decode image or image dimensions exceed limits");
+			return;
+		}
+
+		if (!self.reserve(image.w, image.h, image.channels, frame)) return;
+		self.store(static_cast<CompositeTexture::Image&&>(image), frame);
+	}
+
+	static void create(ex_runtime*, ex_call_frame frame) {
+		Recipe& self = *current_recipe;
+		EX_ARG(frame, u32, width);
+		EX_ARG(frame, u32, height);
+		EX_ARG(frame, u32, channels);
+		if (!self.reserve(width, height, channels, frame)) return;
+
+		CompositeTexture::Image image(width, height, channels, self.allocator);
+		image.fill(Vec4(0));
+		self.store(static_cast<CompositeTexture::Image&&>(image), frame);
+	}
+
+	static void resize(ex_runtime*, ex_call_frame frame) {
+		Recipe& self = *current_recipe;
+		EX_ARG(frame, ImageHandle, handle);
+		EX_ARG(frame, u32, width);
+		EX_ARG(frame, u32, height);
+		const auto* source = self.lookup(handle);
+		if (!source) {
+			panic(frame, "Invalid image handle");
+			return;
+		}
+
+		if (!self.reserve(width, height, source->channels, frame)) return;
+
+		CompositeTexture::Image image(self.allocator);
+		if (!image.resize(*source, width, height)) {
+			panic(frame, "Could not resize image");
+			return;
+		}
+
+		self.store(static_cast<CompositeTexture::Image&&>(image), frame);
+	}
+
+	static void getPixel(ex_runtime*, ex_call_frame frame) {
+		EX_ARG(frame, ImageHandle, handle);
+		EX_ARG(frame, u32, x);
+		EX_ARG(frame, u32, y);
+		const auto* image = current_recipe->lookup(handle);
+		if (!image || x >= image->w || y >= image->h) {
+			panic(frame, "Invalid image handle or pixel coordinates");
+			return;
+		}
+
+		Vec4 value(0, 0, 0, 1);
+		memcpy(&value, &image->pixels[(x + y * image->w) * image->channels], image->channels * sizeof(float));
+		EX_RESULT(frame, value);
+	}
+
+	static void setPixel(ex_runtime*, ex_call_frame frame) {
+		EX_ARG(frame, ImageHandle, handle);
+		EX_ARG(frame, u32, x);
+		EX_ARG(frame, u32, y);
+		EX_ARG(frame, Vec4, value);
+		auto* image = current_recipe->lookup(handle);
+		if (!image || x >= image->w || y >= image->h) {
+			panic(frame, "Invalid image handle or pixel coordinates");
+			return;
+		}
+
+		for (u32 i = 0; i < image->channels; ++i) {
+			if (!finite(value[i])) {
+				panic(frame, "Pixel value must be finite");
+				return;
+			}
+		}
+
+		image->setPixel(x, y, value);
+	}
+
+	ex_native_fn resolveNative(ex_native_function_desc function) {
+		struct Native {
+			const char* name;
+			ex_native_fn function;
+			u32 args, result;
+		};
+		const Native natives[] = {
+			{"load", &load, 16, 16}, 
+			{"resize", &resize, 24, 16}, 
+			{"create", &create, 12, 16}, 
+			{"getPixel", &getPixel, 24, 16}, 
+			{"setPixel", &setPixel, 40, 0}
+		};
+		if (StringView(function.unit_path.begin, function.unit_path.length) == "core:texture_recipe") {
+			for (const Native& native : natives) {
+				if (StringView(function.name.begin, function.name.length) == native.name && function.param_size == native.args && function.return_size == native.result) return native.function;
+			}
+		}
+		error.append("Unsupported texture recipe native or ABI: ", StringView(function.unit_path.begin, function.unit_path.length), ".", StringView(function.name.begin, function.name.length), "\n");
+		return nullptr;
+	}
+
+	// Moves a validated image into the result; a handle that was already emitted is copied from its layer.
+	// `used[i]` is the handle of `result.layers[i]` (result.layers starts empty).
+	void appendLayer(ImageHandle handle, Array<u32>& used) {
+		for (u32 i = 0; i < (u32)used.size(); ++i) {
+			if (used[i] != handle.handle) continue;
+			CompositeTexture::Image& layer = result.layers.emplace(handle.width, handle.height, handle.channels, allocator);
+			const CompositeTexture::Image& source = result.layers[i];
+			memcpy(layer.pixels.data(), source.pixels.data(), source.pixels.byte_size());
+			used.push(handle.handle);
+			return;
+		}
+		used.push(handle.handle);
+		result.layers.push(static_cast<CompositeTexture::Image&&>(*lookup(handle)));
+	}
+
+	bool acceptResult(const void* data, u32 size) {
+		const ex_type* type = ex_bytecode_runtime_result_type(runtime, {"main", 4});
+		const ex_string_view type_name = ex_type_get_name(type);
+		const StringView name(type_name.begin, type_name.length);
+		if (data && name == "core:texture_recipe.TextureCube" && size == sizeof(TextureCubeOutput)) {
+			TextureCubeOutput output;
+			memcpy(&output, data, sizeof(output));
+			const auto* first = lookup(output.faces[0]);
+			if (!first || first->w != first->h) {
+				error.append("Cubemap faces must be valid square images");
+				return false;
+			}
+
+			if (u64(first->w) * first->h * first->channels * 6 * sizeof(float) > MAX_RECIPE_BYTES) {
+				error.append("Cubemap output pixel budget exceeded");
+				return false;
+			}
+
+			for (const ImageHandle face : output.faces) {
+				const auto* image = lookup(face);
+				if (!image || image->w != first->w || image->h != first->h || image->channels != first->channels) {
+					error.append("Cubemap faces must have matching dimensions and channel counts");
+					return false;
+				}
+
+				for (float value : image->pixels) {
+					if (!finite(value)) {
+						error.append("Recipe produced non-finite pixels");
+						return false;
+					}
+				}
+
+			}
+
+			Array<u32> used(allocator);
+			for (const ImageHandle face : output.faces) appendLayer(face, used);
+			result.is_cubemap = true;
+			return true;
+		}
+
+		if (data && name == "core:texture_recipe.TextureArray" && size == sizeof(TextureArrayOutput)) {
+			TextureArrayOutput output;
+			memcpy(&output, data, sizeof(output));
+			if (!output.layers.data || output.layers.length <= 0 || output.layers.length > 256) {
+				error.append("Texture array requires 1-256 layers");
+				return false;
+			}
+
+			u32 width = 0, height = 0, channels = 0;
+			for (u32 i = 0; i < output.layers.length; ++i) {
+				ImageHandle handle;
+				memcpy(&handle, output.layers.data + i * sizeof(handle), sizeof(handle));
+				const auto* image = lookup(handle);
+				if (!image) {
+					error.append("Invalid texture array image handle");
+					return false;
+				}
+
+				if (i == 0) {
+					width = image->w;
+					height = image->h;
+					channels = image->channels;
+				}
+				if (image->w != width || image->h != height) {
+					error.append("Texture array layers must have matching dimensions");
+					return false;
+				}
+
+				if (image->channels != channels) {
+					error.append("Texture array layers must have matching channel counts");
+					return false;
+				}
+
+				if (u64(width) * height * channels * output.layers.length * sizeof(float) > MAX_RECIPE_BYTES) {
+					error.append("Texture array output pixel budget exceeded");
+					return false;
+				}
+
+				for (float value : image->pixels) {
+					if (!finite(value)) {
+						error.append("Recipe produced non-finite pixels");
+						return false;
+					}
+				}
+
+			}
+
+			Array<u32> used(allocator);
+			for (u32 i = 0; i < output.layers.length; ++i) {
+				ImageHandle handle;
+				memcpy(&handle, output.layers.data + i * sizeof(handle), sizeof(handle));
+				appendLayer(handle, used);
+			}
+
+			result.is_cubemap = false;
+			return true;
+		}
+
+		if (!data || name != "core:texture_recipe.Texture2D" || size != sizeof(TextureOutput)) {
+			error.append("Recipe main must return Texture2D, TextureArray or TextureCube");
+			return false;
+		}
+
+		TextureOutput output;
+		memcpy(&output, data, sizeof(output));
+		auto* image = lookup(output.image);
+		if (!image) {
+			error.append("Invalid output image");
+			return false;
+		}
+
+		for (float value : image->pixels) {
+			if (!finite(value)) {
+				error.append("Recipe produced non-finite pixels");
+				return false;
+			}
+		}
+
+		result.layers.push(static_cast<CompositeTexture::Image&&>(*image));
+		result.is_cubemap = false;
+		return true;
+	}
+
+	FileSystem& fs;
+	const Path& path;
+	CompositeTexture::Result& result;
+	String& error;
+	IAllocator& allocator;
+	AssetCompiler* dependencies;
+	Array<CompositeTexture::Image> images;
+	Array<OutputMemoryStream> sources;
+	ex_host host = {};
+	ex_module* module = nullptr;
+	ex_bytecode* bytecode = nullptr;
+	ex_runtime* runtime = nullptr;
+	ex_task* task = nullptr;
+	u64 generated_bytes = 0;
+};
+} // namespace
+
+bool compileTextureRecipe(FileSystem& fs, StringView source, const Path& path, CompositeTexture::Result& result, String& error, IAllocator& allocator, AssetCompiler* dependencies) {
+	result.layers.clear();
+	result.is_cubemap = false;
+	error = "";
+	Recipe recipe(fs, path, result, error, allocator, dependencies);
+	Recipe* previous = current_recipe;
+	current_recipe = &recipe;
+	const bool success = recipe.execute(source);
+	current_recipe = previous;
+	if (!success) result.layers.clear();
+	return success;
 }
 
 } // namespace Lumix

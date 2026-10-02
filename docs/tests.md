@@ -65,7 +65,14 @@ scripts\run_imgui_tests.bat Debug
 scripts\run_imgui_tests.bat RelWithDebInfo
 scripts\run_imgui_tests.bat RelWithDebInfo -open "data/scripts/tests/sample.unv"
 scripts\run_imgui_tests.bat -open "data/scripts/tests/sample.unv"
+scripts\run_imgui_tests.bat Debug -imgui_run_tests ltct_open_close
+scripts\run_imgui_tests.bat Debug -imgui_run_tests ltct_array_open_close
+scripts\run_imgui_tests.bat Debug -imgui_run_tests ltct_cube_open_close
 ```
+
+`ltct_open_close` opens `scripts/tests/texture_recipe.ltct`, verifies its code-editor pane, and closes it through Studio's Close action. The test requires the `data` project.
+`ltct_array_open_close` additionally checks a three-layer compiled texture array and its layer selector.
+`ltct_cube_open_close` checks cubemap compilation, the face selector, and the code-editor lifecycle.
 
 `-imgui_test_ui` enables ImGui Test Engine windows in Studio, where editor UI tests can be browsed and executed.
 

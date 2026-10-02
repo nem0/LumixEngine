@@ -1,0 +1,864 @@
+import "core:vec4"
+import "core:vec2"
+import "std:math" as math
+
+// Eager, build-local images. Copies of Image alias the same storage.
+struct Image {
+    handle : u32;
+    width : u32;
+    height : u32;
+    channels : u32;
+}
+
+struct Texture2D {
+    image : Image;
+}
+
+struct TextureArray {
+    layers : [] const Image;
+}
+
+struct TextureCube {
+    faces : [6] Image;
+}
+
+extern fn load(path : [] const u8) : Image;
+extern fn resize(image : Image, width : u32, height : u32) : Image;
+extern fn create(width : u32, height : u32, channels : u32) : Image;
+extern fn getPixel(image : Image, x : u32, y : u32) : Vec4;
+extern fn setPixel(image : Image, x : u32, y : u32, value : Vec4) : void;
+
+fn color(width : u32, height : u32, value : Vec4) : Image {
+    var image = create(width, height, 4);
+    for y in 0..height {
+        for x in 0..width {
+            setPixel(image, x, y, value);
+        }
+    }
+    return image;
+}
+
+fn textureArray(images : [] const Image) : TextureArray {
+    return {images};
+}
+
+fn texture2D(image : Image) : Texture2D {
+    return {image};
+}
+
+// Face order: +X, -X, +Y, -Y, +Z, -Z.
+fn textureCube(faces : [6] Image) : TextureCube {
+    return {faces};
+}
+
+fn map(image : Image, callback : fn(u32, u32, Vec4) : Vec4) : void {
+    for y in 0..image.height {
+        for x in 0..image.width {
+            setPixel(image, x, y, callback(x, y, getPixel(image, x, y)));
+        }
+    }
+}
+
+fn mapWith(image : Image, state : $S, callback : fn(u32, u32, Vec4, S) : Vec4) : void {
+    for y in 0..image.height {
+        for x in 0..image.width {
+            setPixel(image, x, y, callback(x, y, getPixel(image, x, y), state));
+        }
+    }
+}
+
+fn recipeMin(a : f32, b : f32) : f32 {
+    if a < b {
+        return a;
+    }
+    return b;
+}
+
+fn recipeMax(a : f32, b : f32) : f32 {
+    if a > b {
+        return a;
+    }
+    return b;
+}
+
+fn recipeAbs(a : f32) : f32 {
+    if a < 0 {
+        return-a;
+    }
+    return a;
+}
+
+fn recipeFloor(a : f32) : f32 {
+    var i = a as i32;
+    if a < i as f32 {
+        i -= 1;
+    }
+    return i as f32;
+}
+
+fn recipeFract(a : f32) : f32 {
+    return a - recipeFloor(a);
+}
+
+fn recipeClamp(a : f32) : f32 {
+    return recipeMin(1, recipeMax(0, a));
+}
+
+fn recipeComponent(v : Vec4, c : u32) : f32 {
+    if c == 0 {
+        return v.x;
+    }
+    if c == 1 {
+        return v.y;
+    }
+    if c == 2 {
+        return v.z;
+    }
+    return v.w;
+}
+
+fn recipeCoord(p : i32, size : u32, wrap : bool) : u32 {
+    const n = size as i32;
+    if wrap {
+        return((p % n + n) % n) as u32;
+    }
+    if p < 0 {
+        return 0;
+    }
+    if p >= n {
+        return size - 1;
+    }
+    return p as u32;
+}
+
+// Pixel coordinates: integers address pixel centers.
+fn samplePixel(image : Image, x : i32, y : i32, wrap : bool) : Vec4 {
+    return getPixel(image, recipeCoord(x, image.width, wrap), recipeCoord(y, image.height, wrap));
+}
+
+fn sample(image : Image, x : f32, y : f32, wrap : bool) : Vec4 {
+    const ix = recipeFloor(x) as i32;
+    const iy = recipeFloor(y) as i32;
+    const fx = x - ix as f32;
+    const fy = y - iy as f32;
+    const a = samplePixel(image, ix, iy, wrap) * (1 - fx) + samplePixel(image, ix + 1, iy, wrap) * fx;
+    const b = samplePixel(image, ix, iy + 1, wrap) * (1 - fx) + samplePixel(image, ix + 1, iy + 1, wrap) * fx;
+    return a * (1 - fy) + b * fy;
+}
+
+fn recipeMatch(a : Image, b : Image, channels : bool) : void {
+    if a.width != b.width or a.height != b.height or(channels and a.channels != b.channels) {
+        panic("Images must have matching dimensions and channel counts");
+    }
+}
+
+fn copy(image : Image) : Image {
+    var result = create(image.width, image.height, image.channels);
+    for y in 0..image.height {
+        for x in 0..image.width {
+            setPixel(result, x, y, getPixel(image, x, y));
+        }
+    }
+    return result;
+}
+
+fn crop(image : Image, x : u32, y : u32, width : u32, height : u32) : Image {
+    if x > image.width or y > image.height or width > image.width - x or height > image.height - y {
+        panic("Crop outside image");
+    }
+    var result = create(width, height, image.channels);
+    for j in 0..height {
+        for i in 0..width {
+            setPixel(result, i, j, getPixel(image, x + i, y + j));
+        }
+    }
+    return result;
+}
+
+fn flip(image : Image, horizontal : bool, vertical : bool) : void {
+    for y in 0..image.height {
+        for x in 0..image.width {
+            var sx = x;
+            var sy = y;
+            if horizontal {
+                sx = image.width - 1 - x;
+            }
+            if vertical {
+                sy = image.height - 1 - y;
+            }
+            if sx + sy * image.width > x + y * image.width {
+                const a = getPixel(image, x, y);
+                const b = getPixel(image, sx, sy);
+                setPixel(image, x, y, b);
+                setPixel(image, sx, sy, a);
+            }
+        }
+    }
+}
+
+fn translate(image : Image, dx : i32, dy : i32, wrap : bool) : void {
+    const source = copy(image);
+    for y in 0..image.height {
+        for x in 0..image.width {
+            setPixel(image, x, y, samplePixel(source, x as i32 + dx, y as i32 + dy, wrap));
+        }
+    }
+}
+
+struct RecipeChannel {
+    image : Image;
+    channel : u32;
+}
+
+fn split(image : Image, channel : u32) : Image {
+    if channel >= image.channels {
+        panic("Channel outside image");
+    }
+    var result = create(image.width, image.height, 1);
+    mapWith(result, RecipeChannel {image, channel}, fn(x : u32, y : u32, v : Vec4, state : RecipeChannel) : Vec4 {
+        return Vec4 {recipeComponent(getPixel(state.image, x, y), state.channel), 0, 0, 1};
+    });
+    return result;
+}
+
+fn merge(channels : [] const Image) : Image {
+    if channels.length < 1 or channels.length > 4 {
+        panic("Merge requires one to four scalar images");
+    }
+    const first = channels[0];
+    for i in 0..channels.length {
+        recipeMatch(first, channels[i], false);
+        if channels[i].channels != 1 {
+            panic("Merge requires scalar images");
+        }
+    }
+    var result = create(first.width, first.height, channels.length as u32);
+    for y in 0..first.height {
+        for x in 0..first.width {
+            var v = Vec4 {getPixel(first, x, y).x, 0, 0, 1};
+            if channels.length > 1 {
+                v.y = getPixel(channels[1], x, y).x;
+            }
+            if channels.length > 2 {
+                v.z = getPixel(channels[2], x, y).x;
+            }
+            if channels.length > 3 {
+                v.w = getPixel(channels[3], x, y).x;
+            }
+            setPixel(result, x, y, v);
+        }
+    }
+    return result;
+}
+
+fn setAlpha(image : Image, alpha : Image) : Image {
+    recipeMatch(image, alpha, false);
+    if image.channels < 3 or alpha.channels != 1 {
+        panic("Set alpha requires RGB and scalar alpha");
+    }
+    var result = create(image.width, image.height, 4);
+    for y in 0..image.height {
+        for x in 0..image.width {
+            var v = getPixel(image, x, y);
+            v.w = getPixel(alpha, x, y).x;
+            setPixel(result, x, y, v);
+        }
+    }
+    return result;
+}
+
+fn splat(image : Image) : Image {
+    if image.channels != 1 {
+        panic("Splat requires a scalar image");
+    }
+    var result = create(image.width, image.height, 4);
+    for y in 0..image.height {
+        for x in 0..image.width {
+            const v = getPixel(image, x, y).x;
+            setPixel(result, x, y, Vec4 {v, v, v, v});
+        }
+    }
+    return result;
+}
+
+fn recipeBinary(a : Image, b : Image, op : fn(f32, f32) : f32) : void {
+    recipeMatch(a, b, true);
+    for y in 0..a.height {
+        for x in 0..a.width {
+            const u = getPixel(a, x, y);
+            const v = getPixel(b, x, y);
+            var value = Vec4 {0, 0, 0, 1};
+            value.x = op(u.x, v.x);
+            if a.channels > 1 {
+                value.y = op(u.y, v.y);
+            }
+            if a.channels > 2 {
+                value.z = op(u.z, v.z);
+            }
+            if a.channels > 3 {
+                value.w = op(u.w, v.w);
+            }
+            setPixel(a, x, y, value);
+        }
+    }
+}
+
+fn multiply(a : Image, b : Image) : void {
+    recipeBinary(a, b, fn(a : f32, b : f32) : f32 {
+        return a * b;
+    });
+}
+
+fn divide(a : Image, b : Image) : void {
+    recipeBinary(a, b, fn(a : f32, b : f32) : f32 {
+        return a / b;
+    });
+}
+
+fn minimum(a : Image, b : Image) : void {
+    recipeBinary(a, b, recipeMin);
+}
+
+fn maximum(a : Image, b : Image) : void {
+    recipeBinary(a, b, recipeMax);
+}
+
+fn mix(a : Image, b : Image, alpha : f32) : void {
+    recipeMatch(a, b, true);
+    for y in 0..a.height {
+        for x in 0..a.width {
+            setPixel(a, x, y, getPixel(a, x, y) * (1 - alpha) + getPixel(b, x, y) * alpha);
+        }
+    }
+}
+
+fn invert(image : Image) : void {
+    map(image, fn(x : u32, y : u32, v : Vec4) : Vec4 {
+        return Vec4 {1 - v.x, 1 - v.y, 1 - v.z, 1 - v.w};
+    });
+}
+
+fn step(image : Image, edge : f32) : void {
+    mapWith(image, edge, fn(x : u32, y : u32, v : Vec4, e : f32) : Vec4 {
+        var r = Vec4 {0, 0, 0, 0};
+        if v.x >= e {
+            r.x = 1;
+        }
+        if v.y >= e {
+            r.y = 1;
+        }
+        if v.z >= e {
+            r.z = 1;
+        }
+        if v.w >= e {
+            r.w = 1;
+        }
+        return r;
+    });
+}
+
+fn brightness(image : Image, amount : f32) : void {
+    mapWith(image, amount, fn(x : u32, y : u32, v : Vec4, a : f32) : Vec4 {
+        return Vec4 {v.x + a, v.y + a, v.z + a, v.w};
+    });
+}
+
+fn contrast(image : Image, amount : f32) : void {
+    if amount < -255 or amount > 255 {
+        panic("Contrast must be between -255 and 255");
+    }
+    const factor = 259 * (amount + 255) / (255 * (259 - amount));
+    mapWith(image, factor, fn(x : u32, y : u32, v : Vec4, f : f32) : Vec4 {
+        return(v - Vec4 {0.5, 0.5, 0.5, 0.5}) * f + Vec4 {0.5, 0.5, 0.5, 0.5};
+    });
+}
+
+fn gamma(image : Image, amount : f32) : void {
+    if amount <= 0 {
+        panic("Gamma must be positive");
+    }
+    mapWith(image, 1 / amount, fn(x : u32, y : u32, v : Vec4, p : f32) : Vec4 {
+        return Vec4 {math.pow(v.x, p), math.pow(v.y, p), math.pow(v.z, p), v.w};
+    });
+}
+
+fn grayscale(image : Image) : void {
+    if image.channels < 3 {
+        panic("Grayscale requires RGB");
+    }
+    map(image, fn(x : u32, y : u32, v : Vec4) : Vec4 {
+        const g = v.x * 0.299 + v.y * 0.587 + v.z * 0.114;
+        return Vec4 {g, g, g, v.w};
+    });
+}
+
+struct ColorStop {
+    position : f32;
+    value : Vec4;
+}
+
+fn gradientMap(image : Image, stops : [] const ColorStop) : Image {
+    if image.channels != 1 or stops.length < 2 {
+        panic("Gradient map requires a scalar image and two stops");
+    }
+    for i in 1..stops.length {
+        if stops[i].position <= stops[i - 1].position {
+            panic("Stops must be strictly increasing");
+        }
+    }
+    var result = create(image.width, image.height, 4);
+    for y in 0..image.height {
+        for x in 0..image.width {
+            const v = getPixel(image, x, y).x;
+            var c = stops[0].value;
+            for i in 1..stops.length {
+                if v >= stops[i].position {
+                    c = stops[i].value;
+                } else if v > stops[i - 1].position {
+                    const t = (v - stops[i - 1].position) / (stops[i].position - stops[i - 1].position);
+                    c = stops[i - 1].value * (1 - t) + stops[i].value * t;
+                    break;
+                } else {
+                    break;
+                }
+            }
+            setPixel(result, x, y, c);
+        }
+    }
+    return result;
+}
+
+fn recipeCurve(value : f32, points : [] const Vec2) : f32 {
+    if value <= points[0].x {
+        return points[0].y;
+    }
+    const last = points.length - 1;
+    if value >= points[last].x {
+        return points[last].y;
+    }
+    for i in 1..points.length {
+        if value <= points[i].x {
+            const y1 = points[i - 1].y;
+            const y2 = points[i].y;
+            var y0 = 2 * y1 - y2;
+            var y3 = 2 * y2 - y1;
+            if i > 1 {
+                y0 = points[i - 2].y;
+            }
+            if i < last {
+                y3 = points[i + 1].y;
+            }
+            const t = (value - points[i - 1].x) / (points[i].x - points[i - 1].x);
+            return((-0.5 * y0 + 1.5 * y1 - 1.5 * y2 + 0.5 * y3) * t + (y0 - 2.5 * y1 + 2 * y2 - 0.5 * y3)) * t * t + (-0.5 * y0 + 0.5 * y2) * t + y1;
+        }
+    }
+    return points[last].y;
+}
+
+fn curve(image : Image, points : [] const Vec2) : void {
+    if points.length < 2 {
+        panic("Curve requires two points");
+    }
+    for i in 1..points.length {
+        if points[i].x <= points[i - 1].x {
+            panic("Curve points must be strictly increasing");
+        }
+    }
+    mapWith(image, points, fn(x : u32, y : u32, v : Vec4, p : [] const Vec2) : Vec4 {
+        return Vec4 {recipeCurve(v.x, p), recipeCurve(v.y, p), recipeCurve(v.z, p), recipeCurve(v.w, p)};
+    });
+}
+
+fn recipeUV(p : u32, size : u32) : f32 {
+    if size == 1 {
+        return 0.5;
+    }
+    return p as f32 / (size - 1) as f32;
+}
+
+fn gradient(size : u32) : Image {
+    var result = create(size, 1, 1);
+    for x in 0..size {
+        setPixel(result, x, 0, Vec4 {recipeUV(x, size), 0, 0, 1});
+    }
+    return result;
+}
+
+fn checkerboard(width : u32, height : u32, size : u32) : Image {
+    if size == 0 {
+        panic("Checker size must be positive");
+    }
+    var result = create(width, height, 1);
+    for y in 0..height {
+        for x in 0..width {
+            setPixel(result, x, y, Vec4 {((x / size + y / size) % 2) as f32, 0, 0, 1});
+        }
+    }
+    return result;
+}
+
+fn recipeShape(width : u32, height : u32, power : f32, kind : u32) : Image {
+    if power <= 0 {
+        panic("Shape power must be positive");
+    }
+    var result = create(width, height, 1);
+    for y in 0..height {
+        for x in 0..width {
+            const vx = recipeUV(x, width) - 0.5;
+            const vy = recipeUV(y, height) - 0.5;
+            var d = math.sqrt(vx * vx + vy * vy) * 2;
+            if kind == 1 {
+                d = recipeMax(recipeAbs(vx), recipeAbs(vy)) * 2;
+            }
+            if kind == 2 {
+                d = 2 * recipeMax(vy, recipeMax(0.8660254 * vx - 0.5 * vy, -0.8660254 * vx - 0.5 * vy));
+            }
+            setPixel(result, x, y, Vec4 {math.pow(d, power), 0, 0, 1});
+        }
+    }
+    return result;
+}
+
+fn circle(width : u32, height : u32, power : f32) : Image {
+    return recipeShape(width, height, power, 0);
+}
+
+fn square(width : u32, height : u32, power : f32) : Image {
+    return recipeShape(width, height, power, 1);
+}
+
+fn triangle(width : u32, height : u32, power : f32) : Image {
+    return recipeShape(width, height, power, 2);
+}
+
+// Evox has no bitwise operators; compute XOR using integer arithmetic.
+fn recipeXor(a : u32, b : u32) : u32 {
+    var x = a;
+    var y = b;
+    var bit : u32 = 1;
+    var result : u32 = 0;
+    for i in 0..32 {
+        if x % 2 != y % 2 {
+            result += bit;
+        }
+        x /= 2;
+        y /= 2;
+        if i < 31 {
+            bit *= 2;
+        }
+    }
+    return result;
+}
+
+fn recipeHash(v : u32) : u32 {
+    var q = v * 747796405 + 2891336453;
+    q = recipeXor(q * 8192, q);
+    return q * (q * q * 15731 + 789221) + 1376312589;
+}
+
+struct RecipeRandom {
+    u : u32;
+    v : u32;
+}
+
+fn recipeRandom(state : *RecipeRandom) : f32 {
+    state.u = 36969 * (state.u % 65536) + state.u / 65536;
+    state.v = 18000 * (state.v % 65536) + state.v / 65536;
+    return(state.u * 65536 + state.v) as f32 * 2.328306436996595e-10;
+}
+
+fn valueNoise(width : u32, height : u32, seed : u32) : Image {
+    var state = RecipeRandom {seed, 362436069};
+    var result = create(width, height, 1);
+    for y in 0..height {
+        for x in 0..width {
+            setPixel(result, x, y, Vec4 {recipeRandom(&state), 0, 0, 1});
+        }
+    }
+    return result;
+}
+
+fn recipeHash2(x : f32, y : f32) : Vec2 {
+    return Vec2 {recipeFract(math.sin(x * 127.1 + y * 311.7) * 18.5453), recipeFract(math.sin(x * 269.5 + y * 183.3) * 18.5453)};
+}
+
+fn recipeGradientDot(x : i32, y : i32, dx : f32, dy : f32, scale : f32) : f32 {
+    const cx = (x as f32 - recipeFloor(x as f32 / scale) * scale) as u32;
+    const cy = (y as f32 - recipeFloor(y as f32 / scale) * scale) as u32;
+    const h = recipeHash(recipeHash(cx) + cy);
+    const h2 = recipeHash(recipeXor(h, 1933247));
+    return(h as f32 / (4294967295 as u32 as f32) * 2 - 1) * dx + (h2 as f32 / (4294967295 as u32 as f32) * 2 - 1) * dy;
+}
+
+fn gradientNoise(width : u32, height : u32, scale : f32) : Image {
+    if scale <= 0 or scale > 16384 {
+        panic("Noise scale must be positive and at most 16384");
+    }
+    var result = create(width, height, 1);
+    for y in 0..height {
+        for x in 0..width {
+            const px = x as f32 / width as f32 * scale as f32;
+            const py = y as f32 / height as f32 * scale as f32;
+            const ix = recipeFloor(px) as i32;
+            const iy = recipeFloor(py) as i32;
+            const fx = recipeFract(px);
+            const fy = recipeFract(py);
+            const ux = fx * fx * fx * (fx * (fx * 6 - 15) + 10);
+            const uy = fy * fy * fy * (fy * (fy * 6 - 15) + 10);
+            const a = recipeGradientDot(ix, iy, fx, fy, scale) * (1 - ux) + recipeGradientDot(ix + 1, iy, fx - 1, fy, scale) * ux;
+            const b = recipeGradientDot(ix, iy + 1, fx, fy - 1, scale) * (1 - ux) + recipeGradientDot(ix + 1, iy + 1, fx - 1, fy - 1, scale) * ux;
+            setPixel(result, x, y, Vec4 {(a * (1 - uy) + b * uy) * 0.70710678 + 0.5, 0, 0, 1});
+        }
+    }
+    return result;
+}
+
+fn cellNoise(width : u32, height : u32, scale : f32, offset : f32) : Image {
+    var result = create(width, height, 1);
+    for y in 0..height {
+        for x in 0..width {
+            const px = recipeUV(x, width) * scale;
+            const py = recipeUV(y, height) * scale;
+            const ix = recipeFloor(px);
+            const iy = recipeFloor(py);
+            const fx = recipeFract(px);
+            const fy = recipeFract(py);
+            var distance : f32 = 8;
+            for j in 0..3 {
+                for i in 0..3 {
+                    const gx = i as f32 - 1;
+                    const gy = j as f32 - 1;
+                    const h = recipeHash2(ix + gx, iy + gy);
+                    const dx = gx - fx + math.sin(h.x * 6.2831853 + offset) * 0.5 + 0.5;
+                    const dy = gy - fy + math.sin(h.y * 6.2831853 + offset) * 0.5 + 0.5;
+                    distance = recipeMin(distance, dx * dx + dy * dy);
+                }
+            }
+            setPixel(result, x, y, Vec4 {math.sqrt(distance), 0, 0, 1});
+        }
+    }
+    return result;
+}
+
+fn waveNoise(width : u32, height : u32, scale : f32, offset : f32) : Image {
+    var result = create(width, height, 1);
+    for y in 0..height {
+        for x in 0..width {
+            const px = recipeUV(x, width) * scale + offset;
+            const py = recipeUV(y, height) * scale + offset;
+            const ix = recipeFloor(px);
+            const iy = recipeFloor(py);
+            var fx = recipeFract(px);
+            var fy = recipeFract(py);
+            fx = fx * fx * (3 - 2 * fx);
+            fy = fy * fy * (3 - 2 * fy);
+            const h0 = recipeHash2(ix, iy);
+            const h1 = recipeHash2(ix + 1, iy);
+            const h2 = recipeHash2(ix, iy + 1);
+            const h3 = recipeHash2(ix + 1, iy + 1);
+            const a = math.sin(px * h0.x + py * h0.y) * (1 - fx) + math.sin(px * h1.x + py * h1.y) * fx;
+            const b = math.sin(px * h2.x + py * h2.y) * (1 - fx) + math.sin(px * h3.x + py * h3.y) * fx;
+            setPixel(result, x, y, Vec4 {(a * (1 - fy) + b * fy) * 0.5 + 0.5, 0, 0, 1});
+        }
+    }
+    return result;
+}
+
+fn warp(image : Image, pattern : Image, intensity : f32) : void {
+    recipeMatch(image, pattern, false);
+    if pattern.channels != 1 {
+        panic("Warp requires a scalar pattern");
+    }
+    const source = copy(image);
+    var displacement = pattern;
+    if image.handle == pattern.handle {
+        displacement = source;
+    }
+    for y in 0..image.height {
+        for x in 0..image.width {
+            const ix = x as i32;
+            const iy = y as i32;
+            const dx = samplePixel(displacement, ix + 1, iy, false).x - samplePixel(displacement, ix - 1, iy, false).x;
+            const dy = samplePixel(displacement, ix, iy + 1, false).x - samplePixel(displacement, ix, iy - 1, false).x;
+            setPixel(image, x, y, sample(source, x as f32 + dx * intensity, y as f32 + dy * intensity, false));
+        }
+    }
+}
+
+fn twirl(image : Image, intensity : f32) : void {
+    const source = copy(image);
+    const hw = image.width as f32 * 0.5;
+    const hh = image.height as f32 * 0.5;
+    for y in 0..image.height {
+        for x in 0..image.width {
+            const tx = (x as f32 - hw) / hw;
+            const ty = (y as f32 - hh) / hh;
+            const r = math.sqrt(tx * tx + ty * ty) * intensity;
+            const c = math.cos(r);
+            const s = math.sin(r);
+            setPixel(image, x, y, sample(source, (tx * c + ty * s) * hw + hw, (-tx * s + ty * c) * hh + hh, true));
+        }
+    }
+}
+
+fn normalmap(image : Image, intensity : f32) : Image {
+    if image.channels != 1 {
+        panic("Normalmap requires a scalar image");
+    }
+    var result = create(image.width, image.height, 2);
+    for y in 0..image.height {
+        for x in 0..image.width {
+            const ix = x as i32;
+            const iy = y as i32;
+            const dx = (samplePixel(image, ix + 1, iy, true).x - samplePixel(image, ix - 1, iy, true).x) * intensity;
+            const dy = (samplePixel(image, ix, iy + 1, true).x - samplePixel(image, ix, iy - 1, true).x) * intensity;
+            setPixel(result, x, y, Vec4 {recipeClamp(dx * 0.5 + 0.5), recipeClamp(dy * 0.5 + 0.5), 0, 1});
+        }
+    }
+    return result;
+}
+
+// XY weights act on the encoded normal's deviation from 0.5, as in the examples.
+struct ReliefLight {
+    direction : Vec2;
+    ambient : f32;
+    minimum : f32;
+    maximum : f32;
+}
+
+struct RecipeShade {
+    normals : Image;
+    light : ReliefLight;
+}
+
+fn shade(image : Image, height : Image, intensity : f32, light : ReliefLight) : void {
+    recipeMatch(image, height, false);
+    if light.minimum > light.maximum {
+        panic("Light minimum must not exceed maximum");
+    }
+    mapWith(image, RecipeShade {normalmap(height, intensity), light}, fn(x : u32, y : u32, v : Vec4, state : RecipeShade) : Vec4 {
+        const n = getPixel(state.normals, x, y);
+        const light = state.light;
+        var gain = light.ambient + (n.x - 0.5) * light.direction.x + (n.y - 0.5) * light.direction.y;
+        if gain < light.minimum {
+            gain = light.minimum;
+        }
+        if gain > light.maximum {
+            gain = light.maximum;
+        }
+        return Vec4 {v.x * gain, v.y * gain, v.z * gain, v.w};
+    });
+}
+
+// One scratch image, independent of the pass count.
+fn recipeBlur(image : Image, iterations : u32, vertical_only : bool) : void {
+    var a = image;
+    if iterations == 0 {
+        return;
+    }
+    var b = create(image.width, image.height, image.channels);
+    for pass in 0..iterations {
+        if not vertical_only {
+            for y in 0..image.height {
+                for x in 0..image.width {
+                    const ix = x as i32;
+                    const iy = y as i32;
+                    setPixel(b, x, y, (samplePixel(a, ix - 1, iy, false) + getPixel(a, x, y) + samplePixel(a, ix + 1, iy, false)) / 3);
+                }
+            }
+            const tmp = a;
+            a = b;
+            b = tmp;
+        }
+        for y in 0..image.height {
+            for x in 0..image.width {
+                const ix = x as i32;
+                const iy = y as i32;
+                setPixel(b, x, y, (samplePixel(a, ix, iy - 1, false) + getPixel(a, x, y) + samplePixel(a, ix, iy + 1, false)) / 3);
+            }
+        }
+        const tmp = a;
+        a = b;
+        b = tmp;
+    }
+    if a.handle != image.handle {
+        for y in 0..image.height {
+            for x in 0..image.width {
+                setPixel(image, x, y, getPixel(a, x, y));
+            }
+        }
+    }
+}
+
+fn blur(image : Image, iterations : u32) : void {
+    recipeBlur(image, iterations, false);
+}
+
+fn vBlur(image : Image, iterations : u32) : void {
+    recipeBlur(image, iterations, true);
+}
+
+fn sharpen(image : Image) : void {
+    const source = copy(image);
+    for y in 0..image.height {
+        for x in 0..image.width {
+            var sum = Vec4 {0, 0, 0, 0};
+            for j in 0..3 {
+                for i in 0..3 {
+                    sum += samplePixel(source, x as i32 + i as i32 - 1, y as i32 + j as i32 - 1, false);
+                }
+            }
+            setPixel(image, x, y, getPixel(source, x, y) * 2 - sum / 9);
+        }
+    }
+}
+
+fn recipeBlit(background : Image, pattern : Image, px : i32, py : i32) : void {
+    for y in 0..pattern.height {
+        for x in 0..pattern.width {
+            const dx = px + x as i32;
+            const dy = py + y as i32;
+            if dx >= 0 and dy >= 0 and dx < background.width as i32 and dy < background.height as i32 {
+                const v = getPixel(pattern, x, y);
+                const old = getPixel(background, dx as u32, dy as u32);
+                setPixel(background, dx as u32, dy as u32, old * (1 - v.w) + v * v.w);
+            }
+        }
+    }
+}
+
+fn gridSplatter(background : Image, pattern : Image, x_count : u32, y_count : u32, x_spread : u32, y_spread : u32, seed : u32) : void {
+    if background.channels != pattern.channels or x_count == 0 or y_count == 0 {
+        panic("Grid splatter requires matching channels and positive counts");
+    }
+    var source = pattern;
+    if background.handle == pattern.handle {
+        source = copy(pattern);
+    }
+    var state = RecipeRandom {seed, 362436069};
+    for y in 0..y_count {
+        for x in 0..x_count {
+            const dx = x as f32 / x_count as f32 * background.width as f32 + (recipeRandom(&state) * 2 - 1) * x_spread as f32;
+            const dy = y as f32 / y_count as f32 * background.height as f32 + (recipeRandom(&state) * 2 - 1) * y_spread as f32;
+            recipeBlit(background, source, dx as i32, dy as i32);
+        }
+    }
+}
+
+fn circularSplatter(background : Image, pattern : Image, count : u32, radius : f32, radius_step : f32, radius_spread : f32, angle_step : f32, angle_spread : f32, seed : u32) : void {
+    if background.channels != pattern.channels {
+        panic("Splatter requires matching channels");
+    }
+    var source = pattern;
+    if background.handle == pattern.handle {
+        source = copy(pattern);
+    }
+    var state = RecipeRandom {seed, 362436069};
+    for i in 0..count {
+        const r = radius + i as f32 * radius_step + (recipeRandom(&state) * 2 - 1) * radius_spread;
+        const angle = i as f32 * angle_step + (recipeRandom(&state) * 2 - 1) * angle_spread;
+        const x = background.width as f32 * 0.5 + r * math.cos(angle) - pattern.width as f32 * 0.5;
+        const y = background.height as f32 * 0.5 + r * math.sin(angle) - pattern.height as f32 * 0.5;
+        recipeBlit(background, source, x as i32, y as i32);
+    }
+}

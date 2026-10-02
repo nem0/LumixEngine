@@ -10,10 +10,14 @@
 #include "core/path.h"
 #include "core/string.h"
 #include "editor/action.h"
+#include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
+#include "editor/editor_asset.h"
 #include "editor/studio_app.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
+#include "engine/resource_manager.h"
+#include "renderer/texture.h"
 
 
 namespace Lumix {
@@ -169,6 +173,83 @@ void registerEditorTests(ImGuiTestEngine* engine) {
 			++toggled;
 		}
 		IM_CHECK(toggled > 0);
+	};
+
+	t = IM_REGISTER_TEST(engine, "editor", "ltct_open_close");
+	t->TestFunc = [](ImGuiTestContext* ctx) {
+		IM_CHECK_RETV(!isWelcomeScreenOpen(ctx), (void)0);
+		const Path path("scripts/tests/texture_recipe.ltct");
+		FileSystem& fs = g_state.app->getEngine().getFileSystem();
+		IM_CHECK_RETV(fs.fileExists(path), (void)0);
+
+		AssetBrowser& browser = g_state.app->getAssetBrowser();
+		IM_CHECK_RETV(browser.getWindow(path) == nullptr, (void)0);
+		browser.openEditor(path);
+		ctx->Yield(3);
+		AssetEditorWindow* window = browser.getWindow(path);
+		IM_CHECK_RETV(window != nullptr, (void)0);
+		StaticString<128> title("//", Path::getBasename(path), "##ae", (uintptr)window);
+		ctx->WindowFocus(title.data);
+		ctx->SetRef(title.data);
+		ctx->Yield(2);
+		IM_CHECK(ctx->WindowInfo("tab/recipe_editor").Window != nullptr);
+		g_state.app->getCommonActions().close_window.request = true;
+		ctx->Yield(3);
+		IM_CHECK(browser.getWindow(path) == nullptr);
+	};
+
+	t = IM_REGISTER_TEST(engine, "editor", "ltct_array_open_close");
+	t->TestFunc = [](ImGuiTestContext* ctx) {
+		IM_CHECK_RETV(!isWelcomeScreenOpen(ctx), (void)0);
+		const Path path("scripts/tests/texture_recipe_array.ltct");
+		AssetBrowser& browser = g_state.app->getAssetBrowser();
+		IM_CHECK_RETV(g_state.app->getEngine().getFileSystem().fileExists(path), (void)0);
+		IM_CHECK_RETV(browser.getWindow(path) == nullptr, (void)0);
+		browser.openEditor(path);
+		ctx->Yield(3);
+		AssetEditorWindow* window = browser.getWindow(path);
+		IM_CHECK_RETV(window != nullptr, (void)0);
+		Texture* texture = g_state.app->getEngine().getResourceManager().load<Texture>(path);
+		for (float elapsed = 0; elapsed < 10.f && texture->isEmpty(); elapsed += 0.1f) ctx->SleepNoSkip(0.1f, 0.05f);
+		IM_CHECK(texture->isReady());
+		IM_CHECK(texture->depth == 3);
+		texture->decRefCount();
+		StaticString<128> title("//", Path::getBasename(path), "##ae", (uintptr)window);
+		ctx->WindowFocus(title.data);
+		ctx->SetRef(title.data);
+		ctx->Yield(2);
+		IM_CHECK(ctx->WindowInfo("tab/recipe_editor").Window != nullptr);
+		IM_CHECK(ctx->ItemExists("tab/View layer"));
+		g_state.app->getCommonActions().close_window.request = true;
+		ctx->Yield(3);
+		IM_CHECK(browser.getWindow(path) == nullptr);
+	};
+
+	t = IM_REGISTER_TEST(engine, "editor", "ltct_cube_open_close");
+	t->TestFunc = [](ImGuiTestContext* ctx) {
+		IM_CHECK_RETV(!isWelcomeScreenOpen(ctx), (void)0);
+		const Path path("scripts/tests/texture_recipe_cube.ltct");
+		AssetBrowser& browser = g_state.app->getAssetBrowser();
+		IM_CHECK_RETV(g_state.app->getEngine().getFileSystem().fileExists(path), (void)0);
+		IM_CHECK_RETV(browser.getWindow(path) == nullptr, (void)0);
+		browser.openEditor(path);
+		ctx->Yield(3);
+		AssetEditorWindow* window = browser.getWindow(path);
+		IM_CHECK_RETV(window != nullptr, (void)0);
+		Texture* texture = g_state.app->getEngine().getResourceManager().load<Texture>(path);
+		for (float elapsed = 0; elapsed < 10.f && texture->isEmpty(); elapsed += 0.1f) ctx->SleepNoSkip(0.1f, 0.05f);
+		IM_CHECK(texture->isReady());
+		IM_CHECK(texture->is_cubemap);
+		texture->decRefCount();
+		StaticString<128> title("//", Path::getBasename(path), "##ae", (uintptr)window);
+		ctx->WindowFocus(title.data);
+		ctx->SetRef(title.data);
+		ctx->Yield(2);
+		IM_CHECK(ctx->WindowInfo("tab/recipe_editor").Window != nullptr);
+		IM_CHECK(ctx->ItemExists("tab/Side"));
+		g_state.app->getCommonActions().close_window.request = true;
+		ctx->Yield(3);
+		IM_CHECK(browser.getWindow(path) == nullptr);
 	};
 
 	// the scripts are in data/scripts/tests/evox_deps/<dir>, run Studio with `-data_dir data`

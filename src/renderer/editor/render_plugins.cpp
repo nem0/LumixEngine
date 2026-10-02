@@ -432,7 +432,7 @@ static bool isValid(const Input& src_data, const Options& options) {
 	if (!can_compress) {
 		compress(compressRGBA, src_data, options, dst, allocator);
 	}
-	if (src_data.is_normalmap) {
+	else if (src_data.is_normalmap) {
 		compress(compressBC5, src_data, options, dst, allocator);
 	}
 	else if (src_data.has_alpha) {
@@ -954,6 +954,17 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 		if (Path::hasExtension(path, "ltc")) {
 			m_composite_editor = CompositeTextureEditor::open(path, app, m_allocator);
 		}
+		else if (Path::hasExtension(path, "ltct")) {
+			OutputMemoryStream source(m_allocator);
+			if (app.getEngine().getFileSystem().getContentSync(path, source)) {
+				m_recipe_editor = createEvoxCodeEditor(app);
+				m_recipe_editor->setText(StringView((const char*)source.data(), (u32)source.size()));
+				m_recipe_editor->focus();
+			}
+			else {
+				logError("Failed to read ", path);
+			}
+		}
 		app.getAssetCompiler().resourceCompiled().bind<&TextureAssetEditorWindow::onResourceCompiled>(this);
 	}
 
@@ -985,6 +996,11 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 		m_meta.serialize(blob, m_texture->getPath());
 		compiler.updateMeta(m_texture->getPath(), blob);
 		if (m_composite_editor) m_composite_editor->save();
+		if (m_recipe_editor) {
+			OutputMemoryStream source(m_allocator);
+			m_recipe_editor->serializeText(source);
+			m_app.getAssetBrowser().saveResource(m_texture->getPath(), source);
+		}
 		m_dirty = false;
 	}
 
@@ -1042,13 +1058,15 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 					Path full_path = fs.getFullPath(m_texture->getPath());
 					os::openExplorer(full_path);
 				}
-				if (actions.undo.iconButton(canUndo(), &m_app)) undo();
-				if (actions.redo.iconButton(canRedo(), &m_app)) redo();
+				if (!m_recipe_editor || !m_recipe_editor->canHandleInput()) {
+					if (actions.undo.iconButton(canUndo(), &m_app)) undo();
+					if (actions.redo.iconButton(canRedo(), &m_app)) redo();
+				}
 			}
 			ImGui::EndMenuBar();
 		}
 
-		if (!ImGui::BeginTable("tab", m_composite_editor ? 3 : 2, ImGuiTableFlags_Resizable)) return;
+		if (!ImGui::BeginTable("tab", m_composite_editor || m_recipe_editor ? 3 : 2, ImGuiTableFlags_Resizable)) return;
 
 		ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, 250);
 		ImGui::TableNextRow();
@@ -1167,6 +1185,10 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 			m_composite_editor->gui();
 			m_dirty = m_dirty || m_composite_editor->isDirty();
 		}
+		else if (m_recipe_editor) {
+			ImGui::TableNextColumn();
+			if (m_recipe_editor->gui("recipe_editor", ImVec2(0, 0), m_app.getMonospaceFont(), m_app.getDefaultFont())) m_dirty = true;
+		}
 
 		ImGui::EndTable();
 	}
@@ -1178,6 +1200,7 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 	IAllocator& m_allocator;
 	StudioApp& m_app;
 	UniquePtr<CompositeTextureEditor> m_composite_editor;
+	UniquePtr<CodeEditor> m_recipe_editor;
 	Texture* m_texture;
 	gpu::TextureHandle m_texture_view = gpu::INVALID_TEXTURE;
 	u32 m_view_layer = 0;
@@ -1326,6 +1349,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		app.getAssetCompiler().registerExtension("tga", Texture::TYPE);
 		app.getAssetCompiler().registerExtension("raw", Texture::TYPE);
 		app.getAssetCompiler().registerExtension("ltc", Texture::TYPE);
+		app.getAssetCompiler().registerExtension("ltct", Texture::TYPE);
 	}
 
 	void openEditor(const Path& path) override {
@@ -1380,7 +1404,20 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 			int image_comp;
 			int w, h;
-			if (Path::hasExtension(m_in_path, "ltc")) {
+			if (Path::hasExtension(m_in_path, "ltct")) {
+				CompositeTexture::Result result(m_allocator);
+				String error(m_allocator);
+				if (!compileTextureRecipe(fs, StringView((const char*)tmp.data(), tmp.size()), m_in_path, result, error, m_allocator)) {
+					logError(m_in_path, ": ", error); return;
+				}
+				auto& image = result.layers[0];
+				image.convertChannels(4);
+				stbir_resize_uint8_linear(image.asU8().data(), image.w, image.h, 0,
+					resized_data.getMutableData(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, 0, STBIR_RGBA);
+				applyTint();
+				if (!saveAsLBC(fs, m_out_path.c_str(), resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, true, false, m_allocator)) logError("Failed to save ", m_out_path);
+			}
+			else if (Path::hasExtension(m_in_path, "ltc")) {
 				CompositeTexture ct(m_app, m_allocator);
 				InputMemoryStream blob(tmp);
 				if (!ct.deserialize(blob)) {
@@ -1497,6 +1534,19 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 		CompositeTexture::Result img(m_allocator);
 		if (!tc.generate(&img)) return false;
+		return encodeComposite(img, dst, meta, src_path);
+	}
+
+	bool compileRecipe(const Path& path, const OutputMemoryStream& source, OutputMemoryStream& dst, const TextureMeta& meta) {
+		CompositeTexture::Result result(m_allocator);
+		String error(m_allocator);
+		if (!compileTextureRecipe(m_app.getEngine().getFileSystem(), StringView((const char*)source.data(), source.size()), path, result, error, m_allocator, &m_app.getAssetCompiler())) {
+			logError(path, ": ", error); return false;
+		}
+		return encodeComposite(result, dst, meta, path);
+	}
+
+	bool encodeComposite(CompositeTexture::Result& img, OutputMemoryStream& dst, const TextureMeta& meta, StringView src_path) {
 		if (img.layers.empty()) {
 			logError(src_path, " : empty output");
 			return false;
@@ -1522,7 +1572,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				for(u32 i = 0; i < layer.w * layer.h; ++i) {
 					memcpy(dst + i * 4, src + i * layer.channels, layer.channels);
 					for (u32 j = layer.channels; j < 4; ++j) {
-						dst[i * 4 + j] = 1;
+						dst[i * 4 + j] = 255;
 					}
 				}
 			}
@@ -1535,6 +1585,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
 		dst.write(&flags, sizeof(flags));
 		TextureCompressor::Options options;
+		options.compress = meta.compress;
 		options.generate_mipmaps = meta.mips;
 		options.stochastic_mipmap = meta.stochastic_mip;
 		options.scale_coverage_ref = meta.mip_scale_coverage;
@@ -1659,6 +1710,9 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		}
 		else if (equalStrings(ext, "ltc")) {
 			if (!compileComposite(src_data, out, meta, src)) return false;
+		}
+		else if (equalStrings(ext, "ltct")) {
+			if (!compileRecipe(src, src_data, out, meta)) return false;
 		}
 		else {
 			ASSERT(false);
@@ -5606,7 +5660,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		const char* inc_exts[] = {"hlsli"};
 		asset_compiler.addPlugin(m_shader_include_plugin, Span(inc_exts));
 
-		const char* texture_exts[] = {"png", "jpg", "jpeg", "tga", "raw", "ltc"};
+		const char* texture_exts[] = {"png", "jpg", "jpeg", "tga", "raw", "ltc", "ltct"};
 		asset_compiler.addPlugin(m_texture_plugin, Span(texture_exts));
 
 		const char* material_exts[] = {"mat"};

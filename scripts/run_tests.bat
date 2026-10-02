@@ -50,8 +50,10 @@ if not %errorlevel%==0 (
 REM Run tests
 if exist "tmp\vs2022\bin\Debug\tests.exe" (
   echo Running tests.exe
-  "tmp\vs2022\bin\Debug\tests.exe"
+  pushd "..\data"
+  "..\scripts\tmp\vs2022\bin\Debug\tests.exe"
   set rc=!ERRORLEVEL!
+  popd
   if NOT "!rc!"=="0" (
     echo Some tests failed.
     popd

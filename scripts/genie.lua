@@ -286,6 +286,8 @@ solution "LumixEngine"
 
 	if not dynamic_plugins then
 		defines {"STATIC_PLUGINS"}
+	else
+		defines {"EVOX_SHARED"}
 	end
 
 	if build_tests then
@@ -389,7 +391,7 @@ lib_project "core"
 
 lib_project "engine"
 	libType()
-	defines { "BUILDING_ENGINE" }
+	defines { "BUILDING_ENGINE", "EVOX_BUILD" }
 	dynamic_link_plugin { "core" }
 	defaultConfigurations()
 	includedirs { "../src", "../external/freetype/include" }
@@ -418,6 +420,8 @@ lib_project "engine"
 		"../external/imgui/imgui_widgets.cpp",
 		"../external/imgui/imgui_freetype.cpp",
 	}
+	files { "../external/evox/**.cpp", "../external/evox/**.c", "../external/evox/**.h" }
+	excludes { "../external/evox/evoxc.c", "../external/evox/tests/*.cpp", "../external/evox/benchmarks/**.*" }
 
 	configuration { "linux" }
 		buildoptions { "`pkg-config --cflags gtk+-3.0`" }
@@ -571,8 +575,7 @@ if plugin "ui" then
 end
 
 if plugin "evox" then
-	files { "../src/evox/**.h", "../src/evox/**.cpp", "../external/evox/**.cpp", "../external/evox/**.c", "../external/evox/**.h" }
-	excludes { "../external/evox/evoxc.c", "../external/evox/tests/*.cpp", "../external/evox/c_compiler/**.*", "../external/evox/benchmarks/**.*" }
+	files { "../src/evox/**.h", "../src/evox/**.cpp" }
 	includedirs { "../src", "../src/evox" }
 	defines { "BUILDING_EVOX" }
 	dynamic_link_plugin { "core", "engine", "renderer" }

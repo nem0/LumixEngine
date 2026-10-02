@@ -24,6 +24,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "api.h"
+
 #ifndef EX_ASSERT
 	#ifdef NDEBUG
 		#define EX_ASSERT(X)
@@ -175,11 +177,11 @@ typedef struct ex_call_frame {
 	ex_string_view* panic;
 } ex_call_frame;
 
-ex_string_view ex_arg_read_string(ex_call_frame* frame);
+EVOX_API ex_string_view ex_arg_read_string(ex_call_frame* frame);
 
 // Writes a string result into a native call frame. The bytes are copied into
 // runtime-owned storage, so `value` only needs to remain valid for this call.
-void ex_result_string(ex_runtime* runtime, ex_call_frame* frame, ex_string_view value);
+EVOX_API void ex_result_string(ex_runtime* runtime, ex_call_frame* frame, ex_string_view value);
 
 #define EX_ARG(frame, type, name) type name; \
 	do { \
@@ -272,8 +274,8 @@ typedef struct ex_attribute {
 //
 // Create one module per script bundle or compilation unit. Destroy it when the
 // compiled declarations and any runtime state are no longer needed.
-ex_module* ex_module_create(ex_host* host);
-void ex_module_destroy(ex_module* module);
+EVOX_API ex_module* ex_module_create(ex_host* host);
+EVOX_API void ex_module_destroy(ex_module* module);
 
 // Native registration.
 //
@@ -281,17 +283,17 @@ void ex_module_destroy(ex_module* module);
 // Native types let scripts talk about engine objects by name, while native
 // functions expose host behavior to scripts.
 // Units and their native functions are available after a successful typecheck.
-int ex_unit_get_native_function_count(ex_unit* unit);
-ex_string_view ex_unit_get_native_function_name(ex_unit* unit, int index);
+EVOX_API int ex_unit_get_native_function_count(ex_unit* unit);
+EVOX_API ex_string_view ex_unit_get_native_function_name(ex_unit* unit, int index);
 
 // unit enumeration
-int ex_module_get_unit_count(ex_module* module);
-ex_unit* ex_module_get_unit(ex_module* module, int index);
-ex_string_view ex_unit_get_path(ex_unit* unit);
+EVOX_API int ex_module_get_unit_count(ex_module* module);
+EVOX_API ex_unit* ex_module_get_unit(ex_module* module, int index);
+EVOX_API ex_string_view ex_unit_get_path(ex_unit* unit);
 
 // import enumeration
-int ex_unit_get_import_count(ex_unit* unit);
-ex_string_view ex_unit_get_import_path(ex_unit* unit, int index);
+EVOX_API int ex_unit_get_import_count(ex_unit* unit);
+EVOX_API ex_string_view ex_unit_get_import_path(ex_unit* unit, int index);
 
 // symbol/global enumeration
 typedef enum ex_symbol_kind {
@@ -310,8 +312,8 @@ typedef struct ex_symbol_desc {
 	u32 column;
 } ex_symbol_desc;
 
-int ex_unit_get_symbols_count(ex_unit* unit);
-ex_symbol_desc ex_unit_get_symbol(ex_unit* unit, int index);
+EVOX_API int ex_unit_get_symbols_count(ex_unit* unit);
+EVOX_API ex_symbol_desc ex_unit_get_symbol(ex_unit* unit, int index);
 
 // Front-end pipeline helpers.
 //
@@ -319,16 +321,16 @@ ex_symbol_desc ex_unit_get_symbol(ex_unit* unit, int index);
 // `ex_module_typecheck` resolves and validates the current module contents.
 // `ex_module_compile` performs parse + import resolution + typecheck in one
 // call.
-ex_result ex_module_parse(ex_module* module, ex_string_view source, ex_string_view source_name);
+EVOX_API ex_result ex_module_parse(ex_module* module, ex_string_view source, ex_string_view source_name);
 
-ex_result ex_module_typecheck(ex_module* module);
+EVOX_API ex_result ex_module_typecheck(ex_module* module);
 
 // Finds the semantic declaration referred to by the token at `line`, `column`.
 // The module must already have been parsed and typechecked; all positions
 // are zero-based. Looks up the checked AST via source locations, so no source
 // text needs to be passed back in. Returns EX_RESULT_OK when a declaration is
 // found, and EX_RESULT_FAILURE otherwise.
-ex_result ex_module_definition_at(
+EVOX_API ex_result ex_module_definition_at(
 	ex_module* module,
 	ex_string_view source_name,
 	u32 line,
@@ -336,7 +338,7 @@ ex_result ex_module_definition_at(
 	ex_definition_location* out_location
 );
 
-ex_result ex_module_compile(
+EVOX_API ex_result ex_module_compile(
 	ex_module* module,
 	ex_string_view source,
 	ex_string_view source_name,
@@ -344,24 +346,24 @@ ex_result ex_module_compile(
 	void* import_resolver_userdata
 );
 
-int ex_module_get_function_count(ex_module* module);
+EVOX_API int ex_module_get_function_count(ex_module* module);
 
 typedef struct ex_bytecode_compile_options {
 	bool optimize;
 } ex_bytecode_compile_options;
 
 // Compile the checked module into bytecode through the IR pipeline.
-ex_bytecode* ex_bytecode_compile(
+EVOX_API ex_bytecode* ex_bytecode_compile(
 	ex_module* module,
 	ex_host* host,
 	ex_bytecode_compile_options* options
 );
-void ex_bytecode_destroy(ex_bytecode* bytecode);
+EVOX_API void ex_bytecode_destroy(ex_bytecode* bytecode);
 
 // Enumerate all types emitted into the bytecode. Returned type handles are
 // stable until the bytecode is destroyed.
-u32 ex_bytecode_type_count(const ex_bytecode* bytecode);
-const ex_type* ex_bytecode_type(const ex_bytecode* bytecode, u32 index);
+EVOX_API u32 ex_bytecode_type_count(const ex_bytecode* bytecode);
+EVOX_API const ex_type* ex_bytecode_type(const ex_bytecode* bytecode, u32 index);
 
 // Bytecode VM lifetime.
 //
@@ -369,8 +371,8 @@ const ex_type* ex_bytecode_type(const ex_bytecode* bytecode, u32 index);
 // bindings. It is not an execution context: script execution happens only
 // through ex_task. The runtime must outlive every task created from it;
 // destroy tasks before destroying their runtime.
-ex_runtime* ex_runtime_create(ex_bytecode* bytecode, ex_host* host);
-void ex_runtime_destroy(ex_runtime* runtime);
+EVOX_API ex_runtime* ex_runtime_create(ex_bytecode* bytecode, ex_host* host);
+EVOX_API void ex_runtime_destroy(ex_runtime* runtime);
 
 // Task lifetime and execution.
 //
@@ -380,9 +382,9 @@ void ex_runtime_destroy(ex_runtime* runtime);
 // call has finished. Each task owns its stack, call frames, locals, and
 // suspension state; tasks share the runtime's bytecode, globals, and native
 // bindings.
-ex_task* ex_task_create(ex_runtime* runtime);
-void ex_task_destroy(ex_task* task);
-ex_task_state ex_task_get_state(const ex_task* task);
+EVOX_API ex_task* ex_task_create(ex_runtime* runtime);
+EVOX_API void ex_task_destroy(ex_task* task);
+EVOX_API ex_task_state ex_task_get_state(const ex_task* task);
 
 // Begin executing a script function on a newly-created task. Arguments are
 // copied from `args` according to the function's declared ABI. `args_size`
@@ -392,7 +394,7 @@ ex_task_state ex_task_get_state(const ex_task* task);
 // valid while the task is running or suspended. Returns FUNCTION_NOT_FOUND,
 // INVALID_ARGUMENT, INVALID_STATE, or RUNTIME_ERROR when the invocation
 // cannot complete.
-ex_call_result ex_call(
+EVOX_API ex_call_result ex_call(
 	ex_task* task,
 	ex_string_view function_name,
 	const void* args,
@@ -410,7 +412,7 @@ ex_call_result ex_call(
 // EX_CALL_RESULT_OK when the task completes, or a failure result otherwise.
 // `data` must contain one value in the runtime representation of `type`; the
 // runtime copies it before this call returns.
-ex_call_result ex_task_resume(
+EVOX_API ex_call_result ex_task_resume(
 	ex_task* task,
 	const ex_type* type,
 	const void* data,
@@ -420,7 +422,7 @@ ex_call_result ex_task_resume(
 // TODO: Accept the resolver during ex_runtime_create and remove this setter.
 // Installs a runtime-local lazy resolver for extern functions. A returned
 // callback is cached; unresolved functions are retried on later calls.
-ex_result ex_runtime_set_native_resolver(
+EVOX_API ex_result ex_runtime_set_native_resolver(
 	ex_runtime* runtime,
 	ex_native_resolver_fn resolver,
 	void* userdata
@@ -429,27 +431,31 @@ ex_result ex_runtime_set_native_resolver(
 // Result access for the most recently completed task execution. Result memory
 // belongs to the task and remains valid until the next ex_call, task resume,
 // or task destruction.
-const void* ex_task_result(ex_task* task, u32* size);
+EVOX_API const void* ex_task_result(ex_task* task, u32* size);
 
 // Typed accessors for the current task result. Index -1 refers to the result.
-i32 ex_task_to_bool(ex_task* task, i32 index);
-i8  ex_task_to_i8 (ex_task* task, i32 index);
-u8  ex_task_to_u8 (ex_task* task, i32 index);
-i16 ex_task_to_i16(ex_task* task, i32 index);
-u16 ex_task_to_u16(ex_task* task, i32 index);
-i32 ex_task_to_i32(ex_task* task, i32 index);
-u32 ex_task_to_u32(ex_task* task, i32 index);
-i64 ex_task_to_i64(ex_task* task, i32 index);
-u64 ex_task_to_u64(ex_task* task, i32 index);
-float ex_task_to_f32(ex_task* task, i32 index);
-double ex_task_to_f64(ex_task* task, i32 index);
-ex_string_view ex_task_to_string(ex_task* task, i32 index);
-void* ex_task_to_ptr(ex_task* task, i32 index);
+EVOX_API i32 ex_task_to_bool(ex_task* task, i32 index);
+EVOX_API i8  ex_task_to_i8 (ex_task* task, i32 index);
+EVOX_API u8  ex_task_to_u8 (ex_task* task, i32 index);
+EVOX_API i16 ex_task_to_i16(ex_task* task, i32 index);
+EVOX_API u16 ex_task_to_u16(ex_task* task, i32 index);
+EVOX_API i32 ex_task_to_i32(ex_task* task, i32 index);
+EVOX_API u32 ex_task_to_u32(ex_task* task, i32 index);
+EVOX_API i64 ex_task_to_i64(ex_task* task, i32 index);
+EVOX_API u64 ex_task_to_u64(ex_task* task, i32 index);
+EVOX_API float ex_task_to_f32(ex_task* task, i32 index);
+EVOX_API double ex_task_to_f64(ex_task* task, i32 index);
+EVOX_API ex_string_view ex_task_to_string(ex_task* task, i32 index);
+EVOX_API void* ex_task_to_ptr(ex_task* task, i32 index);
 
 // Query the declared return type of the function named `function_name`.
 // Callers can then read the result through ex_task_result() or the
 // ex_task_to_* helpers.
-ex_type_kind ex_bytecode_runtime_result_kind(ex_runtime* runtime, ex_string_view function_name);
+EVOX_API ex_type_kind ex_bytecode_runtime_result_kind(ex_runtime* runtime, ex_string_view function_name);
+
+// Returns the declared return type, or NULL if the function does not exist.
+// The type handle remains valid until the runtime's bytecode is destroyed.
+EVOX_API const ex_type* ex_bytecode_runtime_result_type(ex_runtime* runtime, ex_string_view function_name);
 
 // Type introspection.
 //
@@ -463,59 +469,59 @@ ex_type_kind ex_bytecode_runtime_result_kind(ex_runtime* runtime, ex_string_view
 //
 
 // Returns a type handle for a primitive kind in the runtime bytecode.
-const ex_type* ex_primitive_type_from_kind(const ex_runtime* runtime, ex_type_kind kind);
+EVOX_API const ex_type* ex_primitive_type_from_kind(const ex_runtime* runtime, ex_type_kind kind);
 
 // Returns the kind category of the type.
-ex_type_kind ex_type_get_kind(const ex_type* type);
+EVOX_API ex_type_kind ex_type_get_kind(const ex_type* type);
 
 // Returns the fully qualified name of the type (unit path + '.' + declaration
 // name, e.g. "core:entity.Entity"). Returns an empty string_view for
 // anonymous or unnamed types.
-ex_string_view ex_type_get_name(const ex_type* type);
+EVOX_API ex_string_view ex_type_get_name(const ex_type* type);
 
 // Returns the byte size of values of this type. Matches the byte_size
 // reported by ex_debug_local_value / ex_debug_global_value.
-u32 ex_type_get_size(const ex_type* type);
+EVOX_API u32 ex_type_get_size(const ex_type* type);
 
 // Returns the required byte alignment of values of this type.
-u32 ex_type_get_alignment(const ex_type* type);
+EVOX_API u32 ex_type_get_alignment(const ex_type* type);
 
 // Introspect a struct type (valid when kind == EX_TYPE_STRUCT).
 // Fields are enumerated in declaration order. Non-extern struct layout is
 // implementation-defined; extern structs use target C ABI layout.
 
 // Number of fields in the struct.
-u32 ex_type_struct_field_count(const ex_type* type);
+EVOX_API u32 ex_type_struct_field_count(const ex_type* type);
 
 // Name of the field at `field_index`.
-ex_string_view ex_type_struct_field_name(const ex_type* type, u32 field_index);
+EVOX_API ex_string_view ex_type_struct_field_name(const ex_type* type, u32 field_index);
 
 // Type handle for the field at `field_index`. Recursively queryable for
 // nested struct drill-down.
-const ex_type* ex_type_struct_field_type(const ex_type* type, u32 field_index);
+EVOX_API const ex_type* ex_type_struct_field_type(const ex_type* type, u32 field_index);
 
 // Byte offset of the field from the start of the struct value. The host
 // uses this to read the field: `(u8*)struct_value + offset`.
-u32 ex_type_struct_field_offset(const ex_type* type, u32 field_index);
+EVOX_API u32 ex_type_struct_field_offset(const ex_type* type, u32 field_index);
 
 // Attributes.
 
 // Number of attributes attached to a type.
-u32 ex_type_attribute_count(const ex_type* type);
+EVOX_API u32 ex_type_attribute_count(const ex_type* type);
 
 // Attribute value at `attribute_index`. The attribute's declaration type is
 // returned in `.type`; its struct value is returned in `.value`. Use
 // ex_type_get_size(result.type) for the value size. Returns { NULL, NULL } for
 // an invalid index.
-ex_attribute ex_type_attribute_value(const ex_type* type, u32 attribute_index);
+EVOX_API ex_attribute ex_type_attribute_value(const ex_type* type, u32 attribute_index);
 
 // Number of attributes attached to the struct field at `field_index`.
 // Returns 0 when `type` is not a struct or the field index is invalid.
-u32 ex_type_struct_field_attribute_count(const ex_type* type, u32 field_index);
+EVOX_API u32 ex_type_struct_field_attribute_count(const ex_type* type, u32 field_index);
 
 // Attribute value attached to a struct field. Returns { NULL, NULL } for an
 // invalid index. Use ex_type_get_size(result.type) for the value size.
-ex_attribute ex_type_struct_field_attribute_value(
+EVOX_API ex_attribute ex_type_struct_field_attribute_value(
 	const ex_type* type,
 	u32 field_index,
 	u32 attribute_index
@@ -527,59 +533,59 @@ ex_attribute ex_type_struct_field_attribute_value(
 // All members share the same payload space (size = max member size).
 
 // Number of member types in the union.
-u32 ex_type_union_member_count(const ex_type* type);
+EVOX_API u32 ex_type_union_member_count(const ex_type* type);
 
 // Type handle for the member at `member_index`.
-const ex_type* ex_type_union_member_type(const ex_type* type, u32 member_index);
+EVOX_API const ex_type* ex_type_union_member_type(const ex_type* type, u32 member_index);
 
 // Returns the active tag from a tagged union value. The tag is the first 4
 // bytes of the value, interpreted as a signed i32.
-i32 ex_type_union_tag(const ex_type* type, const void* value);
+EVOX_API i32 ex_type_union_tag(const ex_type* type, const void* value);
 
 // Introspect an enum type (valid when kind == EX_TYPE_ENUM).
 
 // Number of values (members) in the enum.
-u32 ex_type_enum_value_count(const ex_type* type);
+EVOX_API u32 ex_type_enum_value_count(const ex_type* type);
 
 // Name of the enum value at `value_index`.
-ex_string_view ex_type_enum_value_name(const ex_type* type, u32 value_index);
+EVOX_API ex_string_view ex_type_enum_value_name(const ex_type* type, u32 value_index);
 
 // Raw discriminant bits in the enum's backing representation.
-u64 ex_type_enum_value_bits(const ex_type* type, u32 value_index);
+EVOX_API u64 ex_type_enum_value_bits(const ex_type* type, u32 value_index);
 
 // Integer kind used to store the enum, or EX_TYPE_INVALID for a non-enum type.
-ex_type_kind ex_type_enum_backing_kind(const ex_type* type);
+EVOX_API ex_type_kind ex_type_enum_backing_kind(const ex_type* type);
 
 // Introspect an array or slice type (valid when kind is EX_TYPE_ARRAY
 // or EX_TYPE_SLICE).
 
 // Element type of the array or slice.
-const ex_type* ex_type_array_element_type(const ex_type* type);
+EVOX_API const ex_type* ex_type_array_element_type(const ex_type* type);
 // Returns the pointee type for a language pointer, or NULL for opaque cptrs.
-const ex_type* ex_type_pointer_inner_type(const ex_type* type);
+EVOX_API const ex_type* ex_type_pointer_inner_type(const ex_type* type);
 
 // Compile-time element count. Returns the fixed length for EX_TYPE_ARRAY;
 // returns 0 for EX_TYPE_SLICE (whose length is dynamic at runtime).
-u32 ex_type_array_length(const ex_type* type);
+EVOX_API u32 ex_type_array_length(const ex_type* type);
 
 // Returns whether the type is const-qualified.
-bool ex_type_is_const(const ex_type* type);
+EVOX_API bool ex_type_is_const(const ex_type* type);
 
 // Introspect a nullable type (valid when kind == EX_TYPE_NULLABLE).
 // A nullable value is stored as: [has_value : u8] [inner_value : N bytes].
 // Read the first byte: 0 = null, 1 = value present.
 
 // Inner (wrapped) type of the nullable.
-const ex_type* ex_type_nullable_inner_type(const ex_type* type);
+EVOX_API const ex_type* ex_type_nullable_inner_type(const ex_type* type);
 
 // Returns true when the nullable value is null (has_value byte is 0).
-bool ex_type_nullable_is_null(const ex_type* type, const void* value);
+EVOX_API bool ex_type_nullable_is_null(const ex_type* type, const void* value);
 
 // Returns a pointer past the has_value flag, i.e. to the inner value bytes.
 // Only valid when ex_type_nullable_is_null returns false.
-const void* ex_type_nullable_value_ptr(const ex_type* type, const void* value);
+EVOX_API const void* ex_type_nullable_value_ptr(const ex_type* type, const void* value);
 
-const ex_type* ex_type_from_any(const ex_runtime* runtime, const void* value);
+EVOX_API const ex_type* ex_type_from_any(const ex_runtime* runtime, const void* value);
 
 //////////////////////////
 // Debugger.
@@ -629,49 +635,49 @@ typedef struct ex_debug_event {
 	ex_string_view message;
 } ex_debug_event;
 
-ex_result ex_debug_pause_event(ex_task* task, ex_debug_event* out_event);
+EVOX_API ex_result ex_debug_pause_event(ex_task* task, ex_debug_event* out_event);
 
 // Re-enter the task where it paused. Must be called on the script thread;
 // fails when the task is not suspended.
-ex_call_result ex_debug_resume(ex_task* task, ex_debug_action action);
+EVOX_API ex_call_result ex_debug_resume(ex_task* task, ex_debug_action action);
 
 // Breakpoints. `line` is 1-based; the snapped statement line is written to
 // `*resolved_line` (may be null). Fails when the source or line is unknown.
-ex_result ex_debug_set_breakpoint(ex_bytecode* bytecode, ex_string_view source_name, u32 line, u32* resolved_line);
-ex_result ex_debug_remove_breakpoint(ex_bytecode* bytecode, ex_string_view source_name, u32 line);
-void ex_debug_remove_all_breakpoints(ex_bytecode* bytecode);
+EVOX_API ex_result ex_debug_set_breakpoint(ex_bytecode* bytecode, ex_string_view source_name, u32 line, u32* resolved_line);
+EVOX_API ex_result ex_debug_remove_breakpoint(ex_bytecode* bytecode, ex_string_view source_name, u32 line);
+EVOX_API void ex_debug_remove_all_breakpoints(ex_bytecode* bytecode);
 
 // Call stack inspection. Frame 0 is the innermost frame. Also valid
 // immediately after a failed task execution, reporting the stack at the
 // point of failure; the next task execution overwrites it.
-u32 ex_debug_stack_depth(ex_task* task);
-ex_string_view ex_debug_frame_function_name(ex_task* task, u32 frame_index);
-ex_result ex_debug_frame_location(ex_task* task, u32 frame_index, ex_debug_location* out_location);
+EVOX_API u32 ex_debug_stack_depth(ex_task* task);
+EVOX_API ex_string_view ex_debug_frame_function_name(ex_task* task, u32 frame_index);
+EVOX_API ex_result ex_debug_frame_location(ex_task* task, u32 frame_index, ex_debug_location* out_location);
 
 // Variable inspection. Locals enumerate the parameters and locals in scope at
 // the frame's current statement. Values point at the raw bytes in live task
 // frame storage; writing through them mutates the running script.
-u32 ex_debug_frame_local_count(ex_task* task, u32 frame_index);
-ex_string_view ex_debug_local_name(ex_task* task, u32 frame_index, u32 local_index);
-void* ex_debug_local_value(ex_task* task, u32 frame_index, u32 local_index, u32* size);
-const ex_type* ex_debug_local_type(ex_task* task, u32 frame_index, u32 local_index);
+EVOX_API u32 ex_debug_frame_local_count(ex_task* task, u32 frame_index);
+EVOX_API ex_string_view ex_debug_local_name(ex_task* task, u32 frame_index, u32 local_index);
+EVOX_API void* ex_debug_local_value(ex_task* task, u32 frame_index, u32 local_index, u32* size);
+EVOX_API const ex_type* ex_debug_local_type(ex_task* task, u32 frame_index, u32 local_index);
 
 // Bytecode-owned unit metadata. Indices are valid only for this runtime's
 // bytecode lifetime. These queries do not require suspension or a live module.
 #define EX_DEBUG_UNIT_NONE ((u32)-1)
-u32 ex_debug_unit_count(const ex_runtime* runtime);
-u32 ex_debug_find_unit(const ex_runtime* runtime, ex_string_view source_name);
-ex_string_view ex_debug_unit_source_name(const ex_runtime* runtime, u32 unit_index);
-u32 ex_debug_unit_import_count(const ex_runtime* runtime, u32 unit_index);
+EVOX_API u32 ex_debug_unit_count(const ex_runtime* runtime);
+EVOX_API u32 ex_debug_find_unit(const ex_runtime* runtime, ex_string_view source_name);
+EVOX_API ex_string_view ex_debug_unit_source_name(const ex_runtime* runtime, u32 unit_index);
+EVOX_API u32 ex_debug_unit_import_count(const ex_runtime* runtime, u32 unit_index);
 // Returns the imported unit index, or EX_DEBUG_UNIT_NONE for invalid indices.
-u32 ex_debug_unit_import(const ex_runtime* runtime, u32 unit_index, u32 import_index);
+EVOX_API u32 ex_debug_unit_import(const ex_runtime* runtime, u32 unit_index, u32 import_index);
 // Returns EX_DEBUG_UNIT_NONE for an invalid global index.
-u32 ex_debug_global_unit(const ex_runtime* runtime, u32 global_index);
+EVOX_API u32 ex_debug_global_unit(const ex_runtime* runtime, u32 global_index);
 
-u32 ex_debug_global_count(ex_runtime* runtime);
-ex_string_view ex_debug_global_name(ex_runtime* runtime, u32 global_index);
-void* ex_debug_global_value(ex_runtime* runtime, u32 global_index, u32* size);
-const ex_type* ex_debug_global_type(ex_runtime* runtime, u32 global_index);
+EVOX_API u32 ex_debug_global_count(ex_runtime* runtime);
+EVOX_API ex_string_view ex_debug_global_name(ex_runtime* runtime, u32 global_index);
+EVOX_API void* ex_debug_global_value(ex_runtime* runtime, u32 global_index, u32* size);
+EVOX_API const ex_type* ex_debug_global_type(ex_runtime* runtime, u32 global_index);
 
 #ifdef __cplusplus
 }

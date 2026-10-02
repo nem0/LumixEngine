@@ -1,0 +1,10 @@
+import "core:texture_recipe"
+import "core:vec4"
+fn main():TextureCube {
+    var faces:[6]Image=[
+        color(4,4,Vec4 {1,0,0,1}), color(4,4,Vec4 {0,1,1,1}),
+        color(4,4,Vec4 {0,1,0,1}), color(4,4,Vec4 {1,0,1,1}),
+        color(4,4,Vec4 {0,0,1,1}), color(4,4,Vec4 {1,1,0,1})
+    ];
+    return textureCube(faces);
+}

@@ -2120,7 +2120,9 @@ struct IRBuilder {
 			param.slot.type = param.resolved_type;
 			param_offset += typeByteSize(*param.resolved_type);
 		}
-		stack_cursor = param_offset;
+		// Returning a slice must not overwrite the locals it points into.
+		const u32 result_size = typeByteSize(*return_type);
+		stack_cursor = param_offset > result_size ? param_offset : result_size;
 		buildStatementIR(*expr.body, root);
 		root.ops.push(&alloc<ExOpReturn>());
 		alloca_region_size = stack_cursor;
@@ -4205,6 +4207,7 @@ struct BytecodeCompiler {
 			param_offset += size;
 		}
 		fn_bc->return_kind = toTypeKind(*return_type);
+		fn_bc->return_type_index = type_info.internType(*return_type);
 		fn_bc->return_size = typeByteSize(*return_type);
 		fn_bc->frame_size = 0;
 		fn_bc->code_size = 0u;

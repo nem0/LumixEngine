@@ -39,6 +39,137 @@ static ImVec2 CalcTextSize(const char* text, const char* text_end = nullptr, flo
 	return text_size;
 }
 
+namespace EvoxTokens {
+
+static inline const u32 token_colors[] = {
+	IM_COL32(0xFF, 0x00, 0xFF, 0xff), // EMPTY (not rendered)
+	IM_COL32(0xD6, 0xDE, 0xEB, 0xff), // IDENTIFIER
+	IM_COL32(0xF6, 0xC1, 0x77, 0xff), // NUMBER
+	IM_COL32(0xA7, 0xD8, 0xA0, 0xff), // STRING
+	IM_COL32(0xC7, 0x92, 0xEA, 0xff), // KEYWORD
+	IM_COL32(0x89, 0xDD, 0xFF, 0xff), // OPERATOR
+	IM_COL32(0x6A, 0x99, 0x55, 0xff), // COMMENT
+};
+
+enum class TokenType : u8 {
+	EMPTY,
+	IDENTIFIER,
+	NUMBER,
+	STRING,
+	KEYWORD,
+	OPERATOR,
+	COMMENT,
+};
+
+static bool isWordChar(char c) {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+}
+
+static bool tokenize(const char* str, u32& token_len, u8& token_type, u8) {
+	static const char* keywords[] = {
+		"and",
+		"as",
+		"bool",
+		"case",
+		"comptime",
+		"const",
+		"defer",
+		"else",
+		"enum",
+		"f32",
+		"f64",
+		"false",
+		"fn",
+		"for",
+		"i8",
+		"i16",
+		"i32",
+		"i64",
+		"if",
+		"import",
+		"in",
+		"match",
+		"null",
+		"not",
+		"or",
+		"panic",
+		"return",
+		"struct",
+		"true",
+		"u8",
+		"u16",
+		"u32",
+		"u64",
+		"var",
+		"void",
+		"while",
+	};
+
+	const char* c = str;
+	if (!*c) return false;
+
+	if (*c == '"' || *c == '`') {
+		const char quote = *c;
+		token_type = (u8)TokenType::STRING;
+		++c;
+		while (*c && *c != quote) {
+			if (*c == '\\' && c[1]) ++c;
+			++c;
+		}
+		if (*c == quote) ++c;
+		token_len = u32(c - str);
+		return *c;
+	}
+
+	if (c[0] == '/' && c[1] == '/') {
+		token_type = (u8)TokenType::COMMENT;
+		while (*c) ++c;
+		token_len = u32(c - str);
+		return *c;
+	}
+
+	const char operators[] = "*/+-%.<>;=(),:{}!";
+	for (char op : operators) {
+		if (*c == op) {
+			token_type = (u8)TokenType::OPERATOR;
+			token_len = 1;
+			return *c;
+		}
+	}
+
+	if (*c >= '0' && *c <= '9') {
+		token_type = (u8)TokenType::NUMBER;
+		while (*c >= '0' && *c <= '9') ++c;
+		if (*c == '.') {
+			++c;
+			while (*c >= '0' && *c <= '9') ++c;
+		}
+		token_len = u32(c - str);
+		return *c;
+	}
+
+	if ((*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') || *c == '_') {
+		token_type = (u8)TokenType::IDENTIFIER;
+		while (isWordChar(*c)) ++c;
+		token_len = u32(c - str);
+		const StringView token_view(str, str + token_len);
+		for (const char* kw : keywords) {
+			if (equalStrings(kw, token_view)) {
+				token_type = (u8)TokenType::KEYWORD;
+				break;
+			}
+		}
+		return *c;
+	}
+
+	token_type = (u8)TokenType::IDENTIFIER;
+	token_len = 1;
+	++c;
+	return *c;
+}
+
+} // namespace EvoxTokens
+
 namespace LuaTokens {
 
 static const u32 token_colors[] = {
@@ -2436,6 +2567,13 @@ UniquePtr<CodeEditor> createHLSLCodeEditor(StudioApp& app) {
 	UniquePtr<CodeEditorImpl> editor = UniquePtr<CodeEditorImpl>::create(app.getAllocator(), app);
 	editor->setTokenColors(HLSLTokens::token_colors);
 	editor->setTokenizer(&HLSLTokens::tokenize);
+	return editor.move();
+}
+
+UniquePtr<CodeEditor> createEvoxCodeEditor(StudioApp& app) {
+	UniquePtr<CodeEditorImpl> editor = UniquePtr<CodeEditorImpl>::create(app.getAllocator(), app);
+	editor->setTokenColors(EvoxTokens::token_colors);
+	editor->setTokenizer(&EvoxTokens::tokenize);
 	return editor.move();
 }
 

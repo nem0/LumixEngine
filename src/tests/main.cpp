@@ -17,6 +17,7 @@ void runPathTests();
 void runStringTests();
 void runTokenizerTests();
 void runEvoxModuleTests();
+void runTextureRecipeTests();
 
 namespace Lumix {
 	int test_count = 0;
@@ -54,6 +55,7 @@ int main(int argc, char* argv[]) {
 	runStringTests();
 	runTokenizerTests();
 	runEvoxModuleTests();
+	runTextureRecipeTests();
 	Lumix::logInfo("=== Test Results: ", Lumix::passed_count, "/", Lumix::test_count, " passed ===");
 
 	Lumix::profiler::shutdown();

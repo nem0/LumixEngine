@@ -10,6 +10,8 @@
 
 namespace Lumix {
 
+struct AssetCompiler;
+
 struct LUMIX_RENDERER_API CompositeTexture {
 	enum class NodeType : u32;
 	
@@ -22,6 +24,10 @@ struct LUMIX_RENDERER_API CompositeTexture {
 		Vec4 sampleWrap(float x, float y);
 		void setPixel(u32 x, u32 y, const Vec4& color);
 		void init(u32 w, u32 h, u32 channels);
+		bool load(Span<const u8> bytes);
+		bool resize(const Image& source, u32 width, u32 height);
+		void fill(const Vec4& value);
+		void convertChannels(u32 channels);
 		OutputMemoryStream asU8() const;
 		Array<float> pixels;
 		u32 channels = 4;
@@ -146,5 +152,10 @@ struct CompositeTextureEditor {
 	
 	static UniquePtr<CompositeTextureEditor> open(const Path& path, StudioApp& app, IAllocator& allocator);
 };
+
+// Eager .ltct recipes with an independent compiler/runtime and build-local images.
+LUMIX_RENDERER_API bool compileTextureRecipe(FileSystem& fs,
+	StringView source, const Path& path, CompositeTexture::Result& result,
+	String& error, IAllocator& allocator, AssetCompiler* dependencies = nullptr);
 
 } // namespace Lumix

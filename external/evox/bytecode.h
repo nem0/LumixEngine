@@ -399,6 +399,7 @@ typedef struct ex_function_bc {
 	u32 frame_size;
 
 	ex_type_kind return_kind;
+	u32 return_type_index;
 	u8* code;
 	u32 code_size;
 

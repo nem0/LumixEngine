@@ -1,0 +1,6 @@
+import "core:texture_recipe"
+import "core:vec4"
+
+fn main() : Texture2D {
+    return texture2D(color(4, 4, Vec4 { 0.25, 0.5, 0.75, 1 }));
+}

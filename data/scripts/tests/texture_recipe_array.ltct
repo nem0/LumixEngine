@@ -1,0 +1,11 @@
+import "core:texture_recipe"
+import "core:vec4"
+
+fn main() : TextureArray {
+    var layers : [3]Image = [
+        color(4, 4, Vec4 { 1, 0, 0, 1 }),
+        color(4, 4, Vec4 { 0, 1, 0, 1 }),
+        color(4, 4, Vec4 { 0, 0, 1, 1 })
+    ];
+    return textureArray(layers);
+}
