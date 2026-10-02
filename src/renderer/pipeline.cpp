@@ -1741,6 +1741,8 @@ struct PipelineImpl final : Pipeline {
 			return false;
 		}
 
+		m_module->invalidateStaleMaterialOverrides();
+
 		m_renderer.waitCanSetup();
 
 		m_viewport.pixel_offset = Vec2(0);

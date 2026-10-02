@@ -535,6 +535,34 @@ struct RenderModuleImpl final : RenderModule {
 		m_moved_instances.clear();
 	}
 
+	// Material overrides are owned by the model instance, not by the model, so the model's state does not track them.
+	// When a material or shader is reloaded, per-mesh state derived from it (sort key, material index) is stale and the
+	// instance would keep producing draw commands with it. Drop that state and flag the instance dirty,
+	// Pipeline::refreshMaterialOverrides() rebuilds it once the material is ready.
+	// This runs at the start of every Pipeline::render(), after any unload that happened since the last render and
+	// before the pipeline gathers instances. Pipelines set up one after another, so none has jobs reading this state.
+	// The scan only happens after a material/shader unload, otherwise it is a single integer compare.
+	void invalidateStaleMaterialOverrides() override {
+		const u32 counter = m_renderer.getMaterialReloadCounter();
+		if (counter == m_material_reload_counter) return;
+		m_material_reload_counter = counter;
+
+		for (ModelInstance& mi : m_model_instances) {
+			if (!isFlagSet(mi.flags, ModelInstance::VALID)) continue;
+			if (!mi.model || !mi.model->isReady()) continue;
+			if (mi.mesh_materials.begin() == mi.model->getMeshMaterials().begin()) continue; // no override
+
+			for (MeshMaterial& mat : mi.mesh_materials) {
+				if (mat.sort_key) m_renderer.freeSortKey(mat.sort_key);
+				if (mat.flags & MeshMaterial::OWN_MATERIAL_INDEX) m_renderer.destroyMaterialConstants(mat.material_index);
+				mat.sort_key = 0;
+				mat.material_index = MaterialIndex{0};
+				mat.flags = mat.flags & ~MeshMaterial::OWN_MATERIAL_INDEX;
+			}
+			mi.dirty = true;
+		}
+	}
+
 	void update(float dt) override {
 		PROFILE_FUNCTION();
 
@@ -3414,6 +3442,7 @@ struct RenderModuleImpl final : RenderModule {
 	HashMap<EntityRef, Decal> m_decals;
 	HashMap<EntityRef, CurveDecal> m_curve_decals;
 	Array<ModelInstance> m_model_instances;
+	u32 m_material_reload_counter = 0;
 	Array<EntityRef> m_moved_instances;
 	HashMap<EntityRef, InstancedModel> m_instanced_models;
 	HashMap<EntityRef, Environment> m_environments;

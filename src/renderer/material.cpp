@@ -110,6 +110,7 @@ Material::Uniform* Material::findUniform(RuntimeHash name_hash) {
 
 void Material::unload()
 {
+	m_renderer.notifyMaterialReload();
 	m_uniforms.clear();
 	for (u32 i = 0; i < m_texture_count; i++) {
 		if (m_textures[i]) {

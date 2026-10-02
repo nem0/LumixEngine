@@ -106,6 +106,9 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual u32 allocSortKey(u32 hash) = 0;
 	virtual void freeSortKey(u32 key) = 0;
 	virtual u32 getMaxSortKey() const = 0;
+	// bumped whenever a material or shader is unloaded (e.g. on reload), per-instance data derived from them is stale then
+	virtual u32 getMaterialReloadCounter() const = 0;
+	virtual void notifyMaterialReload() = 0;
 	virtual void enableBuiltinTAA(bool enable) = 0;
 	
 	virtual const char* getSemanticDefines(Span<const AttributeSemantic> attributes) = 0;

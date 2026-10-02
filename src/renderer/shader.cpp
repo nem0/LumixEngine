@@ -181,6 +181,7 @@ bool Shader::load(Span<const u8> mem) {
 
 void Shader::unload()
 {
+	m_renderer.notifyMaterialReload();
 	for (const ProgramPair& p : m_programs) {
 		m_renderer.getEndFrameDrawStream().destroy(p.program);
 	}

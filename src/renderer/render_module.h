@@ -461,6 +461,8 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual ModelInstance* getModelInstance(EntityRef entity) = 0;
 	virtual Span<const ModelInstance> getModelInstances() const = 0;
 	virtual Span<ModelInstance> getModelInstances() = 0;
+	// resets per-mesh state of material overrides after a material/shader unload, call before rendering a pipeline
+	virtual void invalidateStaleMaterialOverrides() = 0;
 	virtual void setModelInstanceLOD(EntityRef entity, u32 lod) = 0;
 	virtual CullResult* getRenderables(const ShiftedFrustum& frustum, RenderableTypes type) const = 0;
 	virtual CullResult* getRenderables(const ShiftedFrustum& frustum) const = 0;

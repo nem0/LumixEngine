@@ -1004,6 +1004,9 @@ struct RendererImpl final : Renderer {
 		return key;
 	}
 
+	u32 getMaterialReloadCounter() const override { return m_material_reload_counter; }
+	void notifyMaterialReload() override { ++m_material_reload_counter; }
+
 	void freeSortKey(u32 key) override {
 		SortKey& sort_key = m_sort_keys[key];
 		--sort_key.ref_count;
@@ -1413,6 +1416,7 @@ struct RendererImpl final : Renderer {
 	Array<SortKey> m_sort_keys;
 	HashMap<u32, u32> m_sort_key_map;
 	i32 m_first_free_sort_key = -1;
+	u32 m_material_reload_counter = 0;
 
 	Array<Renderbuffer> m_renderbuffers;
 	gpu::BufferHandle m_instanced_meshes_buffer = gpu::INVALID_BUFFER;
