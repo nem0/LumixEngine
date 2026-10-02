@@ -49,6 +49,8 @@ struct AssetCompilerImpl : AssetCompiler {
 		u32 generation;
 		Path path;
 		bool compiled = false;
+		// false for jobs queued as a dependent of another file: all dependents are queued up front, so they must not queue their own
+		bool propagate = true;
 	};
 
 	struct LoadHook : ResourceManagerHub::LoadHook {
@@ -585,7 +587,29 @@ struct AssetCompilerImpl : AssetCompiler {
 		return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 	}
 
-	void pushToCompileQueue(const Path& path) {
+	// queues everything that depends on `path`, directly or through other files, exactly once;
+	// the dependency graph can have cycles (e.g. two scripts importing each other) and diamonds
+	void pushDependentsToCompileQueue(const Path& path) {
+		Array<Path> visited(m_allocator);
+		visited.push(path);
+		pushDependentsRec(path, visited);
+	}
+
+	// post-order: a node is queued after everything that depends on it.
+	// m_to_compile is popped from the back, so dependencies are started before their dependents
+	// (jobs run in parallel, so this is dispatch order only, not a completion guarantee)
+	void pushDependentsRec(const Path& path, Array<Path>& visited) {
+		auto dep_iter = m_dependencies.find(path);
+		if (!dep_iter.isValid()) return;
+		for (const Path& dependent : dep_iter.value()) {
+			if (visited.indexOf(dependent) >= 0) continue; // cycle or diamond, already handled
+			visited.push(dependent);
+			pushDependentsRec(dependent, visited);
+			pushToCompileQueue(dependent, false);
+		}
+	}
+
+	void pushToCompileQueue(const Path& path, bool propagate = true) {
 		auto iter = m_generations.find(path);
 		if (!iter.isValid()) {
 			iter = m_generations.insert(path, 0);
@@ -597,6 +621,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		CompileJob job;
 		job.path = path;
 		job.generation = iter.value();
+		job.propagate = propagate;
 
 		m_to_compile.push(job);
 		++m_compile_batch_count;
@@ -712,13 +737,8 @@ struct AssetCompilerImpl : AssetCompiler {
 				}
 			}
 
-			// compile all dependents
-			auto dep_iter = m_dependencies.find(job.path);
-			if (dep_iter.isValid()) {
-				for (const Path& p : dep_iter.value()) {
-					pushToCompileQueue(p);
-				}
-			}
+			// compile all dependents (unless this job is itself a dependent, then they are already queued)
+			if (job.propagate) pushDependentsToCompileQueue(job.path);
 		}
 
 		for (;;) {
@@ -783,12 +803,7 @@ struct AssetCompilerImpl : AssetCompiler {
 				}
 			}
 			else {
-				auto dep_iter = m_dependencies.find(path_obj);
-				if (dep_iter.isValid()) {
-					for (const Path& p : dep_iter.value()) {
-						pushToCompileQueue(p);
-					}
-				}
+				pushDependentsToCompileQueue(path_obj);
 			}
 		}
 	}
