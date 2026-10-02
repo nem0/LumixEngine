@@ -600,6 +600,159 @@ bool testDocumentDestructorReleasesImageRefs() {
 	return true;
 }
 
+// A sprite used by many elements is loaded once; a sprite named only by a state rule is loaded with the document; an element whose state rule stops applying
+// does not keep that sprite.
+bool testSpritesAreSharedPreloadedAndNotStale() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+		[style] {
+			.hot { bg-image: "bg.spr"; }
+		}
+		[box .cold] {}
+		[box .cold] {}
+	)");
+	ASSERT_EQ(2, doc.m_root.children.size());
+	// only a rule names the sprite: loaded already, once, and no element shows it
+	ASSERT_TRUE(doc.m_sprite_manager.hasAnyRefs());
+	ASSERT_TRUE(doc.getElement(doc.m_root.children[0])->getSpriteHandle() == nullptr);
+	ASSERT_EQ(1, doc.m_sprites.size());
+
+	doc.addClass(doc.m_root.children[0], "hot");
+	doc.addClass(doc.m_root.children[1], "hot");
+	ASSERT_TRUE(doc.getElement(doc.m_root.children[0])->getSpriteHandle() != nullptr);
+	ASSERT_EQ(1, doc.m_sprites.size());   // shared, not loaded again
+	ASSERT_TRUE(!doc.m_sprite_manager.hasLeakedRefs(doc));
+
+	doc.removeClass(doc.m_root.children[0], "hot");
+	ASSERT_TRUE(doc.getElement(doc.m_root.children[0])->getSpriteHandle() == nullptr);
+	ASSERT_TRUE(doc.getElement(doc.m_root.children[1])->getSpriteHandle() != nullptr);
+	ASSERT_TRUE(!doc.m_sprite_manager.hasLeakedRefs(doc));
+	return true;
+}
+
+// a sprite set at runtime is shared with every other element that uses it, and released with the document
+bool testSetBGImageSharesSprite() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+		[box] {}
+		[box] {}
+	)");
+	ASSERT_EQ(2, doc.m_root.children.size());
+	ui::Element* a = doc.getElement(doc.m_root.children[0]);
+	ui::Element* b = doc.getElement(doc.m_root.children[1]);
+	a->setBGImage(Path("a.spr"));
+	b->setBGImage(Path("a.spr"));
+	ASSERT_TRUE(a->getSpriteHandle() != nullptr);
+	ASSERT_TRUE(a->getSpriteHandle() == b->getSpriteHandle());
+	ASSERT_EQ(1, doc.m_sprites.size());
+	b->setBGImage(Path("b.spr"));
+	ASSERT_TRUE(a->getSpriteHandle() != b->getSpriteHandle());
+	ASSERT_EQ(2, doc.m_sprites.size());
+	ASSERT_TRUE(!doc.m_sprite_manager.hasLeakedRefs(doc));
+	return true;
+}
+
+bool testGetElementByIdFindsElements() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+		[box $outer] {
+			[box $inner] {}
+		}
+		[box] {}
+	)");
+	ASSERT_EQ(2, doc.m_root.children.size());
+	ui::Element* outer = doc.getElement(doc.m_root.children[0]);
+	ASSERT_TRUE(doc.getElementByID("outer") == outer);
+	ASSERT_EQ(1, outer->children.size());
+	ASSERT_TRUE(doc.getElementByID("inner") == doc.getElement(outer->children[0]));
+	ASSERT_TRUE(doc.getElementByID("missing") == nullptr);
+	ASSERT_TRUE(doc.getElementByID("") == nullptr);
+	ASSERT_TRUE(doc.getElementByID(nullptr) == nullptr);
+	return true;
+}
+
+// ids identify elements, so a document can't use one twice (also not at different depths)
+bool testDuplicateIdIsAParseError() {
+	MockDocument doc;
+	doc.m_suppress_logging = true;
+	ASSERT_EQ(false, doc.parse("[box $same] {} [box $same] {}", "test.ui"));
+	ASSERT_TRUE(doc.getElementByID("same") == nullptr);
+	ASSERT_EQ(false, doc.parse("[box $same] { [box $same] {} }", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box $a] { [span $b] {} } [box $b] {}", "test.ui"));
+	ASSERT_TRUE(doc.parse("[box $a] { [box $b] {} } [box $c] {}", "test.ui"));
+	ASSERT_TRUE(doc.getElementByID("a") != nullptr && doc.getElementByID("b") != nullptr && doc.getElementByID("c") != nullptr);
+	return true;
+}
+
+// the id index follows the document: a new parse replaces it, a failed parse leaves it empty
+bool testGetElementByIdFollowsParse() {
+	MockDocument doc;
+	doc.m_suppress_logging = true;
+	ASSERT_PARSE(doc, "[box $first] {}");
+	ASSERT_TRUE(doc.getElementByID("first") != nullptr);
+
+	ASSERT_PARSE(doc, "[box $second] {}");
+	ASSERT_TRUE(doc.getElementByID("first") == nullptr);
+	ASSERT_TRUE(doc.getElementByID("second") == doc.getElement(doc.m_root.children[0]));
+
+	ASSERT_EQ(false, doc.parse("[box $third width=wat]", "test.ui"));
+	ASSERT_TRUE(doc.getElementByID("second") == nullptr);
+	ASSERT_TRUE(doc.getElementByID("third") == nullptr);
+	return true;
+}
+
+// mutators only mark the layout dirty, it is recomputed by flushLayout(), computeLayout() or a hit test
+bool testLayoutIsDeferredUntilFlush() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+		[style] {
+			.wide { width: 200; }
+		}
+		[box $a width=100 height=20] {}
+		[box $b height=20] {}
+	)");
+	ui::Element* a = doc.getElementByID("a");
+	ui::Element* b = doc.getElementByID("b");
+	ASSERT_TRUE(a != nullptr && b != nullptr);
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(!doc.m_layout_dirty);
+	ASSERT_FLOAT_EQ(100.0f, a->size.x);
+
+	a->setWidth("50");
+	ASSERT_TRUE(doc.m_layout_dirty);
+	ASSERT_FLOAT_EQ(100.0f, a->size.x);   // not recomputed yet
+	doc.flushLayout();
+	ASSERT_TRUE(!doc.m_layout_dirty);
+	ASSERT_FLOAT_EQ(50.0f, a->size.x);
+
+	doc.flushLayout();   // nothing to do
+	ASSERT_FLOAT_EQ(50.0f, a->size.x);
+
+	// a class change is deferred as well (b has no width of its own, so the rule applies)
+	doc.addClass(doc.m_root.children[1], "wide");
+	ASSERT_TRUE(doc.m_layout_dirty);
+	ASSERT_TRUE(b->size.x != 200.0f);
+	doc.computeLayout(Vec2(800, 600));   // an explicit layout clears the flag too
+	ASSERT_TRUE(!doc.m_layout_dirty);
+	ASSERT_FLOAT_EQ(200.0f, b->size.x);
+	return true;
+}
+
+// hit testing sees the layout of the mutations made before it
+bool testHitTestFlushesDeferredLayout() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box $a width=100 height=20] {}");
+	ui::Element* a = doc.getElementByID("a");
+	ASSERT_TRUE(a != nullptr);
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(doc.getElementAt(Vec2(75, 5)) == a);
+
+	a->setWidth("50");
+	ASSERT_TRUE(doc.getElementAt(Vec2(75, 5)) == nullptr);
+	ASSERT_TRUE(doc.getElementAt(Vec2(25, 5)) == a);
+	return true;
+}
+
 bool testDocumentDestructorReleasesSpriteRefs() {
 	MockFontManager font_manager;
 	MockImageManager image_manager;
@@ -914,6 +1067,7 @@ bool testSetWidthUpdatesPixelsAndLayout() {
 
 	ASSERT_FLOAT_EQ(250.0f, root->width_unit.value);
 	ASSERT_EQ((int)ui::Unit::PIXELS, (int)root->width_unit.unit);
+	doc.flushLayout();
 	ASSERT_FLOAT_EQ(250.0f, root->size.x);
 	return true;
 }
@@ -934,6 +1088,7 @@ bool testSetWidthUpdatesPercentAndLayout() {
 
 	ASSERT_FLOAT_EQ(25.0f, root->width_unit.value);
 	ASSERT_EQ((int)ui::Unit::PERCENT, (int)root->width_unit.unit);
+	doc.flushLayout();
 	ASSERT_FLOAT_EQ(200.0f, root->size.x);
 	return true;
 }
@@ -1134,6 +1289,44 @@ bool testActionEventEmittedViaGrandparentOnClick() {
 	return true;
 }
 
+static void injectMouseMove(MockDocument& doc, MockMouseDevice& mouse, float x, float y) {
+	InputSystem::Event ev;
+	ev.device = &mouse;
+	ev.type = InputEventType::AXIS;
+	ev.data.axis.x_abs = x;
+	ev.data.axis.y_abs = y;
+	doc.injectEvent(ev);
+}
+
+static bool hasEvent(MockDocument& doc, ui::EventType type, u32 element_index) {
+	for (const ui::Event& e : doc.getEvents()) {
+		if (e.type == type && e.element_index == element_index) return true;
+	}
+	return false;
+}
+
+// mouse movement hit tests the layout of the mutations made before it, e.g. a box that was just made narrower is no longer hovered
+bool testHoverUsesCurrentLayoutAfterMutation() {
+	MockDocument doc;
+	doc.m_canvas_size = Vec2(800, 600);
+	ASSERT_PARSE(doc, "[box $a width=100 height=20] {}");
+	doc.computeLayout(doc.m_canvas_size);
+	ui::Element* a = doc.getElementByID("a");
+	ASSERT_TRUE(a != nullptr);
+	const u32 a_idx = u32(a - doc.m_elements.begin());
+
+	MockMouseDevice mouse;
+	injectMouseMove(doc, mouse, 75, 5);
+	ASSERT_TRUE(hasEvent(doc, ui::EventType::MOUSE_ENTER, a_idx));
+	doc.clearEvents();
+
+	a->setWidth("50");
+	injectMouseMove(doc, mouse, 76, 5);   // still over the old bounds, outside the new ones
+	ASSERT_TRUE(hasEvent(doc, ui::EventType::MOUSE_LEAVE, a_idx));
+	ASSERT_TRUE(!hasEvent(doc, ui::EventType::MOUSE_ENTER, a_idx));
+	return true;
+}
+
 bool testHoverEvents() {
 	// TODO better test
 	MockDocument doc;
@@ -1229,6 +1422,7 @@ bool testDPIScaling() {
 	ASSERT_FLOAT_EQ(20.0f, span->size.x);
 
 	doc.setDPIScale(2.0f);
+	doc.flushLayout();
 
 	ASSERT_FLOAT_EQ(20.0f, root->size.x);
 	ASSERT_FLOAT_EQ(20.0f, root->size.y);
@@ -1328,6 +1522,13 @@ void runUITests() {
 	RUN_TEST(testDocumentDestructorReleasesFontRefs);
 	RUN_TEST(testDocumentDestructorReleasesImageRefs);
 	RUN_TEST(testDocumentDestructorReleasesSpriteRefs);
+	RUN_TEST(testSpritesAreSharedPreloadedAndNotStale);
+	RUN_TEST(testSetBGImageSharesSprite);
+	RUN_TEST(testGetElementByIdFindsElements);
+	RUN_TEST(testDuplicateIdIsAParseError);
+	RUN_TEST(testGetElementByIdFollowsParse);
+	RUN_TEST(testLayoutIsDeferredUntilFlush);
+	RUN_TEST(testHitTestFlushesDeferredLayout);
 	RUN_TEST(testColorInheritance);
 	RUN_TEST(testColorInheritanceDeep);
 	RUN_TEST(testColorAlphaSupport);
@@ -1353,6 +1554,7 @@ void runUITests() {
 	RUN_TEST(testActionEventEmittedViaAncestorOnClick);
 	RUN_TEST(testActionEventEmittedViaGrandparentOnClick);
 	RUN_TEST(testHoverEvents);
+	RUN_TEST(testHoverUsesCurrentLayoutAfterMutation);
 	RUN_TEST(testDPIScaling);
 	RUN_TEST(testInvalidAttributeValuesRejected);
 }

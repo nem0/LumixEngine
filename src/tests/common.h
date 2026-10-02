@@ -196,8 +196,10 @@ struct MockSpriteManager : ui::ISpriteManager {
 	{}
 
 	SpriteHandle loadSprite(StringView path) override {
-		if (path != "bg.spr") return nullptr;
-		const SpriteHandle handle = (SpriteHandle)1;
+		// a distinct non-null handle per path
+		size_t hash = 5381;
+		for (u32 i = 0; i < path.size(); ++i) hash = hash * 33 + (unsigned char)path[i];
+		const SpriteHandle handle = (SpriteHandle)(hash | 1);
 		for (RefEntry& entry : m_refs) {
 			if (entry.handle != handle) continue;
 			++entry.refs;
@@ -224,9 +226,10 @@ struct MockSpriteManager : ui::ISpriteManager {
 
 	bool hasLeakedRefs(const ui::Document& doc) const {
 		for (const RefEntry& entry : m_refs) {
+			// the document owns one reference per distinct sprite path; elements only point into its cache
 			int live = 0;
-			for (const ui::Element& elem : doc.m_elements) {
-				if (elem.getSpriteHandle() == entry.handle) ++live;
+			for (ui::ISpriteManager::SpriteHandle cached : doc.m_sprites) {
+				if (cached == entry.handle) ++live;
 			}
 			if (entry.refs > live) return true;
 		}
@@ -243,17 +246,19 @@ struct MockSpriteManager : ui::ISpriteManager {
 	Array<RefEntry> m_refs;
 };
 
-struct MockDocument : ui::Document {
+// a base listed before ui::Document, so the managers are destroyed after the document, which unloads its resources through them
+struct MockManagers {
 	MockFontManager m_font_manager;
 	MockImageManager m_image_manager;
 	MockSpriteManager m_sprite_manager;
+};
+
+struct MockDocument : MockManagers, ui::Document {
+	// ui::Document has pointers with the same names, the mocks are what the tests want
+	using MockManagers::m_font_manager;
+	using MockManagers::m_image_manager;
+	using MockManagers::m_sprite_manager;
 	MockDocument() : ui::Document(&m_font_manager, getGlobalAllocator(), &m_image_manager, &m_sprite_manager) {}
-	~MockDocument() {
-		// `ui::Element` destructor unloads resources via document managers.
-		// Clear elements before mock managers are destroyed.
-		m_elements.clear();
-		m_root.children.clear();
-	}
 };
 
 extern int test_count;

@@ -374,10 +374,38 @@ Document::Document(IFontManager* font_manager, IAllocator& allocator, IImageMana
 	, m_canvas_size(0, 0)
 	, m_content(allocator)
 	, m_hovered_elements(allocator)
+	, m_sprites(allocator)
+	, m_id_index(allocator)
 	, m_events(allocator)
 	, m_root(Tag::BOX, allocator, *this)
 {
 	m_root.tag = Tag::BOX;
+}
+
+Document::~Document() {
+	unloadSprites();
+}
+
+void Document::unloadSprites() {
+	if (m_sprite_manager) {
+		for (ISpriteManager::SpriteHandle handle : m_sprites) {
+			if (handle) m_sprite_manager->unloadSprite(handle);
+		}
+	}
+	m_sprites.clear();
+}
+
+// the handle of a sprite, loaded on first use and then shared by every element that names it
+ISpriteManager::SpriteHandle Document::acquireSprite(StringView path) {
+	if (!m_sprite_manager || path.empty()) return nullptr;
+
+	const InternString key = m_intern_table.intern(path);
+	auto iter = m_sprites.find(key);
+	if (iter.isValid()) return iter.value();
+
+	const ISpriteManager::SpriteHandle handle = m_sprite_manager->loadSprite(m_intern_table.resolve(key));
+	m_sprites.insert(key, handle);
+	return handle;
 }
 
 bool Document::parseAttributeValue(Element& elem, AttributeName name, StringView value) {
@@ -851,9 +879,6 @@ Element::~Element() {
 	if (m_document.m_image_manager && image_handle) {
 		m_document.m_image_manager->unloadImage(image_handle);
 	}
-	if (m_document.m_sprite_manager && sprite_handle) {
-		m_document.m_sprite_manager->unloadSprite(sprite_handle);
-	}
 }
 
 void Element::setFontHandle(IFontManager::FontHandle handle) {
@@ -870,19 +895,12 @@ void Element::setImageHandle(IImageManager::ImageHandle image_handle) {
 	this->image_handle = image_handle;
 }
 
-void Element::setSpriteHandle(ISpriteManager::SpriteHandle sprite_handle) {
-	if (m_document.m_sprite_manager && this->sprite_handle) {
-		m_document.m_sprite_manager->unloadSprite(this->sprite_handle);
-	}
-	this->sprite_handle = sprite_handle;
-}
-
 void Element::setVisible(bool show) {
 	upsertAttribute<AttributeName::VISIBLE>(*this, show, AttributeSource::ELEMENT);
 
 	if (visible == show) return;
 	visible = show;
-	m_document.computeLayout(m_document.m_canvas_size);
+	m_document.invalidateLayout();
 }
 
 void Element::setBGImage(const Path& path) {
@@ -890,9 +908,7 @@ void Element::setBGImage(const Path& path) {
 	InternString s = m_document.m_intern_table.intern(path);
 	StringView sv = m_document.m_intern_table.resolve(s);
 	upsertAttribute<AttributeName::BG_IMAGE>(*this, sv, AttributeSource::ELEMENT);
-	if (m_document.m_sprite_manager) {
-		setSpriteHandle(m_document.m_sprite_manager->loadSprite(sv));
-	}
+	setSpriteHandle(m_document.acquireSprite(sv));
 
 }
 
@@ -901,7 +917,7 @@ void Element::setText(StringView v) {
 	StringView stable_text = m_document.m_intern_table.resolve(s);
 	upsertAttribute<AttributeName::TEXT>(*this, stable_text, AttributeSource::ELEMENT);
 	text = stable_text;
-	m_document.computeLayout(m_document.m_canvas_size);
+	m_document.invalidateLayout();
 }
 
 void Element::setWidth(StringView value) {
@@ -913,7 +929,7 @@ void Element::setWidth(StringView value) {
 
 	upsertAttribute<AttributeName::WIDTH>(*this, value, AttributeSource::ELEMENT);
 	width_unit = parsed;
-	m_document.computeLayout(m_document.m_canvas_size);
+	m_document.invalidateLayout();
 }
 
 static float computeAbsoluteSize(const ParsedUnit& unit, float parent_size, float font_size, float dpi_scale) {
@@ -1811,18 +1827,8 @@ Element* Document::getElementByID(const char* id) {
 	if (!id || !id[0]) return nullptr;
 
 	StringView id_view(id);
-	if (id[0] == '$') {
-		if (!id[1]) return nullptr;
-		id_view = StringView(id + 1);
-	}
-
-	for (Element& elem : m_elements) {
-		if (!elem.id.empty() && elem.id == id_view) {
-			return &elem;
-		}
-	}
-
-	return nullptr;
+	auto iter = m_id_index.find(id_view);
+	return iter.isValid() ? &m_elements[iter.value()] : nullptr;
 }
 
 void Document::computeLayout(Vec2 canvas_size) {
@@ -1830,6 +1836,7 @@ void Document::computeLayout(Vec2 canvas_size) {
 	
 	os::Timer timer;
 	m_layout_duration = 0;
+	m_layout_dirty = false;
 	m_canvas_size = canvas_size;
 	ParentContext root_inherit;
 	root_inherit.size = canvas_size;
@@ -1953,6 +1960,7 @@ static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, co
 
 void Document::render(Draw2D& draw) {
 	PROFILE_FUNCTION();
+	flushLayout();
 	os::Timer timer;
 	m_render_duration = 0;
 	for (u32 idx : m_root.children) {
@@ -2032,9 +2040,9 @@ void Document::addClassRaw(u32 element_index, StringView classname) {
 	if (hasClassId(elem.classes, class_id)) return;
 	
 	elem.classes.push(class_id);
-	
+
 	recomputeStyles();
-	computeLayout(m_canvas_size);
+	invalidateLayout();
 }
 
 void Document::removeClass(u32 element_index, StringView classname) {
@@ -2057,10 +2065,11 @@ void Document::removeClassRaw(u32 element_index, StringView classname) {
 	}
 	
 	recomputeStyles();
-	computeLayout(m_canvas_size);
+	invalidateLayout();
 }
 
 Element* Document::getElementAt(Vec2 pos) {
+	flushLayout();
 	for (u32 idx : m_root.children) {
 		Element* root = &m_elements[idx]; 
 		if (!root->visible) continue;
@@ -2089,6 +2098,7 @@ static void loadResources(Document& doc, u32 element_index, const ParentContext&
 	ParentContext ctx = parent;
 
 	elem.font_size = ctx.font_size;
+	bool has_bg_image = false;
 
 	for (const Attribute& attr : elem.attributes) {
 		switch (attr.type) {
@@ -2104,14 +2114,17 @@ static void loadResources(Document& doc, u32 element_index, const ParentContext&
 				break;
 			}
 			case AttributeName::BG_IMAGE: {
-				if (doc.m_sprite_manager && !attr.value.empty()) {
-					elem.setSpriteHandle(doc.m_sprite_manager->loadSprite(attr.value));
-				}
+				has_bg_image = true;
+				elem.setSpriteHandle(doc.acquireSprite(attr.value));
 				break;
 			}
 			default: break;
 		}
 	}
+
+	// TODO what about other properties?
+	// a state rule (:hover) that no longer applies must not leave its image behind
+	if (!has_bg_image) elem.setSpriteHandle(nullptr);
 
 	if (!ctx.font.empty() && doc.m_font_manager) {
 		elem.setFontHandle(doc.m_font_manager->loadFont(ctx.font, (i32)ctx.font_size));
@@ -2127,6 +2140,8 @@ bool Document::parse(StringView content, const char* filename) {
 	os::Timer timer;
 	m_parse_duration = 0;
 	m_elements.clear();
+	m_id_index.clear();
+	unloadSprites();
 	m_root.children.clear();
 	m_stylesheet.m_rules.clear();
 	m_content = content;
@@ -2135,8 +2150,26 @@ bool Document::parse(StringView content, const char* filename) {
 	m_tokenizer.m_current = m_content.c_str();
 	m_tokenizer.m_current_token = m_tokenizer.nextToken();
 	if (!parseElements(0xFFFF'FFFF)) return false;
+	for (u32 i = 0, c = (u32)m_elements.size(); i < c; ++i) {
+		const StringView id = m_elements[i].id;
+		if (id.empty()) continue;
+		if (m_id_index.find(id).isValid()) {
+			error(id, m_tokenizer, "duplicate id '", id, "'");
+			m_id_index.clear();
+			return false;
+		}
+		m_id_index.insert(id, i);
+	}
 	m_stylesheet.buildIndex();
 	recomputeStyles();
+
+	// the stylesheet is only applied to an element while its rule matches (:hover, ...), so its sprites would load on first use: load them now
+	for (const StyleRule& rule : m_stylesheet.m_rules) {
+		for (const Attribute& attr : rule.attributes) {
+			if (attr.type != AttributeName::BG_IMAGE || attr.value.empty()) continue;
+			acquireSprite(attr.value);
+		}
+	}
 
 	m_parse_duration = timer.getTimeSinceStart();
 	return true;
@@ -2188,6 +2221,7 @@ void Document::injectEvent(const InputSystem::Event& event) {
 		}
 		case InputEventType::AXIS: {
 			if (event.device->type == InputDeviceType::MOUSE) {
+				flushLayout(); // an earlier event (:hover) or a script may have changed the layout, don't hit test the old bounds
 				Vec2 pos(event.data.axis.x_abs, event.data.axis.y_abs);
 				StackArray<u32, 16> new_hovered_path(m_allocator);
 				for (u32 idx : m_root.children) {
@@ -2277,10 +2311,11 @@ void Document::injectEvent(const InputSystem::Event& event) {
 }
 
 bool Document::areDependenciesReady() const {
+	if (m_sprite_manager) {
+		for (ISpriteManager::SpriteHandle handle : m_sprites) if (handle && !m_sprite_manager->isReady(handle)) return false;
+	}
 	for (const Element& elem : m_elements) {
-		const auto sprite_handle = elem.getSpriteHandle();
 		const auto image_handle = elem.getImageHandle();
-		if (m_sprite_manager && sprite_handle && !m_sprite_manager->isReady(sprite_handle)) return false;
 		if (m_image_manager && image_handle && !m_image_manager->isReady(image_handle)) return false;
 		if (elem.getFontHandle() && !m_font_manager->isReady(elem.getFontHandle())) return false;
 	}
@@ -2292,10 +2327,12 @@ void Document::setDPIScale(float scale) {
 	if (m_dpi_scale == scale) return;
 	m_dpi_scale = scale;
 	recomputeStyles();
-	computeLayout(m_canvas_size);
+	invalidateLayout();
 }
 
 void Document::recomputeStyles() {
+	PROFILE_FUNCTION();
+
 	for (Element& elem : m_elements) {
 		for (i32 i = elem.attributes.size() - 1; i >= 0; --i) {
 			if (elem.attributes[i].source == AttributeSource::STYLESHEET) {
@@ -2307,11 +2344,18 @@ void Document::recomputeStyles() {
 	ParentContext ctx;
 	ctx.font_size = 12.0f * m_dpi_scale;
 	ctx.font = "/engine/editor/fonts/JetBrainsMono-Regular.ttf";
-	for (u32 idx : m_root.children) {
-		applyStylesheet(*this, idx, ctx);
+	{
+		PROFILE_BLOCK("apply stylesheet");
+		for (u32 idx : m_root.children) {
+			applyStylesheet(*this, idx, ctx);
+		}
 	}
-	for (u32 idx : m_root.children) {
-		loadResources(*this, idx, ctx);
+	
+	{
+		PROFILE_BLOCK("load resources");
+		for (u32 idx : m_root.children) {
+			loadResources(*this, idx, ctx);
+		}
 	}
 }
 

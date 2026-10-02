@@ -288,8 +288,9 @@ struct Element {
 
 	IFontManager::FontHandle getFontHandle() const { return font_handle; }
 	void setFontHandle(IFontManager::FontHandle font_handle);
+	// not owned: the document's sprite cache holds the reference (Document::acquireSprite)
 	ISpriteManager::SpriteHandle getSpriteHandle() const { return sprite_handle; }
-	void setSpriteHandle(ISpriteManager::SpriteHandle sprite_handle);
+	void setSpriteHandle(ISpriteManager::SpriteHandle sprite_handle) { this->sprite_handle = sprite_handle; }
 	IImageManager::ImageHandle getImageHandle() const { return image_handle; }
 	void setImageHandle(IImageManager::ImageHandle image_handle);
 
@@ -345,18 +346,28 @@ struct Document {
 	Vec2 m_canvas_size;
 	String m_content;
 	float m_dpi_scale = 1.0f;
+	bool m_layout_dirty = false;
 	float m_layout_duration = 0;
 	float m_parse_duration = 0;
 	float m_render_duration = 0;
 	StackArray<u32, 16> m_hovered_elements;
+	// every sprite the document uses, loaded once per path: named by an element, set at runtime, or by any stylesheet rule (hover and other state rules
+	// included, so a state change never waits for a load). Elements only point into it; the document owns the references.
+	HashMap<InternString, ISpriteManager::SpriteHandle> m_sprites;
+	// element id -> index in m_elements, built at the end of a parse, which fails on duplicate ids
+	HashMap<StringView, u32> m_id_index;
 
 	Document(IFontManager* font_manager, IAllocator& allocator, IImageManager* image_manager = nullptr, ISpriteManager* sprite_manager = nullptr);
+	~Document();
 
 	bool parse(StringView content, const char* filename);
 	//@ function
 	Element* getElement(u32 index) { return &m_elements[index]; }
 	const Element* getElement(u32 index) const { return &m_elements[index]; }
 	void computeLayout(Vec2 canvas_size);
+	// mutators only mark the layout dirty, it's recomputed at most once, on flushLayout() (called before render and hit testing)
+	void invalidateLayout() { m_layout_dirty = true; }
+	void flushLayout() { if (m_layout_dirty) computeLayout(m_canvas_size); }
 	void render(Draw2D& draw);
 	Element* getElementAt(Vec2 pos);
 	void setDPIScale(float scale);
@@ -373,8 +384,12 @@ struct Document {
 	void injectEvent(const InputSystem::Event& event);
 	void clearEvents();
 	bool areDependenciesReady() const;
+	ISpriteManager::SpriteHandle acquireSprite(StringView path);
 
 private:
+	// drops every cached sprite reference, the sprite manager must be alive: a document has to be destroyed before the managers it was created with
+	void unloadSprites();
+
 	template <typename... Args>
 	void error(StringView location, UITokenizer& tokenizer, Args&&... args) {
 		if (!m_suppress_logging) {
