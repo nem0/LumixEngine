@@ -6,6 +6,7 @@
 #include "core/hash_map.h"
 #include "core/log.h"
 #include "core/path.h"
+#include "core/profiler.h"
 #include "core/stream.h"
 #include "core/tag_allocator.h"
 #include "engine/engine.h"
@@ -272,6 +273,7 @@ struct EvoxSystemImpl : EvoxSystem {
 	}
 
 	void update(float time_delta) override {
+		PROFILE_FUNCTION();
 		if (!m_is_ready || !m_runtime || !m_task || !m_is_game_running) return;
 		if (ex_task_get_state(m_task) != EX_TASK_SUSPENDED) return;
 
