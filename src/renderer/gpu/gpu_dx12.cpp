@@ -499,23 +499,33 @@ struct ShaderCompiler {
 	};
 
 	void saveCache(const char* filename) {
-		os::OutputFile file;
-		if (file.open(filename)) {
-			u32 version = 0;
-			bool success = file.write(&version, sizeof(version));
-			for (auto iter = m_cache.begin(), end = m_cache.end(); iter != end; ++iter) {
-				const StableHash hash = iter.key();
-				ID3DBlob* blob = iter.value();
-				const u32 size = (u32)blob->GetBufferSize();
-				success = file.write(&hash, sizeof(hash)) && success;
-				success = file.write(&size, sizeof(size)) && success;
-				success = file.write(blob->GetBufferPointer(), size) && success;
-			}
-			if (!success) {
-				logError("Could not write ", filename);
-			}
-			file.close();
+		const StringView dir = Path::getDir(filename);
+		if (dir.size() > 0) {
+			char dir_path[MAX_PATH];
+			copyString(Span(dir_path), dir);
+			if (!os::makePath(dir_path)) logError("Could not create directory ", dir_path);
 		}
+
+		os::OutputFile file;
+		if (!file.open(filename)) {
+			logError("Could not open ", filename, " for writing, shader cache not saved");
+			return;
+		}
+
+		u32 version = 0;
+		bool success = file.write(&version, sizeof(version));
+		for (auto iter = m_cache.begin(), end = m_cache.end(); iter != end; ++iter) {
+			const StableHash hash = iter.key();
+			ID3DBlob* blob = iter.value();
+			const u32 size = (u32)blob->GetBufferSize();
+			success = file.write(&hash, sizeof(hash)) && success;
+			success = file.write(&size, sizeof(size)) && success;
+			success = file.write(blob->GetBufferPointer(), size) && success;
+		}
+		if (!success) {
+			logError("Could not write ", filename);
+		}
+		file.close();
 	}
 
 	void loadCache(const char* filename) {
@@ -555,6 +565,8 @@ struct ShaderCompiler {
 	
 	// cache source code -> binary blob
 	HashMap<StableHash, ID3DBlob*> m_cache;
+	// where the cache is loaded from and saved to, empty if the cache is disabled
+	Path m_cache_path;
 };
 
 struct PSOCache {
@@ -1751,7 +1763,7 @@ void preinit(IAllocator& allocator, bool load_renderdoc) {
 }
 
 void shutdown() {
-	d3d->shader_compiler.saveCache(".lumix/shader_cache_dx");
+	if (!d3d->shader_compiler.m_cache_path.isEmpty()) d3d->shader_compiler.saveCache(d3d->shader_compiler.m_cache_path.c_str());
 
 	if (d3d->nvml_lib) {
 		nvmlShutdown();
@@ -2071,7 +2083,14 @@ bool init(void* hwnd, InitFlags flags) {
 
 	for (TextureHandle& h : d3d->current_framebuffer.attachments) h = INVALID_TEXTURE;
 
-	d3d->shader_compiler.loadCache(".lumix/shader_cache_dx");
+	{
+		// the cache maps shader source to binary, so it's project independent and lives next to the executable,
+		// it can't go through FileSystem since the project is mounted after the renderer is initialized
+		char exe_path[MAX_PATH];
+		os::getExecutablePath(Span(exe_path));
+		d3d->shader_compiler.m_cache_path = Path(Path::getDir(exe_path), "shader_cache_dx");
+	}
+	if (!d3d->shader_compiler.m_cache_path.isEmpty()) d3d->shader_compiler.loadCache(d3d->shader_compiler.m_cache_path.c_str());
 
 	{
 		D3D12_QUERY_HEAP_DESC queryHeapDesc = {};
