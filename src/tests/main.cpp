@@ -35,6 +35,7 @@ static void consoleLog(Lumix::LogLevel level, const char* message) {
 }
 
 int main(int argc, char* argv[]) {
+	setvbuf(stdout, nullptr, _IONBF, 0);   // a crash must not swallow the output so far
 	Lumix::registerLogCallback<&consoleLog>();
 	Lumix::debug::init(Lumix::getGlobalAllocator());
 	Lumix::configureCrashReport(Lumix::CrashReportFlags::ENABLED | Lumix::CrashReportFlags::STDERR);

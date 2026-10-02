@@ -1,3 +1,5 @@
+#include "core/job_system.h"
+#include "core/profiler.h"
 #include "core/array.h"
 #include "core/log.h"
 #include "core/stream.h"
@@ -31,14 +33,15 @@ struct Font {
 };
 
 float getAdvanceY(const Font& font) { return float(font.font_size); }
-float getDescender(const Font& font) { return font.descender; }
-float getAscender(const Font& font) { return font.ascender; }
-float getHeight(const Font& font) { return font.height; }
-bool isBuilt(const Font& font) { return font.is_built; }
+float getDescender(const Font& font) { font.resource->buildIfDirty(); return font.descender; }
+float getAscender(const Font& font) { font.resource->buildIfDirty(); return font.ascender; }
+float getHeight(const Font& font) { font.resource->buildIfDirty(); return font.height; }
+bool isBuilt(const Font& font) { font.resource->buildIfDirty(); return font.is_built; }
 void release(Font& font) { font.resource->removeRef(font); }
 
 
 const Glyph* findGlyph(const Font& font, u32 codepoint) {
+	font.resource->buildIfDirty();
 	auto iter = font.glyphs.find(codepoint);
 	if (!iter.isValid()) return nullptr;
 	return &iter.value();
@@ -65,6 +68,7 @@ SplitWord splitFirstWord(const Font& font, StringView text) {
 }
 
 Vec2 measureTextA(const Font& font, const char* str, const char* str_end) {
+	font.resource->buildIfDirty();
 	Vec2 res;
 	res.x = 0;
 	res.y = font.height;
@@ -103,6 +107,15 @@ struct ToChar {
 	u32 codepoint;
 	u32 bmp_offset;
 	u32 advance_x;
+	const Array<u8>* bmp; // glyph bitmaps of the font, bmp_offset points into it
+};
+
+// everything rasterizing one font produces, so fonts can be rasterized in parallel and merged afterwards
+struct FontRasterResult {
+	FontRasterResult(IAllocator& allocator) : rects(allocator), to_char(allocator), bmp(allocator) {}
+	Array<stbrp_rect> rects;
+	Array<ToChar> to_char;
+	Array<u8> bmp;
 };
 
 static void blit(FT_Bitmap* bitmap,  Array<u8>* out) {
@@ -110,16 +123,19 @@ static void blit(FT_Bitmap* bitmap,  Array<u8>* out) {
 	const u32 offset = out->size();
 	const u32 src_pitch = bitmap->pitch;
 	const u8* src = bitmap->buffer;
-	out->resize(out->size() + bitmap->width * bitmap->rows);
+	const u32 new_size = out->size() + bitmap->width * bitmap->rows;
+	// Array::resize reserves the exact size, grow geometrically or every glyph would copy the whole array
+	if (new_size > out->capacity()) out->reserve(maximum(new_size, out->capacity() * 2));
+	out->resize(new_size);
 	u8* dst = out->begin() + offset;
 	for (u32 y = 0; y < bitmap->rows; ++y, src += src_pitch, dst += bitmap->width) {
 		memcpy(dst, src, bitmap->width);
 	}
 }
 
-static void blit(const ToChar& tc, const Array<u8>& src_bmp, const IVec2& size, Array<u32>* out) {
+static void blit(const ToChar& tc, const IVec2& size, Array<u32>* out) {
 	const Glyph& c = tc.font->glyphs[tc.codepoint];
-	const u8* src = &src_bmp[tc.bmp_offset];
+	const u8* src = tc.bmp->begin() + tc.bmp_offset;
 	const u32 u0 = u32(c.u0 * size.x + 0.5f);
 	const u32 v0 = u32(c.v0 * size.y + 0.5f);
 	const u32 u1 = u32(c.u1 * size.x + 0.5f);
@@ -139,8 +155,8 @@ Texture* FontManager::getAtlasTexture() {
 	return m_atlas_texture;
 }
 
-bool FontManager::build()
-{
+bool FontManager::build() {
+	PROFILE_FUNCTION();
 	ASSERT(m_dirty);
 	for(Font* font : m_fonts) {
 		if (!font->resource->isReady()) return false;
@@ -161,24 +177,31 @@ bool FontManager::build()
 		return alloc->reallocate(block, new_size, cur_size, 8);
 	};
 
-	FT_Library ft_library;
-	FT_Error error = FT_New_Library(&memory_rec, &ft_library);
-	if (error != 0) return false;
-
-	FT_Add_Default_Modules(ft_library);
-
-	Array<u8> tmp_bmp(m_allocator);
-	tmp_bmp.reserve(1024 * 1024);
-	Array<stbrp_rect> rects(m_allocator);
-	Array<ToChar> to_char(m_allocator);
 	constexpr u32 PADDING = 1;
 
-	for(Font* font : m_fonts) {
+	// fonts are independent: each one is rasterized with its own FT_Library/FT_Face and writes only to its own Font and result,
+	// so they can run in parallel (FreeType libraries are not thread safe, but separate libraries are fine)
+	// ToChar points into the results, so they must not move: reserve first and never grow the array afterwards
+	Array<FontRasterResult> results(m_allocator);
+	results.reserve(m_fonts.size());
+	for (u32 i = 0, c = m_fonts.size(); i < c; ++i) results.emplace(m_allocator);
+
+	auto rasterize = [&](u32 font_idx) {
+		PROFILE_BLOCK("rasterize font");
+		Font* font = m_fonts[font_idx];
+		FontRasterResult& out = results[font_idx];
+
+		FT_Library ft_library;
+		FT_Error error = FT_New_Library(&memory_rec, &ft_library);
+		if (error != 0) return;
+		FT_Add_Default_Modules(ft_library);
+
 		FT_Face face;
 		error = FT_New_Memory_Face(ft_library, font->resource->m_file_data.data(), (u32)font->resource->m_file_data.size(), 0, &face);
 		if (error != 0) {
 			logError("Failed to create font ", font->resource->getPath());
-			continue;
+			FT_Done_Library(ft_library);
+			return;
 		}
 	
 		FT_Size_RequestRec size_req;
@@ -190,13 +213,15 @@ bool FontManager::build()
 		error = FT_Request_Size(face, &size_req);
 		if (error != 0) {
 			logError("Failed to request font size ", font->font_size, " for ", font->resource->getPath());
-			continue;
+			FT_Done_Library(ft_library);
+			return;
 		}
 
 		error = FT_Select_Charmap(face, FT_ENCODING_UNICODE);
 		if (error != 0) {
 			logError("Failed to select unicode charmap of font ", font->resource->getPath());
-			continue;
+			FT_Done_Library(ft_library);
+			return;
 		}
 		
 		font->descender = face->size->metrics.descender / 64.f;
@@ -217,17 +242,27 @@ bool FontManager::build()
 			if (error != 0) continue;
 
 			FT_Bitmap* ft_bitmap = &face->glyph->bitmap;
-			stbrp_rect& r = rects.emplace();
+			stbrp_rect& r = out.rects.emplace();
 			r.w = ft_bitmap->width + 2 * PADDING;
 			r.h = ft_bitmap->rows + 2 * PADDING;
-			to_char.push({font, c.codepoint, (u32)tmp_bmp.size(), static_cast<u32>(slot->advance.x)});
-			blit(ft_bitmap, &tmp_bmp);
+			out.to_char.push({font, c.codepoint, (u32)out.bmp.size(), static_cast<u32>(slot->advance.x), &out.bmp});
+			blit(ft_bitmap, &out.bmp);
 			c.x0 = float(slot->bitmap_left);
 			c.y0 = float(-slot->bitmap_top);
 			c.x1 = float(c.x0 + r.w - 2 * PADDING);
 			c.y1 = float(c.y0 + r.h - 2 * PADDING);
 		}
 		font->is_built = true;
+		FT_Done_Library(ft_library);
+	};
+
+	jobs::forEach(m_fonts.size(), 1, [&](u32 idx, u32) { rasterize(idx); });
+
+	// merge the rects in font order, the same order a serial build produces
+	// rects[i] belongs to the i-th ToChar when walking the results in order (rects and to_char of a result are parallel)
+	Array<stbrp_rect> rects(m_allocator);
+	for (const FontRasterResult& result : results) {
+		for (const stbrp_rect& r : result.rects) rects.push(r);
 	}
 
 	stbrp_context ctx;
@@ -243,21 +278,24 @@ bool FontManager::build()
 		h = maximum(h, r.y + r.h);
 	}
 
-	for (const stbrp_rect& r : rects) {
-		const ToChar& tc = to_char[int(&r - rects.begin())];
-		Glyph& c = tc.font->glyphs[tc.codepoint];
-		c.advance_x = float(((tc.advance_x + 63) & -64) / 64);
-		c.u0 = (r.x + PADDING) / (float)w;
-		c.v0 = (r.y + PADDING) / (float)h;
-		c.u1 = float(r.x + r.w - PADDING) / w;
-		c.v1 = float(r.y + r.h - PADDING) / h;
+	const stbrp_rect* packed = rects.begin();
+	for (const FontRasterResult& result : results) {
+		for (const ToChar& tc : result.to_char) {
+			const stbrp_rect& r = *packed++;
+			Glyph& c = tc.font->glyphs[tc.codepoint];
+			c.advance_x = float(((tc.advance_x + 63) & -64) / 64);
+			c.u0 = (r.x + PADDING) / (float)w;
+			c.v0 = (r.y + PADDING) / (float)h;
+			c.u1 = float(r.x + r.w - PADDING) / w;
+			c.v1 = float(r.y + r.h - PADDING) / h;
+		}
 	}
 
 	Array<u32> pixels(m_allocator);
 	pixels.resize(w * h);
 	for (u32& p : pixels) p = 0;
-	for (const ToChar& tc : to_char) {
-		blit(tc, tmp_bmp, IVec2(w, h), &pixels);
+	for (const FontRasterResult& result : results) {
+		for (const ToChar& tc : result.to_char) blit(tc, IVec2(w, h), &pixels);
 	}
 
 	pixels[0] = 0xffFFffFF;
@@ -270,7 +308,6 @@ bool FontManager::build()
 	}
 	m_atlas_texture->create(w, h, gpu::TextureFormat::RGBA8, pixels.begin(), pixels.byte_size());
 
-	FT_Done_Library(ft_library);
 	return true;
 }
 
@@ -316,8 +353,12 @@ Font* FontResource::addRef(int font_size)
 	}
 	manager.m_fonts.push(font);
 	manager.m_dirty = true;
-	if (isReady()) manager.build();
 	return font;
+}
+
+void FontResource::buildIfDirty() {
+	auto& manager = (FontManager&)m_resource_manager;
+	if (manager.m_dirty) manager.build();
 }
 
 
@@ -330,7 +371,6 @@ void FontResource::removeRef(Font& font)
 		LUMIX_DELETE(manager.m_allocator, &font);
 		manager.m_fonts.eraseItem(&font);
 		manager.m_dirty = true;
-		if (isReady()) manager.build();
 	}
 }
 

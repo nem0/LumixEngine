@@ -187,7 +187,7 @@ struct RenderModuleImpl final : RenderModule {
 			
 			if (!r.model || !r.model->isReady() || r.mesh_materials.begin() != r.model->getMeshMaterials().begin()) {
 				for (MeshMaterial& m : r.mesh_materials) {
-					m.material->decRefCount();
+					if (m.material) m.material->decRefCount();
 					m_renderer.freeSortKey(m.sort_key);
 				}
 				m_allocator.deallocate(r.mesh_materials.begin());
@@ -3121,7 +3121,7 @@ struct RenderModuleImpl final : RenderModule {
 
 		if (!old_model || !old_model->isReady() || r.mesh_materials.begin() != old_model->getMeshMaterials().begin()) {
 			for (MeshMaterial& m : r.mesh_materials) {
-				m.material->decRefCount();
+				if (m.material) m.material->decRefCount();
 				m_renderer.freeSortKey(m.sort_key);
 			}
 			m_allocator.deallocate(r.mesh_materials.begin());

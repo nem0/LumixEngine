@@ -53,6 +53,7 @@ struct LUMIX_RENDERER_API FontResource final : Resource
 	bool load(Span<const u8> mem) override;
 	Font* addRef(int font_size);
 	void removeRef(Font& font);
+	void buildIfDirty();
 
 	TagAllocator m_allocator;
 	OutputMemoryStream m_file_data;
