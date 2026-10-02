@@ -1045,7 +1045,7 @@ struct StudioAppImpl final : StudioApp {
 		m_engine->init();
 		jobs::wait(&m_init_imgui_signal);
 		#ifdef LUMIX_TESTS
-			initImGuiTests();
+			initImGuiTests(*this);
 		#endif
 		
 		{

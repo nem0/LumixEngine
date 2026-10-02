@@ -2,7 +2,7 @@
 
 namespace Lumix {
 
-void initImGuiTests();
+void initImGuiTests(struct StudioApp& app);
 void shutdownImGuiTests();
 void postSwapImGuiTests();
 void showImGuiTestEngineWindows();
