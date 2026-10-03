@@ -20,6 +20,8 @@
 
 namespace Lumix {
 
+static ex_bytecode_compile_options s_compile_options = { true };
+
 namespace Evox {
 	void gatherCoreFunctions(HashMap<NativeFunctionKey, ex_native_fn, NativeFunctionKeyHash>& functions);
 }
@@ -231,7 +233,7 @@ struct EvoxSystemImpl : EvoxSystem {
 				goto cleanup;
 			}
 		}
-		bytecode = ex_bytecode_compile(module, &host, nullptr);
+		bytecode = ex_bytecode_compile(module, &host, &s_compile_options);
 		if (!bytecode) {
 			if (output.length() == 0) output.append("Evox bytecode compilation failed");
 			goto cleanup;
@@ -386,7 +388,7 @@ struct EvoxSystemImpl : EvoxSystem {
 			logError("Evox compilation failed: ", diagnostics);
 			return false;
 		}
-		m_bytecode = ex_bytecode_compile(m_module, &m_host, nullptr);
+		m_bytecode = ex_bytecode_compile(m_module, &m_host, &s_compile_options);
 		m_host.diagnostics_userdata = nullptr;
 		m_host.print = nullptr;
 		if (!m_bytecode) {

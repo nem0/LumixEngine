@@ -3667,7 +3667,8 @@ struct Recipe {
 		if (!module) return false;
 		if (ex_module_compile(module, {source.data, (i64)source.size()}, {path.c_str(), (i64)stringLength(path.c_str())}, &resolveImport, this) != EX_RESULT_OK) return false;
 
-		bytecode = ex_bytecode_compile(module, &host, nullptr);
+		ex_bytecode_compile_options compile_options = { true };
+		bytecode = ex_bytecode_compile(module, &host, &compile_options);
 		if (!bytecode) {
 			error.append("Could not compile texture recipe bytecode");
 			return false;

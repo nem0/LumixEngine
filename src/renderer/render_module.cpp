@@ -3349,28 +3349,32 @@ struct RenderModuleImpl final : RenderModule {
 		return -1;
 	}
 	
-	void setParticleEmitterGlobal(EntityRef entity, i32 id, float value) override {
-		ASSERT(id >= 0);
-		ParticleSystem& ps = m_particle_emitters[entity];
+	// Offset of global `id` in the emitter's global values, or -1 if there is no such global: the resource may still be loading or being reloaded
+	// (no globals yet), or the script may hold a stale id.
+	i32 getParticleEmitterGlobalOffset(EntityRef entity, i32 id) {
 		ParticleSystemResource* res = m_particle_emitters[entity].getResource();
+		Span<const ParticleSystemResource::Global> globals = res ? res->getGlobals() : Span<const ParticleSystemResource::Global>();
+		if (id < 0 || id >= (i32)globals.length()) {
+			logError("Trying to access invalid particle system value on entity ", entity.index, ", global ", id);
+			return -1;
+		}
+		return (i32)globals[id].offset;
+	}
 
-		u32 offset = res->getGlobals()[id].offset;
-		if (offset >= (u32)ps.m_globals.size()) {
+	void setParticleEmitterGlobal(EntityRef entity, i32 id, float value) override {
+		const i32 offset = getParticleEmitterGlobalOffset(entity, id);
+		if (offset < 0) return;
+		ParticleSystem& ps = m_particle_emitters[entity];
+		if ((u32)offset >= (u32)ps.m_globals.size()) {
 			ps.m_globals.resize(offset + 1);
 		}
 		ps.m_globals[offset] = value;
 	}
 	
 	void setParticleEmitterGlobal(EntityRef entity, i32 id, Vec3 value) override {
+		const i32 offset = getParticleEmitterGlobalOffset(entity, id);
+		if (offset < 0) return;
 		ParticleSystem& ps = m_particle_emitters[entity];
-		ParticleSystemResource* res = m_particle_emitters[entity].getResource();
-
-		Span<const ParticleSystemResource::Global> globals = res->getGlobals();
-		if (id < 0 || id >= (i32)globals.size()) {
-			logError("Trying to access invalid particle system value on entity ", entity.index, ", emitter ", id);
-			return; 
-		}
-		u32 offset = globals[id].offset;
 		u32 needed_size = offset + 3;
 		if (needed_size > (u32)ps.m_globals.size()) {
 			ps.m_globals.resize(needed_size);
@@ -3400,11 +3404,9 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 	void setParticleEmitterGlobal(EntityRef entity, i32 id, Vec4 value) override {
-		ASSERT(id >= 0);
+		const i32 offset = getParticleEmitterGlobalOffset(entity, id);
+		if (offset < 0) return;
 		ParticleSystem& ps = m_particle_emitters[entity];
-		ParticleSystemResource* res = m_particle_emitters[entity].getResource();
-
-		u32 offset = res->getGlobals()[id].offset;
 		u32 needed_size = offset + 4;
 		if (needed_size > (u32)ps.m_globals.size()) {
 			ps.m_globals.resize(needed_size);

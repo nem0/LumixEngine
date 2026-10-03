@@ -362,8 +362,9 @@ struct Document {
 
 	bool parse(StringView content, const char* filename);
 	//@ function
-	Element* getElement(u32 index) { return &m_elements[index]; }
-	const Element* getElement(u32 index) const { return &m_elements[index]; }
+	// null for an out of range index, e.g. Event::INVALID_ELEMENT_INDEX of an event with no element under the cursor
+	Element* getElement(u32 index) { return index < (u32)m_elements.size() ? &m_elements[index] : nullptr; }
+	const Element* getElement(u32 index) const { return index < (u32)m_elements.size() ? &m_elements[index] : nullptr; }
 	void computeLayout(Vec2 canvas_size);
 	// mutators only mark the layout dirty, it's recomputed at most once, on flushLayout() (called before render and hit testing)
 	void invalidateLayout() { m_layout_dirty = true; }
