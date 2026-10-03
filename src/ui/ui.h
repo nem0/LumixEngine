@@ -361,8 +361,8 @@ struct Document {
 	~Document();
 
 	bool parse(StringView content, const char* filename);
-	//@ function
 	// null for an out of range index, e.g. Event::INVALID_ELEMENT_INDEX of an event with no element under the cursor
+	//@ function
 	Element* getElement(u32 index) { return index < (u32)m_elements.size() ? &m_elements[index] : nullptr; }
 	const Element* getElement(u32 index) const { return index < (u32)m_elements.size() ? &m_elements[index] : nullptr; }
 	void computeLayout(Vec2 canvas_size);
