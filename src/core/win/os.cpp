@@ -11,6 +11,7 @@
 #pragma warning(disable : 4091)
 #include <windowsx.h>
 #include <shlobj_core.h>
+#include <KnownFolders.h>
 #include <Psapi.h>
 #include <hidsdi.h>
 #include <hidpi.h>
@@ -1928,6 +1929,17 @@ bool getAppDataDir(Span<char> out) {
 	if (!SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_APPDATA | CSIDL_FLAG_CREATE, NULL, 0, path))) return false;
 	fromWChar(out, path);
 	return true;
+}
+
+bool getSavedGamesDir(Span<char> out) {
+	PWSTR path = nullptr;
+	if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_SavedGames, KF_FLAG_CREATE, NULL, &path)) && path) {
+		fromWChar(out, path);
+		CoTaskMemFree(path);
+		return true;
+	}
+	if (path) CoTaskMemFree(path);
+	return getAppDataDir(out);
 }
 
 void getExecutablePath(Span<char> buffer)

@@ -24,6 +24,7 @@ template <> inline i32 readArg<i32>(ex_call_frame& frame) { i32 value; memcpy(&v
 template <> inline float readArg<float>(ex_call_frame& frame) { float value; memcpy(&value, frame.args, sizeof(value)); frame.args += sizeof(value); return value; }
 template <> inline double readArg<double>(ex_call_frame& frame) { double value; memcpy(&value, frame.args, sizeof(value)); frame.args += sizeof(value); return value; }
 template <> inline ex_string_view readArg<ex_string_view>(ex_call_frame& frame) { return ex_arg_read_string(&frame); }
+template <> inline ex_slice readArg<ex_slice>(ex_call_frame& frame) { ex_slice value; memcpy(&value, frame.args, sizeof(value)); frame.args += sizeof(value); return value; }
 
 template <typename T> void writeResult(ex_runtime*, ex_call_frame& frame, T* value) {
 	EX_RESULT(frame, value);

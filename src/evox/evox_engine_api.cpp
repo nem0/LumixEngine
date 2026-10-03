@@ -1,4 +1,6 @@
 #include "core/log.h"
+#include "core/os.h"
+#include "core/string.h"
 #include "engine/engine.h"
 #include "engine/input_system.h"
 #include "engine/reflection.h"
@@ -566,6 +568,109 @@ static Vec3 evox_entity_getScale(ExEntity entity) {
 	return entity.world->getScale(EntityRef{entity.index});
 }
 
+// core:storage
+// Scripts pass a path relative to the saved games directory ("my_game/save.dat"). Absolute paths, ".." and
+// backslashes are rejected, so a script can't leave that directory.
+static bool getStoragePath(ex_string_view relative, Span<char> out) {
+	if (!relative.begin || relative.length <= 0 || relative.length > 200) return false;
+	if (relative.begin[0] == '/') return false;
+	for (i64 i = 0; i < relative.length; ++i) {
+		const char c = relative.begin[i];
+		if (c < 32 || c == '\\' || c == ':') return false;
+		if (c == '.' && i + 1 < relative.length && relative.begin[i + 1] == '.') return false;
+	}
+
+	char base[MAX_PATH];
+	if (!os::getSavedGamesDir(Span(base))) return false;
+	StaticString<MAX_PATH + 256> path(base, "/", StringView(relative.begin, (u64)relative.length));
+	if (path.length() >= out.length()) return false;
+	copyString(out, path);
+	return true;
+}
+
+// writeBlob(path : []const u8, data : []const u8) : bool
+// writes to a temporary file first, so a failed write keeps the previous file
+static bool evox_storage_writeBlob(ex_string_view relative, ex_slice data) {
+	if (data.length < 0 || (data.length > 0 && !data.data)) return false;
+
+	char path[MAX_PATH + 256];
+	if (!getStoragePath(relative, Span(path))) return false;
+
+	// create the directory the file goes into
+	char dir[MAX_PATH + 256];
+	copyString(dir, path);
+	char* slash = nullptr;
+	for (char* c = dir; *c; ++c) {
+		if (*c == '/' || *c == '\\') slash = c;
+	}
+	if (slash) {
+		*slash = 0;
+		if (!os::makePath(dir)) logError("Failed to create ", dir);
+	}
+
+	StaticString<MAX_PATH + 262> tmp_path(path, ".tmp");
+	os::OutputFile file;
+	bool success = file.open(tmp_path);
+	success = success && file.write(data.data, (u64)data.length);
+	file.close();
+	success = success && !file.isError();
+	if (success) {
+		if (os::fileExists(path)) os::deleteFile(path);
+		success = os::moveFile(tmp_path, path);
+	}
+	else {
+		os::deleteFile(tmp_path);
+	}
+	return success;
+}
+
+// readBlob(path : []const u8, buffer : []u8) : i32
+// returns the size of the file or -1, copies at most buffer.length bytes
+static void evox_storage_readBlob(ex_runtime*, ex_call_frame frame) {
+	EX_STRING_ARG(frame, relative);
+	EX_ARG(frame, ex_slice, buffer);
+	if (buffer.length < 0 || (buffer.length > 0 && !buffer.data)) {
+		panic(frame, "Invalid buffer");
+		return;
+	}
+
+	char path[MAX_PATH + 256];
+	os::InputFile file;
+	if (!getStoragePath(relative, Span(path)) || !file.open(path)) {
+		EX_RESULT(frame, i32(-1));
+		return;
+	}
+	const u64 size = file.size();
+	if (size > 0x7fffFFFF) {
+		file.close();
+		EX_RESULT(frame, i32(-1));
+		return;
+	}
+	const u64 to_read = minimum(size, (u64)buffer.length);
+	const bool success = to_read == 0 || file.read(buffer.data, to_read);
+	file.close();
+	EX_RESULT(frame, success ? (i32)size : i32(-1));
+}
+
+static i32 evox_storage_size(ex_string_view relative) {
+	char path[MAX_PATH + 256];
+	os::InputFile file;
+	if (!getStoragePath(relative, Span(path)) || !file.open(path)) return -1;
+	const u64 size = file.size();
+	file.close();
+	return size > 0x7fffFFFF ? -1 : (i32)size;
+}
+
+static bool evox_storage_exists(ex_string_view relative) {
+	char path[MAX_PATH + 256];
+	return getStoragePath(relative, Span(path)) && os::fileExists(path);
+}
+
+static bool evox_storage_remove(ex_string_view relative) {
+	char path[MAX_PATH + 256];
+	return getStoragePath(relative, Span(path)) && os::deleteFile(path);
+}
+
 void registerImguiModule(NativeFunctionMap& functions) {
 	functions.insert({"core:imgui", "begin"}, &wrap<imguiBegin>);
 	functions.insert({"core:imgui", "textUnformatted"}, &wrap<imguiTextUnformatted>);
@@ -583,6 +688,12 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	functions.insert({"core:input", "input"}, &inputGetInput);
 	functions.insert({"core:input", "getEventCount"}, &inputGetEventCount);
 	functions.insert({"core:input", "getEvent"}, &inputGetEvent);
+	// storage
+	functions.insert({"core:storage", "writeBlob"}, &wrap<evox_storage_writeBlob>);
+	functions.insert({"core:storage", "readBlob"}, &evox_storage_readBlob);
+	functions.insert({"core:storage", "size"}, &wrap<evox_storage_size>);
+	functions.insert({"core:storage", "exists"}, &wrap<evox_storage_exists>);
+	functions.insert({"core:storage", "remove"}, &wrap<evox_storage_remove>);
 	// log
 	functions.insert({"core:log", "logErrorString"}, &wrap<logErrorString>);
 	functions.insert({"core:log", "logInfoString"}, &wrap<logInfoString>);

@@ -1,0 +1,10 @@
+// Files in the user's saved games directory. Paths are relative ("my_game/save.dat") and should start with
+// the game's name. Absolute paths and ".." are rejected. writeBlob replaces the file only if the write succeeds.
+
+extern fn writeBlob(path : []const u8, data : []const u8) : bool;
+// returns the size of the file (-1 if it can't be read), copies at most buffer.length bytes
+extern fn readBlob(path : []const u8, buffer : []u8) : i32;
+// size of the file in bytes, -1 if it doesn't exist
+extern fn size(path : []const u8) : i32;
+extern fn exists(path : []const u8) : bool;
+extern fn remove(path : []const u8) : bool;

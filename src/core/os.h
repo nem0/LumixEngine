@@ -301,6 +301,8 @@ LUMIX_CORE_API i32 getDPI();
 LUMIX_CORE_API [[nodiscard]] bool copyFile(StringView from, StringView to);
 LUMIX_CORE_API void getExecutablePath(Span<char> path);
 LUMIX_CORE_API [[nodiscard]] bool getAppDataDir(Span<char> path);
+// where games keep savegames: Windows `Saved Games`, Linux $XDG_DATA_HOME or ~/.local/share; a visible, writable per-user folder. No trailing slash.
+LUMIX_CORE_API [[nodiscard]] bool getSavedGamesDir(Span<char> path);
 LUMIX_CORE_API void messageBox(const char* text);
 LUMIX_CORE_API void setCommandLine(int, char**);
 LUMIX_CORE_API bool getCommandLine(Span<char> output);
