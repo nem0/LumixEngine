@@ -67,41 +67,12 @@ fn mapWith(image : Image, state : $S, callback : fn(u32, u32, Vec4, S) : Vec4) :
     }
 }
 
-fn recipeMin(a : f32, b : f32) : f32 {
-    if a < b {
-        return a;
-    }
-    return b;
-}
-
-fn recipeMax(a : f32, b : f32) : f32 {
-    if a > b {
-        return a;
-    }
-    return b;
-}
-
-fn recipeAbs(a : f32) : f32 {
-    if a < 0 {
-        return-a;
-    }
-    return a;
-}
-
-fn recipeFloor(a : f32) : f32 {
-    var i = a as i32;
-    if a < i as f32 {
-        i -= 1;
-    }
-    return i as f32;
-}
-
 fn recipeFract(a : f32) : f32 {
-    return a - recipeFloor(a);
+    return a - math.floor(a);
 }
 
 fn recipeClamp(a : f32) : f32 {
-    return recipeMin(1, recipeMax(0, a));
+    return math.min(math.max(a, 0), 1);
 }
 
 fn recipeComponent(v : Vec4, c : u32) : f32 {
@@ -137,8 +108,8 @@ fn samplePixel(image : Image, x : i32, y : i32, wrap : bool) : Vec4 {
 }
 
 fn sample(image : Image, x : f32, y : f32, wrap : bool) : Vec4 {
-    const ix = recipeFloor(x) as i32;
-    const iy = recipeFloor(y) as i32;
+    const ix = math.floor(x) as i32;
+    const iy = math.floor(y) as i32;
     const fx = x - ix as f32;
     const fy = y - iy as f32;
     const a = samplePixel(image, ix, iy, wrap) * (1 - fx) + samplePixel(image, ix + 1, iy, wrap) * fx;
@@ -316,11 +287,15 @@ fn divide(a : Image, b : Image) : void {
 }
 
 fn minimum(a : Image, b : Image) : void {
-    recipeBinary(a, b, recipeMin);
+    recipeBinary(a, b, fn(a : f32, b : f32) : f32 {
+        return math.min(a, b);
+    });
 }
 
 fn maximum(a : Image, b : Image) : void {
-    recipeBinary(a, b, recipeMax);
+    recipeBinary(a, b, fn(a : f32, b : f32) : f32 {
+        return math.max(a, b);
+    });
 }
 
 fn mix(a : Image, b : Image, alpha : f32) : void {
@@ -508,10 +483,10 @@ fn recipeShape(width : u32, height : u32, power : f32, kind : u32) : Image {
             const vy = recipeUV(y, height) - 0.5;
             var d = math.sqrt(vx * vx + vy * vy) * 2;
             if kind == 1 {
-                d = recipeMax(recipeAbs(vx), recipeAbs(vy)) * 2;
+                d = math.max(math.abs(vx), math.abs(vy)) * 2;
             }
             if kind == 2 {
-                d = 2 * recipeMax(vy, recipeMax(0.8660254 * vx - 0.5 * vy, -0.8660254 * vx - 0.5 * vy));
+                d = 2 * math.max(vy, math.max(0.8660254 * vx - 0.5 * vy, -0.8660254 * vx - 0.5 * vy));
             }
             setPixel(result, x, y, Vec4 {math.pow(d, power), 0, 0, 1});
         }
@@ -583,8 +558,8 @@ fn recipeHash2(x : f32, y : f32) : Vec2 {
 }
 
 fn recipeGradientDot(x : i32, y : i32, dx : f32, dy : f32, scale : f32) : f32 {
-    const cx = (x as f32 - recipeFloor(x as f32 / scale) * scale) as u32;
-    const cy = (y as f32 - recipeFloor(y as f32 / scale) * scale) as u32;
+    const cx = (x as f32 - math.floor(x as f32 / scale) * scale) as u32;
+    const cy = (y as f32 - math.floor(y as f32 / scale) * scale) as u32;
     const h = recipeHash(recipeHash(cx) + cy);
     const h2 = recipeHash(recipeXor(h, 1933247));
     return(h as f32 / (4294967295 as u32 as f32) * 2 - 1) * dx + (h2 as f32 / (4294967295 as u32 as f32) * 2 - 1) * dy;
@@ -599,8 +574,8 @@ fn gradientNoise(width : u32, height : u32, scale : f32) : Image {
         for x in 0..width {
             const px = x as f32 / width as f32 * scale as f32;
             const py = y as f32 / height as f32 * scale as f32;
-            const ix = recipeFloor(px) as i32;
-            const iy = recipeFloor(py) as i32;
+            const ix = math.floor(px) as i32;
+            const iy = math.floor(py) as i32;
             const fx = recipeFract(px);
             const fy = recipeFract(py);
             const ux = fx * fx * fx * (fx * (fx * 6 - 15) + 10);
@@ -619,8 +594,8 @@ fn cellNoise(width : u32, height : u32, scale : f32, offset : f32) : Image {
         for x in 0..width {
             const px = recipeUV(x, width) * scale;
             const py = recipeUV(y, height) * scale;
-            const ix = recipeFloor(px);
-            const iy = recipeFloor(py);
+            const ix = math.floor(px);
+            const iy = math.floor(py);
             const fx = recipeFract(px);
             const fy = recipeFract(py);
             var distance : f32 = 8;
@@ -631,7 +606,7 @@ fn cellNoise(width : u32, height : u32, scale : f32, offset : f32) : Image {
                     const h = recipeHash2(ix + gx, iy + gy);
                     const dx = gx - fx + math.sin(h.x * 6.2831853 + offset) * 0.5 + 0.5;
                     const dy = gy - fy + math.sin(h.y * 6.2831853 + offset) * 0.5 + 0.5;
-                    distance = recipeMin(distance, dx * dx + dy * dy);
+                    distance = math.min(distance, dx * dx + dy * dy);
                 }
             }
             setPixel(result, x, y, Vec4 {math.sqrt(distance), 0, 0, 1});
@@ -646,8 +621,8 @@ fn waveNoise(width : u32, height : u32, scale : f32, offset : f32) : Image {
         for x in 0..width {
             const px = recipeUV(x, width) * scale + offset;
             const py = recipeUV(y, height) * scale + offset;
-            const ix = recipeFloor(px);
-            const iy = recipeFloor(py);
+            const ix = math.floor(px);
+            const iy = math.floor(py);
             var fx = recipeFract(px);
             var fy = recipeFract(py);
             fx = fx * fx * (3 - 2 * fx);
@@ -861,4 +836,320 @@ fn circularSplatter(background : Image, pattern : Image, count : u32, radius : f
         const y = background.height as f32 * 0.5 + r * math.sin(angle) - pattern.height as f32 * 0.5;
         recipeBlit(background, source, x as i32, y as i32);
     }
+}
+
+// ---- vector drawing ---------------------------------------------------------------------------------------------------------------------
+// Antialiased shapes for icons and other line art. A DrawCanvas is drawn in its own units (for example a 24 x 24 grid) onto a supersampled
+// premultiplied RGBA image; drawFinish averages it down to the output size and converts to straight alpha. Colours are Vec4 with RGB in 0..1
+// (see recipeRgb); alpha is a separate argument. A shape marks the samples it covers in a scratch mask and paints them in one go, so
+// overlapping segments of one line are blended once. Shapes are painted in call order, later ones over earlier ones.
+//
+//     var c = drawCanvas(96, 96, 3, 24.0);
+//     drawDisc(c, 12, 12, 8, recipeRgb(232, 149, 42), 1.0);
+//     return texture2D(drawFinish(c));
+
+struct DrawCanvas {
+    image : Image;      // width * samples x height * samples, premultiplied RGBA
+    mask : Image;       // scratch, one channel
+    width : u32;        // output size in pixels
+    height : u32;
+    samples : u32;      // supersampling per axis
+    scale : f32;        // samples per drawing unit
+}
+
+// `units_wide` is how many drawing units span the canvas width; the same scale is used vertically.
+fn drawCanvas(width : u32, height : u32, samples : u32, units_wide : f32) : DrawCanvas {
+    return DrawCanvas {
+        create(width * samples, height * samples, 4),
+        create(width * samples, height * samples, 1),
+        width, height, samples,
+        (width * samples) as f32 / units_wide
+    };
+}
+
+// colour from 0..255 channels, alpha 1
+fn recipeRgb(r : u32, g : u32, b : u32) : Vec4 {
+    return Vec4 { r as f32 / 255, g as f32 / 255, b as f32 / 255, 1 };
+}
+
+fn recipeClampInt(v : i32, lo : i32, hi : i32) : i32 {
+    if v < lo {
+        return lo;
+    }
+    if v > hi {
+        return hi;
+    }
+    return v;
+}
+
+// ---- polylines and polygons ----
+
+struct DrawPath {
+    x : [128]f32;
+    y : [128]f32;
+    n : u32;
+}
+
+fn drawPath() : DrawPath {
+    var p : DrawPath = undefined;
+    p.n = 0;
+    return p;
+}
+
+fn pathClear(p : *DrawPath) : void {
+    p.n = 0;
+}
+
+// appends a point; points past the capacity of 128 are dropped
+fn pathPoint(p : *DrawPath, x : f32, y : f32) : void {
+    if p.n < 128 {
+        p.x[p.n] = x;
+        p.y[p.n] = y;
+        p.n += 1;
+    }
+}
+
+// appends a cubic bezier as 24 points from (x0, y0) to (x3, y3) inclusive
+fn pathBezier(p : *DrawPath, x0 : f32, y0 : f32, x1 : f32, y1 : f32, x2 : f32, y2 : f32, x3 : f32, y3 : f32) : void {
+    for i in 0..24 {
+        const t = i as f32 / 23.0;
+        const u = 1.0 - t;
+        const a = u * u * u;
+        const b = 3.0 * u * u * t;
+        const c = 3.0 * u * t * t;
+        const d = t * t * t;
+        pathPoint(p, a * x0 + b * x1 + c * x2 + d * x3, a * y0 + b * y1 + c * y2 + d * y3);
+    }
+}
+
+// appends an elliptical arc from angle a0 to a1 (degrees) as n points inclusive
+fn pathArc(p : *DrawPath, cx : f32, cy : f32, rx : f32, ry : f32, a0 : f32, a1 : f32, n : u32) : void {
+    for i in 0..n {
+        const a = (a0 + (a1 - a0) * i as f32 / (n - 1) as f32) * math.pi / 180.0;
+        pathPoint(p, cx + rx * math.cos(a), cy + ry * math.sin(a));
+    }
+}
+
+// ---- painting ----
+
+struct DrawBox {
+    x0 : i32;
+    y0 : i32;
+    x1 : i32;
+    y1 : i32;
+}
+
+// sample bounds of a rectangle in drawing units, one sample of slack, clamped to the canvas
+fn drawBounds(c : DrawCanvas, xmin : f32, ymin : f32, xmax : f32, ymax : f32) : DrawBox {
+    return DrawBox {
+        recipeClampInt(math.floor(xmin * c.scale) as i32 - 1, 0, c.image.width as i32),
+        recipeClampInt(math.floor(ymin * c.scale) as i32 - 1, 0, c.image.height as i32),
+        recipeClampInt(math.floor(xmax * c.scale) as i32 + 2, 0, c.image.width as i32),
+        recipeClampInt(math.floor(ymax * c.scale) as i32 + 2, 0, c.image.height as i32)
+    };
+}
+
+fn drawMark(c : DrawCanvas, x : i32, y : i32) : void {
+    setPixel(c.mask, x as u32, y as u32, Vec4 { 1, 0, 0, 1 });
+}
+
+// paints every marked sample in `b` with `tint` (RGB 0..1) at `alpha` and clears the mask
+fn drawCommit(c : DrawCanvas, b : DrawBox, tint : Vec4, alpha : f32) : void {
+    const src = Vec4 { tint.x * alpha, tint.y * alpha, tint.z * alpha, alpha };
+    for y in b.y0..b.y1 {
+        for x in b.x0..b.x1 {
+            if getPixel(c.mask, x as u32, y as u32).x > 0.5 {
+                const dst = getPixel(c.image, x as u32, y as u32);
+                setPixel(c.image, x as u32, y as u32, src + dst * (1.0 - alpha));
+                setPixel(c.mask, x as u32, y as u32, Vec4 { 0, 0, 0, 1 });
+            }
+        }
+    }
+}
+
+fn drawDisc(c : DrawCanvas, cx : f32, cy : f32, r : f32, tint : Vec4, alpha : f32) : void {
+    const b = drawBounds(c, cx - r, cy - r, cx + r, cy + r);
+    for y in b.y0..b.y1 {
+        for x in b.x0..b.x1 {
+            const dx = (x as f32 + 0.5) / c.scale - cx;
+            const dy = (y as f32 + 0.5) / c.scale - cy;
+            if math.hypot(dx, dy) <= r {
+                drawMark(c, x, y);
+            }
+        }
+    }
+    drawCommit(c, b, tint, alpha);
+}
+
+// circle outline of width w centered on radius r
+fn drawRing(c : DrawCanvas, cx : f32, cy : f32, r : f32, w : f32, tint : Vec4, alpha : f32) : void {
+    const o = r + w * 0.5;
+    const b = drawBounds(c, cx - o, cy - o, cx + o, cy + o);
+    for y in b.y0..b.y1 {
+        for x in b.x0..b.x1 {
+            const dx = (x as f32 + 0.5) / c.scale - cx;
+            const dy = (y as f32 + 0.5) / c.scale - cy;
+            if math.abs(math.hypot(dx, dy) - r) <= w * 0.5 {
+                drawMark(c, x, y);
+            }
+        }
+    }
+    drawCommit(c, b, tint, alpha);
+}
+
+fn drawRect(c : DrawCanvas, x : f32, y : f32, w : f32, h : f32, tint : Vec4, alpha : f32) : void {
+    const b = drawBounds(c, x, y, x + w, y + h);
+    for sy in b.y0..b.y1 {
+        for sx in b.x0..b.x1 {
+            const px = (sx as f32 + 0.5) / c.scale;
+            const py = (sy as f32 + 0.5) / c.scale;
+            if px >= x and px <= x + w and py >= y and py <= y + h {
+                drawMark(c, sx, sy);
+            }
+        }
+    }
+    drawCommit(c, b, tint, alpha);
+}
+
+// rounded rectangle outline: corner radius r, stroke width sw growing inwards
+fn drawRoundedRect(c : DrawCanvas, x : f32, y : f32, w : f32, h : f32, r : f32, sw : f32, tint : Vec4, alpha : f32) : void {
+    const cx = x + w * 0.5;
+    const cy = y + h * 0.5;
+    const b = drawBounds(c, x, y, x + w, y + h);
+    for sy in b.y0..b.y1 {
+        for sx in b.x0..b.x1 {
+            const px = (sx as f32 + 0.5) / c.scale;
+            const py = (sy as f32 + 0.5) / c.scale;
+            const qx = math.abs(px - cx) - (w * 0.5 - r);
+            const qy = math.abs(py - cy) - (h * 0.5 - r);
+            const ox = math.max(qx, 0);
+            const oy = math.max(qy, 0);
+            const sdf = math.hypot(ox, oy) + math.min(math.max(qx, qy), 0) - r;
+            if sdf <= 0 and sdf > -sw {
+                drawMark(c, sx, sy);
+            }
+        }
+    }
+    drawCommit(c, b, tint, alpha);
+}
+
+fn drawPathBounds(c : DrawCanvas, p : *DrawPath, pad : f32) : DrawBox {
+    var xmin = p.x[0];
+    var xmax = p.x[0];
+    var ymin = p.y[0];
+    var ymax = p.y[0];
+    for i in 1..p.n {
+        xmin = math.min(xmin, p.x[i]);
+        xmax = math.max(xmax, p.x[i]);
+        ymin = math.min(ymin, p.y[i]);
+        ymax = math.max(ymax, p.y[i]);
+    }
+    return drawBounds(c, xmin - pad, ymin - pad, xmax + pad, ymax + pad);
+}
+
+fn drawMarkSegment(c : DrawCanvas, x0 : f32, y0 : f32, x1 : f32, y1 : f32, half : f32) : void {
+    const b = drawBounds(c, math.min(x0, x1) - half, math.min(y0, y1) - half, math.max(x0, x1) + half, math.max(y0, y1) + half);
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const l2 = dx * dx + dy * dy;
+    for y in b.y0..b.y1 {
+        for x in b.x0..b.x1 {
+            const px = (x as f32 + 0.5) / c.scale;
+            const py = (y as f32 + 0.5) / c.scale;
+            var t : f32 = 0.0;
+            if l2 > 0 {
+                t = recipeClamp(((px - x0) * dx + (py - y0) * dy) / l2);
+            }
+            const ex = px - (x0 + t * dx);
+            const ey = py - (y0 + t * dy);
+            if math.hypot(ex, ey) <= half {
+                drawMark(c, x, y);
+            }
+        }
+    }
+}
+
+// stroked polyline of width w with round joins and caps; closed also joins the last point to the first
+fn drawLine(c : DrawCanvas, p : *DrawPath, w : f32, tint : Vec4, alpha : f32, closed : bool) : void {
+    if p.n < 2 {
+        return;
+    }
+    const half = w * 0.5;
+    var segments = p.n - 1;
+    if closed {
+        segments = p.n;
+    }
+    for i in 0..segments {
+        const j = (i + 1) % p.n;
+        drawMarkSegment(c, p.x[i], p.y[i], p.x[j], p.y[j], half);
+    }
+    drawCommit(c, drawPathBounds(c, p, half), tint, alpha);
+}
+
+fn drawSegment(c : DrawCanvas, x0 : f32, y0 : f32, x1 : f32, y1 : f32, w : f32, tint : Vec4, alpha : f32) : void {
+    var p = drawPath();
+    pathPoint(&p, x0, y0);
+    pathPoint(&p, x1, y1);
+    drawLine(c, &p, w, tint, alpha, false);
+}
+
+// filled polygon through the path points, even-odd rule
+fn drawPolygon(c : DrawCanvas, p : *DrawPath, tint : Vec4, alpha : f32) : void {
+    if p.n < 3 {
+        return;
+    }
+    const b = drawPathBounds(c, p, 0.0);
+    var xs : [128]f32 = undefined;
+    for y in b.y0..b.y1 {
+        const py = (y as f32 + 0.5) / c.scale;
+        var m : u32 = 0;
+        for i in 0..p.n {
+            const j = (i + 1) % p.n;
+            const y0 = p.y[i];
+            const y1 = p.y[j];
+            if (y0 > py) != (y1 > py) {
+                const xi = (p.x[j] - p.x[i]) * (py - y0) / (y1 - y0 + 0.000000000001) + p.x[i];
+                // insertion sort by x
+                var k = m;
+                while k > 0 and xs[k - 1] > xi {
+                    xs[k] = xs[k - 1];
+                    k -= 1;
+                }
+                xs[k] = xi;
+                m += 1;
+            }
+        }
+        // samples between crossings 2k and 2k + 1 are inside
+        var k : u32 = 0;
+        while k + 1 < m {
+            const from = recipeClampInt(math.ceil(xs[k] * c.scale - 0.5) as i32, b.x0, b.x1);
+            const to = recipeClampInt(math.ceil(xs[k + 1] * c.scale - 0.5) as i32, b.x0, b.x1);
+            for x in from..to {
+                drawMark(c, x, y);
+            }
+            k += 2;
+        }
+    }
+    drawCommit(c, b, tint, alpha);
+}
+
+// averages the supersampled canvas down to width x height and converts from premultiplied to straight alpha
+fn drawFinish(c : DrawCanvas) : Image {
+    var out = create(c.width, c.height, 4);
+    const area = (c.samples * c.samples) as f32;
+    for y in 0..c.height {
+        for x in 0..c.width {
+            var sum = Vec4 { 0, 0, 0, 0 };
+            for j in 0..c.samples {
+                for i in 0..c.samples {
+                    sum = sum + getPixel(c.image, x * c.samples + i, y * c.samples + j);
+                }
+            }
+            sum = sum / area;
+            if sum.w > 0.000001 {
+                setPixel(out, x, y, Vec4 { sum.x / sum.w, sum.y / sum.w, sum.z / sum.w, sum.w });
+            }
+        }
+    }
+    return out;
 }

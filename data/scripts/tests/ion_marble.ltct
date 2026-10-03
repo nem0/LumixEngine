@@ -15,7 +15,7 @@ fn main() : Texture2D {
     map(height,
         fn(x : u32, y : u32, value : Vec4) : Vec4 {
             const bands = math.sin(value.x * 32);
-            const vein = math.pow(recipeAbs(bands), 12);
+            const vein = math.pow(math.abs(bands), 12);
             return Vec4 {recipeClamp(value.x * 0.55 + vein * 0.35), 0, 0, 1};
         });
 
@@ -33,7 +33,7 @@ fn main() : Texture2D {
     mapWith(albedo, stone,
         fn(x : u32, y : u32, value : Vec4, field : Image) : Vec4 {
             const mineral = getPixel(field, x, y).x;
-            const vein = math.pow(recipeAbs(math.sin(mineral * 32)), 28);
+            const vein = math.pow(math.abs(math.sin(mineral * 32)), 28);
             const warm = recipeClamp((mineral - 0.42) * 3);
             const emission = Vec4 {0.05 + warm * 0.8, 0.75 - warm * 0.3, 0.85 - warm * 0.75, 0};
             return Vec4 {

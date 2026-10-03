@@ -149,6 +149,41 @@ Ordinary `if` statements select which operations execute; unselected branches do
 
 Loading, resizing, and filling share implementation with `.ltc`. Output uses the existing texture compression/mipmap pipeline and metadata. `.ltct` appears as a texture asset with compiled preview and thumbnail; its texture editor includes a code editor beside the settings and preview. Saving writes the recipe source and recompiles the texture. The external-editor action is also available. The asset browser still creates `.ltc` by default in this review-sized prototype.
 
+## Vector drawing
+
+For icons and other line art, recipes can draw antialiased shapes instead of filling pixels by hand. A `DrawCanvas` has its own drawing units (for example a 24 x 24 grid) and is supersampled; `drawFinish` averages it down to the output size and returns a straight-alpha RGBA `Image`. Shapes are painted in call order, later over earlier. Colors are `Vec4` with RGB in 0..1 (`recipeRgb(r, g, b)` converts from 0..255); alpha is a separate argument.
+
+```evox
+import "core:texture_recipe"
+import "core:vec4"
+
+fn main() : Texture2D {
+    var c = drawCanvas(96, 96, 3, 24.0);               // 96 x 96 pixels, 3 x 3 samples, 24 units across
+    drawRing(c, 12, 12, 8.6, 2.0, recipeRgb(111, 227, 160), 1.0);
+    var p = drawPath();
+    pathPoint(&p, 7.6, 12.6);
+    pathPoint(&p, 10.8, 15.8);
+    pathPoint(&p, 16.8, 8.8);
+    drawLine(c, &p, 2.2, recipeRgb(111, 227, 160), 1.0, false);
+    return texture2D(drawFinish(c));
+}
+```
+
+| Function | Behavior |
+| --- | --- |
+| `drawCanvas(width, height, samples, units_wide)` | New canvas of `width` x `height` output pixels with `samples` x `samples` samples per pixel; `units_wide` drawing units span the width (the same scale is used vertically). |
+| `drawFinish(canvas)` | Averages the samples down and converts from premultiplied to straight alpha; returns a four-channel `Image`. |
+| `drawDisc(c, cx, cy, r, color, alpha)` | Filled circle. |
+| `drawRing(c, cx, cy, r, w, color, alpha)` | Circle outline of width `w` centered on radius `r`. |
+| `drawRect(c, x, y, w, h, color, alpha)` | Filled rectangle. |
+| `drawRoundedRect(c, x, y, w, h, r, stroke, color, alpha)` | Outline of a rounded rectangle, corner radius `r`, stroke growing inwards. |
+| `drawSegment(c, x0, y0, x1, y1, w, color, alpha)` | One stroked segment with round caps. |
+| `drawLine(c, path, w, color, alpha, closed)` | Stroked polyline with round joins and caps; `closed` joins the last point to the first. Overlapping parts of one stroke are blended once. |
+| `drawPolygon(c, path, color, alpha)` | Filled polygon through the path points, even-odd rule. |
+
+A `DrawPath` holds up to 128 points: `drawPath()` creates an empty one, `pathPoint(&p, x, y)` appends a point, `pathBezier(&p, x0, y0, x1, y1, x2, y2, x3, y3)` appends a 24-point cubic bezier, `pathArc(&p, cx, cy, rx, ry, from_degrees, to_degrees, n)` appends an elliptical arc of `n` points, and `pathClear(&p)` empties it. Because a path is a value, build it with `var p = drawPath()` and pass `&p`.
+
+
 ## Limits and testing
 
 LTCT owns its compiler and isolated runtime directly through the standalone Evox C API. It does not depend on EvoxSystem, evox_module, or loading the Evox game plugin; Studio can build recipes with --no-evox. The Evox library sources belong to the engine project; the Evox game plugin contains only the engine integration. Builds expose only recipe natives and language builtins, not game-world bindings. Invalid paths/handles, out-of-bounds pixel access, non-finite stored values, and invalid output channels produce diagnostics. Limits are 16384 per dimension, 16M pixels per image, 32M cumulatively allocated pixels, and 256 images. Texture arrays require at least one layer, allow 256 layer references per build, and have a 32M output-pixel limit, including repeated layers. Scripts remain trusted code: arbitrary loops have no instruction timeout.

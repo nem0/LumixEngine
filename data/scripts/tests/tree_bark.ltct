@@ -35,7 +35,7 @@ fn main() : Texture2D {
             var relief = ridge * 0.7 + chip * 0.2;
 
             // Break up the raised plates with short cross-cracks.
-            const cross = recipeAbs(math.sin(v * 210 + bend * 17));
+            const cross = math.abs(math.sin(v * 210 + bend * 17));
             if cross < 0.055 and ridge > 0.45 and chip < 0.5 { relief *= 0.4; }
             if chip < 0.12 { relief *= 0.65; }
             relief += knot(u, v, 0.24, 0.31);

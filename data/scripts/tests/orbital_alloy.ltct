@@ -1,6 +1,7 @@
 import "core:texture_recipe"
 import "core:vec2"
 import "core:vec4"
+import "std:math" as math
 
 const SIZE : u32 = 256;
 const PANEL : u32 = 64;
@@ -8,7 +9,7 @@ const PANEL : u32 = 64;
 fn panelHeight(x : u32, y : u32) : f32 {
     const px = (x % PANEL) as f32;
     const py = (y % PANEL) as f32;
-    const edge = recipeMin(recipeMin(px, 63 - px), recipeMin(py, 63 - py));
+    const edge = math.min(math.min(px, 63 - px), math.min(py, 63 - py));
     var height = recipeClamp((edge - 2) / 5) * 0.75;
 
     // Recessed vent slots across each panel's lower half.
@@ -17,8 +18,8 @@ fn panelHeight(x : u32, y : u32) : f32 {
     }
 
     // Four raised screw heads, each with a horizontal driver slot.
-    const sx = recipeMin(recipeAbs(px - 10), recipeAbs(px - 53));
-    const sy = recipeMin(recipeAbs(py - 10), recipeAbs(py - 53));
+    const sx = math.min(math.abs(px - 10), math.abs(px - 53));
+    const sy = math.min(math.abs(py - 10), math.abs(py - 53));
     if sx * sx + sy * sy < 9 {
         height = 0.95;
         if sy < 0.7 { height = 0.55; }

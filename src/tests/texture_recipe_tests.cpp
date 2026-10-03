@@ -500,6 +500,55 @@ bool testRecipeOperationErrors() {
 	}
 	return true;
 }
+
+bool testRecipeDrawing() {
+	// each case draws one shape on a 16 x 16 canvas (16 units, 2 x 2 samples per pixel) and checks a few pixels
+	struct Probe { u32 x, y; float rgba[4]; };
+	struct Case { const char* body; Probe probes[3]; };
+	const Case cases[] = {
+		{ "drawDisc(c, 8, 8, 5, recipeRgb(255, 0, 0), 1.0);", { {8, 8, {1, 0, 0, 1}}, {0, 0, {0, 0, 0, 0}}, {8, 14, {0, 0, 0, 0}} } },
+		{ "drawRing(c, 8, 8, 5, 2, recipeRgb(0, 255, 0), 1.0);", { {8, 8, {0, 0, 0, 0}}, {12, 8, {0, 1, 0, 1}}, {15, 8, {0, 0, 0, 0}} } },
+		{ "drawRect(c, 2, 2, 4, 4, recipeRgb(0, 0, 255), 0.5);", { {3, 3, {0, 0, 1, 0.5f}}, {1, 1, {0, 0, 0, 0}}, {6, 6, {0, 0, 0, 0}} } },
+		{ "drawRoundedRect(c, 1, 1, 14, 14, 2, 2, recipeRgb(255, 255, 0), 1.0);", { {8, 1, {1, 1, 0, 1}}, {8, 8, {0, 0, 0, 0}}, {0, 0, {0, 0, 0, 0}} } },
+		{ "drawSegment(c, 2, 8, 14, 8, 2, recipeRgb(255, 255, 255), 1.0);", { {8, 7, {1, 1, 1, 1}}, {8, 4, {0, 0, 0, 0}}, {8, 12, {0, 0, 0, 0}} } },
+		{ "var p = drawPath(); pathPoint(&p, 2, 2); pathPoint(&p, 14, 2); pathPoint(&p, 14, 14); pathPoint(&p, 2, 14); pathPoint(&p, 2, 8); pathPoint(&p, 8, 8); pathPoint(&p, 8, 2); drawPolygon(c, &p, recipeRgb(255, 0, 255), 1.0);", { {12, 12, {1, 0, 1, 1}}, {4, 4, {0, 0, 0, 0}}, {1, 1, {0, 0, 0, 0}} } },
+		{ "drawDisc(c, 8, 8, 6, recipeRgb(255, 0, 0), 1.0); drawDisc(c, 8, 8, 3, recipeRgb(0, 0, 255), 0.5);", { {8, 8, {0.5f, 0, 0.5f, 1}}, {8, 3, {1, 0, 0, 1}}, {0, 8, {0, 0, 0, 0}} } },
+	};
+	for (const Case& c : cases) {
+		Fixture f;
+		const StaticString<512> source("import \"core:texture_recipe\"
+import \"core:vec4\"
+fn main() : Texture2D {
+var c = drawCanvas(16, 16, 2, 16.0);
+", c.body, "
+return texture2D(drawFinish(c));
+}
+");
+		ASSERT_TRUE(f.run(source.data));
+		const auto& image = f.result.layers[0];
+		ASSERT_EQ(16, image.w); ASSERT_EQ(16, image.h); ASSERT_EQ(4, image.channels);
+		for (const Probe& p : c.probes) {
+			for (u32 k = 0; k < 4; ++k) ASSERT_FLOAT_EQ(p.rgba[k], image.pixels[(p.y * 16 + p.x) * 4 + k]);
+		}
+	}
+	return true;
+}
+
+bool testRecipeAtan2() {
+	Fixture f;
+	ASSERT_TRUE(f.run(R"(
+import "core:texture_recipe"
+import "core:vec4"
+import "std:math" as math
+fn main() : Texture2D {
+    return texture2D(color(1, 1, Vec4 {math.atan2(1.0, 1.0), math.atan2(1.0, -1.0), math.atan2(-1.0, 0.0), math.atan2(0.0, 1.0)}));
+}
+)"));
+	const auto& pixels = f.result.layers[0].pixels;
+	ASSERT_FLOAT_EQ(0.7853982f, pixels[0]); ASSERT_FLOAT_EQ(2.3561945f, pixels[1]);
+	ASSERT_FLOAT_EQ(-1.5707964f, pixels[2]); ASSERT_EQ(0.f, pixels[3]);
+	return true;
+}
 } // namespace
 
 void runTextureRecipeTests() {
@@ -522,4 +571,6 @@ void runTextureRecipeTests() {
 	RUN_TEST(testRecipeArraySlice);
 	RUN_TEST(testEagerRecipeArrayErrors);
 	RUN_TEST(testEagerRecipeErrors);
+	RUN_TEST(testRecipeDrawing);
+	RUN_TEST(testRecipeAtan2);
 }
