@@ -583,7 +583,7 @@ static bool getStoragePath(ex_string_view relative, Span<char> out) {
 	char base[MAX_PATH];
 	if (!os::getSavedGamesDir(Span(base))) return false;
 	StaticString<MAX_PATH + 256> path(base, "/", StringView(relative.begin, (u64)relative.length));
-	if (path.length() >= out.length()) return false;
+	if ((i64)stringLength(path) >= (i64)out.length()) return false;
 	copyString(out, path);
 	return true;
 }
