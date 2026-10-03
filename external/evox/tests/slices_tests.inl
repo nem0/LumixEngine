@@ -1546,3 +1546,29 @@ TEST(ComptimeSliceLengthNarrowedToI32Runtime) {
 	CAPI_END(module);
 	return true;
 }
+
+TEST(SliceOfArrayFieldThroughPointerParameter) {
+	// `b.data[0:b.len]` where b is a pointer parameter: the array address is b itself, so the slice length
+	// must not be read from whatever happens to follow the parameter in the frame.
+	const char* source = R"(
+		struct Buf { data : [32]u8; len : i32; }
+
+		fn view(b : *Buf) : []const u8 { return b.data[0:b.len]; }
+
+		fn main() : i32 {
+			var b : Buf = undefined;
+			b.len = 12;
+			const first = view(&b);
+			b.len = 20;
+			const second = view(&b);
+			return (first.length + second.length) as i32;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(32, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}

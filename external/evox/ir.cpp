@@ -3759,6 +3759,17 @@ struct BytecodeCompiler {
 		} else if (op.source_is_array) {
 			EX_ASSERT(op.source->result_mode == ExIrOp::ADDRESS);
 			result = emit(*op.source, nullptr);
+			if (result + sizeof(void*) != stack_top) {
+				// the address already lives in some other register (e.g. the base of a pointer parameter);
+				// the length below has to sit right after the pointer, so copy it to the top of the stack
+				const u32 address = result;
+				result = stack_top;
+				emitOp(EX_OP_COPY);
+				emit(result);
+				emit(address);
+				emit((u32)sizeof(void*));
+				stack_top += sizeof(void*);
+			}
 			emitOp(EX_OP_LOAD_CONST_8);
 			emit(stack_top);
 			emit(op.source_length);
