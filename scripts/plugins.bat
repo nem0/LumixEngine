@@ -48,7 +48,7 @@ setlocal
 	if %errorlevel%==11 call :basisu
 	if %errorlevel%==12 call :jolt_plugin
 	if %errorlevel%==13 call :lua_plugin
-	if %errorlevel%==14 call :remote_control_plugin
+	if %errorlevel%==14 call :remote_plugin
 goto :begin
 
 :glft_import_plugin
@@ -201,16 +201,16 @@ exit /B 0
 	popd
 exit /B 0
 
-:remote_control_plugin
+:remote_plugin
 	if not exist ..\plugins mkdir ..\plugins
 	pushd ..\plugins
-	if not exist remote_control (
-		git.exe clone https://github.com/nem0/remote_control_lumix.git remote_control
-		pushd remote_control
+	if not exist remote (
+		git.exe clone https://github.com/nem0/remote_control_lumix.git remote
+		pushd remote
 		git remote add origin2 git@github.com:nem0/remote_control_lumix.git
 		popd
 	) else (
-		cd remote_control
+		cd remote
 		git pull
 	)
 	popd
