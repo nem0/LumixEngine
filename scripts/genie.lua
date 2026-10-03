@@ -375,6 +375,7 @@ lib_project "core"
 	-- Run the meta tool before compilation on Windows. Linux currently uses the
 	-- checked-in generated headers until the meta tool is made portable.
 	configuration { "not linux" }
+		dependson { "meta" } -- build meta in the solution first, otherwise it races with the msbuild call below
 		prebuildcommands { "msbuild $(SolutionDir)meta.vcxproj /p:Configuration=$(Configuration) /p:Platform=$(Platform) /verbosity:minimal", "cd $(ProjectDir)../../../ && $(SolutionDir)bin\\$(Configuration)\\meta.exe" }
 	configuration {}
 
