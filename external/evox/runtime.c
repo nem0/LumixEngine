@@ -129,6 +129,32 @@ static void runtime_native_cos_f64(ex_runtime* runtime, ex_call_frame frame) { (
 static void runtime_native_sqrt_f64(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f64, value); EX_TYPED_RESULT(frame, f64, sqrt(value)); }
 static void runtime_native_pow_f32(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f32, base); EX_ARG(frame, f32, exponent); EX_TYPED_RESULT(frame, f32, powf(base, exponent)); }
 static void runtime_native_pow_f64(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f64, base); EX_ARG(frame, f64, exponent); EX_TYPED_RESULT(frame, f64, pow(base, exponent)); }
+static void runtime_native_atan2_f32(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f32, y); EX_ARG(frame, f32, x); EX_TYPED_RESULT(frame, f32, atan2f(y, x)); }
+static void runtime_native_atan2_f64(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f64, y); EX_ARG(frame, f64, x); EX_TYPED_RESULT(frame, f64, atan2(y, x)); }
+static void runtime_native_floor_f32(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f32, value); EX_TYPED_RESULT(frame, f32, floorf(value)); }
+static void runtime_native_floor_f64(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f64, value); EX_TYPED_RESULT(frame, f64, floor(value)); }
+static void runtime_native_ceil_f32(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f32, value); EX_TYPED_RESULT(frame, f32, ceilf(value)); }
+static void runtime_native_ceil_f64(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f64, value); EX_TYPED_RESULT(frame, f64, ceil(value)); }
+static void runtime_native_round_f32(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f32, value); EX_TYPED_RESULT(frame, f32, roundf(value)); }
+static void runtime_native_round_f64(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f64, value); EX_TYPED_RESULT(frame, f64, round(value)); }
+static void runtime_native_abs_f32(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f32, value); EX_TYPED_RESULT(frame, f32, fabsf(value)); }
+static void runtime_native_abs_f64(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f64, value); EX_TYPED_RESULT(frame, f64, fabs(value)); }
+static void runtime_native_tan_f32(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f32, value); EX_TYPED_RESULT(frame, f32, tanf(value)); }
+static void runtime_native_tan_f64(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f64, value); EX_TYPED_RESULT(frame, f64, tan(value)); }
+static void runtime_native_asin_f32(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f32, value); EX_TYPED_RESULT(frame, f32, asinf(value)); }
+static void runtime_native_asin_f64(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f64, value); EX_TYPED_RESULT(frame, f64, asin(value)); }
+static void runtime_native_acos_f32(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f32, value); EX_TYPED_RESULT(frame, f32, acosf(value)); }
+static void runtime_native_acos_f64(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f64, value); EX_TYPED_RESULT(frame, f64, acos(value)); }
+static void runtime_native_atan_f32(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f32, value); EX_TYPED_RESULT(frame, f32, atanf(value)); }
+static void runtime_native_atan_f64(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f64, value); EX_TYPED_RESULT(frame, f64, atan(value)); }
+static void runtime_native_exp_f32(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f32, value); EX_TYPED_RESULT(frame, f32, expf(value)); }
+static void runtime_native_exp_f64(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f64, value); EX_TYPED_RESULT(frame, f64, exp(value)); }
+static void runtime_native_log_f32(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f32, value); EX_TYPED_RESULT(frame, f32, logf(value)); }
+static void runtime_native_log_f64(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f64, value); EX_TYPED_RESULT(frame, f64, log(value)); }
+static void runtime_native_hypot_f32(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f32, a); EX_ARG(frame, f32, b); EX_TYPED_RESULT(frame, f32, hypotf(a, b)); }
+static void runtime_native_hypot_f64(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f64, a); EX_ARG(frame, f64, b); EX_TYPED_RESULT(frame, f64, hypot(a, b)); }
+static void runtime_native_fmod_f32(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f32, a); EX_ARG(frame, f32, b); EX_TYPED_RESULT(frame, f32, fmodf(a, b)); }
+static void runtime_native_fmod_f64(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f64, a); EX_ARG(frame, f64, b); EX_TYPED_RESULT(frame, f64, fmod(a, b)); }
 
 /* std:mem alloc(size, align) : byte[]. Allocates `size` bytes of heap memory. */
 static void runtime_native_alloc(ex_runtime* runtime, ex_call_frame frame) {
@@ -165,6 +191,32 @@ static void runtime_bind_builtin_callbacks(ex_runtime* runtime) {
 		else if (runtime_string_equals_cstr(fn->name, "sqrt_f64")) runtime->native_callbacks[i] = &runtime_native_sqrt_f64;
 		else if (runtime_string_equals_cstr(fn->name, "pow")) runtime->native_callbacks[i] = &runtime_native_pow_f32;
 		else if (runtime_string_equals_cstr(fn->name, "pow_f64")) runtime->native_callbacks[i] = &runtime_native_pow_f64;
+		else if (runtime_string_equals_cstr(fn->name, "atan2")) runtime->native_callbacks[i] = &runtime_native_atan2_f32;
+		else if (runtime_string_equals_cstr(fn->name, "atan2_f64")) runtime->native_callbacks[i] = &runtime_native_atan2_f64;
+		else if (runtime_string_equals_cstr(fn->name, "floor")) runtime->native_callbacks[i] = &runtime_native_floor_f32;
+		else if (runtime_string_equals_cstr(fn->name, "floor_f64")) runtime->native_callbacks[i] = &runtime_native_floor_f64;
+		else if (runtime_string_equals_cstr(fn->name, "ceil")) runtime->native_callbacks[i] = &runtime_native_ceil_f32;
+		else if (runtime_string_equals_cstr(fn->name, "ceil_f64")) runtime->native_callbacks[i] = &runtime_native_ceil_f64;
+		else if (runtime_string_equals_cstr(fn->name, "round")) runtime->native_callbacks[i] = &runtime_native_round_f32;
+		else if (runtime_string_equals_cstr(fn->name, "round_f64")) runtime->native_callbacks[i] = &runtime_native_round_f64;
+		else if (runtime_string_equals_cstr(fn->name, "abs")) runtime->native_callbacks[i] = &runtime_native_abs_f32;
+		else if (runtime_string_equals_cstr(fn->name, "abs_f64")) runtime->native_callbacks[i] = &runtime_native_abs_f64;
+		else if (runtime_string_equals_cstr(fn->name, "tan")) runtime->native_callbacks[i] = &runtime_native_tan_f32;
+		else if (runtime_string_equals_cstr(fn->name, "tan_f64")) runtime->native_callbacks[i] = &runtime_native_tan_f64;
+		else if (runtime_string_equals_cstr(fn->name, "asin")) runtime->native_callbacks[i] = &runtime_native_asin_f32;
+		else if (runtime_string_equals_cstr(fn->name, "asin_f64")) runtime->native_callbacks[i] = &runtime_native_asin_f64;
+		else if (runtime_string_equals_cstr(fn->name, "acos")) runtime->native_callbacks[i] = &runtime_native_acos_f32;
+		else if (runtime_string_equals_cstr(fn->name, "acos_f64")) runtime->native_callbacks[i] = &runtime_native_acos_f64;
+		else if (runtime_string_equals_cstr(fn->name, "atan")) runtime->native_callbacks[i] = &runtime_native_atan_f32;
+		else if (runtime_string_equals_cstr(fn->name, "atan_f64")) runtime->native_callbacks[i] = &runtime_native_atan_f64;
+		else if (runtime_string_equals_cstr(fn->name, "exp")) runtime->native_callbacks[i] = &runtime_native_exp_f32;
+		else if (runtime_string_equals_cstr(fn->name, "exp_f64")) runtime->native_callbacks[i] = &runtime_native_exp_f64;
+		else if (runtime_string_equals_cstr(fn->name, "log")) runtime->native_callbacks[i] = &runtime_native_log_f32;
+		else if (runtime_string_equals_cstr(fn->name, "log_f64")) runtime->native_callbacks[i] = &runtime_native_log_f64;
+		else if (runtime_string_equals_cstr(fn->name, "hypot")) runtime->native_callbacks[i] = &runtime_native_hypot_f32;
+		else if (runtime_string_equals_cstr(fn->name, "hypot_f64")) runtime->native_callbacks[i] = &runtime_native_hypot_f64;
+		else if (runtime_string_equals_cstr(fn->name, "fmod")) runtime->native_callbacks[i] = &runtime_native_fmod_f32;
+		else if (runtime_string_equals_cstr(fn->name, "fmod_f64")) runtime->native_callbacks[i] = &runtime_native_fmod_f64;
 		else if (runtime_string_equals_cstr(fn->name, "alloc")) runtime->native_callbacks[i] = &runtime_native_alloc;
 		else if (runtime_string_equals_cstr(fn->name, "free")) runtime->native_callbacks[i] = &runtime_native_free;
 	}

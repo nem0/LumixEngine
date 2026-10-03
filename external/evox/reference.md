@@ -161,7 +161,7 @@ fn main() : f32 {
 }
 ```
 
-Builtin math functions live under `std:`. Use `std:math` for `sin`, `cos`, and `sqrt`.
+Builtin math functions live under `std:`. Use `std:math` for `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`, `sqrt`, `pow`, `exp`, `log`, `hypot`, `fmod`, `floor`, `ceil`, `round` and `abs` (each also has an `_f64` variant, e.g. `atan2_f64`), the generic `min(a, b)` and `max(a, b)` that work on any ordered type such as `i32` or `f32` (both arguments must have the same type, so write `math.max(x, 0.0 as f32)` or put the typed value first), plus the untyped comptime constant `pi`, which takes the type of its use (`f32` or `f64`).
 The `std:` prefix is reserved for builtin modules and cannot be used for user-defined imports.
 
 Rules:

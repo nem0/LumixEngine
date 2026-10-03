@@ -3578,6 +3578,11 @@ struct Checker {
 				expr.resolved_type = sym.symbol->resolved_type;
 				expr.eval_stage = sym.symbol->kind == EX_SYM_KIND_COMPTIME ? comptimeStageForType(expr.resolved_type) : Expression::RUNTIME;
 				member.resolved_symbol = sym.symbol;
+				// Carry the value on the expression so that pinning an untyped numeric (makeConcrete) re-encodes it for the use site;
+				// otherwise the IR would copy the symbol's untyped bytes into a narrower type (an untyped float read as f32).
+				if (sym.symbol->kind == EX_SYM_KIND_COMPTIME && sym.symbol->comptime_value.kind == ComptimeValue::VALUE && expr.resolved_type && isUntypedNumeric(*expr.resolved_type)) {
+					expr.comptime_value = sym.symbol->comptime_value;
+				}
 				if (sym.symbol->expression && sym.symbol->expression->kind == Expression::FUNCTION) {
 					member.resolved_fn = static_cast<FunctionExpression*>(sym.symbol->expression);
 				}
@@ -5813,6 +5818,41 @@ struct Checker {
 		extern fn sqrt_f64(v : f64) : f64;
 		extern fn pow(v : f32, exponent : f32) : f32;
 		extern fn pow_f64(v : f64, exponent : f64) : f64;
+		extern fn atan2(y : f32, x : f32) : f32;
+		extern fn atan2_f64(y : f64, x : f64) : f64;
+		extern fn floor(v : f32) : f32;
+		extern fn floor_f64(v : f64) : f64;
+		extern fn ceil(v : f32) : f32;
+		extern fn ceil_f64(v : f64) : f64;
+		extern fn round(v : f32) : f32;
+		extern fn round_f64(v : f64) : f64;
+		extern fn abs(v : f32) : f32;
+		extern fn abs_f64(v : f64) : f64;
+		extern fn tan(v : f32) : f32;
+		extern fn tan_f64(v : f64) : f64;
+		extern fn asin(v : f32) : f32;
+		extern fn asin_f64(v : f64) : f64;
+		extern fn acos(v : f32) : f32;
+		extern fn acos_f64(v : f64) : f64;
+		extern fn atan(v : f32) : f32;
+		extern fn atan_f64(v : f64) : f64;
+		extern fn exp(v : f32) : f32;
+		extern fn exp_f64(v : f64) : f64;
+		extern fn log(v : f32) : f32;
+		extern fn log_f64(v : f64) : f64;
+		extern fn hypot(a : f32, b : f32) : f32;
+		extern fn hypot_f64(a : f64, b : f64) : f64;
+		extern fn fmod(a : f32, b : f32) : f32;
+		extern fn fmod_f64(a : f64, b : f64) : f64;
+		fn min(a : $T, b : T) : T {
+			if b < a { return b; }
+			return a;
+		}
+		fn max(a : $T, b : T) : T {
+			if b > a { return b; }
+			return a;
+		}
+		comptime pi = 3.14159265358979323846;
 	)";
 
 	static inline const char builtin_mem_source[] = R"(
