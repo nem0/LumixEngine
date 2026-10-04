@@ -79,8 +79,21 @@ struct EvoxDiscoveryFileSystem : FileSystem {
 		: content(getGlobalAllocator())
 		, resource_path(".lumix/resources/", Path("main.evox").getHash(), ".res")
 	{
+		// The asset compiler stores bytecode, so do the same here.
 		content.write(CompiledResourceHeader{});
-		content.write(source, stringLength(source));
+		EvoxTestHost script_host;
+		ex_module* module = ex_module_create(&script_host.host);
+		ASSERT(module);
+		const ex_result compiled = ex_module_compile(module, {source, (i64)stringLength(source)}, {"main.evox", 9}, &resolveTestImport, nullptr);
+		ASSERT(compiled == EX_RESULT_OK);
+		ex_bytecode* bytecode = ex_bytecode_compile(module, &script_host.host, nullptr);
+		ASSERT(bytecode);
+		const ex_result saved = ex_bytecode_save(bytecode, [](void* userdata, const void* data, u64 size) {
+			((OutputMemoryStream*)userdata)->write(data, size);
+		}, &content);
+		ASSERT(saved == EX_RESULT_OK);
+		ex_bytecode_destroy(bytecode);
+		ex_module_destroy(module);
 	}
 
 	const char* getEngineDataDir() override { return ""; }

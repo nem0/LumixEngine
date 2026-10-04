@@ -181,7 +181,6 @@ struct EvoxSystemImpl : EvoxSystem {
 	bool isReady() const override { return m_is_ready; }
 	Span<const ex_type*> getEvoxDataTypes() const override { return m_data_types; }
 	ex_task* getTask() override { return m_task; }
-	ex_module* getDebugModule() override { return m_module; }
 
 	ex_string_view debugSourceName(const Path& source) {
 		// Debug locations retain import names, while the editor uses filesystem paths.
@@ -356,7 +355,6 @@ struct EvoxSystemImpl : EvoxSystem {
 		if (m_task) { ex_task_destroy(m_task); m_task = nullptr; }
 		if (m_runtime) { ex_runtime_destroy(m_runtime); m_runtime = nullptr; }
 		if (m_bytecode) { ex_bytecode_destroy(m_bytecode); m_bytecode = nullptr; }
-		if (m_module) { ex_module_destroy(m_module); m_module = nullptr; }
 		if (m_host.arena.allocate) {
 			ex_default_arena_destroy(&m_host.arena);
 			m_host.arena = {};
@@ -371,28 +369,16 @@ struct EvoxSystemImpl : EvoxSystem {
 		return m_task != nullptr;
 	}
 
+	// The asset compiler already compiled the script, we only instantiate its bytecode.
 	bool compileAndRun() {
 		if (!m_resource) return false;
 
 		destroyScript();
-		String diagnostics(m_allocator);
-		EvoxDiagnosticsContext diagnostics_context = {&diagnostics, &m_host};
-		m_host.diagnostics_userdata = &diagnostics_context;
-		m_host.print = &printEvoxMessage;
 		ex_default_arena_create(&m_host.arena);
-		m_module = ex_module_create(&m_host);
-		ImportContext imports(m_engine.getFileSystem(), m_allocator);
-		if (!m_module || !ex_module_compile(m_module, toEvox(m_resource->getSourceCode()), toEvox(MAIN_PATH), &resolveImport, &imports)) {
-			m_host.diagnostics_userdata = nullptr;
-			m_host.print = nullptr;
-			logError("Evox compilation failed: ", diagnostics);
-			return false;
-		}
-		m_bytecode = ex_bytecode_compile(m_module, &m_host, &s_compile_options);
-		m_host.diagnostics_userdata = nullptr;
-		m_host.print = nullptr;
+		const Span<const u8> image = m_resource->getBytecode();
+		m_bytecode = ex_bytecode_load(&m_host, image.begin(), image.length());
 		if (!m_bytecode) {
-			logError("Evox bytecode compilation failed: ", diagnostics);
+			logError("Evox failed to load bytecode of ", m_resource->getPath());
 			return false;
 		}
 		for (u32 i = 0, count = ex_bytecode_type_count(m_bytecode); i < count; ++i) {
@@ -413,7 +399,6 @@ struct EvoxSystemImpl : EvoxSystem {
 	EvoxResourceManager m_evox_resource_manager;
 	EvoxResource* m_resource = nullptr;
 	ex_host m_host;
-	ex_module* m_module = nullptr;
 	ex_bytecode* m_bytecode = nullptr;
 	ex_runtime* m_runtime = nullptr;
 	ex_task* m_task = nullptr;
@@ -752,7 +737,6 @@ struct EvoxModuleImpl : EvoxModule {
 	}
 	ex_runtime* getDebugRuntime() override { return m_system.m_runtime; }
 	ex_task* getTask() override { return m_system.getTask(); }
-	ex_module* getDebugModule() override { return m_system.getDebugModule(); }
 	bool setDebugBreakpoint(const Path& source, u32 line) override { return m_system.setDebugBreakpoint(source, line); }
 	bool removeDebugBreakpoint(const Path& source, u32 line) override { return m_system.removeDebugBreakpoint(source, line); }
 

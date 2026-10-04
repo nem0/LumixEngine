@@ -3022,3 +3022,86 @@ TEST(StaticArrayRuntimeOutOfBoundsFails) {
 	EXPECT_EQ(EX_CALL_RESULT_INDEX_OUT_OF_BOUNDS, test_call(runtime, toLs("main")));
 	return true;
 }
+
+static void testSaveBytecodeChunk(void* userdata, const void* data, u64 size) {
+	std::vector<u8>& out = *(std::vector<u8>*)userdata;
+	out.insert(out.end(), (const u8*)data, (const u8*)data + size);
+}
+
+TEST(BytecodeSaveLoadRoundTrip) {
+	const char* source = R"(
+		enum Color : u8 {
+			RED = 1,
+			GREEN = 2
+		}
+		struct range { min : i32; max : i32; }
+		#[range { 1, 9 }]
+		struct Settings {
+			#[range { 2, 3 }]
+			value : i32;
+			color : Color;
+		}
+		var counter : i32 = 5;
+		var table : [3]i32 = [10, 20, 30];
+		fn add(a : i32, b : i32) : i32 { return a + b; }
+		fn main() : i32 {
+			var settings : Settings = undefined;
+			settings.value = add(counter, 2);
+			var sum : i32 = 0;
+			for i in 0..3 { sum += table[i]; }
+			var text : []const u8 = "hello";
+			return settings.value + sum + (text.length as i32);
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	ex_bytecode* original = ex_bytecode_compile(module, &module_host, nullptr);
+	EXPECT_TRUE(original != nullptr);
+
+	std::vector<u8> image;
+	EXPECT_EQ((int)EX_RESULT_OK, (int)ex_bytecode_save(original, &testSaveBytecodeChunk, &image));
+	EXPECT_TRUE(image.size() > 0);
+
+	// Load into an unrelated host: the loaded bytecode must not depend on the compiler.
+	TestContext load_context;
+	ex_bytecode* loaded = ex_bytecode_load(&load_context.host, image.data(), image.size());
+	EXPECT_TRUE(loaded != nullptr);
+	EXPECT_EQ(original->function_count, loaded->function_count);
+	EXPECT_EQ(original->type_info_count, loaded->type_info_count);
+	EXPECT_EQ(original->global_size, loaded->global_size);
+	EXPECT_EQ(original->location_count, loaded->location_count);
+
+	ex_runtime* runtime = ex_runtime_create(loaded, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(7 + 60 + 5, ex_task_to_i32(runtime, -1));
+	test_runtime_destroy(runtime);
+
+	// Type metadata, including attribute payloads, survives the round trip.
+	const ex_type* settings = nullptr;
+	for (u32 i = 0; i < ex_bytecode_type_count(loaded); ++i) {
+		const ex_type* type = ex_bytecode_type(loaded, i);
+		if (equalStrings(ex_type_get_name(type), toLs("BytecodeSaveLoadRoundTrip.Settings"))) settings = type;
+	}
+	EXPECT_TRUE(settings != nullptr);
+	EXPECT_EQ(1u, ex_type_attribute_count(settings));
+	const ex_attribute attribute = ex_type_attribute_value(settings, 0);
+	EXPECT_TRUE(attribute.type != nullptr);
+	i32 max = 0;
+	memcpy(&max, (const u8*)attribute.value + ex_type_struct_field_offset(attribute.type, 1), sizeof(max));
+	EXPECT_EQ(9, max);
+	EXPECT_EQ(1u, ex_type_struct_field_attribute_count(settings, 0));
+
+	// Malformed images are rejected instead of loaded.
+	EXPECT_TRUE(ex_bytecode_load(&load_context.host, image.data(), image.size() / 2) == nullptr);
+	std::vector<u8> bad_magic = image;
+	bad_magic[0] ^= 0xff;
+	EXPECT_TRUE(ex_bytecode_load(&load_context.host, bad_magic.data(), bad_magic.size()) == nullptr);
+	EXPECT_TRUE(ex_bytecode_load(&load_context.host, nullptr, 0) == nullptr);
+
+	ex_bytecode_destroy(loaded);
+	ex_bytecode_destroy(original);
+	CAPI_END(module);
+	return true;
+}

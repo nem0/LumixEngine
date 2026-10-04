@@ -491,3 +491,413 @@ ex_attribute ex_type_struct_field_attribute_value(const ex_type* type, u32 field
 
 	return {(const ex_type*)&type->bytecode->type_info[info.type_index], info.value};
 }
+
+// Bytecode serialization
+
+namespace {
+
+constexpr u32 BYTECODE_IMAGE_MAGIC = 0x43425845; // "EXBC"
+constexpr u32 BYTECODE_IMAGE_VERSION = 1;
+
+struct BytecodeWriter {
+	ex_write_fn write;
+	void* userdata;
+
+	void bytes(const void* data, u64 size) {
+		if (size) write(userdata, data, size);
+	}
+	void u32v(u32 v) { bytes(&v, sizeof(v)); }
+	void u64v(u64 v) { bytes(&v, sizeof(v)); }
+	void u8v(u8 v) { bytes(&v, sizeof(v)); }
+	void string(ex_string_view s) {
+		const u32 length = s.begin ? (u32)s.length : 0;
+		u32v(length);
+		bytes(s.begin, length);
+	}
+};
+
+struct BytecodeReader {
+	ex_host* host;
+	const u8* cursor;
+	const u8* end;
+	bool ok = true;
+
+	u64 remaining() const { return (u64)(end - cursor); }
+
+	void bytes(void* out, u64 size) {
+		if (!ok || remaining() < size) {
+			ok = false;
+			return;
+		}
+		if (size) memcpy(out, cursor, size);
+		cursor += size;
+	}
+
+	u32 u32v() {
+		u32 v = 0;
+		bytes(&v, sizeof(v));
+		return v;
+	}
+
+	u64 u64v() {
+		u64 v = 0;
+		bytes(&v, sizeof(v));
+		return v;
+	}
+
+	u8 u8v() {
+		u8 v = 0;
+		bytes(&v, sizeof(v));
+		return v;
+	}
+
+	// Element count of an array whose entries each take at least one byte in
+	// the image, so a corrupt count cannot trigger a huge allocation.
+	u32 count() {
+		const u32 n = u32v();
+		// this catch at least some issues 
+		if (n > remaining()) ok = false;
+		return ok ? n : 0;
+	}
+
+	void* allocate(u64 size, u64 align) {
+		if (!ok || size == 0) return nullptr;
+		void* mem = host->arena.allocate(host->arena.user_data, (size_t)size, (size_t)align);
+		if (!mem) ok = false;
+		return mem;
+	}
+
+	template <typename T> T* array(u32 n) {
+		T* mem = (T*)allocate(sizeof(T) * (u64)n, alignof(T));
+		if (mem) memset(mem, 0, sizeof(T) * (size_t)n);
+		return mem;
+	}
+
+	ex_string_view string() {
+		const u32 length = u32v();
+		if (!ok || remaining() < length) {
+			ok = false;
+			return {};
+		}
+		char* mem = (char*)allocate((u64)length + 1, 1);
+		if (!mem) return {};
+		memcpy(mem, cursor, length);
+		mem[length] = '\0';
+		cursor += length;
+		return {mem, (i64)length};
+	}
+};
+
+bool validIndexOrNone(u32 index, u32 count) {
+	return index == EX_TYPE_INDEX_NONE || index < count;
+}
+bool validRange(u32 first, u32 n, u32 count) {
+	return n == 0 || ((u64)first + n <= count);
+}
+
+} // namespace
+
+ex_result ex_bytecode_save(const ex_bytecode* bc, ex_write_fn write, void* userdata) {
+	if (!bc || !write) return EX_RESULT_INVALID_ARGUMENT;
+	// Breakpoints patch opcodes in place; saving them would persist the traps.
+	if (bc->breakpoint_count > 0) return EX_RESULT_FAILURE;
+
+	BytecodeWriter w{write, userdata};
+	w.u32v(BYTECODE_IMAGE_MAGIC);
+	w.u32v(BYTECODE_IMAGE_VERSION);
+
+	w.u32v(bc->unit_count);
+	for (u32 i = 0; i < bc->unit_count; ++i) {
+		w.string(bc->units[i].source_name);
+		w.u32v(bc->units[i].first_import);
+		w.u32v(bc->units[i].import_count);
+	}
+	w.u32v(bc->unit_import_count);
+	for (u32 i = 0; i < bc->unit_import_count; ++i) w.u32v(bc->unit_imports[i]);
+
+	w.u32v(bc->global_size);
+	w.u8v(bc->has_global_init ? 1 : 0);
+
+	w.u32v(bc->function_count);
+	for (u32 i = 0; i < bc->function_count; ++i) {
+		const ex_function_bc& fn = bc->functions[i];
+		w.string(fn.name);
+		w.string(fn.unit_path);
+		w.u32v((u32)fn.kind);
+		w.u8v(fn.is_builtin_native ? 1 : 0);
+		w.u32v(fn.param_size);
+		w.u32v(fn.return_size);
+		w.u32v(fn.frame_size);
+		w.u32v((u32)fn.return_kind);
+		w.u32v(fn.code_size);
+		w.bytes(fn.code, fn.code_size);
+		w.u32v(fn.source_map_count);
+		for (u32 j = 0; j < fn.source_map_count; ++j) {
+			w.u32v(fn.source_map[j].code_offset);
+			w.u32v(fn.source_map[j].location_index);
+		}
+		w.u32v(fn.local_count);
+		for (u32 j = 0; j < fn.local_count; ++j) {
+			const ex_bytecode_local_debug_entry& local = fn.locals[j];
+			w.string(local.name);
+			w.u32v(local.offset);
+			w.u32v(local.byte_size);
+			w.u32v(local.type_index);
+			w.u32v(local.scope_begin_offset);
+		}
+	}
+
+	w.u32v(bc->string_count);
+	for (u32 i = 0; i < bc->string_count; ++i) w.string(bc->strings[i]);
+
+	w.u32v(bc->location_count);
+	for (u32 i = 0; i < bc->location_count; ++i) {
+		w.u32v(bc->locations[i].unit_index);
+		w.u32v(bc->locations[i].line);
+		w.u32v(bc->locations[i].column);
+	}
+
+	w.u32v(bc->global_debug_count);
+	for (u32 i = 0; i < bc->global_debug_count; ++i) {
+		const ex_bytecode_global_debug_entry& g = bc->global_debug[i];
+		w.string(g.name);
+		w.u32v(g.unit_index);
+		w.u32v(g.offset);
+		w.u32v(g.byte_size);
+		w.u32v(g.type_index);
+	}
+
+	w.u32v(bc->type_info_count);
+	for (u32 i = 0; i < bc->type_info_count; ++i) {
+		const ex_type& t = bc->type_info[i];
+		w.u32v((u32)t.kind);
+		w.u32v(t.byte_size);
+		w.u32v(t.alignment);
+		w.u32v(t.field_count);
+		w.u32v(t.first_field_index);
+		w.u32v(t.attribute_count);
+		w.u32v(t.first_attribute_index);
+		w.u32v(t.member_count);
+		w.u32v(t.first_member_index);
+		w.u32v(t.value_count);
+		w.u32v(t.first_value_index);
+		w.u32v((u32)t.enum_backing_kind);
+		w.u32v(t.element_type_index);
+		w.u32v(t.array_length);
+		w.u8v(t.is_const ? 1 : 0);
+		w.string(t.name);
+	}
+
+	w.u32v(bc->type_field_count);
+	for (u32 i = 0; i < bc->type_field_count; ++i) {
+		const ex_type_field_info& f = bc->type_fields[i];
+		w.string(f.name);
+		w.u32v(f.type_index);
+		w.u32v(f.offset);
+		w.u32v(f.first_attribute_index);
+		w.u32v(f.attribute_count);
+	}
+
+	// The payload size of an attribute is the byte size of its own type.
+	w.u32v(bc->type_attribute_count);
+	for (u32 i = 0; i < bc->type_attribute_count; ++i) {
+		const ex_type_attribute_info& a = bc->type_attributes[i];
+		w.u32v(a.type_index);
+		w.bytes(a.value, a.type_index < bc->type_info_count ? bc->type_info[a.type_index].byte_size : 0);
+	}
+
+	w.u32v(bc->type_member_count);
+	for (u32 i = 0; i < bc->type_member_count; ++i) w.u32v(bc->type_member_indices[i]);
+
+	w.u32v(bc->type_enum_value_count);
+	for (u32 i = 0; i < bc->type_enum_value_count; ++i) {
+		w.string(bc->type_enum_values[i].name);
+		w.u64v(bc->type_enum_values[i].value_bits);
+	}
+	return EX_RESULT_OK;
+}
+
+ex_bytecode* ex_bytecode_load(ex_host* host, const void* data, u64 size) {
+	if (!host || !host->arena.allocate || !data) return nullptr;
+
+	BytecodeReader r{host, (const u8*)data, (const u8*)data + size};
+	if (r.u32v() != BYTECODE_IMAGE_MAGIC || r.u32v() != BYTECODE_IMAGE_VERSION) return nullptr;
+
+	ex_bytecode* bc = r.array<ex_bytecode>(1);
+	if (!bc) return nullptr;
+	bc->host = host;
+	bc->arena = &host->arena;
+
+	bc->unit_count = r.count();
+	bc->units = r.array<ex_bytecode_unit>(bc->unit_count);
+	for (u32 i = 0; i < bc->unit_count && r.ok; ++i) {
+		bc->units[i].source_name = r.string();
+		bc->units[i].first_import = r.u32v();
+		bc->units[i].import_count = r.u32v();
+	}
+	bc->unit_import_count = r.count();
+	bc->unit_imports = r.array<u32>(bc->unit_import_count);
+	for (u32 i = 0; i < bc->unit_import_count && r.ok; ++i) {
+		bc->unit_imports[i] = r.u32v();
+		if (bc->unit_imports[i] >= bc->unit_count) return nullptr;
+	}
+	for (u32 i = 0; i < bc->unit_count && r.ok; ++i) {
+		if (!validRange(bc->units[i].first_import, bc->units[i].import_count, bc->unit_import_count)) return nullptr;
+	}
+
+	bc->global_size = r.u32v();
+	bc->has_global_init = r.u8v() != 0;
+
+	bc->function_count = r.count();
+	bc->function_capacity = bc->function_count;
+	bc->functions = r.array<ex_function_bc>(bc->function_count);
+	for (u32 i = 0; i < bc->function_count && r.ok; ++i) {
+		ex_function_bc& fn = bc->functions[i];
+		fn.name = r.string();
+		fn.unit_path = r.string();
+		fn.kind = (ex_function_kind)r.u32v();
+		fn.is_builtin_native = r.u8v() != 0;
+		fn.param_size = r.u32v();
+		fn.return_size = r.u32v();
+		fn.frame_size = r.u32v();
+		fn.return_kind = (ex_type_kind)r.u32v();
+		fn.code_size = r.count();
+		fn.code = (u8*)r.allocate(fn.code_size, 8);
+		r.bytes(fn.code, fn.code_size);
+		fn.source_map_count = r.count();
+		fn.source_map = r.array<ex_bytecode_source_map_entry>(fn.source_map_count);
+		for (u32 j = 0; j < fn.source_map_count && r.ok; ++j) {
+			fn.source_map[j].code_offset = r.u32v();
+			fn.source_map[j].location_index = r.u32v();
+		}
+		fn.local_count = r.count();
+		fn.locals = r.array<ex_bytecode_local_debug_entry>(fn.local_count);
+		for (u32 j = 0; j < fn.local_count && r.ok; ++j) {
+			ex_bytecode_local_debug_entry& local = fn.locals[j];
+			local.name = r.string();
+			local.offset = r.u32v();
+			local.byte_size = r.u32v();
+			local.type_index = r.u32v();
+			local.scope_begin_offset = r.u32v();
+		}
+	}
+
+	bc->string_count = r.count();
+	bc->strings = r.array<ex_string_view>(bc->string_count);
+	for (u32 i = 0; i < bc->string_count && r.ok; ++i) bc->strings[i] = r.string();
+
+	bc->location_count = r.count();
+	bc->locations = r.array<ex_bytecode_location>(bc->location_count);
+	for (u32 i = 0; i < bc->location_count && r.ok; ++i) {
+		bc->locations[i].unit_index = r.u32v();
+		bc->locations[i].line = r.u32v();
+		bc->locations[i].column = r.u32v();
+		if (bc->locations[i].unit_index >= bc->unit_count) return nullptr;
+	}
+
+	bc->global_debug_count = r.count();
+	bc->global_debug = r.array<ex_bytecode_global_debug_entry>(bc->global_debug_count);
+	for (u32 i = 0; i < bc->global_debug_count && r.ok; ++i) {
+		ex_bytecode_global_debug_entry& g = bc->global_debug[i];
+		g.name = r.string();
+		g.unit_index = r.u32v();
+		g.offset = r.u32v();
+		g.byte_size = r.u32v();
+		g.type_index = r.u32v();
+		if (g.unit_index >= bc->unit_count) return nullptr;
+	}
+
+	bc->type_info_count = r.count();
+	bc->type_info_capacity = bc->type_info_count;
+	bc->type_info = r.array<ex_type>(bc->type_info_count);
+	for (u32 i = 0; i < bc->type_info_count && r.ok; ++i) {
+		ex_type& t = bc->type_info[i];
+		t.bytecode = bc;
+		t.kind = (ex_type_kind)r.u32v();
+		t.byte_size = r.u32v();
+		t.alignment = r.u32v();
+		t.field_count = r.u32v();
+		t.first_field_index = r.u32v();
+		t.attribute_count = r.u32v();
+		t.first_attribute_index = r.u32v();
+		t.member_count = r.u32v();
+		t.first_member_index = r.u32v();
+		t.value_count = r.u32v();
+		t.first_value_index = r.u32v();
+		t.enum_backing_kind = (ex_type_kind)r.u32v();
+		t.element_type_index = r.u32v();
+		t.array_length = r.u32v();
+		t.is_const = r.u8v() != 0;
+		t.name = r.string();
+	}
+
+	bc->type_field_count = r.count();
+	bc->type_field_capacity = bc->type_field_count;
+	bc->type_fields = r.array<ex_type_field_info>(bc->type_field_count);
+	for (u32 i = 0; i < bc->type_field_count && r.ok; ++i) {
+		ex_type_field_info& f = bc->type_fields[i];
+		f.name = r.string();
+		f.type_index = r.u32v();
+		f.offset = r.u32v();
+		f.first_attribute_index = r.u32v();
+		f.attribute_count = r.u32v();
+	}
+
+	bc->type_attribute_count = r.count();
+	bc->type_attribute_capacity = bc->type_attribute_count;
+	bc->type_attributes = r.array<ex_type_attribute_info>(bc->type_attribute_count);
+	for (u32 i = 0; i < bc->type_attribute_count && r.ok; ++i) {
+		ex_type_attribute_info& a = bc->type_attributes[i];
+		a.type_index = r.u32v();
+		if (a.type_index >= bc->type_info_count) return nullptr;
+		const u32 value_size = bc->type_info[a.type_index].byte_size;
+		void* value = r.allocate(value_size, 16);
+		r.bytes(value, value_size);
+		a.value = value;
+	}
+
+	bc->type_member_count = r.count();
+	bc->type_member_capacity = bc->type_member_count;
+	bc->type_member_indices = r.array<u32>(bc->type_member_count);
+	for (u32 i = 0; i < bc->type_member_count && r.ok; ++i) bc->type_member_indices[i] = r.u32v();
+
+	bc->type_enum_value_count = r.count();
+	bc->type_enum_value_capacity = bc->type_enum_value_count;
+	bc->type_enum_values = r.array<ex_type_enum_value_info>(bc->type_enum_value_count);
+	for (u32 i = 0; i < bc->type_enum_value_count && r.ok; ++i) {
+		bc->type_enum_values[i].name = r.string();
+		bc->type_enum_values[i].value_bits = r.u64v();
+	}
+	if (!r.ok) return nullptr;
+
+	// Cross-reference validation: later code indexes these tables unchecked.
+	for (u32 i = 0; i < bc->function_count; ++i) {
+		const ex_function_bc& fn = bc->functions[i];
+		for (u32 j = 0; j < fn.source_map_count; ++j) {
+			if (fn.source_map[j].location_index >= bc->location_count) return nullptr;
+		}
+		for (u32 j = 0; j < fn.local_count; ++j) {
+			if (!validIndexOrNone(fn.locals[j].type_index, bc->type_info_count)) return nullptr;
+		}
+	}
+	for (u32 i = 0; i < bc->global_debug_count; ++i) {
+		if (!validIndexOrNone(bc->global_debug[i].type_index, bc->type_info_count)) return nullptr;
+	}
+	for (u32 i = 0; i < bc->type_info_count; ++i) {
+		const ex_type& t = bc->type_info[i];
+		if (!validRange(t.first_field_index, t.field_count, bc->type_field_count)) return nullptr;
+		if (!validRange(t.first_attribute_index, t.attribute_count, bc->type_attribute_count)) return nullptr;
+		if (!validRange(t.first_member_index, t.member_count, bc->type_member_count)) return nullptr;
+		if (!validRange(t.first_value_index, t.value_count, bc->type_enum_value_count)) return nullptr;
+		if (!validIndexOrNone(t.element_type_index, bc->type_info_count)) return nullptr;
+	}
+	for (u32 i = 0; i < bc->type_field_count; ++i) {
+		const ex_type_field_info& f = bc->type_fields[i];
+		if (!validIndexOrNone(f.type_index, bc->type_info_count)) return nullptr;
+		if (!validRange(f.first_attribute_index, f.attribute_count, bc->type_attribute_count)) return nullptr;
+	}
+	for (u32 i = 0; i < bc->type_member_count; ++i) {
+		if (!validIndexOrNone(bc->type_member_indices[i], bc->type_info_count)) return nullptr;
+	}
+	return bc;
+}

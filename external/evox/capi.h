@@ -360,6 +360,19 @@ EVOX_API ex_bytecode* ex_bytecode_compile(
 );
 EVOX_API void ex_bytecode_destroy(ex_bytecode* bytecode);
 
+// Bytecode serialization.
+//
+// `ex_bytecode_save` streams a self-contained, position independent image of
+// the bytecode (code, strings, debug info and type metadata) through `write`,
+// which may be called many times. It fails if debugger breakpoints are set.
+// `ex_bytecode_load` rebuilds bytecode from such an image, allocating from
+// `host->arena`; it returns NULL if the image is malformed or has an
+// unsupported version. Loaded bytecode is used exactly like compiled bytecode
+// and does not need the source module.
+typedef void (*ex_write_fn)(void* userdata, const void* data, u64 size);
+ex_result ex_bytecode_save(const ex_bytecode* bytecode, ex_write_fn write, void* userdata);
+ex_bytecode* ex_bytecode_load(ex_host* host, const void* data, u64 size);
+
 // Enumerate all types emitted into the bytecode. Returned type handles are
 // stable until the bytecode is destroyed.
 EVOX_API u32 ex_bytecode_type_count(const ex_bytecode* bytecode);

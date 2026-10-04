@@ -2,10 +2,12 @@
 
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
-#include "core/string.h"
+#include "core/stream.h"
 
 namespace Lumix {
 
+// Holds the serialized bytecode produced by the asset compiler. The runtime
+// never sees evox source code, it instantiates ex_bytecode from this image.
 struct EvoxResource final : Resource {
 public:
 	EvoxResource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
@@ -15,13 +17,12 @@ public:
 
 	void unload() override;
 	bool load(Span<const u8> mem) override;
-	StringView getSourceCode() const { return m_source_code; }
+	Span<const u8> getBytecode() const { return Span(m_bytecode.data(), (u32)m_bytecode.size()); }
 
 	static const ResourceType TYPE;
 
 private:
-	IAllocator& m_allocator;
-	String m_source_code;
+	OutputMemoryStream m_bytecode;
 };
 
 struct EvoxResourceManager final : ResourceManager {

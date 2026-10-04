@@ -498,6 +498,61 @@ static Path evoxSourcePath(StringView source) {
 	return endsWith(source, ".evox") ? Path(source) : Path(source, ".evox");
 }
 
+// Compiles a script and its imports from disk so the editor can query symbols
+// (autocomplete, symbol search). The runtime only loads bytecode, so it has no sources.
+struct EvoxSymbolIndex {
+	explicit EvoxSymbolIndex(StudioApp& app)
+		: m_app(app)
+		, m_main_source(app.getAllocator())
+		, m_imports(app.getAllocator()) {}
+	EvoxSymbolIndex(const EvoxSymbolIndex&) = delete;
+	~EvoxSymbolIndex() { clear(); }
+
+	ex_module* module() const { return m_module; }
+
+	// Returns the compiled module or nullptr if the script does not compile.
+	ex_module* build(const Path& path) {
+		clear();
+		if (!m_app.getEngine().getFileSystem().getContentSync(path, m_main_source)) return nullptr;
+
+		ex_default_arena_create(&m_host.arena);
+		m_module = ex_module_create(&m_host);
+		const ex_string_view source = {(const char*)m_main_source.data(), (i64)m_main_source.size()};
+		const ex_string_view name = {path.c_str(), (i64)stringLength(path.c_str())};
+		if (!m_module || !ex_module_compile(m_module, source, name, &resolveImport, this)) clear();
+		return m_module;
+	}
+
+	void clear() {
+		if (m_module) {
+			ex_module_destroy(m_module);
+			m_module = nullptr;
+		}
+		if (m_host.arena.allocate) ex_default_arena_destroy(&m_host.arena);
+		m_host = {};
+		m_main_source.clear();
+		m_imports.clear(); // imported sources must outlive the module
+	}
+
+private:
+	static int resolveImport(void* userdata, ex_string_view path, ex_string_view, ex_string_view* source) {
+		EvoxSymbolIndex& index = *(EvoxSymbolIndex*)userdata;
+		OutputMemoryStream& blob = index.m_imports.emplace(index.m_app.getAllocator());
+		if (!index.m_app.getEngine().getFileSystem().getContentSync(evoxSourcePath(StringView(path.begin, path.length)), blob)) {
+			index.m_imports.pop();
+			return 0;
+		}
+		*source = {(const char*)blob.data(), (i64)blob.size()};
+		return 1;
+	}
+
+	StudioApp& m_app;
+	ex_host m_host = {};
+	ex_module* m_module = nullptr;
+	OutputMemoryStream m_main_source;
+	Array<OutputMemoryStream> m_imports;
+};
+
 struct EvoxEditorWindow final : AssetEditorWindow {
 	EvoxEditorWindow(const Path& path, StudioApp& app)
 		: AssetEditorWindow(app)
@@ -681,9 +736,9 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 
 	void showAutocomplete() {
 		m_autocomplete_list.clear();
-		World* world = m_app.getWorldEditor().getWorld();
-		EvoxModule* evox = world ? static_cast<EvoxModule*>(world->getModule("evox")) : nullptr;
-		ex_module* module = evox ? evox->getDebugModule() : nullptr;
+		// Compile the last saved version: unsaved text with a half-typed identifier would not compile.
+		EvoxSymbolIndex index(m_app);
+		ex_module* module = index.build(m_path);
 		if (!module) return;
 
 		const StringView prefix = m_editor->getPrefix();
@@ -904,10 +959,112 @@ struct EvoxAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		m_app.getAssetBrowser().addWindow(win.move());
 	}
 
+	struct CompileContext {
+		CompileContext(FileSystem& filesystem, IAllocator& allocator)
+			: filesystem(filesystem)
+			, allocator(allocator)
+			, sources(allocator)
+			, diagnostics(allocator)
+			, unresolved_imports(allocator)
+			, location_source(allocator)
+		{}
+
+		FileSystem& filesystem;
+		IAllocator& allocator;
+		Array<OutputMemoryStream> sources; // imported sources must outlive the module
+		String diagnostics;
+		String unresolved_imports;
+		String location_source;
+		u32 line = 0;
+		u32 column = 0;
+	};
+
+	static int resolveImport(void* userdata, ex_string_view path, ex_string_view, ex_string_view* source) {
+		CompileContext& ctx = *(CompileContext*)userdata;
+		const StringView import_path(path.begin, path.length);
+		Path file_path;
+		if (startsWith(import_path, "core:")) {
+			const StringView name = import_path.withoutLeft(5);
+			file_path = endsWith(name, ".evox") ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".evox");
+		}
+		else {
+			file_path = endsWith(import_path, ".evox") ? Path(import_path) : Path(import_path, ".evox");
+		}
+		OutputMemoryStream& blob = ctx.sources.emplace(ctx.allocator);
+		if (!ctx.filesystem.getContentSync(file_path, blob)) {
+			ctx.sources.pop();
+			if (ctx.unresolved_imports.length() > 0) ctx.unresolved_imports.append(", ");
+			ctx.unresolved_imports.append("\"");
+			ctx.unresolved_imports.append(import_path);
+			ctx.unresolved_imports.append("\" (");
+			ctx.unresolved_imports.append(file_path.c_str());
+			ctx.unresolved_imports.append(")");
+			return 0;
+		}
+		*source = {(const char*)blob.data(), (i64)blob.size()};
+		return 1;
+	}
+
+	// The runtime loads bytecode only, sources and imports are resolved here.
 	bool compile(const Path& src) override {
-		// For Evox, we just copy the source file as-is
-		// The runtime will parse and compile it when loaded
-		return m_app.getAssetCompiler().copyCompile(src);
+		IAllocator& allocator = m_app.getAllocator();
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		OutputMemoryStream content(allocator);
+		if (!fs.getContentSync(src, content)) {
+			logError("Failed to read ", src);
+			return false;
+		}
+
+		CompileContext ctx(fs, allocator);
+		ex_host host = {};
+		ex_default_arena_create(&host.arena);
+		host.diagnostics_userdata = &ctx;
+		host.print = [](void* userdata, ex_string_view msg) {
+			((CompileContext*)userdata)->diagnostics.append(StringView(msg.begin, msg.length));
+		};
+
+		host.diagnostic = [](void* userdata, ex_string_view source, u32 line, u32 column, u32) {
+			CompileContext* c = (CompileContext*)userdata;
+			c->location_source = StringView(source.begin, source.length);
+			c->line = line;
+			c->column = column;
+		};
+
+		bool success = false;
+		const char* stage = "";
+		ex_module* module = ex_module_create(&host);
+		if (!module) {
+			stage = "failed to allocate Evox module";
+		}
+		else {
+			const ex_string_view source = {(const char*)content.data(), (i64)content.size()};
+			const ex_string_view name = {src.c_str(), (i64)stringLength(src.c_str())};
+			if (!ex_module_compile(module, source, name, &resolveImport, &ctx)) {
+				stage = "script has errors";
+			}
+			else if (ex_bytecode* bytecode = ex_bytecode_compile(module, &host, nullptr)) {
+				OutputMemoryStream image(allocator);
+				const ex_result saved = ex_bytecode_save(bytecode, [](void* userdata, const void* data, u64 size) {
+					((OutputMemoryStream*)userdata)->write(data, size);
+				}, &image);
+				if (saved != EX_RESULT_OK) stage = "failed to serialize bytecode";
+				else if (!m_app.getAssetCompiler().writeCompiledResource(src, Span(image.data(), (u32)image.size()))) stage = "failed to write compiled resource";
+				else success = true;
+				ex_bytecode_destroy(bytecode);
+			}
+			else {
+				stage = "failed to generate bytecode";
+			}
+			ex_module_destroy(module);
+		}
+		ex_default_arena_destroy(&host.arena);
+		if (!success) {
+			logError(src, ": Evox compilation failed: ", stage);
+			if (ctx.line > 0) logError("  at ", ctx.location_source, "(", ctx.line, ":", ctx.column, ")");
+			if (ctx.unresolved_imports.length() > 0) logError("  unresolved imports: ", ctx.unresolved_imports);
+			if (ctx.diagnostics.length() > 0) logError("  ", ctx.diagnostics);
+		}
+		return success;
 	}
 
 	bool canCreateResource() const override { return true; }
@@ -1311,9 +1468,13 @@ struct EvoxVariablesWindow final : StudioApp::GUIPlugin {
 };
 
 struct EvoxSymbolsPopup final : StudioApp::GUIPlugin {
-	explicit EvoxSymbolsPopup(StudioApp& app) : m_app(app) { m_filter.clear(); }
+	explicit EvoxSymbolsPopup(StudioApp& app) : m_app(app), m_index(app) { m_filter.clear(); }
 	const char* getName() const override { return "evox_symbols_popup"; }
-	void open() { m_open = true; m_focus_filter = true; }
+	void open() {
+		m_open = true;
+		m_focus_filter = true;
+		m_index.build(Path("main.evox"));
+	}
 	static bool nameMatchesFilter(ex_string_view name, const char* filter) {
 		if (!filter || !filter[0]) return true;
 		for (const char* c = name.begin; c < name.begin + name.length; ++c) {
@@ -1335,8 +1496,6 @@ struct EvoxSymbolsPopup final : StudioApp::GUIPlugin {
 			viewport->Pos.y + (viewport->Size.y - size.y) * 0.5f);
 		ImGui::SetNextWindowPos(pos);
 		ImGui::SetNextWindowSize(size, ImGuiCond_Always);
-		World* world = m_app.getWorldEditor().getWorld();
-		EvoxModule* module = world ? static_cast<EvoxModule*>(world->getModule("evox")) : nullptr;
 		ImGui::SetNextWindowSize(ImVec2(500, 300), ImGuiCond_Always);
 		if (!ImGui::BeginPopup("evox_symbols_palette", ImGuiWindowFlags_NoNavInputs)) {
 			m_open = false;
@@ -1358,9 +1517,9 @@ struct EvoxSymbolsPopup final : StudioApp::GUIPlugin {
 			m_open = false;
 			return;
 		}
-		ex_module* debug_module = module->getDebugModule();
+		ex_module* debug_module = m_index.module();
 		if (!debug_module) {
-			ImGui::TextDisabled("Waiting for module...");
+			ImGui::TextDisabled("main.evox does not compile");
 			ImGui::EndPopup();
 			m_open = false;
 			return;
@@ -1436,6 +1595,7 @@ struct EvoxSymbolsPopup final : StudioApp::GUIPlugin {
 	}
 
 	StudioApp& m_app;
+	EvoxSymbolIndex m_index;
 	bool m_open = false;
 	bool m_focus_filter = false;
 	int m_selected = -1;

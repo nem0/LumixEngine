@@ -7,20 +7,18 @@ const ResourceType EvoxResource::TYPE("evox");
 
 EvoxResource::EvoxResource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
-	, m_allocator(allocator)
-	, m_source_code(allocator)
+	, m_bytecode(allocator)
 {}
 
 EvoxResource::~EvoxResource() = default;
 
 void EvoxResource::unload() {
-	m_source_code = "";
+	m_bytecode.clear();
 }
 
 bool EvoxResource::load(Span<const u8> mem) {
-	// Load the .evox file as UTF-8 text
-	m_source_code = "";
-	m_source_code.append(StringView((const char*)mem.begin(), (const char*)mem.end()));
+	m_bytecode.clear();
+	m_bytecode.write(mem.begin(), mem.length());
 	return true;
 }
 

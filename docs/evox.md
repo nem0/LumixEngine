@@ -44,11 +44,11 @@ There is one Evox runtime shared by the Evox system, not one runtime per world. 
 
 ### Compilation and errors
 
-`.evox` assets are copied into the compiled resource tree as source text. The root script and all of its imports are compiled to Evox bytecode at runtime. Compilation and runtime-call failures are written to the Studio log.
+`.evox` assets are compiled by the asset compiler. Each script is compiled together with all of its imports to Evox bytecode, which is stored in `.lumix/resources` instead of the source text. The runtime only loads and runs this bytecode and never parses sources. Compilation failures are written to the Studio log by the asset compiler, runtime-call failures by the Evox system.
 
-Saving a changed script causes the asset compiler to process it. Imports are registered as asset dependencies, so changes can propagate to dependent script resources. The active root resource is rebuilt into a new Evox module/runtime when its resource-change notification arrives.
+Saving a changed script causes the asset compiler to process it. Imports are registered as asset dependencies, so changes propagate to dependent script resources. The active root resource is loaded into a new Evox runtime when its resource-change notification arrives.
 
-The system is not ready until `main.evox` has loaded and both source and bytecode compilation have succeeded. If compilation fails, no lifecycle function runs and no script data types are available to worlds.
+The system is not ready until the compiled `main.evox` has loaded. If compilation fails, no compiled resource is produced, no lifecycle function runs and no script data types are available to worlds.
 
 ## Imports and source paths
 
@@ -239,11 +239,11 @@ Double-click an `.evox` asset to open the Evox editor. It provides:
 - syntax highlighting and save/reload handling;
 - **Check**, which compiles the editor buffer and underlines a diagnostic in the current file;
 - go to definition;
-- autocomplete from symbols in the last successfully compiled runtime module;
+- autocomplete from symbols of `main.evox` and its imports, compiled from sources by Studio (the runtime itself only uses bytecode);
 - a symbol search palette (`Ctrl+Q` by default);
 - breakpoint markers (`F8` by default).
 
-Autocomplete does not parse the current unsaved buffer. This lets it keep working while that buffer is incomplete, but newly typed declarations do not appear until a successful runtime compilation.
+Autocomplete does not parse the current unsaved buffer. This lets it keep working while that buffer is incomplete, but newly typed declarations do not appear until the script is saved and recompiled.
 
 The **Evox Debugger** supports continue (`F1`), step over (`F2`), step into (`F3`), and step out (`Shift+F11`). The call-stack view opens source locations, and the Variables window displays locals and relevant project globals while execution is suspended. Breakpoints are reapplied when a runtime becomes available.
 
