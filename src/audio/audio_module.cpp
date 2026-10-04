@@ -19,14 +19,12 @@
 
 namespace Lumix {
 
-struct Listener
-{
+struct Listener {
 	EntityPtr entity;
 };
 
 
-struct AmbientSound
-{
+struct AmbientSound {
 	EntityRef entity;
 	Clip* clip = nullptr;
 	bool is_3d;
@@ -34,17 +32,16 @@ struct AmbientSound
 };
 
 
-struct PlayingSound
-{
+struct PlayingSound {
 	AudioDevice::BufferHandle buffer_id;
 	EntityPtr entity;
 	Clip* clip = nullptr;
 	bool is_3d;
+	u32 generation = 0;		// bumped whenever a sound is started in this slot, so a handle to an earlier sound in it goes stale
 };
 
 
-struct AudioModuleImpl final : AudioModule
-{
+struct AudioModuleImpl final : AudioModule {
 	enum class Version : i32 {
 		INIT,
 		CLIPS_REWORKED,
@@ -155,16 +152,16 @@ struct AudioModuleImpl final : AudioModule
 	}
 
 	void pauseAmbientSound(EntityRef entity) override {
-		const i32 idx = m_ambient_sounds[entity].playing_sound;
-		if (idx < 0) return;
-		m_device.pause(m_playing_sounds[idx].buffer_id);
+		PlayingSound* sound = findSound(m_ambient_sounds[entity].playing_sound);
+		if (!sound) return;		// never started or already ended
+		m_device.pause(sound->buffer_id);
 	}
 
 	void resumeAmbientSound(EntityRef entity) override {
 		const AmbientSound& as = m_ambient_sounds[entity];
-		const i32 idx = as.playing_sound;
-		if (idx < 0) return;
-		m_device.play(m_playing_sounds[idx].buffer_id, as.clip->m_looped);
+		PlayingSound* sound = findSound(as.playing_sound);
+		if (!sound) return;
+		m_device.play(sound->buffer_id, as.clip->m_looped);
 	}
 
 	void startGame() override
@@ -411,6 +408,7 @@ struct AudioModuleImpl final : AudioModule
 					m_device.setSourcePosition(buffer, pos);
 				}
 
+				++sound.generation;
 				sound.is_3d = is_3d;
 				sound.buffer_id = buffer;
 				sound.entity = entity;
@@ -436,39 +434,63 @@ struct AudioModuleImpl final : AudioModule
 					break;
 				}
 
-				return SoundHandle(&sound - m_playing_sounds);
+				return makeHandle(sound);
 			}
 		}
 
 		return INVALID_SOUND_HANDLE;
 	}
 
-	// handles come from scripts too (play2D/play3D return INVALID_SOUND_HANDLE while a clip is loading), so never index with a bad one
-	// logs an error naming the caller when the handle is unusable, so a script bug is visible instead of silent
-	bool checkSound(SoundHandle sound_id, const char* fn) const {
-		if (sound_id < 0 || sound_id >= (int)lengthOf(m_playing_sounds)) {
-			logError("AudioModule::", fn, ": invalid sound handle ", sound_id, " (play2D/play3D return -1 while the clip is loading or no slot is free)");
-			return false;
-		}
-		if (m_playing_sounds[sound_id].buffer_id == AudioDevice::INVALID_BUFFER_HANDLE) {
-			logError("AudioModule::", fn, ": sound handle ", sound_id, " is not playing (already stopped?)");
-			return false;
-		}
-		return true;
+	// A handle is the slot index in the low SLOT_BITS and the slot's generation above it. Sounds end and their slot is reused, so a script's
+	// old handle must not reach the sound that took the slot: findSound() compares the generation. It stays non-negative (-1 = invalid).
+	static constexpr int SLOT_BITS = 8;
+	static constexpr u32 GENERATION_MASK = 0x7fffFF;	// 31 - SLOT_BITS bits
+	static_assert(AudioDevice::MAX_PLAYING_SOUNDS <= (1 << SLOT_BITS), "sound slot does not fit in a handle");
+
+	SoundHandle makeHandle(const PlayingSound& sound) const {
+		const u32 slot = u32(&sound - m_playing_sounds);
+		return SoundHandle(((sound.generation & GENERATION_MASK) << SLOT_BITS) | slot);
 	}
 
+	// the sound a handle refers to, nullptr if the handle is invalid, the sound has ended or its slot is used by a later sound.
+	// A negative handle (play2D/play3D return -1 while the clip is loading or no slot is free) is a caller bug: it is logged when `fn`
+	// names the caller. A stale handle is never logged here, a sound can end at any time.
+	PlayingSound* findSound(SoundHandle handle, const char* fn = nullptr) {
+		if (handle < 0) {
+			if (fn) logError("AudioModule::", fn, ": invalid sound handle ", handle, " (play2D/play3D return -1 while the clip is loading or no slot is free)");
+			return nullptr;
+		}
+		const u32 slot = u32(handle) & ((1u << SLOT_BITS) - 1);
+		if (slot >= (u32)lengthOf(m_playing_sounds)) return nullptr;
+		PlayingSound& sound = m_playing_sounds[slot];
+		if (sound.buffer_id == AudioDevice::INVALID_BUFFER_HANDLE) return nullptr;
+		if ((sound.generation & GENERATION_MASK) != (u32(handle) >> SLOT_BITS)) return nullptr;
+		return &sound;
+	}
+
+	// For the calls that change a sound: a stale handle (its sound ended or was stopped, the slot may be reused) is an error too.
+	PlayingSound* checkSound(SoundHandle sound_id, const char* fn) {
+		PlayingSound* sound = findSound(sound_id, fn);
+		if (!sound && sound_id >= 0) logError("AudioModule::", fn, ": stale sound handle ", sound_id, " (that sound already ended or was stopped)");
+		return sound;
+	}
+
+	// A sound that ended is released by update() and its handle goes stale, so for isEnd() a stale handle just means "ended".
 	bool isEnd(SoundHandle sound_id) override {
-		if (!checkSound(sound_id, "isEnd")) return true;
-		return m_device.isEnd(m_playing_sounds[sound_id].buffer_id);
+		PlayingSound* sound = findSound(sound_id, "isEnd");
+		if (!sound) return true;
+		return m_device.isEnd(sound->buffer_id);
 	}
 
+	// stopping is idempotent: a sound can end on its own just before the script stops it, so a stale handle is not an error
 	void stop(SoundHandle sound_id) override {
-		if (!checkSound(sound_id, "stop")) return;
-		m_device.stop(m_playing_sounds[sound_id].buffer_id);
-		m_playing_sounds[sound_id].buffer_id = AudioDevice::INVALID_BUFFER_HANDLE;
-		if (m_playing_sounds[sound_id].clip) {
-			m_playing_sounds[sound_id].clip->decRefCount();
-			m_playing_sounds[sound_id].clip = nullptr;
+		PlayingSound* sound = findSound(sound_id, "stop");
+		if (!sound) return;
+		m_device.stop(sound->buffer_id);
+		sound->buffer_id = AudioDevice::INVALID_BUFFER_HANDLE;
+		if (sound->clip) {
+			sound->clip->decRefCount();
+			sound->clip = nullptr;
 		}
 	}
 
@@ -476,21 +498,19 @@ struct AudioModuleImpl final : AudioModule
 	void setMasterVolume(float volume) override { m_device.setMasterVolume(volume); }
 
 
-	void setVolume(SoundHandle sound_id, float volume) override
-	{
-		if (!checkSound(sound_id, "setVolume")) return;
-		m_device.setVolume(m_playing_sounds[sound_id].buffer_id, volume);
+	void setVolume(SoundHandle sound_id, float volume) override {
+		PlayingSound* sound = checkSound(sound_id, "setVolume");
+		if (sound) m_device.setVolume(sound->buffer_id, volume);
 	}
 
 	void setFrequency(SoundHandle sound_id, u32 frequency) override {
-		if (!checkSound(sound_id, "setFrequency")) return;
-		m_device.setFrequency(m_playing_sounds[sound_id].buffer_id, frequency);
+		PlayingSound* sound = checkSound(sound_id, "setFrequency");
+		if (sound) m_device.setFrequency(sound->buffer_id, frequency);
 	}
 
-	void setEcho(SoundHandle sound_id, float wet_dry_mix, float feedback, float left_delay, float right_delay) override
-	{
-		if (!checkSound(sound_id, "setEcho")) return;
-		m_device.setEcho(m_playing_sounds[sound_id].buffer_id, wet_dry_mix, feedback, left_delay, right_delay);
+	void setEcho(SoundHandle sound_id, float wet_dry_mix, float feedback, float left_delay, float right_delay) override {
+		PlayingSound* sound = checkSound(sound_id, "setEcho");
+		if (sound) m_device.setEcho(sound->buffer_id, wet_dry_mix, feedback, left_delay, right_delay);
 	}
 
 	World& getWorld() override { return m_world; }
