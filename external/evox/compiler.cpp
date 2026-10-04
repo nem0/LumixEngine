@@ -2960,6 +2960,13 @@ struct Checker {
 		expr.resolved_type = concrete;
 		if (expr.comptime_value.kind == ComptimeValue::VALUE && expr.comptime_value.type && expr.comptime_value.type != concrete) {
 			if (ComptimeValue coerced = coerceComptimeValue(expr.comptime_value, concrete)) {
+				// coerced.value lives on the transient comptime stack, which later evaluations overwrite: keep a persistent copy
+				if (coerced.kind == ComptimeValue::VALUE) {
+					const u32 size = typeByteSize(*coerced.type);
+					u8* persistent = static_cast<u8*>(module.arena.allocate(module.arena.user_data, size, 1));
+					copyMemory(persistent, coerced.value, size);
+					coerced.value = persistent;
+				}
 				expr.comptime_value = coerced;
 			}
 		}
