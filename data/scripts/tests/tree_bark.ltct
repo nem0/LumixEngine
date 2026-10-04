@@ -3,8 +3,8 @@ import "core:vec2"
 import "core:vec4"
 import "std:math" as math
 
-const SIZE : u32 = 512;
-const RIDGES : f32 = 19;
+comptime SIZE = 512;
+comptime RIDGES = 19;
 
 struct BarkFields {
     flow : Image;
@@ -30,7 +30,7 @@ fn main() : Texture2D {
             const v = y as f32 / SIZE as f32;
             const bend = getPixel(fields.flow, x, y).x;
             const chip = getPixel(fields.chips, x, y).x;
-            const phase = (u * RIDGES + bend * 1.8) * 6.2831853;
+            const phase = (u * RIDGES + bend * 1.8) * (2.0 * math.pi);
             const ridge = math.pow(0.5 + 0.5 * math.sin(phase), 0.65);
             var relief = ridge * 0.7 + chip * 0.2;
 

@@ -3,8 +3,8 @@ import "core:vec2"
 import "core:vec4"
 import "std:math" as math
 
-const SIZE : u32 = 256;
-const PANEL : u32 = 64;
+comptime SIZE = 256;
+comptime PANEL = 64;
 
 fn panelHeight(x : u32, y : u32) : f32 {
     const px = (x % PANEL) as f32;

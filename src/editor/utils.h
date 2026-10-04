@@ -180,6 +180,20 @@ LUMIX_EDITOR_API UniquePtr<CodeEditor> createHLSLCodeEditor(StudioApp& app);
 LUMIX_EDITOR_API UniquePtr<CodeEditor> createEvoxCodeEditor(StudioApp& app);
 LUMIX_EDITOR_API UniquePtr<CodeEditor> createParticleScriptEditor(StudioApp& app);
 
+// Asks the user what to do when a text file edited in a `CodeEditor` was changed on disk.
+// Call `onFileChanged` from `AssetEditorWindow::fileChangedExternally` and `gui` every frame
+// from inside the window. A dialog is shown only if the file differs from the editor's text,
+// with a choice to keep the editor's text or reload the file.
+struct LUMIX_EDITOR_API ExternalFileChangeDialog {
+	void onFileChanged() { m_check = true; }
+	// `dirty` is cleared when the editor and file match or when the file is reloaded.
+	// Returns true in the frame when the user reloaded the file.
+	bool gui(StudioApp& app, const struct Path& path, CodeEditor& editor, bool& dirty);
+
+private:
+	bool m_check = false;
+};
+
 template <typename F> void alignGUI(float align, const F& f) {
 	const ImVec2 container_size = ImGui::GetContentRegionAvail();
 	const ImVec2 cp = ImGui::GetCursorScreenPos();

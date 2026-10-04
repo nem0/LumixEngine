@@ -197,7 +197,7 @@ bool testEagerRecipeArrayErrors() {
 
 bool testRecipeProceduralExamples() {
 	Fixture f;
-	const char* paths[] = {"scripts/tests/ion_marble.ltct", "scripts/tests/orbital_alloy.ltct", "scripts/tests/tree_bark.ltct"};
+	const char* paths[] = {"scripts/tests/ion_marble.ltct", "scripts/tests/orbital_alloy.ltct", "scripts/tests/tree_bark.ltct", "scripts/tests/pagoda.ltct"};
 	for (const char* name : paths) {
 		OutputMemoryStream source(getGlobalAllocator());
 		const Path path(name);
@@ -516,14 +516,7 @@ bool testRecipeDrawing() {
 	};
 	for (const Case& c : cases) {
 		Fixture f;
-		const StaticString<512> source("import \"core:texture_recipe\"
-import \"core:vec4\"
-fn main() : Texture2D {
-var c = drawCanvas(16, 16, 2, 16.0);
-", c.body, "
-return texture2D(drawFinish(c));
-}
-");
+		const StaticString<512> source("import \"core:texture_recipe\"\nimport \"core:vec4\"\nfn main() : Texture2D {\nvar c = drawCanvas(16, 16, 2, 16.0);\n", c.body, "\nreturn texture2D(drawFinish(c));\n}\n");
 		ASSERT_TRUE(f.run(source.data));
 		const auto& image = f.result.layers[0];
 		ASSERT_EQ(16, image.w); ASSERT_EQ(16, image.h); ASSERT_EQ(4, image.channels);

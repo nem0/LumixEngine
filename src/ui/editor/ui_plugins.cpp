@@ -89,17 +89,7 @@ struct UIEditorWindow : AssetEditorWindow {
 		if (m_font_manager) LUMIX_DELETE(m_app.getAllocator(), m_font_manager);
 	}
 
-	void fileChangedExternally() override {
-		OutputMemoryStream tmp(m_app.getAllocator());
-		OutputMemoryStream tmp2(m_app.getAllocator());
-		m_editor->serializeText(tmp);
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (!fs.getContentSync(m_path, tmp2)) return;
-
-		if (tmp.size() == tmp2.size() && memcmp(tmp.data(), tmp2.data(), tmp.size()) == 0) {
-			m_dirty = false;
-		}
-	}
+	void fileChangedExternally() override { m_external_change.onFileChanged(); }
 
 	void save() {
 		OutputMemoryStream blob(m_app.getAllocator());
@@ -123,6 +113,7 @@ struct UIEditorWindow : AssetEditorWindow {
 
 	void windowGUI() override {
 		CommonActions& actions = m_app.getCommonActions();
+		if (m_external_change.gui(m_app, m_path, *m_editor, m_dirty)) refresh();
 
 		if (ImGui::BeginMenuBar()) {
 			if (actions.save.iconButton(m_dirty, &m_app)) save();
@@ -292,6 +283,7 @@ struct UIEditorWindow : AssetEditorWindow {
 	StudioApp& m_app;
 	Path m_path;
 	UniquePtr<CodeEditor> m_editor;
+	ExternalFileChangeDialog m_external_change;
 	String m_stored_text;
 	Array<String> m_autocomplete_list;
 	u32 m_autocomplete_selection_idx = 0;

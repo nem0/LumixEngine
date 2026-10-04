@@ -3506,4 +3506,45 @@ void endCenterStrip() {
 	ImGui::EndPopup();
 }
 
+bool ExternalFileChangeDialog::gui(StudioApp& app, const Path& path, CodeEditor& editor, bool& dirty) {
+	static constexpr const char* ID = "external_file_change";
+	IAllocator& allocator = app.getAllocator();
+	bool reloaded = false;
+	if (m_check) {
+		m_check = false;
+		OutputMemoryStream editor_blob(allocator);
+		OutputMemoryStream file_blob(allocator);
+		editor.serializeText(editor_blob);
+		if (!app.getEngine().getFileSystem().getContentSync(path, file_blob)) {
+			logError("Unexpected error while reading file ", path);
+		}
+		else if (editor_blob.size() != file_blob.size() || memcmp(editor_blob.data(), file_blob.data(), editor_blob.size()) != 0) {
+			openCenterStrip(ID);
+		}
+		else {
+			dirty = false;
+		}
+	}
+
+	if (beginCenterStrip(ID)) {
+		ImGui::NewLine();
+		alignGUICenter([&]() { ImGui::Text("File %s modified externally", path.c_str()); });
+		alignGUICenter([&]() {
+			if (ImGui::Button("Ignore")) ImGui::CloseCurrentPopup();
+			ImGui::SameLine();
+			if (ImGui::Button("Reload")) {
+				OutputMemoryStream blob(allocator);
+				if (app.getEngine().getFileSystem().getContentSync(path, blob)) {
+					editor.setText(StringView((const char*)blob.data(), (u32)blob.size()));
+					dirty = false;
+					reloaded = true;
+				}
+				ImGui::CloseCurrentPopup();
+			}
+		});
+		endCenterStrip();
+	}
+	return reloaded;
+}
+
 } // namespace Lumix

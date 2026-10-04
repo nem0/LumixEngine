@@ -47,6 +47,7 @@
 #include "renderer/editor/composite_texture.h"
 #include "renderer/editor/model_importer.h"
 #include "renderer/editor/particle_editor.h"
+#include "renderer/editor/procedural_mesh.h"
 #include "renderer/draw_stream.h"
 #include "renderer/font.h"
 #include "renderer/gpu/gpu.h"
@@ -976,6 +977,8 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 
 	void onResourceCompiled(Resource& res, bool success) { if (m_texture == &res) clearTextureView(); }
 
+	void fileChangedExternally() override { m_external_change.onFileChanged(); }
+
 	void saveUndo(bool changed) {
 		if (!changed) return;
 
@@ -1047,6 +1050,7 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 		CommonActions& actions = m_app.getCommonActions();
 		if (m_app.checkShortcut(actions.del) && m_composite_editor) m_composite_editor->deleteSelectedNodes();
 
+		if (m_recipe_editor) m_external_change.gui(m_app, m_texture->getPath(), *m_recipe_editor, m_dirty);
 		if (ImGui::BeginMenuBar()) {
 			if (m_composite_editor) m_composite_editor->menu();
 			if (actions.save.iconButton(m_dirty, &m_app)) save();
@@ -1201,6 +1205,7 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 	StudioApp& m_app;
 	UniquePtr<CompositeTextureEditor> m_composite_editor;
 	UniquePtr<CodeEditor> m_recipe_editor;
+	ExternalFileChangeDialog m_external_change;
 	Texture* m_texture;
 	gpu::TextureHandle m_texture_view = gpu::INVALID_TEXTURE;
 	u32 m_view_layer = 0;
@@ -3189,17 +3194,7 @@ struct ShaderCodeEditorWindow : AssetEditorWindow {
 		if (m_shader) m_shader->decRefCount();
 	}
 
-	void fileChangedExternally() override {
-		OutputMemoryStream tmp(m_app.getAllocator());
-		OutputMemoryStream tmp2(m_app.getAllocator());
-		m_editor->serializeText(tmp);
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (!fs.getContentSync(m_path, tmp2)) return;
-
-		if (tmp.size() == tmp2.size() && memcmp(tmp.data(), tmp2.data(), tmp.size()) == 0) {
-			m_dirty = false;
-		}
-	}
+	void fileChangedExternally() override { m_external_change.onFileChanged(); }
 
 	void save() {
 		OutputMemoryStream blob(m_app.getAllocator());
@@ -3260,6 +3255,7 @@ struct ShaderCodeEditorWindow : AssetEditorWindow {
 			ImGui::EndMenuBar();
 		}
 
+		m_external_change.gui(m_app, m_path, *m_editor, m_dirty);
 		if (m_editor->gui("codeeditor", ImVec2(0, 0), m_app.getMonospaceFont(), m_app.getDefaultFont())) m_dirty = true;
 	}
 	
@@ -3268,6 +3264,7 @@ struct ShaderCodeEditorWindow : AssetEditorWindow {
 
 	StudioApp& m_app;
 	UniquePtr<CodeEditor> m_editor;
+	ExternalFileChangeDialog m_external_change;
 	UniquePtr<CodeEditor> m_disassembly_view;
 	Path m_path;
 	Shader* m_shader = nullptr;
@@ -5702,6 +5699,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_game_view.init();
 		m_env_probe_plugin.init();
 		m_model_plugin.init();
+		// after ModelPlugin, so that Model assets keep the "Model" label
+		m_procedural_mesh_editor = ProceduralMeshEditor::create(m_app);
 
 		m_particle_editor = ParticleEditor::create(m_app);
 		Delegate<void()> vsync_delegate;
@@ -5899,6 +5898,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	~StudioAppPlugin()
 	{
 		destroyFBXImporter(*m_fbx_importer);
+		m_procedural_mesh_editor.reset();
 
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
 		asset_browser.removePlugin(m_model_plugin);
@@ -5937,6 +5937,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	ModelImporter* m_fbx_importer = nullptr; // only for preloading impostor shadow shader // TODO do this in a better way
 	Local<Action> m_renderdoc_capture_action;
 	UniquePtr<ParticleEditor> m_particle_editor;
+	UniquePtr<ProceduralMeshEditor> m_procedural_mesh_editor;
 	EditorUIRenderPlugin m_editor_ui_render_plugin;
 	MaterialPlugin m_material_plugin;
 	ParticleSystemPropertyPlugin m_particle_emitter_property_plugin;

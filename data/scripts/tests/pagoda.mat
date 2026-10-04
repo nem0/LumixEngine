@@ -1,0 +1,14 @@
+shader "/engine/shaders/standard.hlsl"
+backface_culling true
+layer "default"
+
+texture "/engine/scripts/tests/pagoda.ltct"
+texture ""
+texture ""
+texture ""
+layer "default"
+uniform "Material color", { 1.000000, 1.000000, 1.000000, 1.000000 }
+uniform "Roughness", 0.500000
+uniform "Metallic", 0.000000
+uniform "Emission", 0.000000
+uniform "Translucency", 0.000000

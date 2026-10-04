@@ -3,7 +3,7 @@ import "core:vec2"
 import "core:vec4"
 import "std:math" as math
 
-const SIZE : u32 = 256;
+comptime SIZE = 256;
 
 fn main() : Texture2D {
     // Distort the mineral cells, then pick out narrow luminous contours.

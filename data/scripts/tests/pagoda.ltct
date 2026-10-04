@@ -1,0 +1,111 @@
+import "core:texture_recipe"
+import "core:vec2"
+import "core:vec4"
+import "std:math" as math
+
+// Material atlas for pagoda.lpg (2 x 2 regions, each part of the mesh maps its
+// UVs into one of them):
+//   top left     cream panels in a brown frame         (upper walls)
+//   top right    tan timber planks                     (columns, beams, trim)
+//   bottom left  green glazed roof tiles               (roofs)
+//   bottom right grey stone slabs                      (base slab)
+comptime SIZE = 1024;
+comptime HALF = SIZE / 2;
+
+struct Fields {
+    flow : Image;
+    wear : Image;
+}
+
+struct ColorFields {
+    height : Image;
+}
+
+fn tint(dark : Vec4, light : Vec4, t : f32) : Vec4 {
+    return Vec4 {
+        dark.x + (light.x - dark.x) * t,
+        dark.y + (light.y - dark.y) * t,
+        dark.z + (light.z - dark.z) * t,
+        1
+    };
+}
+
+fn relief(cx : u32, cy : u32, u : f32, v : f32, bend : f32, chips : f32) : f32 {
+    const edge = math.min(math.min(u, 1 - u), math.min(v, 1 - v));
+    var r : f32 = 0.5;
+    if cy == 0 and cx == 0 {
+        // cream plaster: soft mottling, stains, a recessed frame
+        r = 0.62 + (bend - 0.5) * 0.2;
+        if chips < 0.08 { r *= 0.75; }
+        if edge < 0.04 { r *= 0.5; }
+    } else if cy == 0 {
+        // timber planks with bent grain
+        const pu = u * 6.0;
+        const cell = pu as i32;
+        const local = pu - (cell as f32);
+        const seam = math.min(local, 1 - local);
+        r = 0.55;
+        if seam < 0.045 { r = 0.05 + seam * 4; }
+        r += (0.5 + 0.5 * math.sin((v * 5 + bend * 3.2 + (cell as f32) * 1.7) * (2.0 * math.pi) + u * 40)) * 0.14 - 0.07;
+        if edge < 0.035 { r *= 0.55; }
+        if chips < 0.1 { r *= 0.8; }
+    } else if cx == 0 {
+        // scalloped roof tiles, every other row shifted by half a tile. A tile
+        // is lowest in its middle and its lower edge curves up toward its sides;
+        // the gaps beside the curve show the (shadowed) top of the row below.
+        const rows = v * 9.0;
+        const row = rows as i32;
+        const fv = rows - (row as f32);
+        const shift : f32 = (row % 2 == 0) ? 0.0 : 0.5;
+        const tu = u * 9.0 + shift;
+        const ti = tu as i32;
+        const fu = tu - (ti as f32);
+        const x = fu * 2 - 1;
+        const lip = 0.32 * (1.0 - math.sqrt(math.max(1.0 - x * x, 0.0 as f32)));
+        if fv < lip {
+            r = 0.1 + 0.25 * (fv / lip);
+            if lip - fv < 0.05 { r *= 0.5; }
+        } else {
+            const w = (fv - lip) / (1.0 - lip);
+            r = math.pow(1.0 - w, 0.7) * (0.55 + 0.45 * (1.0 - x * x)) * 0.85 + 0.15;
+            if fv - lip < 0.03 { r = math.min(r + 0.15, 1.0 as f32); }
+            if math.abs(x) > 0.93 { r *= 0.6; }
+        }
+    } else {
+        // stone: mottled, with seams between slabs
+        r = 0.65 + (bend - 0.5) * 0.35 + (chips - 0.5) * 0.15;
+        if edge < 0.02 { r *= 0.6; }
+    }
+    return recipeClamp(r);
+}
+
+fn main() : Texture2D {
+    var flow = resize(gradientNoise(32, 8, 11), SIZE, SIZE);
+    var wear = resize(cellNoise(64, 64, 14, 0.2), SIZE, SIZE);
+    var height = create(SIZE, SIZE, 1);
+    mapWith(height, Fields {flow, wear},
+        fn(x : u32, y : u32, value : Vec4, fields : Fields) : Vec4 {
+            const cx = x / HALF;
+            const cy = y / HALF;
+            const u = (x - cx * HALF) as f32 / HALF as f32;
+            const v = (y - cy * HALF) as f32 / HALF as f32;
+            const bend = getPixel(fields.flow, x, y).x;
+            const chips = getPixel(fields.wear, x, y).x;
+            return Vec4 {relief(cx, cy, u, v, bend, chips), 0, 0, 1};
+        });
+
+    var albedo = color(SIZE, SIZE, Vec4 {1, 1, 1, 1});
+    mapWith(albedo, ColorFields {height},
+        fn(x : u32, y : u32, value : Vec4, fields : ColorFields) : Vec4 {
+            const cx = x / HALF;
+            const cy = y / HALF;
+            const r = getPixel(fields.height, x, y).x;
+            if cy == 0 and cx == 0 { return tint(Vec4 {0.5, 0.36, 0.22, 1}, Vec4 {0.96, 0.9, 0.76, 1}, r); }
+            if cy == 0 { return tint(Vec4 {0.52, 0.29, 0.15, 1}, Vec4 {0.96, 0.68, 0.42, 1}, r); }
+            if cx == 0 { return tint(Vec4 {0.07, 0.3, 0.18, 1}, Vec4 {0.4, 0.76, 0.52, 1}, r); }
+            return tint(Vec4 {0.4, 0.4, 0.4, 1}, Vec4 {0.85, 0.85, 0.83, 1}, r);
+        });
+    shade(albedo, height, 2.0,
+        ReliefLight {Vec2 {1.1, -0.45}, 1.0, 0.55, 1.5});
+    return texture2D(albedo);
+}

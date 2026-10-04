@@ -34,20 +34,11 @@ struct ParticleScriptImportEditorWindow : AssetEditorWindow {
 		m_dirty = false;
 	}
 
-	void fileChangedExternally() override {
-		OutputMemoryStream tmp(m_app.getAllocator());
-		OutputMemoryStream tmp2(m_app.getAllocator());
-		m_editor->serializeText(tmp);
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (!fs.getContentSync(m_path, tmp2)) return;
-
-		if (tmp.size() == tmp2.size() && memcmp(tmp.data(), tmp2.data(), tmp.size()) == 0) {
-			m_dirty = false;
-		}
-	}
+	void fileChangedExternally() override { m_external_change.onFileChanged(); }
 
 	void windowGUI() override {
 		CommonActions& actions = m_app.getCommonActions();
+		m_external_change.gui(m_app, m_path, *m_editor, m_dirty);
 
 		if (ImGui::BeginMenuBar()) {
 			if (actions.save.iconButton(m_dirty, &m_app)) save();
@@ -64,6 +55,7 @@ struct ParticleScriptImportEditorWindow : AssetEditorWindow {
 
 	StudioApp& m_app;
 	UniquePtr<CodeEditor> m_editor;
+	ExternalFileChangeDialog m_external_change;
 	Path m_path;
 };
 
@@ -257,20 +249,11 @@ struct ParticleScriptEditorWindow : AssetEditorWindow {
 		m_dirty = false;
 	}
 
-	void fileChangedExternally() override {
-		OutputMemoryStream tmp(m_app.getAllocator());
-		OutputMemoryStream tmp2(m_app.getAllocator());
-		m_editor->serializeText(tmp);
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (!fs.getContentSync(m_path, tmp2)) return;
-
-		if (tmp.size() == tmp2.size() && memcmp(tmp.data(), tmp2.data(), tmp.size()) == 0) {
-			m_dirty = false;
-		}
-	}
+	void fileChangedExternally() override { m_external_change.onFileChanged(); }
 
 	void windowGUI() override {
 		CommonActions& actions = m_app.getCommonActions();
+		m_external_change.gui(m_app, m_path, *m_editor, m_dirty);
 
 		if (ImGui::BeginMenuBar()) {
 			if (actions.save.iconButton(m_dirty, &m_app)) save();
@@ -525,6 +508,7 @@ struct ParticleScriptEditorWindow : AssetEditorWindow {
 	ParticleScriptPlugin& m_plugin;
 	StudioApp& m_app;
 	UniquePtr<CodeEditor> m_editor;
+	ExternalFileChangeDialog m_external_change;
 	WorldViewer m_viewer;
 	Path m_path;
 	EntityRef m_preview_entity;

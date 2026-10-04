@@ -517,51 +517,7 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 	const char* getName() const override { return "evox_editor"; }
 	const Path& getPath() override { return m_path; }
 
-	void fileChangedExternally() override {
-		m_show_external_modification_notification = true;
-	}
-
-	void modificationNotificationUI() {
-		if (m_show_external_modification_notification) {
-			OutputMemoryStream editor_blob(m_app.getAllocator());
-			OutputMemoryStream file_blob(m_app.getAllocator());
-			m_editor->serializeText(editor_blob);
-			FileSystem& fs = m_app.getEngine().getFileSystem();
-			if (fs.getContentSync(m_path, file_blob)) {
-				if (editor_blob.size() != file_blob.size()
-					|| memcmp(editor_blob.data(), file_blob.data(), editor_blob.size()) != 0) {
-					openCenterStrip("evox_external_modification");
-				}
-				else {
-					m_dirty = false;
-				}
-			}
-			else {
-				logError("Unexpected error while reading file ", m_path);
-			}
-			m_show_external_modification_notification = false;
-		}
-
-		if (beginCenterStrip("evox_external_modification")) {
-			ImGui::NewLine();
-			alignGUICenter([&]() {
-				ImGui::Text("File %s modified externally", m_path.c_str());
-			});
-			alignGUICenter([&]() {
-				if (ImGui::Button("Ignore")) ImGui::CloseCurrentPopup();
-				ImGui::SameLine();
-				if (ImGui::Button("Reload")) {
-					OutputMemoryStream blob(m_app.getAllocator());
-					if (m_app.getEngine().getFileSystem().getContentSync(m_path, blob)) {
-						m_editor->setText(StringView((const char*)blob.data(), (u32)blob.size()));
-						m_dirty = false;
-					}
-					ImGui::CloseCurrentPopup();
-				}
-			});
-			endCenterStrip();
-		}
-	}
+	void fileChangedExternally() override { m_external_change.onFileChanged(); }
 
 	void save() {
 		check();
@@ -706,7 +662,7 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 			ImGui::EndMenuBar();
 		}
 
-		modificationNotificationUI();
+		m_external_change.gui(m_app, m_path, *m_editor, m_dirty);
 
 		applyEvoxBreakpointMarkers(*m_editor, m_path);
 		if (m_editor->gui("evox_editor", ImGui::GetContentRegionAvail(), m_app.getMonospaceFont(), m_app.getDefaultFont())) {
@@ -895,7 +851,7 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 	String m_message;
 	Array<AutocompleteItem> m_autocomplete_list;
 	i32 m_autocomplete_selection_idx = 0;
-	bool m_show_external_modification_notification = false;
+	ExternalFileChangeDialog m_external_change;
 };
 
 struct EvoxAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {

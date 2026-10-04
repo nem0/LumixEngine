@@ -604,8 +604,8 @@ fn cellNoise(width : u32, height : u32, scale : f32, offset : f32) : Image {
                     const gx = i as f32 - 1;
                     const gy = j as f32 - 1;
                     const h = recipeHash2(ix + gx, iy + gy);
-                    const dx = gx - fx + math.sin(h.x * 6.2831853 + offset) * 0.5 + 0.5;
-                    const dy = gy - fy + math.sin(h.y * 6.2831853 + offset) * 0.5 + 0.5;
+                    const dx = gx - fx + math.sin(h.x * (2.0 * math.pi) + offset) * 0.5 + 0.5;
+                    const dy = gy - fy + math.sin(h.y * (2.0 * math.pi) + offset) * 0.5 + 0.5;
                     distance = math.min(distance, dx * dx + dy * dy);
                 }
             }

@@ -78,13 +78,12 @@ fn quad(mesh : *Mesh, a : vec3.Vec3, b : vec3.Vec3, c : vec3.Vec3, d : vec3.Vec3
 fn sphere(radius : f32, segments : i32, rings : i32) : Mesh {
     if radius <= 0.0 or segments < 3 or rings < 2 or segments > 512 or rings > 512 { panic("Invalid sphere parameters"); }
     var result = empty();
-    const pi : f32 = 3.141592653589793;
     for y in 0..(rings + 1) {
         const v = (y as f32) / (rings as f32);
-        const phi = v * pi;
+        const phi = v * math.pi;
         for x in 0..(segments + 1) {
             const u = (x as f32) / (segments as f32);
-            const theta = u * (2.0 * pi);
+            const theta = u * (2.0 * math.pi);
             const normal : vec3.Vec3 = { math.sin(phi) * math.cos(theta), math.cos(phi), math.sin(phi) * math.sin(theta) };
             const tangent : vec3.Vec3 = { -math.sin(theta), 0.0, math.cos(theta) };
             vertex(&result, normal * radius, normal, tangent, u, v);
@@ -127,10 +126,9 @@ fn grid(columns : i32, rows : i32) : Mesh {
 fn cone(radius : f32, height : f32, segments : i32) : Mesh {
     if radius <= 0.0 or height <= 0.0 or segments < 3 or segments > 512 { panic("Invalid cone parameters"); }
     var result = empty();
-    const pi : f32 = 3.141592653589793;
     for i in 0..segments {
         const u = (i as f32) / (segments as f32);
-        const a = u * 2.0 * pi;
+        const a = u * 2.0 * math.pi;
         const c = math.cos(a);
         const s = math.sin(a);
         const normal = vec3.normalize(vec3.Vec3 {c * height, s * height, radius});
@@ -145,7 +143,7 @@ fn cone(radius : f32, height : f32, segments : i32) : Mesh {
     const start = result.vertices.size as u32;
     vertex(&result, {0.0, 0.0, 0.0}, {0.0, 0.0, -1.0}, {1.0, 0.0, 0.0}, 0.5, 0.5);
     for i in 0..segments {
-        const a = (i as f32) / (segments as f32) * 2.0 * pi;
+        const a = (i as f32) / (segments as f32) * 2.0 * math.pi;
         const c = math.cos(a);
         const s = math.sin(a);
         vertex(&result, {c * radius, s * radius, 0.0}, {0.0, 0.0, -1.0}, {1.0, 0.0, 0.0}, (c + 1.0) * 0.5, (s + 1.0) * 0.5);
@@ -160,10 +158,9 @@ fn cone(radius : f32, height : f32, segments : i32) : Mesh {
 fn cylinder(radius : f32, height : f32, segments : i32) : Mesh {
     if radius <= 0.0 or height <= 0.0 or segments < 3 or segments > 512 { panic("Invalid cylinder parameters"); }
     var result = empty();
-    const pi : f32 = 3.141592653589793;
     for i in 0..(segments + 1) {
         const u = (i as f32) / (segments as f32);
-        const a = u * 2.0 * pi;
+        const a = u * 2.0 * math.pi;
         const c = math.cos(a);
         const s = math.sin(a);
         const normal : vec3.Vec3 = {c, s, 0.0};
@@ -182,7 +179,7 @@ fn cylinder(radius : f32, height : f32, segments : i32) : Mesh {
         const center = result.vertices.size as u32;
         vertex(&result, {0.0, 0.0, z}, {0.0, 0.0, nz}, {1.0, 0.0, 0.0}, 0.5, 0.5);
         for i in 0..segments {
-            const a = (i as f32) / (segments as f32) * 2.0 * pi;
+            const a = (i as f32) / (segments as f32) * 2.0 * math.pi;
             const c = math.cos(a);
             const s = math.sin(a);
             vertex(&result, {c * radius, s * radius, z}, {0.0, 0.0, nz}, {1.0, 0.0, 0.0}, (c + 1.0) * 0.5, (s + 1.0) * 0.5);
@@ -221,10 +218,9 @@ fn circle(radius : f32, segments : i32) : Mesh {
     if radius <= 0.0 or segments < 3 or segments > 512 { panic("Invalid circle parameters"); }
     var result = empty();
     result.topology = 1;
-    const pi : f32 = 3.141592653589793;
     for i in 0..(segments + 1) {
         const u = (i as f32) / (segments as f32);
-        const angle = u * 2.0 * pi;
+        const angle = u * 2.0 * math.pi;
         const c = math.cos(angle);
         const s = math.sin(angle);
         vertex(&result, {c * radius, s * radius, 0.0}, {c, s, 0.0}, {-s, c, 0.0}, u, 0.0);
@@ -240,15 +236,14 @@ fn spiral(height : f32, start_radius : f32, end_radius : f32, turns : f32, resol
     if count < 2 or count > 262144 { panic("Invalid spiral point count"); }
     var result = empty();
     result.topology = 2;
-    const pi : f32 = 3.141592653589793;
     for i in 0..count {
         const t = (i as f32) / ((count - 1) as f32);
         const radius = start_radius + (end_radius - start_radius) * t;
-        const a = turns * t * 2.0 * pi;
+        const a = turns * t * 2.0 * math.pi;
         const c = math.cos(a);
         const s = math.sin(a);
         const dr = end_radius - start_radius;
-        const angular_speed = turns * 2.0 * pi;
+        const angular_speed = turns * 2.0 * math.pi;
         const tangent = vec3.normalizeSafe(vec3.Vec3 {dr * c - radius * s * angular_speed, dr * s + radius * c * angular_speed, height});
         vertex(&result, {radius * c, radius * s, height * t}, {c, s, 0.0}, tangent, height * t, 0.0);
     }
