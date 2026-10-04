@@ -443,14 +443,27 @@ struct AudioModuleImpl final : AudioModule
 		return INVALID_SOUND_HANDLE;
 	}
 
+	// handles come from scripts too (play2D/play3D return INVALID_SOUND_HANDLE while a clip is loading), so never index with a bad one
+	// logs an error naming the caller when the handle is unusable, so a script bug is visible instead of silent
+	bool checkSound(SoundHandle sound_id, const char* fn) const {
+		if (sound_id < 0 || sound_id >= (int)lengthOf(m_playing_sounds)) {
+			logError("AudioModule::", fn, ": invalid sound handle ", sound_id, " (play2D/play3D return -1 while the clip is loading or no slot is free)");
+			return false;
+		}
+		if (m_playing_sounds[sound_id].buffer_id == AudioDevice::INVALID_BUFFER_HANDLE) {
+			logError("AudioModule::", fn, ": sound handle ", sound_id, " is not playing (already stopped?)");
+			return false;
+		}
+		return true;
+	}
+
 	bool isEnd(SoundHandle sound_id) override {
-		ASSERT(sound_id >= 0 && sound_id < (int)lengthOf(m_playing_sounds));
+		if (!checkSound(sound_id, "isEnd")) return true;
 		return m_device.isEnd(m_playing_sounds[sound_id].buffer_id);
 	}
 
-	void stop(SoundHandle sound_id) override
-	{
-		ASSERT(sound_id >= 0 && sound_id < (int)lengthOf(m_playing_sounds));
+	void stop(SoundHandle sound_id) override {
+		if (!checkSound(sound_id, "stop")) return;
 		m_device.stop(m_playing_sounds[sound_id].buffer_id);
 		m_playing_sounds[sound_id].buffer_id = AudioDevice::INVALID_BUFFER_HANDLE;
 		if (m_playing_sounds[sound_id].clip) {
@@ -465,20 +478,18 @@ struct AudioModuleImpl final : AudioModule
 
 	void setVolume(SoundHandle sound_id, float volume) override
 	{
-		ASSERT(sound_id != AudioModule::INVALID_SOUND_HANDLE);
-		ASSERT(sound_id >= 0 && sound_id < (int)lengthOf(m_playing_sounds));
+		if (!checkSound(sound_id, "setVolume")) return;
 		m_device.setVolume(m_playing_sounds[sound_id].buffer_id, volume);
 	}
 
 	void setFrequency(SoundHandle sound_id, u32 frequency) override {
-		ASSERT(sound_id != AudioModule::INVALID_SOUND_HANDLE);
-		ASSERT(sound_id >= 0 && sound_id < (int)lengthOf(m_playing_sounds));
+		if (!checkSound(sound_id, "setFrequency")) return;
 		m_device.setFrequency(m_playing_sounds[sound_id].buffer_id, frequency);
 	}
 
 	void setEcho(SoundHandle sound_id, float wet_dry_mix, float feedback, float left_delay, float right_delay) override
 	{
-		ASSERT(sound_id >= 0 && sound_id < (int)lengthOf(m_playing_sounds));
+		if (!checkSound(sound_id, "setEcho")) return;
 		m_device.setEcho(m_playing_sounds[sound_id].buffer_id, wet_dry_mix, feedback, left_delay, right_delay);
 	}
 
