@@ -100,6 +100,7 @@ struct AssetCompilerImpl : AssetCompiler {
 				file << "\"" << ri.path << "\",\n";
 			}
 			file << "]\n\n";
+			MutexGuard lock(m_dependencies_mutex);
 			file << "dependencies = {\n";
 			for (auto iter : m_dependencies.iterated()) {
 				file << "\t\"" << iter.key() << "\" = [\n";
@@ -373,8 +374,8 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 
 
-	void registerDependency(const Path& included_from, const Path& dependency) override
-	{
+	void registerDependency(const Path& included_from, const Path& dependency) override {
+		MutexGuard lock(m_dependencies_mutex);
 		auto iter = m_dependencies.find(dependency);
 		if (!iter.isValid()) {
 			m_dependencies.insert(dependency, Array<Path>(m_allocator));
@@ -590,6 +591,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	// queues everything that depends on `path`, directly or through other files, exactly once;
 	// the dependency graph can have cycles (e.g. two scripts importing each other) and diamonds
 	void pushDependentsToCompileQueue(const Path& path) {
+		MutexGuard lock(m_dependencies_mutex);
 		Array<Path> visited(m_allocator);
 		visited.push(path);
 		pushDependentsRec(path, visited);
@@ -843,6 +845,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	TagAllocator m_allocator;
 	Mutex m_compiled_mutex;
+	Mutex m_dependencies_mutex;
 	Mutex m_changed_mutex;
 	Mutex m_plugin_mutex;
 	jobs::Mutex m_resources_mutex;
