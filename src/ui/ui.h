@@ -285,7 +285,7 @@ struct Element {
 	void setWidth(StringView value);
 	//@ function 
 	void setBGImage(const Path& path);
-	// "left"/"top" of a relative element shift it (and its content) after layout without moving its siblings, e.g. "-120px" for animations
+	// "left"/"top" of a relative element shift it (and its content) after layout without moving its siblings, e.g. "-120" (pixels), "10%" or "2em", for animations
 	//@ function
 	void setLeft(StringView value);
 	//@ function
