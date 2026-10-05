@@ -8,7 +8,6 @@ extern fn setVisible(object : Element, show : bool) : void;
 extern fn setText(object : Element, value : []const u8) : void;
 extern fn setWidth(object : Element, value : []const u8) : void;
 extern fn setBGImage(object : Element, path : []const u8) : void;
-
 extern fn setLeft(object : Element, value : []const u8) : void;
 extern fn setTop(object : Element, value : []const u8) : void;
 extern fn setOpacity(object : Element, value : f32) : void;
@@ -16,3 +15,4 @@ extern fn getCenterX(object : Element) : f32;
 extern fn getCenterY(object : Element) : f32;
 extern fn getWidth(object : Element) : f32;
 extern fn getHeight(object : Element) : f32;
+
