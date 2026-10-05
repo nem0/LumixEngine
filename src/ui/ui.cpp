@@ -932,6 +932,38 @@ void Element::setWidth(StringView value) {
 	m_document.invalidateLayout();
 }
 
+void Element::setOpacity(float value) {
+	upsertAttribute<AttributeName::OPACITY>(*this, clamp(value, 0.f, 1.f), AttributeSource::ELEMENT);
+	// TODO opacity is only recomputed (with the inherited value) in the style/layout pass, so this runs a full layout for a change that moves nothing;
+	// update the opacity of this element and its descendants directly instead
+	m_document.invalidateLayout();
+}
+
+static void setPositionAttribute(Element& elem, AttributeName name, StringView value) {
+	Attribute attr;
+	attr.type = name;
+	if (!parseUnit(value, attr.parsed_unit)) {
+		logError("invalid value '", value, "' for attribute '", attributeNameToString(name), "'");
+		return;
+	}
+	upsertAttribute(elem, attr, AttributeSource::ELEMENT);
+	elem.m_document.invalidateLayout();
+}
+
+void Element::setLeft(StringView value) { setPositionAttribute(*this, AttributeName::LEFT, value); }
+void Element::setTop(StringView value) { setPositionAttribute(*this, AttributeName::TOP, value); }
+
+float Element::getCenterX() const {
+	return (position.x + size.x * 0.5f - (position_mode == PositionMode::RELATIVE ? left : 0.f)) / m_document.m_dpi_scale;
+}
+
+float Element::getCenterY() const {
+	return (position.y + size.y * 0.5f - (position_mode == PositionMode::RELATIVE ? top : 0.f)) / m_document.m_dpi_scale;
+}
+
+float Element::getWidth() const { return size.x / m_document.m_dpi_scale; }
+float Element::getHeight() const { return size.y / m_document.m_dpi_scale; }
+
 static float computeAbsoluteSize(const ParsedUnit& unit, float parent_size, float font_size, float dpi_scale) {
 	switch (unit.unit) {
 		case Unit::PIXELS: return unit.value * dpi_scale;

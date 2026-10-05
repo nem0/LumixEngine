@@ -285,6 +285,22 @@ struct Element {
 	void setWidth(StringView value);
 	//@ function 
 	void setBGImage(const Path& path);
+	// "left"/"top" of a relative element shift it (and its content) after layout without moving its siblings, e.g. "-120px" for animations
+	//@ function
+	void setLeft(StringView value);
+	//@ function
+	void setTop(StringView value);
+	//@ function
+	void setOpacity(float value);
+	// as laid out, in UI units (pixels before the DPI scale), without the shift of left/top; valid after the first layout with the element visible
+	//@ function
+	float getCenterX() const;
+	//@ function
+	float getCenterY() const;
+	//@ function
+	float getWidth() const;
+	//@ function
+	float getHeight() const;
 
 	IFontManager::FontHandle getFontHandle() const { return font_handle; }
 	void setFontHandle(IFontManager::FontHandle font_handle);

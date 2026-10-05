@@ -5308,6 +5308,48 @@ namespace Lumix::Evox::generated {
 		object->setBGImage(Path(StringView{path.begin, (u64)path.length}));
 	}
 	
+	static void evox_object_Element_setLeft_1(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_STRING_ARG(frame, value);
+		object->setLeft(StringView{value.begin, (u64)value.length});
+	}
+	
+	static void evox_object_Element_setTop_1(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_STRING_ARG(frame, value);
+		object->setTop(StringView{value.begin, (u64)value.length});
+	}
+	
+	static void evox_object_Element_setOpacity_1(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, float, value);
+		object->setOpacity(value);
+	}
+	
+	static void evox_object_Element_getCenterX_1(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getCenterX();
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Element_getCenterY_1(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getCenterY();
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Element_getWidth_1(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getWidth();
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Element_getHeight_1(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getHeight();
+		EX_RESULT(frame, ret);
+	}
+	
 	static void evox_object_Document_getElement_11405592870786360628(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ui::Document*, object);
 		EX_ARG(frame, u32, index);
@@ -5962,6 +6004,13 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:ui/element"), StringView("setText")}, &evox_object_Element_setText_16123516204308000926);
 		functions.insert({StringView("core:ui/element"), StringView("setWidth")}, &evox_object_Element_setWidth_1690122863701504102);
 		functions.insert({StringView("core:ui/element"), StringView("setBGImage")}, &evox_object_Element_setBGImage_9641999657146036441);
+		functions.insert({StringView("core:ui/element"), StringView("setLeft")}, &evox_object_Element_setLeft_1);
+		functions.insert({StringView("core:ui/element"), StringView("setTop")}, &evox_object_Element_setTop_1);
+		functions.insert({StringView("core:ui/element"), StringView("setOpacity")}, &evox_object_Element_setOpacity_1);
+		functions.insert({StringView("core:ui/element"), StringView("getCenterX")}, &evox_object_Element_getCenterX_1);
+		functions.insert({StringView("core:ui/element"), StringView("getCenterY")}, &evox_object_Element_getCenterY_1);
+		functions.insert({StringView("core:ui/element"), StringView("getWidth")}, &evox_object_Element_getWidth_1);
+		functions.insert({StringView("core:ui/element"), StringView("getHeight")}, &evox_object_Element_getHeight_1);
 		functions.insert({StringView("core:ui/document"), StringView("getElement")}, &evox_object_Document_getElement_11405592870786360628);
 		functions.insert({StringView("core:ui/document"), StringView("getElementByID")}, &evox_object_Document_getElementByID_12240067967033170654);
 		functions.insert({StringView("core:ui/document"), StringView("getEvents")}, &evox_object_Document_getEvents_4526885960883524382);
