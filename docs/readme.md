@@ -37,6 +37,7 @@
 * [Evox procedural mesh recipes (.lpg)](lpg.md)
 * [Upscaling (DLSS and FSR3)](upscaling.md)
 * [Custom postprocess](renderer/postprocess.md)
+* [Evox postprocess scripts](postprocess.md)
 * [Particle script](renderer/particle_script.md)
 
 # Physics

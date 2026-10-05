@@ -1,0 +1,34 @@
+import "core:postprocess"
+import "core:renderer/camera"
+import "core:renderer/module"
+import "core:renderer/pipelinetype"
+
+// Layout of `Drawcall` in engine/shaders/film_grain.hlsl
+struct FilmGrainUniform {
+	intensity : f32;
+	lumamount : f32;
+	in_out : u32;
+}
+
+// Film grain, controlled by the film grain intensity of the active camera. An `afterTonemap` hook, game view only.
+fn filmGrain(ctx : Context, input : RenderBuffer) : RenderBuffer {
+	if ctx.pipelineType() != .GAME_VIEW {
+		return input;
+	}
+	const module = ctx.renderModule();
+	const camera_entity = module.getActiveCamera() else return input;
+	const camera = camera_entity.camera() else return input;
+	const intensity = camera.getFilmGrainIntensity();
+	if intensity <= 0.00001 {
+		return input;
+	}
+	const shader = ctx.loadShader("engine/shaders/film_grain.hlsl");
+	if not shader.isReady() {
+		return input;
+	}
+
+	ctx.beginBlock("film_grain_evox");
+	ctx.dispatch(shader, FilmGrainUniform {intensity, 0.1, ctx.rwBindless(input)}, (ctx.width() + 15) / 16, (ctx.height() + 15) / 16, 1);
+	ctx.endBlock();
+	return input;
+}

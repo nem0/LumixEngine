@@ -7449,7 +7449,7 @@ ex_result ex_module_typecheck(ex_module* module) {
 	return EX_RESULT_OK;
 }
 
-ex_result ex_module_compile(ex_module* module, ex_string_view source, ex_string_view source_name, ex_import_resolver_fn import_resolver, void* import_resolver_userdata) {
+ex_result ex_module_add_root(ex_module* module, ex_string_view source, ex_string_view source_name, ex_import_resolver_fn import_resolver, void* import_resolver_userdata) {
 	if (!module) return EX_RESULT_FAILURE;
 	Checker checker(*module);
 	if (ex_module_parse(module, source, source_name) == EX_RESULT_FAILURE) return EX_RESULT_FAILURE;
@@ -7457,6 +7457,10 @@ ex_result ex_module_compile(ex_module* module, ex_string_view source, ex_string_
 		Unit& unit = checker.module.units[unit_index];
 		if (!checker.resolveImportsForUnit(unit, import_resolver, import_resolver_userdata)) return EX_RESULT_FAILURE;
 	}
-	if (ex_module_typecheck(module) == EX_RESULT_FAILURE) return EX_RESULT_FAILURE;
 	return EX_RESULT_OK;
+}
+
+ex_result ex_module_compile(ex_module* module, ex_string_view source, ex_string_view source_name, ex_import_resolver_fn import_resolver, void* import_resolver_userdata) {
+	if (ex_module_add_root(module, source, source_name, import_resolver, import_resolver_userdata) == EX_RESULT_FAILURE) return EX_RESULT_FAILURE;
+	return ex_module_typecheck(module);
 }

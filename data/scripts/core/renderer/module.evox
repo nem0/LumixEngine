@@ -21,4 +21,5 @@ extern fn addDebugCubeSolid(module : RenderModule, from : DVec3, max : DVec3, co
 extern fn setActiveCamera(module : RenderModule, camera : Entity) : void;
 extern fn getActiveCamera(module : RenderModule) : ?Entity;
 extern fn setActiveEnvironment(module : RenderModule, entity : Entity) : void;
+extern fn getActiveEnvironment(module : RenderModule) : ?Entity;
 

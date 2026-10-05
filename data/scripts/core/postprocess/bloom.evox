@@ -1,0 +1,246 @@
+import "core:postprocess"
+import "core:imgui" as imgui
+import "core:renderer/camera"
+import "core:renderer/module"
+import "core:renderer/pipelinetype"
+
+// Per pipeline state: GPU buffer with the luminance histogram and the average luminance (index 256).
+struct BloomState {
+	luminance : Storage;
+	// the extracted bright areas, kept only while the debug view shows them
+	extracted : RenderBuffer;
+}
+
+// Layouts of the constant buffers of the shaders in engine/shaders
+struct AvgLuminanceUniform {
+	accomodation_speed : f32;
+	image : u32;
+	histogram : u32;
+}
+
+struct ExtractUniform {
+	avg_lum_multiplier : f32;
+	histogram : u32;
+	input : u32;
+	output : u32;
+}
+
+struct DownscaleUniform {
+	input : u32;
+	output : u32;
+}
+
+// float4 inv_size, only x and y are used
+struct BlurUniform {
+	inv_x : f32;
+	inv_y : f32;
+	unused_z : f32;
+	unused_w : f32;
+	input : u32;
+}
+
+struct BlurUpscaleUniform {
+	inv_x : f32;
+	inv_y : f32;
+	unused_z : f32;
+	unused_w : f32;
+	big : u32;
+	small : u32;
+}
+
+struct CompositeUniform {
+	bloom : u32;
+	output : u32;
+}
+
+struct TonemapUniform {
+	exposure : f32;
+	input : u32;
+	accum : u32;
+	output : u32;
+}
+
+fn activeCamera(ctx : Context) : ?Camera {
+	const module = ctx.renderModule();
+	const entity = module.getActiveCamera() else return null;
+	return entity.camera();
+}
+
+fn groups(size : u32) : u32 {
+	return (size + 15) / 16;
+}
+
+fn computeAvgLuminance(ctx : Context, state : *BloomState, input : RenderBuffer, accomodation_speed : f32, width : u32, height : u32) : void {
+	const shader = ctx.loadShader("engine/shaders/avg_luminance.hlsl");
+	ctx.beginBlock("autoexposure");
+	const image = ctx.bindless(input);
+	ctx.dispatchDefine(shader, "PASS0", AvgLuminanceUniform {accomodation_speed, image, ctx.rwBindlessStorage(state.luminance)}, 1, 1, 1);
+	ctx.dispatch(shader, AvgLuminanceUniform {accomodation_speed, image, ctx.rwBindlessStorage(state.luminance)}, groups(width), groups(height), 1);
+	ctx.dispatchDefine(shader, "PASS2", AvgLuminanceUniform {accomodation_speed, image, ctx.rwBindlessStorage(state.luminance)}, 1, 1, 1);
+	ctx.endBlock();
+}
+
+fn downscale(ctx : Context, big : RenderBuffer, width : u32, height : u32) : RenderBuffer {
+	const small = ctx.createRenderTarget(width, height, .RGBA16F);
+	const shader = ctx.loadShader("engine/shaders/bloom_downscale.hlsl");
+	ctx.dispatch(shader, DownscaleUniform {ctx.bindless(big), ctx.rwBindless(small)}, groups(width), groups(height), 1);
+	return small;
+}
+
+// two pass blur of `source`, in place
+fn blur(ctx : Context, width : u32, height : u32, source : RenderBuffer) : void {
+	const shader = ctx.loadShader("engine/shaders/blur.hlsl");
+	const temp = ctx.createRenderTarget(width, height, .RGBA16F);
+	const inv_x = 1.0 / width as f32;
+	const inv_y = 1.0 / height as f32;
+
+	const horizontal = BlurUniform {inv_x, inv_y, 0, 0, ctx.bindless(source)};
+	ctx.setRenderTarget(temp);
+	ctx.drawDefine(shader, "BLUR_H", horizontal);
+
+	ctx.setRenderTarget(source);
+	ctx.draw(shader, BlurUniform {inv_x, inv_y, 0, 0, ctx.bindless(temp)});
+	ctx.releaseBuffer(temp);
+}
+
+// blurs `big` (width x height) together with the smaller `small` buffer, in place
+fn blurUpscale(ctx : Context, width : u32, height : u32, big : RenderBuffer, small : RenderBuffer) : void {
+	const blur_h_shader = ctx.loadShader("engine/shaders/bloom_blur.hlsl");
+	const blur_shader = ctx.loadShader("engine/shaders/blur.hlsl");
+	const temp = ctx.createRenderTarget(width, height, .RGBA16F);
+	const inv_x = 1.0 / width as f32;
+	const inv_y = 1.0 / height as f32;
+
+	const horizontal = BlurUpscaleUniform {inv_x, inv_y, 0, 0, ctx.bindless(big), ctx.bindless(small)};
+	ctx.setRenderTarget(temp);
+	ctx.drawDefine(blur_h_shader, "BLUR_H", horizontal);
+
+	ctx.setRenderTarget(big);
+	ctx.draw(blur_shader, BlurUniform {inv_x, inv_y, 0, 0, ctx.bindless(temp)});
+	ctx.releaseBuffer(temp);
+}
+
+fn shadersReady(ctx : Context) : bool {
+	return ctx.loadShader("engine/shaders/bloom.hlsl").isReady()
+		and ctx.loadShader("engine/shaders/bloom_extract.hlsl").isReady()
+		and ctx.loadShader("engine/shaders/bloom_downscale.hlsl").isReady()
+		and ctx.loadShader("engine/shaders/bloom_tonemap.hlsl").isReady()
+		and ctx.loadShader("engine/shaders/blur.hlsl").isReady()
+		and ctx.loadShader("engine/shaders/avg_luminance.hlsl").isReady()
+		and ctx.loadShader("engine/shaders/bloom_blur.hlsl").isReady();
+}
+
+// Bloom with autoexposure, controlled by the bloom properties of the active camera. A `beforeTonemap` hook, game view only.
+fn bloom(ctx : Context, input : RenderBuffer) : RenderBuffer {
+	if ctx.pipelineType() != .GAME_VIEW {
+		return input;
+	}
+	const camera = activeCamera(ctx) else return input;
+	if not camera.getBloomEnabled() {
+		return input;
+	}
+	if not shadersReady(ctx) {
+		return input;
+	}
+
+	var state = ctx.state(BloomState);
+	if state.luminance.id == 0 {
+		state.luminance = ctx.createStorage(2048);
+	}
+
+	ctx.beginBlock("bloom_evox");
+	const width = ctx.width();
+	const height = ctx.height();
+	computeAvgLuminance(ctx, state, input, camera.getBloomAccomodationSpeed(), width, height);
+
+	const bloom_buffer = ctx.createRenderTarget(width / 2, height / 2, .RGBA16F);
+	const extract = ctx.loadShader("engine/shaders/bloom_extract.hlsl");
+	ctx.dispatch(extract, ExtractUniform {
+		camera.getBloomAvgBloomMultiplier(),
+		ctx.bindlessStorage(state.luminance),
+		ctx.bindless(input),
+		ctx.rwBindless(bloom_buffer)
+	}, groups(width / 2), groups(height / 2), 1);
+
+	// the debug view shows the extracted bright areas, the buffer is kept for `debugOutput` instead of bloomed
+	if ctx.isDebugShown("Bloom") {
+		ctx.releaseBuffer(state.extracted);
+		state.extracted = bloom_buffer;
+		ctx.endBlock();
+		return input;
+	}
+	if state.extracted.isValid() {
+		ctx.releaseBuffer(state.extracted);
+		state.extracted = invalidBuffer();
+	}
+
+	const bloom2 = downscale(ctx, bloom_buffer, width / 4, height / 4);
+	const bloom4 = downscale(ctx, bloom2, width / 8, height / 8);
+	const bloom8 = downscale(ctx, bloom4, width / 16, height / 16);
+	const bloom16 = downscale(ctx, bloom8, width / 32, height / 32);
+
+	blur(ctx, width / 32, height / 32, bloom16);
+	blurUpscale(ctx, width / 16, height / 16, bloom8, bloom16);
+	blurUpscale(ctx, width / 8, height / 8, bloom4, bloom8);
+	blurUpscale(ctx, width / 4, height / 4, bloom2, bloom4);
+	blurUpscale(ctx, width / 2, height / 2, bloom_buffer, bloom2);
+	ctx.releaseBuffer(bloom2);
+	ctx.releaseBuffer(bloom4);
+	ctx.releaseBuffer(bloom8);
+	ctx.releaseBuffer(bloom16);
+
+	const composite = ctx.loadShader("engine/shaders/bloom.hlsl");
+	ctx.dispatch(composite, CompositeUniform {ctx.bindless(bloom_buffer), ctx.rwBindless(input)}, groups(width), groups(height), 1);
+	ctx.releaseBuffer(bloom_buffer);
+	ctx.endBlock();
+	return input;
+}
+
+// Tonemapping with the exposure from the autoexposure (if the camera enables it). A `tonemap` hook, game view only.
+fn bloomTonemap(ctx : Context, input : RenderBuffer) : RenderBuffer {
+	if ctx.pipelineType() != .GAME_VIEW {
+		return invalidBuffer();
+	}
+	const camera = activeCamera(ctx) else return invalidBuffer();
+	if not camera.getBloomEnabled() or not camera.getBloomTonemapEnabled() {
+		return invalidBuffer();
+	}
+	if not shadersReady(ctx) {
+		return invalidBuffer();
+	}
+	var state = ctx.state(BloomState);
+	if state.luminance.id == 0 {
+		return invalidBuffer();
+	}
+
+	ctx.beginBlock("bloom tonemap");
+	const width = ctx.width();
+	const height = ctx.height();
+	const output = ctx.createRenderTarget(width, height, .RGBA8);
+	const shader = ctx.loadShader("engine/shaders/bloom_tonemap.hlsl");
+	ctx.dispatch(shader, TonemapUniform {
+		camera.getBloomExposure(),
+		ctx.bindless(input),
+		ctx.bindlessStorage(state.luminance),
+		ctx.rwBindless(output)
+	}, groups(width), groups(height), 1);
+	ctx.endBlock();
+	return output;
+}
+
+// Radio button of the debug popup, a `debugUI` hook.
+fn debugUI(ctx : Context) : void {
+	ctx.debugRadio("Bloom");
+}
+
+// Shows the bright areas bloom is made of (a quarter of the screen, the buffer has half the resolution), a `debugOutput` hook.
+fn debugOutput(ctx : Context, output : RenderBuffer) : bool {
+	if not ctx.isDebugShown("Bloom") {
+		return false;
+	}
+	const state = ctx.state(BloomState);
+	if state.extracted.isValid() {
+		ctx.blit(state.extracted, output, ctx.width() / 2, ctx.height() / 2);
+	}
+	return true;
+}

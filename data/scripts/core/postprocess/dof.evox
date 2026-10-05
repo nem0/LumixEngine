@@ -1,0 +1,51 @@
+import "core:postprocess"
+import "core:renderer/camera"
+import "core:renderer/module"
+import "core:renderer/pipelinetype"
+
+// Layout of `Drawcall` in engine/shaders/dof.hlsl
+struct DofUniform {
+	distance : f32;
+	range : f32;
+	max_blur_size : f32;
+	sharp_range : f32;
+	texture : u32;
+	depth : u32;
+	output : u32;
+}
+
+// Depth of field, controlled by the DOF properties of the active camera. A `beforeTonemap` hook, game view only.
+fn dof(ctx : Context, input : RenderBuffer) : RenderBuffer {
+	if ctx.pipelineType() != .GAME_VIEW {
+		return input;
+	}
+	const module = ctx.renderModule();
+	const camera_entity = module.getActiveCamera() else return input;
+	const camera = camera_entity.camera() else return input;
+	if not camera.getDofEnabled() {
+		return input;
+	}
+	const shader = ctx.loadShader("engine/shaders/dof.hlsl");
+	if not shader.isReady() {
+		return input;
+	}
+
+	ctx.beginBlock("dof_evox");
+	const width = ctx.width();
+	const height = ctx.height();
+	const blurred = ctx.createBuffer(width, height, .RGBA16F);
+	const uniform = DofUniform {
+		camera.getDofDistance(),
+		camera.getDofRange(),
+		camera.getDofMaxBlurSize(),
+		camera.getDofSharpRange(),
+		ctx.bindless(input),
+		ctx.bindless(ctx.depth()),
+		ctx.rwBindless(blurred)
+	};
+	ctx.dispatch(shader, uniform, (width + 15) / 16, (height + 15) / 16, 1);
+	ctx.blit(blurred, input, width, height);
+	ctx.releaseBuffer(blurred);
+	ctx.endBlock();
+	return input;
+}

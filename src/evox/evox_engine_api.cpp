@@ -9,6 +9,7 @@
 #include "evox/capi.h"
 #include "evox/bytecode.h"
 #include "evox/evox_module.h"
+#include "evox/evox_postprocess.h"
 #include "evox/evox_capi.gen.h"
 #include "evox/evox_wrapper.h"
 #include "renderer/render_module.h"
@@ -261,6 +262,46 @@ static void imguiTextUnformatted(ex_string_view sv) {
 static bool imguiButton(ex_string_view sv) {
 	StaticString<256> label(StringView{sv.begin, (u64)sv.length});
 	return ImGui::Button(label);
+}
+
+static bool imguiCheckbox(ex_string_view sv, bool value) {
+	StaticString<256> label(StringView{sv.begin, (u64)sv.length});
+	ImGui::Checkbox(label, &value);
+	return value;
+}
+
+static bool imguiRadioButton(ex_string_view sv, bool active) {
+	StaticString<256> label(StringView{sv.begin, (u64)sv.length});
+	return ImGui::RadioButton(label, active);
+}
+
+static float imguiDragFloat(ex_string_view sv, float value, float speed, float min, float max) {
+	StaticString<256> label(StringView{sv.begin, (u64)sv.length});
+	ImGui::DragFloat(label, &value, speed, min, max);
+	return value;
+}
+
+static i32 imguiDragInt(ex_string_view sv, i32 value, i32 min, i32 max) {
+	StaticString<256> label(StringView{sv.begin, (u64)sv.length});
+	ImGui::DragInt(label, &value, 1, min, max);
+	return value;
+}
+
+static bool imguiBeginMenu(ex_string_view sv) {
+	StaticString<256> label(StringView{sv.begin, (u64)sv.length});
+	return ImGui::BeginMenu(label);
+}
+
+static void imguiEndMenu() {
+	ImGui::EndMenu();
+}
+
+static void imguiSameLine() {
+	ImGui::SameLine();
+}
+
+static void imguiSeparator() {
+	ImGui::Separator();
 }
 
 static ExEntity evox_world_createEntity(World* world) {
@@ -676,6 +717,14 @@ void registerImguiModule(NativeFunctionMap& functions) {
 	functions.insert({"core:imgui", "textUnformatted"}, &wrap<imguiTextUnformatted>);
 	functions.insert({"core:imgui", "button"}, &wrap<imguiButton>);
 	functions.insert({"core:imgui", "end"}, &wrap<imguiEnd>);
+	functions.insert({"core:imgui", "checkbox"}, &wrap<imguiCheckbox>);
+	functions.insert({"core:imgui", "radioButton"}, &wrap<imguiRadioButton>);
+	functions.insert({"core:imgui", "dragFloat"}, &wrap<imguiDragFloat>);
+	functions.insert({"core:imgui", "dragInt"}, &wrap<imguiDragInt>);
+	functions.insert({"core:imgui", "beginMenu"}, &wrap<imguiBeginMenu>);
+	functions.insert({"core:imgui", "endMenu"}, &wrap<imguiEndMenu>);
+	functions.insert({"core:imgui", "sameLine"}, &wrap<imguiSameLine>);
+	functions.insert({"core:imgui", "separator"}, &wrap<imguiSeparator>);
 }
 
 } // namespace
@@ -683,6 +732,7 @@ void registerImguiModule(NativeFunctionMap& functions) {
 void gatherCoreFunctions(NativeFunctionMap& functions) {
 	generated::registerGeneratedEngineImport(functions);
 	registerImguiModule(functions);
+	registerPostprocessFunctions(functions);
 	functions.insert({"core:procedural_geom", "setMeshRaw"}, &setMesh);
 	// input
 	functions.insert({"core:input", "input"}, &inputGetInput);

@@ -452,15 +452,8 @@ struct RendererImpl final : Renderer {
 		, m_free_frames(m_allocator)
 		, m_renderbuffers(m_allocator)
 		, m_frame_thread(*this)
-		, m_atmo(*this)
 		, m_cubemap_sky(*this)
 		, m_tdao(*this)
-		, m_sss(*this)
-		, m_film_grain(*this)
-		, m_dof(*this)
-		, m_bloom(*this)
-		, m_ssao(*this)
-		, m_taa(*this)
 	{
 		m_sort_keys.emplace().hash = 0; // we use sort_key 0 as "null" sort key
 		m_sort_key_map.insert(0, 0);
@@ -476,14 +469,7 @@ struct RendererImpl final : Renderer {
 
 		m_frame_thread.create("frame_thread", true);
 		addPlugin(m_cubemap_sky);
-		addPlugin(m_atmo);
 		addPlugin(m_tdao);
-		addPlugin(m_sss);
-		addPlugin(m_film_grain);
-		addPlugin(m_dof);
-		addPlugin(m_bloom);
-		addPlugin(m_ssao);
-		addPlugin(m_taa);
 	}
 
 	Pipeline& createPipeline(PipelineType type) override {
@@ -595,15 +581,8 @@ struct RendererImpl final : Renderer {
 	}
 
 	void initEnd() override {
-		m_bloom.init();
-		m_atmo.init();
 		m_cubemap_sky.init();
-		m_dof.init();
-		m_film_grain.init();
 		m_tdao.init();
-		m_sss.init();
-		m_ssao.init();
-		m_taa.init();
 	}
 
 	void shutdownStarted() override {
@@ -965,8 +944,10 @@ struct RendererImpl final : Renderer {
 	}
 
 	void enableBuiltinTAA(bool enable) override {
-		m_taa.m_enabled = enable;
+		m_builtin_taa_enabled = enable;
 	}
+
+	bool isBuiltinTAAEnabled() const override { return m_builtin_taa_enabled; }
 
 	struct SortKey {
 		union {
@@ -1420,19 +1401,12 @@ struct RendererImpl final : Renderer {
 
 	Array<Renderbuffer> m_renderbuffers;
 	gpu::BufferHandle m_instanced_meshes_buffer = gpu::INVALID_BUFFER;
-	// built-in postprocesses
+	// built-in postprocesses, the rest (film grain, DOF, bloom, SSAO, TAA, ...) are scripts in data/scripts/core/postprocess
 	// environment
-	Atmo m_atmo;
 	CubemapSky m_cubemap_sky;
-	// camera
-	DOF m_dof;
-	FilmGrain m_film_grain;
-	Bloom m_bloom;
 	// global
 	TDAO m_tdao;
-	SSS m_sss;
-	SSAO m_ssao;
-	TAA m_taa;
+	bool m_builtin_taa_enabled = true;
 };
 
 FrameData::FrameData(struct RendererImpl& renderer, IAllocator& allocator, PageAllocator& page_allocator) 

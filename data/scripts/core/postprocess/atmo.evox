@@ -1,0 +1,121 @@
+import "core:postprocess"
+import "core:entity"
+import "core:vec4"
+import "core:renderer/environment"
+import "core:renderer/module"
+import "core:renderer/pipelinetype"
+
+// Per pipeline state: the precomputed tables of the atmosphere, they are recomputed every frame.
+struct AtmoState {
+	optical_depth : RenderBuffer;
+	inscatter : RenderBuffer;
+}
+
+// Layout of the constant buffers of engine/shaders/atmo_optical_depth.hlsl, atmo_scattering.hlsl and atmo.hlsl. The
+// shaders use different handles at the end, they all share this struct (`output`, `optical_depth`, `depth_buffer` and
+// `inscatter` are the handles in the order of atmo.hlsl, the others read the first ones they need).
+struct AtmoUniform {
+	bot : f32;
+	top : f32;
+	distribution_rayleigh : f32;
+	distribution_mie : f32;
+	scatter_rayleigh : Vec4;
+	scatter_mie : Vec4;
+	absorb_mie : Vec4;
+	sunlight : Vec4;
+	resolution : Vec4;
+	fog_scattering : Vec4;
+	fog_top : f32;
+	fog_enabled : f32;
+	godrays_enabled : f32;
+	clouds_enabled : f32;
+	clouds_top : f32;
+	clouds_bottom : f32;
+	output : u32;
+	optical_depth : u32;
+	depth_buffer : u32;
+	inscatter : u32;
+}
+
+fn flag(value : bool) : f32 {
+	if value {
+		return 1;
+	}
+	return 0;
+}
+
+// Atmospheric scattering of the active environment: the sky and the fog, drawn into the lit scene. A `beforeTransparent`
+// hook.
+fn atmo(ctx : Context, hdr : RenderBuffer) : RenderBuffer {
+	if ctx.pipelineType() == .PREVIEW {
+		return hdr;
+	}
+	const module = ctx.renderModule();
+	const entity = module.getActiveEnvironment() else return hdr;
+	const env = entity.environment() else return hdr;
+	if not env.getAtmoEnabled() {
+		return hdr;
+	}
+	const optical_depth_shader = ctx.loadShader("engine/shaders/atmo_optical_depth.hlsl");
+	const scattering_shader = ctx.loadShader("engine/shaders/atmo_scattering.hlsl");
+	const atmo_shader = ctx.loadShader("engine/shaders/atmo.hlsl");
+	if not optical_depth_shader.isReady() or not scattering_shader.isReady() or not atmo_shader.isReady() {
+		return hdr;
+	}
+
+	var state = ctx.state(AtmoState);
+	if not state.optical_depth.isValid() {
+		state.optical_depth = ctx.createBuffer(128, 128, .RG32F);
+		state.inscatter = ctx.createBuffer(64, 128, .RGBA32F);
+	}
+
+	ctx.beginBlock("atmo_evox");
+	const rayleigh = env.getScatterRayleigh();
+	const mie = env.getScatterMie();
+	const absorb = env.getAbsorbMie();
+	const sunlight = env.getSunlightColor();
+	const fog = env.getFogScattering();
+	const fog_density = env.getFogDensity();
+	var uniform = AtmoUniform {
+		env.getGroundR() * 1000,
+		env.getAtmoR() * 1000,
+		env.getHeightDistributionRayleigh(),
+		env.getHeightDistributionMie(),
+		Vec4 {rayleigh.x, rayleigh.y, rayleigh.z, 0} * 33.1 * 0.000001,
+		Vec4 {mie.x, mie.y, mie.z, 0} * 3.996 * 0.000001,
+		Vec4 {absorb.x, absorb.y, absorb.z, 0} * 4.4 * 0.000001,
+		Vec4 {sunlight.x, sunlight.y, sunlight.z, env.getSunlightStrength()},
+		Vec4 {128, 128, 1, 0},
+		Vec4 {fog.x * fog_density * 0.0001, fog.y * fog_density * 0.0001, fog.z * fog_density * 0.0001, 0},
+		env.getFogTop(),
+		flag(fog_density > 0),
+		flag(env.getGodraysEnabled()),
+		flag(env.getCloudsEnabled()),
+		env.getCloudsTop(),
+		env.getCloudsBottom(),
+		0, 0, 0, 0
+	};
+
+	// optical depth of the atmosphere
+	ctx.beginBlock("precompute_transmittance");
+	uniform.output = ctx.rwBindless(state.optical_depth);
+	ctx.dispatch(optical_depth_shader, uniform, 128 / 16, 128 / 16, 1);
+	ctx.endBlock();
+
+	// light scattered towards the camera, it reads the optical depth
+	ctx.beginBlock("precompute_inscatter");
+	uniform.resolution = Vec4 {64, 128, 1, 0};
+	uniform.output = ctx.rwBindless(state.inscatter);
+	uniform.optical_depth = ctx.bindless(state.optical_depth);
+	ctx.dispatch(scattering_shader, uniform, 64 / 16, 128 / 16, 1);
+	ctx.endBlock();
+
+	// the sky and the fog, in the lit scene
+	uniform.inscatter = ctx.bindless(state.inscatter);
+	uniform.optical_depth = ctx.bindless(state.optical_depth);
+	uniform.depth_buffer = ctx.bindless(ctx.depth());
+	uniform.output = ctx.rwBindless(hdr);
+	ctx.dispatch(atmo_shader, uniform, (ctx.width() + 15) / 16, (ctx.height() + 15) / 16, 1);
+	ctx.endBlock();
+	return hdr;
+}

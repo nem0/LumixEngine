@@ -1723,6 +1723,13 @@ namespace Lumix::Evox::generated {
 		module->setActiveEnvironment(EntityRef(entity.index));
 	}
 	
+	static void evox_renderer_getActiveEnvironment_6871807499782747591(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, RenderModule*, module);
+		auto ret = module->getActiveEnvironment();
+		EX_RESULT(frame, u8(ret.isValid())); 
+		EX_RESULT(frame, ExEntity(ret.index, &module->getWorld()));
+	}
+	
 	static void evox_ui_getDocument_6532204115686324839(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, UIModule*, module);
 		auto& ret = module->getDocument();
@@ -5427,6 +5434,7 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:renderer/module"), StringView("setActiveCamera")}, &evox_renderer_setActiveCamera_16964213945525572297);
 		functions.insert({StringView("core:renderer/module"), StringView("getActiveCamera")}, &evox_renderer_getActiveCamera_7847415081130583278);
 		functions.insert({StringView("core:renderer/module"), StringView("setActiveEnvironment")}, &evox_renderer_setActiveEnvironment_14874579541215673611);
+		functions.insert({StringView("core:renderer/module"), StringView("getActiveEnvironment")}, &evox_renderer_getActiveEnvironment_6871807499782747591);
 		functions.insert({StringView("core:renderer/module"), StringView("renderer")}, &evox_world_renderer);
 		functions.insert({StringView("core:ui/module"), StringView("getDocument")}, &evox_ui_getDocument_6532204115686324839);
 		functions.insert({StringView("core:ui/module"), StringView("load")}, &evox_ui_load_18010826757131874131);

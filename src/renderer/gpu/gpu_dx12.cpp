@@ -202,7 +202,12 @@ static u32 getSize(DXGI_FORMAT format) {
 		case DXGI_FORMAT_R16_UNORM: return 2;
 		case DXGI_FORMAT_R16_FLOAT: return 2;
 		case DXGI_FORMAT_R32_FLOAT: return 4;
-		default: ASSERT(false); return 0;
+		case DXGI_FORMAT_R16_TYPELESS: return 2;
+		case DXGI_FORMAT_R16G16_FLOAT:
+		case DXGI_FORMAT_R16G16_UNORM:
+		case DXGI_FORMAT_R11G11B10_FLOAT:
+		case DXGI_FORMAT_R10G10B10A2_UNORM: return 4;
+		default: logError("Unsupported DXGI format ", (u32)format); return 0;
 	}
 }
 
@@ -1349,6 +1354,10 @@ void Frame::begin() {
 			d3d->allocator.deallocate(dst_start);
 			read.staging->Unmap(0, nullptr);
 		}
+		else {
+			logError("Failed to map texture readback buffer");
+			read.callback.invoke(Span<const u8>());
+		}
 		read.staging->Release();
 	}
 	texture_reads.clear();
@@ -1584,7 +1593,16 @@ void copy(TextureHandle dst, TextureHandle src, u32 dst_x, u32 dst_y) {
 }
 
 void readTexture(TextureHandle texture, TextureReadCallback callback) {
+	if (!texture || !texture->resource) {
+		logError("Texture read requested on an invalid or destroyed texture");
+		callback.invoke(Span<const u8>());	// empty span signals failure, callers must not wait forever
+		return;
+	}
 	const D3D12_RESOURCE_DESC desc = texture->resource->GetDesc();
+	if (getSize(desc.Format) == 0) {
+		callback.invoke(Span<const u8>());	// the data would not match the texture size, report failure instead
+		return;
+	}
 	bool is_cubemap = isFlagSet(texture->flags, gpu::TextureFlags::IS_CUBE);
 
 	u64 face_bytes = 0;

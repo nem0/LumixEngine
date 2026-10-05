@@ -109,7 +109,10 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	// bumped whenever a material or shader is unloaded (e.g. on reload), per-instance data derived from them is stale then
 	virtual u32 getMaterialReloadCounter() const = 0;
 	virtual void notifyMaterialReload() = 0;
+	// Temporal antialiasing is a script (core:postprocess/taa) that does nothing when this is off. Upscalers such as DLSS
+	// and FSR3 do their own antialiasing and turn it off.
 	virtual void enableBuiltinTAA(bool enable) = 0;
+	virtual bool isBuiltinTAAEnabled() const = 0;
 	
 	virtual const char* getSemanticDefines(Span<const AttributeSemantic> attributes) = 0;
 

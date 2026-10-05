@@ -2,3 +2,14 @@ extern fn begin(name : []const u8) : bool;
 extern fn textUnformatted(text : []const u8) : void;
 extern fn button(label : []const u8) : bool;
 extern fn end() : void;
+// The widgets below take the current value and return the new one, e.g. `enabled = checkbox("Enabled", enabled);`.
+extern fn checkbox(label : []const u8, value : bool) : bool;
+// true when clicked
+extern fn radioButton(label : []const u8, active : bool) : bool;
+extern fn dragFloat(label : []const u8, value : f32, speed : f32, min : f32, max : f32) : f32;
+extern fn dragInt(label : []const u8, value : i32, min : i32, max : i32) : i32;
+// `endMenu` only if `beginMenu` returned true
+extern fn beginMenu(label : []const u8) : bool;
+extern fn endMenu() : void;
+extern fn sameLine() : void;
+extern fn separator() : void;

@@ -600,7 +600,11 @@ void SceneView::makeScreenshot(StringView path) {
 	const IVec2 size = m_pipeline->getDisplaySize();
 	if (size.x <= 0 || size.y <= 0) return;
 	
-	m_pipeline->render(false);
+	// render() can bail out (no world, empty viewport) and leave a stale, already released output behind
+	if (!m_pipeline->render(false)) {
+		logError("Failed to render the scene view when trying to make a screenshot.");
+		return;
+	}
 	const gpu::TextureHandle texture = m_pipeline->getOutput();
 
 	if (!texture) {
@@ -615,6 +619,11 @@ void SceneView::makeScreenshot(StringView path) {
 		IAllocator* allocator;
 
 		void callback(Span<const u8> data) {
+			if (data.length() == 0) {
+				logError("Failed to read back the screenshot of ", path);
+				LUMIX_DELETE(*allocator, this);
+				return;
+			}
 			FileSystem& fs = app->getEngine().getFileSystem();
 			os::OutputFile file;
 			if (!fs.open(path, file)) {

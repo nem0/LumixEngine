@@ -1949,6 +1949,11 @@ struct ImpostorTexturesContextImpl final : public ImpostorTexturesContext {
 	void onRead() {
 		--to_read;
 		if (to_read == 0) {
+			if (failed) {
+				logError("Failed to read back impostor textures");
+				failed = false;
+				return;
+			}
 			postprocessImpostor(gb0_rgba, gb1_rgba, shadow_data, tile_size, allocator);
 			const PathInfo fi(path);
 			Path img_path(fi.dir, fi.basename, "_impostor0.tga");
@@ -2019,21 +2024,25 @@ struct ImpostorTexturesContextImpl final : public ImpostorTexturesContext {
 	}
 
 	void readCallback0(Span<const u8> data) override {
+		if (data.length() == 0) failed = true;
 		gb0_rgba.resize(data.length() / sizeof(u32));
 		memcpy(gb0_rgba.begin(), data.begin(), data.length());
 		onRead();
 	}
 	void readCallback1(Span<const u8> data) override {
+		if (data.length() == 0) failed = true;
 		gb1_rgba.resize(data.length() / sizeof(u32));
 		memcpy(gb1_rgba.begin(), data.begin(), data.length());
 		onRead();
 	}
 	void readCallback2(Span<const u8> data) override {
+		if (data.length() == 0) failed = true;
 		gb_depth.resize(data.length() / sizeof(u16));
 		memcpy(gb_depth.begin(), data.begin(), data.length());
 		onRead();
 	}
 	void readCallback3(Span<const u8> data) override {
+		if (data.length() == 0) failed = true;
 		shadow_data.resize(data.length() / sizeof(u32));
 		memcpy(shadow_data.begin(), data.begin(), data.length());
 		onRead();
@@ -2042,6 +2051,7 @@ struct ImpostorTexturesContextImpl final : public ImpostorTexturesContext {
 	IAllocator& allocator;
 	StudioApp& app;
 	u32 to_read = 0;
+	bool failed = false;
 	jobs::Signal done_signal; // set to green when we have all data in memory (gb0_rgba...)
 	Array<u32> gb0_rgba;
 	Array<u32> gb1_rgba;
@@ -3067,7 +3077,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		void readTextureCallback(Span<const u8> mem) {
 			readback_done = true;
 			data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
-			ASSERT(mem.length() == data.size());
+			if (mem.length() != data.size()) {
+				logError("Failed to read back asset tile");
+				memset(data.getMutableData(), 0, data.size());
+				return;
+			}
 			memcpy(data.getMutableData(), mem.begin(), mem.length());
 		}
 
@@ -3793,6 +3807,12 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 
 			struct Callback {
 				void callback(Span<const u8> mem) {
+					if (mem.length() == 0) {
+						logError("Failed to read back reflection probe");
+						job->done = true;
+						LUMIX_DELETE(*allocator, this);
+						return;
+					}
 					const u32 num_mips = 1 + log2(texture_size);
 					plugin->saveCubemap(job->reflection_probe.guid, (const Vec4*)mem.begin(), texture_size, num_mips, roughness_levels);
 					memoryBarrier();
@@ -3817,6 +3837,12 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		else {
 			struct Callback {
 				void callback(Span<const u8> mem) {
+					if (mem.length() == 0) {
+						logError("Failed to read back reflection probe");
+						job->done = true;
+						LUMIX_DELETE(*allocator, this);
+						return;
+					}
 					job->sh.compute(Span((Vec4*)mem.begin(), mem.length() / sizeof(Vec4)));
 					memoryBarrier();
 					job->done = true;

@@ -1,0 +1,212 @@
+import "core:postprocess"
+import "core:imgui" as imgui
+
+// Settings, edit them here.
+var g_enabled : bool = true;
+var g_temporal : bool = true;
+var g_blur_iterations : u32 = 1;
+// the AO is computed at 1 / 2^downscale of the resolution
+var g_downscale : u32 = 1;
+var g_depth_diff_weight : f32 = 2;
+var g_radius : f32 = 0.4;
+var g_intensity : f32 = 1;
+
+// Per pipeline state: the AO of the previous frame (when temporal filtering is on) and its size.
+struct SsaoState {
+	history : RenderBuffer;
+	width : u32;
+	height : u32;
+}
+
+// Layouts of the constant buffers of the shaders in engine/shaders
+struct DownscaleDepthUniform {
+	scale : u32;
+	input : u32;
+	output : u32;
+}
+
+struct SsaoUniform {
+	rcp_width : f32;
+	rcp_height : f32;
+	radius : f32;
+	intensity : f32;
+	downscale : u32;
+	normal_buffer : u32;
+	depth_buffer : u32;
+	history : u32;
+	motion_vectors : u32;
+	output : u32;
+}
+
+struct BlurUniform {
+	rcp_width : f32;
+	rcp_height : f32;
+	weight_scale : f32;
+	stride : u32;
+	downscale : u32;
+	input : u32;
+	depth_buffer : u32;
+	output : u32;
+}
+
+struct BlitUniform {
+	downscale : u32;
+	depth_diff_weight : f32;
+	ssao_buffer : u32;
+	depth_buffer : u32;
+	depth_buffer_small : u32;
+	gbuffer_b : u32;
+}
+
+// Evox has no bit shifts
+fn shiftRight(value : u32, bits : u32) : u32 {
+	var result = value;
+	for i in 0..bits {
+		result = result / 2;
+	}
+	return result;
+}
+
+fn shiftLeftOne(bits : u32) : u32 {
+	var result : u32 = 1;
+	for i in 0..bits {
+		result = result * 2;
+	}
+	return result;
+}
+
+fn shadersReady(ctx : Context) : bool {
+	return ctx.loadShader("engine/shaders/ssao.hlsl").isReady()
+		and ctx.loadShader("engine/shaders/ssao_blit.hlsl").isReady()
+		and ctx.loadShader("engine/shaders/ssao_blur.hlsl").isReady()
+		and ctx.loadShader("engine/shaders/ssao_downscale_depth.hlsl").isReady();
+}
+
+// Screen space ambient occlusion, a `beforeLightPass` hook that writes the occlusion into G-buffer B.
+fn ssao(ctx : Context) : void {
+	var state = ctx.state(SsaoState);
+	const width = shiftRight(ctx.width(), g_downscale);
+	const height = shiftRight(ctx.height(), g_downscale);
+
+	if not shadersReady(ctx) or not g_enabled or width == 0 or height == 0 {
+		ctx.releaseBuffer(state.history);
+		state.history = invalidBuffer();
+		return;
+	}
+
+	var ssao_buffer = ctx.createBuffer(width, height, .RGBA8);
+	var depth_buffer = ctx.depth();
+	ctx.beginBlock("ssao");
+	if g_downscale > 0 {
+		depth_buffer = ctx.createBuffer(width, height, .R32F);
+		ctx.beginBlock("ssao downscale depth");
+		const downscale_shader = ctx.loadShader("engine/shaders/ssao_downscale_depth.hlsl");
+		ctx.dispatch(downscale_shader, DownscaleDepthUniform {
+			shiftLeftOne(g_downscale),
+			ctx.bindless(ctx.depth()),
+			ctx.rwBindless(depth_buffer)
+		}, (width + 7) / 8, (height + 7) / 8, 1);
+		ctx.endBlock();
+	}
+
+	if g_temporal {
+		if not state.history.isValid() or width != state.width or height != state.height {
+			ctx.releaseBuffer(state.history);
+			state.history = ctx.createRenderTarget(width, height, .R8);
+			state.width = width;
+			state.height = height;
+			ctx.clear(state.history, 1, 1, 1, 1);
+		}
+	} else {
+		ctx.releaseBuffer(state.history);
+		state.history = invalidBuffer();
+	}
+
+	const rcp_width = 1.0 / width as f32;
+	const rcp_height = 1.0 / height as f32;
+	const ssao_shader = ctx.loadShader("engine/shaders/ssao.hlsl");
+	var define : []const u8 = "";
+	if g_temporal {
+		define = "TEMPORAL";
+	}
+	ctx.dispatchDefine(ssao_shader, define, SsaoUniform {
+		rcp_width,
+		rcp_height,
+		g_radius,
+		g_intensity,
+		g_downscale,
+		ctx.bindless(ctx.gbufferB()),
+		ctx.bindless(depth_buffer),
+		ctx.bindless(state.history),
+		ctx.bindless(ctx.gbufferD()),
+		ctx.rwBindless(ssao_buffer)
+	}, (width + 15) / 16, (height + 15) / 16, 1);
+	if g_temporal {
+		// the built-in one swaps them too: the fresh result becomes the history of the next frame
+		const fresh = ssao_buffer;
+		ssao_buffer = state.history;
+		state.history = fresh;
+	}
+
+	if g_blur_iterations > 0 {
+		ctx.beginBlock("ssao_blur");
+		var blurred = ctx.createBuffer(width, height, .R8);
+		const blur_shader = ctx.loadShader("engine/shaders/ssao_blur.hlsl");
+		for i in 0..g_blur_iterations {
+			ctx.dispatch(blur_shader, BlurUniform {
+				rcp_width,
+				rcp_height,
+				0.01,
+				g_blur_iterations - i,
+				g_downscale,
+				ctx.bindless(ssao_buffer),
+				ctx.bindless(depth_buffer),
+				ctx.rwBindless(blurred)
+			}, (width + 15) / 16, (height + 15) / 16, 1);
+			const previous = ssao_buffer;
+			ssao_buffer = blurred;
+			blurred = previous;
+		}
+		ctx.endBlock();
+		ctx.releaseBuffer(blurred);
+	}
+
+	ctx.beginBlock("ssao_blit");
+	const blit_shader = ctx.loadShader("engine/shaders/ssao_blit.hlsl");
+	ctx.dispatch(blit_shader, BlitUniform {
+		g_downscale,
+		g_depth_diff_weight,
+		ctx.bindless(ssao_buffer),
+		ctx.bindless(ctx.depth()),
+		ctx.bindless(depth_buffer),
+		ctx.rwBindless(ctx.gbufferB())
+	}, (ctx.width() + 15) / 16, (ctx.height() + 15) / 16, 1);
+	ctx.endBlock();
+	ctx.endBlock();
+
+	ctx.releaseBuffer(ssao_buffer);
+	if g_downscale > 0 {
+		ctx.releaseBuffer(depth_buffer);
+	}
+}
+
+// Settings menu of the debug popup, a `debugUI` hook.
+fn debugUI(ctx : Context) : void {
+	if not imgui.beginMenu("SSAO") {
+		return;
+	}
+	g_enabled = imgui.checkbox("Enabled", g_enabled);
+	g_temporal = imgui.checkbox("Temporal", g_temporal);
+	g_radius = imgui.dragFloat("Radius", g_radius, 0.1, 0.001, 1000000);
+	g_intensity = imgui.dragFloat("Intensity", g_intensity, 0.1, 0.001, 1000000);
+	g_depth_diff_weight = imgui.dragFloat("Depth difference weight", g_depth_diff_weight, 0.1, 0.001, 1000000);
+	g_blur_iterations = imgui.dragInt("Blur iterations", g_blur_iterations as i32, 0, 50) as u32;
+	imgui.textUnformatted("Downscale");
+	imgui.sameLine();
+	if imgui.radioButton("Disabled", g_downscale == 0) { g_downscale = 0; }
+	imgui.sameLine();
+	if imgui.radioButton("2x", g_downscale == 1) { g_downscale = 1; }
+	imgui.sameLine();
+	if imgui.radioButton("4x", g_downscale == 2) { g_downscale = 2; }
+	imgui.endMenu();
+}

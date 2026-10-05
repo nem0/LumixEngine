@@ -346,6 +346,17 @@ EVOX_API ex_result ex_module_compile(
 	void* import_resolver_userdata
 );
 
+// Parse + import resolution of one more root, without typechecking. To compile several roots into one module, call this
+// for every root and `ex_module_typecheck` once at the end: calling `ex_module_compile` once per root typechecks the
+// units of the earlier roots again, which reports their operator overloads as ambiguous.
+EVOX_API ex_result ex_module_add_root(
+	ex_module* module,
+	ex_string_view source,
+	ex_string_view source_name,
+	ex_import_resolver_fn import_resolver,
+	void* import_resolver_userdata
+);
+
 EVOX_API int ex_module_get_function_count(ex_module* module);
 
 typedef struct ex_bytecode_compile_options {
@@ -414,6 +425,17 @@ EVOX_API ex_call_result ex_call(
 	u32 args_size
 );
 
+// Same as ex_call(), but the function is selected by its index in the bytecode
+// instead of its name. A function value (e.g. a `fn(...)` field returned from
+// the script) is stored as this index in its first 4 bytes, so this is how the
+// host calls a function value. Returns FUNCTION_NOT_FOUND for an invalid index.
+EVOX_API ex_call_result ex_call_function(
+	ex_task* task,
+	u32 function_index,
+	const void* args,
+	u32 args_size
+);
+
 // Resume a SUSPENDED task with an optional input value. Pass NULL, NULL, 0
 // to resume without a value. The supplied type must exactly match the type
 // expected by the current `yield` expression; no implicit conversions apply.
@@ -469,6 +491,16 @@ EVOX_API ex_type_kind ex_bytecode_runtime_result_kind(ex_runtime* runtime, ex_st
 // Returns the declared return type, or NULL if the function does not exist.
 // The type handle remains valid until the runtime's bytecode is destroyed.
 EVOX_API const ex_type* ex_bytecode_runtime_result_type(ex_runtime* runtime, ex_string_view function_name);
+
+// A module can hold several roots (call ex_module_compile once per root with the same module), and the same function
+// name can be defined in more than one of them. ex_call() picks the first match, use this to select a function of a
+// specific unit. `unit_path` is the source name the unit was compiled with. Returns the function index for
+// ex_call_function(), or -1 if the unit has no such function.
+EVOX_API i32 ex_runtime_find_function(ex_runtime* runtime, ex_string_view unit_path, ex_string_view function_name);
+
+// Declared return type of the function with index `function_index` (EX_TYPE_INVALID / NULL for an invalid index).
+EVOX_API ex_type_kind ex_function_result_kind(ex_runtime* runtime, u32 function_index);
+EVOX_API const ex_type* ex_function_result_type(ex_runtime* runtime, u32 function_index);
 
 // Type introspection.
 //

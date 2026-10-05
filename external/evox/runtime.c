@@ -1570,14 +1570,7 @@ void* ex_task_to_ptr(ex_task* task, i32 index) {
 	return value;
 }
 
-ex_call_result ex_call(ex_task* task, ex_string_view function_name, const void* args, u32 args_size) {
-	if (!task) return EX_CALL_RESULT_INVALID_ARGUMENT;
-	if (task->executing || task->is_suspended) return EX_CALL_RESULT_INVALID_STATE;
-
-	task->result_size = 0u;
-	const ex_function_bc* function = runtime_find_function_by_name(task->bytecode, function_name, NULL);
-	if (!function) return EX_CALL_RESULT_FUNCTION_NOT_FOUND;
-	
+static ex_call_result runtime_call_function(ex_task* task, const ex_function_bc* function, const void* args, u32 args_size) {
 	if (args_size != function->param_size) {
 		task->state = EX_TASK_FAILED;
 		return EX_CALL_RESULT_INVALID_ARGUMENT;
@@ -1609,6 +1602,25 @@ ex_call_result ex_call(ex_task* task, ex_string_view function_name, const void* 
 	else if (result == EX_CALL_RESULT_OK) task->state = EX_TASK_READY;
 	else task->state = EX_TASK_FAILED;
 	return result;
+}
+
+ex_call_result ex_call(ex_task* task, ex_string_view function_name, const void* args, u32 args_size) {
+	if (!task) return EX_CALL_RESULT_INVALID_ARGUMENT;
+	if (task->executing || task->is_suspended) return EX_CALL_RESULT_INVALID_STATE;
+
+	task->result_size = 0u;
+	const ex_function_bc* function = runtime_find_function_by_name(task->bytecode, function_name, NULL);
+	if (!function) return EX_CALL_RESULT_FUNCTION_NOT_FOUND;
+	return runtime_call_function(task, function, args, args_size);
+}
+
+ex_call_result ex_call_function(ex_task* task, u32 function_index, const void* args, u32 args_size) {
+	if (!task) return EX_CALL_RESULT_INVALID_ARGUMENT;
+	if (task->executing || task->is_suspended) return EX_CALL_RESULT_INVALID_STATE;
+
+	task->result_size = 0u;
+	if (function_index >= task->bytecode->function_count) return EX_CALL_RESULT_FUNCTION_NOT_FOUND;
+	return runtime_call_function(task, &task->bytecode->functions[function_index], args, args_size);
 }
 
 ex_call_result ex_task_resume_suspended(ex_task* task) {
@@ -1688,4 +1700,27 @@ ex_type_kind ex_bytecode_runtime_result_kind(ex_runtime* runtime, ex_string_view
 const ex_type* ex_bytecode_runtime_result_type(ex_runtime* runtime, ex_string_view function_name) {
 	const ex_function_bc* fn = runtime_find_function_by_name(runtime->bytecode, function_name, NULL);
 	return fn ? ex_bytecode_type(runtime->bytecode, fn->return_type_index) : NULL;
+}
+
+i32 ex_runtime_find_function(ex_runtime* runtime, ex_string_view unit_path, ex_string_view function_name) {
+	if (!runtime || !runtime->bytecode) return -1;
+	const ex_bytecode* bytecode = runtime->bytecode;
+	for (u32 i = 0; i < bytecode->function_count; ++i) {
+		const ex_function_bc* function = &bytecode->functions[i];
+		if (function->name.length != function_name.length || function->unit_path.length != unit_path.length) continue;
+		if (function_name.length > 0 && memcmp(function->name.begin, function_name.begin, (size_t)function_name.length) != 0) continue;
+		if (unit_path.length > 0 && memcmp(function->unit_path.begin, unit_path.begin, (size_t)unit_path.length) != 0) continue;
+		return (i32)i;
+	}
+	return -1;
+}
+
+ex_type_kind ex_function_result_kind(ex_runtime* runtime, u32 function_index) {
+	if (!runtime || function_index >= runtime->bytecode->function_count) return EX_TYPE_INVALID;
+	return runtime->bytecode->functions[function_index].return_kind;
+}
+
+const ex_type* ex_function_result_type(ex_runtime* runtime, u32 function_index) {
+	if (!runtime || function_index >= runtime->bytecode->function_count) return NULL;
+	return ex_bytecode_type(runtime->bytecode, runtime->bytecode->functions[function_index].return_type_index);
 }

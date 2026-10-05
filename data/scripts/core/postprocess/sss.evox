@@ -1,0 +1,110 @@
+import "core:postprocess"
+import "core:imgui" as imgui
+
+// Setting, edit it here or from the debug popup.
+var g_enabled : bool = true;
+
+// Per pipeline state: the previous frame's screen space shadow buffer.
+struct SssState {
+	history : RenderBuffer;
+}
+
+// Layouts of the constant buffers of engine/shaders/sss.hlsl and sss_blit.hlsl
+struct SssUniform {
+	max_steps : f32;
+	stride : f32;
+	depth : u32;
+	sss : u32;
+}
+
+struct SssBlitUniform {
+	current_frame_weight : f32;
+	sss : u32;
+	history : u32;
+	depth : u32;
+	gbuffer_c : u32;
+}
+
+fn groups(size : u32) : u32 {
+	return (size + 15) / 16;
+}
+
+// Screen space (contact) shadows, a `beforeLightPass` hook that writes into G-buffer C. It is not part of the default
+// postprocesses (it was off by default before it became a script too). To use it, register it in `postprocess.evox` of
+// the project:
+//
+//     import "core:postprocess/sss" as sss
+//     ...
+//     sss.register(registry);
+fn sss(ctx : Context) : void {
+	const trace = ctx.loadShader("engine/shaders/sss.hlsl");
+	const blit = ctx.loadShader("engine/shaders/sss_blit.hlsl");
+	if not g_enabled {
+		var disabled_state = ctx.state(SssState);
+		ctx.releaseBuffer(disabled_state.history);
+		disabled_state.history = invalidBuffer();
+		return;
+	}
+	if not trace.isReady() or not blit.isReady() {
+		return;
+	}
+
+	ctx.beginBlock("SSS_evox");
+	const width = ctx.width();
+	const height = ctx.height();
+	var state = ctx.state(SssState);
+	if not state.history.isValid() {
+		state.history = ctx.createRenderTarget(width, height, .R8);
+		ctx.clear(state.history, 1, 1, 1, 1);
+	}
+
+	// trace shadow rays from every pixel towards the light
+	const shadows = ctx.createRenderTarget(width, height, .R8);
+	ctx.dispatch(trace, SssUniform {20, 4, ctx.bindless(ctx.depth()), ctx.rwBindless(shadows)}, groups(width), groups(height), 1);
+
+	// blend with the previous frame and store the result in the w channel of G-buffer C
+	ctx.dispatch(blit, SssBlitUniform {
+		0.1,
+		ctx.rwBindless(shadows),
+		ctx.bindless(state.history),
+		ctx.bindless(ctx.depth()),
+		ctx.rwBindless(ctx.gbufferC())
+	}, groups(width), groups(height), 1);
+
+	// the blended buffer is the history of the next frame
+	const old_history = state.history;
+	state.history = shadows;
+	ctx.releaseBuffer(old_history);
+	ctx.endBlock();
+}
+
+// Menu of the debug popup, a `debugUI` hook.
+fn debugUI(ctx : Context) : void {
+	if not imgui.beginMenu("SSS") {
+		return;
+	}
+	g_enabled = imgui.checkbox("Enable", g_enabled);
+	ctx.debugRadio("SSS");
+	imgui.endMenu();
+}
+
+// Shows the screen space shadows, a `debugOutput` hook.
+fn debugOutput(ctx : Context, output : RenderBuffer) : bool {
+	if not ctx.isDebugShown("SSS") {
+		return false;
+	}
+	const state = ctx.state(SssState);
+	if state.history.isValid() {
+		ctx.blit(state.history, output, ctx.width(), ctx.height());
+	}
+	return true;
+}
+
+// Registers screen space shadows with their debug UI, `sss.register(registry)` in `postprocess.evox` is all it takes.
+fn register(registry : Registry) : void {
+	var effect = postprocess();
+	effect.beforeLightPass = sss;
+	effect.debugUI = debugUI;
+	effect.debugOutput = debugOutput;
+	registry.add(effect);
+}

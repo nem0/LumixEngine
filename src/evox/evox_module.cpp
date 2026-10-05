@@ -16,7 +16,9 @@
 #include "engine/resource_manager.h"
 #include "engine/world.h"
 #include "evox/capi.h"
+#include "evox/evox_postprocess.h"
 #include "evox/evox_resource.h"
+#include "renderer/renderer.h"
 
 namespace Lumix {
 
@@ -29,7 +31,6 @@ namespace Evox {
 static constexpr const char* EVOX_DATA_ATTRIBUTE_TYPE = "core:attributes.Data";
 static constexpr const char* EVOX_OWNER_ATTRIBUTE_TYPE = "core:attributes.Owner";
 static constexpr const char* EVOX_ENTITY_TYPE = "core:entity.Entity";
-static constexpr const char* MAIN_PATH = "main.evox";
 
 struct EvoxDiagnosticsContext {
 	String* message = nullptr;
@@ -145,13 +146,28 @@ struct EvoxSystemImpl : EvoxSystem {
 		callMain();
 	}
 
+	void initEnd() override {
+		auto* renderer = (Renderer*)m_engine.getSystemManager().getSystem("renderer");
+		if (renderer) renderer->addPlugin(m_postprocess);
+	}
+
+	void shutdownStarted() override {
+		auto* renderer = (Renderer*)m_engine.getSystemManager().getSystem("renderer");
+		if (renderer) {
+			renderer->removePlugin(m_postprocess);
+			m_postprocess.shutdown(*renderer);
+		}
+	}
+
 	void stopGame() override {
 		m_is_game_running = false;
 		if (m_runtime) {
+			m_postprocess.detach();
 			ex_runtime_destroy(m_runtime);
 			m_runtime = nullptr;
 			createRuntime();
-			// recreated the runtime to avoid any dangling stuff (changed globals, suspended state, ...)
+			// recreated the runtime to avoid any dangling stuff (changed globals, suspended state, ...), this also
+			// restarts the postprocesses of postprocess.evox, they share the runtime
 		}
 	}
 
@@ -291,18 +307,20 @@ struct EvoxSystemImpl : EvoxSystem {
 	void loadRoot() {
 		if (m_resource) return;
 
-		m_resource = m_engine.getResourceManager().load<EvoxResource>(Path(MAIN_PATH));
+		m_resource = m_engine.getResourceManager().load<EvoxResource>(Path(EVOX_MAIN_PATH));
 		if (m_resource) m_resource->onLoaded<&EvoxSystemImpl::onResourceChanged>(this);
 	}
 
 	void callMain() {
 		if (!m_runtime || m_modules.empty()) return;
-		const ex_string_view function_name = toEvox("main");
+		// postprocess.evox has its own `main`, call the one of main.evox
+		const i32 main_index = ex_runtime_find_function(m_runtime, toEvox(EVOX_MAIN_PATH), toEvox("main"));
+		if (main_index < 0) return;
 		struct Args {
 			Engine* engine;
 			World* world;
 		} args{&m_engine, &m_modules[0]->getWorld()};
-		const ex_call_result result = ex_call(m_task, function_name, &args, sizeof(args));
+		const ex_call_result result = ex_call_function(m_task, (u32)main_index, &args, sizeof(args));
 		if (result != EX_CALL_RESULT_SUSPENDED && result != EX_CALL_RESULT_OK && result != EX_CALL_RESULT_FUNCTION_NOT_FOUND) logEvoxMainFailure(m_task, result);
 	}
 
@@ -350,6 +368,7 @@ struct EvoxSystemImpl : EvoxSystem {
 
 	void destroyScript() {
 		m_is_ready = false;
+		m_postprocess.detach();
 		for (EvoxModule* module : m_modules) module->clearEvoxData();
 		m_data_types.clear();
 		if (m_task) { ex_task_destroy(m_task); m_task = nullptr; }
@@ -366,7 +385,10 @@ struct EvoxSystemImpl : EvoxSystem {
 		if (!m_runtime) return false;
 		if (ex_runtime_set_native_resolver(m_runtime, &resolveCoreFunction, &m_native_functions) != EX_RESULT_OK) return false;
 		m_task = ex_task_create(m_runtime);
-		return m_task != nullptr;
+		if (!m_task) return false;
+		// postprocess.evox is the second root of the same bytecode and shares the runtime with main.evox
+		m_postprocess.attach(m_bytecode, m_runtime);
+		return true;
 	}
 
 	// The asset compiler already compiled the script, we only instantiate its bytecode.
@@ -405,6 +427,7 @@ struct EvoxSystemImpl : EvoxSystem {
 	HashMap<NativeFunctionKey, ex_native_fn, NativeFunctionKeyHash> m_native_functions;
 	Array<const ex_type*> m_data_types;
 	Array<EvoxModule*> m_modules;
+	EvoxPostprocess m_postprocess;
 	bool m_resource_ready = false;
 	bool m_is_ready = false;
 	bool m_is_game_running = false;
@@ -1051,6 +1074,7 @@ EvoxSystemImpl::EvoxSystemImpl(Engine& engine)
 	, m_native_functions(m_allocator)
 	, m_data_types(m_allocator)
 	, m_modules(m_allocator)
+	, m_postprocess(engine, m_allocator)
 {
 	m_host = {};
 	Evox::gatherCoreFunctions(m_native_functions);

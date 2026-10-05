@@ -251,6 +251,8 @@ struct Runner final
 			m_viewport = m_pipeline->getModule()->getCameraViewport((EntityRef)camera);
 			m_viewport.w = w;
 			m_viewport.h = h;
+			// camera.getRay (scripts picking objects under the cursor) needs the screen size, GameView sets it in the editor
+			m_pipeline->getModule()->setCameraScreenSize((EntityRef)camera, w, h);
 		}
 
 		m_pipeline->setViewport(m_viewport);

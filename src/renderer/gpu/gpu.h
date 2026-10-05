@@ -154,6 +154,7 @@ enum class AttributeType : u8 {
 
 
 // keep order, this is serialized
+//@ enum full gpu::TextureFormat
 enum class TextureFormat : u32 {
 	R8,
 	RG8,

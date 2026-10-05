@@ -377,6 +377,7 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual void setActiveCamera(EntityRef camera) = 0;
 	virtual EntityPtr getActiveCamera() const = 0;
 	virtual void setActiveEnvironment(EntityRef entity) = 0;
+	virtual EntityPtr getActiveEnvironment() = 0;
 	//@ end
 	virtual void addDebugCube(DVec3 from, DVec3 to, Color color) = 0;
 	
@@ -402,7 +403,6 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 
 	virtual Pose* lockPose(EntityRef entity) = 0;
 	virtual void unlockPose(EntityRef entity, bool changed) = 0;
-	virtual EntityPtr getActiveEnvironment() = 0;
 
 	//@ component BoneAttachment icon ICON_FA_BONE
 	virtual EntityPtr getBoneAttachmentParent(EntityRef entity) = 0;

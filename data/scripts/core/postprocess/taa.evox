@@ -1,0 +1,84 @@
+import "core:postprocess"
+import "core:imgui" as imgui
+
+// Setting, edit it here. TAA is also off while `Renderer::enableBuiltinTAA(false)` is in effect, e.g. when DLSS or FSR3 are
+// active, since they do their own antialiasing.
+var g_enabled : bool = true;
+
+// Per pipeline state: the antialiased image of the previous frame and its size.
+struct TaaState {
+	history : RenderBuffer;
+	width : u32;
+	height : u32;
+}
+
+// Layout of the constant buffer of engine/shaders/taa.hlsl
+struct TaaUniform {
+	width : f32;
+	height : f32;
+	history : u32;
+	current : u32;
+	motion_vectors : u32;
+	output : u32;
+}
+
+fn groups(size : u32) : u32 {
+	return (size + 15) / 16;
+}
+
+// Temporal antialiasing, an `antialias` hook. Built-in antialiasing (e.g. DLSS) runs first and wins if it is active.
+fn taa(ctx : Context, hdr : RenderBuffer) : RenderBuffer {
+	var state = ctx.state(TaaState);
+	if not g_enabled or not ctx.builtinTaaEnabled() {
+		ctx.releaseBuffer(state.history);
+		state.history = invalidBuffer();
+		ctx.enablePixelJitter(false);
+		return invalidBuffer();
+	}
+
+	const shader = ctx.loadShader("engine/shaders/taa.hlsl");
+	if not shader.isReady() {
+		return invalidBuffer();
+	}
+
+	ctx.enablePixelJitter(true);
+	ctx.beginBlock("taa_evox");
+	const width = ctx.width();
+	const height = ctx.height();
+	if not state.history.isValid() or state.width != width or state.height != height {
+		ctx.releaseBuffer(state.history);
+		state.history = ctx.createRenderTarget(width, height, .RGBA16F);
+		state.width = width;
+		state.height = height;
+		ctx.clear(state.history, 1, 1, 1, 1);
+	}
+
+	// blend the current frame into the history, the motion vectors say where a pixel was in the previous frame
+	const display_width = ctx.displayWidth();
+	const display_height = ctx.displayHeight();
+	const blended = ctx.createRenderTarget(width, height, .RGBA16F);
+	ctx.dispatch(shader, TaaUniform {
+		display_width as f32,
+		display_height as f32,
+		ctx.bindless(state.history),
+		ctx.bindless(hdr),
+		ctx.bindless(ctx.gbufferD()),
+		ctx.rwBindless(blended)
+	}, groups(display_width), groups(display_height), 1);
+
+	// the renderer continues with a copy, the blended image is the history of the next frame
+	const output = ctx.createRenderTarget(width, height, .RGBA16F);
+	ctx.blit(blended, output, display_width, display_height);
+	const old_history = state.history;
+	state.history = blended;
+	ctx.releaseBuffer(old_history);
+	// an antialias hook that returns a new buffer releases its input
+	ctx.releaseBuffer(hdr);
+	ctx.endBlock();
+	return output;
+}
+
+// Checkbox in the debug popup, a `debugUI` hook.
+fn debugUI(ctx : Context) : void {
+	g_enabled = imgui.checkbox("TAA", g_enabled);
+}

@@ -1,4 +1,4 @@
-TEST(CallReturnsSpecificResults) {
+﻿TEST(CallReturnsSpecificResults) {
 	TestContext context;
 	ex_module* module = ex_module_create(&context.host);
 	EXPECT_TRUE(module != nullptr);
@@ -20,6 +20,39 @@ TEST(CallReturnsSpecificResults) {
 		i32 value = 1;
 		EXPECT_EQ(EX_CALL_RESULT_INVALID_ARGUMENT, ex_call(runtime.get(), toLs("takes_arg"), nullptr, 0));
 		EXPECT_EQ(EX_CALL_RESULT_OK, ex_call(runtime.get(), toLs("takes_arg"), &value, sizeof(value)));
+	}
+
+	ex_module_destroy(module);
+	return true;
+}
+
+TEST(CallFunctionByIndex) {
+	TestContext context;
+	ex_module* module = ex_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	const ex_string_view source = makeStringView(
+		"fn double_it(value : i32) : i32 { return value * 2; }\n"
+		"fn get() : fn(i32) : i32 { return double_it; }\n");
+	EXPECT_EQ(EX_RESULT_OK, ex_module_compile(module, source, makeStringView(__func__), nullptr, nullptr));
+
+	{
+		RuntimeGuard runtime(module, &context.host);
+		EXPECT_TRUE(runtime);
+		// a function value is stored as the function's index
+		EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("get")));
+		u32 size = 0;
+		ex_task* task = runtime.get();
+		const void* result = ex_task_result(task, &size);
+		EXPECT_TRUE(result != nullptr);
+		EXPECT_EQ(4u, size);
+		u32 index = 0;
+		memcpy(&index, result, sizeof(index));
+
+		i32 value = 21;
+		EXPECT_EQ(EX_CALL_RESULT_INVALID_ARGUMENT, ex_call_function(task, index, nullptr, 0));
+		EXPECT_EQ(EX_CALL_RESULT_OK, ex_call_function(task, index, &value, sizeof(value)));
+		EXPECT_EQ(42, ex_task_to_i32(task, -1));
+		EXPECT_EQ(EX_CALL_RESULT_FUNCTION_NOT_FOUND, ex_call_function(task, 1000000, &value, sizeof(value)));
 	}
 
 	ex_module_destroy(module);
@@ -687,6 +720,57 @@ TEST(ModuleDefinitionAtSurvivesSourceFree) {
 	EXPECT_EQ(0, location.line);
 	EXPECT_EQ(3, location.column);
 	EXPECT_EQ(3, location.length);
+
+	ex_module_destroy(module);
+	return true;
+}
+
+TEST(MultipleRootsInOneModule) {
+	TestContext context;
+	const char* common_source =
+		"var counter : i32 = 0;\n"
+		"fn bump() : i32 { counter = counter + 1; return counter; }\n";
+	const char* a_source =
+		"import \"common\" as common\n"
+		"fn main() : i32 { return common.bump(); }\n"
+		"fn only_in_a() : i32 { return 7; }\n";
+	const char* b_source =
+		"import \"common\" as common\n"
+		"fn main() : i32 { return common.bump() * 10; }\n";
+	EvoxImportFile files_storage[] = {
+		{ toLs("common"), toLs(common_source) },
+	};
+	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
+
+	ex_module* module = ex_module_create(&context.host);
+	EXPECT_TRUE(module != nullptr);
+	EXPECT_EQ(EX_RESULT_OK, ex_module_compile(module, toLs(a_source), toLs("a.evox"), &resolveEvoxImportC, &files));
+	EXPECT_EQ(EX_RESULT_OK, ex_module_compile(module, toLs(b_source), toLs("b.evox"), &resolveEvoxImportC, &files));
+	// "common" is imported by both roots but parsed once
+	EXPECT_EQ(3, ex_module_get_unit_count(module));
+
+	for (bool optimize : { false, true }) {
+		RuntimeGuard runtime(module, &context.host, optimize);
+		EXPECT_TRUE(runtime);
+		ex_task* task = runtime.get();
+		const i32 a_main = ex_runtime_find_function(runtime.runtime, toLs("a.evox"), toLs("main"));
+		const i32 b_main = ex_runtime_find_function(runtime.runtime, toLs("b.evox"), toLs("main"));
+		EXPECT_TRUE(a_main >= 0);
+		EXPECT_TRUE(b_main >= 0);
+		EXPECT_TRUE(a_main != b_main);
+		EXPECT_EQ(-1, ex_runtime_find_function(runtime.runtime, toLs("b.evox"), toLs("only_in_a")));
+		EXPECT_EQ(-1, ex_runtime_find_function(runtime.runtime, toLs("c.evox"), toLs("main")));
+		EXPECT_EQ(EX_TYPE_I32, ex_function_result_kind(runtime.runtime, (u32)a_main));
+		EXPECT_EQ(EX_TYPE_INVALID, ex_function_result_kind(runtime.runtime, 1000000));
+
+		// both roots share the globals of the runtime
+		EXPECT_EQ(EX_CALL_RESULT_OK, ex_call_function(task, (u32)a_main, nullptr, 0));
+		EXPECT_EQ(1, ex_task_to_i32(task, -1));
+		EXPECT_EQ(EX_CALL_RESULT_OK, ex_call_function(task, (u32)b_main, nullptr, 0));
+		EXPECT_EQ(20, ex_task_to_i32(task, -1));
+		EXPECT_EQ(EX_CALL_RESULT_OK, ex_call_function(task, (u32)a_main, nullptr, 0));
+		EXPECT_EQ(3, ex_task_to_i32(task, -1));
+	}
 
 	ex_module_destroy(module);
 	return true;
