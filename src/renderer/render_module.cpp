@@ -2111,6 +2111,30 @@ struct RenderModuleImpl final : RenderModule {
 		mat.sort_key = 0;
 		mat.material_index = MaterialIndex{0};
 		mi.dirty = true;
+		resolveMaterialOverrides(mi);
+	}
+
+	// A dirty model instance is not drawn until the pipeline refreshes it (Pipeline::refreshMaterialOverrides), so swapping a material at runtime made the
+	// mesh vanish for a frame. When the model and all materials are already loaded, do that refresh right here.
+	void resolveMaterialOverrides(ModelInstance& mi) {
+		if (!mi.model || !mi.model->isReady() || !mi.meshes) return;
+		for (u32 i = 0; i < mi.mesh_count; ++i) {
+			MeshMaterial& mat = mi.mesh_materials[i];
+			if (!mat.material) {
+				mat.material = mi.model->getMeshMaterial(i).material;
+				mat.material->incRefCount();
+			}
+			if (!mat.material->isReady()) return;
+		}
+		for (u32 i = 0; i < mi.mesh_count; ++i) {
+			MeshMaterial& mat = mi.mesh_materials[i];
+			if (mat.sort_key == 0) mat.sort_key = computeSortKey(*mat.material, mi.meshes[i]);
+			if ((u32)mat.material_index == 0) {
+				mat.material_index = mat.material->getIndex();
+				mat.flags = mat.flags & ~MeshMaterial::OWN_MATERIAL_INDEX;
+			}
+		}
+		mi.dirty = false;
 	}
 
 	Path getModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx) override {
@@ -2629,6 +2653,27 @@ struct RenderModuleImpl final : RenderModule {
 			if (hit.is_hit) break;
 		}
 		return hit;
+	}
+
+	float castRayModelInstance(DVec3 origin, Vec3 dir, EntityRef entity) override {
+		if (!getWorld().hasComponent(entity, types::model_instance)) return -1.f;
+		const ModelInstance& r = m_model_instances[entity.index];
+		if ((r.flags & (ModelInstance::ENABLED | ModelInstance::VALID)) != (ModelInstance::ENABLED | ModelInstance::VALID)) return -1.f;
+		if (!r.model) return -1.f;
+
+		const Transform& tr = getWorld().getTransform(entity);
+		const Vec3 origin_ms = Vec3(tr.invTransform(origin));
+		const Vec3 dir_ms = normalize(tr.invTransformVector(dir));
+		float sphere_t;
+		if (!getRaySphereIntersection(origin_ms, dir_ms, Vec3::ZERO, r.model->getOriginBoundingRadius(), sphere_t) || sphere_t < 0) return -1.f;
+		const AABB& aabb = r.model->getAABB();
+		Vec3 aabb_hit;
+		if (!getRayAABBIntersection(origin_ms, dir_ms, aabb.min, aabb.max - aabb.min, aabb_hit)) return -1.f;
+
+		const RayCastModelHit hit = r.model->castRay(origin_ms, dir_ms, r.pose, entity, nullptr);
+		if (!hit.is_hit) return -1.f;
+		const DVec3 hit_pos = tr.transform(Vec3(hit.origin + hit.dir * hit.t));
+		return (float)length(origin - hit_pos);
 	}
 
 	RayCastModelHit castRay(const Ray& ray, EntityPtr ignored_model_instance) override {

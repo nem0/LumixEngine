@@ -368,6 +368,8 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual Renderer& getRenderer() const = 0;
 	virtual RayCastModelHit castRay(const Ray& ray, EntityPtr ignore) = 0;
 	virtual RayCastModelHit castRayTerrain(const Ray& ray) = 0;
+	// TODO use castRay instead of castRayModelInstance, but evox currently don't now how to export castRay
+	virtual float castRayModelInstance(DVec3 origin, Vec3 dir, EntityRef entity) = 0; // distance along the ray to the model instance's triangles, negative if it is not hit
 	virtual void addDebugTriangle(const DVec3& p0, const DVec3& p1, const DVec3& p2, Color color) = 0;
 	virtual void addDebugLine(DVec3 from, DVec3 to, Color color) = 0; 
 	virtual void addDebugCross(DVec3 center, float size, Color color) = 0;

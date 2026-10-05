@@ -1633,6 +1633,15 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, &ret);
 	}
 	
+	static void evox_renderer_castRayModelInstance_9694972620097455906(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, RenderModule*, module);
+		EX_ARG(frame, DVec3, origin);
+		EX_ARG(frame, Vec3, dir);
+		EX_ARG(frame, ExEntity, entity);
+		auto ret = module->castRayModelInstance(origin, dir, EntityRef(entity.index));
+		EX_RESULT(frame, ret);
+	}
+	
 	static void evox_renderer_addDebugTriangle_9051351881586580716(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, RenderModule*, module);
 		EX_ARG(frame, DVec3, p0);
@@ -5425,6 +5434,7 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:physics/module"), StringView("raycastEx")}, &evox_physics_raycastEx_5324446236776470796);
 		functions.insert({StringView("core:physics/module"), StringView("physics")}, &evox_world_physics);
 		functions.insert({StringView("core:renderer/module"), StringView("getRenderer")}, &evox_renderer_getRenderer_743583755130421523);
+		functions.insert({StringView("core:renderer/module"), StringView("castRayModelInstance")}, &evox_renderer_castRayModelInstance_9694972620097455906);
 		functions.insert({StringView("core:renderer/module"), StringView("addDebugTriangle")}, &evox_renderer_addDebugTriangle_9051351881586580716);
 		functions.insert({StringView("core:renderer/module"), StringView("addDebugLine")}, &evox_renderer_addDebugLine_11999449654256854668);
 		functions.insert({StringView("core:renderer/module"), StringView("addDebugCross")}, &evox_renderer_addDebugCross_12225788651207943196);

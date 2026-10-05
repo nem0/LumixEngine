@@ -5,13 +5,14 @@ import "core:world"
 
 import "core:renderer/renderer"
 import "core:dvec3"
-import "core:color"
 import "core:vec3"
 import "core:entity"
+import "core:color"
 struct RenderModule { module : cptr; }
 
 extern fn renderer(w : World) : ?RenderModule;
 extern fn getRenderer(module : RenderModule) : Renderer;
+extern fn castRayModelInstance(module : RenderModule, origin : DVec3, dir : Vec3, entity : Entity) : f32;
 extern fn addDebugTriangle(module : RenderModule, p0 : DVec3, p1 : DVec3, p2 : DVec3, color : Color) : void;
 extern fn addDebugLine(module : RenderModule, from : DVec3, to : DVec3, color : Color) : void;
 extern fn addDebugCross(module : RenderModule, center : DVec3, size : f32, color : Color) : void;
