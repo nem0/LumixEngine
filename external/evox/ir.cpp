@@ -3398,14 +3398,16 @@ struct BytecodeCompiler {
 		stack_top += typeByteSize(*aggregate.type);
 		u32 offset = 0;
 		for (u32 i = 0; i < aggregate.value_count; ++i) {
-			const u32 value = emit(*aggregate.values[i], nullptr);
 			const u32 size = aggregate.sizes								   ? aggregate.sizes[i]
 							 : aggregate.type->kind == ResolvedTypeKind::ARRAY ? typeByteSize(*static_cast<ArrayResolvedType*>(aggregate.type)->element_type)
 																			   : (u32)sizeof(u64);
-			emitOp(EX_OP_COPY);
-			emit(result + (aggregate.offsets ? aggregate.offsets[i] : offset));
-			emit(value);
-			emit(size);
+			if (aggregate.values[i]->kind != ExIrOpKind::NOP) {
+				const u32 value = emit(*aggregate.values[i], nullptr);
+				emitOp(EX_OP_COPY);
+				emit(result + (aggregate.offsets ? aggregate.offsets[i] : offset));
+				emit(value);
+				emit(size);
+			}
 			offset += size;
 		}
 		return result;

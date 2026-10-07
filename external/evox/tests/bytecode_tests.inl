@@ -88,6 +88,31 @@ TEST(BytecodeRecursion) {
 	return true;
 }
 
+TEST(BytecodeStructLiteralUndefinedNestedField) {
+	const char* source = R"(
+		struct Handle { index : i32; ptr : cptr; }
+		struct Item { kind : i32; handle : Handle; hp : f32; }
+
+		fn main() : i32 {
+			var item = Item {19, undefined, 23};
+			item.handle = Handle {-1, null};
+			if item.handle.index != -1 or item.handle.ptr != null { return 0; }
+			return item.kind + item.hp as i32;
+		}
+	)";
+
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	for (bool optimize : {false, true}) {
+		RuntimeGuard runtime(module, &module_host, optimize);
+		EXPECT_TRUE(runtime);
+		EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime.runtime, toLs("main")));
+		EXPECT_EQ(42, ex_task_to_i32(runtime.task, -1));
+	}
+	CAPI_END(module);
+	return true;
+}
+
 TEST(BytecodeThreeByteStructUndefinedLocalCanBeFullyAssigned) {
 	const char* source = R"(
 		struct Packed {
