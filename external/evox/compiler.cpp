@@ -544,6 +544,12 @@ struct Checker {
 			return;
 		}
 		if (value.kind == ComptimeValue::VALUE) {
+			// Implicit array to slice conversion: the slice refers to the array's bytes.
+			if (type.kind == ResolvedTypeKind::SLICE && value.type && value.type->kind == ResolvedTypeKind::ARRAY) {
+				ex_slice slice = {(u8*)value.value, static_cast<ArrayResolvedType*>(value.type)->size};
+				copyMemory(destination, &slice, sizeof(slice));
+				return;
+			}
 			copyMemory(destination, value.value, typeByteSize(type));
 			return;
 		}

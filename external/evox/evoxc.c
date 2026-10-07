@@ -253,6 +253,7 @@ static const char* evoxc_opcode_name(ex_op op) {
 		case EX_OP_COPY: return "COPY";
 		case EX_OP_FRAME_PTR: return "FRAME_PTR";
 		case EX_OP_GLOBAL_PTR: return "GLOBAL_PTR";
+		case EX_OP_CONST_PTR: return "CONST_PTR";
 		case EX_OP_LOAD_PTR: return "LOAD_PTR";
 		case EX_OP_STORE_PTR: return "STORE_PTR";
 		case EX_OP_LOAD_INDEXED_8: return "LOAD_INDEXED_8";
@@ -448,6 +449,7 @@ static void evoxc_dump_bytecode(const ex_bytecode* bytecode, const char* source_
 				break;
 			}
 			case EX_OP_FRAME_PTR:
+			case EX_OP_CONST_PTR:
 			case EX_OP_GLOBAL_PTR: {
 				const u32 dst = evoxc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 off = evoxc_read_u32(fn->code, fn->code_size, &pc);

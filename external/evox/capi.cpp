@@ -5,6 +5,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <vector>
 
 const ex_type* ex_type_from_any(const ex_runtime* runtime, const void* value) {
 	if (!runtime || !value) return nullptr;
@@ -497,7 +498,7 @@ ex_attribute ex_type_struct_field_attribute_value(const ex_type* type, u32 field
 namespace {
 
 constexpr u32 BYTECODE_IMAGE_MAGIC = 0x43425845; // "EXBC"
-constexpr u32 BYTECODE_IMAGE_VERSION = 1;
+constexpr u32 BYTECODE_IMAGE_VERSION = 2;
 
 struct BytecodeWriter {
 	ex_write_fn write;
@@ -714,6 +715,16 @@ ex_result ex_bytecode_save(const ex_bytecode* bc, ex_write_fn write, void* userd
 		w.string(bc->type_enum_values[i].name);
 		w.u64v(bc->type_enum_values[i].value_bits);
 	}
+
+	// Slices inside the constant data are saved in their offset form.
+	w.u32v(bc->const_data_size);
+	if (bc->const_data_size > 0) {
+		std::vector<u8> const_data(bc->const_data, bc->const_data + bc->const_data_size);
+		ex_bytecode_relocate_const_data(bc, const_data.data(), false);
+		w.bytes(const_data.data(), const_data.size());
+	}
+	w.u32v(bc->const_reloc_count);
+	for (u32 i = 0; i < bc->const_reloc_count; ++i) w.u32v(bc->const_relocs[i]);
 	return EX_RESULT_OK;
 }
 
@@ -868,6 +879,21 @@ ex_bytecode* ex_bytecode_load(ex_host* host, const void* data, u64 size) {
 		bc->type_enum_values[i].name = r.string();
 		bc->type_enum_values[i].value_bits = r.u64v();
 	}
+
+	bc->const_data_size = r.count();
+	bc->const_data = (u8*)r.allocate(bc->const_data_size, 16);
+	r.bytes(bc->const_data, bc->const_data_size);
+	bc->const_reloc_count = r.count();
+	bc->const_relocs = r.array<u32>(bc->const_reloc_count);
+	for (u32 i = 0; i < bc->const_reloc_count && r.ok; ++i) {
+		bc->const_relocs[i] = r.u32v();
+		if (!r.ok) return nullptr;
+		// Each slot must fit in the data and refer to an offset inside it.
+		if (!validRange(bc->const_relocs[i], sizeof(uintptr_t), bc->const_data_size)) return nullptr;
+		uintptr_t target;
+		memcpy(&target, bc->const_data + bc->const_relocs[i], sizeof(target));
+		if (target > bc->const_data_size) return nullptr;
+	}
 	if (!r.ok) return nullptr;
 
 	// Cross-reference validation: later code indexes these tables unchecked.
@@ -899,5 +925,6 @@ ex_bytecode* ex_bytecode_load(ex_host* host, const void* data, u64 size) {
 	for (u32 i = 0; i < bc->type_member_count; ++i) {
 		if (!validIndexOrNone(bc->type_member_indices[i], bc->type_info_count)) return nullptr;
 	}
+	ex_bytecode_relocate_const_data(bc, bc->const_data, true);
 	return bc;
 }

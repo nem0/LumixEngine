@@ -1,6 +1,8 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdint.h>
+#include <string.h>
 #include <stdbool.h>
 
 #include "capi.h"
@@ -97,6 +99,7 @@ typedef enum ex_op {
 	EX_OP_COPY,
 	EX_OP_FRAME_PTR,
 	EX_OP_GLOBAL_PTR,
+	EX_OP_CONST_PTR,
 	EX_OP_LOAD_PTR,
 	EX_OP_STORE_PTR,
 	EX_OP_LOAD_INDEXED_8,
@@ -458,6 +461,15 @@ typedef struct ex_bytecode {
 	ex_string_view* strings;
 	u32 string_count;
 
+	// Read-only data referenced by EX_OP_CONST_PTR, e.g. the backing store of
+	// slices inside comptime constants. Slices stored inside it are listed in
+	// `const_relocs` (byte offsets of their pointer slots), see
+	// ex_bytecode_relocate_const_data.
+	u8* const_data;
+	u32 const_data_size;
+	u32* const_relocs;
+	u32 const_reloc_count;
+
 	// Deduplicated source locations referenced by the functions' source maps.
 	// `ex_bytecode_source_map_entry::location_index` indexes here.
 	ex_bytecode_location* locations;
@@ -509,6 +521,17 @@ typedef struct ex_bytecode {
 	u32 breakpoint_count;
 	u32 breakpoint_capacity;
 } ex_bytecode;
+
+// Pointer slots inside `data` (a copy of, or the bytecode's own, const_data) hold
+// offsets into const_data in the stored form and real pointers in the runtime form.
+static inline void ex_bytecode_relocate_const_data(const ex_bytecode* bc, u8* data, bool to_pointers) {
+	for (u32 i = 0; i < bc->const_reloc_count; ++i) {
+		uintptr_t slot;
+		memcpy(&slot, data + bc->const_relocs[i], sizeof(slot));
+		slot = to_pointers ? slot + (uintptr_t)bc->const_data : slot - (uintptr_t)bc->const_data;
+		memcpy(data + bc->const_relocs[i], &slot, sizeof(slot));
+	}
+}
 
 #define EX_MAX_CALL_DEPTH 4096u
 

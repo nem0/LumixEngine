@@ -718,6 +718,13 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 				memcpy(frame + dst, &ptr, sizeof(ptr));
 				break;
 			}
+			case EX_OP_CONST_PTR: {
+				const u32 dst = runtime_read_u32();
+				const u32 offset = runtime_read_u32();
+				void* ptr = task->bytecode->const_data + offset;
+				memcpy(frame + dst, &ptr, sizeof(ptr));
+				break;
+			}
 			case EX_OP_LOAD_PTR: {
 				const u32 dst = runtime_read_u32();
 				const u32 addr = runtime_read_u32();

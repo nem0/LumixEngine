@@ -2464,6 +2464,8 @@ struct BytecodeCompiler {
 		, bytecode(bytecode)
 		, type_info(type_info)
 		, code(host.arena)
+		, const_data(host.arena)
+		, const_relocs(host.arena)
 		, local_debug(host.arena) {}
 
 	template <typename T, typename... Args> T& alloc(Args&&... args) {
@@ -3034,8 +3036,85 @@ struct BytecodeCompiler {
 		return 0xffFFffFF;
 	}
 
+	// Appends `size` bytes to the constant data section and returns their offset.
+	u32 appendConstData(const u8* bytes, u32 size) {
+		while (const_data.count % 16u) const_data.push_back(0);
+		const u32 offset = const_data.count;
+		for (u32 i = 0; i < size; ++i) const_data.push_back(bytes[i]);
+		return offset;
+	}
+
+	// The value of `type` at const_data[offset] was copied from compiler memory.
+	// Copies the backing store of every slice inside it into the constant data
+	// section too and rewrites the slice to refer to it by offset.
+	void relocateSlices(ResolvedType& type, u32 offset) {
+		switch (type.kind) {
+			case ResolvedTypeKind::SLICE: {
+				ResolvedType& element_type = *static_cast<SliceResolvedType&>(type).element_type;
+				const u8* data;
+				i64 length;
+				memcpy(&data, &const_data[offset], sizeof(data));
+				memcpy(&length, &const_data[offset + sizeof(data)], sizeof(length));
+				if (!data) return;
+				const u32 element_size = typeByteSize(element_type);
+				const u32 backing = appendConstData(data, u32(length) * element_size);
+				for (i64 i = 0; i < length; ++i) relocateSlices(element_type, backing + u32(i) * element_size);
+				const u64 relative = backing;
+				memcpy(&const_data[offset], &relative, sizeof(relative));
+				const_relocs.push(offset);
+				return;
+			}
+			case ResolvedTypeKind::ARRAY: {
+				auto& array = static_cast<ArrayResolvedType&>(type);
+				const u32 element_size = typeByteSize(*array.element_type);
+				for (i64 i = 0; i < array.size; ++i) relocateSlices(*array.element_type, offset + u32(i) * element_size);
+				return;
+			}
+			case ResolvedTypeKind::STRUCT: {
+				auto& st = static_cast<StructResolvedType&>(type);
+				for (i32 i = 0; i < st.fields.size(); ++i) relocateSlices(*st.fields[i].type, offset + structFieldOffset(st, i));
+				return;
+			}
+			case ResolvedTypeKind::TUPLE: {
+				auto& tuple = static_cast<TupleResolvedType&>(type);
+				for (i32 i = 0; i < tuple.elements.size(); ++i) relocateSlices(*tuple.elements[i], offset + tuple.offsets[i]);
+				return;
+			}
+			default: return;
+		}
+	}
+
+	// Values containing slices cannot be emitted as immediates, their pointers
+	// would reference compiler memory. They are loaded from the constant data.
+	bool emitConstDataLoad(const ExOpLoadBytes& load, EmitDst* dst, u32& result) {
+		const u32 data_start = const_data.count;
+		const i32 relocs_start = const_relocs.size();
+		const u32 offset = appendConstData(load.value, load.size);
+		relocateSlices(*load.type, offset);
+		if (const_relocs.size() == relocs_start) {
+			const_data.count = data_start;
+			return false;
+		}
+		result = dst ? dst->dst : stack_top;
+		const u32 saved_stack_top = stack_top;
+		if (!dst) stack_top += load.size;
+		const u32 pointer = stack_top;
+		emitOp(EX_OP_CONST_PTR);
+		emit(pointer);
+		emit(offset);
+		emitOp(EX_OP_LOAD_PTR);
+		emit(result);
+		emit(pointer);
+		emit(0u);
+		emit(load.size);
+		stack_top = dst ? saved_stack_top : result + load.size;
+		return true;
+	}
+
 	u32 emitLoadBytes(const ExOpLoadBytes& load, EmitDst* dst) {
-		const u32 result = dst ? dst->dst : stack_top;
+		u32 result;
+		if (load.type && emitConstDataLoad(load, dst, result)) return result;
+		result = dst ? dst->dst : stack_top;
 		u32 iter = result;
 		u32 offset = 0;
 		while (offset < load.size) {
@@ -4283,6 +4362,8 @@ struct BytecodeCompiler {
 	TypeInfoBuilder& type_info;
 	ex_function_bc* fn_bc = nullptr;
 	ByteArray code;
+	ByteArray const_data;
+	ExpArray<u32> const_relocs;
 	bool do_optimize = false;
 	bool do_inline = false;
 	// Debug entries for the current function's named params and locals, in
@@ -4494,14 +4575,6 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 		}
 	}
 
-	if (builder.strings.size() > 0) {
-		bc->string_count = builder.strings.size();
-		bc->strings = (ex_string_view*)host->arena.allocate(host->arena.user_data, sizeof(ex_string_view) * bc->string_count, alignof(ex_string_view));
-		for (i32 i = 0, c = builder.strings.size(); i < c; ++i) {
-			bc->strings[i] = builder.strings[i];
-		}
-	}
-
 	if (bc->global_size > 0) {
 		ex_function_bc& fn = bc->functions[fn_index++];
 		memset(&fn, 0, sizeof(fn));
@@ -4572,6 +4645,15 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 		bc->has_global_init = true;
 	}
 
+	// Copied last: the global initializer interns strings too.
+	if (builder.strings.size() > 0) {
+		bc->string_count = builder.strings.size();
+		bc->strings = (ex_string_view*)host->arena.allocate(host->arena.user_data, sizeof(ex_string_view) * bc->string_count, alignof(ex_string_view));
+		for (i32 i = 0, c = builder.strings.size(); i < c; ++i) {
+			bc->strings[i] = builder.strings[i];
+		}
+	}
+
 	// Copy the module's append-only SourceLocTable into the bytecode location
 	// table verbatim (one entry per token; token indices are reused as-is by
 	// the source maps). Unit indices are recorded during parsing and reused as-is.
@@ -4593,6 +4675,15 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 
 	for (u32 i = 0; i < bc->function_count; ++i) {
 		bc->functions[i].code = (u8*)(u64)bc_compiler.code.data + (u64)bc->functions[i].code;
+	}
+
+	bc->const_data = bc_compiler.const_data.data;
+	bc->const_data_size = bc_compiler.const_data.count;
+	bc->const_reloc_count = bc_compiler.const_relocs.size();
+	if (bc->const_reloc_count > 0) {
+		bc->const_relocs = (u32*)host->arena.allocate(host->arena.user_data, sizeof(u32) * bc->const_reloc_count, alignof(u32));
+		for (u32 i = 0; i < bc->const_reloc_count; ++i) bc->const_relocs[i] = bc_compiler.const_relocs[i];
+		ex_bytecode_relocate_const_data(bc, bc->const_data, true);
 	}
 
 	type_info.commit();

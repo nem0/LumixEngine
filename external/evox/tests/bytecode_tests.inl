@@ -3130,3 +3130,132 @@ TEST(BytecodeSaveLoadRoundTrip) {
 	CAPI_END(module);
 	return true;
 }
+
+static bool testSerializedStringArray(const char* source) {
+	std::vector<u8> image;
+	{
+		TestContext context;
+		ex_module* module = ex_module_create(&context.host);
+		EXPECT_TRUE(ex_module_compile(module, toLs(source), toLs("strings"), nullptr, nullptr));
+		ex_bytecode* bytecode = ex_bytecode_compile(module, &context.host, nullptr);
+		EXPECT_TRUE(bytecode != nullptr);
+		EXPECT_EQ(EX_RESULT_OK, ex_bytecode_save(bytecode, &testSaveBytecodeChunk, &image));
+		ex_bytecode_destroy(bytecode);
+		ex_module_destroy(module);
+	}
+	TestContext context;
+	ex_bytecode* loaded = ex_bytecode_load(&context.host, image.data(), image.size());
+	EXPECT_TRUE(loaded != nullptr);
+	ex_runtime* runtime = ex_runtime_create(loaded, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	for (i32 i = 0; i < 2; ++i) {
+		test_push_i32(runtime, i);
+		EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+		const ex_string_view text = ex_task_to_string(runtime, -1);
+		bool owned = false;
+		for (u32 j = 0; j < loaded->string_count; ++j) {
+			owned |= text.begin == loaded->strings[j].begin && text.length == loaded->strings[j].length;
+		}
+		owned |= (const u8*)text.begin >= loaded->const_data && (const u8*)text.begin + text.length <= loaded->const_data + loaded->const_data_size;
+		// Check ownership before dereferencing a potentially dangling compiler pointer.
+		EXPECT_TRUE(owned);
+		EXPECT_TRUE(equalStrings(text, toLs(i == 0 ? "hello" : "world")));
+	}
+	test_runtime_destroy(runtime);
+	ex_bytecode_destroy(loaded);
+	return true;
+}
+
+TEST(BytecodeSaveLoadConstStringArray) {
+	return testSerializedStringArray(R"(
+		const lines : [2][]const u8 = ["hello", "world"];
+		fn main(i : i32) : []const u8 { return lines[i]; }
+	)");
+}
+
+TEST(BytecodeSaveLoadGlobalStringArray) {
+	return testSerializedStringArray(R"(
+		var lines : [2][]const u8 = ["hello", "world"];
+		fn main(i : i32) : []const u8 { return lines[i]; }
+	)");
+}
+
+TEST(BytecodeSaveLoadConstStringStruct) {
+	return testSerializedStringArray(R"(
+		struct Lines { a : []const u8; b : []const u8; }
+		const lines : Lines = Lines { "hello", "world" };
+		fn main(i : i32) : []const u8 { if i == 0 { return lines.a; } return lines.b; }
+	)");
+}
+
+TEST(BytecodeSaveLoadConstStringTuple) {
+	return testSerializedStringArray(R"(
+		const lines : tuple { []const u8, []const u8 } = .{ "hello", "world" };
+		fn main(i : i32) : []const u8 { if i == 0 { return lines[0]; } return lines[1]; }
+	)");
+}
+
+
+TEST(BytecodeSaveLoadComptimeStringArray) {
+	return testSerializedStringArray(R"(
+		comptime lines = ["hello", "world"];
+		fn main(i : i32) : []const u8 { return lines[i]; }
+	)");
+}
+
+TEST(BytecodeSaveLoadComptimeStringCall) {
+	return testSerializedStringArray(R"(
+		fn make() : [2][]const u8 { return ["hello", "world"]; }
+		comptime lines = make();
+		fn main(i : i32) : []const u8 { return lines[i]; }
+	)");
+}
+
+
+
+static bool testSerializedI32Slices(const char* source) {
+	std::vector<u8> image;
+	{
+		TestContext context;
+		ex_module* module = ex_module_create(&context.host);
+		EXPECT_TRUE(ex_module_compile(module, toLs(source), toLs("slices"), nullptr, nullptr));
+		ex_bytecode* bytecode = ex_bytecode_compile(module, &context.host, nullptr);
+		EXPECT_TRUE(bytecode != nullptr);
+		EXPECT_EQ(EX_RESULT_OK, ex_bytecode_save(bytecode, &testSaveBytecodeChunk, &image));
+		ex_bytecode_destroy(bytecode);
+		ex_module_destroy(module);
+	}
+	TestContext context;
+	ex_bytecode* loaded = ex_bytecode_load(&context.host, image.data(), image.size());
+	EXPECT_TRUE(loaded != nullptr);
+	ex_runtime* runtime = ex_runtime_create(loaded, nullptr);
+	EXPECT_TRUE(runtime != nullptr);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(42, ex_task_to_i32(test_task_for_runtime(runtime), -1));
+	test_runtime_destroy(runtime);
+	ex_bytecode_destroy(loaded);
+	return true;
+}
+
+TEST(BytecodeSaveLoadConstI32SliceArray) {
+	return testSerializedI32Slices(R"(
+		const values : [2][]const i32 = [[10], [32]];
+		fn main() : i32 { return values[0][0] + values[1][0]; }
+	)");
+}
+
+TEST(BytecodeSaveLoadConstI32SliceStruct) {
+	return testSerializedI32Slices(R"(
+		struct S { v : []const i32; }
+		const s : S = S { [10, 32] };
+		fn main() : i32 { return s.v[0] + s.v[1]; }
+	)");
+}
+
+TEST(BytecodeSaveLoadConstNestedStringSlice) {
+	return testSerializedStringArray(R"(
+		struct S { names : []const []const u8; }
+		const s : S = S { ["hello", "world"] };
+		fn main(i : i32) : []const u8 { return s.names[i]; }
+	)");
+}
