@@ -479,6 +479,12 @@ struct RenderModuleImpl final : RenderModule {
 		m_updating_attachment = backup;
 	}
 
+	void setBoneAttachmentBoneName(EntityRef entity, const char* name) override {
+		BoneAttachment& ba = m_bone_attachments[entity];
+		ba.bone_name_hash = BoneNameHash(name);
+		updateBoneAttachment(ba);
+	}
+
 	int getBoneAttachmentBone(EntityRef entity) override {
 		BoneAttachment& ba = m_bone_attachments[entity];
 		if (!ba.parent_entity.isValid()) return -1;

@@ -4346,6 +4346,15 @@ namespace Lumix::Evox::generated {
 		module->setBoneAttachmentRotationQuat(EntityRef(entity.index), rot);
 	}
 	
+	static void evox_bone_attachment_setBoneName_1386788009701049385(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, entity);
+		RenderModule* module = static_cast<RenderModule*>(entity.module);
+		EX_STRING_ARG(frame, name);
+		char evox_string_arg_name[128];
+		copyString(Span(evox_string_arg_name), StringView{name.begin, (u64)name.length});
+		module->setBoneAttachmentBoneName(EntityRef(entity.index), evox_string_arg_name);
+	}
+	
 	static void evox_bone_attachment_getBoneAttachmentParent_18142689017962228472(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
@@ -4395,13 +4404,6 @@ namespace Lumix::Evox::generated {
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
 		auto ret = module->getBoneAttachmentRotation(EntityRef(entity.index));
 		EX_RESULT(frame, ret);
-	}
-	
-	static void evox_bone_attachment_setBoneAttachmentRotation_2627513105013326150(ex_runtime* runtime, ex_call_frame frame) {
-		EX_ARG(frame, ExComponent, entity);
-		RenderModule* module = static_cast<RenderModule*>(entity.module);
-		EX_ARG(frame, Vec3, rot);
-		module->setBoneAttachmentRotation(EntityRef(entity.index), rot);
 	}
 	
 	static void evox_particle_emitter_getGlobalID_903115760734972517(ex_runtime* runtime, ex_call_frame frame) {
@@ -5863,6 +5865,7 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:renderer/environment_probe"), StringView("getEnabled")}, &evox_environment_probe_isEnvironmentProbeEnabled_6472315036682061276);
 		functions.insert({StringView("core:renderer/environment_probe"), StringView("setEnabled")}, &evox_environment_probe_enableEnvironmentProbe_15467030845922521952);
 		functions.insert({StringView("core:renderer/bone_attachment"), StringView("setRotation")}, &evox_bone_attachment_setRotation_7525519620484028447);
+		functions.insert({StringView("core:renderer/bone_attachment"), StringView("setBoneName")}, &evox_bone_attachment_setBoneName_1386788009701049385);
 		functions.insert({StringView("core:renderer/bone_attachment"), StringView("getParent")}, &evox_bone_attachment_getBoneAttachmentParent_18142689017962228472);
 		functions.insert({StringView("core:renderer/bone_attachment"), StringView("setParent")}, &evox_bone_attachment_setBoneAttachmentParent_3779313276891743601);
 		functions.insert({StringView("core:renderer/bone_attachment"), StringView("getBone")}, &evox_bone_attachment_getBoneAttachmentBone_2784195155658238731);
@@ -5870,7 +5873,6 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:renderer/bone_attachment"), StringView("getPosition")}, &evox_bone_attachment_getBoneAttachmentPosition_14063061698960809797);
 		functions.insert({StringView("core:renderer/bone_attachment"), StringView("setPosition")}, &evox_bone_attachment_setBoneAttachmentPosition_10702452899333319646);
 		functions.insert({StringView("core:renderer/bone_attachment"), StringView("getRotation")}, &evox_bone_attachment_getBoneAttachmentRotation_4979697275069747087);
-		functions.insert({StringView("core:renderer/bone_attachment"), StringView("setRotation")}, &evox_bone_attachment_setBoneAttachmentRotation_2627513105013326150);
 		functions.insert({StringView("core:renderer/particle_emitter"), StringView("getGlobalID")}, &evox_particle_emitter_getGlobalID_903115760734972517);
 		functions.insert({StringView("core:renderer/particle_emitter"), StringView("setFloatGlobal")}, &evox_particle_emitter_setFloatGlobal_8048456309304325320);
 		functions.insert({StringView("core:renderer/particle_emitter"), StringView("setVec3Global")}, &evox_particle_emitter_setVec3Global_5038922086369882645);

@@ -416,6 +416,8 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual Vec3 getBoneAttachmentRotation(EntityRef entity) = 0;						//@ label "Relative rotation" radians
 	virtual void setBoneAttachmentRotation(EntityRef entity, Vec3 rot) = 0;
 	virtual void setBoneAttachmentRotationQuat(EntityRef entity, Quat rot) = 0;	//@ function alias setRotation
+	// attaches to the bone with this name (hashed, like the dynenum Bone does): works before the model is loaded and keeps the relative transform, unlike setBoneAttachmentBone
+	virtual void setBoneAttachmentBoneName(EntityRef entity, const char* name) = 0;	//@ function alias setBoneName
 	//@ end
 
 	virtual void clearDebugLines() = 0;

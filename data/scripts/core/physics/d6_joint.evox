@@ -4,7 +4,6 @@
 import "core:physics/d6motion"
 import "core:entity"
 import "core:vec2"
-import "core:entity"
 import "core:vec3"
 struct D6Joint { entity : i32; module : cptr; }
 

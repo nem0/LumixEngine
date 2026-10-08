@@ -157,6 +157,8 @@ struct Property {
 	StringView setter_args;
 	Attributes attributes;
 	bool is_var = false;
+	bool getter_hidden = false;	// set by the evox generator when the script name of the getter / setter is already taken (see hideCollidingScriptNames)
+	bool setter_hidden = false;
 };
 
 struct Function {
@@ -165,6 +167,7 @@ struct Function {
 	StringView args;
 	Attributes attributes;
 	bool is_const = false;
+	bool script_hidden = false;	// set by the evox generator when the script name is already taken (see hideCollidingScriptNames)
 };
 
 struct StructVar {

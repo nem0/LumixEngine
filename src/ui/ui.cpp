@@ -1015,6 +1015,34 @@ static u32 offsetInlineRun(Document& doc, Element& parent, u32 first_span_idx, f
 // Positions child elements within their parent container based on layout direction and margins.
 // For row direction, children are laid out horizontally; for column, vertically.
 // Margins between adjacent children collapse to the maximum value.
+struct BoxRow {
+	i32 to;
+	float free_width;
+	float height;
+	i32 flow_count;
+};
+
+// Share row breaks between fit-content measurement and child placement.
+static BoxRow measureBoxRow(Document& doc, const Element& parent, i32 from) {
+	BoxRow row;
+	row.free_width = parent.size.x - parent.paddings.right - parent.paddings.left;
+	row.height = 0;
+	row.flow_count = 0;
+	float prev_margin = 0;
+	for (row.to = from; row.to < parent.children.size(); ++row.to) {
+		const Element& child = doc.m_elements[parent.children[row.to]];
+		if (child.position_mode == PositionMode::ABSOLUTE || !child.visible) continue;
+		const float width = child.size.x + maximum(prev_margin, child.margins.left);
+		if ((parent.wrap && row.free_width < width + child.margins.right) || isInlineTag(child.tag)) break;
+		row.height = maximum(row.height, child.size.y + child.margins.top + child.margins.bottom);
+		row.free_width -= width;
+		prev_margin = child.margins.right;
+		++row.flow_count;
+	}
+	row.free_width -= prev_margin;
+	return row;
+}
+
 static void layoutChildrenHorizontal(Document& doc, Element& parent) {
 	float start_x = parent.position.x + parent.paddings.left;
 	float y = parent.position.y + parent.paddings.top;
@@ -1031,57 +1059,25 @@ static void layoutChildrenHorizontal(Document& doc, Element& parent) {
 			y += child.size.y;
 		}
 		else { // boxes
-			struct BoxRow {
-				i32 from;
-				i32 to;
-				float free_width;
-				float height;
-			};
-
-			BoxRow row;
-			row.from = i;
-			row.free_width = parent.size.x - parent.paddings.right - parent.paddings.left;
-			row.height = 0;
-			
-			float prev_margin = 0;
-			i32 last_flow_child = -1;
-			i32 flow_count = 0;
-			for (row.to = i; row.to < parent.children.size(); ++row.to) {
-				Element& row_child = doc.m_elements[parent.children[row.to]];
-				if (row_child.position_mode == PositionMode::ABSOLUTE) continue;
-				if (!row_child.visible) continue;
-
-				float wtmp = row_child.size.x + maximum(prev_margin, row_child.margins.left);
-				bool overflow = row.free_width < wtmp + row_child.margins.right && parent.wrap;				
-				if (overflow || isInlineTag(row_child.tag)) break;
-
-				row.height = maximum(row.height, row_child.size.y + row_child.margins.top + row_child.margins.bottom);
-				row.free_width -= wtmp;
-				prev_margin = row_child.margins.right;
-				last_flow_child = row.to;
-				++flow_count;
-			}
-			if (flow_count == 0) continue;
-
-			row.free_width -= doc.m_elements[parent.children[last_flow_child]].margins.right;
-
+			const BoxRow row = measureBoxRow(doc, parent, i);
+			if (row.flow_count == 0) continue;
 			float x = start_x;
 			float space = 0;
 			switch (parent.justify_content) {
 				case JustifyContent::END: x += row.free_width; break;
 				case JustifyContent::CENTER: x += row.free_width / 2; break;
 				case JustifyContent::SPACE_BETWEEN:
-					if (flow_count > 1) space = row.free_width / (flow_count - 1);
+					if (row.flow_count > 1) space = row.free_width / (row.flow_count - 1);
 					break;
 				case JustifyContent::SPACE_AROUND: 
-					space = row.free_width / (flow_count + 1);
+					space = row.free_width / (row.flow_count + 1);
 					x += space;
 					break;
 				default: break;
 			}
 
-			prev_margin = 0;
-			for (i32 j = row.from; j < row.to; ++j) {
+			float prev_margin = 0;
+			for (i32 j = i; j < row.to; ++j) {
 				Element& row_child = doc.m_elements[parent.children[j]];
 				if (row_child.position_mode == PositionMode::ABSOLUTE) continue;
 				row_child.position.x = x + maximum(prev_margin, row_child.margins.left);
@@ -1315,7 +1311,23 @@ static void computeFitContentHeights(Document& doc, Element& elem) {
 	}
 	
 	if (elem.height_unit.unit == Unit::FIT_CONTENT && !isInlineTag(elem.tag)) {
-		if (elem.direction == Direction::ROW) {
+		if (elem.direction == Direction::ROW && elem.wrap) {
+			float height = 0;
+			for (u32 i = 0, n = elem.children.size(); i < n; ++i) {
+				const Element& child = doc.m_elements[elem.children[i]];
+				if (child.position_mode == PositionMode::ABSOLUTE || !child.visible) continue;
+				if (isInlineTag(child.tag)) {
+					height += computeInlineRunHeight(doc, elem, i);
+					while (i + 1 < n && isInlineTag(doc.m_elements[elem.children[i + 1]].tag)) ++i;
+				} else {
+					const BoxRow row = measureBoxRow(doc, elem, i);
+					if (row.flow_count == 0) continue;
+					height += row.height;
+					i = row.to - 1;
+				}
+			}
+			elem.size.y = height + elem.paddings.top + elem.paddings.bottom;
+		} else if (elem.direction == Direction::ROW) {
 			float max_height = 0;
 			for (u32 child_idx : elem.children) {
 				Element& child = doc.m_elements[child_idx];

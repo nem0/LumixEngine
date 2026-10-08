@@ -1210,6 +1210,70 @@ bool testHorizontalMarginCollapse() {
 	return true;
 }
 
+bool testWrappedRowFitContentHeight() {
+	// A fit-content grid must include every wrapped row in its own and its parent's height.
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box $panel width=200] {
+		[box $grid width=200 direction=row wrap=true] {
+			[box width=100 height=30] {}
+			[box width=100 height=30] {}
+			[box $second_row width=100 height=30] {}
+			[box width=100 height=30] {}
+		}
+		[box $footer width=200 height=10] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+
+	ui::Element* panel = doc.getElementByID("panel");
+	ui::Element* grid = doc.getElementByID("grid");
+	ui::Element* second_row = doc.getElementByID("second_row");
+	ui::Element* footer = doc.getElementByID("footer");
+	ASSERT_TRUE(panel && grid && second_row && footer);
+	ASSERT_FLOAT_EQ(0.0f, second_row->position.x);
+	ASSERT_FLOAT_EQ(30.0f, second_row->position.y);
+	ASSERT_FLOAT_EQ(60.0f, grid->size.y);
+	ASSERT_FLOAT_EQ(60.0f, footer->position.y);
+	ASSERT_FLOAT_EQ(70.0f, panel->size.y);
+
+	grid->setWidth("400");
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_FLOAT_EQ(30.0f, grid->size.y);
+	ASSERT_FLOAT_EQ(30.0f, footer->position.y);
+	ASSERT_FLOAT_EQ(40.0f, panel->size.y);
+	return true;
+}
+
+bool testWrappedRowFitContentHeightWithMarginsAndPadding() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box $panel width=210] {
+		[box $grid width=210 direction=row wrap=true padding=10] {
+			[box width=80 height=20 margin-left=5 margin-right=10 margin-top=2 margin-bottom=3] {}
+			[box width=80 height=30 margin-left=5 margin-right=10 margin-top=4 margin-bottom=6] {}
+			[box position=absolute width=1000 height=1000] {}
+			[box $second_row width=80 height=15 margin-left=5 margin-right=10 margin-top=1 margin-bottom=2] {}
+			[box width=80 height=300 visible=false] {}
+		}
+		[box $footer width=210 height=10] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+
+	ui::Element* panel = doc.getElementByID("panel");
+	ui::Element* grid = doc.getElementByID("grid");
+	ui::Element* second_row = doc.getElementByID("second_row");
+	ui::Element* footer = doc.getElementByID("footer");
+	ASSERT_TRUE(panel && grid && second_row && footer);
+	// Row heights are max(25, 40) and 18; vertical padding adds 20.
+	ASSERT_FLOAT_EQ(51.0f, second_row->position.y);
+	ASSERT_FLOAT_EQ(78.0f, grid->size.y);
+	ASSERT_FLOAT_EQ(78.0f, footer->position.y);
+	ASSERT_FLOAT_EQ(88.0f, panel->size.y);
+	return true;
+}
+
 bool testWrap() {
 	// Citation: layout.md - Wrapping
 	// "When `wrap=true`, elements that don't fit on the current line move to the next line (for `direction=row`)"
@@ -2345,6 +2409,8 @@ void runUILayoutTests() {
 	RUN_TEST(testTwoPanelsLayout);
 	RUN_TEST(testVerticalMarginCollapse);
 	RUN_TEST(testWrap);
+	RUN_TEST(testWrappedRowFitContentHeight);
+	RUN_TEST(testWrappedRowFitContentHeightWithMarginsAndPadding);
 	RUN_TEST(testWrapCrossAxisDistribution);
 	RUN_TEST(testWrappingInheritance);
 }

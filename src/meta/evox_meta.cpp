@@ -1,5 +1,6 @@
 #include "meta.h"
 #include <stdio.h>
+#include <string.h>
 
 #define OUT_ENDL "\r\n"
 #define L(...) out.add(__VA_ARGS__, OUT_ENDL)
@@ -646,6 +647,7 @@ void appendReturnValue(OutputStream& out, StringView type, const char* value, co
 }
 
 bool isSupportedEvoxFunction(Function& f) {
+	if (f.script_hidden) return false;
 	const EvoxType ret_type = getEvoxType(f.return_type);
 	if (!isSupportedEvoxType(f.return_type, ret_type)) return false;
 	if (ret_type == EvoxType::OBJECT_T && !isObjectPointerType(f.return_type) && !isReferenceType(f.return_type)) return false;
@@ -667,6 +669,7 @@ bool isSupportedEvoxPropertyArg(const Arg& arg) {
 }
 
 bool isSupportedEvoxPropertyGetter(Property& p) {
+	if (p.getter_hidden) return false;
 	if (!p.is_var && p.getter_name.size() == 0) return false;
 	const EvoxType type = getEvoxType(p.type);
 	if (!isSupportedEvoxType(p.type, type)) return false;
@@ -678,6 +681,7 @@ bool isSupportedEvoxPropertyGetter(Property& p) {
 }
 
 bool isSupportedEvoxPropertySetter(Property& p) {
+	if (p.setter_hidden) return false;
 	if (!p.is_var && p.setter_name.size() == 0) return false;
 	bool supported = true;
 	forEachArg(p.setter_args, [&](const Arg& arg, bool) {
@@ -1882,6 +1886,8 @@ void serializeCoreImports(MetaData& data) {
 				if (type.begin[0] == '?') type = {type.begin + 1, type.end};
 				if (isSpanType(type)) type = spanElementBaseType(type);
 				const EvoxType import_type = getEvoxType(type);
+				// Entity, EntityRef and EntityPtr all import core:entity (like the module scripts): one import line
+				if (import_type == EvoxType::ENTITY_T) type = makeStringView("EntityRef");
 				if (import_type != EvoxType::VEC2_T && import_type != EvoxType::VEC3_T && import_type != EvoxType::DVEC3_T && import_type != EvoxType::VEC4_T &&
 					import_type != EvoxType::COLOR_T && import_type != EvoxType::QUAT_T && import_type != EvoxType::ENTITY_T && import_type != EvoxType::ENUM_T &&
 					import_type != EvoxType::STRUCT_T && import_type != EvoxType::OBJECT_T && !isWrappedAlias(type))
@@ -1980,8 +1986,70 @@ void serializeCoreImports(MetaData& data) {
 	}
 }
 
+// Script names must be unique within a component (module, object): the declaration file and the native function table are both keyed by name, so a second
+// function with the same name is rejected by the compiler and would shadow the first one at runtime. This happens, for example, when `//@ function alias X`
+// names a function like a property accessor. Entries are claimed in emission order (functions, then property getters and setters); a later entry with a name that is
+// already taken is reported and hidden from every evox output.
+struct ScriptNames {
+	static constexpr int MAX_NAMES = 256;
+	static constexpr int MAX_LEN = 96;
+	char names[MAX_NAMES][MAX_LEN];
+	int lengths[MAX_NAMES];
+	int count = 0;
+
+	void clear() { count = 0; }
+	bool claim(const char* name, int len) {
+		if (len >= MAX_LEN) len = MAX_LEN - 1;
+		for (int i = 0; i < count; ++i) {
+			if (lengths[i] == len && memcmp(names[i], name, len) == 0) return false;
+		}
+		if (count == MAX_NAMES) return true;
+		memcpy(names[count], name, len);
+		lengths[count] = len;
+		++count;
+		return true;
+	}
+};
+
+void hideCollidingScriptNames(MetaData& data) {
+	static ScriptNames names;
+	OutputStream name_out;
+	auto claimFunction = [&](const char* scope, StringView owner, Function& f) {
+		if (!isSupportedEvoxFunction(f)) return;
+		const StringView name = functionScriptName(f);
+		if (names.claim(name.begin, name.size())) return;
+		f.script_hidden = true;
+		logInfo("Evox: warning: ignored ", scope, " ", owner, ".", name, " because another ", scope, " member already has the script name '", name, "'");
+	};
+	auto claimAccessor = [&](StringView owner, Property& p, bool is_setter) {
+		name_out.length = 0;
+		appendPropertyScriptName(name_out, p, is_setter);
+		if (names.claim(name_out.data, name_out.length)) return;
+		(is_setter ? p.setter_hidden : p.getter_hidden) = true;
+		logInfo("Evox: warning: ignored ", is_setter ? "setter" : "getter", " of property ", owner, ".", p.name, " because another member already has the script name '",
+			StringView{name_out.data, name_out.data + name_out.length}, "'");
+	};
+	for (Object& o : data.objects) {
+		names.clear();
+		for (Function& f : o.functions) claimFunction("object function", o.name, f);
+	}
+	for (Module& m : data.modules) {
+		names.clear();
+		for (Function& f : m.functions) claimFunction("module function", m.id, f);
+		for (Component& c : m.components) {
+			names.clear();
+			for (Function& f : c.functions) claimFunction("component function", c.id, f);
+			for (Property& p : c.properties) {
+				if (isSupportedEvoxPropertyGetter(p)) claimAccessor(c.id, p, false);
+				if (isSupportedEvoxPropertySetter(p)) claimAccessor(c.id, p, true);
+			}
+		}
+	}
+}
+
 void serializeEvoxMeta(MetaData& data) {
 	g_meta_data = &data;
+	hideCollidingScriptNames(data);
 	for (Object& o : data.objects) {
 		for (Function& f : o.functions) {
 			if (hasUnsupportedEvoxFunctionArg(f)) {
