@@ -1845,6 +1845,9 @@ struct EvoxPlugin : StudioApp::IPlugin {
 		g_show_evox_symbols.shortcut = os::Keycode::CTRL | os::Keycode::Q;
 		m_app.getAssetBrowser().addPlugin(m_asset_plugin, Span(evox_exts));
 		m_app.getAssetCompiler().addPlugin(m_asset_plugin, Span(evox_exts));
+		// main.evox compiles render.evox as a second root. Its import scan only runs when main.evox changes, so the edge is registered
+		// here, otherwise a change to render.evox (or to a file it imports) would not recompile main.evox after a restart.
+		m_app.getAssetCompiler().registerDependency(Path(EVOX_MAIN_PATH), Path(EVOX_RENDER_PATH));
 		m_app.registerComponent("", "evox", *m_add_data_plugin);
 		m_app.getPropertyGrid().addPlugin(m_property_grid_plugin);
 		m_app.addPlugin(m_debugger);
