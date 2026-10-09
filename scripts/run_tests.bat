@@ -40,7 +40,7 @@ if defined VSINSTALL (
 )
 
 echo Using MSBuild: %msbuild_cmd%
-"%msbuild_cmd%" "tmp\vs2022\tests.vcxproj" /p:Configuration=Debug /p:Platform=x64 /verbosity:minimal
+"%msbuild_cmd%" "tmp\vs2022\tests.vcxproj" /m /p:Configuration=Debug /p:Platform=x64 /verbosity:minimal
 if not %errorlevel%==0 (
   echo Build failed.
   popd

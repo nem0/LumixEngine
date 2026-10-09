@@ -176,7 +176,7 @@ workspace "LumixEngine"
 	filter "action:vs*"
 		defines { "_HAS_EXCEPTIONS=0", "_SILENCE_ALL_CXX20_DEPRECATION_WARNINGS" }
 		-- /FS: parallel cl.exe processes share one pdb per project
-		buildoptions { "/Zc:char8_t-", "/FS" }
+		buildoptions { "/Zc:char8_t-", "/FS", "/MP" }
 
 	filter { "action:vs*", "configurations:RelWithDebInfo" }
 		buffersecuritycheck "Off"
@@ -242,10 +242,6 @@ beginProject(ENGINE_NAME, LIB_KIND)
 		-- evoxc is the command line compiler, tests and benchmarks are not part of the library
 		"../external/evox/evoxc.c", "../external/evox/tests/*.cpp", "../external/evox/benchmarks/**.*"
 	}
-	-- EVOX is always optimized, so script compilation is fast in every configuration
-	filter "files:../external/evox/**"
-		optimize "On"
-	filter {}
 	filter "system:linux"
 		buildoptions { "`pkg-config --cflags gtk+-3.0`" }
 	filter {}
