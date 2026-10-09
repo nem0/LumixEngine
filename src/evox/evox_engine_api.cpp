@@ -556,6 +556,30 @@ static void evox_entity_getParent(ex_runtime*, ex_call_frame frame) {
 	EX_RESULT(frame, ExEntity(parent.index, entity.world));
 }
 
+static void evox_entity_setParent(ex_runtime*, ex_call_frame frame) {
+	const ExEntity child = readArg<ExEntity>(frame);
+	EX_ARG(frame, u8, has_parent);
+	const ExEntity parent = readArg<ExEntity>(frame);
+	if (!evox_entity_isValid(child) || (has_parent && (!evox_entity_isValid(parent) || parent.world != child.world))) {
+		panic(frame, "Invalid hierarchy entity");
+		return;
+	}
+	if (has_parent && (parent.index == child.index || child.world->isDescendant(EntityRef{child.index}, EntityRef{parent.index}))) {
+		panic(frame, "Hierarchy can not contain a cycle");
+		return;
+	}
+	child.world->setParent(has_parent ? EntityPtr{parent.index} : INVALID_ENTITY, EntityRef{child.index});
+}
+
+static void evox_entity_setTransform(ExEntity entity, double x, double y, double z, float qx, float qy, float qz, float qw) {
+	entity.world->setTransform(EntityRef{entity.index}, RigidTransform(DVec3(x, y, z), Quat(qx, qy, qz, qw)));
+}
+
+static void evox_entity_setLocalTransform(ExEntity entity, double x, double y, double z, float qx, float qy, float qz, float qw) {
+	const EntityRef ref{entity.index};
+	entity.world->setLocalTransform(ref, Transform(DVec3(x, y, z), Quat(qx, qy, qz, qw), entity.world->getLocalScale(ref)));
+}
+
 static void evox_entity_destroy(ExEntity entity) {
 	entity.world->destroyEntity(EntityRef{entity.index});
 }
@@ -762,6 +786,9 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	functions.insert({"core:entity", "getFirstChild"}, &evox_entity_getFirstChild);
 	functions.insert({"core:entity", "getNextSibling"}, &evox_entity_getNextSibling);
 	functions.insert({"core:entity", "getParent"}, &evox_entity_getParent);
+	functions.insert({"core:entity", "setParent"}, &evox_entity_setParent);
+	functions.insert({"core:entity", "setTransform"}, &wrap<evox_entity_setTransform>);
+	functions.insert({"core:entity", "setLocalTransform"}, &wrap<evox_entity_setLocalTransform>);
 	// world
 	functions.insert({"core:world", "createEntity"}, &wrap<evox_world_createEntity>);
 	functions.insert({"core:world", "destroyEntity"}, &evox_world_destroyEntity);

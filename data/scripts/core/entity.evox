@@ -20,6 +20,10 @@ extern fn findChildByName(e: Entity, child_name : []const u8) : ?Entity;
 extern fn getFirstChild(e : Entity) : ?Entity;
 extern fn getNextSibling(e : Entity) : ?Entity;
 extern fn getParent(e : Entity) : ?Entity;
+// setParent preserves the world pose; setLocalTransform sets the pose relative to its parent.
+extern fn setParent(e : Entity, parent : ?Entity) : void;
+extern fn setTransform(e : Entity, position : DVec3, rotation : Quat) : void;
+extern fn setLocalTransform(e : Entity, position : DVec3, rotation : Quat) : void;
 
 struct ChildrenIterator {
 	next : fn(iter : *ChildrenIterator, out : *Entity) : bool;
