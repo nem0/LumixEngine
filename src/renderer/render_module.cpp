@@ -3013,6 +3013,9 @@ struct RenderModuleImpl final : RenderModule {
 		if (r.mesh_materials.size() == 0) {
 			r.mesh_materials = r.model->getMeshMaterials();
 		}
+		else {
+			ensureMaterialDataSize(r, r.mesh_count);
+		}
 
 		if (r.flags & ModelInstance::IS_BONE_ATTACHMENT_PARENT) {
 			for (auto& attachment : m_bone_attachments) {
