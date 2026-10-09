@@ -583,8 +583,8 @@ bool Document::parseStyleBlock() {
 			switch (token.type) {
 				case Token::DOLLAR:
 				case Token::IDENTIFIER:
-					ASSERT(false); // TODO
-					break;
+					error(token.value, m_tokenizer, "unsupported selector, got ", tokenTypeToString(token.type));
+					return false;
 				case Token::COLON:
 				case Token::DOT: {
 					Token id_token;
