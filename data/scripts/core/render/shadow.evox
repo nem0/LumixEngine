@@ -1,0 +1,42 @@
+import "core:render"
+
+// Shadow maps of the main light, port of Pipeline::shadowPass. Returns the shadow map.
+fn shadowPass(ctx : Context) : RenderBuffer {
+	ctx.beginStatsBlock("shadow pass_evox");
+	if not ctx.shadowsEnabled() {
+		// the light pass still samples a shadow map, give it an empty one
+		const empty = ctx.createDepthBuffer(1, 1);
+		ctx.setDepthTarget(empty);
+		ctx.clearTargets(.DEPTH, 0.0, 0.0, 0.0, 0.0, 0.0);
+		ctx.barrierRead(empty);
+		ctx.endBlock();
+		return empty;
+	}
+
+	const shadowmap = ctx.createDepthBuffer(4096, 1024);
+	ctx.setDepthTarget(shadowmap);
+	ctx.clearTargets(.DEPTH, 0.0, 0.0, 0.0, 0.0, 0.0);
+
+	const bucket_state = stateBits(.DEPTH_FUNCTION, .DEPTH_WRITE);
+	const shadow_state = bucket_state + (StateFlags.CULL_BACK as u64);
+	var slice : u32 = 0;
+	while slice < 4 {
+		const camera = ctx.shadowCamera(slice);
+		ctx.viewport(slice * 1024, 0, 1024, 1024);
+		ctx.pass(camera);
+
+		ctx.addBucket("default", "DEPTH", .DEFAULT, bucket_state);
+		ctx.addBucket("impostor", "DEPTH", .DEFAULT, bucket_state);
+		const view = ctx.cull(camera);
+		ctx.renderBucket(view, 0);
+		ctx.renderBucket(view, 1);
+
+		ctx.renderGrass(camera, shadow_state, "GRASS DEPTH");
+		ctx.renderTerrains(camera, shadow_state, "DEPTH");
+		slice = slice + 1;
+	}
+	ctx.endBlock();
+	ctx.barrierRead(shadowmap);
+	return shadowmap;
+}
+

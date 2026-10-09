@@ -21,6 +21,7 @@
 #include "engine/file_system.h"
 #include "engine/resource_manager.h"
 #include "engine/world.h"
+#include "evox_render.h"
 #include "font.h"
 #include "gpu/gpu.h"
 #include "material.h"
@@ -596,14 +597,10 @@ struct PipelineImpl final : Pipeline {
 	{
 		m_viewport.w = m_viewport.h = 800;
 		ResourceManagerHub& rm = renderer.getEngine().getResourceManager();
-		m_tonemap_shader = rm.load<Shader>(Path("engine/shaders/tonemap.hlsl"));
 		m_blit_shader = rm.load<Shader>(Path("engine/shaders/blit.hlsl"));
-		m_lighting_shader = rm.load<Shader>(Path("engine/shaders/lighting.hlsl"));
 		m_draw2d_shader = rm.load<Shader>(Path("engine/shaders/draw2d.hlsl"));
 		m_downscale_depth_shader = rm.load<Shader>(Path("engine/shaders/downscale_depth.hlsl"));
 		m_debug_shape_shader = rm.load<Shader>(Path("engine/shaders/debug_shape.hlsl"));
-		m_debug_clusters_shader = rm.load<Shader>(Path("engine/shaders/debug_clusters.hlsl"));
-		m_debug_velocity_shader = rm.load<Shader>(Path("engine/shaders/debug_velocity.hlsl"));
 		m_instancing_shader = rm.load<Shader>(Path("engine/shaders/instancing.hlsl"));
 		m_flatten_shader = rm.load<Shader>(Path("engine/shaders/flatten_cube.hlsl"));
 		
@@ -686,14 +683,10 @@ struct PipelineImpl final : Pipeline {
 		for (gpu::TextureHandle t : m_textures) stream.destroy(t);
 		for (gpu::BufferHandle b : m_buffers) stream.destroy(b);
 
-		m_tonemap_shader->decRefCount();
 		m_blit_shader->decRefCount();
-		m_lighting_shader->decRefCount();
 		m_draw2d_shader->decRefCount();
 		m_downscale_depth_shader->decRefCount();
 		m_debug_shape_shader->decRefCount();
-		m_debug_clusters_shader->decRefCount();
-		m_debug_velocity_shader->decRefCount();
 		m_instancing_shader->decRefCount();
 		m_flatten_shader->decRefCount();
 
@@ -717,6 +710,8 @@ struct PipelineImpl final : Pipeline {
 	}
 
 	void setClearColor(Vec3 color) override { m_clear_color = color; }
+	Vec3 getClearColor() const override { return m_clear_color; }
+	gpu::BindlessHandle getShadowAtlasBindless() const override { return m_shadow_atlas.texture ? gpu::getBindlessHandle(m_shadow_atlas.texture) : gpu::INVALID_BINDLESS_HANDLE; }
 
 	void setViewport(const Viewport& viewport) override 
 	{
@@ -1162,38 +1157,7 @@ struct PipelineImpl final : Pipeline {
 		stream.dispatch(x, y, z);
 	}
 
-	RenderBufferHandle tonemap(GBuffer gbuffer, RenderBufferHandle input) {
-		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
-			RenderBufferHandle tonemapped;
-			if (plugin->tonemap(input, tonemapped, *this)) {
-				m_renderer.releaseRenderbuffer(input);
-				return tonemapped;
-			}
-		}
-
-		beginBlock("tonemap");
-		const IVec2 display_size = getDisplaySize();
-		const RenderBufferHandle rb = m_renderer.createRenderbuffer({
-			.size = display_size,
-			.format = gpu::TextureFormat::SRGBA,
-			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE,
-			.debug_name = "tonemap"
-		});
-		DrawStream& stream = m_renderer.getDrawStream();
-		struct {
-			gpu::BindlessHandle input;
-		} ubdata {
-			toBindless(input, stream),
-		};
-		setUniform(ubdata);
-		m_renderer.setRenderTargets(Span(&rb, 1));
-		drawArray(0, 3, *m_tonemap_shader, 0, gpu::StateFlags::NONE);
-		endBlock();
-		m_renderer.releaseRenderbuffer(input);
-		return rb;
-	}
-
-	CameraParams getShadowCamera(u32 slice) const {
+	CameraParams getShadowCamera(u32 slice) const override {
 		const Viewport& vp = m_shadow_camera_viewports[slice];
 		CameraParams cp;
 		cp.pos = vp.pos;
@@ -1205,7 +1169,11 @@ struct PipelineImpl final : Pipeline {
 		return cp;
 	}
 
-	CameraParams getMainCamera() const {
+	u32 getBucketCount(u32 view_idx) const override {
+		return view_idx < (u32)m_views.size() ? (u32)m_views[view_idx]->buckets.size() : 0;
+	}
+
+	CameraParams getMainCamera() const override {
 		CameraParams cp;
 		cp.pos = m_viewport.pos;
 		cp.frustum = m_viewport.getFrustum();
@@ -1214,219 +1182,6 @@ struct PipelineImpl final : Pipeline {
 		cp.view = m_viewport.getView(cp.pos);
 		cp.projection = m_viewport.getProjectionWithJitter();
 		return cp;
-	}
-
-	RenderBufferHandle shadowPass() {
-		PROFILE_FUNCTION();
-		beginBlock("shadow pass", true);
-		DrawStream& stream = m_renderer.getDrawStream();
-
-		const BucketDesc buckets[] = {
-			{.layer = "default", .define = "DEPTH" },
-			{.layer = "impostor", .define = "DEPTH", }
-		};
-
-		bool cast_shadows = true;
-		EntityPtr env = m_module->getActiveEnvironment();
-		if (env.isValid()) {
-			cast_shadows = isFlagSet(m_module->getEnvironment(*env).flags, Environment::CAST_SHADOWS);
-		}
-
-		if (!cast_shadows) {
-			const RenderBufferHandle shadowmap_rb = m_renderer.createRenderbuffer({
-				.size = {1, 1},
-				.format = gpu::TextureFormat::D32,
-				.debug_name = "shadowmap"
-			});
-			m_renderer.setRenderTargets({}, shadowmap_rb);
-			clear(gpu::ClearFlags::DEPTH, 0, 0, 0, 0, 0);
-			stream.barrier(m_renderer.toTexture(shadowmap_rb), gpu::BarrierType::READ);
-			endBlock();
-			return shadowmap_rb;
-		}
-
-		const RenderBufferHandle shadowmap_rb = m_renderer.createRenderbuffer({
-			.size = {4096, 1024},
-			.format = gpu::TextureFormat::D32,
-			.debug_name = "shadowmap"
-			});
-		m_renderer.setRenderTargets({}, shadowmap_rb);
-		clear(gpu::ClearFlags::DEPTH, 0, 0, 0, 0, 0);
-
-		for (u32 slice = 0; slice < 4; ++slice) {
-			PROFILE_BLOCK("slice");
-			CameraParams view_params = getShadowCamera(slice);
-			stream.viewport(slice * 1024, 0, 1024, 1024);
-			pass(view_params);
-
-			u32 shadow_view = cull(view_params, Span(buckets));
-
-			renderBucket(shadow_view, 0);
-			renderBucket(shadow_view, 1);
-
-			const u32 grass_depth_defines = 1 << m_renderer.getShaderDefineIdx("GRASS") | 1 << m_renderer.getShaderDefineIdx("DEPTH");
-			const gpu::StateFlags shadow_state = gpu::StateFlags::DEPTH_FUNCTION | gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::CULL_BACK;
-			renderGrass(view_params, shadow_state, grass_depth_defines);
-			renderTerrains(view_params, shadow_state, "DEPTH");
-		}
-		endBlock();
-		stream.barrier(m_renderer.toTexture(shadowmap_rb), gpu::BarrierType::READ);
-		return shadowmap_rb;
-	}
-
-	GBuffer geomPass(u32& view_idx) {
-		PROFILE_FUNCTION();
-		GBuffer gbuffer;
-		DrawStream& stream = m_renderer.getDrawStream();
-		beginBlock("geom pass", true);
-		const gpu::TextureFlags flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE;
-		gbuffer.A = m_renderer.createRenderbuffer({ .size = {m_viewport.w, m_viewport.h}, .format = gpu::TextureFormat::SRGBA, .debug_name = "gbufferA" });
-		gbuffer.B = m_renderer.createRenderbuffer({ .size = {m_viewport.w, m_viewport.h}, .format = gpu::TextureFormat::RGBA16, .flags = flags, .debug_name = "gbufferB" });
-		gbuffer.C = m_renderer.createRenderbuffer({ .size = {m_viewport.w, m_viewport.h}, .format = gpu::TextureFormat::RGBA8, .flags = flags, .debug_name = "gbufferC" });
-		gbuffer.D = m_renderer.createRenderbuffer({ .size = {m_viewport.w, m_viewport.h}, .format = gpu::TextureFormat::RG16F, .flags = flags, .debug_name = "gbufferD" });
-		gbuffer.DS = m_renderer.createRenderbuffer({ .size = {m_viewport.w, m_viewport.h}, .format = gpu::TextureFormat::D24S8, .debug_name = "gbufferDS" });
-
-		const CameraParams cp = getMainCamera();
-		pass(cp);
-		const RenderBufferHandle gbuffer_rbs[] = { gbuffer.A, gbuffer.B, gbuffer.C, gbuffer.D };
-		m_renderer.setRenderTargets(Span(gbuffer_rbs), gbuffer.DS);
-		// TODO clear only depth?
-		// TODO refactor so we don't need setRenderTargets before clear
-		clear(gpu::ClearFlags::ALL, 0, 0, 0, 0, 0);
-
-		const gpu::StateFlags default_state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FUNCTION | gpu::getStencilStateBits(0xff, gpu::StencilFuncs::ALWAYS, 1, 0xff, gpu::StencilOps::KEEP, gpu::StencilOps::KEEP, gpu::StencilOps::REPLACE);
-		const BucketDesc buckets[] = {
-			{
-				.layer = "default",
-				.define = "DEFERRED",
-				.state = default_state
-			},
-			{
-				.layer = "water",
-				.sort = BucketDesc::Sort::DEPTH,
-				.state = gpu::StateFlags::DEPTH_FUNCTION
-			},
-			{
-				.layer = "transparent",
-				.sort = BucketDesc::Sort::DEPTH,
-				.state = gpu::StateFlags::DEPTH_FUNCTION | gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA)
-			},
-			{
-				.layer = "decal",
-				.state = gpu::StateFlags::DEPTH_FUNCTION | gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA)
-			},
-			{
-				.layer = "impostor",
-				.define = "DEFERRED",
-				.state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FUNCTION | gpu::getStencilStateBits(0xff, gpu::StencilFuncs::ALWAYS, 1, 0xff, gpu::StencilOps::KEEP, gpu::StencilOps::KEEP, gpu::StencilOps::REPLACE)
-			},
-		};
-
-		view_idx = cull(cp, buckets);
-		const gpu::StateFlags terrain_state = gpu::StateFlags::DEPTH_WRITE 
-			| gpu::StateFlags::DEPTH_FUNCTION 
-			| gpu::getStencilStateBits(0xff, gpu::StencilFuncs::ALWAYS, 2, 0xff, gpu::StencilOps::KEEP, gpu::StencilOps::KEEP, gpu::StencilOps::REPLACE);
-		renderTerrains(cp, terrain_state, "DEFERRED");
-		renderBucket(view_idx, 0);
-		renderBucket(view_idx, 4);
-		renderGrass(cp, default_state);
-
-		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
-			plugin->renderOpaque(*this);
-		}
-		endBlock();
-
-
-		beginBlock("decals");
-		m_renderer.setRenderTargets(Span(gbuffer_rbs), gbuffer.DS, gpu::FramebufferFlags::READONLY_DEPTH_STENCIL);
-		setUniform(toBindless(gbuffer.DS, stream));
-		renderBucket(view_idx, 3);
-		endBlock();
-
-		return gbuffer;
-	}
-
-	void transparentPass(GBuffer gbuffer, RenderBufferHandle shadowmap, RenderBufferHandle hdr_rb, u32 view_idx) {
-		PROFILE_FUNCTION();
-		beginBlock("water");
-		const RenderBufferHandle color_copy = m_renderer.createRenderbuffer({
-			.size = {m_viewport.w, m_viewport.h},
-			.format = gpu::TextureFormat::R11G11B10F,
-			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE,
-			.debug_name = "hdr_copy"
-			});
-
-		DrawStream& stream = m_renderer.getDrawStream();
-		pass(getMainCamera());
-		const IVec2 size = {m_viewport.w, m_viewport.h};
-		blit(toBindless(hdr_rb, stream), toRWBindless(color_copy, stream), size, false, false);
-
-		m_renderer.setRenderTargets(Span(&hdr_rb, 1), gbuffer.DS, gpu::FramebufferFlags::READONLY_DEPTH);
-
-		gpu::TextureHandle reflection_probes = m_module->getReflectionProbesTexture();
-		const gpu::BindlessHandle water_textures[] = { 
-			toBindless(shadowmap, stream), 
-			toBindless(gbuffer.DS, stream), 
-			gpu::getBindlessHandle(reflection_probes), 
-			toBindless(color_copy, stream)
-		};
-		setUniform(water_textures, UniformBuffer::DRAWCALL2);
-		renderBucket(view_idx, 1);
-		endBlock();
-
-		// TODO can we marge water + transparent pass?
-		beginBlock("transparent_pass");
-		m_renderer.setRenderTargets(Span(&hdr_rb, 1), gbuffer.DS, gpu::FramebufferFlags::READONLY_DEPTH);
-		const gpu::BindlessHandle transparent_pass_textures[] = { 
-			toBindless(shadowmap, stream), 
-			toBindless(gbuffer.DS, stream), 
-			gpu::getBindlessHandle(reflection_probes), 
-			toBindless(color_copy, stream) };
-		setUniform(transparent_pass_textures, UniformBuffer::DRAWCALL2);
-		pass(getMainCamera());
-		renderBucket(view_idx, 2);
-
-		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
-			plugin->renderTransparent(*this);
-		}
-
-		m_renderer.releaseRenderbuffer(color_copy);
-
-		endBlock();
-	}
-
-	RenderBufferHandle lightPass(GBuffer gbuffer, RenderBufferHandle shadowmap) {
-		PROFILE_FUNCTION();
-		DrawStream& stream = m_renderer.getDrawStream();
-		// stream.barrierRead(m_shadow_atlas.texture); // TODO do we need this?
-
-		beginBlock("light pass");
-		const bool is_probe = m_type == PipelineType::PROBE;
-		const RenderBufferHandle hdr_rb = m_renderer.createRenderbuffer({
-			.size = {m_viewport.w, m_viewport.h}, 
-			.format = is_probe ? gpu::TextureFormat::RGBA32F : gpu::TextureFormat::RGBA16F, 
-			.flags = gpu::TextureFlags::RENDER_TARGET | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE,
-			.debug_name = "hdr" });
-
-		m_renderer.setRenderTargets(Span(&hdr_rb, 1));
-		clear(gpu::ClearFlags::ALL, m_clear_color.x, m_clear_color.y, m_clear_color.z, 0, 0);
-
-		m_renderer.setRenderTargets(Span(&hdr_rb, 1), gbuffer.DS, gpu::FramebufferFlags::READONLY_DEPTH);
-		gpu::TextureHandle reflection_probes = m_module->getReflectionProbesTexture();
-		const gpu::BindlessHandle ubdata[] = { toBindless(gbuffer.A, stream)
-			, toBindless(gbuffer.B, stream)
-			, toBindless(gbuffer.C, stream)
-			, toBindless(gbuffer.D, stream)
-			, toBindless(gbuffer.DS, stream)
-			, toBindless(shadowmap, stream)
-			, m_shadow_atlas.texture ? gpu::getBindlessHandle(m_shadow_atlas.texture) : gpu::INVALID_BINDLESS_HANDLE
-			, gpu::getBindlessHandle(reflection_probes)
-		};
-		setUniform(ubdata);
-		gpu::StateFlags stencil_state = gpu::getStencilStateBits(0, gpu::StencilFuncs::NOT_EQUAL, 0, 0xff, gpu::StencilOps::KEEP, gpu::StencilOps::KEEP, gpu::StencilOps::REPLACE);
-		drawArray(0, 3, *m_lighting_shader, 0, stencil_state);
-		endBlock();
-		return hdr_rb;
 	}
 
 	void copy(RenderBufferHandle dst, RenderBufferHandle src, IVec2 size, Vec4 r = Vec4(1, 0, 0, 0), Vec4 g = Vec4(0, 1, 0, 0), Vec4 b = Vec4(0, 0, 1, 0)) override {
@@ -1454,62 +1209,6 @@ struct PipelineImpl final : Pipeline {
 		copy_ub.dst = toRWBindless(dst, stream);
 		setUniform(copy_ub);
 		dispatch(*m_blit_shader, (size.x + 15) / 16, (size.y + 15) / 16, 1);
-	}
-
-	bool debugOutput(GBuffer gbuffer, RenderBufferHandle result) {
-		const IVec2 size = {m_viewport.w, m_viewport.h};
-		if (m_debug_show == DebugShow::ALBEDO) {
-			copy(result, gbuffer.A, size);
-			return true;
-		}
-		if (m_debug_show == DebugShow::NORMAL) {
-			copy(result, gbuffer.B, size, {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 0});
-			return true;
-		}
-		if (m_debug_show == DebugShow::VELOCITY) {
-			DrawStream& stream = m_renderer.getDrawStream();
-			struct {
-				gpu::BindlessHandle depth;
-				gpu::RWBindlessHandle output;
-			} ub {
-				toBindless(gbuffer.D, stream),
-				toRWBindless(result, stream)
-			};
-			setUniform(ub);
-			dispatch(*m_debug_velocity_shader, (m_viewport.w + 15) / 16, (m_viewport.h + 15) / 16, 1);
-			return true;
-		}
-		if (m_debug_show == DebugShow::LIGHT_CLUSTERS || m_debug_show == DebugShow::PROBE_CLUSTERS) {	
-			DrawStream& stream = m_renderer.getDrawStream();
-			struct {
-				gpu::BindlessHandle depth;
-				gpu::RWBindlessHandle output;
-			} ub {
-				toBindless(gbuffer.DS, stream),
-				toRWBindless(result, stream)
-			};
-			setUniform(ub);
-			dispatch(*m_debug_clusters_shader, (m_viewport.w + 15) / 16, (m_viewport.h + 15) / 16, 1, m_debug_show == DebugShow::LIGHT_CLUSTERS  ? "LIGHTS" : nullptr);
-			return true;
-		}
-		if (m_debug_show == DebugShow::ROUGHNESS) {
-			copy(result, gbuffer.A, size, { 0, 0, 0, 1 }, { 0, 0, 0, 1 }, { 0, 0, 0, 1 });
-			return true;
-		}
-		if (m_debug_show == DebugShow::METALLIC) {
-			copy(result, gbuffer.C, size, { 0, 0, 1, 0 }, { 0, 0, 1, 0 }, { 0, 0, 1, 0 });
-			return true;
-		}
-		if (m_debug_show == DebugShow::AO) {
-			copy(result, gbuffer.B, size, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 1});
-			return true;
-		}
-
-		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
-			if (plugin->debugOutput(result, *this)) return true;
-		}
-
-		return false;
 	}
 
 	gpu::BindlessHandle toBindless(RenderBufferHandle rb_idx, DrawStream& stream) override { 
@@ -1587,83 +1286,34 @@ struct PipelineImpl final : Pipeline {
 		m_output = rb;
 	}
 
-	void renderMain() {
-		DrawStream& stream = m_renderer.getDrawStream();
+	void beginFrame3D() override {
 		m_sort_keys_group.begin();
-		fillClusters(stream, getMainCamera());
-
+		fillClusters(m_renderer.getDrawStream(), getMainCamera());
 		m_renderer.releaseRenderbuffer(m_output);
-		UniformPool& uniform_pool = m_renderer.getUniformPool();
-
-		const RenderBufferHandle shadowmap = shadowPass();
-		
+		m_output = INVALID_RENDERBUFFER;
 		m_downscaled_depth = INVALID_RENDERBUFFER;
+	}
+
+	void bindGlobalState(RenderBufferHandle shadowmap) override {
+		DrawStream& stream = m_renderer.getDrawStream();
 		m_global_state.shadowmap_bindless = toBindless(shadowmap, stream);
-	 	TransientSlice gsb = alloc(uniform_pool, &m_global_state, sizeof(GlobalState));
+		TransientSlice gsb = alloc(m_renderer.getUniformPool(), &m_global_state, sizeof(GlobalState));
 		stream.bindUniformBuffer(UniformBuffer::GLOBAL, gsb.buffer, gsb.offset, sizeof(GlobalState));
-		
-		u32 view_idx;
-		GBuffer gbuffer = geomPass(view_idx);
+	}
 
-		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
-			plugin->renderBeforeLightPass(gbuffer, *this);
-		}
-
-		RenderBufferHandle result = lightPass(gbuffer, shadowmap);
-		
-		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
-			result = plugin->renderBeforeTransparent(gbuffer, result, *this);
-		}
-		transparentPass(gbuffer, shadowmap, result, view_idx);
-
-		if (m_type == PipelineType::PROBE) {
-			m_sort_keys_group.end();
-			m_sort_keys_group.wait();
-			m_renderer.releaseRenderbuffer(gbuffer.A);
-			m_renderer.releaseRenderbuffer(gbuffer.B);
-			m_renderer.releaseRenderbuffer(gbuffer.C);
-			m_renderer.releaseRenderbuffer(gbuffer.D);
-			m_renderer.releaseRenderbuffer(gbuffer.DS);
-			m_renderer.releaseRenderbuffer(shadowmap);
-			m_output = result;
-			return;
-		}
-
-		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
-			RenderBufferHandle rb = plugin->renderAA(gbuffer, result, *this);
-			if (rb != INVALID_RENDERBUFFER) {
-				result = rb;
-				break;
-			}
-		}
-		
-		const bool is_debug_output = debugOutput(gbuffer, result);
-
-		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
-			result = plugin->renderBeforeTonemap(gbuffer, result, *this);
-		}
-		renderDebugShapes(result, gbuffer.DS);
-		if (!is_debug_output) {
-			result = tonemap(gbuffer, result);
-		}
-
-		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
-			result = plugin->renderAfterTonemap(gbuffer, result, *this);
-		}
-
-		render2D(result);
-
+	void endFrame3D() override {
 		m_sort_keys_group.end();
 		m_sort_keys_group.wait();
+	}
 
-		m_renderer.releaseRenderbuffer(gbuffer.A);
-		m_renderer.releaseRenderbuffer(gbuffer.B);
-		m_renderer.releaseRenderbuffer(gbuffer.C);
-		m_renderer.releaseRenderbuffer(gbuffer.D);
-		m_renderer.releaseRenderbuffer(gbuffer.DS);
-		m_renderer.releaseRenderbuffer(shadowmap);
-
-		m_output = result;
+	// The 3D frame is a script (render.evox, core:render/frame). Without it (e.g. while the scripts are still compiling) only the UI is drawn.
+	void renderMain() {
+		RenderBufferHandle output;
+		if (m_renderer.getRenderScript().renderFrame(output, *this)) {
+			m_output = output;
+			return;
+		}
+		render2DOnly();
 	}
 
 	void blitOutputToScreen() override {
@@ -1916,7 +1566,7 @@ struct PipelineImpl final : Pipeline {
 		});
 	}
 
-	void renderDebugShapes(RenderBufferHandle output, RenderBufferHandle depth) {
+	void renderDebugShapes(RenderBufferHandle output, RenderBufferHandle depth) override {
 		if (m_debug_shape_shader->isReady() && (!m_module->getDebugTriangles().empty() || !m_module->getDebugLines().empty())) {
 			m_renderer.setRenderTargets(Span(&output, 1), depth);
 		}
@@ -1925,7 +1575,7 @@ struct PipelineImpl final : Pipeline {
 		//renderDebugPoints();
 	}
 
-	void render2D(RenderBufferHandle input) {
+	void render2D(RenderBufferHandle input) override {
 		const IVec2 display_size = getDisplaySize();
 		Matrix matrix;
 		matrix.setOrtho(0, (float)display_size.x, (float)display_size.y, 0, 0, 1, false);
@@ -2012,7 +1662,7 @@ struct PipelineImpl final : Pipeline {
 
 	RenderModule* getModule() const override { return m_module; }
 
-	void renderTerrains(const CameraParams& cp, gpu::StateFlags state, const char* define) {
+	void renderTerrains(const CameraParams& cp, gpu::StateFlags state, const char* define) override {
 		const u32 define_mask = define ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
 		m_renderer.pushJob("terrain", [this, cp, state, define_mask](DrawStream& stream){
 			UniformPool& uniform_pool = m_renderer.getUniformPool();
@@ -2114,7 +1764,7 @@ struct PipelineImpl final : Pipeline {
 		});
 	}
 	
-	void renderGrass(CameraParams cp, gpu::StateFlags state = gpu::StateFlags::NONE, u32 define_mask = 0) {
+	void renderGrass(CameraParams cp, gpu::StateFlags state = gpu::StateFlags::NONE, u32 define_mask = 0) override {
 		PROFILE_FUNCTION();
 		if (!cp.is_shadow) {
 			for (Terrain* terrain : m_module->getTerrains()) {
@@ -3690,7 +3340,15 @@ struct PipelineImpl final : Pipeline {
 				m_cluster_buffers.refl_probes.buffer,
 				m_renderer.getMaterialUniformBuffer()
 			};
-			stream.bindShaderBuffers(sbs);
+			const u32 strides[] = {
+				sizeof(ClusterLight),
+				sizeof(Cluster),
+				sizeof(i32),
+				sizeof(ClusterEnvProbe),
+				sizeof(ClusterReflProbe),
+				0 // material uniform buffer, not a StructuredBuffer
+			};
+			stream.bindShaderBuffers(sbs, strides);
 		});
 	}
 
@@ -4202,9 +3860,7 @@ struct PipelineImpl final : Pipeline {
 	Array<gpu::StateFlags> m_render_states;
 	RenderModule* m_module;
 	Draw2D m_draw2d;
-	Shader* m_tonemap_shader = nullptr;
 	Shader* m_blit_shader = nullptr;
-	Shader* m_lighting_shader = nullptr;
 	Shader* m_draw2d_shader = nullptr;
 	Shader* m_downscale_depth_shader = nullptr;
 	gpu::ProgramHandle m_blit_screen_program = gpu::INVALID_PROGRAM;
@@ -4220,8 +3876,6 @@ struct PipelineImpl final : Pipeline {
 	RenderBufferHandle m_output = INVALID_RENDERBUFFER;
 	RenderBufferHandle m_downscaled_depth = INVALID_RENDERBUFFER;
 	Shader* m_debug_shape_shader;
-	Shader* m_debug_clusters_shader;
-	Shader* m_debug_velocity_shader;
 	Shader* m_instancing_shader;
 	Shader* m_flatten_shader;
 	Array<gpu::TextureHandle> m_textures;

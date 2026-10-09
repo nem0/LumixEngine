@@ -1,4 +1,4 @@
-import "core:postprocess"
+import "core:render"
 import "core:renderer/camera"
 import "core:renderer/module"
 import "core:renderer/pipelinetype"
@@ -14,7 +14,7 @@ struct DofUniform {
 	output : u32;
 }
 
-// Depth of field, controlled by the DOF properties of the active camera. A `beforeTonemap` hook, game view only.
+// Depth of field, controlled by the DOF properties of the active camera. Runs before tonemapping, game view only.
 fn dof(ctx : Context, input : RenderBuffer) : RenderBuffer {
 	if ctx.pipelineType() != .GAME_VIEW {
 		return input;

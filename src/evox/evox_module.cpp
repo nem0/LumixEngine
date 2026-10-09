@@ -16,7 +16,7 @@
 #include "engine/resource_manager.h"
 #include "engine/world.h"
 #include "evox/capi.h"
-#include "evox/evox_postprocess.h"
+#include "renderer/evox_render.h"
 #include "evox/evox_resource.h"
 #include "renderer/renderer.h"
 
@@ -146,31 +146,25 @@ struct EvoxSystemImpl : EvoxSystem {
 		callMain();
 	}
 
-	void initEnd() override {
+	EvoxRender* getRenderScript() {
 		auto* renderer = (Renderer*)m_engine.getSystemManager().getSystem("renderer");
-		if (renderer) renderer->addPlugin(m_postprocess);
+		return renderer ? &renderer->getRenderScript() : nullptr;
 	}
 
 	void shutdownStarted() override {
-		auto* renderer = (Renderer*)m_engine.getSystemManager().getSystem("renderer");
-		if (renderer) {
-			renderer->removePlugin(m_postprocess);
-			m_postprocess.shutdown(*renderer);
-		}
+		// the renderer (and the script host in it) can outlive this system, don't leave it with a dangling runtime
+		destroyRuntime();
 	}
 
 	void stopGame() override {
 		m_is_game_running = false;
 		if (m_runtime) {
-			m_postprocess.detach();
-			ex_runtime_destroy(m_runtime);
-			m_runtime = nullptr;
-			createRuntime();
 			// recreated the runtime to avoid any dangling stuff (changed globals, suspended state, ...), this also
-			// restarts the postprocesses of postprocess.evox, they share the runtime
+			// restarts the render script of render.evox, it shares the runtime
+			destroyRuntime();
+			createRuntime();
 		}
 	}
-
 
 	const char* getName() const override { return "evox_system"; }
 	Engine& getEngine() override { return m_engine; }
@@ -313,7 +307,7 @@ struct EvoxSystemImpl : EvoxSystem {
 
 	void callMain() {
 		if (!m_runtime || m_modules.empty()) return;
-		// postprocess.evox has its own `main`, call the one of main.evox
+		// render.evox has its own `main`, call the one of main.evox
 		const i32 main_index = ex_runtime_find_function(m_runtime, toEvox(EVOX_MAIN_PATH), toEvox("main"));
 		if (main_index < 0) return;
 		struct Args {
@@ -368,16 +362,21 @@ struct EvoxSystemImpl : EvoxSystem {
 
 	void destroyScript() {
 		m_is_ready = false;
-		m_postprocess.detach();
 		for (EvoxModule* module : m_modules) module->clearEvoxData();
 		m_data_types.clear();
-		if (m_task) { ex_task_destroy(m_task); m_task = nullptr; }
-		if (m_runtime) { ex_runtime_destroy(m_runtime); m_runtime = nullptr; }
+		destroyRuntime();
 		if (m_bytecode) { ex_bytecode_destroy(m_bytecode); m_bytecode = nullptr; }
 		if (m_host.arena.allocate) {
 			ex_default_arena_destroy(&m_host.arena);
 			m_host.arena = {};
 		}
+	}
+
+	// Everything that uses the runtime (the task, the render script in the renderer) goes before it.
+	void destroyRuntime() {
+		if (EvoxRender* render = getRenderScript()) render->detach();
+		if (m_task) { ex_task_destroy(m_task); m_task = nullptr; }
+		if (m_runtime) { ex_runtime_destroy(m_runtime); m_runtime = nullptr; }
 	}
 
 	bool createRuntime() {
@@ -386,8 +385,8 @@ struct EvoxSystemImpl : EvoxSystem {
 		if (ex_runtime_set_native_resolver(m_runtime, &resolveCoreFunction, &m_native_functions) != EX_RESULT_OK) return false;
 		m_task = ex_task_create(m_runtime);
 		if (!m_task) return false;
-		// postprocess.evox is the second root of the same bytecode and shares the runtime with main.evox
-		m_postprocess.attach(m_bytecode, m_runtime);
+		// render.evox is the second root of the same bytecode and shares the runtime with main.evox
+		if (EvoxRender* render = getRenderScript()) render->attach(m_bytecode, m_runtime);
 		return true;
 	}
 
@@ -427,7 +426,6 @@ struct EvoxSystemImpl : EvoxSystem {
 	HashMap<NativeFunctionKey, ex_native_fn, NativeFunctionKeyHash> m_native_functions;
 	Array<const ex_type*> m_data_types;
 	Array<EvoxModule*> m_modules;
-	EvoxPostprocess m_postprocess;
 	bool m_resource_ready = false;
 	bool m_is_ready = false;
 	bool m_is_game_running = false;
@@ -1074,7 +1072,6 @@ EvoxSystemImpl::EvoxSystemImpl(Engine& engine)
 	, m_native_functions(m_allocator)
 	, m_data_types(m_allocator)
 	, m_modules(m_allocator)
-	, m_postprocess(engine, m_allocator)
 {
 	m_host = {};
 	Evox::gatherCoreFunctions(m_native_functions);

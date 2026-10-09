@@ -1,4 +1,4 @@
-import "core:postprocess"
+import "core:render"
 import "core:renderer/camera"
 import "core:renderer/module"
 import "core:renderer/pipelinetype"
@@ -10,7 +10,7 @@ struct FilmGrainUniform {
 	in_out : u32;
 }
 
-// Film grain, controlled by the film grain intensity of the active camera. An `afterTonemap` hook, game view only.
+// Film grain, controlled by the film grain intensity of the active camera. Runs after tonemapping, game view only.
 fn filmGrain(ctx : Context, input : RenderBuffer) : RenderBuffer {
 	if ctx.pipelineType() != .GAME_VIEW {
 		return input;

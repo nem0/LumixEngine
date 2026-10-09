@@ -9,7 +9,7 @@
 #include "evox/capi.h"
 #include "evox/bytecode.h"
 #include "evox/evox_module.h"
-#include "evox/evox_postprocess.h"
+#include "renderer/evox_render.h"
 #include "evox/evox_capi.gen.h"
 #include "evox/evox_wrapper.h"
 #include "renderer/render_module.h"
@@ -732,7 +732,7 @@ void registerImguiModule(NativeFunctionMap& functions) {
 void gatherCoreFunctions(NativeFunctionMap& functions) {
 	generated::registerGeneratedEngineImport(functions);
 	registerImguiModule(functions);
-	registerPostprocessFunctions(functions);
+	registerRenderFunctions(functions);
 	functions.insert({"core:procedural_geom", "setMeshRaw"}, &setMesh);
 	// input
 	functions.insert({"core:input", "input"}, &inputGetInput);

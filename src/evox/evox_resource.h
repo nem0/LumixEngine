@@ -6,9 +6,9 @@
 
 namespace Lumix {
 
-// Roots of the project's Evox bytecode. `postprocess.evox` is compiled as a second root of `main.evox`, see EvoxPostprocess.
+// Roots of the project's Evox bytecode. `render.evox` is compiled as a second root of `main.evox`, see EvoxRender.
 static constexpr const char* EVOX_MAIN_PATH = "main.evox";
-static constexpr const char* EVOX_POSTPROCESS_PATH = "postprocess.evox";
+static constexpr const char* EVOX_RENDER_PATH = "render.evox";
 
 // Holds the serialized bytecode produced by the asset compiler. The runtime
 // never sees evox source code, it instantiates ex_bytecode from this image.

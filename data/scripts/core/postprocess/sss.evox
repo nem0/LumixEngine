@@ -1,4 +1,4 @@
-import "core:postprocess"
+import "core:render"
 import "core:imgui" as imgui
 
 // Setting, edit it here or from the debug popup.
@@ -29,13 +29,13 @@ fn groups(size : u32) : u32 {
 	return (size + 15) / 16;
 }
 
-// Screen space (contact) shadows, a `beforeLightPass` hook that writes into G-buffer C. It is not part of the default
-// postprocesses (it was off by default before it became a script too). To use it, register it in `postprocess.evox` of
-// the project:
+// Screen space (contact) shadows, runs before the lighting and writes into G-buffer C. It is not part of the default
+// postprocesses (it was off by default before it became a script too). To use it, copy frame.evox into the project and call it
+// after `ssao.ssao(ctx)`, and call `sss.debugUI(ctx)` from `debugUI` of render.evox:
 //
 //     import "core:postprocess/sss" as sss
 //     ...
-//     sss.register(registry);
+//     sss.sss(ctx);
 fn sss(ctx : Context) : void {
 	const trace = ctx.loadShader("engine/shaders/sss.hlsl");
 	const blit = ctx.loadShader("engine/shaders/sss_blit.hlsl");
@@ -78,7 +78,7 @@ fn sss(ctx : Context) : void {
 	ctx.endBlock();
 }
 
-// Menu of the debug popup, a `debugUI` hook.
+// Menu called from debugUI in the debug popup.
 fn debugUI(ctx : Context) : void {
 	if not imgui.beginMenu("SSS") {
 		return;
@@ -88,7 +88,7 @@ fn debugUI(ctx : Context) : void {
 	imgui.endMenu();
 }
 
-// Shows the screen space shadows, a `debugOutput` hook.
+// Shows the screen space shadows when their debug view is selected.
 fn debugOutput(ctx : Context, output : RenderBuffer) : bool {
 	if not ctx.isDebugShown("SSS") {
 		return false;
@@ -100,11 +100,3 @@ fn debugOutput(ctx : Context, output : RenderBuffer) : bool {
 	return true;
 }
 
-// Registers screen space shadows with their debug UI, `sss.register(registry)` in `postprocess.evox` is all it takes.
-fn register(registry : Registry) : void {
-	var effect = postprocess();
-	effect.beforeLightPass = sss;
-	effect.debugUI = debugUI;
-	effect.debugOutput = debugOutput;
-	registry.add(effect);
-}

@@ -1007,6 +1007,8 @@ struct RTVDSVHeap {
 	u32 frame = 0;
 };
 
+static void logDeviceRemoved(ID3D12Device* device, HRESULT call_hr, const char* call);
+
 static ID3D12Resource* createBuffer(ID3D12Device* device, const void* data, u64 size, D3D12_HEAP_TYPE type, const char* debug_name) {
 	D3D12_HEAP_PROPERTIES upload_heap_props = {};
 	upload_heap_props.Type = type;
@@ -1027,12 +1029,16 @@ static ID3D12Resource* createBuffer(ID3D12Device* device, const void* data, u64 
 	desc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
 	desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-	ID3D12Resource* upload_buffer;
+	ID3D12Resource* upload_buffer = nullptr;
 
 	const D3D12_RESOURCE_STATES state = type == D3D12_HEAP_TYPE_READBACK ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_GENERIC_READ;
 
 	HRESULT hr = device->CreateCommittedResource(&upload_heap_props, D3D12_HEAP_FLAG_NONE, &desc, state, nullptr, IID_PPV_ARGS(&upload_buffer));
-	ASSERT(hr == S_OK);
+	if (FAILED(hr)) {
+		// the device is gone (hang/removal): callers must handle nullptr
+		logDeviceRemoved(device, hr, "CreateCommittedResource");
+		return nullptr;
+	}
 
 	if (data) {
 		void* ptr = nullptr;
@@ -1257,6 +1263,21 @@ void memoryBarrier(TextureHandle texture) {
 	d3d->cmd_list->ResourceBarrier(1, &barrier);
 }
 
+// call when a D3D12/DXGI call fails: asks the device why it was removed (hang, reset or removal) and logs it. S_OK means the device is still there
+static void logDeviceRemoved(ID3D12Device* device, HRESULT call_hr, const char* call) {
+	const HRESULT reason = device->GetDeviceRemovedReason();
+	const char* name = "unknown";
+	switch (reason) {
+		case S_OK: name = "device not removed"; break;
+		case DXGI_ERROR_DEVICE_HUNG: name = "DEVICE_HUNG (GPU hang, TDR)"; break;
+		case DXGI_ERROR_DEVICE_RESET: name = "DEVICE_RESET (driver reset)"; break;
+		case DXGI_ERROR_DEVICE_REMOVED: name = "DEVICE_REMOVED (driver crash or hardware)"; break;
+		case DXGI_ERROR_DRIVER_INTERNAL_ERROR: name = "DRIVER_INTERNAL_ERROR"; break;
+		case DXGI_ERROR_INVALID_CALL: name = "INVALID_CALL"; break;
+	}
+	logError(call, " failed, HRESULT ", (u32)call_hr, ". GetDeviceRemovedReason: ", name, " (", (u32)reason, ")");
+}
+
 void Frame::end(ID3D12CommandQueue* cmd_queue, ID3D12GraphicsCommandList* cmd_list, ID3D12QueryHeap* timestamp_query_heap, ID3D12QueryHeap* stats_query_heap) {
 	PROFILE_FUNCTION();
 	#ifdef USE_PIX
@@ -1305,13 +1326,16 @@ void Frame::end(ID3D12CommandQueue* cmd_queue, ID3D12GraphicsCommandList* cmd_li
 	fence_value = d3d->fence_value;
 	profiler::pushInt("Signal fence", (u32)fence_value);
 	hr = cmd_queue->Signal(fence, fence_value);
+	if (FAILED(hr)) logDeviceRemoved(d3d->device, hr, "ID3D12CommandQueue::Signal");
 	ASSERT(hr == S_OK);
 }
 
 void Frame::begin() {
 	wait();
-	timestamp_query_buffer->Map(0, nullptr, (void**)&timestamp_query_buffer_ptr);
-	stats_query_buffer->Map(0, nullptr, (void**)&stats_query_buffer_ptr);
+	const HRESULT timestamp_hr = timestamp_query_buffer->Map(0, nullptr, (void**)&timestamp_query_buffer_ptr);
+	if (FAILED(timestamp_hr)) logDeviceRemoved(d3d->device, timestamp_hr, "timestamp query buffer Map");
+	const HRESULT stats_hr = stats_query_buffer->Map(0, nullptr, (void**)&stats_query_buffer_ptr);
+	if (FAILED(stats_hr)) logDeviceRemoved(d3d->device, stats_hr, "stats query buffer Map");
 
 	for (u32 i = 0, c = to_resolve.size(); i < c; ++i) {
 		QueryHandle q = to_resolve[i];
@@ -1445,6 +1469,8 @@ void destroy(QueryHandle query) {
 
 void update(TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, TextureFormat format, const void* buf, u32 buf_size) {
 	PROFILE_FUNCTION();
+	// the texture was never created (device removed), so there is nothing to upload to
+	if (!texture->resource) return;
 	const D3D12_RESOURCE_STATES prev_state = texture->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_COPY_DEST);
 
 	const FormatDesc& fd = FormatDesc::get(format);
@@ -1465,9 +1491,19 @@ void update(TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, T
 	const u32 tmp_row_pitch = layout.Footprint.RowPitch;
 
 	ID3D12Resource* staging = createBuffer(d3d->device, nullptr, total_bytes, D3D12_HEAP_TYPE_UPLOAD, "staging");
+	if (!staging) {
+		texture->setState(d3d->cmd_list, prev_state);
+		return;
+	}
 	u8* tmp;
 
-	staging->Map(0, nullptr, (void**)&tmp);
+	const HRESULT map_hr = staging->Map(0, nullptr, (void**)&tmp);
+	if (FAILED(map_hr)) {
+		logDeviceRemoved(d3d->device, map_hr, "staging Map");
+		d3d->frame->to_release.push(staging);
+		texture->setState(d3d->cmd_list, prev_state);
+		return;
+	}
 
 	const u32 src_pitch = fd.getRowPitch(w);
 	for (u32 i = 0, height = num_rows; i < height; ++i) {
@@ -1973,6 +2009,7 @@ bool init(void* hwnd, InitFlags flags) {
 		else {
 			d3d->debug->EnableDebugLayer();
 
+			// GPU-based validation checks the GPU's own resource accesses, but is very slow. Enable it when hunting a GPU hang.
 			//ID3D12Debug1* debug1;
 			//d3d->debug->QueryInterface(IID_PPV_ARGS(&debug1));
 			//debug1->SetEnableGPUBasedValidation(true);
@@ -2467,11 +2504,13 @@ u32 present() {
 
 			if (vsync) {
 				PROFILE_BLOCK("IDXGISwapChain3::Present");
-				window.swapchain->Present(1, 0);
+				const HRESULT present_hr = window.swapchain->Present(1, 0);
+				if (FAILED(present_hr)) logDeviceRemoved(d3d->device, present_hr, "IDXGISwapChain3::Present");
 			}
 			else {
 				PROFILE_BLOCK("IDXGISwapChain3::Present");
-				window.swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
+				const HRESULT present_hr = window.swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
+				if (FAILED(present_hr)) logDeviceRemoved(d3d->device, present_hr, "IDXGISwapChain3::Present");
 			}
 		
 			//DXGI_FRAME_STATISTICS stats;
@@ -2547,10 +2586,12 @@ void createBuffer(BufferHandle buffer, BufferFlags flags, size_t size, const voi
 
 	if (data) {
 		ID3D12Resource* upload_buffer = createBuffer(d3d->device, data, size, D3D12_HEAP_TYPE_UPLOAD, "upload");
-		D3D12_RESOURCE_STATES old_state = buffer->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_COPY_DEST);
-		d3d->cmd_list->CopyResource(buffer->resource, upload_buffer);
-		buffer->setState(d3d->cmd_list, old_state);
-		d3d->frame->to_release.push(upload_buffer);
+		if (upload_buffer) {
+			D3D12_RESOURCE_STATES old_state = buffer->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_COPY_DEST);
+			d3d->cmd_list->CopyResource(buffer->resource, upload_buffer);
+			buffer->setState(d3d->cmd_list, old_state);
+			d3d->frame->to_release.push(upload_buffer);
+		}
 	}
 
 	buffer->gpu_address = buffer->resource->GetGPUVirtualAddress();
@@ -2756,7 +2797,12 @@ void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	}
 
 	texture.state = isDepthFormat(desc.Format) ? D3D12_RESOURCE_STATE_COMMON : (compute_write ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : D3D12_RESOURCE_STATE_GENERIC_READ);
-	if (d3d->device->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, texture.state, clear_val_ptr, IID_PPV_ARGS(&texture.resource)) != S_OK) return;
+	const HRESULT create_hr = d3d->device->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, texture.state, clear_val_ptr, IID_PPV_ARGS(&texture.resource));
+	if (FAILED(create_hr)) {
+		// texture.resource stays null: the handle is valid but unusable, and update()/copies check for that
+		logDeviceRemoved(d3d->device, create_hr, "CreateCommittedResource (texture)");
+		return;
+	}
 	
 	D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc = {};
@@ -3018,20 +3064,23 @@ void destroy(BufferHandle buffer) {
 }
 
 
-void bindShaderBuffers(Span<BufferHandle> buffers) {
+void bindShaderBuffers(Span<BufferHandle> buffers, Span<const u32> strides) {
 	ID3D12Resource* resources[16];
 	D3D12_SHADER_RESOURCE_VIEW_DESC descs[16] = {};
 
 	ASSERT(buffers.length() <= lengthOf(resources));
+	ASSERT(strides.length() == buffers.length());
 	for(u32 i = 0; i < buffers.length(); ++i) {
 		resources[i] = buffers[i] ? buffers[i]->resource : nullptr;
 		if (buffers[i]) {
 			descs[i].ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-			descs[i].Format = DXGI_FORMAT_R32_UINT;
+			// a StructuredBuffer<T> in the shader needs a structured view with the size of T, validation checks it
+			const u32 stride = strides[i];
+			descs[i].Format = stride ? DXGI_FORMAT_UNKNOWN : DXGI_FORMAT_R32_UINT;
 			descs[i].Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 			descs[i].Buffer.FirstElement = 0;
-			descs[i].Buffer.NumElements = UINT(buffers[i]->size / sizeof(u32));
-			descs[i].Buffer.StructureByteStride = 0;
+			descs[i].Buffer.NumElements = UINT(buffers[i]->size / (stride ? stride : sizeof(u32)));
+			descs[i].Buffer.StructureByteStride = stride;
 			descs[i].Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 			buffers[i]->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_GENERIC_READ);
 		}

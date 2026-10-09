@@ -96,6 +96,8 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual void addPlugin(RenderPlugin& plugin) = 0;
 	virtual void removePlugin(RenderPlugin& plugin) = 0;
 	virtual Span<RenderPlugin*> getPlugins() = 0;
+	// Runs the scripts of the frame (render.evox), the evox system gives it the script runtime.
+	virtual struct EvoxRender& getRenderScript() = 0;
 
 	virtual u8 getShaderDefineIdx(const char* define) = 0;
 	virtual const char* getShaderDefine(int define_idx) const = 0;

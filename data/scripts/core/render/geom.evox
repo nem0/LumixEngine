@@ -1,0 +1,59 @@
+import "core:render"
+import "core:renderer/gpu/textureformat"
+
+// G-buffer and its depth/stencil, port of Pipeline::geomPass. Returns the G-buffer and the culled view.
+// Stencil 1 marks pixels of regular geometry and impostors, 2 terrain; the light pass shades the pixels with a non-zero stencil.
+fn geomPass(ctx : Context) : GeomResult {
+	ctx.beginStatsBlock("geom pass_evox");
+	const width = ctx.width();
+	const height = ctx.height();
+	const target_flags = textureFlags(.RENDER_TARGET, .NO_MIPS, .COMPUTE_WRITE);
+	const gbuffer = GBuffer {
+		ctx.createRenderbuffer(width, height, .SRGBA, textureFlags(.RENDER_TARGET, .NO_MIPS, .NONE)),
+		ctx.createRenderbuffer(width, height, .RGBA16, target_flags),
+		ctx.createRenderbuffer(width, height, .RGBA8, target_flags),
+		ctx.createRenderbuffer(width, height, .RG16F, target_flags),
+		ctx.createRenderbuffer(width, height, .D24S8, textureFlags(.RENDER_TARGET, .NO_MIPS, .NONE))
+	};
+
+	const camera = ctx.mainCamera();
+	ctx.pass(camera);
+	var targets : [4]RenderBuffer = undefined;
+	targets[0] = gbuffer.A;
+	targets[1] = gbuffer.B;
+	targets[2] = gbuffer.C;
+	targets[3] = gbuffer.D;
+	ctx.setRenderTargets(targets, gbuffer.DS, .NONE);
+	ctx.clearTargets(.ALL, 0.0, 0.0, 0.0, 0.0, 0.0);
+
+	const write_stencil = StencilOps.REPLACE;
+	const depth_write = stateBits(.DEPTH_WRITE, .DEPTH_FUNCTION);
+	const default_state = depth_write + stencilState(255, .ALWAYS, 1, 255, .KEEP, .KEEP, write_stencil);
+	const blend = blendState(.SRC_ALPHA, .ONE_MINUS_SRC_ALPHA, .SRC_ALPHA, .ONE_MINUS_SRC_ALPHA);
+	const depth_test = StateFlags.DEPTH_FUNCTION as u64;
+
+	ctx.addBucket("default", "DEFERRED", .DEFAULT, default_state);
+	ctx.addBucket("water", "", .DEPTH, depth_test);
+	ctx.addBucket("transparent", "", .DEPTH, depth_test + blend);
+	ctx.addBucket("decal", "", .DEFAULT, depth_test + blend);
+	ctx.addBucket("impostor", "DEFERRED", .DEFAULT, default_state);
+	const view = ctx.cull(camera);
+
+	const terrain_state = depth_write + stencilState(255, .ALWAYS, 2, 255, .KEEP, .KEEP, write_stencil);
+	ctx.renderTerrains(camera, terrain_state, "DEFERRED");
+	ctx.renderBucket(view, 0);
+	ctx.renderBucket(view, 4);
+	ctx.renderGrass(camera, default_state, "");
+	ctx.renderOpaquePlugins();
+	ctx.endBlock();
+
+	// decals read the depth and stencil but don't write them
+	ctx.beginBlock("decals_evox");
+	ctx.setRenderTargets(targets, gbuffer.DS, .READONLY_DEPTH_STENCIL);
+	ctx.setUniform(.DRAWCALL, ctx.bindless(gbuffer.DS));
+	ctx.renderBucket(view, 3);
+	ctx.endBlock();
+
+	return GeomResult {gbuffer, view};
+}
+

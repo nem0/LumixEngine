@@ -1,0 +1,64 @@
+import "core:render"
+import "core:vec4"
+
+// Layout of `Data` in engine/shaders/debug_velocity.hlsl and debug_clusters.hlsl
+struct DebugUniform {
+	input : u32;
+	output : u32;
+}
+
+// Shows one channel set of a G-buffer texture as the image: R, G and B of the output are the dot products of the texel with
+// the given masks.
+fn showChannels(ctx : Context, source : RenderBuffer, output : RenderBuffer, r : Vec4, g : Vec4, b : Vec4) : void {
+	ctx.copyChannels(source, output, ctx.width(), ctx.height(), r, g, b);
+}
+
+// The built-in debug views of the Debug popup (albedo, normal, roughness, ...), port of Pipeline::debugOutput. Draws the view that
+// `ctx.debugShow()` says into `output` and returns true, false for views it doesn't know, like the ones of effects.
+fn showDebugView(ctx : Context, gbuffer : GBuffer, output : RenderBuffer) : bool {
+	const groups_x = (ctx.width() + 15) / 16;
+	const groups_y = (ctx.height() + 15) / 16;
+	const red = Vec4 {1.0, 0.0, 0.0, 0.0};
+	const green = Vec4 {0.0, 1.0, 0.0, 0.0};
+	const blue = Vec4 {0.0, 0.0, 1.0, 0.0};
+	const alpha = Vec4 {0.0, 0.0, 0.0, 1.0};
+	const none = Vec4 {0.0, 0.0, 0.0, 0.0};
+
+	const show = ctx.debugShow();
+	if show == .ALBEDO {
+		showChannels(ctx, gbuffer.A, output, red, green, blue);
+		return true;
+	}
+	if show == .NORMAL {
+		showChannels(ctx, gbuffer.B, output, red, green, none);
+		return true;
+	}
+	if show == .ROUGHNESS {
+		showChannels(ctx, gbuffer.A, output, alpha, alpha, alpha);
+		return true;
+	}
+	if show == .METALLIC {
+		showChannels(ctx, gbuffer.C, output, blue, blue, blue);
+		return true;
+	}
+	if show == .AO {
+		showChannels(ctx, gbuffer.B, output, alpha, alpha, alpha);
+		return true;
+	}
+	if show == .VELOCITY {
+		const shader = ctx.loadShader("engine/shaders/debug_velocity.hlsl");
+		ctx.dispatch(shader, DebugUniform {ctx.bindless(gbuffer.D), ctx.rwBindless(output)}, groups_x, groups_y, 1);
+		return true;
+	}
+	if show == .LIGHT_CLUSTERS or show == .PROBE_CLUSTERS {
+		const shader = ctx.loadShader("engine/shaders/debug_clusters.hlsl");
+		var define = "";
+		if show == .LIGHT_CLUSTERS {
+			define = "LIGHTS";
+		}
+		ctx.dispatchDefine(shader, define, DebugUniform {ctx.bindless(gbuffer.DS), ctx.rwBindless(output)}, groups_x, groups_y, 1);
+		return true;
+	}
+	return false;
+}
+

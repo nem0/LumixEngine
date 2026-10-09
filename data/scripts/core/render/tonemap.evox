@@ -1,0 +1,20 @@
+import "core:render"
+import "core:renderer/gpu/textureformat"
+
+// Layout of `Data` in engine/shaders/tonemap.hlsl
+struct TonemapUniform {
+	input : u32;
+}
+
+// The default tonemapping (ACES), port of Pipeline::tonemap. Returns the SRGBA image the pipeline presents. Draws nothing until
+// the shader is compiled. The caller releases `input`.
+fn tonemapImage(ctx : Context, input : RenderBuffer) : RenderBuffer {
+	const shader = ctx.loadShader("engine/shaders/tonemap.hlsl");
+	ctx.beginBlock("tonemap_evox");
+	const output = ctx.createRenderTarget(ctx.displayWidth(), ctx.displayHeight(), .SRGBA);
+	ctx.setRenderTarget(output);
+	ctx.draw(shader, TonemapUniform {ctx.bindless(input)});
+	ctx.endBlock();
+	return output;
+}
+

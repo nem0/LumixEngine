@@ -1,4 +1,4 @@
-import "core:postprocess"
+import "core:render"
 import "core:imgui" as imgui
 
 // Settings, edit them here.
@@ -82,7 +82,7 @@ fn shadersReady(ctx : Context) : bool {
 		and ctx.loadShader("engine/shaders/ssao_downscale_depth.hlsl").isReady();
 }
 
-// Screen space ambient occlusion, a `beforeLightPass` hook that writes the occlusion into G-buffer B.
+// Screen space ambient occlusion, writes the occlusion into G-buffer B before lighting.
 fn ssao(ctx : Context) : void {
 	var state = ctx.state(SsaoState);
 	const width = shiftRight(ctx.width(), g_downscale);
@@ -190,7 +190,7 @@ fn ssao(ctx : Context) : void {
 	}
 }
 
-// Settings menu of the debug popup, a `debugUI` hook.
+// Settings menu called from debugUI in the debug popup.
 fn debugUI(ctx : Context) : void {
 	if not imgui.beginMenu("SSAO") {
 		return;

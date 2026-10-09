@@ -1,0 +1,131 @@
+import "core:render"
+import "core:renderer/pipelinetype"
+import "core:render/shadow" as shadow
+import "core:render/geom" as geom
+import "core:render/lighting" as lighting
+import "core:render/transparent" as transparent
+import "core:render/debug_view" as debug_view
+import "core:render/tonemap" as tonemap
+import "core:postprocess/atmo" as atmo
+import "core:postprocess/ssao" as ssao
+import "core:postprocess/dof" as dof
+import "core:postprocess/bloom" as bloom
+import "core:postprocess/taa" as taa
+import "core:postprocess/film_grain" as film_grain
+
+// The 3D frame of a pipeline, port of Pipeline::renderMain: the sequence of stages, the places where C++ plugins (DLSS, FSR3, ...) run
+// and the default effects (atmosphere, SSAO, depth of field, bloom, TAA, film grain), which are called directly. `render.evox` of a
+// project calls `renderFrame` from its `main`. To change the frame or the effects, copy this file into the project, edit it and call
+// your copy instead.
+//
+// In a stage the C++ plugins run first, then the effects. Buffers returned by effects are owned by the frame, an effect that returns a
+// new buffer releases its input.
+
+// Runs an effect on the image of the previous one. Returns the image it made, or `input` if it left the image as is (returned an
+// invalid buffer).
+fn apply(ctx : Context, effect : fn(Context, RenderBuffer) : RenderBuffer, input : RenderBuffer) : RenderBuffer {
+	const output = effect(ctx, input);
+	if output.isValid() {
+		return output;
+	}
+	return input;
+}
+
+// Starts a stage where effects chain: runs the C++ plugins, returns the image the effects start with.
+fn beginChain(ctx : Context, stage : PluginStage, input : RenderBuffer) : RenderBuffer {
+	const from_plugins = ctx.runPlugins(stage, input);
+	if from_plugins.isValid() {
+		return from_plugins;
+	}
+	return input;
+}
+
+// A built-in debug view of the Debug popup or the view of a plugin or effect. True if one drew into `result`, the tonemap is
+// skipped then.
+fn debugOutput(ctx : Context, gbuffer : GBuffer, result : RenderBuffer) : bool {
+	if debug_view.showDebugView(ctx, gbuffer, result) {
+		return true;
+	}
+	if ctx.debugShow() != .PLUGIN {
+		return false;
+	}
+	if ctx.runPluginsDebugOutput(result) {
+		return true;
+	}
+	return bloom.debugOutput(ctx, result);
+}
+
+fn releaseGBuffer(ctx : Context, gbuffer : GBuffer, shadowmap : RenderBuffer) : void {
+	ctx.releaseBuffer(gbuffer.A);
+	ctx.releaseBuffer(gbuffer.B);
+	ctx.releaseBuffer(gbuffer.C);
+	ctx.releaseBuffer(gbuffer.D);
+	ctx.releaseBuffer(gbuffer.DS);
+	ctx.releaseBuffer(shadowmap);
+}
+
+// Renders the frame and returns the image the pipeline presents.
+fn renderFrame(ctx : Context) : RenderBuffer {
+	ctx.beginFrame();
+	const shadowmap = shadow.shadowPass(ctx);
+	ctx.bindGlobalState(shadowmap);
+
+	const geometry = geom.geomPass(ctx);
+	const gbuffer = geometry.gbuffer;
+	ctx.setGBuffer(gbuffer);
+
+	ctx.runPlugins(.BEFORE_LIGHT_PASS, invalidBuffer());
+	ssao.ssao(ctx);
+	var result = lighting.lightPass(ctx, gbuffer, shadowmap);
+	result = beginChain(ctx, .BEFORE_TRANSPARENT, result);
+	result = apply(ctx, atmo.atmo, result);
+	transparent.transparentPass(ctx, gbuffer, shadowmap, geometry.view, result);
+
+	if ctx.pipelineType() == .PROBE {
+		ctx.endFrame();
+		releaseGBuffer(ctx, gbuffer, shadowmap);
+		return result;
+	}
+
+	// the first plugin or effect that antialiases replaces the image, TAA runs only if no plugin did
+	var antialiased = ctx.runPlugins(.ANTIALIAS, result);
+	if not antialiased.isValid() {
+		antialiased = taa.taa(ctx, result);
+	}
+	if antialiased.isValid() {
+		result = antialiased;
+	}
+
+	const is_debug_output = debugOutput(ctx, gbuffer, result);
+
+	result = beginChain(ctx, .BEFORE_TONEMAP, result);
+	result = apply(ctx, dof.dof, result);
+	result = apply(ctx, bloom.bloom, result);
+	ctx.renderDebugShapes(result, gbuffer.DS);
+	if not is_debug_output {
+		// the first plugin or effect that tonemaps, the default tonemap runs if none did
+		var tonemapped = ctx.runPlugins(.TONEMAP, result);
+		if not tonemapped.isValid() {
+			tonemapped = bloom.bloomTonemap(ctx, result);
+		}
+		if not tonemapped.isValid() {
+			tonemapped = tonemap.tonemapImage(ctx, result);
+		}
+		ctx.releaseBuffer(result);
+		result = tonemapped;
+	}
+
+	result = beginChain(ctx, .AFTER_TONEMAP, result);
+	result = apply(ctx, film_grain.filmGrain, result);
+	ctx.render2D(result);
+	ctx.endFrame();
+	releaseGBuffer(ctx, gbuffer, shadowmap);
+	return result;
+}
+
+// The settings of the default effects in the Debug popup of a view.
+fn debugUI(ctx : Context) : void {
+	ssao.debugUI(ctx);
+	bloom.debugUI(ctx);
+	taa.debugUI(ctx);
+}

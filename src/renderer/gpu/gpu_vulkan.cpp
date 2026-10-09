@@ -285,7 +285,7 @@ void bindIndexBuffer(BufferHandle) {}
 void bindVertexBuffer(u32, BufferHandle, u32, u32) {}
 void bindUniformBuffer(u32, BufferHandle, size_t, size_t) {}
 void bindIndirectBuffer(BufferHandle) {}
-void bindShaderBuffers(Span<BufferHandle>) {}
+void bindShaderBuffers(Span<BufferHandle>, Span<const u32>) {}
 void drawArrays(u32, u32) {}
 void drawIndirect(DataType, u32) {}
 void drawIndexed(u32, u32, DataType) {}

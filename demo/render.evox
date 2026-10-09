@@ -1,0 +1,14 @@
+import "core:render"
+import "core:render/frame" as frame
+
+// The 3D frame of this project, see core:render/frame. `frame.renderFrame` renders the engine's default frame with its
+// postprocesses (atmosphere, SSAO, depth of field, bloom, antialiasing, film grain). To change the frame or add your own
+// effects, copy frame.evox into the project and call your copy, or add your code around the call.
+fn main(ctx : Context) : RenderBuffer {
+	return frame.renderFrame(ctx);
+}
+
+// Called by Studio in the Debug popup of a view, draw ImGui widgets of the settings of your effects.
+fn debugUI(ctx : Context) : void {
+	frame.debugUI(ctx);
+}

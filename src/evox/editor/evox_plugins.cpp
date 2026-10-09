@@ -945,8 +945,8 @@ struct EvoxAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			}
 			m_app.getAssetCompiler().registerDependency(path, dependency);
 		}
-		// postprocess.evox is compiled as a second root of main.evox, see compile()
-		if (path == Path(EVOX_MAIN_PATH)) m_app.getAssetCompiler().registerDependency(path, Path(EVOX_POSTPROCESS_PATH));
+		// render.evox is compiled as a second root of main.evox, see compile()
+		if (path == Path(EVOX_MAIN_PATH)) m_app.getAssetCompiler().registerDependency(path, Path(EVOX_RENDER_PATH));
 
 		ex_module_destroy(module);
 		ex_default_arena_destroy(&host.arena);
@@ -1040,24 +1040,24 @@ struct EvoxAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			stage = "failed to allocate Evox module";
 		}
 		else {
-			// main.evox and postprocess.evox are two roots of one bytecode, so they share a runtime (and its globals).
+			// main.evox and render.evox are two roots of one bytecode, so they share a runtime (and its globals).
 			// The source name of a root is what the runtime uses to find its `main`.
 			const bool is_main = src == Path(EVOX_MAIN_PATH);
 			const char* root_name = is_main ? EVOX_MAIN_PATH : src.c_str();
 			const ex_string_view source = {(const char*)content.data(), (i64)content.size()};
 			const ex_string_view name = {root_name, (i64)stringLength(root_name)};
-			OutputMemoryStream postprocess_content(allocator);
-			bool has_postprocess = is_main && fs.getContentSync(Path(EVOX_POSTPROCESS_PATH), postprocess_content);
+			OutputMemoryStream render_content(allocator);
+			bool has_render = is_main && fs.getContentSync(Path(EVOX_RENDER_PATH), render_content);
 			// the roots are typechecked together, compiling them one by one would typecheck the first one again
 			if (!ex_module_add_root(module, source, name, &resolveImport, &ctx)) {
 				stage = "script has errors";
 			}
-			else if (has_postprocess && !ex_module_add_root(module,
-				ex_string_view{(const char*)postprocess_content.data(), (i64)postprocess_content.size()},
-				ex_string_view{EVOX_POSTPROCESS_PATH, (i64)stringLength(EVOX_POSTPROCESS_PATH)},
+			else if (has_render && !ex_module_add_root(module,
+				ex_string_view{(const char*)render_content.data(), (i64)render_content.size()},
+				ex_string_view{EVOX_RENDER_PATH, (i64)stringLength(EVOX_RENDER_PATH)},
 				&resolveImport, &ctx))
 			{
-				stage = "postprocess.evox has errors";
+				stage = "render.evox has errors";
 			}
 			else if (!ex_module_typecheck(module)) {
 				stage = "script has errors";
@@ -1769,18 +1769,18 @@ struct EvoxDataAddComponentPlugin final : StudioApp::IAddComponentPlugin {
 	StudioApp& m_app;
 };
 
-// `postprocess.evox` is mandatory, create it in projects that don't have one so that they keep the default postprocesses.
-struct EvoxPostprocessTemplatePlugin final : StudioApp::GUIPlugin {
-	explicit EvoxPostprocessTemplatePlugin(StudioApp& app) : m_app(app) {}
+// `render.evox` is mandatory, create it in projects that don't have one so that they get the default frame.
+struct EvoxRenderTemplatePlugin final : StudioApp::GUIPlugin {
+	explicit EvoxRenderTemplatePlugin(StudioApp& app) : m_app(app) {}
 
-	const char* getName() const override { return "evox_postprocess_template"; }
+	const char* getName() const override { return "evox_render_template"; }
 	void onGUI() override {}
 
 	void setProjectDir(const char*) override {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (fs.fileExists("postprocess.evox")) return;
+		if (fs.fileExists("render.evox")) return;
 
-		// postprocess.evox runs in the runtime of main.evox, so there has to be one
+		// render.evox runs in the runtime of main.evox, so there has to be one
 		if (!fs.fileExists("main.evox")) {
 			static const char main_content[] =
 				"import \"core:world\"\n"
@@ -1795,21 +1795,26 @@ struct EvoxPostprocessTemplatePlugin final : StudioApp::GUIPlugin {
 		}
 
 		static const char content[] =
-			"import \"core:postprocess\"\n"
-			"import \"core:postprocess/defaults\" as defaults\n"
+			"import \"core:render\"\n"
+			"import \"core:render/frame\" as frame\n"
 			"\n"
-			"// Postprocesses of this project, see core:postprocess. `defaults.register` adds the engine's default ones: atmosphere, SSAO, depth of\n"
-			"// field, bloom, antialiasing and film grain. Remove it, or call the functions of core:postprocess/defaults for individual\n"
-			"// ones, to change what runs, and add your own effects here.\n"
-			"fn main(registry : Registry) : void {\n"
-			"	defaults.register(registry);\n"
+			"// The 3D frame of this project, see core:render/frame. `frame.renderFrame` renders the engine's default frame with its\n"
+			"// postprocesses (atmosphere, SSAO, depth of field, bloom, antialiasing, film grain). To change the frame or add your own\n"
+			"// effects, copy frame.evox into the project and call your copy, or add your code around the call.\n"
+			"fn main(ctx : Context) : RenderBuffer {\n"
+			"	return frame.renderFrame(ctx);\n"
+			"}\n"
+			"\n"
+			"// Called by Studio in the Debug popup of a view, draw ImGui widgets of the settings of your effects.\n"
+			"fn debugUI(ctx : Context) : void {\n"
+			"	frame.debugUI(ctx);\n"
 			"}\n";
-		if (!fs.saveContentSync(Path("postprocess.evox"), Span((const u8*)content, sizeof(content) - 1))) {
-			logError("Failed to create postprocess.evox");
+		if (!fs.saveContentSync(Path("render.evox"), Span((const u8*)content, sizeof(content) - 1))) {
+			logError("Failed to create render.evox");
 			return;
 		}
-		// postprocess.evox is a dependency of main.evox, the asset compiler recompiles it and the Evox system reloads it
-		logInfo("Created postprocess.evox with the default postprocesses");
+		// render.evox is a dependency of main.evox, the asset compiler recompiles it and the Evox system reloads it
+		logInfo("Created render.evox with the default frame");
 	}
 
 	StudioApp& m_app;
@@ -1822,7 +1827,7 @@ struct EvoxPlugin : StudioApp::IPlugin {
 		, m_debugger(app)
 		, m_variables_window(app)
 		, m_symbols_popup(app)
-		, m_postprocess_template(app)
+		, m_render_template(app)
 		, m_add_data_plugin(nullptr)
 	{
 		m_add_data_plugin = LUMIX_NEW(app.getAllocator(), EvoxDataAddComponentPlugin)(app);
@@ -1845,7 +1850,7 @@ struct EvoxPlugin : StudioApp::IPlugin {
 		m_app.addPlugin(m_debugger);
 		m_app.addPlugin(m_variables_window);
 		m_app.addPlugin(m_symbols_popup);
-		m_app.addPlugin(m_postprocess_template);
+		m_app.addPlugin(m_render_template);
 	}
 
 	void update(float) override {
@@ -1882,7 +1887,7 @@ struct EvoxPlugin : StudioApp::IPlugin {
 	~EvoxPlugin() {
 		m_app.getPropertyGrid().removePlugin(m_property_grid_plugin);
 		m_app.removePlugin(m_variables_window);
-		m_app.removePlugin(m_postprocess_template);
+		m_app.removePlugin(m_render_template);
 		m_app.removePlugin(m_symbols_popup);
 		m_app.removePlugin(m_debugger);
 		m_app.getAssetBrowser().removePlugin(m_asset_plugin);
@@ -1895,7 +1900,7 @@ private:
 	EvoxDebuggerWindow m_debugger;
 	EvoxVariablesWindow m_variables_window;
 	EvoxSymbolsPopup m_symbols_popup;
-	EvoxPostprocessTemplatePlugin m_postprocess_template;
+	EvoxRenderTemplatePlugin m_render_template;
 	EvoxDataAddComponentPlugin* m_add_data_plugin;
 	EvoxPropertyGridPlugin m_property_grid_plugin;
 	Action m_debugger_action{"Evox", "Debugger", "Evox Debugger", "evox_debugger", ICON_FA_BUG, Action::Type::TOOL};

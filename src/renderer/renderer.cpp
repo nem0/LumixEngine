@@ -25,6 +25,7 @@
 #include "renderer/particle_system.h"
 #include "renderer/pipeline.h"
 #include "renderer/postprocess.h"
+#include "renderer/evox_render.h"
 #include "renderer/render_module.h"
 #include "renderer/shader.h"
 #include "renderer/sprite.h"
@@ -446,6 +447,7 @@ struct RendererImpl final : Renderer {
 		, m_layers(m_allocator)
 		, m_material_buffer(m_allocator)
 		, m_plugins(m_allocator)
+		, m_render_script(engine, m_allocator)
 		, m_sort_keys(m_allocator)
 		, m_sort_key_map(m_allocator)
 		, m_semantic_defines(m_allocator)
@@ -470,6 +472,7 @@ struct RendererImpl final : Renderer {
 		m_frame_thread.create("frame_thread", true);
 		addPlugin(m_cubemap_sky);
 		addPlugin(m_tdao);
+		addPlugin(m_render_script);
 	}
 
 	Pipeline& createPipeline(PipelineType type) override {
@@ -1032,6 +1035,7 @@ struct RendererImpl final : Renderer {
 	}
 
 	Span<RenderPlugin*> getPlugins() override { return m_plugins; }
+	EvoxRender& getRenderScript() override { return m_render_script; }
 
 
 	ResourceManager& getTextureManager() override { return m_texture_manager; }
@@ -1360,6 +1364,7 @@ struct RendererImpl final : Renderer {
 	HashMap<RuntimeHash, String> m_semantic_defines;
 
 	Array<RenderPlugin*> m_plugins;
+	EvoxRender m_render_script;
 	Local<FrameData> m_frames[2];
 	jobs::Signal m_gpu_queue_empty;
 	FrameData* m_gpu_queue = nullptr;

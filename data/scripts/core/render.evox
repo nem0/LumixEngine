@@ -1,0 +1,332 @@
+// import core:render as render
+//
+// Script postprocesses and the frame. The root script is `render.evox` in the project root (compiled as a second root of `main.evox`, sharing
+// its runtime). Every project has one, Studio creates it when it opens a project without one. It defines
+//
+//     fn main(ctx : Context) : RenderBuffer     // renders the frame, called every frame of every pipeline
+//     fn debugUI(ctx : Context) : void          // optional, the Debug popup of a view
+//
+// `main` calls the default frame of core:render/frame, which calls the engine's postprocesses (atmosphere, SSAO, DOF, bloom,
+// TAA, film grain) directly, or the project's own frame and effects:
+//
+//     fn main(ctx : Context) : RenderBuffer {
+//         return frame.renderFrame(ctx);
+//     }
+//
+// Postprocesses are plain functions taking the `Context` and usually the image of the previous stage. Effects run for every pipeline
+// (scene view, game view, ...), use `ctx.pipelineType()` to skip some. Global variables are shared by all pipelines. A `main`
+// that fails is disabled until the script is reloaded.
+// Hand-written, native side is in src/renderer/evox_render.cpp.
+
+import "core:renderer/module"
+import "core:renderer/environment"
+import "core:renderer/pipelinetype"
+import "core:renderer/gpu/textureformat"
+import "core:imgui" as imgui
+import "core:vec3"
+import "core:vec4"
+
+// Valid only during the call it was passed to, do not store it.
+struct Context { ptr : cptr; }
+struct Shader { ptr : cptr; }
+struct RenderBuffer { handle : u32; }
+// A GPU buffer (e.g. a histogram) that shaders access through bindless handles. Zero is invalid. Like render
+// buffers, storage in `state` is destroyed automatically.
+struct Storage { id : u32; }
+
+// Zero is the invalid buffer, so a zero-initialized RenderBuffer (e.g. in `state`) is invalid.
+fn invalidBuffer() : RenderBuffer {
+	return RenderBuffer {0};
+}
+
+fn isValid(buffer : RenderBuffer) : bool {
+	return buffer.handle != 0;
+}
+
+// Memory of type `T` that belongs to the pipeline the script is running in. It is zero-initialized the first time and
+// keeps its value between frames, so it's the place for history buffers and other per-pipeline data (globals are
+// shared by all pipelines). Render buffers stored in it (directly or in nested structs/arrays) are released
+// automatically when the pipeline is destroyed or the script reloaded. Do not keep the pointer after the script call returns.
+extern fn stateRaw(ctx : Context, t : type) : []byte;
+fn state(ctx : Context, T : comptime type) : *T {
+	const raw = stateRaw(ctx, T);
+	const items = raw as []T;
+	return &items[0];
+}
+
+// Creates a render buffer of the given size that compute shaders can read and write. Release it with `releaseBuffer`
+// when you don't need it anymore, unless it's stored in `state`, which releases it for you. Depth, compressed, sRGB
+// and BGRA formats are not supported.
+fn createBuffer(ctx : Context, w : u32, h : u32, format : TextureFormat) : RenderBuffer {
+	return createRenderbuffer(ctx, w, h, format, textureFlags(.NO_MIPS, .COMPUTE_WRITE, .NONE));
+}
+// Like `createBuffer`, but the buffer can also be a render target: it can be cleared with `clear` and drawn into with
+// `setRenderTarget` and `draw`. Use it for buffers the frame draws into after your effect, e.g. what tonemapping
+// returns. Prefer `createBuffer` otherwise, some formats (R32F) don't work as render targets.
+fn createRenderTarget(ctx : Context, w : u32, h : u32, format : TextureFormat) : RenderBuffer {
+	return createRenderbuffer(ctx, w, h, format, textureFlags(.RENDER_TARGET, .NO_MIPS, .COMPUTE_WRITE));
+}
+extern fn releaseBuffer(ctx : Context, buffer : RenderBuffer) : void;
+// Clears all channels of a buffer created with `createRenderTarget` with the given color.
+fn clear(ctx : Context, buffer : RenderBuffer, r : f32, g : f32, b : f32, a : f32) : void {
+	setRenderTarget(ctx, buffer);
+	clearTargets(ctx, .ALL, r, g, b, a, 0.0);
+}
+// Copies (and converts the format of) a width x height region from src to dst.
+extern fn blit(ctx : Context, src : RenderBuffer, dst : RenderBuffer, width : u32, height : u32) : void;
+
+// Scene depth set by setGBuffer, available during tonemapping too. Unavailable in debugUI.
+extern fn depth(ctx : Context) : RenderBuffer;
+// The G-buffer textures set by setGBuffer, unavailable in debugUI. The built-in effects use B for normals (and ambient
+// occlusion), C for screen space shadowing (in .w) and D for motion vectors. Write to them with `rwBindless`.
+extern fn gbufferRaw(ctx : Context, index : u32) : RenderBuffer;
+fn gbufferA(ctx : Context) : RenderBuffer { return gbufferRaw(ctx, 0); }
+fn gbufferB(ctx : Context) : RenderBuffer { return gbufferRaw(ctx, 1); }
+fn gbufferC(ctx : Context) : RenderBuffer { return gbufferRaw(ctx, 2); }
+fn gbufferD(ctx : Context) : RenderBuffer { return gbufferRaw(ctx, 3); }
+extern fn renderModule(ctx : Context) : RenderModule;
+extern fn pipelineType(ctx : Context) : PipelineType;
+// viewport (render) size in pixels
+extern fn width(ctx : Context) : u32;
+extern fn height(ctx : Context) : u32;
+// size of the image the pipeline presents, what upscalers and temporal antialiasing work with
+extern fn displayWidth(ctx : Context) : u32;
+extern fn displayHeight(ctx : Context) : u32;
+// Shifts the camera by a sub-pixel offset that changes every frame, which temporal antialiasing needs. It applies from
+// the next frame on, so an antialiasing effect that is not running should switch it off again.
+extern fn enablePixelJitter(ctx : Context, enable : bool) : void;
+// false while temporal antialiasing is switched off, e.g. because an upscaler (DLSS, FSR3) does the antialiasing
+extern fn builtinTaaEnabled(ctx : Context) : bool;
+
+// The G-buffer textures and depth set by setGBuffer.
+struct GBuffer {
+	A : RenderBuffer;
+	B : RenderBuffer;
+	C : RenderBuffer;
+	D : RenderBuffer;
+	DS : RenderBuffer;
+}
+
+fn gbuffer(ctx : Context) : GBuffer {
+	return GBuffer {ctx.gbufferA(), ctx.gbufferB(), ctx.gbufferC(), ctx.gbufferD(), ctx.depth()};
+}
+
+// Loaded once and cached, `path` is relative to the project, e.g. "engine/shaders/film_grain.hlsl".
+extern fn loadShader(ctx : Context, path : []const u8) : Shader;
+extern fn isReady(shader : Shader) : bool;
+
+// Bindless handles to put into uniform data. Use `rwBindless` for buffers the shader writes to.
+extern fn bindless(ctx : Context, buffer : RenderBuffer) : u32;
+extern fn rwBindless(ctx : Context, buffer : RenderBuffer) : u32;
+
+// profiler / graphics debugger scope
+extern fn beginBlockRaw(ctx : Context, name : []const u8, stats : bool) : void;
+fn beginBlock(ctx : Context, name : []const u8) : void {
+	beginBlockRaw(ctx, name, false);
+}
+extern fn endBlock(ctx : Context) : void;
+
+extern fn dispatchRaw(ctx : Context, shader : Shader, define : []const u8, uniform : []const byte, x : u32, y : u32, z : u32) : void;
+
+// Dispatches a compute shader. `uniform` is copied to the shader's `Drawcall` constant buffer (b4), its layout
+// must match the cbuffer in HLSL. Does nothing until the shader is compiled. `define` selects a variant of the shader
+// (an empty string for none). The renderer inserts the memory barriers for buffers whose `rwBindless` handle you
+// asked for before the dispatch, so request it again for every dispatch that writes the buffer.
+fn dispatchDefine(ctx : Context, shader : Shader, define : []const u8, uniform : $T, x : u32, y : u32, z : u32) : void {
+	var storage : [1]T = undefined;
+	storage[0] = uniform;
+	const items : []T = storage;
+	dispatchRaw(ctx, shader, define, items as []byte, x, y, z);
+}
+
+fn dispatch(ctx : Context, shader : Shader, uniform : $T, x : u32, y : u32, z : u32) : void {
+	dispatchDefine(ctx, shader, "", uniform, x, y, z);
+}
+
+// Draws a fullscreen triangle into the render target set by `setRenderTarget`. The shader has to be a surface shader
+// (`//@surface`) with `mainVS` and `mainPS`. Does nothing until the shader is compiled.
+fn drawDefine(ctx : Context, shader : Shader, define : []const u8, uniform : $T) : void {
+	var storage : [1]T = undefined;
+	storage[0] = uniform;
+	const items : []T = storage;
+	drawStateRaw(ctx, shader, define, 0, items as []byte);
+}
+
+fn draw(ctx : Context, shader : Shader, uniform : $T) : void {
+	drawDefine(ctx, shader, "", uniform);
+}
+
+// Makes `buffer` (created with `createRenderTarget`) the target of the following `draw` calls.
+fn setRenderTarget(ctx : Context, buffer : RenderBuffer) : void {
+	setRenderTargetWithDepth(ctx, buffer, invalidBuffer(), .NONE);
+}
+
+// What `geomPass` of core:render/geom returns. A G-buffer with a zero handle is invalid.
+struct GeomResult {
+	gbuffer : GBuffer;
+	view : u32;
+}
+
+// A camera of the pipeline, valid during the current script call only.
+struct ViewCamera { handle : u32; }
+extern fn mainCamera(ctx : Context) : ViewCamera;
+// Sets the camera matrices of the following draws.
+extern fn pass(ctx : Context, camera : ViewCamera) : void;
+extern fn viewport(ctx : Context, x : u32, y : u32, width : u32, height : u32) : void;
+
+// For the shadow pass (core:render/shadow): the cascades of the main light are rendered into one depth buffer.
+extern fn shadowCamera(ctx : Context, slice : u32) : ViewCamera;
+// false if the active environment turns off shadow casting
+fn shadowsEnabled(ctx : Context) : bool {
+	const module = ctx.renderModule();
+	if module.module == null { return true; }
+	const entity = module.getActiveEnvironment() else return true;
+	const env = entity.environment() else return true;
+	return env.getCastShadows();
+}
+// Depth buffer of the given size, usable as a render target (`setDepthTarget`) and as a texture (`bindless`).
+fn createDepthBuffer(ctx : Context, w : u32, h : u32) : RenderBuffer {
+	return createRenderbuffer(ctx, w, h, .D32, textureFlags(.RENDER_TARGET, .NO_MIPS, .NONE));
+}
+// Render to the depth buffer only.
+fn setDepthTarget(ctx : Context, depth_buffer : RenderBuffer) : void {
+	setTargets(ctx, depth_buffer, .NONE);
+}
+// Sets the given color targets, none is fine, and the depth buffer.
+fn setTargets(ctx : Context, depth_buffer : RenderBuffer, flags : FramebufferFlags, colors : ...RenderBuffer) : void {
+	setRenderTargetsRaw(ctx, colors, depth_buffer, flags);
+}
+// Makes the writes to a buffer visible to later reads.
+extern fn barrierRead(ctx : Context, buffer : RenderBuffer) : void;
+// Like `beginBlock`, the block also collects draw statistics.
+fn beginStatsBlock(ctx : Context, name : []const u8) : void {
+	beginBlockRaw(ctx, name, true);
+}
+
+// Values of gpu::StateFlags (add them with `stateBits`) and of BucketDesc::Sort.
+enum StateFlags : u64 { NONE = 0, WIREFRAME = 1, DEPTH_FN_GREATER = 2, DEPTH_FN_EQUAL = 4, DEPTH_FUNCTION = 6, CULL_FRONT = 8, CULL_BACK = 16, DEPTH_WRITE = 32 }
+enum BucketSort : u32 { DEFAULT, DEPTH }
+// Bits of the states added together (they must be different bits).
+fn stateBits(a : StateFlags, b : StateFlags) : u64 {
+	return (a as u64) + (b as u64);
+}
+
+// Values of gpu::TextureFlags (add them with `textureFlags`) and gpu::BlendFactors.
+enum TextureFlags : u32 { NONE = 0, NO_MIPS = 2, COMPUTE_WRITE = 64, RENDER_TARGET = 128 }
+enum BlendFactors : u32 { ZERO, ONE, SRC_COLOR, ONE_MINUS_SRC_COLOR, SRC_ALPHA, ONE_MINUS_SRC_ALPHA, DST_COLOR, ONE_MINUS_DST_COLOR, DST_ALPHA, ONE_MINUS_DST_ALPHA }
+fn textureFlags(a : TextureFlags, b : TextureFlags, c : TextureFlags) : TextureFlags {
+	return ((a as u32) + (b as u32) + (c as u32)) as TextureFlags;
+}
+// Buffer of any format (including depth) and size. `flags` decide what it can be used for.
+extern fn createRenderbuffer(ctx : Context, width : u32, height : u32, format : TextureFormat, flags : TextureFlags) : RenderBuffer;
+// State bits for buckets and draws that set up blending (gpu::getBlendStateBits).
+extern fn blendState(src_rgb : BlendFactors, dst_rgb : BlendFactors, src_a : BlendFactors, dst_a : BlendFactors) : u64;
+// The built-in debug view selected in the Debug popup, values of Pipeline::DebugShow.
+enum DebugShow : u32 { NONE, ALBEDO, NORMAL, ROUGHNESS, METALLIC, AO, LIGHT_CLUSTERS, PROBE_CLUSTERS, VELOCITY, BUILTIN_COUNT, PLUGIN }
+extern fn debugShow(ctx : Context) : DebugShow;
+// Copies channels of a buffer to another: each channel of the output is the dot product of the source texel with a mask.
+extern fn copyChannels(ctx : Context, source : RenderBuffer, output : RenderBuffer, width : u32, height : u32, r : Vec4, g : Vec4, b : Vec4) : void;
+// Frame (`main` of render.evox): the parts of the C++ frame. `beginFrame` starts the sort keys job group, fills the light clusters and releases the
+// previous output, `bindGlobalState` binds the global uniforms with the shadow map and `endFrame` waits for the sort keys. Every frame
+// must call `beginFrame` and `endFrame`.
+extern fn beginFrame(ctx : Context) : void;
+extern fn bindGlobalState(ctx : Context, shadowmap : RenderBuffer) : void;
+extern fn endFrame(ctx : Context) : void;
+extern fn renderDebugShapes(ctx : Context, output : RenderBuffer, depth_buffer : RenderBuffer) : void;
+// Draws the UI into the final image.
+extern fn render2D(ctx : Context, output : RenderBuffer) : void;
+// The G-buffer that effects called from the script see (`gbuffer`, `depth`), and the plugins get.
+extern fn setGBuffer(ctx : Context, gbuffer : GBuffer) : void;
+
+// Stages of the frame the C++ plugins (`RenderPlugin`) run in.
+enum PluginStage : u32 { BEFORE_LIGHT_PASS, BEFORE_TRANSPARENT, ANTIALIAS, BEFORE_TONEMAP, TONEMAP, AFTER_TONEMAP, RENDER_OPAQUE, RENDER_TRANSPARENT }
+// Runs the C++ plugins of a stage. Returns an invalid buffer if no plugin did the stage.
+extern fn runPlugins(ctx : Context, stage : PluginStage, input : RenderBuffer) : RenderBuffer;
+extern fn runPluginsDebugOutput(ctx : Context, output : RenderBuffer) : bool;
+
+// Lets C++ plugins draw their opaque geometry into the G-buffer (stage RENDER_OPAQUE of `runPlugins`).
+fn renderOpaquePlugins(ctx : Context) : void {
+	runPlugins(ctx, .RENDER_OPAQUE, invalidBuffer());
+}
+
+// Culling: add the buckets (a layer of render objects with the state and shader define used to draw them) and call `cull`,
+// it culls the scene for the camera into them and returns a view for `renderBucket`. A bucket index is the order of `addBucket`.
+extern fn addBucket(ctx : Context, layer : []const u8, define : []const u8, sort : BucketSort, state : u64) : void;
+extern fn cull(ctx : Context, camera : ViewCamera) : u32;
+// Draw grass and terrains for the camera. `defines` are space separated shader defines (e.g. "GRASS DEPTH").
+extern fn renderGrass(ctx : Context, camera : ViewCamera, state : u64, defines : []const u8) : void;
+extern fn renderTerrains(ctx : Context, camera : ViewCamera, state : u64, define : []const u8) : void;
+
+// Draws the geometry of a bucket of a culled view into the current targets.
+extern fn renderBucket(ctx : Context, view : u32, bucket : u32) : void;
+// Lets C++ plugins draw their transparent geometry (particles, ...), stage RENDER_TRANSPARENT of `runPlugins`.
+fn renderTransparentPlugins(ctx : Context) : void {
+	runPlugins(ctx, .RENDER_TRANSPARENT, invalidBuffer());
+}
+
+// Constant buffers a shader reads: `Drawcall` (b4) or the second one (b5).
+enum UniformSlot : u32 { DRAWCALL, DRAWCALL2 }
+extern fn setUniformRaw(ctx : Context, slot : UniformSlot, uniform : []const byte) : void;
+fn setUniform(ctx : Context, slot : UniformSlot, uniform : $T) : void {
+	var storage : [1]T = undefined;
+	storage[0] = uniform;
+	const items : []T = storage;
+	setUniformRaw(ctx, slot, items as []byte);
+}
+
+// Up to 4 color targets and an optional depth buffer (an invalid buffer for none).
+extern fn setRenderTargetsRaw(ctx : Context, colors : []const RenderBuffer, depth : RenderBuffer, flags : FramebufferFlags) : void;
+fn setRenderTargets(ctx : Context, colors : []const RenderBuffer, depth_buffer : RenderBuffer, flags : FramebufferFlags) : void {
+	setRenderTargetsRaw(ctx, colors, depth_buffer, flags);
+}
+
+// Values of gpu::FramebufferFlags, gpu::ClearFlags, gpu::StencilFuncs and gpu::StencilOps.
+enum FramebufferFlags : u32 { NONE = 0, SRGB = 1, READONLY_DEPTH = 2, READONLY_STENCIL = 4, READONLY_DEPTH_STENCIL = 6 }
+enum ClearFlags : u32 { COLOR = 1, DEPTH = 2, STENCIL = 4, ALL = 7 }
+enum StencilFuncs : u32 { DISABLE, ALWAYS, EQUAL, NOT_EQUAL }
+enum StencilOps : u32 { KEEP, ZERO, REPLACE, INCR, INCR_WRAP, DECR, DECR_WRAP, INVERT }
+
+// Like `setRenderTarget`, with a depth buffer (the depth of the G-buffer, or an invalid buffer for none).
+fn setRenderTargetWithDepth(ctx : Context, buffer : RenderBuffer, depth_buffer : RenderBuffer, flags : FramebufferFlags) : void {
+	setTargets(ctx, depth_buffer, flags, buffer);
+}
+// Clears the targets set by `setRenderTarget` / `setRenderTargetWithDepth`. `clear` is the shorter way for a single color target.
+extern fn clearTargets(ctx : Context, flags : ClearFlags, r : f32, g : f32, b : f32, a : f32, depth : f32) : void;
+// Color the pipeline clears its HDR image with.
+extern fn clearColor(ctx : Context) : Vec3;
+// Bindless handles of the shadow atlas of local lights and of the reflection probes, invalid handles if there are none.
+extern fn shadowAtlasBindless(ctx : Context) : u32;
+extern fn reflectionProbesBindless(ctx : Context) : u32;
+
+// State bits for `drawState` that set up the stencil test (gpu::getStencilStateBits).
+extern fn stencilState(write_mask : u32, func : StencilFuncs, ref : u32, mask : u32, sfail : StencilOps, dpfail : StencilOps, dppass : StencilOps) : u64;
+extern fn drawStateRaw(ctx : Context, shader : Shader, define : []const u8, render_state : u64, uniform : []const byte) : void;
+
+// `draw` with render state, e.g. from `stencilState`.
+fn drawState(ctx : Context, shader : Shader, render_state : u64, uniform : $T) : void {
+	var storage : [1]T = undefined;
+	storage[0] = uniform;
+	const items : []T = storage;
+	drawStateRaw(ctx, shader, "", render_state, items as []byte);
+}
+
+// GPU buffers of `size` bytes. Their contents are undefined until written. Release one with `releaseStorage`
+// unless it's stored in `state`.
+extern fn createStorage(ctx : Context, size : u32) : Storage;
+extern fn releaseStorage(ctx : Context, storage : Storage) : void;
+// Bindless handles to put into uniform data, `bindlessStorage` to read the buffer, `rwBindlessStorage` to write it.
+extern fn bindlessStorage(ctx : Context, storage : Storage) : u32;
+extern fn rwBindlessStorage(ctx : Context, storage : Storage) : u32;
+
+// Debug view. `debugUI` offers buffers with `debugRadio`, the effect's debug output function checks
+// `isDebugShown` with the same name and copies the buffer to its `output`. The debug view is per pipeline (scene view, game
+// view), names only need to be unique among the effects.
+extern fn showDebug(ctx : Context, name : []const u8) : void;
+extern fn isDebugShown(ctx : Context, name : []const u8) : bool;
+
+// A radio button that switches the debug view to the buffer `name`. Call it from `debugUI`.
+fn debugRadio(ctx : Context, name : []const u8) : void {
+	if imgui.radioButton(name, ctx.isDebugShown(name)) {
+		ctx.showDebug(name);
+	}
+}

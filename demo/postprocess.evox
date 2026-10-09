@@ -1,9 +1,0 @@
-import "core:postprocess"
-import "core:postprocess/defaults" as defaults
-
-// Postprocesses of this project, see core:postprocess. `defaults.register` adds the engine's default ones: atmosphere, SSAO, depth of
-// field, bloom, antialiasing and film grain. Remove it, or call the functions of core:postprocess/defaults for individual
-// ones, to change what runs, and add your own effects here.
-fn main(registry : Registry) : void {
-	defaults.register(registry);
-}

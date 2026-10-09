@@ -1,4 +1,4 @@
-import "core:postprocess"
+import "core:render"
 import "core:entity"
 import "core:vec4"
 import "core:renderer/environment"
@@ -44,8 +44,7 @@ fn flag(value : bool) : f32 {
 	return 0;
 }
 
-// Atmospheric scattering of the active environment: the sky and the fog, drawn into the lit scene. A `beforeTransparent`
-// hook.
+// Atmospheric scattering of the active environment: the sky and the fog, drawn into the lit scene before transparent geometry.
 fn atmo(ctx : Context, hdr : RenderBuffer) : RenderBuffer {
 	if ctx.pipelineType() == .PREVIEW {
 		return hdr;

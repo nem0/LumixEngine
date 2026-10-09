@@ -1,0 +1,47 @@
+import "core:render"
+import "core:renderer/pipelinetype"
+import "core:renderer/gpu/textureformat"
+
+// Layout of `Textures` in engine/shaders/lighting.hlsl
+struct LightingUniform {
+	gbuffer0 : u32;
+	gbuffer1 : u32;
+	gbuffer2 : u32;
+	gbuffer3 : u32;
+	depth : u32;
+	shadowmap : u32;
+	shadow_atlas : u32;
+	reflection_probes : u32;
+}
+
+// Lights the G-buffer, port of Pipeline::lightPass. Returns the HDR image. Draws nothing until the shader is compiled.
+fn lightPass(ctx : Context, gbuffer : GBuffer, shadowmap : RenderBuffer) : RenderBuffer {
+	const shader = ctx.loadShader("engine/shaders/lighting.hlsl");
+	ctx.beginBlock("light pass_evox");
+	var format = TextureFormat.RGBA16F;
+	if ctx.pipelineType() == .PROBE {
+		format = .RGBA32F;
+	}
+	const hdr = ctx.createRenderTarget(ctx.width(), ctx.height(), format);
+
+	ctx.setRenderTarget(hdr);
+	const color = ctx.clearColor();
+	ctx.clearTargets(.ALL, color.x, color.y, color.z, 0.0, 0.0);
+
+	ctx.setRenderTargetWithDepth(hdr, gbuffer.DS, .READONLY_DEPTH);
+	// shade only pixels that were written by the geometry pass (stencil != 0)
+	const state = stencilState(0, .NOT_EQUAL, 0, 255, .KEEP, .KEEP, .REPLACE);
+	ctx.drawState(shader, state, LightingUniform {
+		ctx.bindless(gbuffer.A),
+		ctx.bindless(gbuffer.B),
+		ctx.bindless(gbuffer.C),
+		ctx.bindless(gbuffer.D),
+		ctx.bindless(gbuffer.DS),
+		ctx.bindless(shadowmap),
+		ctx.shadowAtlasBindless(),
+		ctx.reflectionProbesBindless()
+	});
+	ctx.endBlock();
+	return hdr;
+}
+

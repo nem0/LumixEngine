@@ -1,0 +1,49 @@
+import "core:render"
+import "core:renderer/gpu/textureformat"
+
+// Layout of the second constant buffer (b5) the water and transparent materials read
+struct TransparentTextures {
+	shadowmap : u32;
+	depth : u32;
+	reflection_probes : u32;
+	color_copy : u32;
+}
+
+// Water and transparent geometry, port of Pipeline::transparentPass. Draws buckets 1 (water) and 2 (transparent) of the geometry
+// pass `view` into the lit image `hdr`.
+fn transparentPass(ctx : Context, gbuffer : GBuffer, shadowmap : RenderBuffer, view : u32, hdr : RenderBuffer) : void {
+	const width = ctx.width();
+	const height = ctx.height();
+	const camera = ctx.mainCamera();
+
+	ctx.beginBlock("water_evox");
+	// water and transparent materials sample what was rendered so far, a target can't be read while it's drawn to
+	const color_copy = ctx.createRenderTarget(width, height, .R11G11B10F);
+	ctx.pass(camera);
+	ctx.blit(hdr, color_copy, width, height);
+
+	ctx.setRenderTargetWithDepth(hdr, gbuffer.DS, .READONLY_DEPTH);
+	ctx.setUniform(.DRAWCALL2, TransparentTextures {
+		ctx.bindless(shadowmap),
+		ctx.bindless(gbuffer.DS),
+		ctx.reflectionProbesBindless(),
+		ctx.bindless(color_copy)
+	});
+	ctx.renderBucket(view, 1);
+	ctx.endBlock();
+
+	ctx.beginBlock("transparent_pass_evox");
+	ctx.setRenderTargetWithDepth(hdr, gbuffer.DS, .READONLY_DEPTH);
+	ctx.setUniform(.DRAWCALL2, TransparentTextures {
+		ctx.bindless(shadowmap),
+		ctx.bindless(gbuffer.DS),
+		ctx.reflectionProbesBindless(),
+		ctx.bindless(color_copy)
+	});
+	ctx.pass(camera);
+	ctx.renderBucket(view, 2);
+	ctx.renderTransparentPlugins();
+	ctx.releaseBuffer(color_copy);
+	ctx.endBlock();
+}
+

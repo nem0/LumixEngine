@@ -212,6 +212,7 @@ struct DeleteMemoryData {
 
 struct BinderShaderBufferData {
 	gpu::BufferHandle buffers[6];
+	u32 strides[6];
 };
 
 struct CreateProgramData {
@@ -265,10 +266,11 @@ DrawStream::DrawStream(Renderer& renderer)
 	current = first;
 }
 
-void DrawStream::bindShaderBuffers(Span<gpu::BufferHandle> buffers) {
+void DrawStream::bindShaderBuffers(Span<gpu::BufferHandle> buffers, Span<const u32> strides) {
 	BinderShaderBufferData data;
-	ASSERT(buffers.length() == lengthOf(data.buffers));
+	ASSERT(buffers.length() == lengthOf(data.buffers) && strides.length() == buffers.length());
 	memcpy(data.buffers, buffers.begin(), buffers.length() * sizeof(buffers[0]));
+	memcpy(data.strides, strides.begin(), strides.length() * sizeof(strides[0]));
 	write(Instruction::BIND_SHADER_BUFFER, data);
 }
 
@@ -785,7 +787,7 @@ void DrawStream::run() {
 				}
 				case Instruction::BIND_SHADER_BUFFER: {
 					READ(BinderShaderBufferData, data);
-					gpu::bindShaderBuffers(data.buffers);
+					gpu::bindShaderBuffers(data.buffers, data.strides);
 					break;
 				}
 				case Instruction::CREATE_PROGRAM: {

@@ -1,4 +1,4 @@
-import "core:postprocess"
+import "core:render"
 import "core:imgui" as imgui
 import "core:renderer/camera"
 import "core:renderer/module"
@@ -130,7 +130,7 @@ fn shadersReady(ctx : Context) : bool {
 		and ctx.loadShader("engine/shaders/bloom_blur.hlsl").isReady();
 }
 
-// Bloom with autoexposure, controlled by the bloom properties of the active camera. A `beforeTonemap` hook, game view only.
+// Bloom with autoexposure, controlled by the bloom properties of the active camera. Runs before tonemapping, game view only.
 fn bloom(ctx : Context, input : RenderBuffer) : RenderBuffer {
 	if ctx.pipelineType() != .GAME_VIEW {
 		return input;
@@ -196,7 +196,7 @@ fn bloom(ctx : Context, input : RenderBuffer) : RenderBuffer {
 	return input;
 }
 
-// Tonemapping with the exposure from the autoexposure (if the camera enables it). A `tonemap` hook, game view only.
+// Tonemapping with the exposure from the autoexposure (if the camera enables it), game view only.
 fn bloomTonemap(ctx : Context, input : RenderBuffer) : RenderBuffer {
 	if ctx.pipelineType() != .GAME_VIEW {
 		return invalidBuffer();
@@ -228,12 +228,12 @@ fn bloomTonemap(ctx : Context, input : RenderBuffer) : RenderBuffer {
 	return output;
 }
 
-// Radio button of the debug popup, a `debugUI` hook.
+// Radio button called from debugUI in the debug popup.
 fn debugUI(ctx : Context) : void {
 	ctx.debugRadio("Bloom");
 }
 
-// Shows the bright areas bloom is made of (a quarter of the screen, the buffer has half the resolution), a `debugOutput` hook.
+// Shows the bright areas bloom is made of (a quarter of the screen, the buffer has half the resolution).
 fn debugOutput(ctx : Context, output : RenderBuffer) : bool {
 	if not ctx.isDebugShown("Bloom") {
 		return false;

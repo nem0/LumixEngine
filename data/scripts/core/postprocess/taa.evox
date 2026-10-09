@@ -1,4 +1,4 @@
-import "core:postprocess"
+import "core:render"
 import "core:imgui" as imgui
 
 // Setting, edit it here. TAA is also off while `Renderer::enableBuiltinTAA(false)` is in effect, e.g. when DLSS or FSR3 are
@@ -26,7 +26,7 @@ fn groups(size : u32) : u32 {
 	return (size + 15) / 16;
 }
 
-// Temporal antialiasing, an `antialias` hook. Built-in antialiasing (e.g. DLSS) runs first and wins if it is active.
+// Temporal antialiasing. C++ antialiasing plugins (e.g. DLSS) run first and win if active.
 fn taa(ctx : Context, hdr : RenderBuffer) : RenderBuffer {
 	var state = ctx.state(TaaState);
 	if not g_enabled or not ctx.builtinTaaEnabled() {
@@ -72,13 +72,13 @@ fn taa(ctx : Context, hdr : RenderBuffer) : RenderBuffer {
 	const old_history = state.history;
 	state.history = blended;
 	ctx.releaseBuffer(old_history);
-	// an antialias hook that returns a new buffer releases its input
+	// an antialiasing effect that returns a new buffer releases its input
 	ctx.releaseBuffer(hdr);
 	ctx.endBlock();
 	return output;
 }
 
-// Checkbox in the debug popup, a `debugUI` hook.
+// Checkbox called from debugUI in the debug popup.
 fn debugUI(ctx : Context) : void {
 	g_enabled = imgui.checkbox("TAA", g_enabled);
 }

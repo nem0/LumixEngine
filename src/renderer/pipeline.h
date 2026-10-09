@@ -104,6 +104,9 @@ struct LUMIX_RENDERER_API Pipeline {
 	virtual void enablePixelJitter(bool enable) = 0;
 	//@ function
 	virtual void setClearColor(Vec3 color) = 0;
+	virtual Vec3 getClearColor() const = 0;
+	// bindless handle of the shadow atlas of local lights, invalid if there is none
+	virtual gpu::BindlessHandle getShadowAtlasBindless() const = 0;
 
 	virtual Draw2D& getDraw2D() = 0;
 	virtual void clearDraw2D() = 0;
@@ -126,6 +129,21 @@ struct LUMIX_RENDERER_API Pipeline {
 	virtual void blit(gpu::BindlessHandle src, gpu::RWBindlessHandle dst, IVec2 size, bool flip_x = false, bool flip_y = false) = 0;
 	virtual void viewport(i32 x, i32 y, i32 w, i32 h) = 0;
 	virtual void pass(const CameraParams& cp) const = 0;
+	virtual CameraParams getMainCamera() const = 0;
+	// The parts of the frame (see Pipeline::renderMain): `beginFrame3D` starts the sort keys job group, fills the light clusters
+	// and releases the previous output. `bindGlobalState` binds the global uniforms with the shadow map. `endFrame3D` waits for the
+	// sort keys.
+	virtual void beginFrame3D() = 0;
+	virtual void bindGlobalState(RenderBufferHandle shadowmap) = 0;
+	virtual void endFrame3D() = 0;
+	virtual void renderDebugShapes(RenderBufferHandle output, RenderBufferHandle depth) = 0;
+	virtual void render2D(RenderBufferHandle input) = 0;
+	// slice 0..3 of the shadow cascades
+	virtual CameraParams getShadowCamera(u32 slice) const = 0;
+	virtual void renderGrass(CameraParams cp, gpu::StateFlags state, u32 define_mask) = 0;
+	virtual void renderTerrains(const CameraParams& cp, gpu::StateFlags state, const char* define) = 0;
+	// number of buckets of a view returned by `cull`, 0 for an unknown view
+	virtual u32 getBucketCount(u32 view_idx) const = 0;
 	virtual u32 cull(const CameraParams& cp, Span<const BucketDesc> buckets) = 0;
 	virtual void renderBucket(u32 view_idx, u32 bucket_idx) const = 0;
 	virtual void dispatch(Shader& shader, u32 x, u32 y, u32 z, const char* define = nullptr) = 0;

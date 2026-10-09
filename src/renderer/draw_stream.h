@@ -44,7 +44,7 @@ struct DrawStream {
 	void bindVertexBuffer(u32 binding_idx, gpu::BufferHandle buffer, u32 buffer_offset, u32 stride);
 	void bindUniformBuffer(u32 ub_index, gpu::BufferHandle buffer, u32 offset, u32 size);
 	void bindIndirectBuffer(gpu::BufferHandle buffer);
-	void bindShaderBuffers(Span<gpu::BufferHandle> buffers);
+	void bindShaderBuffers(Span<gpu::BufferHandle> buffers, Span<const u32> strides);
 	
 	gpu::Drawcall& draw();
 	void drawArrays(u32 offset, u32 count);

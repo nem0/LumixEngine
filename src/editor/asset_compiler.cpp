@@ -337,7 +337,9 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 
 	
-	void processDir(StringView dir, u64 list_last_modified) {
+	// `propagate_visited`: if set, assets that import a file changed since the list was saved are recompiled too (the file watcher does that only while
+	// we are running, files changed while the editor was closed would leave stale compiled dependents)
+	void processDir(StringView dir, u64 list_last_modified, Array<Path>* propagate_visited = nullptr) {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		auto* iter = fs.createFileIterator(dir);
 		if (!iter) return; // the directory can be removed while we are processing stuff
@@ -350,7 +352,7 @@ struct AssetCompilerImpl : AssetCompiler {
 				copyString(child_path, dir);
 				if(!dir.empty()) catString(child_path, "/");
 				catString(child_path, info.filename);
-				processDir(child_path, list_last_modified);
+				processDir(child_path, list_last_modified, propagate_visited);
 			}
 			else {
 				char fullpath[MAX_PATH];
@@ -360,6 +362,7 @@ struct AssetCompilerImpl : AssetCompiler {
 
 				if (fs.getLastModified(fullpath[0] == '/' ? fullpath + 1 : fullpath) > list_last_modified) {
 					addResource(Path(fullpath));
+					if (propagate_visited) pushDependentsToCompileQueue(Path(fullpath[0] == '/' ? fullpath + 1 : fullpath), propagate_visited);
 				}
 				else {
 					Path path(fullpath[0] == '/' ? fullpath + 1 : fullpath);
@@ -492,8 +495,9 @@ struct AssetCompilerImpl : AssetCompiler {
 			m_scan_timer.tick();
 			PROFILE_BLOCK("asset scan")
 			const u64 list_last_modified = fs.getLastModified(".lumix/resources/_resources.txt");
-			processDir("", list_last_modified);
-			processDir("engine/", list_last_modified);
+			Array<Path> visited(m_allocator);
+			processDir("", list_last_modified, &visited);
+			processDir("engine/", list_last_modified, &visited);
 		}
 		m_save_list_after_scan = true;
 	}
@@ -590,10 +594,12 @@ struct AssetCompilerImpl : AssetCompiler {
 
 	// queues everything that depends on `path`, directly or through other files, exactly once;
 	// the dependency graph can have cycles (e.g. two scripts importing each other) and diamonds
-	void pushDependentsToCompileQueue(const Path& path) {
+	// `shared_visited`: paths already handled by previous calls (e.g. the startup scan), so that a dependent of many changed files is queued once
+	void pushDependentsToCompileQueue(const Path& path, Array<Path>* shared_visited = nullptr) {
 		MutexGuard lock(m_dependencies_mutex);
-		Array<Path> visited(m_allocator);
-		visited.push(path);
+		Array<Path> local_visited(m_allocator);
+		Array<Path>& visited = shared_visited ? *shared_visited : local_visited;
+		if (visited.indexOf(path) < 0) visited.push(path);
 		pushDependentsRec(path, visited);
 	}
 

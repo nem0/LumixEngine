@@ -1,6 +1,7 @@
 #include "../../external/evox/arena.h"
 #include "core/crt.h"
 #include "core/log.h"
+#include "core/os.h"
 #include "core/stream.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
@@ -8,6 +9,7 @@
 #include "engine/world.h"
 #include "evox/capi.h"
 #include "evox/evox_module.h"
+#include "renderer/evox_render.h"
 #include "tests/common.h"
 
 using namespace Lumix;
@@ -974,6 +976,78 @@ bool testEvoxModuleSameNamedTypes() {
 	return true;
 }
 
+// Reads `core:` imports from data/scripts/core, tests run in the `data` directory.
+struct CoreScripts {
+	CoreScripts() : sources(getGlobalAllocator()) {}
+
+	static int resolve(void* userdata, ex_string_view path, ex_string_view, ex_string_view* source) {
+		CoreScripts& self = *(CoreScripts*)userdata;
+		const StringView requested(path.begin, (u64)path.length);
+		if (!startsWith(requested, "core:")) return 0;
+		StaticString<256> file_path("scripts/core/", StringView(requested.data + 5, (u32)requested.size() - 5), ".evox");
+		os::InputFile file;
+		if (!file.open(file_path)) return 0;
+		UniquePtr<OutputMemoryStream>& content = self.sources.emplace();
+		content = UniquePtr<OutputMemoryStream>::create(getGlobalAllocator(), getGlobalAllocator());
+		content->resize(file.size());
+		const bool read = file.read(content->getMutableData(), content->size());
+		file.close();
+		if (!read) return 0;
+		*source = {(const char*)content->data(), (i64)content->size()};
+		return 1;
+	}
+
+	Array<UniquePtr<OutputMemoryStream>> sources;
+};
+
+static ex_native_fn resolveNative(ex_runtime*, ex_native_function_desc function, void* userdata) {
+	auto& functions = *(EvoxRender::NativeFunctions*)userdata;
+	const NativeFunctionKey key{StringView(function.unit_path.begin, (u64)function.unit_path.length), StringView(function.name.begin, (u64)function.name.length)};
+	auto iter = functions.find(key);
+	return iter.isValid() ? iter.value() : nullptr;
+}
+
+// A project's render.evox that calls the default frame must compile with all the effects it calls directly, and `main` and `debugUI` must
+// be found by the runtime.
+bool testEvoxRenderDefaults() {
+	EvoxTestHost host;
+	CoreScripts scripts;
+	const char* source = R"(
+		import "core:render"
+		import "core:render/frame" as frame
+		fn main(ctx : Context) : RenderBuffer { return frame.renderFrame(ctx); }
+		fn debugUI(ctx : Context) : void { frame.debugUI(ctx); }
+	)";
+	ex_module* module = ex_module_create(&host.host);
+	ASSERT_TRUE(module);
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(module, {source, (i64)stringLength(source)}, {"render.evox", 11}, &CoreScripts::resolve, &scripts));
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &host.host, nullptr);
+	ASSERT_TRUE(bytecode);
+	ex_runtime* runtime = ex_runtime_create(bytecode, &host.host);
+	ASSERT_TRUE(runtime);
+	EvoxRender::NativeFunctions functions(getGlobalAllocator());
+	Evox::registerRenderFunctions(functions);
+	ASSERT_EQ(EX_RESULT_OK, ex_runtime_set_native_resolver(runtime, &resolveNative, &functions));
+
+	const char* static_plugins[] = {"evox"};
+	Engine::InitArgs args;
+	args.static_plugins = static_plugins;
+	UniquePtr<Engine> engine = Engine::create(static_cast<Engine::InitArgs&&>(args), getGlobalAllocator());
+	ASSERT_TRUE(engine);
+	{
+		EvoxRender render_script(*engine, getGlobalAllocator());
+		render_script.attach(bytecode, runtime);
+		ASSERT_TRUE(ex_runtime_find_function(runtime, {"render.evox", 11}, {"main", 4}) >= 0);
+		ASSERT_TRUE(ex_runtime_find_function(runtime, {"render.evox", 11}, {"debugUI", 7}) >= 0);
+		render_script.detach();
+	}
+	engine.reset();
+	ex_runtime_destroy(runtime);
+	ex_bytecode_destroy(bytecode);
+	ex_module_destroy(module);
+	return true;
+}
+
 } // namespace
 
 void runEvoxModuleTests() {
@@ -988,4 +1062,5 @@ void runEvoxModuleTests() {
 	RUN_TEST(testEvoxModuleMultiplePendingTypes);
 	RUN_TEST(testEvoxModuleZeroSizedData);
 	RUN_TEST(testEvoxModuleSameNamedTypes);
+	RUN_TEST(testEvoxRenderDefaults);
 }
