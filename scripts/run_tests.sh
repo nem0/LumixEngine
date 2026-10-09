@@ -9,13 +9,13 @@ cd "$SCRIPT_DIR"
 
 "$SCRIPT_DIR/run_meta.sh"
 
-if [[ ! -x ./genie ]]; then
-  echo "error: Linux genie is missing or not executable: $SCRIPT_DIR/genie" >&2
-  echo "       run: chmod +x \"$SCRIPT_DIR/genie\"" >&2
+if [[ ! -x ./premake5 ]]; then
+  echo "error: Linux premake5 is missing or not executable: $SCRIPT_DIR/premake5" >&2
+  echo "       run: chmod +x \"$SCRIPT_DIR/premake5\"" >&2
   exit 1
 fi
 
-./genie --with-tests \
+./premake5 --with-tests \
   --no-physics \
   --no-navigation \
   --no-animation \

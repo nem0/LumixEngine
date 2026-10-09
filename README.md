@@ -32,7 +32,7 @@ A small collection of sample projects built with the Lumix Engine. See the full 
 
 Project generator
 
-* [Genie](https://github.com/bkaradzic/genie)
+* [premake5](https://premake.github.io)
 
 Contact: mikulas.florek@gamedev.sk
 

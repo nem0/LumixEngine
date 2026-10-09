@@ -51,7 +51,7 @@ if not %errorlevel%==0 pause
 popd
 
 REM create engine project
-bin/windows/genie.exe --static-physx --with-app --nodx vs2022
+premake5.exe --static-physx vs2022
 if not %errorlevel%==0 pause
 
 REM build studio.exe
@@ -69,7 +69,7 @@ butler.exe push itch_io mikulasflorek/lumix-engine:win-64-gl
 if not %errorlevel%==0 pause
 
 REM create engine project
-bin/windows/genie.exe --static-physx --with-app vs2022
+premake5.exe --static-physx vs2022
 if not %errorlevel%==0 pause
 
 REM build studio.exe

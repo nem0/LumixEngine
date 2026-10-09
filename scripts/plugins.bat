@@ -28,12 +28,11 @@ setlocal
 	echo  8. Procedural geometry
 	echo  9. Marketplace
 	echo  A. LiveCode 
-	echo  B. Basis Universal
-	echo  C. Jolt
-	echo  D. Lua
-	echo  E. Remote control
+	echo  B. Jolt
+	echo  C. Lua
+	echo  D. Remote control
 	echo ===============================
-	choice /C 123456789ABCDE /N /M "Your choice:"
+	choice /C 123456789ABCD /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :empty_plugin
@@ -45,10 +44,9 @@ setlocal
 	if %errorlevel%==8 call :procedural_geom_plugin
 	if %errorlevel%==9 call :marketplace_plugin
 	if %errorlevel%==10 call :livecode_plugin
-	if %errorlevel%==11 call :basisu
-	if %errorlevel%==12 call :jolt_plugin
-	if %errorlevel%==13 call :lua_plugin
-	if %errorlevel%==14 call :remote_plugin
+	if %errorlevel%==11 call :jolt_plugin
+	if %errorlevel%==12 call :lua_plugin
+	if %errorlevel%==13 call :remote_plugin
 goto :begin
 
 :glft_import_plugin
@@ -223,54 +221,6 @@ exit /B 0
 		git.exe clone https://github.com/nem0/lumix_plugin_template.git myplugin
 	) else (
 		cd myplugin
-		git pull
-	)
-	popd
-exit /B 0
-
-:basisu
-	cls
-	echo Basis Universal
-	echo ===============================
-	echo  1. Go back
-	echo  2. Download
-	if exist "../external/_repos/basisu/" (
-		echo  3. Build
-		echo  4. Deploy
-		echo  5. Open in VS
-	)
-	echo ===============================
-	choice /C 12345 /N /M "Your choice:"
-	echo.
-	if %errorlevel%==1 exit /B 0
-	if %errorlevel%==2 call :download_basisu
-	if %errorlevel%==3 call :build_basisu
-	if %errorlevel%==4 call :deploy_basisu
-	if %errorlevel%==5 "../external/_repos/basisu/lumix/vs2022/basis_lumix.sln"
-	pause
-goto :basisu
-
-:build_basisu
-	.\genie.exe --file=../external/_repos/basisu/lumix/genie.lua vs2022
-	%msbuild_cmd% ..\external\_repos\basisu\lumix\vs2022\basis_lumix.sln /p:Configuration="Release" /p:Platform=x64
-exit /B 0
-
-:deploy_basisu
-	echo %CD%
-	del /Q ..\external\basisu\lib\win64_vs2017\release\*
-	xcopy /E /Y "3rdparty\basisu\lumix\vs2022\bin\*.*" ..\external\basisu\lib\win64_vs2017\release\
-	del /Q ..\external\basisu\include\*
-	xcopy /E /Y "3rdparty\basisu\transcoder\*.h" ..\external\basisu\include\transcoder
-	xcopy /E /Y "3rdparty\basisu\encoder\*.h" ..\external\basisu\include\encoder
-exit /B 0
-
-:download_basisu
-	if not exist %dir_3rdparty_src% mkdir %dir_3rdparty_src%
-	pushd %dir_3rdparty_src%
-	if not exist basisu (
-		git.exe clone --depth=1 https://github.com/nem0/basis_universal.git basisu
-	) else (
-		cd basisu
 		git pull
 	)
 	popd

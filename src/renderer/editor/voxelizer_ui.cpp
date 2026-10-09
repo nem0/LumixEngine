@@ -10,7 +10,7 @@
 #include <imgui/imgui.h>
 
 
-// this file is disabled in genie.lua, because this is only a helper class to develop voxelization
+// this file is disabled in premake5.lua, because this is only a helper class to develop voxelization
 namespace Lumix {
 
 

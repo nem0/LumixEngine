@@ -9,7 +9,7 @@ namespace Lumix {
 
 
 //@ object
-struct Clip final : Resource {
+struct LUMIX_AUDIO_API Clip final : Resource {
 	enum class Format : u8 {
 		OGG,
 		WAV

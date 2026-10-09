@@ -79,6 +79,30 @@ inline EntityRef EntityPtr::operator*() const {
 	#define LUMIX_RENDERER_API LUMIX_LIBRARY_IMPORT
 #endif
 
+#ifdef STATIC_PLUGINS
+	#define LUMIX_ANIMATION_API
+#elif defined BUILDING_ANIMATION
+	#define LUMIX_ANIMATION_API LUMIX_LIBRARY_EXPORT
+#else
+	#define LUMIX_ANIMATION_API LUMIX_LIBRARY_IMPORT
+#endif
+
+#ifdef STATIC_PLUGINS
+	#define LUMIX_AUDIO_API
+#elif defined BUILDING_AUDIO
+	#define LUMIX_AUDIO_API LUMIX_LIBRARY_EXPORT
+#else
+	#define LUMIX_AUDIO_API LUMIX_LIBRARY_IMPORT
+#endif
+
+#ifdef STATIC_PLUGINS
+	#define LUMIX_UI_API
+#elif defined BUILDING_UI
+	#define LUMIX_UI_API LUMIX_LIBRARY_EXPORT
+#else
+	#define LUMIX_UI_API LUMIX_LIBRARY_IMPORT
+#endif
+
 namespace reflection { 
 	LUMIX_ENGINE_API ComponentType getComponentType(StringView id);
 }

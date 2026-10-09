@@ -1,8 +1,5 @@
 #define LUMIX_NO_CUSTOM_CRT
 #include <string.h>
-#ifdef LUMIX_BASIS_UNIVERSAL
-	#include <encoder/basisu_comp.h>
-#endif
 
 #include "engine/lumix.h"
 
@@ -1625,67 +1622,23 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			data = stb_data;
 		}
 
-		#ifdef LUMIX_BASIS_UNIVERSAL
-			dst.write("bsu", 3);
-			u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
-			// TODO wrap_mode
-			flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
-			flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
-			flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
-			flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
-			flags |= meta.filter == Meta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
-			dst.write(&flags, sizeof(flags));
-			gpu::TextureFormat gpu_format = meta.is_normalmap ? gpu::TextureFormat::BC5 : (comps == 4 ? gpu::TextureFormat::BC3 : gpu::TextureFormat::BC1);
-			dst.write(gpu_format);
+		dst.write("lbc", 3);
+		u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
+		dst.write(&flags, sizeof(flags));
 
-			static bool once = [](){ basisu::basisu_encoder_init(); return true; }();
-			basisu::job_pool job_pool(jobs::getWorkersCount());
-			basisu::basis_compressor c;
-			basisu::basis_compressor_params params;
-			params.m_pJob_pool = &job_pool;
-			params.m_source_images.push_back({});
-			params.m_source_images[0].init(data, w, h, 4);
-			params.m_quality_level = 255;
-			params.m_perceptual = !meta.is_normalmap && meta.srgb;
-			params.m_mip_gen = meta.mips;
-			if (meta.is_normalmap) {
-				params.m_mip_srgb = false;
-				params.m_no_selector_rdo = true;
-				params.m_no_endpoint_rdo = true;
-				params.m_swizzle[0] = 0;
-				params.m_swizzle[1] = 0;
-				params.m_swizzle[2] = 0;
-				params.m_swizzle[3] = 1;
-			}
-			if (!c.init(params)) {
-				stbi_image_free(stb_data);
-				return false;
-			}
-			basisu::basis_compressor::error_code err = c.process();
-			stbi_image_free(stb_data);
-			if (err != basisu::basis_compressor::cECSuccess) return false;
-
-			const basisu::uint8_vec& out = c.get_output_basis_file();
-			return dst.write(out.get_ptr(), out.size_in_bytes());
-		#else
-			dst.write("lbc", 3);
-			u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
-			dst.write(&flags, sizeof(flags));
-
-			TextureCompressor::Input input(w, h, 1, 1, m_allocator);
-			input.add(Span(data, w * h * 4), 0, 0, 0);
-			input.is_srgb = meta.srgb;
-			input.is_normalmap = meta.normalmap;
-			input.has_alpha = comps == 4;
-			TextureCompressor::Options options;
-			options.generate_mipmaps = meta.mips;
-			options.stochastic_mipmap = meta.stochastic_mip; 
-			options.scale_coverage_ref = meta.mip_scale_coverage;
-			options.compress = meta.compress;
-			const bool res = TextureCompressor::compress(input, options, dst, m_allocator);
-			stbi_image_free(stb_data);
-			return res;
-		#endif
+		TextureCompressor::Input input(w, h, 1, 1, m_allocator);
+		input.add(Span(data, w * h * 4), 0, 0, 0);
+		input.is_srgb = meta.srgb;
+		input.is_normalmap = meta.normalmap;
+		input.has_alpha = comps == 4;
+		TextureCompressor::Options options;
+		options.generate_mipmaps = meta.mips;
+		options.stochastic_mipmap = meta.stochastic_mip; 
+		options.scale_coverage_ref = meta.mip_scale_coverage;
+		options.compress = meta.compress;
+		const bool res = TextureCompressor::compress(input, options, dst, m_allocator);
+		stbi_image_free(stb_data);
+		return res;
 	}
 
 	bool compile(const Path& src) override {

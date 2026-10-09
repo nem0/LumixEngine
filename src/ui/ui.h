@@ -225,7 +225,7 @@ struct BoxSpacing {
 };
 
 //@ object full ui::Element
-struct Element {
+struct LUMIX_UI_API Element {
 	Element() = delete;
 	Element(Tag t, IAllocator& allocator, Document& doc)
 		: tag(t)
@@ -346,7 +346,7 @@ struct Event {
 };
 
 //@ object full ui::Document
-struct Document {
+struct LUMIX_UI_API Document {
 	using Token = UITokenizer::Token;
 
 	Element m_root;

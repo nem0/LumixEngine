@@ -12,7 +12,7 @@ scripts\run_meta.bat
 
 This script will:
 1. Initialize the Visual Studio developer environment
-2. Generate the solution if it doesn't exist (using genie.exe)
+2. Generate the solution if it doesn't exist (using premake5.exe)
 3. Build the meta project
 4. Run meta.exe from the project root directory
 

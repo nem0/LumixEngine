@@ -98,5 +98,5 @@ Because `tests.exe` includes particle script, UI, and Evox test suites, this wor
 - `src/evox/**`
 - `external/evox/**`
 - `scripts/run_tests.*`
-- `scripts/genie.lua`
+- `scripts/premake5.lua`
 - `.github/workflows/tests.yml`

@@ -3,7 +3,7 @@ echo "Downloading project in LumixEngine/"
 call git clone --depth=1 https://github.com/nem0/LumixEngine.git
 cd LumixEngine\scripts
 
-genie.exe vs2022
+premake5.exe vs2022
 
 set devenv_cmd=devenv.exe
 where /q devenv.exe

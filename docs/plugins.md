@@ -4,7 +4,7 @@
 3. Regenerate the solution (e.g., run [scripts/create_vs22_sln.bat](../scripts/create_vs22_sln.bat)).
 4. Build and run the solution.
 
-Plugins downloaded this way are placed in the `plugins` directory. *GENie* automatically detects all plugins in this directory and includes them in the solution.
+Plugins downloaded this way are placed in the `plugins` directory. *premake5* automatically detects all plugins in this directory and includes them in the solution.
 
 # Up-to-date plugins
 

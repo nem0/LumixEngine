@@ -23,8 +23,8 @@ call "%VSINSTALL%\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul
 
 REM Ensure solution exists
 if not exist "%SLN_PATH%" (
-  echo Solution not found, generating with genie.exe...
-  "%SCRIPTS_DIR%genie.exe" vs2022
+  echo Solution not found, generating with premake5.exe...
+  "%SCRIPTS_DIR%premake5.exe" vs2022
   if errorlevel 1 (
     echo Failed to generate solution.
     exit /b 1

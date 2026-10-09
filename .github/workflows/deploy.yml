@@ -44,7 +44,7 @@ jobs:
             - name: make VS project
               working-directory: scripts
               run: |
-                ./genie.exe --with-app vs2022
+                ./premake5.exe vs2022
                 
             - name: get butler
               working-directory: scripts

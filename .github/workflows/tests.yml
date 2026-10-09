@@ -10,7 +10,7 @@ on:
       - 'external/evox/**'
       - 'data/scripts/core/**.evox'
       - 'scripts/run_tests.*'
-      - 'scripts/genie.lua'
+      - 'scripts/premake5.lua'
       - '.github/workflows/tests.yml'
   pull_request:
     paths:
@@ -22,7 +22,7 @@ on:
       - 'external/evox/**'
       - 'data/scripts/core/**.evox'
       - 'scripts/run_tests.*'
-      - 'scripts/genie.lua'
+      - 'scripts/premake5.lua'
       - '.github/workflows/tests.yml'
 
 jobs:

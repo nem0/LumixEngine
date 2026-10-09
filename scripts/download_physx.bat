@@ -1,7 +1,7 @@
 @echo off
 
 REM This script downloads the PhysX source code from the official repository
-REM GENie automatically detects PhysX source code and uses it instead of the prebuilt version
+REM premake5 automatically detects PhysX source code and uses it instead of the prebuilt version
 
 setlocal
 	set dir_3rdparty_src="..\external\_repos\"

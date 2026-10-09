@@ -12,7 +12,7 @@ We utilize [Recast & Detour](https://github.com/recastnavigation/recastnavigatio
 
 We utilize [FreeType2](https://github.com/nem0/freetype2.git) for text rendering. On Windows, the prebuilt static library is included in [external/freetype/lib/win](../external/freetype/lib/win/) and is used by default. If you want to build FreeType from source code, use the following steps:
 1. Run [download_freetype.bat](../scripts/download_freetype.bat) to download the FreeType source code.
-2. Regenerate the project using *GENie*.
+2. Regenerate the project using *premake5*.
 3. Build the project.
 
 ## PhysX
@@ -20,7 +20,7 @@ We utilize [FreeType2](https://github.com/nem0/freetype2.git) for text rendering
 We utilize [PhysX](https://github.com/nem0/PhysX.git) for physical simulation. On Windows, the prebuilt static library is included in [external/physx/lib/win](../external/physx/lib/win) and is used by default. If you want to build PhysX from source code, use the following steps:
 
 1. Run [download_physx.bat](../scripts/download_physx.bat) to download the PhysX source code.
-2. Regenerate the project using *GENie*.
+2. Regenerate the project using *premake5*.
 3. Build the project.
 
 ## LZ4

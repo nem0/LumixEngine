@@ -59,7 +59,7 @@ jobs:
             - name: make VS project with plugins and app
               working-directory: scripts
               run: |
-                ./genie.exe --with-app vs2022
+                ./premake5.exe vs2022
             - name: build
               working-directory: scripts
               shell: cmd
@@ -98,7 +98,7 @@ jobs:
     #       - name: build
     #         run: |
     #           cd scripts
-    #           ./genie --force-build-luau gmake
+    #           ./premake5 --force-build-luau gmake
     #           cd tmp/gmake
     #           make -j
     #         env:
