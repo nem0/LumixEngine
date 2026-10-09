@@ -25,6 +25,7 @@ import "core:renderer/gpu/textureformat"
 import "core:imgui" as imgui
 import "core:vec3"
 import "core:vec4"
+import "core:entity"
 
 // Valid only during the call it was passed to, do not store it.
 struct Context { ptr : cptr; }
@@ -256,6 +257,11 @@ extern fn cull(ctx : Context, camera : ViewCamera) : u32;
 // Draw grass and terrains for the camera. `defines` are space separated shader defines (e.g. "GRASS DEPTH").
 extern fn renderGrass(ctx : Context, camera : ViewCamera, state : u64, defines : []const u8) : void;
 extern fn renderTerrains(ctx : Context, camera : ViewCamera, state : u64, define : []const u8) : void;
+// Draws the meshes of only these entities into the current targets, with the view of the pipeline (the camera set by the last `pass`).
+// `state` is a StateFlags value, `define` a shader variant such as "DEPTH" (a depth-only mask), "" for none. Entities that are not
+// model instances, or are from another world, are skipped. Use it for overlays such as the selection outline, the rest of the scene is
+// not drawn.
+extern fn renderEntities(ctx : Context, state : u64, define : []const u8, entities : []const Entity) : void;
 
 // Draws the geometry of a bucket of a culled view into the current targets.
 extern fn renderBucket(ctx : Context, view : u32, bucket : u32) : void;

@@ -1655,6 +1655,7 @@ void readTexture(TextureHandle texture, TextureReadCallback callback) {
 	);
 
 	ID3D12Resource* staging = createBuffer(d3d->device, nullptr, face_bytes * (is_cubemap ? 6 : 1), D3D12_HEAP_TYPE_READBACK, "staging");
+	if (!staging) return; // device removed, the callback is not called
 	const D3D12_RESOURCE_STATES prev_state = texture->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_COPY_SOURCE);
 	
 	D3D12_TEXTURE_COPY_LOCATION src_location = {};

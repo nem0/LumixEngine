@@ -17,6 +17,7 @@
 #include "culling_system.h"
 #include "draw_stream.h"
 #include "draw2d.h"
+#include "engine/component_types.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/resource_manager.h"
@@ -1764,6 +1765,111 @@ struct PipelineImpl final : Pipeline {
 		});
 	}
 	
+	void renderEntities(Span<const EntityRef> entities, gpu::StateFlags state, const char* define) override {
+		PROFILE_FUNCTION();
+		if (entities.size() == 0) return;
+		const u32 define_mask = define ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
+		const u32 count = entities.size();
+		// the job runs later, so it gets its own copy of the list
+		EntityRef* list = (EntityRef*)m_renderer.getCurrentFrameAllocator().allocate(sizeof(EntityRef) * count, alignof(EntityRef));
+		for (u32 i = 0; i < count; ++i) list[i] = entities[i];
+
+		m_renderer.pushJob("render entities", [this, list, count, state, define_mask](DrawStream& stream) {
+			UniformPool& uniform_pool = m_renderer.getUniformPool();
+			TransientPool& transient_pool = m_renderer.getTransientPool();
+			const World& world = m_module->getWorld();
+			const u32 skinned_define = 1 << m_renderer.getShaderDefineIdx("SKINNED");
+			const DVec3 view_pos = m_viewport.pos;
+			Array<DualQuat> dq_pose(m_renderer.getAllocator());
+			for (u32 ei = 0; ei < count; ++ei) {
+				const EntityRef e = list[ei];
+				if (!world.hasComponent(e, types::model_instance)) continue;
+
+				const Model* model = m_module->getModelInstanceModel(e);
+				if (!model || !model->isReady()) continue;
+
+				const Pose* pose = m_module->lockPose(e);
+				for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
+					const Mesh& mesh = model->getMesh(i);
+					const MeshMaterial& mesh_mat = model->getMeshMaterial(i);
+
+					Material* material = mesh_mat.material;
+					u32 mask = material->getDefineMask() | define_mask;
+					const Matrix mtx = world.getRelativeMatrix(e, view_pos);
+					dq_pose.clear();
+					if (pose && pose->count > 0 && mesh.type == Mesh::SKINNED) {
+						mask |= skinned_define;
+						dq_pose.reserve(pose->count);
+						for (int j = 0, c = pose->count; j < c; ++j) {
+							const LocalRigidTransform& inv_bind = model->getInverseBindTransform(j);
+							const LocalRigidTransform tmp = {pose->positions[j], pose->rotations[j]};
+							dq_pose.push((tmp * inv_bind).toDualQuat());
+						}
+					}
+
+					if (dq_pose.empty()) {
+						struct UBData {
+							Matrix mtx;
+							MaterialIndex material_index;
+						} ub_data = {
+							mtx,
+							material->getIndex()
+						};
+						TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
+						stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+						stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+						gpu::ProgramHandle program = mesh_mat.material->getShader()->getProgram(material->m_render_states | state, mesh.vertex_decl, mask, mesh.semantics_defines);
+						stream.useProgram(program);
+					}
+					else {
+						struct SkinnedInstanceData {
+							IVec3 idata;
+							Vec3 pos;
+							Quat rot;
+							Vec3 scale;
+							Vec3 prev_pos;
+							Quat prev_rot;
+							Vec3 prev_scale;
+						};
+
+						TransientSlice inst_buf = alloc(transient_pool, sizeof(SkinnedInstanceData));
+						TransientSlice bones = alloc(transient_pool, dq_pose.byte_size());
+						SkinnedInstanceData* idata = (SkinnedInstanceData*)inst_buf.ptr;
+
+						Transform tr = world.getTransform(e);
+						idata->pos = Vec3(tr.pos - view_pos);
+						idata->prev_pos = idata->pos;
+						idata->rot = tr.rot;
+						idata->prev_rot = idata->rot;
+						idata->scale = tr.scale;
+						idata->prev_scale = idata->scale;
+						idata->idata.x = (i32)material->getIndex();
+						idata->idata.y = gpu::getBindlessHandle(bones.buffer).value;
+						idata->idata.z = bones.offset;
+
+						memcpy(bones.ptr, dq_pose.begin(), dq_pose.byte_size());
+						gpu::VertexDecl skinned_instanced_decl(gpu::PrimitiveType::NONE);
+						skinned_instanced_decl.addAttribute(0, 3, gpu::AttributeType::U32, gpu::Attribute::INSTANCED); // material index, bones_buffer, bones_buffer_offset
+						skinned_instanced_decl.addAttribute(12, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // pos
+						skinned_instanced_decl.addAttribute(24, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // rot
+						skinned_instanced_decl.addAttribute(40, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // scale
+						skinned_instanced_decl.addAttribute(52, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // prev_pos
+						skinned_instanced_decl.addAttribute(64, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // prev_rot
+						skinned_instanced_decl.addAttribute(80, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // prev_scale
+						stream.bindVertexBuffer(1, inst_buf.buffer, inst_buf.offset, inst_buf.size);
+						gpu::ProgramHandle program = mesh_mat.material->getShader()->getProgram(material->m_render_states | state, mesh.vertex_decl, skinned_instanced_decl, mask, mesh.semantics_defines);
+						stream.useProgram(program);
+					}
+
+					stream.bindIndexBuffer(mesh.index_buffer_handle);
+					stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
+					stream.drawIndexed(0, mesh.indices_count, mesh.index_type);
+				}
+				m_module->unlockPose(e, false);
+			}
+		});
+	}
+
 	void renderGrass(CameraParams cp, gpu::StateFlags state = gpu::StateFlags::NONE, u32 define_mask = 0) override {
 		PROFILE_FUNCTION();
 		if (!cp.is_shadow) {

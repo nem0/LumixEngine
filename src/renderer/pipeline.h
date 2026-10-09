@@ -142,6 +142,9 @@ struct LUMIX_RENDERER_API Pipeline {
 	virtual CameraParams getShadowCamera(u32 slice) const = 0;
 	virtual void renderGrass(CameraParams cp, gpu::StateFlags state, u32 define_mask) = 0;
 	virtual void renderTerrains(const CameraParams& cp, gpu::StateFlags state, const char* define) = 0;
+	// Draws the meshes of only these entities (non-model entities are skipped) with the view of the pipeline, `define` selects a shader
+	// variant, e.g. "DEPTH" for a depth-only mask. The rest of the scene is not drawn.
+	virtual void renderEntities(Span<const EntityRef> entities, gpu::StateFlags state, const char* define) = 0;
 	// number of buckets of a view returned by `cull`, 0 for an unknown view
 	virtual u32 getBucketCount(u32 view_idx) const = 0;
 	virtual u32 cull(const CameraParams& cp, Span<const BucketDesc> buckets) = 0;

@@ -3,6 +3,7 @@
 #include "core/profiler.h"
 #include "engine/engine.h"
 #include "engine/resource_manager.h"
+#include "engine/world.h"
 #include "evox/capi.h"
 #include "evox/evox_resource.h"
 #include "renderer/pipeline.h"
@@ -871,6 +872,39 @@ static void scriptRenderTerrains(ex_runtime*, ex_call_frame frame) {
 	ctx->pipeline->renderTerrains(*camera, (gpu::StateFlags)state, define[0] ? define : nullptr);
 }
 
+// Draws the meshes of only the given entities (`renderEntities` in core:render), entities of other worlds or invalid ones are skipped.
+static void scriptRenderEntities(ex_runtime*, ex_call_frame frame) {
+	EvoxRenderContext* ctx = readContext(frame);
+	if (!ctx) return;
+	EX_ARG(frame, u64, state);
+	EX_STRING_ARG(frame, define_view);
+	EX_ARG(frame, ex_slice, entities);
+	char define[64];
+	if (!readDefine(define_view, define)) {
+		panic(frame, "Invalid shader define");
+		return;
+	}
+	if (entities.length < 0 || (entities.length > 0 && !entities.data)) {
+		panic(frame, "Invalid entities");
+		return;
+	}
+	// layout of core:entity.Entity
+	struct ScriptEntity {
+		i32 index;
+		u32 padding;
+		World* world;
+	};
+	World& world = ctx->pipeline->getModule()->getWorld();
+	const ScriptEntity* script_entities = (const ScriptEntity*)entities.data;
+	Array<EntityRef> list(ctx->pipeline->getRenderer().getAllocator());
+	for (i64 i = 0; i < entities.length; ++i) {
+		const ScriptEntity& entity = script_entities[i];
+		if (entity.world != &world || entity.index < 0 || !world.hasEntity(EntityRef{entity.index})) continue;
+		list.push(EntityRef{entity.index});
+	}
+	ctx->pipeline->renderEntities(Span<const EntityRef>(list.begin(), list.size()), (gpu::StateFlags)state, define[0] ? define : nullptr);
+}
+
 // Makes writes to the buffer visible to later reads (e.g. after rendering into a depth buffer that is sampled next)
 static void scriptBarrierRead(ex_runtime*, ex_call_frame frame) {
 	EvoxRenderContext* ctx = readContext(frame);
@@ -1196,6 +1230,7 @@ void registerRenderFunctions(HashMap<NativeFunctionKey, ex_native_fn, NativeFunc
 	functions.insert({"core:render", "cull"}, &scriptCull);
 	functions.insert({"core:render", "renderGrass"}, &scriptRenderGrass);
 	functions.insert({"core:render", "renderTerrains"}, &scriptRenderTerrains);
+	functions.insert({"core:render", "renderEntities"}, &scriptRenderEntities);
 	functions.insert({"core:render", "barrierRead"}, &scriptBarrierRead);
 	functions.insert({"core:render", "pass"}, &scriptPass);
 	functions.insert({"core:render", "viewport"}, &scriptViewport);
