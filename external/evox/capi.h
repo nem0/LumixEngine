@@ -381,8 +381,8 @@ EVOX_API void ex_bytecode_destroy(ex_bytecode* bytecode);
 // unsupported version. Loaded bytecode is used exactly like compiled bytecode
 // and does not need the source module.
 typedef void (*ex_write_fn)(void* userdata, const void* data, u64 size);
-ex_result ex_bytecode_save(const ex_bytecode* bytecode, ex_write_fn write, void* userdata);
-ex_bytecode* ex_bytecode_load(ex_host* host, const void* data, u64 size);
+EVOX_API ex_result ex_bytecode_save(const ex_bytecode* bytecode, ex_write_fn write, void* userdata);
+EVOX_API ex_bytecode* ex_bytecode_load(ex_host* host, const void* data, u64 size);
 
 // Enumerate all types emitted into the bytecode. Returned type handles are
 // stable until the bytecode is destroyed.
