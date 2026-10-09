@@ -4286,6 +4286,10 @@ struct BytecodeCompiler {
 		ResolvedType* return_type = static_cast<FunctionResolvedType*>(fn_expr.resolved_type)->return_type;
 
 		fn_bc->code = (u8*)(u64)code.size(); // store offset since code.data may be reallocated
+		// The source map is sorted by code offset (see recordSourceMap), so the entries of this function are the ones at the end of it.
+		// Start at the first entry at or after the function start, endFunction does not have to scan the whole module's map.
+		fn_source_map_begin = code.source_map.size();
+		while (fn_source_map_begin > 0 && code.source_map[fn_source_map_begin - 1].code_offset >= (u32)(u64)fn_bc->code) --fn_source_map_begin;
 		fn_bc->kind = fn_expr.is_extern ? EX_FUNCTION_NATIVE : EX_FUNCTION_SCRIPT;
 		fn_bc->is_builtin_native = false;
 		fn_bc->param_size = 0;
@@ -4316,7 +4320,7 @@ struct BytecodeCompiler {
 
 		const u32 function_start = (u32)(u64)fn_bc->code;
 		const u32 function_end = function_start + fn_bc->code_size;
-		for (i32 i = 0, c = code.source_map.size(); i < c; ++i) {
+		for (i32 i = fn_source_map_begin, c = code.source_map.size(); i < c; ++i) {
 			const ex_bytecode_source_map_entry& entry = code.source_map[(i32)i];
 			if (entry.code_offset < function_start || entry.code_offset >= function_end) continue;
 			++fn_bc->source_map_count;
@@ -4327,7 +4331,7 @@ struct BytecodeCompiler {
 				sizeof(ex_bytecode_source_map_entry) * fn_bc->source_map_count,
 				alignof(ex_bytecode_source_map_entry));
 			u32 out = 0;
-			for (i32 i = 0, c = code.source_map.size(); i < c; ++i) {
+			for (i32 i = fn_source_map_begin, c = code.source_map.size(); i < c; ++i) {
 				const ex_bytecode_source_map_entry& entry = code.source_map[(i32)i];
 				if (entry.code_offset < function_start || entry.code_offset >= function_end) continue;
 				ex_bytecode_source_map_entry& dst = fn_bc->source_map[out++];
@@ -4361,6 +4365,7 @@ struct BytecodeCompiler {
 	ex_bytecode& bytecode;
 	TypeInfoBuilder& type_info;
 	ex_function_bc* fn_bc = nullptr;
+	i32 fn_source_map_begin = 0; // first source map entry of the function being compiled, see beginFunction
 	ByteArray code;
 	ByteArray const_data;
 	ExpArray<u32> const_relocs;

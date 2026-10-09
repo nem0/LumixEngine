@@ -390,6 +390,22 @@ lib_project "core"
 	configuration { "linux" }
 		buildoptions { "`pkg-config --cflags gtk+-3.0`" }
 
+-- EVOX (the script compiler and runtime, external/evox) is a static library of its own. It is optimized in every configuration, Debug
+-- included, so compiling scripts is fast in every build. Executables link it with linkEvoxCore().
+project "evox_core"
+	kind "StaticLib"
+	files { "../external/evox/**.cpp", "../external/evox/**.c", "../external/evox/**.h" }
+	excludes { "../external/evox/evoxc.c", "../external/evox/tests/*.cpp", "../external/evox/benchmarks/**.*" }
+	defines { "EVOX_BUILD" }
+	defaultConfigurations()
+	configuration "Debug"
+		flags { "Optimize" }
+	configuration {}
+
+function linkEvoxCore()
+	if hasPlugin "evox" then links { "evox_core" } end
+end
+
 lib_project "engine"
 	libType()
 	defines { "BUILDING_ENGINE", "EVOX_BUILD" }
@@ -421,8 +437,6 @@ lib_project "engine"
 		"../external/imgui/imgui_widgets.cpp",
 		"../external/imgui/imgui_freetype.cpp",
 	}
-	files { "../external/evox/**.cpp", "../external/evox/**.c", "../external/evox/**.h" }
-	excludes { "../external/evox/evoxc.c", "../external/evox/tests/*.cpp", "../external/evox/benchmarks/**.*" }
 
 	configuration { "linux" }
 		buildoptions { "`pkg-config --cflags gtk+-3.0`" }
@@ -611,6 +625,7 @@ if build_app then
 		defaultConfigurations()
 		includedirs { "../src", "../src/app" }
 		files { "../src/app/main.cpp" }
+		linkEvoxCore()
 
 		if working_dir then
 			debugdir ("../../" .. working_dir)
@@ -630,7 +645,7 @@ if build_app then
 		if build_studio and split_projects then
 			links { "core", "engine", "editor" }
 		end
-		
+
 		if build_studio and use_basisu then
 			linkLib "basisu"
 		end
@@ -709,6 +724,7 @@ if build_studio then
 		if split_projects then
 			links { "core", "engine", "editor" }
 		end
+		linkEvoxCore()
 
 		if debug_args then
 			configuration { "Debug" }
@@ -965,6 +981,7 @@ if build_tests then
 		else
 			links { "engine_merged" }
 		end
+		linkEvoxCore()
 
 		linkLib "freetype"
 		if use_basisu then linkLib "basisu" end
