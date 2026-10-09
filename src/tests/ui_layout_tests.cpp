@@ -2322,9 +2322,30 @@ bool testHeaderContentFooter() {
 	return true;
 }
 
+bool testFitContentRowMarginsCountedOnce() {
+	// Minimal repro of the toolbar bug: a fit-content row of two children with margins on both sides.
+	// Per layout.md, horizontal margins between siblings collapse to the larger one: the gap is max(5, 5) = 5, so the
+	// second child starts 55 after the first and the row is 5 + 50 + 5 + 50 + 5 = 115 wide. The fit-content width must use the same collapsed gaps.
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box width=fit-content direction=row] {
+		[box width=50 height=20 margin-left=5 margin-right=5] {}
+		[box width=50 height=20 margin-left=5 margin-right=5] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+
+	ui::Element* row = doc.getElement(doc.m_root.children[0]);
+	ui::Element* second = doc.getElement(row->children[1]);
+	ASSERT_FLOAT_EQ(55.0f, second->position.x - doc.getElement(row->children[0])->position.x);
+	ASSERT_FLOAT_EQ(115.0f, row->size.x);
+	return true;
+}
+
 } // namespace
 
 void runUILayoutTests() {
+	RUN_TEST(testFitContentRowMarginsCountedOnce);
 	logInfo("=== Running UI Layout Tests ===");
 	RUN_TEST(testAdvancedFitContent);
 	RUN_TEST(testAlignCenter);

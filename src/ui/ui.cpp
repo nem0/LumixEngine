@@ -1488,12 +1488,17 @@ static void computeBaseSizes(Document& doc, Element& elem, const ParentContext& 
 			}
 		}
 		else if (is_row) {
-			// In row direction, width is sum of child widths plus margins
+			// In row direction, width is sum of child widths plus margins. Margins between adjacent children collapse to the
+			// maximum value, as in measureBoxRow and the placement pass; absolute and hidden children take no space.
 			float sum_width = 0;
+			float prev_margin = 0;
 			for (u32 child_idx : elem.children) {
-				Element& child = doc.m_elements[child_idx];
-				sum_width += child.size.x + child.margins.right + child.margins.left;
+				const Element& child = doc.m_elements[child_idx];
+				if (child.position_mode == PositionMode::ABSOLUTE || !child.visible) continue;
+				sum_width += child.size.x + maximum(prev_margin, child.margins.left);
+				prev_margin = child.margins.right;
 			}
+			sum_width += prev_margin;
 			elem.size.x = sum_width + elem.paddings.right + elem.paddings.left;
 		} else {
 			// In column direction, width is max of child widths plus margins
