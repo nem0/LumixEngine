@@ -29,8 +29,11 @@ char* Path::normalize(char* path) {
 
 	char* dst = path;
 	const char* src = dst;
-	if (src[0] == '.' && (src[1] == '\\' || src[1] == '/')) src += 2;
-	
+	if (src[0] == '.' && (src[1] == '\\' || src[1] == '/')) {
+		src += 2;
+		while (src[0] == '\\' || src[0] == '/') ++src;
+	}
+
 	#ifdef _WIN32
 		while (src[0] == '\\' || src[0] == '/') ++src;
 	#endif
@@ -100,8 +103,11 @@ char* Path::normalize(StringView path, Span<char> output) {
 
 	const char* c = path.data;
 	const char* path_end = path.end();
-	// skip "./" or ".\"
-	if (c[0] == '.' && path.size() > 1 && (c[1] == '\\' || c[1] == '/')) c += 2;
+	// skip "./" or ".\" and any slashes after it (e.g. "./" + "/" from concatenation, which must not become an absolute path)
+	if (c[0] == '.' && path.size() > 1 && (c[1] == '\\' || c[1] == '/')) {
+		c += 2;
+		while (c != path_end && (*c == '\\' || *c == '/')) ++c;
+	}
 
 	#ifdef _WIN32
 		// skip slashes at the beginning

@@ -18,16 +18,14 @@ fi
 ./premake5 --with-tests \
   --no-physics \
   --no-navigation \
-  --no-animation \
-  --no-audio \
   gmake
 
-make -C "$BUILD_DIR" -j config=debug64 tests
+make -C "$BUILD_DIR" -j config=debug_x64 tests
 
 if [[ ! -x "$TEST_BIN" ]]; then
   echo "error: test executable was not produced: $TEST_BIN" >&2
   exit 2
 fi
 
-cd "$SCRIPT_DIR/.."
+cd "$SCRIPT_DIR/../data"
 exec "$TEST_BIN" "$@"

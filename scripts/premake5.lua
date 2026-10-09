@@ -183,7 +183,7 @@ workspace "LumixEngine"
 		buildoptions { "/GL", "/Oi" }
 		linkoptions { "/LTCG:incremental" }
 
-	filter "language:C++"
+	filter { "action:vs*", "language:C++" }
 		buildoptions { "/wd4503", "/wd4251" }
 
 	filter {}

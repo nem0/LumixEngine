@@ -14,7 +14,7 @@ if [[ ! -x ./premake5 ]]; then
 fi
 
 ./premake5 --no-studio --no-physics --no-renderer --no-audio --no-navigation --no-animation --no-evox gmake
-make -C "$BUILD_DIR" -j config=debug64 meta
+make -C "$BUILD_DIR" -j config=debug_x64 meta
 
 if [[ ! -x "$META_BIN" ]]; then
   echo "error: meta executable was not produced: $META_BIN" >&2
