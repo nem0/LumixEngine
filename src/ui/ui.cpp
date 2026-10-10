@@ -2119,7 +2119,8 @@ void Document::removeClassRaw(u32 element_index, StringView classname) {
 
 Element* Document::getElementAt(Vec2 pos) {
 	flushLayout();
-	for (u32 idx : m_root.children) {
+	for (i32 i = (i32)m_root.children.size() - 1; i >= 0; --i) {
+		const u32 idx = m_root.children[i];
 		Element* root = &m_elements[idx]; 
 		if (!root->visible) continue;
 		if (!contains(*root, pos, m_font_manager)) continue;
@@ -2127,7 +2128,8 @@ Element* Document::getElementAt(Vec2 pos) {
 		Element* elem = root;
 		for (;;) {
 			bool found_child = false;
-			for (u32 child_id : elem->children) {
+			for (i32 j = (i32)elem->children.size() - 1; j >= 0; --j) {
+				const u32 child_id = elem->children[j];
 				Element* child = &m_elements[child_id];
 				if (!child->visible) continue;
 				if (contains(*child, pos, m_font_manager)) {

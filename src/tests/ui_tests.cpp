@@ -753,6 +753,36 @@ bool testHitTestFlushesDeferredLayout() {
 	return true;
 }
 
+bool testHitTestPrefersLastRoot() {
+	MockDocument doc;
+	ASSERT_PARSE(doc,
+		"[box $back position=absolute left=0 top=0 width=100 height=100] {}"
+		"[box $front position=absolute left=0 top=0 width=100 height=100] {}");
+	doc.computeLayout(Vec2(800, 600));
+	Element* front = doc.getElementByID("front");
+	ASSERT_TRUE(doc.getElementAt(Vec2(50, 50)) == front);
+	front->setVisible(false);
+	ASSERT_TRUE(doc.getElementAt(Vec2(50, 50)) == doc.getElementByID("back"));
+	ASSERT_TRUE(doc.getElementAt(Vec2(150, 50)) == nullptr);
+	return true;
+}
+
+bool testHitTestPrefersLastNestedChild() {
+	MockDocument doc;
+	ASSERT_PARSE(doc,
+		"[box width=200 height=200] {"
+			"[box $back position=absolute left=0 top=0 width=100 height=100] {}"
+			"[box $front position=absolute left=0 top=0 width=100 height=100] {"
+				"[box $skip position=absolute left=0 top=0 width=100 height=100] {}"
+			"}"
+		"}");
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(doc.getElementAt(Vec2(50, 50)) == doc.getElementByID("skip"));
+	doc.getElementByID("front")->setVisible(false);
+	ASSERT_TRUE(doc.getElementAt(Vec2(50, 50)) == doc.getElementByID("back"));
+	return true;
+}
+
 bool testDocumentDestructorReleasesSpriteRefs() {
 	MockFontManager font_manager;
 	MockImageManager image_manager;
@@ -1529,6 +1559,8 @@ void runUITests() {
 	RUN_TEST(testGetElementByIdFollowsParse);
 	RUN_TEST(testLayoutIsDeferredUntilFlush);
 	RUN_TEST(testHitTestFlushesDeferredLayout);
+	RUN_TEST(testHitTestPrefersLastRoot);
+	RUN_TEST(testHitTestPrefersLastNestedChild);
 	RUN_TEST(testColorInheritance);
 	RUN_TEST(testColorInheritanceDeep);
 	RUN_TEST(testColorAlphaSupport);
