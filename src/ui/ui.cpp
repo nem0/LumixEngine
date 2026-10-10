@@ -2036,7 +2036,8 @@ static StringView getAttributeValue(const Element& elem, AttributeName name) {
 }
 
 static Element* getActionTargetAt(Document& doc, Vec2 pos) {
-	for (u32 idx : doc.m_root.children) {
+	for (i32 root_i = (i32)doc.m_root.children.size() - 1; root_i >= 0; --root_i) {
+		const u32 idx = doc.m_root.children[root_i];
 		Element* root = &doc.m_elements[idx];
 		if (!root->visible) continue;
 		if (!contains(*root, pos, doc.m_font_manager)) continue;
@@ -2047,7 +2048,8 @@ static Element* getActionTargetAt(Document& doc, Vec2 pos) {
 		Element* elem = root;
 		for (;;) {
 			bool found_child = false;
-			for (u32 child_id : elem->children) {
+			for (i32 child_i = (i32)elem->children.size() - 1; child_i >= 0; --child_i) {
+				const u32 child_id = elem->children[child_i];
 				Element* child = &doc.m_elements[child_id];
 				if (!child->visible) continue;
 				if (contains(*child, pos, doc.m_font_manager)) {

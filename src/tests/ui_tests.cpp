@@ -1185,6 +1185,50 @@ bool testOnClickAttributeRejectedOnNonBox() {
 	return true;
 }
 
+bool testActionEventPrefersLastRoot() {
+	MockDocument doc;
+	ASSERT_PARSE(doc,
+		"[box width=200 height=200 on-click=background] {}"
+		"[box position=absolute left=0 top=0 width=200 height=200] {"
+			"[box width=100 height=100 on-click=confirm] { [span text=Confirm] }"
+		"}");
+	doc.computeLayout(Vec2(800, 600));
+	MockMouseDevice mouse;
+	injectMouseButton(doc, mouse, true, 50, 50);
+	injectMouseButton(doc, mouse, false, 50, 50);
+	int actions = 0;
+	for (const ui::Event& e : doc.getEvents()) {
+		if (e.type != ui::EventType::ACTION) continue;
+		++actions;
+		ASSERT_EQ("confirm", e.action);
+	}
+	ASSERT_EQ(1, actions);
+	return true;
+}
+
+bool testActionEventPrefersLastNestedChild() {
+	MockDocument doc;
+	ASSERT_PARSE(doc,
+		"[box width=200 height=200] {"
+			"[box width=200 height=200 on-click=background] {}"
+			"[box position=absolute left=0 top=0 width=200 height=200] {"
+				"[box width=100 height=100 on-click=confirm] { [span text=Confirm] }"
+			"}"
+		"}");
+	doc.computeLayout(Vec2(800, 600));
+	MockMouseDevice mouse;
+	injectMouseButton(doc, mouse, true, 50, 50);
+	injectMouseButton(doc, mouse, false, 50, 50);
+	int actions = 0;
+	for (const ui::Event& e : doc.getEvents()) {
+		if (e.type != ui::EventType::ACTION) continue;
+		++actions;
+		ASSERT_EQ("confirm", e.action);
+	}
+	ASSERT_EQ(1, actions);
+	return true;
+}
+
 bool testActionEventEmittedOnReleaseOverClickableBox() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box width=100 height=100 on-click=foo]");
@@ -1579,6 +1623,8 @@ void runUITests() {
 	RUN_TEST(testOnClickAttributeParseOnBox);
 	RUN_TEST(testOnClickAttributeRejectedOnNonBox);
 	RUN_TEST(testActionEventEmittedOnReleaseOverClickableBox);
+	RUN_TEST(testActionEventPrefersLastRoot);
+	RUN_TEST(testActionEventPrefersLastNestedChild);
 	RUN_TEST(testActionEventNotEmittedWithoutOnClick);
 	RUN_TEST(testActionEventNotEmittedForSpan);
 	RUN_TEST(testActionEventNotEmittedOutside);
