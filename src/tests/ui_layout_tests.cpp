@@ -2342,9 +2342,62 @@ bool testFitContentRowMarginsCountedOnce() {
 	return true;
 }
 
+bool testPercentSizeInsidePadding() {
+	for (int direction = 0; direction < 2; ++direction) {
+		MockDocument doc;
+		ASSERT_PARSE(doc, R"(
+		[box width=200 height=100 padding=10] {
+			[box width=100% height=100%] {}
+		}
+		)");
+		ui::Element* parent = doc.getElement(0);
+		parent->direction = direction == 0 ? ui::Direction::ROW : ui::Direction::COLUMN;
+		doc.computeLayout(Vec2(800, 600));
+		ui::Element* fill = doc.getElement(1);
+		ASSERT_FLOAT_EQ(180.0f, fill->size.x);
+		ASSERT_FLOAT_EQ(80.0f, fill->size.y);
+		ASSERT_FLOAT_EQ(parent->position.x + 10.0f, fill->position.x);
+		ASSERT_FLOAT_EQ(parent->position.y + 10.0f, fill->position.y);
+	}
+	return true;
+}
+
+bool testPercentSizeInPaddedGrowingParent() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box width=400 height=200 direction=row] {
+		[box width=0 grow=1 height=200 padding=10] {
+			[box width=50% height=50%] {}
+		}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ui::Element* fill = doc.getElement(2);
+	ASSERT_FLOAT_EQ(190.0f, fill->size.x);
+	ASSERT_FLOAT_EQ(90.0f, fill->size.y);
+	return true;
+}
+
+bool testAbsolutePercentSizeWithPadding() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box width=200 height=100 padding=10] {
+		[box position=absolute width=100% height=100%] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ui::Element* overlay = doc.getElement(1);
+	ASSERT_FLOAT_EQ(200.0f, overlay->size.x);
+	ASSERT_FLOAT_EQ(100.0f, overlay->size.y);
+	return true;
+}
+
 } // namespace
 
 void runUILayoutTests() {
+	RUN_TEST(testPercentSizeInsidePadding);
+	RUN_TEST(testPercentSizeInPaddedGrowingParent);
+	RUN_TEST(testAbsolutePercentSizeWithPadding);
 	RUN_TEST(testFitContentRowMarginsCountedOnce);
 	logInfo("=== Running UI Layout Tests ===");
 	RUN_TEST(testAdvancedFitContent);

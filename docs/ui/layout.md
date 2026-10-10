@@ -183,7 +183,7 @@ Dimensions support these units:
 
 - **em**: Scales with element's font size. E.g., `height=2em` for twice the font height.
 
-- **%**: Percentage of parent (or viewport for roots). E.g., `width=50%` for half the parent's width.
+- **%**: Percentage of the parent's content area, excluding its padding (or viewport for roots). E.g., `width=50%` for half the parent's content width. Absolutely positioned elements use the parent's full size, including padding.
 
 - **fit-content**: Auto-size to content. For panels, sums child sizes. E.g., `width=fit-content`.
 

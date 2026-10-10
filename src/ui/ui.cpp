@@ -1276,7 +1276,8 @@ static void computeParentRelativeWidth(Document& doc, Element& elem) {
 			if (elem.width_unit.unit == Unit::FIT_CONTENT) {
 				logError("Element with fit-content width has child with percent width");
 			}
-			child.size.x = computeAbsoluteSize(child.width_unit, elem.size.x, child.font_size, doc.m_dpi_scale);
+			const float reference_width = child.position_mode == PositionMode::ABSOLUTE ? elem.size.x : maximum(0.0f, elem.size.x - elem.paddings.left - elem.paddings.right);
+			child.size.x = computeAbsoluteSize(child.width_unit, reference_width, child.font_size, doc.m_dpi_scale);
 		}
 		computeParentRelativeWidth(doc, doc.m_elements[child_idx]);
 	}
@@ -1383,7 +1384,8 @@ static void computeParentRelativeHeights(Document& doc, Element& elem) {
 	for (u32 child_idx : elem.children) {
 		Element& child = doc.m_elements[child_idx];
 		if (child.height_unit.unit == Unit::PERCENT) {
-			child.size.y = computeAbsoluteSize(child.height_unit, elem.size.y, child.font_size, doc.m_dpi_scale);
+			const float reference_height = child.position_mode == PositionMode::ABSOLUTE ? elem.size.y : maximum(0.0f, elem.size.y - elem.paddings.top - elem.paddings.bottom);
+			child.size.y = computeAbsoluteSize(child.height_unit, reference_height, child.font_size, doc.m_dpi_scale);
 		}
 		computeParentRelativeHeights(doc, child);
 	}
