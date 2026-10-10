@@ -606,6 +606,12 @@ if build_studio then
 		end
 		filter "system:windows"
 			links { "winmm", "imm32", "version", "shell32", "gdi32", "comdlg32", "advapi32", "ole32" }
+			if not dynamic_plugins then links { "psapi", "dxguid" } end
+			if build_vulkan and not dynamic_plugins then
+				links { "vulkan-1" }
+				local vulkan_sdk = os.getenv("VULKAN_SDK")
+				if vulkan_sdk then libdirs { vulkan_sdk .. "/Lib" } end
+			end
 			libdirs { "../external/pix/bin/x64" }
 			-- main.cpp defines main(), not WinMain
 			entrypoint "mainCRTStartup"
@@ -702,6 +708,15 @@ if build_tests then
 		filter "system:linux"
 			links { "GL", "X11", "dl", "rt", "Xi", "vulkan" }
 		filter {}
+end
+
+-- Keep library dependencies out of the static archive.
+-- The final executables link the dependencies separately.
+if not dynamic_plugins then
+	project(ENGINE_NAME)
+	filter "system:windows"
+		removelinks { "*" }
+	filter {}
 end
 
 -- Generated plugin registration, included by engine and studio sources.
