@@ -4,6 +4,9 @@
 #include "core/path.h"
 #include "core/hash_map.h"
 #include "engine/file_system.h"
+#include "engine/engine.h"
+#include "engine/resource_manager.h"
+#include "engine/world.h"
 #include "renderer/editor/particle_script_compiler.h"
 #include "renderer/particle_system.h"
 #include "tests/common.h"
@@ -1364,6 +1367,75 @@ bool testSystemValues() {
 	ASSERT_TRUE(fabsf(runner.getOutput(4) - 315.0f) < 0.001f);
 
 	return true;
+}
+
+// Exercise the SIMD output path used by the renderer, not the scalar script runner.
+bool testSystemValuesInstanceData() {
+	ParticleScriptRunner runner;
+	ASSERT_TRUE(runner.compile(R"(
+		emitter test {
+			material "particles/particle.mat"
+			out i_dt : float
+			out i_total : float
+			out i_pos : float3
+			out i_scale : float
+			fn emit() {}
+			fn update() {}
+			fn output() {
+				i_dt = time_delta;
+				i_total = total_time;
+				i_pos = entity_position;
+				i_scale = 2;
+			}
+		}
+	)"));
+
+	IAllocator& allocator = getGlobalAllocator();
+	const char* static_plugins[] = {"evox"};
+	Engine::InitArgs args;
+	args.static_plugins = static_plugins;
+	args.file_system = UniquePtr<MemoryFileSystem>::create(allocator).move();
+	UniquePtr<Engine> engine = Engine::create(static_cast<Engine::InitArgs&&>(args), allocator);
+	World& world = engine->createWorld();
+	const bool passed = [&]() {
+		struct UnusedResourceManager : ResourceManager {
+			UnusedResourceManager(IAllocator& allocator) : ResourceManager(allocator) {}
+			Resource* createResource(const Path&) override { ASSERT(false); return nullptr; }
+			void destroyResource(Resource&) override { ASSERT(false); }
+		} manager(allocator);
+		ParticleSystemResource resource(Path("test.pat"), manager, allocator);
+		ParticleSystemResource::Emitter resource_emitter(resource);
+		resource_emitter.instructions.write(runner.instructions.data(), runner.instructions.size());
+		resource_emitter.output_offset = runner.output_offset;
+		resource_emitter.output_registers_count = runner.num_output_registers;
+		resource_emitter.channels_count = runner.channels_count;
+		resource_emitter.outputs_count = 6;
+		ParticleSystem system(INVALID_ENTITY, world, allocator);
+		ParticleSystem::Emitter emitter(system, resource_emitter);
+		// Cross the 1024-particle chunk boundary and round up a partial SIMD batch.
+		const u32 counts[] = {1, 7, 1027};
+		for (u32 count : counts) {
+			emitter.particles_count = count;
+			Array<float> output(allocator);
+			const u32 num_floats = emitter.getParticlesDataSizeBytes() / sizeof(float);
+			output.resize(num_floats + 1);
+			for (u32 frame = 0; frame < 2; ++frame) {
+				const float expected[] = {0.125f + frame, 12.5f + frame, -100.f + frame, 200.f + frame, 300.f + frame, 2.f};
+				system.m_system_values[(u8)ParticleSystemValues::TIME_DELTA] = expected[0];
+				system.m_system_values[(u8)ParticleSystemValues::TOTAL_TIME] = expected[1];
+				system.m_system_values[(u8)ParticleSystemValues::ENTITY_POSITION_X] = expected[2];
+				system.m_system_values[(u8)ParticleSystemValues::ENTITY_POSITION_Y] = expected[3];
+				system.m_system_values[(u8)ParticleSystemValues::ENTITY_POSITION_Z] = expected[4];
+				for (float& value : output) value = -999.f;
+				emitter.fillInstanceData(output.begin(), engine->getPageAllocator());
+				for (u32 i = 0; i < num_floats; ++i) ASSERT_EQ(output[i], expected[i % 6]);
+				ASSERT_EQ(output[num_floats], -999.f);
+			}
+		}
+		return true;
+	}();
+	engine->destroyWorld(world);
+	return passed;
 }
 
 // Test compilation errors like missing semicolons, undefined variables, etc.
@@ -2735,6 +2807,7 @@ void runParticleScriptCompilerTests() {
 	RUN_TEST(testIfConditionalsFolding);
 	RUN_TEST(testSyscalls);
 	RUN_TEST(testSystemValues);
+	RUN_TEST(testSystemValuesInstanceData);
 	RUN_TEST(testBasicImport);
 	RUN_TEST(testNestedImport);
 	RUN_TEST(testImportErrors);

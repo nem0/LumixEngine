@@ -226,6 +226,11 @@ struct RenderResourceManager : ResourceManager
 	TagAllocator m_allocator;
 };
 
+template <>
+Resource* RenderResourceManager<ParticleSystemResource>::createResource(const Path& path) {
+	return LUMIX_NEW(m_allocator, ParticleSystemResource)(path, *this, m_allocator);
+}
+
 struct SpriteResourceManager final : ResourceManager {
 	SpriteResourceManager(IAllocator& allocator)
 		: ResourceManager(allocator)

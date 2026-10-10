@@ -16,7 +16,6 @@ namespace jobs { struct Mutex; }
 struct DVec3;
 struct Material;
 struct Model;
-struct Renderer;
 
 //@ object
 struct LUMIX_RENDERER_API ParticleSystemResource final : Resource {
@@ -124,7 +123,7 @@ struct LUMIX_RENDERER_API ParticleSystemResource final : Resource {
 
 	static const ResourceType TYPE;
 
-	ParticleSystemResource(const Path& path, ResourceManager& manager, Renderer& renderer, IAllocator& allocator);
+	ParticleSystemResource(const Path& path, ResourceManager& manager, IAllocator& allocator);
 
 	ResourceType getType() const override { return TYPE; }
 	void unload() override;

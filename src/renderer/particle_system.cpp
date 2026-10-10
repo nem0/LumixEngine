@@ -42,7 +42,6 @@ ParticleSystemResource::Emitter::Emitter(ParticleSystemResource& resource)
 
 ParticleSystemResource::ParticleSystemResource(const Path& path
 	, ResourceManager& manager
-	, Renderer& renderer
 	, IAllocator& allocator
 )
 	: Resource(path, manager, allocator)
@@ -1282,6 +1281,14 @@ void ParticleSystem::processChunk(ChunkProcessorContext& ctx) {
 					const u32 stride = emitter.resource_emitter.outputs_count;
 					if (op0.type == DataStream::GLOBAL) {
 						const float arg = m_globals[op0.index];
+						u8 output_idx = dst.index;
+						float* res = ctx.output_memory + output_idx + fromf4 * 4 * stride;
+						for (i32 i = 0; i < stepf4 * 4; ++i) {
+							res[i * stride] = arg;
+						}
+					}
+					else if (op0.type == DataStream::SYSTEM_VALUE) {
+						const float arg = m_system_values[op0.index];
 						u8 output_idx = dst.index;
 						float* res = ctx.output_memory + output_idx + fromf4 * 4 * stride;
 						for (i32 i = 0; i < stepf4 * 4; ++i) {
