@@ -1438,6 +1438,89 @@ bool testSystemValuesInstanceData() {
 	return passed;
 }
 
+// Resizing the emitter table moves live systems; their ribbons must survive.
+bool testParticleSystemMovePreservesTrail() {
+	IAllocator& allocator = getGlobalAllocator();
+	struct ParticleFileSystem : MemoryFileSystem {
+		OutputMemoryStream content{getGlobalAllocator()};
+		ContentCallback pending;
+		AsyncHandle getContent(const Path&, const ContentCallback& callback) override {
+			pending = callback;
+			return AsyncHandle(0);
+		}
+		void processCallbacks() override { pending.invoke(Span((const u8*)content.data(), (u32)content.size()), true); }
+	};
+	auto fs = UniquePtr<ParticleFileSystem>::create(allocator);
+	auto* particle_fs = fs.get();
+	CompiledResourceHeader header;
+	fs->content.write(header);
+	OutputMemoryStream compiled(allocator);
+	TestableCompiler compiler;
+	ASSERT_TRUE(compiler.compile(Path("move.pat"), R"(
+		emitter test {
+			material "test.mat"
+			max_ribbons 1
+			max_ribbon_length 16
+			init_ribbons_count 1
+			init_emit_count 1
+			emit_per_second 0
+			out i_time : float
+			var age : float
+			fn emit() { age = 0; }
+			fn update() { age = age + time_delta; }
+			fn output() { i_time = total_time + 1; }
+		}
+	)", compiled));
+	// Strip the material dependency: this test only executes particle bytecode.
+	InputMemoryStream blob(compiled);
+	blob.skip(sizeof(ParticleSystemResource::Header) + sizeof(u32) + sizeof(gpu::VertexDecl));
+	fs->content.write(compiled.data(), blob.getPosition());
+	blob.readString();
+	fs->content.writeString("");
+	fs->content.write((const u8*)compiled.data() + blob.getPosition(), blob.remaining());
+	const char* plugins[] = {"none"};
+	Engine::InitArgs args;
+	args.static_plugins = plugins;
+	args.file_system = fs.move();
+	auto engine = Engine::create(static_cast<Engine::InitArgs&&>(args), allocator);
+	struct ParticleManager : ResourceManager {
+		ParticleManager(IAllocator& allocator) : ResourceManager(allocator) {}
+		Resource* createResource(const Path& path) override { return LUMIX_NEW(m_allocator, ParticleSystemResource)(path, *this, m_allocator); }
+		void destroyResource(Resource& resource) override { LUMIX_DELETE(m_allocator, &resource); }
+	} manager(allocator);
+	manager.create(ParticleSystemResource::TYPE, engine->getResourceManager());
+	World& world = engine->createWorld();
+	const bool passed = [&]() {
+		auto* resource = engine->getResourceManager().load<ParticleSystemResource>(Path("move.pat"));
+		particle_fs->processCallbacks();
+		ASSERT_TRUE(resource && resource->isReady());
+		const EntityRef entity = world.createEntity(DVec3(0, 0, 0), Quat::IDENTITY);
+		ParticleSystem original(entity, world, allocator);
+		original.setResource(resource);
+		original.update(0.25f, engine->getPageAllocator());
+
+		const auto* channel = original.getEmitter(0).channels[0].data;
+		ASSERT_EQ(original.getEmitter(0).ribbons[0].length, 1u);
+		original.m_total_time = 5.f;
+		ParticleSystem moved(static_cast<ParticleSystem&&>(original));
+		ASSERT_EQ(moved.m_total_time, 5.f);
+		ASSERT_EQ(moved.getEmitter(0).particles_count, 1u);
+		ASSERT_EQ(moved.getEmitter(0).ribbons[0].length, 1u);
+		ASSERT_TRUE(moved.getEmitter(0).channels[0].data == channel);
+		ASSERT_EQ(channel[0], 0.25f);
+		original.m_system_values[(u8)ParticleSystemValues::TOTAL_TIME] = 100.f;
+		moved.m_system_values[(u8)ParticleSystemValues::TOTAL_TIME] = 9.f;
+		float output[4] = {};
+		moved.getEmitter(0).fillInstanceData(output, engine->getPageAllocator());
+		ASSERT_EQ(output[0], 10.f);
+		world.destroyEntity(entity);
+		return true;
+	}();
+	engine->destroyWorld(world);
+	manager.destroy();
+	return passed;
+}
+
 // Test compilation errors like missing semicolons, undefined variables, etc.
 bool testCompilationErrors() {
 	bool all_tests_passed = true;
@@ -2808,6 +2891,7 @@ void runParticleScriptCompilerTests() {
 	RUN_TEST(testSyscalls);
 	RUN_TEST(testSystemValues);
 	RUN_TEST(testSystemValuesInstanceData);
+	RUN_TEST(testParticleSystemMovePreservesTrail);
 	RUN_TEST(testBasicImport);
 	RUN_TEST(testNestedImport);
 	RUN_TEST(testImportErrors);

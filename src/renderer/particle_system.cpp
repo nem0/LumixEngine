@@ -233,13 +233,14 @@ ParticleSystem::ParticleSystem(ParticleSystem&& rhs)
 	, m_globals(rhs.m_globals.move())
 {
 	memcpy(m_system_values, rhs.m_system_values, sizeof(m_system_values));
+	for (Emitter& emitter : m_emitters) emitter.system = this;
 	
 	if (rhs.m_resource) {
 		rhs.m_resource->getObserverCb().unbind<&ParticleSystem::onResourceChanged>(&rhs);
 	}
 	rhs.m_resource = nullptr;
 	if (m_resource) {
-		m_resource->onLoaded<&ParticleSystem::onResourceChanged>(this);
+		m_resource->getObserverCb().bind<&ParticleSystem::onResourceChanged>(this);
 	}
 }
 
@@ -583,13 +584,13 @@ struct ProcessHelper {
 					break;
 				}
 				case DataStream::SYSTEM_VALUE: {
-					literals[i] = f4Splat(emitter.system.m_system_values[stream.index]);
+					literals[i] = f4Splat(emitter.system->m_system_values[stream.index]);
 					s[i].data = &literals[i];
 					s[i].step = 0;
 					break;
 				}
 				case DataStream::GLOBAL: {
-					literals[i] = f4Splat(emitter.system.m_globals[stream.index]);
+					literals[i] = f4Splat(emitter.system->m_globals[stream.index]);
 					s[i].data = &literals[i];
 					s[i].step = 0;
 					break;
@@ -1684,7 +1685,7 @@ void ParticleSystem::Emitter::fillInstanceData(float* data, PageAllocator& page_
 			if (ctx.from >= (i32)particles_count) return;
 			
 			ctx.to = minimum(ctx.from + 1024, particles_count);
-			system.processChunk(ctx);
+			system->processChunk(ctx);
 		}
 	};
 

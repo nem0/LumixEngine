@@ -187,14 +187,14 @@ struct LUMIX_RENDERER_API ParticleSystem {
 	struct Emitter {
 		Emitter(Emitter&& rhs);
 		Emitter(ParticleSystem& system, ParticleSystemResource::Emitter& resource_emitter) 
-			: system(system)
+			: system(&system)
 			, resource_emitter(resource_emitter)
 			, ribbons(system.m_allocator)
 		{}
 		u32 getParticlesDataSizeBytes() const;
 		void fillInstanceData(float* data, PageAllocator& page_allocator) const;
 		
-		ParticleSystem& system;
+		ParticleSystem* system;
 		ParticleSystemResource::Emitter& resource_emitter;
 		Channel channels[16];
 		u32 particles_count = 0;
