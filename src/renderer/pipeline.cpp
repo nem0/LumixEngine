@@ -1487,6 +1487,8 @@ struct PipelineImpl final : Pipeline {
 			renderMain();
 		}
 
+		for (RenderPlugin* plugin : m_renderer.getPlugins()) plugin->renderEnd(m_output, *this);
+
 		endBlock();
 
 		m_renderer.waitForCommandSetup();

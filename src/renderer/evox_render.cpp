@@ -1058,7 +1058,6 @@ enum class PluginStage : u32 {
 	AFTER_TONEMAP,
 	RENDER_OPAQUE,
 	RENDER_TRANSPARENT,
-	END,
 	COUNT
 };
 
@@ -1097,7 +1096,6 @@ static void scriptRunPlugins(ex_runtime*, ex_call_frame frame) {
 				break;
 			case PluginStage::RENDER_OPAQUE: plugin->renderOpaque(pipeline); break;
 			case PluginStage::RENDER_TRANSPARENT: plugin->renderTransparent(pipeline); break;
-			case PluginStage::END: plugin->renderEnd(*ctx->gbuffer, input, pipeline); break;
 			case PluginStage::ANTIALIAS: result = plugin->renderAA(*ctx->gbuffer, input, pipeline); break;
 			case PluginStage::TONEMAP: {
 				RenderBufferHandle tonemapped;

@@ -118,8 +118,6 @@ fn renderFrame(ctx : Context) : RenderBuffer {
 	result = beginChain(ctx, .AFTER_TONEMAP, result);
 	result = apply(ctx, film_grain.filmGrain, result);
 	ctx.render2D(result);
-	// the image is final, plugins (e.g. a video recorder) can read it
-	ctx.runPlugins(.END, result);
 	ctx.endFrame();
 	releaseGBuffer(ctx, gbuffer, shadowmap);
 	return result;
