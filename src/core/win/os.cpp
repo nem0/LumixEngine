@@ -494,6 +494,22 @@ bool OutputFile::write(const void* data, u64 size)
 	return !m_is_error;
 }
 
+bool OutputFile::seek(u64 pos)
+{
+	ASSERT(INVALID_HANDLE_VALUE != (HANDLE)m_handle);
+	LARGE_INTEGER dist;
+	dist.QuadPart = (LONGLONG)pos;
+	return ::SetFilePointerEx((HANDLE)m_handle, dist, nullptr, FILE_BEGIN) != 0;
+}
+
+bool OutputFile::seekEnd()
+{
+	ASSERT(INVALID_HANDLE_VALUE != (HANDLE)m_handle);
+	LARGE_INTEGER dist;
+	dist.QuadPart = 0;
+	return ::SetFilePointerEx((HANDLE)m_handle, dist, nullptr, FILE_END) != 0;
+}
+
 bool InputFile::read(void* data, u64 size)
 {
 	ASSERT(INVALID_HANDLE_VALUE != m_handle);

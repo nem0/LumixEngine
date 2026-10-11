@@ -190,6 +190,8 @@ struct LUMIX_CORE_API OutputFile final : IOutputStream {
 	[[nodiscard]] bool open(const char* path);
 	void close();
 	void flush();
+	[[nodiscard]] bool seek(u64 pos);
+	[[nodiscard]] bool seekEnd();
     bool isError() const { return m_is_error; }
 
 	using IOutputStream::write;

@@ -397,6 +397,16 @@ bool OutputFile::write(const void* data, u64 size) {
 	return written == 1;
 }
 
+bool OutputFile::seek(u64 pos) {
+	ASSERT(m_handle);
+	return fseek((FILE*)m_handle, (long)pos, SEEK_SET) == 0;
+}
+
+bool OutputFile::seekEnd() {
+	ASSERT(m_handle);
+	return fseek((FILE*)m_handle, 0, SEEK_END) == 0;
+}
+
 bool InputFile::read(void* data, u64 size) {
 	ASSERT(nullptr != m_handle);
 	size_t read = fread(data, size, 1, (FILE*)m_handle);
