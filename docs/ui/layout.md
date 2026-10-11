@@ -201,6 +201,27 @@ Mix units freely, e.g., `width=50% height=2em`.
 
 In runtime `UI` module (screen-space UI), DPI scale is driven from OS DPI as `os::getDPI() / 96.0`.
 
+#### Reference size (`@document`)
+
+A document can declare the size it was designed for. The scale then follows the canvas size and the OS DPI scale is ignored for that document:
+
+```
+@document {
+	reference-width: 1920;
+	reference-height: 1080;
+	match: height;
+	min-scale: 0.5;
+	max-scale: 4;
+}
+```
+
+- `@document` must be at the root level, once per file. It is not an element and doesn't count as a root element.
+- `scale = canvas size / reference size`. This scales pixels, `font-size` and so `em`, like the DPI scale. `%` is not affected.
+- `reference-width` / `reference-height`: either one or both. With one, that dimension is matched.
+- `match`: `height` (default), `width`, `min` or `max`. Which ratio to use when both reference dimensions are set and the aspect ratios differ.
+- `min-scale` / `max-scale`: optional clamp of the resulting scale.
+- Without `@document` the OS DPI scale is used as before.
+
 ### Fit-Content
 
 When using `fit-content` sizing, margins are included in the total size calculation for containers, ensuring spacing between children is preserved. Padding is added to the computed fit-content size, so the container's total size is the sum of child sizes (plus margins) and its own padding.

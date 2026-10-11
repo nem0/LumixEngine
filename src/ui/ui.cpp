@@ -636,9 +636,69 @@ bool Document::parseStyleBlock() {
 	}
 }
 
+// @document { reference-width: 1920; reference-height: 1080; match: height; min-scale: 0.5; max-scale: 4; }
+// the size the document was designed for: pixel and font-size values are scaled by canvas size / reference size instead of the OS DPI scale
+bool Document::parseDocumentBlock() {
+	if (!consume(Token::LBRACE)) return false;
+
+	for (;;) {
+		Token token = m_tokenizer.consumeToken();
+		if (token.type == Token::RBRACE) return true;
+		if (token.type != Token::IDENTIFIER) {
+			error(token.value, m_tokenizer, "expected @document property name or '}', got ", tokenTypeToString(token.type));
+			return false;
+		}
+		const StringView name = token.value;
+		if (!consume(Token::COLON)) return false;
+
+		const Token value = m_tokenizer.consumeToken();
+		if (name == "match") {
+			if (value.type != Token::IDENTIFIER) {
+				error(value.value, m_tokenizer, "expected height, width, min or max, got ", tokenTypeToString(value.type));
+				return false;
+			}
+			if (value.value == "height") m_scale_match = ScaleMatch::HEIGHT;
+			else if (value.value == "width") m_scale_match = ScaleMatch::WIDTH;
+			else if (value.value == "min") m_scale_match = ScaleMatch::MIN;
+			else if (value.value == "max") m_scale_match = ScaleMatch::MAX;
+			else {
+				error(value.value, m_tokenizer, "invalid match '", value.value, "', expected height, width, min or max");
+				return false;
+			}
+		} else {
+			float* target = nullptr;
+			if (name == "reference-width") target = &m_reference_width;
+			else if (name == "reference-height") target = &m_reference_height;
+			else if (name == "min-scale") target = &m_min_scale;
+			else if (name == "max-scale") target = &m_max_scale;
+			else {
+				error(name, m_tokenizer, "unknown @document property '", name, "'");
+				return false;
+			}
+			float v = 0;
+			const char* end = value.type == Token::NUMBER ? fromCString(value.value, v) : nullptr;
+			if (!end || end != value.value.end() || v < 0 || v != v) {
+				error(value.value, m_tokenizer, "invalid value '", value.value, "' for '", name, "', expected a non-negative number");
+				return false;
+			}
+			*target = v;
+		}
+		if (!consume(Token::SEMICOLON)) return false;
+	}
+}
+
 bool Document::parseElements(u32 parent_index) {
 	for (;;) {
 		Token token = m_tokenizer.consumeToken();
+
+		if (token.type == Token::TEXT && token.value == "@document") {
+			if (parent_index != 0xffff'FFFF) {
+				error(token.value, m_tokenizer, "@document must be at the root level");
+				return false;
+			}
+			if (!parseDocumentBlock()) return false;
+			continue;
+		}
 
 		switch (token.type) {
 			case Token::EOF: 
@@ -1894,7 +1954,14 @@ Element* Document::getElementByID(const char* id) {
 
 void Document::computeLayout(Vec2 canvas_size) {
 	PROFILE_FUNCTION();
-	
+
+	// with an @document reference size the scale follows the canvas, which also changes every font size
+	const float scale = computeScale(canvas_size);
+	if (scale != m_dpi_scale) {
+		m_dpi_scale = scale;
+		recomputeStyles();
+	}
+
 	os::Timer timer;
 	m_layout_duration = 0;
 	m_layout_dirty = false;
@@ -2209,6 +2276,11 @@ bool Document::parse(StringView content, const char* filename) {
 	unloadSprites();
 	m_root.children.clear();
 	m_stylesheet.m_rules.clear();
+	m_reference_width = 0;
+	m_reference_height = 0;
+	m_min_scale = 0;
+	m_max_scale = 0;
+	m_scale_match = ScaleMatch::HEIGHT;
 	m_content = content;
 	m_tokenizer.m_filename = filename;
 	m_tokenizer.m_document = m_content;
@@ -2226,6 +2298,7 @@ bool Document::parse(StringView content, const char* filename) {
 		m_id_index.insert(id, i);
 	}
 	m_stylesheet.buildIndex();
+	m_dpi_scale = computeScale(m_canvas_size);
 	recomputeStyles();
 
 	// the stylesheet is only applied to an element while its rule matches (:hover, ...), so its sprites would load on first use: load them now
@@ -2387,10 +2460,31 @@ bool Document::areDependenciesReady() const {
 	return true;
 }
 
+float Document::computeScale(Vec2 canvas_size) const {
+	if ((m_reference_width <= 0 && m_reference_height <= 0) || canvas_size.x <= 0 || canvas_size.y <= 0) return m_base_scale;
+
+	const float sx = m_reference_width > 0 ? canvas_size.x / m_reference_width : 0.f;
+	const float sy = m_reference_height > 0 ? canvas_size.y / m_reference_height : 0.f;
+	float scale = sx > 0 ? sx : sy; // a single reference dimension is all there is to match
+	if (sx > 0 && sy > 0) {
+		switch (m_scale_match) {
+			case ScaleMatch::HEIGHT: scale = sy; break;
+			case ScaleMatch::WIDTH: scale = sx; break;
+			case ScaleMatch::MIN: scale = minimum(sx, sy); break;
+			case ScaleMatch::MAX: scale = maximum(sx, sy); break;
+		}
+	}
+	if (m_min_scale > 0) scale = maximum(scale, m_min_scale);
+	if (m_max_scale > 0) scale = minimum(scale, m_max_scale);
+	return scale;
+}
+
 void Document::setDPIScale(float scale) {
 	if (scale <= 0) scale = 1.0f;
-	if (m_dpi_scale == scale) return;
-	m_dpi_scale = scale;
+	m_base_scale = scale;
+	const float effective = computeScale(m_canvas_size);
+	if (m_dpi_scale == effective) return;
+	m_dpi_scale = effective;
 	recomputeStyles();
 	invalidateLayout();
 }

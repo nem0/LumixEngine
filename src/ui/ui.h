@@ -361,7 +361,16 @@ struct LUMIX_UI_API Document {
 	IAllocator& m_allocator;
 	Vec2 m_canvas_size;
 	String m_content;
+	// effective scale applied to pixel and font-size values (em follows the font size): m_base_scale (OS DPI), or, with an @document block, derived from the canvas size
 	float m_dpi_scale = 1.0f;
+	float m_base_scale = 1.0f;
+	// set by an @document block, 0 = not set
+	float m_reference_width = 0;
+	float m_reference_height = 0;
+	float m_min_scale = 0;
+	float m_max_scale = 0;
+	enum class ScaleMatch : u8 { HEIGHT, WIDTH, MIN, MAX };
+	ScaleMatch m_scale_match = ScaleMatch::HEIGHT;
 	bool m_layout_dirty = false;
 	float m_layout_duration = 0;
 	float m_parse_duration = 0;
@@ -387,8 +396,12 @@ struct LUMIX_UI_API Document {
 	void flushLayout() { if (m_layout_dirty) computeLayout(m_canvas_size); }
 	void render(Draw2D& draw);
 	Element* getElementAt(Vec2 pos);
+	// the OS DPI scale, ignored while the document has an @document reference size
 	void setDPIScale(float scale);
+	// scale actually applied
 	float getDPIScale() const { return m_dpi_scale; }
+	// scale for a canvas size (in pixels): m_base_scale, or canvas / reference size when an @document block sets one
+	float computeScale(Vec2 canvas_size) const;
 	//@ function
 	Element* getElementByID(const char* id);
 
@@ -416,6 +429,7 @@ private:
 
 	bool parseElements(u32 parent_index);
 	bool parseStyleBlock();
+	bool parseDocumentBlock();
 	bool consume(Token::Type type, Token* out_token = nullptr);
 	bool tryConsume(Token::Type type, Token* out_token = nullptr);
 	void addClassRaw(u32 element_index, StringView classname);

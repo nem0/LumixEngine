@@ -2811,6 +2811,7 @@ void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	const HRESULT create_hr = d3d->device->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, texture.state, clear_val_ptr, IID_PPV_ARGS(&texture.resource));
 	if (FAILED(create_hr)) {
 		// texture.resource stays null: the handle is valid but unusable, and update()/copies check for that
+		logError("Failed to create texture '", debug_name, "': ", w, "x", h, "x", depth, ", mips ", mip_count, ", dxgi format ", (u32)desc.Format, ", flags ", (u32)desc.Flags, (is_3d ? ", 3d" : ""), (is_cubemap ? ", cubemap" : ""));
 		logDeviceRemoved(d3d->device, create_hr, "CreateCommittedResource (texture)");
 		return;
 	}

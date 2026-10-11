@@ -1504,6 +1504,49 @@ bool testDPIScaling() {
 	return true;
 }
 
+bool testDocumentReferenceSize() {
+	MockDocument doc;
+	const char* body = "[box width=10 height=10 font-size=20] { [box width=2em height=1em] {} }";
+
+	// canvas matching the reference size: scale 1
+	ASSERT_PARSE(doc, "@document { reference-width: 100; reference-height: 50; }\n[box width=10 height=10 font-size=20] { [box width=2em height=1em] {} }");
+	doc.computeLayout(Vec2(100, 50));
+	Element* root = doc.getElement(doc.m_root.children[0]);
+	Element* child = doc.getElement(root->children[0]);
+	ASSERT_FLOAT_EQ(1.0f, doc.getDPIScale());
+	ASSERT_FLOAT_EQ(10.0f, root->size.x);
+	ASSERT_FLOAT_EQ(40.0f, child->size.x);
+
+	// twice the reference: px and em values double, the OS DPI scale is ignored
+	doc.setDPIScale(3.0f);
+	doc.computeLayout(Vec2(200, 100));
+	ASSERT_FLOAT_EQ(2.0f, doc.getDPIScale());
+	ASSERT_FLOAT_EQ(20.0f, root->size.x);
+	ASSERT_FLOAT_EQ(80.0f, child->size.x);
+
+	// match=width with a different aspect ratio
+	ASSERT_PARSE(doc, "@document { reference-width: 100; reference-height: 50; match: width; }\n[box width=10 height=10] {}");
+	doc.computeLayout(Vec2(300, 100));
+	ASSERT_FLOAT_EQ(3.0f, doc.getDPIScale());
+
+	// only a reference height: height is matched, and max-scale clamps
+	ASSERT_PARSE(doc, "@document { reference-height: 50; max-scale: 1.5; }\n[box width=10 height=10] {}");
+	doc.computeLayout(Vec2(300, 200));
+	ASSERT_FLOAT_EQ(1.5f, doc.getDPIScale());
+
+	// no @document: the OS scale is used as is
+	ASSERT_PARSE(doc, body);
+	doc.computeLayout(Vec2(300, 200));
+	ASSERT_FLOAT_EQ(3.0f, doc.getDPIScale());
+
+	doc.m_suppress_logging = true;
+	ASSERT_EQ(false, doc.parse("@document { reference-height: abc; }", "test.ui"));
+	ASSERT_EQ(false, doc.parse("@document { match: diagonal; }", "test.ui"));
+	ASSERT_EQ(false, doc.parse("@document { unknown: 1; }", "test.ui"));
+	ASSERT_EQ(false, doc.parse("[box] { @document { reference-height: 10; } }", "test.ui"));
+	return true;
+}
+
 bool testInvalidAttributeValuesRejected() {
 	MockDocument doc;
 	doc.m_suppress_logging = true;
@@ -1634,5 +1677,6 @@ void runUITests() {
 	RUN_TEST(testHoverEvents);
 	RUN_TEST(testHoverUsesCurrentLayoutAfterMutation);
 	RUN_TEST(testDPIScaling);
+	RUN_TEST(testDocumentReferenceSize);
 	RUN_TEST(testInvalidAttributeValuesRejected);
 }

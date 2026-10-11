@@ -265,13 +265,27 @@ bool FontManager::build() {
 		for (const stbrp_rect& r : result.rects) rects.push(r);
 	}
 
-	stbrp_context ctx;
-	Array<stbrp_node> nodes(m_allocator);
-	nodes.resize(2048);
-	stbrp_init_target(&ctx, 2048, 32 * 1024, nodes.begin(), nodes.size());
-	stbrp_pack_rects(&ctx, rects.begin(), rects.size());
-
+	// keep the atlas as narrow as it can be, but never taller than a texture can be (16384 on D3D12): widen it until everything fits
+	constexpr u32 MAX_ATLAS_SIZE = 16384;
 	u32 w = 2048;
+	Array<stbrp_node> nodes(m_allocator);
+	for (;;) {
+		nodes.resize(w);
+		stbrp_context ctx;
+		stbrp_init_target(&ctx, w, MAX_ATLAS_SIZE, nodes.begin(), nodes.size());
+		if (stbrp_pack_rects(&ctx, rects.begin(), rects.size())) break;
+		if (w >= MAX_ATLAS_SIZE) {
+			logError("Fonts do not fit into a ", MAX_ATLAS_SIZE, "x", MAX_ATLAS_SIZE, " atlas, some glyphs are missing");
+			for (stbrp_rect& r : rects) {
+				if (r.was_packed) continue;
+				r.x = r.y = 0;
+				r.w = r.h = 0;
+			}
+			break;
+		}
+		w *= 2;
+	}
+
 	u32 h = 1;
 	for (const stbrp_rect& r : rects) {
 		ASSERT(u32(r.x + r.w) <= w);
