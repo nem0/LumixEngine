@@ -31,8 +31,9 @@ setlocal
 	echo  B. Jolt
 	echo  C. Lua
 	echo  D. Remote control
+	echo  E. Video recorder
 	echo ===============================
-	choice /C 123456789ABCD /N /M "Your choice:"
+	choice /C 123456789ABCDE /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :empty_plugin
@@ -47,6 +48,7 @@ setlocal
 	if %errorlevel%==11 call :jolt_plugin
 	if %errorlevel%==12 call :lua_plugin
 	if %errorlevel%==13 call :remote_plugin
+	if %errorlevel%==14 call :videorec_plugin
 goto :begin
 
 :glft_import_plugin
@@ -209,6 +211,21 @@ exit /B 0
 		popd
 	) else (
 		cd remote
+		git pull
+	)
+	popd
+exit /B 0
+
+:videorec_plugin
+	if not exist ..plugins mkdir ..plugins
+	pushd ..plugins
+	if not exist videorec (
+		git.exe clone https://github.com/nem0/lumix_videorec.git videorec
+		pushd videorec
+		git remote add origin2 git@github.com:nem0/lumix_videorec.git
+		popd
+	) else (
+		cd videorec
 		git pull
 	)
 	popd
