@@ -1901,7 +1901,7 @@ void serializeCoreImports(MetaData& data) {
 				appendEvoxImportType(out, type);
 				out.add("\"" OUT_ENDL);
 			};
-			emitImportForType(makeStringView("Entity"));
+			emitImportForType(makeStringView("EntityRef"));
 			for (Function& f : c.functions) {
 				if (!isSupportedEvoxFunction(f)) continue;
 				emitImportForType(f.return_type);
