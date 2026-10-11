@@ -77,6 +77,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	struct Subdir {
 		StaticString<MAX_PATH> clamped_name;
 		Path dir;
+		bool ignored; // contains AssetCompiler::IGNORE_MARKER
 	};
 	struct FileInfo {
 		StaticString<MAX_PATH> clamped_filename;
@@ -323,6 +324,7 @@ struct AssetBrowserImpl : AssetBrowser {
 					Subdir& dir = m_subdirs.emplace();
 					dir.dir = info.filename;
 					dir.clamped_name = info.filename;
+					dir.ignored = fs.fileExists(Path(m_dir, "/", info.filename, "/", AssetCompiler::IGNORE_MARKER));
 				}
 				destroyFileIterator(iter);
 			}
@@ -577,18 +579,40 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 	}
 
-	bool tileDir(StringView name, StaticString<MAX_PATH>& clamped_name, float size) {
+	// menu item which creates or deletes AssetCompiler::IGNORE_MARKER in `dir`, the asset compiler picks the change up through the file watcher
+	void ignoreDirMenuItem(const Path& dir) {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		const Path marker(dir, "/", AssetCompiler::IGNORE_MARKER);
+		const bool ignored = fs.fileExists(marker);
+		if (ImGui::MenuItem("Ignore directory", nullptr, ignored)) {
+			if (ignored) {
+				if (!fs.deleteFile(marker)) logError("Could not delete ", marker);
+			}
+			else if (!fs.saveContentSync(marker, Span<const u8>())) {
+				logError("Could not create ", marker);
+			}
+		}
+		ImGui::SetItemTooltip("Ignored directories are not compiled, loaded nor exported (%s file)", AssetCompiler::IGNORE_MARKER);
+	}
+
+	bool tileDir(StringView name, StaticString<MAX_PATH>& clamped_name, float size, bool ignored) {
 		ImGui::BeginGroup();
 		ImGui::PushID(name.data, name.end());
-		
+
 		ImVec2 cp = ImGui::GetCursorScreenPos();
-		tileIcon(ICON_FA_FOLDER, size);
+		tileIcon(ignored ? ICON_FA_EYE_SLASH : ICON_FA_FOLDER, size);
 		ImGui::SetCursorScreenPos(cp);
 		bool pressed = ImGui::InvisibleButton("thumbnail", ImVec2(size, size));
+		const bool open_ctx = ImGui::IsItemHovered() && ImGui::IsMouseReleased(1);
 
 		tileLabel(name, clamped_name, size);
-		
+
 		ImGui::PopID();
+		// popup ids are hashed with the ID stack, so it has to be opened outside of PushID
+		if (open_ctx) {
+			m_dir_ctx = Path(m_dir, "/", name);
+			ImGui::OpenPopup("dir_ctx");
+		}
 		ImGui::EndGroup();
 		return pressed;
 	}
@@ -763,7 +787,7 @@ struct AssetBrowserImpl : AssetBrowser {
 						const u32 item_index = i + j * num_columns;
 						if (item_index < (u32)m_subdirs.size()) {
 							Subdir& subdir = m_subdirs[item_index];
-							if (tileDir(subdir.dir, subdir.clamped_name, thumbnail_size)) {
+							if (tileDir(subdir.dir, subdir.clamped_name, thumbnail_size, subdir.ignored)) {
 								Path new_dir(m_dir, "/", subdir.dir);
 								changeDir(new_dir, true);
 								goto after_list;
@@ -786,12 +810,16 @@ struct AssetBrowserImpl : AssetBrowser {
 				}
 				else {
 					if (j < m_subdirs.size()) {
-						ImGui::TextUnformatted(ICON_FA_FOLDER);
+						ImGui::TextUnformatted(m_subdirs[j].ignored ? ICON_FA_EYE_SLASH : ICON_FA_FOLDER);
 						ImGui::SameLine();
 						if (ImGui::Selectable(m_subdirs[j].dir.c_str(), false)) {
 							Path new_dir(m_dir, "/", m_subdirs[j].dir);
 							changeDir(new_dir, true);
 							goto after_list;
+						}
+						if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(1)) {
+							m_dir_ctx = Path(m_dir, "/", m_subdirs[j].dir);
+							ImGui::OpenPopup("dir_ctx");
 						}
 					}
 					else {
@@ -832,6 +860,8 @@ struct AssetBrowserImpl : AssetBrowser {
 				tmp[0] = 0;
 				open_create_dir_popup = true;
 			}
+			// the root directory can not be ignored, see AssetCompiler::onIgnoreMarkerChanged
+			if (!Path::isSame(m_dir, ".")) ignoreDirMenuItem(m_dir);
 
 			if (canMultiEdit() && ImGui::MenuItem("Multiedit")) openMultiEdit();
 
@@ -885,6 +915,13 @@ struct AssetBrowserImpl : AssetBrowser {
 				ImGui::Separator();
 				common_popup();
 			}
+			ImGui::EndPopup();
+		}
+		else if (ImGui::BeginPopup("dir_ctx")) {
+			if (ImGui::MenuItem("View in explorer")) {
+				os::openExplorer(fs.getFullPath(m_dir_ctx));
+			}
+			ignoreDirMenuItem(m_dir_ctx);
 			ImGui::EndPopup();
 		}
 		else if (ImGui::BeginPopupContextWindow("context")) {
@@ -1499,6 +1536,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	bool m_is_open;
 	StudioApp& m_app;
 	Path m_dir;
+	Path m_dir_ctx; // folder the "dir_ctx" popup was opened for
 	Array<Subdir> m_subdirs;
 	Array<FileInfo> m_file_infos;
 	Array<ImmediateTile> m_immediate_tiles;

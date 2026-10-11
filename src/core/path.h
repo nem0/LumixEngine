@@ -27,6 +27,8 @@ struct LUMIX_CORE_API Path {
 	static bool hasExtension(StringView filename, StringView ext);
 	static bool replaceExtension(char* path, const char* ext);
 	static bool isSame(StringView a, StringView b);
+	// true if `path` is `dir` or is inside of it, case insensitive; `dir` has no trailing '/'
+	static bool isInDir(StringView path, StringView dir);
 
 	Path();
 	explicit Path(StringView path);

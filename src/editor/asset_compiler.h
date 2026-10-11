@@ -10,6 +10,9 @@ struct StudioApp;
 
 
 struct LUMIX_EDITOR_API AssetCompiler {
+	// folders containing a file with this name are completely ignored - not scanned, compiled, loaded nor exported
+	static constexpr const char* IGNORE_MARKER = ".lumixignore";
+
 	struct LUMIX_EDITOR_API IPlugin {
 		virtual ~IPlugin() {}
 		virtual bool compile(const Path& src) = 0;
@@ -36,6 +39,8 @@ struct LUMIX_EDITOR_API AssetCompiler {
 	virtual void addPlugin(IPlugin& plugin, Span<const char*> extensions) = 0;
 	virtual void removePlugin(IPlugin& plugin) = 0;
 	virtual bool compile(const Path& path) = 0;
+	virtual u32 compileAll() = 0;
+	virtual bool isCompiling() const = 0;
 	virtual bool getMeta(const Path& res, OutputMemoryStream& blob) = 0;
 	virtual void updateMeta(const Path& resource, Span<const u8> data) const = 0;
 	virtual const HashMap<FilePathHash, ResourceItem>& lockResources() = 0;

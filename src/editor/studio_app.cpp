@@ -1007,7 +1007,6 @@ struct StudioAppImpl final : StudioApp {
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
 		
 		m_settings.registerOption("command_pallete_search_settings", &m_command_palette_search_settings, "General", "Command palette searches in settings");
-		m_settings.registerOption("welcome_shader", &m_welcome_screen_use_shader, "General", "Animated background in welcome screen").setStorage(Settings::USER);
 		m_settings.registerOption("report_crashes", &m_crash_reporting, "General", "Report crashes");
 		m_settings.registerOption("sleep_when_inactive", &m_sleep_when_inactive, "General", "Throttle FPS in background");
 		m_settings.registerOption("fileselector_dir", &m_file_selector.m_path);
@@ -2938,30 +2937,28 @@ struct StudioAppImpl final : StudioApp {
 		char path[MAX_PATH];
 	};
 
+	// every registered resource which has a compiled file, they were compiled before, see guiExportData
+	// (compiled file is .lumix/resources/<hash>.res, resources in folders with AssetCompiler::IGNORE_MARKER have none)
 	void scanCompiled(AssociativeArray<FilePathHash, ExportFileInfo>& infos) {
-		FileSystem& fs = m_engine->getFileSystem();
-		FileIterator* iter = fs.createFileIterator(".lumix/resources");
-		os::FileInfo info;
 		exportFile("lumix.prj", infos);
-		while (getNextFile(iter, &info)) {
-			if (info.is_directory) continue;
 
-			StringView basename = Path::getBasename(info.filename);
-			ExportFileInfo rec;
-			u64 tmp_hash;
-			fromCString(basename, tmp_hash);
-			rec.hash = FilePathHash::fromU64(tmp_hash);
-			rec.offset = 0;
-			const Path path = fs.getFullPath(Path(".lumix/resources/", info.filename));
-			rec.size = os::getFileSize(path);
-			copyString(rec.path, ".lumix/resources/");
-			catString(rec.path, info.filename);
-			infos.insert(rec.hash, rec);
+		const HashMap<FilePathHash, AssetCompiler::ResourceItem>& resources = m_asset_compiler->lockResources();
+		for (const AssetCompiler::ResourceItem& ri : resources) {
+			const FilePathHash hash = ri.path.getHash();
+			if (infos.find(hash) >= 0) continue;
+
+			const Path baked_path(".lumix/resources/", hash, ".res");
+			if (!m_engine->getFileSystem().fileExists(baked_path)) continue;
+			ExportFileInfo& out_info = infos.emplace(hash);
+			copyString(Span(out_info.path), baked_path);
+			out_info.hash = hash;
+			out_info.size = os::getFileSize(m_engine->getFileSystem().getFullPath(baked_path));
+			out_info.offset = ~0UL;
 		}
+		m_asset_compiler->unlockResources();
+
 		exportDataScan("engine/shaders/", infos);
 		exportDataScan("maps/", infos);
-		
-		destroyFileIterator(iter);
 	}
 
 
@@ -2979,6 +2976,9 @@ struct StudioAppImpl final : StudioApp {
 	void exportDataScan(const char* dir_path, AssociativeArray<FilePathHash, ExportFileInfo>& infos)
 	{
 		FileSystem& fs = m_engine->getFileSystem();
+		// `dir_path` ends with '/'
+		if (fs.fileExists(Path(dir_path, AssetCompiler::IGNORE_MARKER))) return;
+
 		FileIterator* iter = fs.createFileIterator(dir_path);
 		if (!iter) {
 			logWarning(dir_path, " not found when trying to scan files to package the game.");
@@ -3026,32 +3026,10 @@ struct StudioAppImpl final : StudioApp {
 	}
 
 
-	void exportDataScanResources(AssociativeArray<FilePathHash, ExportFileInfo>& infos)
-	{
-		ResourceManagerHub& rm = m_engine->getResourceManager();
-		exportFile("lumix.prj", infos);
-		for (auto iter = rm.getAll().begin(), end = rm.getAll().end(); iter != end; ++iter) {
-			const auto& resources = iter.value()->getResourceTable();
-			for (Resource* res : resources) {
-				const FilePathHash hash = res->getPath().getHash();
-				const Path baked_path(".lumix/resources/", hash, ".res");
-
-				if (infos.find(hash) < 0) {
-					auto& out_info = infos.emplace(hash);
-					copyString(Span(out_info.path), baked_path);
-					out_info.hash = hash;
-					out_info.size = os::getFileSize(baked_path);
-					out_info.offset = ~0UL;
-				}
-			}
-		}
-		exportDataScan("engine/shaders/", infos);
-		exportDataScan("maps/", infos);
-	}
-
 	void guiExportData() {
 		if (!m_is_export_game_dialog_open) {
 			m_export_msg_timer = -1;
+			m_export_compiling = false;
 			return;
 		}
 
@@ -3067,16 +3045,32 @@ struct StudioAppImpl final : StudioApp {
 
 			ImGuiEx::Label("Pack data");
 			ImGui::Checkbox("##pack", &m_export.pack);
-			ImGuiEx::Label("Mode");
-			ImGui::Combo("##mode", (int*)&m_export.mode, "All files\0Loaded world\0");
 
-			if (m_export_msg_timer > 0) {
+			if (m_export_compiling) {
+				// resources are compiled in the background (asset compiler shows the progress), we export when it's done
+				if (!m_asset_compiler->isCompiling()) {
+					m_export_compiling = false;
+					if (exportData()) m_export_msg_timer = 3.f;
+				}
+				else {
+					ImGui::TextUnformatted("Compiling resources...");
+					ImGui::SameLine();
+					if (ImGui::Button("Cancel")) m_export_compiling = false;
+				}
+			}
+			else if (m_export_msg_timer > 0) {
 				m_export_msg_timer -= m_engine->getLastTimeDelta();
 				if (ImGui::Button("Export finished")) m_export_msg_timer = -1;
 			}
 			else {
 				if (ImGui::Button("Export")) {
-					if (exportData()) m_export_msg_timer = 3.f;
+					if (m_export.dest_dir.length() == 0) {
+						logError("Select a destination directory first.");
+					}
+					else {
+						m_asset_compiler->compileAll();
+						m_export_compiling = true;
+					}
 				}
 			}
 		}
@@ -3102,10 +3096,8 @@ struct StudioAppImpl final : StudioApp {
 		AssociativeArray<FilePathHash, ExportFileInfo> infos(m_allocator);
 		infos.reserve(10000);
 
-		switch (m_export.mode) {
-			case ExportConfig::Mode::ALL_FILES: scanCompiled(infos); break;
-			case ExportConfig::Mode::CURRENT_WORLD: exportDataScanResources(infos); break;
-		}
+		// resources were compiled before, see guiExportData
+		scanCompiled(infos);
 
 		if (m_export.pack) {
 			StaticString<MAX_PATH> dest(m_export.dest_dir, "main.pak");
@@ -3317,12 +3309,6 @@ struct StudioAppImpl final : StudioApp {
 
 	struct ExportConfig {
 		ExportConfig(IAllocator& allocator) : dest_dir(allocator) {}
-		enum class Mode : i32 {
-			ALL_FILES,
-			CURRENT_WORLD
-		};
-
-		Mode mode = Mode::ALL_FILES;
 
 		bool pack = false;
 		String dest_dir;
@@ -3330,6 +3316,7 @@ struct StudioAppImpl final : StudioApp {
 
 	ExportConfig m_export;
 	float m_export_msg_timer = -1;
+	bool m_export_compiling = false;
 	bool m_entity_selection_changed = false;
 	bool m_finished;
 	bool m_deferred_game_mode_exit;
@@ -3361,7 +3348,6 @@ struct StudioAppImpl final : StudioApp {
 	TextFilter m_all_actions_filter;
 	bool m_sleep_when_inactive = true;
 	bool m_crash_reporting = true;
-	bool m_welcome_screen_use_shader = true;
 	bool m_command_palette_search_settings = true;
 	i32 m_font_size = 16;
 	DelegateList<void(const char*)> m_file_changed;

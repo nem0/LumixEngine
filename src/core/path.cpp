@@ -191,6 +191,11 @@ bool Path::isSame(StringView a, StringView b) {
 	return equalStrings(a, b);
 }
 
+bool Path::isInDir(StringView path, StringView dir) {
+	if (dir.size() == 0 || !startsWithInsensitive(path, dir)) return false;
+	return path.size() == dir.size() || path[dir.size()] == '/';
+}
+
 bool Path::replaceExtension(char* path, const char* ext)
 {
 	char* end = path + stringLength(path);

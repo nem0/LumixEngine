@@ -50,7 +50,9 @@
 * [Engine data and project directories](editor/project_directory.md)
 * [Editor actions](editor/action.md)
 * [Extending property_grid](editor/extending_property_grid.md)
+* [Ignoring folders (.lumixignore)](lumixignore.md)
 
 # Packaged game
 
+* [Packaging a game](packaged_game.md)
 * [ImGui in packaged game](app_imgui.md)

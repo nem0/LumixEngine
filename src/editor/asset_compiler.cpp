@@ -34,7 +34,6 @@ struct HashFunc<Path>
 	}
 };
 
-
 void AssetCompiler::IPlugin::addSubresources(AssetCompiler& compiler, const Path& path, AtomicI32&)
 {
 	const ResourceType type = compiler.getResourceType(path);
@@ -352,6 +351,12 @@ struct AssetCompilerImpl : AssetCompiler {
 				copyString(child_path, dir);
 				if(!dir.empty()) catString(child_path, "/");
 				catString(child_path, info.filename);
+				const Path child(child_path[0] == '/' ? child_path + 1 : child_path);
+				if (fs.fileExists(Path(child, "/", IGNORE_MARKER))) {
+					// resources from the cached list (see fillDB) can be in a folder which was ignored since
+					removeResourcesInDir(child);
+					continue;
+				}
 				processDir(child_path, list_last_modified, propagate_visited);
 			}
 			else {
@@ -376,6 +381,50 @@ struct AssetCompilerImpl : AssetCompiler {
 		destroyFileIterator(iter);
 	}
 
+	// true if `path` (file or folder) is in a folder containing IGNORE_MARKER, or is such folder
+	bool isIgnored(StringView path) {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		for (const char* c = path.begin(); c != path.end(); ++c) {
+			if (*c != '/' || c == path.begin()) continue;
+			if (fs.fileExists(Path(StringView(path.begin(), c), "/", IGNORE_MARKER))) return true;
+		}
+		return fs.dirExists(path) && fs.fileExists(Path(path, "/", IGNORE_MARKER));
+	}
+
+	// forget all resources in `dir` (folder got ignored) and delete their compiled files, so nothing loads stale data
+	void removeResourcesInDir(const Path& dir) {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		bool removed_any = false;
+		{
+			jobs::MutexGuard lock(m_resources_mutex);
+			m_resources.eraseIf([&](const ResourceItem& ri){
+				if (!Path::isInDir(ResourcePath::getResource(ri.path), dir)) return false;
+				fs.deleteFile(Path(".lumix/resources/", ri.path.getHash(), ".res"));
+				removed_any = true;
+				return true;
+			});
+		}
+		if (removed_any) m_on_list_changed.invoke(dir);
+	}
+
+	// IGNORE_MARKER was created or deleted at runtime
+	void onIgnoreMarkerChanged(const Path& marker_path) {
+		StringView dir_view = Path::getDir(marker_path);
+		if (dir_view.empty()) return; // marker in project root is not supported, it would ignore everything
+		dir_view.removeSuffix(1);
+		const Path dir(dir_view);
+		if (isIgnored(dir_view)) {
+			removeResourcesInDir(dir);
+			return;
+		}
+
+		// unignored, scan the folder as if it was just created
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		if (!fs.dirExists(dir)) return;
+		const u64 list_last_modified = fs.getLastModified(".lumix/resources/_resources.txt");
+		processDir(dir, list_last_modified);
+		m_on_list_changed.invoke(dir);
+	}
 
 	void registerDependency(const Path& included_from, const Path& dependency) override {
 		MutexGuard lock(m_dependencies_mutex);
@@ -535,7 +584,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		}
 	}
 
-	IPlugin* getPlugin(const Path& path) {
+	IPlugin* getPlugin(StringView path) {
 		StringView ext = Path::getExtension(path);
 		char tmp[64];
 		copyString(Span(tmp), ext);
@@ -545,6 +594,38 @@ struct AssetCompilerImpl : AssetCompiler {
 		auto iter = m_plugins.find(hash);
 		return iter.isValid() ? iter.value() : nullptr;
 	}
+
+	// queues all resources which are not compiled yet or are out of date, does not block
+	u32 compileAll() override {
+		PROFILE_FUNCTION();
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		// views point into m_resources, so they are only valid while m_resources_mutex is locked
+		HashMap<StringView, bool> to_compile(m_allocator);
+		jobs::MutexGuard lock(m_resources_mutex);
+		for (const ResourceItem& ri : m_resources) {
+			const StringView filepath = ResourcePath::getResource(ri.path);
+			if (filepath.empty() || to_compile.find(filepath) != to_compile.end()) continue;
+			if (startsWith(filepath, ".lumix/")) continue;
+			if (!fs.fileExists(filepath)) continue;
+			if (!getPlugin(filepath)) continue;
+
+			const Path dst_path(".lumix/resources/", ri.path.getHash(), ".res");
+			if (fs.fileExists(dst_path)) {
+				const Path meta_path(filepath, ".meta");
+				const u64 compiled_time = fs.getLastModified(dst_path);
+				if (compiled_time >= fs.getLastModified(filepath) && compiled_time >= fs.getLastModified(meta_path)) continue;
+			}
+			to_compile.insert(filepath, true);
+			// everything is stale, so there's no need to propagate to dependents
+			pushToCompileQueue(Path(filepath), false);
+		}
+
+		if (to_compile.empty()) return 0;
+		logInfo("Compiling ", to_compile.size(), " resources.");
+		return to_compile.size();
+	}
+
+	bool isCompiling() const override { return m_batch_remaining_count > 0; }
 
 	bool compile(const Path& src) override
 	{
@@ -612,6 +693,9 @@ struct AssetCompilerImpl : AssetCompiler {
 		for (const Path& dependent : dep_iter.value()) {
 			if (visited.indexOf(dependent) >= 0) continue; // cycle or diamond, already handled
 			visited.push(dependent);
+			// the dependency list is persisted, so it can name files that were deleted or renamed since
+			FileSystem& fs = m_app.getEngine().getFileSystem();
+			if (!fs.fileExists(ResourcePath::getResource(dependent))) continue;
 			pushDependentsRec(dependent, visited);
 			pushToCompileQueue(dependent, false);
 		}
@@ -698,8 +782,15 @@ struct AssetCompilerImpl : AssetCompiler {
 		jobs::runLambda([p, this]() mutable {
 			PROFILE_BLOCK("compile asset");
 			profiler::pushString(p.path.c_str());
-			p.compiled = compile(p.path);
-			if (!p.compiled) logError("Failed to compile resource ", p.path);
+			// compiled files of ignored resources are deleted (see removeResourcesInDir), so loading them ends up here and fails
+			if (isIgnored(p.path)) {
+				logError(p.path, " is in a folder with ", IGNORE_MARKER, ", it can not be loaded.");
+				p.compiled = false;
+			}
+			else {
+				p.compiled = compile(p.path);
+				if (!p.compiled) logError("Failed to compile resource ", p.path);
+			}
 			MutexGuard lock(m_compiled_mutex);
 			m_compiled.push(p);
 		}, nullptr);
@@ -764,6 +855,7 @@ struct AssetCompilerImpl : AssetCompiler {
 				FileSystem& fs = m_app.getEngine().getFileSystem();
 				const u64 list_last_modified = fs.getLastModified(".lumix/resources/_resources.txt");
 				if (fs.dirExists(path_obj)) {
+					if (isIgnored(path_obj)) continue;
 					processDir(path_obj, list_last_modified);
 					m_on_list_changed.invoke(path_obj);
 				}
@@ -789,11 +881,20 @@ struct AssetCompilerImpl : AssetCompiler {
 				m_changed_files.eraseItems([&](const Path& path) { return path == path_obj; });
 			}
 
+			StringView filename = path_obj;
+			filename.removePrefix(Path::getDir(path_obj).size());
+			if (equalStrings(filename, IGNORE_MARKER)) {
+				onIgnoreMarkerChanged(path_obj);
+				continue;
+			}
+
 			if (Path::hasExtension(path_obj, "meta")) {
 				StringView tmp = path_obj;
 				tmp.removeSuffix(5);
 				path_obj = tmp;
 			}
+
+			if (isIgnored(path_obj)) continue;
 
 			if (getResourceType(path_obj) != INVALID_RESOURCE_TYPE) {
 				FileSystem& fs = m_app.getEngine().getFileSystem();
@@ -878,7 +979,6 @@ struct AssetCompilerImpl : AssetCompiler {
 	u32 m_batch_remaining_count = 0;
 	Path m_res_in_progress;
 };
-
 
 UniquePtr<AssetCompiler> AssetCompiler::create(StudioApp& app) {
 	return UniquePtr<AssetCompilerImpl>::create(app.getAllocator(), app);
