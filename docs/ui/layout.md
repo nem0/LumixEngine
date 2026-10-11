@@ -201,26 +201,35 @@ Mix units freely, e.g., `width=50% height=2em`.
 
 In runtime `UI` module (screen-space UI), DPI scale is driven from OS DPI as `os::getDPI() / 96.0`.
 
-#### Reference size (`@document`)
+#### Reference size (`[doc]`)
 
-A document can declare the size it was designed for. The scale then follows the canvas size and the OS DPI scale is ignored for that document:
+A document can declare the size it was designed for. The scale then follows the canvas size and the OS DPI scale is ignored for that document. The usual case is a design height:
 
 ```
-@document {
-	reference-width: 1920;
-	reference-height: 1080;
-	match: height;
-	min-scale: 0.5;
-	max-scale: 4;
+[doc reference-height=1080]
+```
+
+A canvas of 2160 pixels tall then has scale 2.0, 540 has 0.5. Both dimensions with `match` choose which one wins when the aspect ratio differs from the design one:
+
+```
+[doc reference-width=1920 reference-height=1080 match=min min-scale=0.5 max-scale=4]
+```
+
+Optionally the whole document can be its body, the children are the root elements (`[style]` included):
+
+```
+[doc reference-height=1080] {
+	[style] { ... }
+	[box $menu] { ... }
 }
 ```
 
-- `@document` must be at the root level, once per file. It is not an element and doesn't count as a root element.
+- `[doc]` must be at the root level and there can be only one. It is not a layout element and doesn't count as a root element.
 - `scale = canvas size / reference size`. This scales pixels, `font-size` and so `em`, like the DPI scale. `%` is not affected.
-- `reference-width` / `reference-height`: either one or both. With one, that dimension is matched.
-- `match`: `height` (default), `width`, `min` or `max`. Which ratio to use when both reference dimensions are set and the aspect ratios differ.
+- `reference-width` / `reference-height`: either one or both. With one, that dimension drives the scale.
+- `match`: `height` (default), `width`, `min` or `max`. Which ratio to use when both reference dimensions are set and the aspect ratios differ. It has no effect with a single reference dimension.
 - `min-scale` / `max-scale`: optional clamp of the resulting scale.
-- Without `@document` the OS DPI scale is used as before.
+- Without `[doc]` the OS DPI scale is used as before.
 
 ### Fit-Content
 

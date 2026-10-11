@@ -361,10 +361,10 @@ struct LUMIX_UI_API Document {
 	IAllocator& m_allocator;
 	Vec2 m_canvas_size;
 	String m_content;
-	// scale applied to pixel and font-size values (em follows the font size): m_dpi_scale, or, with an @document block, derived from the canvas size
+	// scale applied to pixel and font-size values (em follows the font size): m_dpi_scale, or, with a [doc] tag, derived from the canvas size
 	float m_scale = 1.0f;
 	float m_dpi_scale = 1.0f; // OS DPI scale, set by setDPIScale()
-	// set by an @document block, 0 = not set
+	// set by the [doc] tag, 0 = not set
 	float m_reference_width = 0;
 	float m_reference_height = 0;
 	float m_min_scale = 0;
@@ -396,11 +396,11 @@ struct LUMIX_UI_API Document {
 	void flushLayout() { if (m_layout_dirty) computeLayout(m_canvas_size); }
 	void render(Draw2D& draw);
 	Element* getElementAt(Vec2 pos);
-	// the OS DPI scale, ignored while the document has an @document reference size
+	// the OS DPI scale, ignored while the document has a [doc] reference size
 	void setDPIScale(float scale);
 	// scale actually applied
 	float getScale() const { return m_scale; }
-	// scale for a canvas size (in pixels): m_dpi_scale, or canvas / reference size when an @document block sets one
+	// scale for a canvas size (in pixels): m_dpi_scale, or canvas / reference size when a [doc] tag sets one
 	float computeScale(Vec2 canvas_size) const;
 	//@ function
 	Element* getElementByID(const char* id);
@@ -427,15 +427,17 @@ private:
 		}
 	}
 
-	bool parseElements(u32 parent_index);
+	// doc_body: parsing the body of [doc], the root level that ends with a }
+	bool parseElements(u32 parent_index, bool doc_body = false);
 	bool parseStyleBlock();
-	bool parseDocumentBlock();
+	bool parseDocTag();
 	bool consume(Token::Type type, Token* out_token = nullptr);
 	bool tryConsume(Token::Type type, Token* out_token = nullptr);
 	void addClassRaw(u32 element_index, StringView classname);
 	void removeClassRaw(u32 element_index, StringView classname);
 	bool parseAttributeValue(Element& elem, AttributeName name, StringView value);
 
+	bool m_has_doc_tag = false;
 	Array<Event> m_events;
 };
 

@@ -636,23 +636,18 @@ bool Document::parseStyleBlock() {
 	}
 }
 
-// @document { reference-width: 1920; reference-height: 1080; match: height; min-scale: 0.5; max-scale: 4; }
-// the size the document was designed for: pixel and font-size values are scaled by canvas size / reference size instead of the OS DPI scale
-bool Document::parseDocumentBlock() {
-	if (!consume(Token::LBRACE)) return false;
-
-	for (;;) {
-		Token token = m_tokenizer.consumeToken();
-		if (token.type == Token::RBRACE) return true;
-		if (token.type != Token::IDENTIFIER) {
-			error(token.value, m_tokenizer, "expected @document property name or '}', got ", tokenTypeToString(token.type));
-			return false;
-		}
-		const StringView name = token.value;
-		if (!consume(Token::COLON)) return false;
-
+// [doc reference-width=1920 reference-height=1080 match=height min-scale=0.5 max-scale=4] { ... }
+// Optional, at the root level, once per file. The size the document was designed for: pixel and font-size values are scaled by
+// canvas size / reference size instead of the OS DPI scale. With a body its content are the root elements, without one the root elements follow it.
+bool Document::parseDocTag() {
+	// "[doc" is consumed
+	while (!tryConsume(Token::RBRACKET)) {
+		Token name;
+		if (!consume(Token::IDENTIFIER, &name)) return false;
+		if (!consume(Token::EQUALS)) return false;
 		const Token value = m_tokenizer.consumeToken();
-		if (name == "match") {
+
+		if (name.value == "match") {
 			if (value.type != Token::IDENTIFIER) {
 				error(value.value, m_tokenizer, "expected height, width, min or max, got ", tokenTypeToString(value.type));
 				return false;
@@ -665,44 +660,41 @@ bool Document::parseDocumentBlock() {
 				error(value.value, m_tokenizer, "invalid match '", value.value, "', expected height, width, min or max");
 				return false;
 			}
-		} else {
-			float* target = nullptr;
-			if (name == "reference-width") target = &m_reference_width;
-			else if (name == "reference-height") target = &m_reference_height;
-			else if (name == "min-scale") target = &m_min_scale;
-			else if (name == "max-scale") target = &m_max_scale;
-			else {
-				error(name, m_tokenizer, "unknown @document property '", name, "'");
-				return false;
-			}
-			float v = 0;
-			const char* end = value.type == Token::NUMBER ? fromCString(value.value, v) : nullptr;
-			if (!end || end != value.value.end() || v < 0 || v != v) {
-				error(value.value, m_tokenizer, "invalid value '", value.value, "' for '", name, "', expected a non-negative number");
-				return false;
-			}
-			*target = v;
-		}
-		if (!consume(Token::SEMICOLON)) return false;
-	}
-}
-
-bool Document::parseElements(u32 parent_index) {
-	for (;;) {
-		Token token = m_tokenizer.consumeToken();
-
-		if (token.type == Token::TEXT && token.value == "@document") {
-			if (parent_index != 0xffff'FFFF) {
-				error(token.value, m_tokenizer, "@document must be at the root level");
-				return false;
-			}
-			if (!parseDocumentBlock()) return false;
 			continue;
 		}
 
+		float* target = nullptr;
+		if (name.value == "reference-width") target = &m_reference_width;
+		else if (name.value == "reference-height") target = &m_reference_height;
+		else if (name.value == "min-scale") target = &m_min_scale;
+		else if (name.value == "max-scale") target = &m_max_scale;
+		else {
+			error(name.value, m_tokenizer, "unknown [doc] attribute '", name.value, "'");
+			return false;
+		}
+		float v = 0;
+		const char* end = value.type == Token::NUMBER ? fromCString(value.value, v) : nullptr;
+		if (!end || end != value.value.end() || v < 0 || v != v) {
+			error(value.value, m_tokenizer, "invalid value '", value.value, "' for '", name.value, "', expected a non-negative number");
+			return false;
+		}
+		*target = v;
+	}
+
+	if (!tryConsume(Token::LBRACE)) return true;
+	return parseElements(0xFFFF'FFFF, true);
+}
+
+bool Document::parseElements(u32 parent_index, bool doc_body) {
+	// the root level, where a stray } ends the file and EOF is fine: the body of [doc] is not it, its } closes the body
+	const bool is_root = parent_index == 0xFFFF'FFFF && !doc_body;
+	for (;;) {
+		Token token = m_tokenizer.consumeToken();
+
 		switch (token.type) {
+
 			case Token::EOF: 
-				if (parent_index != 0xFFFF'FFFF) {
+				if (!is_root) {
 					error(token.value, m_tokenizer, "unexpected EOF, unclosed block");
 					return false;
 				}
@@ -729,14 +721,14 @@ bool Document::parseElements(u32 parent_index) {
 							break;
 						case Token::LBRACKET: is_break = true; break;
 						case Token::RBRACE:
-							if (parent_index == 0xffff'FFFF) {
+							if (is_root) {
 								error(token.value, m_tokenizer, "unexpected right brace");
 								return false;
 							}
 							m_tokenizer.consumeToken();
 							return true;
 						case Token::EOF:
-							if (parent_index == 0xffff'FFFF) return true;
+							if (is_root) return true;
 							error(token.value, m_tokenizer, "unexpected EOF");
 							return false;
 						default:
@@ -751,7 +743,7 @@ bool Document::parseElements(u32 parent_index) {
 				break;
 			}
 			case Token::RBRACE:
-				if (parent_index == 0xFFFF'FFFF) {
+				if (is_root) {
 					error(token.value, m_tokenizer, "unexpected '}' at root level");
 					return false;
 				}
@@ -768,6 +760,19 @@ bool Document::parseElements(u32 parent_index) {
 						}
 						if (!consume(Token::RBRACKET, &token)) return false;
 						if (!parseStyleBlock()) return false;
+						continue;
+					}
+					if (token.value == "doc") {
+						if (!is_root) {
+							error(token.value, m_tokenizer, "[doc] must be at the root level");
+							return false;
+						}
+						if (m_has_doc_tag) {
+							error(token.value, m_tokenizer, "duplicate [doc]");
+							return false;
+						}
+						m_has_doc_tag = true;
+						if (!parseDocTag()) return false;
 						continue;
 					}
 					error(token.value, m_tokenizer, "unknown tag '", token.value, "'");
@@ -859,13 +864,13 @@ bool Document::parseElements(u32 parent_index) {
 						case Token::ERROR: return false;
 						case Token::UNDEFINED: return false;
 						case Token::EOF: 
-							if (parent_index == 0xffff'FFFF) return true;
+							if (is_root) return true;
 
 							error(token.value, m_tokenizer, "unexpected EOF");
 							return false;
 						case Token::LBRACKET: is_break = true; break; // start of an element
 						case Token::RBRACE: 
-							if (parent_index == 0xffff'FFFF) {
+							if (is_root) {
 								error(token.value, m_tokenizer, "unexpected right brace");
 								return false;
 							}
@@ -1955,7 +1960,7 @@ Element* Document::getElementByID(const char* id) {
 void Document::computeLayout(Vec2 canvas_size) {
 	PROFILE_FUNCTION();
 
-	// with an @document reference size the scale follows the canvas, which also changes every font size
+	// with an [doc] reference size the scale follows the canvas, which also changes every font size
 	const float scale = computeScale(canvas_size);
 	if (scale != m_scale) {
 		m_scale = scale;
@@ -2281,6 +2286,7 @@ bool Document::parse(StringView content, const char* filename) {
 	m_min_scale = 0;
 	m_max_scale = 0;
 	m_scale_match = ScaleMatch::HEIGHT;
+	m_has_doc_tag = false;
 	m_content = content;
 	m_tokenizer.m_filename = filename;
 	m_tokenizer.m_document = m_content;
