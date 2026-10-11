@@ -1304,8 +1304,11 @@ void Frame::end(ID3D12CommandQueue* cmd_queue, ID3D12GraphicsCommandList* cmd_li
 
 	HRESULT hr = cmd_list->Close();
 	ASSERT(hr == S_OK);
+	// fence_value is 0 the first time this frame is used; waiting for 0 is a no-op and triggers a D3D12 warning
+	if (fence_value != 0) {
 	hr = cmd_queue->Wait(fence, fence_value);
 	ASSERT(hr == S_OK);
+	}
 	if (capture_requested) {
 		if (d3d->rdoc_api) {
 			if (!d3d->rdoc_api->IsRemoteAccessConnected()) {
