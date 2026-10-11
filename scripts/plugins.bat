@@ -217,8 +217,8 @@ exit /B 0
 exit /B 0
 
 :videorec_plugin
-	if not exist ..plugins mkdir ..plugins
-	pushd ..plugins
+	if not exist ..\plugins mkdir ..\plugins
+	pushd ..\plugins
 	if not exist videorec (
 		git.exe clone https://github.com/nem0/lumix_videorec.git videorec
 		pushd videorec
