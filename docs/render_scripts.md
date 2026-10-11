@@ -106,7 +106,7 @@ Functions are called with the context as the first argument, e.g. `ctx.width()`.
 | `debugShow(ctx)`, `copyChannels(ctx, source, output, w, h, r, g, b)` | Selected built-in debug view, and a channel-mask copy between buffers. |
 | `beginFrame(ctx)`, `bindGlobalState(ctx, shadowmap)`, `endFrame(ctx)` | The frame setup and teardown that `main` of `render.evox` has to call (sort keys, light clusters, global uniforms). |
 | `setGBuffer(ctx, gbuffer)` | Sets the G-buffer that effects called from the frame script see as `gbuffer()` and `depth()`. |
-| `runPlugins(ctx, stage, input)`, `runPluginsDebugOutput(ctx, output)` | The C++ plugins of a stage (`PluginStage`). |
+| `runPlugins(ctx, stage, input)`, `runPluginsDebugOutput(ctx, output)` | The C++ plugins of a stage (`PluginStage`). The last stage, `END`, runs after `render2D` and gives the plugins the final image (`RenderPlugin::renderEnd`), the frame script should call it right before `endFrame`. |
 | `renderDebugShapes(ctx, output, depth)`, `render2D(ctx, output)` | Debug shapes and UI of the frame. |
 | `beginStatsBlock(ctx, name)` | `beginBlock` that also collects draw statistics. |
 | `setUniform(ctx, slot, data)` | Binds data to `.DRAWCALL` (b4) or `.DRAWCALL2` (b5). |

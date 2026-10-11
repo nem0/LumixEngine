@@ -65,6 +65,8 @@ struct LUMIX_ENGINE_API Engine {
 	virtual float getLastTimeDelta() const = 0;
 	//@ function
 	virtual void setTimeMultiplier(float multiplier) = 0;
+	// if > 0, every `update` advances the simulation by exactly `delta` seconds regardless of wall clock time (e.g. for video capture), 0 disables it
+	virtual void setFixedTimeDelta(float delta) = 0;
 	virtual void pause(bool pause) = 0;
 	virtual bool isPaused() const = 0;
 	virtual void nextFrame() = 0;

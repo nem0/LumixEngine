@@ -240,7 +240,7 @@ extern fn render2D(ctx : Context, output : RenderBuffer) : void;
 extern fn setGBuffer(ctx : Context, gbuffer : GBuffer) : void;
 
 // Stages of the frame the C++ plugins (`RenderPlugin`) run in.
-enum PluginStage : u32 { BEFORE_LIGHT_PASS, BEFORE_TRANSPARENT, ANTIALIAS, BEFORE_TONEMAP, TONEMAP, AFTER_TONEMAP, RENDER_OPAQUE, RENDER_TRANSPARENT }
+enum PluginStage : u32 { BEFORE_LIGHT_PASS, BEFORE_TRANSPARENT, ANTIALIAS, BEFORE_TONEMAP, TONEMAP, AFTER_TONEMAP, RENDER_OPAQUE, RENDER_TRANSPARENT, END }
 // Runs the C++ plugins of a stage. Returns an invalid buffer if no plugin did the stage.
 extern fn runPlugins(ctx : Context, stage : PluginStage, input : RenderBuffer) : RenderBuffer;
 extern fn runPluginsDebugOutput(ctx : Context, output : RenderBuffer) : bool;

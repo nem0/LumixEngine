@@ -42,6 +42,8 @@ struct LUMIX_RENDERER_API RenderPlugin {
 	virtual RenderBufferHandle renderBeforeTonemap(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline);
 	virtual RenderBufferHandle renderBeforeTransparent(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline);
 	virtual RenderBufferHandle renderAfterTonemap(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline);
+	// the last stage of a frame, `output` is the final image (UI, film grain and 2D drawing are done), it can't be modified
+	virtual void renderEnd(const GBuffer& gbuffer, RenderBufferHandle output, Pipeline& pipeline) {}
 	// returns valid buffer if plugin's Antialiasing run and no other AA should run
 	virtual RenderBufferHandle renderAA(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline);
 	// returns true if plugin's tonemap run and builtin tonemap should not run

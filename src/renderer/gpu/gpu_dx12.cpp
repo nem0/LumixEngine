@@ -1223,6 +1223,13 @@ void* getDX12Resource(TextureHandle h) {
 	return h->resource;
 }
 
+bool getDX12FrameFence(void** fence, u64* value) {
+	*fence = d3d->frame->fence;
+	// Frame::end increments the counter and signals the frame's fence with the new value after executing the command list
+	*value = d3d->fence_value + 1;
+	return true;
+}
+
 void barrier(BufferHandle buffer, BarrierType type) {
 	switch(type) {
 		case BarrierType::WRITE: buffer->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); break;

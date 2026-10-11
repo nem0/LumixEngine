@@ -273,6 +273,10 @@ struct EngineImpl final : Engine {
 		m_time_multiplier = maximum(multiplier, 0.001f);
 	}
 
+	void setFixedTimeDelta(float delta) override {
+		m_fixed_time_delta = maximum(delta, 0.f);
+	}
+
 	void computeSmoothTimeDelta() {
 		float tmp[11];
 		memcpy(tmp, m_last_time_deltas, sizeof(tmp));
@@ -306,6 +310,7 @@ struct EngineImpl final : Engine {
 		#endif
 
 		float dt = m_timer.tick() * m_time_multiplier;
+		if (m_fixed_time_delta > 0) dt = m_fixed_time_delta;
 		if (m_next_frame) dt = 1 / 30.0f;
 		++m_last_time_deltas_frame;
 		m_last_time_deltas[m_last_time_deltas_frame % lengthOf(m_last_time_deltas)] = dt;
@@ -413,6 +418,7 @@ private:
 	UniquePtr<InputSystem> m_input_system;
 	os::Timer m_timer;
 	float m_time_multiplier;
+	float m_fixed_time_delta = 0;
 	float m_last_time_deltas[11] = {};
 	u32 m_last_time_deltas_frame = 0;
 	float m_smooth_time_delta;

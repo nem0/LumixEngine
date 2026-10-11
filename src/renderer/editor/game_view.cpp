@@ -107,6 +107,41 @@ bool GameView::makeScreenshot(StringView path) {
 }
 
 
+void GameView::setupViewport(int w, int h) {
+	RenderModule* module = m_pipeline->getModule();
+	const EntityPtr camera = module->getActiveCamera();
+	Viewport vp;
+	if (camera.isValid()) {
+		vp = module->getCameraViewport((EntityRef)camera);
+		vp.w = w;
+		vp.h = h;
+		module->setCameraScreenSize((EntityRef)camera, vp.w, vp.h);
+	}
+	else {
+		vp.w = w;
+		vp.h = h;
+		vp.fov = degreesToRadians(90.f);
+		vp.is_ortho = false;
+		vp.far = 10'000.f;
+		vp.near = 1.f;
+		vp.pos = DVec3(0);
+		vp.rot = Quat(0, 0, 0, 1);
+	}
+	m_pipeline->setViewport(vp);
+}
+
+// used when rendering is forced but the game view window did not render this frame (closed or hidden)
+void GameView::renderForCapture() {
+	const IVec2 display_size = m_pipeline->getDisplaySize();
+	const int w = m_forced_viewport.enabled ? m_forced_viewport.width : display_size.x;
+	const int h = m_forced_viewport.enabled ? m_forced_viewport.height : display_size.y;
+	if (w <= 0 || h <= 0) return;
+	m_pipeline->setWorld(m_app.getWorldEditor().getWorld());
+	setupViewport(w, h);
+	m_pipeline->render(false);
+	m_was_rendered = true;
+}
+
 void GameView::setCursor(os::CursorType type)
 {
 	m_cursor_type = type;
@@ -161,6 +196,7 @@ void GameView::onFullscreenGUI(WorldEditor& editor)
 		m_pipeline->setViewport(vp);
 		m_pipeline->render(false);
 		const gpu::TextureHandle texture_handle = m_pipeline->getOutput();
+		m_was_rendered = true;
 		if (gpu::isOriginBottomLeft())
 		{
 			ImGui::Image(texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
@@ -254,14 +290,16 @@ void GameView::controlsGUI(WorldEditor& editor) {
 
 
 void GameView::onGUI() {
-	if (m_game_view_merged_with_scene_view) return;
+	m_was_rendered = false;
+	if (!m_game_view_merged_with_scene_view) {
+		const char* window_label = ICON_FA_CAMERA "Game View###game_view";
+		if (m_is_mouse_captured) {
+			window_label = ICON_FA_CAMERA "Game View (mouse captured)###game_view";
+		}
 
-	const char* window_label = ICON_FA_CAMERA "Game View###game_view";
-	if (m_is_mouse_captured) {
-		window_label = ICON_FA_CAMERA "Game View (mouse captured)###game_view";
+		windowUI(window_label);
 	}
-
-	windowUI(window_label);
+	if (m_force_render && !m_was_rendered) renderForCapture();
 }
 
 void GameView::windowUI(const char* window_name) {
@@ -318,51 +356,42 @@ void GameView::windowUI(const char* window_name) {
 		view_size = ImGui::GetContentRegionAvail();
 		if (!m_game_view_merged_with_scene_view) view_size.y -= ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y * 3;
 		ImVec2 content_max(content_min.x + view_size.x, content_min.y + view_size.y);
-		if (m_forced_viewport.enabled) view_size = { (float)m_forced_viewport.width, (float)m_forced_viewport.height };
+		// size of the image on screen, differs from the render resolution when it is forced
+		ImVec2 display_size = view_size;
+		if (m_forced_viewport.enabled) {
+			view_size = { (float)m_forced_viewport.width, (float)m_forced_viewport.height };
+			// the render resolution is fixed, scale the preview to fit the window and keep the aspect ratio
+			if (view_size.x > 0 && view_size.y > 0) {
+				const float scale = maximum(0.f, minimum(display_size.x / view_size.x, display_size.y / view_size.y));
+				display_size = ImVec2(view_size.x * scale, view_size.y * scale);
+			}
+		}
 		if (view_size.x > 0 && view_size.y > 0) {
-			RenderModule* module = m_pipeline->getModule();
-			const EntityPtr camera = module->getActiveCamera();
-			Viewport vp;
-			if (camera.isValid()) {
-				vp = module->getCameraViewport((EntityRef)camera);
-				vp.w = (int)view_size.x;
-				vp.h = (int)view_size.y;
-				module->setCameraScreenSize((EntityRef)camera, vp.w, vp.h);
-			}
-			else {
-				vp.w = (int)view_size.x;
-				vp.h = (int)view_size.y;
-				vp.fov = degreesToRadians(90.f);
-				vp.is_ortho = false;
-				vp.far = 10'000.f;
-				vp.near = 1.f;
-				vp.pos = DVec3(0);
-				vp.rot = Quat(0, 0, 0, 1);
-			}
-			m_pipeline->setViewport(vp);
+			setupViewport((int)view_size.x, (int)view_size.y);
 			m_pipeline->render(false);
 			const gpu::TextureHandle texture_handle = m_pipeline->getOutput();
+			m_was_rendered = true;
 			
 			controlsGUI(editor);
 
 			const ImVec2 view_pos = ImGui::GetCursorScreenPos();
 			if (texture_handle) {
 				if (gpu::isOriginBottomLeft()) {
-					ImGui::Image(texture_handle, view_size, ImVec2(0, 1), ImVec2(1, 0));
+					ImGui::Image(texture_handle, display_size, ImVec2(0, 1), ImVec2(1, 0));
 				}
 				else {
-					ImGui::Image(texture_handle, view_size);
+					ImGui::Image(texture_handle, display_size);
 				}
 			}
 			else {
-				ImGuiEx::Rect(view_size.x, view_size.y, 0xffFF00FF);
+				ImGuiEx::Rect(display_size.x, display_size.y, 0xffFF00FF);
 			}
 			if (m_is_mouse_captured) {
 				os::Rect rect;
 				rect.left = (i32)view_pos.x;
 				rect.top = (i32)view_pos.y;
-				rect.width = (i32)view_size.x;
-				rect.height = (i32)view_size.y;
+				rect.width = (i32)display_size.x;
+				rect.height = (i32)display_size.y;
 				m_app.setMouseClipRect(ImGui::GetWindowViewport()->PlatformHandle, rect);
 			}
 

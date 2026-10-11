@@ -351,6 +351,16 @@ void copy(BufferHandle dst, TextureHandle src);
 	
 using TextureReadCallback = Delegate<void(Span<const u8>)>;
 void readTexture(TextureHandle texture, TextureReadCallback callback);
+
+// Native D3D12 objects, for code that has to share the GPU with the engine (upscalers, hardware video encoders).
+// They return nullptr / false in other backends. The command list is the one commands are currently recorded to, use it only
+// from the render thread (e.g. inside DrawStream::pushLambda) and call resetCommandList() after changing its state.
+void* getDX12Device();			// ID3D12Device*
+void* getDX12CommandList();		// ID3D12GraphicsCommandList*
+void* getDX12Resource(TextureHandle h);	// ID3D12Resource*
+void resetCommandList();		// restores root signatures and descriptor heaps after external code used the command list
+// `fence` is an ID3D12Fence* that is signaled with `value` when all commands recorded in the current frame have finished on the GPU
+bool getDX12FrameFence(void** fence, u64* value);
 void setDebugName(TextureHandle texture, const char* debug_name);
 	
 void update(TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, TextureFormat format, const void* buf, u32 size);

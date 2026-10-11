@@ -297,6 +297,11 @@ void copy(TextureHandle, TextureHandle, u32, u32) {}
 void copy(BufferHandle, BufferHandle, u32, u32, u32) {}
 void copy(BufferHandle, TextureHandle) {}
 void readTexture(TextureHandle, TextureReadCallback) {}
+void* getDX12Device() { return nullptr; }
+void* getDX12CommandList() { return nullptr; }
+void* getDX12Resource(TextureHandle) { return nullptr; }
+void resetCommandList() {}
+bool getDX12FrameFence(void**, u64*) { return false; }
 void setDebugName(TextureHandle, const char*) {}
 void update(TextureHandle, u32, u32, u32, u32, u32, u32, TextureFormat, const void*, u32) {}
 void update(BufferHandle, const void*, size_t) {}

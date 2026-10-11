@@ -24,13 +24,6 @@ If any symbol/library is missing or DLSS is unsupported on the machine,
 initDLSS returns false and renderer falls back to FSR/TAA.
 */
 
-namespace gpu {
-	void* getDX12Device();
-	void* getDX12CommandList();
-	void* getDX12Resource(TextureHandle h);
-	void resetCommandList();
-}
-
 namespace {
 
 struct ID3D11Resource;

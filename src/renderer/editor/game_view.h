@@ -30,6 +30,9 @@ struct LUMIX_RENDERER_API GameView : StudioApp::GUIPlugin {
 	// Queues a TGA screenshot of the game view (including the in-game UI) to a project-relative path. Returns false if the game view has no size yet
 	// (e.g. its window has never been visible). The file is written asynchronously after the GPU read-back.
 	bool makeScreenshot(StringView path);
+	// If enabled, the game view is rendered every frame even if its window is closed or hidden (e.g. for video recording).
+	void setForceRender(bool enable) { m_force_render = enable; }
+	Pipeline* getPipeline() { return m_pipeline.get(); }
 	const char* getName() const override { return "game_view"; }
 	bool isOpen() const { return m_is_open; }
 	void onToggleOpen() { m_is_open = !m_is_open; }
@@ -44,6 +47,8 @@ struct LUMIX_RENDERER_API GameView : StudioApp::GUIPlugin {
 
 private:
 	void toggleFullscreen();
+	void setupViewport(int w, int h);
+	void renderForCapture();
 	void processInputEvents();
 	void onFullscreenGUI(WorldEditor& editor);
 	void setFullscreen(bool fullscreen);
@@ -60,6 +65,8 @@ private:
 	bool m_was_game_mode = false;
 	bool m_focus_on_game_start = false;
 	os::CursorType m_cursor_type = os::CursorType::DEFAULT;
+	bool m_force_render = false;
+	bool m_was_rendered = false;	// the pipeline was rendered since the beginning of `onGUI`
 	struct
 	{
 		bool enabled = false;

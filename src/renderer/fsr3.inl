@@ -16,13 +16,6 @@
 
 namespace Lumix {
 
-namespace gpu {
-	void* getDX12Device();
-	void* getDX12CommandList();
-	void* getDX12Resource(TextureHandle h);
-	void resetCommandList();
-}
-
 enum class FfxResourceStates {
     FFX_RESOURCE_STATE_COMMON               = (1 << 0),
     FFX_RESOURCE_STATE_UNORDERED_ACCESS     = (1 << 1),
