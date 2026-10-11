@@ -102,6 +102,7 @@ private:
 	Action m_select_prev_sibling;
 
 	bool m_is_mouse_captured = false;
+	bool m_is_focused = false;   // the Scene View window (or a child) has keyboard focus; set in onGUI
 	bool m_copy_moved = false;
 	bool m_insert_model_request = false;
 	bool m_search_preview = false;

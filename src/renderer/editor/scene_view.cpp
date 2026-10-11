@@ -1075,7 +1075,8 @@ void SceneView::update(float time_delta)
 	PROFILE_FUNCTION();
 	m_pipeline->setWorld(m_editor.getWorld());
 	ImGuiIO& io = ImGui::GetIO();
-	if (!io.KeyShift) {
+	// Shift / Ctrl are global keyboard state; only snap (and run the per-frame vertex preview ray cast) while this view is the active one
+	if (!io.KeyShift || !(m_is_focused || m_is_mouse_captured)) {
 		m_view->setSnapMode(false, false);
 	}
 	else {
@@ -1633,6 +1634,7 @@ void SceneView::onGUI() {
 	else if (m_app.checkShortcut(m_select_prev_sibling, true)) selectPrevSibling(editor);
 	else if (m_app.checkShortcut(m_use_grid_snapping_action)) m_use_grid_snapping = !m_use_grid_snapping;
 
+	m_is_focused = false;
 	m_pipeline->setWorld(m_editor.getWorld());
 	bool is_open = false;
 	ImVec2 view_pos;
@@ -1640,6 +1642,7 @@ void SceneView::onGUI() {
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	ImVec2 view_size;
 	if (ImGui::Begin(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoNavInputs)) {
+		m_is_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 		if (m_app.checkShortcut(m_top_view_action)) m_view->setTopView();
 		else if (m_app.checkShortcut(m_side_view_action)) m_view->setSideView();
 		else if (m_app.checkShortcut(m_front_view_action)) m_view->setFrontView();
