@@ -932,11 +932,21 @@ void Element::setWidth(StringView value) {
 	m_document.invalidateLayout();
 }
 
+// element.opacity is the product of the inherited and local opacity and is otherwise only recomputed together with the stylesheets,
+// so setOpacity refreshes it down the tree from the stored attributes instead of re-running the whole style pass
+static void refreshOpacity(Document& doc, u32 element_index, float inherited) {
+	Element& elem = doc.m_elements[element_index];
+	float local = 1.0f;
+	for (const Attribute& attr : elem.attributes) {
+		if (attr.type == AttributeName::OPACITY) local = attr.opacity;
+	}
+	elem.opacity = minimum(1.0f, maximum(0.0f, inherited * local));
+	for (u32 child : elem.children) refreshOpacity(doc, child, elem.opacity);
+}
+
 void Element::setOpacity(float value) {
 	upsertAttribute<AttributeName::OPACITY>(*this, clamp(value, 0.f, 1.f), AttributeSource::ELEMENT);
-	// TODO opacity is only recomputed (with the inherited value) in the style/layout pass, so this runs a full layout for a change that moves nothing;
-	// update the opacity of this element and its descendants directly instead
-	m_document.invalidateLayout();
+	for (u32 idx : m_document.m_root.children) refreshOpacity(m_document, idx, 1.0f);
 }
 
 static void setPositionAttribute(Element& elem, AttributeName name, StringView value) {
