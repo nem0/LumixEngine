@@ -206,7 +206,8 @@ struct Runner final
 			if (m_focused || is_mouse_up || is_key_up) {
 				InputSystem& input = m_engine->getInputSystem();
 				os::Point p = os::clientToScreen(m_window, 0, 0);
-				input.injectEvent(event, p.x, p.y);
+				const os::Point cursor = os::getMouseScreenPos();
+				input.injectEvent(event, Vec2((float)(cursor.x - p.x), (float)(cursor.y - p.y)));
 			}
 		}
 		switch (event.type) {

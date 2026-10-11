@@ -7,6 +7,7 @@
 namespace Lumix {
 
 template <typename T> struct UniquePtr;
+struct Vec2;
 namespace os { struct Event; enum class Keycode : u8; enum class MouseButton : i32; }
 
 //@ enum
@@ -102,7 +103,8 @@ struct LUMIX_ENGINE_API InputSystem {
 	virtual void update(float dt) = 0;
 
 	virtual void injectEvent(const Event& event) = 0;
-	virtual void injectEvent(const os::Event& event, int mouse_base_x, int mouse_base_y) = 0;
+	// `mouse_pos` is the cursor in the coordinates the game uses (pixels of the rendered view), it is used by mouse events
+	virtual void injectEvent(const os::Event& event, Vec2 mouse_pos) = 0;
 	virtual Span<const Event> getEvents() const = 0;
 	// emit up "fake" events for every key that's down, useful for when the window loses focus
 	virtual void resetDownKeys() = 0;

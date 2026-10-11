@@ -98,7 +98,7 @@ struct InputSystemImpl final : InputSystem {
 		for (Device* device : m_devices) device->update(dt);
 	}
 
-	void injectEvent(const os::Event& event, int mouse_base_x, int mouse_base_y) override {
+	void injectEvent(const os::Event& event, Vec2 mouse_pos) override {
 		switch (event.type) {
 			case os::Event::Type::GAMEPAD_ADDED: {
 				getOrCreateGamepadDevice(event.gamepad_added.gamepad);
@@ -153,9 +153,8 @@ struct InputSystemImpl final : InputSystem {
 				input_event.device = m_mouse_device;
 				input_event.data.mouse_button.button = event.mouse_button.button;
 				input_event.data.mouse_button.down = event.mouse_button.down;
-				const os::Point cp = os::getMouseScreenPos();
-				input_event.data.mouse_button.x = (float)cp.x - mouse_base_x;
-				input_event.data.mouse_button.y = (float)cp.y - mouse_base_y;
+				input_event.data.mouse_button.x = mouse_pos.x;
+				input_event.data.mouse_button.y = mouse_pos.y;
 				injectEvent(input_event);
 				break;
 			}
@@ -163,9 +162,8 @@ struct InputSystemImpl final : InputSystem {
 				Event input_event;
 				input_event.type = InputEventType::AXIS;
 				input_event.device = m_mouse_device;
-				const os::Point cp = os::getMouseScreenPos();
-				input_event.data.axis.x_abs = (float)cp.x - mouse_base_x;
-				input_event.data.axis.y_abs = (float)cp.y - mouse_base_y;
+				input_event.data.axis.x_abs = mouse_pos.x;
+				input_event.data.axis.y_abs = mouse_pos.y;
 				input_event.data.axis.x = (float)event.mouse_move.xrel;
 				input_event.data.axis.y = (float)event.mouse_move.yrel;
 				injectEvent(input_event);

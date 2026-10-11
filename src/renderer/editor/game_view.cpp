@@ -30,6 +30,42 @@
 namespace Lumix
 {
 
+namespace {
+
+struct Resolution {
+	const char* label;
+	int w;
+	int h;
+};
+
+const Resolution RESOLUTIONS[] = {
+	{ "Fit window", 0, 0 },
+	{ "480p (854x480)", 854, 480 },
+	{ "720p (1280x720)", 1280, 720 },
+	{ "Full HD (1920x1080)", 1920, 1080 },
+	{ "1440p (2560x1440)", 2560, 1440 },
+	{ "4K (3840x2160)", 3840, 2160 },
+	{ "8K (7680x4320)", 7680, 4320 },
+	{ "Square (1024x1024)", 1024, 1024 },
+	{ "Portrait HD (1080x1920)", 1080, 1920 },
+};
+
+} // anonymous namespace
+
+bool GameView::getForcedSize(int& w, int& h) const {
+	if (m_forced_viewport.enabled) {
+		w = m_forced_viewport.width;
+		h = m_forced_viewport.height;
+		return true;
+	}
+	if (m_resolution_idx > 0 && m_resolution_idx < (int)lengthOf(RESOLUTIONS)) {
+		w = RESOLUTIONS[m_resolution_idx].w;
+		h = RESOLUTIONS[m_resolution_idx].h;
+		return true;
+	}
+	return false;
+}
+
 
 
 GameView::GameView(StudioApp& app)
@@ -133,8 +169,9 @@ void GameView::setupViewport(int w, int h) {
 // used when rendering is forced but the game view window did not render this frame (closed or hidden)
 void GameView::renderForCapture() {
 	const IVec2 display_size = m_pipeline->getDisplaySize();
-	const int w = m_forced_viewport.enabled ? m_forced_viewport.width : display_size.x;
-	const int h = m_forced_viewport.enabled ? m_forced_viewport.height : display_size.y;
+	int w = display_size.x;
+	int h = display_size.y;
+	getForcedSize(w, h);
 	if (w <= 0 || h <= 0) return;
 	m_pipeline->setWorld(m_app.getWorldEditor().getWorld());
 	setupViewport(w, h);
@@ -211,6 +248,7 @@ void GameView::onFullscreenGUI(WorldEditor& editor)
 	}
 	m_pos = ImGui::GetItemRectMin();
 	m_size = ImGui::GetItemRectSize();
+	m_input_scale = Vec2(1.f);
 
 	ImGui::End();
 	ImGui::PopStyleVar(2);
@@ -247,8 +285,10 @@ void GameView::processInputEvents() {
 
 	Engine& engine = m_app.getEngine();
 	InputSystem& input = engine.getInputSystem();
+	const os::Point cp = os::getMouseScreenPos();
+	const Vec2 mouse_pos((cp.x - int(m_pos.x)) * m_input_scale.x, (cp.y - int(m_pos.y)) * m_input_scale.y);
 	for (const os::Event& e : m_app.getEvents()) {
-		input.injectEvent(e, int(m_pos.x), int(m_pos.y));
+		input.injectEvent(e, mouse_pos);
 	}
 }
 
@@ -256,13 +296,43 @@ void GameView::controlsGUI(WorldEditor& editor) {
 	if (m_game_view_merged_with_scene_view) return;
 	
 	Engine& engine = m_app.getEngine();
-	ImGui::SetNextItemWidth(50);
-	if (ImGui::DragFloat("Time multiplier", &m_time_multiplier, 0.01f, 0.01f, 30.0f)) {
+	const ImGuiStyle& style = ImGui::GetStyle();
+	ImGui::SetNextItemWidth(ImGui::CalcTextSize("30.00x").x + style.FramePadding.x * 2);
+	if (ImGui::DragFloat("##time_multiplier", &m_time_multiplier, 0.01f, 0.01f, 30.0f, "%.2fx")) {
 		engine.setTimeMultiplier(m_time_multiplier);
+	}
+	if (ImGui::IsItemHovered()) ImGui::SetTooltip("Time multiplier");
+
+	ImGui::SameLine();
+	const bool is_forced_by_script = m_forced_viewport.enabled;
+	// the preview shows the actual render resolution, even when it follows the window
+	StaticString<64> preview_label;
+	if (is_forced_by_script) {
+		preview_label.append(m_forced_viewport.width, "x", m_forced_viewport.height, " (forced)");
+	}
+	else {
+		preview_label = RESOLUTIONS[m_resolution_idx].label;
+		const IVec2 display_size = m_pipeline->getDisplaySize();
+		if (m_resolution_idx == 0 && display_size.x > 0 && display_size.y > 0) {
+			preview_label.append(" (", display_size.x, "x", display_size.y, ")");
+		}
+	}
+	// wide enough for the current text and the arrow
+	ImGui::SetNextItemWidth(ImGui::CalcTextSize(preview_label.data).x + style.FramePadding.x * 2 + ImGui::GetFrameHeight());
+	ImGui::BeginDisabled(is_forced_by_script);
+	if (ImGui::BeginCombo("##resolution", preview_label.data)) {
+		for (int i = 0; i < (int)lengthOf(RESOLUTIONS); ++i) {
+			if (ImGui::Selectable(RESOLUTIONS[i].label, i == m_resolution_idx)) m_resolution_idx = i;
+		}
+		ImGui::EndCombo();
+	}
+	ImGui::EndDisabled();
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+		ImGui::SetTooltip(is_forced_by_script ? "Resolution is forced by a script" : "Game view resolution");
 	}
 
 	ImGui::SameLine();
-	if (ImGui::Button("Debug")) ImGui::OpenPopup("Debug");
+	if (ImGui::Button("Debug"))ImGui::OpenPopup("Debug");
 	if (ImGui::BeginPopup("Debug")) {
 		auto option = [&](const char* label, Pipeline::DebugShow value) {
 			if (ImGui::RadioButton(label, m_pipeline->m_debug_show == value)) {
@@ -358,8 +428,9 @@ void GameView::windowUI(const char* window_name) {
 		ImVec2 content_max(content_min.x + view_size.x, content_min.y + view_size.y);
 		// size of the image on screen, differs from the render resolution when it is forced
 		ImVec2 display_size = view_size;
-		if (m_forced_viewport.enabled) {
-			view_size = { (float)m_forced_viewport.width, (float)m_forced_viewport.height };
+		int forced_w, forced_h;
+		if (getForcedSize(forced_w, forced_h)) {
+			view_size = { (float)forced_w, (float)forced_h };
 			// the render resolution is fixed, scale the preview to fit the window and keep the aspect ratio
 			if (view_size.x > 0 && view_size.y > 0) {
 				const float scale = maximum(0.f, minimum(display_size.x / view_size.x, display_size.y / view_size.y));
@@ -399,6 +470,9 @@ void GameView::windowUI(const char* window_name) {
 			if (is_hovered && ImGui::IsMouseReleased(0) && editor.isGameMode()) captureMouse(true);
 			m_pos = ImGui::GetItemRectMin();
 			m_size = ImGui::GetItemRectSize();
+			// the image can be displayed at a different size than it's rendered at
+			m_input_scale.x = display_size.x > 0 ? view_size.x / display_size.x : 1.f;
+			m_input_scale.y = display_size.y > 0 ? view_size.y / display_size.y : 1.f;
 
 			processInputEvents();
 		}

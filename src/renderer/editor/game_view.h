@@ -53,12 +53,15 @@ private:
 	void onFullscreenGUI(WorldEditor& editor);
 	void setFullscreen(bool fullscreen);
 	void controlsGUI(WorldEditor& editor);
+	bool getForcedSize(int& w, int& h) const;
 
 	UniquePtr<Pipeline> m_pipeline;
 	StudioApp& m_app;
 	float m_time_multiplier;
+	int m_resolution_idx = 0;	// 0 = match window size
 	Vec2 m_pos = Vec2(0);
 	Vec2 m_size = Vec2(0);
+	Vec2 m_input_scale = Vec2(1.f);	// render size / displayed size, used to remap mouse position
 	bool m_is_mouse_captured;
 	bool m_is_ingame_cursor;
 	bool m_is_fullscreen;
