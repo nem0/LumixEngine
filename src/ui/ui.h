@@ -361,9 +361,9 @@ struct LUMIX_UI_API Document {
 	IAllocator& m_allocator;
 	Vec2 m_canvas_size;
 	String m_content;
-	// effective scale applied to pixel and font-size values (em follows the font size): m_base_scale (OS DPI), or, with an @document block, derived from the canvas size
-	float m_dpi_scale = 1.0f;
-	float m_base_scale = 1.0f;
+	// scale applied to pixel and font-size values (em follows the font size): m_dpi_scale, or, with an @document block, derived from the canvas size
+	float m_scale = 1.0f;
+	float m_dpi_scale = 1.0f; // OS DPI scale, set by setDPIScale()
 	// set by an @document block, 0 = not set
 	float m_reference_width = 0;
 	float m_reference_height = 0;
@@ -399,8 +399,8 @@ struct LUMIX_UI_API Document {
 	// the OS DPI scale, ignored while the document has an @document reference size
 	void setDPIScale(float scale);
 	// scale actually applied
-	float getDPIScale() const { return m_dpi_scale; }
-	// scale for a canvas size (in pixels): m_base_scale, or canvas / reference size when an @document block sets one
+	float getScale() const { return m_scale; }
+	// scale for a canvas size (in pixels): m_dpi_scale, or canvas / reference size when an @document block sets one
 	float computeScale(Vec2 canvas_size) const;
 	//@ function
 	Element* getElementByID(const char* id);

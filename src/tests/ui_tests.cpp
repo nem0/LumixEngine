@@ -1513,31 +1513,31 @@ bool testDocumentReferenceSize() {
 	doc.computeLayout(Vec2(100, 50));
 	Element* root = doc.getElement(doc.m_root.children[0]);
 	Element* child = doc.getElement(root->children[0]);
-	ASSERT_FLOAT_EQ(1.0f, doc.getDPIScale());
+	ASSERT_FLOAT_EQ(1.0f, doc.getScale());
 	ASSERT_FLOAT_EQ(10.0f, root->size.x);
 	ASSERT_FLOAT_EQ(40.0f, child->size.x);
 
 	// twice the reference: px and em values double, the OS DPI scale is ignored
 	doc.setDPIScale(3.0f);
 	doc.computeLayout(Vec2(200, 100));
-	ASSERT_FLOAT_EQ(2.0f, doc.getDPIScale());
+	ASSERT_FLOAT_EQ(2.0f, doc.getScale());
 	ASSERT_FLOAT_EQ(20.0f, root->size.x);
 	ASSERT_FLOAT_EQ(80.0f, child->size.x);
 
 	// match=width with a different aspect ratio
 	ASSERT_PARSE(doc, "@document { reference-width: 100; reference-height: 50; match: width; }\n[box width=10 height=10] {}");
 	doc.computeLayout(Vec2(300, 100));
-	ASSERT_FLOAT_EQ(3.0f, doc.getDPIScale());
+	ASSERT_FLOAT_EQ(3.0f, doc.getScale());
 
 	// only a reference height: height is matched, and max-scale clamps
 	ASSERT_PARSE(doc, "@document { reference-height: 50; max-scale: 1.5; }\n[box width=10 height=10] {}");
 	doc.computeLayout(Vec2(300, 200));
-	ASSERT_FLOAT_EQ(1.5f, doc.getDPIScale());
+	ASSERT_FLOAT_EQ(1.5f, doc.getScale());
 
 	// no @document: the OS scale is used as is
 	ASSERT_PARSE(doc, body);
 	doc.computeLayout(Vec2(300, 200));
-	ASSERT_FLOAT_EQ(3.0f, doc.getDPIScale());
+	ASSERT_FLOAT_EQ(3.0f, doc.getScale());
 
 	doc.m_suppress_logging = true;
 	ASSERT_EQ(false, doc.parse("@document { reference-height: abc; }", "test.ui"));

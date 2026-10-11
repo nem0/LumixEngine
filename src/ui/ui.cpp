@@ -1024,15 +1024,15 @@ void Element::setLeft(StringView value) { setPositionAttribute(*this, AttributeN
 void Element::setTop(StringView value) { setPositionAttribute(*this, AttributeName::TOP, value); }
 
 float Element::getCenterX() const {
-	return (position.x + size.x * 0.5f - (position_mode == PositionMode::RELATIVE ? left : 0.f)) / m_document.m_dpi_scale;
+	return (position.x + size.x * 0.5f - (position_mode == PositionMode::RELATIVE ? left : 0.f)) / m_document.m_scale;
 }
 
 float Element::getCenterY() const {
-	return (position.y + size.y * 0.5f - (position_mode == PositionMode::RELATIVE ? top : 0.f)) / m_document.m_dpi_scale;
+	return (position.y + size.y * 0.5f - (position_mode == PositionMode::RELATIVE ? top : 0.f)) / m_document.m_scale;
 }
 
-float Element::getWidth() const { return size.x / m_document.m_dpi_scale; }
-float Element::getHeight() const { return size.y / m_document.m_dpi_scale; }
+float Element::getWidth() const { return size.x / m_document.m_scale; }
+float Element::getHeight() const { return size.y / m_document.m_scale; }
 
 static float computeAbsoluteSize(const ParsedUnit& unit, float parent_size, float font_size, float dpi_scale) {
 	switch (unit.unit) {
@@ -1275,8 +1275,8 @@ static void layoutChildren(Document& doc, Element& parent) {
 	for (u32 child_idx : parent.children) {
 		Element& child = doc.m_elements[child_idx];
 		if (child.position_mode == PositionMode::ABSOLUTE) {
-			const float pivot_x = computeAbsoluteSize(child.pivot_x_unit, child.size.x, child.font_size, doc.m_dpi_scale);
-			const float pivot_y = computeAbsoluteSize(child.pivot_y_unit, child.size.y, child.font_size, doc.m_dpi_scale);
+			const float pivot_x = computeAbsoluteSize(child.pivot_x_unit, child.size.x, child.font_size, doc.m_scale);
+			const float pivot_y = computeAbsoluteSize(child.pivot_y_unit, child.size.y, child.font_size, doc.m_scale);
 			child.position.x = parent.position.x + child.left - pivot_x;
 			child.position.y = parent.position.y + child.top - pivot_y;
 		}
@@ -1347,7 +1347,7 @@ static void computeParentRelativeWidth(Document& doc, Element& elem) {
 				logError("Element with fit-content width has child with percent width");
 			}
 			const float reference_width = child.position_mode == PositionMode::ABSOLUTE ? elem.size.x : maximum(0.0f, elem.size.x - elem.paddings.left - elem.paddings.right);
-			child.size.x = computeAbsoluteSize(child.width_unit, reference_width, child.font_size, doc.m_dpi_scale);
+			child.size.x = computeAbsoluteSize(child.width_unit, reference_width, child.font_size, doc.m_scale);
 		}
 		computeParentRelativeWidth(doc, doc.m_elements[child_idx]);
 	}
@@ -1455,7 +1455,7 @@ static void computeParentRelativeHeights(Document& doc, Element& elem) {
 		Element& child = doc.m_elements[child_idx];
 		if (child.height_unit.unit == Unit::PERCENT) {
 			const float reference_height = child.position_mode == PositionMode::ABSOLUTE ? elem.size.y : maximum(0.0f, elem.size.y - elem.paddings.top - elem.paddings.bottom);
-			child.size.y = computeAbsoluteSize(child.height_unit, reference_height, child.font_size, doc.m_dpi_scale);
+			child.size.y = computeAbsoluteSize(child.height_unit, reference_height, child.font_size, doc.m_scale);
 		}
 		computeParentRelativeHeights(doc, child);
 	}
@@ -1521,21 +1521,21 @@ static void computeBaseSizes(Document& doc, Element& elem, const ParentContext& 
 	}
 
 	if (elem.width_unit.unit != Unit::FIT_CONTENT) {
-		elem.size.x = computeAbsoluteSize(elem.width_unit, elem.position_mode == PositionMode::ABSOLUTE ? parent.size.x : parent.content_size.x, elem.font_size, doc.m_dpi_scale);
+		elem.size.x = computeAbsoluteSize(elem.width_unit, elem.position_mode == PositionMode::ABSOLUTE ? parent.size.x : parent.content_size.x, elem.font_size, doc.m_scale);
 	}
 	if (elem.height_unit.unit != Unit::FIT_CONTENT) {
-		elem.size.y = computeAbsoluteSize(elem.height_unit, elem.position_mode == PositionMode::ABSOLUTE ? parent.size.y : parent.content_size.y, elem.font_size, doc.m_dpi_scale);
+		elem.size.y = computeAbsoluteSize(elem.height_unit, elem.position_mode == PositionMode::ABSOLUTE ? parent.size.y : parent.content_size.y, elem.font_size, doc.m_scale);
 	}
-	elem.margins.left = computeAbsoluteSize(margin_x_unit[0], parent.content_size.x, elem.font_size, doc.m_dpi_scale);
-	elem.margins.right = computeAbsoluteSize(margin_x_unit[1], parent.content_size.x, elem.font_size, doc.m_dpi_scale);
-	elem.margins.top = computeAbsoluteSize(margin_y_unit[0], parent.content_size.y, elem.font_size, doc.m_dpi_scale);
-	elem.margins.bottom = computeAbsoluteSize(margin_y_unit[1], parent.content_size.y, elem.font_size, doc.m_dpi_scale);
-	elem.paddings.left = computeAbsoluteSize(padding_x_unit[0], parent.content_size.x, elem.font_size, doc.m_dpi_scale);
-	elem.paddings.right = computeAbsoluteSize(padding_x_unit[1], parent.content_size.x, elem.font_size, doc.m_dpi_scale);
-	elem.paddings.top = computeAbsoluteSize(padding_y_unit[0], parent.content_size.y, elem.font_size, doc.m_dpi_scale);
-	elem.paddings.bottom = computeAbsoluteSize(padding_y_unit[1], parent.content_size.y, elem.font_size, doc.m_dpi_scale);
-	elem.left = computeAbsoluteSize(left_unit, parent.size.x, elem.font_size, doc.m_dpi_scale);
-	elem.top = computeAbsoluteSize(top_unit, parent.size.y, elem.font_size, doc.m_dpi_scale);
+	elem.margins.left = computeAbsoluteSize(margin_x_unit[0], parent.content_size.x, elem.font_size, doc.m_scale);
+	elem.margins.right = computeAbsoluteSize(margin_x_unit[1], parent.content_size.x, elem.font_size, doc.m_scale);
+	elem.margins.top = computeAbsoluteSize(margin_y_unit[0], parent.content_size.y, elem.font_size, doc.m_scale);
+	elem.margins.bottom = computeAbsoluteSize(margin_y_unit[1], parent.content_size.y, elem.font_size, doc.m_scale);
+	elem.paddings.left = computeAbsoluteSize(padding_x_unit[0], parent.content_size.x, elem.font_size, doc.m_scale);
+	elem.paddings.right = computeAbsoluteSize(padding_x_unit[1], parent.content_size.x, elem.font_size, doc.m_scale);
+	elem.paddings.top = computeAbsoluteSize(padding_y_unit[0], parent.content_size.y, elem.font_size, doc.m_scale);
+	elem.paddings.bottom = computeAbsoluteSize(padding_y_unit[1], parent.content_size.y, elem.font_size, doc.m_scale);
+	elem.left = computeAbsoluteSize(left_unit, parent.size.x, elem.font_size, doc.m_scale);
+	elem.top = computeAbsoluteSize(top_unit, parent.size.y, elem.font_size, doc.m_scale);
 
 	ctx.size = elem.size;
 	ctx.content_size = elem.size - Vec2(elem.paddings.left + elem.paddings.right, elem.paddings.top + elem.paddings.bottom);
@@ -1711,7 +1711,7 @@ static void applyStylesheet(Document& doc, u32 element_index, const ParentContex
 			case AttributeName::TEXT: elem.text = attr.value; break;
 			case AttributeName::JUSTIFY_CONTENT: elem.justify_content = attr.justify; break;
 			case AttributeName::ALIGN_ITEMS: elem.align_items = attr.align_items; break;
-			case AttributeName::FONT_SIZE: ctx.font_size = attr.font_size * doc.m_dpi_scale; break;
+			case AttributeName::FONT_SIZE: ctx.font_size = attr.font_size * doc.m_scale; break;
 			case AttributeName::WRAP: elem.wrap = attr.wrap; break;
 			default: break; // TODO remove the default case
 		}
@@ -1957,8 +1957,8 @@ void Document::computeLayout(Vec2 canvas_size) {
 
 	// with an @document reference size the scale follows the canvas, which also changes every font size
 	const float scale = computeScale(canvas_size);
-	if (scale != m_dpi_scale) {
-		m_dpi_scale = scale;
+	if (scale != m_scale) {
+		m_scale = scale;
 		recomputeStyles();
 	}
 
@@ -1988,11 +1988,11 @@ void Document::computeLayout(Vec2 canvas_size) {
 		Element& root = m_elements[idx];
 		if (!root.visible) continue;
 		if (root.height_unit.unit == Unit::PERCENT) {
-			root.size.y = computeAbsoluteSize(root.height_unit, canvas_size.y, root.font_size, m_dpi_scale);
+			root.size.y = computeAbsoluteSize(root.height_unit, canvas_size.y, root.font_size, m_scale);
 		}
 		if (root.position_mode == PositionMode::ABSOLUTE) {
-			const float pivot_x = computeAbsoluteSize(root.pivot_x_unit, root.size.x, root.font_size, m_dpi_scale);
-			const float pivot_y = computeAbsoluteSize(root.pivot_y_unit, root.size.y, root.font_size, m_dpi_scale);
+			const float pivot_x = computeAbsoluteSize(root.pivot_x_unit, root.size.x, root.font_size, m_scale);
+			const float pivot_y = computeAbsoluteSize(root.pivot_y_unit, root.size.y, root.font_size, m_scale);
 			root.position.x = root.left - pivot_x;
 			root.position.y = root.top - pivot_y;
 			continue;
@@ -2236,7 +2236,7 @@ static void loadResources(Document& doc, u32 element_index, const ParentContext&
 		switch (attr.type) {
 			case AttributeName::FONT: ctx.font = attr.value; break;
 			case AttributeName::FONT_SIZE:
-				elem.font_size = attr.font_size * doc.m_dpi_scale;
+				elem.font_size = attr.font_size * doc.m_scale;
 				ctx.font_size = elem.font_size;
 				break;
 			case AttributeName::SRC: {
@@ -2298,7 +2298,7 @@ bool Document::parse(StringView content, const char* filename) {
 		m_id_index.insert(id, i);
 	}
 	m_stylesheet.buildIndex();
-	m_dpi_scale = computeScale(m_canvas_size);
+	m_scale = computeScale(m_canvas_size);
 	recomputeStyles();
 
 	// the stylesheet is only applied to an element while its rule matches (:hover, ...), so its sprites would load on first use: load them now
@@ -2461,7 +2461,7 @@ bool Document::areDependenciesReady() const {
 }
 
 float Document::computeScale(Vec2 canvas_size) const {
-	if ((m_reference_width <= 0 && m_reference_height <= 0) || canvas_size.x <= 0 || canvas_size.y <= 0) return m_base_scale;
+	if ((m_reference_width <= 0 && m_reference_height <= 0) || canvas_size.x <= 0 || canvas_size.y <= 0) return m_dpi_scale;
 
 	const float sx = m_reference_width > 0 ? canvas_size.x / m_reference_width : 0.f;
 	const float sy = m_reference_height > 0 ? canvas_size.y / m_reference_height : 0.f;
@@ -2481,10 +2481,10 @@ float Document::computeScale(Vec2 canvas_size) const {
 
 void Document::setDPIScale(float scale) {
 	if (scale <= 0) scale = 1.0f;
-	m_base_scale = scale;
+	m_dpi_scale = scale;
 	const float effective = computeScale(m_canvas_size);
-	if (m_dpi_scale == effective) return;
-	m_dpi_scale = effective;
+	if (m_scale == effective) return;
+	m_scale = effective;
 	recomputeStyles();
 	invalidateLayout();
 }
@@ -2501,7 +2501,7 @@ void Document::recomputeStyles() {
 	}
 
 	ParentContext ctx;
-	ctx.font_size = 12.0f * m_dpi_scale;
+	ctx.font_size = 12.0f * m_scale;
 	ctx.font = "/engine/editor/fonts/JetBrainsMono-Regular.ttf";
 	{
 		PROFILE_BLOCK("apply stylesheet");
