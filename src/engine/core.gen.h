@@ -2,6 +2,7 @@
 
 reflection::build_module("core")
 	.cmp<&CoreModule::createSpline, &CoreModule::destroySpline>("spline", "Core / Spline")
+		.function<(Span<const Vec3> (CoreModule::*)(EntityRef entity))&CoreModule::getSplinePoints>("getPoints")
 		.blob_property<&CoreModule::getSplineBlob, &CoreModule::setSplineBlob>("Blob")
 	.cmp<&CoreModule::createSignal, &CoreModule::destroySignal>("signal", "Core / Signal")
 		.blob_property<&CoreModule::getSignalBlob, &CoreModule::setSignalBlob>("Blob")

@@ -35,18 +35,33 @@ struct ExArray {
 	i64 size;
 };
 
+struct ExPart {
+	ex_slice material;
+	u32 lod;
+	u32 first_index;
+	u32 index_count;
+};
+
 struct ExMesh {
 	ExArray vertices;
 	ExArray indices;
 	i32 topology;
+	ExArray parts;
 };
 
 static_assert(sizeof(ProceduralMesh::Vertex) == 44);
+static_assert(sizeof(ExPart) == 32);
 static_assert(sizeof(ExArray) == 24);
-static_assert(sizeof(ExMesh) == 56);
+static_assert(sizeof(ExMesh) == 80);
 
 static constexpr u32 MAX_VERTICES = 1'000'000;
 static constexpr u32 MAX_INDICES = 3'000'000;
+// Material names become material files next to the recipe, so keep the number small.
+static constexpr u32 MAX_MATERIALS = 64;
+static constexpr u32 MAX_MATERIAL_NAME = 64;
+// Matches the number of LOD levels of models.
+static constexpr u32 MAX_LODS = 4;
+static constexpr u32 NO_VERTEX = 0xffFFffFF;
 
 const char* callResultName(ex_call_result result) {
 	switch (result) {
@@ -147,7 +162,7 @@ struct Recipe {
 		return nullptr;
 	}
 
-	bool execute(StringView source) {
+	bool execute(StringView source, u32 lod_count) {
 		module = ex_module_create(&host);
 		if (!module) return false;
 		if (ex_module_compile(module, {source.data, (i64)source.size()}, {path.c_str(), (i64)stringLength(path.c_str())}, &resolveImport, this) != EX_RESULT_OK) return false;
@@ -184,11 +199,12 @@ struct Recipe {
 
 		u32 size = 0;
 		const void* output = ex_task_result(task, &size);
-		return acceptResult(output, size);
+		return acceptResult(output, size, lod_count);
 	}
 
-	bool acceptResult(const void* data, u32 size) {
-		const ex_type* type = ex_bytecode_runtime_result_type(runtime, {"main", 4});
+	bool acceptResult(const void* data, u32 size, u32 lod_count) {
+		const ex_string_view name = {"main", 4};
+		const ex_type* type = ex_bytecode_runtime_result_type(runtime, name);
 		const ex_string_view type_name = ex_type_get_name(type);
 		if (!data || StringView(type_name.begin, type_name.length) != "core:procedural_geom.Mesh" || size != sizeof(ExMesh)) {
 			error.append("Recipe main must return core:procedural_geom.Mesh");
@@ -197,10 +213,12 @@ struct Recipe {
 
 		ExMesh mesh;
 		memcpy(&mesh, data, sizeof(mesh));
+
 		if (mesh.topology != 0) {
 			error.append("Recipe must return a triangle mesh, not a path or points");
 			return false;
 		}
+
 		if (mesh.vertices.size <= 0 || mesh.vertices.size > MAX_VERTICES || !mesh.vertices.values.data
 			|| mesh.indices.size <= 0 || mesh.indices.size > MAX_INDICES || mesh.indices.size % 3 != 0 || !mesh.indices.values.data
 			|| mesh.vertices.size > mesh.vertices.values.length || mesh.indices.size > mesh.indices.values.length)
@@ -222,6 +240,7 @@ struct Recipe {
 				return false;
 			}
 		}
+
 		const float* floats = (const float*)result.vertices.begin();
 		for (u32 i = 0, c = vertex_count * (sizeof(ProceduralMesh::Vertex) / sizeof(float)); i < c; ++i) {
 			if (!isFinite(floats[i])) {
@@ -229,7 +248,54 @@ struct Recipe {
 				return false;
 			}
 		}
+
+		const i64 part_count = mesh.parts.size;
+		if (part_count < 0 || part_count > MAX_INDICES / 3 || (part_count > 0 && (!mesh.parts.values.data || mesh.parts.values.length < part_count))) {
+			error.append("Recipe returned invalid parts");
+			return false;
+		}
+		if (part_count == 0) {
+			const ProceduralMesh::Part all = {0, 0, 0, index_count};
+			result.parts.push(all);
+		}
+		else {
+			const ExPart* parts = (const ExPart*)mesh.parts.values.data;
+			for (i64 i = 0; i < part_count; ++i) {
+				const ExPart& part = parts[i];
+				const i32 material = findMaterial(part.material);
+				if (material < 0 || part.lod >= lod_count) {
+					error.append("Recipe returned invalid part (a material name of 1-64 characters without / \\ : . and a level below lod_count in the meta file)");
+					return false;
+				}
+				if (part.first_index > index_count || part.index_count > index_count - part.first_index || part.index_count % 3 != 0) {
+					error.append("Recipe returned invalid part (an index range of whole triangles within the mesh)");
+					return false;
+				}
+				const ProceduralMesh::Part converted = {(u32)material, part.lod, part.first_index, part.index_count};
+				result.parts.push(converted);
+			}
+		}
+		if (!result.hasLod(0)) {
+			error.append("Recipe must return triangles for level 0");
+			return false;
+		}
 		return true;
+	}
+
+	// Returns the index of the material name in the recipe, adding it if it is new. Returns -1 if the name is invalid.
+	i32 findMaterial(ex_slice name) {
+		if (name.length == 0) return 0;
+		if (name.length < 0 || name.length > MAX_MATERIAL_NAME || !name.data) return -1;
+		const StringView view((const char*)name.data, (u32)name.length);
+		for (u32 c = 0; c < view.size(); ++c) {
+			if (view[c] == '/' || view[c] == '\\' || view[c] == ':' || view[c] == '.' || (u8)view[c] < 32) return -1;
+		}
+		for (u32 i = 1, c = (u32)result.material_names.size(); i < c; ++i) {
+			if (StringView(result.material_names[i].c_str()) == view) return (i32)i;
+		}
+		if (result.material_names.size() >= (i32)MAX_MATERIALS) return -1;
+		result.material_names.push(String(view, allocator));
+		return (i32)result.material_names.size() - 1;
 	}
 
 	FileSystem& fs;
@@ -246,7 +312,7 @@ struct Recipe {
 	ex_task* task = nullptr;
 };
 
-// Converts a compiled recipe to the regular model data.
+// Converts a compiled recipe to the regular model data. Each material of each level becomes a mesh.
 struct ProceduralMeshImporter final : ModelImporter {
 	ProceduralMeshImporter(StudioApp& app, const ProceduralMesh& mesh, StringView name)
 		: ModelImporter(app)
@@ -257,24 +323,69 @@ struct ProceduralMeshImporter final : ModelImporter {
 	bool parseSimple(const Path& filename) override { return false; }
 
 	bool parse(const Path& filename, const ModelMeta& meta) override {
-		ImportMaterial& material = m_materials.emplace(m_allocator);
-		material.name = m_name;
-		material.diffuse_color = Vec3(1);
+		const u32 material_count = (u32)m_mesh.material_names.size();
+		const u32 lod_count = m_mesh.getLodCount();
+		// material of each name, created when the name is first used
+		Array<u32> materials(m_allocator);
+		materials.resize(material_count);
+		for (u32& material : materials) material = NO_VERTEX;
+
+		for (u32 lod = 0; lod < lod_count; ++lod) {
+			// levels without parts are generated from level 0 by the model importer, if autolodN is set
+			for (u32 material = 0; material < material_count; ++material) {
+				Array<u32> indices(m_allocator);
+				for (const ProceduralMesh::Part& part : m_mesh.parts) {
+					if (part.lod != lod || part.material != material) continue;
+					for (u32 i = 0; i < part.index_count; ++i) indices.push(m_mesh.indices[part.first_index + i]);
+				}
+				if (!indices.empty()) addMesh(lod, material, indices, materials);
+			}
+		}
+		return true;
+	}
+
+	// Creates the geometry and mesh of one material of a level. Only the vertices used by the material are kept.
+	void addMesh(u32 lod, u32 material, const Array<u32>& indices, Array<u32>& materials) {
+		// the default material is named after the recipe, others after the recipe and their name
+		String name(m_name, m_allocator);
+		if (material > 0) name.append("_", m_mesh.material_names[material].c_str());
+		if (materials[material] == NO_VERTEX) {
+			ImportMaterial& import_material = m_materials.emplace(m_allocator);
+			import_material.name = name;
+			import_material.diffuse_color = Vec3(1);
+			materials[material] = (u32)m_materials.size() - 1;
+		}
+		if (lod > 0) {
+			const StaticString<16> suffix("_lod", lod);
+			name.append(suffix);
+		}
+
+		const u32 vertex_count = (u32)m_mesh.vertices.size();
+		Array<u32> remap(m_allocator);
+		remap.resize(vertex_count);
+		for (u32& r : remap) r = NO_VERTEX;
+		Array<u32> used(m_allocator);
+		for (u32 index : indices) {
+			if (remap[index] != NO_VERTEX) continue;
+			remap[index] = (u32)used.size();
+			used.push(index);
+		}
 
 		ImportGeometry& geom = m_geometries.emplace(m_allocator);
 		geom.vertex_size = sizeof(Vec3) + sizeof(u32) + sizeof(Vec2) + sizeof(u32);
-		geom.material_index = 0;
+		geom.material_index = materials[material];
 		geom.is_skinned = false;
 		geom.flip_handness = false;
-		geom.name = m_name;
+		geom.name = name;
 		geom.attributes.push({ AttributeSemantic::POSITION, gpu::AttributeType::FLOAT, 3 });
 		geom.attributes.push({ AttributeSemantic::NORMAL, gpu::AttributeType::I8, 4 });
 		geom.attributes.push({ AttributeSemantic::TEXCOORD0, gpu::AttributeType::FLOAT, 2 });
 		geom.attributes.push({ AttributeSemantic::TANGENT, gpu::AttributeType::I8, 4 });
 
-		geom.vertex_buffer.resize(m_mesh.vertices.size() * geom.vertex_size);
+		geom.vertex_buffer.resize(used.size() * geom.vertex_size);
 		u8* out = geom.vertex_buffer.getMutableData();
-		for (const ProceduralMesh::Vertex& v : m_mesh.vertices) {
+		for (u32 index : used) {
+			const ProceduralMesh::Vertex& v = m_mesh.vertices[index];
 			const u32 normal = packF4u(normalize(v.normal));
 			const u32 tangent = packF4u(normalize(v.tangent));
 			memcpy(out, &v.position, sizeof(v.position)); out += sizeof(v.position);
@@ -282,14 +393,13 @@ struct ProceduralMeshImporter final : ModelImporter {
 			memcpy(out, &v.uv, sizeof(v.uv)); out += sizeof(v.uv);
 			memcpy(out, &tangent, sizeof(tangent)); out += sizeof(tangent);
 		}
-		geom.indices.resize(m_mesh.indices.size());
-		memcpy(geom.indices.begin(), m_mesh.indices.begin(), m_mesh.indices.byte_size());
+		geom.indices.resize((u32)indices.size());
+		for (u32 i = 0, c = (u32)indices.size(); i < c; ++i) geom.indices[i] = remap[indices[i]];
 
 		ImportMesh& mesh = m_meshes.emplace(m_allocator);
-		mesh.geometry_idx = 0;
-		mesh.lod = 0;
-		mesh.name = m_name;
-		return true;
+		mesh.geometry_idx = (u32)m_geometries.size() - 1;
+		mesh.lod = lod;
+		mesh.name = name;
 	}
 
 	void fillTracks(const ImportAnimation& anim, Array<Array<Key>>& tracks, u32 from_frame, u32 num_frames) const override {}
@@ -444,30 +554,61 @@ struct Plugin final : ProceduralMeshEditor, EditorAssetPlugin {
 
 } // anonymous namespace
 
-bool compileProceduralMesh(FileSystem& fs, StringView source, const Path& path, ProceduralMesh& result, String& error, IAllocator& allocator, AssetCompiler* dependencies) {
+bool compileProceduralMesh(FileSystem& fs, StringView source, const Path& path, ProceduralMesh& result, String& error, IAllocator& allocator, AssetCompiler* dependencies, u32 lod_count) {
 	result.vertices.clear();
 	result.indices.clear();
+	result.parts.clear();
+	result.material_names.clear();
 	error = "";
+	if (lod_count < 1 || lod_count > MAX_LODS) {
+		error.append("LOD count must be 1-4");
+		return false;
+	}
+	// the default material is always at index 0
+	result.material_names.push(String(StringView(""), allocator));
 	Recipe recipe(fs, path, result, error, allocator, dependencies);
-	const bool success = recipe.execute(source);
+	const bool success = recipe.execute(source, lod_count);
 	if (!success) {
 		result.vertices.clear();
 		result.indices.clear();
+		result.parts.clear();
+		result.material_names.clear();
 	}
 	return success;
 }
 
 bool compileProceduralMeshModel(StudioApp& app, const Path& src, StringView source) {
 	IAllocator& allocator = app.getAllocator();
+	ModelMeta meta(allocator);
+	meta.load(src, app);
+	if (meta.lod_count < 1 || meta.lod_count > MAX_LODS) {
+		logError(src, ": lod_count in the meta file must be 1-4");
+		return false;
+	}
+
+	AssetCompiler& compiler = app.getAssetCompiler();
+	// editing the meta file rebuilds the model
+	compiler.registerDependency(src, Path(src, ".meta"));
+
 	ProceduralMesh mesh(allocator);
 	String error(allocator);
-	if (!compileProceduralMesh(app.getEngine().getFileSystem(), source, src, mesh, error, allocator, &app.getAssetCompiler())) {
+	if (!compileProceduralMesh(app.getEngine().getFileSystem(), source, src, mesh, error, allocator, &compiler, meta.lod_count)) {
 		logError(src, ": ", error);
 		return false;
 	}
 
+	// a level the recipe has parts for replaces the generated one
+	for (u32 lod = 1; lod < meta.lod_count; ++lod) {
+		if (mesh.hasLod(lod)) {
+			meta.autolod_mask = (u8)(meta.autolod_mask & ~(1 << lod));
+		}
+		else if (!(meta.autolod_mask & (1 << lod))) {
+			logError(src, ": LOD levels must have parts in the recipe or be enabled by autolodN in the meta file");
+			return false;
+		}
+	}
+
 	ProceduralMeshImporter importer(app, mesh, Path::getBasename(src));
-	ModelMeta meta(allocator);
 	return importer.parse(src, meta) && importer.write(src, meta);
 }
 

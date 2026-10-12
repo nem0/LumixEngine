@@ -11,8 +11,8 @@ struct Fixture {
 	Fixture() : fs(FileSystem::create(".", getGlobalAllocator())), result(getGlobalAllocator()), error(getGlobalAllocator()) {
 		fs->mount(".", "");
 	}
-	bool run(const char* source, bool expect_error = false) {
-		const bool success = compileProceduralMesh(*fs, source, Path("test.lpg"), result, error, getGlobalAllocator());
+	bool run(const char* source, bool expect_error = false, u32 lod_count = 1) {
+		const bool success = compileProceduralMesh(*fs, source, Path("test.lpg"), result, error, getGlobalAllocator(), nullptr, lod_count);
 		if (!success && !expect_error) logError(error);
 		return success;
 	}
@@ -86,6 +86,145 @@ bool testProceduralMeshPagodaExample() {
 	return true;
 }
 
+bool testProceduralMeshHouseExample() {
+	Fixture f;
+	OutputMemoryStream source(getGlobalAllocator());
+	ASSERT_TRUE(f.fs->getContentSync(Path("scripts/tests/house.lpg"), source));
+	ASSERT_TRUE(f.run(String(StringView((const char*)source.data(), (u32)source.size()), getGlobalAllocator()).c_str()));
+	// default material and stone, walls, roof, wood, glass; the chimney (part 7) shares the stone material of the foundation
+	ASSERT_EQ(6, f.result.material_names.size());
+	ASSERT_EQ(19, f.result.parts.size());
+	ASSERT_EQ(f.result.parts[0].material, f.result.parts[7].material);
+	for (const ProceduralMesh::Part& part : f.result.parts) {
+		ASSERT_TRUE(part.material > 0);
+		ASSERT_EQ(0, part.lod);
+	}
+	return true;
+}
+
+bool testProceduralMeshMaterials() {
+	{
+		Fixture f;
+		ASSERT_TRUE(f.run(R"(
+import "core:procedural_geom"
+import "core:vec3"
+fn main() : Mesh {
+    var body = withMaterial(cube(1.0, 1.0, 1.0), "body");
+    var top = withMaterial(translate(sphere(0.5, 8, 4), Vec3 { 0.0, 0.75, 0.0 }), "top");
+    return merge(body, top);
+}
+)"));
+		ASSERT_EQ(2, f.result.parts.size());
+		ASSERT_EQ(1, f.result.parts[0].material);
+		ASSERT_EQ(0, f.result.parts[0].first_index);
+		ASSERT_EQ(36, f.result.parts[0].index_count);
+		ASSERT_EQ(2, f.result.parts[1].material);
+		ASSERT_EQ(36, f.result.parts[1].first_index);
+		ASSERT_EQ(f.result.indices.size() - 36, f.result.parts[1].index_count);
+	}
+	{
+		// parts of a merged mesh without parts use the default material
+		Fixture f;
+		ASSERT_TRUE(f.run(R"(
+import "core:procedural_geom"
+fn main() : Mesh { return merge(cube(1.0, 1.0, 1.0), withMaterial(cube(1.0, 1.0, 1.0), "crate")); }
+)"));
+		ASSERT_EQ(2, f.result.parts.size());
+		ASSERT_EQ(0, f.result.parts[0].material);
+		ASSERT_EQ(36, f.result.parts[0].index_count);
+		ASSERT_EQ(1, f.result.parts[1].material);
+		ASSERT_EQ(36, f.result.parts[1].first_index);
+	}
+	{
+		Fixture f;
+		ASSERT_TRUE(f.run("import \"core:procedural_geom\"\nfn main() : Mesh { return sphere(1.0, 8, 4); }\n"));
+		ASSERT_EQ(1, f.result.parts.size());
+		ASSERT_EQ(0, f.result.parts[0].material);
+		ASSERT_EQ(f.result.indices.size(), f.result.parts[0].index_count);
+	}
+	{
+		// instances keep the material of the instance
+		Fixture f;
+		ASSERT_TRUE(f.run(R"(
+import "core:procedural_geom"
+fn main() : Mesh { return placeInstancesAtPoints(point({0.0, 0.0, 0.0}), withMaterial(cube(1.0, 1.0, 1.0), "crate")); }
+)"));
+		ASSERT_EQ(1, f.result.parts.size());
+		ASSERT_EQ(1, f.result.parts[0].material);
+		ASSERT_EQ(36, f.result.parts[0].index_count);
+	}
+	{
+		Fixture f;
+		ASSERT_TRUE(!f.run(R"(
+import "core:procedural_geom"
+fn main() : Mesh { return withMaterial(cube(1.0, 1.0, 1.0), "a/b"); }
+)", true));
+	}
+	{
+		Fixture f;
+		ASSERT_TRUE(!f.run(R"(
+import "core:procedural_geom"
+fn main() : Mesh { return withMaterial(circle(1.0, 8), "roof"); }
+)", true));
+	}
+	return true;
+}
+
+bool testProceduralMeshLods() {
+	{
+		Fixture f;
+		ASSERT_TRUE(f.run(R"(
+import "core:procedural_geom"
+fn main() : Mesh {
+    return merge(withLod(cube(1.0, 1.0, 1.0), 0), withLod(withMaterial(sphere(0.5, 8, 4), "roof"), 1));
+}
+)", false, 3));
+		ASSERT_EQ(2, f.result.getLodCount());
+		ASSERT_TRUE(f.result.hasLod(0));
+		ASSERT_TRUE(f.result.hasLod(1));
+		ASSERT_TRUE(!f.result.hasLod(2));
+		ASSERT_EQ(36, f.result.parts[0].index_count);
+		ASSERT_EQ(0, f.result.parts[0].lod);
+		ASSERT_EQ(1, f.result.parts[1].lod);
+		ASSERT_EQ(1, f.result.parts[1].material);
+	}
+	{
+		// withLod keeps the material of the parts
+		Fixture f;
+		ASSERT_TRUE(f.run(R"(
+import "core:procedural_geom"
+fn main() : Mesh { return withLod(withMaterial(cube(1.0, 1.0, 1.0), "wood"), 0); }
+)"));
+		ASSERT_EQ(1, f.result.parts[0].material);
+		ASSERT_EQ(0, f.result.parts[0].lod);
+	}
+	{
+		// a level above lod_count is an error
+		Fixture f;
+		ASSERT_TRUE(!f.run(R"(
+import "core:procedural_geom"
+fn main() : Mesh { return merge(withLod(cube(1.0, 1.0, 1.0), 0), withLod(cube(0.5, 0.5, 0.5), 1)); }
+)", true, 1));
+	}
+	{
+		// level 0 must have triangles
+		Fixture f;
+		ASSERT_TRUE(!f.run(R"(
+import "core:procedural_geom"
+fn main() : Mesh { return withLod(cube(1.0, 1.0, 1.0), 1); }
+)", true, 2));
+	}
+	{
+		// a level that is a path is an error
+		Fixture f;
+		ASSERT_TRUE(!f.run(R"(
+import "core:procedural_geom"
+fn main() : Mesh { return merge(withLod(cube(1.0, 1.0, 1.0), 0), withLod(circle(1.0, 8), 1)); }
+)", true, 2));
+	}
+	return true;
+}
+
 bool testProceduralMeshErrors() {
 	{
 		Fixture f;
@@ -122,5 +261,8 @@ void runProceduralMeshTests() {
 	RUN_TEST(testProceduralMeshMerge);
 	RUN_TEST(testProceduralMeshDefaultRecipe);
 	RUN_TEST(testProceduralMeshPagodaExample);
+	RUN_TEST(testProceduralMeshHouseExample);
+	RUN_TEST(testProceduralMeshMaterials);
+	RUN_TEST(testProceduralMeshLods);
 	RUN_TEST(testProceduralMeshErrors);
 }

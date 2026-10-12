@@ -1998,6 +1998,25 @@ namespace Lumix::Evox::generated {
 		module->setAmbientSound3D(EntityRef(entity.index), is_3d);
 	}
 	
+	static void evox_spline_getPoints_count_14802769907850167141(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, entity);
+		CoreModule* module = static_cast<CoreModule*>(entity.module);
+		const auto ret = module->getSplinePoints(
+		EntityRef(entity.index));
+		EX_RESULT(frame, (i32)ret.size());
+	}
+	
+	static void evox_spline_getPoints_get_4114454413368926861(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, entity);
+		CoreModule* module = static_cast<CoreModule*>(entity.module);
+		EX_ARG(frame, i32, index);
+		const auto ret = module->getSplinePoints(
+		EntityRef(entity.index));
+		ASSERT(index >= 0 && index < (i32)ret.size());
+		const Vec3& value = ret[index];
+		EX_RESULT(frame, value);
+	}
+	
 	static void evox_navmesh_zone_load_13918995704249104099(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, zone_entity);
 		NavigationModule* module = static_cast<NavigationModule*>(zone_entity.module);
@@ -5523,6 +5542,8 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:audio/ambient_sound"), StringView("setClip")}, &evox_ambient_sound_setAmbientSoundClip_1977866805267527577);
 		functions.insert({StringView("core:audio/ambient_sound"), StringView("getIs_3D")}, &evox_ambient_sound_isAmbientSound3D_6191921949559533236);
 		functions.insert({StringView("core:audio/ambient_sound"), StringView("setIs_3D")}, &evox_ambient_sound_setAmbientSound3D_7682859713366114688);
+		functions.insert({StringView("core:engine/spline"), StringView("getPointsCount")}, &evox_spline_getPoints_count_14802769907850167141);
+		functions.insert({StringView("core:engine/spline"), StringView("getPointsGet")}, &evox_spline_getPoints_get_4114454413368926861);
 		functions.insert({StringView("core:navigation/navmesh_zone"), StringView("load")}, &evox_navmesh_zone_load_13918995704249104099);
 		functions.insert({StringView("core:navigation/navmesh_zone"), StringView("drawNavmesh")}, &evox_navmesh_zone_drawNavmesh_5134955218642488807);
 		functions.insert({StringView("core:navigation/navmesh_zone"), StringView("drawCompactHeightfield")}, &evox_navmesh_zone_drawCompactHeightfield_5812805081547031182);

@@ -2,8 +2,14 @@
 // import core:engine/spline as spline
 
 import "core:entity"
+import "core:vec3"
 struct Spline { entity : i32; module : cptr; }
 
 extern fn spline(e : Entity) : ?Spline;
 extern fn createSpline(e : Entity) : ?Spline;
+extern fn getPointsCount(entity : Spline) : i32;
+extern fn getPointsGet(entity : Spline, index : i32) : Vec3;
+struct getPointsIterator { next : fn(iter : *getPointsIterator, out : *Vec3) : bool; entity : Spline; index : i32; }
+fn getPointsNext(iter : *getPointsIterator, out : *Vec3) : bool { iter.index += 1; if iter.index >= getPointsCount(iter.entity) { return false; } out.* = getPointsGet(iter.entity, iter.index); return true; }
+fn getPoints(entity : Spline) : getPointsIterator { return { getPointsNext, entity, -1 }; }
 

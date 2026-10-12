@@ -2,6 +2,7 @@
 
 #include "core/array.h"
 #include "core/hash_map.h"
+#include "core/span.h"
 #include "engine/engine.h"
 #include "engine/plugin.h"
 
@@ -36,6 +37,8 @@ struct CoreModule : IModule {
 	virtual const HashMap<EntityRef, Spline>& getSplines() = 0;
 
 	//@ component Spline
+	// Empty if the entity has no spline.
+	virtual Span<const Vec3> getSplinePoints(EntityRef entity) = 0;	//@ function alias getPoints
 	virtual void getSplineBlob(EntityRef entity, OutputMemoryStream& value) = 0;
 	virtual void setSplineBlob(EntityRef entity, InputMemoryStream& value) = 0;
 	//@ end

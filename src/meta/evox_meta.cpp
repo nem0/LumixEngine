@@ -785,6 +785,48 @@ void serializeEvoxWrapper(OutputStream& out, Module& m, Component& c, Function& 
 	L("}" OUT_ENDL);
 }
 
+void appendComponentSpanWrapperName(OutputStream& out, Component& c, Function& f, bool is_get) {
+	StaticString<2048> signature(c.id, "::", functionScriptName(f), "(", f.args, ")->", f.return_type, is_get ? "::get" : "::count");
+	const XXH64_hash_t hash = XXH3_64bits(signature.buffer, signature.length);
+	out.add("evox_", c.id, "_", functionScriptName(f), is_get ? "_get_" : "_count_", hash);
+}
+
+// Count and Get wrappers of a span-returning component function. The component is the first argument.
+void serializeEvoxComponentSpanWrappers(OutputStream& out, Module& m, Component& c, Function& f) {
+	const StringView element = spanElementBaseType(f.return_type);
+	auto emitPrologue = [&]() {
+		forEachArg(f.args, [&](const Arg& arg, bool is_first) {
+			if (is_first) {
+				L("EX_ARG(frame, ExComponent, ", arg.name, ");");
+				L(m.name, "* module = static_cast<", m.name, "*>(", arg.name, ".module);");
+			}
+			else {
+				emitArgRead(out, arg);
+			}
+		});
+	};
+	auto emitCall = [&]() {
+		L("const auto ret = module->", f.name, "(");
+		forEachArg(f.args, [&](const Arg& arg, bool first) { if (!first) out.add(", "); appendArgExpression(out, arg); });
+		L(");");
+	};
+
+	out.add("static void "); appendComponentSpanWrapperName(out, c, f, false); L("(ex_runtime* runtime, ex_call_frame frame) {");
+	emitPrologue();
+	emitCall();
+	L("EX_RESULT(frame, (i32)ret.size());");
+	L("}" OUT_ENDL);
+
+	out.add("static void "); appendComponentSpanWrapperName(out, c, f, true); L("(ex_runtime* runtime, ex_call_frame frame) {");
+	emitPrologue();
+	L("EX_ARG(frame, i32, index);");
+	emitCall();
+	L("ASSERT(index >= 0 && index < (i32)ret.size());");
+	L("const ", element, "& value = ret[index];");
+	appendReturnValue(out, element, "value", "&module->getWorld()");
+	L("}" OUT_ENDL);
+}
+
 void serializeEvoxPropertyWrapper(OutputStream& out, Module& m, Component& c, Property& p, bool is_setter) {
 	StringView accessor_args = is_setter ? p.setter_args : p.getter_args;
 	out.add("static void ");
@@ -1242,7 +1284,8 @@ void emitGeneratedComponentWrappers(OutputStream& out, MetaData& data) {
 		for (Component& c : m.components) {
 			for (Function& f : c.functions) {
 				if (!isSupportedEvoxFunction(f)) continue;
-				serializeEvoxWrapper(out, m, c, f);
+				if (isSpanType(f.return_type)) serializeEvoxComponentSpanWrappers(out, m, c, f);
+				else serializeEvoxWrapper(out, m, c, f);
 			}
 			for (Property& p : c.properties) {
 				if (isSupportedEvoxPropertyGetter(p)) {
@@ -1321,6 +1364,11 @@ void emitGeneratedComponentImportRegistrations(OutputStream& out, MetaData& data
 
 			for (Function& f : c.functions) {
 				if (!isSupportedEvoxFunction(f)) continue;
+				if (isSpanType(f.return_type)) {
+					out.add("functions.insert({StringView(\"", module_unit.buffer, "\"), StringView(\"", functionScriptName(f), "Count\")}, &"); appendComponentSpanWrapperName(out, c, f, false); L(");");
+					out.add("functions.insert({StringView(\"", module_unit.buffer, "\"), StringView(\"", functionScriptName(f), "Get\")}, &"); appendComponentSpanWrapperName(out, c, f, true); L(");");
+					continue;
+				}
 				out.add("functions.insert({StringView(\"", module_unit.buffer, "\"), StringView(\"", functionScriptName(f), "\")}, &");
 				appendWrapperName(out, c, f);
 				L(");");
@@ -1597,6 +1645,61 @@ void emitEvoxReferenceEnum(OutputStream& out, Enum& e) {
 	out.add("};" OUT_ENDL OUT_ENDL);
 }
 
+// Span-returning functions become an iterator: Count and Get externs, an iterator struct and an entry function.
+// A module function takes the module as its first parameter. A component function takes its component as its first argument.
+void appendSpanParams(OutputStream& out, Function& f, StringView owner_type, bool owner_is_arg) {
+	if (!owner_is_arg) out.add("module : ", owner_type);
+	forEachArg(f.args, [&](const Arg& arg, bool is_first) {
+		if (!owner_is_arg || !is_first) out.add(", ");
+		out.add(arg.name, " : ");
+		if (owner_is_arg && is_first) out.add(owner_type);
+		else appendEvoxDeclArgType(out, arg);
+	});
+}
+
+void appendSpanFields(OutputStream& out, Function& f, StringView owner_type, bool owner_is_arg) {
+	if (!owner_is_arg) out.add("; module : ", owner_type);
+	forEachArg(f.args, [&](const Arg& arg, bool is_first) {
+		out.add("; ", arg.name, " : ");
+		if (owner_is_arg && is_first) out.add(owner_type);
+		else appendEvoxDeclArgType(out, arg);
+	});
+}
+
+void appendSpanArgNames(OutputStream& out, Function& f, const char* prefix, bool owner_is_arg) {
+	if (!owner_is_arg) out.add(prefix, "module");
+	forEachArg(f.args, [&](const Arg& arg, bool is_first) {
+		if (!owner_is_arg || !is_first) out.add(", ");
+		out.add(prefix, arg.name);
+	});
+}
+
+void emitSpanIterator(OutputStream& out, Function& f, StringView owner_type, bool owner_is_arg) {
+	const StringView name = functionScriptName(f);
+	const StringView element = spanElementBaseType(f.return_type);
+	out.add("extern fn ", name, "Count(");
+	appendSpanParams(out, f, owner_type, owner_is_arg);
+	out.add(") : i32;" OUT_ENDL);
+	out.add("extern fn ", name, "Get(");
+	appendSpanParams(out, f, owner_type, owner_is_arg);
+	out.add(", index : i32) : "); appendEvoxDeclType(out, element); out.add(";" OUT_ENDL);
+	out.add("struct ", name, "Iterator { next : fn(iter : *", name, "Iterator, out : *");
+	appendEvoxDeclType(out, element); out.add(") : bool");
+	appendSpanFields(out, f, owner_type, owner_is_arg);
+	out.add("; index : i32; }" OUT_ENDL);
+	out.add("fn ", name, "Next(iter : *", name, "Iterator, out : *");
+	appendEvoxDeclType(out, element); out.add(") : bool { iter.index += 1; if iter.index >= ", name, "Count(");
+	appendSpanArgNames(out, f, "iter.", owner_is_arg);
+	out.add(") { return false; } out.* = ", name, "Get(");
+	appendSpanArgNames(out, f, "iter.", owner_is_arg);
+	out.add(", iter.index); return true; }" OUT_ENDL);
+	out.add("fn ", name, "(");
+	appendSpanParams(out, f, owner_type, owner_is_arg);
+	out.add(") : ", name, "Iterator { return { ", name, "Next, ");
+	appendSpanArgNames(out, f, "", owner_is_arg);
+	out.add(", -1 }; }" OUT_ENDL);
+}
+
 void serializeCoreImports(MetaData& data) {
 	OutputStream out;
 
@@ -1806,28 +1909,7 @@ void serializeCoreImports(MetaData& data) {
 		for (Function& f : m.functions) {
 			if (!isSupportedEvoxFunction(f)) continue;
 			if (isSpanType(f.return_type)) {
-				const StringView element = spanElementBaseType(f.return_type);
-				out.add("extern fn ", functionScriptName(f), "Count(module : ", m.name);
-				forEachArg(f.args, [&](const Arg& arg, bool) { out.add(", ", arg.name, " : "); appendEvoxDeclArgType(out, arg); });
-				out.add(") : i32;" OUT_ENDL);
-				out.add("extern fn ", functionScriptName(f), "Get(module : ", m.name);
-				forEachArg(f.args, [&](const Arg& arg, bool) { out.add(", ", arg.name, " : "); appendEvoxDeclArgType(out, arg); });
-				out.add(", index : i32) : "); appendEvoxDeclType(out, element); out.add(";" OUT_ENDL);
-				out.add("struct ", functionScriptName(f), "Iterator { next : fn(iter : *", functionScriptName(f), "Iterator, out : *");
-				appendEvoxDeclType(out, element); out.add(") : bool; module : ", m.name);
-				forEachArg(f.args, [&](const Arg& arg, bool) { out.add("; ", arg.name, " : "); appendEvoxDeclArgType(out, arg); });
-				out.add("; index : i32; }" OUT_ENDL);
-				out.add("fn ", functionScriptName(f), "Next(iter : *", functionScriptName(f), "Iterator, out : *");
-				appendEvoxDeclType(out, element); out.add(") : bool { iter.index += 1; if iter.index >= ", functionScriptName(f), "Count(iter.module");
-				forEachArg(f.args, [&](const Arg& arg, bool) { out.add(", iter.", arg.name); });
-				out.add(") { return false; } out.* = ", functionScriptName(f), "Get(iter.module");
-				forEachArg(f.args, [&](const Arg& arg, bool) { out.add(", iter.", arg.name); });
-				out.add(", iter.index); return true; }" OUT_ENDL);
-				out.add("fn ", functionScriptName(f), "(module : ", m.name);
-				forEachArg(f.args, [&](const Arg& arg, bool) { out.add(", ", arg.name, " : "); appendEvoxDeclArgType(out, arg); });
-				out.add(") : ", functionScriptName(f), "Iterator { return { ", functionScriptName(f), "Next, module");
-				forEachArg(f.args, [&](const Arg& arg, bool) { out.add(", ", arg.name); });
-				out.add(", -1 }; }" OUT_ENDL);
+				emitSpanIterator(out, f, m.name, false);
 				continue;
 			}
 			out.add("extern fn ", functionScriptName(f), "(module : ", m.name);
@@ -1940,6 +2022,10 @@ void serializeCoreImports(MetaData& data) {
 
 			for (Function& f : c.functions) {
 				if (!isSupportedEvoxFunction(f)) continue;
+				if (isSpanType(f.return_type)) {
+					emitSpanIterator(out, f, c.name, true);
+					continue;
+				}
 				out.add("extern fn ", functionScriptName(f), "(");
 				i32 arg_idx = 0;
 				forEachArg(f.args, [&](const Arg& arg, bool is_first) {

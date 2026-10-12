@@ -1,0 +1,14 @@
+shader "/engine/shaders/standard.hlsl"
+backface_culling true
+layer "default"
+
+texture ""
+texture ""
+texture ""
+texture ""
+layer "default"
+uniform "Material color", { 0.550000, 0.750000, 0.900000, 1.000000 }
+uniform "Roughness", 0.050000
+uniform "Metallic", 0.000000
+uniform "Emission", 0.000000
+uniform "Translucency", 0.000000

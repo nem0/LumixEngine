@@ -19,21 +19,79 @@ struct Vertex {
 // Low-level upload; the entity must already have a procedural geometry component.
 extern fn setMeshRaw(entity : Entity, vertices : []const Vertex, indices : []const u32) : bool;
 
+// A range of indices drawn with one named material, at one level of detail. The empty name is the recipe's default material.
+// Names are 1-64 characters without / \ : or ., and each distinct name becomes a material when the recipe is compiled to a model.
+// lod 0 is the most detailed level. Each level the recipe uses becomes a level of the model.
+struct Part {
+    material : []const u8;
+    lod : u32;
+    first_index : u32;
+    index_count : u32;
+}
+
 // topology: 0 = triangles (uploadable), 1 = polyline, 2 = points (path sources).
+// parts cover all indices. Empty parts means all triangles use the default material at level 0.
+// setMesh uploads a single material and ignores parts.
 struct Mesh {
     vertices : array.Array(Vertex);
     indices : array.Array(u32);
     topology : i32;
+    parts : array.Array(Part);
 }
 
 fn empty() : Mesh {
-    return { array.init(Vertex), array.init(u32), 0 };
+    return { array.init(Vertex), array.init(u32), 0, array.init(Part) };
 }
 
 // Mesh owns its arrays. Do not copy or reuse it after passing it to merge().
 fn deinit(mesh : *Mesh) : void {
     array.deinit(&mesh.vertices);
     array.deinit(&mesh.indices);
+    array.deinit(&mesh.parts);
+}
+
+// Assigns every triangle of the mesh to a named material. The name also names the model mesh.
+// Keeps the level of each part. Returns the mesh, which is owned by the caller.
+fn withMaterial(mesh : Mesh, name : []const u8) : Mesh {
+    if mesh.topology != 0 { panic("Materials apply to triangle meshes only"); }
+    var result = withParts(mesh);
+    for i in 0..result.parts.size {
+        result.parts.values[i].material = name;
+    }
+    return result;
+}
+
+// Assigns every triangle of the mesh to a level of detail. 0 is the most detailed level.
+// Keeps the material of each part. Returns the mesh, which is owned by the caller.
+// Merge meshes of different levels to build a recipe with several levels, for example merge(withLod(high, 0), withLod(low, 1)).
+fn withLod(mesh : Mesh, lod : u32) : Mesh {
+    if mesh.topology != 0 { panic("Levels of detail apply to triangle meshes only"); }
+    var result = withParts(mesh);
+    for i in 0..result.parts.size {
+        result.parts.values[i].lod = lod;
+    }
+    return result;
+}
+
+// Mesh without parts gets one part covering all triangles, with the default material and level 0.
+fn withParts(mesh : Mesh) : Mesh {
+    var result = mesh;
+    if result.parts.size == 0 and result.indices.size > 0 {
+        array.push(&result.parts, {"", 0, 0, result.indices.size as u32});
+    }
+    return result;
+}
+
+// Appends the parts of source, shifted by offset indices, to result.
+// A source without parts uses the default material and level 0 for all of its indices.
+fn appendParts(result : *Mesh, source : Mesh, offset : u32) : void {
+    if source.parts.size == 0 {
+        if source.indices.size > 0 { array.push(&result.parts, {"", 0, offset, source.indices.size as u32}); }
+        return;
+    }
+    for part in array.slice(source.parts) {
+        array.push(&result.parts, {part.material, part.lod, part.first_index + offset, part.index_count});
+    }
 }
 
 fn vertex(mesh : *Mesh, position : vec3.Vec3, normal : vec3.Vec3, tangent : vec3.Vec3, u : f32, v : f32) : void {
@@ -371,10 +429,12 @@ fn placeInstancesAtPoints(points : Mesh, instance : Mesh) : Mesh {
             const tangent = vec3.normalizeSafe(x * v.tangent.x + up * v.tangent.y + z * v.tangent.z);
             vertex(&result, position, normal, tangent, v.uv.x, v.uv.y);
         }
+        const first_index = result.indices.size as u32;
         for j in 0..instance.indices.size {
             if instance.indices.values[j] >= instance.vertices.size as u32 { panic("Invalid instance index"); }
             array.push(&result.indices, offset + instance.indices.values[j]);
         }
+        appendParts(&result, instance, first_index);
     }
     var owned_points = points;
     var owned_instance = instance;
@@ -453,6 +513,8 @@ fn merge(a : Mesh, b : Mesh) : Mesh {
     for i in 0..a.indices.size { array.push(&result.indices, a.indices.values[i]); }
     const offset = a.vertices.size as u32;
     for i in 0..b.indices.size { array.push(&result.indices, b.indices.values[i] + offset); }
+    appendParts(&result, a, 0);
+    appendParts(&result, b, a.indices.size as u32);
     var owned_a = a;
     var owned_b = b;
     deinit(&owned_a);

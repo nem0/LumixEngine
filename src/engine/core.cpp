@@ -81,7 +81,7 @@ struct CoreModuleImpl : CoreModule {
 		u32 count;
 		if (version > (i32)CoreModuleVersion::SIGNALS) {
 			serializer.read(count);
-			m_signals.reserve(m_splines.size() + count);
+			m_signals.reserve(m_signals.size() + count);
 			for (u32 i = 0; i < count; ++i) {
 				UniquePtr<Signal> signal = UniquePtr<Signal>::create(m_allocator);
 				EntityRef e;
@@ -188,6 +188,13 @@ struct CoreModuleImpl : CoreModule {
 	}
 
 	const HashMap<EntityRef, Spline>& getSplines() override { return m_splines; }
+
+	Span<const Vec3> getSplinePoints(EntityRef e) override {
+		const auto iter = m_splines.find(e);
+		if (!iter.isValid()) return {};
+		const Array<Vec3>& points = iter.value().points;
+		return Span<const Vec3>(points.begin(), (u64)points.size());
+	}
 
 	void createSignal(EntityRef e) override {
 		UniquePtr<Signal>& s = m_signals.insert(e);

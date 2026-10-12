@@ -1,0 +1,69 @@
+// Small cottage built from many parts, each assigned to a named material.
+// withMaterial() assigns all triangles of a mesh to a material. Parts with the same name share
+// one material and one model mesh. The recipe is compiled to a model with five materials:
+// house_stone.mat, house_walls.mat, house_roof.mat, house_wood.mat and house_glass.mat
+// (next to this file). Units are meters, the house stands on y = 0 and the door faces +Z.
+// Cones are built along Z and turned to stand along Y.
+import "core:procedural_geom"
+import "core:vec3" as vec3
+import "std:math" as math
+
+fn box(width : f32, height : f32, depth : f32, x : f32, y : f32, z : f32) : Mesh {
+    return translate(cube(width, height, depth), vec3.Vec3 { x, y, z });
+}
+
+// Cone standing on y = 0, optionally turned around Y.
+fn spike(radius : f32, height : f32, segments : i32, angle : f32) : Mesh {
+    var m = rotate(cone(radius, height, segments), vec3.Vec3 { -math.pi * 0.5, 0.0, 0.0 });
+    return rotate(m, vec3.Vec3 { 0.0, angle, 0.0 });
+}
+
+// Wooden frame with a pane of glass, centered at the origin and facing +Z. The back of the
+// frame sits on z = 0, so the window is placed on the outside of a wall.
+fn window(x : f32, y : f32, z : f32, angle : f32) : Mesh {
+    var frame = withMaterial(box(0.52, 0.52, 0.04, 0.0, 0.0, 0.02), "wood");
+    var glass = withMaterial(box(0.38, 0.38, 0.06, 0.0, 0.0, 0.02), "glass");
+    var result = rotate(merge(frame, glass), vec3.Vec3 { 0.0, angle, 0.0 });
+    return translate(result, vec3.Vec3 { x, y, z });
+}
+
+fn main() : Mesh {
+    comptime foundation_height = 0.2;
+    comptime wall_height = 1.5;
+    const wall_top : f32 = foundation_height + wall_height;
+    const window_y : f32 = 1.05;
+
+    var foundation = withMaterial(box(2.4, foundation_height, 2.4, 0.0, foundation_height * 0.5, 0.0), "stone");
+    var steps = withMaterial(box(0.9, 0.1, 0.4, 0.0, 0.05, 1.4), "stone");
+    var walls = withMaterial(box(2.0, wall_height, 2.0, 0.0, foundation_height + wall_height * 0.5, 0.0), "walls");
+
+    // A four sided cone is a pyramid; turn it by 45 degrees so its corners are above the corners
+    // of the walls. It overhangs the walls a little, and a wooden finial sits on its tip.
+    var roof = withMaterial(translate(spike(1.75, 1.2, 4, math.pi * 0.25), vec3.Vec3 { 0.0, wall_top, 0.0 }), "roof");
+    var finial = withMaterial(translate(spike(0.1, 0.35, 8, 0.0), vec3.Vec3 { 0.0, wall_top + 1.15, 0.0 }), "wood");
+
+    // Door with a frame, both stick out of the front wall.
+    var door_frame = withMaterial(box(0.8, 1.25, 0.04, 0.0, foundation_height + 0.625, 1.02), "wood");
+    var door = withMaterial(box(0.6, 1.15, 0.06, 0.0, foundation_height + 0.575, 1.02), "walls");
+
+    // The chimney reuses the "stone" material of the foundation.
+    var chimney = withMaterial(box(0.3, 1.0, 0.3, 0.6, wall_top + 0.55, -0.4), "stone");
+    var chimney_cap = withMaterial(box(0.4, 0.06, 0.4, 0.6, wall_top + 1.08, -0.4), "stone");
+
+    var result = merge(foundation, steps);
+    result = merge(result, walls);
+    result = merge(result, roof);
+    result = merge(result, finial);
+    result = merge(result, door_frame);
+    result = merge(result, door);
+    result = merge(result, chimney);
+    result = merge(result, chimney_cap);
+
+    // Two windows beside the door, one on each side wall and one on the back.
+    result = merge(result, window(-0.68, window_y, 1.0, 0.0));
+    result = merge(result, window(0.68, window_y, 1.0, 0.0));
+    result = merge(result, window(1.0, window_y, 0.0, math.pi * 0.5));
+    result = merge(result, window(-1.0, window_y, 0.0, -math.pi * 0.5));
+    result = merge(result, window(0.0, window_y, -1.0, math.pi));
+    return result;
+}
