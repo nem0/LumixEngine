@@ -16,6 +16,8 @@ extern fn createEntity(w : World) : Entity;
 extern fn destroyEntity(w : World, e : Entity) : void;
 extern fn hasEntity(w : World, e : Entity) : bool;
 extern fn findByName(w : World, name : []const u8) : ?Entity;
+extern fn getFirstEntity(w : World) : ?Entity;
+extern fn getNextEntity(w : World, e : Entity) : ?Entity;
 extern fn getPartitionCount(w : World) : i32;
 extern fn getPartitionHandle(w : World, index : i32) : u32;
 extern fn getPartitionName(w : World, handle : u32) : []const u8;
@@ -32,4 +34,24 @@ extern fn getEvoxDataRaw(w : World, t : type) : [] byte;
 fn getEvoxData(w : World, T : comptime type) : []T {
     var raw = getEvoxDataRaw(w, T);
     return raw as []T;
+}
+
+struct EntityIterator {
+	next : fn(iter : *EntityIterator, out : *Entity) : bool;
+	world : World;
+	current : ?Entity;
+}
+
+fn entityIteratorNext(iter : *EntityIterator, out : *Entity) : bool {
+	if const entity = iter.current {
+		out.* = entity;
+		iter.current = iter.world.getNextEntity(entity);
+		return true;
+	}
+	return false;
+}
+
+// iterates all valid entities in the world
+fn entities(w : World) : EntityIterator {
+	return {entityIteratorNext, w, w.getFirstEntity()};
 }

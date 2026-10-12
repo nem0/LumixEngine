@@ -351,6 +351,43 @@ static void evox_world_findByName(ex_runtime*, ex_call_frame frame) {
 	EX_RESULT(frame, ExEntity(entity.index, world));
 }
 
+static void evox_world_getFirstEntity(ex_runtime*, ex_call_frame frame) {
+	EX_ARG(frame, World*, world);
+	if (!world) {
+		panic(frame, "Invalid world");
+		return;
+	}
+	const EntityPtr entity = world->getFirstEntity();
+	if (!entity.isValid()) {
+		EX_RESULT(frame, u8(0));
+		EX_RESULT(frame, ExEntity(i32(0), nullptr));
+		return;
+	}
+	EX_RESULT(frame, u8(1));
+	EX_RESULT(frame, ExEntity(entity.index, world));
+}
+
+static void evox_world_getNextEntity(ex_runtime*, ex_call_frame frame) {
+	EX_ARG(frame, World*, world);
+	const ExEntity entity = readArg<ExEntity>(frame);
+	if (!world) {
+		panic(frame, "Invalid world");
+		return;
+	}
+	if (!evox_world_hasEntity(world, entity)) {
+		panic(frame, "Invalid entity for world");
+		return;
+	}
+	const EntityPtr next = world->getNextEntity(EntityRef{entity.index});
+	if (!next.isValid()) {
+		EX_RESULT(frame, u8(0));
+		EX_RESULT(frame, ExEntity(i32(0), nullptr));
+		return;
+	}
+	EX_RESULT(frame, u8(1));
+	EX_RESULT(frame, ExEntity(next.index, world));
+}
+
 static void evox_world_getPartitionCount(ex_runtime*, ex_call_frame frame) {
 	EX_ARG(frame, World*, world);
 	if (!world) {
@@ -793,6 +830,8 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	functions.insert({"core:world", "createEntity"}, &wrap<evox_world_createEntity>);
 	functions.insert({"core:world", "destroyEntity"}, &evox_world_destroyEntity);
 	functions.insert({"core:world", "findByName"}, &evox_world_findByName);
+	functions.insert({"core:world", "getFirstEntity"}, &evox_world_getFirstEntity);
+	functions.insert({"core:world", "getNextEntity"}, &evox_world_getNextEntity);
 	functions.insert({"core:world", "getPartitionCount"}, &evox_world_getPartitionCount);
 	functions.insert({"core:world", "getPartitionHandle"}, &evox_world_getPartitionHandle);
 	functions.insert({"core:world", "getPartitionName"}, &evox_world_getPartitionName);
