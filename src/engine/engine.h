@@ -70,6 +70,12 @@ struct LUMIX_ENGINE_API Engine {
 	virtual void pause(bool pause) = 0;
 	virtual bool isPaused() const = 0;
 	virtual void nextFrame() = 0;
+	// Requests quit with `exit_code`. Standalone app: exits. Editor: stops the game only, the editor stays open.
+	//@ function
+	virtual void quit(int exit_code) = 0;
+	virtual bool isQuitRequested() const = 0;
+	virtual int getQuitCode() const = 0;
+	virtual void clearQuitRequest() = 0;
 	virtual bool decompress(Span<const u8> src, Span<u8> dst) = 0;
 	virtual bool compress(Span<const u8> src, OutputMemoryStream& dst) = 0;
 

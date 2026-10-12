@@ -3,7 +3,5 @@
 
 struct StudioApp { ptr : cptr; }
 
-extern fn exitWithCode(object : StudioApp, exit_code : i32) : void;
-extern fn exitGameMode(object : StudioApp) : void;
 extern fn newWorld(object : StudioApp) : void;
 

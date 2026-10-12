@@ -288,6 +288,7 @@ int main(int args, char* argv[])
 		Data() : semaphore(0, 1) {}
 		Runner app;
 		Semaphore semaphore;
+		int exit_code = 0;
 	} data;
 	
 	profiler::setThreadName("Main thread");
@@ -301,6 +302,10 @@ int main(int args, char* argv[])
 				data->app.onEvent(e);
 			}
 			data->app.onIdle();
+			if (data->app.m_engine->isQuitRequested()) {
+				data->exit_code = data->app.m_engine->getQuitCode();
+				data->app.m_finished = true;
+			}
 		}
 
 		data->app.shutdown();
@@ -311,7 +316,7 @@ int main(int args, char* argv[])
 	PROFILE_BLOCK("sleeping");
 	data.semaphore.wait();
 
-	return 0;
+	return data.exit_code;
 }
 
 #else

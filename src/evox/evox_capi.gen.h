@@ -4980,17 +4980,6 @@ namespace Lumix::Evox::generated {
 		object->openEditor(Path(StringView{resource.begin, (u64)resource.length}));
 	}
 	
-	static void evox_object_StudioApp_exitWithCode_758235736626335650(ex_runtime* runtime, ex_call_frame frame) {
-		EX_ARG(frame, StudioApp*, object);
-		EX_ARG(frame, int, exit_code);
-		object->exitWithCode(exit_code);
-	}
-	
-	static void evox_object_StudioApp_exitGameMode_3617391861646806333(ex_runtime* runtime, ex_call_frame frame) {
-		EX_ARG(frame, StudioApp*, object);
-		object->exitGameMode();
-	}
-	
 	static void evox_object_StudioApp_newWorld_6688068326512970617(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, StudioApp*, object);
 		object->newWorld();
@@ -5024,6 +5013,12 @@ namespace Lumix::Evox::generated {
 		EX_ARG(frame, Engine*, object);
 		EX_ARG(frame, float, multiplier);
 		object->setTimeMultiplier(multiplier);
+	}
+	
+	static void evox_object_Engine_quit_6439751202468863570(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Engine*, object);
+		EX_ARG(frame, int, exit_code);
+		object->quit(exit_code);
 	}
 	
 	static void evox_resource_load_PrefabResource(ex_runtime* runtime, ex_call_frame frame) {
@@ -5957,13 +5952,12 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:audio/clip"), StringView("isReady")}, &evox_resource_isReady_Clip);
 		functions.insert({StringView("core:audio/clip"), StringView("isFailure")}, &evox_resource_isFailure_Clip);
 		functions.insert({StringView("core:editor/assetbrowser"), StringView("openEditor")}, &evox_object_AssetBrowser_openEditor_11783148113040368601);
-		functions.insert({StringView("core:editor/studioapp"), StringView("exitWithCode")}, &evox_object_StudioApp_exitWithCode_758235736626335650);
-		functions.insert({StringView("core:editor/studioapp"), StringView("exitGameMode")}, &evox_object_StudioApp_exitGameMode_3617391861646806333);
 		functions.insert({StringView("core:editor/studioapp"), StringView("newWorld")}, &evox_object_StudioApp_newWorld_6688068326512970617);
 		functions.insert({StringView("core:engine/engine"), StringView("createWorld")}, &evox_object_Engine_createWorld_9620427070019288589);
 		functions.insert({StringView("core:engine/engine"), StringView("destroyWorld")}, &evox_object_Engine_destroyWorld_4167552932825757200);
 		functions.insert({StringView("core:engine/engine"), StringView("instantiatePrefab")}, &evox_object_Engine_instantiatePrefab_17117969483096900978);
 		functions.insert({StringView("core:engine/engine"), StringView("setTimeMultiplier")}, &evox_object_Engine_setTimeMultiplier_4469831530226950084);
+		functions.insert({StringView("core:engine/engine"), StringView("quit")}, &evox_object_Engine_quit_6439751202468863570);
 		functions.insert({StringView("core:engine/prefabresource"), StringView("load")}, &evox_resource_load_PrefabResource);
 		functions.insert({StringView("core:engine/prefabresource"), StringView("unload")}, &evox_resource_unload_PrefabResource);
 		functions.insert({StringView("core:engine/prefabresource"), StringView("isReady")}, &evox_resource_isReady_PrefabResource);

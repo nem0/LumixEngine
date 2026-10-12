@@ -90,9 +90,7 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual WorldEditor& getWorldEditor() = 0;
 	virtual void run() = 0;
 	virtual int getExitCode() const = 0;
-	//@ function
 	virtual void exitWithCode(int exit_code) = 0;
-	//@ function
 	virtual void exitGameMode() = 0;
 	virtual const char* getProjectDir() = 0;
 	

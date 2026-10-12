@@ -824,6 +824,12 @@ struct StudioAppImpl final : StudioApp {
 
 		if (m_watched_plugin.reload_request) tryReloadPlugin();
 
+		// engine exit request from scripts: in the editor it only stops the game, the editor stays open
+		if (m_engine->isQuitRequested()) {
+			m_engine->clearQuitRequest();
+			if (m_editor->isGameMode()) exitGameMode();
+		}
+
 		guiBeginFrame();
 		m_asset_compiler->update();
 		m_editor->update();

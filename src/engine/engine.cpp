@@ -245,6 +245,15 @@ struct EngineImpl final : Engine {
 		m_paused = pause;
 	}
 
+	void quit(int exit_code) override {
+		m_quit_requested = true;
+		m_quit_code = exit_code;
+	}
+
+	bool isQuitRequested() const override { return m_quit_requested; }
+	int getQuitCode() const override { return m_quit_code; }
+	void clearQuitRequest() override { m_quit_requested = false; }
+
 
 	void nextFrame() override
 	{
@@ -425,6 +434,8 @@ private:
 	bool m_is_game_running;
 	bool m_paused;
 	bool m_next_frame;
+	bool m_quit_requested = false;
+	int m_quit_code = 0;
 	os::WindowHandle m_window_handle = os::INVALID_WINDOW;
 	os::OutputFile m_log_file;
 	bool m_is_log_file_open = false;
