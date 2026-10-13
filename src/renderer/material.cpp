@@ -462,9 +462,16 @@ bool Material::load(Span<const u8> mem) {
 
 		if (key == "shader") {
 			if (!tokenizer.consume(value)) return false;
-			// TODO does not Path::normalize already do this?
-			if (startsWith(value, "/") || startsWith(value, "\\")) value.removePrefix(1);
-			setShader(Path(value));
+			if (value.empty()) {
+				setShader(Path());
+			}
+			else if (startsWith(value, "/") || startsWith(value, "\\")) {
+				value.removePrefix(1);
+				setShader(Path(value));
+			}
+			else {
+				setShader(Path(Path::getDir(getPath()), value));
+			}
 		}
 		else if (key == "custom_flag") {
 			if (!tokenizer.consume(value)) return false;
