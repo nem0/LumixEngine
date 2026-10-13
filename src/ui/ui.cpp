@@ -51,6 +51,7 @@ Tag parseTag(StringView str) {
 		case 3: if (memcmp(s, "box", 3) == 0) return Tag::BOX; break;
 		case 4: if (memcmp(s, "span", 4) == 0) return Tag::SPAN; break;
 		case 5: if (memcmp(s, "image", 5) == 0) return Tag::IMAGE; break;
+		case 6: if (memcmp(s, "canvas", 6) == 0) return Tag::CANVAS; break;
 	}
 	return Tag::INVALID;
 }
@@ -685,6 +686,307 @@ bool Document::parseDocTag() {
 	return parseElements(0xFFFF'FFFF, true);
 }
 
+static Color withAlpha(Color color, u8 alpha) {
+	color.a = alpha;
+	return color;
+}
+
+// the edges of a [path] fade to transparent over this distance outside the shape, in element-local units
+static constexpr float path_feather = 1.f;
+
+bool Document::parsePath(u32 parent_index, StringView location) {
+	if (parent_index == 0xFFFF'FFFF || m_elements[parent_index].tag != Tag::CANVAS) {
+		error(location, m_tokenizer, "[path] must be inside a [canvas]");
+		return false;
+	}
+	Element& canvas = m_elements[parent_index];
+
+	float width = 1;
+	bool closed = false;
+	bool filled = false;
+	bool has_width = false;
+	for (;;) {
+		if (tryConsume(Token::RBRACKET)) break;
+		Token name;
+		if (!consume(Token::IDENTIFIER, &name)) return false;
+		if (!consume(Token::EQUALS)) return false;
+		Token value = m_tokenizer.consumeToken();
+
+		bool* flag = nullptr;
+		if (name.value == "width") {
+			const char* end = value.type == Token::NUMBER ? fromCString(value.value, width) : nullptr;
+			if (!end || end != value.value.end() || !(width > 0)) {
+				error(value.value, m_tokenizer, "invalid value '", value.value, "' for [path] attribute 'width', expected a positive number");
+				return false;
+			}
+			has_width = true;
+			continue;
+		}
+		else if (name.value == "filled") flag = &filled;
+		else if (name.value == "closed") flag = &closed;
+		else {
+			error(name.value, m_tokenizer, "unknown [path] attribute '", name.value, "'");
+			return false;
+		}
+		if (value.type != Token::IDENTIFIER || !parseBool(value.value, *flag)) {
+			error(value.value, m_tokenizer, "invalid value '", value.value, "' for [path] attribute '", name.value, "', expected true or false");
+			return false;
+		}
+	}
+
+	if (m_tokenizer.peekToken().type != Token::LBRACE) {
+		error(location, m_tokenizer, "[path] needs a body with points, e.g. [path] { 0,0 10,0 }");
+		return false;
+	}
+
+	// points are separated by whitespace, invalid ones are logged and skipped. A point is "x,y" with optional "#color"
+	// and "@u,v", in that order. Without "#color" it takes the previous point's color, the uv is 0,0
+	Array<Draw2D::Vertex> points(m_allocator);
+	Color color = Color::WHITE;
+	const char* p = m_tokenizer.peekToken().value.end(); // just after '{'
+	const char* const body_end = m_tokenizer.m_document.end();
+	auto read_float = [&](float& out) {
+		const char* r = fromCString(StringView{p, body_end}, out);
+		if (!r || r == p) return false;
+		p = r;
+		return true;
+	};
+	auto read_comma = [&]() {
+		if (p == body_end || *p != ',') return false;
+		++p;
+		return true;
+	};
+	while (p != body_end && *p != '}') {
+		if (UITokenizer::isWhitespace(*p)) {
+			++p;
+			continue;
+		}
+		const char* start = p;
+
+		float x, y, u = 0, v = 0;
+		Color point_color = color;
+		bool has_color = false;
+		bool ok = read_float(x) && read_comma() && read_float(y);
+		if (ok && p != body_end && *p == '#') {
+			has_color = true;
+			const char* color_end = p + 1;
+			while (color_end != body_end && (color_end - p) < 9 && UITokenizer::isHexDigit(*color_end)) ++color_end;
+			ok = parseColor(StringView{p, color_end}, point_color);
+			p = color_end;
+		}
+		if (ok && p != body_end && *p == '@') {
+			++p;
+			ok = read_float(u) && read_comma() && read_float(v);
+		}
+		ok = ok && (p == body_end || *p == '}' || UITokenizer::isWhitespace(*p));
+		if (!ok) {
+			// skip the rest of the bad token so the next point starts clean
+			while (p != body_end && *p != '}' && !UITokenizer::isWhitespace(*p)) ++p;
+			error(location, m_tokenizer, "invalid [path] point '", StringView{start, p}, "', ignored");
+			continue;
+		}
+		const Draw2D::Vertex point = {Vec2(x, y), Vec2(u, v), point_color};
+		if (points.size() == 0 && !has_color) {
+			error(location, m_tokenizer, "the first [path] point needs a color, e.g. { 0,0#ff0000 10,0 }");
+			return false;
+		}
+		// identical consecutive vertices would make empty segments, same position with different color/uv is kept
+		if (points.size() > 0) {
+			const Draw2D::Vertex& last = points[points.size() - 1];
+			if (last.pos == point.pos && last.uv == point.uv && last.color == point.color) continue;
+		}
+		points.push(point);
+		color = point.color;
+	}
+	if (p == body_end) {
+		error(location, m_tokenizer, "unclosed [path] body");
+		return false;
+	}
+	// move the tokenizer past the closing }
+	m_tokenizer.m_current = p + 1;
+	m_tokenizer.m_current_token = m_tokenizer.nextToken();
+
+	if (!canvas.canvas_geometry) {
+		canvas.canvas_geometry = LUMIX_NEW(m_allocator, CanvasGeometry)(m_allocator);
+	}
+	CanvasGeometry& geometry = *canvas.canvas_geometry;
+
+	const u32 n = points.size();
+
+	// the fill is the polygon through points, triangulated by ear clipping, so it can be concave. Colors and uvs are
+	// interpolated across the triangles
+	if (filled && n >= 3) {
+		const u32 fill_base = (u32)geometry.vertices.size();
+		for (u32 i = 0; i < n; ++i) {
+			geometry.vertices.push(points[i]);
+		}
+
+		float area = 0;
+		for (u32 i = 0; i < n; ++i) {
+			const Vec2 a = points[i].pos;
+			const Vec2 b = points[(i + 1) % n].pos;
+			area += a.x * b.y - b.x * a.y;
+		}
+		const float orient = area < 0 ? -1.f : 1.f;
+		auto cross2 = [](Vec2 o, Vec2 a, Vec2 b) { return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x); };
+
+		Array<u32> remaining(m_allocator);
+		for (u32 i = 0; i < n; ++i) remaining.push(i);
+		while (remaining.size() > 3) {
+			const u32 count = remaining.size();
+			u32 ear = 0xFFFF'FFFF;
+			for (u32 i = 0; i < count && ear == 0xFFFF'FFFF; ++i) {
+				const Vec2 a = points[remaining[(i + count - 1) % count]].pos;
+				const Vec2 b = points[remaining[i]].pos;
+				const Vec2 c = points[remaining[(i + 1) % count]].pos;
+				if (cross2(a, b, c) * orient <= 0) continue; // reflex or degenerate corner
+				bool empty = true;
+				for (u32 k = 0; k < count && empty; ++k) {
+					if (k == i || k == (i + count - 1) % count || k == (i + 1) % count) continue;
+					const Vec2 q = points[remaining[k]].pos;
+					empty = !(cross2(a, b, q) * orient >= 0 && cross2(b, c, q) * orient >= 0 && cross2(c, a, q) * orient >= 0);
+				}
+				if (empty) ear = i;
+			}
+			if (ear == 0xFFFF'FFFF) ear = 0; // self-intersecting input, clip something anyway to terminate
+			geometry.indices.push(fill_base + remaining[(ear + count - 1) % count]);
+			geometry.indices.push(fill_base + remaining[ear]);
+			geometry.indices.push(fill_base + remaining[(ear + 1) % count]);
+			remaining.erase(ear);
+		}
+		geometry.indices.push(fill_base + remaining[0]);
+		geometry.indices.push(fill_base + remaining[1]);
+		geometry.indices.push(fill_base + remaining[2]);
+
+		// feathering: the edges fade to transparent over path_feather outside the polygon. Each edge gets a quad, and each convex
+		// corner a triangle for the gap between the quads of its two edges. Reflex corners are covered by the quads already
+		auto outward = [&](const Draw2D::Vertex& a, const Draw2D::Vertex& b) -> Vec2 {
+			const float len = length(b.pos - a.pos);
+			if (len == 0) return Vec2(0, 0);
+			return Vec2((b.pos.y - a.pos.y) / len * path_feather * orient, -(b.pos.x - a.pos.x) / len * path_feather * orient);
+		};
+		for (u32 i = 0; i < n; ++i) {
+			const Draw2D::Vertex& a = points[i];
+			const Draw2D::Vertex& b = points[(i + 1) % n];
+			const Vec2 out = outward(a, b);
+			const u32 base = (u32)geometry.vertices.size();
+			geometry.vertices.push({a.pos, a.uv, a.color});
+			geometry.vertices.push({b.pos, b.uv, b.color});
+			geometry.vertices.push({b.pos + out, b.uv, withAlpha(b.color, 0)});
+			geometry.vertices.push({a.pos + out, a.uv, withAlpha(a.color, 0)});
+			geometry.indices.push(base);
+			geometry.indices.push(base + 1);
+			geometry.indices.push(base + 2);
+			geometry.indices.push(base);
+			geometry.indices.push(base + 2);
+			geometry.indices.push(base + 3);
+
+			const Draw2D::Vertex& prev = points[(i + n - 1) % n];
+			if (cross2(prev.pos, a.pos, b.pos) * orient <= 0) continue;
+			const Vec2 out_prev = outward(prev, a);
+			const u32 corner = (u32)geometry.vertices.size();
+			geometry.vertices.push({a.pos, a.uv, a.color});
+			geometry.vertices.push({a.pos + out_prev, a.uv, withAlpha(a.color, 0)});
+			geometry.vertices.push({a.pos + out, a.uv, withAlpha(a.color, 0)});
+			geometry.indices.push(corner);
+			geometry.indices.push(corner + 1);
+			geometry.indices.push(corner + 2);
+		}
+	}
+
+	// a filled path is only stroked if it has an explicit width
+	if (filled && !has_width) return true;
+
+	// strokes the polyline through points: a quad per segment and a bevel triangle on the outer side of each corner.
+	// Colors and uvs are interpolated across each segment. Zero-length segments are skipped, a closed loop does not repeat its first point
+	if (n < 2) return true;
+
+	// the outline of a filled path is always closed
+	const bool stroke_closed = closed || filled;
+	const float h = width * 0.5f;
+	const u32 segments = stroke_closed ? n : n - 1;
+	for (u32 i = 0; i < segments; ++i) {
+		const Draw2D::Vertex& a = points[i];
+		const Draw2D::Vertex& b = points[(i + 1) % n];
+		const float len = length(b.pos - a.pos);
+		if (len == 0) continue;
+		const Vec2 nrm((a.pos.y - b.pos.y) / len * h, (b.pos.x - a.pos.x) / len * h);
+
+		const u32 base = (u32)geometry.vertices.size();
+		geometry.vertices.push({a.pos + nrm, a.uv, a.color});
+		geometry.vertices.push({b.pos + nrm, b.uv, b.color});
+		geometry.vertices.push({b.pos - nrm, b.uv, b.color});
+		geometry.vertices.push({a.pos - nrm, a.uv, a.color});
+		geometry.indices.push(base);
+		geometry.indices.push(base + 1);
+		geometry.indices.push(base + 2);
+		geometry.indices.push(base);
+		geometry.indices.push(base + 2);
+		geometry.indices.push(base + 3);
+
+		// feathering, on both sides of the segment: from the edge of the stroke out to path_feather, fading to transparent
+		const Vec2 feather_nrm = nrm * (path_feather / h);
+		for (u32 side = 0; side < 2; ++side) {
+			const float s = side == 0 ? 1.f : -1.f;
+			const Vec2 o = nrm * s;
+			const Vec2 f = feather_nrm * s;
+			const u32 fringe = (u32)geometry.vertices.size();
+			geometry.vertices.push({a.pos + o, a.uv, a.color});
+			geometry.vertices.push({b.pos + o, b.uv, b.color});
+			geometry.vertices.push({b.pos + o + f, b.uv, withAlpha(b.color, 0)});
+			geometry.vertices.push({a.pos + o + f, a.uv, withAlpha(a.color, 0)});
+			geometry.indices.push(fringe);
+			geometry.indices.push(fringe + 1);
+			geometry.indices.push(fringe + 2);
+			geometry.indices.push(fringe);
+			geometry.indices.push(fringe + 2);
+			geometry.indices.push(fringe + 3);
+		}
+	}
+
+	// the corners: open paths only have the inner points, closed ones every point
+	const u32 corners = stroke_closed ? n : n - 2;
+	for (u32 k = 0; k < corners; ++k) {
+		const u32 j = stroke_closed ? k : k + 1;
+		const Draw2D::Vertex& pt = points[j];
+		const Vec2 d0 = points[j].pos - points[(j + n - 1) % n].pos;
+		const Vec2 d1 = points[(j + 1) % n].pos - points[j].pos;
+		const float len0 = length(d0);
+		const float len1 = length(d1);
+		if (len0 == 0 || len1 == 0) continue;
+		const float cross = (d0.x * d1.y - d0.y * d1.x) / (len0 * len1);
+		if (cross > -1e-6f && cross < 1e-6f) continue;
+
+		// a left turn (cross > 0) has its outer side on the right, and the other way around
+		const float s = cross > 0 ? -h : h;
+		const Vec2 n0((-d0.y / len0) * s, (d0.x / len0) * s);
+		const Vec2 n1((-d1.y / len1) * s, (d1.x / len1) * s);
+		const u32 base = (u32)geometry.vertices.size();
+		geometry.vertices.push({pt.pos, pt.uv, pt.color});
+		geometry.vertices.push({pt.pos + n0, pt.uv, pt.color});
+		geometry.vertices.push({pt.pos + n1, pt.uv, pt.color});
+		geometry.indices.push(base);
+		geometry.indices.push(base + 1);
+		geometry.indices.push(base + 2);
+
+		// feathering on the outer side of the corner, continuing the fringes of the two segments
+		const Vec2 f0 = n0 * (path_feather / h);
+		const Vec2 f1 = n1 * (path_feather / h);
+		const u32 fringe = (u32)geometry.vertices.size();
+		geometry.vertices.push({pt.pos + n0, pt.uv, pt.color});
+		geometry.vertices.push({pt.pos + n1, pt.uv, pt.color});
+		geometry.vertices.push({pt.pos + n1 + f1, pt.uv, withAlpha(pt.color, 0)});
+		geometry.vertices.push({pt.pos + n0 + f0, pt.uv, withAlpha(pt.color, 0)});
+		geometry.indices.push(fringe);
+		geometry.indices.push(fringe + 1);
+		geometry.indices.push(fringe + 2);
+		geometry.indices.push(fringe);
+		geometry.indices.push(fringe + 2);
+		geometry.indices.push(fringe + 3);
+	}
+	return true;
+}
+
 bool Document::parseElements(u32 parent_index, bool doc_body) {
 	// the root level, where a stray } ends the file and EOF is fine: the body of [doc] is not it, its } closes the body
 	const bool is_root = parent_index == 0xFFFF'FFFF && !doc_body;
@@ -773,6 +1075,11 @@ bool Document::parseElements(u32 parent_index, bool doc_body) {
 						}
 						m_has_doc_tag = true;
 						if (!parseDocTag()) return false;
+						continue;
+					}
+					// [path] is not an element, it adds its stroke to the parent [canvas]
+					if (token.value == "path") {
+						if (!parsePath(parent_index, token.value)) return false;
 						continue;
 					}
 					error(token.value, m_tokenizer, "unknown tag '", token.value, "'");
@@ -910,6 +1217,7 @@ Element::Element(Element&& rhs)
 	, size(rhs.size)
 	, text(rhs.text)
 	, lines(rhs.lines.move())
+	, canvas_geometry(rhs.canvas_geometry)
 	, sprite_handle(rhs.sprite_handle)
 	, image_handle(rhs.image_handle)
 	, font_size(rhs.font_size)
@@ -935,6 +1243,7 @@ Element::Element(Element&& rhs)
 	rhs.font_handle = nullptr;
 	rhs.sprite_handle = nullptr;
 	rhs.image_handle = nullptr;
+	rhs.canvas_geometry = nullptr;
 }
 
 Element::~Element() {
@@ -943,6 +1252,9 @@ Element::~Element() {
 	}
 	if (m_document.m_image_manager && image_handle) {
 		m_document.m_image_manager->unloadImage(image_handle);
+	}
+	if (canvas_geometry) {
+		LUMIX_DELETE(m_document.m_allocator, canvas_geometry);
 	}
 }
 
@@ -975,6 +1287,46 @@ void Element::setBGImage(const Path& path) {
 	upsertAttribute<AttributeName::BG_IMAGE>(*this, sv, AttributeSource::ELEMENT);
 	setSpriteHandle(m_document.acquireSprite(sv));
 
+}
+
+void Element::setGeometry(Span<const Vertex> vertices, Span<const u32> indices) {
+	if (tag != Tag::CANVAS) {
+		logError("setGeometry: element is not a [canvas]");
+		return;
+	}
+	if (indices.size() % 3 != 0) {
+		logError("setGeometry: index count must be a multiple of 3");
+		return;
+	}
+	for (u32 idx : indices) {
+		if (idx >= vertices.size()) {
+			logError("setGeometry: index ", idx, " is out of range");
+			return;
+		}
+	}
+
+	if (vertices.size() == 0) {
+		clearGeometry();
+		return;
+	}
+
+	if (!canvas_geometry) {
+		canvas_geometry = LUMIX_NEW(m_document.m_allocator, CanvasGeometry)(m_document.m_allocator);
+	}
+	canvas_geometry->vertices.clear();
+	for (const Vertex& v : vertices) {
+		const Color color(v.r, v.g, v.b, v.a);
+		canvas_geometry->vertices.push({Vec2(v.x, v.y), Vec2(v.u, v.v), color});
+	}
+	canvas_geometry->indices.clear();
+	for (u32 idx : indices) canvas_geometry->indices.push(idx);
+}
+
+void Element::clearGeometry() {
+	if (canvas_geometry) {
+		LUMIX_DELETE(m_document.m_allocator, canvas_geometry);
+		canvas_geometry = nullptr;
+	}
 }
 
 void Element::setText(StringView v) {
@@ -2061,6 +2413,22 @@ static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, co
 			}
 			break;
 		}
+		case Tag::CANVAS: {
+			const auto image_handle = element.getImageHandle();
+			gpu::TextureHandle texture = gpu::INVALID_TEXTURE;
+			if (image_handle) {
+				if (!doc.m_image_manager || !doc.m_image_manager->isReady(image_handle)) break;
+				texture = static_cast<Texture*>(image_handle)->handle;
+			}
+			if (element.canvas_geometry) {
+				const CanvasGeometry& geometry = *element.canvas_geometry;
+				draw.addMesh(texture,
+					Span(geometry.vertices.begin(), geometry.vertices.size()),
+					Span(geometry.indices.begin(), geometry.indices.size()),
+					pos, doc.m_scale);
+			}
+			break;
+		}
 		case Tag::SPAN: {
 			if (element.getFontHandle() && !element.text.empty()) {
 				const Font& font = *(const Font*)element.getFontHandle();
@@ -2245,7 +2613,7 @@ static void loadResources(Document& doc, u32 element_index, const ParentContext&
 				ctx.font_size = elem.font_size;
 				break;
 			case AttributeName::SRC: {
-				if (elem.tag == Tag::IMAGE && doc.m_image_manager && !attr.value.empty()) {
+				if ((elem.tag == Tag::IMAGE || elem.tag == Tag::CANVAS) && doc.m_image_manager && !attr.value.empty()) {
 					elem.setImageHandle(doc.m_image_manager->loadImage(attr.value));
 				}
 				break;

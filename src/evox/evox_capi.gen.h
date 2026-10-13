@@ -5324,6 +5324,20 @@ namespace Lumix::Evox::generated {
 		object->setBGImage(Path(StringView{path.begin, (u64)path.length}));
 	}
 	
+	static void evox_object_Element_setGeometry_15196642487151414820(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, ex_slice, vertices_slice);
+		Span<const ui::Vertex> vertices(reinterpret_cast<const ui::Vertex*>(vertices_slice.data), vertices_slice.length);
+		EX_ARG(frame, ex_slice, indices_slice);
+		Span<const u32> indices(reinterpret_cast<const u32*>(indices_slice.data), indices_slice.length);
+		object->setGeometry(vertices, indices);
+	}
+	
+	static void evox_object_Element_clearGeometry_11530183421897493893(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		object->clearGeometry();
+	}
+	
 	static void evox_object_Element_setLeft_100438595916105358(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ui::Element*, object);
 		EX_STRING_ARG(frame, value);
@@ -6021,6 +6035,8 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:ui/element"), StringView("setText")}, &evox_object_Element_setText_16123516204308000926);
 		functions.insert({StringView("core:ui/element"), StringView("setWidth")}, &evox_object_Element_setWidth_1690122863701504102);
 		functions.insert({StringView("core:ui/element"), StringView("setBGImage")}, &evox_object_Element_setBGImage_9641999657146036441);
+		functions.insert({StringView("core:ui/element"), StringView("setGeometry")}, &evox_object_Element_setGeometry_15196642487151414820);
+		functions.insert({StringView("core:ui/element"), StringView("clearGeometry")}, &evox_object_Element_clearGeometry_11530183421897493893);
 		functions.insert({StringView("core:ui/element"), StringView("setLeft")}, &evox_object_Element_setLeft_100438595916105358);
 		functions.insert({StringView("core:ui/element"), StringView("setTop")}, &evox_object_Element_setTop_16096759703562549142);
 		functions.insert({StringView("core:ui/element"), StringView("setOpacity")}, &evox_object_Element_setOpacity_11480515910923902992);

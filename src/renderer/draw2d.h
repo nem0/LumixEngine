@@ -34,6 +34,7 @@ struct LUMIX_RENDERER_API Draw2D {
 	void addLine(const Vec2& from, const Vec2& to, Color color, float width);
 	void addRect(const Vec2& from, const Vec2& to, Color color, float width);
 	void addRectFilled(const Vec2& from, const Vec2& to, Color color);
+	void addMesh(gpu::TextureHandle texture, Span<const Vertex> vertices, Span<const u32> indices, const Vec2& offset, float scale);
 	void addText(const Font& font, const Vec2& pos, Color color, const char* text);
 	void addText(const Font& font, const Vec2& pos, Color color, StringView text);
 	void addImage(gpu::TextureHandle tex, const Vec2& from, const Vec2& to, const Vec2& uv0, const Vec2& uv1, Color color);

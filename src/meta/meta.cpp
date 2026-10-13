@@ -1511,6 +1511,14 @@ bool consumeArg(StringView& line, Arg& out) {
 		out.is_const = true;
 	}
 	if (equal(word, "struct")) word = consumeWord(line);
+	if (peekChar(line) == '<') { // template type, e.g. Span<const Vertex>
+		const char* end = line.begin;
+		while (end != line.end && *end != '>') ++end;
+		if (end != line.end) ++end;
+		word.end = end;
+		line.begin = end;
+		line = skipWhitespaces(line);
+	}
 	if (endsWith(word, "&")) {
 		out.is_ref = true;
 		word.end -= 1;

@@ -98,6 +98,64 @@ Sizing behavior:
 - If both `width` and `height` are set, both values are used as-is.
 - If neither is set, intrinsic bitmap width and height are used.
 
+## canvas
+
+Drawing surface for custom shapes such as rings, gauges or icons. It has no background or text of its own; its content is geometry set from script, or shapes written in markup (see [Shapes](#shapes)).
+
+| Attribute | Description | Default / Values |
+|---|---|---|
+| `width` | Width of the drawing area. | `fit-content` (zero) |
+| `height` | Height of the drawing area. | `fit-content` (zero) |
+| `src` | Texture the geometry samples, loaded like the `src` of an [image](#image). | `""` (solid color) |
+
+Set `width` and `height` explicitly, or use `grow` in a flex parent. With `src`, nothing is drawn until the texture is ready.
+
+Geometry is set from script, using `element` from `core:ui/element` and `vertex` from `core:ui/vertex`:
+
+```
+element.setGeometry(canvas : element.Element, vertices : []const vertex.Vertex, indices : []const u32) : void
+element.clearGeometry(canvas : element.Element) : void
+```
+
+- `x`, `y`: position in element-local units, origin at the canvas top-left. DPI and reference-size scaling is applied automatically.
+- `u`, `v`: texture coordinates, `0` to `1`, origin at the top-left. Ignored without `src`.
+- `r`, `g`, `b`, `a`: color, `0` to `255`. With a texture it multiplies the texel, so white leaves it unchanged.
+- `indices`: three per triangle, each smaller than the vertex count. Invalid input is logged and ignored.
+- Geometry persists until replaced or cleared, and takes effect on the next frame.
+- Drawn before children, so children appear on top. One texture per canvas.
+
+Example, a red triangle:
+
+```
+import "core:ui/element" as element
+import "core:ui/vertex" as vertex
+
+fn drawRedTriangle(canvas : element.Element) : void {
+	const vertices : []const vertex.Vertex = [
+		vertex.Vertex { .x = 0.0, .y = 0.0, .u = 0.0, .v = 0.0, .r = 255, .g = 0, .b = 0, .a = 255 },
+		vertex.Vertex { .x = 100.0, .y = 0.0, .u = 0.0, .v = 0.0, .r = 255, .g = 0, .b = 0, .a = 255 },
+		vertex.Vertex { .x = 0.0, .y = 100.0, .u = 0.0, .v = 0.0, .r = 255, .g = 0, .b = 0, .a = 255 }
+	];
+	const indices : []const u32 = [0, 1, 2];
+	element.setGeometry(canvas, vertices, indices);
+}
+```
+
+### Shapes
+
+Shapes are tags that can only appear inside a `[canvas]`. The engine converts them to the same geometry that `setGeometry` produces, once when the document loads. Shapes are drawn in document order, and a `setGeometry` call from script replaces all of them.
+
+- `[path]`: body text is a list of points separated by whitespace. Each point is `x,y`, optionally followed by `#color` and `@u,v`, in that order. A point without `#color` takes the color of the point before it, so the first point must have one (otherwise the path is an error). Invalid points are logged and skipped. Attributes: `width` (default `1`, in element-local units) and `closed` (`true` closes the shape back to the first point, default `false`; a closed path does not repeat its first point) and `filled` (`true` fills the polygon through the points, default `false`). A filled path can be concave but should not intersect itself; point colors are interpolated across the fill. A filled path is only stroked if `width` is set explicitly, and then its outline is always closed. A path with two points is a line. Edges are feathered: they fade from the shape's color to transparent over `1` element-local unit outside the shape, which smooths them when drawn at pixel scale. Example:
+
+  ```
+  [canvas] {
+  	[path width=2 closed=true] { 0,0#ff0000 1,0 0.5,1 }
+  	[path width=4] { 0,0#ff0000 1,0#00ff00@1,0 0.5,1#0000ff }
+  }
+  ```
+
+  `@u,v` is only used with `src`, and points without it take `u,v` of `0,0`.
+
 ## span
 
 Inline text container for styling text without creating a block element. It does no have children, text is in `text` attribute.

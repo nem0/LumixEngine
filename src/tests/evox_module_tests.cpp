@@ -1048,6 +1048,44 @@ bool testEvoxRenderDefaults() {
 	return true;
 }
 
+// The canvas examples from docs/ui/elements_attributes.md must compile against the generated core:ui/element declarations.
+bool testEvoxCanvasGeometryCompiles() {
+	EvoxTestHost host;
+	CoreScripts scripts;
+	const char* source = R"(
+		import "core:ui/element" as element
+		import "core:ui/vertex" as vertex
+		fn drawTriangle(canvas : element.Element) : void {
+			const vertices : []const vertex.Vertex = [
+				vertex.Vertex { .x = 0.0, .y = 0.0, .u = 0.0, .v = 0.0, .r = 255, .g = 0, .b = 0, .a = 255 },
+				vertex.Vertex { .x = 100.0, .y = 0.0, .u = 0.0, .v = 0.0, .r = 255, .g = 0, .b = 0, .a = 255 },
+				vertex.Vertex { .x = 0.0, .y = 100.0, .u = 0.0, .v = 0.0, .r = 255, .g = 0, .b = 0, .a = 255 }
+			];
+			const indices : []const u32 = [0, 1, 2];
+			element.setGeometry(canvas, vertices, indices);
+		}
+		fn drawQuad(canvas : element.Element) : void {
+			const vertices : []const vertex.Vertex = [
+				vertex.Vertex { .x = 0.0, .y = 0.0, .u = 0.0, .v = 0.0, .r = 255, .g = 255, .b = 255, .a = 255 },
+				vertex.Vertex { .x = 100.0, .y = 0.0, .u = 1.0, .v = 0.0, .r = 255, .g = 255, .b = 255, .a = 255 },
+				vertex.Vertex { .x = 100.0, .y = 100.0, .u = 1.0, .v = 1.0, .r = 255, .g = 255, .b = 255, .a = 255 },
+				vertex.Vertex { .x = 0.0, .y = 100.0, .u = 0.0, .v = 1.0, .r = 255, .g = 255, .b = 255, .a = 255 }
+			];
+			const indices : []const u32 = [0, 1, 2, 0, 2, 3];
+			element.setGeometry(canvas, vertices, indices);
+		}
+		fn clear(canvas : element.Element) : void { element.clearGeometry(canvas); }
+	)";
+	ex_module* module = ex_module_create(&host.host);
+	ASSERT_TRUE(module);
+	ASSERT_EQ(EX_RESULT_OK, ex_module_compile(module, {source, (i64)stringLength(source)}, {"canvas.evox", 11}, &CoreScripts::resolve, &scripts));
+	ex_bytecode* bytecode = ex_bytecode_compile(module, &host.host, nullptr);
+	ASSERT_TRUE(bytecode);
+	ex_bytecode_destroy(bytecode);
+	ex_module_destroy(module);
+	return true;
+}
+
 } // namespace
 
 void runEvoxModuleTests() {
@@ -1063,4 +1101,5 @@ void runEvoxModuleTests() {
 	RUN_TEST(testEvoxModuleZeroSizedData);
 	RUN_TEST(testEvoxModuleSameNamedTypes);
 	RUN_TEST(testEvoxRenderDefaults);
+	RUN_TEST(testEvoxCanvasGeometryCompiles);
 }

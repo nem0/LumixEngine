@@ -20,6 +20,7 @@ static const char* getTagName(Tag tag) {
 		case Tag::BOX: return "box";
 		case Tag::IMAGE: return "image";
 		case Tag::SPAN: return "span";
+		case Tag::CANVAS: return "canvas";
 		case Tag::INVALID: return "invalid";
 	}
 	return "unknown";
@@ -150,6 +151,7 @@ static void debugElementGUI(const Document& document, u32 element_idx, int depth
 		case Tag::BOX: type_color = ImVec4(0.8f, 0.6f, 0.4f, 1.0f); break;
 		case Tag::IMAGE: type_color = ImVec4(0.4f, 0.8f, 0.6f, 1.0f); break;
 		case Tag::SPAN: type_color = ImVec4(0.6f, 0.4f, 0.8f, 1.0f); break;
+		case Tag::CANVAS: type_color = ImVec4(0.4f, 0.6f, 0.8f, 1.0f); break;
 		default: type_color = ImVec4(0.7f, 0.7f, 0.7f, 1.0f); break;
 	}
 

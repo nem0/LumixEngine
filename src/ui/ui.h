@@ -8,6 +8,7 @@
 #include "core/stack_array.h"
 #include "core/string.h"
 #include "engine/input_system.h"
+#include "renderer/draw2d.h"
 #include "ui_tokenizer.h"
 
 namespace Lumix {
@@ -26,6 +27,7 @@ enum class Tag : u8 {
 	BOX,
 	IMAGE,
 	SPAN,
+	CANVAS,
 	INVALID
 };
 
@@ -220,6 +222,27 @@ struct SpanLine {
 	float width;
 };
 
+// geometry vertex of a [canvas], the layout matches core:ui/element.Vertex in EVOX
+//@ struct full ui::Vertex
+struct Vertex {
+	float x; // element-local UI units, origin at the canvas's top-left corner
+	float y;
+	float u; // texture coordinates, 0..1
+	float v;
+	u8 r; // color, 0..255
+	u8 g;
+	u8 b;
+	u8 a;
+};
+
+// the geometry of a [canvas], allocated by the first setGeometry so other elements don't pay for it
+struct CanvasGeometry {
+	CanvasGeometry(IAllocator& allocator) : vertices(allocator), indices(allocator) {}
+
+	Array<Draw2D::Vertex> vertices;
+	Array<u32> indices;
+};
+
 struct BoxSpacing {
 	float top, right, bottom, left;
 };
@@ -256,6 +279,8 @@ struct LUMIX_UI_API Element {
 	Vec2 size = {0, 0};
 	StringView text;
 	Array<SpanLine> lines;
+	// [canvas] only, null until setGeometry; owned by the element
+	CanvasGeometry* canvas_geometry = nullptr;
 	float font_size = 0;
 	Color color = Color::WHITE;
 	float opacity = 1.0f;
@@ -285,6 +310,11 @@ struct LUMIX_UI_API Element {
 	void setWidth(StringView value);
 	//@ function 
 	void setBGImage(const Path& path);
+	// [canvas] only, ignored with an error log on other elements. Indices must be a multiple of 3 and point into vertices; otherwise the previous geometry stays
+	//@ function
+	void setGeometry(Span<const Vertex> vertices, Span<const u32> indices);
+	//@ function
+	void clearGeometry();
 	// "left"/"top" of a relative element shift it (and its content) after layout without moving its siblings, e.g. "-120" (pixels), "10%" or "2em", for animations
 	//@ function
 	void setLeft(StringView value);
@@ -431,6 +461,8 @@ private:
 	bool parseElements(u32 parent_index, bool doc_body = false);
 	bool parseStyleBlock();
 	bool parseDocTag();
+		// [path] inside the [canvas] at parent_index, appends its stroke to the canvas geometry
+		bool parsePath(u32 parent_index, StringView location);
 	bool consume(Token::Type type, Token* out_token = nullptr);
 	bool tryConsume(Token::Type type, Token* out_token = nullptr);
 	void addClassRaw(u32 element_index, StringView classname);

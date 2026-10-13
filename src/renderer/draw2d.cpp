@@ -143,6 +143,31 @@ void Draw2D::addRectFilled(const Vec2& from, const Vec2& to, Color color) {
 	cmd->indices_count += 6;
 }
 
+void Draw2D::addMesh(gpu::TextureHandle texture, Span<const Vertex> vertices, Span<const u32> indices, const Vec2& offset, float scale) {
+	Cmd* cmd = &m_cmds.back();
+
+	if (cmd->texture != texture && cmd->indices_count != 0) {
+		cmd = &m_cmds.emplace();
+		const Rect& r = m_clip_queue.back();
+		cmd->clip_pos = r.from;
+		cmd->clip_size = r.to - r.from;
+		cmd->indices_count = 0;
+		cmd->index_offset = m_indices.size();
+	}
+
+	cmd->texture = texture;
+	const u32 voff = m_vertices.size();
+	for (u32 idx : indices) m_indices.push(voff + idx);
+
+	const Vec2 white_uv = Vec2(0.5f) / m_atlas_size;
+	for (const Vertex& v : vertices) {
+		const Vec2 uv = texture != gpu::INVALID_TEXTURE ? v.uv : white_uv;
+		m_vertices.push({v.pos * scale + offset, uv, v.color});
+	}
+
+	cmd->indices_count += indices.size();
+}
+
 void Draw2D::addImage(gpu::TextureHandle tex, const Vec2& from, const Vec2& to, const Vec2& uv0, const Vec2& uv1, Color color) {
 	Cmd* cmd = &m_cmds.back();
 

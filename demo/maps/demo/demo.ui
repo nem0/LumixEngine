@@ -45,8 +45,25 @@
 		align-items=stretch
 		padding=1.5em
 	] {
-	    [box direction=row align=center] {
-	        Welcome to [span text=" Lumix " color=#ff0000 font-size=60] Demo
+	    [box direction=row justify-content=center align-items=center] {
+	        [box padding-right=0.3em] { Welcome to }
+	        [canvas width=36 height=47 margin-left=0.3em margin-right=0.05em] {
+	            [path filled=true] {
+	                0.0,39.6#fa2d09 3.8,38.7#f93209 7.2,38.1#f93509 10.3,37.7#f83708 
+	                13.1,37.5#f83808 15.7,37.5#f83808 18.1,37.7#f83708 20.4,38.1#f93509 
+	                22.4,38.6#f93309 24.4,39.2#f92f09 26.2,39.9#fa2c09 26.2,39.9#fa2c09 
+	                26.1,39.9#fa2c09 26.0,40.0#fa2b09 25.9,40.2#fa2a09 25.7,40.5#fa2809 
+	                25.3,41.1#fb2509 24.9,41.9#fb2109 24.4,43.0#fc1c0a 23.8,44.4#fd140a 
+	                23.1,46.2#ff0b0b 23.4,46.1#fe0b0a 24.2,45.6#fe0e0a 25.4,44.9#fe110a 
+	                26.8,44.0#fd160a 28.5,42.8#fc1d0a 30.2,41.3#fb2409 31.8,39.7#fa2d09 
+	                33.3,37.9#f93609 34.6,35.9#f74108 35.5,33.7#f64c08 32.5,33.2#f54f07 
+	                29.6,32.7#f55107 27.0,32.3#f55307 24.5,32.0#f45507 22.1,31.8#f45607 
+	                19.9,31.7#f45607 17.7,31.8#f45607 15.6,31.9#f45507 13.6,32.2#f45407 
+	                11.6,32.6#f55207 20.3,0.0#defd00 
+	            }
+	        }
+	        [box font-size=60 color=#ff0000] { umix }
+	        [box padding-left=0.3em] { Demo }
 	    }
 	    [box padding=0.5em align-items=center align=center] {
 	        [box .button on-click=start] { Start Demo }

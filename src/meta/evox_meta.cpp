@@ -143,6 +143,15 @@ StringView spanElementBaseType(StringView type) {
 	return element;
 }
 
+// the element of a span argument as C++ spells it: a struct gets its namespace, "const Vertex" -> "const ui::Vertex"
+StaticString<256> spanArgElementCppType(StringView type) {
+	StringView element = spanElementType(type);
+	const bool is_const = element.size() > 6 && element[0] == 'c' && element[1] == 'o' && element[2] == 'n' && element[3] == 's' && element[4] == 't';
+	const StringView base = spanElementBaseType(type);
+	const Struct* s = findStructByTypeName(base);
+	return StaticString<256>(is_const ? "const " : "", s ? s->full : base);
+}
+
 EvoxType getScalarType(StringView type) {
 	if (equal(type, "bool")) return EvoxType::BOOL_T;
 	if (equal(type, "i8")) return EvoxType::I8_T;
@@ -452,7 +461,9 @@ void emitArgRead(OutputStream& out, const Arg& arg) {
 	}
 	if (isSpanType(arg.type)) {
 		L("EX_ARG(frame, ex_slice, ", arg.name, "_slice);");
-		out.add(arg.type, " ", arg.name, "(reinterpret_cast<", spanElementType(arg.type), "*>(", arg.name, "_slice.data), ", arg.name, "_slice.length);" OUT_ENDL);
+		const StaticString<256> element = spanArgElementCppType(arg.type);
+		const StringView element_view{element.buffer, element.buffer + element.length};
+		out.add("Span<", element_view, "> ", arg.name, "(reinterpret_cast<", element_view, "*>(", arg.name, "_slice.data), ", arg.name, "_slice.length);" OUT_ENDL);
 	}
 	else if (isEvoxStringArg(arg)) {
 		L("EX_STRING_ARG(frame, ", arg.name, ");");

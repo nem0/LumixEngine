@@ -132,6 +132,9 @@ struct MockImageManager : ui::IImageManager {
 		: m_refs(getGlobalAllocator())
 	{}
 
+	// false keeps every image loading, for tests of elements waiting on their texture
+	bool ready = true;
+
 	ImageHandle loadImage(StringView path) override {
 		if (path != "img.png") return nullptr;
 		const ImageHandle handle = (ImageHandle)1;
@@ -174,7 +177,7 @@ struct MockImageManager : ui::IImageManager {
 	}
 
 	bool isReady(ImageHandle image) override {
-		return image != nullptr;
+		return ready && image != nullptr;
 	}
 
 	Vec2 getIntrinsicSize(ImageHandle image) override {

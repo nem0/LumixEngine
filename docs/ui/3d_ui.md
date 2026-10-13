@@ -17,7 +17,7 @@ There are two UI rendering paths:
 2. Add the `UI / UI3D` component.
 3. Set these properties:
    - `Source`: path to a `.ui` document.
-   - `Virtual size`: logical canvas size (for example `1000, 1000`).
+   - `Virtual size`: logical viewport size (for example `1000, 1000`).
    - `Orient to camera`: if enabled, the surface faces the active camera.
 
 If `Source` is empty, the component is inactive and renders nothing.

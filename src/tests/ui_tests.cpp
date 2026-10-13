@@ -1,4 +1,6 @@
 #include "core/log.h"
+#include "renderer/draw2d.h"
+#include <stddef.h>
 #include "tests/common.h"
 
 using namespace Lumix;
@@ -1610,6 +1612,514 @@ bool testInvalidAttributeValuesRejected() {
 	return true;
 }
 
+bool testCanvasParse() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[canvas width=10 height=20]");
+	doc.computeLayout(Vec2(200, 200));
+	Element* canvas = doc.getElement(doc.m_root.children[0]);
+	ASSERT_TAG(canvas, CANVAS);
+	ASSERT_FLOAT_EQ(10.0f, canvas->size.x);
+	ASSERT_FLOAT_EQ(20.0f, canvas->size.y);
+	return true;
+}
+
+bool testCanvasDefaultSizeIsZero() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[canvas]");
+	doc.computeLayout(Vec2(200, 200));
+	Element* canvas = doc.getElement(doc.m_root.children[0]);
+	ASSERT_FLOAT_EQ(0.0f, canvas->size.x);
+	ASSERT_FLOAT_EQ(0.0f, canvas->size.y);
+	return true;
+}
+
+bool testCanvasRejectsOnClick() {
+	MockDocument doc;
+	doc.m_suppress_logging = true;
+	ASSERT_EQ(false, doc.parse("[canvas on-click=\"go\"]", "test.ui"));
+	return true;
+}
+
+bool testCanvasSetGeometryEmitsTriangle() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[canvas width=100 height=100]");
+	doc.computeLayout(Vec2(200, 200));
+	Element* canvas = doc.getElement(doc.m_root.children[0]);
+
+	ui::Vertex vertices[] = {
+		{ 0, 0, 0, 0, 255, 0, 0, 255 },
+		{ 10, 0, 0, 0, 255, 0, 0, 255 },
+		{ 0, 10, 0, 0, 255, 0, 0, 255 },
+	};
+	u32 indices[] = { 0, 1, 2 };
+	canvas->setGeometry(Span(vertices, 3), Span(indices, 3));
+
+	Draw2D draw(getGlobalAllocator());
+	doc.render(draw);
+	ASSERT_EQ(3, draw.getVertices().size());
+	ASSERT_EQ(3, draw.getIndices().size());
+	ASSERT_FLOAT_EQ(canvas->position.x + 10.0f * doc.getScale(), draw.getVertices()[1].pos.x);
+	ASSERT_FLOAT_EQ(canvas->position.y, draw.getVertices()[1].pos.y);
+	ASSERT_EQ(0, draw.getIndices()[0]);
+	ASSERT_EQ(1, draw.getIndices()[1]);
+	ASSERT_EQ(2, draw.getIndices()[2]);
+	ASSERT_EQ(255, draw.getVertices()[0].color.r);
+	ASSERT_EQ(0, draw.getVertices()[0].color.g);
+	return true;
+}
+
+bool testCanvasGeometryRebasesIndices() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[canvas width=50 height=50] [canvas width=50 height=50]");
+	doc.computeLayout(Vec2(200, 200));
+	ui::Vertex vertices[] = {
+		{ 0, 0, 0, 0, 255, 255, 255, 255 },
+		{ 10, 0, 0, 0, 255, 255, 255, 255 },
+		{ 0, 10, 0, 0, 255, 255, 255, 255 },
+	};
+	u32 indices[] = { 0, 1, 2 };
+	doc.getElement(doc.m_root.children[0])->setGeometry(Span(vertices, 3), Span(indices, 3));
+	doc.getElement(doc.m_root.children[1])->setGeometry(Span(vertices, 3), Span(indices, 3));
+
+	Draw2D draw(getGlobalAllocator());
+	doc.render(draw);
+	ASSERT_EQ(6, draw.getVertices().size());
+	ASSERT_EQ(3, draw.getIndices()[3]);
+	ASSERT_EQ(4, draw.getIndices()[4]);
+	ASSERT_EQ(5, draw.getIndices()[5]);
+	return true;
+}
+
+bool testCanvasInvalidGeometryRejected() {
+	MockDocument doc;
+	doc.m_suppress_logging = true;
+	ASSERT_PARSE(doc, "[canvas width=100 height=100]");
+	doc.computeLayout(Vec2(200, 200));
+	Element* canvas = doc.getElement(doc.m_root.children[0]);
+
+	ui::Vertex vertices[] = {
+		{ 0, 0, 0, 0, 255, 0, 0, 255 },
+		{ 10, 0, 0, 0, 255, 0, 0, 255 },
+		{ 0, 10, 0, 0, 255, 0, 0, 255 },
+	};
+	u32 good[] = { 0, 1, 2 };
+	canvas->setGeometry(Span(vertices, 3), Span(good, 3));
+
+	// index count not a multiple of 3: rejected, the previous geometry stays
+	u32 bad_count[] = { 0, 1, 2, 0 };
+	canvas->setGeometry(Span(vertices, 3), Span(bad_count, 4));
+
+	// index past the vertex count: rejected, the previous geometry stays
+	u32 bad_index[] = { 0, 1, 3 };
+	canvas->setGeometry(Span(vertices, 3), Span(bad_index, 3));
+
+	Draw2D draw(getGlobalAllocator());
+	doc.render(draw);
+	ASSERT_EQ(3, draw.getVertices().size());
+	ASSERT_EQ(3, draw.getIndices().size());
+	return true;
+}
+
+bool testCanvasClearGeometry() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[canvas width=100 height=100]");
+	doc.computeLayout(Vec2(200, 200));
+	Element* canvas = doc.getElement(doc.m_root.children[0]);
+
+	ui::Vertex vertices[] = {
+		{ 0, 0, 0, 0, 255, 0, 0, 255 },
+		{ 10, 0, 0, 0, 255, 0, 0, 255 },
+		{ 0, 10, 0, 0, 255, 0, 0, 255 },
+	};
+	u32 indices[] = { 0, 1, 2 };
+	canvas->setGeometry(Span(vertices, 3), Span(indices, 3));
+	canvas->clearGeometry();
+
+	Draw2D draw(getGlobalAllocator());
+	doc.render(draw);
+	ASSERT_EQ(0, draw.getVertices().size());
+	ASSERT_EQ(0, draw.getIndices().size());
+	return true;
+}
+
+bool testCanvasSetGeometryOnBoxIgnored() {
+	MockDocument doc;
+	doc.m_suppress_logging = true;
+	ASSERT_PARSE(doc, "[box width=100 height=100]");
+	doc.computeLayout(Vec2(200, 200));
+	Element* box = doc.getElement(doc.m_root.children[0]);
+
+	ui::Vertex vertices[] = {
+		{ 0, 0, 0, 0, 255, 0, 0, 255 },
+		{ 10, 0, 0, 0, 255, 0, 0, 255 },
+		{ 0, 10, 0, 0, 255, 0, 0, 255 },
+	};
+	u32 indices[] = { 0, 1, 2 };
+	box->setGeometry(Span(vertices, 3), Span(indices, 3));
+
+	Draw2D draw(getGlobalAllocator());
+	doc.render(draw);
+	ASSERT_EQ(0, draw.getVertices().size());
+	return true;
+}
+
+bool testCanvasGeometryDrawnBeforeChildren() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[canvas width=100 height=100] { [box width=10 height=10 bg-color=#00ff00] }");
+	doc.computeLayout(Vec2(200, 200));
+	Element* canvas = doc.getElement(doc.m_root.children[0]);
+	Element* child = doc.getElement(canvas->children[0]);
+
+	ui::Vertex vertices[] = {
+		{ 0, 0, 0, 0, 255, 0, 0, 255 },
+		{ 10, 0, 0, 0, 255, 0, 0, 255 },
+		{ 0, 10, 0, 0, 255, 0, 0, 255 },
+	};
+	u32 indices[] = { 0, 1, 2 };
+	canvas->setGeometry(Span(vertices, 3), Span(indices, 3));
+
+	Draw2D draw(getGlobalAllocator());
+	doc.render(draw);
+	// the 3 geometry vertices come first, then the child box's quad
+	ASSERT_EQ(7, draw.getVertices().size());
+	ASSERT_FLOAT_EQ(child->position.x, draw.getVertices()[3].pos.x);
+	ASSERT_FLOAT_EQ(child->position.y, draw.getVertices()[3].pos.y);
+	return true;
+}
+
+bool testCanvasGeometryScalesWithDPI() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[canvas width=100 height=100]");
+	doc.setDPIScale(2.0f);
+	doc.computeLayout(Vec2(200, 200));
+	Element* canvas = doc.getElement(doc.m_root.children[0]);
+
+	ui::Vertex vertices[] = {
+		{ 0, 0, 0, 0, 255, 0, 0, 255 },
+		{ 10, 0, 0, 0, 255, 0, 0, 255 },
+		{ 0, 10, 0, 0, 255, 0, 0, 255 },
+	};
+	u32 indices[] = { 0, 1, 2 };
+	canvas->setGeometry(Span(vertices, 3), Span(indices, 3));
+
+	Draw2D draw(getGlobalAllocator());
+	doc.render(draw);
+	ASSERT_FLOAT_EQ(2.0f, doc.getScale());
+	ASSERT_FLOAT_EQ(canvas->position.x + 20.0f, draw.getVertices()[1].pos.x);
+	return true;
+}
+
+bool testCanvasSrcLoadsImage() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[canvas width=10 height=10 src=\"img.png\"]");
+	doc.computeLayout(Vec2(200, 200));
+	Element* canvas = doc.getElement(doc.m_root.children[0]);
+	ASSERT_TRUE(canvas->getImageHandle() != nullptr);
+	return true;
+}
+
+bool testCanvasTextureNotReadyDrawsNothing() {
+	MockDocument doc;
+	doc.m_image_manager.ready = false;
+	ASSERT_PARSE(doc, "[canvas width=100 height=100 src=\"img.png\"]");
+	doc.computeLayout(Vec2(200, 200));
+	Element* canvas = doc.getElement(doc.m_root.children[0]);
+
+	ui::Vertex vertices[] = {
+		{ 0, 0, 0, 0, 255, 255, 255, 255 },
+		{ 10, 0, 1, 0, 255, 255, 255, 255 },
+		{ 0, 10, 0, 1, 255, 255, 255, 255 },
+	};
+	u32 indices[] = { 0, 1, 2 };
+	canvas->setGeometry(Span(vertices, 3), Span(indices, 3));
+
+	Draw2D draw(getGlobalAllocator());
+	doc.render(draw);
+	ASSERT_EQ(0, draw.getVertices().size());
+	return true;
+}
+
+// [path] inside [canvas], see docs/ui/elements_attributes.md "Shapes"
+
+static u32 renderVertexCount(MockDocument& doc) {
+	Draw2D draw(getGlobalAllocator());
+	doc.render(draw);
+	return draw.getVertices().size();
+}
+
+static u32 renderIndexCount(MockDocument& doc) {
+	Draw2D draw(getGlobalAllocator());
+	doc.render(draw);
+	return draw.getIndices().size();
+}
+
+bool testPathDrawsStroke() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[canvas width=100 height=100] { [path width=2] { 0,0#ffffff 10,0 } }");
+	doc.computeLayout(Vec2(200, 200));
+
+	ASSERT_TRUE(renderVertexCount(doc) > 0);
+	ASSERT_TRUE(renderIndexCount(doc) > 0);
+	return true;
+}
+
+bool testPathClosedAddsSegment() {
+	MockDocument open_doc;
+	ASSERT_PARSE(open_doc, "[canvas width=100 height=100] { [path width=2] { 0,0#ffffff 10,0 5,10 } }");
+	open_doc.computeLayout(Vec2(200, 200));
+
+	MockDocument closed_doc;
+	ASSERT_PARSE(closed_doc, "[canvas width=100 height=100] { [path width=2 closed=true] { 0,0#ffffff 10,0 5,10 } }");
+	closed_doc.computeLayout(Vec2(200, 200));
+
+	ASSERT_TRUE(renderIndexCount(closed_doc) > renderIndexCount(open_doc));
+	return true;
+}
+
+// the first count indices of the canvas geometry, the fill triangles, only use vertices that are not feathered
+static bool firstIndicesOpaque(MockDocument& doc, u32 count) {
+	Element* canvas = doc.getElement(doc.m_root.children[0]);
+	if (!canvas->canvas_geometry) return false;
+	const CanvasGeometry& geometry = *canvas->canvas_geometry;
+	for (u32 i = 0; i < count; ++i) {
+		if (geometry.vertices[geometry.indices[i]].color.a != 255) return false;
+	}
+	return true;
+}
+
+bool testPathFeatherFades() {
+	MockDocument stroke_doc;
+	ASSERT_PARSE(stroke_doc, "[canvas width=100 height=100] { [path width=2] { 0,0#ffffff 10,0 10,10 } }");
+	stroke_doc.computeLayout(Vec2(200, 200));
+	Element* canvas = stroke_doc.getElement(stroke_doc.m_root.children[0]);
+	ASSERT_TRUE(canvas->canvas_geometry != nullptr);
+
+	// the stroke is opaque, its feathered edges are transparent
+	u32 opaque = 0, transparent = 0;
+	for (const Draw2D::Vertex& v : canvas->canvas_geometry->vertices) {
+		if (v.color.a == 255) ++opaque;
+		else if (v.color.a == 0) ++transparent;
+	}
+	ASSERT_TRUE(opaque > 0);
+	ASSERT_TRUE(transparent > 0);
+
+	MockDocument fill_doc;
+	ASSERT_PARSE(fill_doc, "[canvas width=100 height=100] { [path filled=true] { 0,0#ffffff 10,0 5,10 } }");
+	fill_doc.computeLayout(Vec2(200, 200));
+	canvas = fill_doc.getElement(fill_doc.m_root.children[0]);
+	ASSERT_TRUE(canvas->canvas_geometry != nullptr);
+	bool has_transparent = false;
+	for (const Draw2D::Vertex& v : canvas->canvas_geometry->vertices) {
+		if (v.color.a == 0) has_transparent = true;
+	}
+	ASSERT_TRUE(has_transparent);
+	return true;
+}
+
+bool testPathFilled() {
+	// a filled triangle is 3 vertices and 1 triangle, a stroke is only added with an explicit width
+	MockDocument fill_doc;
+	ASSERT_PARSE(fill_doc, "[canvas width=100 height=100] { [path filled=true] { 0,0#ffffff 10,0 5,10 } }");
+	fill_doc.computeLayout(Vec2(200, 200));
+	ASSERT_TRUE(renderIndexCount(fill_doc) > 3);
+	ASSERT_TRUE(firstIndicesOpaque(fill_doc, 3));
+
+	MockDocument stroked_doc;
+	ASSERT_PARSE(stroked_doc, "[canvas width=100 height=100] { [path filled=true width=2] { 0,0#ffffff 10,0 5,10 } }");
+	stroked_doc.computeLayout(Vec2(200, 200));
+	ASSERT_TRUE(renderIndexCount(stroked_doc) > 3);
+
+	// a concave quad (an arrow head) is two triangles
+	MockDocument concave_doc;
+	ASSERT_PARSE(concave_doc, "[canvas width=100 height=100] { [path filled=true] { 0,0#ffffff 10,5 0,10 4,5 } }");
+	concave_doc.computeLayout(Vec2(200, 200));
+	ASSERT_TRUE(firstIndicesOpaque(concave_doc, 6));
+	return true;
+}
+
+bool testPathPointColors() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[canvas width=100 height=100] { [path width=2] { 0,0#ff0000 10,0#00ff00 } }");
+	doc.computeLayout(Vec2(200, 200));
+
+	Draw2D draw(getGlobalAllocator());
+	doc.render(draw);
+	bool has_red = false;
+	bool has_green = false;
+	for (const Draw2D::Vertex& v : draw.getVertices()) {
+		if (v.color.r == 255 && v.color.g == 0 && v.color.b == 0) has_red = true;
+		if (v.color.r == 0 && v.color.g == 255 && v.color.b == 0) has_green = true;
+	}
+	ASSERT_TRUE(has_red);
+	ASSERT_TRUE(has_green);
+	return true;
+}
+
+bool testPathPointUVWithSrc() {
+	MockDocument doc;
+	// checked on the geometry, rendering a textured canvas needs a real gpu texture
+	ASSERT_PARSE(doc, "[canvas width=100 height=100 src=\"img.png\"] { [path width=2] { 0,0#ffffff@0,0 10,0@1,0 } }");
+	doc.computeLayout(Vec2(200, 200));
+
+	Element* canvas = doc.getElement(doc.m_root.children[0]);
+	ASSERT_TRUE(canvas->canvas_geometry != nullptr);
+	bool has_uv_1 = false;
+	for (const Draw2D::Vertex& v : canvas->canvas_geometry->vertices) {
+		if (v.uv.x == 1.0f && v.uv.y == 0.0f) has_uv_1 = true;
+	}
+	ASSERT_TRUE(has_uv_1);
+	return true;
+}
+
+bool testPathMalformedPointIgnored() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[canvas width=100 height=100] { [path width=2] { 0,0#ffffff abc 10,0 } }");
+	doc.computeLayout(Vec2(200, 200));
+
+	// the bad token is logged and skipped, the two valid points still draw
+	ASSERT_TRUE(renderVertexCount(doc) > 0);
+	return true;
+}
+
+bool testPathOutsideCanvasRejected() {
+	MockDocument doc;
+	ASSERT_EQ(false, doc.parse("[path] { 0,0 1,1 }", "test.ui"));
+	return true;
+}
+
+bool testPathPointWithoutColorInheritsPrevious() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[canvas width=100 height=100] { [path width=2] { 0,0#ff0000 10,0 5,10#00ff00 0,5 } }");
+	doc.computeLayout(Vec2(200, 200));
+
+	Element* canvas = doc.getElement(doc.m_root.children[0]);
+	ASSERT_TRUE(canvas->canvas_geometry != nullptr);
+	// every stroke vertex is red or green, the points without a color took the one before them
+	u32 red = 0, green = 0;
+	for (const Draw2D::Vertex& v : canvas->canvas_geometry->vertices) {
+		if (v.color.r == 255 && v.color.g == 0 && v.color.b == 0) ++red;
+		else if (v.color.r == 0 && v.color.g == 255 && v.color.b == 0) ++green;
+		else ASSERT_TRUE(false);
+	}
+	ASSERT_TRUE(red > 0);
+	ASSERT_TRUE(green > 0);
+	return true;
+}
+
+bool testPathFirstPointNeedsColor() {
+	MockDocument doc;
+	ASSERT_EQ(false, doc.parse("[canvas width=100 height=100] { [path width=2] { 0,0 10,0#ff0000 } }", "test.ui"));
+	return true;
+}
+
+bool testPathColorAttributeRejected() {
+	MockDocument doc;
+	ASSERT_EQ(false, doc.parse("[canvas width=100 height=100] { [path color=#ff0000 width=2] { 0,0#ff0000 10,0 } }", "test.ui"));
+	return true;
+}
+
+bool testDraw2DMeshWithTextureKeepsUV() {
+	Draw2D draw(getGlobalAllocator());
+	draw.clear(Vec2(64, 64));
+	const gpu::TextureHandle tex = (gpu::TextureHandle)0x1;
+	const Color white(255, 255, 255, 255);
+	Draw2D::Vertex vertices[] = {
+		{ Vec2(0, 0), Vec2(0.25f, 0.5f), white },
+		{ Vec2(10, 0), Vec2(0.75f, 0.5f), white },
+		{ Vec2(0, 10), Vec2(0.25f, 1.0f), white },
+	};
+	u32 indices[] = { 0, 1, 2 };
+	draw.addMesh(tex, Span(vertices, 3), Span(indices, 3), Vec2(5, 5), 2.0f);
+
+	ASSERT_TRUE(draw.getCmds().back().texture == tex);
+	ASSERT_FLOAT_EQ(0.25f, draw.getVertices()[0].uv.x);
+	ASSERT_FLOAT_EQ(0.5f, draw.getVertices()[0].uv.y);
+	ASSERT_FLOAT_EQ(0.75f, draw.getVertices()[1].uv.x);
+	ASSERT_FLOAT_EQ(5.0f, draw.getVertices()[0].pos.x);
+	ASSERT_FLOAT_EQ(25.0f, draw.getVertices()[1].pos.x);
+	return true;
+}
+
+bool testCanvasGeometryAllocatedOnDemand() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[box width=10 height=10] [canvas width=10 height=10]");
+	doc.computeLayout(Vec2(200, 200));
+	Element* box = doc.getElement(doc.m_root.children[0]);
+	Element* canvas = doc.getElement(doc.m_root.children[1]);
+	ASSERT_TRUE(box->canvas_geometry == nullptr);
+	ASSERT_TRUE(canvas->canvas_geometry == nullptr);
+
+	ui::Vertex vertices[] = {
+		{ 0, 0, 0, 0, 255, 0, 0, 255 },
+		{ 10, 0, 0, 0, 255, 0, 0, 255 },
+		{ 0, 10, 0, 0, 255, 0, 0, 255 },
+	};
+	u32 indices[] = { 0, 1, 2 };
+	canvas->setGeometry(Span(vertices, 3), Span(indices, 3));
+	ASSERT_TRUE(canvas->canvas_geometry != nullptr);
+	ASSERT_EQ(3, canvas->canvas_geometry->vertices.size());
+
+	canvas->clearGeometry();
+	ASSERT_TRUE(canvas->canvas_geometry == nullptr);
+	return true;
+}
+
+bool testCanvasSetGeometryEmptyVerticesClears() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[canvas width=10 height=10]");
+	doc.computeLayout(Vec2(200, 200));
+	Element* canvas = doc.getElement(doc.m_root.children[0]);
+
+	// empty vertices does not allocate geometry
+	canvas->setGeometry(Span<const ui::Vertex>(), Span<const u32>());
+	ASSERT_TRUE(canvas->canvas_geometry == nullptr);
+
+	// empty vertices clears geometry set earlier
+	ui::Vertex vertices[] = {
+		{ 0, 0, 0, 0, 255, 0, 0, 255 },
+		{ 10, 0, 0, 0, 255, 0, 0, 255 },
+		{ 0, 10, 0, 0, 255, 0, 0, 255 },
+	};
+	u32 indices[] = { 0, 1, 2 };
+	canvas->setGeometry(Span(vertices, 3), Span(indices, 3));
+	ASSERT_TRUE(canvas->canvas_geometry != nullptr);
+	canvas->setGeometry(Span<const ui::Vertex>(), Span<const u32>());
+	ASSERT_TRUE(canvas->canvas_geometry == nullptr);
+
+	Draw2D draw(getGlobalAllocator());
+	doc.render(draw);
+	ASSERT_EQ(0, draw.getVertices().size());
+	return true;
+}
+
+// the EVOX vertex and the draw vertex share one layout: floats for the position and uv, then the color bytes
+static_assert(sizeof(ui::Vertex) == 20);
+static_assert(sizeof(Draw2D::Vertex) == sizeof(ui::Vertex));
+static_assert(offsetof(ui::Vertex, r) == 16);
+
+bool testCanvasColorBytesReachDraw() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, "[canvas width=100 height=100]");
+	doc.computeLayout(Vec2(200, 200));
+	Element* canvas = doc.getElement(doc.m_root.children[0]);
+
+	ui::Vertex vertices[] = {
+		{ 0, 0, 0, 0, 255, 128, 0, 255 },
+		{ 10, 0, 0, 0, 255, 128, 0, 255 },
+		{ 0, 10, 0, 0, 255, 128, 0, 255 },
+	};
+	u32 indices[] = { 0, 1, 2 };
+	canvas->setGeometry(Span(vertices, 3), Span(indices, 3));
+
+	Draw2D draw(getGlobalAllocator());
+	doc.render(draw);
+	ASSERT_EQ(255, draw.getVertices()[0].color.r);
+	ASSERT_EQ(128, draw.getVertices()[0].color.g);
+	ASSERT_EQ(0, draw.getVertices()[0].color.b);
+	ASSERT_EQ(255, draw.getVertices()[0].color.a);
+	return true;
+}
+
 } // namespace
 
 void runUITests() {
@@ -1689,4 +2199,31 @@ void runUITests() {
 	RUN_TEST(testDPIScaling);
 	RUN_TEST(testDocumentReferenceSize);
 	RUN_TEST(testInvalidAttributeValuesRejected);
+	RUN_TEST(testCanvasParse);
+	RUN_TEST(testCanvasDefaultSizeIsZero);
+	RUN_TEST(testCanvasRejectsOnClick);
+	RUN_TEST(testCanvasSetGeometryEmitsTriangle);
+	RUN_TEST(testCanvasGeometryRebasesIndices);
+	RUN_TEST(testCanvasInvalidGeometryRejected);
+	RUN_TEST(testCanvasClearGeometry);
+	RUN_TEST(testCanvasSetGeometryOnBoxIgnored);
+	RUN_TEST(testCanvasGeometryDrawnBeforeChildren);
+	RUN_TEST(testCanvasGeometryScalesWithDPI);
+	RUN_TEST(testCanvasSrcLoadsImage);
+	RUN_TEST(testCanvasTextureNotReadyDrawsNothing);
+	RUN_TEST(testDraw2DMeshWithTextureKeepsUV);
+	RUN_TEST(testCanvasGeometryAllocatedOnDemand);
+	RUN_TEST(testCanvasSetGeometryEmptyVerticesClears);
+	RUN_TEST(testPathDrawsStroke);
+	RUN_TEST(testPathClosedAddsSegment);
+	RUN_TEST(testPathFilled);
+	RUN_TEST(testPathPointColors);
+	RUN_TEST(testPathPointUVWithSrc);
+	RUN_TEST(testPathMalformedPointIgnored);
+	RUN_TEST(testPathOutsideCanvasRejected);
+	RUN_TEST(testPathFeatherFades);
+	RUN_TEST(testPathPointWithoutColorInheritsPrevious);
+	RUN_TEST(testPathFirstPointNeedsColor);
+	RUN_TEST(testPathColorAttributeRejected);
+	RUN_TEST(testCanvasColorBytesReachDraw);
 }

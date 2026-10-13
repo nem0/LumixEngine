@@ -197,19 +197,19 @@ Mix units freely, e.g., `width=50% height=2em`.
 - Pixel units are multiplied by DPI scale (`width=200` becomes `400` at scale `2.0`).
 - `font-size` is multiplied by DPI scale before text measurement and layout.
 - `em` units follow the scaled font size, so they scale naturally.
-- Percentage units (`%`) are not directly multiplied by DPI; they remain relative to parent/canvas size.
+- Percentage units (`%`) are not directly multiplied by DPI; they remain relative to parent/viewport size.
 
 In runtime `UI` module (screen-space UI), DPI scale is driven from OS DPI as `os::getDPI() / 96.0`.
 
 #### Reference size (`[doc]`)
 
-A document can declare the size it was designed for. The scale then follows the canvas size and the OS DPI scale is ignored for that document. The usual case is a design height:
+A document can declare the size it was designed for. The scale then follows the viewport size and the OS DPI scale is ignored for that document. The usual case is a design height:
 
 ```
 [doc reference-height=1080]
 ```
 
-A canvas of 2160 pixels tall then has scale 2.0, 540 has 0.5. Both dimensions with `match` choose which one wins when the aspect ratio differs from the design one:
+A viewport of 2160 pixels tall then has scale 2.0, 540 has 0.5. Both dimensions with `match` choose which one wins when the aspect ratio differs from the design one:
 
 ```
 [doc reference-width=1920 reference-height=1080 match=min min-scale=0.5 max-scale=4]
@@ -225,7 +225,7 @@ Optionally the whole document can be its body, the children are the root element
 ```
 
 - `[doc]` must be at the root level and there can be only one. It is not a layout element and doesn't count as a root element.
-- `scale = canvas size / reference size`. This scales pixels, `font-size` and so `em`, like the DPI scale. `%` is not affected.
+- `scale = viewport size / reference size`. This scales pixels, `font-size` and so `em`, like the DPI scale. `%` is not affected.
 - `reference-width` / `reference-height`: either one or both. With one, that dimension drives the scale.
 - `match`: `height` (default), `width`, `min` or `max`. Which ratio to use when both reference dimensions are set and the aspect ratios differ. It has no effect with a single reference dimension.
 - `min-scale` / `max-scale`: optional clamp of the resulting scale.
@@ -499,7 +499,7 @@ Position mode and offsets are then applied:
   - `bottom-left`, `bottom-center`, `bottom-right`
   - For each preset, horizontal token maps left/pivot-x to `0%`, `50%`, or `100%` and vertical token maps top/pivot-y to `0%`, `50%`, or `100%`.
 
-Where `pivot_x` and `pivot_y` come from `pivot-x` and `pivot-y` attributes (default `0`). Percent pivots are resolved from the absolute element's own final size (`pivot-x` from width, `pivot-y` from height). This applies to all absolute elements, including absolute roots where the base origin is the canvas origin.
+Where `pivot_x` and `pivot_y` come from `pivot-x` and `pivot-y` attributes (default `0`). Percent pivots are resolved from the absolute element's own final size (`pivot-x` from width, `pivot-y` from height). This applies to all absolute elements, including absolute roots where the base origin is the viewport origin.
 
 Absolute-positioned elements do not participate in sibling flow spacing (`justify-content`, line packing, or margin collapsing with flow siblings).
 
