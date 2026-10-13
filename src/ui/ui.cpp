@@ -844,6 +844,7 @@ bool Document::parsePath(u32 parent_index, StringView location) {
 				for (u32 k = 0; k < count && empty; ++k) {
 					if (k == i || k == (i + count - 1) % count || k == (i + 1) % count) continue;
 					const Vec2 q = points[remaining[k]].pos;
+						if (q == a || q == b || q == c) continue; // duplicated vertex (e.g. a bridge to a hole), not inside
 					empty = !(cross2(a, b, q) * orient >= 0 && cross2(b, c, q) * orient >= 0 && cross2(c, a, q) * orient >= 0);
 				}
 				if (empty) ear = i;
