@@ -5,6 +5,8 @@
 
 #include <math.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <time.h>
 #include <string.h>
 
 #if defined(_MSC_VER)
@@ -156,6 +158,22 @@ static void runtime_native_hypot_f64(ex_runtime* runtime, ex_call_frame frame) {
 static void runtime_native_fmod_f32(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f32, a); EX_ARG(frame, f32, b); EX_TYPED_RESULT(frame, f32, fmodf(a, b)); }
 static void runtime_native_fmod_f64(ex_runtime* runtime, ex_call_frame frame) { (void)runtime; EX_ARG(frame, f64, a); EX_ARG(frame, f64, b); EX_TYPED_RESULT(frame, f64, fmod(a, b)); }
 
+/* std:random seedEntropy() : u32. A non-zero value that differs from run to run: the wall clock, the CPU time, a counter and an address,
+   mixed by splitmix64. Not for cryptography. */
+static void runtime_native_seed_entropy(ex_runtime* runtime, ex_call_frame frame) {
+	static u64 counter = 0;
+	u64 z = (u64)time(NULL) * 0x9E3779B97F4A7C15ull;
+	z ^= (u64)clock() << 20;
+	z ^= (u64)(uintptr_t)runtime;
+	z += (++counter) * 0xBF58476D1CE4E5B9ull;
+	z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+	z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+	z ^= z >> 31;
+	u32 value = (u32)(z ^ (z >> 32));
+	if (value == 0u) value = 1u;
+	EX_TYPED_RESULT(frame, u32, value);
+}
+
 /* std:mem alloc(size, align) : byte[]. Allocates `size` bytes of heap memory. */
 static void runtime_native_alloc(ex_runtime* runtime, ex_call_frame frame) {
 	(void)runtime;
@@ -177,7 +195,7 @@ static void runtime_native_free(ex_runtime* runtime, ex_call_frame frame) {
 }
 
 static void runtime_bind_builtin_callbacks(ex_runtime* runtime) {
-	// The compiler marks only extern functions from std:math and std:mem as
+	// The compiler marks only extern functions from std:math, std:mem and std:random as
 	// builtins, so checking is_builtin_native here excludes same-named user
 	// functions from other units.
 	for (u32 i = 0; i < runtime->bytecode->function_count; ++i) {
@@ -217,6 +235,7 @@ static void runtime_bind_builtin_callbacks(ex_runtime* runtime) {
 		else if (runtime_string_equals_cstr(fn->name, "hypot_f64")) runtime->native_callbacks[i] = &runtime_native_hypot_f64;
 		else if (runtime_string_equals_cstr(fn->name, "fmod")) runtime->native_callbacks[i] = &runtime_native_fmod_f32;
 		else if (runtime_string_equals_cstr(fn->name, "fmod_f64")) runtime->native_callbacks[i] = &runtime_native_fmod_f64;
+		else if (runtime_string_equals_cstr(fn->name, "seedEntropy")) runtime->native_callbacks[i] = &runtime_native_seed_entropy;
 		else if (runtime_string_equals_cstr(fn->name, "alloc")) runtime->native_callbacks[i] = &runtime_native_alloc;
 		else if (runtime_string_equals_cstr(fn->name, "free")) runtime->native_callbacks[i] = &runtime_native_free;
 	}
@@ -1440,6 +1459,9 @@ ex_runtime* ex_runtime_create(ex_bytecode* bytecode, ex_host* host) {
 
 	runtime->bytecode = bytecode;
 	runtime->host = host;
+	// installed before the global initializers run, they may call extern functions
+	runtime->native_resolver = host->native_resolver;
+	runtime->native_resolver_userdata = host->native_resolver_userdata;
 	runtime->arena = &host->arena;
 	runtime->global_size = bytecode->global_size;
 	runtime->globals = (u8*)runtime_allocate_host(runtime->host, bytecode->global_size ? bytecode->global_size : 1u, 1u);

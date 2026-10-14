@@ -5878,6 +5878,11 @@ struct Checker {
 		comptime pi = 3.14159265358979323846;
 	)";
 
+	// seedEntropy: a non-zero u32 that differs from run to run, bound by the runtime itself (ex_runtime_create), so global initializers can call it
+	static inline const char builtin_random_source[] = R"(
+		extern fn seedEntropy() : u32;
+	)";
+
 	static inline const char builtin_mem_source[] = R"(
 		extern fn alloc(size : isize, align : isize) : []byte;
 		extern fn free(memory : []byte) : void;
@@ -5925,6 +5930,8 @@ struct Checker {
 				ex_string_view source = {};
 				if (equalStrings(import.path, makeStringView("std:math"))) {
 					source = makeStringView(builtin_math_source);
+				} else if (equalStrings(import.path, makeStringView("std:random"))) {
+					source = makeStringView(builtin_random_source);
 				} else if (equalStrings(import.path, makeStringView("std:mem"))) {
 					source = makeStringView(builtin_mem_source);
 				} else {

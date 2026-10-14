@@ -2668,6 +2668,20 @@ fn free(memory : []byte) : void
 - accessing a slice over freed memory traps at runtime (use-after-free detection): `free` marks the allocation's units dead, and any later `[]byte`/reinterpreted-slice read or write over them aborts execution.
 - the returned `[]byte` can be reinterpreted as a typed slice with `as` (see [Casts](#casts)); the length rescales by the element's `sizeof`.
 
+
+## Random seeds
+
+`std:random` is a builtin module like `std:mem`. It has one function:
+
+```cpp
+import "std:random" as rnd
+
+fn seedEntropy() : u32
+```
+
+- `seedEntropy()` returns a non-zero `u32` that differs from run to run (clock, CPU time, a counter and an address, mixed; not for cryptography). Successive calls in one run return different values.
+- It is bound by `ex_runtime_create` itself, like the `std:math` and `std:mem` functions, so it can be called from a global initializer, which runs inside `ex_runtime_create` before the host can do anything. Native functions that come from the host's resolver cannot be called there unless the resolver is set in `ex_host` before the runtime is created.
+- The generator itself is plain Evox code. `core:random` in the Lumix scripts seeds its Marsaglia generator from this function.
 ## Compile-time introspection
 
 Types are compile-time values (see [Comptime](#comptime)). Introspection lets compile-time code ask what a type *is* and enumerate its structure, so a single function template can handle every type in the language.
@@ -3177,11 +3191,11 @@ static void native_add(ex_runtime* runtime, ex_call_frame frame) {
 ex_module* module = ex_module_create(&host);
 if (ex_module_compile(module, source, source_name, nullptr, nullptr) == EX_RESULT_OK) {
 	ex_bytecode* bytecode = ex_bytecode_compile(module, &host);
+	// the resolver goes into the host before the runtime is created: global initializers run inside ex_runtime_create
+	// and may call native functions
+	host.native_resolver = &resolve_native;
+	host.native_resolver_userdata = nullptr;
 	ex_runtime* runtime = bytecode ? ex_runtime_create(bytecode, &host) : nullptr;
-	ex_unit* unit = ex_module_get_unit(module, 0);
-	if (runtime && unit && ex_unit_get_native_function_count(unit) == 1) {
-		ex_runtime_set_native_resolver(runtime, &resolve_native, nullptr);
-	}
 }
 ex_runtime_destroy(runtime);
 ex_bytecode_destroy(bytecode);

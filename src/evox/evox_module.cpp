@@ -247,8 +247,10 @@ struct EvoxSystemImpl : EvoxSystem {
 			if (output.length() == 0) output.append("Evox bytecode compilation failed");
 			goto cleanup;
 		}
+		host.native_resolver = &resolveCoreFunction;
+		host.native_resolver_userdata = &m_native_functions;
 		runtime = ex_runtime_create(bytecode, &host);
-		if (!runtime || ex_runtime_set_native_resolver(runtime, &resolveCoreFunction, &m_native_functions) != EX_RESULT_OK) {
+		if (!runtime) {
 			output.append("Could not initialize Evox runtime");
 			goto cleanup;
 		}
@@ -380,9 +382,14 @@ struct EvoxSystemImpl : EvoxSystem {
 	}
 
 	bool createRuntime() {
+		// the resolver must be known before the runtime runs global initializers, they can call extern functions
+		m_host.native_resolver = &resolveCoreFunction;
+		m_host.native_resolver_userdata = &m_native_functions;
 		m_runtime = ex_runtime_create(m_bytecode, &m_host);
-		if (!m_runtime) return false;
-		if (ex_runtime_set_native_resolver(m_runtime, &resolveCoreFunction, &m_native_functions) != EX_RESULT_OK) return false;
+		if (!m_runtime) {
+			logError("Evox failed to create runtime of ", m_resource->getPath(), ", a global initializer probably failed");
+			return false;
+		}
 		m_task = ex_task_create(m_runtime);
 		if (!m_task) return false;
 		// render.evox is the second root of the same bytecode and shares the runtime with main.evox

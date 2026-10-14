@@ -1776,6 +1776,8 @@ static void computeFitContentHeights(Document& doc, Element& elem) {
 			float max_height = 0;
 			for (u32 child_idx : elem.children) {
 				Element& child = doc.m_elements[child_idx];
+				// absolute children do not take part in the layout of their parent, as in the width pass
+				if (child.position_mode == PositionMode::ABSOLUTE || !child.visible) continue;
 				float child_height = child.size.y + child.margins.top + child.margins.bottom;
 				if (child_height > max_height) max_height = child_height;
 			}
@@ -1784,6 +1786,7 @@ static void computeFitContentHeights(Document& doc, Element& elem) {
 			float sum_height = 0;
 			for (u32 i = 0, n = elem.children.size(); i < n; ++i) {
 				Element& child = doc.m_elements[elem.children[i]];
+				if (child.position_mode == PositionMode::ABSOLUTE || !child.visible) continue;   // not part of the flow, as in the width pass
 				if (isInlineTag(child.tag)) {
 					sum_height += computeInlineRunHeight(doc, elem, i);
 					++i;

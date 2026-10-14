@@ -252,6 +252,11 @@ typedef struct ex_host {
 	ex_print_fn print;
 	ex_diagnostic_fn diagnostic;
 	ex_allocator allocator;
+
+	// Resolver of extern functions, copied to the runtime by ex_runtime_create so it is known when global initializers run
+	// (they can call extern functions). ex_runtime_set_native_resolver replaces it for a single runtime.
+	ex_native_resolver_fn native_resolver;
+	void* native_resolver_userdata;
 } ex_host;
 
 // Opaque module/runtime handles.

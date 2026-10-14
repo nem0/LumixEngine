@@ -331,6 +331,32 @@ bool testPositionPresetsLayout() {
 	return true;
 }
 
+// A fit-content parent is as tall as its in-flow children only: absolute children do not take part in its layout (the width pass agrees).
+// Regression: both the column sum and the row maximum used to include them, so a column with spacers and absolute cards was taller than its spacers.
+bool testFitContentHeightIgnoresAbsoluteChildren() {
+	MockDocument doc;
+	ASSERT_PARSE(doc,
+		"[box $col width=100 direction=column] {"
+			"[box width=100 height=50] {}"
+			"[box width=100 height=20] {}"
+			"[box position=absolute left=0 top=0 width=100 height=500] {}"
+		"}"
+		"[box $row width=300 direction=row wrap=false] {"
+			"[box width=100 height=40] {}"
+			"[box position=absolute left=0 top=0 width=100 height=500] {}"
+		"}");
+	doc.computeLayout(Vec2(800, 600));
+
+	ui::Element* col = doc.getElementByID("col");
+	ASSERT_TRUE(col != nullptr);
+	ASSERT_FLOAT_EQ(70.0f, col->size.y);
+
+	ui::Element* row = doc.getElementByID("row");
+	ASSERT_TRUE(row != nullptr);
+	ASSERT_FLOAT_EQ(40.0f, row->size.y);
+	return true;
+}
+
 bool testPanelAttributes() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, "[box bg-image=\"bg.spr\" bg-fit=cover bg-color=#000000 direction=column wrap=true justify-content=center]");
@@ -2143,6 +2169,7 @@ void runUITests() {
 	RUN_TEST(testPositionPresetAttributeParse);
 	RUN_TEST(testClippingAttributeParse);
 	RUN_TEST(testPositionPresetsLayout);
+	RUN_TEST(testFitContentHeightIgnoresAbsoluteChildren);
 	RUN_TEST(testPanelAttributes);
 	RUN_TEST(testImageAttributes);
 	RUN_TEST(testDefaultValues);

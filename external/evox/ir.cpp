@@ -4567,7 +4567,7 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 				} else {
 					bc_compiler.beginFunction(&fn_bc, fn_expr, 0);
 				}
-				fn_bc.is_builtin_native = fn_expr.is_extern && (equalStrings(u.path, makeStringView("std:math")) || equalStrings(u.path, makeStringView("std:mem")));
+				fn_bc.is_builtin_native = fn_expr.is_extern && (equalStrings(u.path, makeStringView("std:math")) || equalStrings(u.path, makeStringView("std:mem")) || equalStrings(u.path, makeStringView("std:random")));
 				bc_compiler.endFunction();
 				++fn_index;
 			}

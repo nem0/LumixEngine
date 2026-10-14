@@ -491,3 +491,25 @@ TEST(MemberArrayToSliceAssignmentRuntime) {
 	CAPI_END(module);
 	return true;
 }
+
+// std:random is bound by ex_runtime_create itself, so a global initializer can call it without any host resolver
+TEST(StdRandomSeedEntropyInGlobalInitializer) {
+	const char* source = R"(
+		import "std:random" as rnd
+
+		var a : u32 = rnd.seedEntropy();
+		var b : u32 = rnd.seedEntropy();
+
+		fn main() : i32 {
+			if a != 0 and b != 0 and a != b { return 1; }
+			return 0;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}

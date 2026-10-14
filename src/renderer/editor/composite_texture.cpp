@@ -3674,9 +3674,10 @@ struct Recipe {
 			return false;
 		}
 
+		host.native_resolver = &resolveNativeFunction;
+		host.native_resolver_userdata = this;
 		runtime = ex_runtime_create(bytecode, &host);
 		if (!runtime) return false;
-		if (ex_runtime_set_native_resolver(runtime, &resolveNativeFunction, this) != EX_RESULT_OK) return false;
 
 		task = ex_task_create(runtime);
 		if (!task) {

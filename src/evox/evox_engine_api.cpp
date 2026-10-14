@@ -168,12 +168,6 @@ static void setMesh(ex_runtime*, ex_call_frame frame) {
 	EX_RESULT(frame, u8(1));
 }
 
-// core:random - entropy for seeding the script-side generator
-// never 0, a zero generator state would stay zero forever
-static u32 evox_random_seedEntropy() {
-	return rand() | 1;
-}
-
 static void logErrorString(ex_string_view v) {
 	logError(StringView(v.begin, (u64)v.length));
 }
@@ -811,8 +805,6 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	functions.insert({"core:storage", "size"}, &wrap<evox_storage_size>);
 	functions.insert({"core:storage", "exists"}, &wrap<evox_storage_exists>);
 	functions.insert({"core:storage", "remove"}, &wrap<evox_storage_remove>);
-	// random
-	functions.insert({"core:random", "seedEntropy"}, &wrap<evox_random_seedEntropy>);
 	// log
 	functions.insert({"core:log", "logErrorString"}, &wrap<logErrorString>);
 	functions.insert({"core:log", "logInfoString"}, &wrap<logInfoString>);

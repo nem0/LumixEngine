@@ -880,6 +880,7 @@ int main(int argc, char** argv) {
 		goto cleanup;
 	}
 
+	ctx.host.native_resolver = &evoxc_native_resolver;
 	ctx.runtime = ex_runtime_create(ctx.bytecode, &ctx.host);
 	if (!ctx.runtime) {
 		fprintf(stderr, "Error: Failed to create bytecode runtime\n");
@@ -891,10 +892,6 @@ int main(int argc, char** argv) {
 		goto cleanup;
 	}
 
-	if (ex_runtime_set_native_resolver(ctx.runtime, &evoxc_native_resolver, NULL) != EX_RESULT_OK) {
-		fprintf(stderr, "Error: Failed to install native resolver\n");
-		goto cleanup;
-	}
 
 	const int first_call_arg = script_arg + 2;
 	size_t call_arg_count = argc > first_call_arg ? (size_t)(argc - first_call_arg) : 0;
