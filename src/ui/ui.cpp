@@ -988,6 +988,12 @@ bool Document::parsePath(u32 parent_index, StringView location) {
 	return true;
 }
 
+void Document::setSourceRange(u32 element_idx, const char* begin, const char* end) {
+	if (!m_source_map) return;
+	const char* doc_begin = m_tokenizer.m_document.data;
+	m_source_map->set(element_idx, u32(begin - doc_begin), u32(end - doc_begin));
+}
+
 bool Document::parseElements(u32 parent_index, bool doc_body) {
 	// the root level, where a stray } ends the file and EOF is fine: the body of [doc] is not it, its } closes the body
 	const bool is_root = parent_index == 0xFFFF'FFFF && !doc_body;
@@ -1013,6 +1019,7 @@ bool Document::parseElements(u32 parent_index, bool doc_body) {
 				}
 				elem.text = token.value;
 				
+				setSourceRange(elem_idx, elem.text.data, elem.text.end());
 				// Accumulate consecutive text tokens
 				bool is_break = false;
 				while (!is_break) {
@@ -1029,9 +1036,10 @@ bool Document::parseElements(u32 parent_index, bool doc_body) {
 								return false;
 							}
 							m_tokenizer.consumeToken();
+							setSourceRange(elem_idx, elem.text.data, elem.text.end());
 							return true;
 						case Token::EOF:
-							if (is_root) return true;
+							if (is_root) { setSourceRange(elem_idx, elem.text.data, elem.text.end()); return true; }
 							error(token.value, m_tokenizer, "unexpected EOF");
 							return false;
 						default:
@@ -1043,6 +1051,7 @@ bool Document::parseElements(u32 parent_index, bool doc_body) {
 							break;
 					}
 				}
+				setSourceRange(elem_idx, elem.text.data, elem.text.end());
 				break;
 			}
 			case Token::RBRACE:
@@ -1052,6 +1061,7 @@ bool Document::parseElements(u32 parent_index, bool doc_body) {
 				}
 				return true; // end of block
 			case Token::LBRACKET: {
+				const char* tag_begin = token.value.data;
 				if (!consume(Token::IDENTIFIER, &token)) return false;
 
 				Tag tag = parseTag(token.value);
@@ -1095,9 +1105,10 @@ bool Document::parseElements(u32 parent_index, bool doc_body) {
 					m_root.children.push(elem_idx);
 				}
 
+				Token rbracket;
 				// Parse element attributes: key="value" pairs enclosed in []
 				for (;;) {
-					if (tryConsume(Token::RBRACKET)) break;
+					if (tryConsume(Token::RBRACKET, &rbracket)) break;
 					Token name_token;
 					Token peeked = m_tokenizer.peekToken();
 					// id
@@ -1143,6 +1154,8 @@ bool Document::parseElements(u32 parent_index, bool doc_body) {
 					token = m_tokenizer.peekToken();
 				}
 
+				// the source range of an element is its opening tag
+				setSourceRange(elem_idx, tag_begin, rbracket.value.end());
 				if (tryConsume(Token::LBRACE)) {
 					// parse children
 					if (!parseElements(elem_idx)) {
@@ -1165,6 +1178,7 @@ bool Document::parseElements(u32 parent_index, bool doc_body) {
 				} else {
 					elem.text = token.value;
 				}
+				setSourceRange(elem_idx, elem.text.data, elem.text.end());
 				bool is_break = false;
 				while (!is_break) {
 					Token next = m_tokenizer.peekToken();
@@ -1172,7 +1186,7 @@ bool Document::parseElements(u32 parent_index, bool doc_body) {
 						case Token::ERROR: return false;
 						case Token::UNDEFINED: return false;
 						case Token::EOF: 
-							if (is_root) return true;
+							if (is_root) { setSourceRange(elem_idx, elem.text.data, elem.text.end()); return true; }
 
 							error(token.value, m_tokenizer, "unexpected EOF");
 							return false;
@@ -1183,6 +1197,7 @@ bool Document::parseElements(u32 parent_index, bool doc_body) {
 								return false;
 							}
 							m_tokenizer.consumeToken();
+							setSourceRange(elem_idx, elem.text.data, elem.text.end());
 							return true; // end of the parent container
 						case Token::TEXT:
 							// Include TEXT tokens in the element value
@@ -1198,6 +1213,7 @@ bool Document::parseElements(u32 parent_index, bool doc_body) {
 							break;
 					}
 				}
+				setSourceRange(elem_idx, elem.text.data, elem.text.end());
 				break;
 			}
 		}
@@ -2641,7 +2657,7 @@ static void loadResources(Document& doc, u32 element_index, const ParentContext&
 	}
 }
 
-bool Document::parse(StringView content, const char* filename) {
+bool Document::parse(StringView content, const char* filename, SourceMap* source_map) {
 	PROFILE_FUNCTION();
 	os::Timer timer;
 	m_parse_duration = 0;
@@ -2661,7 +2677,11 @@ bool Document::parse(StringView content, const char* filename) {
 	m_tokenizer.m_document = m_content;
 	m_tokenizer.m_current = m_content.c_str();
 	m_tokenizer.m_current_token = m_tokenizer.nextToken();
-	if (!parseElements(0xFFFF'FFFF)) return false;
+	m_source_map = source_map;
+	if (m_source_map) m_source_map->clear();
+	const bool parsed = parseElements(0xFFFF'FFFF);
+	m_source_map = nullptr;
+	if (!parsed) return false;
 	for (u32 i = 0, c = (u32)m_elements.size(); i < c; ++i) {
 		const StringView id = m_elements[i].id;
 		if (id.empty()) continue;

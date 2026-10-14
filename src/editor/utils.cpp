@@ -1682,12 +1682,13 @@ struct CodeEditorImpl final : CodeEditor {
 		return s[p.col];
 	}
 
-	StringView getPrefix() override {
+	StringView getPrefix(bool (*is_word_char)(char c)) override {
 		ASSERT(m_cursors.size() == 1);
-		if (m_cursors[0].col == 0) return {};
-		TextPoint left = getPrevTokenStartPoint(m_cursors[0]);
-		const char* line_str = m_lines[m_cursors[0].line].value.c_str();
-		return StringView(line_str + left.col, line_str + m_cursors[0].col);
+		const Cursor& cursor = m_cursors[0];
+		const char* line_str = m_lines[cursor.line].value.c_str();
+		i32 from = cursor.col;
+		while (from > 0 && is_word_char(line_str[from - 1])) --from;
+		return StringView(line_str + from, line_str + cursor.col);
 	}
 
 	TextPoint getPrevTokenStartPoint(TextPoint point) {

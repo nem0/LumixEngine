@@ -156,8 +156,11 @@ struct CodeEditor {
 	virtual u32 getNumCursors() = 0;
 	virtual ImVec2 getCursorScreenPosition(u32 cursor_index = 0) = 0;
 	virtual void focus() = 0;
-	// get part of word left of cursor, usable for example for autocomplete
-	virtual StringView getPrefix() = 0;
+	// text on the cursor's line from the start of the run of chars left of the cursor for which is_word_char is true, usable for example for autocomplete
+	virtual StringView getPrefix(bool (*is_word_char)(char c)) = 0;
+	static bool isIdentifierChar(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'; }
+	// identifier chars and the characters of an import path, e.g. "ui/panel
+	static bool isImportPathChar(char c) { return isIdentifierChar(c) || c == '"' || c == '/' || c == '.' || c == '-'; }
 
 	virtual void setReadOnly(bool readonly) = 0;
 	virtual void setBreakpoint(u32 line, bool enabled) = 0;

@@ -48,6 +48,37 @@ struct UIEditorWindow : AssetEditorWindow {
 		"fit-content",
 		"row",
 		"column",
+		"id",
+		"class",
+		"visible",
+		"opacity",
+		"clipping",
+		"top",
+		"left",
+		"pivot-x",
+		"pivot-y",
+		"position",
+		"padding",
+		"padding-top",
+		"padding-right",
+		"padding-bottom",
+		"padding-left",
+		"margin-top",
+		"margin-right",
+		"margin-bottom",
+		"margin-left",
+		"bg-image",
+		"bg-fit",
+		"wrap",
+		"justify-content",
+		"align-items",
+		"align",
+		"text",
+		"src",
+		"fit",
+		"grow",
+		"on-click",
+		"placeholder",
 		nullptr
 	};
 
@@ -57,6 +88,7 @@ struct UIEditorWindow : AssetEditorWindow {
 		, m_path(path)
 		, m_stored_text(app.getAllocator())
 		, m_autocomplete_list(app.getAllocator())
+		, m_source_map(app.getAllocator())
 	{
 		Engine& engine = m_app.getEngine();
 		Renderer& renderer = *static_cast<Renderer*>(engine.getSystemManager().getSystem("renderer"));
@@ -76,7 +108,7 @@ struct UIEditorWindow : AssetEditorWindow {
 			m_stored_text.resize((u32)blob.size());
 			memcpy(m_stored_text.getMutableData(), blob.data(), blob.size());
 			StringView text(m_stored_text.c_str(), m_stored_text.length());
-			m_parse_success = m_document->parse(text, m_path.c_str());
+			m_parse_success = m_document->parse(text, m_path.c_str(), &m_source_map);
 			m_needs_layout = true;
 		}
 	}
@@ -107,8 +139,11 @@ struct UIEditorWindow : AssetEditorWindow {
 		m_stored_text.resize((u32)blob.size());
 		memcpy(m_stored_text.getMutableData(), blob.data(), blob.size());
 		StringView text(m_stored_text.c_str(), m_stored_text.length());
-		m_parse_success = m_document->parse(text, m_path.c_str());
+		m_parse_success = m_document->parse(text, m_path.c_str(), &m_source_map);
 		m_needs_layout = true;
+		// element indices are rebuilt by the parse
+		m_hovered_element_idx = 0xFFFFFFF;
+		m_selected_element_idx = 0xFFFFFFF;
 	}
 
 	void windowGUI() override {
@@ -134,7 +169,9 @@ struct UIEditorWindow : AssetEditorWindow {
 		ImGui::NextColumn();
 		if (m_show_debug_view) {
 			if (m_parse_success) {
-				debugViewGUI(*m_document, m_hovered_element_idx);
+				ImGui::BeginChild("debug_view");
+				debugViewGUI(*m_document, m_hovered_element_idx, m_selected_element_idx, m_reveal_selected_in_tree);
+				ImGui::EndChild();
 			}
 			ImGui::NextColumn();
 		}
@@ -159,7 +196,7 @@ struct UIEditorWindow : AssetEditorWindow {
 					Draw2D& draw2d = m_pipeline->getDraw2D();
 					m_document->render(draw2d);
 
-					ui::drawDebugVisualizations(draw2d, *m_document, m_hovered_element_idx);
+					ui::drawDebugVisualizations(draw2d, *m_document, m_hovered_element_idx, m_selected_element_idx);
 
 					if (m_pipeline->render(true)) {
 						gpu::TextureHandle texture_handle = m_pipeline->getOutput();
@@ -189,6 +226,13 @@ struct UIEditorWindow : AssetEditorWindow {
 								} else {
 									m_hovered_element_idx = 0xFFFFFFF;
 								}
+								if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+									m_selected_element_idx = m_hovered_element_idx;
+									m_reveal_selected_in_tree = m_show_debug_view;
+									revealElementInSource(m_selected_element_idx);
+								}
+							} else {
+								m_hovered_element_idx = 0xFFFFFFF;
 							}
 						}
 					}
@@ -202,12 +246,52 @@ struct UIEditorWindow : AssetEditorWindow {
 
 
 
+	// selects the opening tag of the element in the code editor, scrolling to it
+	void revealElementInSource(u32 element_idx) {
+		// the source map is for the parsed text, ranges don't match the editor text after unsaved changes
+		if (m_dirty) return;
+		if (element_idx >= (u32)m_source_map.elements.size()) return;
+		const ui::SourceMap::Range range = m_source_map.elements[element_idx];
+		// the source map is for the parsed text, which the editor shows unless it has unsaved changes
+		const StringView text(m_stored_text.c_str(), m_stored_text.length());
+		u32 from_line, from_col, to_line, to_col;
+		offsetToLineColumn(text, range.begin, from_line, from_col);
+		offsetToLineColumn(text, range.end, to_line, to_col);
+		m_editor->setSelection(from_line, from_col, to_line, to_col, true);
+	}
+
+	static void offsetToLineColumn(StringView text, u32 offset, u32& line, u32& column) {
+		line = 0;
+		u32 line_start = 0;
+		for (u32 i = 0; i < offset && i < text.size(); ++i) {
+			if (text.data[i] == '\n') {
+				++line;
+				line_start = i + 1;
+			}
+		}
+		column = offset - line_start;
+	}
+
+	// attribute names contain '-', e.g. "bg-color"
+	static bool isAttributeNameChar(char c) {
+		return CodeEditor::isIdentifierChar(c) || c == '-';
+	}
+
+	// replaces the prefix that was used for the autocomplete, see handleAutocomplete
+	void insertAutocompleteWord(const char* word) {
+		const u32 line = m_editor->getCursorLine();
+		const u32 cursor_col = m_editor->getCursorColumn();
+		m_editor->setSelection(line, m_autocomplete_from_col, line, cursor_col, false);
+		m_editor->insertText(word);
+	}
+
 	void handleAutocomplete() {
 		if (!m_editor->canHandleInput()) return;
 		if (m_editor->getNumCursors() != 1) return;
 		if (!m_app.checkShortcut(m_app.getCommonActions().autocomplete)) return;
 
-		StringView prefix = m_editor->getPrefix();
+		const StringView prefix = m_editor->getPrefix(isAttributeNameChar);
+		m_autocomplete_from_col = m_editor->getCursorColumn() - (u32)prefix.size();
 
 		m_autocomplete_list.clear();
 
@@ -223,8 +307,7 @@ struct UIEditorWindow : AssetEditorWindow {
 		if (m_autocomplete_list.empty()) return;
 
 		if (m_autocomplete_list.size() == 1) {
-			m_editor->selectWord();
-			m_editor->insertText(m_autocomplete_list[0].c_str());
+			insertAutocompleteWord(m_autocomplete_list[0].c_str());
 			m_autocomplete_list.clear();
 		} else {
 			ImGui::OpenPopup("ui_autocomplete");
@@ -262,8 +345,7 @@ struct UIEditorWindow : AssetEditorWindow {
 			if (i - 1 == m_autocomplete_selection_idx) ImGui::SetScrollHereY(0.5f);
 			const bool is_selected = i == sel_idx;
 			if (ImGui::Selectable(s.c_str(), is_selected) || (is_enter && i == m_autocomplete_selection_idx)) {
-				m_editor->selectWord();
-				m_editor->insertText(s.c_str());
+				insertAutocompleteWord(s.c_str());
 				ImGui::CloseCurrentPopup();
 				m_editor->focus();
 				m_autocomplete_list.clear();
@@ -286,7 +368,9 @@ struct UIEditorWindow : AssetEditorWindow {
 	ExternalFileChangeDialog m_external_change;
 	String m_stored_text;
 	Array<String> m_autocomplete_list;
+	ui::SourceMap m_source_map;
 	u32 m_autocomplete_selection_idx = 0;
+	u32 m_autocomplete_from_col = 0;
 	TextFilter m_autocomplete_filter;
 	ui::IFontManager* m_font_manager = nullptr;
 	UIImageManager* m_image_manager = nullptr;
@@ -298,6 +382,8 @@ struct UIEditorWindow : AssetEditorWindow {
 	UniquePtr<Pipeline> m_pipeline;
 	Vec3 m_clear_color = Vec3(0.5f, 0.5f, 0.5f);
 	u32 m_hovered_element_idx = 0xFFFFFFF;
+	u32 m_selected_element_idx = 0xFFFFFFF;
+	bool m_reveal_selected_in_tree = false;
 	bool m_show_debug_view = false;
 };
 

@@ -377,9 +377,11 @@ struct ParticleScriptEditorWindow : AssetEditorWindow {
 		if (m_editor->getNumCursors() != 1) return;
 		if (!m_app.checkShortcut(m_autocomplete_action)) return;
 
-		StringView prefix = m_editor->getPrefix();
-		
+		// an import path starts at the quote, keywords and symbols are identifiers
+		StringView prefix = m_editor->getPrefix(CodeEditor::isImportPathChar);
 		const char* quote_pos = find(prefix, '"');
+		if (!quote_pos) prefix = m_editor->getPrefix(CodeEditor::isIdentifierChar);
+
 		m_autocomplete_list.clear();
 		
 		if (quote_pos) {

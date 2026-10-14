@@ -105,9 +105,27 @@ static StaticString<128> formatAttributeValue(const Attribute& attr) {
 	return out;
 }
 
-static void debugElementGUI(const Document& document, u32 element_idx, int depth, u32& hovered_element_idx) {
+struct DebugTreeState {
+	u32& hovered_element_idx;
+	u32& selected_element_idx;
+	// the selection was made in the preview: open the ancestors of the selected element and scroll to it
+	bool reveal_selected;
+	// ancestors of selected_element_idx, filled only when reveal_selected
+	Array<u32> ancestors;
+};
+
+static bool containsIndex(const Array<u32>& indices, u32 idx) {
+	for (u32 i : indices) {
+		if (i == idx) return true;
+	}
+	return false;
+}
+
+static void debugElementGUI(const Document& document, u32 element_idx, int depth, DebugTreeState& state) {
 	const Element* element = document.getElement(element_idx);
 	if (!element) return;
+	u32& hovered_element_idx = state.hovered_element_idx;
+	u32& selected_element_idx = state.selected_element_idx;
 
 	const char* tag_name = getTagName(element->tag);
 
@@ -144,7 +162,7 @@ static void debugElementGUI(const Document& document, u32 element_idx, int depth
 
 	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
 	if (element->children.empty()) flags |= ImGuiTreeNodeFlags_Leaf;
-	if (element_idx == hovered_element_idx) flags |= ImGuiTreeNodeFlags_Selected;
+	if (element_idx == selected_element_idx) flags |= ImGuiTreeNodeFlags_Selected;
 
 	ImVec4 type_color;
 	switch (element->tag) {
@@ -157,10 +175,14 @@ static void debugElementGUI(const Document& document, u32 element_idx, int depth
 
 	ImGui::PushStyleColor(ImGuiCol_Text, type_color);
 	ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.3f, 0.6f, 1.0f, 0.8f));
-	bool open = ImGui::TreeNodeEx(label, flags);
+	// id from the element index, not from the label: the label contains the size, which changes with layout and would reset the open state
+	if (state.reveal_selected && containsIndex(state.ancestors, element_idx)) ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+	bool open = ImGui::TreeNodeEx((const void*)(uintptr_t)element_idx, flags, "%s", label.data);
+	if (state.reveal_selected && element_idx == selected_element_idx) ImGui::SetScrollHereY(0.5f);
 	ImGui::PopStyleColor();
 	ImGui::PopStyleColor();
 	bool is_hovered = ImGui::IsItemHovered();
+	if (ImGui::IsItemClicked()) selected_element_idx = element_idx;
 	if (is_hovered) {
 		hovered_element_idx = element_idx;
 		ImGui::BeginTooltip();
@@ -195,13 +217,24 @@ static void debugElementGUI(const Document& document, u32 element_idx, int depth
 
 	if (open) {
 		for (u32 child_idx : element->children) {
-			debugElementGUI(document, child_idx, depth + 1, hovered_element_idx);
+			debugElementGUI(document, child_idx, depth + 1, state);
 		}
 		ImGui::TreePop();
 	}
 }
 
-void debugViewGUI(Document& document, u32& hovered_element_idx) {
+// the parent of element idx, or 0xFFFFFFF for a top-level element
+static u32 findParentElement(const Document& document, u32 idx) {
+	for (u32 i = 0; i < (u32)document.m_elements.size(); ++i) {
+		for (u32 child : document.m_elements[i].children) {
+			if (child == idx) return i;
+		}
+	}
+	return 0xFFFFFFF;
+}
+
+// reveal_selected is cleared once the tree is drawn, so the tree is expanded only once per click in the preview
+void debugViewGUI(Document& document, u32& hovered_element_idx, u32& selected_element_idx, bool& reveal_selected) {
     ImGui::Text("Parse: %.2fms, Layout: %.2fms, Render: %.2fms",
         document.m_parse_duration * 1000.0f,
         document.m_layout_duration * 1000.0f,
@@ -213,37 +246,54 @@ void debugViewGUI(Document& document, u32& hovered_element_idx) {
     ImGui::Checkbox("Show Padding", &g_show_padding);
     ImGui::Checkbox("Show All Elements", &g_show_all_visualizations);
 
-    for (u32 idx : document.m_root.children) {
-        debugElementGUI(document, idx, 0, hovered_element_idx);
+    DebugTreeState state{hovered_element_idx, selected_element_idx, reveal_selected, Array<u32>(document.m_allocator)};
+    if (reveal_selected && selected_element_idx != 0xFFFFFFF) {
+        for (u32 parent = findParentElement(document, selected_element_idx); parent != 0xFFFFFFF; parent = findParentElement(document, parent)) {
+            state.ancestors.emplace(parent);
+        }
     }
+
+    for (u32 idx : document.m_root.children) {
+        debugElementGUI(document, idx, 0, state);
+    }
+    reveal_selected = false;
 }
 
-void drawDebugVisualizations(Draw2D& draw2d, const Document& document, u32 hovered_element_idx) {
+static void drawElementHighlight(Draw2D& draw2d, const Document& document, const Element& element, Color fill, Color border) {
+	if (element.tag == Tag::SPAN && !element.lines.empty() && element.getFontHandle() && document.m_font_manager) {
+		float asc = document.m_font_manager->getAscender(element.getFontHandle());
+		float height = document.m_font_manager->getHeight(element.getFontHandle());
+		for (const SpanLine& line : element.lines) {
+			Vec2 line_pos = line.pos;
+			line_pos.y -= asc;
+			Vec2 line_end = line_pos + Vec2(line.width, height);
+			draw2d.addRectFilled(line_pos, line_end, fill);
+			draw2d.addRect(line_pos, line_end, border, 2.0f);
+		}
+	} else {
+		Vec2 pos = element.position;
+		Vec2 size = element.size;
+		if (element.tag == Tag::SPAN && element.getFontHandle() && document.m_font_manager) {
+			float asc = document.m_font_manager->getAscender(element.getFontHandle());
+			pos.y -= asc;
+		}
+		draw2d.addRectFilled(pos, pos + size, fill);
+		draw2d.addRect(pos, pos + size, border, 2.0f);
+	}
+}
+
+void drawDebugVisualizations(Draw2D& draw2d, const Document& document, u32 hovered_element_idx, u32 selected_element_idx) {
+	// selected is drawn first, so the hovered element is on top when both are the same
+	if (selected_element_idx != 0xFFFFFFF && selected_element_idx != hovered_element_idx) {
+		const Element* selected_element = document.getElement(selected_element_idx);
+		if (selected_element) {
+			drawElementHighlight(draw2d, document, *selected_element, Color(0, 160, 255, 76), Color(0, 200, 255, 255));
+		}
+	}
 	if (hovered_element_idx != 0xFFFFFFF) {
 		const Element* hovered_element = document.getElement(hovered_element_idx);
 		if (hovered_element) {
-			Color highlight_fill(255, 128, 0, 76);
-			Color highlight_border(255, 255, 0, 255);
-			if (hovered_element->tag == Tag::SPAN && !hovered_element->lines.empty() && hovered_element->getFontHandle() && document.m_font_manager) {
-				float asc = document.m_font_manager->getAscender(hovered_element->getFontHandle());
-				float height = document.m_font_manager->getHeight(hovered_element->getFontHandle());
-				for (const SpanLine& line : hovered_element->lines) {
-					Vec2 line_pos = line.pos;
-					line_pos.y -= asc;
-					Vec2 line_end = line_pos + Vec2(line.width, height);
-					draw2d.addRectFilled(line_pos, line_end, highlight_fill);
-					draw2d.addRect(line_pos, line_end, highlight_border, 2.0f);
-				}
-			} else {
-				Vec2 pos = hovered_element->position;
-				Vec2 size = hovered_element->size;
-				if (hovered_element->tag == Tag::SPAN && hovered_element->getFontHandle() && document.m_font_manager) {
-					float asc = document.m_font_manager->getAscender(hovered_element->getFontHandle());
-					pos.y -= asc;
-				}
-				draw2d.addRectFilled(pos, pos + size, highlight_fill);
-				draw2d.addRect(pos, pos + size, highlight_border, 2.0f);
-			}
+			drawElementHighlight(draw2d, document, *hovered_element, Color(255, 128, 0, 76), Color(255, 255, 0, 255));
 		}
 	}
 

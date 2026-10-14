@@ -375,6 +375,24 @@ struct Event {
 	float wheel_y = 0;
 };
 
+// where each element was parsed from, filled by Document::parse when a SourceMap is passed
+struct SourceMap {
+	struct Range {
+		u32 begin; // byte offset into the parsed content
+		u32 end;
+	};
+	// indexed like Document::m_elements, elements without a range have {0, 0}
+	Array<Range> elements;
+
+	SourceMap(IAllocator& allocator) : elements(allocator) {}
+
+	void clear() { elements.clear(); }
+	void set(u32 element_idx, u32 begin, u32 end) {
+		if (element_idx >= (u32)elements.size()) elements.resize(element_idx + 1);
+		elements[element_idx] = {begin, end};
+	}
+};
+
 //@ object full ui::Document
 struct LUMIX_UI_API Document {
 	using Token = UITokenizer::Token;
@@ -415,7 +433,8 @@ struct LUMIX_UI_API Document {
 	Document(IFontManager* font_manager, IAllocator& allocator, IImageManager* image_manager = nullptr, ISpriteManager* sprite_manager = nullptr);
 	~Document();
 
-	bool parse(StringView content, const char* filename);
+	// source_map, if not null, receives the source range of every element
+	bool parse(StringView content, const char* filename, SourceMap* source_map = nullptr);
 	// null for an out of range index, e.g. Event::INVALID_ELEMENT_INDEX of an event with no element under the cursor
 	//@ function
 	Element* getElement(u32 index) { return index < (u32)m_elements.size() ? &m_elements[index] : nullptr; }
@@ -461,8 +480,11 @@ private:
 	bool parseElements(u32 parent_index, bool doc_body = false);
 	bool parseStyleBlock();
 	bool parseDocTag();
-		// [path] inside the [canvas] at parent_index, appends its stroke to the canvas geometry
-		bool parsePath(u32 parent_index, StringView location);
+	// records the source range [begin, end) of an element, no-op without a source map
+	void setSourceRange(u32 element_idx, const char* begin, const char* end);
+	SourceMap* m_source_map = nullptr; // only set during parse
+	// [path] inside the [canvas] at parent_index, appends its stroke to the canvas geometry
+	bool parsePath(u32 parent_index, StringView location);
 	bool consume(Token::Type type, Token* out_token = nullptr);
 	bool tryConsume(Token::Type type, Token* out_token = nullptr);
 	void addClassRaw(u32 element_index, StringView classname);

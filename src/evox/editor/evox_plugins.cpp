@@ -742,7 +742,7 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 		ex_module* module = index.build(m_path);
 		if (!module) return;
 
-		const StringView prefix = m_editor->getPrefix();
+		const StringView prefix = m_editor->getPrefix(CodeEditor::isIdentifierChar);
 		for (u32 unit_idx = 0, unit_count = ex_module_get_unit_count(module); unit_idx < unit_count; ++unit_idx) {
 			ex_unit* unit = ex_module_get_unit(module, unit_idx);
 			const ex_string_view ex_source = ex_unit_get_path(unit);
