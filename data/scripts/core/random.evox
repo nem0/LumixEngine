@@ -1,8 +1,12 @@
 // Marsaglia's simple pseudo-random number generator.
 // This follows Lumix::RandomGenerator in core/math.cpp.
 
-var u : u32 = 521288629;
-var v : u32 = 362436069;
+// Non-deterministic, non-zero u32 from the engine's time-seeded generator.
+extern fn seedEntropy() : u32;
+
+// The generator starts from a different state on every run. Call seed(a, b) for a reproducible sequence.
+var u : u32 = seedEntropy();
+var v : u32 = seedEntropy();
 
 fn seed(a : u32, b : u32) : void {
 	if a != 0 {
@@ -11,6 +15,11 @@ fn seed(a : u32, b : u32) : void {
 	if b != 0 {
 		v = b;
 	}
+}
+
+// Re-seeds the generator from engine entropy, e.g. after a reproducible seed(a, b) section.
+fn randomize() : void {
+	seed(seedEntropy(), seedEntropy());
 }
 
 fn rand() : u32 {
