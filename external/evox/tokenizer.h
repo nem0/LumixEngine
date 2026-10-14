@@ -335,6 +335,7 @@ struct Tokenizer {
 				break;
 			}
 			case 'w': return checkKeyword("hile", 1, 4, Token::WHILE);
+			case 'z': return checkKeyword("ero", 1, 3, Token::ZERO);
 		}
 		return makeToken(Token::IDENTIFIER);
 	}

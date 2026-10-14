@@ -81,6 +81,7 @@ struct Expression {
 		ENUM,
 		STRUCT,
 		UNDEFINED, // var a : i32 = undefined;
+		ZERO, // var a : i32 = zero;
 		TYPEOF,
 		SIZEOF,
 		
@@ -172,6 +173,10 @@ struct NullLiteralExpression : Expression {
 
 struct UndefinedExpression : Expression {
 	UndefinedExpression() : Expression(UNDEFINED) {}
+};
+
+struct ZeroExpression : Expression {
+	ZeroExpression() : Expression(ZERO) {}
 };
 
 struct TypeLiteralExpression : Expression {

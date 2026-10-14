@@ -36,6 +36,7 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 	- [Tuples](#tuples)
 	- [Slices](#slices)
 - [Variables](#variables)
+	- [Zero initializer](#zero-initializer)
 	- [Union extraction and propagation](#union-extraction-and-propagation)
 	- [Temporaries](#temporaries)
 - [Statements](#statements)
@@ -1203,6 +1204,7 @@ A structural union has no declaring namespace. Union-typed values do not partici
 
 **Initialization and literals**
 
+- `var e : InputEvent = zero;` selects the canonical-first variant with a zeroed payload
 - `var e : InputEvent = undefined;` is allowed: the tag is zeroed (the active variant becomes the union's canonical-first member, which is implementation-defined) and the payload is undefined
 - a typeless struct literal cannot pick a variant: `var e : InputEvent = { 0, 1 };` is a compile-time error; write the member type explicitly (`MouseMoveEvent { 0, 1 }`)
 
@@ -1652,12 +1654,39 @@ Rules:
 - locals use same declaration syntax
 - all `var` and `const` declarations must have an initializer
 - to intentionally skip initialization, use explicit `undefined` (for example `var x : i32 = undefined`)
+- to initialize to all-zero bytes, use explicit `zero` (for example `var p : Particle = zero`); see [Zero initializer](#zero-initializer)
 - explicit type is optional if inference can resolve from initializer
 - `var` and `const` declarations concretize untyped numeric initializers during declaration-time inference. Integers use the narrowest representable type (`i32`, then `i64`, then `u64`); untyped decimal literals infer `f64`. An unannotated `comptime` binding preserves its untyped value until a later use supplies a concrete numeric target
 - `const` cannot be reassigned
 - variables are block scoped
 - shadowing is a compile-time error: a new declaration in the same scope or an inner scope cannot re-use a name that is already visible
 - a **name** is any identifier introduced by `var`, `const`, `comptime`, `fn`, `struct`, `enum`, or `import` alias; the same rules apply to all of them
+
+### Zero initializer
+
+`zero` is an initializer expression that fills the declared storage with zero bytes:
+
+```cpp
+struct Particle {
+	position : [3]f32;
+	age : f32;
+	next : ?*Particle;
+}
+
+var pool : [64]Particle = zero;
+
+fn main() : void {
+	var p : Particle = zero;   // all fields are 0, `next` is null
+	p = zero;                  // reset an existing variable
+}
+```
+
+- the type comes from context, so `var x = zero;` is a compile-time error; annotate the type or use it where a type is expected (assignment, argument, return, struct field)
+- works for every type: numbers are `0`, `false`, and `0.0`; pointers, slices, and nullable values are null/empty; structs and arrays are zeroed recursively; a union gets the canonical-first variant with a zeroed payload
+- the whole value is written, including padding, so reading any part of it is defined, unlike [`undefined`](#variables)
+- valid for `var` and `const` declarations, globals, and assignments
+- not a compile-time constant: it cannot be used in `comptime` evaluation
+- `zero` is a reserved keyword and cannot be used as an identifier
 
 ### Union extraction and propagation
 
@@ -3211,6 +3240,11 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 - `NestedFunctionCanNotCaptureOuterLocal`
 - `DuplicateDeclarationsFail`
 - `ConstCanNotBeUndefined`
+- `ZeroInitializesLocalsToZero`
+- `ZeroCanBeAssignedAndPassed`
+- `ZeroGlobalIsZero`
+- `ZeroInitializerRequiresExplicitTypeFails`
+- `ConstCanBeZero`
 - `FunctionCallAssignmentFails`
 - `FunctionNamedSinCompilesAndRuns`
 - `ImportPathCanMatchPreviousAlias`

@@ -1037,8 +1037,8 @@ struct Checker {
 				return nullptr;
 			}
 		}
-		if (expr.kind == Expression::UNDEFINED && !target) {
-			errorLine(expr.token, "Cannot use undefined value without a type hint");
+		if ((expr.kind == Expression::UNDEFINED || expr.kind == Expression::ZERO) && !target) {
+			errorLine(expr.token, expr.kind == Expression::ZERO ? "Cannot use zero value without a type hint" : "Cannot use undefined value without a type hint");
 			return nullptr;
 		}
 		return makeConcrete(expr, target);
@@ -1170,6 +1170,7 @@ struct Checker {
 			}
 			case Expression::NULL_LITERAL: out = makeType<NullLiteralExpression>(unit.arena); break;
 			case Expression::UNDEFINED: out = makeType<UndefinedExpression>(unit.arena); break;
+			case Expression::ZERO: out = makeType<ZeroExpression>(unit.arena); break;
 			case Expression::TYPEOF: {
 				TypeofExpression* s = static_cast<TypeofExpression*>(src);
 				TypeofExpression* typeof_expr = makeType<TypeofExpression>(unit.arena);
@@ -2598,6 +2599,10 @@ struct Checker {
 		EX_ASSERT(sym.expression);
 		Expression& expr = *sym.expression;
 
+		if (expr.kind == Expression::ZERO && !annotation) {
+			errorLine(sym.token, "'zero' initializer requires an explicit type annotation: ", sym.name);
+			return EX_RESULT_FAILURE;
+		}
 		if (expr.kind == Expression::UNDEFINED) {
 			if (!annotation) {
 				// var a = undefined; - no way to know the type
@@ -4224,6 +4229,7 @@ struct Checker {
 				return &expr;
 			}
 			case Expression::UNDEFINED: expr.resolved_type = hint; expr.eval_stage = Expression::RUNTIME; return &expr;
+			case Expression::ZERO: expr.resolved_type = hint; expr.eval_stage = Expression::RUNTIME; return &expr;
 			case Expression::BOOL_LITERAL: expr.resolved_type = primitiveType(ResolvedTypeKind::BOOL); expr.eval_stage = Expression::COMPTIME_VALUE; return &expr;
 			case Expression::STRING_LITERAL: {
 				StringLiteralExpression& literal = static_cast<StringLiteralExpression&>(expr);
@@ -4742,6 +4748,10 @@ struct Checker {
 		// uninitialized local form. Unlike global symbols, this path may dereference
 		// it unconditionally.
 		EX_ASSERT(var.expression);
+		if (var.expression->kind == Expression::ZERO && !annotation) {
+			errorLine(var.token, "Variable ", var.name, " must have a type annotation if initialized with zero");
+			return false;
+		}
 		if (var.expression->kind == Expression::UNDEFINED) {
 			if (!annotation) {
 				errorLine(var.token, "Variable ", var.name, " must have a type annotation if initialized with undefined");
@@ -7387,6 +7397,9 @@ struct Checker {
 			}
 			case Expression::UNDEFINED:
 				errorLine(expr.token, "`undefined` is not a compile-time constant");
+				return {};
+			case Expression::ZERO:
+				errorLine(expr.token, "`zero` is not a compile-time constant");
 				return {};
 			default:
 				errorLine(expr.token, "Expression is not a compile-time constant");

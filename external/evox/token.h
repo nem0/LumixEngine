@@ -110,6 +110,7 @@ struct Token {
 		FALSE,
 		NULL_KW,
 		UNDEFINED,
+		ZERO,
 		AND,
 		OR,
 		NOT,

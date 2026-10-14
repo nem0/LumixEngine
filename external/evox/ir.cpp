@@ -123,6 +123,7 @@ struct IRBuilder {
 	void assignSrcLoc(ExIrBlockData&) {}
 
 	ExIrOp& buildImplicitConversionIR(Expression& expression, ResolvedType& target_type) {
+		if (expression.kind == Expression::ZERO) return buildExpressionIR(expression, true);
 		if (expression.kind == Expression::UNDEFINED) {
 			// TODO should undefined do nothing?
 			auto& storage = allocAlloca(&target_type, {}, &alloc<ExOpNop>());
@@ -764,8 +765,17 @@ struct IRBuilder {
 					return extract;
 				}
 
+				// The address of a field of a temporary (for example `make().field` boxed into
+				// `any`) needs the temporary's frame address, not the temporary itself.
+				ExIrOp* base_address = &base;
+				if (!pointer_base && base.result_mode == ExIrOp::VALUE) {
+					auto& materialized = alloc<ExOpMaterializeAddr>();
+					materialized.value = &base;
+					base_address = &materialized;
+				}
+
 				auto& add = alloc<ExOpAdd>();
-				add.lhs = &base;
+				add.lhs = base_address;
 				auto& rhs = alloc<ExOpLoadConst>();
 				static ResolvedType R(ResolvedTypeKind::U64);
 				const u64 pointer_offset = offset;
@@ -1012,6 +1022,7 @@ struct IRBuilder {
 				op.value = &inner;
 				return op;
 			}
+			case Expression::ZERO:
 			case Expression::NULL_LITERAL: {
 				auto& op = alloc<ExOpNull>();
 				op.size = typeByteSize(*expr.resolved_type);

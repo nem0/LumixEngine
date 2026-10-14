@@ -1459,12 +1459,12 @@ TEST(TemplateFunctionMissingArgumentFails) {
 // Explicit comptime type parameter required: no value arguments to infer from.
 TEST(TemplateFunctionComptimeTypeParamNoArgs) {
 	const char* source = R"(
-		fn zero(T : comptime type) : T {
+		fn makeUndefined(T : comptime type) : T {
 			return undefined;
 		}
 
 		fn main() : i32 {
-			return zero(i32);
+			return makeUndefined(i32);
 		}
 	)";
 	EXPECT_COMPILE(source);
@@ -1555,12 +1555,12 @@ TEST(TemplateFunctionGenericNameDoesNotShadowTypeImportQualifier) {
 // Without a comptime type argument and no value args to infer from, inference fails.
 TEST(TemplateFunctionNoArgsUnresolvedFails) {
 	const char* source = R"(
-		fn zero(T : comptime type) : T {
+		fn makeValue(T : comptime type) : T {
 			return undefined;
 		}
 
 		fn main() : i32 {
-			return zero();
+			return makeValue();
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);

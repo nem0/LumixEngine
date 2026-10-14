@@ -148,6 +148,7 @@ struct Parser {
 			case Token::FALSE: return "false";
 			case Token::NULL_KW: return "null";
 			case Token::UNDEFINED: return "undefined";
+			case Token::ZERO: return "zero";
 			case Token::AND: return "and";
 			case Token::OR: return "or";
 			case Token::NOT: return "not";
@@ -457,6 +458,7 @@ struct Parser {
 			}
 			case Token::NULL_KW: return makeExpr<NullLiteralExpression>(token);
 			case Token::UNDEFINED: return makeExpr<UndefinedExpression>(token);
+			case Token::ZERO: return makeExpr<ZeroExpression>(token);
 			case Token::YIELD: return makeExpr<YieldExpression>(token);
 			case Token::STAR: {
 				PointerTypeExpression* pointer = makeExpr<PointerTypeExpression>(token);

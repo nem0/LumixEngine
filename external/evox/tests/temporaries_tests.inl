@@ -376,3 +376,38 @@ TEST(BuilderPatternWithUFCSSucceeds) {
 	EXPECT_COMPILE(source);
 	return true;
 }
+
+// Regression: a field of a temporary (function call result) passed straight into a
+// variadic `...any` parameter crashed the runtime (access violation). Studio hit this
+// through `logInfo(integerToString(x).slice)` in an evox_execute script.
+TEST(TemporaryFieldPassedToVariadicAny) {
+	const char* source = R"(
+		struct Text { buffer : [8]u8; slice : []const u8; }
+		fn make() : Text {
+			var text : Text = undefined;
+			text.buffer[7] = 48;
+			text.slice = text.buffer[7:];
+			return text;
+		}
+		var g_length : i32 = 0;
+		fn record(args : ...any) : void {
+			for arg in args {
+				match arg {
+					case []const u8: g_length += arg.length as i32;
+					case: g_length += 1000;
+				}
+			}
+		}
+		fn main() : i32 {
+			record(make().slice);
+			return g_length;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(1, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}

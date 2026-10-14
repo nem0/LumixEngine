@@ -607,3 +607,79 @@ TEST(TernarnyUntypedBranches) {
 	return true;
 }
 
+
+TEST(ZeroInitializesLocalsToZero) {
+	const char* source = R"(
+		struct Inner { a : i32; b : f32; }
+		struct Outer { x : i64; inner : Inner; items : [3]i32; }
+
+		fn dirty() : i32 {
+			var junk : [16]i32 = [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7];
+			return junk[0];
+		}
+
+		fn main() : i32 {
+			dirty();
+			var n : i32 = zero;
+			var f : f32 = zero;
+			var o : Outer = zero;
+			var arr : [4]i32 = zero;
+			var opt : ?i32 = zero;
+			var ok : i32 = 0;
+			if opt == null { ok = 1; }
+			return n + o.inner.a + o.items[2] + arr[3] + (f == 0.0 ? 100 : 0) + (o.x == 0 ? 10 : 0) + ok * 1000;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(1110, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ZeroCanBeAssignedAndPassed) {
+	const char* source = R"(
+		struct S { a : i32; b : i32; }
+		fn sum(s : S) : i32 { return s.a + s.b; }
+		fn main() : i32 {
+			var s = S { 3, 4 };
+			s = zero;
+			return sum(s) + sum(zero);
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ZeroGlobalIsZero) {
+	const char* source = R"(
+		struct S { a : i32; b : i32; }
+		var g : S = zero;
+		fn main() : i32 { return g.a + g.b; }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(0, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ZeroInitializerRequiresExplicitTypeFails) {
+	EXPECT_COMPILE_FAIL("fn main() : void { var x = zero; }");
+	EXPECT_COMPILE_FAIL("var g = zero;");
+	return true;
+}
+
+TEST(ConstCanBeZero) {
+	EXPECT_COMPILE("fn main() : i32 { const c : i32 = zero; return c; }");
+	return true;
+}
