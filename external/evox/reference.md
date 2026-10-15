@@ -42,6 +42,7 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 - [Statements](#statements)
 	- [Blocks](#blocks)
 	- [Assignment](#assignment)
+	- [Expression statements](#expression-statements)
 	- [If / else](#if--else)
 	- [Match](#match)
 	- [Compile-time branches](#compile-time-branches)
@@ -56,11 +57,13 @@ See the [benchmark results](benchmarks/results.md) for current performance compa
 	- [Literals](#literals)
 	- [Arithmetic](#arithmetic)
 	- [Integer overflow](#integer-overflow)
+	- [Bitwise operators](#bitwise-operators)
 	- [Casts](#casts)
 	- [Sizeof and alignof](#sizeof-and-alignof)
 	- [Comparison and boolean operators](#comparison-and-boolean-operators)
 		- [Slice equality](#slice-equality)
 	- [Operator precedence](#operator-precedence)
+	- [Order of evaluation](#order-of-evaluation)
 	- [Ternary operator](#ternary-operator)
 	- [Calls](#calls)
 		- [Panic](#panic)
@@ -784,7 +787,13 @@ Rules:
   - `<=`
   - `>`
   - `>=`
+  - `&`
+  - `|`
+  - `^`
+  - `<<`
+  - `>>`
   - unary `-`
+  - unary `~`
 - `and`, `or`, and `not` remain built-in boolean operators and are not overloaded
 - declaring an operator overload for a built-in primitive signature, such as `operator +(f32, f32)`, is a compile-time error
 - declaring `operator ==` or `operator !=` with slice parameters is a compile-time error for the same reason; slice equality is built in (see [Slice equality](#slice-equality))
@@ -798,7 +807,7 @@ Rules:
 - if multiple declarations match equally well, the expression is ambiguous and is a compile-time error
 - primitive built-in operator behavior still applies when no overload is involved
 - compound assignment on a non-primitive left-hand target uses the corresponding binary operator, for example `x += y` behaves like `x = x + y`
-- compound assignment evaluates the left-hand side once // TODO test
+- compound assignment evaluates the left-hand side once, before the right-hand side: `values[next()] += 1` calls `next` one time (see [Order of evaluation](#order-of-evaluation))
 - primitive compound assignment means the left-hand target has a primitive type; it keeps the built-in behavior and cannot be overridden
 - for primitive compound assignment, the right-hand operand must be implicitly convertible to the left-hand target type; for example, `5 *= Vec2 { 1, 2 }` is invalid because `Vec2` cannot be converted to the integer type of `5`
 
@@ -821,7 +830,7 @@ Built-in and user types:
 - user-defined `enum` types
 - tuple types
 - function types
-- tagged union types (`A | B`)
+- tagged union types (`union { A, B }`)
 - `any` values (see [Any values](#any-values))
 
 `isize` is the signed integer type used for memory sizes, slice lengths, and indices. It is signed and a fixed 64 bits on all targets (not platform/pointer-width dependent).
@@ -875,8 +884,8 @@ A union target supplies numeric context only when exactly one member has a
 compatible numeric category. Representability does not resolve ambiguity:
 
 ```cpp
-const number : i32 | []const u8 = 12; // 12 becomes i32
-const ambiguous : i32 | i64 = 2147483648; // compile-time error: both numeric members match
+const number : union { i32, []const u8 } = 12; // 12 becomes i32
+const ambiguous : union { i32, i64 } = 2147483648; // compile-time error: both numeric members match
 ```
 
 Concretization requires the value to be representable by the selected type; it
@@ -1080,7 +1089,7 @@ its lifetime rules must be used when pointers outlive their source variables.
 
 ### Tagged unions
 
-A union type is written as members separated by `|`. A union value holds exactly one of its member types at a time; a tag records which one (the active variant). The member type itself is the tag - there are no named variants.
+A union type is written `union { A, B, ... }`, listing its members. A union value holds exactly one of its member types at a time; a tag records which one (the active variant). The member type itself is the tag - there are no named variants.
 
 ```cpp
 struct ButtonEvent {
@@ -1092,7 +1101,7 @@ struct MouseMoveEvent {
 	y : i32;
 }
 
-comptime InputEvent = ButtonEvent | MouseMoveEvent;
+comptime InputEvent = union { ButtonEvent, MouseMoveEvent };
 
 var b : ButtonEvent = foo();
 var e : InputEvent = b;                        // active variant becomes ButtonEvent
@@ -1103,17 +1112,17 @@ e = MouseMoveEvent { 1, 0 };                   // e's active variant switches to
 Union type expressions are compile-time type values like any other type, so they can be bound with `comptime` or written anonymously anywhere a type is valid: variable declarations, parameters, return types, and struct fields.
 
 ```cpp
-fn parse(source : Code) : Error | ASTNode;
+fn parse(source : Code) : union { Error, ASTNode };
 ```
 
 **Identity**
 
 Unions are structural with set semantics:
 
-- member order does not matter: `A | B` and `B | A` are the same type
-- a union member that is itself a union flattens: if `comptime AB = A | B`, then `AB | C` is `A | B | C`
+- member order does not matter: `union { A, B }` and `union { B, A }` are the same type
+- a union member that is itself a union flattens: if `comptime AB = union { A, B }`, then `union { AB, C }` is `union { A, B, C }`
 - two union types with the same member set are the same type, regardless of how or where they were spelled
-- duplicate members collapse into the set, whether written directly or introduced by flattening: `A | A` is `A`, and if `comptime AB = A | B` and `comptime BC = B | C`, then `AB | BC` is `A | B | C`
+- duplicate members collapse into the set, whether written directly or introduced by flattening: `union { A, A }` is `A`, and if `comptime AB = union { A, B }` and `comptime BC = union { B, C }`, then `union { AB, BC }` is `union { A, B, C }`
 
 **Members**
 
@@ -1126,7 +1135,7 @@ All members must be pairwise distinct types. Because the member type is the tag,
 **Coercion**
 
 - a member value coerces implicitly to any union containing its type: `var e : InputEvent = b;`
-- a union value coerces implicitly to any union whose member set is a superset (the tag is remapped at the coercion site): an `A | B` value can be assigned where `A | B | C` is expected - this is what lets error unions propagate across call layers
+- a union value coerces implicitly to any union whose member set is a superset (the tag is remapped at the coercion site): a `union { A, B }` value can be assigned where `union { A, B, C }` is expected - this is what lets error unions propagate across call layers
 - no other implicit conversions apply; narrowing (superset to subset, or union to member) is never implicit
 
 **Testing: `is`**
@@ -1140,13 +1149,13 @@ All members must be pairwise distinct types. Because the member type is the tag,
 A branch that rules out some members narrows the value to the **residual type**: the subject's member set minus the members the branch excluded. With one member left the residual is that member type, and narrowing to it is the promotion described above; with several left it is the smaller union.
 
 ```cpp
-comptime Shape = Circle | Square | Triangle;
+comptime Shape = union { Circle, Square, Triangle };
 
 fn area(s : Shape) : f32 {
 	if s is Circle {
 		return s.r * s.r * 3.14159; // s is Circle
 	} else {
-		// s is Square | Triangle
+		// s is union { Square, Triangle }
 		if s is Square {
 			return s.w * s.w;       // s is Square
 		}
@@ -1158,9 +1167,9 @@ fn area(s : Shape) : f32 {
 The same subtraction applies after a branch that always leaves the enclosing scope, so an early return narrows the code that follows it:
 
 ```cpp
-fn handle(e : Error | Warning | Value) : void {
+fn handle(e : union { Error, Warning, Value }) : void {
 	if e is Error { return; }
-	// e is Warning | Value here
+	// e is union { Warning, Value } here
 	if e is Warning { log_warning(e); return; }
 	use(e); // e is Value
 }
@@ -1194,8 +1203,8 @@ Rules:
 - duplicate member cases are compile-time errors
 - a case pattern that is not a member type of the subject is a compile-time error
 - an unqualified member type resolves against the union first, so `case ButtonEvent:` works even if the union was declared with `events.ButtonEvent`; qualify it only to disambiguate members with the same name
-- comma-separated alternatives (`case A, B:`) narrow the subject to `A | B`, the [residual](#narrowing) of that arm, rather than promoting it to a single member type
-- inside an empty `case:` fallback the subject narrows to the residual of every member matched by the arms above it, so a fallback after `case A:` on an `A | B | C` subject reads the subject as `B | C`
+- comma-separated alternatives (`case A, B:`) narrow the subject to `union { A, B }`, the [residual](#narrowing) of that arm, rather than promoting it to a single member type
+- inside an empty `case:` fallback the subject narrows to the residual of every member matched by the arms above it, so a fallback after `case A:` on a `union { A, B, C }` subject reads the subject as `union { B, C }`
 - promotion is flow-typing: assigning to the subject inside a case (which may switch the active variant) is allowed and is not re-checked; the earlier promotion does not keep later uses safe
 
 **Namespaces, ADL, and UFCS**
@@ -1216,8 +1225,8 @@ A structural union has no declaring namespace. Union-typed values do not partici
 
 - storage is a tag followed by payload space sized for the largest member
 - the tag is an `i32` holding the member's index in the union's canonical member order; the canonical order is deterministic but implementation-defined (member sets are unordered at the language level)
-- `sizeof(A | B)` is `sizeof(i32) + max(sizeof(members))`
-- `alignof(A | B)` is `max(alignof(i32), alignof(members))`
+- `sizeof(union { A, B })` is `sizeof(i32) + max(sizeof(members))`
+- `alignof(union { A, B })` is `max(alignof(i32), alignof(members))`
 - the tag is not directly observable; there is no union-to-integer cast
 
 ### String literals
@@ -1693,9 +1702,9 @@ fn main() : void {
 A `var` declaration can extract one or more members from a tagged union and return every other member from the enclosing function:
 
 ```cpp
-fn parse() : IOError | SyntaxError | Warning | ASTNode;
+fn parse() : union { IOError, SyntaxError, Warning, ASTNode };
 
-fn load() : IOError | SyntaxError | Warning | Result {
+fn load() : union { IOError, SyntaxError, Warning, Result } {
 	var node : ASTNode = parse() else return;
 	return Result { node };
 }
@@ -1720,13 +1729,13 @@ evaluates `expression` exactly once. Its static type must be a tagged union `U`.
 Subunion extraction can handle several members locally while propagating the rest:
 
 ```cpp
-fn inspect() : IOError | SyntaxError | Warning | ASTNode {
-	var issue : SyntaxError | Warning = parse() else return;
+fn inspect() : union { IOError, SyntaxError, Warning, ASTNode } {
+	var issue : union { SyntaxError, Warning } = parse() else return;
 	return issue;
 }
 ```
 
-Here `issue` retains whichever of `SyntaxError` or `Warning` was active. The failure residual is `IOError | ASTNode`.
+Here `issue` retains whichever of `SyntaxError` or `Warning` was active. The failure residual is `union { IOError, ASTNode }`.
 
 ### Temporaries
 
@@ -1779,6 +1788,17 @@ i--;
 ```
 
 Postfix increment/decrement are statement forms equivalent to `+= 1` and `-= 1`.
+
+### Expression statements
+
+A call whose result is not used is a compile-time error:
+
+```cpp
+compute();        // compile-time error
+_ = compute();    // explicitly ignores the result
+```
+
+Assign the result to `_` to discard it explicitly.
 
 ### If / else
 
@@ -2264,6 +2284,48 @@ const d : i8 = (c + 1 as i8) as i8; // d == -128
 
 Width-changing integer casts follow the same wrap behavior.
 
+### Bitwise operators
+
+```cpp
+a & b    // and
+a | b    // or
+a ^ b    // xor
+~a       // bitwise negation
+a << n   // shift left
+a >> n   // shift right
+```
+
+Compound assignment forms `&=`, `|=`, `^=`, `<<=`, and `>>=` are available and follow the rules in [Operators](#operators).
+
+Rules:
+
+- operands must be integers; `bool`, floating-point types, enums, pointers, and `byte` are a compile-time error. Use `and`, `or`, and `not` for booleans
+- `&`, `|`, and `^` require both operands to have the same concrete integer type, like arithmetic. An untyped integer operand adopts the type of the other operand
+- `~a` has the type of `a` and flips every bit of its width, so `~0 as u8` is `255` and `~(0 as i32)` is `-1`. It is distinct from `not`, which accepts only `bool`
+- `~` of an untyped constant is the untyped constant `-a - 1`, so `~0` is `-1`. It never takes the contextual type: an inline `~0` and a named `comptime A = ~0;` are the same value, and both fit signed types but not unsigned ones. Write `~(0 as u8)` to invert at a given width, or cast the result, which truncates like any other out-of-range cast (`~0xF0 as u8` is `0x0F`). So `var r : u8 = ~0;` and `x &= ~1` with an unsigned `x` are compile-time errors
+- `a << n` and `a >> n` have the type of `a`. The count `n` may be any integer type and does not have to match `a`; it does not affect the result type
+- `>>` is arithmetic (sign-filling) for signed types and logical (zero-filling) for unsigned types
+- a shift count greater than or equal to the bit width of `a` is defined: `<<` and logical `>>` produce `0`, arithmetic `>>` produces `0` or `-1` depending on the sign of `a`. It is not undefined behavior and not a runtime error
+- a negative shift count is a compile-time error when it is a constant, and is treated as its unsigned value (so over-wide) at runtime
+- shifts do not trap on overflow; bits shifted out are discarded, in line with [Integer overflow](#integer-overflow)
+- when both operands are untyped integer constants the result is an untyped integer constant, so `1 << 4` can be used wherever a compile-time integer is required
+
+```cpp
+const FLAG_A : u32 = 1 << 0;
+const FLAG_B : u32 = 1 << 1;
+
+var flags : u32 = FLAG_A | FLAG_B;
+flags &= ~FLAG_A;               // clear a bit
+flags |= FLAG_A;                // set a bit
+flags ^= FLAG_B;                // toggle a bit
+const has_b = (flags & FLAG_B) != 0;
+const high = (value >> 8) & 0xFF;
+```
+
+Bitwise operators bind tighter than comparisons, so `flags & mask == 0` parses as `(flags & mask) == 0`, unlike C. See [Operator precedence](#operator-precedence).
+
+Non-primitive operands may resolve to `operator` declarations, as for arithmetic (see [Operators](#operators)). Primitive integer operands keep their built-in semantics and cannot be overridden.
+
 ### Casts
 
 Use explicit `as` casts:
@@ -2492,24 +2554,65 @@ From loosest to tightest. Operators on the same row have equal precedence and as
 | | operators | associativity |
 |---|---|---|
 | 1 | `? :` | right |
-| 2 | `\|` (union types), `or` | left |
+| 2 | `or` | left |
 | 3 | `and` | left |
 | 4 | `not` (prefix) | right |
 | 5 | `==`, `!=` | left |
 | 6 | `<`, `>`, `<=`, `>=`, `is` | left |
-| 7 | `+`, `-` (binary) | left |
-| 8 | `*`, `/`, `%` | left |
-| 9 | `as` | left |
-| 10 | `-`, `*`, `&` (prefix) | right |
-| 11 | `.`, `()`, `[]` | left |
+| 7 | `\|` | left |
+| 8 | `^` | left |
+| 9 | `&` (binary) | left |
+| 10 | `<<`, `>>` | left |
+| 11 | `+`, `-` (binary) | left |
+| 12 | `*`, `/`, `%` | left |
+| 13 | `as` | left |
+| 14 | `-`, `*`, `&`, `~` (prefix) | right |
+| 15 | `.`, `()`, `[]` | left |
 
 Notes:
 
 - `not` is the only prefix operator below the arithmetic levels; it negates a whole comparison or `is` test without parentheses, while `and` and `or` still separate its operands (see [Comparison and boolean operators](#comparison-and-boolean-operators))
 - `as` binds tighter than arithmetic but looser than prefix `-`, so `-x as f32` is `(-x) as f32` and `a + b as f32` is `a + (b as f32)`
-- `|` shares a level with `or`, but the two never compete: `|` combines types and `or` combines `bool` values (see [Tagged unions](#tagged-unions))
+- the bitwise operators bind tighter than the comparisons and `==`/`!=`, and looser than `+` and `-`; in C they sit below the comparisons, so `x & m == 0` there means `x & (m == 0)`. Here it means `(x & m) == 0`. See [Bitwise operators](#bitwise-operators)
+- among themselves `&` binds tighter than `^`, which binds tighter than `|`; the shifts bind tighter than all three but looser than `+` and `-`, so `a << 1 + 2` is `a << (1 + 2)` and `a | b & c` is `a | (b & c)`
+- binary `&` is distinguished from prefix address-of `&` by position: `a & &b` is the bitwise and of `a` and the address of `b`
+- `~` is a prefix operator at the same level as unary `-`, so `~x as u8` is `(~x) as u8`
+- `|` is bitwise or only; unions are written with `union { ... }`
 - assignment (`=`) and compound assignment (`+=`, `*=`, and the rest) are statements, not expressions, so they take no precedence level and cannot appear inside an expression
 - `sizeof`, `alignof`, and `typeof` are call-like compile-time operators whose operand is parenthesised, so they need no precedence level either
+
+### Order of evaluation
+
+Evaluation order is defined: operands, arguments and elements are evaluated **left to right**, in the order they are written, and each is evaluated exactly once. Precedence and associativity decide how an expression is grouped, not when its parts run: in `f() + g() * h()` the calls run `f`, `g`, `h`.
+
+| construct | order |
+|---|---|
+| binary operators (arithmetic, bitwise, shifts, comparisons) | left operand, then right operand |
+| call arguments | first argument to last, each fully evaluated before the next |
+| call `callee(args)` | the callee expression first, then the arguments, then the call |
+| method-style call `receiver.f(args)` | the receiver, then the arguments |
+| indexing `a[i]`, `a[i][j]` | the indexed expression, then the index; `i` before `j` |
+| slicing `a[i:j]` | the sliced expression, then `i`, then `j` |
+| member access `f().field`, dereference `f().*` | the call, then whatever uses its result |
+| struct, array and tuple literals | elements in written order |
+| `a ? b : c` | `a`, then only the selected branch |
+| `a and b`, `a or b` | `a`, then `b` only when `a` does not already decide the result |
+| assignment `target = value` and `target op= value` | the target's subexpressions, then the right-hand side |
+
+```cpp
+// prints calls in the order next(), compute(): index first, then value
+values[next()] = compute();
+values[next()] += compute();   // next() is called once
+```
+
+Rules:
+
+- the target of an assignment is evaluated once and before the right-hand side, for `=` and for every compound form. `values[next()] += compute()` calls `next` once and `compute` once, in that order, and reads and writes the same element even when `compute` changes the variables the index depends on
+- an operand that a short-circuiting operator or the ternary skips is not evaluated at all
+- the arguments of a call are all evaluated before the call is made, and before any of the callee's body runs
+- the callee of a call is an expression like any other: in `get_handler()(compute())` the call to `get_handler` happens before `compute`
+- there is no unspecified or implementation-defined order: code that calls functions with side effects in several operands of the same expression has one meaning
+- a nested expression is evaluated completely, at its position, before the next sibling starts: in `(a() + b()) * (c() + d())` the calls run `a`, `b`, `c`, `d`
 
 ### Ternary operator
 
@@ -2853,7 +2956,7 @@ This is the same [compile-time branch](#compile-time-branches) pruning used ever
 | pointers | `"*Vec3"`, `"*const Vec3"`, `"?*Vec3"`, `"?*const Vec3"` |
 | slices and arrays | `"[]i32"`, `"[]const u8"`, `"[4]i32"` |
 | tuples | `"tuple { i32, f32 }"` |
-| unions | `"A \| B \| C"` in canonical member order |
+| unions | `"union { A, B, C }"` in canonical member order |
 | function types | `"fn(i32, i32) : i32"` or `"fn(a : i32, b : i32) : void"` |
 
 `t::kind` and `t::name` are the only members available for every type; `t::min` and `t::max` are restricted to numeric types. The same validity rules apply when the receiver is a value: `v::kind` and `v::name` inspect `typeof(v)`, while `v::fields` requires `typeof(v)` to be a struct. A type's constituent parts are reached through the [reflection sequences](#reflection-sequences), which exist only for structs, enums, and unions.
@@ -2879,7 +2982,7 @@ enum TypeKind {
 	Tuple,     // tuple { T1, T2, ... }
 	Enum,
 	Struct,
-	Union,     // A | B
+	Union,     // union { A, B }
 	Fn         // fn(...) : R
 }
 ```
@@ -2904,7 +3007,7 @@ if T == Vec3 {
 }
 ```
 
-Type comparison follows the identity rules of the types themselves: structural types compare structurally, so `A | B` equals `B | A` (see [Tagged unions](#tagged-unions)), while two distinct `struct` declarations with identical fields are different types.
+Type comparison follows the identity rules of the types themselves: structural types compare structurally, so `union { A, B }` equals `union { B, A }` (see [Tagged unions](#tagged-unions)), while two distinct `struct` declarations with identical fields are different types.
 
 A type comparison is always compile-time known, so an `if` on one is always a [compile-time branch](#compile-time-branches) and the branch not taken is not type-checked. That is what lets the taken branch use members that exist only on the compared type.
 
@@ -3363,6 +3466,16 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 		- word operators keep the word-operator convention: `and`, `or`, and `not` sit together at the bottom of the precedence ladder, as in Python and Lua, rather than `not` sitting with unary `-` the way C's `!` does
 		- the two constraints are independent: looser than the comparisons makes `not a == b` and `not e is T` read as written, while tighter than `and` keeps De Morgan rewriting direct (`not a and not b` negates each operand, not the conjunction)
 		- C's placement is a known trap - `!a == b` silently means `(!a) == b`. Requiring `bool` operands would turn that into a compile-time error here anyway, so the precedence choice is about ergonomics rather than safety
+	- evaluation order is left to right and defined, with the assignment target before the right-hand side
+		- C leaves operand and argument order unspecified, which makes `f(a(), b())` a portability trap; Go, Java and C# define left to right, and Zig behaves that way in practice without documenting it. Rust and C++17 evaluate the right-hand side of a primitive compound assignment first, for reasons tied to their borrow and sequencing models that do not apply here
+		- target first reads in the order the statement is written, and it keeps `values[next()] += compute()` and `values[next()] = compute()` consistent with each other
+		- the cost is that a target which contains a call, or that reads memory the right-hand side may write, is evaluated into a temporary once; plain locals, constant offsets and call-free right-hand sides keep the direct code
+	- bitwise operators are integer-only and sit above the comparisons
+		- C places `&`, `^`, and `|` below `==` and `<`, so `x & mask == 0` silently means `x & (mask == 0)`. With no implicit conversion to `bool` that would be a type error here, but the intended reading is almost always the other one, so the bitwise operators bind tighter than the comparisons, as in Go, Rust, Zig, and Odin
+		- unary `~` is a separate token from `not`: `not` is boolean-only and `~` is integer-only, so neither can be applied to the wrong kind of value by accident
+		- `~` of an untyped constant is `-a - 1` regardless of context, as in Go, Zig and Odin, so hoisting an inline `~0` into a named constant never changes its meaning. The cost is that an unsigned destination needs a typed operand or a cast
+		- over-wide shifts are defined instead of undefined, as in Odin and Go (x64 instead masks the count): the shift count of a real program is often data, and C's behavior there is a long-standing source of miscompiles. The cost is one extra compare on the runtime path for non-constant counts
+		- enums are excluded for the same reason they are excluded from arithmetic; flag sets are written as integer constants or wrapped in a struct
 	- typeless struct literals do not participate in operator overload resolution
 		- expected-type inference remains useful when one destination type is already known, such as an annotated variable, return, or function argument
 		- using a candidate parameter as that expected type makes overload selection recursive and creates surprising ambiguities
@@ -3387,7 +3500,7 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 - tagged unions
 	- the member type is the tag; no named variants (Rust-style `enum` payloads) keeps the feature small - two variants with the same payload type use wrapper structs
 		- var a : SomeUnion = SomeMember { 1, "foo" }; is possible and uses only existing language features
-	- structural set semantics (order-insensitive, flattening) so anonymous unions like `Error | ASTNode` compose across modules and call layers
+	- structural set semantics (order-insensitive, flattening) so anonymous unions like `union { Error, ASTNode }` compose across modules and call layers
 	- subset → superset widening is implicit so error unions propagate without manual re-wrapping, including through [`else return`](#union-extraction-and-propagation)
 	- promotion in `match`/`is` is flow-typing; keeping the checker simple was preferred over a borrow-like aliasing rule
 	- [narrowing](#narrowing) is one residual-type rule (member set minus excluded members) shared by the `else` branch, the `match` fallback arm, and post-early-return flow; promotion to a single member is just the case where one member is left
@@ -3447,7 +3560,7 @@ core:vec3: line 28, column 14: Arithmetic operands must have the same type
 	- slicing
 	- concatenation
 * union tag is always 4 bytes
-* how can we push unions if we don't know the tag value of variants, i.e. U = A | B - we don't know if A's tag is 0 or 1
+* how can we push unions if we don't know the tag value of variants, i.e. U = union { A, B } - we don't know if A's tag is 0 or 1
 
 * https://verdagon.dev/grimoire/grimoire#the-list
 * should we make string literal to cstr cast explicit?

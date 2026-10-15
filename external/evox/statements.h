@@ -76,6 +76,8 @@ struct AssignStatement : Statement {
 	Expression* rhs = nullptr;
 	Token::Type op = Token::EQUAL;
 	FunctionExpression* resolved_op_fn = nullptr;
+	// Set by the type checker for `_ = rhs;`: rhs is evaluated and its result is dropped.
+	bool discard = false;
 };
 
 struct IfStatement : Statement {

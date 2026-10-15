@@ -45,6 +45,12 @@ enum class ExIrOpKind {
 	OR,
 	NEG,
 	NOT,
+	BIT_AND,
+	BIT_OR,
+	BIT_XOR,
+	BIT_NOT,
+	SHL,
+	SHR,
 
 	NOP,
 	PUSH_LOCAL_ADDR,
@@ -295,12 +301,21 @@ struct ExOpUnary : ExIrOp {
 
 struct ExOpNeg : ExOpUnary { ExOpNeg() : ExOpUnary(ExIrOpKind::NEG) {} };
 struct ExOpNot : ExOpUnary { ExOpNot() : ExOpUnary(ExIrOpKind::NOT) {} };
+struct ExOpBitNot : ExOpUnary { ExOpBitNot() : ExOpUnary(ExIrOpKind::BIT_NOT) {} };
 
 struct ExOpAdd : ExOpBinary { ExOpAdd() : ExOpBinary(ExIrOpKind::ADD) {} };
 struct ExOpSub : ExOpBinary { ExOpSub() : ExOpBinary(ExIrOpKind::SUB) {} };
 struct ExOpMul : ExOpBinary { ExOpMul() : ExOpBinary(ExIrOpKind::MUL) {} };
 struct ExOpDiv : ExOpBinary { ExOpDiv() : ExOpBinary(ExIrOpKind::DIV) {} };
 struct ExOpMod : ExOpBinary { ExOpMod() : ExOpBinary(ExIrOpKind::MOD) {} };
+
+// Bitwise and shift operators; operand_type is the type of the value operand.
+// The right operand of a shift is always a u64 count.
+struct ExOpBitAnd : ExOpBinary { ExOpBitAnd() : ExOpBinary(ExIrOpKind::BIT_AND) {} };
+struct ExOpBitOr : ExOpBinary { ExOpBitOr() : ExOpBinary(ExIrOpKind::BIT_OR) {} };
+struct ExOpBitXor : ExOpBinary { ExOpBitXor() : ExOpBinary(ExIrOpKind::BIT_XOR) {} };
+struct ExOpShl : ExOpBinary { ExOpShl() : ExOpBinary(ExIrOpKind::SHL) {} };
+struct ExOpShr : ExOpBinary { ExOpShr() : ExOpBinary(ExIrOpKind::SHR) {} };
 
 struct ExOpAnd : ExOpBinary { ExOpAnd() : ExOpBinary(ExIrOpKind::AND) {} };
 struct ExOpOr : ExOpBinary { ExOpOr() : ExOpBinary(ExIrOpKind::OR) {} };

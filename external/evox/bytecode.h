@@ -239,6 +239,39 @@ typedef enum ex_op {
 
 	EX_OP_NOT,
 
+	// Bitwise ops. Signedness does not matter, so they are selected by width.
+	EX_OP_BAND_8,
+	EX_OP_BAND_16,
+	EX_OP_BAND_32,
+	EX_OP_BAND_64,
+	EX_OP_BOR_8,
+	EX_OP_BOR_16,
+	EX_OP_BOR_32,
+	EX_OP_BOR_64,
+	EX_OP_BXOR_8,
+	EX_OP_BXOR_16,
+	EX_OP_BXOR_32,
+	EX_OP_BXOR_64,
+	EX_OP_BNOT_8,
+	EX_OP_BNOT_16,
+	EX_OP_BNOT_32,
+	EX_OP_BNOT_64,
+	// Shifts: operands are dst, value, count. The count register is always a
+	// u64 whatever the type of the shifted value; a count >= the bit width
+	// gives 0 (or 0/-1 for arithmetic right shift), it is never masked.
+	EX_OP_SHL_8,
+	EX_OP_SHL_16,
+	EX_OP_SHL_32,
+	EX_OP_SHL_64,
+	EX_OP_SHR_I8,
+	EX_OP_SHR_U8,
+	EX_OP_SHR_I16,
+	EX_OP_SHR_U16,
+	EX_OP_SHR_I32,
+	EX_OP_SHR_U32,
+	EX_OP_SHR_I64,
+	EX_OP_SHR_U64,
+
 	EX_OP_EQ,
 	EX_OP_NE,
 	EX_OP_LT,
@@ -295,6 +328,9 @@ typedef enum ex_op {
 	// Terminates execution and reports the UTF-8 slice in its register operand.
 	EX_OP_PANIC,
 } ex_op;
+
+// Opcodes are emitted as single bytes.
+typedef char ex_op_fits_in_a_byte[(EX_OP_PANIC < 256) ? 1 : -1];
 
 typedef enum ex_function_kind {
 	EX_FUNCTION_SCRIPT = 0,

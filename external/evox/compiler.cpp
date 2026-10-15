@@ -390,10 +390,12 @@ static void appendReflectedTypeName(char*& out, char* end, const ResolvedType& t
 		case ResolvedTypeKind::NULLABLE: text("?"); appendReflectedTypeName(out, end, *static_cast<const NullableResolvedType&>(type).inner); return;
 		case ResolvedTypeKind::UNION: {
 			const UnionResolvedType& u = static_cast<const UnionResolvedType&>(type);
+			text("union { ");
 			for (i32 i = 0; i < u.members.size(); ++i) {
-				if (i) text(" | ");
+				if (i) text(", ");
 				appendReflectedTypeName(out, end, *u.members[i]);
 			}
+			text(" }");
 			return;
 		}
 		default: text("type"); return;
@@ -721,7 +723,7 @@ struct Checker {
 		return memcmp(a.value, b.value, size) == 0;
 	}
 
-	// we intern unions type to make sure A | B is the same type as B | A
+	// we intern unions type to make sure union { A, B } is the same type as union { B, A }
 	UnionResolvedType* getUnionType(ExpArray<ResolvedType*>& members) {
 		ExpArray<ResolvedType*> unique_members(module.arena);
 		// flatten nested unions and remove duplicates
@@ -933,10 +935,12 @@ struct Checker {
 			}
 			case ResolvedTypeKind::UNION: {
 				const UnionResolvedType* un = static_cast<const UnionResolvedType*>(type);
+				error("union { ");
 				for (i32 i = 0; i < un->members.size(); ++i) {
-					if (i > 0) error(" | ");
+					if (i > 0) error(", ");
 					error(un->members[i]);
 				}
+				error(" }");
 				return;
 			}
 			default:
@@ -1485,6 +1489,7 @@ struct Checker {
 				st->lhs = cloneExpression(unit, s->lhs, bindings);
 				st->rhs = cloneExpression(unit, s->rhs, bindings);
 				st->op = s->op;
+				st->discard = s->discard;
 				out = st;
 				break;
 			}
@@ -1731,6 +1736,13 @@ struct Checker {
 			}
 			case Expression::UNARY: {
 				const UnaryExpression& un = static_cast<const UnaryExpression&>(expr);
+				if (un.op == Token::TILDE && expr.comptime_value.kind == ComptimeValue::VALUE && expr.comptime_value.type
+					&& expr.comptime_value.type->kind == ResolvedTypeKind::UNTYPED_INT) {
+					// the folded constant -a - 1 decides, not the operand
+					const i64 value = comptimeNumericToI64(expr.comptime_value.value, ResolvedTypeKind::UNTYPED_INT);
+					if (value < 0) return negatedIntLiteralFitsType(u64(-(value + 1)) + 1, concrete.kind);
+					return intLiteralFitsType((u64)value, concrete.kind);
+				}
 				if (un.op == Token::MINUS && un.expression->resolved_type->kind == ResolvedTypeKind::UNTYPED_INT) {
 					u64 magnitude;
 					if (un.expression->kind == Expression::INT_LITERAL) {
@@ -1748,8 +1760,9 @@ struct Checker {
 			}
 			case Expression::BINARY: {
 				const BinaryExpression& bin = static_cast<const BinaryExpression&>(expr);
+				const bool is_shift = bin.op == Token::SHIFT_LEFT || bin.op == Token::SHIFT_RIGHT;
 				return (!bin.lhs || canMakeConcrete(*bin.lhs, concrete))
-					&& (!bin.rhs || canMakeConcrete(*bin.rhs, concrete));
+					&& (is_shift || !bin.rhs || canMakeConcrete(*bin.rhs, concrete));
 			}
 			case Expression::TERNARY: {
 				const TernaryExpression& tern = static_cast<const TernaryExpression&>(expr);
@@ -2334,7 +2347,10 @@ struct Checker {
 		FunctionResolvedType* fn_type = static_cast<FunctionResolvedType*>(fn.resolved_type);
 		if (const Token::Type op_token = tokenFromOperatorName(sym.name); op_token != Token::ERROR) {
 			const i32 arity = (i32)fn_type->params.size();
-			if ((op_token == Token::MINUS ? (arity != 1 && arity != 2) : arity != 2)) {
+			const bool bad_arity = op_token == Token::MINUS ? (arity != 1 && arity != 2)
+				: op_token == Token::TILDE ? arity != 1
+				: arity != 2;
+			if (bad_arity) {
 				errorLine(sym.token, "Invalid operator arity");
 				return EX_RESULT_FAILURE;
 			}
@@ -2939,7 +2955,7 @@ struct Checker {
 			}
 		}
 
-		// union, e.g. var a : i32 | bool = 42;
+		// union, e.g. var a : union { i32, bool } = 42;
 		if (concrete->kind == ResolvedTypeKind::UNION && isUntypedNumeric(*expr.resolved_type)) {
 			UnionResolvedType& un = static_cast<UnionResolvedType&>(*concrete);
 			ResolvedType* member = nullptr;
@@ -2989,8 +3005,10 @@ struct Checker {
 			}
 			case Expression::BINARY: {
 				BinaryExpression& bin = static_cast<BinaryExpression&>(expr);
+				const bool is_shift = bin.op == Token::SHIFT_LEFT || bin.op == Token::SHIFT_RIGHT;
 				if (bin.lhs) makeConcrete(*bin.lhs, concrete, false);
-				if (bin.rhs) makeConcrete(*bin.rhs, concrete, false);
+				// the count of a shift is independent of the shifted type; the VM takes it as u64
+				if (bin.rhs) makeConcrete(*bin.rhs, is_shift ? primitiveType(ResolvedTypeKind::U64) : concrete, false);
 				break;
 			}
 			case Expression::TERNARY: {
@@ -3027,10 +3045,12 @@ struct Checker {
 			expr.eval_stage = Expression::COMPTIME_VALUE;
 			return &expr;
 		}
-		Expression* inner = checkExpr(unit, ctx, *un.expression, hint);
+		// `~` never takes the contextual type: an untyped operand stays untyped and the
+		// result is the untyped constant -a - 1, exactly as for a named comptime constant.
+		Expression* inner = checkExpr(unit, ctx, *un.expression, un.op == Token::TILDE ? nullptr : hint);
 		if (!inner) return nullptr;
 
-		if (un.op == Token::MINUS && inner->resolved_type->kind == ResolvedTypeKind::STRUCT) {
+		if ((un.op == Token::MINUS || un.op == Token::TILDE) && inner->resolved_type->kind == ResolvedTypeKind::STRUCT) {
 			ResolvedType* overload_result = nullptr;
 			FunctionExpression* overload_fn = nullptr;
 			StructExpression* host = static_cast<StructResolvedType*>(inner->resolved_type)->decl;
@@ -3066,6 +3086,31 @@ struct Checker {
 				expr.eval_stage = un.expression->eval_stage;
 				return &expr;
 			}
+			case Token::TILDE:
+				if (!isIntegerOrUntyped(*inner->resolved_type)) {
+					errorLine(expr.token, "Cannot apply bitwise negation operator to ", inner->resolved_type);
+					return nullptr;
+				}
+				expr.resolved_type = inner->resolved_type;
+				expr.eval_stage = un.expression->eval_stage;
+				if (inner->resolved_type->kind == ResolvedTypeKind::UNTYPED_INT) {
+					// Remember the folded value: it decides whether the constant fits a
+					// concrete type later, and a negative value never fits an unsigned one.
+					++suppress_errors;
+					u8* const saved_stack = comptime_stack_ptr;
+					ComptimeValue folded = evalComptime(unit, expr, ctx);
+					if (folded && folded.kind == ComptimeValue::VALUE && folded.type) {
+						const u32 size = typeByteSize(*folded.type);
+						u8* persistent = static_cast<u8*>(module.arena.allocate(module.arena.user_data, size, 1));
+						copyMemory(persistent, folded.value, size);
+						expr.comptime_value = {ComptimeValue::VALUE, folded.type, persistent};
+					}
+					// the scratch stack is allocated by the first evaluation, so a null
+					// saved pointer means "back to the base"
+					comptime_stack_ptr = saved_stack ? saved_stack : comptime_stack;
+					--suppress_errors;
+				}
+				return &expr;
 			case Token::NOT:
 				if (!typesEqual(inner->resolved_type, primitiveType(ResolvedTypeKind::BOOL))) {
 					errorLine(expr.token, "Cannot apply not operator to ", inner->resolved_type);
@@ -3095,7 +3140,9 @@ struct Checker {
 		// typeless struct literals are not allowed in operators
 		// so we can't use structs as hints
 		const bool lhs_is_struct = lhs && lhs->resolved_type->kind == ResolvedTypeKind::STRUCT;
-		Expression* rhs_expr = checkExpr(unit, ctx, *bin.rhs, lhs_is_struct ? nullptr : (lhs ? lhs->resolved_type : hint));
+		// the count of a shift is independent of the shifted value, so it never takes its type as a hint
+		const bool is_shift = bin.op == Token::SHIFT_LEFT || bin.op == Token::SHIFT_RIGHT;
+		Expression* rhs_expr = checkExpr(unit, ctx, *bin.rhs, (lhs_is_struct || is_shift) ? nullptr : (lhs ? lhs->resolved_type : hint));
 		ResolvedType* rhs = rhs_expr ? rhs_expr->resolved_type : nullptr;
 		if (!rhs) return nullptr;
 		if (bin.op == Token::IS && rhs->kind != ResolvedTypeKind::META && bin.rhs->kind == Expression::TYPE_LITERAL) {
@@ -3106,7 +3153,7 @@ struct Checker {
 		}
 		// Retry the lhs once the rhs gives it a non-struct contextual type.
 		// try to use rhs's type as hint for lhs, e.g. 2 * v, or .Idle == e
-		if (!lhs) lhs = checkExpr(unit, ctx, *bin.lhs, rhs->kind == ResolvedTypeKind::STRUCT ? nullptr : rhs);
+		if (!lhs) lhs = checkExpr(unit, ctx, *bin.lhs, is_shift ? hint : (rhs->kind == ResolvedTypeKind::STRUCT ? nullptr : rhs));
 		if (!lhs) return nullptr;
 		if (bin.op == Token::IS) {
 			if (lhs->resolved_type->kind != ResolvedTypeKind::UNION || rhs->kind != ResolvedTypeKind::META) {
@@ -3242,6 +3289,48 @@ struct Checker {
 				result = resolveNumeric(NumericMode::ARITHMETIC);
 				break;
 			case Token::PERCENT: result = resolveNumeric(NumericMode::INTEGER); break;
+			case Token::AMPERSAND:
+			case Token::PIPE:
+			case Token::CARET:
+				result = resolveNumeric(NumericMode::INTEGER);
+				break;
+			case Token::SHIFT_LEFT:
+			case Token::SHIFT_RIGHT: {
+				if (!isIntegerOrUntyped(*lhs->resolved_type) || !isIntegerOrUntyped(*rhs)) {
+					errorLine(expr.token, "Operator ", operatorSymbolName(bin.op), " expects integer operands, got ", lhs->resolved_type, " and ", rhs);
+					return nullptr;
+				}
+				if (bin.rhs->kind == Expression::UNARY) {
+					const UnaryExpression& count = static_cast<const UnaryExpression&>(*bin.rhs);
+					if (count.op == Token::MINUS && count.expression->kind == Expression::INT_LITERAL) {
+						errorLine(expr.token, "Shift count must not be negative");
+						return nullptr;
+					}
+				}
+				ResolvedType* value_type = lhs->resolved_type;
+				if (value_type->kind == ResolvedTypeKind::UNTYPED_INT && rhs->kind == ResolvedTypeKind::UNTYPED_INT) {
+					// a constant shifted by a constant stays untyped
+					result = value_type;
+					break;
+				}
+				if (value_type->kind == ResolvedTypeKind::UNTYPED_INT) {
+					// an untyped value shifted by a runtime count takes the contextual integer type
+					ResolvedType* i32 = primitiveType(ResolvedTypeKind::I32);
+					ResolvedType* i64 = primitiveType(ResolvedTypeKind::I64);
+					ResolvedType* target = nullptr;
+					if (hint && isIntegerType(*hint) && canMakeConcrete(*bin.lhs, *hint)) target = hint;
+					else if (canMakeConcrete(*bin.lhs, *i32)) target = i32;
+					else target = i64;
+					value_type = makeConcrete(*bin.lhs, target);
+					if (!value_type) return nullptr;
+				}
+				if (rhs->kind == ResolvedTypeKind::UNTYPED_INT) {
+					// the VM takes the count as a u64
+					if (!makeConcrete(*bin.rhs, primitiveType(ResolvedTypeKind::U64))) return nullptr;
+				}
+				result = value_type;
+				break;
+			}
 			case Token::EQUAL_EQUAL:
 			case Token::BANG_EQUAL: {
 				// Equality also works on non-numerics such as enums; only unify when numeric.
@@ -4901,6 +4990,21 @@ struct Checker {
 	}
 
 	bool checkAssignStatement(Unit& unit, FunctionCheckContext& ctx, AssignStatement& assign) {
+		if (assign.lhs->kind == Expression::IDENTIFIER && equalStrings(static_cast<IdentifierExpression*>(assign.lhs)->name, "_")) {
+			if (assign.op != Token::EQUAL) {
+				errorLine(assign.token, "Discard target _ can only be assigned with =");
+				return false;
+			}
+			if (!checkExpr(unit, &ctx, *assign.rhs, nullptr)) return false;
+			if (assign.rhs->resolved_type->kind == ResolvedTypeKind::VOID) {
+				errorLine(assign.token, "Cannot discard a void value");
+				return false;
+			}
+			if (!requireMaterializable(*assign.rhs, "an assignment value")) return false;
+			makeConcrete(*assign.rhs, nullptr);
+			assign.discard = true;
+			return true;
+		}
 		bool writable = false;
 		Expression* lhs_expr = checkAssignableExpr(unit, &ctx, *assign.lhs, writable);
 		if (!lhs_expr) return false;
@@ -4912,10 +5016,18 @@ struct Checker {
 		ResolvedType* lhs_type = lhs_expr->resolved_type;
 		assign.lhs->resolved_type = lhs_type;
 
+		const bool shift_assign = assign.op == Token::SHIFT_LEFT_EQUAL || assign.op == Token::SHIFT_RIGHT_EQUAL;
+		const bool bitwise_assign = shift_assign || assign.op == Token::AMPERSAND_EQUAL
+			|| assign.op == Token::PIPE_EQUAL || assign.op == Token::CARET_EQUAL;
+		if (bitwise_assign && isNumericType(*lhs_type) && !isIntegerType(*lhs_type)) {
+			errorLine(assign.token, "Bitwise compound assignment expects an integer target, got ", lhs_type);
+			return false;
+		}
+
 		const bool custom_compound = assign.op != Token::EQUAL && !isNumericType(*lhs_type);
 		
 		ResolvedType* rhs_type;
-		if (custom_compound) {
+		if (custom_compound || shift_assign) {
 			Expression* expr = checkExpr(unit, &ctx, *assign.rhs, nullptr);
 			if (!expr) return false;
 			rhs_type = expr->resolved_type;
@@ -4940,6 +5052,25 @@ struct Checker {
 			}
 		}
 
+		if (shift_assign && isNumericType(*lhs_type)) {
+			// the count may have any integer type; it does not have to match the target
+			if (!isIntegerOrUntyped(*rhs_type)) {
+				errorLine(assign.token, "Shift count must be an integer, got ", rhs_type);
+				return false;
+			}
+			if (assign.rhs->kind == Expression::UNARY) {
+				const UnaryExpression& count = static_cast<const UnaryExpression&>(*assign.rhs);
+				if (count.op == Token::MINUS && count.expression->kind == Expression::INT_LITERAL) {
+					errorLine(assign.token, "Shift count must not be negative");
+					return false;
+				}
+			}
+			if (rhs_type->kind == ResolvedTypeKind::UNTYPED_INT) {
+				if (!makeConcrete(*assign.rhs, primitiveType(ResolvedTypeKind::U64))) return false;
+			}
+			return true;
+		}
+
 		if (isNumericType(*lhs_type)) {
 			if (!canImplicitlyConvert(rhs_type, lhs_type)) {
 				errorLine(assign.token, "Cannot convert ", rhs_type, " to ", lhs_type, " for compound assignment");
@@ -4959,10 +5090,20 @@ struct Checker {
 			case Token::PLUS_EQUAL:
 			case Token::MINUS_EQUAL:
 			case Token::STAR_EQUAL:
-			case Token::SLASH_EQUAL: {
+			case Token::SLASH_EQUAL:
+			case Token::AMPERSAND_EQUAL:
+			case Token::PIPE_EQUAL:
+			case Token::CARET_EQUAL:
+			case Token::SHIFT_LEFT_EQUAL:
+			case Token::SHIFT_RIGHT_EQUAL: {
 				const Token::Type base_op = assign.op == Token::PLUS_EQUAL	   ? Token::PLUS
 											: assign.op == Token::MINUS_EQUAL ? Token::MINUS
 											: assign.op == Token::STAR_EQUAL  ? Token::STAR
+											: assign.op == Token::AMPERSAND_EQUAL ? Token::AMPERSAND
+											: assign.op == Token::PIPE_EQUAL ? Token::PIPE
+											: assign.op == Token::CARET_EQUAL ? Token::CARET
+											: assign.op == Token::SHIFT_LEFT_EQUAL ? Token::SHIFT_LEFT
+											: assign.op == Token::SHIFT_RIGHT_EQUAL ? Token::SHIFT_RIGHT
 																			   : Token::SLASH;
 				Expression* operands[2] = {assign.lhs, assign.rhs};
 				FunctionExpression* op_fn = nullptr;
@@ -5740,6 +5881,10 @@ struct Checker {
 			case Statement::EXPRESSION: {
 				ExpressionStatement* expr = static_cast<ExpressionStatement*>(st);
 				if (!checkExpr(unit, &ctx, *expr->expression, nullptr)) return false;
+				if (expr->expression->kind == Expression::CALL && expr->expression->resolved_type->kind != ResolvedTypeKind::VOID) {
+					errorLine(expr->expression->token, "Result of call is ignored; assign it to _ to discard it");
+					return false;
+				}
 				if (!requireMaterializable(*expr->expression, "a runtime expression")) return false;
 				// A discarded expression has no context to pin its width; default it to i32.
 				makeConcrete(*expr->expression, nullptr);
@@ -6148,6 +6293,18 @@ struct Checker {
 				}
 				lhs /= rhs;
 				break;
+			case Token::AMPERSAND_EQUAL:
+			case Token::PIPE_EQUAL:
+			case Token::CARET_EQUAL:
+				if constexpr ((Arithmetic)0.5 == (Arithmetic)0) {
+					// integer storage only; the checker rejects these on floats
+					if (op == Token::AMPERSAND_EQUAL) lhs = (Arithmetic)(lhs & rhs);
+					else if (op == Token::PIPE_EQUAL) lhs = (Arithmetic)(lhs | rhs);
+					else lhs = (Arithmetic)(lhs ^ rhs);
+					break;
+				}
+				EX_ASSERT(false);
+				return false;
 			default: EX_ASSERT(false); return false;
 		}
 		lhs_value = (Storage)lhs;
@@ -6271,6 +6428,7 @@ struct Checker {
 				AssignStatement& assign = static_cast<AssignStatement&>(statement);
 				ComptimeValue value = evalComptime(unit, *assign.rhs, nullptr, nullptr, &frame);
 				if (!value) return value;
+				if (assign.discard) return {ComptimeValue::VOID};
 
 				u8* lhs_bytes = nullptr;
 				ResolvedType* lhs_type = nullptr;
@@ -6290,6 +6448,21 @@ struct Checker {
 				if (!isNumericType(*lhs_type) || !isNumericType(*value.type)) {
 					errorLine(assign.token, "Comptime compound assignment requires numeric values");
 					return {};
+				}
+				if (assign.op == Token::SHIFT_LEFT_EQUAL || assign.op == Token::SHIFT_RIGHT_EQUAL) {
+					if (!isIntegerOrUntyped(*lhs_type) || !isIntegerOrUntyped(*value.type)) {
+						errorLine(assign.token, "Shift requires integer values");
+						return {};
+					}
+					const u32 size = typeByteSize(*lhs_type);
+					u64 raw = 0;
+					memcpy(&raw, lhs_bytes, size);
+					bool negative_count = false;
+					u64 count = 0;
+					comptimeShiftCount(value, negative_count, count);
+					const u64 bits = comptimeShift(assign.op == Token::SHIFT_LEFT_EQUAL, isSignedIntegerKind(lhs_type->kind), size, raw, negative_count, count);
+					memcpy(lhs_bytes, &bits, size);
+					return {ComptimeValue::VOID};
 				}
 				EX_ASSERT(typesEqual(lhs_type, value.type));
 				bool applied = false;
@@ -6431,6 +6604,87 @@ struct Checker {
 			}
 			default: return false;
 		}
+	}
+
+	static bool isSignedIntegerKind(ResolvedTypeKind kind) {
+		return kind == ResolvedTypeKind::I8 || kind == ResolvedTypeKind::I16 || kind == ResolvedTypeKind::I32
+			|| kind == ResolvedTypeKind::I64 || kind == ResolvedTypeKind::ISIZE || kind == ResolvedTypeKind::UNTYPED_INT;
+	}
+
+	// Reads the count of a shift. A negative signed count is reported separately
+	// so that it is treated as over-wide, whatever its magnitude.
+	void comptimeShiftCount(const ComptimeValue& value, bool& negative, u64& count) {
+		const u32 size = typeByteSize(*value.type);
+		u64 raw = 0;
+		memcpy(&raw, value.value, size);
+		negative = false;
+		count = raw;
+		if (!isSignedIntegerKind(value.type->kind)) return;
+		if (size < 8) {
+			const u64 sign = (u64)1 << (size * 8 - 1);
+			raw = (raw ^ sign) - sign;
+		}
+		if ((i64)raw < 0) negative = true;
+		count = raw;
+	}
+
+	// Shifts the low `size` bytes of `raw`. Counts >= the bit width are defined:
+	// `<<` and logical `>>` give 0 and arithmetic `>>` gives 0 or -1.
+	static u64 comptimeShift(bool left, bool is_signed, u32 size, u64 raw, bool negative_count, u64 count) {
+		const u32 width = size * 8;
+		const u64 mask = size >= 8 ? ~(u64)0 : (((u64)1 << width) - 1);
+		const bool over = negative_count || count >= width;
+		raw &= mask;
+		u64 bits = 0;
+		if (left) {
+			bits = over ? 0 : raw << count;
+		}
+		else if (is_signed) {
+			i64 value = (i64)raw;
+			if (size < 8) {
+				const u64 sign = (u64)1 << (width - 1);
+				value = (i64)((raw ^ sign) - sign);
+			}
+			bits = over ? (value < 0 ? ~(u64)0 : 0) : (u64)(value >> count);
+		}
+		else {
+			bits = over ? 0 : raw >> count;
+		}
+		return bits & mask;
+	}
+
+	ComptimeValue evalComptimeBitwise(const BinaryExpression& be, const ComptimeValue& lhs, const ComptimeValue& rhs) {
+		if (lhs.kind != ComptimeValue::VALUE || rhs.kind != ComptimeValue::VALUE
+			|| !isIntegerOrUntyped(*lhs.type) || !isIntegerOrUntyped(*rhs.type)) {
+			errorLine(be.token, "Operator ", operatorSymbolName(be.op), " requires integer values, got ", lhs.type, " and ", rhs.type);
+			return {};
+		}
+		if (be.op == Token::SHIFT_LEFT || be.op == Token::SHIFT_RIGHT) {
+			const u32 size = typeByteSize(*lhs.type);
+			u64 raw = 0;
+			memcpy(&raw, lhs.value, size);
+			bool negative_count = false;
+			u64 count = 0;
+			comptimeShiftCount(rhs, negative_count, count);
+			const u64 bits = comptimeShift(be.op == Token::SHIFT_LEFT, isSignedIntegerKind(lhs.type->kind), size, raw, negative_count, count);
+			return copyComptimeValue(lhs.type, &bits, size);
+		}
+
+		// & | ^: an untyped operand adopts the type of the other one
+		ResolvedType* type = lhs.type->kind == ResolvedTypeKind::UNTYPED_INT ? rhs.type : lhs.type;
+		if (lhs.type->kind != ResolvedTypeKind::UNTYPED_INT && rhs.type->kind != ResolvedTypeKind::UNTYPED_INT
+			&& !typesEqual(lhs.type, rhs.type)) {
+			errorLine(be.token, "Expected matching integer types, got ", lhs.type, " and ", rhs.type);
+			return {};
+		}
+		const u32 size = typeByteSize(*type);
+		u64 a = 0;
+		u64 b = 0;
+		memcpy(&a, lhs.value, typeByteSize(*lhs.type));
+		memcpy(&b, rhs.value, typeByteSize(*rhs.type));
+		u64 bits = be.op == Token::AMPERSAND ? (a & b) : be.op == Token::PIPE ? (a | b) : (a ^ b);
+		if (size < 8) bits &= ((u64)1 << (size * 8)) - 1;
+		return copyComptimeValue(type, &bits, size);
 	}
 
 	template <typename T>
@@ -7021,6 +7275,11 @@ struct Checker {
 						: makeComptimeResult(lhs_bool || rhs_bool, res_bytes);
 				}
 
+				if (be.op == Token::AMPERSAND || be.op == Token::PIPE || be.op == Token::CARET
+					|| be.op == Token::SHIFT_LEFT || be.op == Token::SHIFT_RIGHT) {
+					return evalComptimeBitwise(be, lhs, rhs);
+				}
+
 				if (!isNumericOrUntyped(*lhs.type) || !isNumericOrUntyped(*rhs.type)) {
 					errorLine(be.token, "Expected numeric values, got ", lhs.type, " and ", rhs.type);
 					return {};
@@ -7146,7 +7405,7 @@ struct Checker {
 			case Expression::NULL_LITERAL: {
 				auto& nl = static_cast<NullLiteralExpression&>(expr);
 				if (!nl.resolved_type) {
-					// e.g. `comptime A = B | null;`
+					// e.g. `comptime A = null;`
 					errorLine(nl.token, "Null literal must have a type");
 					return {};
 				}
@@ -7353,6 +7612,19 @@ struct Checker {
 					value = !value;
 					memcpy(operand_type.value, &value, sizeof(value));
 					return operand_type;
+				}
+
+				if (un.op == Token::TILDE) {
+					if (!isIntegerOrUntyped(*operand_type.type)) {
+						errorLine(un.token, "Bitwise negation is only valid for integers, got ", operand_type.type);
+						return {};
+					}
+					const u32 size = typeByteSize(*operand_type.type);
+					u64 bits = 0;
+					memcpy(&bits, operand_type.value, size);
+					bits = ~bits;
+					if (size < 8) bits &= ((u64)1 << (size * 8)) - 1;
+					return copyComptimeValue(operand_type.type, &bits, size);
 				}
 
 				EX_ASSERT(un.op == Token::MINUS);

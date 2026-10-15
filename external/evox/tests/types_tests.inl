@@ -209,7 +209,7 @@ TEST(UntypedLiteralsConcretizeInAllContexts) {
 		fn identity(value : $T) : T { return value; }
 
 		comptime global_value : i16 = 1;
-		comptime Number = i32 | []const u8;
+		comptime Number = union { i32, []const u8 };
 
 		fn main() : i32 {
 			var assigned : i16 = 0;
@@ -260,12 +260,12 @@ TEST(UntypedLiteralsConcretizeInAllContexts) {
 	EXPECT_COMPILE(source);
 	EXPECT_COMPILE_FAIL(R"(
 		fn main() : void {
-			const ambiguous : i32 | i64 = 1;
+			const ambiguous : union { i32, i64 } = 1;
 		}
 	)");
 	EXPECT_COMPILE_FAIL(R"(
 		fn main() : void {
-			const ambiguous : i8 | i16 = 255;
+			const ambiguous : union { i8, i16 } = 255;
 		}
 	)");
 	return true;
@@ -274,7 +274,7 @@ TEST(UntypedLiteralsConcretizeInAllContexts) {
 TEST(UntypedLiteralsConcretizeInAllContextsWithUnion) {
 	EXPECT_COMPILE(R"(
 		fn main() : void {
-			const u : i8 | bool = 1;
+			const u : union { i8, bool } = 1;
 		}
 	)");
 
@@ -290,7 +290,7 @@ TEST(ComptimeUntypedIntegerMustFitAnnotatedType) {
 
 TEST(ComptimeUntypedIntegerUnionMustBeUnambiguous) {
 	EXPECT_COMPILE_FAIL(R"(
-		comptime value : i8 | i16 = 1;
+		comptime value : union { i8, i16 } = 1;
 	)");
 	return true;
 }

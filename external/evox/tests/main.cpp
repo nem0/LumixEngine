@@ -420,6 +420,10 @@ static void nativeReenter(ex_runtime* runtime, ex_call_frame) {
 #include "any_tests.inl"
 #include "interpolation_tests.inl"
 #include "yield_tests.inl"
+#include "expression_statement_tests.inl"
+#include "bitwise_tests.inl"
+#include "compound_assignment_tests.inl"
+#include "evaluation_order_tests.inl"
 
 int main(int argc, char** argv) {
 	const char* test_name = nullptr;

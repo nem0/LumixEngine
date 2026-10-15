@@ -227,12 +227,19 @@ static const char* evoxc_opcode_name(ex_op op) {
 	static const char* const madd[] = {"MADD_F32", "MADD_F64", "MSUB_F32", "MSUB_F64", "NMADD_F32", "NMADD_F64", "NMSUB_F32", "NMSUB_F64"};
 	static const char* const div[] = {"DIV_I8", "DIV_U8", "DIV_I16", "DIV_U16", "DIV_I32", "DIV_U32", "DIV_I64", "DIV_U64", "DIV_F32", "DIV_F64"};
 	static const char* const mod[] = {"MOD_I8", "MOD_U8", "MOD_I16", "MOD_U16", "MOD_I32", "MOD_U32", "MOD_I64", "MOD_U64"};
+	static const char* const bit_ops[] = {
+		"BAND_8", "BAND_16", "BAND_32", "BAND_64", "BOR_8", "BOR_16", "BOR_32", "BOR_64",
+		"BXOR_8", "BXOR_16", "BXOR_32", "BXOR_64", "BNOT_8", "BNOT_16", "BNOT_32", "BNOT_64",
+		"SHL_8", "SHL_16", "SHL_32", "SHL_64",
+		"SHR_I8", "SHR_U8", "SHR_I16", "SHR_U16", "SHR_I32", "SHR_U32", "SHR_I64", "SHR_U64"
+	};
 	static const char* const add_imm[] = {"ADD_8_IMM", "ADD_16_IMM", "ADD_32_IMM", "ADD_64_IMM", "ADD_F32_IMM", "ADD_F64_IMM"};
 	static const char* const sub_imm[] = {"SUB_8_IMM", "SUB_16_IMM", "SUB_32_IMM", "SUB_64_IMM", "SUB_F32_IMM", "SUB_F64_IMM"};
 	static const char* const mul_imm[] = {"MUL_8_IMM", "MUL_16_IMM", "MUL_32_IMM", "MUL_64_IMM", "MUL_F32_IMM", "MUL_F64_IMM"};
 	static const char* const div_imm[] = {"DIV_I8_IMM", "DIV_U8_IMM", "DIV_I16_IMM", "DIV_U16_IMM", "DIV_I32_IMM", "DIV_U32_IMM", "DIV_I64_IMM", "DIV_U64_IMM", "DIV_F32_IMM", "DIV_F64_IMM"};
 	static const char* const mod_imm[] = {"MOD_I8_IMM", "MOD_U8_IMM", "MOD_I16_IMM", "MOD_U16_IMM", "MOD_I32_IMM", "MOD_U32_IMM", "MOD_I64_IMM", "MOD_U64_IMM"};
 	if (op >= EX_OP_NEG_I8 && op <= EX_OP_NEG_F64) return unary[(u32)op - (u32)EX_OP_NEG_I8];
+	if (op >= EX_OP_BAND_8 && op <= EX_OP_SHR_U64) return bit_ops[(u32)op - (u32)EX_OP_BAND_8];
 	if (op >= EX_OP_ADD_8 && op <= EX_OP_ADD_F64) return add[(u32)op - (u32)EX_OP_ADD_8];
 	if (op >= EX_OP_SUB_8 && op <= EX_OP_SUB_F64) return sub[(u32)op - (u32)EX_OP_SUB_8];
 	if (op >= EX_OP_MUL_8 && op <= EX_OP_MUL_F64) return mul[(u32)op - (u32)EX_OP_MUL_8];
@@ -334,17 +341,15 @@ static const char* evoxc_opcode_name(ex_op op) {
 }
 
 static u32 evoxc_immediate_size(ex_op op) {
-	if ((op >= EX_OP_ADD_8_IMM && op <= EX_OP_ADD_F64_IMM)
-		|| (op >= EX_OP_SUB_8_IMM && op <= EX_OP_SUB_F64_IMM)
-		|| (op >= EX_OP_MUL_8_IMM && op <= EX_OP_MUL_F64_IMM)
-		|| (op >= EX_OP_DIV_I8_IMM && op <= EX_OP_DIV_F64_IMM)) {
-		const u32 index = op >= EX_OP_DIV_I8_IMM ? (u32)(op - EX_OP_DIV_I8_IMM) % 10u : (op >= EX_OP_MUL_8_IMM ? (u32)(op - EX_OP_MUL_8_IMM) % 6u : op >= EX_OP_SUB_8_IMM ? (u32)(op - EX_OP_SUB_8_IMM) % 6u : (u32)(op - EX_OP_ADD_8_IMM));
-		return index < 1 ? 1u : index < 2 ? 2u : index < 3 ? 4u : index < 4 ? 8u : index == 4 ? 4u : 8u;
-	}
-	if (op >= EX_OP_MOD_I8_IMM && op <= EX_OP_MOD_U64_IMM) {
-		const u32 index = (u32)(op - EX_OP_MOD_I8_IMM);
-		return index < 2 ? 1u : index < 4 ? 2u : index < 6 ? 4u : 8u;
-	}
+	// Immediate widths in enum order, matching the operand sizes the runtime reads.
+	static const u32 arith_sizes[] = {1, 2, 4, 8, 4, 8}; // 8, 16, 32, 64, F32, F64
+	static const u32 div_sizes[] = {1, 1, 2, 2, 4, 4, 8, 8, 4, 8}; // I8, U8, I16, U16, I32, U32, I64, U64, F32, F64
+	static const u32 mod_sizes[] = {1, 1, 2, 2, 4, 4, 8, 8}; // I8, U8, I16, U16, I32, U32, I64, U64
+	if (op >= EX_OP_ADD_8_IMM && op <= EX_OP_ADD_F64_IMM) return arith_sizes[(u32)(op - EX_OP_ADD_8_IMM)];
+	if (op >= EX_OP_SUB_8_IMM && op <= EX_OP_SUB_F64_IMM) return arith_sizes[(u32)(op - EX_OP_SUB_8_IMM)];
+	if (op >= EX_OP_MUL_8_IMM && op <= EX_OP_MUL_F64_IMM) return arith_sizes[(u32)(op - EX_OP_MUL_8_IMM)];
+	if (op >= EX_OP_DIV_I8_IMM && op <= EX_OP_DIV_F64_IMM) return div_sizes[(u32)(op - EX_OP_DIV_I8_IMM)];
+	if (op >= EX_OP_MOD_I8_IMM && op <= EX_OP_MOD_U64_IMM) return mod_sizes[(u32)(op - EX_OP_MOD_I8_IMM)];
 	return 0;
 }
 
@@ -566,7 +571,13 @@ static void evoxc_dump_bytecode(const ex_bytecode* bytecode, const char* source_
 			case EX_OP_SUB_8: case EX_OP_SUB_16: case EX_OP_SUB_32: case EX_OP_SUB_64: case EX_OP_SUB_F32: case EX_OP_SUB_F64:
 			case EX_OP_MUL_8: case EX_OP_MUL_16: case EX_OP_MUL_32: case EX_OP_MUL_64: case EX_OP_MUL_F32: case EX_OP_MUL_F64:
 			case EX_OP_DIV_I8: case EX_OP_DIV_U8: case EX_OP_DIV_I16: case EX_OP_DIV_U16: case EX_OP_DIV_I32: case EX_OP_DIV_U32: case EX_OP_DIV_I64: case EX_OP_DIV_U64: case EX_OP_DIV_F32: case EX_OP_DIV_F64:
-			case EX_OP_MOD_I8: case EX_OP_MOD_U8: case EX_OP_MOD_I16: case EX_OP_MOD_U16: case EX_OP_MOD_I32: case EX_OP_MOD_U32: case EX_OP_MOD_I64: case EX_OP_MOD_U64: {
+			case EX_OP_MOD_I8: case EX_OP_MOD_U8: case EX_OP_MOD_I16: case EX_OP_MOD_U16: case EX_OP_MOD_I32: case EX_OP_MOD_U32: case EX_OP_MOD_I64: case EX_OP_MOD_U64:
+			case EX_OP_BAND_8: case EX_OP_BAND_16: case EX_OP_BAND_32: case EX_OP_BAND_64:
+			case EX_OP_BOR_8: case EX_OP_BOR_16: case EX_OP_BOR_32: case EX_OP_BOR_64:
+			case EX_OP_BXOR_8: case EX_OP_BXOR_16: case EX_OP_BXOR_32: case EX_OP_BXOR_64:
+			case EX_OP_SHL_8: case EX_OP_SHL_16: case EX_OP_SHL_32: case EX_OP_SHL_64:
+			case EX_OP_SHR_I8: case EX_OP_SHR_U8: case EX_OP_SHR_I16: case EX_OP_SHR_U16:
+			case EX_OP_SHR_I32: case EX_OP_SHR_U32: case EX_OP_SHR_I64: case EX_OP_SHR_U64: {
 				const u32 dst = evoxc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 lhs = evoxc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 rhs = evoxc_read_u32(fn->code, fn->code_size, &pc);
@@ -725,6 +736,7 @@ static void evoxc_dump_bytecode(const ex_bytecode* bytecode, const char* source_
 				break;
 			}
 			case EX_OP_NOT:
+			case EX_OP_BNOT_8: case EX_OP_BNOT_16: case EX_OP_BNOT_32: case EX_OP_BNOT_64:
 			case EX_OP_NEG_I8: case EX_OP_NEG_U8: case EX_OP_NEG_I16: case EX_OP_NEG_U16: case EX_OP_NEG_I32: case EX_OP_NEG_U32: case EX_OP_NEG_I64: case EX_OP_NEG_U64: case EX_OP_NEG_F32: case EX_OP_NEG_F64: {
 				const u32 dst = evoxc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 src = evoxc_read_u32(fn->code, fn->code_size, &pc);

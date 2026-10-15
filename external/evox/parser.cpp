@@ -59,7 +59,6 @@ struct Parser {
 
 	static int precedence(Token::Type type) {
 		switch (type) {
-			case Token::PIPE: return 1;
 			case Token::OR: return 1;
 			case Token::AND: return 2;
 			case Token::EQUAL_EQUAL:
@@ -69,11 +68,16 @@ struct Parser {
 			case Token::GT_EQUAL:
 			case Token::LT_EQUAL:
 			case Token::IS: return 4;
+			case Token::PIPE: return 5;
+			case Token::CARET: return 6;
+			case Token::AMPERSAND: return 7;
+			case Token::SHIFT_LEFT:
+			case Token::SHIFT_RIGHT: return 8;
 			case Token::PLUS:
-			case Token::MINUS: return 5;
+			case Token::MINUS: return 9;
 			case Token::STAR:
 			case Token::SLASH:
-			case Token::PERCENT: return 6;
+			case Token::PERCENT: return 10;
 			default: return 0;
 		}
 	}
@@ -104,6 +108,16 @@ struct Parser {
 			case Token::DOLLAR: return "$";
 			case Token::HASH: return "#";
 			case Token::PIPE: return "|";
+			case Token::AMPERSAND: return "&";
+			case Token::CARET: return "^";
+			case Token::TILDE: return "~";
+			case Token::SHIFT_LEFT: return "<<";
+			case Token::SHIFT_RIGHT: return ">>";
+			case Token::AMPERSAND_EQUAL: return "&=";
+			case Token::PIPE_EQUAL: return "|=";
+			case Token::CARET_EQUAL: return "^=";
+			case Token::SHIFT_LEFT_EQUAL: return "<<=";
+			case Token::SHIFT_RIGHT_EQUAL: return ">>=";
 			case Token::PLUS: return "+";
 			case Token::MINUS: return "-";
 			case Token::STAR: return "*";
@@ -127,6 +141,7 @@ struct Parser {
 			case Token::STRUCT: return "struct";
 			case Token::ENUM: return "enum";
 			case Token::FN: return "fn";
+			case Token::UNION: return "union";
 			case Token::VAR: return "var";
 			case Token::CONST: return "const";
 			case Token::DEFER: return "defer";
@@ -216,7 +231,10 @@ struct Parser {
 	}
 
 	Expression* numberLiteral(Token token) {
-		if (contains(token.value, '.') || contains(token.value, 'e') || contains(token.value, 'E')) {
+		// `e` and `E` are hexadecimal digits in `0x...` literals, not exponent markers
+		const bool is_hex = token.value.length > 1 && token.value.begin[0] == '0'
+			&& (token.value.begin[1] == 'x' || token.value.begin[1] == 'X');
+		if (!is_hex && (contains(token.value, '.') || contains(token.value, 'e') || contains(token.value, 'E'))) {
 			double value = 0.0;
 			fromCString(token.value, value);
 			FloatLiteralExpression* expr = makeExpr<FloatLiteralExpression>(token);
@@ -316,6 +334,9 @@ struct Parser {
 			case Token::RANGE_INCLUSIVE:
 			case Token::QUESTION:
 			case Token::PIPE:
+			case Token::CARET:
+			case Token::SHIFT_LEFT:
+			case Token::SHIFT_RIGHT:
 			case Token::PLUS:
 			case Token::MINUS:
 			case Token::STAR:
@@ -326,6 +347,11 @@ struct Parser {
 			case Token::MINUS_EQUAL:
 			case Token::STAR_EQUAL:
 			case Token::SLASH_EQUAL:
+			case Token::AMPERSAND_EQUAL:
+			case Token::PIPE_EQUAL:
+			case Token::CARET_EQUAL:
+			case Token::SHIFT_LEFT_EQUAL:
+			case Token::SHIFT_RIGHT_EQUAL:
 			case Token::PLUS_PLUS:
 			case Token::MINUS_MINUS:
 			case Token::EQUAL_EQUAL:
@@ -353,9 +379,7 @@ struct Parser {
 				consumeToken();
 				slice->is_const = true;
 			}
-			// `false` so that `[]u8 | i32` is a union of a slice and i32, not a slice of a union;
-			// the trailing `|` is picked up by binaryExpression
-			slice->element_type = type(false);
+			slice->element_type = type();
 			return slice->element_type ? slice : nullptr;
 		}
 
@@ -397,7 +421,7 @@ struct Parser {
 	
 		ArrayTypeExpression* array = makeExpr<ArrayTypeExpression>(token);
 		array->size = first;
-		array->element_type = type(false);
+		array->element_type = type();
 		return array->element_type ? array : nullptr;
 	}
 
@@ -456,6 +480,7 @@ struct Parser {
 				if (expr) expr->token = token;
 				return expr;
 			}
+			case Token::UNION: return unionType(token);
 			case Token::NULL_KW: return makeExpr<NullLiteralExpression>(token);
 			case Token::UNDEFINED: return makeExpr<UndefinedExpression>(token);
 			case Token::ZERO: return makeExpr<ZeroExpression>(token);
@@ -466,12 +491,12 @@ struct Parser {
 					consumeToken();
 					pointer->is_const = true;
 				}
-				pointer->inner = type(false);
+				pointer->inner = type();
 				return pointer->inner ? pointer : nullptr;
 			}
 			case Token::QUESTION: {
 				NullableTypeExpression* nullable = makeExpr<NullableTypeExpression>(token);
-				nullable->inner = type(false);
+				nullable->inner = type();
 				return nullable->inner ? nullable : nullptr;
 			}
 			case Token::VOID:
@@ -794,7 +819,8 @@ struct Parser {
 				pointer->inner = type();
 				return pointer->inner ? pointer : nullptr;
 			}
-			case Token::MINUS: {
+			case Token::MINUS:
+			case Token::TILDE: {
 				consumeToken();
 				UnaryExpression* expr = makeExpr<UnaryExpression>(token);
 				expr->op = token.type;
@@ -940,7 +966,31 @@ struct Parser {
 		return true;
 	}
 
-	Expression* type(bool allow_union = true) {
+	// Parse `union { A, B, ... }`, a structural union type. A nested union member is flattened into the outer one.
+	Expression* unionType(Token token) {
+		if (!consume(Token::LEFT_BRACE)) return nullptr;
+		UnionTypeExpression* union_type = makeExpr<UnionTypeExpression>(token, m_unit.arena);
+		while (peekToken().type != Token::RIGHT_BRACE) {
+			Expression* member = type();
+			if (!member) return nullptr;
+			if (member->kind == Expression::UNION_TYPE) {
+				for (Expression* inner : static_cast<UnionTypeExpression*>(member)->members) union_type->members.push(inner);
+			}
+			else {
+				union_type->members.push(member);
+			}
+			if (peekToken().type != Token::COMMA) break;
+			consumeToken();
+		}
+		if (!consume(Token::RIGHT_BRACE)) return nullptr;
+		if (union_type->members.size() < 2) {
+			m_output.errorAt(token, "union needs at least two members");
+			return nullptr;
+		}
+		return union_type;
+	}
+
+	Expression* type() {
 		// Parse prefix brackets and nullable syntax recursively.
 		// Examples:
 		// - [4]i32: array of 4 ints
@@ -973,7 +1023,7 @@ struct Parser {
 						consumeToken();
 						slice->is_const = true;
 					}
-					slice->element_type = type(false);
+					slice->element_type = type();
 					if (!slice->element_type) return nullptr;
 					res = slice;
 					break;
@@ -984,7 +1034,7 @@ struct Parser {
 				if (!consume(Token::RIGHT_BRACKET)) return nullptr;
 				ArrayTypeExpression* array = makeExpr<ArrayTypeExpression>(token);
 				array->size = size;
-				array->element_type = type(false);
+				array->element_type = type();
 				if (!array->element_type) return nullptr;
 				res = array;
 				break;
@@ -995,13 +1045,14 @@ struct Parser {
 					consumeToken();
 					pointer->is_const = true;
 				}
-				pointer->inner = type(false);
+				pointer->inner = type();
 				if (!pointer->inner) return nullptr;
 				res = pointer;
 				break;
 			}
+			case Token::UNION: return unionType(token);
 			case Token::QUESTION: {
-				Expression* inner = type(false);
+				Expression* inner = type();
 				if (!inner) return nullptr;
 				NullableTypeExpression* nullable = makeExpr<NullableTypeExpression>(token);
 				nullable->inner = inner;
@@ -1043,7 +1094,7 @@ struct Parser {
 				break;
 			}
 			case Token::LEFT_PAREN: {
-				res = type(true);
+				res = type();
 				if (!res || !consume(Token::RIGHT_PAREN)) return nullptr;
 				break;
 			}
@@ -1109,17 +1160,7 @@ struct Parser {
 			res = index;
 		}
 
-		if (!allow_union || peekToken().type != Token::PIPE) return res;
-
-		UnionTypeExpression* union_type = makeExpr<UnionTypeExpression>(res->token, m_unit.arena);
-		union_type->members.push(res);
-		while (peekToken().type == Token::PIPE) {
-			consumeToken();
-			Expression* member = type();
-			if (!member) return nullptr;
-			union_type->members.push(member);
-		}
-		return union_type;
+		return res;
 	}
 
 	// Parse a binary expression, e.g. `a + b` or `x * y`. 
@@ -1136,22 +1177,6 @@ struct Parser {
 			consumeToken();
 			Expression* rhs = binaryExpression(prec + 1, mode);
 			if (!rhs) return nullptr;
-			if (op.type == Token::PIPE) {
-				UnionTypeExpression* union_type = makeExpr<UnionTypeExpression>(op, m_unit.arena);
-				const auto append = [&](Expression* expr) {
-					if (expr->kind == Expression::UNION_TYPE) {
-						for (Expression* member : static_cast<UnionTypeExpression*>(expr)->members) union_type->members.push(member);
-					}
-					else {
-						union_type->members.push(expr);
-					}
-				};
-				append(lhs);
-				append(rhs);
-				lhs = union_type;
-				continue;
-			}
-
 			BinaryExpression* bin = makeExpr<BinaryExpression>(op);
 			bin->lhs = lhs;
 			bin->rhs = rhs;
@@ -1553,6 +1578,11 @@ struct Parser {
 					case Token::MINUS_EQUAL:
 					case Token::STAR_EQUAL:
 					case Token::SLASH_EQUAL:
+					case Token::AMPERSAND_EQUAL:
+					case Token::PIPE_EQUAL:
+					case Token::CARET_EQUAL:
+					case Token::SHIFT_LEFT_EQUAL:
+					case Token::SHIFT_RIGHT_EQUAL:
 					{
 						consumeToken();
 						AssignStatement* res = makeStmt<AssignStatement>(op);

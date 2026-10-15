@@ -51,7 +51,7 @@ fn main() : i32 {
 		if f > flips {
 			flips = f;
 		}
-		if nperm % 2 == 0 {
+		if (nperm & 1) == 0 {
 			checksum += f;
 		} else {
 			checksum -= f;

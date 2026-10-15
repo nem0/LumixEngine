@@ -47,7 +47,7 @@ TEST(ExternStructRejectsNonCAbiFields) {
 	EXPECT_COMPILE_FAIL(R"(
 		struct A { value : i32; }
 		struct B { value : i32; }
-		comptime U = A | B;
+		comptime U = union { A, B };
 		extern struct Bad {
 			value : U;
 		}
@@ -619,7 +619,7 @@ TEST(ZeroInitializesLocalsToZero) {
 		}
 
 		fn main() : i32 {
-			dirty();
+			_ = dirty();
 			var n : i32 = zero;
 			var f : f32 = zero;
 			var o : Outer = zero;

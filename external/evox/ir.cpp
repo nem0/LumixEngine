@@ -268,6 +268,81 @@ struct IRBuilder {
 		return load;
 	}
 
+	// True when the address does not depend on any memory: a local or global plus
+	// constants. Its value cannot change while the right-hand side runs.
+	static bool isFixedAddress(const ExIrOp& op) {
+		switch (op.kind) {
+			case ExIrOpKind::LOAD_CONST:
+			case ExIrOpKind::FRAME_PTR:
+			case ExIrOpKind::PUSH_LOCAL_ADDR:
+			case ExIrOpKind::PUSH_GLOBAL_ADDR:
+				return true;
+			case ExIrOpKind::BOUNDS_CHECK: return isFixedAddress(*static_cast<const ExOpBoundsCheck&>(op).index);
+			case ExIrOpKind::CAST: return isFixedAddress(*static_cast<const ExOpCast&>(op).value);
+			case ExIrOpKind::ADD:
+			case ExIrOpKind::SUB:
+			case ExIrOpKind::MUL: {
+				const auto& binary = static_cast<const ExOpBinary&>(op);
+				return isFixedAddress(*binary.lhs) && isFixedAddress(*binary.rhs);
+			}
+			default:
+				return false;
+		}
+	}
+
+	// True when evaluating `op` writes no memory and calls nothing: it only reads, so
+	// evaluating it again with no write in between gives the same result. Expressions can
+	// only write through calls, so anything that is not recognized here is treated as
+	// having side effects.
+	static bool isSideEffectFree(const ExIrOp& op) {
+		switch (op.kind) {
+			case ExIrOpKind::LOAD_CONST:
+			case ExIrOpKind::LOAD_BYTES:
+			case ExIrOpKind::FRAME_PTR:
+			case ExIrOpKind::PUSH_LOCAL_ADDR:
+			case ExIrOpKind::PUSH_GLOBAL_ADDR:
+			case ExIrOpKind::NULL_VALUE:
+			case ExIrOpKind::STRING_LITERAL:
+				return true;
+			case ExIrOpKind::LOAD: return isSideEffectFree(*static_cast<const ExOpLoad&>(op).addr);
+			case ExIrOpKind::CAST: return isSideEffectFree(*static_cast<const ExOpCast&>(op).value);
+			case ExIrOpKind::MATERIALIZE_ADDR: return isSideEffectFree(*static_cast<const ExOpMaterializeAddr&>(op).value);
+			case ExIrOpKind::EXTRACT_VALUE: return isSideEffectFree(*static_cast<const ExOpExtractValue&>(op).value);
+			case ExIrOpKind::BOUNDS_CHECK: return isSideEffectFree(*static_cast<const ExOpBoundsCheck&>(op).index);
+			case ExIrOpKind::NEG:
+			case ExIrOpKind::NOT:
+			case ExIrOpKind::BIT_NOT:
+				return isSideEffectFree(*static_cast<const ExOpUnary&>(op).operand);
+			case ExIrOpKind::SLICE_REF: {
+				const auto& ref = static_cast<const ExOpSliceRef&>(op);
+				return isSideEffectFree(*ref.slice) && isSideEffectFree(*ref.index);
+			}
+			case ExIrOpKind::ADD:
+			case ExIrOpKind::SUB:
+			case ExIrOpKind::MUL:
+			case ExIrOpKind::DIV:
+			case ExIrOpKind::MOD:
+			case ExIrOpKind::BIT_AND:
+			case ExIrOpKind::BIT_OR:
+			case ExIrOpKind::BIT_XOR:
+			case ExIrOpKind::SHL:
+			case ExIrOpKind::SHR:
+			case ExIrOpKind::EQ:
+			case ExIrOpKind::NE:
+			case ExIrOpKind::LT:
+			case ExIrOpKind::LE:
+			case ExIrOpKind::GT:
+			case ExIrOpKind::GE:
+			case ExIrOpKind::AND:
+			case ExIrOpKind::OR: {
+				const auto& binary = static_cast<const ExOpBinary&>(op);
+				return isSideEffectFree(*binary.lhs) && isSideEffectFree(*binary.rhs);
+			}
+			default:
+				return false;
+		}
+	}
+
 	ExIrOp& offsetAddress(ExIrOp& address, u64 bytes) {
 		if (bytes == 0) return address;
 		auto& add = alloc<ExOpAdd>();
@@ -1178,6 +1253,12 @@ struct IRBuilder {
 					call.args[0] = &operand;
 					return call;
 				}
+				if (unary.op == Token::TILDE) {
+					auto& op = alloc<ExOpBitNot>();
+					op.operand_type = unary.resolved_type;
+					op.operand = &operand;
+					return op;
+				}
 				if (unary.op == Token::MINUS) {
 					auto& op = alloc<ExOpNeg>();
 					op.operand_type = unary.resolved_type;
@@ -1248,11 +1329,18 @@ struct IRBuilder {
 					case Token::BANG_EQUAL: op = &alloc<ExOpNe>(); break;
 					case Token::AND: op = &alloc<ExOpAnd>(); break;
 					case Token::OR: op = &alloc<ExOpOr>(); break;
+					case Token::AMPERSAND: op = &alloc<ExOpBitAnd>(); break;
+					case Token::PIPE: op = &alloc<ExOpBitOr>(); break;
+					case Token::CARET: op = &alloc<ExOpBitXor>(); break;
+					case Token::SHIFT_LEFT: op = &alloc<ExOpShl>(); break;
+					case Token::SHIFT_RIGHT: op = &alloc<ExOpShr>(); break;
 					default: EX_ASSERT(false); break;
 				}
+				ExIrOp* rhs_op = &rhs;
+				if (be.op == Token::SHIFT_LEFT || be.op == Token::SHIFT_RIGHT) rhs_op = &buildShiftCountIR(rhs, *be.rhs->resolved_type);
 				op->operand_type = be.lhs->resolved_type;
 				op->lhs = &lhs;
-				op->rhs = &rhs;
+				op->rhs = rhs_op;
 				return *op;
 			}
 			case Expression::TERNARY: {
@@ -1268,6 +1356,18 @@ struct IRBuilder {
 		EX_ASSERT(false);
 		static ExIrOp dummy(ExIrOpKind::RETURN);
 		return dummy;
+	}
+
+	// Shift counts are always passed to the VM as u64, whatever their source type.
+	ExIrOp& buildShiftCountIR(ExIrOp& count, ResolvedType& count_type) {
+		if (count_type.kind == ResolvedTypeKind::U64) return count;
+		EX_ASSERT(count_type.kind != ResolvedTypeKind::UNTYPED_INT);
+		static ResolvedType u64_type(ResolvedTypeKind::U64);
+		auto& cast = alloc<ExOpCast>();
+		cast.type = &u64_type;
+		cast.target_type = &count_type;
+		cast.value = &count;
+		return cast;
 	}
 
 	void emitDefers(ExIrBlockData& parent, u32 mark) {
@@ -1311,6 +1411,11 @@ struct IRBuilder {
 			case ExIrOpKind::MUL:
 			case ExIrOpKind::DIV:
 			case ExIrOpKind::MOD:
+			case ExIrOpKind::BIT_AND:
+			case ExIrOpKind::BIT_OR:
+			case ExIrOpKind::BIT_XOR:
+			case ExIrOpKind::SHL:
+			case ExIrOpKind::SHR:
 			case ExIrOpKind::AND:
 			case ExIrOpKind::OR: {
 				auto& bin = *static_cast<ExOpBinary*>(node);
@@ -1319,6 +1424,7 @@ struct IRBuilder {
 				break;
 			}
 			case ExIrOpKind::NOT:
+			case ExIrOpKind::BIT_NOT:
 			case ExIrOpKind::NEG: {
 				auto& unary = *static_cast<ExOpUnary*>(node);
 				hoistConditionConstants(unary.operand, parent);
@@ -1923,8 +2029,33 @@ struct IRBuilder {
 			}
 			case Statement::ASSIGN: {
 				auto& as = static_cast<AssignStatement&>(st);
-				auto& rhs = buildImplicitConversionIR(*as.rhs, *as.lhs->resolved_type);
-				auto& lhs = buildExpressionIR(*as.lhs, false);
+				if (as.discard) {
+					parent.ops.push(&buildExpressionIR(*as.rhs, true));
+					return;
+				}
+				const bool shift_assign = as.op == Token::SHIFT_LEFT_EQUAL || as.op == Token::SHIFT_RIGHT_EQUAL;
+				// a shift count keeps its own type, so it is not converted to the target type
+				ExIrOp& rhs = shift_assign
+					? buildExpressionIR(*as.rhs, true)
+					: buildImplicitConversionIR(*as.rhs, *as.lhs->resolved_type);
+				ExIrOp* target_address = &buildExpressionIR(*as.lhs, false);
+				// The target is evaluated once, before the right-hand side, for `=` and for
+				// compound assignment: `a[f()] = g()` calls f then g, `a[f()] += 1` calls f once,
+				// and `a[i] += g()` uses the same `i` for the read and the write even when g
+				// changes it. That is only observable when something can write or call in
+				// between, so plain targets with a plain right-hand side keep their direct form.
+				const bool needs_single_evaluation = !isFixedAddress(*target_address)
+					&& (!isSideEffectFree(*target_address) || !isSideEffectFree(rhs) || as.resolved_op_fn);
+				if (needs_single_evaluation) {
+					// Evaluate the address into a temporary and go through that.
+					static ResolvedType address_type(ResolvedTypeKind::CPTR);
+					auto& slot = allocAlloca(&address_type, {}, target_address);
+					parent.ops.push(&slot);
+					ExIrOp& address = loadAllocaValue(slot);
+					address.result_mode = ExIrOp::ADDRESS;
+					target_address = &address;
+				}
+				auto& lhs = *target_address;
 				if (as.op == Token::EQUAL) {
 					auto& cpy = alloc<ExOpCopy>();
 					cpy.src = &rhs;
@@ -1958,11 +2089,16 @@ struct IRBuilder {
 					case Token::PLUS_EQUAL: op = &alloc<ExOpAdd>(); break;
 					case Token::MINUS_EQUAL: op = &alloc<ExOpSub>(); break;
 					case Token::SLASH_EQUAL: op = &alloc<ExOpDiv>(); break;
+					case Token::AMPERSAND_EQUAL: op = &alloc<ExOpBitAnd>(); break;
+					case Token::PIPE_EQUAL: op = &alloc<ExOpBitOr>(); break;
+					case Token::CARET_EQUAL: op = &alloc<ExOpBitXor>(); break;
+					case Token::SHIFT_LEFT_EQUAL: op = &alloc<ExOpShl>(); break;
+					case Token::SHIFT_RIGHT_EQUAL: op = &alloc<ExOpShr>(); break;
 					default: EX_ASSERT(false); return;
 				}
 				op->operand_type = as.lhs->resolved_type;
 				op->lhs = lhs_value;
-				op->rhs = &rhs;
+				op->rhs = shift_assign ? &buildShiftCountIR(rhs, *as.rhs->resolved_type) : &rhs;
 				auto& cpy = alloc<ExOpCopy>();
 				cpy.src = op;
 				cpy.dst = &lhs;
@@ -2587,6 +2723,8 @@ struct BytecodeCompiler {
 		const u32 operand = emitOperand(*op.operand);
 		if (op.kind == ExIrOpKind::NEG)
 			emitOp(ex_op(EX_OP_NEG_I8 + numericKindIndex(*op.operand_type)));
+		else if (op.kind == ExIrOpKind::BIT_NOT)
+			emitOp(ex_op(EX_OP_BNOT_8 + bitWidthIndex(*op.operand_type)));
 		else
 			emitOp(EX_OP_NOT);
 		const u32 result = dst ? dst->dst : stack_top;
@@ -2928,6 +3066,36 @@ struct BytecodeCompiler {
 		emit(ordered_addend);
 		if (!dst) stack_top += size;
 		return result;
+	}
+
+	// 0..3 for 8, 16, 32 and 64 bit integers.
+	static u32 bitWidthIndex(const ResolvedType& type) {
+		switch (typeByteSize(type)) {
+			case 1: return 0;
+			case 2: return 1;
+			case 4: return 2;
+			default: EX_ASSERT(typeByteSize(type) == 8); return 3;
+		}
+	}
+
+	u32 emitBitwise(const ExOpBinary& ir_op, EmitDst* dst) {
+		const u32 lhs = emitOperand(*ir_op.lhs);
+		const u32 rhs = emitOperand(*ir_op.rhs);
+		const u32 width = bitWidthIndex(*ir_op.operand_type);
+		switch (ir_op.kind) {
+			case ExIrOpKind::BIT_AND: emitOp(ex_op(EX_OP_BAND_8 + width)); break;
+			case ExIrOpKind::BIT_OR: emitOp(ex_op(EX_OP_BOR_8 + width)); break;
+			case ExIrOpKind::BIT_XOR: emitOp(ex_op(EX_OP_BXOR_8 + width)); break;
+			case ExIrOpKind::SHL: emitOp(ex_op(EX_OP_SHL_8 + width)); break;
+			case ExIrOpKind::SHR: emitOp(ex_op(EX_OP_SHR_I8 + numericKindIndex(*ir_op.operand_type))); break;
+			default: EX_ASSERT(false); break;
+		}
+		const u32 ret = dst ? dst->dst : stack_top;
+		emit(ret);
+		emit(lhs);
+		emit(rhs);
+		if (!dst) stack_top += typeByteSize(*ir_op.operand_type);
+		return ret;
 	}
 
 	u32 emitBinary(ex_op base_op, const ExOpBinary& ir_op, EmitDst* dst) {
@@ -3671,6 +3839,8 @@ struct BytecodeCompiler {
 		tryGetOffsetAddress(*op.addr, address_base, address_offset);
 		u32 frame_offset = 0;
 		if (tryGetDirectFrameAddress(*op.addr, frame_offset)) {
+			// The value already sits in the destination slot: nothing to copy.
+			if (dst && dst->dst == frame_offset) return frame_offset;
 			const u32 ret = dst ? dst->dst : stack_top;
 			emitOp(EX_OP_COPY);
 			emit(ret);
@@ -3712,6 +3882,7 @@ struct BytecodeCompiler {
 			}
 			case ExIrOpKind::NEG:
 			case ExIrOpKind::NOT:
+			case ExIrOpKind::BIT_NOT:
 				return canForward(*static_cast<const ExOpUnary&>(op).operand);
 			case ExIrOpKind::CAST:
 				return canForward(*static_cast<const ExOpCast&>(op).value);
@@ -3722,6 +3893,11 @@ struct BytecodeCompiler {
 			case ExIrOpKind::MUL:
 			case ExIrOpKind::DIV:
 			case ExIrOpKind::MOD:
+			case ExIrOpKind::BIT_AND:
+			case ExIrOpKind::BIT_OR:
+			case ExIrOpKind::BIT_XOR:
+			case ExIrOpKind::SHL:
+			case ExIrOpKind::SHR:
 			case ExIrOpKind::EQ:
 			case ExIrOpKind::NE:
 			case ExIrOpKind::LT:
@@ -3799,10 +3975,13 @@ struct BytecodeCompiler {
 		u32 arg_size = 0;
 		for (u32 i = 0; i < call.arg_count; ++i) {
 			args[i] = emit(*call.args[i], nullptr);
-			emitOp(EX_OP_COPY);
-			emit(arg_base + arg_size);
-			emit(args[i]);
-			emit(call.arg_sizes[i]);
+			// Already evaluated into its argument slot: nothing to copy.
+			if (args[i] != arg_base + arg_size) {
+				emitOp(EX_OP_COPY);
+				emit(arg_base + arg_size);
+				emit(args[i]);
+				emit(call.arg_sizes[i]);
+			}
 			arg_size += call.arg_sizes[i];
 		}
 		if (stack_top > stack_high_water) stack_high_water = stack_top;
@@ -3993,6 +4172,7 @@ struct BytecodeCompiler {
 			case ExIrOpKind::SLICE_LOAD: result = emitSliceLoad(static_cast<ExOpSliceLoad&>(op)); break;
 			case ExIrOpKind::SLICE: result = emitSlice(static_cast<ExOpSlice&>(op)); break;
 			case ExIrOpKind::NEG:
+			case ExIrOpKind::BIT_NOT:
 			case ExIrOpKind::NOT: result = emitUnary(static_cast<ExOpUnary&>(op), dst); break;
 			case ExIrOpKind::AND:
 			case ExIrOpKind::OR: result = emitShortCircuit(static_cast<ExOpBinary&>(op)); break;
@@ -4042,6 +4222,11 @@ struct BytecodeCompiler {
 			case ExIrOpKind::SUB: result = emitBinary(EX_OP_SUB_8, static_cast<ExOpBinary&>(op), dst); break;
 			case ExIrOpKind::DIV: result = emitBinary(EX_OP_DIV_I8, static_cast<ExOpBinary&>(op), dst); break;
 			case ExIrOpKind::MOD: result = emitBinary(EX_OP_MOD_I8, static_cast<ExOpBinary&>(op), dst); break;
+			case ExIrOpKind::BIT_AND:
+			case ExIrOpKind::BIT_OR:
+			case ExIrOpKind::BIT_XOR:
+			case ExIrOpKind::SHL:
+			case ExIrOpKind::SHR: result = emitBitwise(static_cast<ExOpBinary&>(op), dst); break;
 			case ExIrOpKind::LOAD_CONST: result = emitLoadConst(static_cast<ExOpLoadConst&>(op), dst); break;
 			case ExIrOpKind::LOAD_BYTES: result = emitLoadBytes(static_cast<ExOpLoadBytes&>(op), dst); break;
 			case ExIrOpKind::UNION_CONVERT: result = emitUnionConvert(static_cast<ExOpUnionConvert&>(op)); break;
@@ -4117,6 +4302,7 @@ struct BytecodeCompiler {
 				break;
 			}
 			case ExIrOpKind::NOT:
+			case ExIrOpKind::BIT_NOT:
 			case ExIrOpKind::NEG: {
 				auto& v = *static_cast<ExOpUnary*>(op);
 				optimize(v.operand);
@@ -4179,6 +4365,11 @@ struct BytecodeCompiler {
 			}
 			case ExIrOpKind::DIV:
 			case ExIrOpKind::MOD:
+			case ExIrOpKind::BIT_AND:
+			case ExIrOpKind::BIT_OR:
+			case ExIrOpKind::BIT_XOR:
+			case ExIrOpKind::SHL:
+			case ExIrOpKind::SHR:
 			case ExIrOpKind::COMPARE:
 			case ExIrOpKind::EQ:
 			case ExIrOpKind::NE:

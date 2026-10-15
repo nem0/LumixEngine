@@ -1462,7 +1462,7 @@ TEST(DebugTaggedUnionMemberCountAndTypes) {
 		struct B {
 			y : f32;
 		}
-		comptime Union = A | B | i32;
+		comptime Union = union { A, B, i32 };
 
 		fn main() : i32 {
 			var u : Union = A { 7 };
@@ -1480,7 +1480,7 @@ TEST(DebugTaggedUnionMemberCountAndTypes) {
 	EXPECT_TRUE(type != nullptr);
 	EXPECT_EQ((int)EX_TYPE_TAGGED_UNION, (int)ex_type_get_kind(type));
 
-	// Union = A | B | i32  => 3 members, size = 4 (tag) + 4 (max payload) = 8
+	// Union = union { A, B, i32 }  => 3 members, size = 4 (tag) + 4 (max payload) = 8
 	EXPECT_EQ(8u, ex_type_get_size(type));
 	EXPECT_EQ(3u, ex_type_union_member_count(type));
 
@@ -1525,7 +1525,7 @@ TEST(DebugTaggedUnionTagChangesWithMember) {
 		struct B {
 			y : f32;
 		}
-		comptime Union = A | B | i32;
+		comptime Union = union { A, B, i32 };
 
 		fn main() : i32 {
 			var u : Union = A { 7 };

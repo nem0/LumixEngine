@@ -1769,7 +1769,7 @@ TEST(BytecodeTupleUnpackTemporaryOrderAndLifetime) {
 			return .{ mark(a), mark(b) };
 		}
 		fn add(a : i32, b : i32) : i32 { return a + b; }
-		fn choose() : fn(i32, i32) : i32 { mark(1); return add; }
+		fn choose() : fn(i32, i32) : i32 { _ = mark(1); return add; }
 		fn sum(start : i32, values : ...i32) : i32 {
 			var result = start;
 			for value in values { result += value; }

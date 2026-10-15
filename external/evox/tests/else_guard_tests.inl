@@ -289,7 +289,7 @@ TEST(ElseGuardUnionExplicitReturnValueRuntime) {
 	const char* source = R"(
 		struct A { value : i32; }
 		struct B { error : i32; }
-		fn choose(ok : bool) : A | B {
+		fn choose(ok : bool) : union { A, B } {
 			if ok { return A { 12 }; }
 			return B { 9 };
 		}
@@ -312,7 +312,7 @@ TEST(ElseGuardUnionPanicRuntime) {
 	const char* source = R"(
 		struct Value { number : i32; }
 		struct Error { code : i32; }
-		fn choose(ok : bool) : Value | Error {
+		fn choose(ok : bool) : union { Value, Error } {
 			if ok { return Value { 5 }; }
 			return Error { 1 };
 		}
@@ -335,8 +335,8 @@ TEST(ElseGuardUnionSubunionWithBlockReturnRuntime) {
 		struct A { value : i32; }
 		struct B { value : i32; }
 		struct C { value : i32; }
-		fn take(input : A | B | C) : i32 {
-			var handled : A | B = input else { return 99; };
+		fn take(input : union { A, B, C }) : i32 {
+			var handled : union { A, B } = input else { return 99; };
 			if handled is A { return handled.value; }
 			return handled.value * 10;
 		}
@@ -476,9 +476,9 @@ TEST(ElseGuardRejectsWholeUnionTargetWithGeneralGuard) {
 	const char* source = R"(
 		struct A { x : i32; }
 		struct B { x : i32; }
-		fn choose() : A | B { return A { 1 }; }
+		fn choose() : union { A, B } { return A { 1 }; }
 		fn main() : void {
-			var value : A | B = choose() else panic("impossible");
+			var value : union { A, B } = choose() else panic("impossible");
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -490,9 +490,9 @@ TEST(ElseGuardRejectsUnionTargetContainingForeignMember) {
 		struct A { x : i32; }
 		struct B { x : i32; }
 		struct C { x : i32; }
-		fn choose() : A | B { return A { 1 }; }
+		fn choose() : union { A, B } { return A { 1 }; }
 		fn main() : void {
-			var value : A | C = choose() else panic("not selected");
+			var value : union { A, C } = choose() else panic("not selected");
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);

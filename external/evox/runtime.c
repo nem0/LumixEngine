@@ -492,6 +492,34 @@ static u64 runtime_numeric_to_u64(const u8* value, ex_type_kind kind) {
 		memcpy(out__, &result__, sizeof(TYPE));      \
 	} while (0)
 
+#define EX_REG_BNOT(TYPE)                               \
+	do {                                                \
+		const u32 dst__ = runtime_read_u32();           \
+		const u32 src__ = runtime_read_u32();           \
+		TYPE value__ = 0;                               \
+		TYPE result__ = 0;                              \
+		memcpy(&value__, frame + src__, sizeof(TYPE));  \
+		result__ = (TYPE)(~value__);                    \
+		memcpy(frame + dst__, &result__, sizeof(TYPE)); \
+	} while (0)
+
+// Shift by a u64 count held in a register. Counts >= WIDTH are well defined:
+// IN_RANGE is evaluated only when count < WIDTH, OVERWIDE gives the result otherwise.
+#define EX_REG_SHIFT(TYPE, WIDTH, IN_RANGE, OVERWIDE)      \
+	do {                                                   \
+		const u32 dst__ = runtime_read_u32();              \
+		const u32 lhs_offset__ = runtime_read_u32();       \
+		const u32 count_offset__ = runtime_read_u32();     \
+		TYPE a = 0;                                        \
+		u64 n = 0;                                         \
+		TYPE result__ = 0;                                 \
+		memcpy(&a, frame + lhs_offset__, sizeof(TYPE));    \
+		memcpy(&n, frame + count_offset__, sizeof(n));     \
+		if (n < (u64)(WIDTH)) result__ = (TYPE)(IN_RANGE); \
+		else result__ = (TYPE)(OVERWIDE);                  \
+		memcpy(frame + dst__, &result__, sizeof(TYPE));    \
+	} while (0)
+
 #define EX_REG_NEGOP(TYPE)                         \
 	do {                                           \
 		const u32 dst__ = runtime_read_u32();      \
@@ -1007,6 +1035,31 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 				*out = *src_ptr ? 0u : 1u;
 				break;
 			}
+			#define EX_BIT_CASES(OP, EXPR)                                \
+				case EX_OP_##OP##_8: EX_REG_BINOP(u8, a EXPR b); break;   \
+				case EX_OP_##OP##_16: EX_REG_BINOP(u16, a EXPR b); break; \
+				case EX_OP_##OP##_32: EX_REG_BINOP(u32, a EXPR b); break; \
+				case EX_OP_##OP##_64: EX_REG_BINOP(u64, a EXPR b); break;
+			EX_BIT_CASES(BAND, &)
+			EX_BIT_CASES(BOR, |)
+			EX_BIT_CASES(BXOR, ^)
+			#undef EX_BIT_CASES
+			case EX_OP_BNOT_8: EX_REG_BNOT(u8); break;
+			case EX_OP_BNOT_16: EX_REG_BNOT(u16); break;
+			case EX_OP_BNOT_32: EX_REG_BNOT(u32); break;
+			case EX_OP_BNOT_64: EX_REG_BNOT(u64); break;
+			case EX_OP_SHL_8: EX_REG_SHIFT(u8, 8, a << n, 0); break;
+			case EX_OP_SHL_16: EX_REG_SHIFT(u16, 16, a << n, 0); break;
+			case EX_OP_SHL_32: EX_REG_SHIFT(u32, 32, a << n, 0); break;
+			case EX_OP_SHL_64: EX_REG_SHIFT(u64, 64, a << n, 0); break;
+			case EX_OP_SHR_U8: EX_REG_SHIFT(u8, 8, a >> n, 0); break;
+			case EX_OP_SHR_U16: EX_REG_SHIFT(u16, 16, a >> n, 0); break;
+			case EX_OP_SHR_U32: EX_REG_SHIFT(u32, 32, a >> n, 0); break;
+			case EX_OP_SHR_U64: EX_REG_SHIFT(u64, 64, a >> n, 0); break;
+			case EX_OP_SHR_I8: EX_REG_SHIFT(i8, 8, a >> n, a < 0 ? -1 : 0); break;
+			case EX_OP_SHR_I16: EX_REG_SHIFT(i16, 16, a >> n, a < 0 ? -1 : 0); break;
+			case EX_OP_SHR_I32: EX_REG_SHIFT(i32, 32, a >> n, a < 0 ? -1 : 0); break;
+			case EX_OP_SHR_I64: EX_REG_SHIFT(i64, 64, a >> n, a < 0 ? -1 : 0); break;
 			#define EX_ARITH_BIN_CASES(OP, EXPR) \
 				case EX_OP_##OP##_I8: EX_REG_BINOP(i8, a EXPR b); break; \
 				case EX_OP_##OP##_U8: EX_REG_BINOP(u8, a EXPR b); break; \

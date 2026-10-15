@@ -90,7 +90,7 @@ struct Expression {
 		SLICE_TYPE,    			// []T
 		NULLABLE_TYPE, 			// ?T
 		FUNCTION_TYPE, 			// fn(A, B) : R used as a type
-		UNION_TYPE,    			// A | B used as a type
+		UNION_TYPE,    			// union { A, B } used as a type
 		TUPLE_TYPE,
 		RESOLVED_TYPE, 			// A fully resolved type injected by template substitution during cloning.
 		CONSTANT,               // A frozen ComptimeValue injected by template substitution.

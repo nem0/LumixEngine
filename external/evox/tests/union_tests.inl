@@ -6,7 +6,7 @@ TEST(UnionBasicConstruction) {
 		struct B {
 			y : f32;
 		}
-		comptime Union = A | B;
+		comptime Union = union { A, B };
 
 		fn main() : void {
 			var u : Union = A { 5 };
@@ -22,7 +22,7 @@ TEST(BytecodeUnionMemberStore) {
 	const char* source = R"(
 		struct A { x : i32; }
 		struct B { y : i32; }
-		comptime Value = A | B;
+		comptime Value = union { A, B };
 
 		fn main() : i32 {
 			var value : Value = A { 1 };
@@ -54,7 +54,7 @@ TEST(UnionMemberToUnion) {
 			x : i32;
 			y : i32;
 		}
-		comptime InputEvent = ButtonEvent | MouseMoveEvent;
+		comptime InputEvent = union { ButtonEvent, MouseMoveEvent };
 
 		fn main() : void {
 			var b : ButtonEvent = ButtonEvent { 1 };
@@ -75,7 +75,7 @@ TEST(UnionAnonymousType) {
 			id : i32;
 		}
 
-		fn parse() : Error | ASTNode {
+		fn parse() : union { Error, ASTNode } {
 			return Error { -1 };
 		}
 	)";
@@ -91,7 +91,7 @@ TEST(UnionExhaustiveMatch) {
 		struct B {
 			y : f32;
 		}
-		comptime Union = A | B;
+		comptime Union = union { A, B };
 
 		fn main() : void {
 			var u : Union = A { 5 };
@@ -111,7 +111,7 @@ TEST(UnionMatchImportedMemberWithoutNamespace) {
 	const char* source = R"(
 		import "events" as ns
 
-		comptime Event = ns.ButtonEvent | ns.AxisEvent;
+		comptime Event = union { ns.ButtonEvent, ns.AxisEvent };
 
 		fn main() : void {
 			var event : Event = ns.ButtonEvent { 1 };
@@ -146,7 +146,7 @@ TEST(UnionMatchWithFallback) {
 		struct B {
 			y : f32;
 		}
-		comptime Union = A | B;
+		comptime Union = union { A, B };
 
 		fn main() : void {
 			var u : Union = A { 5 };
@@ -171,7 +171,7 @@ TEST(UnionMatchNarrowing) {
 			x : i32;
 			y : i32;
 		}
-		comptime InputEvent = ButtonEvent | MouseMoveEvent;
+		comptime InputEvent = union { ButtonEvent, MouseMoveEvent };
 
 		fn main() : void {
 			var e : InputEvent = ButtonEvent { 1 };
@@ -200,7 +200,7 @@ TEST(ComptimeUnionBindingKeepsDeclaredType) {
 	const char* source = R"(
 		struct A { x : i32; }
 		struct B { y : f32; }
-		comptime Union = A | B;
+		comptime Union = union { A, B };
 		comptime u : Union = A { 5 };
 		comptime is_a = u is A;
 
@@ -217,8 +217,8 @@ TEST(ComptimeUnionSubsetWidening) {
 		struct A { x : i32; }
 		struct B { y : i32; }
 		struct C { z : i32; }
-		comptime Small = A | B;
-		comptime Large = A | B | C;
+		comptime Small = union { A, B };
+		comptime Large = union { A, B, C };
 		comptime small : Small = A { 5 };
 		comptime large : Large = small;
 	)";
@@ -230,8 +230,8 @@ TEST(ComptimeReorderedUnionPreservesMemberTag) {
 	const char* source = R"(
 		struct A { x : i32; }
 		struct B { y : i32; }
-		comptime AB = A | B;
-		comptime BA = B | A;
+		comptime AB = union { A, B };
+		comptime BA = union { B, A };
 		comptime source : AB = A { 7 };
 		comptime same_first_member = AB::types[0] == BA::types[0];
 
@@ -265,7 +265,7 @@ TEST(UnionIsOperator) {
 		struct B {
 			y : f32;
 		}
-		comptime Union = A | B;
+		comptime Union = union { A, B };
 
 		fn main() : void {
 			var u : Union = A { 5 };
@@ -286,7 +286,7 @@ TEST(UnionMemberCastError) {
 		struct B {
 			y : f32;
 		}
-		comptime Union = A | B;
+		comptime Union = union { A, B };
 
 		fn main() : void {
 			var u : Union = A { 5 };
@@ -308,8 +308,8 @@ TEST(UnionSubsetWidening) {
 		struct C {
 			z : bool;
 		}
-		comptime Small = A | B;
-		comptime Large = A | B | C;
+		comptime Small = union { A, B };
+		comptime Large = union { A, B, C };
 
 		var small : Small = A { 5 };
 		var large : Large = small;
@@ -329,9 +329,9 @@ TEST(UnionFlattening) {
 		struct C {
 			z : bool;
 		}
-		comptime AB = A | B;
-		comptime BC = B | C;
-		comptime ABC = AB | BC;
+		comptime AB = union { A, B };
+		comptime BC = union { B, C };
+		comptime ABC = union { AB, BC };
 
 		var value : ABC = A { 1 };
 	)";
@@ -347,8 +347,8 @@ TEST(UnionIdentityUnordered) {
 		struct B {
 			y : f32;
 		}
-		comptime Union1 = A | B;
-		comptime Union2 = B | A;
+		comptime Union1 = union { A, B };
+		comptime Union2 = union { B, A };
 	)";
 	EXPECT_COMPILE(source);
 	return true;
@@ -362,9 +362,9 @@ TEST(UnionDuplicateMemberFlattening) {
 		struct C {
 			y : i32;
 		}
-		comptime Direct = A | A;
-		comptime AC = A | C;
-		comptime Nested = A | AC;
+		comptime Direct = union { A, A };
+		comptime AC = union { A, C };
+		comptime Nested = union { A, AC };
 
 		var direct : Direct = A { 1 };
 		var nested : Nested = C { 2 };
@@ -381,7 +381,7 @@ TEST(UnionTypelessLiteralError) {
 		struct B {
 			y : f32;
 		}
-		comptime Union = A | B;
+		comptime Union = union { A, B };
 
 		var u : Union = { 5 };
 	)";
@@ -394,7 +394,7 @@ TEST(UnionNullMemberError) {
 		struct A {
 			x : i32;
 		}
-		comptime Union = A | null;
+		comptime Union = union { A, null };
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
@@ -408,7 +408,7 @@ TEST(UnionNullableUnion) {
 		struct B {
 			y : f32;
 		}
-		comptime OptionalUnion = ?(A | B);
+		comptime OptionalUnion = ?(union { A, B });
 
 		var u : OptionalUnion = null;
 	)";
@@ -418,8 +418,8 @@ TEST(UnionNullableUnion) {
 
 TEST(UnionNullableMemberPrecedence) {
 	const char* source = R"(
-		comptime Parsed = ?i32 | []const u8;
-		comptime Expected = (?i32) | []const u8;
+		comptime Parsed = union { ?i32, []const u8 };
+		comptime Expected = union { ?i32, []const u8 };
 
 		fn main() : void {
 			var parsed : Parsed = "text";
@@ -438,7 +438,7 @@ TEST(UnionUndefinedInit) {
 		struct B {
 			y : f32;
 		}
-		comptime Union = A | B;
+		comptime Union = union { A, B };
 
 		var u : Union = undefined;
 	)";
@@ -454,7 +454,7 @@ TEST(UnionNoEquality) {
 		struct B {
 			y : f32;
 		}
-		comptime Union = A | B;
+		comptime Union = union { A, B };
 
 		fn main() : void {
 			var u1 : Union = A { 5 };
@@ -475,7 +475,7 @@ TEST(UnionMatchCommaAlternative) {
 		struct B {
 			y : f32;
 		}
-		comptime Union = A | B;
+		comptime Union = union { A, B };
 
 		fn main() : void {
 			var u : Union = A { 5 };
@@ -497,7 +497,7 @@ TEST(UnionMatchDuplicateCaseError) {
 		struct B {
 			y : f32;
 		}
-		comptime Union = A | B;
+		comptime Union = union { A, B };
 
 		fn main() : void {
 			var u : Union = A { 5 };
@@ -521,7 +521,7 @@ TEST(UnionMutableNarrowing) {
 		struct B {
 			y : f32;
 		}
-		comptime Union = A | B;
+		comptime Union = union { A, B };
 
 		fn main() : void {
 			var u : Union = A { 5 };
@@ -540,7 +540,7 @@ TEST(UnionMutableNarrowing) {
 
 TEST(UnionPrimitiveMembers) {
 	const char* source = R"(
-		comptime IntOrFloat = i32 | f32;
+		comptime IntOrFloat = union { i32, f32 };
 
 		fn main() : void {
 			var u : IntOrFloat = 42;
@@ -559,10 +559,10 @@ TEST(UnionPrimitiveMembers) {
 }
 
 TEST(UnionWithLeadingSliceMember) {
-	// `[]const u8 | i32` must be a union of a slice and i32, not a slice of `u8 | i32`
+	// `union { []const u8, i32 }` must be a union of a slice and i32, not a slice of `union { u8, i32 }`
 	const char* source = R"(
-		comptime StringOrInt = []const u8 | i32;
-		comptime ArrayOrInt = [2]u8 | i32;
+		comptime StringOrInt = union { []const u8, i32 };
+		comptime ArrayOrInt = union { [2]u8, i32 };
 
 		fn main() : void {
 			var u : StringOrInt = 42;
@@ -585,7 +585,7 @@ TEST(UnionWithLeadingSliceMember) {
 TEST(UnionTypeExpressionOutsideComptimeFails) {
 	const char* source = R"(
 		fn main() : void {
-			var type_value = i32 | f32;
+			var type_value = union { i32, f32 };
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -594,7 +594,7 @@ TEST(UnionTypeExpressionOutsideComptimeFails) {
 
 TEST(UnionTypeExpressionGlobalOutsideComptimeFails) {
 	const char* source = R"(
-		const Union = i32 | f32;
+		const Union = union { i32, f32 };
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
@@ -612,12 +612,12 @@ TEST(UnionErrorPropagation) {
 			errno : i32;
 		}
 
-		fn parse() : ParseError | ASTNode {
+		fn parse() : union { ParseError, ASTNode } {
 			return ParseError { 1 };
 		}
 
-		fn readAndParse() : ParseError | IOError | ASTNode {
-			var result : ParseError | ASTNode = parse();
+		fn readAndParse() : union { ParseError, IOError, ASTNode } {
+			var result : union { ParseError, ASTNode } = parse();
 			return result;
 		}
 	)";
@@ -633,7 +633,7 @@ TEST(UnionMatchNotExhaustive) {
 		struct B {
 			y : f32;
 		}
-		comptime Union = A | B;
+		comptime Union = union { A, B };
 
 		fn main() : void {
 			var u : Union = A { 5 };
@@ -656,7 +656,7 @@ TEST(UnionSizeof) {
 			y : f32;
 			z : f32;
 		}
-		comptime Union = A | B;
+		comptime Union = union { A, B };
 
 		fn main() : i32 {
 			return sizeof(Union);
@@ -673,7 +673,7 @@ TEST(UnionSizeof) {
 
 TEST(UnionAlignof) {
 	const char* source = R"(
-		comptime Union = i32 | f32;
+		comptime Union = union { i32, f32 };
 
 		fn main() : i32 {
 			return alignof(Union);
@@ -690,7 +690,7 @@ TEST(UnionAlignof) {
 
 TEST(UnionNarrowedValueRuntime) {
 	const char* source = R"(
-		comptime Union = i32 | i64;
+		comptime Union = union { i32, i64 };
 
 		fn main() : i32 {
 			var value : Union = 42 as i32;
@@ -721,7 +721,7 @@ TEST(UnionIsRuntime) {
 		struct B {
 			y : i32;
 		}
-		comptime Union = A | B;
+		comptime Union = union { A, B };
 
 		fn main() : i32 {
 			var value : Union = A { 7 };
@@ -753,7 +753,7 @@ TEST(UnionMatchDispatchRuntime) {
 		struct C {
 			z : i32;
 		}
-		comptime Union = A | B | C;
+		comptime Union = union { A, B, C };
 
 		fn classify(value : Union) : i32 {
 			match value {
@@ -793,8 +793,8 @@ TEST(UnionSubsetWideningRemapsTag) {
 		struct A { x : i32; }
 		struct B { y : i32; }
 		struct C { z : i32; }
-		comptime AB = A | B;
-		comptime BAC = B | A | C;
+		comptime AB = union { A, B };
+		comptime BAC = union { B, A, C };
 
 		fn widen(value : AB) : BAC {
 			return value;
@@ -828,8 +828,8 @@ TEST(UnionWideningAcrossCallRuntime) {
 		struct C {
 			z : i32;
 		}
-		comptime AB = A | B;
-		comptime BAC = B | A | C;
+		comptime AB = union { A, B };
+		comptime BAC = union { B, A, C };
 
 		fn widen(value : AB) : BAC {
 			return value;
@@ -869,7 +869,7 @@ TEST(UnionFieldGlobalAndPointerRuntime) {
 		struct B {
 			y : i32;
 		}
-		comptime Union = A | B;
+		comptime Union = union { A, B };
 
 		struct Container {
 			value : Union;
@@ -913,7 +913,7 @@ TEST(UnionEnumMembers) {
 			x : i32;
 			y : i32;
 		}
-		comptime ColorOrPoint = Color | Point;
+		comptime ColorOrPoint = union { Color, Point };
 
 		fn main() : void {
 			var u : ColorOrPoint = Color.Red;
@@ -933,7 +933,7 @@ TEST(UnionEnumMembers) {
 
 TEST(UnionStringMembers) {
 	const char* source = R"(
-		comptime StringOrInt = []const u8 | i32;
+		comptime StringOrInt = union { []const u8, i32 };
 
 		fn main() : void {
 			var u : StringOrInt = "hello";
@@ -961,7 +961,7 @@ TEST(UnionAllConcreteRuntimeMemberKinds) {
 			value : i32;
 		}
 
-		comptime AllKinds = byte | bool | i8 | u8 | i16 | u16 | i32 | u32 | i64 | u64 | isize | f32 | f64 | []const u8 | cstr | cptr | []i32 | []f32 | [3]i32 | [4]i32 | (fn(u8) : void) | Kind | Record;
+		comptime AllKinds = union { byte, bool, i8, u8, i16, u16, i32, u32, i64, u64, isize, f32, f64, []const u8, cstr, cptr, []i32, []f32, [3]i32, [4]i32, (fn(u8) : void), Kind, Record };
 
 		fn main() : void {
 			var value : AllKinds = undefined;
@@ -979,7 +979,7 @@ TEST(UnionStructTemplateMember) {
 
 		comptime I32Box = box(i32);
 		comptime F32Box = box(f32);
-		comptime Boxes = I32Box | F32Box;
+		comptime Boxes = union { I32Box, F32Box };
 
 		fn main() : void {
 			var value : Boxes = I32Box { 42 };
@@ -991,12 +991,12 @@ TEST(UnionStructTemplateMember) {
 
 TEST(UnionGenericTypeMember) {
 	const char* source = R"(
-		comptime make = fn(value : $T) : i32 | T {
+		comptime make = fn(value : $T) : union { i32, T } {
 			return value;
 		};
 
 		fn main() : void {
-			var value : i32 | f32 = make(1.5 as f32);
+			var value : union { i32, f32 } = make(1.5 as f32);
 		}
 	)";
 	EXPECT_COMPILE(source);
@@ -1005,7 +1005,7 @@ TEST(UnionGenericTypeMember) {
 
 TEST(UnionSliceMembers) {
 	const char* source = R"(
-		comptime Slices = []i32 | []f32;
+		comptime Slices = union { []i32, []f32 };
 
 		fn main() : void {
 			var value : Slices = undefined;
@@ -1018,7 +1018,7 @@ TEST(UnionSliceMembers) {
 TEST(UnionRecursiveStructMemberError) {
 	const char* source = R"(
 		struct Node {
-			child : Node | i32;
+			child : union { Node, i32 };
 		}
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -1036,7 +1036,7 @@ TEST(UnionIsNonMemberError) {
 		struct C {
 			z : bool;
 		}
-		comptime Union = A | B;
+		comptime Union = union { A, B };
 
 		fn main() : void {
 			var u : Union = A { 5 };
@@ -1059,7 +1059,7 @@ TEST(UnionMatchNonMemberCaseError) {
 		struct C {
 			z : bool;
 		}
-		comptime Union = A | B;
+		comptime Union = union { A, B };
 
 		fn main() : void {
 			var u : Union = A { 5 };
@@ -1085,7 +1085,7 @@ TEST(UnionInStructField) {
 		}
 
 		struct Container {
-			value : A | B;
+			value : union { A, B };
 		}
 
 		var c : Container = Container { A { 5 } };
@@ -1103,7 +1103,7 @@ TEST(UnionInFunctionParameter) {
 			y : f32;
 		}
 
-		fn process(u : A | B) : void {
+		fn process(u : union { A, B }) : void {
 			match u {
 				case A:
 					var x : i32 = u.x;
@@ -1118,7 +1118,7 @@ TEST(UnionInFunctionParameter) {
 
 TEST(UnionVoidMemberError) {
 	const char* source = R"(
-		comptime Union = void | i32;
+		comptime Union = union { void, i32 };
 	)";
 	EXPECT_COMPILE_FAIL(source);
 	return true;
@@ -1135,9 +1135,9 @@ TEST(UnionNestedUnionFlattens) {
 		struct C {
 			z : bool;
 		}
-		comptime AB = A | B;
-		comptime ABC = AB | C;
-		comptime Direct = A | B | C;
+		comptime AB = union { A, B };
+		comptime ABC = union { AB, C };
+		comptime Direct = union { A, B, C };
 
 		var u : ABC = A { 5 };
 		var v : Direct = u;
@@ -1157,9 +1157,9 @@ TEST(UnionComposedDuplicateFlattens) {
 		struct C {
 			z : bool;
 		}
-		comptime AB = A | B;
-		comptime BC = B | C;
-		comptime ABC = AB | BC;
+		comptime AB = union { A, B };
+		comptime BC = union { B, C };
+		comptime ABC = union { AB, BC };
 	)";
 	EXPECT_COMPILE(source);
 	return true;
@@ -1170,7 +1170,7 @@ TEST(UnionElseReturnExtractsMemberRuntime) {
 		struct A { x : i32; }
 		struct B { y : i32; }
 
-		fn choose(flag : bool) : A | B {
+		fn choose(flag : bool) : union { A, B } {
 			if flag { return A { 7 }; }
 			return B { 9 };
 		}
@@ -1198,10 +1198,10 @@ TEST(UnionElseReturnExtractsSubunion) {
 		struct A { x : i32; }
 		struct B { y : i32; }
 		struct C { z : i32; }
-		comptime U = A | B | C;
+		comptime U = union { A, B, C };
 
 		fn take(value : U) : A {
-			var rest : B | C = value else return;
+			var rest : union { B, C } = value else return;
 			match rest {
 				case B: return A { rest.y };
 				case C: return A { rest.z };
@@ -1226,7 +1226,7 @@ TEST(UnionElseReturnRejectsNonSubsetTarget) {
 		struct A { x : i32; }
 		struct B { y : i32; }
 		struct C { z : i32; }
-		fn main(value : A | B) : void {
+		fn main(value : union { A, B }) : void {
 			var c : C = value else return;
 		}
 	)";
@@ -1238,7 +1238,7 @@ TEST(UnionElseReturnRejectsWholeUnionTarget) {
 	const char* source = R"(
 		struct A { x : i32; }
 		struct B { y : i32; }
-		comptime U = A | B;
+		comptime U = union { A, B };
 		fn main(value : U) : void {
 			var same : U = value else return;
 		}
@@ -1262,7 +1262,7 @@ TEST(UnionIfElseResidualNarrowing) {
 	const char* source = R"(
 		struct A { x : i32; }
 		struct B { y : i32; }
-		fn main(value : A | B) : i32 {
+		fn main(value : union { A, B }) : i32 {
 			if value is A {
 				return value.x;
 			} else {
@@ -1278,7 +1278,7 @@ TEST(UnionEarlyReturnResidualNarrowing) {
 	const char* source = R"(
 		struct A { x : i32; }
 		struct B { y : i32; }
-		fn main(value : A | B) : i32 {
+		fn main(value : union { A, B }) : i32 {
 			if value is A { return value.x; }
 			return value.y;
 		}
@@ -1292,7 +1292,7 @@ TEST(UnionElseReturnEvaluatesExpressionOnce) {
 		struct A { x : i32; }
 		struct B { y : i32; }
 		var calls : i32 = 0;
-		fn make() : A | B {
+		fn make() : union { A, B } {
 			calls += 1;
 			return A { 6 };
 		}
@@ -1316,14 +1316,14 @@ TEST(UnionElseReturnRunsDeferOnFailure) {
 		struct B { y : i32; }
 		var cleaned : i32 = 0;
 		fn cleanup() : void { cleaned = 1; }
-		fn make() : A | B { return B { 4 }; }
+		fn make() : union { A, B } { return B { 4 }; }
 		fn take() : B {
 			defer cleanup();
 			var a : A = make() else return;
 			return B { a.x };
 		}
 		fn main() : i32 {
-			take();
+			_ = take();
 		return cleaned;
 		}
 	)";
@@ -1341,8 +1341,8 @@ TEST(UnionElseReturnResidualReturnWidening) {
 		struct A { x : i32; }
 		struct B { y : i32; }
 		struct C { z : i32; }
-		fn make() : A | B | C { return B { 2 }; }
-		fn take() : B | C {
+		fn make() : union { A, B, C } { return B { 2 }; }
+		fn take() : union { B, C } {
 			var a : A = make() else return;
 			return C { a.x };
 		}
@@ -1356,13 +1356,13 @@ TEST(UnionElseReturnResidualReturnWideningRuns) {
 		struct A { x : i32; }
 		struct B { y : i32; }
 		struct C { z : i32; }
-		fn make() : A | B | C { return B { 2 }; }
-		fn take() : B | C {
+		fn make() : union { A, B, C } { return B { 2 }; }
+		fn take() : union { B, C } {
 			var a : A = make() else return;
 			return C { a.x };
 		}
 		fn main() : i32 {
-			var value : B | C = take();
+			var value : union { B, C } = take();
 			if value is B { return value.y; }
 			return value.z;
 		}
@@ -1381,7 +1381,7 @@ TEST(UnionElseReturnRejectsIncompatibleResidualReturn) {
 		struct A { x : i32; }
 		struct B { y : i32; }
 		struct C { z : i32; }
-		fn make() : A | B { return B { 2 }; }
+		fn make() : union { A, B } { return B { 2 }; }
 		fn take() : C {
 			var a : A = make() else return;
 			return C { a.x };
@@ -1395,7 +1395,7 @@ TEST(UnionNarrowingAfterContinue) {
 	const char* source = R"(
 		struct A { x : i32; }
 		struct B { y : i32; }
-		fn main(value : A | B) : i32 {
+		fn main(value : union { A, B }) : i32 {
 			while true {
 				if value is A { continue; }
 				return value.y;
@@ -1411,7 +1411,7 @@ TEST(UnionNarrowingAfterBreak) {
 	const char* source = R"(
 		struct A { x : i32; }
 		struct B { y : i32; }
-		fn main(value : A | B) : i32 {
+		fn main(value : union { A, B }) : i32 {
 			while true {
 				if value is A { break; }
 				return value.y;
@@ -1432,7 +1432,7 @@ TEST(UnionNotBindsLooserThanIs) {
 			y : i32;
 		}
 		fn main() : i32 {
-			var e : A | B = B { 7 };
+			var e : union { A, B } = B { 7 };
 			// not (e is A) is true; (not e) is A would not compile
 			return not e is A ? 1 : 0;
 		}
@@ -1465,7 +1465,7 @@ TEST(UnionNotBindsLooserThanIsMatchingVariant) {
 			y : i32;
 		}
 		fn main() : i32 {
-			var e : A | B = B { 7 };
+			var e : union { A, B } = B { 7 };
 			// not (e is B) is false - the active variant matches
 			return not e is B ? 1 : 0;
 		}
@@ -1513,8 +1513,8 @@ TEST(UnionNotIsAcrossAnd) {
 			y : i32;
 		}
 		fn main() : i32 {
-			var e : A | B = A { 1 };
-			var f : A | B = A { 2 };
+			var e : union { A, B } = A { 1 };
+			var f : union { A, B } = A { 2 };
 			// (not (e is A)) and (not (f is B)) is false and true -> false
 			return not e is A and not f is B ? 1 : 0;
 		}

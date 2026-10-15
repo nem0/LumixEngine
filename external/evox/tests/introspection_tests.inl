@@ -168,7 +168,7 @@ TEST(UnrollForEnumValues) {
 
 TEST(UnrollForUnionTypes) {
 	const char* source = R"(
-		comptime U = i32 | f32;
+		comptime U = union { i32, f32 };
 		fn main() : void {
 			unroll for M in U::types { if M == i32 { var value : i32 = 1; } }
 		}
@@ -179,7 +179,7 @@ TEST(UnrollForUnionTypes) {
 
 TEST(UnrollForComptimeSequenceRuntimeForRejected) {
 	const char* source = R"(
-		comptime U = i32 | f32;
+		comptime U = union { i32, f32 };
 		comptime values : []type = U::types;
 		fn main() : void { for value in values { } }
 	)";
@@ -197,7 +197,7 @@ TEST(UnrollForBindingIsImmutable) {
 
 TEST(UnrollForBoundSequenceCanBeReused) {
 	const char* source = R"(
-		comptime U = i32 | f32;
+		comptime U = union { i32, f32 };
 		comptime members : []type = U::types;
 		comptime first = members[0];
 		fn main() : void {
@@ -381,7 +381,7 @@ TEST(IntrospectionParamsRuntimeUseRejected) {
 
 TEST(IntrospectionTypeValueRuntimeUseRejected) {
 	const char* source = R"(
-		comptime U = i32 | f32;
+		comptime U = union { i32, f32 };
 		fn main() : void { var value = U::types[0]; }
 	)";
 	EXPECT_COMPILE_FAIL(source);
@@ -453,7 +453,7 @@ TEST(IntrospectionEnumSequenceIndexAndMaterialization) {
 
 TEST(IntrospectionUnionSequenceIndex) {
 	const char* source = R"(
-		comptime U = i32 | f32;
+		comptime U = union { i32, f32 };
 		comptime members = U::types;
 		comptime First = members[0];
 		fn main(value : First) : void {}
@@ -508,7 +508,7 @@ TEST(IntrospectionKindProvingBranchAllowsFields) {
 
 TEST(IntrospectionSequenceLength) {
 	const char* source = R"(
-		comptime U = i32 | f32;
+		comptime U = union { i32, f32 };
 		comptime count = U::types.length;
 		fn main() : i32 { return count; }
 	)";
@@ -630,7 +630,7 @@ TEST(IntrospectionKindClassifiesEveryTypeForm) {
 	const char* source = R"(
 		struct S { value : i32; }
 		enum E { Value }
-		comptime U = i32 | f32;
+		comptime U = union { i32, f32 };
 		comptime N = ?i32;
 		comptime Sl = []i32;
 		comptime Ar = [2]i32;
@@ -788,8 +788,8 @@ TEST(IntrospectionTypeEqualityUsesIdentity) {
 	const char* source = R"(
 		struct A { value : i32; }
 		struct B { value : i32; }
-		comptime U1 = i32 | f32;
-		comptime U2 = f32 | i32;
+		comptime U1 = union { i32, f32 };
+		comptime U2 = union { f32, i32 };
 		fn main() : void {
 			if U1 == U2 and A != B { } else { var bad : MissingType = undefined; }
 		}
@@ -828,7 +828,7 @@ TEST(IntrospectionChildAndArrayLength) {
 TEST(IntrospectionEnumAndUnionValuesAreNotIterable) {
 	const char* source = R"(
 		enum E { A, B }
-		comptime U = i32 | f32;
+		comptime U = union { i32, f32 };
 		fn main(e : E, u : U) : void {
 			unroll for value in e { }
 			unroll for value in u { }
@@ -899,7 +899,7 @@ TEST(IntrospectionTypeofDoesNotEvaluateOperand) {
 
 TEST(IntrospectionTypeofObservesUnionPromotion) {
 	const char* source = R"(
-		comptime U = i32 | f32;
+		comptime U = union { i32, f32 };
 		fn inspect(value : U) : void {
 			if value is i32 {
 				comptime T = typeof(value);
@@ -974,7 +974,7 @@ TEST(IntrospectionBareTypesAreNotIterable) {
 	const char* source = R"(
 		struct S { value : i32; }
 		enum E { Value }
-		comptime U = i32 | f32;
+		comptime U = union { i32, f32 };
 		fn main() : void {
 			unroll for value in S { }
 			unroll for value in E { }
@@ -1074,9 +1074,9 @@ TEST(IntrospectionTypeNamesCoverDeclarationsTemplatesAndUnions) {
 		comptime PairI32 = pair(i32);
 		comptime Nested = box(pair(i32));
 		comptime Array = static_array(i32, 4);
-		comptime U = f32 | i32;
+		comptime U = union { f32, i32 };
 		fn main() : void {
-			if i32::name == "i32" and S::name == "S" and E::name == "E" and PairI32::name == "pair(i32)" and Nested::name == "box(pair(i32))" and Array::name == "static_array(i32, 4)" and U::name == "f32 | i32" { }
+			if i32::name == "i32" and S::name == "S" and E::name == "E" and PairI32::name == "pair(i32)" and Nested::name == "box(pair(i32))" and Array::name == "static_array(i32, 4)" and U::name == "union { f32, i32 }" { }
 			else { var bad : MissingType = undefined; }
 		}
 	)FACTORY";
@@ -1180,14 +1180,14 @@ TEST(IntrospectionTypeNamesCoverZeroParameterFunction) {
 }
 
 TEST(IntrospectionTypeNamesCanonicalizeUnionOrder) {
-	const char* source = R"(
-		comptime First = i32 | f32;
-		comptime Second = f32 | i32;
+	const char* source = R"evox(
+		comptime First = union { i32, f32 };
+		comptime Second = union { f32, i32 };
 		fn main() : void {
-			if First::name == "i32 | f32" and Second::name == "i32 | f32" { }
+			if First::name == "union { i32, f32 }" and Second::name == "union { i32, f32 }" { }
 			else { var bad : MissingType = undefined; }
 		}
-	)";
+	)evox";
 	EXPECT_COMPILE(source);
 	return true;
 }
@@ -1273,7 +1273,7 @@ TEST(IntrospectionTypeEqualityPrunesUnselectedBranch) {
 
 TEST(IntrospectionUnrollSequenceIndicesAreComptimeValues) {
 	const char* source = R"(
-		comptime U = i32 | f32;
+		comptime U = union { i32, f32 };
 		fn main() : void {
 			unroll for index, T in U::types {
 				if index == 0 or index == 1 { }
@@ -1297,7 +1297,7 @@ TEST(IntrospectionFieldCursorNameMaterializes) {
 
 TEST(IntrospectionUnrollControlFlowWorksForReflectionSequences) {
 	const char* source = R"(
-		comptime U = i32 | f32;
+		comptime U = union { i32, f32 };
 		fn main() : void {
 			unroll for index, T in U::types {
 				if index == 0 { continue; }
@@ -1447,7 +1447,7 @@ TEST(IntrospectionGenericPrintRendersEveryKind) {
 
 		fn print_nullable() : void { var v : ?i32 = 5; print(v); }
 		fn print_null() : void { var v : ?i32 = null; print(v); }
-		fn print_union() : void { var v : i32 | f32 = 3; print(v); }
+		fn print_union() : void { var v : union { i32, f32 } = 3; print(v); }
 		fn print_void_kind() : void { print(print_bool); }
 	)";
 

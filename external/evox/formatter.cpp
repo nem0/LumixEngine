@@ -118,7 +118,14 @@ struct EvoxFormatter {
             start(false); out.push_back(':'); space = brackets == 0; break;
         case Token::EQUAL: case Token::PLUS_EQUAL: case Token::MINUS_EQUAL:
         case Token::STAR_EQUAL: case Token::SLASH_EQUAL:
+        case Token::AMPERSAND_EQUAL: case Token::PIPE_EQUAL: case Token::CARET_EQUAL:
+        case Token::SHIFT_LEFT_EQUAL: case Token::SHIFT_RIGHT_EQUAL:
             start(true); out.append(begin, end); space = true; break;
+        case Token::TILDE: {
+            // always a prefix operator: no space after it
+            const bool tight = previous == Token::LEFT_PAREN || previous == Token::LEFT_BRACKET;
+            start(!tight); out.append(begin, end); space = false; break;
+        }
         case Token::PLUS: case Token::MINUS: {
             const bool unary = previous == Token::LEFT_PAREN || previous == Token::LEFT_BRACKET ||
                 previous == Token::COMMA || previous == Token::EQUAL || previous == Token::COLON ||

@@ -88,6 +88,12 @@ inline const char* operatorSymbolName(Token::Type op) {
 		case Token::LT_EQUAL:     return "<=";
 		case Token::GT:           return ">";
 		case Token::GT_EQUAL:     return ">=";
+		case Token::AMPERSAND:    return "&";
+		case Token::PIPE:         return "|";
+		case Token::CARET:        return "^";
+		case Token::TILDE:        return "~";
+		case Token::SHIFT_LEFT:   return "<<";
+		case Token::SHIFT_RIGHT:  return ">>";
 		default:                  return nullptr;
 	}
 }
@@ -108,6 +114,12 @@ inline Token::Type tokenFromOperatorName(ex_string_view name) {
 		{ "<=", Token::LT_EQUAL },
 		{ ">",  Token::GT },
 		{ ">=", Token::GT_EQUAL },
+		{ "&",  Token::AMPERSAND },
+		{ "|",  Token::PIPE },
+		{ "^",  Token::CARET },
+		{ "~",  Token::TILDE },
+		{ "<<", Token::SHIFT_LEFT },
+		{ ">>", Token::SHIFT_RIGHT },
 	};
 	for (const Entry& e : table) {
 		const char* p = name.begin;

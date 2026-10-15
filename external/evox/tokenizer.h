@@ -316,6 +316,7 @@ struct Tokenizer {
 						switch (m_start_token[2]) {
 							case 'd': return checkKeyword("efined", 3, 6, Token::UNDEFINED);
 							case 'r': return checkKeyword("oll", 3, 3, Token::UNROLL);
+							case 'i': return checkKeyword("on", 3, 2, Token::UNION);
 						}
 						break;
 					}
@@ -400,11 +401,13 @@ struct Tokenizer {
 				}
 				return makeToken(Token::DOT);
 			}
-			case '&': return makeToken(Token::AMPERSAND);
+			case '&': return makeToken(match('=') ? Token::AMPERSAND_EQUAL : Token::AMPERSAND);
+			case '^': return makeToken(match('=') ? Token::CARET_EQUAL : Token::CARET);
+			case '~': return makeToken(Token::TILDE);
 			case '?': return makeToken(Token::QUESTION);
 			case '$': return makeToken(Token::DOLLAR);
 			case '#': return makeToken(Token::HASH);
-			case '|': return makeToken(Token::PIPE);
+			case '|': return makeToken(match('=') ? Token::PIPE_EQUAL : Token::PIPE);
 			case '+': {
 				if (match('=')) return makeToken(Token::PLUS_EQUAL);
 				if (match('+')) return makeToken(Token::PLUS_PLUS);
@@ -420,8 +423,12 @@ struct Tokenizer {
 			case '%': return makeToken(Token::PERCENT);
 			case '=': return makeToken(match('=') ? Token::EQUAL_EQUAL : Token::EQUAL);
 			case '!': return makeToken(match('=') ? Token::BANG_EQUAL : Token::ERROR);
-			case '>': return makeToken(match('=') ? Token::GT_EQUAL : Token::GT);
-			case '<': return makeToken(match('=') ? Token::LT_EQUAL : Token::LT);
+			case '>':
+				if (match('>')) return makeToken(match('=') ? Token::SHIFT_RIGHT_EQUAL : Token::SHIFT_RIGHT);
+				return makeToken(match('=') ? Token::GT_EQUAL : Token::GT);
+			case '<':
+				if (match('<')) return makeToken(match('=') ? Token::SHIFT_LEFT_EQUAL : Token::SHIFT_LEFT);
+				return makeToken(match('=') ? Token::LT_EQUAL : Token::LT);
 		}
 
 		return makeToken(Token::ERROR);
