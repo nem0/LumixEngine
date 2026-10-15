@@ -1074,6 +1074,9 @@ struct Checker {
 				EX_ASSERT(imp.unit);
 				Unit* imported_unit = imp.unit;
 				if (Symbol* candidate = findSymbol(*imported_unit, name)) {
+					// `import "x" as y` declares y in the importing unit only; an unaliased import
+					// of that unit must not re-export it.
+					if (candidate->kind == EX_SYM_KIND_IMPORT) continue;
 					if (imported.symbol) {
 						imported = {nullptr, nullptr, true};
 						break;

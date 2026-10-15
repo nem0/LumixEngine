@@ -86,6 +86,63 @@ TEST(UnaliasedImportedVariableIsAssignable) {
 	return true;
 }
 
+// Regression: an unaliased import used to leak the imported module's own `import "x" as helper`
+// alias into the importing file. Using `helper.value` there then dereferenced a null resolved type
+// in Checker::checkMemberExpr (access violation in the compiler) instead of reporting an error.
+// Real-world trigger: `import "core:vec3"` and then calling `math.cos(...)` without importing math.
+TEST(UnaliasedImportDoesNotLeakItsOwnImportAliases) {
+	const char* main_source = R"(
+		import "a"
+
+		fn main() : i32 {
+			return helper.value;
+		}
+	)";
+	const char* a_source = R"(
+		import "b" as helper
+
+		fn get() : i32 { return helper.value; }
+	)";
+	const char* b_source = R"(
+		const value : i32 = 42;
+	)";
+	EvoxImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) },
+	};
+	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
+TEST(UnaliasedImportAliasMemberInStructLiteralDoesNotCrash) {
+	const char* main_source = R"(
+		import "a"
+
+		struct S { x : i32; }
+
+		fn main() : i32 {
+			const s = S { helper.value };
+			return s.x;
+		}
+	)";
+	const char* a_source = R"(
+		import "b" as helper
+
+		fn get() : i32 { return helper.value; }
+	)";
+	const char* b_source = R"(
+		const value : i32 = 42;
+	)";
+	EvoxImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+		{ toLs("b"), toLs(b_source) },
+	};
+	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
+	EXPECT_COMPILE_FAIL_WITH_IMPORTS(main_source, files);
+	return true;
+}
+
 TEST(DiamondImportTypechecks) {
 	const char* main_source = R"(
 		import "a" as a
