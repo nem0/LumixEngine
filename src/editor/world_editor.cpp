@@ -2830,6 +2830,13 @@ public:
 		m_entity_selection_changed.invoke();
 	}
 
+	void addToSelection(Span<const EntityRef> entities) override {
+		for (EntityRef e : entities) {
+			if (m_selected_entities.indexOf(e) < 0) m_selected_entities.push(e);
+		}
+		m_entity_selection_changed.invoke();
+	}
+
 
 	void onEntityDestroyed(EntityRef entity)
 	{

@@ -115,9 +115,38 @@ struct StudioAppImpl final : StudioApp {
 			ImGui::PopStyleColor();			
 		}
 
+		// shift-click: the clicked row is the range end, the range is selected while the next frame's tree walk draws it
+		void onEntityClicked(EntityRef entity) {
+			const ImGuiIO& io = ImGui::GetIO();
+			if (io.KeyShift && m_anchor_entity.isValid() && (EntityRef)m_anchor_entity != entity) {
+				m_range_end = entity;
+				m_range_state = RangeState::REQUESTED;
+				return;
+			}
+			m_anchor_entity = entity;
+			m_app.getWorldEditor().selectEntities(Span(&entity, 1), io.KeyCtrl);
+		}
+
+		// called for every row in display order, selects the rows from one endpoint to the other
+		void visitRangeRow(EntityRef entity) {
+			if ((u8)m_range_state < (u8)RangeState::SEARCHING) return;
+
+			const bool is_endpoint = entity == (EntityRef)m_anchor_entity || entity == (EntityRef)m_range_end;
+			if (m_range_state == RangeState::SEARCHING) {
+				if (!is_endpoint) return;
+
+				m_range_state = RangeState::SELECTING;
+				m_app.getWorldEditor().addToSelection(Span(&entity, 1));
+				return;
+			}
+			m_app.getWorldEditor().addToSelection(Span(&entity, 1));
+			if (is_endpoint) m_range_state = RangeState::NONE;
+		}
+
 		void showHierarchy(EntityRef entity, Span<const EntityRef> selected_entities, Span<const EntityRef> selection_chain) {
 			WorldEditor& editor = m_app.getWorldEditor();
 			World* world = editor.getWorld();
+			visitRangeRow(entity);
 			bool is_selected = selected_entities.indexOf(entity) >= 0;
 			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowOverlap;
 			bool has_child = world->getFirstChild(entity).isValid();
@@ -192,11 +221,13 @@ struct StudioAppImpl final : StudioApp {
 
 					if (auto* payload = ImGui::AcceptDragDropPayload("selected_entities")) {
 						Span<const EntityRef> selected = editor.getSelectedEntities();
+						editor.beginCommandGroup("make_parent_entities_group");
 						for (EntityRef e : selected) {
 							if (e != entity) {
 								editor.makeParent(entity, e);
 							}
 						}
+						editor.endCommandGroup();
 						ImGui::EndDragDropTarget();
 						if (node_open) ImGui::TreePop();
 						return;
@@ -222,7 +253,7 @@ struct StudioAppImpl final : StudioApp {
 				}
 				else {
 					if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-						editor.selectEntities(Span(&entity, 1), ImGui::GetIO().KeyCtrl);
+						onEntityClicked(entity);
 					}
 				}
 			}
@@ -468,6 +499,7 @@ struct StudioAppImpl final : StudioApp {
 					m_request_focus_filter = false;
 				}
 				
+				if (m_range_state == RangeState::REQUESTED) m_range_state = RangeState::SEARCHING;
 				bool select_first = false;
 				World* world = editor.getWorld();
 				filter.gui("Filter", -1, false, &m_focus_filter_action, false);
@@ -493,6 +525,7 @@ struct StudioAppImpl final : StudioApp {
 
 							ImGui::PushID(e.index);
 							const EntityRef e_ref = (EntityRef)e;
+							visitRangeRow(e_ref);
 							if (select_all) {
 								editor.selectEntities(Span(&e_ref, 1), true);
 							}
@@ -506,7 +539,7 @@ struct StudioAppImpl final : StudioApp {
 							} else {
 								bool selected = entities.indexOf(e_ref) >= 0;
 								if (ImGui::Selectable(buffer, &selected, ImGuiSelectableFlags_SpanAvailWidth)) {
-									editor.selectEntities(Span(&e_ref, 1), ImGui::GetIO().KeyCtrl);
+									onEntityClicked(e_ref);
 								}
 								if (ImGui::BeginDragDropSource()) {
 									ImGui::TextUnformatted(buffer);
@@ -530,6 +563,12 @@ struct StudioAppImpl final : StudioApp {
 					ImGui::PopItemWidth();
 				}
 				ImGui::EndChild();
+				if ((u8)m_range_state >= (u8)RangeState::SEARCHING) { // the other endpoint is not visible, select only the clicked entity
+					m_range_state = RangeState::NONE;
+					const EntityRef end = (EntityRef)m_range_end;
+					m_anchor_entity = end;
+					editor.selectEntities(Span(&end, 1), false);
+				}
 			}
 			ImGui::End();
 		}
@@ -543,6 +582,10 @@ struct StudioAppImpl final : StudioApp {
 		StudioAppImpl& m_app;
 		bool m_is_open = true;
 		bool m_entity_selection_changed = false;
+		EntityPtr m_anchor_entity = INVALID_ENTITY;
+		enum class RangeState : u8 { NONE, REQUESTED, SEARCHING, SELECTING };
+		RangeState m_range_state = RangeState::NONE;
+		EntityPtr m_range_end = INVALID_ENTITY;
 		Action m_focus_filter_action{"Hierarchy", "Focus filter", "Focus filter", "hierarchy_focus_filter", ""};
 		Action m_toggle_ui_action{"Hierarchy", "Hierarchy", "Toggle UI", "hierarchy_toggle_ui", "", Action::WINDOW};
 		bool m_request_focus_filter = false;
