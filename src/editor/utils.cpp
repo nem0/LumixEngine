@@ -873,7 +873,6 @@ static bool tokenize(const char* str, u32& token_len, u8& token_type, u8 prev_to
 } // namespace HLSLTokens
 
 // TODO page-up/down ignore virtual_x
-// TODO horizontal scroll
 // TODO utf8
 // TODO clipping selection 
 // TODO selection should render including "end of line char" in certain cases
@@ -1217,7 +1216,25 @@ struct CodeEditorImpl final : CodeEditor {
 		if (&cursor == &m_cursors[0]) ensurePointVisible(cursor);
 	}
 
+	void ensurePointVisibleX(TextPoint& cursor, bool center) {
+		if (m_view_width <= 0) return;
+		const char* line_str = m_lines[cursor.line].value.c_str();
+		const float cursor_x = m_text_offset_x + CalcTextSize(line_str, line_str + cursor.col).x;
+		const float text_left = m_view_scroll_x + m_text_offset_x;
+		const float view_right = m_view_scroll_x + m_view_width;
+		if (center) {
+			m_scroll_diff_x = cursor_x - (m_view_scroll_x + m_view_width * 0.5f);
+		}
+		else if (cursor_x < text_left) {
+			m_scroll_diff_x = cursor_x - text_left;
+		}
+		else if (cursor_x > view_right - m_text_offset_x) {
+			m_scroll_diff_x = cursor_x - view_right + m_text_offset_x;
+		}
+	}
+
 	void ensurePointVisible(TextPoint& cursor, bool center = false) {
+		ensurePointVisibleX(cursor, center);
 		if (center) {
 			m_scroll_diff = (cursor.line - (m_first_visible_line + m_max_visible_lines / 2)) * ImGui::GetTextLineHeight();	
 			return;
@@ -2061,7 +2078,7 @@ struct CodeEditorImpl final : CodeEditor {
 
 	bool gui(const char* str_id, const ImVec2& size, ImFont* code_font, ImFont* ui_font) override {
 		PROFILE_FUNCTION();
-		if (!ImGui::BeginChild(str_id, size, false, ImGuiWindowFlags_NoNavInputs)) {
+		if (!ImGui::BeginChild(str_id, size, false, ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_HorizontalScrollbar)) {
 			m_handle_input = false;
 			ImGui::EndChild();
 			return false;
@@ -2087,6 +2104,32 @@ struct CodeEditorImpl final : CodeEditor {
 		ImGuiID id = ImGui::GetID("codeditor");
 		ImRect bb = { min, min + content_size };
 		bb.Max.y = bb.Min.y + line_height * m_lines.size() + 1;
+
+		// content is at least as wide as the longest line, so the horizontal scrollbar appears when needed
+		const float font_size = ImGui::GetFontSize();
+		if (m_max_line_width_version != version || m_max_line_width_font_size != font_size) {
+			// code font is monospace, so the width of an ascii line is its length times the char width,
+			// except tabs, which have their own advance; non-ascii lines are measured by imgui
+			const float tab_width = CalcTextSize("\t").x;
+			float max_width = 0;
+			for (const Line& line : m_lines) {
+				const u32 len = line.length();
+				const char* str = line.value.c_str();
+				u32 tabs = 0;
+				bool ascii = true;
+				for (u32 i = 0; i < len; ++i) {
+					tabs += str[i] == '\t';
+					ascii = ascii && u8(str[i]) < 0x80;
+				}
+				const float width = ascii ? (len - tabs) * char_width + tabs * tab_width : CalcTextSize(str, str + len).x;
+				max_width = maximum(max_width, width);
+			}
+			m_max_line_width = max_width;
+			m_max_line_width_version = version;
+			m_max_line_width_font_size = font_size;
+		}
+		m_text_offset_x = line_num_width + 2 * style.FramePadding.x;
+		bb.Max.x = bb.Min.x + maximum(content_size.x, m_text_offset_x + m_max_line_width + char_width);
 
 		ImGui::ItemSize(bb);
 		ImGui::ItemAdd(bb, id);
@@ -2117,6 +2160,14 @@ struct CodeEditorImpl final : CodeEditor {
 			ImGui::SetScrollY(scroll_y + m_scroll_diff);
 			m_scroll_diff = 0;
 			// we use old scroll_y value this frame to avoid blinking
+		}
+
+		const float scroll_x = ImGui::GetScrollX();
+		m_view_scroll_x = scroll_x;
+		m_view_width = content_size.x;
+		if (m_scroll_diff_x != 0) {
+			ImGui::SetScrollX(scroll_x + m_scroll_diff_x);
+			m_scroll_diff_x = 0;
 		}
 		min.x += style.FramePadding.x;
 		ImVec2 text_area_pos = min + ImVec2(line_num_width + style.FramePadding.x, 0);
@@ -2501,6 +2552,13 @@ struct CodeEditorImpl final : CodeEditor {
 	Array<u32> m_breakpoints;
 	Array<Cursor> m_cursors;
 	float m_scroll_diff = 0;
+	float m_scroll_diff_x = 0;
+	float m_view_scroll_x = 0; // scroll x of the last gui() call
+	float m_view_width = 0;
+	float m_text_offset_x = 0; // distance from the start of content to the start of text
+	float m_max_line_width = 0;
+	u32 m_max_line_width_version = 0;
+	float m_max_line_width_font_size = -1;
 	i32 m_first_visible_line = 0;
 	i32 m_last_visible_line = 0;
 	i32 m_max_visible_lines = 0;
