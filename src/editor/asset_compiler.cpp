@@ -66,6 +66,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		, m_plugins(m_allocator)
 		, m_to_compile(m_allocator)
 		, m_compiled(m_allocator)
+		, m_failed(m_allocator)
 		, m_registered_extensions(m_allocator)
 		, m_resources(m_allocator)
 		, m_generations(m_allocator)
@@ -438,8 +439,53 @@ struct AssetCompilerImpl : AssetCompiler {
 		}
 	}
 
+	// resources whose last compile failed, recompiled on every start so the errors are reported again
+	void loadFailedList() {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		OutputMemoryStream content(m_allocator);
+		if (!fs.getContentSync(Path(".lumix/resources/_failed.txt"), content)) return;
+
+		StringView text(content);
+		const char* line = text.begin();
+		for (const char* c = text.begin(); c <= text.end(); ++c) {
+			if (c != text.end() && *c != '\n') continue;
+			if (c > line) {
+				const Path path(StringView(line, c));
+				if (m_failed.indexOf(path) < 0) m_failed.push(path);
+			}
+			line = c + 1;
+		}
+	}
+
+	void saveFailedList() {
+		os::OutputFile file;
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		if (fs.open(".lumix/resources/_failed.txt_tmp", file)) {
+			for (const Path& p : m_failed) {
+				file << p << "\n";
+			}
+			file.close();
+			fs.deleteFile(".lumix/resources/_failed.txt");
+			fs.moveFile(".lumix/resources/_failed.txt_tmp", ".lumix/resources/_failed.txt");
+		}
+		else {
+			logError("Could not save .lumix/resources/_failed.txt");
+		}
+	}
+
+	void queueFailedResources() {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		for (const Path& p : m_failed) {
+			if (fs.fileExists(ResourcePath::getResource(p))) pushToCompileQueue(p);
+		}
+		// deleted since the last start, nothing to compile
+		m_failed.eraseItems([&](const Path& p) { return !fs.fileExists(ResourcePath::getResource(p)); });
+		saveFailedList();
+	}
+
 	void fillDB() {
 		if (m_plugins.empty()) return;
+		loadFailedList();
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		OutputMemoryStream content(m_allocator);
@@ -801,6 +847,7 @@ struct AssetCompilerImpl : AssetCompiler {
 			m_save_list_after_scan = false;
 			saveResourceList();
 			logInfo("Asset scan took ", m_scan_timer.getTimeSinceTick(), " seconds.");
+			queueFailedResources();
 		}
 
 		for(;;) {
@@ -810,6 +857,25 @@ struct AssetCompilerImpl : AssetCompiler {
 
 			const u32 generation = m_generations[job.path];
 			if (job.generation != generation) continue;
+
+			if (!isIgnored(job.path)) {
+				const int failed_idx = m_failed.indexOf(job.path);
+				if (job.compiled) {
+					if (failed_idx >= 0) {
+						m_failed.erase((u32)failed_idx);
+						saveFailedList();
+					}
+				}
+				else {
+					// do not load an older build of a resource that does not compile
+					FileSystem& fs = m_app.getEngine().getFileSystem();
+					fs.deleteFile(Path(".lumix/resources/", job.path.getHash(), ".res"));
+					if (failed_idx < 0) {
+						m_failed.push(job.path);
+						saveFailedList();
+					}
+				}
+			}
 
 			// this can take some time, mutex is probably not the best option
 			jobs::MutexGuard lock(m_resources_mutex);
@@ -962,6 +1028,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	Array<Path> m_changed_dirs;
 	Array<CompileJob> m_to_compile;
 	Array<CompileJob> m_compiled;
+	Array<Path> m_failed;
 	StudioApp& m_app;
 	LoadHook m_load_hook;
 	HashMap<RuntimeHash, IPlugin*> m_plugins;
