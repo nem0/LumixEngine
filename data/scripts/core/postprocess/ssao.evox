@@ -58,23 +58,6 @@ struct BlitUniform {
 	gbuffer_b : u32;
 }
 
-// Evox has no bit shifts
-fn shiftRight(value : u32, bits : u32) : u32 {
-	var result = value;
-	for i in 0..bits {
-		result = result / 2;
-	}
-	return result;
-}
-
-fn shiftLeftOne(bits : u32) : u32 {
-	var result : u32 = 1;
-	for i in 0..bits {
-		result = result * 2;
-	}
-	return result;
-}
-
 fn shadersReady(ctx : Context) : bool {
 	return ctx.loadShader("engine/shaders/ssao.hlsl").isReady()
 		and ctx.loadShader("engine/shaders/ssao_blit.hlsl").isReady()
@@ -85,8 +68,8 @@ fn shadersReady(ctx : Context) : bool {
 // Screen space ambient occlusion, writes the occlusion into G-buffer B before lighting.
 fn ssao(ctx : Context) : void {
 	var state = ctx.state(SsaoState);
-	const width = shiftRight(ctx.width(), g_downscale);
-	const height = shiftRight(ctx.height(), g_downscale);
+	const width = ctx.width() >> g_downscale;
+	const height = ctx.height() >> g_downscale;
 
 	if not shadersReady(ctx) or not g_enabled or width == 0 or height == 0 {
 		ctx.releaseBuffer(state.history);
@@ -102,7 +85,7 @@ fn ssao(ctx : Context) : void {
 		ctx.beginBlock("ssao downscale depth");
 		const downscale_shader = ctx.loadShader("engine/shaders/ssao_downscale_depth.hlsl");
 		ctx.dispatch(downscale_shader, DownscaleDepthUniform {
-			shiftLeftOne(g_downscale),
+			(1 as u32) << g_downscale,
 			ctx.bindless(ctx.depth()),
 			ctx.rwBindless(depth_buffer)
 		}, (width + 7) / 8, (height + 7) / 8, 1);

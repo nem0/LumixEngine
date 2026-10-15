@@ -86,7 +86,7 @@ fn start(world : World) : void {
 
 	for c in random_color_components {
 		var mi = c.entity.modelInstance() else return;
-		mi.overrideMaterialVec4(0, "Material color", {0, randFloat(), randFloat(), 1});
+		_ = mi.overrideMaterialVec4(0, "Material color", {0, randFloat(), randFloat(), 1});
 	}
 
 	var rnd_col = g_world.getEvoxData(RandomColorTickComponent);
@@ -172,7 +172,7 @@ fn goToRandomPoint(agent : Agent) : void {
 	const index = randRange(0, (waypoints.length - 1) as u32);
 	const point = waypoints[index].entity;
 	if g_world.hasEntity(point) {
-		agent.navigate(point.getPosition(), 5, 1);
+		_ = agent.navigate(point.getPosition(), 5, 1);
 	}
 }
 
@@ -204,7 +204,7 @@ fn update(td : f32, input : InputSystem) : void {
 	for &c in rnd_col {
 		c.t = c.t + td * 3;
 		var mi = c.entity.modelInstance() else return;
-		mi.overrideMaterialVec4(0, "Material color", {0, c.green, abs(math.cos(c.t)), 1});	
+		_ = mi.overrideMaterialVec4(0, "Material color", {0, c.green, abs(math.cos(c.t)), 1});	
 	}
 
 	// UI

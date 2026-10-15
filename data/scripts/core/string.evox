@@ -31,7 +31,7 @@ enum ParseError {
 
 // parse string until not a number character is encountered
 // var a : u64 = parseU64(text) else return;
-fn parseU64(a : []const u8) : u64 | ParseError {
+fn parseU64(a : []const u8) : union { u64, ParseError } {
     var len = a.length;
     if len < 1 { return ParseError.NotANumber; }
     
@@ -53,19 +53,19 @@ fn parseU64(a : []const u8) : u64 | ParseError {
     return res;
 }
 
-fn parseU32(a : []const u8) : u32 | ParseError {
+fn parseU32(a : []const u8) : union { u32, ParseError } {
     var tmp : u64 = parseU64(a) else return;
     if tmp > u32::max { return ParseError.Overeflow; }
     return tmp as u32;
 }
 
-fn parseU16(a : []const u8) : u16 | ParseError {
+fn parseU16(a : []const u8) : union { u16, ParseError } {
     var tmp : u64 = parseU64(a) else return;
     if tmp > u16::max { return ParseError.Overeflow; }
     return tmp as u16;
 }
 
-fn parseU8(a : []const u8) : u8 | ParseError {
+fn parseU8(a : []const u8) : union { u8, ParseError } {
     var tmp : u64 = parseU64(a) else return;
     if tmp > u8::max { return ParseError.Overeflow; }
     return tmp as u8;

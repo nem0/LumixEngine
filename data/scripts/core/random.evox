@@ -23,9 +23,9 @@ fn randomize() : void {
 }
 
 fn rand() : u32 {
-	u = 36969 * (u % 65536) + u / 65536;
-	v = 18000 * (v % 65536) + v / 65536;
-	return u * 65536 + v;
+	u = 36969 * (u & 0xFFFF) + (u >> 16);
+	v = 18000 * (v & 0xFFFF) + (v >> 16);
+	return (u << 16) + v;
 }
 
 fn randRange(from : u32, to : u32) : u32 {

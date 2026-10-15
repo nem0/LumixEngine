@@ -65,7 +65,7 @@ struct DeviceRemovedEvent {
 	device_index : i32;
 }
 
-comptime InputEvent = ButtonEvent | AxisEvent | MouseWheelEvent | TextEvent | DeviceAddedEvent | DeviceRemovedEvent | KeyboardEvent | MouseButtonEvent;
+comptime InputEvent = union { ButtonEvent, AxisEvent, MouseWheelEvent, TextEvent, DeviceAddedEvent, DeviceRemovedEvent, KeyboardEvent, MouseButtonEvent };
 
 extern fn input(engine : Engine) : InputSystem;
 extern fn getEventCount(system : InputSystem) : i32;

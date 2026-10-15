@@ -74,7 +74,7 @@ fn renderFrame(ctx : Context) : RenderBuffer {
 	const gbuffer = geometry.gbuffer;
 	ctx.setGBuffer(gbuffer);
 
-	ctx.runPlugins(.BEFORE_LIGHT_PASS, invalidBuffer());
+	_ = ctx.runPlugins(.BEFORE_LIGHT_PASS, invalidBuffer());
 	ssao.ssao(ctx);
 	var result = lighting.lightPass(ctx, gbuffer, shadowmap);
 	result = beginChain(ctx, .BEFORE_TRANSPARENT, result);

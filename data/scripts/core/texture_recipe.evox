@@ -466,7 +466,7 @@ fn checkerboard(width : u32, height : u32, size : u32) : Image {
     var result = create(width, height, 1);
     for y in 0..height {
         for x in 0..width {
-            setPixel(result, x, y, Vec4 {((x / size + y / size) % 2) as f32, 0, 0, 1});
+            setPixel(result, x, y, Vec4 {((x / size + y / size) & 1) as f32, 0, 0, 1});
         }
     }
     return result;
@@ -506,28 +506,9 @@ fn triangle(width : u32, height : u32, power : f32) : Image {
     return recipeShape(width, height, power, 2);
 }
 
-// Evox has no bitwise operators; compute XOR using integer arithmetic.
-fn recipeXor(a : u32, b : u32) : u32 {
-    var x = a;
-    var y = b;
-    var bit : u32 = 1;
-    var result : u32 = 0;
-    for i in 0..32 {
-        if x % 2 != y % 2 {
-            result += bit;
-        }
-        x /= 2;
-        y /= 2;
-        if i < 31 {
-            bit *= 2;
-        }
-    }
-    return result;
-}
-
 fn recipeHash(v : u32) : u32 {
     var q = v * 747796405 + 2891336453;
-    q = recipeXor(q * 8192, q);
+    q = (q << 13) ^ q;
     return q * (q * q * 15731 + 789221) + 1376312589;
 }
 
@@ -537,9 +518,9 @@ struct RecipeRandom {
 }
 
 fn recipeRandom(state : *RecipeRandom) : f32 {
-    state.u = 36969 * (state.u % 65536) + state.u / 65536;
-    state.v = 18000 * (state.v % 65536) + state.v / 65536;
-    return(state.u * 65536 + state.v) as f32 * 2.328306436996595e-10;
+    state.u = 36969 * (state.u & 0xFFFF) + (state.u >> 16);
+    state.v = 18000 * (state.v & 0xFFFF) + (state.v >> 16);
+    return((state.u << 16) + state.v) as f32 * 2.328306436996595e-10;
 }
 
 fn valueNoise(width : u32, height : u32, seed : u32) : Image {
@@ -561,7 +542,7 @@ fn recipeGradientDot(x : i32, y : i32, dx : f32, dy : f32, scale : f32) : f32 {
     const cx = (x as f32 - math.floor(x as f32 / scale) * scale) as u32;
     const cy = (y as f32 - math.floor(y as f32 / scale) * scale) as u32;
     const h = recipeHash(recipeHash(cx) + cy);
-    const h2 = recipeHash(recipeXor(h, 1933247));
+    const h2 = recipeHash(h ^ 1933247);
     return(h as f32 / (4294967295 as u32 as f32) * 2 - 1) * dx + (h2 as f32 / (4294967295 as u32 as f32) * 2 - 1) * dy;
 }
 

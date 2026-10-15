@@ -204,19 +204,19 @@ fn beginStatsBlock(ctx : Context, name : []const u8) : void {
 	beginBlockRaw(ctx, name, true);
 }
 
-// Values of gpu::StateFlags (add them with `stateBits`) and of BucketDesc::Sort.
+// Values of gpu::StateFlags (combine them with `stateBits`) and of BucketDesc::Sort.
 enum StateFlags : u64 { NONE = 0, WIREFRAME = 1, DEPTH_FN_GREATER = 2, DEPTH_FN_EQUAL = 4, DEPTH_FUNCTION = 6, CULL_FRONT = 8, CULL_BACK = 16, DEPTH_WRITE = 32 }
 enum BucketSort : u32 { DEFAULT, DEPTH }
-// Bits of the states added together (they must be different bits).
+// Bitwise OR of the states.
 fn stateBits(a : StateFlags, b : StateFlags) : u64 {
-	return (a as u64) + (b as u64);
+	return (a as u64) | (b as u64);
 }
 
-// Values of gpu::TextureFlags (add them with `textureFlags`) and gpu::BlendFactors.
+// Values of gpu::TextureFlags (combine them with `textureFlags`) and gpu::BlendFactors.
 enum TextureFlags : u32 { NONE = 0, NO_MIPS = 2, COMPUTE_WRITE = 64, RENDER_TARGET = 128 }
 enum BlendFactors : u32 { ZERO, ONE, SRC_COLOR, ONE_MINUS_SRC_COLOR, SRC_ALPHA, ONE_MINUS_SRC_ALPHA, DST_COLOR, ONE_MINUS_DST_COLOR, DST_ALPHA, ONE_MINUS_DST_ALPHA }
 fn textureFlags(a : TextureFlags, b : TextureFlags, c : TextureFlags) : TextureFlags {
-	return ((a as u32) + (b as u32) + (c as u32)) as TextureFlags;
+	return ((a as u32) | (b as u32) | (c as u32)) as TextureFlags;
 }
 // Buffer of any format (including depth) and size. `flags` decide what it can be used for.
 extern fn createRenderbuffer(ctx : Context, width : u32, height : u32, format : TextureFormat, flags : TextureFlags) : RenderBuffer;
@@ -247,7 +247,7 @@ extern fn runPluginsDebugOutput(ctx : Context, output : RenderBuffer) : bool;
 
 // Lets C++ plugins draw their opaque geometry into the G-buffer (stage RENDER_OPAQUE of `runPlugins`).
 fn renderOpaquePlugins(ctx : Context) : void {
-	runPlugins(ctx, .RENDER_OPAQUE, invalidBuffer());
+	_ = runPlugins(ctx, .RENDER_OPAQUE, invalidBuffer());
 }
 
 // Culling: add the buckets (a layer of render objects with the state and shader define used to draw them) and call `cull`,
@@ -267,7 +267,7 @@ extern fn renderEntities(ctx : Context, state : u64, define : []const u8, entiti
 extern fn renderBucket(ctx : Context, view : u32, bucket : u32) : void;
 // Lets C++ plugins draw their transparent geometry (particles, ...), stage RENDER_TRANSPARENT of `runPlugins`.
 fn renderTransparentPlugins(ctx : Context) : void {
-	runPlugins(ctx, .RENDER_TRANSPARENT, invalidBuffer());
+	_ = runPlugins(ctx, .RENDER_TRANSPARENT, invalidBuffer());
 }
 
 // Constant buffers a shader reads: `Drawcall` (b4) or the second one (b5).

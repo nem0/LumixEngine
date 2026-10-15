@@ -18,7 +18,7 @@ fn shadowPass(ctx : Context) : RenderBuffer {
 	ctx.clearTargets(.DEPTH, 0.0, 0.0, 0.0, 0.0, 0.0);
 
 	const bucket_state = stateBits(.DEPTH_FUNCTION, .DEPTH_WRITE);
-	const shadow_state = bucket_state + (StateFlags.CULL_BACK as u64);
+	const shadow_state = bucket_state | (StateFlags.CULL_BACK as u64);
 	var slice : u32 = 0;
 	while slice < 4 {
 		const camera = ctx.shadowCamera(slice);
