@@ -541,10 +541,33 @@ struct RenderModuleImpl final : RenderModule {
 		m_moved_instances.clear();
 	}
 
+	// Whether the draw state of an instance with material overrides (sort key, material index) no longer matches its materials.
+	// A mesh material with nothing derived yet is not stale. One that is not ready cannot be checked, so it is stale: it is
+	// being (re)loaded. A ready one is stale only if what would be derived from it now differs from what is stored.
+	bool isMaterialOverrideStale(const ModelInstance& mi) const {
+		for (u32 i = 0, c = mi.mesh_materials.size(); i < c; ++i) {
+			const MeshMaterial& mat = mi.mesh_materials[i];
+			if (!mat.sort_key && u32(mat.material_index) == 0) continue;
+			if (!mat.material || !mat.material->isReady()) return true;
+			if (isFlagSet(mat.flags, MeshMaterial::OWN_MATERIAL_INDEX)) return true; // a private copy of the uniforms, made from the old material
+			if (i >= mi.mesh_count) return true;
+			if (u32(mat.material_index) != 0 && u32(mat.material_index) != u32(mat.material->getIndex())) return true;
+			if (mat.sort_key) {
+				const u32 fresh = computeSortKey(*mat.material, mi.meshes[i]);
+				m_renderer.freeSortKey(fresh);
+				if (fresh != mat.sort_key) return true;
+			}
+		}
+		return false;
+	}
+
 	// Material overrides are owned by the model instance, not by the model, so the model's state does not track them.
-	// When a material or shader is reloaded, per-mesh state derived from it (sort key, material index) is stale and the
+	// When a material or shader is reloaded, per-mesh state derived from it (sort key, material index) can be stale and the
 	// instance would keep producing draw commands with it. Drop that state and flag the instance dirty,
 	// Pipeline::refreshMaterialOverrides() rebuilds it once the material is ready.
+	// Only instances whose state really is stale are touched: a dirty instance is not drawn until it is refreshed, so
+	// invalidating all of them whenever any material was unloaded (e.g. the models of a new module were swapped) made every
+	// instance with an override (the planet, its clouds and atmosphere, the sky) disappear for a few frames.
 	// This runs at the start of every Pipeline::render(), after any unload that happened since the last render and
 	// before the pipeline gathers instances. Pipelines set up one after another, so none has jobs reading this state.
 	// The scan only happens after a material/shader unload, otherwise it is a single integer compare.
@@ -557,6 +580,7 @@ struct RenderModuleImpl final : RenderModule {
 			if (!isFlagSet(mi.flags, ModelInstance::VALID)) continue;
 			if (!mi.model || !mi.model->isReady()) continue;
 			if (mi.mesh_materials.begin() == mi.model->getMeshMaterials().begin()) continue; // no override
+			if (!isMaterialOverrideStale(mi)) continue;
 
 			for (MeshMaterial& mat : mi.mesh_materials) {
 				if (mat.sort_key) m_renderer.freeSortKey(mat.sort_key);
