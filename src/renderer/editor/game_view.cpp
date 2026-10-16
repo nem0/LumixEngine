@@ -372,6 +372,20 @@ void GameView::controlsGUI(WorldEditor& editor) {
 		ImGui::EndPopup();
 	}
 
+	ImGui::SameLine();
+	if (ImGui::Button(ICON_FA_CAMERA " Screenshot")) {
+		// the same function as the remote `make_game_screenshot`, at the current game view size, into <project>/screenshots/
+		const Path dir(m_app.getProjectDir(), "screenshots/");
+		if (!os::makePath(dir.c_str()) && !os::dirExists(dir)) logError("Failed to create ", dir);
+		StaticString<MAX_PATH> rel_path;
+		for (u32 i = 1; i < 100000; ++i) {
+			rel_path = "screenshots/game_view_";
+			rel_path.append(i, ".tga");
+			if (!os::fileExists(StringView(Path(m_app.getProjectDir(), rel_path).c_str()))) break;
+		}
+		if (makeScreenshot(rel_path)) logInfo("Saving game view screenshot to ", rel_path);
+	}
+	if (ImGui::IsItemHovered()) ImGui::SetTooltip("Save a screenshot of the game view to screenshots/ (TGA, current resolution)");
 }
 
 
