@@ -68,7 +68,7 @@ bool Sprite::load(Span<const u8> mem) {
 
 void Sprite::render(Draw2D& draw, float l, float t, float r, float b, Color color) {
 	Texture* tex = getTexture();
-	if (!tex) return;
+	if (!tex || !tex->isReady()) return;
 
 	if (type == PATCH9) {
 		struct Quad {
