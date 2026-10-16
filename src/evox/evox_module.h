@@ -26,8 +26,10 @@ struct NativeFunctionKeyHash {
 struct EvoxModule;
 
 struct EvoxSystem : ISystem {
-	// Compile and execute a standalone script against the given world. Runs synchronously.
-	virtual bool executeSource(StringView source, World& world, String& output) = 0;
+	// The runtime of the running game (main.evox), nullptr while there is none. Tasks created on it share the game's globals.
+	virtual ex_runtime* getRuntime() = 0;
+	// The native function behind an `extern` of a script unit (what a runtime's host.native_resolver needs), nullptr if it is not registered.
+	virtual ex_native_fn getNativeFunction(StringView unit_path, StringView name) = 0;
 	virtual Engine& getEngine() = 0;
 	virtual bool registerNativeFunction(StringView unit_path, StringView name, ex_native_fn function) = 0;
 	virtual void registerModule(EvoxModule& module) = 0;

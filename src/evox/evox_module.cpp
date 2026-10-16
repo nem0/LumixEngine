@@ -22,8 +22,6 @@
 
 namespace Lumix {
 
-static ex_bytecode_compile_options s_compile_options = { true };
-
 namespace Evox {
 	void gatherCoreFunctions(HashMap<NativeFunctionKey, ex_native_fn, NativeFunctionKeyHash>& functions);
 }
@@ -31,16 +29,6 @@ namespace Evox {
 static constexpr const char* EVOX_DATA_ATTRIBUTE_TYPE = "core:attributes.Data";
 static constexpr const char* EVOX_OWNER_ATTRIBUTE_TYPE = "core:attributes.Owner";
 static constexpr const char* EVOX_ENTITY_TYPE = "core:entity.Entity";
-
-struct EvoxDiagnosticsContext {
-	String* message = nullptr;
-	ex_host* host = nullptr;
-};
-
-static void printEvoxMessage(void* userdata, ex_string_view msg) {
-	EvoxDiagnosticsContext* ctx = (EvoxDiagnosticsContext*)userdata;
-	if (ctx->message) ctx->message->append(StringView(msg.begin, (u64)msg.length));
-}
 
 static ex_string_view toEvox(StringView value) {
 	return {value.data, (i64)value.length};
@@ -121,14 +109,6 @@ static ex_native_fn resolveCoreFunction(ex_runtime*, ex_native_function_desc fun
 
 
 struct EvoxSystemImpl : EvoxSystem {
-	struct ImportContext {
-		FileSystem& filesystem;
-		IAllocator& allocator;
-		Array<OutputMemoryStream> sources;
-		ImportContext(FileSystem& filesystem, IAllocator& allocator)
-			: filesystem(filesystem), allocator(allocator), sources(allocator) {}
-	};
-
 	explicit EvoxSystemImpl(Engine& engine);
 
 	~EvoxSystemImpl() {
@@ -212,70 +192,13 @@ struct EvoxSystemImpl : EvoxSystem {
 
 	void createModules(World& world) override;
 
-	bool executeSource(StringView source, World& world, String& output) override {
-		// Keep every object alive until the task finishes: bytecode owns types, runtime owns globals.
-		ex_host host = {};
-		EvoxDiagnosticsContext diagnostics = {&output, &host};
-		host.diagnostics_userdata = &diagnostics;
-		host.print = &printEvoxMessage;
-		ex_default_arena_create(&host.arena);
-		ex_module* module = ex_module_create(&host);
-		ex_bytecode* bytecode = nullptr;
-		ex_runtime* runtime = nullptr;
-		ex_task* task = nullptr;
-		bool success = false;
-		if (!module) {
-			output.append("Could not create Evox module");
-			goto cleanup;
-		}
-		{
-			ImportContext imports(m_engine.getFileSystem(), m_allocator);
-			if (!ex_module_compile(module, toEvox(source), toEvox("<mcp>"), &resolveImport, &imports)) {
-				if (output.length() == 0) output.append("Evox compilation failed");
-				goto cleanup;
-			}
-		}
-		bytecode = ex_bytecode_compile(module, &host, &s_compile_options);
-		if (!bytecode) {
-			if (output.length() == 0) output.append("Evox bytecode compilation failed");
-			goto cleanup;
-		}
-		host.native_resolver = &resolveCoreFunction;
-		host.native_resolver_userdata = &m_native_functions;
-		runtime = ex_runtime_create(bytecode, &host);
-		if (!runtime) {
-			output.append("Could not initialize Evox runtime");
-			goto cleanup;
-		}
-		task = ex_task_create(runtime);
-		if (!task) {
-			output.append("Could not create Evox task");
-			goto cleanup;
-		}
-		{
-			// The Evox World handle is a native World* (same ABI as the regular main call).
-			World* arg = &world;
-			const ex_call_result result = ex_call(task, toEvox("main"), &arg, sizeof(arg));
-			if (result != EX_CALL_RESULT_OK) {
-				output.append("Evox main failed: ", evoxCallResultName(result));
-				for (u32 i = 0, count = ex_debug_stack_depth(task); i < count; ++i) {
-					ex_debug_location loc = {};
-					if (ex_debug_frame_location(task, i, &loc) == EX_RESULT_OK) {
-						StaticString<32> line(loc.line + 1);
-						output.append("\n  at ", fromEvox(loc.source_name), ":", (const char*)line);
-					}
-				}
-				goto cleanup;
-			}
-		}
-		success = true;
-	cleanup:
-		if (task) ex_task_destroy(task);
-		if (runtime) ex_runtime_destroy(runtime);
-		if (bytecode) ex_bytecode_destroy(bytecode);
-		if (module) ex_module_destroy(module);
-		ex_default_arena_destroy(&host.arena);
-		return success;
+	ex_runtime* getRuntime() override { return m_runtime; }
+
+	ex_native_fn getNativeFunction(StringView unit_path, StringView name) override {
+		auto iter = m_native_functions.find(NativeFunctionKey{unit_path, name});
+		if (iter.isValid()) return iter.value();
+		logError("Evox : failed to resolve native function ", unit_path, ".", name);
+		return nullptr;
 	}
 
 	void loadRoot() {
@@ -296,26 +219,6 @@ struct EvoxSystemImpl : EvoxSystem {
 			if (StringView(name.begin, name.length) == EVOX_DATA_ATTRIBUTE_TYPE) return true;
 		}
 		return false;
-	}
-
-	static int resolveImport(void* userdata, ex_string_view path, ex_string_view, ex_string_view* source) {
-		ImportContext& ctx = *(ImportContext*)userdata;
-		StringView requested(path.begin, path.length);
-		Path file_path;
-		if (startsWith(requested, "core:")) {
-			StringView name = requested.withoutLeft(5);
-			file_path = endsWith(name, ".evox") ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".evox");
-		}
-		else {
-			file_path = endsWith(requested, ".evox") ? Path(requested) : Path(requested, ".evox");
-		}
-		OutputMemoryStream& blob = ctx.sources.emplace(ctx.allocator);
-		if (!ctx.filesystem.getContentSync(file_path, blob)) {
-			ctx.sources.pop();
-			return 0;
-		}
-		*source = {(const char*)blob.data(), (i64)blob.size()};
-		return 1;
 	}
 
 	void onResourceChanged(Resource::State, Resource::State state, Resource&) {
