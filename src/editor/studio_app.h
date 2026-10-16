@@ -126,6 +126,10 @@ struct LUMIX_EDITOR_API StudioApp {
 	
 	//@ function
 	virtual void newWorld() = 0;
+	//@ function
+	virtual struct GameView* getGameView() = 0;
+	//@ function
+	virtual struct SceneView* getSceneView() = 0;
 	virtual void setFullscreen(bool fullscreen) = 0;
 	virtual float getFOV() const = 0;
 	virtual void setFOV(float fov_radians) = 0;

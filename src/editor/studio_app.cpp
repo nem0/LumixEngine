@@ -45,6 +45,8 @@
 	#include "renderer/renderer.h"
 	#include "renderer/shader.h"
 #endif
+#include "renderer/editor/game_view.h"
+#include "renderer/editor/scene_view.h"
 #include "tests/imgui_tests.h"
 #include "settings.h"
 #include "studio_app.h"
@@ -1689,6 +1691,14 @@ struct StudioAppImpl final : StudioApp {
 		else {
 			m_finished = true;
 		}
+	}
+
+	struct GameView* getGameView() override {
+		return static_cast<GameView*>(getGUIPlugin("game_view"));
+	}
+
+	struct SceneView* getSceneView() override {
+		return static_cast<SceneView*>(getGUIPlugin("scene_view"));
 	}
 
 	void newWorld() override {

@@ -32,6 +32,7 @@ struct LUMIX_RENDERER_API GameView : StudioApp::GUIPlugin {
 	// If width and height are both > 0, this capture is rendered at that size; the window size applies again on the next GUI frame.
 	bool makeScreenshot(StringView path, int width = 0, int height = 0);
 	// If enabled, the game view is rendered every frame even if its window is closed or hidden (e.g. for video recording).
+	//@ function
 	void setForceRender(bool enable) { m_force_render = enable; }
 	Pipeline* getPipeline() { return m_pipeline.get(); }
 	const char* getName() const override { return "game_view"; }

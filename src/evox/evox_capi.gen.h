@@ -5004,6 +5004,20 @@ namespace Lumix::Evox::generated {
 		object->newWorld();
 	}
 	
+	static void evox_object_StudioApp_getGameView_6947001410995523351(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, StudioApp*, object);
+		auto ret = object->getGameView();
+		EX_RESULT(frame, u8(ret != nullptr));
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_StudioApp_getSceneView_9405430407362718083(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, StudioApp*, object);
+		auto ret = object->getSceneView();
+		EX_RESULT(frame, u8(ret != nullptr));
+		EX_RESULT(frame, ret);
+	}
+	
 	static void evox_object_Engine_createWorld_9620427070019288589(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, Engine*, object);
 		auto& ret = object->createWorld();
@@ -5068,6 +5082,12 @@ namespace Lumix::Evox::generated {
 		EX_ARG(frame, int, w);
 		EX_ARG(frame, int, h);
 		object->forceViewport(enable, w, h);
+	}
+	
+	static void evox_object_GameView_setForceRender_8616242492035293462(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, GameView*, object);
+		EX_ARG(frame, bool, enable);
+		object->setForceRender(enable);
 	}
 	
 	static void evox_object_SceneView_setViewport_14548538436635539605(ex_runtime* runtime, ex_call_frame frame) {
@@ -5988,6 +6008,8 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:audio/clip"), StringView("isFailure")}, &evox_resource_isFailure_Clip);
 		functions.insert({StringView("core:editor/assetbrowser"), StringView("openEditor")}, &evox_object_AssetBrowser_openEditor_11783148113040368601);
 		functions.insert({StringView("core:editor/studioapp"), StringView("newWorld")}, &evox_object_StudioApp_newWorld_6688068326512970617);
+		functions.insert({StringView("core:editor/studioapp"), StringView("getGameView")}, &evox_object_StudioApp_getGameView_6947001410995523351);
+		functions.insert({StringView("core:editor/studioapp"), StringView("getSceneView")}, &evox_object_StudioApp_getSceneView_9405430407362718083);
 		functions.insert({StringView("core:engine/engine"), StringView("createWorld")}, &evox_object_Engine_createWorld_9620427070019288589);
 		functions.insert({StringView("core:engine/engine"), StringView("destroyWorld")}, &evox_object_Engine_destroyWorld_4167552932825757200);
 		functions.insert({StringView("core:engine/engine"), StringView("instantiatePrefab")}, &evox_object_Engine_instantiatePrefab_17117969483096900978);
@@ -5998,6 +6020,7 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:engine/prefabresource"), StringView("isReady")}, &evox_resource_isReady_PrefabResource);
 		functions.insert({StringView("core:engine/prefabresource"), StringView("isFailure")}, &evox_resource_isFailure_PrefabResource);
 		functions.insert({StringView("core:renderer/editor/gameview"), StringView("forceViewport")}, &evox_object_GameView_forceViewport_14906880937046627925);
+		functions.insert({StringView("core:renderer/editor/gameview"), StringView("setForceRender")}, &evox_object_GameView_setForceRender_8616242492035293462);
 		functions.insert({StringView("core:renderer/editor/sceneview"), StringView("setViewport")}, &evox_object_SceneView_setViewport_14548538436635539605);
 		functions.insert({StringView("core:renderer/editor/sceneview"), StringView("makeScreenshot")}, &evox_object_SceneView_makeScreenshot_13676003394318764375);
 		functions.insert({StringView("core:renderer/model"), StringView("load")}, &evox_resource_load_Model);
