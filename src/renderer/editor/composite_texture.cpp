@@ -3629,25 +3629,26 @@ struct Recipe {
 	}
 
 	bool readFile(const Path& file, OutputMemoryStream& bytes) {
+		// registered before the file is read: a missing input is a dependency too, creating or moving the file must rebuild the recipe
+		if (dependencies) dependencies->registerDependency(path, file);
 		if (!relativePath(file) || !fs.getContentSync(file, bytes)) {
 			error.append("Could not read recipe input (invalid path or missing file): ", file, "\n");
 			return false;
 		}
-
-		if (dependencies) dependencies->registerDependency(path, file);
 		return true;
+	}
+
+	static Path importToPath(StringView requested) {
+		if (startsWith(requested, "core:")) {
+			const StringView unit = requested.withoutLeft(5);
+			return endsWith(unit, ".evox") ? Path("engine/scripts/core/", unit) : Path("engine/scripts/core/", unit, ".evox");
+		}
+		return endsWith(requested, ".evox") ? Path(requested) : Path(requested, ".evox");
 	}
 
 	static int resolveImport(void* userdata, ex_string_view name, ex_string_view, ex_string_view* source) {
 		Recipe& self = *(Recipe*)userdata;
-		const StringView requested(name.begin, name.length);
-		Path file;
-		if (startsWith(requested, "core:")) {
-			const StringView unit = requested.withoutLeft(5);
-			file = endsWith(unit, ".evox") ? Path("engine/scripts/core/", unit) : Path("engine/scripts/core/", unit, ".evox");
-		} else {
-			file = endsWith(requested, ".evox") ? Path(requested) : Path(requested, ".evox");
-		}
+		const Path file = importToPath(StringView(name.begin, name.length));
 		OutputMemoryStream& bytes = self.sources.emplace(self.allocator);
 		if (!self.readFile(file, bytes)) {
 			self.sources.pop();
@@ -4007,6 +4008,27 @@ struct Recipe {
 	u64 generated_bytes = 0;
 };
 } // namespace
+
+void registerTextureRecipeImports(FileSystem& fs, const Path& path, AssetCompiler& compiler, IAllocator& allocator) {
+	OutputMemoryStream content(allocator);
+	if (!fs.getContentSync(path, content)) return;
+
+	ex_host host = {};
+	ex_default_arena_create(&host.arena);
+	ex_module* module = ex_module_create(&host);
+	if (module) {
+		ex_module_parse(module, {(const char*)content.data(), (i64)content.size()}, {path.c_str(), (i64)stringLength(path.c_str())});
+		ex_unit* unit = ex_module_get_unit(module, 0);
+		for (int i = 0, count = ex_unit_get_import_count(unit); i < count; ++i) {
+			const ex_string_view value = ex_unit_get_import_path(unit, i);
+			const StringView import_path(value.begin, value.length);
+			if (startsWith(import_path, "std:")) continue;
+			compiler.registerDependency(path, Recipe::importToPath(import_path));
+		}
+		ex_module_destroy(module);
+	}
+	ex_default_arena_destroy(&host.arena);
+}
 
 bool compileTextureRecipe(FileSystem& fs, StringView source, const Path& path, CompositeTexture::Result& result, String& error, IAllocator& allocator, AssetCompiler* dependencies) {
 	result.layers.clear();

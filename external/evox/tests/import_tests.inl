@@ -1440,3 +1440,42 @@ TEST(UfcsNotShadowedByLocalFunctionWithSameName) {
 	return true;
 }
 
+
+TEST(RootFileNameMatchesImportWithoutExtension) {
+	// the root unit is named "root.evox", the other file imports it as "root": it must be the same unit, not a second copy with its own types
+	const char* root_source = R"(
+		import "other" as other
+
+		enum Kind { A, B }
+
+		fn get(kind : Kind) : i32 {
+			return other.stats(kind);
+		}
+
+		fn main() : i32 {
+			return get(.B);
+		}
+	)";
+	const char* other_source = R"(
+		import "root" as root
+
+		fn stats(kind : root.Kind) : i32 {
+			match kind {
+				case .A: return 1;
+				case .B: return 2;
+			}
+			return 0;
+		}
+	)";
+	EvoxImportFile files_storage[] = {
+		{ toLs("other"), toLs(other_source) },
+	};
+	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(root_source), makeStringView("root.evox"), &resolveEvoxImportC, &files));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(test_call(runtime, toLs("main")), EX_CALL_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 2);
+	CAPI_END(module);
+	return true;
+}

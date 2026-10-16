@@ -1354,6 +1354,12 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		app.getAssetCompiler().registerExtension("ltct", Texture::TYPE);
 	}
 
+	// .ltct recipes import scripts: register them by parsing when scanned, not only while compiling (see registerTextureRecipeImports)
+	void addSubresources(AssetCompiler& compiler, const Path& path, AtomicI32& signal) override {
+		AssetCompiler::IPlugin::addSubresources(compiler, path, signal);
+		if (Path::hasExtension(path, "ltct")) registerTextureRecipeImports(m_app.getEngine().getFileSystem(), path, compiler, m_app.getAllocator());
+	}
+
 	void openEditor(const Path& path) override {
 		UniquePtr<TextureAssetEditorWindow> win = UniquePtr<TextureAssetEditorWindow>::create(m_allocator, path, m_app, m_allocator);
 		m_app.getAssetBrowser().addWindow(win.move());

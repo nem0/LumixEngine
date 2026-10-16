@@ -132,24 +132,26 @@ struct Recipe {
 		ex_default_arena_destroy(&host.arena);
 	}
 
-	static int resolveImport(void* userdata, ex_string_view name, ex_string_view, ex_string_view* source) {
-		Recipe& self = *(Recipe*)userdata;
-		const StringView requested(name.begin, name.length);
-		Path file;
+	static Path importToPath(StringView requested) {
 		if (startsWith(requested, "core:")) {
 			const StringView unit = requested.withoutLeft(5);
-			file = endsWith(unit, ".evox") ? Path("engine/scripts/core/", unit) : Path("engine/scripts/core/", unit, ".evox");
-		} else {
-			file = endsWith(requested, ".evox") ? Path(requested) : Path(requested, ".evox");
+			return endsWith(unit, ".evox") ? Path("engine/scripts/core/", unit) : Path("engine/scripts/core/", unit, ".evox");
 		}
+		return endsWith(requested, ".evox") ? Path(requested) : Path(requested, ".evox");
+	}
 
+	static int resolveImport(void* userdata, ex_string_view name, ex_string_view, ex_string_view* source) {
+		Recipe& self = *(Recipe*)userdata;
+		const Path file = importToPath(StringView(name.begin, name.length));
+
+		// registered before the file is read: a missing import is a dependency too, creating or moving the file must rebuild the recipe
+		if (self.dependencies) self.dependencies->registerDependency(self.path, file);
 		OutputMemoryStream& bytes = self.sources.emplace(self.allocator);
 		if (!isRelativePath(file) || !self.fs.getContentSync(file, bytes)) {
 			self.error.append("Could not read recipe input (invalid path or missing file): ", file, "\n");
 			self.sources.pop();
 			return 0;
 		}
-		if (self.dependencies) self.dependencies->registerDependency(self.path, file);
 
 		*source = {(const char*)bytes.data(), (i64)bytes.size()};
 		return 1;
@@ -721,6 +723,31 @@ struct Plugin final : ProceduralMeshEditor, EditorAssetPlugin {
 	Plugin(StudioApp& app)
 		: EditorAssetPlugin("Procedural mesh", PROCEDURAL_MESH_EXTENSION, Model::TYPE, app, app.getAllocator())
 	{}
+
+	// Like Evox scripts, a recipe's imports are found by parsing it when it is scanned, not only while it compiles: a compile that fails
+	// (or never ran) stops at the first broken import and would leave the later ones unregistered.
+	void addSubresources(AssetCompiler& compiler, const Path& path, AtomicI32& signal) override {
+		EditorAssetPlugin::addSubresources(compiler, path, signal);
+
+		OutputMemoryStream content(m_app.getAllocator());
+		if (!m_app.getEngine().getFileSystem().getContentSync(path, content)) return;
+
+		ex_host host = {};
+		ex_default_arena_create(&host.arena);
+		ex_module* module = ex_module_create(&host);
+		if (module) {
+			ex_module_parse(module, {(const char*)content.data(), (i64)content.size()}, {path.c_str(), (i64)stringLength(path.c_str())});
+			ex_unit* unit = ex_module_get_unit(module, 0);
+			for (int i = 0, count = ex_unit_get_import_count(unit); i < count; ++i) {
+				const ex_string_view value = ex_unit_get_import_path(unit, i);
+				const StringView import_path(value.begin, value.length);
+				if (startsWith(import_path, "std:")) continue;
+				compiler.registerDependency(path, Recipe::importToPath(import_path));
+			}
+			ex_module_destroy(module);
+		}
+		ex_default_arena_destroy(&host.arena);
+	}
 
 	bool compile(const Path& src) override {
 		PROFILE_FUNCTION();

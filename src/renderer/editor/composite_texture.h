@@ -158,4 +158,7 @@ LUMIX_RENDERER_API bool compileTextureRecipe(FileSystem& fs,
 	StringView source, const Path& path, CompositeTexture::Result& result,
 	String& error, IAllocator& allocator, AssetCompiler* dependencies = nullptr);
 
+// Registers the imports of an .ltct recipe as its dependencies by parsing it (no compile), so a recipe that fails to compile still gets rebuilt when an import changes.
+LUMIX_RENDERER_API void registerTextureRecipeImports(FileSystem& fs, const Path& path, AssetCompiler& compiler, IAllocator& allocator);
+
 } // namespace Lumix
