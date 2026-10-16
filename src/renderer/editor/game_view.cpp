@@ -148,6 +148,13 @@ bool GameView::makeScreenshot(StringView path, int width, int height) {
 
 	auto delegate = makeDelegate<&Callback::callback>(cb);
 	m_pipeline->getRenderer().getDrawStream().readTexture(texture, delegate);
+
+	// the requested size is for this capture only: go back to the size the GUI uses (no render, the read-back above keeps its texture)
+	if (width > 0 && height > 0) {
+		int w, h;
+		if (getForcedSize(w, h)) setupViewport(w, h);
+		else if (m_size.x > 0 && m_size.y > 0) setupViewport((int)m_size.x, (int)m_size.y);
+	}
 	return true;
 }
 
