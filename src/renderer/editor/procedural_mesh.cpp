@@ -428,9 +428,11 @@ struct Plugin final : ProceduralMeshEditor, EditorAssetPlugin {
 			, m_allocator(allocator)
 			, m_path(path)
 			, m_viewer(app)
+			, m_meta(allocator)
 		{
 			Engine& engine = app.getEngine();
 			m_resource = engine.getResourceManager().load<Model>(path);
+			m_meta.load(path, app);
 			auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(types::model_instance));
 			render_module->setModelInstancePath(*m_viewer.m_mesh, path);
 
@@ -452,6 +454,12 @@ struct Plugin final : ProceduralMeshEditor, EditorAssetPlugin {
 				OutputMemoryStream source(m_allocator);
 				m_editor->serializeText(source);
 				m_app.getAssetBrowser().saveResource(m_path, source);
+			}
+			if (m_meta_dirty) {
+				OutputMemoryStream blob(m_allocator);
+				m_meta.serialize(blob, m_path);
+				m_app.getAssetCompiler().updateMeta(m_path, blob);
+				m_meta_dirty = false;
 			}
 			m_dirty = false;
 		}
@@ -479,6 +487,7 @@ struct Plugin final : ProceduralMeshEditor, EditorAssetPlugin {
 			}
 			else if (!m_resource->isReady()) {
 				ImGui::TextUnformatted("Failed to compile. See log for more info.");
+				metaGUI();
 			}
 			else {
 				if (ImGui::Checkbox("Wireframe", &m_wireframe)) setWireframe();
@@ -491,7 +500,8 @@ struct Plugin final : ProceduralMeshEditor, EditorAssetPlugin {
 				if (ImGui::Button("Reset camera")) m_viewer.resetCamera(*m_resource);
 				// recompiling the recipe replaces the materials, so apply the checkbox again
 				if (m_resource->getMeshCount() > 0 && m_resource->getMeshMaterial(0).material != m_wireframe_material) setWireframe();
-				statsGUI();
+				metaGUI();
+				if (ImGui::CollapsingHeader("Info")) infoGUI();
 				if (!m_init) {
 					m_init = true;
 					m_viewer.resetCamera(*m_resource);
@@ -508,16 +518,187 @@ struct Plugin final : ProceduralMeshEditor, EditorAssetPlugin {
 			m_wireframe_material = m_resource->getMeshCount() > 0 ? m_resource->getMeshMaterial(0).material : nullptr;
 		}
 
-		void statsGUI() {
-			u32 vertices = 0, triangles = 0;
-			for (i32 i = 0, c = m_resource->getMeshCount(); i < c; ++i) {
-				const Mesh& mesh = m_resource->getMesh(i);
-				vertices += (u32)mesh.vertices.size();
-				triangles += mesh.indices_count / 3;
+		// Same information as the Info section of the model editor (bones left out, a generated mesh has none).
+		void infoGUI() {
+			if (!m_resource->isReady()) {
+				ImGui::TextUnformatted("Failed to load.");
+				return;
 			}
-			const AABB& aabb = m_resource->getAABB();
-			const Vec3 size = aabb.max - aabb.min;
-			ImGui::Text("Vertices: %u   Triangles: %u   Size: %.2f x %.2f x %.2f m", vertices, triangles, size.x, size.y, size.z);
+
+			ImGuiEx::Label("Bounding radius (from origin)");
+			ImGui::Text("%f", m_resource->getOriginBoundingRadius());
+			ImGuiEx::Label("Bounding radius (from center)");
+			ImGui::Text("%f", m_resource->getCenterBoundingRadius());
+
+			if (m_resource->getMeshCount() <= 0) return;
+
+			ImGui::SeparatorText("LODs");
+			const LODMeshIndices* lods = m_resource->getLODIndices();
+			float* distances = m_resource->getLODDistances();
+			if (lods[0].to >= 0 && !m_resource->isFailure() && ImGui::BeginTable("lodtbl", 5, ImGuiTableFlags_Resizable)) {
+				ImGui::TableSetupColumn("LOD");
+				ImGui::TableSetupColumn("Distance");
+				ImGui::TableSetupColumn("# of meshes");
+				ImGui::TableSetupColumn("# of triangles");
+				ImGui::TableSetupColumn("# of vertices");
+				ImGui::TableHeadersRow();
+
+				for (i32 i = 0; i < Model::MAX_LOD_COUNT && lods[i].to >= 0; ++i) {
+					ImGui::PushID(i);
+					ImGui::TableNextRow();
+					ImGui::TableNextColumn();
+					ImGui::Text("%d", i);
+					ImGui::TableNextColumn();
+					float dist = sqrtf(distances[i]);
+					if (ImGui::DragFloat("", &dist)) distances[i] = dist * dist;
+					ImGui::TableNextColumn();
+					ImGui::Text("%d", lods[i].to - lods[i].from + 1);
+					ImGui::TableNextColumn();
+					i32 tri_count = 0;
+					i32 num_vertices = 0;
+					for (i32 j = lods[i].from; j <= lods[i].to; ++j) {
+						const Mesh& mesh = m_resource->getMesh(j);
+						const i32 indices_count = (i32)mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2);
+						tri_count += indices_count / 3;
+						num_vertices += (i32)mesh.vertices.size();
+					}
+					ImGui::Text("%d", tri_count);
+					ImGui::TableNextColumn();
+					ImGui::Text("%d", num_vertices);
+					ImGui::PopID();
+				}
+				ImGui::EndTable();
+			}
+
+			ImGui::SeparatorText("Meshes");
+			if (ImGui::BeginTable("mshtbl", 3, ImGuiTableFlags_Resizable)) {
+				ImGui::TableSetupColumn("Name");
+				ImGui::TableSetupColumn("Triangles");
+				ImGui::TableSetupColumn("Material");
+				ImGui::TableHeadersRow();
+
+				const float go_to_w = ImGui::CalcTextSize(ICON_FA_BULLSEYE).x;
+				for (i32 i = 0; i < m_resource->getMeshCount(); ++i) {
+					ImGui::PushID(i);
+					ImGui::TableNextRow();
+					ImGui::TableNextColumn();
+					const Mesh& mesh = m_resource->getMesh(i);
+					const MeshMaterial& mesh_mat = m_resource->getMeshMaterial(i);
+					ImGuiEx::TextUnformatted(mesh.name);
+					ImGui::TableNextColumn();
+					ImGui::Text("%d", ((i32)mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2)) / 3);
+					ImGui::TableNextColumn();
+					const float w = ImGui::GetContentRegionAvail().x - go_to_w;
+					ImGuiEx::TextClipped(mesh_mat.material->getPath().c_str(), w);
+					ImGui::SameLine();
+					if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to")) {
+						m_app.getAssetBrowser().openEditor(mesh_mat.material->getPath());
+					}
+					ImGui::PopID();
+				}
+				ImGui::EndTable();
+			}
+		}
+
+		// Import settings stored in the .meta file next to the recipe. Only what applies to a generated static mesh is shown.
+		void metaGUI() {
+			if (!ImGui::CollapsingHeader("Import settings")) return;
+			bool changed = false;
+
+			ImGuiEx::Label("Bake vertex AO");
+			changed |= ImGui::Checkbox("##vrtxao", &m_meta.bake_vertex_ao);
+			if (m_meta.bake_vertex_ao) {
+				ImGuiEx::Label("Min bake vertex AO");
+				changed |= ImGui::DragFloat("##minvrtxao", &m_meta.min_bake_vertex_ao, 0.01f, 0, 1);
+			}
+			ImGuiEx::Label("Culling scale");
+			changed |= ImGui::InputFloat("##cull_scale", &m_meta.culling_scale);
+
+			ImGuiEx::Label("Origin");
+			if (ImGui::BeginCombo("##origin", ModelMeta::toUIString(m_meta.origin))) {
+				const ModelMeta::Origin origins[] = { ModelMeta::Origin::SOURCE, ModelMeta::Origin::CENTER, ModelMeta::Origin::CENTER_XZ, ModelMeta::Origin::BOTTOM };
+				for (ModelMeta::Origin o : origins) {
+					if (ImGui::Selectable(ModelMeta::toUIString(o))) {
+						m_meta.origin = o;
+						changed = true;
+					}
+				}
+				ImGui::EndCombo();
+			}
+
+			ImGuiEx::Label("Physics");
+			if (ImGui::BeginCombo("##phys", ModelMeta::toUIString(m_meta.physics))) {
+				const ModelMeta::Physics physics[] = { ModelMeta::Physics::NONE, ModelMeta::Physics::CONVEX, ModelMeta::Physics::TRIMESH };
+				for (ModelMeta::Physics p : physics) {
+					if (ImGui::Selectable(ModelMeta::toUIString(p))) {
+						m_meta.physics = p;
+						changed = true;
+					}
+				}
+				ImGui::EndCombo();
+			}
+
+			ImGui::SeparatorText("LODs");
+			ImGuiEx::Label("LOD count");
+			if (ImGui::SliderInt("##lodcount", (i32*)&m_meta.lod_count, 1, 4)) {
+				for (u32 i = 1; i < 4; ++i) {
+					m_meta.lods_distances[i] = maximum(m_meta.lods_distances[i - 1] + 0.01f, m_meta.lods_distances[i]);
+				}
+				changed = true;
+			}
+
+			if (ImGui::BeginTable("lods", 4, ImGuiTableFlags_BordersOuter)) {
+				ImGui::TableSetupColumn("LOD", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize);
+				ImGui::TableSetupColumn("Distance");
+				ImGui::TableSetupColumn("Auto LOD", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize);
+				ImGui::TableSetupColumn("% triangles", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize);
+				ImGui::TableHeadersRow();
+
+				for (u32 i = 0; i < m_meta.lod_count; ++i) {
+					ImGui::PushID(i);
+					ImGui::TableNextColumn();
+					ImGui::Text("%d", i);
+
+					ImGui::TableNextColumn();
+					ImGui::SetNextItemWidth(-1);
+					if (ImGui::DragFloat("##lod", &m_meta.lods_distances[i], 1, 0, FLT_MAX, "%.1f")) {
+						m_meta.lods_distances[0] = maximum(0.f, m_meta.lods_distances[0]);
+						for (u32 j = 1; j < 4; ++j) {
+							m_meta.lods_distances[j] = maximum(m_meta.lods_distances[j - 1] + 0.01f, m_meta.lods_distances[j]);
+						}
+						changed = true;
+					}
+
+					// level 0 is never generated, the recipe has to return it
+					ImGui::TableNextColumn();
+					bool autolod = m_meta.autolod_mask & (1 << i);
+					if (i > 0) {
+						ImGui::SetNextItemWidth(-1);
+						if (ImGui::Checkbox("##auto_lod", &autolod)) {
+							m_meta.autolod_mask &= ~(1 << i);
+							if (autolod) m_meta.autolod_mask |= 1 << i;
+							changed = true;
+						}
+					}
+
+					ImGui::TableNextColumn();
+					if (i > 0 && autolod) {
+						ImGui::SetNextItemWidth(-1);
+						float f = m_meta.autolod_coefs[i] * 100;
+						if (ImGui::DragFloat("##lodcoef", &f, 1, 0, 100, "%.1f", ImGuiSliderFlags_AlwaysClamp)) {
+							m_meta.autolod_coefs[i] = f * 0.01f;
+							changed = true;
+						}
+					}
+					ImGui::PopID();
+				}
+				ImGui::EndTable();
+			}
+
+			if (changed) {
+				m_meta_dirty = true;
+				m_dirty = true;
+			}
 		}
 
 		const Path& getPath() override { return m_path; }
@@ -527,6 +708,8 @@ struct Plugin final : ProceduralMeshEditor, EditorAssetPlugin {
 		Path m_path;
 		Model* m_resource;
 		WorldViewer m_viewer;
+		ModelMeta m_meta;
+		bool m_meta_dirty = false;
 		UniquePtr<CodeEditor> m_editor;
 		const Material* m_wireframe_material = nullptr;
 		bool m_wireframe = false;
