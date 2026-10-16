@@ -6068,7 +6068,12 @@ struct Checker {
 			Unit* imported = import.unit;
 			if (!imported) {
 				for (Unit& u : module.units) {
-					if (equalStrings(u.path, import.path)) {
+					// a root is named with its extension ("scripts/defs.evox") while imports of it are not ("scripts/defs"): same unit,
+					// otherwise a cyclic import loads a second copy of the root with its own, incompatible types
+					const bool root_with_extension = size(u.path) == size(import.path) + 5
+						&& compareMemory(data(u.path), data(import.path), size(import.path)) == 0
+						&& compareMemory(data(u.path) + size(import.path), ".evox", 5) == 0;
+					if (equalStrings(u.path, import.path) || root_with_extension) {
 						imported = &u;
 						break;
 					}

@@ -140,12 +140,6 @@ struct EvoxSystemImpl : EvoxSystem {
 		m_evox_resource_manager.destroy();
 	}
 
-	void startGame() override {
-		m_is_game_running = true;
-		if (!m_is_ready) return;
-		callMain();
-	}
-
 	EvoxRender* getRenderScript() {
 		auto* renderer = (Renderer*)m_engine.getSystemManager().getSystem("renderer");
 		return renderer ? &renderer->getRenderScript() : nullptr;
@@ -157,7 +151,6 @@ struct EvoxSystemImpl : EvoxSystem {
 	}
 
 	void stopGame() override {
-		m_is_game_running = false;
 		if (m_runtime) {
 			// recreated the runtime to avoid any dangling stuff (changed globals, suspended state, ...), this also
 			// restarts the render script of render.evox, it shares the runtime
@@ -285,39 +278,11 @@ struct EvoxSystemImpl : EvoxSystem {
 		return success;
 	}
 
-	void update(float time_delta) override {
-		PROFILE_FUNCTION();
-		if (!m_is_ready || !m_runtime || !m_task || !m_is_game_running) return;
-		if (ex_task_get_state(m_task) != EX_TASK_SUSPENDED) return;
-
-		// The main script owns the frame loop and yields once per frame.
-		ex_debug_event event = {};
-		const bool debug_suspended = ex_debug_pause_event(m_task, &event) == EX_RESULT_OK;
-		if (debug_suspended && event.reason != EX_DEBUG_PAUSE_YIELD) return;
-
-		const ex_type* dt_type = ex_primitive_type_from_kind(m_runtime, EX_TYPE_F32);
-		const ex_call_result result = ex_task_resume(m_task, dt_type, &time_delta, sizeof(time_delta));
-		if (result != EX_CALL_RESULT_SUSPENDED && result != EX_CALL_RESULT_OK) logEvoxMainFailure(m_task, result);
-	}
-
 	void loadRoot() {
 		if (m_resource) return;
 
 		m_resource = m_engine.getResourceManager().load<EvoxResource>(Path(EVOX_MAIN_PATH));
 		if (m_resource) m_resource->onLoaded<&EvoxSystemImpl::onResourceChanged>(this);
-	}
-
-	void callMain() {
-		if (!m_runtime || m_modules.empty()) return;
-		// render.evox has its own `main`, call the one of main.evox
-		const i32 main_index = ex_runtime_find_function(m_runtime, toEvox(EVOX_MAIN_PATH), toEvox("main"));
-		if (main_index < 0) return;
-		struct Args {
-			Engine* engine;
-			World* world;
-		} args{&m_engine, &m_modules[0]->getWorld()};
-		const ex_call_result result = ex_call_function(m_task, (u32)main_index, &args, sizeof(args));
-		if (result != EX_CALL_RESULT_SUSPENDED && result != EX_CALL_RESULT_OK && result != EX_CALL_RESULT_FUNCTION_NOT_FOUND) logEvoxMainFailure(m_task, result);
 	}
 
 	static bool isEvoxDataType(const ex_type& type) {
@@ -415,10 +380,8 @@ struct EvoxSystemImpl : EvoxSystem {
 		}
 		for (EvoxModule* module : m_modules) module->setEvoxDataTypes(m_data_types);
 		if (!createRuntime()) return false;
-		// startGame can be called before the script resource has finished loading.
-		if (m_is_game_running) {
-			callMain();
-		}
+		// the game can be started before the script resource has finished loading.
+		for (EvoxModule* module : m_modules) module->onRuntimeCreated();
 		return true;
 	}
 
@@ -435,7 +398,6 @@ struct EvoxSystemImpl : EvoxSystem {
 	Array<EvoxModule*> m_modules;
 	bool m_resource_ready = false;
 	bool m_is_ready = false;
-	bool m_is_game_running = false;
 };
 
 
@@ -556,6 +518,13 @@ struct EvoxModuleImpl : EvoxModule {
 
 	~EvoxModuleImpl() { m_system.unregisterModule(*this); }
 
+	void startGame() override {
+		m_is_game_started = true;
+		// if the script is not loaded yet, main() is called from onRuntimeCreated
+		if (m_system.isReady()) callMain();
+	}
+	void stopGame() override { m_is_game_started = false; }
+
 	static void reflect() {
 		#include "evox_module.gen.h"
 	}
@@ -667,7 +636,38 @@ struct EvoxModuleImpl : EvoxModule {
 		applyPendingData();
 	}
 
-	void update(float) override {}
+	void callMain() {
+		if (!m_system.m_runtime) return;
+		// render.evox has its own `main`, call the one of main.evox
+		const i32 main_index = ex_runtime_find_function(m_system.m_runtime, toEvox(EVOX_MAIN_PATH), toEvox("main"));
+		if (main_index < 0) return;
+		struct Args {
+			Engine* engine;
+			World* world;
+		} args{&m_system.m_engine, &m_world};
+		const ex_call_result result = ex_call_function(m_system.m_task, (u32)main_index, &args, sizeof(args));
+		if (result != EX_CALL_RESULT_SUSPENDED && result != EX_CALL_RESULT_OK && result != EX_CALL_RESULT_FUNCTION_NOT_FOUND) logEvoxMainFailure(m_system.m_task, result);
+	}
+
+	void update(float time_delta) override {
+		PROFILE_FUNCTION();
+		EvoxSystemImpl& system = m_system;
+		if (!m_is_game_started || !system.m_is_ready || !system.m_runtime || !system.m_task) return;
+		if (ex_task_get_state(system.m_task) != EX_TASK_SUSPENDED) return;
+
+		// The main script owns the frame loop and yields once per frame.
+		ex_debug_event event = {};
+		const bool debug_suspended = ex_debug_pause_event(system.m_task, &event) == EX_RESULT_OK;
+		if (debug_suspended && event.reason != EX_DEBUG_PAUSE_YIELD) return;
+
+		const ex_type* dt_type = ex_primitive_type_from_kind(system.m_runtime, EX_TYPE_F32);
+		const ex_call_result result = ex_task_resume(system.m_task, dt_type, &time_delta, sizeof(time_delta));
+		if (result != EX_CALL_RESULT_SUSPENDED && result != EX_CALL_RESULT_OK) logEvoxMainFailure(system.m_task, result);
+	}
+
+	void onRuntimeCreated() override {
+		if (m_is_game_started) callMain();
+	}
 
 	Span<const u8> getEvoxData(const char* type_name) override {
 		const StringView requested_name(type_name);
@@ -1065,6 +1065,7 @@ struct EvoxModuleImpl : EvoxModule {
 	}
 
 	World& m_world;
+	bool m_is_game_started = false;
 	EvoxSystemImpl& m_system;
 	IAllocator& m_allocator;
 	Array<EvoxDataType> m_data_storage;

@@ -50,6 +50,7 @@ struct EvoxModule : IModule {
 	virtual Span<const u8> getEvoxData(const char* type_name) = 0;
 	virtual void setEvoxDataTypes(Span<const ex_type*> types) = 0;
 	virtual void clearEvoxData() = 0;
+	virtual void onRuntimeCreated() = 0;
 	virtual bool isReady() const = 0;
 	virtual Span<const ex_type*> getEvoxDataTypes() const = 0;
 	virtual u32 getEvoxDataCount(EntityRef entity) const = 0;
