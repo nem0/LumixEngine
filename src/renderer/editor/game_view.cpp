@@ -94,7 +94,11 @@ void GameView::init() {
 	m_pipeline = Pipeline::create(*renderer, PipelineType::GAME_VIEW);
 }
 
-bool GameView::makeScreenshot(StringView path) {
+bool GameView::makeScreenshot(StringView path, int width, int height) {
+	if (width > 0 && height > 0) {
+		m_pipeline->setWorld(m_app.getWorldEditor().getWorld());
+		setupViewport(width, height);
+	}
 	const IVec2 size = m_pipeline->getDisplaySize();
 	if (size.x <= 0 || size.y <= 0) return false;
 
