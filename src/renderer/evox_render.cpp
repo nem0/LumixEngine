@@ -774,6 +774,56 @@ static void scriptShadowCamera(ex_runtime*, ex_call_frame frame) {
 	EX_RESULT(frame, handle);
 }
 
+// Orthographic camera for a custom shadow map, built like the cascades in Pipeline::prepareShadowCameras. `ortho_size` is half of
+// the height of the view volume, its width is ortho_size * width / height. The volume spans from the camera position to `far`
+// along `dir`.
+static void scriptCustomOrthoCamera(ex_runtime*, ex_call_frame frame) {
+	EvoxRenderContext* ctx = readContext(frame);
+	if (!ctx) return;
+	EX_ARG(frame, DVec3, pos);
+	EX_ARG(frame, Vec3, dir);
+	EX_ARG(frame, Vec3, up);
+	EX_ARG(frame, float, ortho_size);
+	EX_ARG(frame, u32, width);
+	EX_ARG(frame, u32, height);
+	EX_ARG(frame, float, far_plane);
+	const float dir_len = length(dir);
+	if (!(ortho_size > 0) || width == 0 || height == 0 || !(far_plane > 0) || !(dir_len > 1e-6f)) {
+		panic(frame, "Invalid camera");
+		return;
+	}
+	dir = dir / dir_len;
+	if (!(length(cross(dir, up)) > 1e-4f * length(up))) {
+		panic(frame, "Camera up is parallel to the direction");
+		return;
+	}
+
+	Matrix view_matrix;
+	view_matrix.lookAt(Vec3::ZERO, dir, normalize(up));
+
+	Viewport vp;
+	vp.is_ortho = true;
+	vp.fov = 0;
+	vp.w = (i32)width;
+	vp.h = (i32)height;
+	vp.ortho_size = ortho_size;
+	vp.pos = pos;
+	vp.rot = view_matrix.getRotation().conjugated();
+	vp.near = 0;
+	vp.far = far_plane;
+
+	CameraParams cp;
+	cp.pos = vp.pos;
+	cp.frustum = vp.getFrustum();
+	cp.lod_multiplier = 1;
+	cp.is_shadow = true;
+	cp.view = vp.getView(cp.pos);
+	cp.projection = vp.getProjectionNoJitter();
+	u32 handle;
+	if (!pushCamera(*ctx, frame, cp, handle)) return;
+	EX_RESULT(frame, handle);
+}
+
 // Buckets are collected with addBucket and consumed by cull, strings are copied.
 static void scriptAddBucket(ex_runtime*, ex_call_frame frame) {
 	EvoxRenderContext* ctx = readContext(frame);
@@ -1226,6 +1276,7 @@ void registerRenderFunctions(HashMap<NativeFunctionKey, ex_native_fn, NativeFunc
 	functions.insert({"core:render", "createRenderbuffer"}, &scriptCreateRenderbuffer);
 	functions.insert({"core:render", "blendState"}, &scriptBlendState);
 	functions.insert({"core:render", "shadowCamera"}, &scriptShadowCamera);
+	functions.insert({"core:render", "customOrthoCamera"}, &scriptCustomOrthoCamera);
 	functions.insert({"core:render", "addBucket"}, &scriptAddBucket);
 	functions.insert({"core:render", "cull"}, &scriptCull);
 	functions.insert({"core:render", "renderGrass"}, &scriptRenderGrass);

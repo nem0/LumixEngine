@@ -97,6 +97,7 @@ Functions are called with the context as the first argument, e.g. `ctx.width()`.
 | `renderBucket(ctx, view, bucket)` | Draws a bucket of the view returned by `cull`. |
 | `addBucket(ctx, layer, define, sort, state)`, `cull(ctx, camera)` | Add buckets (render object layers with a state and shader define), then cull the scene for the camera into them, `cull` returns the view for `renderBucket`. |
 | `shadowCamera(ctx, slice)`, `shadowsEnabled(ctx)` | Camera of a shadow cascade (0..3), and whether the active environment casts shadows. |
+| `customOrthoCamera(ctx, pos, dir, up, ortho_size, width, height, far)` | Orthographic camera for custom shadow maps. `ortho_size` is half of the view volume height, the width follows from `width / height`, the volume reaches from `pos` to `far` along `dir`. Culled and drawn as a shadow view. |
 | `renderGrass(ctx, camera, state, defines)`, `renderTerrains(ctx, camera, state, define)` | Draw grass and terrains. |
 | `renderEntities(ctx, state, define, entities)` | Draw the meshes of only the given `Entity` values (model instances; others are skipped) into the current targets, e.g. a depth-only mask with `"DEPTH"` for an outline. The rest of the scene is not drawn. |
 | `createDepthBuffer(ctx, w, h)`, `setDepthTarget(ctx, buffer)`, `barrierRead(ctx, buffer)` | D32 depth buffer, rendering to it only, and a read barrier. |

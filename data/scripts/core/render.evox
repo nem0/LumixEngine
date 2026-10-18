@@ -24,6 +24,7 @@ import "core:renderer/pipelinetype"
 import "core:renderer/gpu/textureformat"
 import "core:imgui" as imgui
 import "core:vec3"
+import "core:dvec3"
 import "core:vec4"
 import "core:entity"
 
@@ -177,10 +178,14 @@ extern fn viewport(ctx : Context, x : u32, y : u32, width : u32, height : u32) :
 
 // For the shadow pass (core:render/shadow): the cascades of the main light are rendered into one depth buffer.
 extern fn shadowCamera(ctx : Context, slice : u32) : ViewCamera;
+// Orthographic camera at `pos` looking along `dir`, for custom shadow maps. `ortho_size` is half of the height of the view volume,
+// its width is `ortho_size * width / height` (`width` and `height` are the size of the target in pixels). The volume reaches from
+// `pos` to `far` along `dir`. Works like the cameras of `shadowCamera` (culled as a shadow view). Valid during the current script
+// call only, at most 8 cameras per call.
+extern fn customOrthoCamera(ctx : Context, pos : DVec3, dir : Vec3, up : Vec3, ortho_size : f32, width : u32, height : u32, far : f32) : ViewCamera;
 // false if the active environment turns off shadow casting
 fn shadowsEnabled(ctx : Context) : bool {
 	const module = ctx.renderModule();
-	if module.module == null { return true; }
 	const entity = module.getActiveEnvironment() else return true;
 	const env = entity.environment() else return true;
 	return env.getCastShadows();
