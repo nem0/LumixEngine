@@ -576,12 +576,24 @@ float3 pointLightsLighting(Cluster cluster, Surface surface, uint shadow_atlas, 
 					float s = sqrt(1 - c * c); 
 					float2x2 rot = float2x2(c, s, -s, c);
 
-					// TODO PCF
+					// PCF: jitter the lookup direction instead of the uv, so every tap stays inside the light's own tile and octahedral seams are handled by the mapping
+					float3 dir = -L;
+					float3 tangent = normalize(cross(dir, abs(dir.y) < 0.99 ? float3(0, 1, 0) : float3(1, 0, 0)));
+					float3 bitangent = cross(dir, tangent);
+					// about 3 texels of the tile, an octahedral texel covers roughly 3.5 / resolution radians
+					float radius = 10.5 / getShadowAtlasResolution(atlas_idx);
+
 					// TODO do not hardcode near plane
-					float occluder = 0.1 / sampleBindlessLod(LinearSamplerClamp, shadow_atlas, oct_uv, 0).r;
-					float shadow = saturate((occluder - receiver) * 1e2);
-					
-					attn *= shadow;
+					float shadow = 0;
+					for (int j = 0; j < 16; ++j) {
+						float2 pcf_offset = mul(rot, POISSON_DISK_16[j]) * radius;
+						float3 tap_dir = normalize(dir + tangent * pcf_offset.x + bitangent * pcf_offset.y);
+						float2 tap_uv = toOctahedral(tap_dir) * tile.scale + tile.offset;
+						float occluder = 0.1 / sampleBindlessLod(LinearSamplerClamp, shadow_atlas, tap_uv, 0).r;
+						shadow += saturate((occluder - receiver) * 1e2);
+					}
+
+					attn *= shadow / 16.0;
 				}
 				else {
 					float4 proj_pos = transformPosition(lpos, u_shadow_atlas_matrices[atlas_idx]);
