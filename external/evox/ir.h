@@ -71,7 +71,8 @@ enum class ExIrOpKind {
 	SLICE_FIELD_LOAD,
 	SLICE_FIELD_STORE,
 	STRING_LITERAL,
-	FRAME_PTR
+	FRAME_PTR,
+	BLOCK_EXPR
 };
 
 struct ExIrOp {
@@ -180,6 +181,19 @@ struct ExOpFramePtr : ExIrOp {
 	struct ExOpAlloca* alloca = nullptr;
 };
 
+// Inlined call: runs `block` (parameter allocas, then the callee's statements) at this point of the
+// expression, then evaluates `result` (null for void callees), which is the value of the expression.
+struct ExOpBlockExpr : ExIrOp {
+	ExOpBlockExpr() : ExIrOp(ExIrOpKind::BLOCK_EXPR) {}
+	struct ExIrBlockData* block = nullptr;
+	ExIrOp* result = nullptr;
+	// Slot the early returns store the value into (null when the value is the `result` expression).
+	ExOpAlloca* result_slot = nullptr;
+	// Set by the emitter when the expression initializes a new variable: nothing else reads that slot, so the
+	// value can be built in place.
+	bool dst_is_fresh = false;
+};
+
 struct ExOpStringLiteral : ExIrOp {
 	ExOpStringLiteral() : ExIrOp(ExIrOpKind::STRING_LITERAL) {}
 	u32 index;
@@ -208,6 +222,8 @@ struct ExOpAggregateInit : ExIrOp {
 	u32* offsets = nullptr;
 	u32* sizes = nullptr;
 	u32 value_count = 0;
+	// The destination is a slot nothing in `values` reads, so the fields can be written straight into it.
+	bool target_dst = false;
 };
 
 // Widen a tagged union to a superset. The payload is copied; the tag is remapped

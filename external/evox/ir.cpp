@@ -100,7 +100,8 @@ struct IRBuilder {
 		, strings(host.arena)
 		, locals(host.arena)
 		, defers(host.arena)
-		, loops(host.arena) {}
+		, loops(host.arena)
+		, inline_stack(host.arena) {}
 
 	template <typename T, typename... Args> T& alloc(Args&&... args) {
 		T* v = (T*)host.arena.allocate(host.arena.user_data, sizeof(T), alignof(T));
@@ -378,10 +379,18 @@ struct IRBuilder {
 		block.ops.push(&ir_ret);
 	}
 
-	ResolvedType* identifierStorageType(const IdentifierExpression& ie) {
-		for (i32 i = locals.size() - 1; i >= 0; --i) {
-			if (equalStrings(locals[i].name, ie.name)) return locals[i].alloca->type;
+	struct Local;
+
+	// The innermost local visible to the code being built (an inlined body doesn't see its caller's locals).
+	const Local* findLocal(ex_string_view name) const {
+		for (i32 i = locals.size() - 1; i >= locals_floor; --i) {
+			if (equalStrings(locals[i].name, name)) return &locals[i];
 		}
+		return nullptr;
+	}
+
+	ResolvedType* identifierStorageType(const IdentifierExpression& ie) {
+		if (const Local* local = findLocal(ie.name)) return local->alloca->type;
 		StorageSlot* slot = ie.symbol ? &ie.symbol->slot : ie.slot;
 		if (slot && slot->type) return slot->type;
 		return ie.resolved_type;
@@ -399,126 +408,165 @@ struct IRBuilder {
 		return strings.size() - 1;
 	}
 
-	bool hasInliningBlocker(const Expression& expression, u32 depth = 0) {
-		if (depth > 8) return true;
-		switch (expression.kind) {
-			case Expression::ADDRESSOF:
+	// What an inlined body may contain: no loops, labels, defers or yields, so the body is code with `if`s
+	// only. A `return` stores the result and jumps to the end of the inlined body.
+	struct InlineScan {
+		static constexpr u32 BUDGET = 24;
+		u32 budget = BUDGET;
+		u32 returns = 0;
+		bool returns_value = false;
+	};
+
+	static bool scanInlineable(const Statement& statement, InlineScan& scan) {
+		if (scan.budget == 0) return false;
+		--scan.budget;
+		switch (statement.kind) {
+			case Statement::EXPRESSION:
+			case Statement::ASSIGN:
 				return true;
-			case Expression::PANIC:
+			case Statement::RETURN:
+				++scan.returns;
+				// Every return must carry a value exactly when the function returns one.
+				return scan.returns_value == (static_cast<const ReturnStatement&>(statement).expression != nullptr);
+			case Statement::VAR_DECL: {
+				const auto& declaration = static_cast<const VarDeclStatement&>(statement);
+				return !declaration.else_guard && !declaration.is_comptime && declaration.expression;
+			}
+			case Statement::BLOCK: {
+				for (const Statement* inner : static_cast<const BlockStatement&>(statement).statements) {
+					if (!scanInlineable(*inner, scan)) return false;
+				}
 				return true;
-			case Expression::CALL: {
-				const auto& call = static_cast<const CallExpression&>(expression);
-				FunctionExpression* function = call.resolved_fn;
-				if (!function && call.callee->kind == Expression::IDENTIFIER) {
-					const auto& callee = static_cast<const IdentifierExpression&>(*call.callee);
-					function = callee.resolved_fn;
-					if (!function && callee.symbol && callee.symbol->expression && callee.symbol->expression->kind == Expression::FUNCTION) {
-						function = static_cast<FunctionExpression*>(callee.symbol->expression);
-					}
+			}
+			case Statement::IF: {
+				const auto& branch = static_cast<const IfStatement&>(statement);
+				if (branch.nullable_binding) return false;
+				if (branch.body && !scanInlineable(*branch.body, scan)) return false;
+				return !branch.else_branch || scanInlineable(*branch.else_branch, scan);
+			}
+			case Statement::MATCH: {
+				// Only plain value matches: union and any subjects narrow the subject inside the arms.
+				const auto& match = static_cast<const MatchStatement&>(statement);
+				const ResolvedTypeKind subject_kind = match.subject->resolved_type->kind;
+				if (subject_kind == ResolvedTypeKind::ANY || subject_kind == ResolvedTypeKind::UNION) return false;
+				for (const MatchArm& arm : match.arms) {
+					if (arm.body && !scanInlineable(*arm.body, scan)) return false;
 				}
-				if (!function && call.callee->kind == Expression::MEMBER) {
-					function = static_cast<const MemberExpression&>(*call.callee).resolved_fn;
-				}
-				if (!function) return true;
-				if (!function->is_extern) {
-					if (!function->body || function->body->kind != Statement::BLOCK) return true;
-					const auto& body = static_cast<const BlockStatement&>(*function->body);
-					if (body.statements.size() != 1 || body.statements[0]->kind != Statement::RETURN) return true;
-					const auto& ret = static_cast<const ReturnStatement&>(*body.statements[0]);
-					if (!ret.expression || hasInliningBlocker(*ret.expression, depth + 1)) return true;
-				}
-				for (Expression* arg : call.args) if (hasInliningBlocker(*arg, depth + 1)) return true;
-				return false;
+				return true;
 			}
-			case Expression::UNARY: {
-				const auto& unary = static_cast<const UnaryExpression&>(expression);
-				return (unary.operator_fn && !unary.operator_fn->is_extern) || hasInliningBlocker(*unary.expression, depth + 1);
-			}
-			case Expression::BINARY: {
-				const auto& binary = static_cast<const BinaryExpression&>(expression);
-				return (binary.operator_fn && !binary.operator_fn->is_extern) || hasInliningBlocker(*binary.lhs, depth + 1) || hasInliningBlocker(*binary.rhs, depth + 1);
-			}
-			case Expression::CAST:
-				return hasInliningBlocker(*static_cast<const CastExpression&>(expression).expression, depth + 1);
-			case Expression::MEMBER: {
-				const auto& member = static_cast<const MemberExpression&>(expression);
-				return member.expression && hasInliningBlocker(*member.expression, depth + 1);
-			}
-			case Expression::BRACKET: {
-				const auto& bracket = static_cast<const BracketExpression&>(expression);
-				if (hasInliningBlocker(*bracket.base, depth + 1)) return true;
-				for (Expression* arg : bracket.args) if (hasInliningBlocker(*arg, depth + 1)) return true;
-				return false;
-			}
-			case Expression::UNPACK_TUPLE: {
-				const auto& unpack = static_cast<const UnpackTupleExpression&>(expression);
-				return hasInliningBlocker(*unpack.tuple, depth + 1);
-			}
-			case Expression::SLICE: {
-				const auto& slice = static_cast<const SliceExpression&>(expression);
-				return hasInliningBlocker(*slice.base, depth + 1) ||
-					(slice.begin && hasInliningBlocker(*slice.begin, depth + 1)) ||
-					(slice.end && hasInliningBlocker(*slice.end, depth + 1));
-			}
-			case Expression::STRUCT_LITERAL: {
-				const auto& literal = static_cast<const StructLiteralExpression&>(expression);
-				for (const StructLiteralEntry& entry : literal.entries) if (hasInliningBlocker(*entry.value, depth + 1)) return true;
-				return false;
-			}
-			case Expression::ARRAY_LITERAL: {
-				const auto& literal = static_cast<const ArrayLiteralExpression&>(expression);
-				for (Expression* value : literal.values) if (hasInliningBlocker(*value, depth + 1)) return true;
-				return false;
-			}
-			case Expression::TUPLE_LITERAL: {
-				const auto& literal = static_cast<const TupleLiteralExpression&>(expression);
-				for (Expression* value : literal.values) if (hasInliningBlocker(*value, depth + 1)) return true;
-				return false;
-			}
-			case Expression::TERNARY: {
-				const auto& ternary = static_cast<const TernaryExpression&>(expression);
-				return hasInliningBlocker(*ternary.condition, depth + 1) ||
-					hasInliningBlocker(*ternary.true_expr, depth + 1) || hasInliningBlocker(*ternary.false_expr, depth + 1);
-			}
-			case Expression::DEREFERENCE:
-				return hasInliningBlocker(*static_cast<const DereferenceExpression&>(expression).subject, depth + 1);
 			default:
 				return false;
 		}
 	}
 
-	ExIrOp* buildInlineCall(FunctionExpression& function, CallExpression& call) {
-		if (function.is_extern || function.is_template) return nullptr;
-		const auto& body = static_cast<const BlockStatement&>(*function.body);
-		if (body.statements.size() != 1 || body.statements[0]->kind != Statement::RETURN) return nullptr;
-		const auto& ret = static_cast<const ReturnStatement&>(*body.statements[0]);
-		if (!ret.expression || hasInliningBlocker(*ret.expression)) return nullptr;
-
-		u32 runtime_param_count = 0;
+	// Whether the function can be inlined; on success `return_count` is the number of returns in its body.
+	bool canInline(const FunctionExpression& function, u32& return_count, u32& statement_count) {
+		if (function.is_extern || function.is_template || function.is_variadic || !function.body) return false;
+		if (&function == current_function || inline_stack.size() >= 3) return false;
+		for (const FunctionExpression* active : inline_stack) {
+			if (active == &function) return false;
+		}
+		if (function.body->kind != Statement::BLOCK) return false;
 		for (const FunctionParam& param : function.params) {
-			if (!param.is_comptime) ++runtime_param_count;
+			if (param.is_comptime) return false;
 		}
-		if (runtime_param_count != call.args.size()) return nullptr;
-		for (Expression* arg : call.args) {
-			if (hasInliningBlocker(*arg)) return nullptr;
+		InlineScan scan;
+		scan.returns_value = static_cast<const FunctionResolvedType&>(*function.resolved_type).return_type->kind != ResolvedTypeKind::VOID;
+		if (!scanInlineable(*function.body, scan)) return false;
+		return_count = scan.returns;
+		statement_count = InlineScan::BUDGET - scan.budget;
+		return true;
+	}
+
+	// The storage of the local variable an argument names when nothing can write it during the call, so the
+	// inlined body can use it as its parameter without a copy. Null when the argument needs its own copy.
+	ExOpAlloca* immutableLocalOf(const Expression& arg, const ResolvedType& param_type) {
+		if (arg.kind != Expression::IDENTIFIER || arg.comptime_value.kind == ComptimeValue::VALUE) return nullptr;
+		const auto& identifier = static_cast<const IdentifierExpression&>(arg);
+		const Local* local = findLocal(identifier.name);
+		if (!local || !local->immutable || !local->alloca || local->inline_value) return nullptr;
+		if (!typesEqual(local->alloca->type, &param_type)) return nullptr;
+		return arg.resolved_type && typesEqual(arg.resolved_type, &param_type) ? local->alloca : nullptr;
+	}
+
+	// Inlines a call to a small straight-line function (see scanInlineable) as a block expression.
+	ExIrOp* buildInlineBody(FunctionExpression& function, Expression* const* args, i32 arg_count) {
+		u32 return_count = 0;
+		u32 statement_count = 0;
+		if (!function.resolved_type || !canInline(function, return_count, statement_count)) return nullptr;
+		// Inlining must not make a function grow without bound: a big caller with many call sites would otherwise multiply
+		// the inlined bodies (and the bodies they inline in turn).
+		if (inline_growth + statement_count > MAX_INLINE_GROWTH) return nullptr;
+		if ((u32)arg_count != (u32)function.params.size()) return nullptr;
+		for (i32 i = 0; i < arg_count; ++i) {
+			if (args[i]->kind == Expression::ZERO || args[i]->kind == Expression::UNDEFINED) return nullptr;
+		}
+		inline_growth += statement_count;
+
+		auto& block_expr = alloc<ExOpBlockExpr>();
+		block_expr.block = &alloc<ExIrBlockData>(host.arena);
+		ExOpAlloca** params = static_cast<ExOpAlloca**>(host.arena.allocate(host.arena.user_data, sizeof(ExOpAlloca*) * (arg_count + 1), alignof(ExOpAlloca*)));
+		for (i32 i = 0; i < arg_count; ++i) {
+			ResolvedType& type = *function.params[i].resolved_type;
+			if (ExOpAlloca* alias = immutableLocalOf(*args[i], type)) {
+				params[i] = alias;
+				continue;
+			}
+			params[i] = &allocAlloca(&type, {}, &buildImplicitConversionIR(*args[i], type));
+			block_expr.block->ops.push(params[i]);
 		}
 
-		ExIrOp** args = static_cast<ExIrOp**>(host.arena.allocate(host.arena.user_data, sizeof(ExIrOp*) * call.args.size(), alignof(ExIrOp*)));
-		for (i32 i = 0, param_index = 0; i < call.args.size(); ++i) {
-			while (function.params[param_index].is_comptime) ++param_index;
-			args[i] = &buildImplicitConversionIR(*call.args[i], *function.params[param_index].resolved_type);
-			++param_index;
-		}
-
+		// The body sees its parameters and the globals, never the caller's locals.
 		const i32 local_watermark = locals.size();
-		u32 arg_index = 0;
-		for (const FunctionParam& param : function.params) {
-			if (param.is_comptime) continue;
-			locals.push({param.name.value, nullptr, args[arg_index++]});
+		const i32 saved_floor = locals_floor;
+		locals_floor = local_watermark;
+		for (i32 i = 0; i < arg_count; ++i) {
+			locals.push({function.params[i].name.value, params[i], nullptr, true});
 		}
-		ExIrOp& result = buildImplicitConversionIR(*ret.expression, *static_cast<FunctionResolvedType*>(function.resolved_type)->return_type);
+		inline_stack.push(&function);
+
+		const auto& body = static_cast<const BlockStatement&>(*function.body);
+		const i32 count = body.statements.size();
+		ResolvedType& result_type = *static_cast<FunctionResolvedType*>(function.resolved_type)->return_type;
+		const bool tail_return = count > 0 && body.statements[count - 1]->kind == Statement::RETURN && return_count == 1;
+		if (tail_return || return_count == 0) {
+			// Straight-line body: the trailing return expression is the value of the inlined call.
+			for (i32 i = 0; i < count; ++i) {
+				const Statement& statement = *body.statements[i];
+				if (i + 1 == count && statement.kind == Statement::RETURN) {
+					const auto& ret = static_cast<const ReturnStatement&>(statement);
+					if (ret.expression) {
+						SourceScope scope(*this, ret.token);
+						block_expr.result = &buildImplicitConversionIR(*ret.expression, result_type);
+					}
+					break;
+				}
+				buildStatementIR(*body.statements[i], *block_expr.block);
+			}
+		} else {
+			// Returns inside branches store into a result slot and jump to the end of the body.
+			InlineReturn inline_return_target;
+			inline_return_target.type = &result_type;
+			inline_return_target.exit = &alloc<ExOpNop>();
+			if (result_type.kind != ResolvedTypeKind::VOID) {
+				inline_return_target.result = &allocAlloca(&result_type, {}, &alloc<ExOpNop>());
+				block_expr.block->ops.push(inline_return_target.result);
+			}
+			InlineReturn* saved_return = inline_return;
+			inline_return = &inline_return_target;
+			for (i32 i = 0; i < count; ++i) buildStatementIR(*body.statements[i], *block_expr.block);
+			inline_return = saved_return;
+			block_expr.block->ops.push(inline_return_target.exit);
+			if (inline_return_target.result) {
+				block_expr.result_slot = inline_return_target.result;
+				block_expr.result = &loadAllocaValue(*inline_return_target.result);
+			}
+		}
+
+		inline_stack.pop_back();
 		locals.resize(local_watermark);
-		return &result;
+		locals_floor = saved_floor;
+		return &block_expr;
 	}
 
 	ExIrOp& buildExpressionIR(Expression& expr, bool as_rvalue) {
@@ -887,7 +935,7 @@ struct IRBuilder {
 					return op;
 				}
 				
-				for (i32 i = locals.size() - 1; i >= 0; --i) {
+				for (i32 i = locals.size() - 1; i >= locals_floor; --i) {
 					if (!equalStrings(locals[i].name, ie.name)) continue;
 					if (locals[i].inline_value) {
 						if (as_rvalue) return *locals[i].inline_value;
@@ -973,12 +1021,13 @@ struct IRBuilder {
 					function = static_cast<MemberExpression&>(*call.callee).resolved_fn;
 				}
 				if (function && function->bytecode_index != ~0u) {
-					if (do_inline && call.callee->kind != Expression::MEMBER) {
-						if (ExIrOp* inlined = buildInlineCall(*function, call)) return *inlined;
-					}
 					MemberExpression* member_callee = call.callee->kind == Expression::MEMBER ? static_cast<MemberExpression*>(call.callee) : nullptr;
 					ResolvedType* receiver_type = member_callee && member_callee->expression ? member_callee->expression->resolved_type : nullptr;
 					const bool is_ufcs = receiver_type && (receiver_type->kind == ResolvedTypeKind::STRUCT || receiver_type->kind == ResolvedTypeKind::ENUM || receiver_type->kind == ResolvedTypeKind::POINTER);
+					// UFCS calls pass the receiver as an implicit first argument, which inlining doesn't handle; module-qualified calls (`math.min`) are plain calls.
+					if (do_inline && !is_ufcs) {
+						if (ExIrOp* inlined = buildInlineBody(*function, call.args.data(), call.args.size())) return *inlined;
+					}
 					auto& op = alloc<ExOpCallDirect>();
 					op.function = function;
 					op.arg_count = (is_ufcs ? 1u : 0u);
@@ -1243,6 +1292,10 @@ struct IRBuilder {
 			}
 			case Expression::UNARY: {
 				auto& unary = static_cast<UnaryExpression&>(expr);
+				if (do_inline && unary.operator_fn) {
+					Expression* args[] = {unary.expression};
+					if (ExIrOp* inlined = buildInlineBody(*unary.operator_fn, args, 1)) return *inlined;
+				}
 				ExIrOp& operand = buildExpressionIR(*unary.expression, true);
 				if (unary.operator_fn) {
 					auto& call = alloc<ExOpCallDirect>();
@@ -1283,6 +1336,10 @@ struct IRBuilder {
 			}
 			case Expression::BINARY: {
 				auto& be = static_cast<BinaryExpression&>(expr);
+				if (do_inline && be.operator_fn) {
+					Expression* args[] = {be.lhs, be.rhs};
+					if (ExIrOp* inlined = buildInlineBody(*be.operator_fn, args, 2)) return *inlined;
+				}
 				ExIrOp& lhs = buildExpressionIR(*be.lhs, true);
 				if (be.op == Token::IS) {
 					EX_ASSERT(be.lhs->resolved_type->kind == ResolvedTypeKind::UNION);
@@ -1557,7 +1614,7 @@ struct IRBuilder {
 					auto& end = allocAlloca(value_type, {}, &buildExpressionIR(*for_statement.end, true));
 					parent.ops.push(&end);
 
-					locals.push({for_statement.value_var, &value});
+					locals.push({for_statement.value_var, &value, nullptr, true});
 					auto& value_addr = alloc<ExOpPushLocalAddr>();
 					value_addr.alloca = &value;
 					auto& value_load = alloc<ExOpLoad>();
@@ -2208,7 +2265,7 @@ struct IRBuilder {
 					break;
 				}
 				auto& alloca = allocAlloca(vd.resolved_type, vd.name, &buildImplicitConversionIR(*vd.expression, *vd.resolved_type));
-				locals.push({vd.name, &alloca});
+				locals.push({vd.name, &alloca, nullptr, vd.is_immutable});
 				parent.ops.push(&alloca);
 				break;
 			}
@@ -2226,6 +2283,22 @@ struct IRBuilder {
 			}
 			case Statement::RETURN: {
 				auto& ret = static_cast<ReturnStatement&>(st);
+				if (inline_return) {
+					if (ret.expression) {
+						auto& store = alloc<ExOpCopy>();
+						store.type = inline_return->type;
+						store.src = &buildImplicitConversionIR(*ret.expression, *inline_return->type);
+						if (store.src->kind == ExIrOpKind::AGGREGATE_INIT) static_cast<ExOpAggregateInit&>(*store.src).target_dst = true;
+						auto& dst = alloc<ExOpPushLocalAddr>();
+						dst.alloca = inline_return->result;
+						store.dst = &dst;
+						parent.ops.push(&store);
+					}
+					auto& jump = alloc<ExOpJump>();
+					jump.target = inline_return->exit;
+					parent.ops.push(&jump);
+					break;
+				}
 				EX_ASSERT(!ret.expression || return_type);
 				ExIrOp* value = ret.expression ? &buildImplicitConversionIR(*ret.expression, *return_type) : nullptr;
 				buildReturnIR(parent, value);
@@ -2250,6 +2323,8 @@ struct IRBuilder {
 		EX_ASSERT(locals.empty());
 		EX_ASSERT(!return_type);
 		return_type = static_cast<FunctionResolvedType*>(expr.resolved_type)->return_type;
+		current_function = &expr;
+		inline_growth = 0;
 		current_src_loc = expr.token.src_loc;
 		stack_cursor = 0;
 		alloca_region_size = 0;
@@ -2261,7 +2336,7 @@ struct IRBuilder {
 			alloca.type = param.resolved_type;
 			alloca.name = param.name.value;
 			alloca.stack_sp = param_offset;
-			locals.push({param.name.value, &alloca});
+			locals.push({param.name.value, &alloca, nullptr, true});
 			param.slot.storage = StorageSlot::LOCAL;
 			param.slot.offset = param_offset;
 			param.slot.type = param.resolved_type;
@@ -2275,6 +2350,7 @@ struct IRBuilder {
 		alloca_region_size = stack_cursor;
 		locals.clear();
 		return_type = nullptr;
+		current_function = nullptr;
 		current_src_loc = EX_IR_INVALID_SOURCE_LOC;
 		return root;
 	}
@@ -2283,6 +2359,9 @@ struct IRBuilder {
 		ex_string_view name;
 		ExOpAlloca* alloca = nullptr;
 		ExIrOp* inline_value = nullptr;
+		// Nothing can write the variable after its initialization (parameter, `const`, range loop variable), so an
+		// inlined call may read it directly instead of copying it.
+		bool immutable = false;
 	};
 	struct Loop {
 		ex_string_view label = {};
@@ -2297,6 +2376,19 @@ struct IRBuilder {
 	ExpArray<ex_string_view> strings;
 	ExpArray<Statement*> defers;
 	ExpArray<Loop> loops;
+	ExpArray<FunctionExpression*> inline_stack;
+	FunctionExpression* current_function = nullptr;
+	// Statements of the bodies inlined into current_function so far.
+	u32 inline_growth = 0;
+	// Measured on the pagoda and parts sheet recipes: 200 keeps the code ~25% smaller than unlimited inlining for ~2-4% of run time.
+	static constexpr u32 MAX_INLINE_GROWTH = 200;
+	struct InlineReturn {
+		ResolvedType* type = nullptr;
+		ExOpAlloca* result = nullptr;
+		ExOpNop* exit = nullptr;
+	};
+	InlineReturn* inline_return = nullptr;
+	i32 locals_floor = 0;
 
 	ex_string_view pending_loop_label = {};
 	ResolvedType* return_type = nullptr;
@@ -2733,6 +2825,8 @@ struct BytecodeCompiler {
 		return result;
 	}
 
+	// TODO: ~80% of the jumps of big scripts (e.g. the parts sheet recipes) are shorter than 128 bytes. A short (8-bit offset) form of each
+	// jump opcode would save ~3 bytes per jump, but needs branch relaxation: forward jumps are emitted before their distance is known.
 	void patchJump(u32 position, u32 target) {
 		const i64 relative = (i64)target - (i64)(position + sizeof(i32));
 		EX_ASSERT(relative >= INT32_MIN && relative <= INT32_MAX);
@@ -2794,6 +2888,112 @@ struct BytecodeCompiler {
 		return true;
 	}
 
+	// Branch targets still to be patched: every jump emitted for one condition that lands on the same label.
+	static constexpr u32 MAX_BRANCH_LEAVES = 16;
+	struct JumpList {
+		u32 positions[MAX_BRANCH_LEAVES * 2];
+		u32 count = 0;
+	};
+	// Highest stack_top reached by the tests of the condition being emitted (see emitConditionBranch).
+	u32 branch_peak = 0;
+
+	// Emits the 32-bit offset of a jump whose target isn't known yet and records it in `list`.
+	void emitPendingJump(JumpList& list) {
+		list.positions[list.count++] = code.size();
+		emit((i32)0);
+	}
+
+	void patchJumpList(const JumpList& list, u32 target) {
+		for (u32 i = 0; i < list.count; ++i) patchJump(list.positions[i], target);
+	}
+
+	// Number of jumps emitBranch emits for a condition.
+	static u32 branchLeaves(const ExIrOp& condition) {
+		switch (condition.kind) {
+			case ExIrOpKind::AND:
+			case ExIrOpKind::OR: {
+				const auto& binary = static_cast<const ExOpBinary&>(condition);
+				return branchLeaves(*binary.lhs) + branchLeaves(*binary.rhs);
+			}
+			case ExIrOpKind::NOT: return branchLeaves(*static_cast<const ExOpUnary&>(condition).operand);
+			default: return 1;
+		}
+	}
+
+	static bool isZeroConstant(const ExIrOp& op) {
+		if (op.kind != ExIrOpKind::LOAD_CONST) return false;
+		const auto& constant = static_cast<const ExOpLoadConst&>(op);
+		for (u32 i = 0; i < typeByteSize(*constant.type); ++i) {
+			if (constant.value[i] != 0) return false;
+		}
+		return true;
+	}
+
+	// Emits code that jumps (the jump positions are added to `out`) when `condition == jump_when`, and falls
+	// through otherwise. `and`, `or` and `not` become chains of jumps, so no bool is materialized.
+	void emitBranch(ExIrOp& condition, bool jump_when, JumpList& out) {
+		switch (condition.kind) {
+			case ExIrOpKind::AND:
+			case ExIrOpKind::OR: {
+				const auto& binary = static_cast<ExOpBinary&>(condition);
+				// `decisive` is the value of lhs that already decides the result.
+				const bool decisive = condition.kind == ExIrOpKind::OR;
+				if (jump_when == decisive) {
+					emitBranch(*binary.lhs, jump_when, out);
+					emitBranch(*binary.rhs, jump_when, out);
+				} else {
+					JumpList skip;
+					emitBranch(*binary.lhs, decisive, skip);
+					emitBranch(*binary.rhs, jump_when, out);
+					patchJumpList(skip, code.size());
+				}
+				return;
+			}
+			case ExIrOpKind::NOT:
+				emitBranch(*static_cast<ExOpUnary&>(condition).operand, !jump_when, out);
+				return;
+			default: break;
+		}
+
+		const u32 entry_stack_top = stack_top;
+		ex_op opcode;
+		bool fused = false;
+		if (condition.kind >= ExIrOpKind::EQ && condition.kind <= ExIrOpKind::GE) {
+			const auto& compare = static_cast<ExOpBinary&>(condition);
+			if (isZeroConstant(*compare.rhs) && zeroCompareJumpOp(jump_when ? compare.kind : invertCompare(compare.kind), *compare.operand_type, opcode)) {
+				const u32 lhs_slot = emitOperand(*compare.lhs);
+				emitOp(opcode);
+				emit(lhs_slot);
+				fused = true;
+			} else if (fusedCompareJumpOp(compare.kind, *compare.operand_type, jump_when, opcode)) {
+				const u32 lhs_slot = emitOperand(*compare.lhs);
+				const u32 rhs_slot = emitOperand(*compare.rhs);
+				emitOp(opcode);
+				emit(lhs_slot);
+				emit(rhs_slot);
+				fused = true;
+			}
+		}
+		if (!fused) {
+			const u32 slot = emit(condition, nullptr);
+			emitOp(jump_when ? EX_OP_JNZ_U8 : EX_OP_JZ_U8);
+			emit(slot);
+		}
+		emitPendingJump(out);
+		// The temporaries of this test are dead once it jumped, the next test reuses them.
+		if (stack_top > branch_peak) branch_peak = stack_top;
+		stack_top = entry_stack_top;
+	}
+
+	// Jumps when `condition == jump_when`; leaves stack_top above every temporary the tests used.
+	void emitConditionBranch(ExIrOp& condition, bool jump_when, JumpList& out) {
+		const u32 saved_peak = branch_peak;
+		branch_peak = stack_top;
+		emitBranch(condition, jump_when, out);
+		stack_top = branch_peak;
+		branch_peak = saved_peak;
+	}
+
 	u32 emitConditionalJump(const ExOpConditionalJump& conditional) {
 		const u32 entry_stack_top = stack_top;
 
@@ -2832,93 +3032,36 @@ struct BytecodeCompiler {
 			}
 			// Jump back into the body while the condition holds; fall through to
 			// whatever follows (the loop exit) once it fails.
-			const ExOpBinary* compare = nullptr;
-			if (condition->kind >= ExIrOpKind::EQ && condition->kind <= ExIrOpKind::GE) {
-				compare = static_cast<const ExOpBinary*>(condition);
-			}
-			ex_op fused_opcode;
-			const ExOpLoadConst* rhs_constant = compare && compare->rhs->kind == ExIrOpKind::LOAD_CONST
-				? static_cast<const ExOpLoadConst*>(compare->rhs) : nullptr;
-			bool rhs_is_zero = rhs_constant != nullptr;
-			if (rhs_is_zero) {
-				for (u32 i = 0; i < typeByteSize(*rhs_constant->type); ++i)
-					if (rhs_constant->value[i] != 0) rhs_is_zero = false;
-			}
-			if (compare && rhs_is_zero && zeroCompareJumpOp(compare->kind, *compare->operand_type, fused_opcode)) {
-				const u32 lhs_slot = emitOperand(*compare->lhs);
-				emitOp(fused_opcode);
-				emit(lhs_slot);
-				const u32 patch_pos = code.size();
-				emit((i32)0);
-				patchJump(patch_pos, conditional.body_start->bytecode_offset);
-			} else if (compare && fusedCompareJumpOp(compare->kind, *compare->operand_type, true, fused_opcode)) {
-				const u32 lhs_slot = emitOperand(*compare->lhs);
-				const u32 rhs_slot = emitOperand(*compare->rhs);
-				emitOp(fused_opcode);
-				emit(lhs_slot);
-				emit(rhs_slot);
-				const u32 patch_pos = code.size();
-				emit((i32)0);
-				patchJump(patch_pos, conditional.body_start->bytecode_offset);
+			JumpList back_edges;
+			if (branchLeaves(*condition) <= MAX_BRANCH_LEAVES) {
+				emitConditionBranch(*conditional.condition, true, back_edges);
 			} else {
 				const u32 condition_slot = emit(*conditional.condition, nullptr);
 				emitOp(EX_OP_JNZ_U8);
 				emit(condition_slot);
-				const u32 patch_pos = code.size();
-				emit((i32)0);
-				patchJump(patch_pos, conditional.body_start->bytecode_offset);
+				emitPendingJump(back_edges);
 			}
+			patchJumpList(back_edges, conditional.body_start->bytecode_offset);
 			// Leave stack_top at its post-condition value so emitBlock records
 			// the temporary slots used by the condition evaluation.
 			return entry_stack_top;
 		}
 
-		u32 false_jump = 0;
-		bool have_jump = false;
+		JumpList false_jumps;
 		if (is_constant) {
 			if (!constant_value) {
 				// Always false: jump straight past the block.
 				emitOp(EX_OP_JUMP);
-				false_jump = code.size();
-				emit((i32)0);
-				have_jump = true;
+				emitPendingJump(false_jumps);
 			}
 			// Always true: no branch - fall into the block.
-		} else if (condition->kind >= ExIrOpKind::EQ && condition->kind <= ExIrOpKind::GE) {
-			const ExOpBinary& compare = static_cast<const ExOpBinary&>(*condition);
-			ex_op fused_opcode;
-			const ExOpLoadConst* rhs_constant = compare.rhs->kind == ExIrOpKind::LOAD_CONST
-				? static_cast<const ExOpLoadConst*>(compare.rhs) : nullptr;
-			bool rhs_is_zero = rhs_constant != nullptr;
-			if (rhs_is_zero) {
-				for (u32 i = 0; i < typeByteSize(*rhs_constant->type); ++i)
-					if (rhs_constant->value[i] != 0) rhs_is_zero = false;
-			}
-			if (rhs_is_zero && zeroCompareJumpOp(invertCompare(compare.kind), *compare.operand_type, fused_opcode)) {
-				const u32 lhs_slot = emitOperand(*compare.lhs);
-				emitOp(fused_opcode);
-				emit(lhs_slot);
-				false_jump = code.size();
-				emit((i32)0);
-				have_jump = true;
-			} else if (fusedCompareJumpOp(compare.kind, *compare.operand_type, false, fused_opcode)) {
-				const u32 lhs_slot = emitOperand(*compare.lhs);
-				const u32 rhs_slot = emitOperand(*compare.rhs);
-				emitOp(fused_opcode);
-				emit(lhs_slot);
-				emit(rhs_slot);
-				false_jump = code.size();
-				emit((i32)0);
-				have_jump = true;
-			}
-		}
-		if (!have_jump && !is_constant) {
+		} else if (branchLeaves(*condition) <= MAX_BRANCH_LEAVES) {
+			emitConditionBranch(*conditional.condition, false, false_jumps);
+		} else {
 			const u32 condition_slot = emit(*conditional.condition, nullptr);
 			emitOp(EX_OP_JZ_U8);
 			emit(condition_slot);
-			false_jump = code.size();
-			emit((i32)0);
-			have_jump = true;
+			emitPendingJump(false_jumps);
 		}
 		const u32 condition_peak = stack_top;
 
@@ -2926,7 +3069,7 @@ struct BytecodeCompiler {
 		u32 peak = stack_top;
 		if (peak < condition_peak) peak = condition_peak;
 		if (!conditional.false_block) {
-			if (have_jump) patchJump(false_jump, code.size());
+			patchJumpList(false_jumps, code.size());
 			stack_top = peak;
 			return entry_stack_top;
 		}
@@ -2934,7 +3077,7 @@ struct BytecodeCompiler {
 		emitOp(EX_OP_JUMP);
 		const u32 end_jump = code.size();
 		emit((i32)0);
-		if (have_jump) patchJump(false_jump, code.size());
+		patchJumpList(false_jumps, code.size());
 		stack_top = entry_stack_top;
 		emitBlock(*conditional.false_block);
 		if (stack_top > peak) peak = stack_top;
@@ -3320,6 +3463,7 @@ struct BytecodeCompiler {
 		if (alloca.value->kind != ExIrOpKind::NOP) {
 			if (do_optimize && alloca.value->kind != ExIrOpKind::AGGREGATE_INIT) {
 				EmitDst dst = { .dst = alloca.stack_sp, .size = typeByteSize(*alloca.type) };
+				if (alloca.value->kind == ExIrOpKind::BLOCK_EXPR) static_cast<ExOpBlockExpr&>(*alloca.value).dst_is_fresh = true;
 				const u32 value_slot = emit(*alloca.value, &dst);
 				if (!empty(alloca.name)) recordLocal(alloca.name, alloca.stack_sp, *alloca.type, functionCodeOffset((u32)code.size()));
 			}
@@ -3497,7 +3641,11 @@ struct BytecodeCompiler {
 	u32 emitSliceFieldCopy(const ExOpCopy& copy, ExIrOp& slice_op, ExIrOp& index_op, const ResolvedType& index_type,
 		u32 element_size, u32 field_offset, u32 field_size)
 	{
-		const u32 src = emit(*copy.src, nullptr);
+		// The source already sits in a frame slot: store from there, unless computing the address could change it.
+		u32 src = 0;
+		if (!(do_optimize && IRBuilder::isSideEffectFree(slice_op) && IRBuilder::isSideEffectFree(index_op) && tryGetDirectFrameValue(*copy.src, src))) {
+			src = emit(*copy.src, nullptr);
+		}
 		const u32 slice = emitOperand(slice_op);
 		const u32 index = emitOperand(index_op);
 		emitOp(sliceFieldStoreOp(toTypeKind(index_type)));
@@ -3548,7 +3696,10 @@ struct BytecodeCompiler {
 			}
 			return indexed.base_slot;
 		}
-		u32 src = emit(*copy.src, nullptr);
+		u32 src = 0;
+		if (!(do_optimize && IRBuilder::isSideEffectFree(*copy.dst) && tryGetDirectFrameValue(*copy.src, src))) {
+			src = emit(*copy.src, nullptr);
+		}
 		if (direct_frame) {
 			emitOp(EX_OP_COPY);
 			emit(frame_offset);
@@ -3650,20 +3801,27 @@ struct BytecodeCompiler {
 		return result;
 	}
 
-	u32 emitAggregateInit(const ExOpAggregateInit& aggregate) {
-		const u32 result = stack_top;
-		stack_top += typeByteSize(*aggregate.type);
+	u32 emitAggregateInit(const ExOpAggregateInit& aggregate, EmitDst* dst = nullptr) {
+		const u32 result = dst ? dst->dst : stack_top;
+		if (!dst) stack_top += typeByteSize(*aggregate.type);
 		u32 offset = 0;
 		for (u32 i = 0; i < aggregate.value_count; ++i) {
 			const u32 size = aggregate.sizes								   ? aggregate.sizes[i]
 							 : aggregate.type->kind == ResolvedTypeKind::ARRAY ? typeByteSize(*static_cast<ArrayResolvedType*>(aggregate.type)->element_type)
 																			   : (u32)sizeof(u64);
 			if (aggregate.values[i]->kind != ExIrOpKind::NOP) {
-				const u32 value = emit(*aggregate.values[i], nullptr);
-				emitOp(EX_OP_COPY);
-				emit(result + (aggregate.offsets ? aggregate.offsets[i] : offset));
-				emit(value);
-				emit(size);
+				const u32 field_slot = result + (aggregate.offsets ? aggregate.offsets[i] : offset);
+				if (do_optimize) {
+					// Each field is computed straight into its place in the aggregate.
+					EmitDst field = { field_slot, size };
+					emit(*aggregate.values[i], &field);
+				} else {
+					const u32 value = emit(*aggregate.values[i], nullptr);
+					emitOp(EX_OP_COPY);
+					emit(field_slot);
+					emit(value);
+					emit(size);
+				}
 			}
 			offset += size;
 		}
@@ -3720,6 +3878,13 @@ struct BytecodeCompiler {
 		// frame-slot reference optimize() rewrites plain loads into.
 		if (value.kind == ExIrOpKind::FRAME_PTR) {
 			offset = static_cast<const ExOpFramePtr&>(value).alloca->stack_sp;
+			return true;
+		}
+		if (value.kind == ExIrOpKind::EXTRACT_VALUE) {
+			const auto& extract = static_cast<const ExOpExtractValue&>(value);
+			u32 base = 0;
+			if (!tryGetDirectFrameValue(*extract.value, base)) return false;
+			offset = base + extract.offset;
 			return true;
 		}
 		if (value.kind != ExIrOpKind::LOAD) return false;
@@ -4082,10 +4247,10 @@ struct BytecodeCompiler {
 		return destination;
 	}
 
-	u32 emitSliceLoad(const ExOpSliceLoad& op) {
+	u32 emitSliceLoad(const ExOpSliceLoad& op, EmitDst* dst) {
 		const u32 slice = emitOperand(*op.slice);
 		const u32 index = emitOperand(*op.index);
-		const u32 result = stack_top;
+		const u32 result = dst ? dst->dst : stack_top;
 		const ex_op load_op = sliceFieldLoadOp(toTypeKind(*op.index_type));
 		emitOp(load_op);
 		emit(result);
@@ -4094,7 +4259,7 @@ struct BytecodeCompiler {
 		emit(op.element_size);
 		emit((u32)0);
 		emit(op.element_size);
-		stack_top += op.element_size;
+		if (!dst) stack_top += op.element_size;
 		return result;
 	}
 
@@ -4168,7 +4333,7 @@ struct BytecodeCompiler {
 			case ExIrOpKind::SLICE_REF: result = emitSliceRef(static_cast<ExOpSliceRef&>(op), dst); break;
 			case ExIrOpKind::SLICE_FIELD_LOAD: result = emitSliceFieldLoad(static_cast<ExOpSliceFieldLoad&>(op), dst); break;
 			case ExIrOpKind::SLICE_FIELD_STORE: result = emitSliceFieldStoreAddress(static_cast<ExOpSliceFieldStore&>(op)); break;
-			case ExIrOpKind::SLICE_LOAD: result = emitSliceLoad(static_cast<ExOpSliceLoad&>(op)); break;
+			case ExIrOpKind::SLICE_LOAD: result = emitSliceLoad(static_cast<ExOpSliceLoad&>(op), dst); break;
 			case ExIrOpKind::SLICE: result = emitSlice(static_cast<ExOpSlice&>(op)); break;
 			case ExIrOpKind::NEG:
 			case ExIrOpKind::BIT_NOT:
@@ -4229,8 +4394,13 @@ struct BytecodeCompiler {
 			case ExIrOpKind::LOAD_CONST: result = emitLoadConst(static_cast<ExOpLoadConst&>(op), dst); break;
 			case ExIrOpKind::LOAD_BYTES: result = emitLoadBytes(static_cast<ExOpLoadBytes&>(op), dst); break;
 			case ExIrOpKind::UNION_CONVERT: result = emitUnionConvert(static_cast<ExOpUnionConvert&>(op)); break;
-			case ExIrOpKind::AGGREGATE_INIT: result = emitAggregateInit(static_cast<ExOpAggregateInit&>(op)); break;
+			case ExIrOpKind::AGGREGATE_INIT: {
+				auto& aggregate = static_cast<ExOpAggregateInit&>(op);
+				result = emitAggregateInit(aggregate, do_optimize && aggregate.target_dst ? dst : nullptr);
+				break;
+			}
 			case ExIrOpKind::RETURN: result = emitReturn(static_cast<ExOpReturn&>(op)); break;
+			case ExIrOpKind::BLOCK_EXPR: result = emitBlockExpr(static_cast<ExOpBlockExpr&>(op), dst); break;
 			default: EX_ASSERT(false); break;
 		}
 		if (dst && dst->dst != result) {
@@ -4240,6 +4410,27 @@ struct BytecodeCompiler {
 			emit(dst->size);
 		}
 		return dst ? dst->dst : result;
+	}
+
+	// The statements of an inlined body run in the middle of an enclosing expression, so the temporaries
+	// the expression already holds (everything below stack_top) must survive them.
+	u32 emitBlockExpr(ExOpBlockExpr& expr, EmitDst* dst) {
+		const u32 entry_stack_top = stack_top;
+		const u32 saved_temp_base = temp_base;
+		// Early returns store into their result slot: when the value initializes a new variable, that slot is the variable.
+		if (dst && expr.dst_is_fresh && expr.result_slot && typeByteSize(*expr.result_slot->type) == dst->size) {
+			expr.result_slot->stack_sp = dst->dst;
+		}
+		temp_base = entry_stack_top;
+		emitBlock(*expr.block);
+		patchJumps(*expr.block);
+		temp_base = saved_temp_base;
+		stack_top = entry_stack_top;
+		if (!expr.result) return entry_stack_top;
+		if (dst && expr.dst_is_fresh && expr.result->kind == ExIrOpKind::AGGREGATE_INIT) {
+			return emitAggregateInit(static_cast<ExOpAggregateInit&>(*expr.result), dst);
+		}
+		return emit(*expr.result, dst);
 	}
 
 	u32 emitReturn(const ExOpReturn& ret) {
@@ -4284,9 +4475,16 @@ struct BytecodeCompiler {
 				// old address-shaped fallback for builds without optimization.
 				ExIrOp* address_base = copy.dst;
 				u32 field_offset = 0;
-				if (copy.dst->result_mode == ExIrOp::ADDRESS
+				bool folds_to_slice_ref = copy.dst->result_mode == ExIrOp::ADDRESS
 					&& tryGetOffsetAddress(*copy.dst, address_base, field_offset)
-					&& address_base->kind == ExIrOpKind::SLICE_REF) {
+					&& address_base->kind == ExIrOpKind::SLICE_REF;
+				if (!folds_to_slice_ref && copy.dst->kind == ExIrOpKind::SLICE_REF) {
+					// A whole element store: field offset zero.
+					address_base = copy.dst;
+					field_offset = 0;
+					folds_to_slice_ref = true;
+				}
+				if (folds_to_slice_ref) {
 					auto& ref = *static_cast<ExOpSliceRef*>(address_base);
 					auto& field = alloc<ExOpSliceFieldStore>();
 					field.slice = ref.slice;
@@ -4457,6 +4655,12 @@ struct BytecodeCompiler {
 			case ExIrOpKind::MATERIALIZE_ADDR: {
 				auto& address = *static_cast<ExOpMaterializeAddr*>(op);
 				optimize(address.value);
+				break;
+			}
+			case ExIrOpKind::BLOCK_EXPR: {
+				auto& block_expr = *static_cast<ExOpBlockExpr*>(op);
+				optimize(*block_expr.block);
+				if (block_expr.result) optimize(block_expr.result);
 				break;
 			}
 		}
