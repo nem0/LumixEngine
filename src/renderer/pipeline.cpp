@@ -202,7 +202,8 @@ struct GlobalState {
 
 struct ShadowAtlas {
 	static constexpr u32 SIZE = 2048;
-	
+	static constexpr u32 SLOTS = 1 + 4 + 32; // sum of group sizes, see add()
+
 	ShadowAtlas(IAllocator& allocator)
 		: map(allocator)
 	{
@@ -917,6 +918,8 @@ struct PipelineImpl final : Pipeline {
 				stream.dispatch(m_viewport.w / 16, m_viewport.h / 16, 1);
 			}
 			
+			// the flatten dispatches left the atlas in UAV state, it's sampled as SRV by the light pass
+			stream.barrier(m_shadow_atlas.texture, gpu::BarrierType::READ);
 			m_renderer.releaseRenderbuffer(depthbuf);
 
 
@@ -3180,24 +3183,39 @@ struct PipelineImpl final : Pipeline {
 			light_entities->free(m_renderer.getEngine().getPageAllocator());
 		}
 
-		for (u32 i = 0; i < atlas_sorter.count; ++i) {
-			ClusterLight& light = lights[atlas_sorter.lights[i].idx];
-			if (light.atlas_idx != -1 && ShadowAtlas::getGroup(i) != ShadowAtlas::getGroup(light.atlas_idx)) {
-				m_shadow_atlas.remove(atlas_sorter.lights[i].entity);
-				light.atlas_idx = -1;
+		// release every slot whose light is not ranked into the same group this frame
+		// this includes lights that are not in the sorter at all (outside of the frustum, destroyed, shadows turned off, ...),
+		// otherwise their slots would never be freed
+		for (u32 slot = 0; slot < ShadowAtlas::SLOTS; ++slot) {
+			if (!m_shadow_atlas.inv_map[slot].isValid()) continue;
+
+			const EntityRef slot_entity = EntityRef(m_shadow_atlas.inv_map[slot]);
+			bool keep = false;
+			for (u32 i = 0; i < atlas_sorter.count && i < ShadowAtlas::SLOTS; ++i) {
+				if (atlas_sorter.lights[i].entity != slot_entity) continue;
+
+				keep = ShadowAtlas::getGroup(i) == ShadowAtlas::getGroup(slot);
+				break;
 			}
+			if (!keep) m_shadow_atlas.remove(slot_entity);
+		}
+		for (u32 i = 0; i < atlas_sorter.count; ++i) {
+			auto iter = m_shadow_atlas.map.find(atlas_sorter.lights[i].entity);
+			lights[atlas_sorter.lights[i].idx].atlas_idx = iter.isValid() ? iter.value() : -1;
 		}
 
 		if (!m_shadow_atlas.texture && atlas_sorter.count > 0) {
 			m_shadow_atlas.texture = m_renderer.createTexture(ShadowAtlas::SIZE, ShadowAtlas::SIZE, 1, gpu::TextureFormat::D32, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE, Renderer::MemRef(), "shadow_atlas");
 		}
 		Matrix shadow_atlas_matrices[128];
-		for (u32 i = 0; i < atlas_sorter.count; ++i) {
+		for (u32 i = 0; i < atlas_sorter.count && i < ShadowAtlas::SLOTS; ++i) {
 			ClusterLight& light = lights[atlas_sorter.lights[i].idx];
 			EntityRef e = atlas_sorter.lights[i].entity;
 			PointLight& pl = m_module->getPointLight(e);
 			if (light.atlas_idx == -1) {
 				light.atlas_idx = m_shadow_atlas.add(ShadowAtlas::getGroup(i), e);
+				if (light.atlas_idx == -1) continue;
+
 				bakeShadow(pl, light.atlas_idx);
 			}
 			else if (pl.flags & PointLight::DYNAMIC) {

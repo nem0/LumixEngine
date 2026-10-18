@@ -1242,7 +1242,8 @@ void barrier(TextureHandle texture, BarrierType type) {
 	switch(type) {
 		case BarrierType::WRITE: texture->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS); break;
 		case BarrierType::READ: 
-			if (isDepthFormat(texture->dxgi_format)) {
+			// DEPTH_READ is only valid for resources created with ALLOW_DEPTH_STENCIL (RENDER_TARGET flag), e.g. not for the shadow atlas, which is a UAV/copy target
+			if (isDepthFormat(texture->dxgi_format) && isFlagSet(texture->flags, TextureFlags::RENDER_TARGET)) {
 				texture->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_DEPTH_READ |  D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 			}
 			else {
