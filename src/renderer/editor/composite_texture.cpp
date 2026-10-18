@@ -3558,7 +3558,7 @@ static_assert(sizeof(TextureArrayOutput) == 16);
 static_assert(sizeof(TextureCubeOutput) == 240);
 
 // Budget for all script memory (build-local image pixels) and, separately, for the output built from it.
-static constexpr u64 MAX_RECIPE_BYTES = 256ull * 1024 * 1024;
+static constexpr u64 MAX_RECIPE_BYTES = 1024ull * 1024 * 1024;
 
 static bool finite(float value) {
 	u32 bits;

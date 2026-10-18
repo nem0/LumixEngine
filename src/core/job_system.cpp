@@ -214,8 +214,8 @@ struct System {
 
 	TagAllocator m_allocator;
 	Array<WorkerTask*> m_workers;
-	FiberJobPair m_fiber_pool[512];
-	RingBuffer<FiberJobPair*, 512> m_free_fibers;
+	FiberJobPair m_fiber_pool[1024];
+	RingBuffer<FiberJobPair*, 1024> m_free_fibers;
 	WorkQueue m_global_queue; // non-worker threads must push here
 	AtomicI32 m_num_sleeping = 0; // if 0, we are sure that no worker is sleeping; if not 0, workers can be in any state
 	Lumix::Mutex m_sleeping_sync;
