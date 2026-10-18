@@ -367,13 +367,6 @@ static i32 evoxc_read_i32(const u8* code, u32 size, u32* pc) {
 	return value;
 }
 
-static i32 evoxc_read_i16(const u8* code, u32 size, u32* pc) {
-	i16 value = 0;
-	if (*pc + sizeof(value) <= size) memcpy(&value, code + *pc, sizeof(value));
-	*pc += (u32)sizeof(value);
-	return (i32)value;
-}
-
 static u64 evoxc_read_u64(const u8* code, u32 size, u32* pc) {
 	u64 value = 0;
 	if (*pc + sizeof(value) <= size) memcpy(&value, code + *pc, sizeof(value));
@@ -661,19 +654,19 @@ static void evoxc_dump_bytecode(const ex_bytecode* bytecode, const char* source_
 			{
 				const u32 lhs = evoxc_read_u32(fn->code, fn->code_size, &pc);
 				const u32 rhs = evoxc_read_u32(fn->code, fn->code_size, &pc);
-				const i32 jump_offset = evoxc_read_i16(fn->code, fn->code_size, &pc);
+				const i32 jump_offset = evoxc_read_i32(fn->code, fn->code_size, &pc);
 				printf(" lhs=%u, rhs=%u, offset=%d, target=%d", lhs, rhs, jump_offset, (i32)pc + jump_offset);
 				break;
 			}
 			case EX_OP_JUMP: {
-				const i32 jump_offset = evoxc_read_i16(fn->code, fn->code_size, &pc);
+				const i32 jump_offset = evoxc_read_i32(fn->code, fn->code_size, &pc);
 				printf(" offset=%d, target=%d", jump_offset, (i32)pc + jump_offset);
 				break;
 			}
 			case EX_OP_JZ_U8:
 			case EX_OP_JNZ_U8: {
 				const u32 condition = evoxc_read_u32(fn->code, fn->code_size, &pc);
-				const i32 jump_offset = evoxc_read_i16(fn->code, fn->code_size, &pc);
+				const i32 jump_offset = evoxc_read_i32(fn->code, fn->code_size, &pc);
 				printf(" cond=%u, offset=%d, target=%d", condition, jump_offset, (i32)pc + jump_offset);
 				break;
 			}
@@ -690,7 +683,7 @@ static void evoxc_dump_bytecode(const ex_bytecode* bytecode, const char* source_
 			case EX_OP_JLEZ_I32:
 			case EX_OP_JLEZ_I64: {
 				const u32 reg = evoxc_read_u32(fn->code, fn->code_size, &pc);
-				const i32 jump_offset = evoxc_read_i16(fn->code, fn->code_size, &pc);
+				const i32 jump_offset = evoxc_read_i32(fn->code, fn->code_size, &pc);
 				printf(" reg=%u, offset=%d, target=%d", reg, jump_offset, (i32)pc + jump_offset);
 				break;
 			}

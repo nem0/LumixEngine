@@ -356,7 +356,6 @@ static EX_FORCE_INLINE bool runtime_invoke_native(ex_task* task, u32 function_in
 #define runtime_read_u64() ( (ip += sizeof(u64)), *(const u64*)(ip - sizeof(u64)) )
 #define runtime_read_u32() ( (ip += sizeof(u32)), *(const u32*)(ip - sizeof(u32)) )
 #define runtime_read_i32() ( (ip += sizeof(i32)), *(const i32*)(ip - sizeof(i32)) )
-#define runtime_read_i16() ( (ip += sizeof(i16)), (i32)*(const i16*)(ip - sizeof(i16)) )
 
 static double runtime_numeric_to_double(const u8* value, ex_type_kind kind) {
 	switch (kind) {
@@ -555,7 +554,7 @@ static u64 runtime_numeric_to_u64(const u8* value, ex_type_kind kind) {
 	do {                                                     \
 		const u32 lhs_offset__ = runtime_read_u32();         \
 		const u32 rhs_offset__ = runtime_read_u32();         \
-		const i32 jump_offset__ = runtime_read_i16();        \
+		const i32 jump_offset__ = runtime_read_i32();        \
 		TYPE lhs__;                                          \
 		TYPE rhs__;                                          \
 		memcpy(&lhs__, frame + lhs_offset__, sizeof(lhs__)); \
@@ -1240,27 +1239,27 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 			case EX_OP_JNE_F32: EX_REG_CMP_JUMP(f32, ==); break;
 			case EX_OP_JNE_F64: EX_REG_CMP_JUMP(f64, ==); break;
 			case EX_OP_JUMP: {
-				const i32 offset = runtime_read_i16();
+				const i32 offset = runtime_read_i32();
 				ip += offset;
 				break;
 			}
 			case EX_OP_JZ_U8: {
 				const u32 cond = runtime_read_u32();
-				const i32 offset = runtime_read_i16();
+				const i32 offset = runtime_read_i32();
 				u8* ptr = frame + cond;
 				if (*ptr == 0u) ip += offset;
 				break;
 			}
 			case EX_OP_JNZ_U8: {
 				const u32 cond = runtime_read_u32();
-				const i32 offset = runtime_read_i16();
+				const i32 offset = runtime_read_i32();
 				u8* ptr = frame + cond;
 				if (*ptr != 0u) ip += offset;
 				break;
 			}
 			case EX_OP_JZ_I32: {
 				const u32 reg = runtime_read_u32();
-				const i32 offset = runtime_read_i16();
+				const i32 offset = runtime_read_i32();
 				i32 value = 0;
 				memcpy(&value, frame + reg, 4u);
 				if (value == 0) ip += offset;
@@ -1268,7 +1267,7 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 			}
 			case EX_OP_JZ_I64: {
 				const u32 reg = runtime_read_u32();
-				const i32 offset = runtime_read_i16();
+				const i32 offset = runtime_read_i32();
 				i64 value = 0;
 				memcpy(&value, frame + reg, 8u);
 				if (value == 0) ip += offset;
@@ -1276,7 +1275,7 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 			}
 			case EX_OP_JGZ_I32: {
 				const u32 reg = runtime_read_u32();
-				const i32 offset = runtime_read_i16();
+				const i32 offset = runtime_read_i32();
 				i32 value = 0;
 				memcpy(&value, frame + reg, 4u);
 				if (value > 0) ip += offset;
@@ -1284,7 +1283,7 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 			}
 			case EX_OP_JGZ_I64: {
 				const u32 reg = runtime_read_u32();
-				const i32 offset = runtime_read_i16();
+				const i32 offset = runtime_read_i32();
 				i64 value = 0;
 				memcpy(&value, frame + reg, 8u);
 				if (value > 0) ip += offset;
@@ -1313,7 +1312,7 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 			}
 			case EX_OP_JGEZ_I32: {
 				const u32 reg = runtime_read_u32();
-				const i32 offset = runtime_read_i16();
+				const i32 offset = runtime_read_i32();
 				i32 value = 0;
 				memcpy(&value, frame + reg, 4u);
 				if (value >= 0) ip += offset;
@@ -1321,7 +1320,7 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 			}
 			case EX_OP_JGEZ_I64: {
 				const u32 reg = runtime_read_u32();
-				const i32 offset = runtime_read_i16();
+				const i32 offset = runtime_read_i32();
 				i64 value = 0;
 				memcpy(&value, frame + reg, 8u);
 				if (value >= 0) ip += offset;
@@ -1329,7 +1328,7 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 			}
 			case EX_OP_JLTZ_I32: {
 				const u32 reg = runtime_read_u32();
-				const i32 offset = runtime_read_i16();
+				const i32 offset = runtime_read_i32();
 				i32 value = 0;
 				memcpy(&value, frame + reg, 4u);
 				if (value < 0) ip += offset;
@@ -1337,7 +1336,7 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 			}
 			case EX_OP_JLTZ_I64: {
 				const u32 reg = runtime_read_u32();
-				const i32 offset = runtime_read_i16();
+				const i32 offset = runtime_read_i32();
 				i64 value = 0;
 				memcpy(&value, frame + reg, 8u);
 				if (value < 0) ip += offset;
@@ -1345,7 +1344,7 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 			}
 			case EX_OP_JLEZ_I32: {
 				const u32 reg = runtime_read_u32();
-				const i32 offset = runtime_read_i16();
+				const i32 offset = runtime_read_i32();
 				i32 value = 0;
 				memcpy(&value, frame + reg, 4u);
 				if (value <= 0) ip += offset;
@@ -1353,7 +1352,7 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 			}
 			case EX_OP_JLEZ_I64: {
 				const u32 reg = runtime_read_u32();
-				const i32 offset = runtime_read_i16();
+				const i32 offset = runtime_read_i32();
 				i64 value = 0;
 				memcpy(&value, frame + reg, 8u);
 				if (value <= 0) ip += offset;
@@ -1361,7 +1360,7 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 			}
 			case EX_OP_JNZ_I32: {
 				const u32 reg = runtime_read_u32();
-				const i32 offset = runtime_read_i16();
+				const i32 offset = runtime_read_i32();
 				i32 value = 0;
 				memcpy(&value, frame + reg, 4u);
 				if (value != 0) ip += offset;
@@ -1369,7 +1368,7 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 			}
 			case EX_OP_JNZ_I64: {
 				const u32 reg = runtime_read_u32();
-				const i32 offset = runtime_read_i16();
+				const i32 offset = runtime_read_i32();
 				i64 value = 0;
 				memcpy(&value, frame + reg, 8u);
 				if (value != 0) ip += offset;

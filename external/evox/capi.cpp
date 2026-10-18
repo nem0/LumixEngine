@@ -498,7 +498,7 @@ ex_attribute ex_type_struct_field_attribute_value(const ex_type* type, u32 field
 namespace {
 
 constexpr u32 BYTECODE_IMAGE_MAGIC = 0x43425845; // "EXBC"
-constexpr u32 BYTECODE_IMAGE_VERSION = 2;
+constexpr u32 BYTECODE_IMAGE_VERSION = 3;
 
 struct BytecodeWriter {
 	ex_write_fn write;

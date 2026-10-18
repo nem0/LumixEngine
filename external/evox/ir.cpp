@@ -2632,7 +2632,6 @@ struct BytecodeCompiler {
 	}
 
 	void emit(u8 v) { emit(&v, sizeof(v)); }
-	void emit(i16 v) { emit(&v, sizeof(v)); }
 	void emit(i32 v) { emit(&v, sizeof(v)); }
 	void emit(u32 v) { emit(&v, sizeof(v)); }
 	void emit(u64 v) { emit(&v, sizeof(v)); }
@@ -2734,10 +2733,10 @@ struct BytecodeCompiler {
 		return result;
 	}
 
-	void patchI16(u32 position, u32 target) {
-		const i64 relative = (i64)target - (i64)(position + sizeof(i16));
-		EX_ASSERT(relative >= -32768 && relative <= 32767);
-		const i16 offset = (i16)relative;
+	void patchJump(u32 position, u32 target) {
+		const i64 relative = (i64)target - (i64)(position + sizeof(i32));
+		EX_ASSERT(relative >= INT32_MIN && relative <= INT32_MAX);
+		const i32 offset = (i32)relative;
 		memcpy(code.data + position, &offset, sizeof(offset));
 	}
 
@@ -2825,8 +2824,8 @@ struct BytecodeCompiler {
 					// Always taken: the back edge is an unconditional jump.
 					emitOp(EX_OP_JUMP);
 					const u32 patch_pos = code.size();
-					emit((i16)0);
-					patchI16(patch_pos, conditional.body_start->bytecode_offset);
+					emit((i32)0);
+					patchJump(patch_pos, conditional.body_start->bytecode_offset);
 				}
 				// Never taken: fall through to the loop exit.
 				return entry_stack_top;
@@ -2850,8 +2849,8 @@ struct BytecodeCompiler {
 				emitOp(fused_opcode);
 				emit(lhs_slot);
 				const u32 patch_pos = code.size();
-				emit((i16)0);
-				patchI16(patch_pos, conditional.body_start->bytecode_offset);
+				emit((i32)0);
+				patchJump(patch_pos, conditional.body_start->bytecode_offset);
 			} else if (compare && fusedCompareJumpOp(compare->kind, *compare->operand_type, true, fused_opcode)) {
 				const u32 lhs_slot = emitOperand(*compare->lhs);
 				const u32 rhs_slot = emitOperand(*compare->rhs);
@@ -2859,15 +2858,15 @@ struct BytecodeCompiler {
 				emit(lhs_slot);
 				emit(rhs_slot);
 				const u32 patch_pos = code.size();
-				emit((i16)0);
-				patchI16(patch_pos, conditional.body_start->bytecode_offset);
+				emit((i32)0);
+				patchJump(patch_pos, conditional.body_start->bytecode_offset);
 			} else {
 				const u32 condition_slot = emit(*conditional.condition, nullptr);
 				emitOp(EX_OP_JNZ_U8);
 				emit(condition_slot);
 				const u32 patch_pos = code.size();
-				emit((i16)0);
-				patchI16(patch_pos, conditional.body_start->bytecode_offset);
+				emit((i32)0);
+				patchJump(patch_pos, conditional.body_start->bytecode_offset);
 			}
 			// Leave stack_top at its post-condition value so emitBlock records
 			// the temporary slots used by the condition evaluation.
@@ -2881,7 +2880,7 @@ struct BytecodeCompiler {
 				// Always false: jump straight past the block.
 				emitOp(EX_OP_JUMP);
 				false_jump = code.size();
-				emit((i16)0);
+				emit((i32)0);
 				have_jump = true;
 			}
 			// Always true: no branch - fall into the block.
@@ -2900,7 +2899,7 @@ struct BytecodeCompiler {
 				emitOp(fused_opcode);
 				emit(lhs_slot);
 				false_jump = code.size();
-				emit((i16)0);
+				emit((i32)0);
 				have_jump = true;
 			} else if (fusedCompareJumpOp(compare.kind, *compare.operand_type, false, fused_opcode)) {
 				const u32 lhs_slot = emitOperand(*compare.lhs);
@@ -2909,7 +2908,7 @@ struct BytecodeCompiler {
 				emit(lhs_slot);
 				emit(rhs_slot);
 				false_jump = code.size();
-				emit((i16)0);
+				emit((i32)0);
 				have_jump = true;
 			}
 		}
@@ -2918,7 +2917,7 @@ struct BytecodeCompiler {
 			emitOp(EX_OP_JZ_U8);
 			emit(condition_slot);
 			false_jump = code.size();
-			emit((i16)0);
+			emit((i32)0);
 			have_jump = true;
 		}
 		const u32 condition_peak = stack_top;
@@ -2927,19 +2926,19 @@ struct BytecodeCompiler {
 		u32 peak = stack_top;
 		if (peak < condition_peak) peak = condition_peak;
 		if (!conditional.false_block) {
-			if (have_jump) patchI16(false_jump, code.size());
+			if (have_jump) patchJump(false_jump, code.size());
 			stack_top = peak;
 			return entry_stack_top;
 		}
 
 		emitOp(EX_OP_JUMP);
 		const u32 end_jump = code.size();
-		emit((i16)0);
-		if (have_jump) patchI16(false_jump, code.size());
+		emit((i32)0);
+		if (have_jump) patchJump(false_jump, code.size());
 		stack_top = entry_stack_top;
 		emitBlock(*conditional.false_block);
 		if (stack_top > peak) peak = stack_top;
-		patchI16(end_jump, code.size());
+		patchJump(end_jump, code.size());
 		stack_top = peak;
 		return entry_stack_top;
 	}
@@ -2953,7 +2952,7 @@ struct BytecodeCompiler {
 		emitOp(EX_OP_JZ_U8);
 		emit(condition);
 		const u32 false_jump = code.size();
-		emit((i16)0);
+		emit((i32)0);
 
 		const u32 true_value = emit(*ternary.true_value, nullptr);
 		emitOp(EX_OP_COPY);
@@ -2963,9 +2962,9 @@ struct BytecodeCompiler {
 		u32 high_water = stack_top;
 		emitOp(EX_OP_JUMP);
 		const u32 end_jump = code.size();
-		emit((i16)0);
+		emit((i32)0);
 
-		patchI16(false_jump, code.size());
+		patchJump(false_jump, code.size());
 		stack_top = result + size;
 		const u32 false_value = emit(*ternary.false_value, nullptr);
 		emitOp(EX_OP_COPY);
@@ -2973,7 +2972,7 @@ struct BytecodeCompiler {
 		emit(false_value);
 		emit(size);
 		if (stack_top > high_water) high_water = stack_top;
-		patchI16(end_jump, code.size());
+		patchJump(end_jump, code.size());
 		stack_top = high_water;
 		return result;
 	}
@@ -2982,7 +2981,7 @@ struct BytecodeCompiler {
 		EX_ASSERT(jump.target);
 		emitOp(EX_OP_JUMP);
 		jump.bytecode_patch_offset = code.size();
-		emit((i16)0);
+		emit((i32)0);
 		return stack_top;
 	}
 
@@ -2991,7 +2990,7 @@ struct BytecodeCompiler {
 		emitOp(op.kind == ExIrOpKind::AND ? EX_OP_JZ_U8 : EX_OP_JNZ_U8);
 		emit(lhs);
 		const u32 short_jump = code.size();
-		emit((i16)0);
+		emit((i32)0);
 
 		const u32 rhs = emit(*op.rhs, nullptr);
 		const u32 result = stack_top;
@@ -3002,14 +3001,14 @@ struct BytecodeCompiler {
 		emit((u32)1);
 		emitOp(EX_OP_JUMP);
 		const u32 end_jump = code.size();
-		emit((i16)0);
+		emit((i32)0);
 
-		patchI16(short_jump, code.size());
+		patchJump(short_jump, code.size());
 		emitOp(EX_OP_COPY);
 		emit(result);
 		emit(lhs);
 		emit((u32)1);
-		patchI16(end_jump, code.size());
+		patchJump(end_jump, code.size());
 		return result;
 	}
 
@@ -3020,7 +3019,7 @@ struct BytecodeCompiler {
 				EX_ASSERT(jump.target);
 				EX_ASSERT(jump.target->bytecode_offset != 0xffffffffu);
 				EX_ASSERT(jump.bytecode_patch_offset != 0xffffffffu);
-				patchI16(jump.bytecode_patch_offset, jump.target->bytecode_offset);
+				patchJump(jump.bytecode_patch_offset, jump.target->bytecode_offset);
 			} else if (op->kind == ExIrOpKind::CONDITIONAL_JUMP) {
 				auto& conditional = static_cast<ExOpConditionalJump&>(*op);
 				if (conditional.true_block) patchJumps(*conditional.true_block);
@@ -3642,11 +3641,11 @@ struct BytecodeCompiler {
 			emitOp(EX_OP_JZ_U8);
 			emit(cond_sp);
 			const u32 skip = code.size();
-			emit((i16)0);
+			emit((i32)0);
 			emitOp(EX_OP_LOAD_CONST_4);
 			emit(result);
 			emit(dest_tag);
-			patchI16(skip, code.size());
+			patchJump(skip, code.size());
 		}
 		return result;
 	}
