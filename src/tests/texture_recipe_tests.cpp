@@ -181,7 +181,8 @@ bool testEagerRecipeArrayErrors() {
 	const char* invalid[] = {
 		R"(import "core:texture_recipe" fn main():TextureArray { var layers:[1]Image=[create(1,1,4)]; return textureArray(layers[0:0]); })",
 		R"(import "core:texture_recipe" fn main():TextureArray { var layers:[2]Image=[create(1,1,4),create(2,1,4)]; return textureArray(layers); })",
-		R"(import "core:texture_recipe" fn main():TextureArray { var layers:[1]Image=[create(1,1,4)]; layers[0].handle=0; return textureArray(layers); })",
+		R"(import "core:texture_recipe" fn main():TextureArray { var layers:[1]Image=[create(1,1,4)]; layers[0].pixels=null; return textureArray(layers); })",
+		R"(import "core:texture_recipe" fn main():TextureArray { var layers:[1]Image=[create(1,1,4)]; layers[0].channels=2; return textureArray(layers); })",
 		R"(import "core:texture_recipe" fn main():TextureArray { var layers:[2]Image=[create(1,1,1),create(1,1,4)]; return textureArray(layers); })",
 		R"(import "core:texture_recipe" fn main():TextureArray { var image=create(1,1,4); var layers:[257]Image=undefined; for i in 0..257 { layers[i]=image; } return textureArray(layers); })"
 	};
@@ -223,6 +224,9 @@ bool testEagerRecipeErrors() {
 		"import \"core:texture_recipe\" fn main():Texture2D { return texture2D(create(0,1,4)); }",
 		"import \"core:texture_recipe\" fn main():Texture2D { return texture2D(create(20000,1,4)); }",
 		"import \"core:texture_recipe\" fn main():Texture2D { var i=create(1,1,4); var p=getPixel(i,1,0); return texture2D(i); }",
+		"import \"core:texture_recipe\" fn main():Texture2D { var i=create(2,2,4); var p=getPixel(i,0,2); return texture2D(i); }",
+		"import \"core:texture_recipe\" fn main():Texture2D { var i=create(2,2,4); var p=getPixel(i,1,5); return texture2D(i); }",
+		"import \"core:texture_recipe\" import \"core:vec4\" fn main():Texture2D { var i=create(2,2,4); setPixel(i,0,2,Vec4{1,1,1,1}); return texture2D(i); }",
 		"import \"core:texture_recipe\" fn main():Texture2D { var i=create(1,1,4); i.width=2; return texture2D(i); }",
 		"import \"core:texture_recipe\" fn main():Texture2D { var i=create(1,1,4); i.channels=0; return texture2D(i); }",
 		"import \"core:texture_recipe\" fn main():Texture2D { return texture2D(load(\"../outside.tga\")); }",
@@ -242,6 +246,50 @@ fn main():Texture2D { var image=create(1,1,4); map(image,fn(x:u32,y:u32,v:Vec4):
 	ASSERT_TRUE(f.run("import \"core:texture_recipe\" fn main():Texture2D { return texture2D(create(1,1,4)); }"));
 	return true;
 }
+bool testRecipeRegion() {
+	Fixture f;
+	// 4x3 one-channel image, pixel value = x + 10 * y. The 2x2 region at (1,1) shares its pixels.
+	ASSERT_TRUE(f.run(R"(
+import "core:texture_recipe"
+import "core:vec4"
+fn main() : Texture2D {
+    var image = create(4, 3, 1);
+    for y in 0..3 { for x in 0..4 { setPixel(image, x as u32, y as u32, Vec4 {(x + 10 * y) as f32, 0, 0, 1}); } }
+    var part = region(image, 1, 1, 2, 2);
+    // Reads go through the stride, writes reach the original.
+    if getPixel(part, 0, 0).x != 11 or getPixel(part, 1, 0).x != 12 or getPixel(part, 0, 1).x != 21 or getPixel(part, 1, 1).x != 22 {
+        panic("region read");
+    }
+    setPixel(part, 1, 1, Vec4 {99, 0, 0, 1});
+    if getPixel(image, 2, 2).x != 99 { panic("region write"); }
+    // Regions of regions.
+    var inner = region(part, 1, 0, 1, 2);
+    if getPixel(inner, 0, 0).x != 12 or getPixel(inner, 0, 1).x != 99 { panic("nested region"); }
+    return texture2D(part);
+}
+)"));
+	// The output is compacted to the region's own size.
+	ASSERT_EQ(1, f.result.layers.size());
+	const auto& image = f.result.layers[0];
+	ASSERT_EQ(2, image.w); ASSERT_EQ(2, image.h); ASSERT_EQ(1, image.channels);
+	ASSERT_EQ(4, image.pixels.size());
+	ASSERT_EQ(11.f, image.pixels[0]); ASSERT_EQ(12.f, image.pixels[1]);
+	ASSERT_EQ(21.f, image.pixels[2]); ASSERT_EQ(99.f, image.pixels[3]);
+
+	// Accesses outside a region panic, even where the parent image has pixels.
+	const char* invalid[] = {
+		"import \"core:texture_recipe\" fn main():Texture2D { var i=create(4,4,1); var r=region(i,1,1,2,2); var p=getPixel(r,2,0); return texture2D(r); }",
+		"import \"core:texture_recipe\" fn main():Texture2D { var i=create(4,4,1); var r=region(i,1,1,2,2); var p=getPixel(r,0,2); return texture2D(r); }",
+		"import \"core:texture_recipe\" fn main():Texture2D { var i=create(4,4,1); var r=region(i,3,0,2,2); return texture2D(r); }",
+		"import \"core:texture_recipe\" fn main():Texture2D { var i=create(4,4,1); var r=region(i,0,0,0,2); return texture2D(r); }"
+	};
+	for (const char* source : invalid) {
+		ASSERT_TRUE(!f.run(source, true));
+		ASSERT_TRUE(f.error.length() > 0);
+	}
+	return true;
+}
+
 bool testRecipeInPlace() {
 	Fixture f;
 	ASSERT_TRUE(f.run(R"(
@@ -259,7 +307,7 @@ fn main():Texture2D {
     const resized=resize(image,3,2);
     const cropped=crop(image,0,0,1,1);
     const scalar=split(image,0);
-    if resized.handle == image.handle or cropped.handle == image.handle or scalar.handle == image.handle {
+    if resized.id == image.id or cropped.id == image.id or scalar.id == image.id {
         panic("Layout-changing operations must allocate");
     }
     if image.width != 2 or image.height != 1 or image.channels != 4 {
@@ -476,7 +524,7 @@ fn main():TextureCube {
 	    R"(import "core:texture_recipe" fn main():TextureCube { var i=create(2,1,1); return textureCube([i,i,i,i,i,i]); })",
 	    R"(import "core:texture_recipe" fn main():TextureCube { var i=create(1,1,1); return textureCube([i,i,i,i,i,create(2,2,1)]); })",
 	    R"(import "core:texture_recipe" fn main():TextureCube { var i=create(1,1,1); return textureCube([i,i,i,i,i,create(1,1,4)]); })",
-	    R"(import "core:texture_recipe" fn main():TextureCube { var i=create(1,1,1); var bad=i; bad.handle=0; return textureCube([i,i,i,i,i,bad]); })"
+	    R"(import "core:texture_recipe" fn main():TextureCube { var i=create(1,1,1); var bad=i; bad.pixels=null; return textureCube([i,i,i,i,i,bad]); })"
 	};
 	for (const char* source : invalid) { ASSERT_TRUE(!f.run(source, true)); ASSERT_TRUE(f.result.layers.empty()); }
 	return true;
@@ -547,6 +595,7 @@ fn main() : Texture2D {
 void runTextureRecipeTests() {
 	RUN_TEST(testRecipeProceduralExamples);
 	RUN_TEST(testRecipeInPlace);
+	RUN_TEST(testRecipeRegion);
 	RUN_TEST(testRecipeSamplingAndTransforms);
 	RUN_TEST(testRecipeChannelsAndMath);
 	RUN_TEST(testRecipeShade);

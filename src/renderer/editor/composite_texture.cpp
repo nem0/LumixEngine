@@ -3535,12 +3535,14 @@ UniquePtr<CompositeTextureEditor> CompositeTextureEditor::open(const Path& path,
 
 namespace {
 
-struct ImageHandle {
-	u32 handle, width, height, channels;
+// Matches the script-side Image: pixels live in script memory (std:mem), allocated through Recipe::allocateBlock.
+struct ImageValue {
+	ex_slice pixels;
+	u32 width, height, channels, id, row_stride;
 };
 
 struct TextureOutput {
-	ImageHandle image;
+	ImageValue image;
 };
 
 struct TextureArrayOutput {
@@ -3548,14 +3550,14 @@ struct TextureArrayOutput {
 };
 
 struct TextureCubeOutput {
-	ImageHandle faces[6];
+	ImageValue faces[6];
 };
 
-static_assert(sizeof(ImageHandle) == 16 && sizeof(TextureOutput) == 16 && sizeof(Vec4) == 16);
+static_assert(sizeof(ImageValue) == 40 && sizeof(TextureOutput) == 40 && sizeof(Vec4) == 16);
 static_assert(sizeof(TextureArrayOutput) == 16);
-static_assert(sizeof(TextureCubeOutput) == 96);
+static_assert(sizeof(TextureCubeOutput) == 240);
 
-// Budget for build-local images (float pixels) and, separately, for the output built from them.
+// Budget for all script memory (build-local image pixels) and, separately, for the output built from it.
 static constexpr u64 MAX_RECIPE_BYTES = 256ull * 1024 * 1024;
 
 static bool finite(float value) {
@@ -3613,9 +3615,9 @@ struct Recipe {
 		, error(error)
 		, allocator(allocator)
 		, dependencies(dependencies)
-		, images(allocator)
 		, sources(allocator) {
 		ex_default_arena_create(&host.arena);
+		host.allocator = { this, &allocateBlock, &deallocateBlock };
 		host.print = [](void* userdata, ex_string_view message) { ((String*)userdata)->append(StringView(message.begin, message.length)); };
 		host.diagnostics_userdata = &error;
 	}
@@ -3626,6 +3628,45 @@ struct Recipe {
 		if (bytecode) ex_bytecode_destroy(bytecode);
 		if (module) ex_module_destroy(module);
 		ex_default_arena_destroy(&host.arena);
+		while (blocks) deallocateBlock(this, blocks + 1);
+	}
+
+	// Allocator of everything the runtime owns, including script memory (std:mem). Zeroed and budgeted; blocks the
+	// script never frees are released with the recipe.
+	struct Block {
+		Block* prev;
+		Block* next;
+		u64 size;
+		u64 padding;
+	};
+	static_assert(sizeof(Block) == 32);
+
+	static void* allocateBlock(void* user_data, size_t size, size_t align) {
+		Recipe& self = *(Recipe*)user_data;
+		// The alignment comes from the script; the header keeps results 16-byte aligned, so nothing stricter is supported.
+		if (align == 0 || (align & (align - 1)) != 0 || align > 16) return nullptr;
+		if (size > MAX_RECIPE_BYTES || self.live_bytes + size > MAX_RECIPE_BYTES) return nullptr;
+		Block* block = (Block*)self.allocator.allocate(sizeof(Block) + size, 16);
+		if (!block) return nullptr;
+		memset(block + 1, 0, size);
+		block->size = size;
+		block->prev = nullptr;
+		block->next = self.blocks;
+		if (self.blocks) self.blocks->prev = block;
+		self.blocks = block;
+		self.live_bytes += size;
+		return block + 1;
+	}
+
+	static void deallocateBlock(void* user_data, void* ptr) {
+		if (!ptr) return;
+		Recipe& self = *(Recipe*)user_data;
+		Block* block = (Block*)ptr - 1;
+		if (block->prev) block->prev->next = block->next;
+		else self.blocks = block->next;
+		if (block->next) block->next->prev = block->prev;
+		self.live_bytes -= block->size;
+		self.allocator.deallocate(block);
 	}
 
 	bool readFile(const Path& file, OutputMemoryStream& bytes) {
@@ -3703,38 +3744,42 @@ struct Recipe {
 		return acceptResult(output, size);
 	}
 
-	bool reserve(u32 width, u32 height, u32 channels, ex_call_frame frame) {
-		const u64 count = u64(width) * height;
+	static bool validImage(const ImageValue& image) {
+		return image.channels >= 1 && image.channels <= 4
+			&& image.width >= 1 && image.width <= 16384
+			&& image.height >= 1 && image.height <= 16384
+			&& image.row_stride >= image.width && image.row_stride <= 16384
+			&& image.pixels.data
+			&& image.pixels.length == (i64(image.height - 1) * image.row_stride + image.width) * image.channels;
+	}
+
+	// Copies the visible pixels of an image (rows may be padded to row_stride) into dense storage.
+	static void copyDense(const ImageValue& image, float* dst) {
+		const float* src = (const float*)image.pixels.data;
+		const size_t row_floats = size_t(image.width) * image.channels;
+		for (u32 y = 0; y < image.height; ++y) {
+			memcpy(dst + y * row_floats, src + size_t(y) * image.row_stride * image.channels, row_floats * sizeof(float));
+		}
+	}
+
+	// Allocates zeroed script memory for a new image.
+	static float* createImage(u32 width, u32 height, u32 channels, ImageValue& out, ex_call_frame frame) {
 		if (!width || !height || width > 16384 || height > 16384) {
 			panic(frame, "Texture recipe image dimensions exceeded");
-			return false;
+			return nullptr;
 		}
 		if (channels < 1 || channels > 4) {
 			panic(frame, "Texture recipe image channels exceeded");
-			return false;
+			return nullptr;
 		}
-		const u64 bytes = count * channels * sizeof(float);
-		if (bytes > MAX_RECIPE_BYTES
-			|| bytes + generated_bytes > MAX_RECIPE_BYTES
-			|| images.size() >= 256)
-		{
+		const u64 count = u64(width) * height * channels;
+		float* pixels = (float*)allocateBlock(current_recipe, count * sizeof(float), alignof(float));
+		if (!pixels) {
 			panic(frame, "Texture recipe image dimensions/channels or allocation budget exceeded");
-			return false;
+			return nullptr;
 		}
-		generated_bytes += bytes;
-		return true;
-	}
-
-	CompositeTexture::Image* lookup(ImageHandle handle) {
-		if (!handle.handle || handle.handle > (u32)images.size()) return nullptr;
-		auto& image = images[handle.handle - 1];
-		return image.w == handle.width && image.h == handle.height && image.channels == handle.channels ? &image : nullptr;
-	}
-
-	void store(CompositeTexture::Image&& image, ex_call_frame frame) {
-		images.push(static_cast<CompositeTexture::Image&&>(image));
-		const auto& stored = images.back();
-		EX_RESULT(frame, (ImageHandle{(u32)images.size(), stored.w, stored.h, stored.channels}));
+		out = { { (u8*)pixels, (i64)count }, width, height, channels, 0, width };
+		return pixels;
 	}
 
 	static void load(ex_runtime*, ex_call_frame frame) {
@@ -3758,78 +3803,38 @@ struct Recipe {
 			return;
 		}
 
-		if (!self.reserve(image.w, image.h, image.channels, frame)) return;
-		self.store(static_cast<CompositeTexture::Image&&>(image), frame);
-	}
-
-	static void create(ex_runtime*, ex_call_frame frame) {
-		Recipe& self = *current_recipe;
-		EX_ARG(frame, u32, width);
-		EX_ARG(frame, u32, height);
-		EX_ARG(frame, u32, channels);
-		if (!self.reserve(width, height, channels, frame)) return;
-
-		CompositeTexture::Image image(width, height, channels, self.allocator);
-		image.fill(Vec4(0));
-		self.store(static_cast<CompositeTexture::Image&&>(image), frame);
+		ImageValue result;
+		float* pixels = createImage(image.w, image.h, image.channels, result, frame);
+		if (!pixels) return;
+		memcpy(pixels, image.pixels.data(), image.pixels.byte_size());
+		EX_RESULT(frame, result);
 	}
 
 	static void resize(ex_runtime*, ex_call_frame frame) {
 		Recipe& self = *current_recipe;
-		EX_ARG(frame, ImageHandle, handle);
+		EX_ARG(frame, ImageValue, source);
 		EX_ARG(frame, u32, width);
 		EX_ARG(frame, u32, height);
-		const auto* source = self.lookup(handle);
-		if (!source) {
-			panic(frame, "Invalid image handle");
+		if (!validImage(source)) {
+			panic(frame, "Invalid image");
 			return;
 		}
 
-		if (!self.reserve(width, height, source->channels, frame)) return;
+		// Reserve the output first so dimensions and budget are checked before anything large is allocated.
+		ImageValue result;
+		float* pixels = createImage(width, height, source.channels, result, frame);
+		if (!pixels) return;
 
+		CompositeTexture::Image input(source.width, source.height, source.channels, self.allocator);
+		copyDense(source, input.pixels.data());
 		CompositeTexture::Image image(self.allocator);
-		if (!image.resize(*source, width, height)) {
+		if (!image.resize(input, width, height) || u64(image.pixels.byte_size()) != u64(result.pixels.length) * sizeof(float)) {
 			panic(frame, "Could not resize image");
 			return;
 		}
 
-		self.store(static_cast<CompositeTexture::Image&&>(image), frame);
-	}
-
-	static void getPixel(ex_runtime*, ex_call_frame frame) {
-		EX_ARG(frame, ImageHandle, handle);
-		EX_ARG(frame, u32, x);
-		EX_ARG(frame, u32, y);
-		const auto* image = current_recipe->lookup(handle);
-		if (!image || x >= image->w || y >= image->h) {
-			panic(frame, "Invalid image handle or pixel coordinates");
-			return;
-		}
-
-		Vec4 value(0, 0, 0, 1);
-		memcpy(&value, &image->pixels[(x + y * image->w) * image->channels], image->channels * sizeof(float));
-		EX_RESULT(frame, value);
-	}
-
-	static void setPixel(ex_runtime*, ex_call_frame frame) {
-		EX_ARG(frame, ImageHandle, handle);
-		EX_ARG(frame, u32, x);
-		EX_ARG(frame, u32, y);
-		EX_ARG(frame, Vec4, value);
-		auto* image = current_recipe->lookup(handle);
-		if (!image || x >= image->w || y >= image->h) {
-			panic(frame, "Invalid image handle or pixel coordinates");
-			return;
-		}
-
-		for (u32 i = 0; i < image->channels; ++i) {
-			if (!finite(value[i])) {
-				panic(frame, "Pixel value must be finite");
-				return;
-			}
-		}
-
-		image->setPixel(x, y, value);
+		memcpy(pixels, image.pixels.data(), image.pixels.byte_size());
+		EX_RESULT(frame, result);
 	}
 
 	ex_native_fn resolveNative(ex_native_function_desc function) {
@@ -3839,11 +3844,8 @@ struct Recipe {
 			u32 args, result;
 		};
 		const Native natives[] = {
-			{"load", &load, 16, 16}, 
-			{"resize", &resize, 24, 16}, 
-			{"create", &create, 12, 16}, 
-			{"getPixel", &getPixel, 24, 16}, 
-			{"setPixel", &setPixel, 40, 0}
+			{"recipeLoad", &load, 16, 40},
+			{"recipeResize", &resize, 48, 40}
 		};
 		if (StringView(function.unit_path.begin, function.unit_path.length) == "core:texture_recipe") {
 			for (const Native& native : natives) {
@@ -3854,19 +3856,25 @@ struct Recipe {
 		return nullptr;
 	}
 
-	// Moves a validated image into the result; a handle that was already emitted is copied from its layer.
-	// `used[i]` is the handle of `result.layers[i]` (result.layers starts empty).
-	void appendLayer(ImageHandle handle, Array<u32>& used) {
-		for (u32 i = 0; i < (u32)used.size(); ++i) {
-			if (used[i] != handle.handle) continue;
-			CompositeTexture::Image& layer = result.layers.emplace(handle.width, handle.height, handle.channels, allocator);
-			const CompositeTexture::Image& source = result.layers[i];
-			memcpy(layer.pixels.data(), source.pixels.data(), source.pixels.byte_size());
-			used.push(handle.handle);
-			return;
+	bool finitePixels(const ImageValue& image) {
+		const float* pixels = (const float*)image.pixels.data;
+		const size_t row_floats = size_t(image.width) * image.channels;
+		for (u32 y = 0; y < image.height; ++y) {
+			const float* row = pixels + size_t(y) * image.row_stride * image.channels;
+			for (size_t i = 0; i < row_floats; ++i) {
+				if (!finite(row[i])) {
+					error.append("Recipe produced non-finite pixels");
+					return false;
+				}
+			}
 		}
-		used.push(handle.handle);
-		result.layers.push(static_cast<CompositeTexture::Image&&>(*lookup(handle)));
+		return true;
+	}
+
+	// Copies a validated image from script memory into the result.
+	void appendLayer(const ImageValue& image) {
+		CompositeTexture::Image& layer = result.layers.emplace(image.width, image.height, image.channels, allocator);
+		copyDense(image, layer.pixels.data());
 	}
 
 	bool acceptResult(const void* data, u32 size) {
@@ -3876,35 +3884,26 @@ struct Recipe {
 		if (data && name == "core:texture_recipe.TextureCube" && size == sizeof(TextureCubeOutput)) {
 			TextureCubeOutput output;
 			memcpy(&output, data, sizeof(output));
-			const auto* first = lookup(output.faces[0]);
-			if (!first || first->w != first->h) {
+			const ImageValue& first = output.faces[0];
+			if (!validImage(first) || first.width != first.height) {
 				error.append("Cubemap faces must be valid square images");
 				return false;
 			}
 
-			if (u64(first->w) * first->h * first->channels * 6 * sizeof(float) > MAX_RECIPE_BYTES) {
+			if (u64(first.width) * first.height * first.channels * 6 * sizeof(float) > MAX_RECIPE_BYTES) {
 				error.append("Cubemap output pixel budget exceeded");
 				return false;
 			}
 
-			for (const ImageHandle face : output.faces) {
-				const auto* image = lookup(face);
-				if (!image || image->w != first->w || image->h != first->h || image->channels != first->channels) {
+			for (const ImageValue& face : output.faces) {
+				if (!validImage(face) || face.width != first.width || face.height != first.height || face.channels != first.channels) {
 					error.append("Cubemap faces must have matching dimensions and channel counts");
 					return false;
 				}
-
-				for (float value : image->pixels) {
-					if (!finite(value)) {
-						error.append("Recipe produced non-finite pixels");
-						return false;
-					}
-				}
-
+				if (!finitePixels(face)) return false;
 			}
 
-			Array<u32> used(allocator);
-			for (const ImageHandle face : output.faces) appendLayer(face, used);
+			for (const ImageValue& face : output.faces) appendLayer(face);
 			result.is_cubemap = true;
 			return true;
 		}
@@ -3918,26 +3917,25 @@ struct Recipe {
 			}
 
 			u32 width = 0, height = 0, channels = 0;
-			for (u32 i = 0; i < output.layers.length; ++i) {
-				ImageHandle handle;
-				memcpy(&handle, output.layers.data + i * sizeof(handle), sizeof(handle));
-				const auto* image = lookup(handle);
-				if (!image) {
-					error.append("Invalid texture array image handle");
+			for (i64 i = 0; i < output.layers.length; ++i) {
+				ImageValue image;
+				memcpy(&image, output.layers.data + i * sizeof(image), sizeof(image));
+				if (!validImage(image)) {
+					error.append("Invalid texture array image");
 					return false;
 				}
 
 				if (i == 0) {
-					width = image->w;
-					height = image->h;
-					channels = image->channels;
+					width = image.width;
+					height = image.height;
+					channels = image.channels;
 				}
-				if (image->w != width || image->h != height) {
+				if (image.width != width || image.height != height) {
 					error.append("Texture array layers must have matching dimensions");
 					return false;
 				}
 
-				if (image->channels != channels) {
+				if (image.channels != channels) {
 					error.append("Texture array layers must have matching channel counts");
 					return false;
 				}
@@ -3947,20 +3945,13 @@ struct Recipe {
 					return false;
 				}
 
-				for (float value : image->pixels) {
-					if (!finite(value)) {
-						error.append("Recipe produced non-finite pixels");
-						return false;
-					}
-				}
-
+				if (!finitePixels(image)) return false;
 			}
 
-			Array<u32> used(allocator);
-			for (u32 i = 0; i < output.layers.length; ++i) {
-				ImageHandle handle;
-				memcpy(&handle, output.layers.data + i * sizeof(handle), sizeof(handle));
-				appendLayer(handle, used);
+			for (i64 i = 0; i < output.layers.length; ++i) {
+				ImageValue image;
+				memcpy(&image, output.layers.data + i * sizeof(image), sizeof(image));
+				appendLayer(image);
 			}
 
 			result.is_cubemap = false;
@@ -3974,20 +3965,13 @@ struct Recipe {
 
 		TextureOutput output;
 		memcpy(&output, data, sizeof(output));
-		auto* image = lookup(output.image);
-		if (!image) {
+		if (!validImage(output.image)) {
 			error.append("Invalid output image");
 			return false;
 		}
 
-		for (float value : image->pixels) {
-			if (!finite(value)) {
-				error.append("Recipe produced non-finite pixels");
-				return false;
-			}
-		}
-
-		result.layers.push(static_cast<CompositeTexture::Image&&>(*image));
+		if (!finitePixels(output.image)) return false;
+		appendLayer(output.image);
 		result.is_cubemap = false;
 		return true;
 	}
@@ -3998,14 +3982,14 @@ struct Recipe {
 	String& error;
 	IAllocator& allocator;
 	AssetCompiler* dependencies;
-	Array<CompositeTexture::Image> images;
 	Array<OutputMemoryStream> sources;
 	ex_host host = {};
 	ex_module* module = nullptr;
 	ex_bytecode* bytecode = nullptr;
 	ex_runtime* runtime = nullptr;
 	ex_task* task = nullptr;
-	u64 generated_bytes = 0;
+	Block* blocks = nullptr;
+	u64 live_bytes = 0;
 };
 } // namespace
 

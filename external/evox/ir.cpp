@@ -490,7 +490,8 @@ struct IRBuilder {
 	}
 
 	// Inlines a call to a small straight-line function (see scanInlineable) as a block expression.
-	ExIrOp* buildInlineBody(FunctionExpression& function, Expression* const* args, i32 arg_count) {
+	ExIrOp* buildInlineBody(FunctionExpression& function, const ExpArray<Expression*>& args) {
+		const i32 arg_count = (i32)args.size();
 		u32 return_count = 0;
 		u32 statement_count = 0;
 		if (!function.resolved_type || !canInline(function, return_count, statement_count)) return nullptr;
@@ -1026,7 +1027,7 @@ struct IRBuilder {
 					const bool is_ufcs = receiver_type && (receiver_type->kind == ResolvedTypeKind::STRUCT || receiver_type->kind == ResolvedTypeKind::ENUM || receiver_type->kind == ResolvedTypeKind::POINTER);
 					// UFCS calls pass the receiver as an implicit first argument, which inlining doesn't handle; module-qualified calls (`math.min`) are plain calls.
 					if (do_inline && !is_ufcs) {
-						if (ExIrOp* inlined = buildInlineBody(*function, call.args.data(), call.args.size())) return *inlined;
+						if (ExIrOp* inlined = buildInlineBody(*function, call.args)) return *inlined;
 					}
 					auto& op = alloc<ExOpCallDirect>();
 					op.function = function;
@@ -1293,8 +1294,9 @@ struct IRBuilder {
 			case Expression::UNARY: {
 				auto& unary = static_cast<UnaryExpression&>(expr);
 				if (do_inline && unary.operator_fn) {
-					Expression* args[] = {unary.expression};
-					if (ExIrOp* inlined = buildInlineBody(*unary.operator_fn, args, 1)) return *inlined;
+					ExpArray<Expression*> args(host.arena);
+					args.push(unary.expression);
+					if (ExIrOp* inlined = buildInlineBody(*unary.operator_fn, args)) return *inlined;
 				}
 				ExIrOp& operand = buildExpressionIR(*unary.expression, true);
 				if (unary.operator_fn) {
@@ -1337,8 +1339,10 @@ struct IRBuilder {
 			case Expression::BINARY: {
 				auto& be = static_cast<BinaryExpression&>(expr);
 				if (do_inline && be.operator_fn) {
-					Expression* args[] = {be.lhs, be.rhs};
-					if (ExIrOp* inlined = buildInlineBody(*be.operator_fn, args, 2)) return *inlined;
+					ExpArray<Expression*> args(host.arena);
+					args.push(be.lhs);
+					args.push(be.rhs);
+					if (ExIrOp* inlined = buildInlineBody(*be.operator_fn, args)) return *inlined;
 				}
 				ExIrOp& lhs = buildExpressionIR(*be.lhs, true);
 				if (be.op == Token::IS) {
