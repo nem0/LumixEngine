@@ -515,6 +515,7 @@ struct IRBuilder {
 			}
 			params[i] = &allocAlloca(&type, {}, &buildImplicitConversionIR(*args[i], type));
 			block_expr.block->ops.push(params[i]);
+			++block_expr.param_ops;
 		}
 
 		// The body sees its parameters and the globals, never the caller's locals.
@@ -4426,10 +4427,18 @@ struct BytecodeCompiler {
 			expr.result_slot->stack_sp = dst->dst;
 		}
 		temp_base = entry_stack_top;
-		emitBlock(*expr.block);
+		for (u32 i = 0; i < expr.param_ops; ++i) {
+			stack_top = temp_base;
+			emit(*expr.block->ops[i], nullptr);
+			if (stack_top > stack_high_water) stack_high_water = stack_top;
+			temp_base = stack_top;
+		}
+		// The parameters' temporaries are still referenced by the result expression (a call passing the slice on).
+		const u32 params_top = temp_base;
+		emitBlock(*expr.block, expr.param_ops);
 		patchJumps(*expr.block);
 		temp_base = saved_temp_base;
-		stack_top = entry_stack_top;
+		stack_top = expr.result ? params_top : entry_stack_top;
 		if (!expr.result) return entry_stack_top;
 		if (dst && expr.dst_is_fresh && expr.result->kind == ExIrOpKind::AGGREGATE_INIT) {
 			return emitAggregateInit(static_cast<ExOpAggregateInit&>(*expr.result), dst);
@@ -4677,8 +4686,9 @@ struct BytecodeCompiler {
 		}
 	}
 
-	void emitBlock(ExIrBlockData& block) {
-		for (ExIrOp* op : block.ops) {
+	void emitBlock(ExIrBlockData& block, u32 first_op = 0) {
+		for (i32 i = (i32)first_op; i < block.ops.size(); ++i) {
+			ExIrOp* op = block.ops[i];
 			stack_top = temp_base;
 			emit(*op, nullptr);
 			if (stack_top > stack_high_water) stack_high_water = stack_top;

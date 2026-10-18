@@ -477,3 +477,23 @@ TEST(ir_in_place_destinations) {
 	for (bool optimize : {false, true}) EXPECT_EQ(312 * 1000000 + 15 * 10000 + 10 * 100 + 7 + 123, inlineRun(source, EX_CALL_RESULT_OK, optimize));
 	return true;
 }
+
+// An inlined parameter that holds a slice of a temporary array (an array literal argument) must keep that array
+// alive for the whole inlined body: the body's own statements and the calls it makes must not overwrite it.
+TEST(ir_inline_slice_of_temporary_array) {
+	const char* source = R"(
+		fn inner(pts : []const f32) : f32 {
+			var big : [64]f32 = undefined;
+			for i in 0..64 { big[i] = 100.0; }
+			var s : f32 = 0.0;
+			for i in 0..(pts.length as i32) { s += pts[i]; }
+			return s;
+		}
+		fn wrap(pts : []const f32) : f32 { return inner(pts); }
+		fn main() : i32 {
+			return wrap([1.0, 2.0, 3.0]) as i32;
+		}
+	)";
+	for (bool optimize : {false, true}) EXPECT_EQ(6, inlineRun(source, EX_CALL_RESULT_OK, optimize));
+	return true;
+}

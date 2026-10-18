@@ -189,6 +189,9 @@ struct ExOpBlockExpr : ExIrOp {
 	ExIrOp* result = nullptr;
 	// Slot the early returns store the value into (null when the value is the `result` expression).
 	ExOpAlloca* result_slot = nullptr;
+	// The first `param_ops` ops initialize the parameters. Their values may point at temporaries (a slice of an array
+	// literal, the address of a materialized value), which must stay live for the whole body.
+	u32 param_ops = 0;
 	// Set by the emitter when the expression initializes a new variable: nothing else reads that slot, so the
 	// value can be built in place.
 	bool dst_is_fresh = false;
