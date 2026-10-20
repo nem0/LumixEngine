@@ -2994,6 +2994,8 @@ struct StudioAppImpl final : StudioApp {
 		u64 size;
 
 		char path[MAX_PATH];
+		// original source file of a compiled resource, empty otherwise
+		char source[MAX_PATH] = {};
 	};
 
 	// every registered resource which has a compiled file, they were compiled before, see guiExportData
@@ -3010,6 +3012,7 @@ struct StudioAppImpl final : StudioApp {
 			if (!m_engine->getFileSystem().fileExists(baked_path)) continue;
 			ExportFileInfo& out_info = infos.emplace(hash);
 			copyString(Span(out_info.path), baked_path);
+			copyString(Span(out_info.source), ri.path.c_str());
 			out_info.hash = hash;
 			out_info.size = os::getFileSize(m_engine->getFileSystem().getFullPath(baked_path));
 			out_info.offset = ~0UL;
@@ -3201,6 +3204,24 @@ struct StudioAppImpl final : StudioApp {
 				logError("Could not write ", dest);
 				return false;
 			}
+
+			StaticString<MAX_PATH> list_dest(m_export.dest_dir, "pak_list.txt");
+			os::OutputFile list_file;
+			if (!list_file.open(list_dest)) {
+				logError("Could not create ", list_dest);
+				return false;
+			}
+			for (const ExportFileInfo& info : infos) {
+				char size_str[32];
+				toCString(info.size, Span(size_str));
+				const StaticString<MAX_PATH * 2 + 64> line(info.path, "\t", size_str, info.source[0] ? "\t" : "", info.source, "\n");
+				if (!list_file.write(line.data, stringLength(line.data))) {
+					logError("Could not write ", list_dest);
+					list_file.close();
+					return false;
+				}
+			}
+			list_file.close();
 		}
 		else {
 			for (auto& info : infos) {
