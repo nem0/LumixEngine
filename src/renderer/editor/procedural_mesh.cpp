@@ -494,11 +494,6 @@ struct Plugin final : ProceduralMeshEditor, EditorAssetPlugin {
 			else {
 				if (ImGui::Checkbox("Wireframe", &m_wireframe)) setWireframe();
 				ImGui::SameLine();
-				if (ImGui::Checkbox("Show ground", &m_show_ground)) {
-					auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(types::model_instance));
-					render_module->enableModelInstance(m_viewer.m_ground, m_show_ground);
-				}
-				ImGui::SameLine();
 				if (ImGui::Button("Reset camera")) m_viewer.resetCamera(*m_resource);
 				// recompiling the recipe replaces the materials, so apply the checkbox again
 				if (m_resource->getMeshCount() > 0 && m_resource->getMeshMaterial(0).material != m_wireframe_material) setWireframe();
@@ -715,7 +710,6 @@ struct Plugin final : ProceduralMeshEditor, EditorAssetPlugin {
 		UniquePtr<CodeEditor> m_editor;
 		const Material* m_wireframe_material = nullptr;
 		bool m_wireframe = false;
-		bool m_show_ground = true;
 		ExternalFileChangeDialog m_external_change;
 		bool m_init = false;
 	};

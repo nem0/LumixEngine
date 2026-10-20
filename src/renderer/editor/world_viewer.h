@@ -20,6 +20,8 @@ struct LUMIX_RENDERER_API WorldViewer {
 	void setModelPath(const Path& path);
 	void setAnimatorPath(const Path& path);
 
+	static inline bool s_show_ground = true; // global setting, shared by all viewers
+
 	StudioApp& m_app;
 	World* m_world;
 	EntityRef m_ground;

@@ -136,6 +136,7 @@ void WorldViewer::resetCamera(const Model& model) {
 void WorldViewer::gui() {
 	auto* render_module = static_cast<RenderModule*>(m_world->getModule(types::model_instance));
 	ASSERT(render_module);
+	render_module->enableModelInstance(m_ground, s_show_ground);
 
 	ImVec2 image_size = ImGui::GetContentRegionAvail();
 	image_size.y = maximum(200.f, image_size.y);

@@ -2540,11 +2540,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			ImGui::SameLine();
 			ImGui::Checkbox("Show skeleton", &m_show_skeleton);
 			ImGui::SameLine();
-			if (ImGui::Checkbox("Show ground", &m_show_ground)) {
-				auto* render_module = static_cast<RenderModule*>(m_viewer.m_world->getModule(types::model_instance));
-				render_module->enableModelInstance(m_viewer.m_ground, m_show_ground);
-			}
-			ImGui::SameLine();
 			if (ImGui::Button("Save preview")) {
 				m_resource->incRefCount();
 				m_plugin.renderTile(m_resource, nullptr, &m_viewer.m_viewport);
@@ -2585,7 +2580,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		i32 m_preview_lod = 0;
 		bool m_has_meshes = true;
 		bool m_show_skeleton = true;
-		bool m_show_ground = true;
 		FileSystem::AsyncHandle m_fbx_async_handle = FileSystem::AsyncHandle::invalid();
 		ImpostorTexturesContextImpl m_impostor_texture_context;
 	};
@@ -5697,6 +5691,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		Delegate<void()> vsync_delegate;
 		vsync_delegate.bind<&StudioAppPlugin::onVsyncSet>(this);
 		m_app.getSettings().registerOption("vsync", &m_vsync, "General", "Vsync", &vsync_delegate);
+		m_app.getSettings().registerOption("preview_show_ground", &WorldViewer::s_show_ground, "World preview", "Show ground");
 	}
 
 	void onVsyncSet() {

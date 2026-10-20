@@ -295,12 +295,6 @@ struct ParticleScriptEditorWindow : AssetEditorWindow {
 				}
 
 				ImGui::SameLine();
-				if (ImGuiEx::IconButton(ICON_FA_EYE, "Toggle ground")) {
-					m_show_ground = !m_show_ground;
-					module->enableModelInstance(m_viewer.m_ground, m_show_ground);
-				};
-
-				ImGui::SameLine();
 				if (ImGui::Button(ICON_FA_UNDO_ALT " Reset")) system.reset();
 				u32 num_particles = 0;
 				for (ParticleSystem::Emitter& emitter : system.getEmitters()) {
@@ -515,7 +509,6 @@ struct ParticleScriptEditorWindow : AssetEditorWindow {
 	Path m_path;
 	EntityRef m_preview_entity;
 	bool m_play = true;
-	bool m_show_ground = true;
 	bool m_show_info = false;
 	Array<String> m_autocomplete_list;
 	u32 m_autocomplete_selection_idx = 0;
