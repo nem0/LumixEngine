@@ -69,7 +69,19 @@ struct ModelMeta {
 		return "none";
 	}
 
-	ModelMeta(IAllocator& allocator) : clips(allocator), root_motion_bone(allocator) {}
+	struct MaterialRemap {
+		StaticString<128> name; // material name in the source file
+		Path path; // material used instead of the generated `<name>.mat`
+	};
+
+	ModelMeta(IAllocator& allocator) : clips(allocator), material_remap(allocator), root_motion_bone(allocator) {}
+
+	const MaterialRemap* findMaterialRemap(StringView name) const {
+		for (const MaterialRemap& r : material_remap) {
+			if (!r.path.isEmpty() && equalStrings(StringView(r.name.data), name)) return &r;
+		}
+		return nullptr;
+	}
 
 	void serialize(OutputMemoryStream& blob, const Path& path) {
 		if (physics != Physics::NONE) blob << "\nphysics = \"" << toString(physics) << "\"";
@@ -134,6 +146,17 @@ struct ModelMeta {
 			blob << "\n]";
 		}
 
+		if (!material_remap.empty()) {
+			blob << "\nmaterial_remap = [";
+			for (const MaterialRemap& r : material_remap) {
+				blob << "\n\n{";
+				blob << "\n\n\nname = \"" << r.name << "\",";
+				blob << "\n\n\npath = \"" << r.path << "\"";
+				blob << "\n\n},";
+			}
+			blob << "\n]";
+		}
+
 		if (autolod_mask & 1) blob << "\nautolod0 = " << autolod_coefs[0];
 		if (autolod_mask & 2) blob << "\nautolod1 = " << autolod_coefs[1];
 		if (autolod_mask & 4) blob << "\nautolod2 = " << autolod_coefs[2];
@@ -151,7 +174,7 @@ struct ModelMeta {
 		autolod_coefs[1] = -1;
 		autolod_coefs[2] = -1;
 		autolod_coefs[3] = -1;
-		StringView tmp_root_motion_bone, tmp_skeleton, tmp_skeleton_rel, tmp_physics, tmp_origin, tmp_clips;
+		StringView tmp_root_motion_bone, tmp_skeleton, tmp_skeleton_rel, tmp_physics, tmp_origin, tmp_clips, tmp_material_remap;
 		const ParseItemDesc descs[] = {
 			{ "root_motion_flags", (i32*)&root_motion_flags },
 			{ "use_mikktspace", &use_mikktspace },
@@ -190,6 +213,7 @@ struct ModelMeta {
 			{ "physics", &tmp_physics },
 			{ "origin", &tmp_origin },
 			{ "clips", &tmp_clips, true },
+			{ "material_remap", &tmp_material_remap, true },
 		};
 		if (!parse(content, path.c_str(), descs)) return;
 
@@ -217,7 +241,7 @@ struct ModelMeta {
 			return;
 		}
 
-		clips.clear();	
+		clips.clear();
 		if (!tmp_clips.empty()) {
 			Tokenizer t(StringView(content.data, tmp_clips.end()), path.c_str());
 			t.cursor = tmp_clips.data;
@@ -264,7 +288,64 @@ struct ModelMeta {
 						return;
 					}
 				}
-				
+
+				token = t.nextToken();
+				if (!token) return;
+				if (token == "]") break;
+				if (token != ",") {
+					logError(t.filename, "(", t.getLine(), "): expected ']' or ',', got ", token.value);
+					t.logErrorPosition(token.value.data);
+					return;
+				}
+			}
+		}
+
+		material_remap.clear();
+		if (!tmp_material_remap.empty()) {
+			Tokenizer t(StringView(content.data, tmp_material_remap.end()), path.c_str());
+			t.cursor = tmp_material_remap.data;
+			Tokenizer::Token token = t.nextToken();
+			ASSERT(token && token.value[0] == '[');
+			for (;;) {
+				token = t.nextToken();
+				if (!token) return;
+				if (token == "]") break;
+				if (token != "{") {
+					logError(t.filename, "(", t.getLine(), "): expected ']' or '{', got ", token.value);
+					t.logErrorPosition(token.value.data);
+					return;
+				}
+
+				MaterialRemap& r = material_remap.emplace();
+				for (;;) {
+					token = t.nextToken();
+					if (!token) return;
+					if (token == "}") break;
+					if (!t.consume("=")) return;
+					StringView value;
+					if (token == "name") {
+						if (!t.consume(value)) return;
+						r.name = value;
+					}
+					else if (token == "path") {
+						if (!t.consume(value)) return;
+						r.path = Path(value);
+					}
+					else {
+						logError(t.filename, "(", t.getLine(), "): unknown token ", token.value);
+						t.logErrorPosition(token.value.data);
+						return;
+					}
+					token = t.nextToken();
+					if (!token) return;
+					if (token == "}") break;
+					if (token != ",") {
+						logError(t.filename, "(", t.getLine(), "): expected '}' or ',', got ", token.value);
+						t.logErrorPosition(token.value.data);
+						return;
+					}
+				}
+
 				token = t.nextToken();
 				if (!token) return;
 				if (token == "]") break;
@@ -309,6 +390,7 @@ struct ModelMeta {
 	Animation::Flags root_motion_flags = Animation::Flags::NONE;
 	
 	Array<Clip> clips;
+	Array<MaterialRemap> material_remap;
 	String root_motion_bone;
 
 	bool bake_impostor_normals = false;

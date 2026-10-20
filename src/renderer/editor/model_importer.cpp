@@ -638,6 +638,11 @@ bool ModelImporter::write(const Path& src, const ModelMeta& meta) {
 	return true;
 }
 
+static Path getMaterialPath(StringView dir, const String& name, const ModelMeta& meta) {
+	if (const ModelMeta::MaterialRemap* remap = meta.findMaterialRemap(name.c_str())) return remap->path;
+	return Path(dir, name.c_str(), ".mat");
+}
+
 bool ModelImporter::writeMaterials(const Path& src, const ModelMeta& meta, bool force) {
 	PROFILE_FUNCTION()
 
@@ -646,6 +651,7 @@ bool ModelImporter::writeMaterials(const Path& src, const ModelMeta& meta, bool 
 	StringView dir = Path::getDir(src);
 	OutputMemoryStream blob(m_app.getAllocator());
 	for (const ImportMaterial& material : m_materials) {
+		if (meta.findMaterialRemap(material.name.c_str())) continue;
 		const Path mat_src(dir, material.name, ".mat");
 		if (filesystem.fileExists(mat_src) && !force) continue;
 
@@ -1203,7 +1209,7 @@ void ModelImporter::writeSubmesh(const Path& src, i32 geom_idx, const ModelMeta&
 	}
 
 	const ImportMaterial& material = m_materials[geom.material_index];
-	const Path mat_path(src_info.dir, material.name, ".mat");
+	const Path mat_path = getMaterialPath(src_info.dir, material.name, meta);
 	const i32 len = mat_path.length();
 	write(len);
 	write(mat_path.c_str(), len);
@@ -1237,7 +1243,7 @@ void ModelImporter::writeMeshes(const Path& src, const ModelMeta& meta) {
 		}
 
 		const ImportMaterial& material = m_materials[geom.material_index];
-		const Path mat_path(src_info.dir, material.name, ".mat");
+		const Path mat_path = getMaterialPath(src_info.dir, material.name, meta);
 		const i32 len = mat_path.length();
 		write(len);
 		write(mat_path.c_str(), len);

@@ -2362,6 +2362,59 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			}
 		}
 
+		void materialRemapGUI() {
+			if (!ImGui::CollapsingHeader("Material remap")) return;
+			if (ImGui::BeginTable("material_remap", 3, ImGuiTableFlags_BordersOuter)) {
+				ImGui::TableSetupColumn("Source material");
+				ImGui::TableSetupColumn("Use material");
+				ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize);
+				ImGui::TableHeadersRow();
+
+				for (ModelMeta::MaterialRemap& r : m_meta.material_remap) {
+					ImGui::TableNextColumn();
+					ImGui::PushID(&r);
+					ImGui::SetNextItemWidth(-1);
+					if (ImGui::BeginCombo("##name", r.name.data)) {
+						// source materials are the meshes' current materials, named after their .mat files
+						if (m_resource->isReady()) {
+							for (i32 i = 0; i < m_resource->getMeshCount(); ++i) {
+								const StringView name = Path::getBasename(m_resource->getMeshMaterial(i).material->getPath());
+								bool is_duplicate = false;
+								for (i32 j = 0; j < i; ++j) {
+									is_duplicate = is_duplicate || equalStrings(name, Path::getBasename(m_resource->getMeshMaterial(j).material->getPath()));
+								}
+								if (is_duplicate) continue;
+								char name_str[128];
+								copyString(name_str, name);
+								if (ImGui::Selectable(name_str, equalStrings(name_str, r.name.data))) {
+									r.name = name_str;
+									saveUndo(true);
+								}
+							}
+						}
+						ImGui::EndCombo();
+					}
+					ImGui::TableNextColumn();
+					saveUndo(m_app.getAssetBrowser().resourceInput("##path", r.path, Material::TYPE, -1));
+					ImGui::TableNextColumn();
+					if (ImGuiEx::IconButton(ICON_FA_TRASH, "Delete")) {
+						m_meta.material_remap.erase(u32(&r - m_meta.material_remap.begin()));
+						saveUndo(true);
+						ImGui::PopID();
+						break;
+					}
+					ImGui::PopID();
+				}
+
+				ImGui::TableNextColumn();
+				if (ImGuiEx::IconButton(ICON_FA_PLUS_CIRCLE, "Add remap")) {
+					m_meta.material_remap.emplace();
+					saveUndo(true);
+				}
+				ImGui::EndTable();
+			}
+		}
+
 		void infoGUI() {
 			if (!m_resource->isReady()) {
 				ImGui::TextUnformatted("Failed to load.");
@@ -2501,6 +2554,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 			if (ImGui::BeginChild("leftpane")) {
 				importGUI();
+				materialRemapGUI();
 				if (ImGui::CollapsingHeader("Info")) infoGUI();
 			}
 			ImGui::EndChild();
