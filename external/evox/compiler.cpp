@@ -320,6 +320,42 @@ static u32 writeComptimeNumeric(u8* dst, const u8* src_bytes, ResolvedTypeKind s
 	}
 }
 
+// Whether an all-zero value of `type` is valid. A non-null `*T` can never be null,
+// so any type that contains one by value cannot be zero-initialized. Nullable
+// pointers, slices, and function values are fine (a zero function value traps when
+// called). A union is zeroable only when every member is, so the answer does not
+// depend on the implementation-defined canonical member order. Pointees are not
+// inspected, which also keeps self-referential types from recursing.
+static bool isZeroable(const ResolvedType* type) {
+	if (!type) return true;
+	switch (type->kind) {
+		case ResolvedTypeKind::POINTER: return false;
+		case ResolvedTypeKind::STRUCT: {
+			for (const ResolvedStructField& field : static_cast<const StructResolvedType*>(type)->fields) {
+				if (!isZeroable(field.type)) return false;
+			}
+			return true;
+		}
+		case ResolvedTypeKind::TUPLE: {
+			for (const ResolvedType* element : static_cast<const TupleResolvedType*>(type)->elements) {
+				if (!isZeroable(element)) return false;
+			}
+			return true;
+		}
+		case ResolvedTypeKind::ARRAY: {
+			const ArrayResolvedType* array = static_cast<const ArrayResolvedType*>(type);
+			return array->size == 0 || isZeroable(array->element_type);
+		}
+		case ResolvedTypeKind::UNION: {
+			for (const ResolvedType* member : static_cast<const UnionResolvedType*>(type)->members) {
+				if (!isZeroable(member)) return false;
+			}
+			return true;
+		}
+		default: return true;
+	}
+}
+
 struct TemplateBinding {
 	ex_string_view name = {};
 	ComptimeValue arg;
@@ -2602,6 +2638,9 @@ struct Checker {
 		ComptimeValue value = evalComptime(unit, expr, ctx, nullptr, nullptr, hint);
 		allow_runtime_const = previous_runtime_const_mode;
 		--suppress_errors;
+		// A function value is the callee's bytecode index, which is only assigned when
+		// bytecode is generated, so it cannot be folded into a constant here.
+		if (value && value.kind == ComptimeValue::VALUE && value.type && value.type->kind == ResolvedTypeKind::FUNCTION) return {};
 		if (value && value.kind == ComptimeValue::VALUE) {
 			value = makePersistentValue(unit, value.type, value.value, typeByteSize(*value.type));
 			expr.comptime_value = value;
@@ -4321,7 +4360,14 @@ struct Checker {
 				return &expr;
 			}
 			case Expression::UNDEFINED: expr.resolved_type = hint; expr.eval_stage = Expression::RUNTIME; return &expr;
-			case Expression::ZERO: expr.resolved_type = hint; expr.eval_stage = Expression::RUNTIME; return &expr;
+			case Expression::ZERO:
+				if (!isZeroable(hint)) {
+					errorLine(expr.token, "Cannot zero-initialize ", hint, ": it contains a non-null pointer; use a nullable pointer (?*T) or initialize it explicitly");
+					return nullptr;
+				}
+				expr.resolved_type = hint;
+				expr.eval_stage = Expression::RUNTIME;
+				return &expr;
 			case Expression::BOOL_LITERAL: expr.resolved_type = primitiveType(ResolvedTypeKind::BOOL); expr.eval_stage = Expression::COMPTIME_VALUE; return &expr;
 			case Expression::STRING_LITERAL: {
 				StringLiteralExpression& literal = static_cast<StringLiteralExpression&>(expr);

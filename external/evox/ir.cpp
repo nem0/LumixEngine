@@ -4850,7 +4850,9 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 	TypeInfoBuilder type_info(*host, *bc);
 	IRBuilder builder(*host, type_info);
 
-	bc->function_count = 0;
+	// Function index 0 is reserved for a function that panics, so a zeroed function
+	// value never refers to a real function.
+	bc->function_count = 1;
 	bc->global_size = 0;
 	bc->has_global_init = false;
 
@@ -4953,7 +4955,26 @@ ex_bytecode* ex_bytecode_compile(ex_module* module, ex_host* host, ex_bytecode_c
 	if (options) bc_compiler.do_optimize = options->optimize;
 	bc_compiler.do_inline = bc_compiler.do_optimize;
 	builder.do_inline = bc_compiler.do_optimize;
-	u32 fn_index = 0;
+	{
+		// Function index 0 panics when called, so a zeroed function value traps
+		// through the normal call path with no extra check there.
+		ex_function_bc& fn = bc->functions[0];
+		memset(&fn, 0, sizeof(fn));
+		fn.kind = EX_FUNCTION_SCRIPT;
+		fn.code = (u8*)(u64)bc_compiler.code.size();
+		bc_compiler.fn_bc = &fn;
+		bc_compiler.stack_top = 0;
+		bc_compiler.stack_high_water = 0;
+		ExOpStringLiteral message;
+		const ex_string_view text = makeStringView("called a null function value");
+		message.index = builder.internString(text);
+		message.length = u32(text.length);
+		ExOpPanic panic;
+		panic.message = &message;
+		bc_compiler.emit(panic, nullptr);
+		bc_compiler.endFunction();
+	}
+	u32 fn_index = 1;
 	for (Unit& u : module->units) {
 		for (Symbol& s : u.symbols) {
 			if (!s.expression) continue; // alias

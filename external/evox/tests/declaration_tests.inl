@@ -658,6 +658,61 @@ TEST(ZeroCanBeAssignedAndPassed) {
 	return true;
 }
 
+TEST(ZeroRejectsNonNullPointers) {
+	EXPECT_COMPILE_FAIL(R"(
+		struct N { x : i32; }
+		fn main() : void { var p : *N = zero; }
+	)");
+	EXPECT_COMPILE_FAIL(R"(
+		struct N { x : i32; }
+		struct H { a : i32; p : *N; }
+		fn main() : void { var h : H = zero; }
+	)");
+	EXPECT_COMPILE_FAIL(R"(
+		struct N { x : i32; }
+		fn main() : void { var a : [2]*N = zero; }
+	)");
+	EXPECT_COMPILE_FAIL(R"(
+		struct N { x : i32; }
+		var g : *N = zero;
+		fn main() : void {}
+	)");
+	EXPECT_COMPILE_FAIL(R"(
+		struct N { x : i32; }
+		fn take(p : *N) : void {}
+		fn main() : void { take(zero); }
+	)");
+	return true;
+}
+
+TEST(ZeroAllowsNullablePointersAndSlices) {
+	EXPECT_COMPILE(R"(
+		struct N { x : i32; next : ?*N; items : []i32; ptrs : []*N; }
+		fn main() : void {
+			var n : N = zero;
+			var p : ?*N = zero;
+		}
+	)");
+	return true;
+}
+
+TEST(ZeroFunctionValueCallPanics) {
+	const char* source = R"(
+		fn main() : i32 {
+			var h : fn() : i32 = zero;
+			return h();
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	test_diagnostics.output_enabled = false;
+	EXPECT_EQ(EX_CALL_RESULT_PANIC, test_call(runtime, toLs("main")));
+	test_abort(runtime);
+	CAPI_END(module);
+	return true;
+}
+
 TEST(ZeroGlobalIsZero) {
 	const char* source = R"(
 		struct S { a : i32; b : i32; }

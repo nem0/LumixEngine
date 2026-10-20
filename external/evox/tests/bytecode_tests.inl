@@ -24,8 +24,8 @@ TEST(BytecodeCompileAndRunMain) {
 
 	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
-	EXPECT_TRUE(bytecode->functions[0].source_map_count > 0u);
-	EXPECT_EQ(0u, bytecode->functions[0].source_map[0].code_offset);
+	EXPECT_TRUE(bytecode->functions[1].source_map_count > 0u);
+	EXPECT_EQ(0u, bytecode->functions[1].source_map[0].code_offset);
 
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);
 	EXPECT_TRUE(runtime != nullptr);
@@ -50,8 +50,8 @@ TEST(BytecodePanic) {
 	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 	bool has_panic = false;
-	for (u32 i = 0; i < bytecode->functions[0].code_size; ++i) {
-		if (bytecode->functions[0].code[i] == (u8)EX_OP_PANIC) has_panic = true;
+	for (u32 i = 0; i < bytecode->functions[1].code_size; ++i) {
+		if (bytecode->functions[1].code[i] == (u8)EX_OP_PANIC) has_panic = true;
 	}
 	EXPECT_TRUE(has_panic);
 	ex_runtime* runtime = ex_runtime_create(bytecode, nullptr);

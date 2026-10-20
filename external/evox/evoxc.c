@@ -415,7 +415,7 @@ static void evoxc_dump_bytecode(const ex_bytecode* bytecode, const char* source_
 		printf("function %u %.*s (%s, params=%u, frame=%u, returns=%u)\n",
 			function_index,
 			fn->name.begin ? (int)(fn->name.length) : 0,
-			fn->name.begin ? fn->name.begin : "<global_init>",
+			fn->name.begin ? fn->name.begin : function_index == 0u ? "<null_function>" : "<global_init>",
 			fn->kind == EX_FUNCTION_NATIVE ? "native" : "script",
 			fn->param_size, fn->frame_size, fn->return_size);
 

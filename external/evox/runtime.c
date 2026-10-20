@@ -81,7 +81,7 @@ static int runtime_slice_equal(ex_runtime_slice a, ex_runtime_slice b, u32 eleme
 
 static const ex_function_bc* runtime_find_function_by_name(const ex_bytecode* bytecode, ex_string_view name, i32* out_index) {
 	if (!bytecode) return NULL;
-	for (u32 i = 0; i < bytecode->function_count; ++i) {
+	for (u32 i = 1; i < bytecode->function_count; ++i) { // 0 is the reserved invalid function
 		const ex_string_view function_name = bytecode->functions[i].name;
 		if (function_name.length != name.length) continue;
 		bool equal = true;

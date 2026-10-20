@@ -1691,7 +1691,8 @@ fn main() : void {
 ```
 
 - the type comes from context, so `var x = zero;` is a compile-time error; annotate the type or use it where a type is expected (assignment, argument, return, struct field)
-- works for every type: numbers are `0`, `false`, and `0.0`; pointers, slices, and nullable values are null/empty; structs and arrays are zeroed recursively; a union gets the canonical-first variant with a zeroed payload
+- numbers are `0`, `false`, and `0.0`; slices and nullable values (including `?*T`) are null/empty; structs, tuples and arrays are zeroed recursively; a union gets the canonical-first variant with a zeroed payload; a function value becomes the null function (index 0), and calling it panics with `called a null function value`
+- a non-null pointer `*T` has no zero value, so `zero` is a compile-time error for `*T` and for any struct, tuple, array, or union that contains a `*T` by value (a union is rejected when any member is); use `?*T` or initialize explicitly. Pointees are not inspected, so `next : ?*Particle` is fine
 - the whole value is written, including padding, so reading any part of it is defined, unlike [`undefined`](#variables)
 - valid for `var` and `const` declarations, globals, and assignments
 - not a compile-time constant: it cannot be used in `comptime` evaluation

@@ -318,7 +318,7 @@ TEST(DebugSetBreakpointPatchesCode) {
 	EXPECT_TRUE(ex_debug_set_breakpoint(bytecode, makeStringView(__func__), 4u, &resolved_line));
 	EXPECT_EQ(4u, resolved_line);
 
-	const ex_function_bc& fn = bytecode->functions[0];
+	const ex_function_bc& fn = bytecode->functions[1];
 	u32 patched_offset = (u32)-1;
 	for (u32 i = 0; i < fn.source_map_count; ++i) {
 		if (bytecode->locations[fn.source_map[i].location_index].line == 4u) {
@@ -369,7 +369,7 @@ TEST(DebugRemoveBreakpointRestoresOriginalByte) {
 	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
-	const ex_function_bc& fn = bytecode->functions[0];
+	const ex_function_bc& fn = bytecode->functions[1];
 	u32 patched_offset = (u32)-1;
 	for (u32 i = 0; i < fn.source_map_count; ++i) {
 		if (bytecode->locations[fn.source_map[i].location_index].line == 4u) {
@@ -405,7 +405,7 @@ TEST(DebugRemoveAllBreakpointsRestoresEverything) {
 	ex_bytecode* bytecode = ex_bytecode_compile(module, &module_host, nullptr);
 	EXPECT_TRUE(bytecode != nullptr);
 
-	const ex_function_bc& fn = bytecode->functions[0];
+	const ex_function_bc& fn = bytecode->functions[1];
 	u32 offset_line3 = (u32)-1;
 	u32 offset_line4 = (u32)-1;
 	for (u32 i = 0; i < fn.source_map_count; ++i) {
