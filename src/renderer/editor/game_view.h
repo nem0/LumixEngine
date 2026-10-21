@@ -35,6 +35,8 @@ struct LUMIX_RENDERER_API GameView : StudioApp::GUIPlugin {
 	//@ function
 	void setForceRender(bool enable) { m_force_render = enable; }
 	Pipeline* getPipeline() { return m_pipeline.get(); }
+	// Mouse position in pixels of the rendered image, valid if the function returns true (mouse over the view on the last GUI frame)
+	bool getCursorPixel(IVec2& pixel) const { pixel = m_cursor_pixel; return m_cursor_visible; }
 	const char* getName() const override { return "game_view"; }
 	bool isOpen() const { return m_is_open; }
 	void onToggleOpen() { m_is_open = !m_is_open; }
@@ -64,6 +66,8 @@ private:
 	Vec2 m_pos = Vec2(0);
 	Vec2 m_size = Vec2(0);
 	Vec2 m_input_scale = Vec2(1.f);	// render size / displayed size, used to remap mouse position
+	IVec2 m_cursor_pixel = IVec2(0);
+	bool m_cursor_visible = false;
 	bool m_is_mouse_captured;
 	bool m_is_ingame_cursor;
 	bool m_is_fullscreen;

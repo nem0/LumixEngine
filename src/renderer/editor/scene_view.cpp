@@ -1604,6 +1604,7 @@ static void selectPrevSibling(WorldEditor& editor) {
 }
 
 void SceneView::onGUI() {
+	m_cursor_visible = false;
 	const char* title = ICON_FA_GLOBE "Scene View###Scene View";
 	if (m_log_ui.getUnreadErrorCount() > 0) title = ICON_FA_GLOBE "Scene View | " ICON_FA_EXCLAMATION_TRIANGLE " errors in log###Scene View";
 
@@ -1726,6 +1727,9 @@ void SceneView::onGUI() {
 				else {
 					ImGui::Image(t, view_size);
 				}
+				const os::Point cursor = os::getMouseScreenPos();
+				m_cursor_pixel = IVec2(cursor.x - m_screen_x, cursor.y - m_screen_y);
+				m_cursor_visible = ImGui::IsItemHovered() && !m_is_mouse_captured;
 			}
 
 			if (ImGui::BeginDragDropTarget()) {

@@ -405,6 +405,7 @@ void GameView::onGUI() {
 void GameView::windowUI(const char* window_name) {
 	PROFILE_FUNCTION();
 
+	m_cursor_visible = false;
 	Engine& engine = m_app.getEngine();
 	const UISystem* ui_system = (const UISystem*)engine.getSystemManager().getSystem("ui");
 	const bool enable = ui_system && ui_system->isCursorEnabled();
@@ -503,6 +504,11 @@ void GameView::windowUI(const char* window_name) {
 			// the image can be displayed at a different size than it's rendered at
 			m_input_scale.x = display_size.x > 0 ? view_size.x / display_size.x : 1.f;
 			m_input_scale.y = display_size.y > 0 ? view_size.y / display_size.y : 1.f;
+
+			const os::Point cursor = os::getMouseScreenPos();
+			m_cursor_pixel.x = int((cursor.x - m_pos.x) * m_input_scale.x);
+			m_cursor_pixel.y = int((cursor.y - m_pos.y) * m_input_scale.y);
+			m_cursor_visible = m_is_mouse_captured && m_is_ingame_cursor;
 
 			processInputEvents();
 		}

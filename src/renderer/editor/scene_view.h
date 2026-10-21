@@ -32,6 +32,8 @@ struct LUMIX_RENDERER_API SceneView : StudioApp::GUIPlugin
 	void setWorld(World* world);
 	void onGUI() override;
 	Pipeline* getPipeline() { return m_pipeline.get(); }
+	// Mouse position in pixels of the rendered image, valid if the function returns true (mouse over the view on the last GUI frame)
+	bool getCursorPixel(IVec2& pixel) const { pixel = m_cursor_pixel; return m_cursor_visible; }
 	const char* getName() const override { return "scene_view"; }
 	void init();
 
@@ -114,6 +116,8 @@ private:
 	int m_height;
 	int m_captured_mouse_x;
 	int m_captured_mouse_y;
+	IVec2 m_cursor_pixel = IVec2(0);
+	bool m_cursor_visible = false;
 	float m_camera_speed = 0.1f;
 	UniquePtr<Pipeline> m_pipeline;
 	UniquePtr<Pipeline> m_camera_preview_pipeline;
