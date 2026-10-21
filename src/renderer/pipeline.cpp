@@ -3720,6 +3720,9 @@ struct PipelineImpl final : Pipeline {
 								}
 							};
 
+							// first time this instance is seen (e.g. just spawned), use the correct lod without transition
+							if (mi.lod < 0) mi.lod = float(lod_idx);
+
 							if (mi.lod != lod_idx) {
 								const float d = lod_idx - mi.lod;
 								const float ad = fabsf(d);

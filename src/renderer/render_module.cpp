@@ -3017,6 +3017,8 @@ struct RenderModuleImpl final : RenderModule {
 	void modelLoaded(Model* model, EntityRef entity) {
 		ASSERT(model->isReady());
 		auto& r = m_model_instances[entity.index];
+		// Transform changes while the model was loading were not tracked by the culling system.
+		r.prev_frame_transform = m_world.getTransform(entity);
 
 		float bounding_radius = r.model->getOriginBoundingRadius();
 		const Vec3& scale = m_world.getScale(entity);
@@ -3049,12 +3051,8 @@ struct RenderModuleImpl final : RenderModule {
 			}
 		}
 
-		for (i32 i = 3; i >= 0; --i) {
-			if (r.model->getLODIndices()[i].to != -1) {
-				r.lod = float(i);
-				break;
-			}
-		}
+		// negative lod means "not yet known", the pipeline snaps it to the correct lod on first use
+		r.lod = -1;
 		
 		r.dirty = r.mesh_materials.begin() != r.model->getMeshMaterials().begin();
 	}
