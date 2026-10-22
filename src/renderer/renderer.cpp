@@ -610,6 +610,12 @@ struct RendererImpl final : Renderer {
 			else if (cmd_line_parser.currentEquals("-gpu_stable_power_state")) {
 				flags = flags | gpu::InitFlags::STABLE_POWER_STATE;
 			}
+			else if (cmd_line_parser.currentEquals("-dred")) {
+				flags = flags | gpu::InitFlags::DRED;
+			}
+			else if (cmd_line_parser.currentEquals("-gpu_validation")) {
+				flags = flags | gpu::InitFlags::GPU_VALIDATION;
+			}
 		}
 
 		m_instanced_meshes_buffer = gpu::allocBufferHandle();

@@ -1160,6 +1160,7 @@ struct D3D {
 	DWORD thread;
 	RENDERDOC_API_1_0_2* rdoc_api = nullptr;
 	ID3D12Device* device = nullptr;
+	AtomicI32 dred_reported{0};
 	ID3D12RootSignature* root_signature = nullptr;
 	ID3D12Debug* debug = nullptr;
 	ID3D12CommandQueue* cmd_queue = nullptr;
@@ -1271,6 +1272,128 @@ void memoryBarrier(TextureHandle texture) {
 	d3d->cmd_list->ResourceBarrier(1, &barrier);
 }
 
+static const char* getDredName(const char* name, const wchar_t* wide_name, Span<char> buffer) {
+	if (name) return name;
+	if (!wide_name) return "<unnamed>";
+	fromWChar(buffer, wide_name);
+	return buffer.begin();
+}
+
+static const char* getBreadcrumbOpName(D3D12_AUTO_BREADCRUMB_OP op) {
+	switch (op) {
+		case D3D12_AUTO_BREADCRUMB_OP_SETMARKER: return "SetMarker";
+		case D3D12_AUTO_BREADCRUMB_OP_BEGINEVENT: return "BeginEvent";
+		case D3D12_AUTO_BREADCRUMB_OP_ENDEVENT: return "EndEvent";
+		case D3D12_AUTO_BREADCRUMB_OP_DRAWINSTANCED: return "DrawInstanced";
+		case D3D12_AUTO_BREADCRUMB_OP_DRAWINDEXEDINSTANCED: return "DrawIndexedInstanced";
+		case D3D12_AUTO_BREADCRUMB_OP_EXECUTEINDIRECT: return "ExecuteIndirect";
+		case D3D12_AUTO_BREADCRUMB_OP_DISPATCH: return "Dispatch";
+		case D3D12_AUTO_BREADCRUMB_OP_COPYBUFFERREGION: return "CopyBufferRegion";
+		case D3D12_AUTO_BREADCRUMB_OP_COPYTEXTUREREGION: return "CopyTextureRegion";
+		case D3D12_AUTO_BREADCRUMB_OP_COPYRESOURCE: return "CopyResource";
+		case D3D12_AUTO_BREADCRUMB_OP_COPYTILES: return "CopyTiles";
+		case D3D12_AUTO_BREADCRUMB_OP_RESOLVESUBRESOURCE: return "ResolveSubresource";
+		case D3D12_AUTO_BREADCRUMB_OP_CLEARRENDERTARGETVIEW: return "ClearRenderTargetView";
+		case D3D12_AUTO_BREADCRUMB_OP_CLEARUNORDEREDACCESSVIEW: return "ClearUnorderedAccessView";
+		case D3D12_AUTO_BREADCRUMB_OP_CLEARDEPTHSTENCILVIEW: return "ClearDepthStencilView";
+		case D3D12_AUTO_BREADCRUMB_OP_RESOURCEBARRIER: return "ResourceBarrier";
+		case D3D12_AUTO_BREADCRUMB_OP_EXECUTEBUNDLE: return "ExecuteBundle";
+		case D3D12_AUTO_BREADCRUMB_OP_PRESENT: return "Present";
+		case D3D12_AUTO_BREADCRUMB_OP_RESOLVEQUERYDATA: return "ResolveQueryData";
+		case D3D12_AUTO_BREADCRUMB_OP_BEGINSUBMISSION: return "BeginSubmission";
+		case D3D12_AUTO_BREADCRUMB_OP_ENDSUBMISSION: return "EndSubmission";
+		case D3D12_AUTO_BREADCRUMB_OP_DECODEFRAME: return "DecodeFrame";
+		case D3D12_AUTO_BREADCRUMB_OP_PROCESSFRAMES: return "ProcessFrames";
+		case D3D12_AUTO_BREADCRUMB_OP_ATOMICCOPYBUFFERUINT: return "AtomicCopyBufferUINT";
+		case D3D12_AUTO_BREADCRUMB_OP_ATOMICCOPYBUFFERUINT64: return "AtomicCopyBufferUINT64";
+		case D3D12_AUTO_BREADCRUMB_OP_RESOLVESUBRESOURCEREGION: return "ResolveSubresourceRegion";
+		case D3D12_AUTO_BREADCRUMB_OP_WRITEBUFFERIMMEDIATE: return "WriteBufferImmediate";
+		case D3D12_AUTO_BREADCRUMB_OP_DECODEFRAME1: return "DecodeFrame1";
+		case D3D12_AUTO_BREADCRUMB_OP_SETPROTECTEDRESOURCESESSION: return "SetProtectedResourceSession";
+		case D3D12_AUTO_BREADCRUMB_OP_DECODEFRAME2: return "DecodeFrame2";
+		case D3D12_AUTO_BREADCRUMB_OP_PROCESSFRAMES1: return "ProcessFrames1";
+		case D3D12_AUTO_BREADCRUMB_OP_BUILDRAYTRACINGACCELERATIONSTRUCTURE: return "BuildRaytracingAccelerationStructure";
+		case D3D12_AUTO_BREADCRUMB_OP_EMITRAYTRACINGACCELERATIONSTRUCTUREPOSTBUILDINFO: return "EmitRaytracingAccelerationStructurePostbuildInfo";
+		case D3D12_AUTO_BREADCRUMB_OP_COPYRAYTRACINGACCELERATIONSTRUCTURE: return "CopyRaytracingAccelerationStructure";
+		case D3D12_AUTO_BREADCRUMB_OP_DISPATCHRAYS: return "DispatchRays";
+		case D3D12_AUTO_BREADCRUMB_OP_INITIALIZEMETACOMMAND: return "InitializeMetaCommand";
+		case D3D12_AUTO_BREADCRUMB_OP_EXECUTEMETACOMMAND: return "ExecuteMetaCommand";
+		case D3D12_AUTO_BREADCRUMB_OP_ESTIMATEMOTION: return "EstimateMotion";
+		case D3D12_AUTO_BREADCRUMB_OP_RESOLVEMOTIONVECTORHEAP: return "ResolveMotionVectorHeap";
+		case D3D12_AUTO_BREADCRUMB_OP_SETPIPELINESTATE1: return "SetPipelineState1";
+		case D3D12_AUTO_BREADCRUMB_OP_INITIALIZEEXTENSIONCOMMAND: return "InitializeExtensionCommand";
+		case D3D12_AUTO_BREADCRUMB_OP_EXECUTEEXTENSIONCOMMAND: return "ExecuteExtensionCommand";
+		case D3D12_AUTO_BREADCRUMB_OP_DISPATCHMESH: return "DispatchMesh";
+		case D3D12_AUTO_BREADCRUMB_OP_ENCODEFRAME: return "EncodeFrame";
+		case D3D12_AUTO_BREADCRUMB_OP_RESOLVEENCODEROUTPUTMETADATA: return "ResolveEncoderOutputMetadata";
+		// Numeric values keep these newer operations compatible with older Windows SDK headers.
+		case D3D12_AUTO_BREADCRUMB_OP(45): return "Barrier";
+		case D3D12_AUTO_BREADCRUMB_OP(46): return "BeginCommandList";
+		case D3D12_AUTO_BREADCRUMB_OP(47): return "DispatchGraph";
+		case D3D12_AUTO_BREADCRUMB_OP(48): return "SetProgram";
+		case D3D12_AUTO_BREADCRUMB_OP(52): return "ProcessFrames2";
+		default: return "Other";
+	}
+}
+
+static void logDredAllocations(const char* label, const D3D12_DRED_ALLOCATION_NODE* node) {
+	if (!node) logError("DRED: ", label, ": no matching allocations");
+	for (; node; node = node->pNext) {
+		char name[256];
+		logError("DRED: ", label, ": ", getDredName(node->ObjectNameA, node->ObjectNameW, Span(name)), ", allocation type ", (u32)node->AllocationType);
+	}
+}
+
+static void logDred(ID3D12Device* device) {
+	ID3D12DeviceRemovedExtendedData* dred = nullptr;
+	const HRESULT hr = device->QueryInterface(IID_PPV_ARGS(&dred));
+	if (FAILED(hr)) {
+		logError("DRED: interface unavailable, HRESULT ", (u32)hr);
+		return;
+	}
+
+	D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT breadcrumbs = {};
+	const HRESULT breadcrumbs_hr = dred->GetAutoBreadcrumbsOutput(&breadcrumbs);
+	if (FAILED(breadcrumbs_hr)) {
+		logError("DRED: breadcrumbs unavailable, HRESULT ", (u32)breadcrumbs_hr);
+	}
+	else {
+		if (!breadcrumbs.pHeadAutoBreadcrumbNode) logError("DRED: no breadcrumbs recorded");
+		for (const D3D12_AUTO_BREADCRUMB_NODE* node = breadcrumbs.pHeadAutoBreadcrumbNode; node; node = node->pNext) {
+			char list_name[256];
+			char queue_name[256];
+			const u32 completed = node->pLastBreadcrumbValue ? minimum(*node->pLastBreadcrumbValue, node->BreadcrumbCount) : 0;
+			logError("DRED: command list ", getDredName(node->pCommandListDebugNameA, node->pCommandListDebugNameW, Span(list_name)),
+				", queue ", getDredName(node->pCommandQueueDebugNameA, node->pCommandQueueDebugNameW, Span(queue_name)),
+				", completed ", completed, "/", node->BreadcrumbCount);
+			if (!node->pCommandHistory || completed == node->BreadcrumbCount) continue;
+
+			const u32 begin = completed > 8 ? completed - 8 : 0;
+			const u32 end = completed + minimum(8u, node->BreadcrumbCount - completed);
+			for (u32 i = begin; i < end; ++i) {
+				const D3D12_AUTO_BREADCRUMB_OP op = node->pCommandHistory[i];
+				logError("DRED: op ", i, " ", getBreadcrumbOpName(op), " (", (u32)op, ")",
+					i < completed ? " completed" : " pending");
+			}
+		}
+	}
+
+	D3D12_DRED_PAGE_FAULT_OUTPUT page_fault = {};
+	const HRESULT page_fault_hr = dred->GetPageFaultAllocationOutput(&page_fault);
+	if (FAILED(page_fault_hr)) {
+		logError("DRED: page fault data unavailable, HRESULT ", (u32)page_fault_hr);
+	}
+	else if (page_fault.PageFaultVA == 0) {
+		logError("DRED: no GPU page fault recorded");
+	}
+	else {
+		logError("DRED: GPU page fault address ", (u64)page_fault.PageFaultVA);
+		logDredAllocations("existing", page_fault.pHeadExistingAllocationNode);
+		logDredAllocations("recently freed", page_fault.pHeadRecentFreedAllocationNode);
+	}
+	dred->Release();
+}
+
 // call when a D3D12/DXGI call fails: asks the device why it was removed (hang, reset or removal) and logs it. S_OK means the device is still there
 static void logDeviceRemoved(ID3D12Device* device, HRESULT call_hr, const char* call) {
 	const HRESULT reason = device->GetDeviceRemovedReason();
@@ -1284,6 +1407,7 @@ static void logDeviceRemoved(ID3D12Device* device, HRESULT call_hr, const char* 
 		case DXGI_ERROR_INVALID_CALL: name = "INVALID_CALL"; break;
 	}
 	logError(call, " failed, HRESULT ", (u32)call_hr, ". GetDeviceRemovedReason: ", name, " (", (u32)reason, ")");
+	if (FAILED(reason) && d3d->dred_reported.compareExchange(1, 0)) logDred(device);
 }
 
 void Frame::end(ID3D12CommandQueue* cmd_queue, ID3D12GraphicsCommandList* cmd_list, ID3D12QueryHeap* timestamp_query_heap, ID3D12QueryHeap* stats_query_heap) {
@@ -1980,7 +2104,8 @@ ID3D12RootSignature* createRootSignature() {
 
 bool init(void* hwnd, InitFlags flags) {
 	PROFILE_FUNCTION();
-	bool debug = u32(flags & InitFlags::DEBUG);
+	const bool gpu_validation = isFlagSet(flags, InitFlags::GPU_VALIDATION);
+	bool debug = isFlagSet(flags, InitFlags::DEBUG) || gpu_validation;
 	#ifdef LUMIX_DEBUG
 		debug = true;
 	#endif
@@ -2013,6 +2138,21 @@ bool init(void* hwnd, InitFlags flags) {
 	DECL_D3D_API(D3D12CreateDevice);
 	DECL_D3D_API(D3D12GetDebugInterface);
 
+	// Collect diagnostics on player PCs independently of the debug layer and GPU validation.
+	d3d->dred_reported = 0;
+	if (isFlagSet(flags, InitFlags::DRED)) {
+		ID3D12DeviceRemovedExtendedDataSettings* dred_settings = nullptr;
+		if (api_D3D12GetDebugInterface && SUCCEEDED(api_D3D12GetDebugInterface(IID_PPV_ARGS(&dred_settings)))) {
+			dred_settings->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+			dred_settings->SetPageFaultEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+			dred_settings->Release();
+			logInfo("DRED: auto-breadcrumbs and page fault reporting enabled");
+		}
+		else {
+			logWarning("DRED: settings unavailable, continuing without forced GPU diagnostics");
+		}
+	}
+
 	if (debug) {
 		if (api_D3D12GetDebugInterface(IID_PPV_ARGS(&d3d->debug)) != S_OK) {
 			logWarning("Failed to get D3D12 debug interface (D3D12 SDK Layers / Graphics Tools not installed), continuing without debug layer");
@@ -2021,10 +2161,17 @@ bool init(void* hwnd, InitFlags flags) {
 		else {
 			d3d->debug->EnableDebugLayer();
 
-			// GPU-based validation checks the GPU's own resource accesses, but is very slow. Enable it when hunting a GPU hang.
-			//ID3D12Debug1* debug1;
-			//d3d->debug->QueryInterface(IID_PPV_ARGS(&debug1));
-			//debug1->SetEnableGPUBasedValidation(true);
+			if (gpu_validation) {
+				ID3D12Debug1* debug1 = nullptr;
+				if (SUCCEEDED(d3d->debug->QueryInterface(IID_PPV_ARGS(&debug1)))) {
+					debug1->SetEnableGPUBasedValidation(true);
+					debug1->Release();
+					logInfo("GPU-based validation enabled");
+				}
+				else {
+					logWarning("GPU-based validation interface unavailable, continuing without GPU-based validation");
+				}
+			}
 		}
 	}
 

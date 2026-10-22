@@ -45,7 +45,9 @@ enum class InitFlags : u32 {
 	DEBUG = 1 << 0,
 	// disable dynamic frequency scaling
 	// can crash gpu if PC is not in developer mode
-	STABLE_POWER_STATE = 1 << 1
+	STABLE_POWER_STATE = 1 << 1,
+	DRED = 1 << 2,
+	GPU_VALIDATION = 1 << 3
 };
 
 enum class BarrierType : u8 {
