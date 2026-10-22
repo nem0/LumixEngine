@@ -79,3 +79,12 @@ fn makeQuatFromPitch(value : f32) : Quat {
 	const half = value * 0.5;
 	return { -math.sin(half), 0.0, 0.0, math.cos(half) };
 }
+
+comptime X_PLUS = Quat { 0.7071068, 0, 0, 0.7071068 };
+comptime X_MINUS = Quat { -0.7071068, 0, 0, 0.7071068 };
+comptime Y_PLUS = Quat { 0, 0.7071068, 0, 0.7071068 };
+comptime Y_MINUS = Quat { 0, -0.7071068, 0, 0.7071068 };
+comptime Z_PLUS = Quat { 0, 0, 0.7071068, 0.7071068 };
+comptime Z_MINUS = Quat { 0, 0, -0.7071068, 0.7071068 };
+
+

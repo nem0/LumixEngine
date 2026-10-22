@@ -5,6 +5,7 @@ Lumix Engine includes automatic crash reporting to help improve stability. When 
 ## Features
 - **Minidump Generation**: Creates `minidump.dmp` in the working directory for debugging.
 - **Sentry Integration**: Sends crash reports to Sentry with stack traces and system info.
+- **Log Attachment**: Sentry attaches the last 128 KiB of the engine's active log as `engine.log`, including `lumix_app.log` for the standalone app.
 - **Configurable Flags**: Control what happens on crash via `CrashReportFlags`:
   - `ENABLED`: Enables crash handling.
   - `MESSAGE_BOX`: Shows a message box with crash info.

@@ -89,6 +89,7 @@ enum class CrashReportFlags : u32 {
 };
 
 LUMIX_CORE_API void configureCrashReport(CrashReportFlags flags);
+LUMIX_CORE_API void setCrashReportLogPath(const char* path);
 LUMIX_CORE_API void installUnhandledExceptionHandler();
 LUMIX_CORE_API void clearHardwareBreakpoint(u32 breakpoint_idx);
 LUMIX_CORE_API void setHardwareBreakpoint(u32 breakpoint_idx, const void* mem, u32 size);

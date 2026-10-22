@@ -36,6 +36,7 @@
 namespace Lumix {
 	
 static CrashReportFlags g_crash_report_flags = CrashReportFlags::ENABLED;
+static char g_crash_report_log_path[MAX_PATH] = "";
 
 namespace sentry {
 
@@ -65,6 +66,12 @@ static void sendToSentry(const char* message) {
 			}
 
 			DWORD to_read = size.QuadPart > max_size ? max_size : (DWORD)size.QuadPart;
+			LARGE_INTEGER offset;
+			offset.QuadPart = size.QuadPart - to_read;
+			if (!SetFilePointerEx(file, offset, nullptr, FILE_BEGIN)) {
+				CloseHandle(file);
+				return 0;
+			}
 			DWORD read = 0;
 			if (!ReadFile(file, data, to_read, &read, nullptr)) {
 				CloseHandle(file);
@@ -79,6 +86,8 @@ static void sendToSentry(const char* message) {
 			return readFromPath(path.data);
 		};
 
+		// A configured log must never fall back to an unrelated file.
+		if (g_crash_report_log_path[0]) return readFromPath(g_crash_report_log_path);
 		if (u32 read = readFromPath("lumix.log")) return read;
 
 		char current_dir[MAX_PATH];
@@ -156,7 +165,7 @@ static void sendToSentry(const char* message) {
 
 	const u32 log_data_size = readLogFile(s_sentry_data->log_data, 131072);
 	if (log_data_size > 0) {
-		envelope.append("{\"type\":\"attachment\",\"length\":", log_data_size, ",\"filename\":\"lumix.log\",\"content_type\":\"text/plain\"}\n");
+		envelope.append("{\"type\":\"attachment\",\"length\":", log_data_size, ",\"filename\":\"engine.log\",\"content_type\":\"text/plain\"}\n");
 		envelope.append(StringView(s_sentry_data->log_data, s_sentry_data->log_data + log_data_size), "\n");
 	}
 
@@ -1020,6 +1029,12 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 
 void configureCrashReport(CrashReportFlags flags) {
 	g_crash_report_flags = flags;
+}
+
+void setCrashReportLogPath(const char* path) {
+	// Resolve relative paths now, before the working directory can change.
+	const DWORD length = GetFullPathNameA(path, sizeof(g_crash_report_log_path), g_crash_report_log_path, nullptr);
+	if (length == 0 || length >= sizeof(g_crash_report_log_path)) g_crash_report_log_path[0] = '\0';
 }
 
 void installUnhandledExceptionHandler() {
