@@ -1066,6 +1066,9 @@ struct StudioAppImpl final : StudioApp {
 		m_settings.registerOption("code_editor_show_line_nums", &CodeEditor::s_show_line_numbers, "Code editor", "Show line numbers");
 		m_settings.registerOption("export_pack", &m_export.pack);
 		m_settings.registerOption("export_dir", &m_export.dest_dir);
+		m_settings.registerOption("export_exe_name", &m_export.exe_name);
+		m_settings.registerOption("export_include_pdb", &m_export.include_pdb);
+		m_settings.registerOption("export_generate_pak_list", &m_export.generate_pak_list);
 		m_settings.registerOption("gizmo_scale", &m_gizmo_config.scale, "General", "Gizmo scale").setMin(0.001f);
 		m_settings.registerOption("fov", &m_fov, "General", "FOV").setMin(1).setMax(179).setIsAngle(true);
 		static bool use_native_titlebar = false;
@@ -3105,8 +3108,19 @@ struct StudioAppImpl final : StudioApp {
 				}
 			}
 
+			ImGuiEx::Label("Executable name");
+			inputString("##exe_name", &m_export.exe_name);
+
+			ImGuiEx::Label("Include debug symbols (.pdb)");
+			ImGui::Checkbox("##include_pdb", &m_export.include_pdb);
+
 			ImGuiEx::Label("Pack data");
 			ImGui::Checkbox("##pack", &m_export.pack);
+
+			ImGui::BeginDisabled(!m_export.pack);
+			ImGuiEx::Label("Generate pak_list.txt");
+			ImGui::Checkbox("##generate_pak_list", &m_export.generate_pak_list);
+			ImGui::EndDisabled();
 
 			if (m_export_compiling) {
 				// resources are compiled in the background (asset compiler shows the progress), we export when it's done
@@ -3126,8 +3140,15 @@ struct StudioAppImpl final : StudioApp {
 			}
 			else {
 				if (ImGui::Button("Export")) {
+					bool valid_exe_name = m_export.exe_name.length() > 4 && endsWithInsensitive(m_export.exe_name, ".exe");
+					for (const char* c = m_export.exe_name.c_str(); *c; ++c) {
+						if (u8(*c) < 32 || find("<>:\"/\\|?*", *c)) valid_exe_name = false;
+					}
 					if (m_export.dest_dir.length() == 0) {
 						logError("Select a destination directory first.");
+					}
+					else if (!valid_exe_name) {
+						logError("Enter a valid executable filename ending in .exe.");
 					}
 					else {
 						m_asset_compiler->compileAll();
@@ -3205,23 +3226,25 @@ struct StudioAppImpl final : StudioApp {
 				return false;
 			}
 
-			StaticString<MAX_PATH> list_dest(m_export.dest_dir, "pak_list.txt");
-			os::OutputFile list_file;
-			if (!list_file.open(list_dest)) {
-				logError("Could not create ", list_dest);
-				return false;
-			}
-			for (const ExportFileInfo& info : infos) {
-				char size_str[32];
-				toCString(info.size, Span(size_str));
-				const StaticString<MAX_PATH * 2 + 64> line(info.path, "\t", size_str, info.source[0] ? "\t" : "", info.source, "\n");
-				if (!list_file.write(line.data, stringLength(line.data))) {
-					logError("Could not write ", list_dest);
-					list_file.close();
+			if (m_export.generate_pak_list) {
+				StaticString<MAX_PATH> list_dest(m_export.dest_dir, "pak_list.txt");
+				os::OutputFile list_file;
+				if (!list_file.open(list_dest)) {
+					logError("Could not create ", list_dest);
 					return false;
 				}
+				for (const ExportFileInfo& info : infos) {
+					char size_str[32];
+					toCString(info.size, Span(size_str));
+					const StaticString<MAX_PATH * 2 + 64> line(info.path, "\t", size_str, info.source[0] ? "\t" : "", info.source, "\n");
+					if (!list_file.write(line.data, stringLength(line.data))) {
+						logError("Could not write ", list_dest);
+						list_file.close();
+						return false;
+					}
+				}
+				list_file.close();
 			}
-			list_file.close();
 		}
 		else {
 			for (auto& info : infos) {
@@ -3249,10 +3272,19 @@ struct StudioAppImpl final : StudioApp {
 		}
 
 		for (auto& file : bin_files) {
-			StaticString<MAX_PATH> tmp(m_export.dest_dir, file);
+			StaticString<MAX_PATH> tmp(m_export.dest_dir, equalStrings(file, "app.exe") ? m_export.exe_name.c_str() : file);
 			StaticString<MAX_PATH> src(src_dir, file);
 			if (!os::copyFile(src, tmp)) {
 				logError("Failed to copy ", src, " to ", tmp);
+			}
+		}
+
+		if (m_export.include_pdb) {
+			const StaticString<MAX_PATH> src(src_dir, "app.pdb");
+			const StaticString<MAX_PATH> dst(m_export.dest_dir, "app.pdb");
+			if (!os::copyFile(src, dst)) {
+				logError("Failed to copy ", src, " to ", dst);
+				return false;
 			}
 		}
 
@@ -3388,10 +3420,13 @@ struct StudioAppImpl final : StudioApp {
 	u32 m_fps_frame = 0;
 
 	struct ExportConfig {
-		ExportConfig(IAllocator& allocator) : dest_dir(allocator) {}
+		ExportConfig(IAllocator& allocator) : dest_dir(allocator), exe_name("app.exe", allocator) {}
 
 		bool pack = false;
+		bool include_pdb = false;
+		bool generate_pak_list = true;
 		String dest_dir;
+		String exe_name;
 	};
 
 	ExportConfig m_export;
