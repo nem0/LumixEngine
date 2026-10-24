@@ -1056,8 +1056,13 @@ struct TextureAssetEditorWindow : AssetEditorWindow, SimpleUndoRedo {
 				if (actions.view_in_browser.iconButton(true, &m_app)) m_app.getAssetBrowser().locate(*m_texture);
 				if (ImGuiEx::IconButton(ICON_FA_FOLDER_OPEN, "Open folder")) {
 					FileSystem& fs = m_app.getEngine().getFileSystem();
-					Path full_path = fs.getFullPath(m_texture->getPath());
-					os::openExplorer(full_path);
+					Path full_path;
+					if (fs.getFullPath(m_texture->getPath(), full_path)) {
+						os::openExplorer(full_path);
+					}
+					else {
+						logError("Could not resolve ", m_texture->getPath());
+					}
 				}
 				if (!m_recipe_editor || !m_recipe_editor->canHandleInput()) {
 					if (actions.undo.iconButton(canUndo(), &m_app)) undo();
@@ -3932,8 +3937,11 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		if (m_done_counter == m_probe_counter && !m_probe_jobs.empty()) {
 			Engine& engine = m_app.getEngine();
 			FileSystem& fs = engine.getFileSystem();
-			Path dir_path = fs.getFullPath("probes/");
-			if (!fs.dirExists("probes/") && !os::makePath(dir_path.c_str())) {
+			Path dir_path;
+			if (!fs.getFullPath("probes/", dir_path)) {
+				logError("Failed to resolve probes/");
+			}
+			else if (!fs.dirExists("probes/") && !os::makePath(dir_path.c_str())) {
 				logError("Failed to create ", dir_path);
 			}
 			RenderModule* module = nullptr;

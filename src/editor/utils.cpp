@@ -2976,7 +2976,11 @@ void DirSelector::fillSubitems() {
 	m_subdirs.clear();
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	
-	Path path = fs.getFullPath(m_current_dir);
+	Path path;
+	if (!fs.getFullPath(m_current_dir, path)) {
+		logError("Could not resolve ", m_current_dir);
+		return;
+	}
 	TextFilter filter;
 	FileIterator* iter;
 	if (fs.dirExists(m_current_dir)) {
@@ -2988,6 +2992,7 @@ void DirSelector::fillSubitems() {
 		filter.build();
 		iter = fs.createFileIterator(dir);
 	}
+	if (!iter) return;
 	os::FileInfo info;
 	while (getNextFile(iter, &info)) {
 		if (!info.is_directory) continue;
@@ -3016,100 +3021,113 @@ bool DirSelector::gui(const char* label, bool* open) {
 
 	if (ImGui::BeginPopupModal(label, open, ImGuiWindowFlags_NoNavInputs)) {
 		bool res = false;
-		const Path fullpath = fs.getFullPath(m_current_dir);
-		if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
-		if (ImGui::IsKeyPressed(ImGuiKey_Enter)) {
-			if (os::dirExists(fullpath)) res = true;
-			else {
-				ImGui::OpenPopup("Confirm");
+		Path fullpath;
+		if (fs.getFullPath(m_current_dir, fullpath)) {
+			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+			if (ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+				if (os::dirExists(fullpath)) res = true;
+				else {
+					ImGui::OpenPopup("Confirm");
+				}
 			}
-		}
 
-		if (beginCenterStrip("Confirm")) {
-			ImGui::NewLine();
-			alignGUICenter([&](){ ImGui::Text("Create folder '%s'", m_current_dir.c_str()); });
-			alignGUICenter([&](){ 
-				if (ImGui::Button("Yes")) {
+			if (beginCenterStrip("Confirm")) {
+				ImGui::NewLine();
+				alignGUICenter([&](){ ImGui::Text("Create folder '%s'", m_current_dir.c_str()); });
+				alignGUICenter([&](){ 
+					if (ImGui::Button("Yes")) {
+						if (!os::makePath(fullpath.c_str())) {
+							logError("Failed to create ", fullpath);
+						}
+						fillSubitems();
+						ImGui::CloseCurrentPopup();
+						res = true;
+					}
+					ImGui::SameLine();
+					if (ImGui::Button("No")) ImGui::CloseCurrentPopup();
+				});
+				endCenterStrip();
+			}
+
+			if (ImGui::Button(ICON_FA_PLUS " Create folder")) {
+				if (os::dirExists(fullpath)) {
+					logError(fullpath, " already exists");
+				}
+				else {
 					if (!os::makePath(fullpath.c_str())) {
 						logError("Failed to create ", fullpath);
 					}
 					fillSubitems();
-					ImGui::CloseCurrentPopup();
-					res = true;
 				}
-				ImGui::SameLine();
-				if (ImGui::Button("No")) ImGui::CloseCurrentPopup();
-			});
-			endCenterStrip();
-		}
+			}
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(-1);
 
-		if (ImGui::Button(ICON_FA_PLUS " Create folder")) {
-			if (os::dirExists(fullpath)) {
-				logError(fullpath, " already exists");
-			}
-			else {
-				if (!os::makePath(fullpath.c_str())) {
-					logError("Failed to create ", fullpath);
-				}
-				fillSubitems();
-			}
-		}
-		ImGui::SameLine();
-		ImGui::SetNextItemWidth(-1);
-
-		auto cb = [](ImGuiInputTextCallbackData* data) -> int {
-			DirSelector* ds = (DirSelector*)data->UserData;
-			if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
-				FileSystem& fs = ds->m_app.getEngine().getFileSystem();
-				const Path fullpath = fs.getFullPath(ds->m_current_dir);
-				if (!os::dirExists(fullpath) && !ds->m_subdirs.empty()) {
-					const u32 dir_size = (u32)Path::getDir(ds->m_current_dir).size();
-					ds->m_current_dir.resize(dir_size);
-					ds->m_current_dir.append(ds->m_subdirs[0], "/");
-					ds->fillSubitems();
-				}
-				data->DeleteChars(0, data->BufTextLen);
-				data->InsertChars(0, ds->m_current_dir.c_str());
-			}
-			if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
-				String* str = &ds->m_current_dir;
-				str->resize(data->BufTextLen);
-				data->Buf = (char*)str->c_str();
-			}
-			return 0;
-		};
-
-		if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
-		if (ImGui::InputText("##f", (char*)m_current_dir.c_str(), m_current_dir.length() + 1, ImGuiInputTextFlags_CallbackResize | ImGuiInputTextFlags_CallbackCompletion, cb, this)) {
-			fillSubitems();
-		}
-		if (ImGui::BeginChild("list", ImVec2(-1, -ImGui::GetTextLineHeightWithSpacing() - ImGui::GetStyle().WindowPadding.y), true, ImGuiWindowFlags_NoScrollbar)) {
-			for (const String& subdir : m_subdirs) {
-				ImGui::TextUnformatted(ICON_FA_FOLDER); ImGui::SameLine();
-				if (ImGui::Selectable(subdir.c_str(), false, ImGuiSelectableFlags_DontClosePopups)) {
-					if (os::dirExists(fullpath)) {
-						m_current_dir.append("/", subdir.c_str());
+			auto cb = [](ImGuiInputTextCallbackData* data) -> int {
+				DirSelector* ds = (DirSelector*)data->UserData;
+				if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
+					FileSystem& fs = ds->m_app.getEngine().getFileSystem();
+					Path fullpath;
+					if (fs.getFullPath(ds->m_current_dir, fullpath)) {
+						if (!os::dirExists(fullpath) && !ds->m_subdirs.empty()) {
+							const u32 dir_size = (u32)Path::getDir(ds->m_current_dir).size();
+							ds->m_current_dir.resize(dir_size);
+							ds->m_current_dir.append(ds->m_subdirs[0], "/");
+							ds->fillSubitems();
+						}
+						data->DeleteChars(0, data->BufTextLen);
+						data->InsertChars(0, ds->m_current_dir.c_str());
 					}
 					else {
-						const u32 dir_size = (u32)Path::getDir(m_current_dir).size();
-						m_current_dir.resize(dir_size);
-						m_current_dir.append(subdir.c_str());
+						logError("Could not resolve ", ds->m_current_dir);
 					}
-					fillSubitems();
-					break;
+				}
+				if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
+					String* str = &ds->m_current_dir;
+					str->resize(data->BufTextLen);
+					data->Buf = (char*)str->c_str();
+				}
+				return 0;
+			};
+
+			if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+			if (ImGui::InputText("##f", (char*)m_current_dir.c_str(), m_current_dir.length() + 1, ImGuiInputTextFlags_CallbackResize | ImGuiInputTextFlags_CallbackCompletion, cb, this)) {
+				fillSubitems();
+			}
+			if (ImGui::BeginChild("list", ImVec2(-1, -ImGui::GetTextLineHeightWithSpacing() - ImGui::GetStyle().WindowPadding.y), true, ImGuiWindowFlags_NoScrollbar)) {
+				for (const String& subdir : m_subdirs) {
+					ImGui::TextUnformatted(ICON_FA_FOLDER); ImGui::SameLine();
+					if (ImGui::Selectable(subdir.c_str(), false, ImGuiSelectableFlags_DontClosePopups)) {
+						if (os::dirExists(fullpath)) {
+							m_current_dir.append("/", subdir.c_str());
+						}
+						else {
+							const u32 dir_size = (u32)Path::getDir(m_current_dir).size();
+							m_current_dir.resize(dir_size);
+							m_current_dir.append(subdir.c_str());
+						}
+						fillSubitems();
+						break;
+					}
 				}
 			}
+			ImGui::EndChild();
+		
+			res = ImGui::Button(ICON_FA_CHECK " Select") || res;
+			ImGui::SameLine();
+			if (ImGui::Button(ICON_FA_TIMES " Cancel")) ImGui::CloseCurrentPopup();
+		
+			if (res) ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+			if (!ImGui::IsPopupOpen(label)) *open = false;
+			return res;
 		}
-		ImGui::EndChild();
-	
-		res = ImGui::Button(ICON_FA_CHECK " Select") || res;
-		ImGui::SameLine();
-		if (ImGui::Button(ICON_FA_TIMES " Cancel")) ImGui::CloseCurrentPopup();
-	
-		if (res) ImGui::CloseCurrentPopup();
-		ImGui::EndPopup();
-		if (!ImGui::IsPopupOpen(label)) *open = false;
-		return res;
+		else {
+			logError("Could not resolve ", m_current_dir);
+			ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+			*open = false;
+		}
 	}
 	return false;
 }
@@ -3137,31 +3155,36 @@ bool FileSelector::gui(const char* accepted_extension) {
 		FileSelector* selector = (FileSelector*)data->UserData;
 		if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
 			FileSystem& fs = selector->m_app.getEngine().getFileSystem();
-			const Path fullpath = fs.getFullPath(selector->m_path);
-			if (!os::fileExists(fullpath)) {
-				u32 dir_size;
-				if (os::dirExists(fullpath)) {
-					if (!endsWith(selector->m_path, "/") && !endsWith(selector->m_path, "\\")) {
-						selector->m_path.append("/");
+			Path fullpath;
+			if (fs.getFullPath(selector->m_path, fullpath)) {
+				if (!os::fileExists(fullpath)) {
+					u32 dir_size;
+					if (os::dirExists(fullpath)) {
+						if (!endsWith(selector->m_path, "/") && !endsWith(selector->m_path, "\\")) {
+							selector->m_path.append("/");
+						}
+						dir_size = selector->m_path.length();
 					}
-					dir_size = selector->m_path.length();
+					else {
+						dir_size = (u32)Path::getDir(selector->m_path).size();
+					}
+					if (!selector->m_subdirs.empty()) {
+						selector->m_path.resize(dir_size);
+						selector->m_path.append(selector->m_subdirs[0], "/");
+						selector->fillSubitems();
+					}
+					else if (!selector->m_subfiles.empty()) {
+						selector->m_path.resize(dir_size);
+						selector->m_path.append(selector->m_subfiles[0]);
+						selector->fillSubitems();
+					}
 				}
-				else {
-					dir_size = (u32)Path::getDir(selector->m_path).size();
-				}
-				if (!selector->m_subdirs.empty()) {
-					selector->m_path.resize(dir_size);
-					selector->m_path.append(selector->m_subdirs[0], "/");
-					selector->fillSubitems();
-				}
-				else if (!selector->m_subfiles.empty()) {
-					selector->m_path.resize(dir_size);
-					selector->m_path.append(selector->m_subfiles[0]);
-					selector->fillSubitems();
-				}
+				data->DeleteChars(0, data->BufTextLen);
+				data->InsertChars(0, selector->m_path.c_str());
 			}
-			data->DeleteChars(0, data->BufTextLen);
-			data->InsertChars(0, selector->m_path.c_str());
+			else {
+				logError("Could not resolve ", selector->m_path);
+			}
 		}
 		if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
 			String* str = &selector->m_path;
@@ -3178,11 +3201,16 @@ bool FileSelector::gui(const char* accepted_extension) {
 			logError(m_path, " already exists");
 		}
 		else {
-			const Path fullpath = fs.getFullPath(m_path);
-			if (!os::makePath(fullpath.c_str())) {
-				logError("Failed to create ", fullpath);
+			Path fullpath;
+			if (fs.getFullPath(m_path, fullpath)) {
+				if (!os::makePath(fullpath.c_str())) {
+					logError("Failed to create ", fullpath);
+				}
+				fillSubitems();
 			}
-			fillSubitems();
+			else {
+				logError("Could not resolve ", m_path);
+			}
 		}
 	}
 	ImGui::SameLine();

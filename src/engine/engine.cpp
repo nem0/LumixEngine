@@ -80,7 +80,10 @@ struct EngineImpl final : Engine {
 		}
 
 		m_is_log_file_open = m_file_system->open(init_data.log_path, m_log_file);
-		if (m_is_log_file_open) setCrashReportLogPath(m_file_system->getFullPath(init_data.log_path).c_str());
+		Path log_full_path;
+		if (m_is_log_file_open && m_file_system->getFullPath(init_data.log_path, log_full_path)) {
+			setCrashReportLogPath(log_full_path.c_str());
+		}
 
 		logInfo("Creating engine...");
 		char cmd_line[2048] = "";

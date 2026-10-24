@@ -853,8 +853,13 @@ struct AssetBrowserImpl : AssetBrowser {
 		IPlugin* create_resource_plugin = nullptr;
 		auto common_popup = [&](){
 			if (ImGui::MenuItem("View in explorer")) {
-				const Path dir_full_path = fs.getFullPath(m_dir);
-				os::openExplorer(dir_full_path);
+				Path dir_full_path;
+				if (fs.getFullPath(m_dir, dir_full_path)) {
+					os::openExplorer(dir_full_path);
+				}
+				else {
+					logError("Could not resolve ", m_dir);
+				}
 			}
 			if (ImGui::MenuItem("Create directory")) {
 				tmp[0] = 0;
@@ -919,7 +924,13 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 		else if (ImGui::BeginPopup("dir_ctx")) {
 			if (ImGui::MenuItem("View in explorer")) {
-				os::openExplorer(fs.getFullPath(m_dir_ctx));
+				Path p;
+				if (fs.getFullPath(m_dir_ctx, p)) {
+					os::openExplorer(p);
+				}
+				else {
+					logError("Could not resolve ", m_dir_ctx);
+				}
 			}
 			ignoreDirMenuItem(m_dir_ctx);
 			ImGui::EndPopup();
@@ -1012,12 +1023,17 @@ struct AssetBrowserImpl : AssetBrowser {
 			alignGUICenter([&](){
 				if (input_entered || ImGui::Button("Create")) {
 					input_entered = false;
-					Path path = fs.getFullPath(m_dir);
-					path.append("/", tmp);
-					if (!os::makePath(path.c_str())) {
-						logError("Failed to create ", path);
+					Path path;
+					if (fs.getFullPath(m_dir, path)) {
+						path.append("/", tmp);
+						if (!os::makePath(path.c_str())) {
+							logError("Failed to create ", path);
+						}
+						changeDir(StaticString<MAX_PATH>(m_dir, "/", tmp), false);
 					}
-					changeDir(StaticString<MAX_PATH>(m_dir, "/", tmp), false);
+					else {
+						logError("Could not resolve ", m_dir);
+					}
 					ImGui::CloseCurrentPopup();
 				}
 				ImGui::SameLine();
@@ -1236,9 +1252,10 @@ struct AssetBrowserImpl : AssetBrowser {
 		os::destroyFileIterator(iter);
 	}
 
-	bool onDropFile(const char* path)  override {
+	bool onDropFile(const char* path) override {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		Path tmp = fs.getFullPath(m_dir);
+		Path tmp;
+		if (!fs.getFullPath(m_dir, tmp)) return false;
 		if (os::dirExists(path)) {
 			copyDir(path, tmp, m_allocator);
 		}
@@ -1383,8 +1400,16 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 
 		Engine& engine = m_app.getEngine();
-		const Path src_full_path = fs.getFullPath(tmp_path);
-		const Path dest_full_path = fs.getFullPath(path);
+		Path src_full_path;
+		if (!fs.getFullPath(tmp_path, src_full_path)) {
+			logError("Could not resolve ", tmp_path);
+			return;
+		}
+		Path dest_full_path;
+		if (!fs.getFullPath(path, dest_full_path)) {
+			logError("Could not resolve ", path);
+			return;
+		}
 		
 		os::deleteFile(dest_full_path);
 
@@ -1490,7 +1515,11 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	void openInExternalEditor(StringView path) const override {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		const Path full_path = fs.getFullPath(path);
+		Path full_path; 
+		if (!fs.getFullPath(path, full_path)) {
+			logError("Could not resolve ", path);
+			return;
+		}
 		const os::ExecuteOpenResult res = os::shellExecuteOpen(full_path, {}, {});
 		if (res == os::ExecuteOpenResult::NO_ASSOCIATION) {
 			logError(full_path, " is not associated with any app.");

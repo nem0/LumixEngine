@@ -40,7 +40,7 @@ struct MemoryFileSystem : FileSystem {
 	bool open(StringView, os::InputFile&) override { return false; }
 	bool open(StringView, os::OutputFile&) override { return false; }
 	void mount(StringView, StringView) override {}
-	Path getFullPath(StringView path) const override { return Path(path); }
+	bool getFullPath(StringView path, Path& out) const override { out = Path(path); return true; }
 	void processCallbacks() override {}
 	bool hasWork() override { return false; }
 	AsyncHandle getContent(const Path&, const ContentCallback&) override { return AsyncHandle::invalid(); }

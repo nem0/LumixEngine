@@ -109,7 +109,7 @@ struct EvoxDiscoveryFileSystem : FileSystem {
 	bool open(StringView, os::InputFile&) override { return false; }
 	bool open(StringView, os::OutputFile&) override { return false; }
 	void mount(StringView, StringView) override {}
-	Path getFullPath(StringView path) const override { return Path(path); }
+	bool getFullPath(StringView path, Path& out) const override { out = Path(path); return true; }
 	bool saveContentSync(const Path&, Span<const u8>) override { return false; }
 	bool getContentSync(const Path& path, OutputMemoryStream& output) override {
 		if (path != Path("engine/scripts/core/attributes.evox")) return false;

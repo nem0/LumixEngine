@@ -45,7 +45,7 @@ struct LUMIX_ENGINE_API FileSystem {
 	virtual bool open(StringView path, os::OutputFile& file) = 0;
 
 	virtual void mount(StringView path, StringView virtual_path) = 0;
-	virtual struct Path getFullPath(StringView virtual_path) const = 0;
+	[[nodiscard]] virtual bool getFullPath(StringView virtual_path, struct Path& out) const = 0;
 	virtual void processCallbacks() = 0;
 	virtual bool hasWork() = 0;
 

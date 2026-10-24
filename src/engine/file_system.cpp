@@ -104,7 +104,7 @@ struct FileSystemImpl : FileSystem {
 		return m_work_counter != 0;
 	}
 
-	Path getFullPath(StringView virtual_path) const override {
+	bool getFullPath(StringView virtual_path, Path& out) const override {
 		if (startsWith(virtual_path, "/") || startsWith(virtual_path, "\\")) {
 			virtual_path.removePrefix(1);
 		}
@@ -112,22 +112,24 @@ struct FileSystemImpl : FileSystem {
 			if (startsWith(virtual_path, m.point)) {
 				// exact match
 				if (virtual_path.size() == m.point.length()) {
-					return Path(m.path);
+					out = m.path;
+					return true;
 				}
 				char next = virtual_path[m.point.length()];
 				if (m.point.length() == 0 || next == '\\' || next == '/') {
 					virtual_path.removePrefix(m.point.length());
-					return Path(m.path, "/", virtual_path);
+					out = Path(m.path, "/", virtual_path);
+					return true;
 				}
 			}
 		}
-		ASSERT(false);
-		return {};
+		return false;
 	}
 
 	bool saveContentSync(const Path& path, Span<const u8> content) override {
 		os::OutputFile file;
-		const Path full_path = getFullPath(path);
+		Path full_path;
+		if (!getFullPath(path, full_path)) return false;
 		if (!file.open(full_path.c_str())) return false;
 
 		bool res = file.write(content.begin(), content.length());
@@ -139,7 +141,8 @@ struct FileSystemImpl : FileSystem {
 	bool getContentSync(const Path& path, OutputMemoryStream& content) override {
 		PROFILE_FUNCTION();
 		os::InputFile file;
-		const Path full_path = getFullPath(path);
+		Path full_path;
+		if (!getFullPath(path, full_path)) return false;
 
 		if (!file.open(full_path.c_str())) return false;
 
@@ -192,61 +195,67 @@ struct FileSystemImpl : FileSystem {
 
 	bool open(StringView path, os::InputFile& file) override
 	{
-		const Path full_path = getFullPath(path);
+		Path full_path;
+		if (!getFullPath(path, full_path)) return false;
 		return file.open(full_path.c_str());
 	}
 
 
-	bool open(StringView path, os::OutputFile& file) override
-	{
-		const Path full_path = getFullPath(path);
+	bool open(StringView path, os::OutputFile& file) override {
+		Path full_path;
+		if (!getFullPath(path, full_path)) return false;
 		return file.open(full_path.c_str());
 	}
 
 
-	bool deleteFile(StringView path) override
-	{
-		const Path full_path = getFullPath(path);
+	bool deleteFile(StringView path) override {
+		Path full_path;
+		if (!getFullPath(path, full_path)) return false;
 		return os::deleteFile(full_path.c_str());
 	}
 
 
-	bool moveFile(StringView from, StringView to) override
-	{
-		const Path full_path_from = getFullPath(from);
-		const Path full_path_to = getFullPath(to);
+	bool moveFile(StringView from, StringView to) override {
+		Path full_path_from;
+		if (!getFullPath(from, full_path_from)) return false;
+		Path full_path_to;
+		if (!getFullPath(to, full_path_to)) return false;
 		return os::moveFile(full_path_from, full_path_to);
 	}
 
 
-	bool copyFile(StringView from, StringView to) override
-	{
-		const Path full_path_from = getFullPath(from);
-		const Path full_path_to = getFullPath(to);
+	bool copyFile(StringView from, StringView to) override {
+		Path full_path_from;
+		if (!getFullPath(from, full_path_from)) return false;
+		Path full_path_to;
+		if (!getFullPath(to, full_path_to)) return false;
 		return os::copyFile(full_path_from, full_path_to);
 	}
 
-
 	bool fileExists(StringView path) override {
-		const Path full_path = getFullPath(path);
+		Path full_path;
+		if (!getFullPath(path, full_path)) return false;
 		return os::fileExists(full_path);
 	}
 
 	bool dirExists(StringView path) override {
-		const Path full_path = getFullPath(path);
+		Path full_path;
+		if (!getFullPath(path, full_path)) return false;
 		return os::dirExists(full_path);
 	}
 
-	u64 getLastModified(StringView path) override
-	{
-		const Path full_path = getFullPath(path);
+	u64 getLastModified(StringView path) override {
+		Path full_path;
+		if (!getFullPath(path, full_path)) return 0;
 		return os::getLastModified(full_path);
 	}
 
 
 	FileIterator* createFileIterator(StringView dir) override
 	{
-		const Path path = getFullPath(dir);
+		Path path;
+		if (!getFullPath(dir, path)) return nullptr;
+
 		FileIterator* iter = LUMIX_NEW(m_allocator, FileIterator);
 		iter->iter = os::createFileIterator(path, m_allocator);
 		iter->fs = this;
