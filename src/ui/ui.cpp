@@ -2212,7 +2212,16 @@ static void wrapInlineRun(Document& doc, Element& parent, i32 start_span_idx, i3
 		StringView text = span.text;
 		if (wrap_enabled) {
 			SpanLine* line = nullptr;
+			bool force_break = false;
 			while (!text.empty()) {
+				// a newline in the whitespace before the next word is a hard line break
+				for (const char* c = text.data; c != text.end() && isWhitespace(*c); ++c) {
+					if (*c == '\n') {
+						force_break = true;
+						line = nullptr;
+						is_prev_space = false;
+					}
+				}
 				is_prev_space = is_prev_space || isWhitespace(*text.data);
 				SplitWord split = doc.m_font_manager->splitFirstWord(span.getFontHandle(), text);
 				if (split.head.empty()) {
@@ -2222,7 +2231,8 @@ static void wrapInlineRun(Document& doc, Element& parent, i32 start_span_idx, i3
 					break;
 				}
 				// we wrap
-				if ((is_prev_space ? space_w : 0) + split.head_width > content_width - x) {
+				if (force_break || (is_prev_space ? space_w : 0) + split.head_width > content_width - x) {
+					force_break = false;
 					line = &span.lines.emplace();
 					line->text = split.head;
 					line->pos.x = 0;
