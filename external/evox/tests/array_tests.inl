@@ -843,20 +843,30 @@ TEST(ForOverArrayRvalue) {
 	return true;
 }
 
-// an index that is an untyped constant expression (comptime N - 1) used to reach the bytecode emitter still untyped: arithmeticKindIndex asserted
+
+// an index that is an untyped constant expression (comptime N - 1) used to reach the bytecode emitter still untyped: arithmeticKindIndex asserted.
+// It must also run: the folded index has to be the right value, not just compile
 TEST(ArrayIndexedByUntypedConstantExpression) {
 	const char* source = R"(
 		comptime N = 4;
 		var g : [N]i32 = zero;
+		var h : [N]f32 = zero;
 
 		fn main() : i32 {
 			g[N - 1] = 40;
-			var local : [N]f32 = zero;
-			local[N - 2] = 2.0;
+			h[N - 2] = 2.0;
+			var local : [N]i32 = zero;
+			local[N - 1] = 3;
 			const s : []i32 = g[0:N];
-			return g[N - 1] + s[N - 1] / 40 + (local[N - 2] as i32) - 1;
+			return g[N - 1] + s[N - 1] / 40 + (h[N - 2] as i32) + local[N - 1] * 100;
 		}
 	)";
-	EXPECT_COMPILE(source);
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(343, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
 	return true;
 }
