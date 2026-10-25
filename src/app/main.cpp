@@ -24,6 +24,11 @@
 #include "ui/ui_system.h"
 #include "imgui_integration.h"
 
+// window title, set with premake's --app-title
+#ifndef LUMIX_APP_TITLE
+	#define LUMIX_APP_TITLE "Lumix App"
+#endif
+
 #ifdef __linux__
 	#define STB_IMAGE_IMPLEMENTATION
 	#include "stb/stb_image.h"
@@ -159,7 +164,7 @@ struct Runner final
 		m_imgui.m_engine = m_engine.get();
 
 		os::InitWindowArgs init_window_args;
-		init_window_args.name = "Lumix App";
+		init_window_args.name = LUMIX_APP_TITLE;
 		m_window = os::createWindow(init_window_args);
 		m_engine->setMainWindow(m_window);
 
@@ -433,4 +438,4 @@ int main(int args, char* argv[]) {
 	os::destroyWindow(win);
 }
 
-#endif
+#endif
