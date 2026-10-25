@@ -140,7 +140,18 @@ struct Runner final
 		if (os::fileExists("main.pak")) {
 			init_data.file_system = FileSystem::createPacked("main.pak", m_allocator);
 		}
-		init_data.log_path = "lumix_app.log";
+		else {
+			char current_dir[MAX_PATH];
+			os::getCurrentDirectory(Span(current_dir));
+			init_data.file_system = FileSystem::create(init_data.engine_data_dir ? init_data.engine_data_dir : current_dir, m_allocator);
+		}
+
+		// log is opened inside Engine::create, so the exe dir must be mounted before that
+		char exe_path[MAX_PATH];
+		os::getExecutablePath(Span(exe_path));
+		const StringView exe_dir = Path::getDir(exe_path);
+		init_data.file_system->mount(exe_dir, "exe");
+		init_data.log_path = "exe/lumix_app.log";
 
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
 		if (!data_dir[0]) os::getCurrentDirectory(Span(data_dir));
