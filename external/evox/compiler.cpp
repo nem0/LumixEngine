@@ -3942,6 +3942,8 @@ struct Checker {
 			errorLine(expr.token, "Cannot index with type ", index_expr->resolved_type, ", expected integer type");
 			return nullptr;
 		}
+		// An untyped constant expression such as `N - 1` stays untyped when nothing gives it a type: pin it, the bytecode needs a concrete integer to index with
+		if (index_expr->resolved_type->kind == ResolvedTypeKind::UNTYPED_INT && !makeConcrete(*index_expr, primitiveType(ResolvedTypeKind::I32))) return nullptr;
 
 		if (base_type->kind == ResolvedTypeKind::ARRAY) {
 			const ArrayResolvedType* arr = static_cast<const ArrayResolvedType*>(base_type);

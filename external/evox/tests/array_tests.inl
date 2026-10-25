@@ -842,3 +842,21 @@ TEST(ForOverArrayRvalue) {
 	CAPI_END(module);
 	return true;
 }
+
+// an index that is an untyped constant expression (comptime N - 1) used to reach the bytecode emitter still untyped: arithmeticKindIndex asserted
+TEST(ArrayIndexedByUntypedConstantExpression) {
+	const char* source = R"(
+		comptime N = 4;
+		var g : [N]i32 = zero;
+
+		fn main() : i32 {
+			g[N - 1] = 40;
+			var local : [N]f32 = zero;
+			local[N - 2] = 2.0;
+			const s : []i32 = g[0:N];
+			return g[N - 1] + s[N - 1] / 40 + (local[N - 2] as i32) - 1;
+		}
+	)";
+	EXPECT_COMPILE(source);
+	return true;
+}
