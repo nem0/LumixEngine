@@ -1,3 +1,4 @@
+#include "core/command_line_parser.h"
 #include "core/log.h"
 #include "core/os.h"
 #include "core/tag_allocator.h"
@@ -456,6 +457,11 @@ struct DLSSPlugin : RenderPlugin {
 
 bool initDLSS(Renderer& renderer, IAllocator& allocator) {
 	if (g_ngx.initialized) return true;
+
+	if (CommandLineParser::isOn("-no_dlss")) {
+		logInfo("DLSS disabled by -no_dlss");
+		return false;
+	}
 
 	// Runtime gate: no NGX libs/symbols => no DLSS path.
 	if (!loadNGXApi()) {

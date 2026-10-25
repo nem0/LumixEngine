@@ -1,3 +1,4 @@
+#include "core/command_line_parser.h"
 #include "core/job_system.h"
 #include "core/log.h"
 #include "core/os.h"
@@ -228,6 +229,10 @@ struct FSR3Plugin : RenderPlugin {
 
 // init FSR3 if available
 void initFSR3(Renderer& renderer, IAllocator& allocator) {
+	if (CommandLineParser::isOn("-no_fsr")) {
+		logInfo("FSR3 disabled by -no_fsr");
+		return;
+	}
 	void* ffx_lib = os::loadLibrary("amd_fidelityfx_dx12.dll");
 	if (!ffx_lib) return;
 
