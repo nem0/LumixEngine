@@ -336,7 +336,7 @@ void bindIndexBuffer(BufferHandle buffer);
 void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride);
 void bindUniformBuffer(u32 ub_index, BufferHandle buffer, size_t offset, size_t size);
 void bindIndirectBuffer(BufferHandle buffer);
-// strides[i] is the element size of the StructuredBuffer the shader declares for slot i, 0 for a typed R32 view
+// strides[i] is the element size of the StructuredBuffer the shader declares for slot i, 0 for a raw ByteAddressBuffer view
 void bindShaderBuffers(Span<BufferHandle> buffers, Span<const u32> strides);
 
 void drawArrays(u32 offset, u32 count);

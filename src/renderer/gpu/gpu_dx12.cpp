@@ -54,6 +54,8 @@ static constexpr u32 INVALID_HEAP_ID = 0xffFFffFF;
 static constexpr u32 BINDLESS_SRV_ROOT_PARAMETER_INDEX = 6;
 static constexpr u32 BINDLESS_SAMPLERS_ROOT_PARAMETER_INDEX = 7;
 static constexpr u32 SRV_ROOT_PARAMETER_INDEX = 8;
+static constexpr u32 UNIFORM_BLOCK_COUNT = 6;
+static constexpr u32 ALL_UNIFORM_BLOCKS_DIRTY = (1 << UNIFORM_BLOCK_COUNT) - 1;
 
 static DXGI_FORMAT getDXGIFormat(const Attribute& attr) {
 	const bool as_int = attr.flags & Attribute::AS_INT;
@@ -171,6 +173,7 @@ struct FormatDesc {
 			case TextureFormat::RGBA32F: return {		false,		16, DXGI_FORMAT_R32G32B32A32_TYPELESS,	DXGI_FORMAT_R32G32B32A32_FLOAT,		DXGI_FORMAT_UNKNOWN};
 			case TextureFormat::RG32F: return {			false,		8,	DXGI_FORMAT_R32G32_TYPELESS,		DXGI_FORMAT_R32G32_FLOAT,			DXGI_FORMAT_UNKNOWN};
 			case TextureFormat::RGB32F: return {		false,		12,	DXGI_FORMAT_R32G32B32_TYPELESS,		DXGI_FORMAT_R32G32B32_FLOAT,		DXGI_FORMAT_UNKNOWN};
+			case TextureFormat::R16F: return {			false,		2,	DXGI_FORMAT_R16_TYPELESS,			DXGI_FORMAT_R16_FLOAT,				DXGI_FORMAT_UNKNOWN};
 			case TextureFormat::R32F: return {			false,		4,	DXGI_FORMAT_R32_TYPELESS,			DXGI_FORMAT_R32_FLOAT,				DXGI_FORMAT_UNKNOWN};
 			case TextureFormat::RG16F: return {			false,		4,	DXGI_FORMAT_R16G16_TYPELESS,		DXGI_FORMAT_R16G16_FLOAT,			DXGI_FORMAT_UNKNOWN};
 
@@ -313,9 +316,10 @@ struct Program {
 	StateFlags state;
 	D3D12_PRIMITIVE_TOPOLOGY primitive_topology;
 	D3D12_PRIMITIVE_TOPOLOGY_TYPE primitive_topology_type;
-	// for CS, there's 1:1 mapping from `shader_hash` to PSO
-	// for VS/PS, there's 1:1 mapping from `shader_hash` and RT formats to PSO
-	StableHash shader_hash;
+	// `pso_hash` is source hash + vertex layout, it is not used as a key of the shader bytecode cache
+	// for CS, there's 1:1 mapping from `pso_hash` to PSO
+	// for VS/PS, there's 1:1 mapping from `pso_hash` and RT formats to PSO
+	StableHash pso_hash;
 	String disassembly;
 	StaticString<64> name;
 };
@@ -408,7 +412,21 @@ struct ShaderCompiler {
 		}
 
 		const StableHash hash = hasher.end64();
-		program.shader_hash = hash;
+
+		// same shader can be used with different vertex layouts, so the layout is a part of the PSO key
+		RollingStableHasher pso_hasher;
+		pso_hasher.begin();
+		pso_hasher.update(&hash, sizeof(hash));
+		pso_hasher.update(&program.attribute_count, sizeof(program.attribute_count));
+		for (u32 i = 0; i < program.attribute_count; ++i) {
+			const D3D12_INPUT_ELEMENT_DESC& attr = program.attributes[i];
+			pso_hasher.update(&attr.Format, sizeof(attr.Format));
+			pso_hasher.update(&attr.InputSlot, sizeof(attr.InputSlot));
+			pso_hasher.update(&attr.AlignedByteOffset, sizeof(attr.AlignedByteOffset));
+			pso_hasher.update(&attr.InputSlotClass, sizeof(attr.InputSlotClass));
+			pso_hasher.update(&attr.InstanceDataStepRate, sizeof(attr.InstanceDataStepRate));
+		}
+		program.pso_hash = pso_hasher.end64();
 
 		if (type == ShaderType::SURFACE) {
 			auto iter = m_cache.find(hash);
@@ -581,7 +599,7 @@ struct PSOCache {
 	{}
 
 	ID3D12PipelineState* getPipelineStateCompute(ID3D12Device* device, ID3D12RootSignature* root_signature, ProgramHandle program) {
-		auto iter = cache.find(program->shader_hash);
+		auto iter = cache.find(program->pso_hash);
 		if (iter.isValid()) return iter.value();
 
 		if (!program->cs) return nullptr;
@@ -596,7 +614,7 @@ struct PSOCache {
 		ID3D12PipelineState* pso;
 		HRESULT hr = device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&pso));
 		ASSERT(hr == S_OK);
-		cache.insert(program->shader_hash, pso);
+		cache.insert(program->pso_hash, pso);
 		return pso;
 	}
 
@@ -610,18 +628,17 @@ struct PSOCache {
 		Program& p = *program;
 		RollingStableHasher hasher;
 		hasher.begin();
-		hasher.update(&p.shader_hash, sizeof(p.shader_hash));
+		hasher.update(&p.pso_hash, sizeof(p.pso_hash));
 		hasher.update(&fb.ds_format, sizeof(fb.ds_format));
 		hasher.update(&fb.formats[0], sizeof(fb.formats[0]) * fb.count);
 		const StableHash hash = hasher.end64();
 
 		auto iter = cache.find(hash);
 		if (iter.isValid()) {
-			last = iter.value();
 			return iter.value();
 		}
 
-		if (!program->vs && !program->ps && !program->cs) return nullptr;
+		if (!p.vs || !p.ps) return nullptr;
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
 		if (p.vs) desc.VS = {p.vs->GetBufferPointer(), p.vs->GetBufferSize()};
@@ -762,15 +779,13 @@ struct PSOCache {
 		HRESULT hr = device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pso));
 		ASSERT(hr == S_OK);
 		cache.insert(hash, pso);
-		last = pso;
 		return pso;
 	}
 
 	// TODO separate compute and graphics cache
-	// TODO graphics cache should be [framebuffer][shader_hash] -> PSO, and [framebuffer] can be computed once in setFramebuffer
+	// TODO graphics cache should be [framebuffer][pso_hash] -> PSO, and [framebuffer] can be computed once in setFramebuffer
 	TagAllocator allocator;
 	HashMap<StableHash, ID3D12PipelineState*> cache;
-	ID3D12PipelineState* last = nullptr;
 };
 
 // TODO actually use gpu::TextureHandle.flags 
@@ -844,8 +859,8 @@ struct SRVUAVHeap {
 		D3D12_GPU_DESCRIPTOR_HANDLE gpu = heap->GetGPUDescriptorHandleForHeapStart();
 		ASSERT(gpu.ptr);
 		D3D12_CPU_DESCRIPTOR_HANDLE cpu = heap->GetCPUDescriptorHandleForHeapStart();
-		gpu.ptr += (frame * max_transient_count + transient_count) * handle_increment_size;
-		cpu.ptr += (frame * max_transient_count + transient_count) * handle_increment_size;
+		gpu.ptr += (max_resource_count * 2 + frame * max_transient_count + transient_count) * handle_increment_size;
+		cpu.ptr += (max_resource_count * 2 + frame * max_transient_count + transient_count) * handle_increment_size;
 		for (u32 i = 0; i < resources.length(); ++i) {
 			if (resources[i]) device->CreateShaderResourceView(resources[i], &srv_descs[i], cpu);
 			cpu.ptr += handle_increment_size;
@@ -875,7 +890,7 @@ struct SRVUAVHeap {
 		max_transient_count = num_transient;
 		max_resource_count = num_resources;
 		for (u32 i = 2; i < max_resource_count; ++i) {
-			free_list.push(i * 2 + max_transient_count * NUM_BACKBUFFERS);
+			free_list.push(i * 2);
 		}
 }
 
@@ -903,8 +918,9 @@ struct SRVUAVHeap {
 		cpu.ptr += handle_increment_size * 2;
 		D3D12_SHADER_RESOURCE_VIEW_DESC bsrv_desc = {};
 		bsrv_desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-		bsrv_desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		bsrv_desc.Format = DXGI_FORMAT_R32_TYPELESS;
 		bsrv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		bsrv_desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
 		device->CreateShaderResourceView(nullptr, &bsrv_desc, cpu);
 
 		this->num_resouces = 2;
@@ -1187,9 +1203,11 @@ struct D3D {
 	RTVDSVHeap rtv_heap;
 	RTVDSVHeap ds_heap;
 	ShaderCompiler shader_compiler;
-	D3D12_GPU_VIRTUAL_ADDRESS uniform_blocks[6];
+	D3D12_GPU_VIRTUAL_ADDRESS uniform_blocks[UNIFORM_BLOCK_COUNT] = {};
 	u32 dirty_compute_uniform_blocks = 0;
 	u32 dirty_gfx_uniform_blocks = 0;
+	// program whose PSO and root arguments are currently set on cmd_list, INVALID_PROGRAM forces them to be set again
+	ProgramHandle last_program = INVALID_PROGRAM;
 	u64 frame_number = 0;
 	u32 debug_groups_depth = 0;
 	StaticString<128> debug_groups_queue[8];
@@ -1205,11 +1223,20 @@ struct D3D {
 
 static Local<D3D> d3d;
 
+// root arguments (CBVs, descriptor tables) and PSO are lost whenever the command list is reset
+// or used by external code, so everything cached in d3d must be applied again
+static void invalidateBoundState() {
+	d3d->last_program = INVALID_PROGRAM;
+	d3d->dirty_compute_uniform_blocks = ALL_UNIFORM_BLOCKS_DIRTY;
+	d3d->dirty_gfx_uniform_blocks = ALL_UNIFORM_BLOCKS_DIRTY;
+}
+
 void resetCommandList() {
 	d3d->cmd_list->SetGraphicsRootSignature(d3d->root_signature);
 	d3d->cmd_list->SetComputeRootSignature(d3d->root_signature);
 	ID3D12DescriptorHeap* heaps[] = {d3d->srv_heap.heap, d3d->sampler_heap.heap};
 	d3d->cmd_list->SetDescriptorHeaps(lengthOf(heaps), heaps);
+	invalidateBoundState();
 }
 
 void* getDX12CommandList() {
@@ -1547,8 +1574,8 @@ static void tryLoadRenderDoc() {
 	if (!lib) return;
 	pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)GetProcAddress(lib, "RENDERDOC_GetAPI");
 	if (RENDERDOC_GetAPI) {
-		RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_0_2, (void**)&d3d->rdoc_api);
-		d3d->rdoc_api->MaskOverlayBits(~RENDERDOC_OverlayBits::eRENDERDOC_Overlay_Enabled, 0);
+		if (!RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_0_2, (void**)&d3d->rdoc_api)) d3d->rdoc_api = nullptr;
+		if (d3d->rdoc_api) d3d->rdoc_api->MaskOverlayBits(~RENDERDOC_OverlayBits::eRENDERDOC_Overlay_Enabled, 0);
 	}
 	// FreeLibrary(lib);
 }
@@ -1584,12 +1611,18 @@ void destroy(ProgramHandle program) {
 	checkThread();
 
 	ASSERT(program);
+	// a new program can be allocated at the same address, it must not be mistaken for the bound one
+	if (d3d->last_program == program) d3d->last_program = INVALID_PROGRAM;
+	if (d3d->current_program == program) d3d->current_program = INVALID_PROGRAM;
 	LUMIX_DELETE(d3d->allocator, program);
 }
 
 void destroy(TextureHandle texture) {
 	checkThread();
 	ASSERT(texture);
+	for (TextureHandle& attachment : d3d->current_framebuffer.attachments) {
+		if (attachment == texture) attachment = INVALID_TEXTURE;
+	}
 	Texture& t = *texture;
 	debug::unregisterAlloc(t.allocation_info);
 	if (t.resource && !t.is_view) d3d->frame->to_release.push(t.resource);
@@ -1774,23 +1807,31 @@ void readTexture(TextureHandle texture, TextureReadCallback callback) {
 		callback.invoke(Span<const u8>());	// the data would not match the texture size, report failure instead
 		return;
 	}
-	bool is_cubemap = isFlagSet(texture->flags, gpu::TextureFlags::IS_CUBE);
+	// 3D textures have only mip subresources, depth slices are part of the footprint
+	const u32 array_size = desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D ? 1 : desc.DepthOrArraySize;
 
-	u64 face_bytes = 0;
+	u64 total_bytes = 0;
 	D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts[16 * 6];
-	ASSERT(desc.MipLevels <= (int)lengthOf(layouts));
+	if (desc.MipLevels * array_size > (u32)lengthOf(layouts)) {
+		logError("Texture read requested on a texture with too many subresources");
+		callback.invoke(Span<const u8>());
+		return;
+	}
 	d3d->device->GetCopyableFootprints(&desc
 		, 0
-		, desc.MipLevels * desc.DepthOrArraySize 
+		, desc.MipLevels * array_size
 		, 0
 		, layouts
 		, nullptr
 		, nullptr
-		, &face_bytes
+		, &total_bytes
 	);
 
-	ID3D12Resource* staging = createBuffer(d3d->device, nullptr, face_bytes * (is_cubemap ? 6 : 1), D3D12_HEAP_TYPE_READBACK, "staging");
-	if (!staging) return; // device removed, the callback is not called
+	ID3D12Resource* staging = createBuffer(d3d->device, nullptr, total_bytes, D3D12_HEAP_TYPE_READBACK, "staging");
+	if (!staging) {
+		callback.invoke(Span<const u8>()); // device removed, report failure
+		return;
+	}
 	const D3D12_RESOURCE_STATES prev_state = texture->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_COPY_SOURCE);
 	
 	D3D12_TEXTURE_COPY_LOCATION src_location = {};
@@ -1801,7 +1842,7 @@ void readTexture(TextureHandle texture, TextureReadCallback callback) {
 	dst_location.pResource = staging;
 	dst_location.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
 
-	for (int face = 0; face < (is_cubemap ? 6 : 1); ++face) {
+	for (u32 face = 0; face < array_size; ++face) {
 		for (u32 mip = 0; mip < desc.MipLevels; ++mip) {
 			src_location.SubresourceIndex = calcSubresource(mip, face, desc.MipLevels);
 			const auto& layout = layouts[src_location.SubresourceIndex];
@@ -1824,7 +1865,7 @@ void readTexture(TextureHandle texture, TextureReadCallback callback) {
 	Frame::TextureRead& wait = d3d->frame->texture_reads.emplace();
 	wait.staging = staging;
 	wait.callback = callback;
-	wait.num_layouts = desc.DepthOrArraySize * desc.MipLevels;
+	wait.num_layouts = array_size * desc.MipLevels;
 	wait.dst_total_bytes = 0;
 	for (u32 mip = 0; mip < desc.MipLevels; ++mip) {
 		const auto& footprint = layouts[mip].Footprint;
@@ -2354,7 +2395,12 @@ void popDebugGroup() {
 }
 
 void setFramebufferCube(TextureHandle cube, u32 face, u32 mip) {
-	d3d->pso_cache.last = nullptr;
+	d3d->last_program = INVALID_PROGRAM;
+	for (TextureHandle& texture : d3d->current_framebuffer.attachments) {
+		if (texture) texture->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_GENERIC_READ);
+		texture = INVALID_TEXTURE;
+	}
+	d3d->current_framebuffer.attachments[0] = cube;
 	D3D12_CPU_DESCRIPTOR_HANDLE rt;
 
 	D3D12_RENDER_TARGET_VIEW_DESC desc = {};
@@ -2376,10 +2422,11 @@ void setFramebufferCube(TextureHandle cube, u32 face, u32 mip) {
 
 void setFramebuffer(const TextureHandle* attachments, u32 num, TextureHandle depth_stencil, FramebufferFlags flags) {
 	checkThread();
-	d3d->pso_cache.last = nullptr;
+	d3d->last_program = INVALID_PROGRAM;
 
 	for (TextureHandle& texture : d3d->current_framebuffer.attachments) {
 		if (texture) texture->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_GENERIC_READ);
+		texture = INVALID_TEXTURE;
 	}
 
 	const bool readonly_depth = u32(flags & FramebufferFlags::READONLY_DEPTH);
@@ -2510,6 +2557,10 @@ void setCurrentWindow(void* window_handle) {
 
 		if (!createSwapchain((HWND)window_handle, window, vsync)) {
 			logError("Failed to create swapchain");
+			// a window without a swapchain must not be used by present()
+			window.handle = nullptr;
+			window.swapchain = nullptr;
+			d3d->current_window = &d3d->windows[0];
 		}
 		return;
 	}
@@ -2539,8 +2590,6 @@ void enableVSync(bool enable) {
 	d3d->vsync_dirty = true;
 }
 
-static ProgramHandle g_last_program = INVALID_PROGRAM;
-
 void pushGPUCounters() {
 	if (!d3d->nvml_lib) return;
 
@@ -2568,7 +2617,6 @@ u32 present() {
 	const bool vsync_dirty = d3d->vsync_dirty;
 	d3d->vsync_dirty = false;
 	d3d->vsync_mutex.exit();
-	d3d->pso_cache.last = nullptr;
 	for (auto& window : d3d->windows) {
 		if (!window.handle) continue;
 
@@ -2608,10 +2656,9 @@ u32 present() {
 	d3d->frame->scratch_buffer_ptr = d3d->frame->scratch_buffer_begin;
 	d3d->frame->cmd_allocator->Reset();
 	d3d->cmd_list->Reset(d3d->frame->cmd_allocator, nullptr);
-	d3d->cmd_list->SetGraphicsRootSignature(d3d->root_signature);
-	d3d->cmd_list->SetComputeRootSignature(d3d->root_signature);
-	ID3D12DescriptorHeap* heaps[] = { d3d->srv_heap.heap, d3d->sampler_heap.heap };
-	d3d->cmd_list->SetDescriptorHeaps(lengthOf(heaps), heaps);
+	// transient SRV table of the previous frame is not valid anymore
+	d3d->bound_shader_buffers = {};
+	resetCommandList();
 
 	for (auto& window : d3d->windows) {
 		if (!window.handle) continue;
@@ -2635,8 +2682,25 @@ u32 present() {
 			if (!createSwapchain((HWND)window.handle, window, vsync)) {
 				logError("Failed to create swapchain");
 			}
+			continue;
 		}
-		else if ((size != window.size && size.x != 0)) {
+
+		if (vsync) {
+			PROFILE_BLOCK("IDXGISwapChain3::Present");
+			const HRESULT present_hr = window.swapchain->Present(1, 0);
+			if (FAILED(present_hr)) logDeviceRemoved(d3d->device, present_hr, "IDXGISwapChain3::Present");
+		}
+		else {
+			PROFILE_BLOCK("IDXGISwapChain3::Present");
+			const HRESULT present_hr = window.swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
+			if (FAILED(present_hr)) logDeviceRemoved(d3d->device, present_hr, "IDXGISwapChain3::Present");
+		}
+
+		//DXGI_FRAME_STATISTICS stats;
+		//window.swapchain->GetFrameStatistics(&stats);
+
+		// resize only after the present, ResizeBuffers discards the content of the backbuffers
+		if (size != window.size && size.x != 0) {
 			window.size = size;
 
 			for (Frame& f : d3d->frames) f.wait();
@@ -2654,33 +2718,11 @@ u32 present() {
 				window.backbuffers[i]->SetName(L"window_rb");
 			}
 		}
+
+		const UINT current_idx = window.swapchain->GetCurrentBackBufferIndex();
+		switchState(d3d->cmd_list, window.backbuffers[current_idx], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	}
 
-	if (!vsync_dirty) {
-		for (auto& window : d3d->windows) {
-			if (!window.handle) continue;
-			if (window.last_used_frame + 1 != d3d->frame_number && &window != d3d->windows) continue;
-
-			if (vsync) {
-				PROFILE_BLOCK("IDXGISwapChain3::Present");
-				const HRESULT present_hr = window.swapchain->Present(1, 0);
-				if (FAILED(present_hr)) logDeviceRemoved(d3d->device, present_hr, "IDXGISwapChain3::Present");
-			}
-			else {
-				PROFILE_BLOCK("IDXGISwapChain3::Present");
-				const HRESULT present_hr = window.swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
-				if (FAILED(present_hr)) logDeviceRemoved(d3d->device, present_hr, "IDXGISwapChain3::Present");
-			}
-		
-			//DXGI_FRAME_STATISTICS stats;
-			//window.swapchain->GetFrameStatistics(&stats);
-
-			const UINT current_idx = window.swapchain->GetCurrentBackBufferIndex();
-			switchState(d3d->cmd_list, window.backbuffers[current_idx], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		}
-	}
-
-	g_last_program = INVALID_PROGRAM;
 	return frame_idx;
 }
 
@@ -2719,23 +2761,23 @@ void createBuffer(BufferHandle buffer, BufferFlags flags, size_t size, const voi
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
 	srv_desc = {};
-	srv_desc.Format = DXGI_FORMAT_R32_UINT;
+	srv_desc.Format = DXGI_FORMAT_R32_TYPELESS;
 	srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	srv_desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 	srv_desc.Buffer.FirstElement = 0;
 	srv_desc.Buffer.NumElements = UINT(size / sizeof(u32));
 	srv_desc.Buffer.StructureByteStride = 0;
-	srv_desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+	srv_desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
 
 	if (shader_buffer) {
 		D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc = {};
 		uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-		uav_desc.Format = DXGI_FORMAT_R32_UINT;
+		uav_desc.Format = DXGI_FORMAT_R32_TYPELESS;
 		uav_desc.Buffer.CounterOffsetInBytes = 0;
 		uav_desc.Buffer.FirstElement = 0;
 		uav_desc.Buffer.NumElements = srv_desc.Buffer.NumElements;
 		uav_desc.Buffer.StructureByteStride = 0;
-		uav_desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+		uav_desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
 
 		d3d->srv_heap.alloc(d3d->device, buffer->heap_id, buffer->resource, srv_desc, &uav_desc);
 	}
@@ -2880,6 +2922,8 @@ void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	const bool is_cubemap = u32(flags & TextureFlags::IS_CUBE);
 	const bool compute_write = u32(flags & TextureFlags::COMPUTE_WRITE);
 	const bool render_target = u32(flags & TextureFlags::RENDER_TARGET);
+	// R32F and D32 share the same backing format, so the depth-ness must come from the texture format
+	const bool is_depth = format == TextureFormat::D32 || format == TextureFormat::D24S8;
 
 	switch (format) {
 		case TextureFormat::R8:
@@ -2927,7 +2971,7 @@ void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	desc.Format = FormatDesc::get(format).backing;
 	desc.SampleDesc.Count = 1;
 	desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-	desc.Flags = render_target ? (isDepthFormat(desc.Format) ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET) : D3D12_RESOURCE_FLAG_NONE;
+	desc.Flags = render_target ? (is_depth ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET) : D3D12_RESOURCE_FLAG_NONE;
 	if (compute_write) desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
 	texture.name = debug_name;
@@ -2941,7 +2985,7 @@ void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	D3D12_CLEAR_VALUE* clear_val_ptr = nullptr;
 	if (render_target) {
 		clear_val_ptr = &clear_val;
-		if (isDepthFormat(desc.Format)) {
+		if (is_depth) {
 			clear_val.Format = toDSViewFormat(texture.dxgi_format);
 			clear_val.DepthStencil.Depth = 0.0f;
 			clear_val.DepthStencil.Stencil = 0;
@@ -2955,7 +2999,7 @@ void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 		}
 	}
 
-	texture.state = isDepthFormat(desc.Format) ? D3D12_RESOURCE_STATE_COMMON : (compute_write ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : D3D12_RESOURCE_STATE_GENERIC_READ);
+	texture.state = is_depth ? D3D12_RESOURCE_STATE_COMMON : (compute_write ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : D3D12_RESOURCE_STATE_GENERIC_READ);
 	const HRESULT create_hr = d3d->device->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &desc, texture.state, clear_val_ptr, IID_PPV_ARGS(&texture.resource));
 	if (FAILED(create_hr)) {
 		// texture.resource stays null: the handle is valid but unusable, and update()/copies check for that
@@ -3121,10 +3165,7 @@ bool getDisassembly(ProgramHandle program, String& output) {
 
 
 void useProgram(ProgramHandle handle) {
-	if (handle != d3d->current_program) {
-		d3d->pso_cache.last = nullptr;
-		d3d->current_program = handle;
-	}
+	d3d->current_program = handle;
 }
 
 void scissor(u32 x, u32 y, u32 w, u32 h) {
@@ -3144,7 +3185,7 @@ enum class PipelineType {
 
 static void applyComputeUniformBlocks() {
 	if (d3d->dirty_compute_uniform_blocks == 0) return;
-	for (u32 i = 0; i < 6; ++i) {
+	for (u32 i = 0; i < UNIFORM_BLOCK_COUNT; ++i) {
 		if (d3d->dirty_compute_uniform_blocks & (1 << i)) {
 			d3d->cmd_list->SetComputeRootConstantBufferView(i, d3d->uniform_blocks[i]);
 		}
@@ -3153,10 +3194,10 @@ static void applyComputeUniformBlocks() {
 }
 
 [[nodiscard]] static bool setPipelineStateCompute() {
-	if (g_last_program != d3d->current_program) {
-		g_last_program = d3d->current_program;
+	if (d3d->last_program != d3d->current_program) {
 		ID3D12PipelineState* pso = d3d->pso_cache.getPipelineStateCompute(d3d->device, d3d->root_signature, d3d->current_program);
 		if (!pso) return false;
+		d3d->last_program = d3d->current_program;
 		d3d->cmd_list->SetPipelineState(pso);
 		d3d->cmd_list->SetComputeRootDescriptorTable(BINDLESS_SRV_ROOT_PARAMETER_INDEX, d3d->srv_heap.gpu_begin);
 		d3d->cmd_list->SetComputeRootDescriptorTable(BINDLESS_SAMPLERS_ROOT_PARAMETER_INDEX, d3d->sampler_heap.gpu_begin);
@@ -3167,8 +3208,8 @@ static void applyComputeUniformBlocks() {
 }
 
 [[nodiscard]] static bool setPipelineStateGraphics() {
-	if (g_last_program != d3d->current_program) {
-		const u8 stencil_ref = u8(u64(d3d->current_program->state) >> 34);
+	if (d3d->last_program != d3d->current_program) {
+		const u8 stencil_ref = u8(u64(d3d->current_program->state) >> 35);
 		d3d->cmd_list->OMSetStencilRef(stencil_ref);
 
 		ID3D12PipelineState* pso = d3d->pso_cache.getPipelineState(d3d->device, d3d->current_program, d3d->current_framebuffer, d3d->root_signature);
@@ -3177,11 +3218,11 @@ static void applyComputeUniformBlocks() {
 		d3d->cmd_list->SetGraphicsRootDescriptorTable(BINDLESS_SRV_ROOT_PARAMETER_INDEX, d3d->srv_heap.gpu_begin);
 		d3d->cmd_list->SetGraphicsRootDescriptorTable(BINDLESS_SAMPLERS_ROOT_PARAMETER_INDEX, d3d->sampler_heap.gpu_begin);
 		if (d3d->bound_shader_buffers.ptr) d3d->cmd_list->SetGraphicsRootDescriptorTable(SRV_ROOT_PARAMETER_INDEX, d3d->bound_shader_buffers);
-		g_last_program = d3d->current_program;
+		d3d->last_program = d3d->current_program;
 	}
-	
+
 	if (d3d->dirty_gfx_uniform_blocks == 0) return true;
-	for (u32 i = 0; i < 6; ++i) {
+	for (u32 i = 0; i < UNIFORM_BLOCK_COUNT; ++i) {
 		if (d3d->dirty_gfx_uniform_blocks & (1 << i)) {
 			d3d->cmd_list->SetGraphicsRootConstantBufferView(i, d3d->uniform_blocks[i]);
 		}
@@ -3236,16 +3277,17 @@ void bindShaderBuffers(Span<BufferHandle> buffers, Span<const u32> strides) {
 			descs[i].ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 			// a StructuredBuffer<T> in the shader needs a structured view with the size of T, validation checks it
 			const u32 stride = strides[i];
-			descs[i].Format = stride ? DXGI_FORMAT_UNKNOWN : DXGI_FORMAT_R32_UINT;
+			descs[i].Format = stride ? DXGI_FORMAT_UNKNOWN : DXGI_FORMAT_R32_TYPELESS;
 			descs[i].Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 			descs[i].Buffer.FirstElement = 0;
 			descs[i].Buffer.NumElements = UINT(buffers[i]->size / (stride ? stride : sizeof(u32)));
 			descs[i].Buffer.StructureByteStride = stride;
-			descs[i].Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+			descs[i].Buffer.Flags = stride ? D3D12_BUFFER_SRV_FLAG_NONE : D3D12_BUFFER_SRV_FLAG_RAW;
 			buffers[i]->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_GENERIC_READ);
 		}
 	}
 	d3d->bound_shader_buffers = d3d->srv_heap.allocTransient(d3d->device, Span(resources, buffers.length()), Span(descs, buffers.length()));
+	d3d->last_program = INVALID_PROGRAM;
 }
 
 void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t size) {
@@ -3350,10 +3392,7 @@ void drawIndirect(DataType index_type, u32 indirect_buffer_offset) {
 
 void draw(const Drawcall& draw) {
 	D3D* d = d3d.get();
-	if (draw.program != d->current_program) {
-		d->pso_cache.last = nullptr;
-		d->current_program = draw.program;
-	}
+	d->current_program = draw.program;
 
 	if (!setPipelineStateGraphics()) return;
 	
@@ -3443,7 +3482,7 @@ void drawIndexed(u32 offset_bytes, u32 count, DataType index_type) {
 			break;
 	}
 
-	ASSERT((offset_bytes & (offset_shift - 1)) == 0);
+	ASSERT((offset_bytes & ((1 << offset_shift) - 1)) == 0);
 	ASSERT(d3d->current_index_buffer);
 	D3D12_INDEX_BUFFER_VIEW ibv = {};
 	ibv.BufferLocation = d3d->current_index_buffer->gpu_address + offset_bytes;
