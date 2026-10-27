@@ -23,6 +23,7 @@ namespace ui {
 struct Document;
 struct Element;
 
+//@ enum full ui::Tag
 enum class Tag : u8 {
 	BOX,
 	IMAGE,
@@ -266,6 +267,8 @@ struct LUMIX_UI_API Element {
 		
 	Document& m_document;
 	Tag tag;
+	i32 parent = -1;
+	u32 index = 0xffFFffFF;
 	Array<u32> children;
 	Array<Attribute> attributes;
 	Array<InternString> classes;
@@ -420,6 +423,8 @@ struct LUMIX_UI_API Document {
 	enum class ScaleMatch : u8 { HEIGHT, WIDTH, MIN, MAX };
 	ScaleMatch m_scale_match = ScaleMatch::HEIGHT;
 	bool m_layout_dirty = false;
+	bool m_styles_dirty = false;
+	i32 m_first_free_element = -1; // head of the free list of destroyed elements, next link is stored in Element::parent
 	float m_layout_duration = 0;
 	float m_parse_duration = 0;
 	float m_render_duration = 0;
@@ -453,6 +458,10 @@ struct LUMIX_UI_API Document {
 	float computeScale(Vec2 canvas_size) const;
 	//@ function
 	Element* getElementByID(const char* id);
+	//@ function
+	Element& createElement(Tag tag, i32 parent);
+	//@ function
+	void destroyElement(Element& el);
 
 	void addClass(u32 element_index, StringView classname);
 	void removeClass(u32 element_index, StringView classname);

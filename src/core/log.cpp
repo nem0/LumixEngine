@@ -1,7 +1,9 @@
 #include "core/crt.h"
+#include "core/debug.h"
 #include "core/delegate_list.h"
 #include "core/log.h"
 #include "core/log_callback.h"
+#include "core/os.h"
 #include "core/path.h"
 #include "core/stream.h"
 #include "core/string.h"
@@ -54,6 +56,11 @@ namespace detail {
 			g_logger.callback.invoke(level, (const char*)g_log.message.data());
 		}
 		g_log.message.clear();
+	}
+
+	void terminate() {
+		debug::logCallstack();
+		os::abort();
 	}
 
 	LogCallback& getLogCallback() { return g_logger.callback; }

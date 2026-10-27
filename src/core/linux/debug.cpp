@@ -1,5 +1,6 @@
 #include "core/debug.h"
 #include "core/default_allocator.h"
+#include "core/log.h"
 #include "core/stack_tree.h"
 #include "core/string.h"
 #include "core/tag_allocator.h"
@@ -168,6 +169,15 @@ void debugOutput(const char* message) {
 }
 void debugBreak() {
 	std::abort();
+}
+void logCallstack() {
+	if (!s_stack_tree.get()) return;
+	for (StackNode* node = s_stack_tree->record(); node; node = StackTree::getParent(node)) {
+		char fn[256] = "N/A";
+		int line = -1;
+		StackTree::getFunction(node, Span(fn), line);
+		logError("\t", fn);
+	}
 }
 void enableFloatingPointTraps(bool) {}
 

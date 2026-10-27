@@ -5418,6 +5418,20 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret);
 	}
 	
+	static void evox_object_Document_createElement_4272656930717277846(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Document*, object);
+		EX_ARG(frame, u8, tag_value);
+		EX_ARG(frame, i32, parent);
+		auto& ret = object->createElement((ui::Tag)tag_value, parent);
+		EX_RESULT(frame, &ret);
+	}
+	
+	static void evox_object_Document_destroyElement_2640139010848314779(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Document*, object);
+		EX_ARG(frame, ui::Element*, el);
+		object->destroyElement(*el);
+	}
+	
 	static void evox_object_Document_getEvents_4526885960883524382(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ui::Document*, object);
 		auto ret = object->getEvents();
@@ -6069,6 +6083,8 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:ui/element"), StringView("getHeight")}, &evox_object_Element_getHeight_15059418239819795461);
 		functions.insert({StringView("core:ui/document"), StringView("getElement")}, &evox_object_Document_getElement_11405592870786360628);
 		functions.insert({StringView("core:ui/document"), StringView("getElementByID")}, &evox_object_Document_getElementByID_12240067967033170654);
+		functions.insert({StringView("core:ui/document"), StringView("createElement")}, &evox_object_Document_createElement_4272656930717277846);
+		functions.insert({StringView("core:ui/document"), StringView("destroyElement")}, &evox_object_Document_destroyElement_2640139010848314779);
 		functions.insert({StringView("core:ui/document"), StringView("getEvents")}, &evox_object_Document_getEvents_4526885960883524382);
 		functions.insert({StringView("core:ui/uisystem"), StringView("enableCursor")}, &evox_object_UISystem_enableCursor_9613396029109500766);
 	}

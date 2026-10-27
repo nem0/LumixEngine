@@ -31,8 +31,7 @@ extern "C" {
 // some winapi calls can fail but we don't have any known way to "fix" the issue
 // some of these calls are not fatal (e.g. if we fail to move a window), so we just assert -> DEBUG_CHECK
 #define DEBUG_CHECK(R) if (!(R)) ASSERT(false)
-// some may end up corrupting user data (e.g. not having enough space for path string and using such shorter path), so we better abort
-#define FATAL_CHECK(R) do { if (!(R)) abort(); } while(false)
+// some may end up corrupting user data (e.g. not having enough space for path string and using such shorter path), so we better abort -> CHECK
 
 
 namespace Lumix::os
@@ -542,19 +541,19 @@ bool InputFile::seek(u64 pos)
 
 static void fromWChar(Span<char> out, const WCHAR* in) {
 	i32 written = WideCharToMultiByte(CP_UTF8, 0, in, -1, out.begin(), out.length(), nullptr, nullptr);
-	FATAL_CHECK(written > 0 && out[written - 1] == 0);
+	CHECK(written > 0 && out[written - 1] == 0);
 }
 
 static void fromWChar(Span<char> out, Span<const WCHAR> in) {
 	i32 written = WideCharToMultiByte(CP_UTF8, 0, in.begin(), in.length(), out.begin(), out.length(), nullptr, nullptr);
-	FATAL_CHECK(written != out.length());
+	CHECK(written != out.length());
 	out[written] = 0;
 }
 
 template <int N> static void toWChar(WCHAR (&out)[N], StringView in) {
 	ASSERT(in.size() < 0x7fFFffFF);
 	i32 written = MultiByteToWideChar(CP_UTF8, 0, in.data, (int)in.size(), out, N);
-	FATAL_CHECK(written != N);
+	CHECK(written != N);
 	out[written] = 0;
 }
 
@@ -916,7 +915,7 @@ Point clientToScreen(WindowHandle win, int x, int y)
 	POINT p;
 	p.x = x;
 	p.y = y;
-	FATAL_CHECK(::ClientToScreen((HWND)win, &p));
+	CHECK(::ClientToScreen((HWND)win, &p));
 	Point res;
 	res.x = p.x;
 	res.y = p.y;
@@ -1074,7 +1073,7 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 		wc.hbrBackground = NULL;
 		wc.lpszClassName = cls_name;
 
-		FATAL_CHECK(RegisterClass(&wc));
+		CHECK(RegisterClass(&wc));
 		return wc;
 	}();
 
@@ -1101,7 +1100,7 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 		wndcls.hInstance,
 		window_data);
 
-	FATAL_CHECK(hwnd);
+	CHECK(hwnd);
 
 	if (args.handle_file_drops)
 	{
@@ -1121,7 +1120,7 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 			{HID_USAGE_PAGE_GENERIC, HID_USAGE_GENERIC_JOYSTICK, RIDEV_DEVNOTIFY, hwnd},
 			{HID_USAGE_PAGE_GENERIC, HID_USAGE_GENERIC_GAMEPAD, RIDEV_DEVNOTIFY, hwnd},
 		};
-		FATAL_CHECK(RegisterRawInputDevices(devices, lengthOf(devices), sizeof(devices[0])));
+		CHECK(RegisterRawInputDevices(devices, lengthOf(devices), sizeof(devices[0])));
 		G.raw_input_registered = true;
 	}
 
@@ -1195,7 +1194,9 @@ void showCursor(bool show)
 }
 
 void abort() {
-	ASSERT(false);
+	#ifdef LUMIX_DEBUG
+		LUMIX_DEBUG_BREAK();
+	#endif
 	::abort();
 }
 
@@ -1233,13 +1234,13 @@ void setWindowTitle(WindowHandle win, const char* title)
 Rect getWindowScreenRect(WindowHandle win)
 {
 	RECT rect;
-	FATAL_CHECK(GetWindowRect((HWND)win, &rect));
+	CHECK(GetWindowRect((HWND)win, &rect));
 	return {rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top};
 }
 
 Point getWindowClientSize(WindowHandle win) {
 	RECT rect;
-	FATAL_CHECK(GetClientRect((HWND)win, &rect));
+	CHECK(GetClientRect((HWND)win, &rect));
 	ASSERT(rect.left == 0);
 	ASSERT(rect.top == 0);
 	return {rect.right - rect.left, rect.bottom - rect.top};
@@ -1471,14 +1472,14 @@ bool getNextFile(FileIterator* iterator, FileInfo* info) {
 void setCurrentDirectory(StringView path)
 {
 	WCharStr<MAX_PATH> tmp(path);
-	FATAL_CHECK(SetCurrentDirectory(tmp));
+	CHECK(SetCurrentDirectory(tmp));
 }
 
 
 void getCurrentDirectory(Span<char> output)
 {
 	WCHAR tmp[MAX_PATH];
-	FATAL_CHECK(GetCurrentDirectory(lengthOf(tmp), tmp));
+	CHECK(GetCurrentDirectory(lengthOf(tmp), tmp));
 	fromWChar(output, tmp);
 }
 
@@ -1961,7 +1962,7 @@ bool getSavedGamesDir(Span<char> out) {
 void getExecutablePath(Span<char> buffer)
 {
 	WCHAR tmp[MAX_PATH];
-	FATAL_CHECK(GetModuleFileName(NULL, tmp, sizeof(tmp)));
+	CHECK(GetModuleFileName(NULL, tmp, sizeof(tmp)));
 	fromWChar(buffer, tmp);
 }
 

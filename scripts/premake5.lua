@@ -8,7 +8,7 @@ newoption { trigger = "dynamic-plugins", description = "Build plugins as shared 
 newoption { trigger = "no-studio", description = "Do not build Studio" }
 newoption { trigger = "with-vulkan", description = "Use the minimal Vulkan clear/present backend (always on Linux)" }
 newoption { trigger = "no-app", description = "Do not build the app (game runtime without Studio)" }
-newoption { trigger = "app-title", value = "TITLE", description = "Window title of the app (default: Lumix App)" }
+newoption { trigger = "app-title", value = "TITLE", description = "Window title of the app (default: Game)" }
 -- PhysX is always linked statically (PX_PHYSX_STATIC_LIB), the option is kept for the scripts that pass it
 newoption { trigger = "static-physx", description = "Link PhysX statically (the default)" }
 newoption { trigger = "with-tests", description = "Build test projects (requires the evox plugin)" }

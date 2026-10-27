@@ -603,6 +603,16 @@ void shutdown() {
 	s_stack_tree.destroy();
 }
 
+void logCallstack() {
+	if (!s_stack_tree.get()) return;
+	for (StackNode* node = s_stack_tree->record(); node; node = StackTree::getParent(node)) {
+		char fn[256] = "N/A";
+		int line = -1;
+		StackTree::getFunction(node, Span(fn), line);
+		logError("\t", fn, ":", line);
+	}
+}
+
 void checkLeaks() {
 	#ifdef LUMIX_DEBUG
 		if (s_allocation_debug.m_root) {

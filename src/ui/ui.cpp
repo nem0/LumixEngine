@@ -1011,15 +1011,17 @@ bool Document::parseElements(u32 parent_index, bool doc_body) {
 			case Token::RBRACKET: error(token.value, m_tokenizer, "unexpected ']'"); return false;
 			case Token::TEXT: {
 				Element& elem = m_elements.emplace(Tag::SPAN, m_allocator, *this);
-				u32 elem_idx = m_elements.size() - 1;
+				elem.index = m_elements.size() - 1;
 				if (parent_index != 0xFFFF'FFFF) {
-					m_elements[parent_index].children.push(elem_idx);
+					m_elements[parent_index].children.push(elem.index);
+					elem.parent = parent_index;
 				} else {
-					m_root.children.push(elem_idx);
+					m_root.children.push(elem.index);
+					elem.parent = -1;
 				}
 				elem.text = token.value;
 				
-				setSourceRange(elem_idx, elem.text.data, elem.text.end());
+				setSourceRange(elem.index, elem.text.data, elem.text.end());
 				// Accumulate consecutive text tokens
 				bool is_break = false;
 				while (!is_break) {
@@ -1036,10 +1038,10 @@ bool Document::parseElements(u32 parent_index, bool doc_body) {
 								return false;
 							}
 							m_tokenizer.consumeToken();
-							setSourceRange(elem_idx, elem.text.data, elem.text.end());
+							setSourceRange(elem.index, elem.text.data, elem.text.end());
 							return true;
 						case Token::EOF:
-							if (is_root) { setSourceRange(elem_idx, elem.text.data, elem.text.end()); return true; }
+							if (is_root) { setSourceRange(elem.index, elem.text.data, elem.text.end()); return true; }
 							error(token.value, m_tokenizer, "unexpected EOF");
 							return false;
 						default:
@@ -1051,7 +1053,7 @@ bool Document::parseElements(u32 parent_index, bool doc_body) {
 							break;
 					}
 				}
-				setSourceRange(elem_idx, elem.text.data, elem.text.end());
+				setSourceRange(elem.index, elem.text.data, elem.text.end());
 				break;
 			}
 			case Token::RBRACE:
@@ -1098,11 +1100,13 @@ bool Document::parseElements(u32 parent_index, bool doc_body) {
 				}
 
 				Element& elem = m_elements.emplace(tag, m_allocator, *this);
-				u32 elem_idx = m_elements.size() - 1;
+				elem.index = m_elements.size() - 1;
 				if (parent_index != 0xFFFF'FFFF) {
-					m_elements[parent_index].children.push(elem_idx);
+					m_elements[parent_index].children.push(elem.index);
+					elem.parent = parent_index;
 				} else {
-					m_root.children.push(elem_idx);
+					m_root.children.push(elem.index);
+					elem.parent = -1;
 				}
 
 				Token rbracket;
@@ -1155,10 +1159,10 @@ bool Document::parseElements(u32 parent_index, bool doc_body) {
 				}
 
 				// the source range of an element is its opening tag
-				setSourceRange(elem_idx, tag_begin, rbracket.value.end());
+				setSourceRange(elem.index, tag_begin, rbracket.value.end());
 				if (tryConsume(Token::LBRACE)) {
 					// parse children
-					if (!parseElements(elem_idx)) {
+					if (!parseElements(elem.index)) {
 						logError(m_tokenizer.m_filename, "(", m_tokenizer.getLine(), "): failed to parse element children");
 						return false;
 					}
@@ -1167,18 +1171,20 @@ bool Document::parseElements(u32 parent_index, bool doc_body) {
 			}
 			default: {
 				Element& elem = m_elements.emplace(Tag::SPAN, m_allocator, *this);
-				u32 elem_idx = m_elements.size() - 1;
+				elem.index = m_elements.size() - 1;
 				if (parent_index != 0xFFFF'FFFF) {
-					m_elements[parent_index].children.push(elem_idx);
+					m_elements[parent_index].children.push(elem.index);
+					elem.parent = parent_index;
 				} else {
-					m_root.children.push(elem_idx);
+					m_root.children.push(elem.index);
+					elem.parent = -1;
 				}
 				if (token.type == Token::STRING) {
 					elem.text = StringView{token.value.data - 1, token.value.end() + 1};
 				} else {
 					elem.text = token.value;
 				}
-				setSourceRange(elem_idx, elem.text.data, elem.text.end());
+				setSourceRange(elem.index, elem.text.data, elem.text.end());
 				bool is_break = false;
 				while (!is_break) {
 					Token next = m_tokenizer.peekToken();
@@ -1186,7 +1192,7 @@ bool Document::parseElements(u32 parent_index, bool doc_body) {
 						case Token::ERROR: return false;
 						case Token::UNDEFINED: return false;
 						case Token::EOF: 
-							if (is_root) { setSourceRange(elem_idx, elem.text.data, elem.text.end()); return true; }
+							if (is_root) { setSourceRange(elem.index, elem.text.data, elem.text.end()); return true; }
 
 							error(token.value, m_tokenizer, "unexpected EOF");
 							return false;
@@ -1197,7 +1203,7 @@ bool Document::parseElements(u32 parent_index, bool doc_body) {
 								return false;
 							}
 							m_tokenizer.consumeToken();
-							setSourceRange(elem_idx, elem.text.data, elem.text.end());
+							setSourceRange(elem.index, elem.text.data, elem.text.end());
 							return true; // end of the parent container
 						case Token::TEXT:
 							// Include TEXT tokens in the element value
@@ -1213,7 +1219,7 @@ bool Document::parseElements(u32 parent_index, bool doc_body) {
 							break;
 					}
 				}
-				setSourceRange(elem_idx, elem.text.data, elem.text.end());
+				setSourceRange(elem.index, elem.text.data, elem.text.end());
 				break;
 			}
 		}
@@ -1256,6 +1262,8 @@ Element::Element(Element&& rhs)
 	, pivot_x_unit(rhs.pivot_x_unit)
 	, pivot_y_unit(rhs.pivot_y_unit)
 	, font_handle(rhs.font_handle)
+	, parent(rhs.parent)
+	, index(rhs.index)
 {
 	rhs.font_handle = nullptr;
 	rhs.sprite_handle = nullptr;
@@ -2331,6 +2339,55 @@ static void wrapText(Document& doc, Element& container) {
 	}
 }
 
+void Document::destroyElement(Element& el) {
+	if (el.tag == Tag::INVALID) return; // already destroyed
+	while (!el.children.empty()) {
+		destroyElement(m_elements[el.children.last()]);
+	}
+	if (el.parent >= 0) {
+		Element& parent = m_elements[el.parent];
+		parent.children.eraseItem(el.index);
+	}
+	else {
+		m_root.children.eraseItem(el.index);
+	}
+	m_id_index.erase(el.id);
+
+	// release element's resources and turn the slot into a free list node,
+	// `parent` of a free slot is the index of the next free slot
+	const u32 idx = el.index;
+	el.~Element();
+	new (NewPlaceholder(), &el) Element(Tag::INVALID, m_allocator, *this);
+	el.index = idx;
+	el.parent = m_first_free_element;
+	m_first_free_element = (i32)idx;
+	m_layout_dirty = true;
+}
+
+Element& Document::createElement(Tag tag, i32 parent) {
+	ASSERT(tag != Tag::INVALID);
+	Element* el;
+	if (m_first_free_element >= 0) {
+		// reuse a destroyed slot, other elements don't move so pointers to them stay valid
+		const u32 idx = (u32)m_first_free_element;
+		el = &m_elements[idx];
+		m_first_free_element = el->parent;
+		el->~Element();
+		new (NewPlaceholder(), el) Element(tag, m_allocator, *this);
+		el->index = idx;
+	}
+	else {
+		el = &m_elements.emplace(tag, m_allocator, *this);
+		el->index = m_elements.size() - 1;
+	}
+	if (parent >= 0) m_elements[parent].children.push(el->index);
+	else m_root.children.push(el->index);
+	el->parent = parent;
+	m_styles_dirty = true; // styles are applied lazily in computeLayout, so creating many elements recomputes once
+	m_layout_dirty = true;
+	return *el;
+}
+
 Element* Document::getElementByID(const char* id) {
 	if (!id || !id[0]) return nullptr;
 
@@ -2348,6 +2405,7 @@ void Document::computeLayout(Vec2 canvas_size) {
 		m_scale = scale;
 		recomputeStyles();
 	}
+	else if (m_styles_dirty) recomputeStyles();
 
 	os::Timer timer;
 	m_layout_duration = 0;
@@ -2675,6 +2733,7 @@ bool Document::parse(StringView content, const char* filename, SourceMap* source
 	os::Timer timer;
 	m_parse_duration = 0;
 	m_elements.clear();
+	m_first_free_element = -1;
 	m_id_index.clear();
 	unloadSprites();
 	m_root.children.clear();
@@ -2899,6 +2958,7 @@ void Document::setDPIScale(float scale) {
 
 void Document::recomputeStyles() {
 	PROFILE_FUNCTION();
+	m_styles_dirty = false;
 
 	for (Element& elem : m_elements) {
 		for (i32 i = elem.attributes.size() - 1; i >= 0; --i) {

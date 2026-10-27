@@ -22,6 +22,7 @@ namespace detail {
 	LUMIX_CORE_API void addLog(i32 val);
 	LUMIX_CORE_API void addLog(float val);
 	LUMIX_CORE_API void emitLog(LogLevel level);
+	[[noreturn]] LUMIX_CORE_API void terminate(); // logs callstack and calls os::abort()
 	LUMIX_CORE_API void lock();
 	LUMIX_CORE_API void unlock();
 	template <typename... T> void log(LogLevel level, const T&... args) {
@@ -34,7 +35,15 @@ namespace detail {
 template <typename... T> void logInfo(const T&... args) { detail::log(LogLevel::INFO, args...); }
 template <typename... T> void logWarning(const T&... args) { detail::log(LogLevel::WARNING, args...); }
 template <typename... T> void logError(const T&... args) { detail::log(LogLevel::ERROR, args...); }
+// logs an error and terminates the process, works in all build configs
+template <typename... T> [[noreturn]] void logFatal(const T&... args) {
+	detail::log(LogLevel::ERROR, "FATAL: ", args...);
+	detail::terminate();
+}
 
 } // namespace Lumix
+
+// like ASSERT, but also active in release builds
+#define CHECK(x) do { if (!(x)) Lumix::logFatal(__FILE__, ":", __LINE__, ": CHECK failed: ", #x); } while (false)
 
 

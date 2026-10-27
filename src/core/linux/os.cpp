@@ -439,6 +439,13 @@ bool InputFile::seek(u64 pos) {
 u32 getCPUsCount() {
 	return sysconf(_SC_NPROCESSORS_ONLN);
 }
+void abort() {
+	#ifdef LUMIX_DEBUG
+		LUMIX_DEBUG_BREAK();
+	#endif
+	::abort();
+}
+
 void sleep(u32 milliseconds) {
 	if (milliseconds) usleep(useconds_t(milliseconds * 1000));
 }
@@ -684,7 +691,7 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 	XChangeWindowAttributes(display, win, CWBackPixel, &attr);
 
 	if (!args.is_hidden) XMapWindow(display, win);
-	XStoreName(display, win, args.name && args.name[0] ? args.name : "Lumix App");
+	XStoreName(display, win, args.name && args.name[0] ? args.name : "Game");
 
 	G.ic = XCreateIC(G.im, XNInputStyle, 0 | XIMPreeditNothing | XIMStatusNothing, XNClientWindow, win, NULL);
 

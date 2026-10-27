@@ -17,6 +17,7 @@ struct StackNode;
 LUMIX_CORE_API void init(IAllocator& allocator);
 LUMIX_CORE_API void shutdown();
 LUMIX_CORE_API void debugBreak();
+LUMIX_CORE_API void logCallstack(); // logs current callstack as errors, no-op if debug::init wasn't called
 LUMIX_CORE_API void debugOutput(const char* message);
 LUMIX_CORE_API void enableFloatingPointTraps(bool enable);
 

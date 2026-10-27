@@ -26,7 +26,7 @@
 
 // window title, set with premake's --app-title
 #ifndef LUMIX_APP_TITLE
-	#define LUMIX_APP_TITLE "Lumix App"
+	#define LUMIX_APP_TITLE "Game"
 #endif
 
 #ifdef __linux__
@@ -438,4 +438,4 @@ int main(int args, char* argv[]) {
 	os::destroyWindow(win);
 }
 
-#endif
+#endif
