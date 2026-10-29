@@ -2831,6 +2831,7 @@ void Document::injectEvent(const InputSystem::Event& event) {
 				StackArray<u32, 16> new_hovered_path(m_allocator);
 				for (u32 idx : m_root.children) {
 					Element* root = &m_elements[idx];
+					if (!root->visible) continue;
 					if (!contains(*root, pos, m_font_manager)) continue;
 
 					new_hovered_path.push(idx);
@@ -2839,6 +2840,7 @@ void Document::injectEvent(const InputSystem::Event& event) {
 						bool found_child = false;
 						for (u32 child_id : elem->children) {
 							Element* child = &m_elements[child_id];
+							if (!child->visible) continue;
 							if (contains(*child, pos, m_font_manager)) {
 								new_hovered_path.push(child_id);
 								elem = child;

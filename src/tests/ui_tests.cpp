@@ -1429,6 +1429,38 @@ bool testHoverUsesCurrentLayoutAfterMutation() {
 	return true;
 }
 
+// a hidden element (and its subtree) keeps its last layout rect, but must not be hit by the mouse
+bool testHoverIgnoresHiddenElements() {
+	MockDocument doc;
+	doc.m_canvas_size = Vec2(800, 600);
+	ASSERT_PARSE(doc, "[box $a width=100 height=100] { [box $b width=50 height=50] {} }");
+	doc.computeLayout(doc.m_canvas_size);
+	ui::Element* a = doc.getElementByID("a");
+	ui::Element* b = doc.getElementByID("b");
+	ASSERT_TRUE(a != nullptr && b != nullptr);
+	const u32 a_idx = u32(a - doc.m_elements.begin());
+	const u32 b_idx = u32(b - doc.m_elements.begin());
+
+	MockMouseDevice mouse;
+	injectMouseMove(doc, mouse, 10, 10);
+	ASSERT_TRUE(hasEvent(doc, ui::EventType::MOUSE_ENTER, a_idx));
+	ASSERT_TRUE(hasEvent(doc, ui::EventType::MOUSE_ENTER, b_idx));
+	doc.clearEvents();
+
+	a->setVisible(false);
+	injectMouseMove(doc, mouse, 11, 10);   // still inside the stale rects of a and b
+	ASSERT_TRUE(hasEvent(doc, ui::EventType::MOUSE_LEAVE, a_idx));
+	ASSERT_TRUE(hasEvent(doc, ui::EventType::MOUSE_LEAVE, b_idx));
+	ASSERT_TRUE(!hasEvent(doc, ui::EventType::MOUSE_ENTER, a_idx));
+	ASSERT_TRUE(!hasEvent(doc, ui::EventType::MOUSE_ENTER, b_idx));
+	doc.clearEvents();
+
+	injectMouseMove(doc, mouse, 12, 10);
+	ASSERT_TRUE(!hasEvent(doc, ui::EventType::MOUSE_ENTER, a_idx));
+	ASSERT_TRUE(!hasEvent(doc, ui::EventType::MOUSE_ENTER, b_idx));
+	return true;
+}
+
 bool testHoverEvents() {
 	// TODO better test
 	MockDocument doc;
@@ -2223,6 +2255,7 @@ void runUITests() {
 	RUN_TEST(testActionEventEmittedViaGrandparentOnClick);
 	RUN_TEST(testHoverEvents);
 	RUN_TEST(testHoverUsesCurrentLayoutAfterMutation);
+	RUN_TEST(testHoverIgnoresHiddenElements);
 	RUN_TEST(testDPIScaling);
 	RUN_TEST(testDocumentReferenceSize);
 	RUN_TEST(testInvalidAttributeValuesRejected);
