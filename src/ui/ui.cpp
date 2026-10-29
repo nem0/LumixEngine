@@ -1533,7 +1533,7 @@ static void layoutChildrenHorizontal(Document& doc, Element& parent) {
 			float prev_margin = 0;
 			for (i32 j = i; j < row.to; ++j) {
 				Element& row_child = doc.m_elements[parent.children[j]];
-				if (row_child.position_mode == PositionMode::ABSOLUTE) continue;
+				if (row_child.position_mode == PositionMode::ABSOLUTE || !row_child.visible) continue;   // as in measureBoxRow
 				row_child.position.x = x + maximum(prev_margin, row_child.margins.left);
 				row_child.position.y = y + row_child.margins.top;
 				switch (parent.align_items) {
@@ -1609,7 +1609,7 @@ static void layoutChildrenVertical(Document& doc, Element& parent) {
 	for (u32 i = 0, n = parent.children.size(); i < n; ++i) {
 		u32 child_idx = parent.children[i];
 		Element& child = doc.m_elements[child_idx];
-		if (child.position_mode == PositionMode::ABSOLUTE) continue;
+		if (child.position_mode == PositionMode::ABSOLUTE || !child.visible) continue;   // as in the measuring loop above
 		if (isInlineTag(child.tag)) {
 			i += offsetInlineRun(doc, parent, i, x + prev_margin, y) - 1;
 			y += child.size.y + space;
@@ -1692,7 +1692,7 @@ static void computeParentRelativeWidth(Document& doc, Element& elem) {
 		float prev_margin = 0;
 		for (u32 child_idx : elem.children) {
 			const Element& child = doc.m_elements[child_idx];
-			if (child.position_mode == PositionMode::ABSOLUTE) continue;
+			if (child.position_mode == PositionMode::ABSOLUTE || !child.visible) continue;
 			sum_grow += child.grow;
 			remaining_w -= child.size.x + maximum(prev_margin, child.margins.left);
 			prev_margin = child.margins.right;
@@ -1704,7 +1704,7 @@ static void computeParentRelativeWidth(Document& doc, Element& elem) {
 			if (remaining_w > 0) {
 				for (u32 child_idx : elem.children) {
 					Element& child = doc.m_elements[child_idx];
-					if (child.position_mode == PositionMode::ABSOLUTE) continue;
+					if (child.position_mode == PositionMode::ABSOLUTE || !child.visible) continue;
 					if (child.grow > 0) {
 						child.size.x += remaining_w * child.grow / sum_grow;
 					}
@@ -1726,6 +1726,7 @@ static void computeParentRelativeWidth(Document& doc, Element& elem) {
 
 	for (u32 child_idx : elem.children) {
 		Element& child = doc.m_elements[child_idx];
+		if (!child.visible) continue;   // a hidden element takes no size, and its children are not laid out
 		if (child.width_unit.unit == Unit::PERCENT) {
 			if (elem.width_unit.unit == Unit::FIT_CONTENT) {
 				logError("Element with fit-content width has child with percent width");
@@ -1823,7 +1824,7 @@ static void computeParentRelativeHeights(Document& doc, Element& elem) {
 		float prev_margin = 0;
 		for (u32 child_idx : elem.children) {
 			const Element& child = doc.m_elements[child_idx];
-			if (child.position_mode == PositionMode::ABSOLUTE) continue;
+			if (child.position_mode == PositionMode::ABSOLUTE || !child.visible) continue;
 			sum_grow += child.grow;
 			remaining_h -= child.size.y + maximum(prev_margin, child.margins.top);
 			prev_margin = child.margins.bottom;
@@ -1833,7 +1834,7 @@ static void computeParentRelativeHeights(Document& doc, Element& elem) {
 		if (sum_grow > 0 && remaining_h > 0) {
 			for (u32 child_idx : elem.children) {
 				Element& child = doc.m_elements[child_idx];
-				if (child.position_mode == PositionMode::ABSOLUTE) continue;
+				if (child.position_mode == PositionMode::ABSOLUTE || !child.visible) continue;
 				if (child.grow > 0) {
 					child.size.y += remaining_h * child.grow / sum_grow;
 				}
@@ -1843,6 +1844,7 @@ static void computeParentRelativeHeights(Document& doc, Element& elem) {
 
 	for (u32 child_idx : elem.children) {
 		Element& child = doc.m_elements[child_idx];
+		if (!child.visible) continue;
 		if (child.height_unit.unit == Unit::PERCENT) {
 			const float reference_height = child.position_mode == PositionMode::ABSOLUTE ? elem.size.y : maximum(0.0f, elem.size.y - elem.paddings.top - elem.paddings.bottom);
 			child.size.y = computeAbsoluteSize(child.height_unit, reference_height, child.font_size, doc.m_scale);

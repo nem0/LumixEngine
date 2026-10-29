@@ -1274,6 +1274,120 @@ bool testWrappedRowFitContentHeightWithMarginsAndPadding() {
 	return true;
 }
 
+// hidden elements take no part in layout: no slot in a row, no size, no share of the free space, no spacing in a column
+
+bool testHiddenRowChildTakesNoSlot() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box width=300 height=100 direction=row wrap=true] {
+		[box $a width=100 height=20] {}
+		[box $hidden width=100 height=20 visible=false] {}
+		[box $b width=100 height=20] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ui::Element* a = doc.getElementByID("a");
+	ui::Element* b = doc.getElementByID("b");
+	ASSERT_TRUE(a && b);
+	ASSERT_FLOAT_EQ(100.0f, b->position.x - a->position.x);
+	return true;
+}
+
+bool testHiddenPercentChildHasNoSize() {
+	// the parent assigns percent sizes to its children without checking whether they are visible
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box width=400 height=200 direction=row] {
+		[box $hidden_w width=50% height=20 visible=false] {}
+		[box $hidden_h width=20 height=50% visible=false] {}
+		[box $shown width=50% height=50%] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ui::Element* hidden_w = doc.getElementByID("hidden_w");
+	ui::Element* hidden_h = doc.getElementByID("hidden_h");
+	ui::Element* shown = doc.getElementByID("shown");
+	ASSERT_TRUE(hidden_w && hidden_h && shown);
+	ASSERT_FLOAT_EQ(0.0f, hidden_w->size.x);
+	ASSERT_FLOAT_EQ(0.0f, hidden_h->size.y);
+	ASSERT_FLOAT_EQ(200.0f, shown->size.x);
+	return true;
+}
+
+bool testHiddenGrowChildGetsNoSpaceRow() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box width=300 height=100 direction=row] {
+		[box width=100 height=20] {}
+		[box $hidden grow=1 height=20 visible=false] {}
+		[box $grow grow=1 height=20] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ui::Element* hidden = doc.getElementByID("hidden");
+	ui::Element* grow = doc.getElementByID("grow");
+	ASSERT_TRUE(hidden && grow);
+	ASSERT_FLOAT_EQ(0.0f, hidden->size.x);
+	ASSERT_FLOAT_EQ(200.0f, grow->size.x);
+	return true;
+}
+
+bool testHiddenGrowChildGetsNoSpaceColumn() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box width=100 height=300 direction=column] {
+		[box width=20 height=100] {}
+		[box $hidden grow=1 width=20 visible=false] {}
+		[box $grow grow=1 width=20] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ui::Element* hidden = doc.getElementByID("hidden");
+	ui::Element* grow = doc.getElementByID("grow");
+	ASSERT_TRUE(hidden && grow);
+	ASSERT_FLOAT_EQ(0.0f, hidden->size.y);
+	ASSERT_FLOAT_EQ(200.0f, grow->size.y);
+	return true;
+}
+
+bool testHiddenColumnChildAddsNoJustifySpace() {
+	// space-between is shared by the visible children only: A at the top, C at the bottom
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box $col width=100 height=300 direction=column justify-content=space-between] {
+		[box $a width=20 height=50] {}
+		[box $hidden width=20 height=50 visible=false] {}
+		[box $c width=20 height=50] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ui::Element* col = doc.getElementByID("col");
+	ui::Element* a = doc.getElementByID("a");
+	ui::Element* c = doc.getElementByID("c");
+	ASSERT_TRUE(col && a && c);
+	ASSERT_FLOAT_EQ(0.0f, a->position.y - col->position.y);
+	ASSERT_FLOAT_EQ(250.0f, c->position.y - col->position.y);
+	return true;
+}
+
+bool testHiddenColumnChildKeepsMarginCollapse() {
+	// a hidden child between two boxes must not reset the margin of the one before it: max(10, 5), not 10 + 5
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+	[box $col width=100 direction=column] {
+		[box $a width=20 height=20 margin-bottom=10] {}
+		[box $hidden width=20 height=5 visible=false] {}
+		[box $c width=20 height=20 margin-top=5] {}
+	}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ui::Element* col = doc.getElementByID("col");
+	ui::Element* c = doc.getElementByID("c");
+	ASSERT_TRUE(col && c);
+	ASSERT_FLOAT_EQ(30.0f, c->position.y - col->position.y);
+	return true;
+}
+
 bool testWrap() {
 	// Citation: layout.md - Wrapping
 	// "When `wrap=true`, elements that don't fit on the current line move to the next line (for `direction=row`)"
@@ -2531,4 +2645,10 @@ void runUILayoutTests() {
 	RUN_TEST(testWrappedRowFitContentHeightWithMarginsAndPadding);
 	RUN_TEST(testWrapCrossAxisDistribution);
 	RUN_TEST(testWrappingInheritance);
+	RUN_TEST(testHiddenRowChildTakesNoSlot);
+	RUN_TEST(testHiddenPercentChildHasNoSize);
+	RUN_TEST(testHiddenGrowChildGetsNoSpaceRow);
+	RUN_TEST(testHiddenGrowChildGetsNoSpaceColumn);
+	RUN_TEST(testHiddenColumnChildAddsNoJustifySpace);
+	RUN_TEST(testHiddenColumnChildKeepsMarginCollapse);
 }
