@@ -71,6 +71,14 @@ Unquoted text spanning multiple lines in markup is treated as a single line:
 
 Renders as: `This is multiline text in markup`
 
+Use `[br]` to end the current line explicitly. Two `[br]` in a row leave a blank line:
+
+```css
+[box] {
+  First line [br] second line
+}
+```
+
 ### Inline Flow and Spacing
 
 Text elements (`span`s and unquoted text) are arranged horizontally in inline flow, regardless of the container's `direction`:

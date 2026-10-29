@@ -39,7 +39,7 @@ static const char* tokenTypeToString(UITokenizer::Token::Type type) {
 }
 
 static bool isInlineTag(Tag tag) {
-	return tag == Tag::SPAN || tag == Tag::IMAGE;
+	return tag == Tag::SPAN || tag == Tag::IMAGE || tag == Tag::BR;
 }
 
 Tag parseTag(StringView str) {
@@ -48,6 +48,7 @@ Tag parseTag(StringView str) {
 	const char* s = str.data;
 
 	switch (len) {
+		case 2: if (memcmp(s, "br", 2) == 0) return Tag::BR; break;
 		case 3: if (memcmp(s, "box", 3) == 0) return Tag::BOX; break;
 		case 4: if (memcmp(s, "span", 4) == 0) return Tag::SPAN; break;
 		case 5: if (memcmp(s, "image", 5) == 0) return Tag::IMAGE; break;
@@ -1444,6 +1445,7 @@ static u32 offsetInlineRun(Document& doc, Element& parent, u32 first_span_idx, f
 				}
 				++count;
 				break;
+			case Tag::BR:
 			case Tag::SPAN: {
 				if (child.lines.empty()) {
 					child.position.x = x;
@@ -1738,9 +1740,12 @@ static void computeParentRelativeWidth(Document& doc, Element& elem) {
 // compute heights of inline run starting at child_idx
 static float computeInlineRunHeight(Document& doc, Element& element, i32 child_idx) {
 	// TODO images
+	// hidden elements have no lines, the run ends at its last visible element
 	i32 end_idx = child_idx;
-	while (end_idx < element.children.size() && isInlineTag(doc.m_elements[element.children[end_idx]].tag)) {
-		++end_idx;
+	for (i32 i = child_idx; i < element.children.size(); ++i) {
+		const Element& e = doc.m_elements[element.children[i]];
+		if (!isInlineTag(e.tag)) break;
+		if (e.visible) end_idx = i + 1;
 	}
 	if (end_idx == child_idx) return 0;
 
@@ -1898,6 +1903,7 @@ static void computeBaseSizes(Document& doc, Element& elem, const ParentContext& 
 		}
 	}
 
+	if (elem.tag == Tag::BR) return;
 	if (elem.tag == Tag::SPAN) {
 		if (doc.m_font_manager && elem.getFontHandle() && !elem.text.empty()) {
 			elem.size = doc.m_font_manager->measureTextA(elem.getFontHandle(), elem.text);
@@ -2197,6 +2203,18 @@ static void wrapInlineRun(Document& doc, Element& parent, i32 start_span_idx, i3
 		child.lines.clear();
 		if (!child.visible) continue;
 
+		if (child.tag == Tag::BR) {
+			// an empty line at the end of the current row, or a row of its own (blank line) if nothing is on it yet
+			SpanLine& line = child.lines.emplace();
+			line.text = StringView();
+			line.pos.x = x;
+			line.pos.y = 0;
+			line.width = 0;
+			is_prev_space = false;
+			x = 0;
+			continue;
+		}
+
 		if (child.tag == Tag::IMAGE) {
 			if (wrap_enabled && x > 0 && child.size.x > content_width - x) {
 				x = 0;
@@ -2220,16 +2238,7 @@ static void wrapInlineRun(Document& doc, Element& parent, i32 start_span_idx, i3
 		StringView text = span.text;
 		if (wrap_enabled) {
 			SpanLine* line = nullptr;
-			bool force_break = false;
 			while (!text.empty()) {
-				// a newline in the whitespace before the next word is a hard line break
-				for (const char* c = text.data; c != text.end() && isWhitespace(*c); ++c) {
-					if (*c == '\n') {
-						force_break = true;
-						line = nullptr;
-						is_prev_space = false;
-					}
-				}
 				is_prev_space = is_prev_space || isWhitespace(*text.data);
 				SplitWord split = doc.m_font_manager->splitFirstWord(span.getFontHandle(), text);
 				if (split.head.empty()) {
@@ -2239,8 +2248,7 @@ static void wrapInlineRun(Document& doc, Element& parent, i32 start_span_idx, i3
 					break;
 				}
 				// we wrap
-				if (force_break || (is_prev_space ? space_w : 0) + split.head_width > content_width - x) {
-					force_break = false;
+				if ((is_prev_space ? space_w : 0) + split.head_width > content_width - x) {
 					line = &span.lines.emplace();
 					line->text = split.head;
 					line->pos.x = 0;

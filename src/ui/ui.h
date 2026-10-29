@@ -28,6 +28,7 @@ enum class Tag : u8 {
 	BOX,
 	IMAGE,
 	SPAN,
+	BR,
 	CANVAS,
 	INVALID
 };

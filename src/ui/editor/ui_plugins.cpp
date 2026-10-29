@@ -36,6 +36,7 @@ struct UIEditorWindow : AssetEditorWindow {
 	static inline const char* s_autocomplete_words[] = {
 		"box",
 		"span",
+		"br",
 		"direction",
 		"width",
 		"height",

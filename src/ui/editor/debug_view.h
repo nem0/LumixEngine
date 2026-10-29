@@ -20,6 +20,7 @@ static const char* getTagName(Tag tag) {
 		case Tag::BOX: return "box";
 		case Tag::IMAGE: return "image";
 		case Tag::SPAN: return "span";
+		case Tag::BR: return "br";
 		case Tag::CANVAS: return "canvas";
 		case Tag::INVALID: return "invalid";
 	}

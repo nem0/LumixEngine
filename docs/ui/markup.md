@@ -93,7 +93,7 @@ letter ::= 'a'-'z' | 'A'-'Z'
 - IDs can be assigned using `$id` syntax.
 - Colors are specified in hexadecimal format with a `#` prefix, e.g. `#FF0000` (`RRGGBB`) or `#FF000080` (`RRGGBBAA`).
 - A block (braced) element contains child elements.
-- Text content inside a block can be unquoted text, treated as spans. Unquoted text may span multiple lines for readability, but newlines are treated as whitespace and do not create line breaks in the rendered output.
+- Text content inside a block can be unquoted text, treated as spans. Unquoted text may span multiple lines for readability, but newlines are treated as whitespace and do not create line breaks in the rendered output. Use `[br]` for an explicit line break.
 - Unquoted text creates an inline text span that flows with other elements.
 - Inside double-quoted attribute values use `\"` to escape quotes, `\\` for backslash, and common escapes `\n`, `\t`, `\r` are supported.
 

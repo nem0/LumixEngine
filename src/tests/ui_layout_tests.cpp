@@ -1847,6 +1847,48 @@ bool testWrappingInheritance() {
 	return true;
 }
 
+bool testBrLayout() {
+	MockFontManager mock;
+	ui::Document doc(&mock, getGlobalAllocator());
+	ASSERT_PARSE(doc, R"(
+		[box width=fit-content height=fit-content font="arial.ttf" font-size=16] {
+			Line 1 [br] Line 2
+		}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ui::Element* panel = doc.getElement(doc.m_root.children[0]);
+
+	// "Line 1", [br], "Line 2"
+	ASSERT_EQ(3, panel->children.size());
+	ui::Element* first = doc.getElement(panel->children[0]);
+	ui::Element* second = doc.getElement(panel->children[2]);
+	ASSERT_EQ(1, first->lines.size());
+	ASSERT_EQ(1, second->lines.size());
+	ASSERT_FLOAT_EQ(0.0f, second->lines[0].pos.x);
+	ASSERT_FLOAT_EQ(16.0f, second->lines[0].pos.y - first->lines[0].pos.y);
+	ASSERT_FLOAT_EQ(32.0f, panel->size.y);
+	return true;
+}
+
+bool testDoubleBrMakesBlankLine() {
+	MockFontManager mock;
+	ui::Document doc(&mock, getGlobalAllocator());
+	ASSERT_PARSE(doc, R"(
+		[box width=fit-content height=fit-content font="arial.ttf" font-size=16] {
+			Line 1 [br][br] Line 2
+		}
+	)");
+	doc.computeLayout(Vec2(800, 600));
+	ui::Element* panel = doc.getElement(doc.m_root.children[0]);
+
+	ASSERT_EQ(4, panel->children.size());
+	ui::Element* first = doc.getElement(panel->children[0]);
+	ui::Element* second = doc.getElement(panel->children[3]);
+	ASSERT_FLOAT_EQ(32.0f, second->lines[0].pos.y - first->lines[0].pos.y);
+	ASSERT_FLOAT_EQ(48.0f, panel->size.y);
+	return true;
+}
+
 bool testMultilineStringLayout() {
 	// Citation: layout.md - Multiline Strings
 	// "Unquoted text spanning multiple lines in markup is treated as a single line"
@@ -2456,6 +2498,8 @@ void runUILayoutTests() {
 	RUN_TEST(testHorizontalSideSpecificMarginPadding);
 	RUN_TEST(testVerticalSideSpecificMarginPadding);
 	RUN_TEST(testSideSpecificShorthandPrecedence);
+	RUN_TEST(testBrLayout);
+	RUN_TEST(testDoubleBrMakesBlankLine);
 	RUN_TEST(testMultilineStringLayout);
 	RUN_TEST(testNestedPanelsDifferentDirections);
 	RUN_TEST(testNestedPanelsWithMargins);
