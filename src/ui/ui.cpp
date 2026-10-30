@@ -2476,8 +2476,14 @@ static u8 applyOpacityToAlpha(u8 alpha, float opacity) {
 static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, const Element* parent) {
 	const Element& element = *doc.getElement(element_idx);
 	if (!element.visible) return;
-	Vec2 pos = Vec2(element.position.x, element.position.y);
-	Vec2 size = Vec2(element.size.x, element.size.y);
+	// snap the edges to whole pixels (layout stays exact), otherwise 1px borders land unevenly on the pixel grid and text/images blur
+	const Vec2 snapped_min = Vec2(floorf(element.position.x + 0.5f), floorf(element.position.y + 0.5f));
+	Vec2 snapped_max = Vec2(floorf(element.position.x + element.size.x + 0.5f), floorf(element.position.y + element.size.y + 0.5f));
+	// a thin line (e.g. 0.12em at a small scale) must not round away to nothing
+	if (element.size.x > 0 && snapped_max.x <= snapped_min.x) snapped_max.x = snapped_min.x + 1;
+	if (element.size.y > 0 && snapped_max.y <= snapped_min.y) snapped_max.y = snapped_min.y + 1;
+	Vec2 pos = snapped_min;
+	Vec2 size = snapped_max - snapped_min;
 	const bool use_clipping = element.clipping && size.x > 0 && size.y > 0;
 	if (use_clipping) {
 		draw.pushClipRect(pos, pos + size);
