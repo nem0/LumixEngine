@@ -37,6 +37,18 @@ static void panic(ex_call_frame& frame, const char* message) {
 	*frame.panic = {message, (i64)strlen(message)};
 }
 
+// Validates an argument coming from a script. A failed check raises a script panic (visible in the log with the script's stack) and returns from the native
+// function, so a stale entity or a NaN can never reach the engine. Never use it for engine invariants: that is what CHECK() from core/log.h is for.
+#define SCRIPT_CHECK(frame, cond, message) do { if (!(cond)) { panic(frame, message); return; } } while (false)
+
+static bool isFiniteF(float v) { return v == v && v - v == 0.0f; }
+static bool isFiniteD(double v) { return v == v && v - v == 0.0; }
+static bool isFiniteVec(double x, double y, double z) { return isFiniteD(x) && isFiniteD(y) && isFiniteD(z); }
+// a rotation needs finite components and a length that can be normalized
+static bool isValidQuat(float x, float y, float z, float w) {
+	return isFiniteF(x) && isFiniteF(y) && isFiniteF(z) && isFiniteF(w) && x * x + y * y + z * z + w * w > 1e-12f;
+}
+
 enum class LoadRequestStatus : i32 { PENDING, SUCCESS, FAIL };
 
 struct EvoxLoadRequest {
@@ -304,8 +316,10 @@ static void imguiSeparator() {
 	ImGui::Separator();
 }
 
-static ExEntity evox_world_createEntity(World* world) {
-	return ExEntity(world->createEntity({0, 0, 0}, Quat::IDENTITY).index, world);
+static void evox_world_createEntity(ex_runtime* runtime, ex_call_frame frame) {
+	EX_ARG(frame, World*, world);
+	SCRIPT_CHECK(frame, world, "Invalid world");
+	writeResult(runtime, frame, ExEntity(world->createEntity({0, 0, 0}, Quat::IDENTITY).index, world));
 }
 
 static bool evox_world_hasEntity(World* world, ExEntity entity) {
@@ -608,16 +622,30 @@ static void evox_entity_setParent(ex_runtime*, ex_call_frame frame) {
 	child.world->setParent(has_parent ? EntityPtr{parent.index} : INVALID_ENTITY, EntityRef{child.index});
 }
 
-static void evox_entity_setTransform(ExEntity entity, double x, double y, double z, float qx, float qy, float qz, float qw) {
+static void evox_entity_setTransform(ex_runtime*, ex_call_frame frame) {
+	const ExEntity entity = readArg<ExEntity>(frame);
+	const double x = readArg<double>(frame), y = readArg<double>(frame), z = readArg<double>(frame);
+	const float qx = readArg<float>(frame), qy = readArg<float>(frame), qz = readArg<float>(frame), qw = readArg<float>(frame);
+	SCRIPT_CHECK(frame, evox_entity_isValid(entity), "Invalid entity");
+	SCRIPT_CHECK(frame, isFiniteVec(x, y, z), "Invalid entity position");
+	SCRIPT_CHECK(frame, isValidQuat(qx, qy, qz, qw), "Invalid entity rotation");
 	entity.world->setTransform(EntityRef{entity.index}, RigidTransform(DVec3(x, y, z), Quat(qx, qy, qz, qw)));
 }
 
-static void evox_entity_setLocalTransform(ExEntity entity, double x, double y, double z, float qx, float qy, float qz, float qw) {
+static void evox_entity_setLocalTransform(ex_runtime*, ex_call_frame frame) {
+	const ExEntity entity = readArg<ExEntity>(frame);
+	const double x = readArg<double>(frame), y = readArg<double>(frame), z = readArg<double>(frame);
+	const float qx = readArg<float>(frame), qy = readArg<float>(frame), qz = readArg<float>(frame), qw = readArg<float>(frame);
+	SCRIPT_CHECK(frame, evox_entity_isValid(entity), "Invalid entity");
+	SCRIPT_CHECK(frame, isFiniteVec(x, y, z), "Invalid entity position");
+	SCRIPT_CHECK(frame, isValidQuat(qx, qy, qz, qw), "Invalid entity rotation");
 	const EntityRef ref{entity.index};
 	entity.world->setLocalTransform(ref, Transform(DVec3(x, y, z), Quat(qx, qy, qz, qw), entity.world->getLocalScale(ref)));
 }
 
-static void evox_entity_destroy(ExEntity entity) {
+static void evox_entity_destroy(ex_runtime*, ex_call_frame frame) {
+	const ExEntity entity = readArg<ExEntity>(frame);
+	SCRIPT_CHECK(frame, evox_entity_isValid(entity), "Invalid entity");
 	entity.world->destroyEntity(EntityRef{entity.index});
 }
 
@@ -646,28 +674,46 @@ static void evox_entity_setName(ex_runtime*, ex_call_frame frame) {
 	entity.world->setEntityName(EntityRef{entity.index}, StringView{name.begin, (u64)name.length});
 }
 
-static void evox_entity_setPosition(ExEntity entity, double x, double y, double z) {
+static void evox_entity_setPosition(ex_runtime*, ex_call_frame frame) {
+	const ExEntity entity = readArg<ExEntity>(frame);
+	const double x = readArg<double>(frame), y = readArg<double>(frame), z = readArg<double>(frame);
+	SCRIPT_CHECK(frame, evox_entity_isValid(entity), "Invalid entity");
+	SCRIPT_CHECK(frame, isFiniteVec(x, y, z), "Invalid entity position");
 	entity.world->setPosition(EntityRef{entity.index}, DVec3(x, y, z));
 }
 
-static DVec3 evox_entity_getPosition(ExEntity entity) {
-	return entity.world->getPosition(EntityRef{entity.index});
+static void evox_entity_getPosition(ex_runtime* runtime, ex_call_frame frame) {
+	const ExEntity entity = readArg<ExEntity>(frame);
+	SCRIPT_CHECK(frame, evox_entity_isValid(entity), "Invalid entity");
+	writeResult(runtime, frame, entity.world->getPosition(EntityRef{entity.index}));
 }
 
-static void evox_entity_setRotation(ExEntity entity, float x, float y, float z, float w) {
+static void evox_entity_setRotation(ex_runtime*, ex_call_frame frame) {
+	const ExEntity entity = readArg<ExEntity>(frame);
+	const float x = readArg<float>(frame), y = readArg<float>(frame), z = readArg<float>(frame), w = readArg<float>(frame);
+	SCRIPT_CHECK(frame, evox_entity_isValid(entity), "Invalid entity");
+	SCRIPT_CHECK(frame, isValidQuat(x, y, z, w), "Invalid entity rotation");
 	entity.world->setRotation(EntityRef{entity.index}, Quat(x, y, z, w));
 }
 
-static Quat evox_entity_getRotation(ExEntity entity) {
-	return entity.world->getRotation(EntityRef{entity.index});
+static void evox_entity_getRotation(ex_runtime* runtime, ex_call_frame frame) {
+	const ExEntity entity = readArg<ExEntity>(frame);
+	SCRIPT_CHECK(frame, evox_entity_isValid(entity), "Invalid entity");
+	writeResult(runtime, frame, entity.world->getRotation(EntityRef{entity.index}));
 }
 
-static void evox_entity_setScale(ExEntity entity, float x, float y, float z) {
+static void evox_entity_setScale(ex_runtime*, ex_call_frame frame) {
+	const ExEntity entity = readArg<ExEntity>(frame);
+	const float x = readArg<float>(frame), y = readArg<float>(frame), z = readArg<float>(frame);
+	SCRIPT_CHECK(frame, evox_entity_isValid(entity), "Invalid entity");
+	SCRIPT_CHECK(frame, isFiniteF(x) && isFiniteF(y) && isFiniteF(z), "Invalid entity scale");
 	entity.world->setScale(EntityRef{entity.index}, Vec3(x, y, z));
 }
 
-static Vec3 evox_entity_getScale(ExEntity entity) {
-	return entity.world->getScale(EntityRef{entity.index});
+static void evox_entity_getScale(ex_runtime* runtime, ex_call_frame frame) {
+	const ExEntity entity = readArg<ExEntity>(frame);
+	SCRIPT_CHECK(frame, evox_entity_isValid(entity), "Invalid entity");
+	writeResult(runtime, frame, entity.world->getScale(EntityRef{entity.index}));
 }
 
 // core:storage
@@ -809,25 +855,25 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	functions.insert({"core:log", "logErrorString"}, &wrap<logErrorString>);
 	functions.insert({"core:log", "logInfoString"}, &wrap<logInfoString>);
 	// entity
-	functions.insert({"core:entity", "destroy"}, &wrap<evox_entity_destroy>);
+	functions.insert({"core:entity", "destroy"}, &evox_entity_destroy);
 	functions.insert({"core:entity", "isValid"}, &wrap<evox_entity_isValid>);
 	functions.insert({"core:entity", "getName"}, &evox_entity_getName);
 	functions.insert({"core:entity", "setName"}, &evox_entity_setName);
-	functions.insert({"core:entity", "getPosition"}, &wrap<evox_entity_getPosition>);
-	functions.insert({"core:entity", "getRotation"}, &wrap<evox_entity_getRotation>);
-	functions.insert({"core:entity", "getScale"}, &wrap<evox_entity_getScale>);
-	functions.insert({"core:entity", "setPosition"}, &wrap<evox_entity_setPosition>);
-	functions.insert({"core:entity", "setScale"}, &wrap<evox_entity_setScale>);
-	functions.insert({"core:entity", "setRotation"}, &wrap<evox_entity_setRotation>);
+	functions.insert({"core:entity", "getPosition"}, &evox_entity_getPosition);
+	functions.insert({"core:entity", "getRotation"}, &evox_entity_getRotation);
+	functions.insert({"core:entity", "getScale"}, &evox_entity_getScale);
+	functions.insert({"core:entity", "setPosition"}, &evox_entity_setPosition);
+	functions.insert({"core:entity", "setScale"}, &evox_entity_setScale);
+	functions.insert({"core:entity", "setRotation"}, &evox_entity_setRotation);
 	functions.insert({"core:entity", "findChildByName"}, &evox_entity_findChildByName);
 	functions.insert({"core:entity", "getFirstChild"}, &evox_entity_getFirstChild);
 	functions.insert({"core:entity", "getNextSibling"}, &evox_entity_getNextSibling);
 	functions.insert({"core:entity", "getParent"}, &evox_entity_getParent);
 	functions.insert({"core:entity", "setParent"}, &evox_entity_setParent);
-	functions.insert({"core:entity", "setTransform"}, &wrap<evox_entity_setTransform>);
-	functions.insert({"core:entity", "setLocalTransform"}, &wrap<evox_entity_setLocalTransform>);
+	functions.insert({"core:entity", "setTransform"}, &evox_entity_setTransform);
+	functions.insert({"core:entity", "setLocalTransform"}, &evox_entity_setLocalTransform);
 	// world
-	functions.insert({"core:world", "createEntity"}, &wrap<evox_world_createEntity>);
+	functions.insert({"core:world", "createEntity"}, &evox_world_createEntity);
 	functions.insert({"core:world", "destroyEntity"}, &evox_world_destroyEntity);
 	functions.insert({"core:world", "findByName"}, &evox_world_findByName);
 	functions.insert({"core:world", "getFirstEntity"}, &evox_world_getFirstEntity);
