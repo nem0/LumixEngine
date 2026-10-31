@@ -1,0 +1,6 @@
+// import core:sentry as sentry
+
+// Blocks until the upload ends, returns false on failure.
+// email and attachment_path can be empty. attachment_path is any file on disk (at most 5 MiB) and it is
+// uploaded as is.
+extern fn sendFeedback(message : []const u8, email : []const u8, attachment_path : []const u8) : bool;

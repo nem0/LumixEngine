@@ -13,6 +13,7 @@
 #include <DbgHelp.h>
 #pragma warning (pop)
 
+#include "core/array.h"
 #include "core/atomic.h"
 #include "core/crt.h"
 #include "core/debug.h"
@@ -22,6 +23,7 @@
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/stack_tree.h"
+#include "core/stream.h"
 #include "core/string.h"
 #include "core/tag_allocator.h"
 
@@ -48,11 +50,102 @@ struct SentryData {
 
 static SentryData* s_sentry_data = nullptr;
 
+// https://sentry.io/settings/lumixengine/projects/native/keys/
+static const char* key = "b3fa911595fa4631eabf0ec1f8618ad9";
+static const char* host = "o4510992885809152.ingest.de.sentry.io";
+static const char* project = "4510992907501648";
+
+// Out is anything with append(char) and append(const char*), e.g. StaticString.
+template <typename Out> static void appendJsonEscaped(Out& out, const char* src, const char* end) {
+	for (; src != end; ++src) {
+		switch (*src) {
+			case '"': out.append("\\\""); break;
+			case '\\': out.append("\\\\"); break;
+			case '\b': out.append("\\b"); break;
+			case '\f': out.append("\\f"); break;
+			case '\n': out.append("\\n"); break;
+			case '\r': out.append("\\r"); break;
+			case '\t': out.append("\\t"); break;
+			default:
+				if ((u8)*src < 0x20) {
+					char hex[3];
+					toCStringHex((u8)*src, Span(hex));
+					hex[2] = '\0';
+					out.append("\\u00");
+					out.append(hex);
+				}
+				else {
+					out.append(*src);
+				}
+				break;
+		}
+	}
+}
+
+// Adapts OutputMemoryStream to the append() interface of appendJsonEscaped.
+struct StreamAppender {
+	OutputMemoryStream& stream;
+	void append(char c) { stream.write(&c, 1); }
+	void append(const char* str) { stream.write(str, stringLength(str)); }
+};
+
+// POSTs a Sentry envelope. Returns true on a 2xx response.
+static bool postEnvelope(const void* data, DWORD size, DWORD timeout_ms) {
+	wchar_t whost[256];
+	if (!MultiByteToWideChar(CP_UTF8, 0, host, -1, whost, 256)) return false;
+
+	StaticString<1024> narrow_url("/api/", project, "/envelope/?sentry_key=", key, "&sentry_version=7");
+	wchar_t url[1024];
+	if (!MultiByteToWideChar(CP_UTF8, 0, narrow_url.data, -1, url, 1024)) return false;
+
+	HINTERNET hSession = WinHttpOpen(L"LumixEngine/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+	if (!hSession) return false;
+
+	WinHttpSetTimeouts(hSession, timeout_ms, timeout_ms, timeout_ms, timeout_ms);
+	HINTERNET hConnect = WinHttpConnect(hSession, whost, INTERNET_DEFAULT_HTTPS_PORT, 0);
+	HINTERNET hRequest = hConnect ? WinHttpOpenRequest(hConnect, L"POST", url, NULL, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE) : nullptr;
+	bool success = false;
+	if (hRequest) {
+		wchar_t wheaders[] = L"Content-Type: application/x-sentry-envelope\r\n";
+		if (WinHttpSendRequest(hRequest, wheaders, -1, (LPVOID)data, size, size, 0) && WinHttpReceiveResponse(hRequest, NULL)) {
+			DWORD status_code = 0;
+			DWORD status_code_size = sizeof(status_code);
+			if (WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX, &status_code, &status_code_size, WINHTTP_NO_HEADER_INDEX)) {
+				success = status_code >= 200 && status_code < 300;
+			}
+		}
+		WinHttpCloseHandle(hRequest);
+	}
+	if (hConnect) WinHttpCloseHandle(hConnect);
+	WinHttpCloseHandle(hSession);
+	return success;
+}
+
+// Random UUIDv4 without dashes (32 lowercase hex chars + terminator).
+static bool makeEventId(char (&event_id)[33]) {
+	u8 uuid[16];
+	if (BCryptGenRandom(nullptr, uuid, sizeof(uuid), BCRYPT_USE_SYSTEM_PREFERRED_RNG) < 0) return false;
+	uuid[6] = (uuid[6] & 0x0F) | 0x40;
+	uuid[8] = (uuid[8] & 0x3F) | 0x80;
+	for (int i = 0; i < 16; ++i) {
+		event_id[i * 2] = "0123456789abcdef"[(uuid[i] >> 4) & 0xF];
+		event_id[i * 2 + 1] = "0123456789abcdef"[uuid[i] & 0xF];
+	}
+	event_id[32] = '\0';
+	return true;
+}
+
+// seconds since epoch
+static u64 getUnixTimestamp() {
+	FILETIME ft;
+	GetSystemTimeAsFileTime(&ft);
+	LARGE_INTEGER li;
+	li.LowPart = ft.dwLowDateTime;
+	li.HighPart = ft.dwHighDateTime;
+	return (li.QuadPart - 116444736000000000ULL) / 10000000ULL;
+}
+
 static void sendToSentry(const char* message) {
-	// https://sentry.io/settings/lumixengine/projects/native/keys/
-	static const char* key = "b3fa911595fa4631eabf0ec1f8618ad9";
-	static const char* host = "o4510992885809152.ingest.de.sentry.io";
-	static const char* project = "4510992907501648";
 
 	auto readLogFile = [](char* data, u32 max_size) -> u32 {
 		auto readFromPath = [data, max_size](const char* path) -> u32 {
@@ -110,26 +203,9 @@ static void sendToSentry(const char* message) {
 		return 0;
 	};
 
-	// Build event id as UUIDv4 without dashes (32 lowercase hex chars)
-	u8 uuid[16];
-	if (BCryptGenRandom(nullptr, uuid, sizeof(uuid), BCRYPT_USE_SYSTEM_PREFERRED_RNG) < 0) return;
-	uuid[6] = (uuid[6] & 0x0F) | 0x40;
-	uuid[8] = (uuid[8] & 0x3F) | 0x80;
 	char event_id[33];
-	for (int i = 0; i < 16; ++i) {
-		u8 v = uuid[i];
-		event_id[i * 2] = "0123456789abcdef"[(v >> 4) & 0xF];
-		event_id[i * 2 + 1] = "0123456789abcdef"[v & 0xF];
-	}
-	event_id[32] = '\0';
-
-	// Get current timestamp in seconds since epoch
-	FILETIME ft;
-	GetSystemTimeAsFileTime(&ft);
-	LARGE_INTEGER li;
-	li.LowPart = ft.dwLowDateTime;
-	li.HighPart = ft.dwHighDateTime;
-	u64 timestamp = (li.QuadPart - 116444736000000000ULL) / 10000000ULL;
+	if (!makeEventId(event_id)) return;
+	const u64 timestamp = getUnixTimestamp();
 
 	auto& envelope = s_sentry_data->envelope;
 	envelope = "";
@@ -137,30 +213,7 @@ static void sendToSentry(const char* message) {
 	envelope.append("{\"type\":\"event\"}\n");
 	envelope.append("{\"event_id\":\"", event_id, "\",\"timestamp\":", (u64)timestamp, ",\"platform\":\"native\",\"message\":\"");
 
-	const char* src = message;
-	while (*src) {
-		switch (*src) {
-			case '"': envelope.append("\\\""); break;
-			case '\\': envelope.append("\\\\"); break;
-			case '\b': envelope.append("\\b"); break;
-			case '\f': envelope.append("\\f"); break;
-			case '\n': envelope.append("\\n"); break;
-			case '\r': envelope.append("\\r"); break;
-			case '\t': envelope.append("\\t"); break;
-			default:
-				if ((u8)*src < 0x20) {
-					char hex[3];
-					toCStringHex((u8)*src, Span(hex));
-					hex[2] = '\0';
-					envelope.append("\\u00", hex);
-				}
-				else {
-					envelope.append(*src);
-				}
-				break;
-		}
-		++src;
-	}
+	appendJsonEscaped(envelope, message, message + strlen(message));
 	envelope.append("\",\"level\":\"fatal\"}\n");
 
 	const u32 log_data_size = readLogFile(s_sentry_data->log_data, 131072);
@@ -169,69 +222,75 @@ static void sendToSentry(const char* message) {
 		envelope.append(StringView(s_sentry_data->log_data, s_sentry_data->log_data + log_data_size), "\n");
 	}
 
-	// Convert to wide
-	wchar_t whost[256];
-	if (!MultiByteToWideChar(CP_UTF8, 0, host, -1, whost, 256)) return;
-
-	// Build URL
-	StaticString<1024> narrow_url;
-	narrow_url.append("/api/", project, "/envelope/?sentry_key=", key, "&sentry_version=7");
-	wchar_t url[1024];
-	if (!MultiByteToWideChar(CP_UTF8, 0, narrow_url.data, -1, url, 1024)) return;
-
-	// Send HTTP POST
-	HINTERNET hSession = WinHttpOpen(L"LumixEngine/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
-	if (!hSession) return;
-	WinHttpSetTimeouts(hSession, 2000, 2000, 2000, 2000);
-	HINTERNET hConnect = WinHttpConnect(hSession, whost, INTERNET_DEFAULT_HTTPS_PORT, 0);
-	if (!hConnect) {
-		WinHttpCloseHandle(hSession);
-		return;
-	}
-	HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"POST", url, NULL, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
-	if (!hRequest) {
-		WinHttpCloseHandle(hConnect);
-		WinHttpCloseHandle(hSession);
-		return;
-	}
-	wchar_t wheaders[] = L"Content-Type: application/x-sentry-envelope\r\n";
-	if (!WinHttpSendRequest(hRequest, wheaders, -1, (LPVOID)envelope.data, (DWORD)strlen(envelope.data), (DWORD)strlen(envelope.data), 0)) {
-		WinHttpCloseHandle(hRequest);
-		WinHttpCloseHandle(hConnect);
-		WinHttpCloseHandle(hSession);
-		return;
-	}
-	if (!WinHttpReceiveResponse(hRequest, NULL)) {
-		WinHttpCloseHandle(hRequest);
-		WinHttpCloseHandle(hConnect);
-		WinHttpCloseHandle(hSession);
-		return;
-	}
-	DWORD status_code = 0;
-	DWORD status_code_size = sizeof(status_code);
-	if (!WinHttpQueryHeaders(hRequest,
-		WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
-		WINHTTP_HEADER_NAME_BY_INDEX,
-		&status_code,
-		&status_code_size,
-		WINHTTP_NO_HEADER_INDEX)) {
-		WinHttpCloseHandle(hRequest);
-		WinHttpCloseHandle(hConnect);
-		WinHttpCloseHandle(hSession);
-		return;
-	}
-	if (status_code < 200 || status_code >= 300) {
-		WinHttpCloseHandle(hRequest);
-		WinHttpCloseHandle(hConnect);
-		WinHttpCloseHandle(hSession);
-		return;
-	}
-	WinHttpCloseHandle(hRequest);
-	WinHttpCloseHandle(hConnect);
-	WinHttpCloseHandle(hSession);
+	postEnvelope(envelope.data, (DWORD)strlen(envelope.data), 2000);
 }
 
 } // namespace sentry
+
+bool sendFeedback(IAllocator& allocator, StringView message, StringView email, StringView attachment_path) {
+	const u64 MAX_FEEDBACK_ATTACHMENT = 5 * 1024 * 1024;
+	if (message.size() == 0 || message.size() > 8192 || email.size() > 256) {
+		logError("Feedback: invalid message or email size");
+		return false;
+	}
+
+	os::InputFile file;
+	u64 attachment_size = 0;
+	const bool has_attachment = attachment_path.size() > 0;
+	if (has_attachment) {
+		if (!file.open(StaticString<MAX_PATH>(attachment_path))) {
+			logError("Feedback: failed to open attachment ", attachment_path);
+			return false;
+		}
+		attachment_size = file.size();
+	}
+	defer { if (has_attachment) file.close(); };
+	if (attachment_size > MAX_FEEDBACK_ATTACHMENT) {
+		logError("Feedback: attachment ", attachment_path, " is too big (", attachment_size, " bytes)");
+		return false;
+	}
+
+	char event_id[33];
+	if (!sentry::makeEventId(event_id)) {
+		logError("Feedback: failed to generate event id");
+		return false;
+	}
+
+	OutputMemoryStream body(allocator);
+	body.reserve(1024 + message.size() * 2 + attachment_size);
+	body << "{\"event_id\":\"" << StringView(event_id) << "\",\"dsn\":\"https://" << sentry::key << "@" << sentry::host << "/" << sentry::project << "\"}\n";
+	body << "{\"type\":\"feedback\"}\n";
+	body << "{\"event_id\":\"" << StringView(event_id) << "\",\"timestamp\":" << sentry::getUnixTimestamp() << ",\"platform\":\"native\",\"level\":\"info\",\"contexts\":{\"feedback\":{\"message\":\"";
+	sentry::StreamAppender out{body};
+	sentry::appendJsonEscaped(out, message.begin(), message.end());
+	body << "\"";
+	if (email.size() > 0) {
+		body << ",\"contact_email\":\"";
+		sentry::appendJsonEscaped(out, email.begin(), email.end());
+		body << "\"";
+	}
+	body << "}}}\n";
+
+	if (has_attachment) {
+		// filename without the directory
+		StringView filename = attachment_path;
+		for (const char* c = attachment_path.begin(); c != attachment_path.end(); ++c) {
+			if (*c == '/' || *c == '\\') filename = StringView(c + 1, attachment_path.end());
+		}
+		body << "{\"type\":\"attachment\",\"length\":" << attachment_size << ",\"filename\":\"";
+		sentry::appendJsonEscaped(out, filename.begin(), filename.end());
+		body << "\"}\n";
+		if (attachment_size > 0 && !file.read(body.skip(attachment_size), attachment_size)) {
+			logError("Feedback: failed to read attachment ", attachment_path);
+			return false;
+		}
+		body << "\n";
+	}
+
+	const bool sent = sentry::postEnvelope(body.data(), (DWORD)body.size(), 15000);
+	if (!sent) logError("Feedback: failed to upload to Sentry");
+	return sent;
+}
 
 namespace debug {
 

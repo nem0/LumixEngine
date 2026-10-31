@@ -26,4 +26,10 @@ On the first device removal, the engine writes `DRED:` entries to the normal log
 - Disable Sentry: Use `-no_crash_report` or configure flags without `SENTRY`.
 - Programmatically: Call `Lumix::configureCrashReport(flags)`.
 
+## User feedback
+
+`sendFeedback(allocator, message, email, attachment_path)` from `core/debug.h` sends standalone feedback to Sentry and blocks until the upload ends (15 s timeout). It is independent of `CrashReportFlags`, since it is always an explicit user action. `email` and `attachment_path` are optional; the attachment can be any file on disk up to 5 MiB.
+
+Evox scripts call `core:sentry` `sendFeedback(message, email, attachment_path) : bool`. Only pass attachment paths the user chose, because the script can upload any readable file. Only the Windows build implements this; elsewhere `sendFeedback` returns false.
+
 Reports are sent to Lumix Engine's Sentry project for internal use only.

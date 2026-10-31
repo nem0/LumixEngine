@@ -1,3 +1,4 @@
+#include "core/debug.h"
 #include "core/log.h"
 #include "core/os.h"
 #include "core/string.h"
@@ -819,6 +820,13 @@ static bool evox_storage_remove(ex_string_view relative) {
 	return getStoragePath(relative, Span(path)) && os::deleteFile(path);
 }
 
+static bool evox_sentry_sendFeedback(ex_string_view message, ex_string_view email, ex_string_view attachment_path) {
+	return sendFeedback(getGlobalAllocator()
+		, StringView(message.begin, (u64)message.length)
+		, StringView(email.begin, (u64)email.length)
+		, StringView(attachment_path.begin, (u64)attachment_path.length));
+}
+
 void registerImguiModule(NativeFunctionMap& functions) {
 	functions.insert({"core:imgui", "begin"}, &wrap<imguiBegin>);
 	functions.insert({"core:imgui", "textUnformatted"}, &wrap<imguiTextUnformatted>);
@@ -851,6 +859,7 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	functions.insert({"core:storage", "size"}, &wrap<evox_storage_size>);
 	functions.insert({"core:storage", "exists"}, &wrap<evox_storage_exists>);
 	functions.insert({"core:storage", "remove"}, &wrap<evox_storage_remove>);
+	functions.insert({"core:sentry", "sendFeedback"}, &wrap<evox_sentry_sendFeedback>);
 	// log
 	functions.insert({"core:log", "logErrorString"}, &wrap<logErrorString>);
 	functions.insert({"core:log", "logInfoString"}, &wrap<logInfoString>);

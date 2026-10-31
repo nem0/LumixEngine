@@ -8,6 +8,7 @@
 namespace Lumix {
 
 struct TagAllocator;
+struct StringView;
 template <typename T> struct Span;
 
 namespace debug {
@@ -91,6 +92,11 @@ enum class CrashReportFlags : u32 {
 
 LUMIX_CORE_API void configureCrashReport(CrashReportFlags flags);
 LUMIX_CORE_API void setCrashReportLogPath(const char* path);
+
+// Sends user feedback to Sentry. Blocks until the upload ends. `email` and `attachment_path` can be empty,
+// the attachment can be any file up to 5 MiB. Works regardless of CrashReportFlags.
+LUMIX_CORE_API bool sendFeedback(IAllocator& allocator, StringView message, StringView email, StringView attachment_path);
+
 LUMIX_CORE_API void installUnhandledExceptionHandler();
 LUMIX_CORE_API void clearHardwareBreakpoint(u32 breakpoint_idx);
 LUMIX_CORE_API void setHardwareBreakpoint(u32 breakpoint_idx, const void* mem, u32 size);

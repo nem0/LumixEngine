@@ -2,6 +2,7 @@
 // Public API: fpng_init(), fpng_encode_max_size(), fpng_encode_image_to_memory().
 #pragma once
 
+#include <stdint.h>
 
 namespace fpng
 {
