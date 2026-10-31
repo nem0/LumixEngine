@@ -632,7 +632,7 @@ void SceneView::makeScreenshot(StringView path) {
 				return;
 			}
 
-			bool res = Texture::saveTGA(&file, size.x, size.y, gpu::TextureFormat::RGBA8, data.begin(), true, Path(path), *allocator);
+			bool res = Texture::savePNG(&file, size.x, size.y, data.begin(), true, Path(path), *allocator);
 			file.close();
 
 			if (!res) {

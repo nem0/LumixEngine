@@ -23,6 +23,10 @@ We utilize [PhysX](https://github.com/nem0/PhysX.git) for physical simulation. O
 2. Regenerate the project using *premake5*.
 3. Build the project.
 
+## fpng
+
+We utilize [fpng](https://github.com/richgel999/fpng) for fast PNG encoding of screenshots. It is included in our repository as a trimmed, encoder-only single file [external/fpng/fpng.inl](../external/fpng/fpng.inl) without the STL dependency.
+
 ## LZ4
 
 We utilize [LZ4](https://github.com/lz4/lz4) for asset compression due to its exceptional speed and efficient compression ratio.  The source code for LZ4 is includede in our repository under [external/lz4](../external/lz4/).

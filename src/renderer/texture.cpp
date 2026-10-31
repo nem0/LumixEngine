@@ -12,6 +12,7 @@
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "stb/stb_image.h"
+#include "fpng/fpng.inl"
 
 namespace Lumix
 {
@@ -172,6 +173,45 @@ bool Texture::saveTGA(IOutputStream* file,
 
 	bool res = file->write(data, width * height * 4);
 	return res;
+}
+
+
+bool Texture::savePNG(IOutputStream* file,
+	int width,
+	int height,
+	const u8* image_dest,
+	bool upper_left_origin,
+	const Path& path,
+	IAllocator& allocator)
+{
+	static bool fpng_initialized = false;
+	if (!fpng_initialized) {
+		fpng::fpng_init();
+		fpng_initialized = true;
+	}
+
+	OutputMemoryStream rgb(allocator);
+	rgb.resize(width * height * 3);
+	u8* out = rgb.getMutableData();
+	for (int y = 0; y < height; ++y) {
+		const u8* src = image_dest + (upper_left_origin ? y : height - 1 - y) * width * 4;
+		for (int x = 0; x < width; ++x) {
+			out[0] = src[0];
+			out[1] = src[1];
+			out[2] = src[2];
+			out += 3;
+			src += 4;
+		}
+	}
+
+	OutputMemoryStream png(allocator);
+	png.resize(fpng::fpng_encode_max_size(width, height, 3));
+	const size_t png_size = fpng::fpng_encode_image_to_memory(rgb.data(), width, height, 3, png.getMutableData(), png.size());
+	if (!png_size) {
+		logError("Texture ", path, " could not be saved, PNG encoding failed");
+		return false;
+	}
+	return file->write(png.data(), png_size);
 }
 
 

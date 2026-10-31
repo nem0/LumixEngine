@@ -133,7 +133,7 @@ bool GameView::makeScreenshot(StringView path, int width, int height) {
 				return;
 			}
 
-			const bool res = Texture::saveTGA(&file, size.x, size.y, gpu::TextureFormat::RGBA8, data.begin(), true, Path(path), *allocator);
+			const bool res = Texture::savePNG(&file, size.x, size.y, data.begin(), true, Path(path), *allocator);
 			file.close();
 			if (!res) logError("Could not save ", path);
 			LUMIX_DELETE(*allocator, this);
@@ -380,12 +380,12 @@ void GameView::controlsGUI(WorldEditor& editor) {
 		StaticString<MAX_PATH> rel_path;
 		for (u32 i = 1; i < 100000; ++i) {
 			rel_path = "screenshots/game_view_";
-			rel_path.append(i, ".tga");
+			rel_path.append(i, ".png");
 			if (!os::fileExists(StringView(Path(m_app.getProjectDir(), rel_path).c_str()))) break;
 		}
 		if (makeScreenshot(rel_path)) logInfo("Saving game view screenshot to ", rel_path);
 	}
-	if (ImGui::IsItemHovered()) ImGui::SetTooltip("Save a screenshot of the game view to screenshots/ (TGA, current resolution)");
+	if (ImGui::IsItemHovered()) ImGui::SetTooltip("Save a screenshot of the game view to screenshots/ (PNG, current resolution)");
 }
 
 

@@ -27,7 +27,7 @@ struct LUMIX_RENDERER_API GameView : StudioApp::GUIPlugin {
 	void setCursor(os::CursorType type);
 	//@ function
 	void forceViewport(bool enable, int w, int h);
-	// Queues a TGA screenshot of the game view (including the in-game UI) to a project-relative path. Returns false if the game view has no size yet
+	// Queues a PNG screenshot of the game view (including the in-game UI) to a project-relative path. Returns false if the game view has no size yet
 	// (e.g. its window has never been visible). The file is written asynchronously after the GPU read-back.
 	// If width and height are both > 0, this capture is rendered at that size; the window size applies again on the next GUI frame.
 	bool makeScreenshot(StringView path, int width = 0, int height = 0);

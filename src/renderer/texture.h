@@ -107,6 +107,15 @@ struct LUMIX_RENDERER_API Texture final : Resource {
 		const Path& path,
 		IAllocator& allocator);
 
+	// writes opaque RGB PNG (alpha is dropped), image_dest is tightly packed RGBA8
+	static bool savePNG(IOutputStream* file,
+		int width,
+		int height,
+		const u8* image_dest,
+		bool upper_left_origin,
+		const Path& path,
+		IAllocator& allocator);
+
 	static const ResourceType TYPE;
 
 	u32 width;
