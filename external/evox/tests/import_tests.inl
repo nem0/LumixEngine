@@ -1479,3 +1479,57 @@ TEST(RootFileNameMatchesImportWithoutExtension) {
 	CAPI_END(module);
 	return true;
 }
+
+// an array comptime of another unit can be indexed and measured through the namespace (it needs an address, not only a value)
+TEST(ImportedComptimeArrayIndexAndLength) {
+	const char* main_source = R"(
+		import "a" as x
+
+		fn main() : i32 {
+			return (x.values.length as i32) * 100 + x.values[1];
+		}
+	)";
+	const char* a_source = R"(
+		comptime values : [3]i32 = [10, 20, 30];
+	)";
+	EvoxImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+	};
+	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(main_source), makeStringView(__func__), &resolveEvoxImportC, &files));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(test_call(runtime, toLs("main")), EX_CALL_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 320);
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ImportedComptimeStructArrayField) {
+	const char* main_source = R"(
+		import "a" as x
+
+		fn main() : i32 {
+			var i = 1;
+			return x.steps[i].n + (x.steps[i - 1].name.length as i32);
+		}
+	)";
+	const char* a_source = R"(
+		struct Step { name : []const u8; n : i32; }
+		comptime steps = [
+			Step { "ab", 5 },
+			Step { "cde", 7 }
+		];
+	)";
+	EvoxImportFile files_storage[] = {
+		{ toLs("a"), toLs(a_source) },
+	};
+	EvoxImportFiles files = { files_storage, lengthOf(files_storage) };
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(main_source), makeStringView(__func__), &resolveEvoxImportC, &files));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(test_call(runtime, toLs("main")), EX_CALL_RESULT_OK);
+	EXPECT_EQ(ex_task_to_i32(runtime, -1), 9);
+	CAPI_END(module);
+	return true;
+}

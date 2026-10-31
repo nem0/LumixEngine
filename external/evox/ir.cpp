@@ -825,12 +825,16 @@ struct IRBuilder {
 
 				// namespace.comptime
 				if (me.resolved_symbol && me.resolved_symbol->kind == EX_SYM_KIND_COMPTIME) {
-					EX_ASSERT(as_rvalue);
 					auto& value = alloc<ExOpLoadBytes>();
 					value.type = expr.resolved_type;
 					value.value = me.resolved_symbol->comptime_value.value;
 					value.size = typeByteSize(*expr.resolved_type);
-					return value;
+					if (as_rvalue) return value;
+
+					// indexing a comptime array asks for its address: give it a temporary copy
+					auto& address = alloc<ExOpMaterializeAddr>();
+					address.value = &value;
+					return address;
 				}
 
 				// namespace.global
