@@ -95,6 +95,11 @@ void GameView::init() {
 }
 
 bool GameView::makeScreenshot(StringView path, int width, int height) {
+	Path full_path;
+	if (!m_app.getEngine().getFileSystem().getFullPath(path, full_path)) {
+		logError("Could not resolve screenshot path ", path);
+		return false;
+	}
 	if (width > 0 && height > 0) {
 		m_pipeline->setWorld(m_app.getWorldEditor().getWorld());
 		setupViewport(width, height);
@@ -113,41 +118,7 @@ bool GameView::makeScreenshot(StringView path, int width, int height) {
 		return false;
 	}
 
-	struct Callback {
-		StaticString<MAX_PATH> path;
-		StudioApp* app;
-		IVec2 size;
-		IAllocator* allocator;
-
-		void callback(Span<const u8> data) {
-			if (data.length() == 0) {
-				logError("Failed to read back the screenshot of ", path);
-				LUMIX_DELETE(*allocator, this);
-				return;
-			}
-			FileSystem& fs = app->getEngine().getFileSystem();
-			os::OutputFile file;
-			if (!fs.open(path, file)) {
-				logError("Could not save ", path);
-				LUMIX_DELETE(*allocator, this);
-				return;
-			}
-
-			const bool res = Texture::savePNG(&file, size.x, size.y, data.begin(), true, Path(path), *allocator);
-			file.close();
-			if (!res) logError("Could not save ", path);
-			LUMIX_DELETE(*allocator, this);
-		}
-	};
-
-	Callback* cb = LUMIX_NEW(m_app.getAllocator(), Callback);
-	cb->allocator = &m_app.getAllocator();
-	cb->path = path;
-	cb->size = size;
-	cb->app = &m_app;
-
-	auto delegate = makeDelegate<&Callback::callback>(cb);
-	m_pipeline->getRenderer().getDrawStream().readTexture(texture, delegate);
+	m_pipeline->getRenderer().saveTexturePNG(StringView(full_path.c_str()), texture, size, 0, 0, nullptr);
 
 	// the requested size is for this capture only: go back to the size the GUI uses (no render, the read-back above keeps its texture)
 	if (width > 0 && height > 0) {

@@ -18,6 +18,7 @@ static bool g_show_all_visualizations = false; // If true, show for all elements
 static const char* getTagName(Tag tag) {
 	switch (tag) {
 		case Tag::BOX: return "box";
+		case Tag::INPUT: return "input";
 		case Tag::IMAGE: return "image";
 		case Tag::SPAN: return "span";
 		case Tag::BR: return "br";
@@ -167,6 +168,7 @@ static void debugElementGUI(const Document& document, u32 element_idx, int depth
 
 	ImVec4 type_color;
 	switch (element->tag) {
+		case Tag::INPUT:
 		case Tag::BOX: type_color = ImVec4(0.8f, 0.6f, 0.4f, 1.0f); break;
 		case Tag::IMAGE: type_color = ImVec4(0.4f, 0.8f, 0.6f, 1.0f); break;
 		case Tag::SPAN: type_color = ImVec4(0.6f, 0.4f, 0.8f, 1.0f); break;

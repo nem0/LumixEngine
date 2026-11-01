@@ -5248,6 +5248,21 @@ namespace Lumix::Evox::generated {
 		object->setLODMultiplier(value);
 	}
 	
+	static void evox_object_Renderer_requestScreenshot_2862291973608057301(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Renderer*, object);
+		EX_STRING_ARG(frame, path);
+		EX_ARG(frame, u32, max_width);
+		EX_ARG(frame, u32, max_height);
+		auto ret = object->requestScreenshot(StringView{path.begin, (u64)path.length}, max_width, max_height);
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Renderer_getScreenshotState_2467548710941015420(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Renderer*, object);
+		auto ret = object->getScreenshotState();
+		EX_RESULT(frame, (i32)ret);
+	}
+	
 	static void evox_resource_load_Shader(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, Engine*, engine);
 		EX_STRING_ARG(frame, path);
@@ -5330,6 +5345,12 @@ namespace Lumix::Evox::generated {
 		EX_ARG(frame, ui::Element*, object);
 		EX_STRING_ARG(frame, value);
 		object->setText(StringView{value.begin, (u64)value.length});
+	}
+	
+	static void evox_object_Element_getText_17915993551711754700(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getText();
+		ex_result_string(runtime, &frame, ex_string_view{ret.data, (i64)ret.length});
 	}
 	
 	static void evox_object_Element_setWidth_1690122863701504102(ex_runtime* runtime, ex_call_frame frame) {
@@ -5437,6 +5458,17 @@ namespace Lumix::Evox::generated {
 		auto ret = object->getEvents();
 		ex_slice result{const_cast<u8*>(reinterpret_cast<const u8*>((ret).begin())), (i64)(ret).size()};
 		EX_RESULT(frame, result);
+	}
+	
+	static void evox_object_Document_hasTextFocus_321500227969594308(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Document*, object);
+		auto ret = object->hasTextFocus();
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Document_blur_15156231924239846169(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Document*, object);
+		object->blur();
 	}
 	
 	static void evox_object_UISystem_enableCursor_9613396029109500766(ex_runtime* runtime, ex_call_frame frame) {
@@ -6055,6 +6087,8 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:renderer/renderer"), StringView("destroyPipeline")}, &evox_object_Renderer_destroyPipeline_10417378349737653994);
 		functions.insert({StringView("core:renderer/renderer"), StringView("getLODMultiplier")}, &evox_object_Renderer_getLODMultiplier_14506703837845548734);
 		functions.insert({StringView("core:renderer/renderer"), StringView("setLODMultiplier")}, &evox_object_Renderer_setLODMultiplier_2531530158563778094);
+		functions.insert({StringView("core:renderer/renderer"), StringView("requestScreenshot")}, &evox_object_Renderer_requestScreenshot_2862291973608057301);
+		functions.insert({StringView("core:renderer/renderer"), StringView("getScreenshotState")}, &evox_object_Renderer_getScreenshotState_2467548710941015420);
 		functions.insert({StringView("core:renderer/shader"), StringView("load")}, &evox_resource_load_Shader);
 		functions.insert({StringView("core:renderer/shader"), StringView("unload")}, &evox_resource_unload_Shader);
 		functions.insert({StringView("core:renderer/shader"), StringView("isReady")}, &evox_resource_isReady_Shader);
@@ -6070,6 +6104,7 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:ui/element"), StringView("getID")}, &evox_object_Element_getID_5043487033988361637);
 		functions.insert({StringView("core:ui/element"), StringView("setVisible")}, &evox_object_Element_setVisible_10775676013963828726);
 		functions.insert({StringView("core:ui/element"), StringView("setText")}, &evox_object_Element_setText_16123516204308000926);
+		functions.insert({StringView("core:ui/element"), StringView("getText")}, &evox_object_Element_getText_17915993551711754700);
 		functions.insert({StringView("core:ui/element"), StringView("setWidth")}, &evox_object_Element_setWidth_1690122863701504102);
 		functions.insert({StringView("core:ui/element"), StringView("setBGImage")}, &evox_object_Element_setBGImage_9641999657146036441);
 		functions.insert({StringView("core:ui/element"), StringView("setGeometry")}, &evox_object_Element_setGeometry_15196642487151414820);
@@ -6086,6 +6121,8 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:ui/document"), StringView("createElement")}, &evox_object_Document_createElement_4272656930717277846);
 		functions.insert({StringView("core:ui/document"), StringView("destroyElement")}, &evox_object_Document_destroyElement_2640139010848314779);
 		functions.insert({StringView("core:ui/document"), StringView("getEvents")}, &evox_object_Document_getEvents_4526885960883524382);
+		functions.insert({StringView("core:ui/document"), StringView("hasTextFocus")}, &evox_object_Document_hasTextFocus_321500227969594308);
+		functions.insert({StringView("core:ui/document"), StringView("blur")}, &evox_object_Document_blur_15156231924239846169);
 		functions.insert({StringView("core:ui/uisystem"), StringView("enableCursor")}, &evox_object_UISystem_enableCursor_9613396029109500766);
 	}
 	

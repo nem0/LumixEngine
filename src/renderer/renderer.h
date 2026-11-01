@@ -3,6 +3,7 @@
 #include "engine/lumix.h"
 
 #include "core/allocator.h"
+#include "core/atomic.h"
 #include "core/color.h"
 #include "core/math.h"
 #include "core/profiler.h"
@@ -61,6 +62,15 @@ struct DrawStream;
 struct UniformPool;
 struct TransientPool;
 
+//@ enum
+enum class ScreenshotState : i32 {
+	NONE, // nothing was requested yet
+	PENDING, // waiting for the next game view frame
+	SAVING, // the frame is being read back and written
+	SAVED, // the file exists
+	FAILED // see the log
+};
+
 //@ object
 struct LUMIX_RENDERER_API Renderer : ISystem {
 	struct MemRef {
@@ -88,6 +98,20 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual float getLODMultiplier() const = 0;
 	//@ function
 	virtual void setLODMultiplier(float value) = 0;
+
+	// Saves the next rendered frame of a game view pipeline (with the in-game UI) as a PNG to an absolute path.
+	// max_width and max_height, if not 0, limit the size of the image: it is averaged down by
+	// a whole factor until it fits. Only one screenshot can be in progress.
+	//@ function
+	virtual bool requestScreenshot(StringView path, u32 max_width, u32 max_height) = 0;
+	//@ function
+	virtual ScreenshotState getScreenshotState() const = 0;
+	// called by a game view pipeline after it rendered into texture, saves the screenshot if one was requested
+	virtual void saveScreenshotIfRequested(gpu::TextureHandle texture, IVec2 size) = 0;
+	// Reads back a texture (RGBA8) and writes it as a PNG to an absolute path, asynchronously. It is written to a temporary file first, so the file
+	// exists only when complete. max_width and max_height, if not 0, limit the size of the image (averaged down by a whole factor).
+	// If result is not null, it is set to ScreenshotState::SAVED or FAILED when done, so it must outlive the call.
+	virtual void saveTexturePNG(StringView path, gpu::TextureHandle texture, IVec2 size, u32 max_width, u32 max_height, AtomicI32* result) = 0;
 	
 	virtual struct ArenaAllocator& getCurrentFrameAllocator() = 0;
 	virtual IAllocator& getAllocator() = 0;

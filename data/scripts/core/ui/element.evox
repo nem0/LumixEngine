@@ -7,6 +7,7 @@ struct Element { ptr : cptr; }
 extern fn getID(object : Element) : []const u8;
 extern fn setVisible(object : Element, show : bool) : void;
 extern fn setText(object : Element, value : []const u8) : void;
+extern fn getText(object : Element) : []const u8;
 extern fn setWidth(object : Element, value : []const u8) : void;
 extern fn setBGImage(object : Element, path : []const u8) : void;
 extern fn setGeometry(object : Element, vertices : []const Vertex, indices : []const u32) : void;

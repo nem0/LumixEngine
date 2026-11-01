@@ -717,7 +717,7 @@ static void evox_entity_getScale(ex_runtime* runtime, ex_call_frame frame) {
 	writeResult(runtime, frame, entity.world->getScale(EntityRef{entity.index}));
 }
 
-// core:storage
+// core:savedgames
 // Scripts pass a path relative to the saved games directory ("my_game/save.dat"). Absolute paths, ".." and
 // backslashes are rejected, so a script can't leave that directory.
 static bool getStoragePath(ex_string_view relative, Span<char> out) {
@@ -801,6 +801,30 @@ static void evox_storage_readBlob(ex_runtime*, ex_call_frame frame) {
 	EX_RESULT(frame, success ? (i32)size : i32(-1));
 }
 
+// fullpath(relative : []const u8, buffer : []u8) : i32
+// copies the full path on disk of a storage file (the saved games directory and the relative path) into buffer, without a terminator, and returns its length, -1 if the path is invalid or does not fit
+static void evox_storage_fullpath(ex_runtime*, ex_call_frame frame) {
+	EX_STRING_ARG(frame, relative);
+	EX_ARG(frame, ex_slice, buffer);
+	if (buffer.length < 0 || (buffer.length > 0 && !buffer.data)) {
+		panic(frame, "Invalid buffer");
+		return;
+	}
+
+	char path[MAX_PATH + 256];
+	if (!getStoragePath(relative, Span(path))) {
+		EX_RESULT(frame, i32(-1));
+		return;
+	}
+	const i64 length = (i64)stringLength(path);
+	if (length > buffer.length) {
+		EX_RESULT(frame, i32(-1));
+		return;
+	}
+	memcpy(buffer.data, path, (size_t)length);
+	EX_RESULT(frame, (i32)length);
+}
+
 static i32 evox_storage_size(ex_string_view relative) {
 	char path[MAX_PATH + 256];
 	os::InputFile file;
@@ -854,11 +878,12 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	functions.insert({"core:input", "getEventCount"}, &inputGetEventCount);
 	functions.insert({"core:input", "getEvent"}, &inputGetEvent);
 	// storage
-	functions.insert({"core:storage", "writeBlob"}, &wrap<evox_storage_writeBlob>);
-	functions.insert({"core:storage", "readBlob"}, &evox_storage_readBlob);
-	functions.insert({"core:storage", "size"}, &wrap<evox_storage_size>);
-	functions.insert({"core:storage", "exists"}, &wrap<evox_storage_exists>);
-	functions.insert({"core:storage", "remove"}, &wrap<evox_storage_remove>);
+	functions.insert({"core:savedgames", "writeBlob"}, &wrap<evox_storage_writeBlob>);
+	functions.insert({"core:savedgames", "readBlob"}, &evox_storage_readBlob);
+	functions.insert({"core:savedgames", "fullpath"}, &evox_storage_fullpath);
+	functions.insert({"core:savedgames", "size"}, &wrap<evox_storage_size>);
+	functions.insert({"core:savedgames", "exists"}, &wrap<evox_storage_exists>);
+	functions.insert({"core:savedgames", "remove"}, &wrap<evox_storage_remove>);
 	functions.insert({"core:sentry", "sendFeedback"}, &wrap<evox_sentry_sendFeedback>);
 	// log
 	functions.insert({"core:log", "logErrorString"}, &wrap<logErrorString>);

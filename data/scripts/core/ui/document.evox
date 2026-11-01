@@ -11,4 +11,6 @@ extern fn getElementByID(object : Document, id : []const u8) : ?Element;
 extern fn createElement(object : Document, tag : Tag, parent : i32) : Element;
 extern fn destroyElement(object : Document, el : Element) : void;
 extern fn getEvents(object : Document) : []const Event;
+extern fn hasTextFocus(object : Document) : bool;
+extern fn blur(object : Document) : void;
 

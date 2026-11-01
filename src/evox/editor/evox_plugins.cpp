@@ -19,6 +19,7 @@
 #include "engine/world.h"
 #include "editor/world_editor.h"
 #include "evox/evox_module.h"
+#include "evox/evox_import.h"
 #include "evox/evox_capi.gen.h"
 #include "core/array.h"
 #include "core/stream.h"
@@ -492,11 +493,7 @@ static bool toggleEvoxBreakpoint(StudioApp& app, const Path& source, u32 line);
 static void applyEvoxBreakpointMarkers(CodeEditor& editor, const Path& path);
 
 static Path evoxSourcePath(StringView source) {
-	if (startsWith(source, "core:")) {
-		const StringView name = source.withoutLeft(5);
-		return endsWith(name, ".evox") ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".evox");
-	}
-	return endsWith(source, ".evox") ? Path(source) : Path(source, ".evox");
+	return getEvoxImportPath(source);
 }
 
 // Compiles a script and its imports from disk so the editor can query symbols
@@ -609,14 +606,7 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 			if (!ctx || !ctx->module || !ctx->import_ctx) return 0;
 			StringView path_view(path.begin, path.length);
 			Path file_path;
-			if (startsWith(path_view, "core:")) {
-				StringView name = path_view.withoutLeft(5);
-				const bool has_lum_extension = endsWith(name, ".evox");
-				file_path = has_lum_extension ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".evox");
-			}
-			else {
-				file_path = endsWith(path_view, ".evox") ? Path(path_view) : Path(path_view, ".evox");
-			}
+			file_path = getEvoxImportPath(path_view);
 			OutputMemoryStream& import_blob = ctx->import_ctx->sources.emplace(*ctx->import_ctx->allocator);
 			if (!ctx->import_ctx->filesystem->getContentSync(file_path, import_blob)) {
 				ctx->import_ctx->sources.pop();
@@ -848,12 +838,7 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 			ImportContext* ctx = (ImportContext*)userdata;
 			StringView path(import_path.begin, import_path.length);
 			Path file_path;
-			if (startsWith(path, "core:")) {
-				StringView name = path.withoutLeft(5);
-				file_path = endsWith(name, ".evox") ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".evox");
-			} else {
-				file_path = endsWith(path, ".evox") ? Path(path) : Path(path, ".evox");
-			}
+			file_path = getEvoxImportPath(path);
 			OutputMemoryStream& blob = ctx->sources.emplace(*ctx->allocator);
 			if (!ctx->filesystem->getContentSync(file_path, blob)) {
 				ctx->sources.pop();
@@ -867,12 +852,7 @@ struct EvoxEditorWindow final : AssetEditorWindow {
 			ex_module_definition_at(module, source_name, m_editor->getCursorLine(), m_editor->getCursorColumn(), &location) == EX_RESULT_OK) {
 			StringView definition_source(location.source_name.begin, location.source_name.length);
 			Path definition_path;
-			if (startsWith(definition_source, "core:")) {
-				StringView name = definition_source.withoutLeft(5);
-				definition_path = endsWith(name, ".evox") ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".evox");
-			} else {
-				definition_path = endsWith(definition_source, ".evox") ? Path(definition_source) : Path(definition_source, ".evox");
-			}
+			definition_path = getEvoxImportPath(definition_source);
 			m_app.getAssetBrowser().openEditor(definition_path);
 			AssetEditorWindow* window = m_app.getAssetBrowser().getWindow(definition_path);
 			if (window) {
@@ -937,12 +917,7 @@ struct EvoxAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			if (startsWith(import_path, "std:")) continue;
 
 			Path dependency;
-			if (startsWith(import_path, "core:")) {
-				const StringView name = import_path.withoutLeft(5);
-				dependency = endsWith(name, ".evox") ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".evox");
-			} else {
-				dependency = endsWith(import_path, ".evox") ? Path(import_path) : Path(import_path, ".evox");
-			}
+			dependency = getEvoxImportPath(import_path);
 			m_app.getAssetCompiler().registerDependency(path, dependency);
 		}
 		// render.evox is compiled as a second root of main.evox, see compile()
@@ -986,13 +961,7 @@ struct EvoxAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		CompileContext& ctx = *(CompileContext*)userdata;
 		const StringView import_path(path.begin, path.length);
 		Path file_path;
-		if (startsWith(import_path, "core:")) {
-			const StringView name = import_path.withoutLeft(5);
-			file_path = endsWith(name, ".evox") ? Path("engine/scripts/core/", name) : Path("engine/scripts/core/", name, ".evox");
-		}
-		else {
-			file_path = endsWith(import_path, ".evox") ? Path(import_path) : Path(import_path, ".evox");
-		}
+		file_path = getEvoxImportPath(import_path);
 		OutputMemoryStream& blob = ctx.sources.emplace(ctx.allocator);
 		if (!ctx.filesystem.getContentSync(file_path, blob)) {
 			ctx.sources.pop();
@@ -1434,7 +1403,7 @@ struct EvoxVariablesWindow final : StudioApp::GUIPlugin {
 					ImGui::PushID("globals");
 					auto drawFileGlobals = [&](u32 unit_index, bool current_file) {
 						const ex_string_view source = ex_debug_unit_source_name(runtime, unit_index);
-						if (source.length == 0 || startsWith(StringView(source.begin, source.length), "core:")) return;
+						if (source.length == 0 || isEvoxPrefixedImport(StringView(source.begin, source.length))) return;
 						const bool source_matches = has_filter && nameMatchesFilter(source, m_filter);
 						auto isVisible = [&](u32 index) {
 							return ex_debug_global_unit(runtime, index) == unit_index

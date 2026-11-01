@@ -8,3 +8,5 @@ extern fn readBlob(path : []const u8, buffer : []u8) : i32;
 extern fn size(path : []const u8) : i32;
 extern fn exists(path : []const u8) : bool;
 extern fn remove(path : []const u8) : bool;
+// the full path on disk of a file (the saved games directory and the relative path), copied into buffer without a terminator; returns its length, -1 if the path is invalid or does not fit
+extern fn fullpath(relative : []const u8, buffer : []u8) : i32;

@@ -1496,6 +1496,8 @@ struct PipelineImpl final : Pipeline {
 
 		m_renderer.waitForCommandSetup();
 
+		if (m_type == PipelineType::GAME_VIEW && !only_2d) m_renderer.saveScreenshotIfRequested(getOutput(), m_display_size);
+
 		m_views.clear();
 		refreshMaterialOverrides();
 

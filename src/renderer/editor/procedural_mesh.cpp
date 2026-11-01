@@ -2,6 +2,7 @@
 #include "animation/animation.h"
 #include "../../../external/evox/capi.h"
 #include "../../../external/evox/arena.h"
+#include "evox/evox_import.h"
 #include "core/log.h"
 #include "core/math.h"
 #include "core/profiler.h"
@@ -132,17 +133,9 @@ struct Recipe {
 		ex_default_arena_destroy(&host.arena);
 	}
 
-	static Path importToPath(StringView requested) {
-		if (startsWith(requested, "core:")) {
-			const StringView unit = requested.withoutLeft(5);
-			return endsWith(unit, ".evox") ? Path("engine/scripts/core/", unit) : Path("engine/scripts/core/", unit, ".evox");
-		}
-		return endsWith(requested, ".evox") ? Path(requested) : Path(requested, ".evox");
-	}
-
 	static int resolveImport(void* userdata, ex_string_view name, ex_string_view, ex_string_view* source) {
 		Recipe& self = *(Recipe*)userdata;
-		const Path file = importToPath(StringView(name.begin, name.length));
+		const Path file = getEvoxImportPath(StringView(name.begin, name.length));
 
 		// registered before the file is read: a missing import is a dependency too, creating or moving the file must rebuild the recipe
 		if (self.dependencies) self.dependencies->registerDependency(self.path, file);
@@ -736,7 +729,7 @@ struct Plugin final : ProceduralMeshEditor, EditorAssetPlugin {
 				const ex_string_view value = ex_unit_get_import_path(unit, i);
 				const StringView import_path(value.begin, value.length);
 				if (startsWith(import_path, "std:")) continue;
-				compiler.registerDependency(path, Recipe::importToPath(import_path));
+				compiler.registerDependency(path, getEvoxImportPath(import_path));
 			}
 			ex_module_destroy(module);
 		}

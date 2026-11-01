@@ -2,6 +2,7 @@
 #include "editor/asset_compiler.h"
 #include "../../../external/evox/capi.h"
 #include "../../../external/evox/arena.h"
+#include "evox/evox_import.h"
 #include "core/crt.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
@@ -3679,17 +3680,9 @@ struct Recipe {
 		return true;
 	}
 
-	static Path importToPath(StringView requested) {
-		if (startsWith(requested, "core:")) {
-			const StringView unit = requested.withoutLeft(5);
-			return endsWith(unit, ".evox") ? Path("engine/scripts/core/", unit) : Path("engine/scripts/core/", unit, ".evox");
-		}
-		return endsWith(requested, ".evox") ? Path(requested) : Path(requested, ".evox");
-	}
-
 	static int resolveImport(void* userdata, ex_string_view name, ex_string_view, ex_string_view* source) {
 		Recipe& self = *(Recipe*)userdata;
-		const Path file = importToPath(StringView(name.begin, name.length));
+		const Path file = getEvoxImportPath(StringView(name.begin, name.length));
 		OutputMemoryStream& bytes = self.sources.emplace(self.allocator);
 		if (!self.readFile(file, bytes)) {
 			self.sources.pop();
@@ -4007,7 +4000,7 @@ void registerTextureRecipeImports(FileSystem& fs, const Path& path, AssetCompile
 			const ex_string_view value = ex_unit_get_import_path(unit, i);
 			const StringView import_path(value.begin, value.length);
 			if (startsWith(import_path, "std:")) continue;
-			compiler.registerDependency(path, Recipe::importToPath(import_path));
+			compiler.registerDependency(path, getEvoxImportPath(import_path));
 		}
 		ex_module_destroy(module);
 	}

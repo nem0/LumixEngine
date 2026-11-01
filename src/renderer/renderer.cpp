@@ -492,6 +492,124 @@ struct RendererImpl final : Renderer {
 	float getLODMultiplier() const override { return m_lod_multiplier; }
 	void setLODMultiplier(float value) override { m_lod_multiplier = maximum(0.f, value); }
 
+	bool requestScreenshot(StringView path, u32 max_width, u32 max_height) override {
+		const ScreenshotState state = getScreenshotState();
+		if (state == ScreenshotState::PENDING || state == ScreenshotState::SAVING) {
+			logError("Screenshot request for ", path, " refused: ", StringView(m_screenshot_path), " is still in progress");
+			return false;
+		}
+		const bool absolute = path.size() > 0 && (path.data[0] == '/' || path.data[0] == '\\' || (path.size() > 1 && path.data[1] == ':'));
+		if (!absolute || path.size() >= MAX_PATH) {
+			logError("Screenshot path must be absolute and shorter than ", (i32)MAX_PATH, ": ", path);
+			return false;
+		}
+		if (os::fileExists(StaticString<MAX_PATH>(path))) (void)os::deleteFile(StaticString<MAX_PATH>(path));
+		m_screenshot_path = StaticString<MAX_PATH>(path);
+		m_screenshot_max_width = max_width;
+		m_screenshot_max_height = max_height;
+		m_screenshot_state = (i32)ScreenshotState::PENDING;
+		return true;
+	}
+
+	ScreenshotState getScreenshotState() const override { return (ScreenshotState)(i32)m_screenshot_state; }
+
+	void saveScreenshotIfRequested(gpu::TextureHandle texture, IVec2 size) override {
+		if (getScreenshotState() != ScreenshotState::PENDING) return;
+
+		if (!texture || size.x <= 0 || size.y <= 0) {
+			logError("Could not save screenshot ", m_screenshot_path, ": the game view has no output to read back");
+			m_screenshot_state = (i32)ScreenshotState::FAILED;
+			return;
+		}
+		m_screenshot_state = (i32)ScreenshotState::SAVING;
+		saveTexturePNG(StringView(m_screenshot_path), texture, size, m_screenshot_max_width, m_screenshot_max_height, &m_screenshot_state);
+	}
+
+	void saveTexturePNG(StringView request, gpu::TextureHandle texture, IVec2 size, u32 max_width, u32 max_height, AtomicI32* result) override {
+		struct Callback {
+			StaticString<MAX_PATH> path;
+			IVec2 size;
+			u32 max_width;
+			u32 max_height;
+			IAllocator* allocator;
+			AtomicI32* result;
+
+			void callback(Span<const u8> data) {
+				const bool saved = save(data);
+				if (result) *result = (i32)(saved ? ScreenshotState::SAVED : ScreenshotState::FAILED);
+				LUMIX_DELETE(*allocator, this);
+			}
+
+			// written to a temporary file first, so the file exists only when it is complete
+			bool save(Span<const u8> data) {
+				if (data.length() == 0) {
+					logError("Failed to read back the screenshot of ", path);
+					return false;
+				}
+				char dir[MAX_PATH];
+				copyString(dir, path);
+				char* slash = nullptr;
+				for (char* c = dir; *c; ++c) {
+					if (*c == '/' || *c == '\\') slash = c;
+				}
+				if (slash) {
+					*slash = 0;
+					if (!os::makePath(dir)) logError("Failed to create ", dir);
+				}
+
+				// averaged down by a whole factor until it fits max_width x max_height (0 = no limit on that side)
+				const u8* pixels = data.begin();
+				IVec2 out_size = size;
+				OutputMemoryStream scaled(*allocator);
+				i32 factor = 1;
+				if (max_width > 0) factor = maximum(factor, i32((u32(size.x) + max_width - 1) / max_width));
+				if (max_height > 0) factor = maximum(factor, i32((u32(size.y) + max_height - 1) / max_height));
+				if (factor > 1) {
+					out_size = IVec2(size.x / factor, size.y / factor);
+					scaled.resize((u64)out_size.x * out_size.y * 4);
+					u8* dst = scaled.getMutableData();
+					for (i32 y = 0; y < out_size.y; ++y) {
+						for (i32 x = 0; x < out_size.x; ++x) {
+							for (i32 c = 0; c < 4; ++c) {
+								u32 sum = 0;
+								for (i32 fy = 0; fy < factor; ++fy) {
+									for (i32 fx = 0; fx < factor; ++fx) sum += pixels[((y * factor + fy) * size.x + x * factor + fx) * 4 + c];
+								}
+								*dst++ = u8(sum / u32(factor * factor));
+							}
+						}
+					}
+					pixels = scaled.data();
+				}
+
+				const StaticString<MAX_PATH + 4> tmp_path(path, ".tmp");
+				os::OutputFile file;
+				if (!file.open(tmp_path)) {
+					logError("Could not save ", path);
+					return false;
+				}
+				const bool saved = Texture::savePNG(&file, out_size.x, out_size.y, pixels, true, Path(path), *allocator);
+				file.close();
+				if (saved && !file.isError() && os::fileExists(path)) (void)os::deleteFile(path); // the editor overwrites screenshots
+				if (!saved || file.isError() || !os::moveFile(tmp_path, path)) {
+					logError("Could not save ", path);
+					(void)os::deleteFile(tmp_path);
+					return false;
+				}
+				return true;
+			}
+		};
+
+		Callback* cb = LUMIX_NEW(m_allocator, Callback);
+		cb->allocator = &m_allocator;
+		cb->result = result;
+		cb->path = request;
+		cb->size = size;
+		cb->max_width = max_width;
+		cb->max_height = max_height;
+		getDrawStream().readTexture(texture, makeDelegate<&Callback::callback>(cb));
+	}
+
 	void serialize(OutputMemoryStream& stream) const override {}
 	bool deserialize(i32 version, InputMemoryStream& stream) override { return version == 0; }
 
@@ -1371,6 +1489,10 @@ struct RendererImpl final : Renderer {
 	RenderResourceManager<Material> m_material_manager;
 	u32 m_frame_number = 0;
 	float m_lod_multiplier = 1;
+	StaticString<MAX_PATH> m_screenshot_path;
+	u32 m_screenshot_max_width = 0;
+	u32 m_screenshot_max_height = 0;
+	AtomicI32 m_screenshot_state = (i32)ScreenshotState::NONE;
 	jobs::Counter m_init_signal;
 	HashMap<RuntimeHash, String> m_semantic_defines;
 

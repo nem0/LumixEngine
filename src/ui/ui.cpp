@@ -51,7 +51,10 @@ Tag parseTag(StringView str) {
 		case 2: if (memcmp(s, "br", 2) == 0) return Tag::BR; break;
 		case 3: if (memcmp(s, "box", 3) == 0) return Tag::BOX; break;
 		case 4: if (memcmp(s, "span", 4) == 0) return Tag::SPAN; break;
-		case 5: if (memcmp(s, "image", 5) == 0) return Tag::IMAGE; break;
+		case 5:
+			if (memcmp(s, "image", 5) == 0) return Tag::IMAGE;
+			if (memcmp(s, "input", 5) == 0) return Tag::INPUT;
+			break;
 		case 6: if (memcmp(s, "canvas", 6) == 0) return Tag::CANVAS; break;
 	}
 	return Tag::INVALID;
@@ -416,7 +419,8 @@ bool Document::parseAttributeValue(Element& elem, AttributeName name, StringView
 		return false;
 	}
 	if (name == AttributeName::TEXT) {
-		elem.text = value;
+		if (elem.tag == Tag::INPUT) elem.setInputText(value, (u32)value.size());
+		else elem.text = value;
 		return true;
 	}
 
@@ -1241,6 +1245,7 @@ Element::Element(Element&& rhs)
 	, size(rhs.size)
 	, text(rhs.text)
 	, lines(rhs.lines.move())
+	, input_value(rhs.input_value.move())
 	, canvas_geometry(rhs.canvas_geometry)
 	, sprite_handle(rhs.sprite_handle)
 	, image_handle(rhs.image_handle)
@@ -1258,6 +1263,7 @@ Element::Element(Element&& rhs)
 	, wrap(rhs.wrap)
 	, visible(rhs.visible)
 	, clipping(rhs.clipping)
+	, caret(rhs.caret)
 	, width_unit(rhs.width_unit)
 	, height_unit(rhs.height_unit)
 	, pivot_x_unit(rhs.pivot_x_unit)
@@ -1355,7 +1361,127 @@ void Element::clearGeometry() {
 	}
 }
 
+StringView Element::getText() const {
+	return text;
+}
+
+static u32 utf8Prev(StringView s, u32 pos) {
+	if (pos == 0) return 0;
+	--pos;
+	while (pos > 0 && (s.data[pos] & 0xC0) == 0x80) --pos;
+	return pos;
+}
+
+static u32 utf8Next(StringView s, u32 pos) {
+	if (pos >= s.size()) return (u32)s.size();
+	++pos;
+	while (pos < s.size() && (s.data[pos] & 0xC0) == 0x80) ++pos;
+	return pos;
+}
+
+void Document::setFocus(u32 element_index) {
+	if (m_focus == element_index) return;
+	if (m_focus != Event::INVALID_ELEMENT_INDEX) removeClassRaw(m_focus, ":focus");
+	m_focus = element_index;
+	if (m_focus != Event::INVALID_ELEMENT_INDEX) addClassRaw(m_focus, ":focus");
+}
+
+// a focused [input] that was hidden (itself or an ancestor, e.g. its window was closed) no longer takes the keyboard
+void Document::dropHiddenFocus() {
+	if (m_focus == Event::INVALID_ELEMENT_INDEX) return;
+
+	for (const Element* e = &m_elements[m_focus]; e; e = e->parent >= 0 ? &m_elements[e->parent] : nullptr) {
+		if (!e->visible) {
+			setFocus(Event::INVALID_ELEMENT_INDEX);
+			return;
+		}
+	}
+}
+
+void Document::blur() {
+	setFocus(Event::INVALID_ELEMENT_INDEX);
+}
+
+void Element::setInputText(StringView value, u32 caret_pos) {
+	ASSERT(tag == Tag::INPUT);
+	if (value.data != input_value.begin()) { // not the current value itself
+		input_value.resize((u32)value.size());
+		if (!value.empty()) memcpy(input_value.begin(), value.data, value.size());
+	}
+	text = StringView(input_value.begin(), (u64)input_value.size());
+	caret = minimum(caret_pos, (u32)input_value.size());
+}
+
+// inserts at the caret
+static void insertIntoInput(Element& input, StringView inserted) {
+	Array<char>& v = input.input_value;
+	const u32 caret = minimum(input.caret, (u32)v.size());
+	const u32 old_size = (u32)v.size();
+	v.resize(old_size + (u32)inserted.size());
+	memmove(v.begin() + caret + inserted.size(), v.begin() + caret, old_size - caret);
+	memcpy(v.begin() + caret, inserted.data, inserted.size());
+	input.setInputText(StringView(v.begin(), (u64)v.size()), caret + (u32)inserted.size());
+}
+
+// removes the bytes [from, to) and puts the caret at from
+static void eraseFromInput(Element& input, u32 from, u32 to) {
+	Array<char>& v = input.input_value;
+	memmove(v.begin() + from, v.begin() + to, (u32)v.size() - to);
+	v.resize((u32)v.size() - (to - from));
+	input.setInputText(StringView(v.begin(), (u64)v.size()), from);
+}
+
+void Document::inputText(u32 input_index, StringView inserted) {
+	insertIntoInput(m_elements[input_index], inserted);
+}
+
+void Document::inputKey(u32 input_index, os::Keycode key) {
+	Element& input = m_elements[input_index];
+	Array<char>& v = input.input_value;
+	const StringView value = input.getText();
+	const u32 caret = minimum(input.caret, (u32)v.size());
+	switch (key) {
+		case os::Keycode::LEFT: input.caret = utf8Prev(value, caret); break;
+		case os::Keycode::RIGHT: input.caret = utf8Next(value, caret); break;
+		case os::Keycode::HOME: input.caret = 0; break;
+		case os::Keycode::END: input.caret = (u32)v.size(); break;
+		case os::Keycode::BACKSPACE:
+			if (caret > 0) eraseFromInput(input, utf8Prev(value, caret), caret);
+			break;
+		case os::Keycode::DEL:
+			if (caret < (u32)v.size()) eraseFromInput(input, caret, utf8Next(value, caret));
+			break;
+		case os::Keycode::V: {
+			if (!os::isKeyDown(os::Keycode::CTRL)) break;
+			const char* clip = os::getClipboardText(m_allocator);
+			if (!clip) break;
+			// one line: control characters (new lines) are dropped
+			Array<char> line(m_allocator);
+			for (const char* c = clip; *c; ++c) {
+				if ((u8)*c >= 32 && *c != 127) line.push(*c);
+			}
+			m_allocator.deallocate((void*)clip);
+			if (!line.empty()) insertIntoInput(input, StringView(line.begin(), (u64)line.size()));
+			break;
+		}
+		case os::Keycode::C:
+			if (os::isKeyDown(os::Keycode::CTRL)) {
+				Array<char> copy(m_allocator);
+				copy.resize((u32)v.size() + 1);
+				if (!v.empty()) memcpy(copy.begin(), v.begin(), (u32)v.size());
+				copy[(u32)v.size()] = '\0';
+				os::copyToClipboard(copy.begin());
+			}
+			break;
+		default: break;
+	}
+}
+
 void Element::setText(StringView v) {
+	if (tag == Tag::INPUT) {
+		setInputText(v, (u32)v.size());
+		return;
+	}
 	InternString s = m_document.m_intern_table.intern(v);
 	StringView stable_text = m_document.m_intern_table.resolve(s);
 	upsertAttribute<AttributeName::TEXT>(*this, stable_text, AttributeSource::ELEMENT);
@@ -2473,6 +2599,118 @@ static u8 applyOpacityToAlpha(u8 alpha, float opacity) {
 	return (u8)minimum(255.0f, maximum(0.0f, a));
 }
 
+static StringView getAttributeValue(const Element& elem, AttributeName name);
+
+struct InputLine {
+	u32 begin; // byte range of the value
+	u32 end;
+};
+
+// greedy word wrap of an [input] value; a word wider than the line is split between characters. Without wrap the value is a single line.
+static void wrapInput(IFontManager& fm, IFontManager::FontHandle font, StringView text, float width, bool wrap, Array<InputLine>& lines) {
+	const u32 n = (u32)text.size();
+	auto fits = [&](u32 from, u32 to) { return fm.measureTextA(font, StringView(text.data + from, (u64)(to - from))).x <= width; };
+	u32 begin = 0;
+	while (wrap && begin < n) {
+		u32 last_fit = begin; // end of the last word that fits
+		u32 i = begin;
+		bool full = false;
+		while (i < n) {
+			u32 word_end = i;
+			while (word_end < n && text.data[word_end] != ' ') ++word_end;
+			if (!fits(begin, word_end)) { full = true; break; }
+			last_fit = word_end;
+			i = word_end;
+			while (i < n && text.data[i] == ' ') ++i;
+		}
+		if (!full) break; // the rest fits
+		if (last_fit == begin) {
+			// a single word is too wide: take as many characters as fit, at least one
+			u32 c = utf8Next(text, begin);
+			for (;;) {
+				const u32 next = utf8Next(text, c);
+				if (next == c || !fits(begin, next)) break;
+				c = next;
+			}
+			last_fit = c;
+		}
+		lines.push({begin, last_fit});
+		begin = last_fit;
+		while (begin < n && text.data[begin] == ' ') ++begin;
+	}
+	lines.push({begin, n});
+}
+
+static void renderInput(Draw2D& draw, const Document& doc, const Element& element, Vec2 pos, Vec2 size, bool focused) {
+	IFontManager::FontHandle font = element.getFontHandle();
+	if (!font || !doc.m_font_manager) return;
+	IFontManager& fm = *doc.m_font_manager;
+	const Vec2 content_min = pos + Vec2(element.paddings.left, element.paddings.top);
+	const Vec2 content_max = pos + size - Vec2(element.paddings.right, element.paddings.bottom);
+	const float width = content_max.x - content_min.x;
+	if (width <= 0 || content_max.y <= content_min.y) return;
+
+	const bool placeholder = element.text.empty();
+	const StringView shown = placeholder ? getAttributeValue(element, AttributeName::PLACEHOLDER) : element.text;
+	Color color = element.color;
+	color.a = applyOpacityToAlpha(color.a, element.opacity * (placeholder ? 0.5f : 1.f));
+
+	StackArray<InputLine, 32> lines(doc.m_allocator);
+	wrapInput(fm, font, shown, width, element.wrap, lines);
+	const float line_h = fm.getHeight(font);
+	const float ascender = fm.getAscender(font);
+
+	// the caret is on the last line that starts at or before it; the text scrolls to keep it inside the box
+	u32 caret_line = 0;
+	float caret_x = 0;
+	if (!placeholder) {
+		const u32 caret = minimum(element.caret, (u32)shown.size());
+		for (u32 i = 0; i < (u32)lines.size(); ++i) {
+			if (lines[i].begin > caret) break;
+			caret_line = i;
+		}
+		const InputLine& l = lines[caret_line];
+		caret_x = fm.measureTextA(font, StringView(shown.data + l.begin, (u64)(minimum(caret, l.end) - l.begin))).x;
+	}
+	const float scroll_x = element.wrap ? 0.f : maximum(0.f, caret_x - width + 1);
+	const float scroll_y = maximum(0.f, (caret_line + 1) * line_h - (content_max.y - content_min.y));
+
+	draw.pushClipRect(content_min, content_max);
+	if (color.a > 0) {
+		for (u32 i = 0; i < (u32)lines.size(); ++i) {
+			const InputLine& l = lines[i];
+			if (l.end == l.begin) continue;
+			const Vec2 baseline(floorf(content_min.x - scroll_x + 0.5f), floorf(content_min.y - scroll_y + ascender + i * line_h + 0.5f));
+			draw.addText(*(const Font*)font, baseline, color, StringView(shown.data + l.begin, (u64)(l.end - l.begin)));
+		}
+	}
+	if (focused) {
+		const float x = floorf(content_min.x - scroll_x + caret_x + 0.5f);
+		const float y = floorf(content_min.y - scroll_y + caret_line * line_h + 0.5f);
+		Color caret_color = element.color;
+		caret_color.a = applyOpacityToAlpha(caret_color.a, element.opacity);
+		draw.addRectFilled(Vec2(x, y), Vec2(x + maximum(1.f, floorf(doc.m_scale + 0.5f)), y + line_h), caret_color);
+	}
+	draw.popClipRect();
+}
+
+static void renderBoxBackground(Draw2D& draw, const Document& doc, const Element& element, Vec2 pos, Vec2 size) {
+	const auto sprite_handle = element.getSpriteHandle();
+	if (doc.m_sprite_manager && sprite_handle && doc.m_sprite_manager->isReady(sprite_handle)) {
+		const u8 alpha = applyOpacityToAlpha(255, element.opacity);
+		if (alpha > 0) {
+			static_cast<Sprite*>(sprite_handle)->render(draw, pos.x, pos.y, pos.x + size.x, pos.y + size.y, Color(255, 255, 255, alpha));
+		}
+	}
+	else if (element.bg_color.a > 0) {
+		Color bg = element.bg_color;
+		bg.a = applyOpacityToAlpha(bg.a, element.opacity);
+		if (bg.a > 0) {
+			draw.addRectFilled(pos, pos + size, bg);
+		}
+	}
+}
+
 static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, const Element* parent) {
 	const Element& element = *doc.getElement(element_idx);
 	if (!element.visible) return;
@@ -2500,23 +2738,11 @@ static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, co
 			}
 			break;
 		}
-		case Tag::BOX: {
-			const auto sprite_handle = element.getSpriteHandle();
-			if (doc.m_sprite_manager && sprite_handle && doc.m_sprite_manager->isReady(sprite_handle)) {
-				const u8 alpha = applyOpacityToAlpha(255, element.opacity);
-				if (alpha > 0) {
-					static_cast<Sprite*>(sprite_handle)->render(draw, pos.x, pos.y, pos.x + size.x, pos.y + size.y, Color(255, 255, 255, alpha));
-				}
-			}
-			else if (element.bg_color.a > 0) {
-				Color bg = element.bg_color;
-				bg.a = applyOpacityToAlpha(bg.a, element.opacity);
-				if (bg.a > 0) {
-					draw.addRectFilled(pos, pos + size, bg);
-				}
-			}
+		case Tag::BOX: renderBoxBackground(draw, doc, element, pos, size); break;
+		case Tag::INPUT:
+			renderBoxBackground(draw, doc, element, pos, size);
+			renderInput(draw, doc, element, pos, size, doc.m_focus == element_idx);
 			break;
-		}
 		case Tag::CANVAS: {
 			const auto image_handle = element.getImageHandle();
 			gpu::TextureHandle texture = gpu::INVALID_TEXTURE;
@@ -2557,6 +2783,7 @@ static void renderElement(Draw2D& draw, const Document& doc, u32 element_idx, co
 	for (u32 child_idx : element.children) {
 		renderElement(draw, doc, child_idx, &element);
 	}
+
 
 	if (use_clipping) {
 		draw.popClipRect();
@@ -2815,6 +3042,22 @@ void Document::injectEvent(const InputSystem::Event& event) {
 			Element* elem = getElementAt(ui_event.position);
 			ui_event.element_index = elem ? u32(elem - m_elements.begin()) : Event::INVALID_ELEMENT_INDEX;
 			m_events.push(ui_event);
+			if (btn.down) {
+				// a press on an [input] (or inside one) focuses it, a press anywhere else drops the focus
+				u32 input_index = Event::INVALID_ELEMENT_INDEX;
+				for (const Element* e = elem; e; e = e->parent >= 0 ? &m_elements[e->parent] : nullptr) {
+					if (e->tag == Tag::INPUT) {
+						input_index = e->index;
+						break;
+					}
+				}
+				if (input_index != m_focus) {
+					setFocus(input_index);
+					if (input_index != Event::INVALID_ELEMENT_INDEX) {
+						m_elements[input_index].caret = (u32)m_elements[input_index].getText().size();
+					}
+				}
+			}
 			if (!btn.down) {
 				Element* action_elem = getActionTargetAt(*this, ui_event.position);
 				const StringView action = action_elem ? getAttributeValue(*action_elem, AttributeName::ON_CLICK) : StringView();
@@ -2836,7 +3079,9 @@ void Document::injectEvent(const InputSystem::Event& event) {
 			ui_event.type = key.down ? EventType::KEY_DOWN : EventType::KEY_UP;
 			ui_event.key_code = (i32)key.keycode;
 			ui_event.position = Vec2(0, 0);
-			ui_event.element_index = Event::INVALID_ELEMENT_INDEX; // TODO: focused element
+			dropHiddenFocus();
+			ui_event.element_index = m_focus;
+			if (m_focus != Event::INVALID_ELEMENT_INDEX && key.down) inputKey(m_focus, key.keycode);
 			m_events.push(ui_event);
 			break;
 		}
@@ -2924,7 +3169,14 @@ void Document::injectEvent(const InputSystem::Event& event) {
 			Event ui_event;
 			ui_event.type = EventType::TEXT_INPUT;
 			ui_event.text_utf8 = event.data.text.utf8;
-			ui_event.element_index = Event::INVALID_ELEMENT_INDEX; // TODO: focused element
+			dropHiddenFocus();
+			ui_event.element_index = m_focus;
+			if (m_focus != Event::INVALID_ELEMENT_INDEX) {
+				char bytes[5] = {};
+				memcpy(bytes, &event.data.text.utf8, 4);
+				// control characters (enter, tab, escape) are keys, not text
+				if ((u8)bytes[0] >= 32 && bytes[0] != 127) inputText(m_focus, StringView(bytes));
+			}
 			m_events.push(ui_event);
 			break;
 		}

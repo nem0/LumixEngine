@@ -30,6 +30,7 @@ enum class Tag : u8 {
 	SPAN,
 	BR,
 	CANVAS,
+	INPUT,
 	INVALID
 };
 
@@ -258,6 +259,7 @@ struct LUMIX_UI_API Element {
 		, attributes(allocator)
 		, classes(allocator)
 		, lines(allocator)
+		, input_value(allocator)
 		, m_document(doc)
 	{}
 	Element(const Element&) = delete;
@@ -283,6 +285,8 @@ struct LUMIX_UI_API Element {
 	Vec2 size = {0, 0};
 	StringView text;
 	Array<SpanLine> lines;
+	// Tag::INPUT only: owns the value, text views it (no interning per keystroke)
+	Array<char> input_value;
 	// [canvas] only, null until setGeometry; owned by the element
 	CanvasGeometry* canvas_geometry = nullptr;
 	float font_size = 0;
@@ -299,6 +303,8 @@ struct LUMIX_UI_API Element {
 	bool wrap = true;
 	bool visible = true;
 	bool clipping = false;
+	// Tag::INPUT: the value is text, drawn (wrapped, scrolled to the caret) by renderElement; caret is a byte offset into it
+	u32 caret = 0;
 	ParsedUnit width_unit = {0, Unit::FIT_CONTENT};
 	ParsedUnit height_unit = {0, Unit::FIT_CONTENT};
 	ParsedUnit pivot_x_unit = {0, Unit::PIXELS};
@@ -310,6 +316,11 @@ struct LUMIX_UI_API Element {
 	void setVisible(bool show);
 	//@ function 
 	void setText(StringView value);
+	// the value of an [input], the text of any other element
+	//@ function
+	StringView getText() const;
+	// Tag::INPUT: replaces the value and puts the caret at caret_pos (a byte offset)
+	void setInputText(StringView value, u32 caret_pos);
 	//@ function
 	void setWidth(StringView value);
 	//@ function 
@@ -399,6 +410,7 @@ struct SourceMap {
 
 //@ object full ui::Document
 struct LUMIX_UI_API Document {
+	friend struct Element;
 	using Token = UITokenizer::Token;
 
 	Element m_root;
@@ -474,6 +486,14 @@ struct LUMIX_UI_API Document {
 	void clearEvents();
 	bool areDependenciesReady() const;
 	ISpriteManager::SpriteHandle acquireSprite(StringView path);
+	// an [input] has the keyboard: scripts should not treat typed keys as game hotkeys
+	//@ function
+	bool hasTextFocus() const { return m_focus != Event::INVALID_ELEMENT_INDEX; }
+	// drops the focus of an [input] (e.g. on Escape)
+	//@ function
+	void blur();
+	// index of the focused [input], Event::INVALID_ELEMENT_INDEX if none; key and text events are delivered with it as element_index
+	u32 m_focus = Event::INVALID_ELEMENT_INDEX;
 
 private:
 	// drops every cached sprite reference, the sprite manager must be alive: a document has to be destroyed before the managers it was created with
@@ -500,6 +520,10 @@ private:
 	void addClassRaw(u32 element_index, StringView classname);
 	void removeClassRaw(u32 element_index, StringView classname);
 	bool parseAttributeValue(Element& elem, AttributeName name, StringView value);
+	void setFocus(u32 element_index);
+	void dropHiddenFocus();
+	void inputText(u32 input_index, StringView inserted);
+	void inputKey(u32 input_index, os::Keycode key);
 
 	bool m_has_doc_tag = false;
 	Array<Event> m_events;

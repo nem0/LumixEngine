@@ -6,6 +6,7 @@ enum Tag : u8 {
 	SPAN = 2,
 	BR = 3,
 	CANVAS = 4,
-	INVALID = 5
+	INPUT = 5,
+	INVALID = 6
 }
 

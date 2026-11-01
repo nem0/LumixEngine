@@ -1,4 +1,5 @@
 #include "evox/evox_module.h"
+#include "evox/evox_import.h"
 #include "../../external/evox/arena.h"
 #include "core/allocator.h"
 #include "core/array.h"
@@ -170,13 +171,7 @@ struct EvoxSystemImpl : EvoxSystem {
 		for (u32 i = 0, count = ex_debug_unit_count(m_runtime); i < count; ++i) {
 			const ex_string_view name = ex_debug_unit_source_name(m_runtime, i);
 			const StringView requested(name.begin, name.length);
-			Path file_path;
-			if (startsWith(requested, "core:")) {
-				const StringView core_name = requested.withoutLeft(5);
-				file_path = endsWith(core_name, ".evox") ? Path("engine/scripts/core/", core_name) : Path("engine/scripts/core/", core_name, ".evox");
-			} else {
-				file_path = endsWith(requested, ".evox") ? Path(requested) : Path(requested, ".evox");
-			}
+			const Path file_path = getEvoxImportPath(requested);
 			if (file_path == source) return name;
 		}
 		return toEvox(source.c_str());
