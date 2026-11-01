@@ -870,3 +870,117 @@ TEST(ArrayIndexedByUntypedConstantExpression) {
 	CAPI_END(module);
 	return true;
 }
+
+// A global's array size is evaluated before its expression is type-checked, so `.length`
+// cannot rely on the resolved type of the expression it is applied to.
+TEST(ArraySizeFromReflectionSequenceLength) {
+	const char* source = R"(
+		enum Kind : i32 { A, B, C }
+		var g : [Kind::values.length]i32 = zero;
+		fn main() : i32 { return g.length as i32; }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(3, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ArraySizeFromBoundReflectionSequenceLength) {
+	const char* source = R"(
+		enum Kind : i32 { A, B, C, D }
+		comptime ALL = Kind::values;
+		var g : [ALL.length]i32 = zero;
+		fn main() : i32 { return g.length as i32; }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(4, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ArraySizeFromComptimeArrayAndStringLength) {
+	const char* source = R"(
+		comptime VALUES = [1, 2, 3];
+		comptime NAME = "lumix";
+		struct S {
+			a : [VALUES.length]i32;
+			b : [NAME.length]i32;
+		}
+		fn main() : i32 {
+			var s : S = zero;
+			return (s.a.length as i32) * 10 + (s.b.length as i32);
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(35, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ArraySizeFromLengthInsideFunction) {
+	const char* source = R"(
+		enum Kind : i32 { A, B }
+		fn main() : i32 {
+			var local : [Kind::values.length]i32 = zero;
+			return local.length as i32;
+		}
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(2, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+// `length` stays an ordinary name for enum members.
+TEST(ArraySizeFromEnumMemberNamedLength) {
+	const char* source = R"(
+		enum Size : i32 { length = 5 }
+		var g : [Size.length as i32]i32 = zero;
+		fn main() : i32 { return g.length as i32; }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(5, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}
+
+TEST(ArraySizeFromLengthOfUnknownNameFails) {
+	EXPECT_COMPILE_FAIL(R"(
+		var g : [MISSING.length]i32 = zero;
+	)");
+	return true;
+}
+
+TEST(ArraySizeFromReflectedLengthInTemplate) {
+	const char* source = R"(
+		enum Two : i32 { A, B }
+		enum Three : i32 { A, B, C }
+		fn count(value : $T) : i32 {
+			var local : [T::values.length]i32 = zero;
+			return local.length as i32;
+		}
+		fn main() : i32 { return count(Two.A) * 10 + count(Three.A); }
+	)";
+	CAPI_BEGIN(module, diagnostics);
+	EXPECT_TRUE(ex_module_compile(module, toLs(source), makeStringView(__func__), nullptr, nullptr));
+	CAPI_RUNTIME(module, runtime);
+	EXPECT_EQ(EX_CALL_RESULT_OK, test_call(runtime, toLs("main")));
+	EXPECT_EQ(23, ex_task_to_i32(runtime, -1));
+	CAPI_END(module);
+	return true;
+}

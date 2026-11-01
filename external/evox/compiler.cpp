@@ -6787,6 +6787,7 @@ struct Checker {
 			case Expression::TYPE_MEMBER: {
 				if (expr.comptime_value) return expr.comptime_value;
 				auto& tme = static_cast<TypeMemberExpression&>(expr);
+				if (!tme.reflected_type && !checkTypeMemberExpr(unit, ctx, expr)) return {};   // an array size is evaluated before it is type-checked
 				switch (tme.kind) {
 					case TypeMemberExpression::NAME: {
 						// TODO double allocation
@@ -7060,6 +7061,25 @@ struct Checker {
 						length = slice.length;
 					}
 					return copyComptimeValue(primitiveType(ResolvedTypeKind::UNTYPED_INT), &length);
+				}
+
+				// an array size is evaluated before its expression is type-checked
+				if (member.expression && !member.expression->resolved_type && equalStrings(member.name.value, makeStringView("length"))) {
+					++suppress_errors;
+					ComptimeValue base = evalComptime(unit, *member.expression, ctx, bindings, frame);
+					--suppress_errors;
+					if (base && base.kind == ComptimeValue::VALUE && base.type) {
+						if (base.type->kind == ResolvedTypeKind::ARRAY) {
+							i64 length = static_cast<ArrayResolvedType*>(base.type)->size;
+							return copyComptimeValue(primitiveType(ResolvedTypeKind::UNTYPED_INT), &length);
+						}
+						if (base.type->kind == ResolvedTypeKind::SLICE) {
+							ex_slice slice;
+							copyMemory(&slice, base.value, sizeof(slice));
+							i64 length = slice.length;
+							return copyComptimeValue(primitiveType(ResolvedTypeKind::UNTYPED_INT), &length);
+						}
+					}
 				}
 
 				// struct.field
