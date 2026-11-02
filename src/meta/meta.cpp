@@ -1181,12 +1181,19 @@ struct Parser {
 		o.filename = (char*)allocator.allocate(filename.size() + 1);
 		strncpy_s(o.filename, filename.size() + 1, filename.begin, filename.size());
 
+		// between `//@ functions` and `//@ end` every declaration is a function, no `//@ function` needed
+		bool in_functions_block = false;
 		while (readLine(line)) {
+			const StringView declaration = line;
 			StringView word = consumeWord(line);
 			if (equal(word, "//@")) {
 				word = consumeWord(line);
 				if (equal(word, "end")) {
-					break;
+					if (!in_functions_block) break;
+					in_functions_block = false;
+				}
+				else if (equal(word, "functions")) {
+					in_functions_block = true;
 				}
 				else if (equal(word, "function")) {
 					if (!readLine(line)) {
@@ -1203,6 +1210,12 @@ struct Parser {
 				else {
 					logError("Unexpected ", word);
 				}
+			}
+			else if (in_functions_block && word.size() > 0 && !(word.size() >= 2 && word.begin[0] == '/' && word.begin[1] == '/')) {
+				StringView decl = declaration;
+				if (equal(word, "virtual")) consumeWord(decl);
+				Function func = consumeCPPFunction(decl);
+				if (func.name.size() != 0) o.functions.emplace(func);
 			}
 		}
 	}
