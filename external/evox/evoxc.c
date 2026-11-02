@@ -42,7 +42,7 @@ static ex_string_view ex_from_cstr(const char* str) {
 	return (ex_string_view){str, str ? (i64)strlen(str) : 0};
 }
 
-typedef struct evoxc_import_context { const char* directory; const char* core_directory; } evoxc_import_context;
+typedef struct evoxc_import_context { const char* directory; const char* core_directory; const char* plugins_directory; } evoxc_import_context;
 
 static int evoxc_import_resolver(void* userdata, ex_string_view path, ex_string_view alias, ex_string_view* source) {
 	(void)alias;
@@ -55,7 +55,21 @@ static int evoxc_import_resolver(void* userdata, ex_string_view path, ex_string_
 	} else if (path.length >= 4 && memcmp(path.begin, "std:", 4) == 0) {
 		prefix = "std"; prefix_len = 3; path.begin += 4; path.length -= 4;
 	}
-	const char* root = prefix_len && ctx->core_directory ? ctx->core_directory : ctx->directory;
+	// "<plugin>:<name>" resolves to <plugins_directory>/<plugin>/scripts/<name>.evox
+	char* plugin_prefix = NULL;
+	if (!prefix_len && ctx->plugins_directory) {
+		const char* colon = (const char*)memchr(path.begin, ':', (size_t)path.length);
+		if (colon && colon != path.begin) {
+			size_t plugin_len = (size_t)(colon - path.begin);
+			plugin_prefix = (char*)malloc(plugin_len + sizeof("/scripts"));
+			if (!plugin_prefix) return 0;
+			memcpy(plugin_prefix, path.begin, plugin_len);
+			memcpy(plugin_prefix + plugin_len, "/scripts", sizeof("/scripts"));
+			prefix = plugin_prefix; prefix_len = plugin_len + 8;
+			path.length -= (i64)(plugin_len + 1); path.begin = colon + 1;
+		}
+	}
+	const char* root = plugin_prefix ? ctx->plugins_directory : prefix_len && ctx->core_directory ? ctx->core_directory : ctx->directory;
 	const size_t root_len = strlen(root);
 	const int has_extension = path.length >= 5 && memcmp(path.begin + path.length - 5, ".evox", 5) == 0;
 	const size_t capacity = root_len + 1 + prefix_len + (prefix_len ? 1 : 0) + (size_t)path.length + (has_extension ? 0 : 5) + 1;
@@ -64,6 +78,7 @@ static int evoxc_import_resolver(void* userdata, ex_string_view path, ex_string_
 	int written = prefix_len
 		? snprintf(filename, capacity, "%s/%.*s/%.*s%s", root, (int)prefix_len, prefix, (int)path.length, path.begin, has_extension ? "" : ".evox")
 		: snprintf(filename, capacity, "%s/%.*s%s", root, (int)path.length, path.begin, has_extension ? "" : ".evox");
+	free(plugin_prefix);
 	if (written < 0 || (size_t)written >= capacity) { free(filename); return 0; }
 	FILE* file = fopen(filename, "rb");
 	if (!file) { fprintf(stderr, "Cannot resolve import '%.*s' at %s\n", (int)path.length, path.begin, filename); free(filename); return 0; }
@@ -98,7 +113,7 @@ static const char* evoxc_result_name(ex_call_result result) {
 		case EX_CALL_RESULT_STACK_OVERFLOW: return "stack overflow";
 		case EX_CALL_RESULT_CALL_DEPTH: return "call depth exceeded";
 		case EX_CALL_RESULT_SUSPENDED: return "execution suspended";
-		case EX_RESULT_FAILURE: return "internal failure";
+		case (ex_call_result)EX_RESULT_FAILURE: return "internal failure";
 		default: return "unknown error";
 	}
 }
@@ -799,6 +814,7 @@ int main(int argc, char** argv) {
 	int typecheck_only = 0;
 	const char* import_directory = ".";
 	const char* core_directory = NULL;
+	const char* plugins_directory = NULL;
 	int script_arg = 1;
 	while (script_arg < argc) {
 		if (strcmp(argv[script_arg], "--dump-bytecode") == 0) {
@@ -814,6 +830,10 @@ int main(int argc, char** argv) {
 		} else if (strcmp(argv[script_arg], "--core-dir") == 0) {
 			if (script_arg + 1 >= argc) { fputs("Error: --core-dir requires a directory\n", stderr); return 1; }
 			core_directory = argv[script_arg + 1];
+			script_arg += 2;
+		} else if (strcmp(argv[script_arg], "--plugins-dir") == 0) {
+			if (script_arg + 1 >= argc) { fputs("Error: --plugins-dir requires a directory\n", stderr); return 1; }
+			plugins_directory = argv[script_arg + 1];
 			script_arg += 2;
 		} else {
 			break;
@@ -857,7 +877,7 @@ int main(int argc, char** argv) {
 		goto cleanup;
 	}
 
-	evoxc_import_context import_context = {import_directory, core_directory};
+	evoxc_import_context import_context = {import_directory, core_directory, plugins_directory};
 	if (!ex_module_compile(
 		ctx.module,
 		ex_from_cstr(ctx.source),
