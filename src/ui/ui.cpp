@@ -1489,6 +1489,55 @@ void Element::setText(StringView v) {
 	m_document.invalidateLayout();
 }
 
+void Element::setID(StringView value) {
+	Document& doc = m_document;
+	if (value == id) return;
+	if (!value.empty()) {
+		auto iter = doc.m_id_index.find(value);
+		if (iter.isValid() && iter.value() != index) {
+			logError("duplicate id '", value, "'");
+			return;
+		}
+	}
+	if (!id.empty()) doc.m_id_index.erase(id);
+	// the index keys on the id's characters, the intern table keeps them alive
+	id = value.empty() ? StringView() : doc.m_intern_table.resolve(doc.m_intern_table.intern(value));
+	if (!id.empty()) doc.m_id_index.insert(id, index);
+}
+
+void Element::setOnClick(StringView value) {
+	if (tag != Tag::BOX) {
+		logError("attribute 'on-click' is allowed only on [box]");
+		return;
+	}
+	InternString s = m_document.m_intern_table.intern(value);
+	upsertAttribute<AttributeName::ON_CLICK>(*this, m_document.m_intern_table.resolve(s), AttributeSource::ELEMENT);
+}
+
+void Element::addClass(StringView classname) {
+	if (classname.empty()) return;
+	StaticString<256> tmp(".", classname);
+	InternString class_id = m_document.m_intern_table.intern(tmp);
+	if (hasClassId(classes, class_id)) return;
+	classes.push(class_id);
+	m_document.m_styles_dirty = true;
+	m_document.invalidateLayout();
+}
+
+void Element::removeClass(StringView classname) {
+	if (classname.empty()) return;
+	StaticString<256> tmp(".", classname);
+	InternString class_id = m_document.m_intern_table.intern(tmp);
+	for (i32 i = 0; i < (i32)classes.size(); ++i) {
+		if (classes[i] == class_id) {
+			classes.erase(i);
+			m_document.m_styles_dirty = true;
+			m_document.invalidateLayout();
+			return;
+		}
+	}
+}
+
 void Element::setWidth(StringView value) {
 	ParsedUnit parsed;
 	if (!parseUnit(value, parsed)) {

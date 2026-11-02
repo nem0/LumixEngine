@@ -5335,6 +5335,12 @@ namespace Lumix::Evox::generated {
 		ex_result_string(runtime, &frame, ex_string_view{ret.data, (i64)ret.length});
 	}
 	
+	static void evox_object_Element_getIndex_3904916664094646129(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getIndex();
+		EX_RESULT(frame, ret);
+	}
+	
 	static void evox_object_Element_setVisible_10775676013963828726(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ui::Element*, object);
 		EX_ARG(frame, bool, show);
@@ -5357,6 +5363,30 @@ namespace Lumix::Evox::generated {
 		EX_ARG(frame, ui::Element*, object);
 		EX_STRING_ARG(frame, value);
 		object->setWidth(StringView{value.begin, (u64)value.length});
+	}
+	
+	static void evox_object_Element_setID_12169639607658353543(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_STRING_ARG(frame, value);
+		object->setID(StringView{value.begin, (u64)value.length});
+	}
+	
+	static void evox_object_Element_setOnClick_5088639074346412775(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_STRING_ARG(frame, value);
+		object->setOnClick(StringView{value.begin, (u64)value.length});
+	}
+	
+	static void evox_object_Element_addClass_7920479689788311660(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_STRING_ARG(frame, classname);
+		object->addClass(StringView{classname.begin, (u64)classname.length});
+	}
+	
+	static void evox_object_Element_removeClass_11518186163908266220(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_STRING_ARG(frame, classname);
+		object->removeClass(StringView{classname.begin, (u64)classname.length});
 	}
 	
 	static void evox_object_Element_setBGImage_9641999657146036441(ex_runtime* runtime, ex_call_frame frame) {
@@ -6439,10 +6469,15 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:renderer/texture"), StringView("isReady")}, &evox_resource_isReady_Texture);
 		functions.insert({StringView("core:renderer/texture"), StringView("isFailure")}, &evox_resource_isFailure_Texture);
 		functions.insert({StringView("core:ui/element"), StringView("getID")}, &evox_object_Element_getID_5043487033988361637);
+		functions.insert({StringView("core:ui/element"), StringView("getIndex")}, &evox_object_Element_getIndex_3904916664094646129);
 		functions.insert({StringView("core:ui/element"), StringView("setVisible")}, &evox_object_Element_setVisible_10775676013963828726);
 		functions.insert({StringView("core:ui/element"), StringView("setText")}, &evox_object_Element_setText_16123516204308000926);
 		functions.insert({StringView("core:ui/element"), StringView("getText")}, &evox_object_Element_getText_17915993551711754700);
 		functions.insert({StringView("core:ui/element"), StringView("setWidth")}, &evox_object_Element_setWidth_1690122863701504102);
+		functions.insert({StringView("core:ui/element"), StringView("setID")}, &evox_object_Element_setID_12169639607658353543);
+		functions.insert({StringView("core:ui/element"), StringView("setOnClick")}, &evox_object_Element_setOnClick_5088639074346412775);
+		functions.insert({StringView("core:ui/element"), StringView("addClass")}, &evox_object_Element_addClass_7920479689788311660);
+		functions.insert({StringView("core:ui/element"), StringView("removeClass")}, &evox_object_Element_removeClass_11518186163908266220);
 		functions.insert({StringView("core:ui/element"), StringView("setBGImage")}, &evox_object_Element_setBGImage_9641999657146036441);
 		functions.insert({StringView("core:ui/element"), StringView("setGeometry")}, &evox_object_Element_setGeometry_15196642487151414820);
 		functions.insert({StringView("core:ui/element"), StringView("clearGeometry")}, &evox_object_Element_clearGeometry_11530183421897493893);

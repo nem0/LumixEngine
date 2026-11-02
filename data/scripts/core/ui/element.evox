@@ -12,10 +12,15 @@ import "core:ui/align"
 struct Element { ptr : cptr; }
 
 extern fn getID(object : Element) : []const u8;
+extern fn getIndex(object : Element) : i32;
 extern fn setVisible(object : Element, show : bool) : void;
 extern fn setText(object : Element, value : []const u8) : void;
 extern fn getText(object : Element) : []const u8;
 extern fn setWidth(object : Element, value : []const u8) : void;
+extern fn setID(object : Element, value : []const u8) : void;
+extern fn setOnClick(object : Element, value : []const u8) : void;
+extern fn addClass(object : Element, classname : []const u8) : void;
+extern fn removeClass(object : Element, classname : []const u8) : void;
 extern fn setBGImage(object : Element, path : []const u8) : void;
 extern fn setGeometry(object : Element, vertices : []const Vertex, indices : []const u32) : void;
 extern fn clearGeometry(object : Element) : void;

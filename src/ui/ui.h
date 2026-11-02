@@ -318,11 +318,19 @@ struct LUMIX_UI_API Element {
 	
 	//@ functions
 	StringView getID() { return id; }
+	i32 getIndex() const { return (i32)index; }
 	void setVisible(bool show);
 	void setText(StringView value);
 	// the value of an [input], the text of any other element
 	StringView getText() const;
 	void setWidth(StringView value);
+	// the id getElementByID finds the element by; empty clears it. Logs an error and keeps the old id if another element already has it
+	void setID(StringView value);
+	// the action of the ACTION event a click on the element produces (on-click), only allowed on [box]; empty removes it
+	void setOnClick(StringView value);
+	// classname without the leading dot, styles are recomputed lazily, on the next layout
+	void addClass(StringView classname);
+	void removeClass(StringView classname);
 	void setBGImage(const Path& path);
 	// [canvas] only, ignored with an error log on other elements. Indices must be a multiple of 3 and point into vertices; otherwise the previous geometry stays
 	void setGeometry(Span<const Vertex> vertices, Span<const u32> indices);
