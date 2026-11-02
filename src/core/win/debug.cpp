@@ -40,6 +40,20 @@ namespace Lumix {
 static CrashReportFlags g_crash_report_flags = CrashReportFlags::ENABLED;
 static char g_crash_report_log_path[MAX_PATH] = "";
 
+// one frame of the crashed thread's callstack
+struct CrashFrame {
+	u64 addr;
+	char module[64]; // file name of the module containing `addr`, empty if unknown
+	char function[256]; // "module+0xrva" if there are no symbols, so frames group the same way despite ASLR
+	char file[MAX_PATH];
+	u32 line;
+};
+
+// static, because the crash handler runs on a thread with a small stack
+static constexpr u32 MAX_CRASH_FRAMES = 64;
+static CrashFrame g_crash_frames[MAX_CRASH_FRAMES]; // innermost frame first
+static u32 g_num_crash_frames = 0;
+
 namespace sentry {
 
 struct SentryData {
@@ -145,7 +159,34 @@ static u64 getUnixTimestamp() {
 	return (li.QuadPart - 116444736000000000ULL) / 10000000ULL;
 }
 
-static void sendToSentry(const char* message) {
+template <typename Out> static void appendJsonEscaped(Out& out, const char* str) {
+	appendJsonEscaped(out, str, str + strlen(str));
+}
+
+// frames are innermost first, Sentry wants the crashing frame last
+template <typename Out> static void appendException(Out& out, const char* type, const char* value, const CrashFrame* frames, u32 num_frames) {
+	out.append("\"exception\":{\"values\":[{\"type\":\"");
+	appendJsonEscaped(out, type);
+	out.append("\",\"value\":\"");
+	appendJsonEscaped(out, value);
+	out.append("\",\"mechanism\":{\"type\":\"generic\",\"handled\":false},\"stacktrace\":{\"frames\":[");
+	for (u32 i = num_frames; i > 0; --i) {
+		const CrashFrame& f = frames[i - 1];
+		if (i != num_frames) out.append(',');
+		char addr[17];
+		toCStringHex(f.addr, Span(addr));
+		out.append("{\"instruction_addr\":\"0x", addr, "\"");
+		if (f.module[0]) { out.append(",\"package\":\""); appendJsonEscaped(out, f.module); out.append("\""); }
+		if (f.function[0]) { out.append(",\"function\":\""); appendJsonEscaped(out, f.function); out.append("\""); }
+		if (f.file[0]) { out.append(",\"filename\":\""); appendJsonEscaped(out, f.file); out.append("\",\"lineno\":", f.line); }
+		out.append("}");
+	}
+	out.append("]}}]},");
+}
+
+// `message` is the whole human readable crash report, `exception_type`/`exception_value` are short
+// and used for the issue title. Without a captured callstack, only `message` is sent.
+static void sendToSentry(const char* message, const char* exception_type, const char* exception_value, const CrashFrame* frames, u32 num_frames) {
 
 	auto readLogFile = [](char* data, u32 max_size) -> u32 {
 		auto readFromPath = [data, max_size](const char* path) -> u32 {
@@ -211,10 +252,18 @@ static void sendToSentry(const char* message) {
 	envelope = "";
 	envelope.append("{\"event_id\":\"", event_id, "\",\"dsn\":\"https://", key, "@", host, "/", project, "\"}\n");
 	envelope.append("{\"type\":\"event\"}\n");
-	envelope.append("{\"event_id\":\"", event_id, "\",\"timestamp\":", (u64)timestamp, ",\"platform\":\"native\",\"message\":\"");
+	envelope.append("{\"event_id\":\"", event_id, "\",\"timestamp\":", (u64)timestamp, ",\"platform\":\"native\",\"level\":\"fatal\",");
 
+	if (num_frames > 0) {
+		appendException(envelope, exception_type, exception_value, frames, num_frames);
+		// full text report, useful when the stacktrace can't be symbolicated, includes the profiler stack
+		envelope.append("\"extra\":{\"crash_report\":\"");
+	}
+	else {
+		envelope.append("\"message\":\"");
+	}
 	appendJsonEscaped(envelope, message, message + strlen(message));
-	envelope.append("\",\"level\":\"fatal\"}\n");
+	envelope.append(num_frames > 0 ? "\"}}\n" : "\"}\n");
 
 	const u32 log_data_size = readLogFile(s_sentry_data->log_data, 131072);
 	if (log_data_size > 0) {
@@ -845,14 +894,12 @@ void* Allocator::reallocate(void* user_ptr, size_t new_size, size_t old_size, si
 
 } // namespace Debug
 
-static void getStack(CONTEXT& context, Span<char> out)
-{
-	BOOL result;
+// captures the callstack of `context` into g_crash_frames
+static void getStack(CONTEXT& context) {
 	STACKFRAME64 stack;
 	alignas(IMAGEHLP_SYMBOL64) char symbol_mem[sizeof(IMAGEHLP_SYMBOL64) + 256];
 	IMAGEHLP_SYMBOL64* symbol = (IMAGEHLP_SYMBOL64*)symbol_mem;
 	char name[256];
-	catString(out, "Crash callstack:\n");
 	memset(&stack, 0, sizeof(STACKFRAME64));
 
 	HANDLE process = GetCurrentProcess();
@@ -890,9 +937,11 @@ static void getStack(CONTEXT& context, Span<char> out)
 	stack.AddrFrame.Mode = AddrModeFlat;
 #endif
 
-	do
+	g_num_crash_frames = 0;
+
+	while (g_num_crash_frames < MAX_CRASH_FRAMES)
 	{
-		result = StackWalk64(machineType,
+		if (!StackWalk64(machineType,
 			process,
 			thread,
 			&stack,
@@ -900,43 +949,75 @@ static void getStack(CONTEXT& context, Span<char> out)
 			NULL,
 			SymFunctionTableAccess64,
 			SymGetModuleBase64,
-			NULL);
+			NULL)) break;
+		if (stack.AddrPC.Offset == 0) break;
+
+		CrashFrame& frame = g_crash_frames[g_num_crash_frames++];
+		frame.addr = stack.AddrPC.Offset;
+		frame.module[0] = '\0';
+		frame.function[0] = '\0';
+		frame.file[0] = '\0';
+		frame.line = 0;
+		const u64 image_base = SymGetModuleBase64(process, stack.AddrPC.Offset);
+		char module_path[MAX_PATH];
+		if (image_base && GetModuleFileNameA((HMODULE)image_base, module_path, MAX_PATH)) {
+			copyString(Span(frame.module), Path::getBasename(module_path));
+			// fallback for no symbols, the offset doesn't change with ASLR
+			StaticString<256> fallback(frame.module, "+0x");
+			char rva[17];
+			toCStringHex(stack.AddrPC.Offset - image_base, Span(rva));
+			fallback.append(rva);
+			copyString(Span(frame.function), fallback);
+		}
 
 		symbol->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL64);
 		symbol->MaxNameLength = 255;
 
-		BOOL symbol_valid = SymGetSymFromAddr64(process, (ULONG64)stack.AddrPC.Offset, &displacement, symbol);
-		if (!symbol_valid) return;
-		DWORD num_char = UnDecorateSymbolName(symbol->Name, (PSTR)name, 256, UNDNAME_COMPLETE);
-
-		if (num_char == 0) return;
-
-		// Get file and line information
-		IMAGEHLP_LINE64 line_info = {};
-		line_info.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
-		DWORD line_displacement;
-		if (SymGetLineFromAddr64(process, (DWORD64)stack.AddrPC.Offset, &line_displacement, &line_info))
+		if (SymGetSymFromAddr64(process, (ULONG64)stack.AddrPC.Offset, &displacement, symbol)
+			&& UnDecorateSymbolName(symbol->Name, (PSTR)name, 256, UNDNAME_COMPLETE) != 0)
 		{
-			catString(out, line_info.FileName);
+			copyString(Span(frame.function), name);
+			IMAGEHLP_LINE64 line_info = {};
+			line_info.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
+			DWORD line_displacement;
+			if (SymGetLineFromAddr64(process, (DWORD64)stack.AddrPC.Offset, &line_displacement, &line_info)) {
+				copyString(Span(frame.file), line_info.FileName);
+				frame.line = line_info.LineNumber;
+			}
+		}
+	}
+}
+
+// appends the captured callstack as text to `out`
+static void callstackToString(Span<char> out) {
+	catString(out, "Crash callstack:\n");
+	for (u32 i = 0; i < g_num_crash_frames; ++i) {
+		const CrashFrame& frame = g_crash_frames[i];
+		if (frame.file[0]) {
+			catString(out, frame.file);
 			catString(out, "(");
 			char line_num[16];
-			toCString((u32)line_info.LineNumber, Span(line_num));
+			toCString(frame.line, Span(line_num));
 			catString(out, line_num);
 			catString(out, "): ");
 		}
-
-		catString(out, name);
+		if (frame.function[0]) {
+			catString(out, frame.function);
+		}
+		else {
+			char addr[17];
+			toCStringHex(frame.addr, Span(addr));
+			catString(out, "0x");
+			catString(out, addr);
+		}
 		catString(out, "\n");
-
-	} while (result);
+	}
 }
 
-
-template <int SIZE>
-static void describeException(PEXCEPTION_RECORD exception_record, StaticString<SIZE>& message) {
+static const char* getExceptionName(DWORD code) {
 	const char* exception_name = "Unknown Exception";
-	
-	switch (exception_record->ExceptionCode) {
+
+	switch (code) {
 		case EXCEPTION_ACCESS_VIOLATION: exception_name = "Access Violation"; break;
 		case EXCEPTION_ARRAY_BOUNDS_EXCEEDED: exception_name = "Array Bounds Exceeded"; break;
 		case EXCEPTION_BREAKPOINT: exception_name = "Breakpoint"; break;
@@ -956,8 +1037,12 @@ static void describeException(PEXCEPTION_RECORD exception_record, StaticString<S
 		case EXCEPTION_SINGLE_STEP: exception_name = "Single Step"; break;
 		case EXCEPTION_STACK_OVERFLOW: exception_name = "Stack Overflow"; break;
 	}
-	
-	message.append(exception_name);
+	return exception_name;
+}
+
+template <int SIZE>
+static void describeException(PEXCEPTION_RECORD exception_record, StaticString<SIZE>& message) {
+	message.append(getExceptionName(exception_record->ExceptionCode));
 	char tmp[19];
 	toCStringHex((u32)exception_record->ExceptionCode, Span(tmp));
 	message.append(" (0x", tmp, ")");
@@ -1017,7 +1102,8 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 		uintptr base = (uintptr)GetModuleHandle(NULL);
 
 		if (info) {
-			getStack(*info->ContextRecord, Span(message.data));
+			getStack(*info->ContextRecord);
+			callstackToString(Span(message.data));
 			message.append("\nException: ");
 			describeException(info->ExceptionRecord, message);
 			char addr_buf[17];
@@ -1031,7 +1117,13 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 		}
 
 		if (isFlagSet(g_crash_report_flags, CrashReportFlags::SENTRY)) {
-			sentry::sendToSentry(message.data);
+			StaticString<256> exception_value;
+			const char* exception_type = "Crash";
+			if (info) {
+				exception_type = getExceptionName(info->ExceptionRecord->ExceptionCode);
+				describeException(info->ExceptionRecord, exception_value);
+			}
+			sentry::sendToSentry(message.data, exception_type, exception_value.data, g_crash_frames, g_num_crash_frames);
 		}
 
 		char minidump_path[MAX_PATH];

@@ -5,6 +5,7 @@ Lumix Engine includes automatic crash reporting to help improve stability. When 
 ## Features
 - **Minidump Generation**: Creates `minidump.dmp` in the working directory for debugging.
 - **Sentry Integration**: Sends crash reports to Sentry with stack traces and system info.
+- **Structured Callstack**: On Windows the crash is sent as a Sentry `exception` with a structured stacktrace (up to 64 frames of the crashing thread). Sentry groups issues by this stacktrace. Frames are symbolicated on the crashing machine, so they have function, file and line only if PDBs are present there. Otherwise the function is `module+0xrva`, where the offset is relative to the module base, so it's stable across runs of the same build (but differs between builds). PDBs are not uploaded to Sentry. The full text report, including the profiler stack, is attached as the `crash_report` extra. Without a captured callstack, only the text is sent as a message.
 - **Log Attachment**: Sentry attaches the last 128 KiB of the engine's active log as `engine.log`, including `lumix_app.log` for the standalone app.
 - **Configurable Flags**: Control what happens on crash via `CrashReportFlags`:
   - `ENABLED`: Enables crash handling.
