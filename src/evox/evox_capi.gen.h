@@ -5397,6 +5397,343 @@ namespace Lumix::Evox::generated {
 		object->setOpacity(value);
 	}
 	
+	static void evox_object_Element_setFontSize_13777094698860720569(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, float, value);
+		object->setFontSize(value);
+	}
+	
+	static void evox_object_Element_setGrow_4442435846056963005(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, float, value);
+		object->setGrow(value);
+	}
+	
+	static void evox_object_Element_getVisible_8840156858409372791(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getVisible();
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Element_getOpacity_10272616881852219792(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getOpacity();
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Element_getFontSize_14264597416406098839(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getFontSize();
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Element_getGrow_12137342906428532169(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getGrow();
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Element_setHeight_14879723725234619969(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, float, value);
+		EX_ARG(frame, u8, unit_value);
+		object->setHeight(value, (ui::Unit)unit_value);
+	}
+	
+	static void evox_object_Element_setPivotX_14310308181804291952(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, float, value);
+		EX_ARG(frame, u8, unit_value);
+		object->setPivotX(value, (ui::Unit)unit_value);
+	}
+	
+	static void evox_object_Element_setPivotY_4083423435111865443(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, float, value);
+		EX_ARG(frame, u8, unit_value);
+		object->setPivotY(value, (ui::Unit)unit_value);
+	}
+	
+	static void evox_object_Element_setPosition_13428496156388757762(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, u8, value_value);
+		object->setPosition((ui::PositionMode)value_value);
+	}
+	
+	static void evox_object_Element_setMargin_8823307402687151635(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, float, value);
+		EX_ARG(frame, u8, unit_value);
+		object->setMargin(value, (ui::Unit)unit_value);
+	}
+	
+	static void evox_object_Element_setMarginTop_16940433681040713621(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, float, value);
+		EX_ARG(frame, u8, unit_value);
+		object->setMarginTop(value, (ui::Unit)unit_value);
+	}
+	
+	static void evox_object_Element_setMarginRight_8108171380176016672(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, float, value);
+		EX_ARG(frame, u8, unit_value);
+		object->setMarginRight(value, (ui::Unit)unit_value);
+	}
+	
+	static void evox_object_Element_setMarginBottom_4495959693808182687(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, float, value);
+		EX_ARG(frame, u8, unit_value);
+		object->setMarginBottom(value, (ui::Unit)unit_value);
+	}
+	
+	static void evox_object_Element_setMarginLeft_16403753707646651707(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, float, value);
+		EX_ARG(frame, u8, unit_value);
+		object->setMarginLeft(value, (ui::Unit)unit_value);
+	}
+	
+	static void evox_object_Element_setPadding_10496049353039414429(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, float, value);
+		EX_ARG(frame, u8, unit_value);
+		object->setPadding(value, (ui::Unit)unit_value);
+	}
+	
+	static void evox_object_Element_setPaddingTop_11896335086627377979(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, float, value);
+		EX_ARG(frame, u8, unit_value);
+		object->setPaddingTop(value, (ui::Unit)unit_value);
+	}
+	
+	static void evox_object_Element_setPaddingRight_2976661518497435766(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, float, value);
+		EX_ARG(frame, u8, unit_value);
+		object->setPaddingRight(value, (ui::Unit)unit_value);
+	}
+	
+	static void evox_object_Element_setPaddingBottom_10676182503551935399(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, float, value);
+		EX_ARG(frame, u8, unit_value);
+		object->setPaddingBottom(value, (ui::Unit)unit_value);
+	}
+	
+	static void evox_object_Element_setPaddingLeft_17507062931410612544(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, float, value);
+		EX_ARG(frame, u8, unit_value);
+		object->setPaddingLeft(value, (ui::Unit)unit_value);
+	}
+	
+	static void evox_object_Element_setColor_3237895003922964646(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, i32, value_r);
+		EX_ARG(frame, i32, value_g);
+		EX_ARG(frame, i32, value_b);
+		EX_ARG(frame, i32, value_a);
+		object->setColor(Color(u8(value_r), u8(value_g), u8(value_b), u8(value_a)));
+	}
+	
+	static void evox_object_Element_getColor_15985662388343506388(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getColor();
+		EX_RESULT(frame, (i32)ret.r);
+		EX_RESULT(frame, (i32)ret.g);
+		EX_RESULT(frame, (i32)ret.b);
+		EX_RESULT(frame, (i32)ret.a);
+	}
+	
+	static void evox_object_Element_setBGColor_7766488667432311886(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, i32, value_r);
+		EX_ARG(frame, i32, value_g);
+		EX_ARG(frame, i32, value_b);
+		EX_ARG(frame, i32, value_a);
+		object->setBGColor(Color(u8(value_r), u8(value_g), u8(value_b), u8(value_a)));
+	}
+	
+	static void evox_object_Element_getBGColor_17301689107628824541(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getBGColor();
+		EX_RESULT(frame, (i32)ret.r);
+		EX_RESULT(frame, (i32)ret.g);
+		EX_RESULT(frame, (i32)ret.b);
+		EX_RESULT(frame, (i32)ret.a);
+	}
+	
+	static void evox_object_Element_setClipping_14312275807116016316(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, bool, value);
+		object->setClipping(value);
+	}
+	
+	static void evox_object_Element_getClipping_10556531722893481681(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getClipping();
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Element_setWrap_10396953407773079847(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, bool, value);
+		object->setWrap(value);
+	}
+	
+	static void evox_object_Element_getWrap_12658582511737338406(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getWrap();
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Element_setDirection_6078868610895604953(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, u8, value_value);
+		object->setDirection((ui::Direction)value_value);
+	}
+	
+	static void evox_object_Element_getDirection_18065035834624218092(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getDirection();
+		EX_RESULT(frame, (u8)ret);
+	}
+	
+	static void evox_object_Element_setJustifyContent_15258698185153021198(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, u8, value_value);
+		object->setJustifyContent((ui::JustifyContent)value_value);
+	}
+	
+	static void evox_object_Element_getJustifyContent_3598623794671227235(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getJustifyContent();
+		EX_RESULT(frame, (u8)ret);
+	}
+	
+	static void evox_object_Element_setAlignItems_3965073944893972547(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, u8, value_value);
+		object->setAlignItems((ui::AlignItems)value_value);
+	}
+	
+	static void evox_object_Element_getAlignItems_14772342679229856925(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getAlignItems();
+		EX_RESULT(frame, (u8)ret);
+	}
+	
+	static void evox_object_Element_setAlign_8501619086915515339(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_ARG(frame, u8, value_value);
+		object->setAlign((ui::Align)value_value);
+	}
+	
+	static void evox_object_Element_getAlign_5872795793336110530(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getAlign();
+		EX_RESULT(frame, (u8)ret);
+	}
+	
+	static void evox_object_Element_setFont_4774784269818050826(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_STRING_ARG(frame, path);
+		object->setFont(StringView{path.begin, (u64)path.length});
+	}
+	
+	static void evox_object_Element_getFont_9723551787315012649(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getFont();
+		ex_result_string(runtime, &frame, ex_string_view{ret.data, (i64)ret.length});
+	}
+	
+	static void evox_object_Element_setSrc_5727387067293558268(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_STRING_ARG(frame, path);
+		object->setSrc(StringView{path.begin, (u64)path.length});
+	}
+	
+	static void evox_object_Element_getSrc_7045929248784580717(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getSrc();
+		ex_result_string(runtime, &frame, ex_string_view{ret.data, (i64)ret.length});
+	}
+	
+	static void evox_object_Element_setPlaceholder_13686685876463529283(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		EX_STRING_ARG(frame, value);
+		object->setPlaceholder(StringView{value.begin, (u64)value.length});
+	}
+	
+	static void evox_object_Element_getPlaceholder_1332159898909763307(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getPlaceholder();
+		ex_result_string(runtime, &frame, ex_string_view{ret.data, (i64)ret.length});
+	}
+	
+	static void evox_object_Element_getLeft_13917110772745256412(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getLeft();
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Element_getTop_9115093722580285684(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getTop();
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Element_getMarginTop_15254134537669000495(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getMarginTop();
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Element_getMarginRight_3603010161982479711(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getMarginRight();
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Element_getMarginBottom_2824035805414205629(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getMarginBottom();
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Element_getMarginLeft_5724818295112335829(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getMarginLeft();
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Element_getPaddingTop_9034945853337678798(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getPaddingTop();
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Element_getPaddingRight_16359276764771033158(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getPaddingRight();
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Element_getPaddingBottom_6659058682121674267(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getPaddingBottom();
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Element_getPaddingLeft_8864918639358503447(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ui::Element*, object);
+		auto ret = object->getPaddingLeft();
+		EX_RESULT(frame, ret);
+	}
+	
 	static void evox_object_Element_getCenterX_15764931111600111070(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ui::Element*, object);
 		auto ret = object->getCenterX();
@@ -6112,6 +6449,58 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:ui/element"), StringView("setLeft")}, &evox_object_Element_setLeft_100438595916105358);
 		functions.insert({StringView("core:ui/element"), StringView("setTop")}, &evox_object_Element_setTop_16096759703562549142);
 		functions.insert({StringView("core:ui/element"), StringView("setOpacity")}, &evox_object_Element_setOpacity_11480515910923902992);
+		functions.insert({StringView("core:ui/element"), StringView("setFontSize")}, &evox_object_Element_setFontSize_13777094698860720569);
+		functions.insert({StringView("core:ui/element"), StringView("setGrow")}, &evox_object_Element_setGrow_4442435846056963005);
+		functions.insert({StringView("core:ui/element"), StringView("getVisible")}, &evox_object_Element_getVisible_8840156858409372791);
+		functions.insert({StringView("core:ui/element"), StringView("getOpacity")}, &evox_object_Element_getOpacity_10272616881852219792);
+		functions.insert({StringView("core:ui/element"), StringView("getFontSize")}, &evox_object_Element_getFontSize_14264597416406098839);
+		functions.insert({StringView("core:ui/element"), StringView("getGrow")}, &evox_object_Element_getGrow_12137342906428532169);
+		functions.insert({StringView("core:ui/element"), StringView("setHeight")}, &evox_object_Element_setHeight_14879723725234619969);
+		functions.insert({StringView("core:ui/element"), StringView("setPivotX")}, &evox_object_Element_setPivotX_14310308181804291952);
+		functions.insert({StringView("core:ui/element"), StringView("setPivotY")}, &evox_object_Element_setPivotY_4083423435111865443);
+		functions.insert({StringView("core:ui/element"), StringView("setPosition")}, &evox_object_Element_setPosition_13428496156388757762);
+		functions.insert({StringView("core:ui/element"), StringView("setMargin")}, &evox_object_Element_setMargin_8823307402687151635);
+		functions.insert({StringView("core:ui/element"), StringView("setMarginTop")}, &evox_object_Element_setMarginTop_16940433681040713621);
+		functions.insert({StringView("core:ui/element"), StringView("setMarginRight")}, &evox_object_Element_setMarginRight_8108171380176016672);
+		functions.insert({StringView("core:ui/element"), StringView("setMarginBottom")}, &evox_object_Element_setMarginBottom_4495959693808182687);
+		functions.insert({StringView("core:ui/element"), StringView("setMarginLeft")}, &evox_object_Element_setMarginLeft_16403753707646651707);
+		functions.insert({StringView("core:ui/element"), StringView("setPadding")}, &evox_object_Element_setPadding_10496049353039414429);
+		functions.insert({StringView("core:ui/element"), StringView("setPaddingTop")}, &evox_object_Element_setPaddingTop_11896335086627377979);
+		functions.insert({StringView("core:ui/element"), StringView("setPaddingRight")}, &evox_object_Element_setPaddingRight_2976661518497435766);
+		functions.insert({StringView("core:ui/element"), StringView("setPaddingBottom")}, &evox_object_Element_setPaddingBottom_10676182503551935399);
+		functions.insert({StringView("core:ui/element"), StringView("setPaddingLeft")}, &evox_object_Element_setPaddingLeft_17507062931410612544);
+		functions.insert({StringView("core:ui/element"), StringView("setColor")}, &evox_object_Element_setColor_3237895003922964646);
+		functions.insert({StringView("core:ui/element"), StringView("getColor")}, &evox_object_Element_getColor_15985662388343506388);
+		functions.insert({StringView("core:ui/element"), StringView("setBGColor")}, &evox_object_Element_setBGColor_7766488667432311886);
+		functions.insert({StringView("core:ui/element"), StringView("getBGColor")}, &evox_object_Element_getBGColor_17301689107628824541);
+		functions.insert({StringView("core:ui/element"), StringView("setClipping")}, &evox_object_Element_setClipping_14312275807116016316);
+		functions.insert({StringView("core:ui/element"), StringView("getClipping")}, &evox_object_Element_getClipping_10556531722893481681);
+		functions.insert({StringView("core:ui/element"), StringView("setWrap")}, &evox_object_Element_setWrap_10396953407773079847);
+		functions.insert({StringView("core:ui/element"), StringView("getWrap")}, &evox_object_Element_getWrap_12658582511737338406);
+		functions.insert({StringView("core:ui/element"), StringView("setDirection")}, &evox_object_Element_setDirection_6078868610895604953);
+		functions.insert({StringView("core:ui/element"), StringView("getDirection")}, &evox_object_Element_getDirection_18065035834624218092);
+		functions.insert({StringView("core:ui/element"), StringView("setJustifyContent")}, &evox_object_Element_setJustifyContent_15258698185153021198);
+		functions.insert({StringView("core:ui/element"), StringView("getJustifyContent")}, &evox_object_Element_getJustifyContent_3598623794671227235);
+		functions.insert({StringView("core:ui/element"), StringView("setAlignItems")}, &evox_object_Element_setAlignItems_3965073944893972547);
+		functions.insert({StringView("core:ui/element"), StringView("getAlignItems")}, &evox_object_Element_getAlignItems_14772342679229856925);
+		functions.insert({StringView("core:ui/element"), StringView("setAlign")}, &evox_object_Element_setAlign_8501619086915515339);
+		functions.insert({StringView("core:ui/element"), StringView("getAlign")}, &evox_object_Element_getAlign_5872795793336110530);
+		functions.insert({StringView("core:ui/element"), StringView("setFont")}, &evox_object_Element_setFont_4774784269818050826);
+		functions.insert({StringView("core:ui/element"), StringView("getFont")}, &evox_object_Element_getFont_9723551787315012649);
+		functions.insert({StringView("core:ui/element"), StringView("setSrc")}, &evox_object_Element_setSrc_5727387067293558268);
+		functions.insert({StringView("core:ui/element"), StringView("getSrc")}, &evox_object_Element_getSrc_7045929248784580717);
+		functions.insert({StringView("core:ui/element"), StringView("setPlaceholder")}, &evox_object_Element_setPlaceholder_13686685876463529283);
+		functions.insert({StringView("core:ui/element"), StringView("getPlaceholder")}, &evox_object_Element_getPlaceholder_1332159898909763307);
+		functions.insert({StringView("core:ui/element"), StringView("getLeft")}, &evox_object_Element_getLeft_13917110772745256412);
+		functions.insert({StringView("core:ui/element"), StringView("getTop")}, &evox_object_Element_getTop_9115093722580285684);
+		functions.insert({StringView("core:ui/element"), StringView("getMarginTop")}, &evox_object_Element_getMarginTop_15254134537669000495);
+		functions.insert({StringView("core:ui/element"), StringView("getMarginRight")}, &evox_object_Element_getMarginRight_3603010161982479711);
+		functions.insert({StringView("core:ui/element"), StringView("getMarginBottom")}, &evox_object_Element_getMarginBottom_2824035805414205629);
+		functions.insert({StringView("core:ui/element"), StringView("getMarginLeft")}, &evox_object_Element_getMarginLeft_5724818295112335829);
+		functions.insert({StringView("core:ui/element"), StringView("getPaddingTop")}, &evox_object_Element_getPaddingTop_9034945853337678798);
+		functions.insert({StringView("core:ui/element"), StringView("getPaddingRight")}, &evox_object_Element_getPaddingRight_16359276764771033158);
+		functions.insert({StringView("core:ui/element"), StringView("getPaddingBottom")}, &evox_object_Element_getPaddingBottom_6659058682121674267);
+		functions.insert({StringView("core:ui/element"), StringView("getPaddingLeft")}, &evox_object_Element_getPaddingLeft_8864918639358503447);
 		functions.insert({StringView("core:ui/element"), StringView("getCenterX")}, &evox_object_Element_getCenterX_15764931111600111070);
 		functions.insert({StringView("core:ui/element"), StringView("getCenterY")}, &evox_object_Element_getCenterY_6124668486010093220);
 		functions.insert({StringView("core:ui/element"), StringView("getWidth")}, &evox_object_Element_getWidth_621648441130809888);
