@@ -1518,19 +1518,181 @@ void Element::setOpacity(float value) {
 	for (u32 idx : m_document.m_root.children) refreshOpacity(m_document, idx, 1.0f);
 }
 
-static void setPositionAttribute(Element& elem, AttributeName name, StringView value) {
-	Attribute attr;
-	attr.type = name;
-	if (!parseUnit(value, attr.parsed_unit)) {
-		logError("invalid value '", value, "' for attribute '", attributeNameToString(name), "'");
+// styles are applied lazily in computeLayout, so several calls in a frame cost one style pass
+static void setFloatAttribute(Element& elem, AttributeName name, float value) {
+	if (value != value || value < 0) {
+		logError("invalid value ", value, " for attribute '", attributeNameToString(name), "'");
 		return;
 	}
+
+	Attribute attr;
+	attr.type = name;
+	if (name == AttributeName::GROW) attr.grow = value;
+	else attr.font_size = value;
+	upsertAttribute(elem, attr, AttributeSource::ELEMENT);
+	elem.m_document.m_styles_dirty = true;
+	elem.m_document.invalidateLayout();
+}
+
+void Element::setFontSize(float value) { setFloatAttribute(*this, AttributeName::FONT_SIZE, value); }
+void Element::setGrow(float value) { setFloatAttribute(*this, AttributeName::GROW, value); }
+
+static void setUnitAttribute(Element& elem, AttributeName name, ParsedUnit unit) {
+	Attribute attr;
+	attr.type = name;
+	attr.parsed_unit = unit;
 	upsertAttribute(elem, attr, AttributeSource::ELEMENT);
 	elem.m_document.invalidateLayout();
 }
 
+static void setPositionAttribute(Element& elem, AttributeName name, StringView value) {
+	ParsedUnit unit;
+	if (!parseUnit(value, unit)) {
+		logError("invalid value '", value, "' for attribute '", attributeNameToString(name), "'");
+		return;
+	}
+	setUnitAttribute(elem, name, unit);
+}
+
 void Element::setLeft(StringView value) { setPositionAttribute(*this, AttributeName::LEFT, value); }
 void Element::setTop(StringView value) { setPositionAttribute(*this, AttributeName::TOP, value); }
+
+// height and the pivots are applied by the style pass, so the computed unit is set right away
+static void setSizeAttribute(Element& elem, AttributeName name, float value, Unit unit, ParsedUnit& computed) {
+	if (value != value) {
+		logError("invalid value NaN for attribute '", attributeNameToString(name), "'");
+		return;
+	}
+	computed = {unit == Unit::FIT_CONTENT ? 0.f : value, unit};
+	setUnitAttribute(elem, name, computed);
+}
+
+void Element::setHeight(float value, Unit unit) { setSizeAttribute(*this, AttributeName::HEIGHT, value, unit, height_unit); }
+void Element::setPivotX(float value, Unit unit) { setSizeAttribute(*this, AttributeName::PIVOT_X, value, unit, pivot_x_unit); }
+void Element::setPivotY(float value, Unit unit) { setSizeAttribute(*this, AttributeName::PIVOT_Y, value, unit, pivot_y_unit); }
+
+// margins and paddings are read from the attributes by the layout
+static void setSpacingAttribute(Element& elem, AttributeName name, float value, Unit unit) {
+	if (value != value) {
+		logError("invalid value NaN for attribute '", attributeNameToString(name), "'");
+		return;
+	}
+	setUnitAttribute(elem, name, {unit == Unit::FIT_CONTENT ? 0.f : value, unit});
+}
+
+void Element::setMargin(float value, Unit unit) { setSpacingAttribute(*this, AttributeName::MARGIN, value, unit); }
+void Element::setMarginTop(float value, Unit unit) { setSpacingAttribute(*this, AttributeName::MARGIN_TOP, value, unit); }
+void Element::setMarginRight(float value, Unit unit) { setSpacingAttribute(*this, AttributeName::MARGIN_RIGHT, value, unit); }
+void Element::setMarginBottom(float value, Unit unit) { setSpacingAttribute(*this, AttributeName::MARGIN_BOTTOM, value, unit); }
+void Element::setMarginLeft(float value, Unit unit) { setSpacingAttribute(*this, AttributeName::MARGIN_LEFT, value, unit); }
+void Element::setPadding(float value, Unit unit) { setSpacingAttribute(*this, AttributeName::PADDING, value, unit); }
+void Element::setPaddingTop(float value, Unit unit) { setSpacingAttribute(*this, AttributeName::PADDING_TOP, value, unit); }
+void Element::setPaddingRight(float value, Unit unit) { setSpacingAttribute(*this, AttributeName::PADDING_RIGHT, value, unit); }
+void Element::setPaddingBottom(float value, Unit unit) { setSpacingAttribute(*this, AttributeName::PADDING_BOTTOM, value, unit); }
+void Element::setPaddingLeft(float value, Unit unit) { setSpacingAttribute(*this, AttributeName::PADDING_LEFT, value, unit); }
+
+static StringView findAttributeValue(const Element& elem, AttributeName name) {
+	for (const Attribute& attr : elem.attributes) {
+		if (attr.type == name) return attr.value;
+	}
+	return {};
+}
+
+// attribute values are views, so the string has to outlive the caller's buffer
+static void setStringAttribute(Element& elem, AttributeName name, StringView value) {
+	InternTable& table = elem.m_document.m_intern_table;
+	Attribute attr;
+	attr.type = name;
+	attr.value = table.resolve(table.intern(value));
+	upsertAttribute(elem, attr, AttributeSource::ELEMENT);
+	elem.m_document.m_styles_dirty = true;
+	elem.m_document.invalidateLayout();
+}
+
+void Element::setPosition(PositionMode value) {
+	setStringAttribute(*this, AttributeName::POSITION, value == PositionMode::ABSOLUTE ? "absolute" : "relative");
+}
+void Element::setFont(StringView path) { setStringAttribute(*this, AttributeName::FONT, path); }
+void Element::setSrc(StringView path) { setStringAttribute(*this, AttributeName::SRC, path); }
+void Element::setPlaceholder(StringView value) { setStringAttribute(*this, AttributeName::PLACEHOLDER, value); }
+StringView Element::getFont() const { return findAttributeValue(*this, AttributeName::FONT); }
+StringView Element::getSrc() const { return findAttributeValue(*this, AttributeName::SRC); }
+StringView Element::getPlaceholder() const { return findAttributeValue(*this, AttributeName::PLACEHOLDER); }
+
+// color is inherited, so it needs the style pass; the background is not
+void Element::setColor(Color value) {
+	Attribute attr;
+	attr.type = AttributeName::COLOR;
+	attr.color = value;
+	upsertAttribute(*this, attr, AttributeSource::ELEMENT);
+	m_document.m_styles_dirty = true;
+}
+
+void Element::setBGColor(Color value) {
+	Attribute attr;
+	attr.type = AttributeName::BG_COLOR;
+	attr.color = value;
+	upsertAttribute(*this, attr, AttributeSource::ELEMENT);
+	bg_color = value;
+}
+
+void Element::setClipping(bool value) {
+	upsertAttribute<AttributeName::CLIPPING>(*this, value, AttributeSource::ELEMENT);
+	clipping = value;
+}
+
+void Element::setWrap(bool value) {
+	upsertAttribute<AttributeName::WRAP>(*this, value, AttributeSource::ELEMENT);
+	m_document.m_styles_dirty = true;
+	m_document.invalidateLayout();
+}
+
+void Element::setDirection(Direction value) {
+	upsertAttribute<AttributeName::DIRECTION>(*this, value, AttributeSource::ELEMENT);
+	m_document.m_styles_dirty = true;
+	m_document.invalidateLayout();
+}
+
+void Element::setJustifyContent(JustifyContent value) {
+	upsertAttribute<AttributeName::JUSTIFY_CONTENT>(*this, value, AttributeSource::ELEMENT);
+	m_document.m_styles_dirty = true;
+	m_document.invalidateLayout();
+}
+
+void Element::setAlignItems(AlignItems value) {
+	upsertAttribute<AttributeName::ALIGN_ITEMS>(*this, value, AttributeSource::ELEMENT);
+	m_document.m_styles_dirty = true;
+	m_document.invalidateLayout();
+}
+
+void Element::setAlign(Align value) {
+	upsertAttribute<AttributeName::ALIGN>(*this, value, AttributeSource::ELEMENT);
+	m_document.m_styles_dirty = true;
+	m_document.invalidateLayout();
+}
+
+bool Element::getVisible() const { return visible; }
+float Element::getOpacity() const { return opacity; }
+float Element::getFontSize() const { return font_size / m_document.m_scale; }
+float Element::getGrow() const { return grow; }
+Color Element::getColor() const { return color; }
+Color Element::getBGColor() const { return bg_color; }
+bool Element::getClipping() const { return clipping; }
+bool Element::getWrap() const { return wrap; }
+Direction Element::getDirection() const { return direction; }
+JustifyContent Element::getJustifyContent() const { return justify_content; }
+AlignItems Element::getAlignItems() const { return align_items; }
+Align Element::getAlign() const { return text_align; }
+float Element::getLeft() const { return left / m_document.m_scale; }
+float Element::getTop() const { return top / m_document.m_scale; }
+float Element::getMarginTop() const { return margins.top / m_document.m_scale; }
+float Element::getMarginRight() const { return margins.right / m_document.m_scale; }
+float Element::getMarginBottom() const { return margins.bottom / m_document.m_scale; }
+float Element::getMarginLeft() const { return margins.left / m_document.m_scale; }
+float Element::getPaddingTop() const { return paddings.top / m_document.m_scale; }
+float Element::getPaddingRight() const { return paddings.right / m_document.m_scale; }
+float Element::getPaddingBottom() const { return paddings.bottom / m_document.m_scale; }
+float Element::getPaddingLeft() const { return paddings.left / m_document.m_scale; }
 
 float Element::getCenterX() const {
 	return (position.x + size.x * 0.5f - (position_mode == PositionMode::RELATIVE ? left : 0.f)) / m_document.m_scale;

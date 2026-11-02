@@ -487,6 +487,54 @@ bool testRemoveClassWithFontAttribute() {
 	return true;
 }
 
+bool testElementSettersBeatStylesheet() {
+	MockDocument doc;
+	ASSERT_PARSE(doc, R"(
+		[style] {
+			.styled {
+				height: 100;
+				grow: 1;
+				font-size: 30;
+				margin-left: 7;
+			}
+		}
+		[box width=50 .styled] {
+		}
+	)");
+	ASSERT_EQ(1, doc.m_root.children.size());
+	ui::Element& elem = doc.m_elements[doc.m_root.children[0]];
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_FLOAT_EQ(100.0f, elem.height_unit.value); // size.y is the canvas height because of grow
+	ASSERT_FLOAT_EQ(1.0f, elem.getGrow());
+	ASSERT_FLOAT_EQ(30.0f, elem.getFontSize());
+	ASSERT_FLOAT_EQ(7.0f, elem.getMarginLeft());
+
+	elem.setHeight(40, ui::Unit::PIXELS);
+	elem.setGrow(3);
+	elem.setFontSize(12);
+	elem.setMarginLeft(2, ui::Unit::PIXELS);
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_FLOAT_EQ(40.0f, elem.height_unit.value);
+	ASSERT_FLOAT_EQ(3.0f, elem.getGrow());
+	ASSERT_FLOAT_EQ(12.0f, elem.getFontSize());
+	ASSERT_FLOAT_EQ(2.0f, elem.getMarginLeft());
+
+	// the stylesheet is applied again on every style pass and still loses
+	doc.m_styles_dirty = true;
+	doc.addClass(elem.index, "styled");
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_FLOAT_EQ(40.0f, elem.height_unit.value);
+	ASSERT_FLOAT_EQ(3.0f, elem.getGrow());
+	ASSERT_FLOAT_EQ(12.0f, elem.getFontSize());
+	ASSERT_FLOAT_EQ(2.0f, elem.getMarginLeft());
+
+	// the setter doesn't leave a stale stylesheet attribute behind: one attribute of each kind
+	int heights = 0;
+	for (const ui::Attribute& attr : elem.attributes) heights += attr.type == ui::AttributeName::HEIGHT;
+	ASSERT_EQ(1, heights);
+	return true;
+}
+
 bool testAddClassDuplicateNoOp() {
 	MockDocument doc;
 	ASSERT_PARSE(doc, R"(
@@ -897,4 +945,5 @@ void runUIStyleTests() {
 	RUN_TEST(testCompoundClassSelectorMatchesAllClasses);
 	RUN_TEST(testCompoundClassSelectorDoesNotMatchWhenMissingClass);
 	RUN_TEST(testCompoundAndSingleClassRulesBothApply);
+	RUN_TEST(testElementSettersBeatStylesheet);
 }

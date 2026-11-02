@@ -1151,6 +1151,267 @@ bool testSetWidthUpdatesPercentAndLayout() {
 	return true;
 }
 
+// first root element of a freshly parsed document, laid out in 800x600
+static ui::Element* parseAndLayout(MockDocument& doc, const char* source) {
+	if (!doc.parse(source, "test.ui")) return nullptr;
+	doc.computeLayout(Vec2(800, 600));
+	return doc.getElement(doc.m_root.children[0]);
+}
+
+bool testSetHeightUnits() {
+	MockDocument doc;
+	ui::Element* e = parseAndLayout(doc, "[box width=100 height=20] {}");
+	ASSERT_TRUE(e);
+	ASSERT_FLOAT_EQ(20.0f, e->size.y);
+
+	e->setHeight(50, Unit::PIXELS);
+	doc.flushLayout();
+	ASSERT_FLOAT_EQ(50.0f, e->size.y);
+
+	e->setHeight(25, Unit::PERCENT);
+	doc.flushLayout();
+	ASSERT_FLOAT_EQ(150.0f, e->size.y);
+
+	// the value is stored as an element attribute so it survives a style pass
+	doc.m_styles_dirty = true;
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_FLOAT_EQ(150.0f, e->size.y);
+	return true;
+}
+
+bool testSetMarginAndPadding() {
+	MockDocument doc;
+	ui::Element* e = parseAndLayout(doc, "[box width=100 height=20] {}");
+	ASSERT_TRUE(e);
+
+	e->setMargin(10, Unit::PIXELS);
+	e->setMarginLeft(30, Unit::PIXELS);
+	e->setPadding(4, Unit::PIXELS);
+	e->setPaddingBottom(8, Unit::PIXELS);
+	doc.flushLayout();
+
+	ASSERT_FLOAT_EQ(10.0f, e->getMarginTop());
+	ASSERT_FLOAT_EQ(10.0f, e->getMarginRight());
+	ASSERT_FLOAT_EQ(10.0f, e->getMarginBottom());
+	ASSERT_FLOAT_EQ(30.0f, e->getMarginLeft());
+	ASSERT_FLOAT_EQ(4.0f, e->getPaddingTop());
+	ASSERT_FLOAT_EQ(4.0f, e->getPaddingRight());
+	ASSERT_FLOAT_EQ(8.0f, e->getPaddingBottom());
+	ASSERT_FLOAT_EQ(4.0f, e->getPaddingLeft());
+
+	// setting the same attribute again replaces it
+	e->setMarginLeft(5, Unit::PIXELS);
+	doc.flushLayout();
+	ASSERT_FLOAT_EQ(5.0f, e->getMarginLeft());
+	return true;
+}
+
+bool testSetLeftTopGetters() {
+	MockDocument doc;
+	ui::Element* e = parseAndLayout(doc, "[box width=100 height=20] {}");
+	ASSERT_TRUE(e);
+	e->setLeft("12");
+	e->setTop("7");
+	doc.flushLayout();
+	ASSERT_FLOAT_EQ(12.0f, e->getLeft());
+	ASSERT_FLOAT_EQ(7.0f, e->getTop());
+	return true;
+}
+
+bool testSetFontSizeAndGrow() {
+	MockDocument doc;
+	ui::Element* e = parseAndLayout(doc, "[box width=100 height=20] {}");
+	ASSERT_TRUE(e);
+
+	e->setFontSize(20);
+	e->setGrow(2);
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_FLOAT_EQ(20.0f, e->getFontSize());
+	ASSERT_FLOAT_EQ(2.0f, e->getGrow());
+
+	// invalid values are rejected and leave the old ones
+	doc.m_suppress_logging = true;
+	e->setFontSize(-1);
+	e->setGrow(-1);
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_FLOAT_EQ(20.0f, e->getFontSize());
+	ASSERT_FLOAT_EQ(2.0f, e->getGrow());
+	return true;
+}
+
+bool testSetFontSizeScalesWithDPI() {
+	MockDocument doc;
+	ui::Element* e = parseAndLayout(doc, "[box width=100 height=20] {}");
+	ASSERT_TRUE(e);
+	e->setFontSize(10);
+	doc.setDPIScale(2.0f);
+	doc.computeLayout(Vec2(800, 600));
+	// reported in UI units, not pixels
+	ASSERT_FLOAT_EQ(10.0f, e->getFontSize());
+	return true;
+}
+
+bool testSetColorsAndInheritance() {
+	MockDocument doc;
+	ui::Element* parent = parseAndLayout(doc, "[box width=100 height=20] { [box width=10 height=10] {} }");
+	ASSERT_TRUE(parent);
+	ui::Element* child = doc.getElement(parent->children[0]);
+
+	parent->setColor(Color(255, 0, 0, 255));
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_EQ(255, parent->getColor().r);
+	ASSERT_EQ(0, parent->getColor().g);
+	ASSERT_EQ(255, child->getColor().r); // inherited
+
+	parent->setBGColor(Color(1, 2, 3, 4));
+	// the background applies immediately
+	ASSERT_EQ(1, parent->getBGColor().r);
+	ASSERT_EQ(4, parent->getBGColor().a);
+	doc.m_styles_dirty = true;
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_EQ(2, parent->getBGColor().g);
+	ASSERT_EQ(0, child->getBGColor().a);
+	return true;
+}
+
+bool testSetBooleans() {
+	MockDocument doc;
+	ui::Element* e = parseAndLayout(doc, "[box width=100 height=20] {}");
+	ASSERT_TRUE(e);
+	ASSERT_TRUE(e->getVisible());
+	ASSERT_TRUE(!e->getClipping());
+	ASSERT_TRUE(e->getWrap());
+
+	e->setVisible(false);
+	e->setClipping(true);
+	e->setWrap(false);
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(!e->getVisible());
+	ASSERT_TRUE(e->getClipping());
+	ASSERT_TRUE(!e->getWrap());
+
+	doc.m_styles_dirty = true;
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(!e->getVisible());
+	ASSERT_TRUE(e->getClipping());
+	ASSERT_TRUE(!e->getWrap());
+	return true;
+}
+
+bool testSetLayoutEnums() {
+	MockDocument doc;
+	ui::Element* e = parseAndLayout(doc, "[box width=100 height=20] {}");
+	ASSERT_TRUE(e);
+	ASSERT_EQ((int)Direction::COLUMN, (int)e->getDirection());
+
+	e->setDirection(Direction::ROW);
+	e->setJustifyContent(JustifyContent::SPACE_BETWEEN);
+	e->setAlignItems(AlignItems::STRETCH);
+	e->setAlign(Align::RIGHT);
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_EQ((int)Direction::ROW, (int)e->getDirection());
+	ASSERT_EQ((int)JustifyContent::SPACE_BETWEEN, (int)e->getJustifyContent());
+	ASSERT_EQ((int)AlignItems::STRETCH, (int)e->getAlignItems());
+	ASSERT_EQ((int)Align::RIGHT, (int)e->getAlign());
+
+	e->setDirection(Direction::COLUMN);
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_EQ((int)Direction::COLUMN, (int)e->getDirection());
+	return true;
+}
+
+bool testSetDirectionChangesLayout() {
+	MockDocument doc;
+	ui::Element* parent = parseAndLayout(doc, "[box width=100 height=100] { [box width=10 height=10] {} [box width=10 height=10] {} }");
+	ASSERT_TRUE(parent);
+	ui::Element* second = doc.getElement(parent->children[1]);
+	const float column_x = second->position.x;
+	const float column_y = second->position.y;
+
+	parent->setDirection(Direction::ROW);
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_TRUE(second->position.x > column_x);
+	ASSERT_FLOAT_EQ(column_y - 10.0f, second->position.y);
+	return true;
+}
+
+bool testSetStringAttributesAreCopied() {
+	MockDocument doc;
+	ui::Element* e = parseAndLayout(doc, "[input width=100 height=20] {}");
+	ASSERT_TRUE(e);
+
+	char buffer[32] = "type here";
+	e->setPlaceholder(buffer);
+	memset(buffer, 'x', sizeof(buffer) - 1); // the caller's buffer is gone/reused
+	ASSERT_EQ(StringView("type here"), e->getPlaceholder());
+
+	char font[32] = "/fonts/a.ttf";
+	e->setFont(font);
+	memset(font, 'x', sizeof(font) - 1);
+	ASSERT_EQ(StringView("/fonts/a.ttf"), e->getFont());
+
+	e->setSrc("a.png");
+	e->setSrc("b.png");
+	ASSERT_EQ(StringView("b.png"), e->getSrc());
+	return true;
+}
+
+bool testSetPositionMode() {
+	MockDocument doc;
+	ui::Element* e = parseAndLayout(doc, "[box width=100 height=20] {}");
+	ASSERT_TRUE(e);
+	ASSERT_EQ((int)PositionMode::RELATIVE, (int)e->position_mode);
+
+	e->setPosition(PositionMode::ABSOLUTE);
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_EQ((int)PositionMode::ABSOLUTE, (int)e->position_mode);
+
+	e->setPosition(PositionMode::RELATIVE);
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_EQ((int)PositionMode::RELATIVE, (int)e->position_mode);
+	return true;
+}
+
+bool testSetPivot() {
+	MockDocument doc;
+	ui::Element* e = parseAndLayout(doc, "[box width=100 height=20] {}");
+	ASSERT_TRUE(e);
+	e->setPivotX(50, Unit::PERCENT);
+	e->setPivotY(3, Unit::PIXELS);
+	ASSERT_FLOAT_EQ(50.0f, e->pivot_x_unit.value);
+	ASSERT_EQ((int)Unit::PERCENT, (int)e->pivot_x_unit.unit);
+	ASSERT_FLOAT_EQ(3.0f, e->pivot_y_unit.value);
+
+	doc.m_styles_dirty = true;
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_FLOAT_EQ(50.0f, e->pivot_x_unit.value);
+	ASSERT_EQ((int)Unit::PERCENT, (int)e->pivot_x_unit.unit);
+	return true;
+}
+
+bool testElementSettersOverrideAttributes() {
+	MockDocument doc;
+	ui::Element* e = parseAndLayout(doc, "[box width=100 height=20 grow=1 font-size=14 margin-left=2] {}");
+	ASSERT_TRUE(e);
+	ASSERT_FLOAT_EQ(1.0f, e->getGrow());
+	ASSERT_FLOAT_EQ(14.0f, e->getFontSize());
+	ASSERT_FLOAT_EQ(2.0f, e->getMarginLeft());
+
+	e->setGrow(3);
+	e->setFontSize(18);
+	e->setMarginLeft(9, Unit::PIXELS);
+	doc.computeLayout(Vec2(800, 600));
+	ASSERT_FLOAT_EQ(3.0f, e->getGrow());
+	ASSERT_FLOAT_EQ(18.0f, e->getFontSize());
+	ASSERT_FLOAT_EQ(9.0f, e->getMarginLeft());
+
+	// exactly one attribute of a kind remains
+	int grow_count = 0;
+	for (const Attribute& attr : e->attributes) grow_count += attr.type == AttributeName::GROW;
+	ASSERT_EQ(1, grow_count);
+	return true;
+}
+
 struct MockMouseDevice : InputSystem::Device {
 	MockMouseDevice() { type = InputDeviceType::MOUSE; }
 	void update(float dt) override {}
@@ -2241,6 +2502,19 @@ void runUITests() {
 	RUN_TEST(testComplexMutationSequence);
 	RUN_TEST(testSetWidthUpdatesPixelsAndLayout);
 	RUN_TEST(testSetWidthUpdatesPercentAndLayout);
+	RUN_TEST(testSetHeightUnits);
+	RUN_TEST(testSetMarginAndPadding);
+	RUN_TEST(testSetLeftTopGetters);
+	RUN_TEST(testSetFontSizeAndGrow);
+	RUN_TEST(testSetFontSizeScalesWithDPI);
+	RUN_TEST(testSetColorsAndInheritance);
+	RUN_TEST(testSetBooleans);
+	RUN_TEST(testSetLayoutEnums);
+	RUN_TEST(testSetDirectionChangesLayout);
+	RUN_TEST(testSetStringAttributesAreCopied);
+	RUN_TEST(testSetPositionMode);
+	RUN_TEST(testSetPivot);
+	RUN_TEST(testElementSettersOverrideAttributes);
 	RUN_TEST(testKeyboardInputEvent);
 	RUN_TEST(testOnClickAttributeParseOnBox);
 	RUN_TEST(testOnClickAttributeRejectedOnNonBox);

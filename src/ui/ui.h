@@ -83,11 +83,13 @@ enum class AttributeSource : u8 {
 	STYLESHEET
 };
 
+//@ enum full ui::Direction
 enum class Direction : u8 {
 	ROW,
 	COLUMN
 };
 
+//@ enum full ui::JustifyContent
 enum class JustifyContent : u8 {
 	START,
 	CENTER,
@@ -96,6 +98,7 @@ enum class JustifyContent : u8 {
 	SPACE_AROUND,
 };
 
+//@ enum full ui::AlignItems
 enum class AlignItems : u8 {
 	START,
 	CENTER,
@@ -103,17 +106,20 @@ enum class AlignItems : u8 {
 	STRETCH
 };
 
+//@ enum full ui::Align
 enum class Align : u8 {
 	LEFT,
 	CENTER,
 	RIGHT,
 };
 
+//@ enum full ui::PositionMode
 enum PositionMode : u8 {
 	RELATIVE,
 	ABSOLUTE
 };
 
+//@ enum full ui::Unit
 enum class Unit : u8 {
 	PIXELS,
 	PERCENT,
@@ -310,42 +316,93 @@ struct LUMIX_UI_API Element {
 	ParsedUnit pivot_x_unit = {0, Unit::PIXELS};
 	ParsedUnit pivot_y_unit = {0, Unit::PIXELS};
 	
-	//@ function
+	//@ functions
 	StringView getID() { return id; }
-	//@ function 
 	void setVisible(bool show);
-	//@ function 
 	void setText(StringView value);
 	// the value of an [input], the text of any other element
-	//@ function
 	StringView getText() const;
-	// Tag::INPUT: replaces the value and puts the caret at caret_pos (a byte offset)
-	void setInputText(StringView value, u32 caret_pos);
-	//@ function
 	void setWidth(StringView value);
-	//@ function 
 	void setBGImage(const Path& path);
 	// [canvas] only, ignored with an error log on other elements. Indices must be a multiple of 3 and point into vertices; otherwise the previous geometry stays
-	//@ function
 	void setGeometry(Span<const Vertex> vertices, Span<const u32> indices);
-	//@ function
 	void clearGeometry();
 	// "left"/"top" of a relative element shift it (and its content) after layout without moving its siblings, e.g. "-120" (pixels), "10%" or "2em", for animations
-	//@ function
 	void setLeft(StringView value);
-	//@ function
 	void setTop(StringView value);
-	//@ function
 	void setOpacity(float value);
+	// in UI units (pixels before the DPI scale)
+	void setFontSize(float value);
+	void setGrow(float value);
+	// getters return the value as of the last style/layout pass (visible and opacity update immediately), lengths in UI units
+	bool getVisible() const;
+	float getOpacity() const;
+	float getFontSize() const;
+	float getGrow() const;
+
+	// lengths: value in the given unit; the value is ignored for Unit::FIT_CONTENT
+	void setHeight(float value, Unit unit);
+	void setPivotX(float value, Unit unit);
+	void setPivotY(float value, Unit unit);
+	void setPosition(PositionMode value);
+	void setMargin(float value, Unit unit);
+	void setMarginTop(float value, Unit unit);
+	void setMarginRight(float value, Unit unit);
+	void setMarginBottom(float value, Unit unit);
+	void setMarginLeft(float value, Unit unit);
+	void setPadding(float value, Unit unit);
+	void setPaddingTop(float value, Unit unit);
+	void setPaddingRight(float value, Unit unit);
+	void setPaddingBottom(float value, Unit unit);
+	void setPaddingLeft(float value, Unit unit);
+
+	void setColor(Color value);
+	Color getColor() const;
+	void setBGColor(Color value);
+	Color getBGColor() const;
+
+	void setClipping(bool value);
+	bool getClipping() const;
+	void setWrap(bool value);
+	bool getWrap() const;
+	void setDirection(Direction value);
+	Direction getDirection() const;
+	void setJustifyContent(JustifyContent value);
+	JustifyContent getJustifyContent() const;
+	void setAlignItems(AlignItems value);
+	AlignItems getAlignItems() const;
+	// text alignment
+	void setAlign(Align value);
+	Align getAlign() const;
+
+	void setFont(StringView path);
+	StringView getFont() const;
+	// [image] and [canvas] source
+	void setSrc(StringView path);
+	StringView getSrc() const;
+	void setPlaceholder(StringView value);
+	StringView getPlaceholder() const;
+
+	// computed, so in UI units after the first layout
+	float getLeft() const;
+	float getTop() const;
+	float getMarginTop() const;
+	float getMarginRight() const;
+	float getMarginBottom() const;
+	float getMarginLeft() const;
+	float getPaddingTop() const;
+	float getPaddingRight() const;
+	float getPaddingBottom() const;
+	float getPaddingLeft() const;
+
 	// as laid out, in UI units (pixels before the DPI scale), without the shift of left/top; valid after the first layout with the element visible
-	//@ function
 	float getCenterX() const;
-	//@ function
 	float getCenterY() const;
-	//@ function
 	float getWidth() const;
-	//@ function
 	float getHeight() const;
+	//@ end
+	// Tag::INPUT: replaces the value and puts the caret at caret_pos (a byte offset)
+	void setInputText(StringView value, u32 caret_pos);
 
 	IFontManager::FontHandle getFontHandle() const { return font_handle; }
 	void setFontHandle(IFontManager::FontHandle font_handle);

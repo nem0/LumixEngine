@@ -2,6 +2,13 @@
 // import core:ui/element as Element
 
 import "core:ui/vertex"
+import "core:ui/unit"
+import "core:ui/positionmode"
+import "core:color"
+import "core:ui/direction"
+import "core:ui/justifycontent"
+import "core:ui/alignitems"
+import "core:ui/align"
 struct Element { ptr : cptr; }
 
 extern fn getID(object : Element) : []const u8;
@@ -15,6 +22,58 @@ extern fn clearGeometry(object : Element) : void;
 extern fn setLeft(object : Element, value : []const u8) : void;
 extern fn setTop(object : Element, value : []const u8) : void;
 extern fn setOpacity(object : Element, value : f32) : void;
+extern fn setFontSize(object : Element, value : f32) : void;
+extern fn setGrow(object : Element, value : f32) : void;
+extern fn getVisible(object : Element) : bool;
+extern fn getOpacity(object : Element) : f32;
+extern fn getFontSize(object : Element) : f32;
+extern fn getGrow(object : Element) : f32;
+extern fn setHeight(object : Element, value : f32, unit : Unit) : void;
+extern fn setPivotX(object : Element, value : f32, unit : Unit) : void;
+extern fn setPivotY(object : Element, value : f32, unit : Unit) : void;
+extern fn setPosition(object : Element, value : PositionMode) : void;
+extern fn setMargin(object : Element, value : f32, unit : Unit) : void;
+extern fn setMarginTop(object : Element, value : f32, unit : Unit) : void;
+extern fn setMarginRight(object : Element, value : f32, unit : Unit) : void;
+extern fn setMarginBottom(object : Element, value : f32, unit : Unit) : void;
+extern fn setMarginLeft(object : Element, value : f32, unit : Unit) : void;
+extern fn setPadding(object : Element, value : f32, unit : Unit) : void;
+extern fn setPaddingTop(object : Element, value : f32, unit : Unit) : void;
+extern fn setPaddingRight(object : Element, value : f32, unit : Unit) : void;
+extern fn setPaddingBottom(object : Element, value : f32, unit : Unit) : void;
+extern fn setPaddingLeft(object : Element, value : f32, unit : Unit) : void;
+extern fn setColor(object : Element, value : Color) : void;
+extern fn getColor(object : Element) : Color;
+extern fn setBGColor(object : Element, value : Color) : void;
+extern fn getBGColor(object : Element) : Color;
+extern fn setClipping(object : Element, value : bool) : void;
+extern fn getClipping(object : Element) : bool;
+extern fn setWrap(object : Element, value : bool) : void;
+extern fn getWrap(object : Element) : bool;
+extern fn setDirection(object : Element, value : Direction) : void;
+extern fn getDirection(object : Element) : Direction;
+extern fn setJustifyContent(object : Element, value : JustifyContent) : void;
+extern fn getJustifyContent(object : Element) : JustifyContent;
+extern fn setAlignItems(object : Element, value : AlignItems) : void;
+extern fn getAlignItems(object : Element) : AlignItems;
+extern fn setAlign(object : Element, value : Align) : void;
+extern fn getAlign(object : Element) : Align;
+extern fn setFont(object : Element, path : []const u8) : void;
+extern fn getFont(object : Element) : []const u8;
+extern fn setSrc(object : Element, path : []const u8) : void;
+extern fn getSrc(object : Element) : []const u8;
+extern fn setPlaceholder(object : Element, value : []const u8) : void;
+extern fn getPlaceholder(object : Element) : []const u8;
+extern fn getLeft(object : Element) : f32;
+extern fn getTop(object : Element) : f32;
+extern fn getMarginTop(object : Element) : f32;
+extern fn getMarginRight(object : Element) : f32;
+extern fn getMarginBottom(object : Element) : f32;
+extern fn getMarginLeft(object : Element) : f32;
+extern fn getPaddingTop(object : Element) : f32;
+extern fn getPaddingRight(object : Element) : f32;
+extern fn getPaddingBottom(object : Element) : f32;
+extern fn getPaddingLeft(object : Element) : f32;
 extern fn getCenterX(object : Element) : f32;
 extern fn getCenterY(object : Element) : f32;
 extern fn getWidth(object : Element) : f32;
