@@ -396,15 +396,42 @@ struct IRBuilder {
 		return ie.resolved_type;
 	}
 
-	u32 internString(ex_string_view value) {
+	static u32 hashString(ex_string_view value) {
+		u32 h = 2166136261u;
+		for (i64 i = 0; i < value.length; ++i) h = (h ^ (u8)value.begin[i]) * 16777619u;
+		return h;
+	}
+
+	void rehashStrings(u32 new_capacity) {
+		i32* table = (i32*)host.arena.allocate(host.arena.user_data, sizeof(i32) * new_capacity, alignof(i32));
+		for (u32 i = 0; i < new_capacity; ++i) table[i] = -1;
 		for (i32 i = 0, c = strings.size(); i < c; ++i) {
-			if (equalStrings(value, strings[i])) return i;
+			u32 slot = hashString(strings[i]) & (new_capacity - 1);
+			while (table[slot] >= 0) slot = (slot + 1) & (new_capacity - 1);
+			table[slot] = i;
 		}
+		string_table = table;
+		string_table_capacity = new_capacity;
+	}
+
+	u32 internString(ex_string_view value) {
+		// open-addressing hash table of indices into `strings`, kept at most half full
+		if ((u32)strings.size() * 2 >= string_table_capacity) rehashStrings(string_table_capacity ? string_table_capacity * 2 : 256);
+		const u32 mask = string_table_capacity - 1;
+		u32 slot = hashString(value) & mask;
+		while (string_table[slot] >= 0) {
+			if (equalStrings(value, strings[string_table[slot]])) {
+				return string_table[slot];
+			}
+			slot = (slot + 1) & mask;
+		}
+
 		i64 len = value.length;
 		char* tmp = (char*)host.arena.allocate(host.arena.user_data, len + 1, 1);
 		memcpy(tmp, value.begin, len);
 		tmp[len] = 0;
 		strings.push({tmp, len});
+		string_table[slot] = strings.size() - 1;
 		return strings.size() - 1;
 	}
 
@@ -2383,6 +2410,8 @@ struct IRBuilder {
 	TypeInfoBuilder& type_info;
 	ExpArray<Local> locals;
 	ExpArray<ex_string_view> strings;
+	i32* string_table = nullptr; // hash index over `strings`
+	u32 string_table_capacity = 0;
 	ExpArray<Statement*> defers;
 	ExpArray<Loop> loops;
 	ExpArray<FunctionExpression*> inline_stack;

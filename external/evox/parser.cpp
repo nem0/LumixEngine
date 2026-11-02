@@ -220,8 +220,7 @@ struct Parser {
 	bool addSymbol(const Symbol& sym) {
 		EX_ASSERT(sym.expression || sym.kind == EX_SYM_KIND_IMPORT);
 		if (!isOperatorSymbol(sym.name)) {
-			for (const Symbol& other : m_unit.symbols) {
-				if (!equalStrings(other.name, sym.name)) continue;
+			if (m_unit.findSymbol(sym.name)) {
 				m_output.errorAt(sym.token, "Duplicate declaration: ", sym.name);
 				return false;
 			}

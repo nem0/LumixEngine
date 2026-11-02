@@ -154,6 +154,17 @@ struct Unit {
 	ex_arena& arena;
 
 	ExpArray<Symbol> symbols;
+
+	// Returns the first symbol named `name`, or nullptr. Symbols are only ever appended, so a hash index
+	// over them (open addressing, indices into `symbols`) is brought up to date lazily on each lookup.
+	Symbol* findSymbol(ex_string_view name);
+	static u32 hashName(ex_string_view name);
+	void syncSymbolIndex();
+
+	i32* symbol_table = nullptr;
+	u32 symbol_table_capacity = 0;
+	i32 symbols_indexed = 0;
+
 	ExpArray<ResolvedType> types;
 	ExpArray<Import> imports;
 	ExpArray<Symbol*> native_symbols;

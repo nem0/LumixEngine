@@ -57,6 +57,10 @@ static inline void* ex_default_arena_allocate(void* userdata, size_t size, size_
 		return NULL;
 	}
 	if (committed_end > arena->committed_size) {
+		// commit in 1 MB steps: a kernel call per page dominated compile time
+		const size_t commit_granularity = 1024 * 1024;
+		committed_end = (size_t)ex_default_arena_align_up_uintptr((uintptr)committed_end, commit_granularity);
+		if (committed_end > arena->reserve_size) committed_end = arena->reserve_size;
 		void* commit_base = (char*)arena->base + arena->committed_size;
 		size_t commit_size = committed_end - arena->committed_size;
 		void* committed = ex_platform_commit(commit_base, commit_size) ? commit_base : NULL;

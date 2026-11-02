@@ -39,6 +39,57 @@ static constexpr TypeKindInfo TYPE_KIND_INFOS[] = {
 	{ResolvedTypeKind::POINTER, "Pointer", nullptr},
 };
 
+Symbol* Unit::findSymbol(ex_string_view name) {
+	syncSymbolIndex();
+	if (!symbol_table) return nullptr;
+
+	const u32 mask = symbol_table_capacity - 1;
+	u32 slot = hashName(name) & mask;
+	while (symbol_table[slot] >= 0) {
+		Symbol& sym = symbols[symbol_table[slot]];
+		if (equalStrings(sym.name, name)) return &sym;
+
+		slot = (slot + 1) & mask;
+	}
+	return nullptr;
+}
+
+u32 Unit::hashName(ex_string_view name) {
+	u32 h = 2166136261u;
+	for (i64 i = 0; i < name.length; ++i) h = (h ^ (u8)name.begin[i]) * 16777619u;
+	return h;
+}
+
+void Unit::syncSymbolIndex() {
+	const i32 count = symbols.size();
+	if (count == symbols_indexed) return;
+
+	if ((u32)count * 2 >= symbol_table_capacity) {
+		u32 capacity = symbol_table_capacity ? symbol_table_capacity : 64;
+		while ((u32)count * 2 >= capacity) capacity *= 2;
+		symbol_table = (i32*)arena.allocate(arena.user_data, sizeof(i32) * capacity, alignof(i32));
+		for (u32 i = 0; i < capacity; ++i) symbol_table[i] = -1;
+		symbol_table_capacity = capacity;
+		symbols_indexed = 0;
+	}
+
+	const u32 mask = symbol_table_capacity - 1;
+	for (i32 i = symbols_indexed; i < count; ++i) {
+		u32 slot = hashName(symbols[i].name) & mask;
+		bool duplicate = false;
+		// a later symbol with the same name (operator overloads) never shadows the first one
+		while (symbol_table[slot] >= 0) {
+			if (equalStrings(symbols[symbol_table[slot]].name, symbols[i].name)) {
+				duplicate = true;
+				break;
+			}
+			slot = (slot + 1) & mask;
+		}
+		if (!duplicate) symbol_table[slot] = i;
+	}
+	symbols_indexed = count;
+}
+
 ex_module::ex_module(ex_host* host)
 	: host(host)
 	, arena(host->arena)
@@ -1994,10 +2045,7 @@ struct Checker {
 	}
 
 	static Symbol* findSymbol(Unit& unit, ex_string_view name) {
-		for (Symbol& sym : unit.symbols) {
-			if (equalStrings(sym.name, name)) return &sym;
-		}
-		return nullptr;
+		return unit.findSymbol(name);
 	}
 
 	static SemanticLocalBinding* findLocal(FunctionCheckContext& ctx, ex_string_view name) {
