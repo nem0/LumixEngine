@@ -483,6 +483,21 @@ struct GUISystem : ISystem {
 
 In this example only `enableCursor` is available to scripting generators. See the backend documentation for supported signatures and object representation.
 
+To expose many methods, wrap them in `//@ functions` and `//@ end` instead of annotating each one. Every declaration inside the block is treated as if it had `//@ function` above it; blank lines and `//` comments are skipped, and declarations Meta cannot parse as a function are ignored. A second `//@ end` closes the object, as usual.
+
+```cpp
+//@ object
+struct Counter {
+	//@ functions
+	void reset();
+	// the current value
+	int get() const;
+	//@ end
+	int m_value;
+};
+//@ end
+```
+
 # Structs
 
 `//@ struct` marks a plain data struct for use by scripting backends. Unlike `//@ component_struct` (which defines ECS components), `//@ struct` is for standalone types used as function parameters or return values, such as raycast results or geometric primitives.
