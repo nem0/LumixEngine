@@ -156,6 +156,10 @@ protected:
 	void writeSubmesh(const Path& src, i32 geom_idx, const ModelMeta& meta);
 	void writeMeshes(const Path& src, const ModelMeta& meta);
 	void writeLODs(const ModelMeta& meta);
+	// Clusters replace the indices of the first LOD: if shouldBakeClusters, writeGeometry does not write them
+	// and writeClusters, which must be called after it, writes them as the finest level of clusters, see Model::parseClusters
+	bool shouldBakeClusters(const ModelMeta& meta) const;
+	bool writeClusters(const ModelMeta& meta);
 	void writeGeometry(const ModelMeta& meta);
 	void writeGeometry(u32 geom_idx, const ModelMeta& meta);
 	void writeSkeleton(const ModelMeta& meta);
@@ -169,6 +173,9 @@ protected:
 	void computeNormals(OutputMemoryStream& unindexed_triangles, u32 vertex_size, u32 normal_offset);
 
 
+	// pads vertices to multiples of 4 bytes, see Model::FileVersion::STRIDE
+	void padVertices();
+
 	// compute AO, auto LODs, etc.
 	// call this from parse when appropriate
 	void postprocessCommon(const ModelMeta& meta, StringView src_dir);
@@ -176,6 +183,8 @@ protected:
 	StudioApp& m_app;
 	IAllocator& m_allocator;
 	OutputMemoryStream m_out_file;
+	bool m_bake_clusters = false;
+	u64 m_vertex_data_offset = 0; // where the vertex buffers of meshes are in m_out_file, set by writeGeometry
 	struct Shader* m_impostor_shadow_shader = nullptr;
 
 	// importers must fill these members

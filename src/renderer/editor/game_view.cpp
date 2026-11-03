@@ -335,6 +335,13 @@ void GameView::controlsGUI(WorldEditor& editor) {
 		option("Velocity", Pipeline::DebugShow::VELOCITY);
 		option("Light clusters", Pipeline::DebugShow::LIGHT_CLUSTERS);
 		option("Probe clusters", Pipeline::DebugShow::PROBE_CLUSTERS);
+		option("Mesh clusters", Pipeline::DebugShow::MESH_CLUSTERS);
+		option("Mesh triangles", Pipeline::DebugShow::MESH_TRIANGLES);
+		ImGui::Checkbox("Cluster backface culling", &m_pipeline->m_cluster_backface_culling);
+		ImGui::Checkbox("Freeze camera of clusters", &m_pipeline->m_cluster_freeze_camera);
+		ImGui::SliderFloat("Cluster error (px)", &m_pipeline->m_cluster_error_pixels, 0.05f, 8.f, "%.2f", ImGuiSliderFlags_Logarithmic);
+		ImGui::SliderFloat("Cluster attribute error weight", &m_pipeline->m_cluster_attribute_weight, 0.f, 2.f);
+		ImGui::SliderFloat("Cluster error scale in shadows", &m_pipeline->m_cluster_shadow_error_scale, 1.f, 8.f, "%.2f");
 		option("AO", Pipeline::DebugShow::AO);
 		Renderer& renderer = m_pipeline->getRenderer();
 		for (Lumix::RenderPlugin* plugin : renderer.getPlugins()) {

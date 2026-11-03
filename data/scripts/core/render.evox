@@ -228,7 +228,7 @@ extern fn createRenderbuffer(ctx : Context, width : u32, height : u32, format : 
 // State bits for buckets and draws that set up blending (gpu::getBlendStateBits).
 extern fn blendState(src_rgb : BlendFactors, dst_rgb : BlendFactors, src_a : BlendFactors, dst_a : BlendFactors) : u64;
 // The built-in debug view selected in the Debug popup, values of Pipeline::DebugShow.
-enum DebugShow : u32 { NONE, ALBEDO, NORMAL, ROUGHNESS, METALLIC, AO, LIGHT_CLUSTERS, PROBE_CLUSTERS, VELOCITY, BUILTIN_COUNT, PLUGIN }
+enum DebugShow : u32 { NONE, ALBEDO, NORMAL, ROUGHNESS, METALLIC, AO, LIGHT_CLUSTERS, PROBE_CLUSTERS, VELOCITY, MESH_CLUSTERS, MESH_TRIANGLES, BUILTIN_COUNT, PLUGIN }
 extern fn debugShow(ctx : Context) : DebugShow;
 // Copies channels of a buffer to another: each channel of the output is the dot product of the source texel with a mask.
 extern fn copyChannels(ctx : Context, source : RenderBuffer, output : RenderBuffer, width : u32, height : u32, r : Vec4, g : Vec4, b : Vec4) : void;

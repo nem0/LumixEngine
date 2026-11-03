@@ -16,6 +16,7 @@
 //@uniform "Radius", "float", 1
 
 #include "engine/shaders/common.hlsli"
+#include "engine/shaders/vertex_pulling.hlsli"
 
 struct VSOutput {
 	float2 uv : TEXCOORD0;
@@ -29,18 +30,52 @@ struct VSOutput {
 	float4 position : SV_POSITION;
 };
 struct VSInput {
-	float3 position : TEXCOORD0;
-	float2 uv  : TEXCOORD1;
+	#ifdef VERTEX_PULLING
+		uint vertex_id : SV_VertexID;
+	#else
+		float3 position : TEXCOORD0;
+		float2 uv  : TEXCOORD1;
+	#endif
 	#define ATTR(X) TEXCOORD##X
-	#ifdef INSTANCED
-		float4 i_rot_lod : ATTR(INSTANCE0_ATTR);
-		float4 i_pos_scale : ATTR(INSTANCE1_ATTR);
-	#elif defined AUTOINSTANCED
-		float4 i_rot : ATTR(INSTANCE0_ATTR);
-		float4 i_pos_lod : ATTR(INSTANCE1_ATTR);
-		float4 i_scale : ATTR(INSTANCE2_ATTR);
+	#if defined INSTANCED || defined AUTOINSTANCED
+		uint instance_id : SV_InstanceID;
 	#endif
 };
+
+// instances are pulled, see vertex_pulling.hlsli
+#ifdef INSTANCED
+	// 32 bytes
+	struct Instance {
+		float4 rot_lod;
+		float4 pos_scale;
+	};
+
+	Instance loadInstance(VSInput input) {
+		ByteAddressBuffer buffer = bindless_buffers[u_instance_buffer];
+		const uint offset = pullInstanceAddress(input.instance_id, 32);
+		Instance r;
+		r.rot_lod = asfloat(buffer.Load4(offset));
+		r.pos_scale = asfloat(buffer.Load4(offset + 16));
+		return r;
+	}
+#elif defined AUTOINSTANCED
+	// 48 bytes
+	struct Instance {
+		float4 rot;
+		float4 pos_lod;
+		float4 scale;
+	};
+
+	Instance loadInstance(VSInput input) {
+		ByteAddressBuffer buffer = bindless_buffers[u_instance_buffer];
+		const uint offset = pullInstanceAddress(input.instance_id, 48);
+		Instance r;
+		r.rot = asfloat(buffer.Load4(offset));
+		r.pos_lod = asfloat(buffer.Load4(offset + 16));
+		r.scale = float4(asfloat(buffer.Load3(offset + 32)), 1);
+		return r;
+	}
+#endif
 
 #ifdef INSTANCED
 #elif defined AUTOINSTANCED
@@ -59,8 +94,17 @@ float2 dirToGrid(float3 vec) {
 }
 
 
+#ifdef VERTEX_PULLING
+	#define VTX(x) vtx.x
+#else
+	#define VTX(x) input.x
+#endif
+
 #ifdef USE_MATRIX
 	VSOutput mainVS(VSInput input) {
+		#ifdef VERTEX_PULLING
+			VSVertex vtx = pullVertex(input.vertex_id);
+		#endif
 		VSOutput output;
 		float3x3 to_model_space = (float3x3)model_mtx;
 		#ifdef DEPTH
@@ -83,13 +127,13 @@ float2 dirToGrid(float3 vec) {
 			output.shadow_coefs /= dot(output.shadow_coefs, 1);
 		#endif
 		float2 grid = dirToGrid(normalize(vd));
-		output.uv = input.uv / 9 + int2(grid * 9) / 9.0;
+		output.uv = VTX(uv) / 9 + int2(grid * 9) / 9.0;
 
 		#ifdef DEPTH
 			// move to avoid selfshadow
-			float3 p = u_center.xyz + mul(input.position + float3(0, 0, u_center.y) - u_center.xyz, tangent_space);
+			float3 p = u_center.xyz + mul(VTX(position) + float3(0, 0, u_center.y) - u_center.xyz, tangent_space);
 		#else
-			float3 p = u_center.xyz + mul(input.position - u_center.xyz, tangent_space);
+			float3 p = u_center.xyz + mul(VTX(position) - u_center.xyz, tangent_space);
 		#endif
 		p = transformPosition(p, model_mtx).xyz;
 		
@@ -103,19 +147,23 @@ float2 dirToGrid(float3 vec) {
 	}
 #else
 	VSOutput mainVS(VSInput input) {
+		#ifdef VERTEX_PULLING
+			VSVertex vtx = pullVertex(input.vertex_id);
+		#endif
 		VSOutput output;
 		float3x3 tangent_space;
 
+		const Instance inst = loadInstance(input);
 		#if defined INSTANCED
-			float3 instance_pos = input.i_pos_scale.xyz;
-			float scale = input.i_pos_scale.w;
-			float4 to_model_space = float4(input.i_rot_lod.xyz, sqrt(1 - dot(input.i_rot_lod.xyz, input.i_rot_lod.xyz)));
-			output.lod = input.i_rot_lod.w;
+			float3 instance_pos = inst.pos_scale.xyz;
+			float scale = inst.pos_scale.w;
+			float4 to_model_space = float4(inst.rot_lod.xyz, sqrt(1 - dot(inst.rot_lod.xyz, inst.rot_lod.xyz)));
+			output.lod = inst.rot_lod.w;
 		#else
-			float3 instance_pos = input.i_pos_lod.xyz;
-			float3 scale = input.i_scale.xyz;
-			float4 to_model_space = input.i_rot * float4(1, 1, 1, -1);
-			output.lod = input.i_pos_lod.w;
+			float3 instance_pos = inst.pos_lod.xyz;
+			float3 scale = inst.scale.xyz;
+			float4 to_model_space = inst.rot * float4(1, 1, 1, -1);
+			output.lod = inst.pos_lod.w;
 		#endif
 
 		#ifdef DEPTH
@@ -135,13 +183,13 @@ float2 dirToGrid(float3 vec) {
 			output.shadow_coefs /= dot(output.shadow_coefs, 1);
 		#endif
 		float2 grid = dirToGrid(normalize(vd));
-		output.uv = input.uv / 9 + int2(grid * 9) / 9.0;
+		output.uv = VTX(uv) / 9 + int2(grid * 9) / 9.0;
 
 		#ifdef DEPTH
 			// move to avoid selfshadow
-			float3 p = u_center.xyz + mul(input.position + float3(0, 0, u_center.y) - u_center.xyz, tangent_space);
+			float3 p = u_center.xyz + mul(VTX(position) + float3(0, 0, u_center.y) - u_center.xyz, tangent_space);
 		#else
-			float3 p = u_center.xyz + mul(input.position - u_center.xyz, tangent_space);
+			float3 p = u_center.xyz + mul(VTX(position) - u_center.xyz, tangent_space);
 		#endif
 		p *= scale;
 		output.tangent = tangent_space[0];

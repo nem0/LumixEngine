@@ -116,6 +116,16 @@ struct LUMIX_RENDERER_API Mesh {
 	gpu::VertexDecl vertex_decl;
 	AttributeSemantic attributes_semantic[gpu::VertexDecl::MAX_ATTRIBUTES];
 	const char* semantics_defines = "";
+	// semantics_defines for vertex pulling, they contain the layout of vertices, see vertex_pulling.hlsli
+	const char* pulling_semantics_defines = "";
+
+	// the only per draw data of vertex pulling, a uniform buffer
+	struct VertexBufferBinding {
+		u32 vertex_buffer;		// bindless handle
+		u32 instance_buffer;	// bindless handle, instance data pulled by shaders (DYNAMIC variant), 0 if not used
+		u32 instance_offset;	// in bytes
+		u32 padding;
+	};
 	Renderer& renderer;
 	float lod = 0;
 
@@ -124,6 +134,17 @@ struct LUMIX_RENDERER_API Mesh {
 	gpu::BufferHandle index_buffer_handle;
 	gpu::DataType index_type;
 	u32 indices_count;
+
+	// cluster DAG for GPU driven LOD, see mesh_clusters.h, baked by the model importer
+	// cluster_index_buffer indexes into vertex_buffer_handle
+	gpu::BufferHandle cluster_buffer = gpu::INVALID_BUFFER;
+	gpu::BufferHandle cluster_index_buffer = gpu::INVALID_BUFFER;
+	u32 cluster_count = 0;
+	gpu::BufferHandle node_buffer = gpu::INVALID_BUFFER; // MeshNodeGPU[node_count], then root_count u32 indices of roots, see MeshClusters
+	u32 node_count = 0;
+	u32 root_count = 0;
+	u32 tree_depth = 0;			// levels of the deepest tree, a leaf node is the last one
+	u32 leaf_cluster_count = 0; // the finest clusters, no selection has more clusters than that
 };
 
 struct LODMeshIndices
@@ -138,6 +159,12 @@ struct LUMIX_RENDERER_API Model final : Resource {
 
 	enum class FileVersion : u32 {
 		ROOT_MOTION_BONE,
+		CLUSTERS, // baked cluster DAGs of the first LOD, see parseClusters
+		// 2 was LATEST while models were written with clusters but without stride, keep it that way
+		STRIDE = 3, // vertex stride of each mesh is stored, it is padded to 4 bytes
+		CLUSTER_CONES = 4, // clusters have a normal cone (MeshClusterGPU is 80 bytes)
+		CLUSTER_NODES = 5, // a tree of nodes over the clusters of each mesh, see MeshClusters
+		CLUSTER_ATTRIBUTE_ERRORS = 6, // clusters (96 bytes) and nodes (64 bytes) have the error of attributes apart from the error of positions
 
 		LATEST // keep this last
 	};
@@ -207,6 +234,10 @@ struct LUMIX_RENDERER_API Model final : Resource {
 	const SOATransform& getInverseBindPose() { return m_inverse_bind; }
 	LocalRigidTransform getInverseBindTransform(i32 bone_idx) const;
 	Span<const i16> getParents() const { return m_parents; }
+	// true if all meshes of the first LOD have cluster DAGs, see Mesh::cluster_buffer
+	bool hasClusters() const { return m_has_clusters; }
+	// index of the last mesh that is rendered when using clusters, further meshes are lower LODs which clusters replace
+	i32 getClusterMeshesEnd() const { return m_lod_indices[0].to >= 0 ? m_lod_indices[0].to : (i32)m_meshes.size() - 1; }
 
 	static constexpr u32 MAX_LOD_COUNT = 4;
 
@@ -217,6 +248,8 @@ private:
 	bool parseBones(InputMemoryStream& file);
 	bool parseMeshes(InputMemoryStream& file, FileVersion version);
 	bool parseLODs(InputMemoryStream& file);
+	bool parseClusters(InputMemoryStream& file, FileVersion version);
+	void destroyClusters();
 	int getBoneIdx(const char* name);
 
 	void unload() override;
@@ -238,6 +271,7 @@ private:
 	AABB m_aabb;
 	BoneNameHash m_root_motion_bone;
 	int m_first_nonroot_bone_index;
+	bool m_has_clusters = false;
 };
 
 

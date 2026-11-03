@@ -259,8 +259,10 @@ struct Recipe {
 			for (i64 i = 0; i < part_count; ++i) {
 				const ExPart& part = parts[i];
 				const i32 material = findMaterial(part.material);
-				if (material < 0 || part.lod >= lod_count) {
-					error.append("Recipe returned invalid part (a material name of 1-64 characters without / \\ : . and a level below lod_count in the meta file)");
+				// recipes can return more levels than the meta file uses, e.g. a model that only uses clusters has one level
+				if (material >= 0 && part.lod >= lod_count) continue;
+				if (material < 0) {
+					error.append("Recipe returned invalid part (a material name of 1-64 characters without / \\ : .)");
 					return false;
 				}
 				if (part.first_index > index_count || part.index_count > index_count - part.first_index || part.index_count % 3 != 0) {

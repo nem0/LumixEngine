@@ -13,6 +13,7 @@
 #include "engine/resource_manager.h"
 #include "renderer/draw_stream.h"
 #include "renderer/material.h"
+#include "renderer/mesh_clusters.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
 #include "renderer/renderer.h"
@@ -55,7 +56,8 @@ Mesh::Mesh(const gpu::VertexDecl& vertex_decl,
 		}
 	}
 	
-	semantics_defines = renderer.getSemanticDefines(Span(attributes_semantic));
+	semantics_defines = renderer.getSemanticDefines(Span(attributes_semantic), vertex_decl, vb_stride, false);
+	pulling_semantics_defines = renderer.getSemanticDefines(Span(attributes_semantic), vertex_decl, vb_stride, true);
 }
 
 Mesh::Mesh(Mesh&& rhs)
@@ -484,6 +486,17 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 
 		StringView mesh_name((const char*)tmp, str_size);
 
+		if (version >= FileVersion::STRIDE) {
+			// vertices are padded to 4 bytes, so that vertex pulling can use wide aligned loads
+			u32 stride;
+			file.read(stride);
+			if (stride < vb_stride || stride > 255) {
+				logError(m_path, ": invalid vertex stride");
+				return false;
+			}
+			vb_stride = stride;
+		}
+
 		m_meshes.emplace(vertex_decl, vb_stride, mesh_name, semantics, m_renderer, m_allocator);
 		m_mesh_material.emplace(material);
 		addDependency(*material);
@@ -500,9 +513,15 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 			return false;
 		}
 		file.read(indices_count);
-		if (indices_count <= 0) {
+		if (indices_count < 0 || (indices_count == 0 && version < FileVersion::CLUSTERS)) {
 			logError(m_path, ": has no geometry data");
 			return false;
+		}
+		if (indices_count == 0) {
+			// indices of the first LOD are stored as the finest level of clusters, see parseClusters
+			mesh.indices_count = 0;
+			mesh.index_type = gpu::DataType::U32;
+			continue;
 		}
 		mesh.indices.resize(index_size * indices_count);
 		mesh.indices_count = indices_count;
@@ -611,12 +630,125 @@ bool Model::load(Span<const u8> mem)
 
 	if (parseMeshes(file, (FileVersion)header.version)
 		&& parseBones(file)
-		&& parseLODs(file))
+		&& parseLODs(file)
+		&& (header.version < FileVersion::CLUSTERS || parseClusters(file, (FileVersion)header.version)))
 	{
 		return true;
 	}
 
 	return false;
+}
+
+// Cluster DAGs of the meshes of the first LOD, baked by the model importer (see ModelImporter::writeClusters):
+//   u32 mesh_count - meshes [0, mesh_count) have clusters, 0 if the model has none
+//   for each mesh: u32 cluster_count, u32 index_count, u32 leaf_index_count, MeshClusterGPU[cluster_count], u32 indices[index_count],
+//                  u32 leaf_cluster_count, u32 node_count, u32 root_count, MeshNodeGPU[node_count], u32 roots[root_count]
+// The first `leaf_index_count` indices are the finest clusters, they contain all triangles of the mesh exactly once.
+// Meshes that have no indices of their own (see parseMeshes) use them as their index buffer, so the geometry is stored only once.
+bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
+	u32 mesh_count;
+	file.read(mesh_count);
+	if (mesh_count > (u32)m_meshes.size()) return false;
+	if (mesh_count > 0 && version < FileVersion::CLUSTER_ATTRIBUTE_ERRORS) {
+		logError(m_path, ": clusters of an old version, the model has to be compiled again");
+		return false;
+	}
+
+	u32 total_clusters = 0;
+	for (u32 i = 0; i < mesh_count; ++i) {
+		u32 cluster_count, index_count, leaf_index_count;
+		file.read(cluster_count);
+		file.read(index_count);
+		file.read(leaf_index_count);
+		const u64 clusters_size = u64(cluster_count) * sizeof(MeshClusterGPU);
+		const u64 indices_size = u64(index_count) * sizeof(u32);
+		if (file.hasOverflow() || leaf_index_count > index_count || clusters_size + indices_size > file.remaining()) return false;
+		const void* clusters = file.skip(clusters_size);
+		const void* indices = file.skip(indices_size);
+
+		u32 leaf_cluster_count, node_count, root_count;
+		file.read(leaf_cluster_count);
+		file.read(node_count);
+		file.read(root_count);
+		const u64 nodes_size = u64(node_count) * sizeof(MeshNodeGPU) + u64(root_count) * sizeof(u32);
+		if (file.hasOverflow() || node_count == 0 || root_count == 0 || leaf_cluster_count > cluster_count || nodes_size > file.remaining()) return false;
+		const void* nodes = file.skip(nodes_size);
+
+		Mesh& mesh = m_meshes[i];
+		mesh.leaf_cluster_count = leaf_cluster_count;
+		mesh.node_count = node_count;
+		mesh.root_count = root_count;
+		{
+			// the trees are balanced (see buildNodes), the first child leads to a leaf as deep as any
+			const u8* node_bytes = (const u8*)nodes;
+			const u32* roots = (const u32*)(node_bytes + u64(node_count) * sizeof(MeshNodeGPU));
+			mesh.tree_depth = 0;
+			for (u32 r = 0; r < root_count; ++r) {
+				u32 depth = 1;
+				u32 node_index = roots[r];
+				for (; depth <= 64; ++depth) {
+					if (node_index >= node_count) return false;
+					MeshNodeGPU node;
+					memcpy(&node, node_bytes + u64(node_index) * sizeof(MeshNodeGPU), sizeof(node));
+					if (node.count_and_flags & MeshClusters::LEAF_FLAG) break;
+					node_index = node.first;
+				}
+				mesh.tree_depth = maximum(mesh.tree_depth, depth);
+			}
+		}
+		mesh.node_buffer = m_renderer.createBuffer(m_renderer.copy(nodes, (u32)nodes_size), gpu::BufferFlags::IMMUTABLE, m_path.c_str());
+		mesh.cluster_count = cluster_count;
+		total_clusters += cluster_count;
+		mesh.cluster_buffer = m_renderer.createBuffer(m_renderer.copy(clusters, (u32)clusters_size), gpu::BufferFlags::IMMUTABLE, m_path.c_str());
+		mesh.cluster_index_buffer = m_renderer.createBuffer(m_renderer.copy(indices, (u32)indices_size), gpu::BufferFlags::IMMUTABLE, m_path.c_str());
+		if (!mesh.cluster_buffer || !mesh.cluster_index_buffer || !mesh.node_buffer) {
+			logError(m_path, ": failed to create cluster buffers");
+			return false;
+		}
+
+		if (mesh.indices_count == 0) {
+			mesh.indices_count = leaf_index_count;
+			mesh.indices.resize(leaf_index_count * sizeof(u32));
+			memcpy(mesh.indices.getMutableData(), indices, leaf_index_count * sizeof(u32));
+			mesh.index_buffer_handle = mesh.cluster_index_buffer; // shared, see unload
+		}
+	}
+
+	for (const Mesh& mesh : m_meshes) {
+		if (mesh.indices_count == 0) {
+			logError(m_path, ": has no geometry data");
+			return false;
+		}
+	}
+
+	// clusters are used only if all meshes of the first LOD have them
+	if (mesh_count > 0 && (i32)mesh_count == getClusterMeshesEnd() + 1) {
+		m_has_clusters = true;
+		logInfo(m_path, ": loaded ", total_clusters, " clusters");
+	}
+	else {
+		destroyClusters();
+	}
+	return true;
+}
+
+void Model::destroyClusters() {
+	DrawStream& stream = m_renderer.getDrawStream();
+	for (Mesh& mesh : m_meshes) {
+		if (mesh.cluster_buffer) stream.destroy(mesh.cluster_buffer);
+		if (mesh.node_buffer) stream.destroy(mesh.node_buffer);
+		// the index buffer of the mesh can be the same buffer, it is destroyed with the mesh
+		if (mesh.cluster_index_buffer && mesh.cluster_index_buffer != mesh.index_buffer_handle) stream.destroy(mesh.cluster_index_buffer);
+		mesh.cluster_buffer = gpu::INVALID_BUFFER;
+		mesh.cluster_index_buffer = gpu::INVALID_BUFFER;
+		mesh.node_buffer = gpu::INVALID_BUFFER;
+		mesh.cluster_count = 0;
+		mesh.node_count = 0;
+		mesh.root_count = 0;
+		mesh.tree_depth = 0;
+		mesh.leaf_cluster_count = 0;
+	}
+	m_has_clusters = false;
 }
 
 
@@ -635,6 +767,7 @@ void Model::unload()
 		m.material_index = MaterialIndex{0};
 	}
 
+	destroyClusters();
 	for (Mesh& mesh : m_meshes) {
 		DrawStream& stream = m_renderer.getDrawStream();
 		if (mesh.index_buffer_handle) stream.destroy(mesh.index_buffer_handle);

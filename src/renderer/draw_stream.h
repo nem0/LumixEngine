@@ -49,6 +49,7 @@ struct DrawStream {
 	gpu::Drawcall& draw();
 	void drawArrays(u32 offset, u32 count);
 	void drawIndirect(gpu::DataType index_type, u32 indirect_buffer_offset);
+	void drawIndirectCount(gpu::DataType index_type, u32 indirect_buffer_offset, u32 max_count, u32 count_buffer_offset);
 	void drawIndexed(u32 offset, u32 count, gpu::DataType type);
 	void drawArraysInstanced(u32 indices_count, u32 instances_count);
 	void drawIndexedInstanced(u32 indices_count, u32 instances_count, gpu::DataType index_type);
@@ -64,6 +65,8 @@ struct DrawStream {
 	void copy(gpu::BufferHandle dst, gpu::BufferHandle src, u32 dst_offset, u32 src_offset, u32 size);
 	
 	void readTexture(gpu::TextureHandle texture, gpu::TextureReadCallback callback);
+	// see gpu::readBuffer, the callback runs on the render thread
+	void readBuffer(gpu::BufferHandle buffer, u32 offset, u32 size, gpu::BufferReadCallback callback);
 	void setDebugName(gpu::TextureHandle texture, const char* debug_name);
 	
 	void update(gpu::TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, gpu::TextureFormat format, const void* buf, u32 size);

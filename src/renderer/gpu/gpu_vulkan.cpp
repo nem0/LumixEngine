@@ -288,6 +288,7 @@ void bindIndirectBuffer(BufferHandle) {}
 void bindShaderBuffers(Span<BufferHandle>, Span<const u32>) {}
 void drawArrays(u32, u32) {}
 void drawIndirect(DataType, u32) {}
+void drawIndirectCount(DataType, u32, u32, u32) {}
 void drawIndexed(u32, u32, DataType) {}
 void drawArraysInstanced(u32, u32) {}
 void drawIndexedInstanced(u32, u32, DataType) {}
@@ -297,6 +298,7 @@ void copy(TextureHandle, TextureHandle, u32, u32) {}
 void copy(BufferHandle, BufferHandle, u32, u32, u32) {}
 void copy(BufferHandle, TextureHandle) {}
 void readTexture(TextureHandle, TextureReadCallback) {}
+void readBuffer(BufferHandle, u32, u32, BufferReadCallback) {}
 void* getDX12Device() { return nullptr; }
 void* getDX12CommandList() { return nullptr; }
 void* getDX12Resource(TextureHandle) { return nullptr; }

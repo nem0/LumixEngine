@@ -74,11 +74,14 @@ void storePass3InstanceData(uint idx, InstanceData data) {
 
 void storeIndirect(uint idx, Indirect indirect) {
 	RWByteAddressBuffer b_indirect = bindless_rw_buffers[u_indirect_buffer];
-	b_indirect.Store(20 * idx, indirect.vertex_count);
-	b_indirect.Store(20 * idx + 4, indirect.instance_count);
-	b_indirect.Store(20 * idx + 8, indirect.first_index);
-	b_indirect.Store(20 * idx + 12, indirect.base_vertex);
-	b_indirect.Store(20 * idx + 16, indirect.base_instance);
+	// 24 bytes: draw id (root constant of the command signature), indexed draw arguments.
+	// SV_InstanceID does not include the start instance, so shaders pulling instances (see INDIRECT_INSTANCE) get it as the draw id.
+	b_indirect.Store(24 * idx, indirect.base_instance);
+	b_indirect.Store(24 * idx + 4, indirect.vertex_count);
+	b_indirect.Store(24 * idx + 8, indirect.instance_count);
+	b_indirect.Store(24 * idx + 12, indirect.first_index);
+	b_indirect.Store(24 * idx + 16, indirect.base_vertex);
+	b_indirect.Store(24 * idx + 20, 0);
 }
 
 void storeInstanceLod(uint idx, float lod) {
