@@ -2,6 +2,7 @@
 //@texture_slot "Albedo", "engine/textures/white.tga"
 
 #include "engine/shaders/common.hlsli"
+#include "engine/shaders/vertex_pulling.hlsli"
 
 cbuffer Drawcall : register(b4) {
 	float4x4 u_ls_to_ws;
@@ -14,11 +15,7 @@ cbuffer Drawcall2 : register(b5) {
 
 #define ATTR(X) TEXCOORD##X
 struct VSInput {
-	float3 position : TEXCOORD0;
-	float3 normal : ATTR(NORMAL_ATTR);
-	#ifdef UV0_ATTR
-		float2 uv : ATTR(UV0_ATTR);
-	#endif
+	uint vertex_id : SV_VertexID;
 };
 
 struct VSOutput {
@@ -29,15 +26,16 @@ struct VSOutput {
 };
 
 VSOutput mainVS(VSInput input) {
+	const VSVertex vtx = pullVertex(input.vertex_id);
 	VSOutput output;
 	#ifdef UV0_ATTR
-		output.uv = input.uv;
+		output.uv = vtx.uv;
 	#else
 		output.uv = 0;
 	#endif
-	float4 pos_vs = transformPosition(input.position, u_ls_to_ws, Global_ws_to_vs);
+	float4 pos_vs = transformPosition(vtx.position, u_ls_to_ws, Global_ws_to_vs);
 	output.distance_squared = dot(pos_vs.xyz, pos_vs.xyz);
-	output.normal = input.normal;
+	output.normal = vtx.normal;
 	output.position = transformPosition(pos_vs, Global_vs_to_ndc_no_jitter);
 	return output;
 }

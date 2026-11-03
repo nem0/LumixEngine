@@ -341,6 +341,8 @@ void bindShaderBuffers(Span<BufferHandle> buffers, Span<const u32> strides);
 
 void drawArrays(u32 offset, u32 count);
 void drawIndirect(DataType index_type, u32 indirect_buffer_offset);
+// executes up to `max_count` indexed draws starting at `indirect_buffer_offset`, the actual count is a u32 stored in the bound indirect buffer at `count_buffer_offset`
+void drawIndirectCount(DataType index_type, u32 indirect_buffer_offset, u32 max_count, u32 count_buffer_offset);
 void drawIndexed(u32 offset, u32 count, DataType type);
 void drawArraysInstanced(u32 indices_count, u32 instances_count);
 void drawIndexedInstanced(u32 indices_count, u32 instances_count, DataType index_type);
@@ -353,6 +355,11 @@ void copy(BufferHandle dst, TextureHandle src);
 	
 using TextureReadCallback = Delegate<void(Span<const u8>)>;
 void readTexture(TextureHandle texture, TextureReadCallback callback);
+
+// Copies a part of the buffer to the CPU. The callback is called on the render thread some frames later,
+// with an empty span if the read failed.
+using BufferReadCallback = Delegate<void(Span<const u8>)>;
+void readBuffer(BufferHandle buffer, u32 offset, u32 size, BufferReadCallback callback);
 
 // Native D3D12 objects, for code that has to share the GPU with the engine (upscalers, hardware video encoders).
 // They return nullptr / false in other backends. The command list is the one commands are currently recorded to, use it only

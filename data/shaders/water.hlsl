@@ -18,24 +18,48 @@
 //@define "SSR"
 
 #include "engine/shaders/common.hlsli"
+#include "engine/shaders/vertex_pulling.hlsli"
 
 #define ATTR(X) TEXCOORD##X
 
 struct VSInput {
-	float3 position : TEXCOORD0;
-	#ifdef UV0_ATTR
-		float2 uv : ATTR(UV0_ATTR);
+	#ifdef VERTEX_PULLING
+		uint vertex_id : SV_VertexID;
+	#else
+		float3 position : TEXCOORD0;
+		#ifdef UV0_ATTR
+			float2 uv : ATTR(UV0_ATTR);
+		#endif
 	#endif
 	#ifdef _HAS_ATTR2 
 		//layout(location = 2) in float2 a_masks;
 	#endif
 	#if defined AUTOINSTANCED
-		float4 i_rot : ATTR(INSTANCE0_ATTR);
-		float4 i_pos_lod : ATTR(INSTANCE1_ATTR);
-		float4 i_scale : ATTR(INSTANCE2_ATTR);
-		uint i_material_index : ATTR(INSTANCE3_ATTR);
+		uint instance_id : SV_InstanceID;
 	#endif
 };
+
+#ifdef AUTOINSTANCED
+	// 48 bytes, instances are pulled, see vertex_pulling.hlsli
+	struct Instance {
+		float4 rot;
+		float4 pos_lod;
+		float4 scale;
+		uint material_index;
+	};
+
+	Instance loadInstance(VSInput input) {
+		ByteAddressBuffer buffer = bindless_buffers[u_instance_buffer];
+		const uint offset = pullInstanceAddress(input.instance_id, 48);
+		Instance r;
+		r.rot = asfloat(buffer.Load4(offset));
+		r.pos_lod = asfloat(buffer.Load4(offset + 16));
+		const uint4 last = buffer.Load4(offset + 32);
+		r.scale = float4(asfloat(last.xyz), 1);
+		r.material_index = last.w;
+		return r;
+	}
+#endif
 
 struct VSOutput {
 	float2 uv : TEXCOORD0;
@@ -55,24 +79,35 @@ struct VSOutput {
 	};
 #endif
 
+#ifdef VERTEX_PULLING
+	#define VTX(x) vtx.x
+#else
+	#define VTX(x) input.x
+#endif
+
 VSOutput mainVS(VSInput input) {
+	#ifdef VERTEX_PULLING
+		VSVertex vtx = pullVertex(input.vertex_id);
+	#endif
 	static const float3 normal = float3(0, 1, 0);
 	static const float3 tangent = float3(1, 0, 0);
 
 	VSOutput output;
-	output.uv = input.uv;
-	output.i_material_index = input.i_material_index;
+	output.uv = VTX(uv);
 	#if defined AUTOINSTANCED
-		output.normal = rotateByQuat(input.i_rot, normal);
-		output.tangent = rotateByQuat(input.i_rot, tangent);
-		float3 p = input.position * input.i_scale.xyz;
-		output.pos_ws = input.i_pos_lod.xyz + rotateByQuat(input.i_rot, p);
+		const Instance inst = loadInstance(input);
+		output.i_material_index = inst.material_index;
+		output.normal = rotateByQuat(inst.rot, normal);
+		output.tangent = rotateByQuat(inst.rot, tangent);
+		float3 p = VTX(position) * inst.scale.xyz;
+		output.pos_ws = inst.pos_lod.xyz + rotateByQuat(inst.rot, p);
 	#elif defined GRASS
 		#error TODO
 	#else
+		output.i_material_index = 0;
 		output.normal = float3x3(u_ls_to_ws) * normal;
 		output.tangent = float3x3(u_ls_to_ws) * tangent;
-		output.pos_ws = transformPosition(input.position, u_ls_to_ws).xyz;
+		output.pos_ws = transformPosition(VTX(position), u_ls_to_ws).xyz;
 	#endif
 	
 	#ifdef _HAS_ATTR2 

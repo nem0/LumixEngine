@@ -770,7 +770,8 @@ struct PSOCache {
 		desc.SampleMask = 0xffFFffFF;
 
 		desc.InputLayout.NumElements = p.attribute_count;
-		desc.InputLayout.pInputElementDescs = p.attributes;
+		// programs that pull all their data have no input elements
+		desc.InputLayout.pInputElementDescs = p.attribute_count ? p.attributes : nullptr;
 
 		desc.DSVFormat = fb.ds_format;
 		desc.NumRenderTargets = fb.count;
@@ -781,7 +782,9 @@ struct PSOCache {
 		ID3D12PipelineState* pso;
 		HRESULT hr = device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pso));
 		if (FAILED(hr)) {
-			logError("Failed to create graphics PSO, hr = ", (u32)hr);
+			logError("Failed to create graphics PSO of ", p.name, ", hr = ", (u32)hr, ", input elements = ", p.attribute_count
+				, ", topology type = ", (u32)desc.PrimitiveTopologyType, ", render targets = ", fb.count, ", ds format = ", (u32)fb.ds_format
+				, ", rt0 format = ", fb.count ? (u32)fb.formats[0] : 0u, ", state = ", (u64)state);
 			pso = nullptr; // cache the failure, otherwise we'd retry and log every frame
 		}
 		cache.insert(hash, pso);
@@ -1084,12 +1087,19 @@ struct Frame {
 		u32 dst_total_bytes;
 	};
 
+	struct BufferRead {
+		ID3D12Resource* staging;
+		BufferReadCallback callback;
+		u32 size;
+	};
+
 	Frame(IAllocator& allocator)
 		: to_release(allocator)
 		, to_heap_release(allocator)
 		, to_resolve(allocator)
 		, to_resolve_stats(allocator)
 		, texture_reads(allocator)
+		, buffer_reads(allocator)
 	{}
 
 	void clear();
@@ -1135,6 +1145,7 @@ struct Frame {
 	Array<Query*> to_resolve;
 	Array<Query*> to_resolve_stats;
 	Array<TextureRead> texture_reads;
+	Array<BufferRead> buffer_reads;
 	ID3D12Resource* timestamp_query_buffer;
 	ID3D12Resource* stats_query_buffer;
 	u8* timestamp_query_buffer_ptr;
@@ -1554,6 +1565,21 @@ void Frame::begin() {
 		read.staging->Release();
 	}
 	texture_reads.clear();
+
+	for (const BufferRead& read : buffer_reads) {
+		u8* src = nullptr;
+		const HRESULT hr = read.staging->Map(0, nullptr, (void**)&src);
+		if (src && hr == S_OK) {
+			read.callback.invoke(Span<const u8>(src, read.size));
+			read.staging->Unmap(0, nullptr);
+		}
+		else {
+			logError("Failed to map buffer readback buffer");
+			read.callback.invoke(Span<const u8>());
+		}
+		read.staging->Release();
+	}
+	buffer_reads.clear();
 }
 
 void Frame::clear() {
@@ -1881,6 +1907,27 @@ void readTexture(TextureHandle texture, TextureReadCallback callback) {
 	memcpy(wait.layouts, layouts, sizeof(layouts[0]) * wait.num_layouts);
 }
 
+void readBuffer(BufferHandle buffer, u32 offset, u32 size, BufferReadCallback callback) {
+	if (!buffer || !buffer->resource || size == 0 || u64(offset) + size > buffer->size) {
+		logError("Buffer read requested on an invalid or destroyed buffer, or out of its range");
+		callback.invoke(Span<const u8>());
+		return;
+	}
+	ID3D12Resource* staging = createBuffer(d3d->device, nullptr, size, D3D12_HEAP_TYPE_READBACK, "buffer staging");
+	if (!staging) {
+		callback.invoke(Span<const u8>()); // device removed, report failure
+		return;
+	}
+	const D3D12_RESOURCE_STATES prev_state = buffer->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_COPY_SOURCE);
+	d3d->cmd_list->CopyBufferRegion(staging, 0, buffer->resource, offset, size);
+	buffer->setState(d3d->cmd_list, prev_state);
+
+	Frame::BufferRead& wait = d3d->frame->buffer_reads.emplace();
+	wait.staging = staging;
+	wait.callback = callback;
+	wait.size = size;
+}
+
 void beginQuery(QueryHandle query) {
 	checkThread();
 	CHECK(query);
@@ -2042,6 +2089,9 @@ void shutdown() {
 	d3d.destroy();
 }
 
+// index of the root constant b6 in createRootSignature
+static constexpr u32 ROOT_PARAMETER_DRAW_ID = 9;
+
 ID3D12RootSignature* createRootSignature() {
 	PROFILE_FUNCTION();
 
@@ -2068,7 +2118,12 @@ ID3D12RootSignature* createRootSignature() {
 		{D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, {{lengthOf(bindless_srv_desc_ranges), bindless_srv_desc_ranges}}, D3D12_SHADER_VISIBILITY_ALL},
 		{D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, {{1, &sampler_desc_range}}, D3D12_SHADER_VISIBILITY_ALL},
 		{D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, {{1, &srv_desc_range}}, D3D12_SHADER_VISIBILITY_ALL},
+		{D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS, {{0, 0}}, D3D12_SHADER_VISIBILITY_ALL},
 	};
+	// per draw id, filled by indirect draws (see ROOT_PARAMETER_DRAW_ID)
+	rootParameter[ROOT_PARAMETER_DRAW_ID].Constants.ShaderRegister = 6;
+	rootParameter[ROOT_PARAMETER_DRAW_ID].Constants.RegisterSpace = 0;
+	rootParameter[ROOT_PARAMETER_DRAW_ID].Constants.Num32BitValues = 1;
 	rootParameter[0].Descriptor.RegisterSpace = 0;
 	rootParameter[0].Descriptor.ShaderRegister = 0;
 	rootParameter[1].Descriptor.RegisterSpace = 0;
@@ -3373,8 +3428,13 @@ RWBindlessHandle getRWBindlessHandle(BufferHandle buffer) {
 	return RWBindlessHandle(buffer->heap_id + 1);
 }
 
-void drawIndirect(DataType index_type, u32 indirect_buffer_offset) {
+// count_buffer_offset == ~0u means a single command, otherwise the number of commands (at most max_count) is read from the indirect buffer at that offset
+static void drawIndirectImpl(DataType index_type, u32 indirect_buffer_offset, u32 max_count, u32 count_buffer_offset) {
 	CHECK(d3d->current_program);
+	if (!d3d->current_indirect_buffer || !d3d->current_indirect_buffer->resource) {
+		logError("Indirect draw without an indirect buffer");
+		return;
+	}
 	if (!setPipelineStateGraphics()) return;
 
 	DXGI_FORMAT dxgi_index_type;
@@ -3396,20 +3456,39 @@ void drawIndirect(DataType index_type, u32 indirect_buffer_offset) {
 	d3d->cmd_list->IASetPrimitiveTopology(d3d->current_program->primitive_topology);
 
 	static ID3D12CommandSignature* signature = [&]() {
-		D3D12_INDIRECT_ARGUMENT_DESC arg_desc = {};
-		arg_desc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+		// a command is: draw id (root constant b6, instance data of shaders is addressed by it), indexed draw arguments
+		D3D12_INDIRECT_ARGUMENT_DESC arg_desc[2] = {};
+		arg_desc[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT;
+		arg_desc[0].Constant.RootParameterIndex = ROOT_PARAMETER_DRAW_ID;
+		arg_desc[0].Constant.DestOffsetIn32BitValues = 0;
+		arg_desc[0].Constant.Num32BitValuesToSet = 1;
+		arg_desc[1].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
 
 		D3D12_COMMAND_SIGNATURE_DESC desc = {};
 		desc.NodeMask = 1;
-		desc.ByteStride = sizeof(u32) * 5;
-		desc.NumArgumentDescs = 1;
-		desc.pArgumentDescs = &arg_desc;
+		desc.ByteStride = sizeof(u32) * 6;
+		desc.NumArgumentDescs = lengthOf(arg_desc);
+		desc.pArgumentDescs = arg_desc;
 		ID3D12CommandSignature* result;
-		d3d->device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(&result));
+		d3d->device->CreateCommandSignature(&desc, d3d->root_signature, IID_PPV_ARGS(&result));
 		return result;
 	}();
 
-	d3d->cmd_list->ExecuteIndirect(signature, 1, d3d->current_indirect_buffer->resource, indirect_buffer_offset, nullptr, 0);
+	if (count_buffer_offset == ~0u) {
+		d3d->cmd_list->ExecuteIndirect(signature, 1, d3d->current_indirect_buffer->resource, indirect_buffer_offset, nullptr, 0);
+	}
+	else {
+		d3d->cmd_list->ExecuteIndirect(signature, max_count, d3d->current_indirect_buffer->resource, indirect_buffer_offset, d3d->current_indirect_buffer->resource, count_buffer_offset);
+	}
+}
+
+void drawIndirect(DataType index_type, u32 indirect_buffer_offset) {
+	drawIndirectImpl(index_type, indirect_buffer_offset, 1, ~0u);
+}
+
+void drawIndirectCount(DataType index_type, u32 indirect_buffer_offset, u32 max_count, u32 count_buffer_offset) {
+	ASSERT(count_buffer_offset != ~0u);
+	drawIndirectImpl(index_type, indirect_buffer_offset, max_count, count_buffer_offset);
 }
 
 void draw(const Drawcall& draw) {
@@ -3423,17 +3502,19 @@ void draw(const Drawcall& draw) {
 	gpu::BufferHandle vb1 = draw.vertex_buffers[1];
 	const u32 vb1_offset = draw.vertex_buffer_offsets[1];
 
-	D3D12_VERTEX_BUFFER_VIEW vbv[] = {
-		{
-			.BufferLocation = vb0->gpu_address + vb0_offset,
-			.SizeInBytes = UINT(vb0->size - vb0_offset),
-			.StrideInBytes = draw.vertex_buffer_sizes[0],
-		},
-		{
-			.BufferLocation = vb1->gpu_address + vb1_offset,
-			.SizeInBytes = UINT(vb1->size - vb1_offset),
-			.StrideInBytes = draw.vertex_buffer_sizes[1],
+	// a buffer can be missing, e.g. meshes have no vertex buffer because their vertices are pulled by vertex shaders
+	auto make_view = [](gpu::BufferHandle buffer, u32 offset, u32 stride) {
+		D3D12_VERTEX_BUFFER_VIEW view = {};
+		if (buffer) {
+			view.BufferLocation = buffer->gpu_address + offset;
+			view.SizeInBytes = UINT(buffer->size - offset);
 		}
+		view.StrideInBytes = stride;
+		return view;
+	};
+	D3D12_VERTEX_BUFFER_VIEW vbv[] = {
+		make_view(vb0, vb0_offset, draw.vertex_buffer_sizes[0]),
+		make_view(vb1, vb1_offset, draw.vertex_buffer_sizes[1])
 	};
 
 	d->cmd_list->IASetVertexBuffers(0, 2, vbv);

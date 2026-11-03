@@ -98,6 +98,7 @@ struct ModelMeta {
 		
 		WRITE_BOOL(create_prefab_with_physics, false);
 		WRITE_BOOL(create_impostor, false);
+		WRITE_BOOL(create_clusters, true);
 		WRITE_BOOL(use_mikktspace, false);
 		WRITE_BOOL(force_recompute_normals, false);
 		WRITE_BOOL(force_recompute_tangents, false);
@@ -191,6 +192,7 @@ struct ModelMeta {
 			{ "bake_vertex_ao", &bake_vertex_ao },
 			{ "min_bake_vertex_ao", &min_bake_vertex_ao },
 			{ "create_impostor", &create_impostor },
+			{ "create_clusters", &create_clusters },
 			{ "import_vertex_colors", &import_vertex_colors },
 			{ "use_specular_as_roughness", &use_specular_as_roughness },
 			{ "use_specular_as_metallic", &use_specular_as_metallic },
@@ -376,6 +378,7 @@ struct ModelMeta {
 	bool use_specular_as_metallic = false;
 	bool vertex_color_is_ao = false;
 	bool create_impostor = false;
+	bool create_clusters = true; // bake cluster DAGs of the first LOD for GPU driven LOD, see mesh_clusters.h
 	u32 lod_count = 1;
 	float min_bake_vertex_ao = 0.f;
 	float anim_translation_error = 1.f;

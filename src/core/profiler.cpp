@@ -351,6 +351,13 @@ u32 createCounter(const char* key_literal, float min) {
 	return g_instance->counters.size() - 1;
 }
 
+u32 getCounters(Span<Counter> out) {
+	MutexGuard lock(g_instance->mutex);
+	const u32 count = (u32)g_instance->counters.size();
+	for (u32 i = 0; i < count && i < out.length(); ++i) out[i] = g_instance->counters[i];
+	return count;
+}
+
 void pushCounter(u32 counter, float value) {
 	{
 		MutexGuard lock(g_instance->mutex);

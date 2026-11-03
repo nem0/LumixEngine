@@ -367,6 +367,7 @@ struct GPUProfiler
 			m_stats_query = allocStatsQuery();
 			gpu::beginQuery(m_stats_query);
 			m_stats_counter = 1;
+			m_stats_name = name;
 		}
 		else if (m_stats_counter > 0) {
 			++m_stats_counter;
@@ -387,11 +388,27 @@ struct GPUProfiler
 			if (m_stats_counter == 0) {
 				gpu::endQuery(m_stats_query);
 				q.stats = m_stats_query;
+				q.name = m_stats_name;
 				m_stats_query = gpu::INVALID_QUERY;
 			}
 		}
 	}
 
+
+	// a counter for each block with stats, e.g. the geometry pass and every shadow pass have their own, "GPU triangles" is the sum
+	void pushBlockTriangles(const StaticString<32>& block, u64 primitives) {
+		for (u32 i = 0; i < m_block_counters_count; ++i) {
+			if (m_block_counters[i].name == block.data) {
+				profiler::pushCounter(m_block_counters[i].counter, (float)primitives);
+				return;
+			}
+		}
+		if (m_block_counters_count == lengthOf(m_block_counters)) return;
+		BlockCounter& c = m_block_counters[m_block_counters_count++];
+		c.name = block;
+		c.counter = profiler::createCounter(StaticString<64>("GPU triangles: ", block.data), 0);
+		profiler::pushCounter(c.counter, (float)primitives);
+	}
 
 	void frame()
 	{
@@ -408,14 +425,28 @@ struct GPUProfiler
 
 				const u64 timestamp = toCPUTimestamp(gpu::getQueryResult(q.handle));
 				if (q.stats) {
-					profiler::gpuStats(gpu::getQueryResult(q.stats));
+					const u64 primitives = gpu::getQueryResult(q.stats);
+					profiler::gpuStats(primitives);
+					m_frame_triangles += primitives;
+					pushBlockTriangles(q.name, primitives);
 					m_stats_pool.push(q.stats);
 				}
 				profiler::endGPUBlock(timestamp);
+				// the block "frame" is the end of the frame. Blocks with stats that are not in it, e.g. passes of the game that run before it,
+				// are counted in the frame that follows them
+				const bool is_frame = m_open_blocks_count > 0 && m_open_blocks_count <= lengthOf(m_open_blocks) && m_open_blocks[m_open_blocks_count - 1] == "frame";
+				if (m_open_blocks_count > 0) --m_open_blocks_count;
+				if (is_frame) {
+					static u32 triangles_counter = profiler::createCounter("GPU triangles", 0);
+					profiler::pushCounter(triangles_counter, (float)m_frame_triangles);
+					m_frame_triangles = 0;
+				}
 			}
 			else {
 				const u64 timestamp = toCPUTimestamp(gpu::getQueryResult(q.handle));
 				profiler::beginGPUBlock(q.name, timestamp, q.profiler_link);
+				if (m_open_blocks_count < lengthOf(m_open_blocks)) m_open_blocks[m_open_blocks_count] = q.name;
+				++m_open_blocks_count;
 			}
 			m_pool.push(q.handle);
 			++processed;
@@ -433,6 +464,16 @@ struct GPUProfiler
 	i64 m_gpu_to_cpu_offset;
 	u32 m_stats_counter = 0;
 	gpu::QueryHandle m_stats_query = gpu::INVALID_QUERY;
+	StaticString<32> m_stats_name;	// of the block with stats that is being recorded
+	struct BlockCounter {
+		StaticString<32> name;
+		u32 counter;
+	};
+	BlockCounter m_block_counters[16];
+	u32 m_block_counters_count = 0;
+	StaticString<32> m_open_blocks[32];	// names of the GPU blocks the profiler has begun and not ended, see frame()
+	u32 m_open_blocks_count = 0;
+	u64 m_frame_triangles = 0;		// primitives of the blocks with stats of the frame processed so far
 };
 
 
@@ -456,6 +497,7 @@ struct RendererImpl final : Renderer {
 		, m_sort_keys(m_allocator)
 		, m_sort_key_map(m_allocator)
 		, m_semantic_defines(m_allocator)
+		, m_pulling_semantic_defines(m_allocator)
 		, m_free_frames(m_allocator)
 		, m_renderbuffers(m_allocator)
 		, m_frame_thread(*this)
@@ -668,18 +710,38 @@ struct RendererImpl final : Renderer {
 		res.append(a, tmp, "\n");
 	}
 
-	const char* getSemanticDefines(Span<const AttributeSemantic> attributes) override {
-		RuntimeHash hash(attributes.begin(), sizeof(attributes[0]) * attributes.length());
-		auto iter = m_semantic_defines.find(hash);
+	const char* getSemanticDefines(Span<const AttributeSemantic> attributes, const gpu::VertexDecl& decl, u32 vertex_stride, bool vertex_pulling) override {
+		// the layout is part of the defines only for vertex pulling
+		u8 key[256];
+		u32 key_size = 0;
+		ASSERT(attributes.length() <= 16);
+		memcpy(key, attributes.begin(), attributes.length());
+		key_size += attributes.length();
+		if (vertex_pulling) {
+			ASSERT(decl.attributes_count <= gpu::VertexDecl::MAX_ATTRIBUTES);
+			memcpy(key + key_size, &vertex_stride, sizeof(vertex_stride));
+			key_size += sizeof(vertex_stride);
+			for (u32 i = 0; i < decl.attributes_count; ++i) {
+				const gpu::Attribute& attr = decl.attributes[i];
+				key[key_size++] = attr.byte_offset;
+				key[key_size++] = attr.components_count;
+				key[key_size++] = (u8)attr.type;
+				key[key_size++] = attr.flags;
+			}
+		}
+		const RuntimeHash hash(key, key_size);
+		HashMap<RuntimeHash, String>& defines = vertex_pulling ? m_pulling_semantic_defines : m_semantic_defines;
+		auto iter = defines.find(hash);
 		if (!iter.isValid()) {
 			String s(m_allocator);
+			if (vertex_pulling) s.append("#define VERTEX_PULLING\n");
 			u32 first_empty = attributes.length();
 			for (u32 i = 0; i < attributes.length(); ++i) {
 				switch (attributes[i]) {
 					case AttributeSemantic::COUNT: ASSERT(false); break;
 					case AttributeSemantic::NONE: first_empty = minimum(first_empty, i); break;
 					case AttributeSemantic::POSITION: break;
-					
+
 					case AttributeSemantic::NORMAL: add(s, "#define NORMAL_ATTR ", i); break;
 					case AttributeSemantic::TANGENT: add(s, "#define TANGENT_ATTR ", i); break;
 					case AttributeSemantic::BITANGENT: add(s, "#define BITANGENT_ATTR ", i); break;
@@ -693,6 +755,29 @@ struct RendererImpl final : Renderer {
 				}
 			}
 
+			if (vertex_pulling) {
+				first_empty = 0;
+				// layout of vertices, see vertex_pulling.hlsli. Attributes that the mesh does not have have 0 components.
+				static const char* names[] = { "POSITION", "NORMAL", "TANGENT", "BITANGENT", "COLOR0", "COLOR1", "JOINTS", "WEIGHTS", "TEXCOORD0", "TEXCOORD1", "AO" };
+				static_assert(lengthOf(names) == (u32)AttributeSemantic::COUNT);
+				add(s, "#define VERTEX_STRIDE ", vertex_stride);
+				for (u32 semantic = 0; semantic < (u32)AttributeSemantic::COUNT; ++semantic) {
+					u32 offset = 0, type = 0, components = 0, normalized = 0;
+					for (u32 i = 0; i < decl.attributes_count && i < attributes.length(); ++i) {
+						if ((u32)attributes[i] != semantic) continue;
+						const gpu::Attribute& attr = decl.attributes[i];
+						offset = attr.byte_offset;
+						type = (u32)attr.type;
+						components = attr.components_count;
+						normalized = (attr.flags & gpu::Attribute::NORMALIZED) ? 1 : 0;
+					}
+					StaticString<96> name("#define PULL_", names[semantic]);
+					add(s, StaticString<96>(name, "_OFFSET ").data, offset);
+					add(s, StaticString<96>(name, "_TYPE ").data, type);
+					add(s, StaticString<96>(name, "_COMPONENTS ").data, components);
+					add(s, StaticString<96>(name, "_NORMALIZED ").data, normalized);
+				}
+			}
 			add(s, "#define INSTANCE0_ATTR ", first_empty + 0);
 			add(s, "#define INSTANCE1_ATTR ", first_empty + 1);
 			add(s, "#define INSTANCE2_ATTR ", first_empty + 2);
@@ -701,7 +786,7 @@ struct RendererImpl final : Renderer {
 			add(s, "#define INSTANCE5_ATTR ", first_empty + 5);
 			add(s, "#define INSTANCE6_ATTR ", first_empty + 6);
 
-			iter = m_semantic_defines.insert(hash, static_cast<String&&>(s));
+			iter = defines.insert(hash, static_cast<String&&>(s));
 		}
 		return iter.value().c_str();
 	}
@@ -1495,6 +1580,7 @@ struct RendererImpl final : Renderer {
 	AtomicI32 m_screenshot_state = (i32)ScreenshotState::NONE;
 	jobs::Counter m_init_signal;
 	HashMap<RuntimeHash, String> m_semantic_defines;
+	HashMap<RuntimeHash, String> m_pulling_semantic_defines;
 
 	Array<RenderPlugin*> m_plugins;
 	EvoxRender m_render_script;

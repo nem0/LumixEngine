@@ -142,7 +142,10 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual void enableBuiltinTAA(bool enable) = 0;
 	virtual bool isBuiltinTAAEnabled() const = 0;
 	
-	virtual const char* getSemanticDefines(Span<const AttributeSemantic> attributes) = 0;
+	// With `vertex_pulling` the vertex shader reads vertices from a buffer, see vertex_pulling.hlsli. It has no
+	// per-vertex attributes in the input assembler, so instance attributes start at 0, and the layout of vertices
+	// (stride, offset and format of each attribute) is part of the defines.
+	virtual const char* getSemanticDefines(Span<const AttributeSemantic> attributes, const gpu::VertexDecl& decl, u32 vertex_stride, bool vertex_pulling) = 0;
 
 	virtual struct FontManager& getFontManager() = 0;
 	virtual struct ResourceManager& getTextureManager() = 0;

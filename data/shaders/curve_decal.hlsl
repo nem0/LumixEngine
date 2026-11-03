@@ -3,6 +3,7 @@
 //@uniform "Material color", "color", {1, 1, 1, 1}
 
 #include "engine/shaders/common.hlsli"
+#include "engine/shaders/vertex_pulling.hlsli"
 
 struct VSOutput {
 	float3 half_extents : TEXCOORD0;
@@ -13,24 +14,44 @@ struct VSOutput {
 	float4 position : SV_POSITION;
 };
 
+// vertices of the cube and instances are pulled, see vertex_pulling.hlsli
 struct VSInput {
-	float3 position : TEXCOORD0;
-	float3 i_pos : TEXCOORD1;
-	float4 i_rot : TEXCOORD2;
-	float3 i_half_extents : TEXCOORD3;
-	float2 i_uv_scale : TEXCOORD4;
-	float4 i_bezier : TEXCOORD5;
+	uint vertex_id : SV_VertexID;
+	uint instance_id : SV_InstanceID;
 };
 
+// 68 bytes, the last 4 are the material index, which is not used
+struct Instance {
+	float3 pos;
+	float4 rot;
+	float3 half_extents;
+	float2 uv_scale;
+	float4 bezier;
+};
+
+Instance loadInstance(uint instance_id) {
+	ByteAddressBuffer buffer = bindless_buffers[u_instance_buffer];
+	const uint offset = pullInstanceAddress(instance_id, 68);
+	Instance r;
+	r.pos = asfloat(buffer.Load3(offset));
+	r.rot = asfloat(buffer.Load4(offset + 12));
+	r.half_extents = asfloat(buffer.Load3(offset + 28));
+	r.uv_scale = asfloat(buffer.Load2(offset + 40));
+	r.bezier = asfloat(buffer.Load4(offset + 48));
+	return r;
+}
+
 VSOutput mainVS(VSInput input) {
+	const Instance inst = loadInstance(input.instance_id);
+	const float3 position = pullVertex(input.vertex_id).position;
 	VSOutput output;
-	output.pos = input.i_pos;
-	output.rot = input.i_rot;
-	output.half_extents = input.i_half_extents;
-	float3 pos_ws = rotateByQuat(input.i_rot, input.position * input.i_half_extents);
-	pos_ws += input.i_pos;
-	output.uv_scale = input.i_uv_scale;
-	output.bezier = input.i_bezier;
+	output.pos = inst.pos;
+	output.rot = inst.rot;
+	output.half_extents = inst.half_extents;
+	float3 pos_ws = rotateByQuat(inst.rot, position * inst.half_extents);
+	pos_ws += inst.pos;
+	output.uv_scale = inst.uv_scale;
+	output.bezier = inst.bezier;
 	output.position = transformPosition(pos_ws, Global_ws_to_ndc);
 	return output;
 }

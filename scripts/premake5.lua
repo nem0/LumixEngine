@@ -414,7 +414,7 @@ end
 plugin_defs.renderer = function()
 	files { "../src/renderer/**.h", "../src/renderer/**.cpp", "../src/renderer/**.c", "../data/shaders/**.*" }
 	excludes {
-		"../external/meshoptimizer/clusterizer.cpp", "../external/meshoptimizer/overdrawanalyzer.cpp",
+		"../external/meshoptimizer/overdrawanalyzer.cpp",
 		"../external/meshoptimizer/overdrawoptimizer.cpp", "../external/meshoptimizer/spatialorder.cpp",
 		"../external/meshoptimizer/stripifier.cpp", "../external/meshoptimizer/vcacheanalyzer.cpp",
 		"../external/meshoptimizer/vcacheoptimizer.cpp", "../external/meshoptimizer/vertexcodec.cpp",

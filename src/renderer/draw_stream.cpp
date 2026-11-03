@@ -42,6 +42,7 @@ enum class DrawStream::Instruction : u8 {
 	TEXTURE_BARRIER,
 	BUFFER_BARRIER,
 	DRAW_INDIRECT,
+	DRAW_INDIRECT_COUNT,
 	BIND_SHADER_BUFFER,
 	DISPATCH,
 	CREATE_BUFFER,
@@ -65,7 +66,8 @@ enum class DrawStream::Instruction : u8 {
 	END_PROFILE_BLOCK,
 	USER_ALLOC,
 	SET_TEXTURE_DEBUG_NAME,
-	READ_TEXTURE
+	READ_TEXTURE,
+	READ_BUFFER
 };
 
 namespace {
@@ -148,9 +150,23 @@ struct DrawIndirectData {
 	u32 indirect_buffer_offset;
 };
 
+struct DrawIndirectCountData {
+	gpu::DataType index_type;
+	u32 indirect_buffer_offset;
+	u32 max_count;
+	u32 count_buffer_offset;
+};
+
 struct ReadTextureData {
 	gpu::TextureHandle texture;
 	gpu::TextureReadCallback callback;
+};
+
+struct ReadBufferCommand {
+	gpu::BufferHandle buffer;
+	u32 offset;
+	u32 size;
+	gpu::BufferReadCallback callback;
 };
 
 struct ReadBufferData {
@@ -289,6 +305,11 @@ void DrawStream::destroy(gpu::BufferHandle buffer) {
 void DrawStream::readTexture(gpu::TextureHandle texture, gpu::TextureReadCallback callback) {
 	ReadTextureData data = { texture, callback };
 	write(Instruction::READ_TEXTURE, data);
+}
+
+void DrawStream::readBuffer(gpu::BufferHandle buffer, u32 offset, u32 size, gpu::BufferReadCallback callback) {
+	ReadBufferCommand data = { buffer, offset, size, callback };
+	write(Instruction::READ_BUFFER, data);
 }
 
 void DrawStream::copy(gpu::BufferHandle dst, gpu::TextureHandle src) {
@@ -551,6 +572,12 @@ void DrawStream::drawIndirect(gpu::DataType index_type, u32 indirect_buffer_offs
 	write(Instruction::DRAW_INDIRECT, data);
 }
 
+void DrawStream::drawIndirectCount(gpu::DataType index_type, u32 indirect_buffer_offset, u32 max_count, u32 count_buffer_offset) {
+	submitCached();
+	DrawIndirectCountData data = { index_type, indirect_buffer_offset, max_count, count_buffer_offset };
+	write(Instruction::DRAW_INDIRECT_COUNT, data);
+}
+
 void DrawStream::barrier(gpu::TextureHandle texture, gpu::BarrierType type) {
 	TextureBarrierData data = {texture, type};
 	write(Instruction::TEXTURE_BARRIER, data);
@@ -741,6 +768,11 @@ void DrawStream::run() {
 					gpu::drawIndirect(data.index_type, data.indirect_buffer_offset);
 					break;
 				}
+				case Instruction::DRAW_INDIRECT_COUNT: {
+					READ(DrawIndirectCountData, data);
+					gpu::drawIndirectCount(data.index_type, data.indirect_buffer_offset, data.max_count, data.count_buffer_offset);
+					break;
+				}
 				case Instruction::MEMORY_BARRIER: {
 					READ(gpu::BufferHandle, buffer);
 					gpu::memoryBarrier(buffer);
@@ -908,6 +940,11 @@ void DrawStream::run() {
 				case Instruction::READ_TEXTURE: {
 					READ(ReadTextureData, data);
 					gpu::readTexture(data.texture, data.callback);
+					break;
+				}
+				case Instruction::READ_BUFFER: {
+					READ(ReadBufferCommand, data);
+					gpu::readBuffer(data.buffer, data.offset, data.size, data.callback);
 					break;
 				}
 				case Instruction::DESTROY_TEXTURE: {

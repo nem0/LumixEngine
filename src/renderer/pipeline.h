@@ -43,7 +43,7 @@ namespace UniformBuffer {
 	enum Enum {
 		GLOBAL,
 		PASS,
-		UNUSED_,
+		VERTEX_BUFFER, // see Mesh::VertexBufferBinding
 		SHADOW,
 		DRAWCALL,
 		DRAWCALL2,
@@ -51,6 +51,10 @@ namespace UniformBuffer {
 		COUNT
 	};
 }
+
+// Binds buffers that vertex shaders pull their data from, see vertex_pulling.hlsli.
+// `vertices` are vertices of a mesh, `instances` are optional instance data from the offset in bytes.
+LUMIX_RENDERER_API void bindPulledBuffers(struct DrawStream& stream, struct UniformPool& pool, gpu::BufferHandle vertices, gpu::BufferHandle instances = gpu::INVALID_BUFFER, u32 instances_offset = 0);
 
 struct BucketDesc {
 	enum Sort {
@@ -183,6 +187,8 @@ struct LUMIX_RENDERER_API Pipeline {
 		LIGHT_CLUSTERS,
 		PROBE_CLUSTERS,
 		VELOCITY,
+		MESH_CLUSTERS, // every cluster of cluster rendered models has its own color
+		MESH_TRIANGLES, // every triangle of cluster rendered models has its own color
 
 		BUILTIN_COUNT,
 		PLUGIN,
@@ -190,6 +196,17 @@ struct LUMIX_RENDERER_API Pipeline {
 
 	DebugShow m_debug_show = DebugShow::NONE;
 	struct RenderPlugin* m_debug_show_plugin = nullptr;
+	// culls clusters that face away from the camera (their normal cones, nanite.hlsl), for measuring, can be changed at run time
+	bool m_cluster_backface_culling = false;
+	// the largest error of a cluster on the screen, in pixels. Smaller values switch to coarser clusters later, can be changed at run time
+	float m_cluster_error_pixels = 1.f;
+	// how much the error of attributes (normals and UVs that simplified triangles took from other places) counts next to the error of positions,
+	// 0: only positions, fewer triangles, but the shading can change when a cluster is replaced by another one. Can be changed at run time.
+	float m_cluster_attribute_weight = 1.f;
+	// The clusters are chosen as the camera of the moment of turning this on sees them (the LOD, the frustum and the faces turned away), while the
+	// frame is drawn with the current camera: fly around to see what the frozen camera selected. Can be changed at run time.
+	bool m_cluster_freeze_camera = false;
+	float m_cluster_shadow_error_scale = 3.f;	// shadow views accept this many times the error of Cluster error (px)
 
 protected:
 	static inline u32 s_data_type_generator = 0;

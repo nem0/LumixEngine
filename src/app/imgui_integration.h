@@ -44,9 +44,7 @@ struct ImGuiIntegration {
 			if (!m_shader) {
 				const char* src =
 					R"#(struct VSInput {
-							float2 pos : TEXCOORD0;
-							float2 uv : TEXCOORD1;
-							float4 color : TEXCOORD2;
+							uint vertex_id : SV_VertexID;
 						};
 
 						cbuffer ImGuiState : register(b4) {
@@ -54,6 +52,8 @@ struct ImGuiIntegration {
 							float2 c_offset;
 							uint c_texture;
 							float c_time;
+							uint c_vertices;
+							uint c_vertices_offset;
 						};
 
 						struct VSOutput {
@@ -63,10 +63,15 @@ struct ImGuiIntegration {
 						};
 
 						VSOutput mainVS(VSInput input) {
+							// vertices are pulled: float2 position, float2 uv, RGBA8 color, 20 bytes each
+							ByteAddressBuffer vb = bindless_buffers[c_vertices];
+							const uint offset = c_vertices_offset + input.vertex_id * 20;
+							const float4 pos_uv = asfloat(vb.Load4(offset));
+							const uint packed = vb.Load(offset + 16);
 							VSOutput output;
-							output.color = input.color;
-							output.uv = input.uv;
-							float2 p = input.pos * c_scale + c_offset;
+							output.color = float4(packed & 0xff, (packed >> 8) & 0xff, (packed >> 16) & 0xff, packed >> 24) / 255.0;
+							output.uv = pos_uv.zw;
+							float2 p = pos_uv.xy * c_scale + c_offset;
 							output.position = float4(p.xy, 0, 1);
 							return output;
 						}
@@ -79,10 +84,8 @@ struct ImGuiIntegration {
 							);
 						}
 					)#";
-				gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
-				decl.addAttribute(0, 2, gpu::AttributeType::FLOAT, 0);
-				decl.addAttribute(8, 2, gpu::AttributeType::FLOAT, 0);
-				decl.addAttribute(16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+				// vertices are pulled by the vertex shader
+				const gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
 				const gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				m_shader = gpu::allocProgramHandle();
 				stream.createProgram(m_shader, state, decl, src, gpu::ShaderType::SURFACE, nullptr, 0, "imgui shader");
@@ -200,6 +203,8 @@ struct ImGuiIntegration {
 		Vec2 offset;
 		gpu::BindlessHandle texture_handle;
 		float time;
+		u32 vertices; // bindless
+		u32 vertices_offset;
 	};
 
 	void encode(const ImDrawList* cmd_list, const ImGuiViewport* vp, Renderer* renderer, DrawStream& stream, gpu::ProgramHandle program, Vec2 scale, Vec2 offset) {
@@ -211,8 +216,6 @@ struct ImGuiIntegration {
 
 		stream.useProgram(program);
 		stream.bindIndexBuffer(ib.buffer);
-		stream.bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(ImDrawVert));
-		stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 
 		for (int i = 0, c = cmd_list->CmdBuffer.size(); i < c; ++i) {
 			const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[i];
@@ -220,8 +223,6 @@ struct ImGuiIntegration {
 				if (ImDrawCallback_ResetRenderState == pcmd->UserCallback) {
 					stream.useProgram(program);
 					stream.bindIndexBuffer(ib.buffer);
-					stream.bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(ImDrawVert));
-					stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 				}
 				else {
 					pcmd->UserCallback(cmd_list, pcmd);
@@ -239,6 +240,8 @@ struct ImGuiIntegration {
 				uniform_data->texture_handle = gpu::getBindlessHandle(tex);
 				static os::Timer timer;
 				uniform_data->time = timer.getTimeSinceStart();
+				uniform_data->vertices = gpu::getBindlessHandle(vb.buffer).value;
+				uniform_data->vertices_offset = vb.offset;
 				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 
 				const u32 h = u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y), 0.f, 65535.f));
