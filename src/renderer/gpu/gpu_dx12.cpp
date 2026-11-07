@@ -2592,6 +2592,17 @@ void pushGPUCounters() {
 	}
 }
 
+// waits until everything submitted to the queue, including Present, has finished
+static void waitQueueIdle() {
+	ID3D12Fence* fence;
+	if (d3d->device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)) != S_OK) {
+		for (Frame& f : d3d->frames) f.wait();
+		return;
+	}
+	if (SUCCEEDED(d3d->cmd_queue->Signal(fence, 1))) fence->SetEventOnCompletion(1, nullptr);
+	fence->Release();
+}
+
 u32 present() {
 	PROFILE_FUNCTION();
 	d3d->vsync_mutex.enter();
@@ -2621,15 +2632,18 @@ u32 present() {
 	for (auto& window : d3d->windows) {
 		if (!window.handle) continue;
 		if (window.last_used_frame + 2 < d3d->frame_number && &window != d3d->windows) {
-			// TODO do not wait here
-			for (Frame& f : d3d->frames) f.wait();
+			// window's last Present was queued before the frame we just submitted, so that frame's
+			// fence covers it; release backbuffers and swapchain once that frame is finished
+			Frame& submitted = d3d->frames.begin()[frame_idx];
 			window.handle = nullptr;
-			for (ID3D12Resource* res : window.backbuffers) {
-				res->Release();
+			for (ID3D12Resource*& res : window.backbuffers) {
+				submitted.to_release.push(res);
+				res = nullptr;
 			}
 			if (window.latency_waitable) CloseHandle(window.latency_waitable);
 			window.latency_waitable = nullptr;
-			window.swapchain->Release();
+			submitted.to_release.push(window.swapchain);
+			window.swapchain = nullptr;
 		}
 	}
 	++d3d->frame_number;
@@ -2656,7 +2670,7 @@ u32 present() {
 		size = minimum(size, IVec2(16384));
 
 		if (vsync_dirty) {
-			for (Frame& f : d3d->frames) f.wait();
+			waitQueueIdle();
 
 			for (ID3D12Resource* res : window.backbuffers) {
 				res->Release();
@@ -2695,7 +2709,7 @@ u32 present() {
 		if (size != window.size && size.x != 0) {
 			window.size = size;
 
-			for (Frame& f : d3d->frames) f.wait();
+			waitQueueIdle();
 
 			for (ID3D12Resource* res : window.backbuffers) {
 				res->Release();

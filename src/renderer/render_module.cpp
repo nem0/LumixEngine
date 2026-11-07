@@ -2121,7 +2121,7 @@ struct RenderModuleImpl final : RenderModule {
 		
 		if (u32(mat.material_index) == 0 || !isFlagSet(mat.flags, MeshMaterial::OWN_MATERIAL_INDEX)) {
 			float tmp[Material::MAX_UNIFORMS_FLOATS];
-			mat.material->getUniformData(Span(tmp));
+			if (!mat.material->getUniformData(Span(tmp))) return nullptr;
 			mat.material_index = m_renderer.createMaterialInstance(tmp);
 			mat.flags = MeshMaterial::OWN_MATERIAL_INDEX;
 		}
