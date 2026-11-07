@@ -986,12 +986,14 @@ struct RendererImpl final : Renderer {
 		return MaterialIndex{idx};
 	}
 
+	// writes data at a byte offset inside the material's constants (the offset of a uniform in its shader)
 	void updateMaterialConstants(MaterialIndex handle, Span<const float> data, u32 offset) override {
 		jobs::wait(&m_cpu_frame->can_setup);
 		const u32 size = u32(data.length() * sizeof(float));
+		ASSERT(offset + size <= Material::MAX_UNIFORMS_BYTES);
 		const TransientSlice slice = m_cpu_frame->uniform_pool.alloc(size);
 		memcpy(slice.ptr, data.begin(), size);
-		m_cpu_frame->draw_stream.copy(m_material_buffer.buffer, slice.buffer, u32(handle) * Material::MAX_UNIFORMS_BYTES, slice.offset, size);
+		m_cpu_frame->draw_stream.copy(m_material_buffer.buffer, slice.buffer, u32(handle) * Material::MAX_UNIFORMS_BYTES + offset, slice.offset, size);
 	}
 
 	MaterialIndex createMaterialConstants(Span<const float> data) override {

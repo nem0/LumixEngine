@@ -4529,6 +4529,18 @@ namespace Lumix::Evox::generated {
 		EX_RESULT(frame, ret);
 	}
 	
+	static void evox_model_instance_overrideMaterialFloat_12257244696162764536(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, entity);
+		RenderModule* module = static_cast<RenderModule*>(entity.module);
+		EX_ARG(frame, u32, mesh_index);
+		EX_STRING_ARG(frame, uniform_name);
+		char evox_string_arg_uniform_name[128];
+		copyString(Span(evox_string_arg_uniform_name), StringView{uniform_name.begin, (u64)uniform_name.length});
+		EX_ARG(frame, float, value);
+		auto ret = module->overrideMaterialFloat(EntityRef(entity.index), mesh_index, evox_string_arg_uniform_name, value);
+		EX_RESULT(frame, ret);
+	}
+	
 	static void evox_model_instance_getModel_17163776195265150550(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
@@ -6349,6 +6361,7 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:renderer/instanced_model"), StringView("getPath")}, &evox_instanced_model_getInstancedModelPath_5042885846977672067);
 		functions.insert({StringView("core:renderer/instanced_model"), StringView("setPath")}, &evox_instanced_model_setInstancedModelPath_11517420952746177454);
 		functions.insert({StringView("core:renderer/model_instance"), StringView("overrideMaterialVec4")}, &evox_model_instance_overrideMaterialVec4_4410224850514097651);
+		functions.insert({StringView("core:renderer/model_instance"), StringView("overrideMaterialFloat")}, &evox_model_instance_overrideMaterialFloat_12257244696162764536);
 		functions.insert({StringView("core:renderer/model_instance"), StringView("getModel")}, &evox_model_instance_getModel_17163776195265150550);
 		functions.insert({StringView("core:renderer/model_instance"), StringView("setMaterialOverride")}, &evox_model_instance_setMaterialOverride_996603591774246378);
 		functions.insert({StringView("core:renderer/model_instance"), StringView("getMaterialOverride")}, &evox_model_instance_getMaterialOverride_10931791879858139541);
