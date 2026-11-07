@@ -314,31 +314,38 @@ void Material::onBeforeReady()
 	updateRenderData(true);
 }
 
-void Material::getUniformData(Span<float> data) const {
-	if (!m_shader) return;
+bool Material::getUniformData(Span<float> data) const {
+	if (!m_shader) return false;
 
-	// TODO check overflow
+	const u32 capacity = u32(data.length() * sizeof(float));
+	memset(data.begin(), 0, capacity);
 	u8* cs = (u8*)data.begin();
 	u32 textures_offset = 0;
 	for (const Shader::Uniform& shader_uniform : m_shader->m_uniforms) {
 		const u32 size = shader_uniform.size();
 		textures_offset = maximum(textures_offset, shader_uniform.offset + size);
-		bool found = false;
-		for (Uniform& uniform : m_uniforms) {
+		if (shader_uniform.offset + size > capacity) continue; // reported below
+		const float* src = shader_uniform.default_value.vec4;
+		for (const Uniform& uniform : m_uniforms) {
 			if (shader_uniform.name_hash == uniform.name_hash) {
-				memcpy((u8*)cs + shader_uniform.offset, uniform.vec4, size);
-				found = true;
+				src = uniform.vec4;
 				break;
 			}
 		}
-		if (!found) {
-			memcpy((u8*)cs + shader_uniform.offset, shader_uniform.default_value.vec4, size);
-		}
+		memcpy(cs + shader_uniform.offset, src, size);
 	}
+
+	const u32 required = textures_offset + m_shader->m_texture_slot_count * sizeof(gpu::BindlessHandle);
+	if (required > capacity) {
+		logError(getPath(), ": shader ", m_shader->getPath(), " needs ", required, " bytes of material constants, max is ", capacity);
+		return false;
+	}
+
 	for (u32 i = 0; i < m_shader->m_texture_slot_count; ++i) {
 		const gpu::BindlessHandle bindless_handle = m_textures[i] ? gpu::getBindlessHandle(m_textures[i]->handle) : gpu::BindlessHandle();
-		memcpy((u8*)cs + textures_offset + i * sizeof(bindless_handle), &bindless_handle, sizeof(bindless_handle));
+		memcpy(cs + textures_offset + i * sizeof(bindless_handle), &bindless_handle, sizeof(bindless_handle));
 	}
+	return true;
 }
 
 void Material::updateRenderData(bool on_before_ready)
@@ -346,31 +353,11 @@ void Material::updateRenderData(bool on_before_ready)
 	if (!m_shader) return;
 	if (!on_before_ready && !isReady()) return;
 
+	float cs[Material::MAX_UNIFORMS_FLOATS];
+	// on failure keep the current constants, so m_material_constants never refers to a freed slot
+	if (!getUniformData(Span(cs))) return;
+
 	m_renderer.destroyMaterialConstants(m_material_constants);
-
-	// TODO check overflow
-	float cs[Material::MAX_UNIFORMS_FLOATS] = {};
-	u32 textures_offset = 0;
-	for (const Shader::Uniform& shader_uniform : m_shader->m_uniforms) {
-		const u32 size = shader_uniform.size();
-		textures_offset = maximum(textures_offset, shader_uniform.offset + size);
-		bool found = false;
-		for (Uniform& uniform : m_uniforms) {
-			if (shader_uniform.name_hash == uniform.name_hash) {
-				memcpy((u8*)cs + shader_uniform.offset, uniform.vec4, size);
-				found = true;
-				break;
-			}
-		}
-		if (!found) {
-			memcpy((u8*)cs + shader_uniform.offset, shader_uniform.default_value.vec4, size);
-		}
-	}
-	for (u32 i = 0; i < m_shader->m_texture_slot_count; ++i) {
-		const gpu::BindlessHandle bindless_handle = m_textures[i] ? gpu::getBindlessHandle(m_textures[i]->handle) : gpu::BindlessHandle();
-		memcpy((u8*)cs + textures_offset + i * sizeof(bindless_handle), &bindless_handle, sizeof(bindless_handle));
-	}
-
 	m_material_constants = m_renderer.createMaterialConstants(Span(cs));
 }
 
