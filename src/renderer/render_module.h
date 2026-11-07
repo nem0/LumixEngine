@@ -463,6 +463,7 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual Path getModelInstancePath(EntityRef entity) = 0;  //@ resource_type Model::TYPE label "Source"
 	virtual void setModelInstancePath(EntityRef entity, const Path& path) = 0;
 	virtual bool overrideMaterialVec4(EntityRef entity, u32 mesh_index, const char* uniform_name, Vec4 value) = 0;
+	virtual bool overrideMaterialFloat(EntityRef entity, u32 mesh_index, const char* uniform_name, float value) = 0; // only for a float uniform of the instance's material, false if there is none
 	virtual Model* getModelInstanceModel(EntityRef entity) = 0; //@ function alias getModel
 	virtual void setModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx, const Path& path) = 0; //@ function alias setMaterialOverride
 	virtual Path getModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx) = 0; //@ function alias getMaterialOverride

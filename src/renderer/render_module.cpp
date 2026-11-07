@@ -2109,14 +2109,15 @@ struct RenderModuleImpl final : RenderModule {
 		}
 	}
 
-	bool overrideMaterialVec4(EntityRef entity, u32 mesh_index, const char* uniform_name, Vec4 value) override {
+	// the mesh material of an instance with its own copy of the material's constants (made on the first call), null while the model or the material is not ready
+	MeshMaterial* getOwnMaterialConstants(EntityRef entity, u32 mesh_index) {
 		ModelInstance& inst = m_model_instances[entity.index];
-		if (!inst.model->isReady()) return false;
+		if (!inst.model->isReady()) return nullptr;
 
 		ensureMaterialDataSize(inst, mesh_index + 1);
 
 		MeshMaterial& mat = inst.mesh_materials[mesh_index];
-		if (!mat.material || !mat.material->isReady()) return false;
+		if (!mat.material || !mat.material->isReady()) return nullptr;
 		
 		if (u32(mat.material_index) == 0 || !isFlagSet(mat.flags, MeshMaterial::OWN_MATERIAL_INDEX)) {
 			float tmp[Material::MAX_UNIFORMS_FLOATS];
@@ -2124,13 +2125,33 @@ struct RenderModuleImpl final : RenderModule {
 			mat.material_index = m_renderer.createMaterialInstance(tmp);
 			mat.flags = MeshMaterial::OWN_MATERIAL_INDEX;
 		}
+		return &mat;
+	}
 
-		Shader* shader = mat.material->getShader();
+	bool overrideMaterialVec4(EntityRef entity, u32 mesh_index, const char* uniform_name, Vec4 value) override {
+		MeshMaterial* mat = getOwnMaterialConstants(entity, mesh_index);
+		if (!mat) return false;
+
+		Shader* shader = mat->material->getShader();
 		for (const auto& u : shader->m_uniforms) {
 			if (equalStrings(u.name, uniform_name)) {
-				m_renderer.updateMaterialConstants(mat.material_index, Span(&value.x, 4), u.offset);
+				m_renderer.updateMaterialConstants(mat->material_index, Span(&value.x, 4), u.offset);
 				return true;
 			}
+		}
+		return false;
+	}
+
+	bool overrideMaterialFloat(EntityRef entity, u32 mesh_index, const char* uniform_name, float value) override {
+		MeshMaterial* mat = getOwnMaterialConstants(entity, mesh_index);
+		if (!mat) return false;
+
+		Shader* shader = mat->material->getShader();
+		for (const auto& u : shader->m_uniforms) {
+			if (!equalStrings(u.name, uniform_name)) continue;
+			if (u.type != Shader::Uniform::FLOAT && u.type != Shader::Uniform::NORMALIZED_FLOAT) return false;
+			m_renderer.updateMaterialConstants(mat->material_index, Span(&value, 1), u.offset);
+			return true;
 		}
 		return false;
 	}
