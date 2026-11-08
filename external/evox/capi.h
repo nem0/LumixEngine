@@ -414,7 +414,6 @@ EVOX_API void ex_runtime_destroy(ex_runtime* runtime);
 EVOX_API ex_task* ex_task_create(ex_runtime* runtime);
 EVOX_API void ex_task_destroy(ex_task* task);
 EVOX_API ex_task_state ex_task_get_state(const ex_task* task);
-
 // Begin executing a script function on a newly-created task. Arguments are
 // copied from `args` according to the function's declared ABI. `args_size`
 // must match the function's declared parameter byte size; `args` may be null
@@ -699,7 +698,10 @@ EVOX_API void ex_debug_remove_all_breakpoints(ex_bytecode* bytecode);
 
 // Call stack inspection. Frame 0 is the innermost frame. Also valid
 // immediately after a failed task execution, reporting the stack at the
-// point of failure; the next task execution overwrites it.
+// point of failure; the next task execution overwrites it. Also valid while
+// the task is in a native call (from the native, or a crash handler on its
+// thread; these functions do not allocate or lock); frame 0 is then the
+// script function that called the native, at the call.
 EVOX_API u32 ex_debug_stack_depth(ex_task* task);
 EVOX_API ex_string_view ex_debug_frame_function_name(ex_task* task, u32 frame_index);
 EVOX_API ex_result ex_debug_frame_location(ex_task* task, u32 frame_index, ex_debug_location* out_location);

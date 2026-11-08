@@ -92,6 +92,10 @@ enum class CrashReportFlags : u32 {
 
 LUMIX_CORE_API void configureCrashReport(CrashReportFlags flags);
 LUMIX_CORE_API void setCrashReportLogPath(const char* path);
+// Called on the crashing thread to add text to the crash report (e.g. the call stack of a running script).
+// Must not allocate or lock; writes a null-terminated string of at most out_size bytes to out.
+using CrashReportCallback = void (*)(char* out, u32 out_size);
+LUMIX_CORE_API void setCrashReportCallback(CrashReportCallback callback);
 
 // Sends user feedback to Sentry. Blocks until the upload ends. `email` and `attachment_path` can be empty,
 // the attachment can be any file up to 5 MiB. Works regardless of CrashReportFlags.

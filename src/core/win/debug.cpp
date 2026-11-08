@@ -38,6 +38,7 @@
 namespace Lumix {
 	
 static CrashReportFlags g_crash_report_flags = CrashReportFlags::ENABLED;
+static CrashReportCallback g_crash_report_callback = nullptr;
 static char g_crash_report_log_path[MAX_PATH] = "";
 
 // one frame of the crashed thread's callstack
@@ -1090,6 +1091,15 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 		crash_info.message.append(open_blocks[i], "\n");
 	}
 	crash_info.message.append("\n");
+
+	// here and not on the dumper thread, which can not see this thread's state (e.g. the running script)
+	if (g_crash_report_callback) {
+		static char extra[4096];
+		extra[0] = '\0';
+		g_crash_report_callback(extra, sizeof(extra));
+		extra[sizeof(extra) - 1] = '\0';
+		if (extra[0]) crash_info.message.append(extra, "\n");
+	}
 	
 	if (!sym_init_success) {
 		DWORD error = GetLastError();
@@ -1190,6 +1200,10 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 
 void configureCrashReport(CrashReportFlags flags) {
 	g_crash_report_flags = flags;
+}
+
+void setCrashReportCallback(CrashReportCallback callback) {
+	g_crash_report_callback = callback;
 }
 
 void setCrashReportLogPath(const char* path) {

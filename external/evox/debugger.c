@@ -19,10 +19,14 @@ static int debug_string_equals(ex_string_view a, ex_string_view b) {
 // ancestors in `call_stack[0..call_depth)`, exactly like `fail_frames` is
 // assembled - so this reads from whichever is current instead of duplicating
 // the assembly logic into a second array.
+// A task inspected while it runs a native (from the native, or a crash
+// handler on its thread) has the native's caller pushed on call_stack, so all
+// its frames are there; a task that is neither suspended nor executing has
+// call_depth 0.
 static u32 debug_active_frame_count(ex_task* task) {
 	if (task->is_suspended && task->fail_frame_count) return task->fail_frame_count;
 	if (task->is_suspended) return 1u + task->call_depth;
-	return task->fail_frame_count;
+	return task->call_depth;
 }
 
 static const runtime_call_frame* debug_active_frame(ex_task* task, u32 frame_index) {
@@ -32,7 +36,7 @@ static const runtime_call_frame* debug_active_frame(ex_task* task, u32 frame_ind
 		const u32 call_stack_index = task->call_depth - frame_index;
 		return &task->call_stack[call_stack_index];
 	}
-	return &task->fail_frames[frame_index];
+	return &task->call_stack[task->call_depth - 1u - frame_index];
 }
 
 u32 ex_debug_stack_depth(ex_task* task) {
