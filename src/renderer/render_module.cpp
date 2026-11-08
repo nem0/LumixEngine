@@ -549,9 +549,11 @@ struct RenderModuleImpl final : RenderModule {
 			const MeshMaterial& mat = mi.mesh_materials[i];
 			if (!mat.sort_key && u32(mat.material_index) == 0) continue;
 			if (!mat.material || !mat.material->isReady()) return true;
-			if (isFlagSet(mat.flags, MeshMaterial::OWN_MATERIAL_INDEX)) return true; // a private copy of the uniforms, made from the old material
 			if (i >= mi.mesh_count) return true;
-			if (u32(mat.material_index) != 0 && u32(mat.material_index) != u32(mat.material->getIndex())) return true;
+			// A private copy of the uniforms (OWN_MATERIAL_INDEX) has its own index, so it cannot be compared with the material's. It is not stale just because
+			// some other material was unloaded (a particle emitter going away, say): that made the planet vanish for a frame. A reload of this very material
+			// shows up above, as the material is not ready while it loads.
+			if (!isFlagSet(mat.flags, MeshMaterial::OWN_MATERIAL_INDEX) && u32(mat.material_index) != 0 && u32(mat.material_index) != u32(mat.material->getIndex())) return true;
 			if (mat.sort_key) {
 				const u32 fresh = computeSortKey(*mat.material, mi.meshes[i]);
 				m_renderer.freeSortKey(fresh);
