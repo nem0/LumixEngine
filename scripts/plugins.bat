@@ -32,8 +32,9 @@ setlocal
 	echo  C. Lua
 	echo  D. Remote control
 	echo  E. Video recorder
+	echo  F. Steam
 	echo ===============================
-	choice /C 123456789ABCDE /N /M "Your choice:"
+	choice /C 123456789ABCDEF /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :empty_plugin
@@ -49,6 +50,7 @@ setlocal
 	if %errorlevel%==12 call :lua_plugin
 	if %errorlevel%==13 call :remote_plugin
 	if %errorlevel%==14 call :videorec_plugin
+	if %errorlevel%==15 call :steam_plugin
 goto :begin
 
 :glft_import_plugin
@@ -226,6 +228,21 @@ exit /B 0
 		popd
 	) else (
 		cd videorec
+		git pull
+	)
+	popd
+exit /B 0
+
+:steam_plugin
+	if not exist ..\plugins mkdir ..\plugins
+	pushd ..\plugins
+	if not exist steam (
+		git.exe clone https://github.com/nem0/lumixengine_steam.git steam
+		pushd steam
+		git remote add origin2 git@github.com:nem0/lumixengine_steam.git
+		popd
+	) else (
+		cd steam
 		git pull
 	)
 	popd
