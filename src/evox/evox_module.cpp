@@ -4,11 +4,13 @@
 #include "core/allocator.h"
 #include "core/array.h"
 #include "core/crt.h"
+#include "core/debug.h"
 #include "core/hash_map.h"
 #include "core/log.h"
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/stream.h"
+#include "core/string.h"
 #include "core/tag_allocator.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
@@ -77,6 +79,39 @@ static void logEvoxMainFailure(ex_task* task, ex_call_result result) {
 	}
 }
 
+// EvoxSystemImpl::m_task, for the crash report
+static ex_task* const* g_crash_report_task = nullptr;
+
+// crash report: the call stack of the main script, if it is executing; most likely it's what crashed
+static void appendRunningScriptStack(char* out, u32 out_size) {
+	ex_task* task = g_crash_report_task ? *g_crash_report_task : nullptr;
+	if (!task) return;
+	// a suspended task (e.g. parked at its per-frame yield) has a stack too, but it's not what crashed;
+	// a task that is not suspended has a stack only while it executes (complete while it's in a native call)
+	ex_debug_event event;
+	if (ex_debug_pause_event(task, &event) == EX_RESULT_OK) return;
+	const u32 depth = ex_debug_stack_depth(task);
+	if (depth == 0) return;
+	// copyString truncates and returns the end of what it wrote, so the next write continues there
+	Span<char> dst(out, out_size);
+	auto put = [&](StringView str) { dst.m_begin = copyString(dst, str); };
+	put("Script stack (innermost first):\n");
+	for (u32 i = 0; i < depth; ++i) {
+		put("  ");
+		put(fromEvox(ex_debug_frame_function_name(task, i)));
+		ex_debug_location location;
+		if (ex_debug_frame_location(task, i, &location) == EX_RESULT_OK) {
+			char line[16];
+			toCString(location.line + 1, Span(line));
+			put("  ");
+			put(fromEvox(location.source_name));
+			put(":");
+			put(line);
+		}
+		put("\n");
+	}
+}
+
 static bool isSerializableType(const ex_type& type) {
 	switch (ex_type_get_kind(&type)) {
 		case EX_TYPE_BOOL:
@@ -117,6 +152,8 @@ struct EvoxSystemImpl : EvoxSystem {
 			m_resource->getObserverCb().unbind<&EvoxSystemImpl::onResourceChanged>(this);
 			m_resource->decRefCount();
 		}
+		setCrashReportCallback(nullptr);
+		g_crash_report_task = nullptr;
 		destroyScript();
 		m_evox_resource_manager.destroy();
 	}
@@ -983,6 +1020,8 @@ EvoxSystemImpl::EvoxSystemImpl(Engine& engine)
 	Evox::gatherCoreFunctions(m_native_functions);
 	EvoxModuleImpl::reflect();
 	m_evox_resource_manager.create(EvoxResource::TYPE, m_engine.getResourceManager());
+	g_crash_report_task = &m_task;
+	setCrashReportCallback(&appendRunningScriptStack);
 }
 
 u32 EvoxModuleImpl::EvoxTypeDesc::getSize() const {

@@ -947,7 +947,10 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 				u8* caller_top = task->stack_top;
 				const ex_function_bc* callee = &task->bytecode->functions[callee_index];
 				task->frame = frame;
-				if (!runtime_invoke_native(task, callee_index, callee, frame + arg_base, NULL, &panic_message)) goto runtime_execute_function_fail;
+				task->call_stack[task->call_depth++] = (runtime_call_frame){ fn, ip, frame, caller_top };
+				const bool native_ok = runtime_invoke_native(task, callee_index, callee, frame + arg_base, NULL, &panic_message);
+				--task->call_depth;
+				if (!native_ok) goto runtime_execute_function_fail;
 				frame = task->frame;
 				task->stack_top = caller_top;
 				break;
@@ -978,7 +981,10 @@ static ex_call_result runtime_execute_function(ex_task* task, const ex_function_
 
 				if (callee->kind == EX_FUNCTION_NATIVE) {
 					task->frame = frame;
-					if (!runtime_invoke_native(task, callee_index, callee, frame + dst, NULL, &panic_message)) goto runtime_execute_function_fail;
+					task->call_stack[task->call_depth++] = (runtime_call_frame){ fn, ip, frame, caller_top };
+					const bool native_ok = runtime_invoke_native(task, callee_index, callee, frame + dst, NULL, &panic_message);
+					--task->call_depth;
+					if (!native_ok) goto runtime_execute_function_fail;
 					frame = task->frame;
 					task->stack_top = caller_top;
 					break;
@@ -1599,7 +1605,6 @@ runtime_deallocate_host(task->runtime->host, task->stack);
 ex_task_state ex_task_get_state(const ex_task* task) {
 	return task ? task->state : EX_TASK_FAILED;
 }
-
 ex_result ex_runtime_set_native_resolver(ex_runtime* runtime, ex_native_resolver_fn resolver, void* userdata) {
 	if (!runtime) return EX_RESULT_INVALID_ARGUMENT;
 	runtime->native_resolver = resolver;

@@ -618,7 +618,8 @@ typedef struct ex_task {
 	u8* stack_end;
 	u32 result_size;
 
-	runtime_call_frame call_stack[EX_MAX_CALL_DEPTH];
+	// +1: a native call pushes its caller too
+	runtime_call_frame call_stack[EX_MAX_CALL_DEPTH + 1u];
 	u32 call_depth;
 	runtime_call_frame fail_frames[EX_MAX_CALL_DEPTH + 1u];
 	u32 fail_frame_count;
