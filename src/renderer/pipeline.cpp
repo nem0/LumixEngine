@@ -3109,7 +3109,6 @@ struct PipelineImpl final : Pipeline {
 			if (from >= keys_count) return;
 			if (to > keys_count) to = keys_count;
 
-			u64 instance_key_mask;
 			u32 define_mask;
 			u32 autoinstanced_define_mask;
 			u32 mesh_particle_define_mask;
@@ -3132,9 +3131,6 @@ struct PipelineImpl final : Pipeline {
 					dynamic_define_mask = define_mask | (1 << m_dynamic_define_idx);
 					skinned_define_mask = define_mask | (1 << m_skinned_define_idx);
 					mesh_particle_define_mask = define_mask | (1 << m_mesh_particle_define_idx);
-					
-					const bool sort_depth = view.buckets[bucket].sort == BucketDesc::DEPTH;
-					instance_key_mask = sort_depth ? 0xff00'0000'00ff'ffff : 0xffff'ffff'0000'0000;
 					render_state = view.buckets[bucket].state;
 				}
 
@@ -3392,11 +3388,11 @@ struct PipelineImpl final : Pipeline {
 							--i;
 						}
 						else {
+							// Only depth sorted meshes get here (the rest is autoinstanced). Their key is the distance of the entity, not its mesh:
+							// neighbours with the same key can be other meshes at the same distance (e.g. two shells around one planet), never merge them.
+							CHECK(view.buckets[bucket].sort == BucketDesc::DEPTH);
 							int start_i = i;
-							const u64 key = sort_keys[i] & instance_key_mask;
-							while (i < to && (sort_keys[i] & instance_key_mask) == key) {
-								++i;
-							}
+							++i;
 							const u32 count = u32(i - start_i);
 							const TransientSlice slice = alloc(transient_pool, count * (sizeof(Vec4) * 3));
 							u8* instance_data = slice.ptr;
