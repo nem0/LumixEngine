@@ -13,7 +13,6 @@ cbuffer Drawcall2 : register(b5) {
 	TextureHandle u_gbuffer_depth;
 };
 
-#define ATTR(X) TEXCOORD##X
 struct VSInput {
 	uint vertex_id : SV_VertexID;
 };

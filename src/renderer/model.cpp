@@ -30,7 +30,7 @@ static LocalRigidTransform invert(const LocalRigidTransform& tr)
 	return result;
 }
 
-Mesh::Mesh(const gpu::VertexDecl& vertex_decl,
+Mesh::Mesh(const VertexDecl& vertex_decl,
 	u8 vb_stride,
 	StringView name,
 	const AttributeSemantic* semantics,
@@ -56,8 +56,7 @@ Mesh::Mesh(const gpu::VertexDecl& vertex_decl,
 		}
 	}
 	
-	semantics_defines = renderer.getSemanticDefines(Span(attributes_semantic), vertex_decl, vb_stride, false);
-	pulling_semantics_defines = renderer.getSemanticDefines(Span(attributes_semantic), vertex_decl, vb_stride, true);
+	semantics_defines = renderer.getSemanticDefines(Span(attributes_semantic), vertex_decl, vb_stride);
 }
 
 Mesh::Mesh(Mesh&& rhs)
@@ -253,7 +252,7 @@ void Model::getPose(Pose& pose)
 }
 
 
-static bool parseVertexDecl(IInputStream& file, gpu::VertexDecl* vertex_decl, AttributeSemantic* semantics, u32& vb_stride)
+static bool parseVertexDecl(IInputStream& file, VertexDecl* vertex_decl, AttributeSemantic* semantics, u32& vb_stride)
 {
 	u32 attribute_count;
 	file.read(&attribute_count, sizeof(attribute_count));
@@ -261,7 +260,7 @@ static bool parseVertexDecl(IInputStream& file, gpu::VertexDecl* vertex_decl, At
 
 	u8 offset = 0;
 	for (u32 i = 0; i < attribute_count; ++i) {
-		gpu::AttributeType type;
+		AttributeType type;
 		u8 cmp_count;
 		file.read(semantics[i]);
 		file.read(type);
@@ -269,8 +268,8 @@ static bool parseVertexDecl(IInputStream& file, gpu::VertexDecl* vertex_decl, At
 
 		switch(semantics[i]) {
 			case AttributeSemantic::WEIGHTS:
-				if (type != gpu::AttributeType::FLOAT) {
-					vertex_decl->addAttribute(offset, cmp_count, type, gpu::Attribute::NORMALIZED);
+				if (type != AttributeType::FLOAT) {
+					vertex_decl->addAttribute(offset, cmp_count, type, VertexAttribute::NORMALIZED);
 				}
 				else {
 					vertex_decl->addAttribute(offset, cmp_count, type, 0);
@@ -282,24 +281,24 @@ static bool parseVertexDecl(IInputStream& file, gpu::VertexDecl* vertex_decl, At
 				break;
 			case AttributeSemantic::AO:
 			case AttributeSemantic::COLOR0:
-				vertex_decl->addAttribute(offset, cmp_count, type, gpu::Attribute::NORMALIZED);
+				vertex_decl->addAttribute(offset, cmp_count, type, VertexAttribute::NORMALIZED);
 				break;
 			case AttributeSemantic::NORMAL:
 			case AttributeSemantic::TANGENT:
-				if (type == gpu::AttributeType::FLOAT) {
+				if (type == AttributeType::FLOAT) {
 					vertex_decl->addAttribute(offset, cmp_count, type, 0);
 				}
 				else {
-					vertex_decl->addAttribute(offset, cmp_count, type, gpu::Attribute::NORMALIZED);
+					vertex_decl->addAttribute(offset, cmp_count, type, VertexAttribute::NORMALIZED);
 				}
 				break;
 			case AttributeSemantic::JOINTS:
-				vertex_decl->addAttribute(offset, cmp_count, type, gpu::Attribute::AS_INT);
+				vertex_decl->addAttribute(offset, cmp_count, type, 0);
 				break;
 			default: ASSERT(false); break;
 		}
 
-		offset += gpu::getSize(type) * cmp_count;
+		offset += getSize(type) * cmp_count;
 	}
 	vb_stride = offset;
 
@@ -467,8 +466,8 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 	m_meshes.reserve(object_count);
 	for (int i = 0; i < object_count; ++i)
 	{
-		gpu::VertexDecl vertex_decl(gpu::PrimitiveType::TRIANGLES);
-		AttributeSemantic semantics[gpu::VertexDecl::MAX_ATTRIBUTES];
+		VertexDecl vertex_decl;
+		AttributeSemantic semantics[VertexDecl::MAX_ATTRIBUTES];
 		for(auto& sem : semantics) sem = AttributeSemantic::NONE;
 		u32 vb_stride;
 		if (!parseVertexDecl(file, &vertex_decl, semantics, vb_stride)) return false;
@@ -542,6 +541,14 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		Mesh& mesh = m_meshes[i];
 		int data_size;
 		file.read(data_size);
+		if (data_size == 0) {
+			// vertices of meshes with clusters are in the clusters, see parseClusters
+			if (version < FileVersion::CLUSTER_VERTICES) {
+				logError(m_path, ": has no geometry data");
+				return false;
+			}
+			continue;
+		}
 		Renderer::MemRef vertices_mem = m_renderer.allocate(data_size);
 		file.read(vertices_mem.data, data_size);
 
@@ -641,93 +648,96 @@ bool Model::load(Span<const u8> mem)
 
 // Cluster DAGs of the meshes of the first LOD, baked by the model importer (see ModelImporter::writeClusters):
 //   u32 mesh_count - meshes [0, mesh_count) have clusters, 0 if the model has none
-//   for each mesh: u32 cluster_count, u32 index_count, u32 leaf_index_count, MeshClusterGPU[cluster_count], u32 indices[index_count],
-//                  u32 leaf_cluster_count, u32 node_count, u32 root_count, MeshNodeGPU[node_count], u32 roots[root_count]
-// The first `leaf_index_count` indices are the finest clusters, they contain all triangles of the mesh exactly once.
-// Meshes that have no indices of their own (see parseMeshes) use them as their index buffer, so the geometry is stored only once.
+//   for each mesh: u32 cluster_count, leaf_cluster_count, node_count, root_count, tree_depth, index_stride, leaf_vertex_count, leaf_index_count,
+//                  vertex_data_size, vertex_stride, VertexDecl, AttributeSemantic[VertexDecl::MAX_ATTRIBUTES],
+//                  MeshClusterGPU[cluster_count], MeshNodeGPU[node_count], u32 roots[root_count], u16 indices[cluster_count * index_stride],
+//                  u8 vertex_data[vertex_data_size], Vec3 vertices[leaf_vertex_count], u32 indices[leaf_index_count]
+// Everything is ready to be uploaded. The vertex data are the headers of clusters followed by their interleaved, bit packed vertices (see mesh_clusters.h).
+// Meshes with clusters have no vertices and indices of their own (see parseMeshes), the CPU ones (`vertices` and `indices`) are the finest clusters.
 bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 	u32 mesh_count;
 	file.read(mesh_count);
 	if (mesh_count > (u32)m_meshes.size()) return false;
-	if (mesh_count > 0 && version < FileVersion::CLUSTER_ATTRIBUTE_ERRORS) {
+	if (mesh_count > 0 && version < FileVersion::CLUSTER_INTERLEAVED) {
 		logError(m_path, ": clusters of an old version, the model has to be compiled again");
 		return false;
 	}
 
 	u32 total_clusters = 0;
 	for (u32 i = 0; i < mesh_count; ++i) {
-		u32 cluster_count, index_count, leaf_index_count;
+		Mesh& mesh = m_meshes[i];
+		u32 cluster_count, leaf_index_count, leaf_vertex_count, node_count, root_count, index_stride, vertex_data_size;
 		file.read(cluster_count);
-		file.read(index_count);
-		file.read(leaf_index_count);
-		const u64 clusters_size = u64(cluster_count) * sizeof(MeshClusterGPU);
-		const u64 indices_size = u64(index_count) * sizeof(u32);
-		if (file.hasOverflow() || leaf_index_count > index_count || clusters_size + indices_size > file.remaining()) return false;
-		const void* clusters = file.skip(clusters_size);
-		const void* indices = file.skip(indices_size);
-
-		u32 leaf_cluster_count, node_count, root_count;
-		file.read(leaf_cluster_count);
+		file.read(mesh.leaf_cluster_count);
 		file.read(node_count);
 		file.read(root_count);
-		const u64 nodes_size = u64(node_count) * sizeof(MeshNodeGPU) + u64(root_count) * sizeof(u32);
-		if (file.hasOverflow() || node_count == 0 || root_count == 0 || leaf_cluster_count > cluster_count || nodes_size > file.remaining()) return false;
-		const void* nodes = file.skip(nodes_size);
+		file.read(mesh.tree_depth);
+		file.read(index_stride);
+		file.read(leaf_vertex_count);
+		file.read(leaf_index_count);
+		file.read(vertex_data_size);
+		file.read(mesh.vb_stride);
+		file.read(mesh.vertex_decl);
+		file.read(mesh.attributes_semantic);
 
-		Mesh& mesh = m_meshes[i];
-		mesh.leaf_cluster_count = leaf_cluster_count;
-		mesh.node_count = node_count;
-		mesh.root_count = root_count;
-		{
-			// the trees are balanced (see buildNodes), the first child leads to a leaf as deep as any
-			const u8* node_bytes = (const u8*)nodes;
-			const u32* roots = (const u32*)(node_bytes + u64(node_count) * sizeof(MeshNodeGPU));
-			mesh.tree_depth = 0;
-			for (u32 r = 0; r < root_count; ++r) {
-				u32 depth = 1;
-				u32 node_index = roots[r];
-				for (; depth <= 64; ++depth) {
-					if (node_index >= node_count) return false;
-					MeshNodeGPU node;
-					memcpy(&node, node_bytes + u64(node_index) * sizeof(MeshNodeGPU), sizeof(node));
-					if (node.count_and_flags & MeshClusters::LEAF_FLAG) break;
-					node_index = node.first;
-				}
-				mesh.tree_depth = maximum(mesh.tree_depth, depth);
-			}
-		}
-		mesh.node_buffer = m_renderer.createBuffer(m_renderer.copy(nodes, (u32)nodes_size), gpu::BufferFlags::IMMUTABLE, m_path.c_str());
-		mesh.cluster_count = cluster_count;
-		total_clusters += cluster_count;
-		mesh.cluster_buffer = m_renderer.createBuffer(m_renderer.copy(clusters, (u32)clusters_size), gpu::BufferFlags::IMMUTABLE, m_path.c_str());
-		mesh.cluster_index_buffer = m_renderer.createBuffer(m_renderer.copy(indices, (u32)indices_size), gpu::BufferFlags::IMMUTABLE, m_path.c_str());
-		if (!mesh.cluster_buffer || !mesh.cluster_index_buffer || !mesh.node_buffer) {
-			logError(m_path, ": failed to create cluster buffers");
+		bool valid_semantics = mesh.vertex_decl.isValid();
+		for (AttributeSemantic semantic : mesh.attributes_semantic) valid_semantics = valid_semantics && (u32)semantic < (u32)AttributeSemantic::COUNT;
+		if (file.hasOverflow() || !valid_semantics || mesh.leaf_cluster_count > cluster_count || mesh.tree_depth > 64) {
+			logError(m_path, ": invalid clusters");
 			return false;
 		}
 
-		if (mesh.indices_count == 0) {
-			mesh.indices_count = leaf_index_count;
-			mesh.indices.resize(leaf_index_count * sizeof(u32));
-			memcpy(mesh.indices.getMutableData(), indices, leaf_index_count * sizeof(u32));
-			mesh.index_buffer_handle = mesh.cluster_index_buffer; // shared, see unload
+		const u64 clusters_size = u64(cluster_count) * sizeof(MeshClusterGPU);
+		const u64 nodes_size = u64(node_count) * sizeof(MeshNodeGPU) + u64(root_count) * sizeof(u32);
+		const u64 indices_size = u64(cluster_count) * index_stride * sizeof(u16);
+		const u64 vertices_size = u64(leaf_vertex_count) * sizeof(Vec3);
+		const u64 cpu_indices_size = u64(leaf_index_count) * sizeof(u32);
+		if (file.hasOverflow() || cluster_count == 0 || node_count == 0 || root_count == 0 || vertex_data_size > 0x7fffFFFF
+			|| clusters_size + nodes_size + indices_size + vertex_data_size + vertices_size + cpu_indices_size > file.remaining()) return false;
+		const void* clusters = file.skip(clusters_size);
+		const void* nodes = file.skip(nodes_size);
+		const void* indices = file.skip(indices_size);
+		const void* vertex_data = file.skip(vertex_data_size);
+
+		mesh.vertices.resize(leaf_vertex_count);
+		memcpy(mesh.vertices.begin(), file.skip(vertices_size), vertices_size);
+		mesh.indices.resize(cpu_indices_size);
+		memcpy(mesh.indices.getMutableData(), file.skip(cpu_indices_size), cpu_indices_size);
+		mesh.indices_count = leaf_index_count;
+		mesh.index_type = gpu::DataType::U32;
+
+		mesh.cluster_count = cluster_count;
+		mesh.node_count = node_count;
+		mesh.root_count = root_count;
+		mesh.cluster_index_stride = index_stride;
+		mesh.semantics_defines = m_renderer.getSemanticDefines(Span(mesh.attributes_semantic), mesh.vertex_decl, mesh.vb_stride);
+		const char* path = m_path.c_str();
+		mesh.cluster_buffer = m_renderer.createBuffer(m_renderer.copy(clusters, (u32)clusters_size), gpu::BufferFlags::IMMUTABLE, path);
+		mesh.node_buffer = m_renderer.createBuffer(m_renderer.copy(nodes, (u32)nodes_size), gpu::BufferFlags::IMMUTABLE, path);
+		mesh.cluster_index_buffer = m_renderer.createBuffer(m_renderer.copy(indices, (u32)indices_size), gpu::BufferFlags::IMMUTABLE, path);
+		mesh.vertex_buffer_handle = m_renderer.createBuffer(m_renderer.copy(vertex_data, vertex_data_size), gpu::BufferFlags::IMMUTABLE, path);
+		if (!mesh.cluster_buffer || !mesh.cluster_index_buffer || !mesh.node_buffer || !mesh.vertex_buffer_handle) {
+			logError(m_path, ": failed to create cluster buffers");
+			return false;
 		}
+		total_clusters += cluster_count;
 	}
 
+	// Meshes of the first LOD have vertices only in clusters, so all of them must have clusters
+	if (mesh_count > 0 && mesh_count != (u32)(getClusterMeshesEnd() + 1)) {
+		logError(m_path, ": not all meshes of the first LOD have clusters");
+		return false;
+	}
 	for (const Mesh& mesh : m_meshes) {
-		if (mesh.indices_count == 0) {
+		if (mesh.indices_count == 0 || !mesh.vertex_buffer_handle) {
 			logError(m_path, ": has no geometry data");
 			return false;
 		}
 	}
 
-	// clusters are used only if all meshes of the first LOD have them
-	if (mesh_count > 0 && (i32)mesh_count == getClusterMeshesEnd() + 1) {
+	if (mesh_count > 0) {
 		m_has_clusters = true;
 		logInfo(m_path, ": loaded ", total_clusters, " clusters");
-	}
-	else {
-		destroyClusters();
 	}
 	return true;
 }
@@ -737,12 +747,12 @@ void Model::destroyClusters() {
 	for (Mesh& mesh : m_meshes) {
 		if (mesh.cluster_buffer) stream.destroy(mesh.cluster_buffer);
 		if (mesh.node_buffer) stream.destroy(mesh.node_buffer);
-		// the index buffer of the mesh can be the same buffer, it is destroyed with the mesh
-		if (mesh.cluster_index_buffer && mesh.cluster_index_buffer != mesh.index_buffer_handle) stream.destroy(mesh.cluster_index_buffer);
+		if (mesh.cluster_index_buffer) stream.destroy(mesh.cluster_index_buffer);
 		mesh.cluster_buffer = gpu::INVALID_BUFFER;
 		mesh.cluster_index_buffer = gpu::INVALID_BUFFER;
 		mesh.node_buffer = gpu::INVALID_BUFFER;
 		mesh.cluster_count = 0;
+		mesh.cluster_index_stride = 0;
 		mesh.node_count = 0;
 		mesh.root_count = 0;
 		mesh.tree_depth = 0;

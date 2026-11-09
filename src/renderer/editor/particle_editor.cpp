@@ -628,30 +628,16 @@ struct ParticleEmitterEditorResource {
 		return success;
 	}
 	
-	void fillVertexDecl(gpu::VertexDecl& decl, Array<String>* attribute_names, IAllocator& allocator) const {
-		u32 offset = 0;
+	u32 getVertexStride() const {
+		u32 stride = 0;
 		for (const ParticleEmitterEditorResource::Output& o : m_outputs) {
 			switch(o.type) {
-				case ValueType::FLOAT: {
-					if (attribute_names) attribute_names->emplace(o.name, allocator);
-					decl.addAttribute(offset, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-					offset += sizeof(float);
-					break;
-				}
-				case ValueType::VEC3: {
-					if (attribute_names) attribute_names->emplace(o.name, allocator);
-					decl.addAttribute(offset, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-					offset += sizeof(Vec3);
-					break;
-				}
-				case ValueType::VEC4: {
-					if (attribute_names) attribute_names->emplace(o.name, allocator);
-					decl.addAttribute(offset, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-					offset += sizeof(Vec4);
-					break;
-				}
+				case ValueType::FLOAT: stride += sizeof(float); break;
+				case ValueType::VEC3: stride += sizeof(Vec3); break;
+				case ValueType::VEC4: stride += sizeof(Vec4); break;
 			}
 		}
+		return stride;
 	}
 
 	ParticleSystemEditorResource& m_system;
@@ -2772,9 +2758,7 @@ struct ParticleEditorImpl : ParticleEditor {
 		for (const UniquePtr<ParticleEmitterEditorResource>& emitter : res.m_emitters) {
 			if (!emitter->generate()) return false;
 
-			gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
-			emitter->fillVertexDecl(decl, nullptr, m_allocator);
-			output.write(decl);
+			output.write(emitter->getVertexStride());
 			output.writeString(emitter->m_mat_path);
 			output.writeString(emitter->m_model_path);
 			const u32 count = u32(emitter->m_update.size() + emitter->m_emit.size() + emitter->m_output.size());
@@ -3642,29 +3626,6 @@ void ParticleEditorImpl::FunctionPlugin::listLoaded() {
 
 DataStream NodeInput::generate(GenerateContext& ctx, DataStream output, u8 subindex) const {
 	return node ? node->generate(ctx, output, subindex) : DataStream();
-}
-
-gpu::VertexDecl ParticleEditor::getVertexDecl(const char* path, u32 emitter_idx, Array<String>& attribute_names, StudioApp& app) {
-	attribute_names.clear();
-	gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
-
-	IAllocator& allocator = app.getAllocator();
-	ParticleSystemEditorResource system(Path(path), app, allocator);
-	OutputMemoryStream blob(allocator);
-	FileSystem& fs = app.getEngine().getFileSystem();
-	if (!fs.getContentSync(Path(path), blob)) {
-		logError("Failed to load ", path);
-		return decl;
-	}
-
-	InputMemoryStream tmp(blob);
-	if (!system.deserialize(tmp)) {
-		logError("Failed to parse ", path);
-		return decl;
-	}
-
-	system.m_emitters[emitter_idx]->fillVertexDecl(decl, &attribute_names, allocator);
-	return decl;
 }
 
 void ParticleSystemEditorResource::registerDependencies() {

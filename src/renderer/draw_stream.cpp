@@ -42,7 +42,6 @@ enum class DrawStream::Instruction : u8 {
 	TEXTURE_BARRIER,
 	BUFFER_BARRIER,
 	DRAW_INDIRECT,
-	DRAW_INDIRECT_COUNT,
 	BIND_SHADER_BUFFER,
 	DISPATCH,
 	CREATE_BUFFER,
@@ -77,10 +76,8 @@ namespace Dirty {
 		PROGRAM = 0b11 << 2,
 		INDEX_BUFFER = 0b11 << 4,
 		INDIRECT_BUFFER = 0b11 << 6,
-		VERTEX_BUFFER0 = 0b1111 << 8,
-		VERTEX_BUFFER1 = 0b1111 << 12,
 
-		BIND = PROGRAM | INDEX_BUFFER | VERTEX_BUFFER0 | VERTEX_BUFFER1
+		BIND = PROGRAM | INDEX_BUFFER
 	};
 }
 
@@ -148,13 +145,6 @@ struct BufferBarrierData {
 struct DrawIndirectData {
 	gpu::DataType index_type;
 	u32 indirect_buffer_offset;
-};
-
-struct DrawIndirectCountData {
-	gpu::DataType index_type;
-	u32 indirect_buffer_offset;
-	u32 max_count;
-	u32 count_buffer_offset;
 };
 
 struct ReadTextureData {
@@ -235,12 +225,11 @@ struct CreateProgramData {
 	CreateProgramData(IAllocator& allocator) 
 		: source(allocator)
 		, name(allocator)
-		, decl(gpu::PrimitiveType::NONE)
 	{}
 
 	gpu::ProgramHandle program;
 	gpu::StateFlags state;
-	gpu::VertexDecl decl;
+	gpu::PrimitiveType primitive_type = gpu::PrimitiveType::NONE;
 	String source;
 	const char* src;
 	gpu::ShaderType type;
@@ -405,28 +394,9 @@ DrawStream& DrawStream::createSubstream() {
 	return *new (NewPlaceholder(), data) DrawStream(renderer);
 }
 
-static const char* getAttrDefine(u32 idx) {
-	switch (idx) {
-		case 0 : return "#define _HAS_ATTR0\n";
-		case 1 : return "#define _HAS_ATTR1\n";
-		case 2 : return "#define _HAS_ATTR2\n";
-		case 3 : return "#define _HAS_ATTR3\n";
-		case 4 : return "#define _HAS_ATTR4\n";
-		case 5 : return "#define _HAS_ATTR5\n";
-		case 6 : return "#define _HAS_ATTR6\n";
-		case 7 : return "#define _HAS_ATTR7\n";
-		case 8 : return "#define _HAS_ATTR8\n";
-		case 9 : return "#define _HAS_ATTR9\n";
-		case 10 : return "#define _HAS_ATTR10\n";
-		case 11 : return "#define _HAS_ATTR11\n";
-		case 12 : return "#define _HAS_ATTR12\n";
-		default: ASSERT(false); return "";
-	}
-}
-
 void DrawStream::createProgram(gpu::ProgramHandle prog
 	, gpu::StateFlags state
-	, const gpu::VertexDecl& decl
+	, gpu::PrimitiveType primitive_type
 	, const char* src
 	, gpu::ShaderType type
 	, const char** prefixes
@@ -436,12 +406,8 @@ void DrawStream::createProgram(gpu::ProgramHandle prog
 	CreateProgramData* data = LUMIX_NEW(gpu::getAllocator(), CreateProgramData)(gpu::getAllocator());
 	data->program = prog;
 	data->state = state;
-	data->decl = decl;
+	data->primitive_type = primitive_type;
 	data->type = type;
-	data->source = String(gpu::getAllocator());
-	for (u32 i = 0; i < decl.attributes_count; ++i) {
-		data->source.append(getAttrDefine(i)); 
-	}
 	data->source = R"#(
 		#define TextureHandle int
 		#define RWTextureHandle int
@@ -537,12 +503,6 @@ void DrawStream::setCurrentWindow(void* window_handle) {
 	write(Instruction::SET_CURRENT_WINDOW, window_handle);
 }
 
-void DrawStream::bindVertexBuffer(u32 binding_idx, gpu::BufferHandle buffer, u32 buffer_offset, u32 stride) {
-	ASSERT(binding_idx < lengthOf(m_cache.vertex_buffers));
-	m_cache.vertex_buffers[binding_idx] = { buffer, buffer_offset, stride};
-	m_cache.dirty |= binding_idx == 0 ? Dirty::VERTEX_BUFFER0 : Dirty::VERTEX_BUFFER1;
-}
-
 void DrawStream::scissor(u32 x,u32 y,u32 w,u32 h) {
 	IVec4 vec(x, y, w, h);
 	write(Instruction::SCISSOR, vec);
@@ -570,12 +530,6 @@ void DrawStream::drawIndirect(gpu::DataType index_type, u32 indirect_buffer_offs
 	submitCached();
 	DrawIndirectData data = { index_type, indirect_buffer_offset };
 	write(Instruction::DRAW_INDIRECT, data);
-}
-
-void DrawStream::drawIndirectCount(gpu::DataType index_type, u32 indirect_buffer_offset, u32 max_count, u32 count_buffer_offset) {
-	submitCached();
-	DrawIndirectCountData data = { index_type, indirect_buffer_offset, max_count, count_buffer_offset };
-	write(Instruction::DRAW_INDIRECT_COUNT, data);
 }
 
 void DrawStream::barrier(gpu::TextureHandle texture, gpu::BarrierType type) {
@@ -711,8 +665,6 @@ void DrawStream::submitCached() {
 	if (dirty & Dirty::PROGRAM) WRITE(m_cache.program);
 	if (dirty & Dirty::INDEX_BUFFER) WRITE(m_cache.index_buffer);
 	if (dirty & Dirty::INDIRECT_BUFFER) WRITE(m_cache.indirect_buffer);
-	if (dirty & Dirty::VERTEX_BUFFER0) WRITE(m_cache.vertex_buffers[0]);
-	if (dirty & Dirty::VERTEX_BUFFER1) WRITE(m_cache.vertex_buffers[1]);
 	#undef WRITE
 }
 
@@ -753,24 +705,11 @@ void DrawStream::run() {
 						READ(gpu::BufferHandle, buf);
 						gpu::bindIndirectBuffer(buf);
 					}
-					if (dirty & Dirty::VERTEX_BUFFER0) {
-						READ(Cache::VertexBuffer, buf);
-						gpu::bindVertexBuffer(0, buf.buffer, buf.offset, buf.stride);
-					}
-					if (dirty & Dirty::VERTEX_BUFFER1) {
-						READ(Cache::VertexBuffer, buf);
-						gpu::bindVertexBuffer(1, buf.buffer, buf.offset, buf.stride);
-					}
 					break;
 				}
 				case Instruction::DRAW_INDIRECT: {
 					READ(DrawIndirectData, data);
 					gpu::drawIndirect(data.index_type, data.indirect_buffer_offset);
-					break;
-				}
-				case Instruction::DRAW_INDIRECT_COUNT: {
-					READ(DrawIndirectCountData, data);
-					gpu::drawIndirectCount(data.index_type, data.indirect_buffer_offset, data.max_count, data.count_buffer_offset);
 					break;
 				}
 				case Instruction::MEMORY_BARRIER: {
@@ -826,7 +765,7 @@ void DrawStream::run() {
 					READ(CreateProgramData*, data);
 					gpu::createProgram(data->program
 						, data->state
-						, data->decl
+						, data->primitive_type
 						, data->src
 						, data->type
 						, data->name.c_str()

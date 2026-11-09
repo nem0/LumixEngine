@@ -10,6 +10,7 @@
 #include "draw_stream.h"
 #include "engine/plugin.h"
 #include "gpu/gpu.h"
+#include "vertex_decl.h"
 
 #ifndef _WIN32
 	#include "engine/engine.h"
@@ -142,10 +143,9 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual void enableBuiltinTAA(bool enable) = 0;
 	virtual bool isBuiltinTAAEnabled() const = 0;
 	
-	// With `vertex_pulling` the vertex shader reads vertices from a buffer, see vertex_pulling.hlsli. It has no
-	// per-vertex attributes in the input assembler, so instance attributes start at 0, and the layout of vertices
-	// (stride, offset and format of each attribute) is part of the defines.
-	virtual const char* getSemanticDefines(Span<const AttributeSemantic> attributes, const gpu::VertexDecl& decl, u32 vertex_stride, bool vertex_pulling) = 0;
+	// Vertex shaders read vertices from a buffer, see vertex_pulling.hlsli. The defines have the layout of vertices
+	// (stride, offset and format of each attribute).
+	virtual const char* getSemanticDefines(Span<const AttributeSemantic> attributes, const VertexDecl& decl, u32 vertex_stride) = 0;
 
 	virtual struct FontManager& getFontManager() = 0;
 	virtual struct ResourceManager& getTextureManager() = 0;
@@ -168,7 +168,7 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual void setRenderTargets(Span<const RenderBufferHandle> renderbuffers, RenderBufferHandle ds = INVALID_RENDERBUFFER, gpu::FramebufferFlags flags = gpu::FramebufferFlags::NONE) = 0;
 	virtual gpu::TextureHandle toTexture(RenderBufferHandle handle) = 0;
 
-	virtual gpu::ProgramHandle queueShaderCompile(struct Shader& shader, const struct ShaderKey& key, gpu::VertexDecl decl) = 0;
+	virtual gpu::ProgramHandle queueShaderCompile(struct Shader& shader, const struct ShaderKey& key) = 0;
 	virtual DrawStream& getDrawStream() = 0;
 	virtual DrawStream& getEndFrameDrawStream() = 0;
 

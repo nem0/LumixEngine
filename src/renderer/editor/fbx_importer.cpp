@@ -337,20 +337,20 @@ struct FBXImporter : ModelImporter {
 
 				import_geom.attributes.push({
 					.semantic = AttributeSemantic::POSITION,
-					.type = gpu::AttributeType::FLOAT,
+					.type = AttributeType::FLOAT,
 					.num_components = 3
 				});
 
 				import_geom.attributes.push({
 					.semantic = AttributeSemantic::NORMAL,
-					.type = gpu::AttributeType::I8,
+					.type = AttributeType::I8,
 					.num_components = 4
 				});
 
 				if (geom.getUVs().values) {
 					import_geom.attributes.push({
 						.semantic = AttributeSemantic::TEXCOORD0,
-						.type = gpu::AttributeType::FLOAT,
+						.type = AttributeType::FLOAT,
 						.num_components = 2
 					});
 				}
@@ -358,7 +358,7 @@ struct FBXImporter : ModelImporter {
 				if (meta.bake_vertex_ao) {
 					import_geom.attributes.push({
 						.semantic = AttributeSemantic::AO,
-						.type = gpu::AttributeType::U8,
+						.type = AttributeType::U8,
 						.num_components = 4 // 1+3 because of padding
 					});
 				}
@@ -366,14 +366,14 @@ struct FBXImporter : ModelImporter {
 					if (meta.vertex_color_is_ao) {
 						import_geom.attributes.push({
 							.semantic = AttributeSemantic::AO,
-							.type = gpu::AttributeType::U8,
+							.type = AttributeType::U8,
 							.num_components = 4 // 1+3 because of padding
 						});
 					}
 					else {
 						import_geom.attributes.push({
 							.semantic = AttributeSemantic::COLOR0,
-							.type = gpu::AttributeType::U8,
+							.type = AttributeType::U8,
 							.num_components = 4
 						});
 					}
@@ -382,7 +382,7 @@ struct FBXImporter : ModelImporter {
 				if (hasTangents(geom)) {
 					import_geom.attributes.push({
 						.semantic = AttributeSemantic::TANGENT,
-						.type = gpu::AttributeType::I8,
+						.type = AttributeType::I8,
 						.num_components = 4
 					});
 				}
@@ -390,12 +390,12 @@ struct FBXImporter : ModelImporter {
 				if (import_geom.is_skinned) {
 					import_geom.attributes.push({
 						.semantic = AttributeSemantic::JOINTS,
-						.type = gpu::AttributeType::U16,
+						.type = AttributeType::U16,
 						.num_components = 4
 					});
 					import_geom.attributes.push({
 						.semantic = AttributeSemantic::WEIGHTS,
-						.type = gpu::AttributeType::U16,
+						.type = AttributeType::U16,
 						.num_components = 4
 					});
 				}

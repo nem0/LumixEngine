@@ -85,10 +85,9 @@ struct ImGuiIntegration {
 						}
 					)#";
 				// vertices are pulled by the vertex shader
-				const gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
 				const gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				m_shader = gpu::allocProgramHandle();
-				stream.createProgram(m_shader, state, decl, src, gpu::ShaderType::SURFACE, nullptr, 0, "imgui shader");
+				stream.createProgram(m_shader, state, gpu::PrimitiveType::TRIANGLES, src, gpu::ShaderType::SURFACE, nullptr, 0, "imgui shader");
 			}
 
 			if (draw_data->Textures != nullptr) {

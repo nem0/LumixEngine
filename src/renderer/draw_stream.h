@@ -14,7 +14,7 @@ struct DrawStream {
 	DrawStream(DrawStream&& rhs);
 	~DrawStream();
 
-	void createProgram(gpu::ProgramHandle prog, gpu::StateFlags state, const gpu::VertexDecl& decl, const char* srcs, gpu::ShaderType type, const char** prefixes, u32 prefixes_count, const char* name);
+	void createProgram(gpu::ProgramHandle prog, gpu::StateFlags state, gpu::PrimitiveType primitive_type, const char* srcs, gpu::ShaderType type, const char** prefixes, u32 prefixes_count, const char* name);
 	void createBuffer(gpu::BufferHandle buffer, gpu::BufferFlags flags, size_t size, const void* data, const char* debug_name);
 	void createTexture(gpu::TextureHandle handle, u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const char* debug_name);
 	void createTextureView(gpu::TextureHandle view, gpu::TextureHandle texture, u32 layer, u32 mip);
@@ -41,7 +41,6 @@ struct DrawStream {
 	void requestDisassembly(gpu::ProgramHandle program);
 	
 	void bindIndexBuffer(gpu::BufferHandle buffer);
-	void bindVertexBuffer(u32 binding_idx, gpu::BufferHandle buffer, u32 buffer_offset, u32 stride);
 	void bindUniformBuffer(u32 ub_index, gpu::BufferHandle buffer, u32 offset, u32 size);
 	void bindIndirectBuffer(gpu::BufferHandle buffer);
 	void bindShaderBuffers(Span<gpu::BufferHandle> buffers, Span<const u32> strides);
@@ -49,7 +48,6 @@ struct DrawStream {
 	gpu::Drawcall& draw();
 	void drawArrays(u32 offset, u32 count);
 	void drawIndirect(gpu::DataType index_type, u32 indirect_buffer_offset);
-	void drawIndirectCount(gpu::DataType index_type, u32 indirect_buffer_offset, u32 max_count, u32 count_buffer_offset);
 	void drawIndexed(u32 offset, u32 count, gpu::DataType type);
 	void drawArraysInstanced(u32 indices_count, u32 instances_count);
 	void drawIndexedInstanced(u32 indices_count, u32 instances_count, gpu::DataType index_type);
@@ -115,11 +113,6 @@ private:
 	struct Cache {
 		gpu::ProgramHandle program;
 		gpu::BufferHandle index_buffer;
-		struct VertexBuffer {
-			gpu::BufferHandle buffer;
-			u32 offset;
-			u32 stride;
-		} vertex_buffers[2];
 		gpu::BufferHandle indirect_buffer;
 		u32 dirty = 0;
 	};

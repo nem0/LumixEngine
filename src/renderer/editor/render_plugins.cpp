@@ -2972,7 +2972,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			)#";
 
 			m_downscale_program = gpu::allocProgramHandle();
-			stream.createProgram(m_downscale_program, gpu::StateFlags::NONE, gpu::VertexDecl(gpu::PrimitiveType::NONE), downscale_src, gpu::ShaderType::COMPUTE, nullptr, 0, "downscale");
+			stream.createProgram(m_downscale_program, gpu::StateFlags::NONE, gpu::PrimitiveType::NONE, downscale_src, gpu::ShaderType::COMPUTE, nullptr, 0, "downscale");
 		}
 
 		ASSERT(src_w % dst_w == 0);
@@ -3260,7 +3260,7 @@ struct ShaderCodeEditorWindow : AssetEditorWindow {
 				else if (m_shader->isEmpty()) ImGui::TextUnformatted("Loading...");
 				else {
 					if (!m_program) {
-						m_program = m_shader->m_programs.empty() ? m_shader->getProgram(gpu::StateFlags::NONE, gpu::VertexDecl(gpu::PrimitiveType::TRIANGLES), 0, nullptr) : m_shader->m_programs[0].program;
+						m_program = m_shader->m_programs.empty() ? m_shader->getProgram(gpu::StateFlags::NONE, gpu::PrimitiveType::TRIANGLES, 0, nullptr) : m_shader->m_programs[0].program;
 						m_shader->m_renderer.getDrawStream().requestDisassembly(m_program);
 					}
 					if (m_disassembly.length() == 0) {
@@ -3933,7 +3933,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		if (m_app.checkShortcut(m_generate_action, true)) generateProbes(false, world);
 
 		if (m_ibl_filter_shader->isReady() && !m_ibl_filter_program) {
-			m_ibl_filter_program = m_ibl_filter_shader->getProgram(gpu::StateFlags::NONE, gpu::VertexDecl(gpu::PrimitiveType::TRIANGLE_STRIP), 0, "");
+			m_ibl_filter_program = m_ibl_filter_shader->getProgram(gpu::StateFlags::NONE, gpu::PrimitiveType::TRIANGLE_STRIP, 0, "");
 		}
 
 		if (m_done_counter != m_probe_counter) {
@@ -5255,9 +5255,8 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 						}
 					)#";
 				// vertices are pulled by the vertex shader
-				const gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
 				const gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
-				stream.createProgram(program, state, decl, src, gpu::ShaderType::SURFACE, nullptr, 0, "imgui shader");
+				stream.createProgram(program, state, gpu::PrimitiveType::TRIANGLES, src, gpu::ShaderType::SURFACE, nullptr, 0, "imgui shader");
 			}
 
 			if (draw_data->Textures != nullptr) {

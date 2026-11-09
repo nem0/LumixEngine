@@ -1013,7 +1013,7 @@ struct RenderModuleImpl final : RenderModule {
 			blob.write(pg.vertex_data.data(), pg.vertex_data.size());
 			blob.write(pg.vertex_decl.attributes_count);
 			blob.write(pg.vertex_decl.attributes, sizeof(pg.vertex_decl.attributes[0]) * pg.vertex_decl.attributes_count);
-			blob.write(pg.vertex_decl.primitive_type);
+			blob.write(pg.primitive_type);
 
 			blob.write((u32)pg.index_data.size());
 			if (pg.index_data.size() > 0) blob.write(pg.index_data.data(), pg.index_data.size());
@@ -1241,9 +1241,13 @@ struct RenderModuleImpl final : RenderModule {
 			pg.vertex_data.resize(data_size);
 			blob.read(pg.vertex_data.getMutableData(), pg.vertex_data.size());
 			blob.read(pg.vertex_decl.attributes_count);
+			if (!pg.vertex_decl.isValid()) {
+				logError("Invalid vertex declaration of procedural geometry");
+				return;
+			}
 			blob.read(pg.vertex_decl.attributes, pg.vertex_decl.attributes_count * sizeof(pg.vertex_decl.attributes[0]));
 			if (version > (i32)RenderModuleVersion::PROCEDURAL_GEOMETRY_PRIMITIVE_TYPE) {
-				blob.read(pg.vertex_decl.primitive_type);
+				blob.read(pg.primitive_type);
 			}
 			if (version > (i32)RenderModuleVersion::PROCEDURAL_GEOMETRY_INDEX_BUFFER) {
 				u32 index_buffer_size;
@@ -1254,7 +1258,6 @@ struct RenderModuleImpl final : RenderModule {
 				}
 				blob.read(pg.index_type);
 			}
-			pg.vertex_decl.computeHash();
 			if (!pg.vertex_data.empty()) {
 				const Renderer::MemRef mem = m_renderer.copy(pg.vertex_data.data(), (u32)pg.vertex_data.size());
 				pg.vertex_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE, "pg_vb");			
@@ -1914,6 +1917,7 @@ struct RenderModuleImpl final : RenderModule {
 	void getProceduralGeometryBlob(EntityRef entity, OutputMemoryStream& value) {
 		const ProceduralGeometry& pg = m_procedural_geometries[entity];
 		value.write(pg.vertex_decl);
+		value.write(pg.primitive_type);
 		value.write(pg.index_type);
 		value.write((u32)pg.vertex_data.size());
 		if (!pg.vertex_data.empty()) value.write(pg.vertex_data.data(), pg.vertex_data.size());
@@ -1935,6 +1939,12 @@ struct RenderModuleImpl final : RenderModule {
 		}
 		
 		value.read(pg.vertex_decl);
+		if (!pg.vertex_decl.isValid()) {
+			logError("Invalid vertex declaration of procedural geometry");
+			pg.vertex_decl = VertexDecl();
+			return;
+		}
+		value.read(pg.primitive_type);
 		value.read(pg.index_type);
 		u32 size = value.read<u32>();
 		if (size > 0) {
@@ -1972,13 +1982,15 @@ struct RenderModuleImpl final : RenderModule {
 
 	void setProceduralGeometry(EntityRef entity
 		, Span<const u8> vertex_data
-		, const gpu::VertexDecl& vertex_decl
+		, const VertexDecl& vertex_decl
+		, gpu::PrimitiveType primitive_type
 		, Span<const u8> indices
 		, gpu::DataType index_type) override
 	{
 		PROFILE_FUNCTION();
 		ProceduralGeometry& pg = m_procedural_geometries[entity];
 		pg.vertex_decl = vertex_decl;
+		pg.primitive_type = primitive_type;
 		pg.vertex_data.clear();
 		pg.index_data.clear();
 		pg.index_type = index_type;
@@ -2782,7 +2794,7 @@ struct RenderModuleImpl final : RenderModule {
 		for (auto iter : m_procedural_geometries.iterated()) {
 			const ProceduralGeometry& pg = iter.value();
 			if (pg.vertex_data.empty()) continue;
-			if (pg.vertex_decl.primitive_type != gpu::PrimitiveType::TRIANGLES) continue;
+			if (pg.primitive_type != gpu::PrimitiveType::TRIANGLES) continue;
 
 			const u32 stride = pg.vertex_decl.getStride();
 			const u8* data = pg.vertex_data.data();
