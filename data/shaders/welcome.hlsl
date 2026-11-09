@@ -1,9 +1,7 @@
 //@surface
 
 struct VSInput {
-	float2 pos : TEXCOORD0;
-	float2 uv : TEXCOORD1;
-	float4 color : TEXCOORD2;
+	uint vertex_id : SV_VertexID;
 };
 
 cbuffer ImGuiState : register(b4) {
@@ -11,6 +9,8 @@ cbuffer ImGuiState : register(b4) {
 	float2 c_offset;
 	uint c_texture;
 	float c_time;
+	uint c_vertices;
+	uint c_vertices_offset;
 };
 
 struct VSOutput {
@@ -20,10 +20,15 @@ struct VSOutput {
 };
 
 VSOutput mainVS(VSInput input) {
+	// vertices are pulled: float2 position, float2 uv, RGBA8 color, 20 bytes each
+	ByteAddressBuffer vb = bindless_buffers[c_vertices];
+	const uint offset = c_vertices_offset + input.vertex_id * 20;
+	const float4 pos_uv = asfloat(vb.Load4(offset));
+	const uint packed = vb.Load(offset + 16);
 	VSOutput output;
-	output.color = input.color;
-	output.uv = input.uv;
-	float2 p = input.pos * c_scale + c_offset;
+	output.color = float4(packed & 0xff, (packed >> 8) & 0xff, (packed >> 16) & 0xff, packed >> 24) / 255.0;
+	output.uv = pos_uv.zw;
+	float2 p = pos_uv.xy * c_scale + c_offset;
 	output.position = float4(p.xy, 0, 1);
 	return output;
 }

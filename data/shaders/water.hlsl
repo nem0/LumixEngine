@@ -20,20 +20,8 @@
 #include "engine/shaders/common.hlsli"
 #include "engine/shaders/vertex_pulling.hlsli"
 
-#define ATTR(X) TEXCOORD##X
-
 struct VSInput {
-	#ifdef VERTEX_PULLING
-		uint vertex_id : SV_VertexID;
-	#else
-		float3 position : TEXCOORD0;
-		#ifdef UV0_ATTR
-			float2 uv : ATTR(UV0_ATTR);
-		#endif
-	#endif
-	#ifdef _HAS_ATTR2 
-		//layout(location = 2) in float2 a_masks;
-	#endif
+	uint vertex_id : SV_VertexID;
 	#if defined AUTOINSTANCED
 		uint instance_id : SV_InstanceID;
 	#endif
@@ -67,9 +55,6 @@ struct VSOutput {
 	float3 tangent : TEXCOORD2;
 	float3 pos_ws : TEXCOORD3;
 	uint i_material_index : TEXCOORD4;
-	#ifdef _HAS_ATTR2 
-		//float2 masks : TEXCOORD4;
-	#endif
 	float4 position : SV_POSITION;
 };
 
@@ -79,27 +64,19 @@ struct VSOutput {
 	};
 #endif
 
-#ifdef VERTEX_PULLING
-	#define VTX(x) vtx.x
-#else
-	#define VTX(x) input.x
-#endif
-
 VSOutput mainVS(VSInput input) {
-	#ifdef VERTEX_PULLING
-		VSVertex vtx = pullVertex(input.vertex_id);
-	#endif
+	VSVertex vtx = pullVertex(input.vertex_id);
 	static const float3 normal = float3(0, 1, 0);
 	static const float3 tangent = float3(1, 0, 0);
 
 	VSOutput output;
-	output.uv = VTX(uv);
+	output.uv = vtx.uv;
 	#if defined AUTOINSTANCED
 		const Instance inst = loadInstance(input);
 		output.i_material_index = inst.material_index;
 		output.normal = rotateByQuat(inst.rot, normal);
 		output.tangent = rotateByQuat(inst.rot, tangent);
-		float3 p = VTX(position) * inst.scale.xyz;
+		float3 p = vtx.position * inst.scale.xyz;
 		output.pos_ws = inst.pos_lod.xyz + rotateByQuat(inst.rot, p);
 	#elif defined GRASS
 		#error TODO
@@ -107,12 +84,9 @@ VSOutput mainVS(VSInput input) {
 		output.i_material_index = 0;
 		output.normal = float3x3(u_ls_to_ws) * normal;
 		output.tangent = float3x3(u_ls_to_ws) * tangent;
-		output.pos_ws = transformPosition(VTX(position), u_ls_to_ws).xyz;
+		output.pos_ws = transformPosition(vtx.position, u_ls_to_ws).xyz;
 	#endif
 	
-	#ifdef _HAS_ATTR2 
-		//output.masks = a_masks;
-	#endif
 	output.position = transformPosition(output.pos_ws, Pass_ws_to_ndc);
 	return output;
 }

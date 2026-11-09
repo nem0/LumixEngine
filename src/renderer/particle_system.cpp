@@ -36,7 +36,6 @@ ParticleSystemResource::Emitter::~Emitter() {
 ParticleSystemResource::Emitter::Emitter(ParticleSystemResource& resource)
 	: resource(resource)
 	, instructions(resource.m_allocator)
-	, vertex_decl(gpu::PrimitiveType::TRIANGLE_STRIP)
 {
 }
 
@@ -162,7 +161,7 @@ bool ParticleSystemResource::load(Span<const u8> mem) {
 
 	for (u32 i = 0; i < emitter_count; ++i) {
 		Emitter& emitter = m_emitters.emplace(*this);
-		blob.read(emitter.vertex_decl);
+		blob.read(emitter.vertex_stride);
 
 		emitter.setMaterial(Path(blob.readString()));
 		emitter.setModel(Path(blob.readString()));

@@ -57,55 +57,6 @@ static constexpr u32 SRV_ROOT_PARAMETER_INDEX = 8;
 static constexpr u32 UNIFORM_BLOCK_COUNT = 6;
 static constexpr u32 ALL_UNIFORM_BLOCKS_DIRTY = (1 << UNIFORM_BLOCK_COUNT) - 1;
 
-static DXGI_FORMAT getDXGIFormat(const Attribute& attr) {
-	const bool as_int = attr.flags & Attribute::AS_INT;
-	switch (attr.type) {
-		case AttributeType::FLOAT:
-			switch (attr.components_count) {
-				case 1: return DXGI_FORMAT_R32_FLOAT;
-				case 2: return DXGI_FORMAT_R32G32_FLOAT;
-				case 3: return DXGI_FORMAT_R32G32B32_FLOAT;
-				case 4: return DXGI_FORMAT_R32G32B32A32_FLOAT;
-			}
-			break;
-
-		case AttributeType::I8: 
-			switch(attr.components_count) {
-				case 1: return as_int ? DXGI_FORMAT_R8_SINT : DXGI_FORMAT_R8_SNORM;
-				case 2: return as_int ? DXGI_FORMAT_R8G8_SINT : DXGI_FORMAT_R8G8_SNORM;
-				case 4: return as_int ? DXGI_FORMAT_R8G8B8A8_SINT : DXGI_FORMAT_R8G8B8A8_SNORM;
-			}
-			break;
-		case AttributeType::U8: 
-			switch(attr.components_count) {
-				case 1: return as_int ? DXGI_FORMAT_R8_UINT : DXGI_FORMAT_R8_UNORM;
-				case 2: return as_int ? DXGI_FORMAT_R8G8_UINT : DXGI_FORMAT_R8G8_UNORM;
-				case 4: return as_int ? DXGI_FORMAT_R8G8B8A8_UINT : DXGI_FORMAT_R8G8B8A8_UNORM;
-			}
-			break;
-		case AttributeType::I16: 
-			switch(attr.components_count) {
-				case 4: return as_int ? DXGI_FORMAT_R16G16B16A16_SINT : DXGI_FORMAT_R16G16B16A16_SNORM;
-			}
-			break;
-		case AttributeType::U16: 
-			switch(attr.components_count) {
-				case 4: return as_int ? DXGI_FORMAT_R16G16B16A16_UINT : DXGI_FORMAT_R16G16B16A16_UNORM;
-			}
-			break;
-		case AttributeType::U32:
-			switch(attr.components_count) {
-				case 1: return DXGI_FORMAT_R32_UINT;
-				case 2: return DXGI_FORMAT_R32G32_UINT;
-				case 3: return DXGI_FORMAT_R32G32B32_UINT;
-				case 4: return DXGI_FORMAT_R32G32B32A32_UINT;
-			}
-			break;
-	}
-	ASSERT(false);
-	return DXGI_FORMAT_R32_FLOAT;
-}
-
 static u32 sizeDXTC(u32 w, u32 h, DXGI_FORMAT format) {
 	const bool is_dxt1 = format == DXGI_FORMAT_BC1_UNORM || format == DXGI_FORMAT_BC1_UNORM_SRGB;
 	const bool is_ati = format == DXGI_FORMAT_BC4_UNORM;
@@ -311,12 +262,10 @@ struct Program {
 	ID3DBlob* vs = nullptr;
 	ID3DBlob* ps = nullptr;
 	ID3DBlob* cs = nullptr;
-	D3D12_INPUT_ELEMENT_DESC attributes[16];
-	u32 attribute_count = 0;
 	StateFlags state;
 	D3D12_PRIMITIVE_TOPOLOGY primitive_topology;
 	D3D12_PRIMITIVE_TOPOLOGY_TYPE primitive_topology_type;
-	// `pso_hash` is source hash + vertex layout, it is not used as a key of the shader bytecode cache
+	// `pso_hash` is source hash, it is not used as a key of the shader bytecode cache
 	// for CS, there's 1:1 mapping from `pso_hash` to PSO
 	// for VS/PS, there's 1:1 mapping from `pso_hash` and RT formats to PSO
 	StableHash pso_hash;
@@ -382,26 +331,13 @@ struct ShaderCompiler {
 		: m_allocator(allocator, "shader compiler")
 		, m_cache(m_allocator) {}
 
-	bool compile(const VertexDecl& decl
-		, const char* src
+	bool compile(const char* src
 		, ShaderType type
 		, const char* name
 		, Program& program)
 	{
 		PROFILE_FUNCTION();
 		profiler::pushString(name);
-		program.attribute_count = decl.attributes_count;
-		for (u8 i = 0; i < decl.attributes_count; ++i) {
-			const Attribute& attr = decl.attributes[i];
-			const bool instanced = attr.flags & Attribute::INSTANCED;
-			program.attributes[i].AlignedByteOffset = attr.byte_offset;
-			program.attributes[i].Format = getDXGIFormat(attr);
-			program.attributes[i].SemanticIndex = i;
-			program.attributes[i].SemanticName = "TEXCOORD";
-			program.attributes[i].InputSlot = instanced ? 1 : 0;
-			program.attributes[i].InputSlotClass = instanced ? D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA : D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
-			program.attributes[i].InstanceDataStepRate = instanced ? 1 : 0;
-		}
 
 		RollingStableHasher hasher;
 		hasher.begin();
@@ -412,21 +348,7 @@ struct ShaderCompiler {
 		}
 
 		const StableHash hash = hasher.end64();
-
-		// same shader can be used with different vertex layouts, so the layout is a part of the PSO key
-		RollingStableHasher pso_hasher;
-		pso_hasher.begin();
-		pso_hasher.update(&hash, sizeof(hash));
-		pso_hasher.update(&program.attribute_count, sizeof(program.attribute_count));
-		for (u32 i = 0; i < program.attribute_count; ++i) {
-			const D3D12_INPUT_ELEMENT_DESC& attr = program.attributes[i];
-			pso_hasher.update(&attr.Format, sizeof(attr.Format));
-			pso_hasher.update(&attr.InputSlot, sizeof(attr.InputSlot));
-			pso_hasher.update(&attr.AlignedByteOffset, sizeof(attr.AlignedByteOffset));
-			pso_hasher.update(&attr.InputSlotClass, sizeof(attr.InputSlotClass));
-			pso_hasher.update(&attr.InstanceDataStepRate, sizeof(attr.InstanceDataStepRate));
-		}
-		program.pso_hash = pso_hasher.end64();
+		program.pso_hash = hash;
 
 		if (type == ShaderType::SURFACE) {
 			auto iter = m_cache.find(hash);
@@ -769,10 +691,6 @@ struct PSOCache {
 		desc.NodeMask = 1;
 		desc.SampleMask = 0xffFFffFF;
 
-		desc.InputLayout.NumElements = p.attribute_count;
-		// programs that pull all their data have no input elements
-		desc.InputLayout.pInputElementDescs = p.attribute_count ? p.attributes : nullptr;
-
 		desc.DSVFormat = fb.ds_format;
 		desc.NumRenderTargets = fb.count;
 		for (u32 i = 0; i < fb.count; ++i) {
@@ -782,7 +700,7 @@ struct PSOCache {
 		ID3D12PipelineState* pso;
 		HRESULT hr = device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pso));
 		if (FAILED(hr)) {
-			logError("Failed to create graphics PSO of ", p.name, ", hr = ", (u32)hr, ", input elements = ", p.attribute_count
+			logError("Failed to create graphics PSO of ", p.name, ", hr = ", (u32)hr
 				, ", topology type = ", (u32)desc.PrimitiveTopologyType, ", render targets = ", fb.count, ", ds format = ", (u32)fb.ds_format
 				, ", rt0 format = ", fb.count ? (u32)fb.formats[0] : 0u, ", state = ", (u64)state);
 			pso = nullptr; // cache the failure, otherwise we'd retry and log every frame
@@ -3396,22 +3314,6 @@ void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z) {
 	}
 }
 
-void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride_in_bytes) {
-	if (buffer) {
-		D3D12_VERTEX_BUFFER_VIEW vbv;
-		vbv.BufferLocation = buffer->gpu_address + buffer_offset;
-		vbv.StrideInBytes = stride_in_bytes;
-		vbv.SizeInBytes = UINT(buffer->size - buffer_offset);
-		d3d->cmd_list->IASetVertexBuffers(binding_idx, 1, &vbv);
-	} else {
-		D3D12_VERTEX_BUFFER_VIEW vbv = {};
-		vbv.BufferLocation = 0;
-		vbv.StrideInBytes = stride_in_bytes;
-		vbv.SizeInBytes = 0;
-		d3d->cmd_list->IASetVertexBuffers(binding_idx, 1, &vbv);
-	}
-}
-
 BindlessHandle getBindlessHandle(TextureHandle texture) {
 	return BindlessHandle(texture->heap_id);
 }
@@ -3428,8 +3330,7 @@ RWBindlessHandle getRWBindlessHandle(BufferHandle buffer) {
 	return RWBindlessHandle(buffer->heap_id + 1);
 }
 
-// count_buffer_offset == ~0u means a single command, otherwise the number of commands (at most max_count) is read from the indirect buffer at that offset
-static void drawIndirectImpl(DataType index_type, u32 indirect_buffer_offset, u32 max_count, u32 count_buffer_offset) {
+void drawIndirect(DataType index_type, u32 indirect_buffer_offset) {
 	CHECK(d3d->current_program);
 	if (!d3d->current_indirect_buffer || !d3d->current_indirect_buffer->resource) {
 		logError("Indirect draw without an indirect buffer");
@@ -3474,21 +3375,7 @@ static void drawIndirectImpl(DataType index_type, u32 indirect_buffer_offset, u3
 		return result;
 	}();
 
-	if (count_buffer_offset == ~0u) {
-		d3d->cmd_list->ExecuteIndirect(signature, 1, d3d->current_indirect_buffer->resource, indirect_buffer_offset, nullptr, 0);
-	}
-	else {
-		d3d->cmd_list->ExecuteIndirect(signature, max_count, d3d->current_indirect_buffer->resource, indirect_buffer_offset, d3d->current_indirect_buffer->resource, count_buffer_offset);
-	}
-}
-
-void drawIndirect(DataType index_type, u32 indirect_buffer_offset) {
-	drawIndirectImpl(index_type, indirect_buffer_offset, 1, ~0u);
-}
-
-void drawIndirectCount(DataType index_type, u32 indirect_buffer_offset, u32 max_count, u32 count_buffer_offset) {
-	ASSERT(count_buffer_offset != ~0u);
-	drawIndirectImpl(index_type, indirect_buffer_offset, max_count, count_buffer_offset);
+	d3d->cmd_list->ExecuteIndirect(signature, 1, d3d->current_indirect_buffer->resource, indirect_buffer_offset, nullptr, 0);
 }
 
 void draw(const Drawcall& draw) {
@@ -3497,28 +3384,6 @@ void draw(const Drawcall& draw) {
 
 	if (!setPipelineStateGraphics()) return;
 	
-	gpu::BufferHandle vb0 = draw.vertex_buffers[0];
-	const u32 vb0_offset = draw.vertex_buffer_offsets[0];
-	gpu::BufferHandle vb1 = draw.vertex_buffers[1];
-	const u32 vb1_offset = draw.vertex_buffer_offsets[1];
-
-	// a buffer can be missing, e.g. meshes have no vertex buffer because their vertices are pulled by vertex shaders
-	auto make_view = [](gpu::BufferHandle buffer, u32 offset, u32 stride) {
-		D3D12_VERTEX_BUFFER_VIEW view = {};
-		if (buffer) {
-			view.BufferLocation = buffer->gpu_address + offset;
-			view.SizeInBytes = UINT(buffer->size - offset);
-		}
-		view.StrideInBytes = stride;
-		return view;
-	};
-	D3D12_VERTEX_BUFFER_VIEW vbv[] = {
-		make_view(vb0, vb0_offset, draw.vertex_buffer_sizes[0]),
-		make_view(vb1, vb1_offset, draw.vertex_buffer_sizes[1])
-	};
-
-	d->cmd_list->IASetVertexBuffers(0, 2, vbv);
-
 	DXGI_FORMAT dxgi_index_type;
 	u32 offset_shift = 0;
 	switch (draw.index_type) {
@@ -3624,7 +3489,7 @@ void update(BufferHandle buffer, const void* data, size_t size) {
 
 void createProgram(ProgramHandle program
 	, StateFlags state
-	, const VertexDecl& decl
+	, PrimitiveType primitive_type
 	, const char* src
 	, ShaderType type
 	, const char* name)
@@ -3633,7 +3498,7 @@ void createProgram(ProgramHandle program
 	program->name = name;
 	program->state = state;
 	
-	switch (decl.primitive_type) {
+	switch (primitive_type) {
 		case PrimitiveType::NONE:
 		case PrimitiveType::TRIANGLES:
 			program->primitive_topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -3654,7 +3519,7 @@ void createProgram(ProgramHandle program
 		default: ASSERT(0); break;
 	}
 
-	d3d->shader_compiler.compile(decl, src, type, name, *program);
+	d3d->shader_compiler.compile(src, type, name, *program);
 }
 
 } // namespace

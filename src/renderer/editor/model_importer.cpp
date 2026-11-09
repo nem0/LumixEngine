@@ -310,7 +310,7 @@ static i32 getAttributeOffset(const ModelImporter::ImportGeometry& mesh, Attribu
 	i32 offset = 0;
 	for (const auto& attr : mesh.attributes) {
 		if (attr.semantic == semantic) return offset;
-		offset += gpu::getSize(attr.type) * attr.num_components;
+		offset += getSize(attr.type) * attr.num_components;
 	}
 	return -1;
 }
@@ -526,7 +526,7 @@ void ModelImporter::createImpostorTextures(Model* model, ImpostorTexturesContext
 					const Material* material = mesh_mat.material;
 					Shader* shader = material->getShader();
 					const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | material->m_render_states;
-					const gpu::ProgramHandle program = shader->getProgram(state, gpu::VertexDecl(mesh.vertex_decl.primitive_type), capture_define | material->getDefineMask(), mesh.pulling_semantics_defines);
+					const gpu::ProgramHandle program = shader->getProgram(state, mesh.primitive_type, capture_define | material->getDefineMask(), mesh.semantics_defines);
 
 					ASSERT(false);
 					// TODO
@@ -1203,11 +1203,11 @@ void ModelImporter::writeImpostorMesh(StringView dir, StringView model_name)
 	write(attribute_count);
 
 	write(AttributeSemantic::POSITION);
-	write(gpu::AttributeType::FLOAT);
+	write(AttributeType::FLOAT);
 	write((u8)3);
 
 	write(AttributeSemantic::TEXCOORD0);
-	write(gpu::AttributeType::FLOAT);
+	write(AttributeType::FLOAT);
 	write((u8)2);
 
 	const Path material_name(dir, model_name, "_impostor.mat");
@@ -1362,9 +1362,40 @@ bool ModelImporter::shouldBakeClusters(const ModelMeta& meta) const {
 		if (mesh.lod != 0) continue;
 		const ImportGeometry& geom = m_geometries[mesh.geometry_idx];
 		if (geom.is_skinned) return false;
+		if (!areClusterAttributesSupported(geom)) return false;
 		triangles += geom.indices.size() / 3;
 	}
 	return triangles > 0;
+}
+
+// Vertices of clusters are packed (see packClusterVertices), which knows only these formats of attributes
+bool ModelImporter::areClusterAttributesSupported(const ImportGeometry& geom) {
+	bool has_position = false, has_normal = false;
+	for (u32 i = 0; i < (u32)geom.attributes.size(); ++i) {
+		const AttributeDesc& desc = geom.attributes[i];
+		switch (desc.semantic) {
+			case AttributeSemantic::POSITION:
+				if (i != 0 || desc.type != AttributeType::FLOAT || desc.num_components != 3) return false;
+				has_position = true;
+				break;
+			case AttributeSemantic::NORMAL:
+				if (desc.type != AttributeType::I8 || desc.num_components != 4) return false;
+				has_normal = true;
+				break;
+			case AttributeSemantic::TANGENT:
+				if (desc.type != AttributeType::I8 || desc.num_components != 4) return false;
+				break;
+			case AttributeSemantic::TEXCOORD0:
+				if (desc.type != AttributeType::FLOAT || desc.num_components != 2) return false;
+				break;
+			case AttributeSemantic::AO:
+			case AttributeSemantic::COLOR0:
+				if (desc.type != AttributeType::U8 || desc.num_components != 4) return false;
+				break;
+			default: return false;
+		}
+	}
+	return has_position && has_normal;
 }
 
 bool ModelImporter::writeClusters(const ModelMeta& meta) {
@@ -1384,7 +1415,10 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 	// (transformed to the origin of the model), clusters must match them
 	Array<Array<Vec3>> positions(m_allocator);
 	Array<Array<Vec3>> normals(m_allocator);
+	Array<Array<Vec3>> tangents(m_allocator);
 	Array<Array<Vec2>> uvs(m_allocator);
+	Array<Array<u32>> aos(m_allocator);
+	Array<Array<u32>> colors(m_allocator);
 	const u8* vertex_data = m_out_file.data() + m_vertex_data_offset;
 	for (const ImportMesh* mesh : meshes) {
 		const ImportGeometry& geom = m_geometries[mesh->geometry_idx];
@@ -1394,23 +1428,40 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 		dst.resize(vertex_count);
 		for (u32 i = 0; i < vertex_count; ++i) memcpy(&dst[i], vertex_data + i * geom.vertex_size, sizeof(Vec3));
 
-		// normals and UVs, to measure the attribute error of simplified clusters. Missing or other formats are not measured
+		// The other attributes. Normals and UVs are also used to measure the attribute error of simplified clusters. All formats are checked by
+		// areClusterAttributesSupported
 		Array<Vec3>& normals_dst = normals.emplace(m_allocator);
+		Array<Vec3>& tangents_dst = tangents.emplace(m_allocator);
 		Array<Vec2>& uvs_dst = uvs.emplace(m_allocator);
-		i32 offset = 0, normal_offset = -1, uv_offset = -1;
+		Array<u32>& ao_dst = aos.emplace(m_allocator);
+		Array<u32>& colors_dst = colors.emplace(m_allocator);
+		i32 offset = 0, normal_offset = -1, tangent_offset = -1, uv_offset = -1, ao_offset = -1, color_offset = -1;
 		for (const AttributeDesc& desc : geom.attributes) {
-			if (desc.semantic == AttributeSemantic::NORMAL && desc.type == gpu::AttributeType::I8 && desc.num_components == 4) normal_offset = offset;
-			if (desc.semantic == AttributeSemantic::TEXCOORD0 && desc.type == gpu::AttributeType::FLOAT && desc.num_components == 2) uv_offset = offset;
-			offset += gpu::getSize(desc.type) * desc.num_components;
+			if (desc.semantic == AttributeSemantic::NORMAL) normal_offset = offset;
+			if (desc.semantic == AttributeSemantic::TANGENT) tangent_offset = offset;
+			if (desc.semantic == AttributeSemantic::TEXCOORD0) uv_offset = offset;
+			if (desc.semantic == AttributeSemantic::AO) ao_offset = offset;
+			if (desc.semantic == AttributeSemantic::COLOR0) color_offset = offset;
+			offset += getSize(desc.type) * desc.num_components;
 		}
-		if (normal_offset >= 0) {
-			normals_dst.resize(vertex_count);
+		auto read_u32 = [&](Array<u32>& out, i32 attribute_offset) {
+			if (attribute_offset < 0) return;
+			out.resize(vertex_count);
+			for (u32 i = 0; i < vertex_count; ++i) memcpy(&out[i], vertex_data + i * geom.vertex_size + attribute_offset, sizeof(u32));
+		};
+		auto read_vectors = [&](Array<Vec3>& out, i32 attribute_offset) {
+			if (attribute_offset < 0) return;
+			out.resize(vertex_count);
 			for (u32 i = 0; i < vertex_count; ++i) {
 				u32 packed;
-				memcpy(&packed, vertex_data + i * geom.vertex_size + normal_offset, sizeof(packed));
-				normals_dst[i] = unpackF4u(packed);
+				memcpy(&packed, vertex_data + i * geom.vertex_size + attribute_offset, sizeof(packed));
+				out[i] = unpackF4u(packed);
 			}
-		}
+		};
+		read_vectors(normals_dst, normal_offset);
+		read_vectors(tangents_dst, tangent_offset);
+		read_u32(ao_dst, ao_offset);
+		read_u32(colors_dst, color_offset);
 		if (uv_offset >= 0) {
 			uvs_dst.resize(vertex_count);
 			for (u32 i = 0; i < vertex_count; ++i) memcpy(&uvs_dst[i], vertex_data + i * geom.vertex_size + uv_offset, sizeof(Vec2));
@@ -1430,26 +1481,137 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 			failed = true;
 			break;
 		}
+
+		ClusterVertexSource source;
+		source.vertex_count = positions[i].size();
+		source.positions = positions[i].begin();
+		source.normals = normals[i].begin();
+		source.tangents = tangents[i].empty() ? nullptr : tangents[i].begin();
+		source.uvs = uvs[i].empty() ? nullptr : uvs[i].begin();
+		source.ao = aos[i].empty() ? nullptr : aos[i].begin();
+		source.colors = colors[i].empty() ? nullptr : colors[i].begin();
+		if (!packClusterVertices(source, *clusters, m_allocator)) {
+			failed = true;
+			break;
+		}
 	}
 
-	// the indices of the first LOD are only in the clusters, so there is no model without them
 	if (!failed) {
+		// The vertices of the first LOD are only in the clusters (packed), so their vertex buffers are empty: the vertex blocks of these meshes are
+		// replaced by blocks of size 0, they are the first ones, see writeGeometry
+		u64 blocks_end = m_vertex_data_offset;
+		for (const ImportMesh* mesh : meshes) blocks_end += sizeof(i32) + m_geometries[mesh->geometry_idx].vertex_buffer.size();
+		OutputMemoryStream stripped(m_allocator);
+		stripped.reserve(m_out_file.size());
+		stripped.write(m_out_file.data(), m_vertex_data_offset);
+		for (u32 i = 0; i < (u32)meshes.size(); ++i) stripped.write((i32)0);
+		stripped.write(m_out_file.data() + blocks_end, m_out_file.size() - blocks_end);
+		m_out_file = static_cast<OutputMemoryStream&&>(stripped);
+
 		write((u32)meshes.size());
 		u32 total_clusters = 0;
-		for (const MeshClusters* clusters : results) {
-			write((u32)clusters->clusters.size());
-			write((u32)clusters->indices.size());
-			write(clusters->leaf_index_count);
-			write(clusters->clusters.begin(), clusters->clusters.byte_size());
-			write(clusters->indices.begin(), clusters->indices.byte_size());
+		u64 packed_bytes = 0, unpacked_bytes = 0;
+		for (u32 i = 0; i < (u32)results.size(); ++i) {
+			const MeshClusters* clusters = results[i];
+			ASSERT(clusters->local_indices.size() == clusters->indices.size());
+			const u32 cluster_count = (u32)clusters->clusters.size();
+
+			// The layout of the vertices for vertex pulling (see vertex_pulling.hlsli, CLUSTER_MESH). The frame (normal and tangent) is one u32,
+			// and so is the UV (two u16), they are unpacked by the shader.
+			AttributeSemantic semantics[VertexDecl::MAX_ATTRIBUTES];
+			for (AttributeSemantic& sem : semantics) sem = AttributeSemantic::NONE;
+			VertexDecl decl;
+			u32 count = 0, offset = 0;
+			semantics[count++] = AttributeSemantic::NORMAL;
+			decl.addAttribute(0, 1, AttributeType::U32, 0);
+			if (clusters->attribute_flags & (u32)ClusterAttribute::TANGENT) {
+				semantics[count++] = AttributeSemantic::TANGENT;
+				decl.addAttribute(0, 1, AttributeType::U32, 0);
+			}
+			offset += 4;
+			if (clusters->attribute_flags & (u32)ClusterAttribute::UV) {
+				semantics[count++] = AttributeSemantic::TEXCOORD0;
+				decl.addAttribute((u8)offset, 1, AttributeType::U32, 0);
+				offset += 4;
+			}
+			if (clusters->attribute_flags & (u32)ClusterAttribute::AO) {
+				semantics[count++] = AttributeSemantic::AO;
+				decl.addAttribute((u8)offset, 4, AttributeType::U8, VertexAttribute::NORMALIZED);
+				offset += 4;
+			}
+			if (clusters->attribute_flags & (u32)ClusterAttribute::COLOR) {
+				semantics[count++] = AttributeSemantic::COLOR0;
+				decl.addAttribute((u8)offset, 4, AttributeType::U8, VertexAttribute::NORMALIZED);
+				offset += 4;
+			}
+			ASSERT(offset == clusters->attribute_stride);
+
+			// Every cluster gets the same number of indices, so that one instanced draw can draw any selection of clusters (instance = cluster).
+			// The padding is made of degenerate triangles of the vertex 0, which the rasterizer drops and the vertex cache already holds.
+			u32 index_stride = 3;
+			for (const MeshClusterGPU& cluster : clusters->clusters) index_stride = maximum(index_stride, cluster.index_count);
+			Array<u16> padded_indices(m_allocator);
+			padded_indices.resize(cluster_count * index_stride);
+			memset(padded_indices.begin(), 0, padded_indices.byte_size());
+			for (u32 c = 0; c < cluster_count; ++c) {
+				const MeshClusterGPU& cluster = clusters->clusters[c];
+				memcpy(padded_indices.begin() + c * index_stride, clusters->local_indices.begin() + cluster.first_index, cluster.index_count * sizeof(u16));
+			}
+
+			// the finest clusters on the CPU side (physics, picking, bounds), positions are the ones of the lattice, the same as on the GPU
+			Array<Vec3> cpu_vertices(m_allocator);
+			Array<u32> cpu_indices(m_allocator);
+			cpu_vertices.resize(clusters->leaf_vertex_count);
+			cpu_indices.resize(clusters->leaf_index_count);
+			const u32 stream_bit_base = u32(u64(cluster_count) * sizeof(MeshClusterVertexGPU) * 8);
+			u32 first_vertex = 0;
+			for (u32 c = 0; c < clusters->leaf_cluster_count; ++c) {
+				const MeshClusterGPU& cluster = clusters->clusters[c];
+				const MeshClusterVertexGPU& header = clusters->vertex_headers[c];
+				for (u32 v = 0; v < header.vertex_count; ++v) {
+					cpu_vertices[first_vertex + v] = decodeClusterPosition(header, clusters->vertex_words.begin(), stream_bit_base, v);
+				}
+				for (u32 k = 0; k < cluster.index_count; ++k) {
+					cpu_indices[cluster.first_index + k] = first_vertex + clusters->local_indices[cluster.first_index + k];
+				}
+				first_vertex += header.vertex_count;
+			}
+
+			// the trees are balanced (see buildNodes), the first child leads to a leaf as deep as any
+			u32 tree_depth = 0;
+			for (u32 root : clusters->roots) {
+				u32 depth = 1;
+				for (u32 node_index = root; !(clusters->nodes[node_index].count_and_flags & MeshClusters::LEAF_FLAG); ++depth) node_index = clusters->nodes[node_index].first;
+				tree_depth = maximum(tree_depth, depth);
+			}
+
+			const u32 vertex_data_size = u32(u64(cluster_count) * sizeof(MeshClusterVertexGPU) + clusters->vertex_words.byte_size());
+			write(cluster_count);
 			write(clusters->leaf_cluster_count);
 			write((u32)clusters->nodes.size());
 			write((u32)clusters->roots.size());
+			write(tree_depth);
+			write(index_stride);
+			write(clusters->leaf_vertex_count);
+			write(clusters->leaf_index_count);
+			write(vertex_data_size);
+			write(clusters->attribute_stride);
+			write(decl);
+			write(semantics, sizeof(semantics));
+			write(clusters->clusters.begin(), clusters->clusters.byte_size());
 			write(clusters->nodes.begin(), clusters->nodes.byte_size());
 			write(clusters->roots.begin(), clusters->roots.byte_size());
-			total_clusters += clusters->clusters.size();
+			write(padded_indices.begin(), padded_indices.byte_size());
+			// the buffer of vertices: headers followed by the interleaved positions and attributes
+			write(clusters->vertex_headers.begin(), clusters->vertex_headers.byte_size());
+			write(clusters->vertex_words.begin(), clusters->vertex_words.byte_size());
+			write(cpu_vertices.begin(), cpu_vertices.byte_size());
+			write(cpu_indices.begin(), cpu_indices.byte_size());
+			total_clusters += cluster_count;
+			packed_bytes += padded_indices.byte_size() + vertex_data_size;
+			unpacked_bytes += u64(m_geometries[meshes[i]->geometry_idx].vertex_buffer.size()) + clusters->indices.byte_size();
 		}
-		logInfo("Baked ", total_clusters, " clusters");
+		logInfo("Baked ", total_clusters, " clusters, vertices and indices of the first LOD: ", packed_bytes, " bytes (", unpacked_bytes, " before)");
 	}
 	else {
 		logError("Failed to build clusters of a model");
@@ -1500,7 +1662,7 @@ void ModelImporter::bakeVertexAO(float min_ao) {
 		u32 ao_offset = 0;
 		for (const AttributeDesc& desc :  geom.attributes) {
 			if (desc.semantic == AttributeSemantic::AO) break;
-			ao_offset += desc.num_components * gpu::getSize(desc.type);
+			ao_offset += desc.num_components * getSize(desc.type);
 		}
 
 		u8* AOs = geom.vertex_buffer.getMutableData() + ao_offset;

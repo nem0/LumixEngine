@@ -145,16 +145,6 @@ enum class BlendFactors : u8 {
 };
 
 
-enum class AttributeType : u8 {
-	U8,
-	FLOAT,
-	I16,
-	I8,
-	U16,
-	U32
-};
-
-
 // keep order, this is serialized
 //@ enum full gpu::TextureFormat
 enum class TextureFormat : u32 {
@@ -207,36 +197,6 @@ enum class DataType : u32 {
 	U32
 };
 
-#pragma pack(1)
-struct Attribute {
-	enum Flags {
-		NORMALIZED = 1 << 0,
-		AS_INT = 1 << 1,
-		INSTANCED = 1 << 2
-	};
-	u8 components_count;
-	u8 byte_offset;
-	AttributeType type;
-	u8 flags;
-};
-#pragma pack()
-
-struct LUMIX_RENDERER_API VertexDecl {
-	enum { MAX_ATTRIBUTES = 16 };
-
-	VertexDecl(PrimitiveType pt);
-	void addAttribute(u8 byte_offset, u8 components_num, AttributeType type, u8 flags);
-	u32 getStride() const;
-	void computeHash();
-	void setPrimitiveType(PrimitiveType type);
-
-	u8 attributes_count = 0;
-	u32 hash;
-	Attribute attributes[MAX_ATTRIBUTES];
-	PrimitiveType primitive_type = PrimitiveType::NONE;
-};
-
-
 struct TextureDesc {
 	TextureFormat format;
 	u32 width;
@@ -261,9 +221,6 @@ struct MemoryStats {
 struct Drawcall {
 	gpu::ProgramHandle program;
 	gpu::BufferHandle index_buffer;
-	gpu::BufferHandle vertex_buffers[2];
-	u32 vertex_buffer_offsets[2];
-	u32 vertex_buffer_sizes[2];
 	u32 indices_count;
 	u32 instances_count;
 	DataType index_type;
@@ -282,7 +239,6 @@ bool frameFinished(u32 frame);
 LUMIX_RENDERER_API bool isOriginBottomLeft();
 void checkThread();
 void shutdown();
-int getSize(AttributeType type);
 u32 getSize(TextureFormat format, u32 w, u32 h);
 u32 getBytesPerPixel(TextureFormat format);
 
@@ -296,7 +252,7 @@ ProgramHandle allocProgramHandle();
 
 QueryHandle createQuery(QueryType type);
 
-void createProgram(ProgramHandle prog, StateFlags state, const VertexDecl& decl, const char* src, ShaderType type, const char* name);
+void createProgram(ProgramHandle prog, StateFlags state, PrimitiveType primitive_type, const char* src, ShaderType type, const char* name);
 void createBuffer(BufferHandle handle, BufferFlags flags, size_t size, const void* data, const char* debug_name);
 void createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, TextureFlags flags, const char* debug_name);
 void createTextureView(TextureHandle view, TextureHandle texture, u32 layer, u32 mip);
@@ -333,7 +289,6 @@ BindlessHandle getBindlessHandle(TextureHandle texture); // safe to call from an
 RWBindlessHandle getRWBindlessHandle(BufferHandle buffer); // safe to call from any job
 RWBindlessHandle getRWBindlessHandle(TextureHandle texture); // safe to call from any job
 void bindIndexBuffer(BufferHandle buffer);
-void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride);
 void bindUniformBuffer(u32 ub_index, BufferHandle buffer, size_t offset, size_t size);
 void bindIndirectBuffer(BufferHandle buffer);
 // strides[i] is the element size of the StructuredBuffer the shader declares for slot i, 0 for a raw ByteAddressBuffer view
@@ -341,8 +296,6 @@ void bindShaderBuffers(Span<BufferHandle> buffers, Span<const u32> strides);
 
 void drawArrays(u32 offset, u32 count);
 void drawIndirect(DataType index_type, u32 indirect_buffer_offset);
-// executes up to `max_count` indexed draws starting at `indirect_buffer_offset`, the actual count is a u32 stored in the bound indirect buffer at `count_buffer_offset`
-void drawIndirectCount(DataType index_type, u32 indirect_buffer_offset, u32 max_count, u32 count_buffer_offset);
 void drawIndexed(u32 offset, u32 count, DataType type);
 void drawArraysInstanced(u32 indices_count, u32 instances_count);
 void drawIndexedInstanced(u32 indices_count, u32 instances_count, DataType index_type);

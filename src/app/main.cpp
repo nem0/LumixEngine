@@ -403,8 +403,7 @@ int main(int args, char* argv[]) {
 				return bindless_textures[2052].Sample(NearestSampler, input.uv);
 			}
 		)#";
-	gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
-	gpu::createProgram(shader, gpu::StateFlags::NONE, decl, src, gpu::ShaderType::SURFACE, "shader");
+	gpu::createProgram(shader, gpu::StateFlags::NONE, gpu::PrimitiveType::TRIANGLES, src, gpu::ShaderType::SURFACE, "shader");
 
 	// main loop
 	bool finished = false;

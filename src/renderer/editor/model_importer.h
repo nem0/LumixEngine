@@ -6,6 +6,7 @@
 #include "core/path.h"
 #include "core/stream.h"
 #include "renderer/gpu/gpu.h"
+#include "renderer/vertex_decl.h"
 
 namespace Lumix {
 
@@ -50,7 +51,7 @@ struct ModelImporter {
 
 	struct AttributeDesc {
 		AttributeSemantic semantic;
-		gpu::AttributeType type;
+		AttributeType type;
 		u8 num_components;
 	};
 
@@ -159,6 +160,8 @@ protected:
 	// Clusters replace the indices of the first LOD: if shouldBakeClusters, writeGeometry does not write them
 	// and writeClusters, which must be called after it, writes them as the finest level of clusters, see Model::parseClusters
 	bool shouldBakeClusters(const ModelMeta& meta) const;
+	static bool areClusterAttributesSupported(const ImportGeometry& geom);
+	// Writes the vertices of the clusters of the first LOD (packed, see packClusterVertices) instead of the ones writeGeometry wrote
 	bool writeClusters(const ModelMeta& meta);
 	void writeGeometry(const ModelMeta& meta);
 	void writeGeometry(u32 geom_idx, const ModelMeta& meta);

@@ -12,6 +12,7 @@
 
 #include "engine/resource.h"
 #include "gpu/gpu.h"
+#include "vertex_decl.h"
 
 
 namespace Lumix {
@@ -95,7 +96,7 @@ struct LUMIX_RENDERER_API Mesh {
 		INDICES_16_BIT = 1 << 0
 	};
 
-	Mesh(const gpu::VertexDecl& vertex_decl,
+	Mesh(const VertexDecl& vertex_decl,
 		u8 vb_stride,
 		StringView name,
 		const AttributeSemantic* semantics,
@@ -113,11 +114,11 @@ struct LUMIX_RENDERER_API Mesh {
 	Array<Skin> skin;
 	Flags flags = Flags::NONE;
 	String name;
-	gpu::VertexDecl vertex_decl;
-	AttributeSemantic attributes_semantic[gpu::VertexDecl::MAX_ATTRIBUTES];
+	VertexDecl vertex_decl;
+	gpu::PrimitiveType primitive_type = gpu::PrimitiveType::TRIANGLES;
+	AttributeSemantic attributes_semantic[VertexDecl::MAX_ATTRIBUTES];
+	// defines with the layout of vertices, see vertex_pulling.hlsli
 	const char* semantics_defines = "";
-	// semantics_defines for vertex pulling, they contain the layout of vertices, see vertex_pulling.hlsli
-	const char* pulling_semantics_defines = "";
 
 	// the only per draw data of vertex pulling, a uniform buffer
 	struct VertexBufferBinding {
@@ -136,10 +137,15 @@ struct LUMIX_RENDERER_API Mesh {
 	u32 indices_count;
 
 	// cluster DAG for GPU driven LOD, see mesh_clusters.h, baked by the model importer
-	// cluster_index_buffer indexes into vertex_buffer_handle
+	// Meshes with clusters have no vertices and indices of their own: vertex_buffer_handle is one buffer with the headers of clusters followed by their
+	// bit packed vertices (position and then attributes, interleaved, see mesh_clusters.h; vb_stride and the vertex decl only say which attributes there are),
+	// and cluster_index_buffer has u16 indices local to a cluster,
+	// cluster `c` starts at c * cluster_index_stride, so that all selected clusters of a mesh are drawn by one instanced draw.
+	// The CPU `vertices` and `indices` are made of the finest clusters.
 	gpu::BufferHandle cluster_buffer = gpu::INVALID_BUFFER;
 	gpu::BufferHandle cluster_index_buffer = gpu::INVALID_BUFFER;
 	u32 cluster_count = 0;
+	u32 cluster_index_stride = 0; // indices of every cluster in cluster_index_buffer are padded (with degenerate triangles) to this count, see Model::loadClusters
 	gpu::BufferHandle node_buffer = gpu::INVALID_BUFFER; // MeshNodeGPU[node_count], then root_count u32 indices of roots, see MeshClusters
 	u32 node_count = 0;
 	u32 root_count = 0;
@@ -165,6 +171,9 @@ struct LUMIX_RENDERER_API Model final : Resource {
 		CLUSTER_CONES = 4, // clusters have a normal cone (MeshClusterGPU is 80 bytes)
 		CLUSTER_NODES = 5, // a tree of nodes over the clusters of each mesh, see MeshClusters
 		CLUSTER_ATTRIBUTE_ERRORS = 6, // clusters (96 bytes) and nodes (64 bytes) have the error of attributes apart from the error of positions
+		CLUSTER_VERTICES = 7, // clusters of the first LOD have their own, packed vertices and u16 indices, the meshes have no vertices of their own, see parseClusters
+
+		CLUSTER_INTERLEAVED = 9, // clusters have one buffer of headers and interleaved, packed vertices and everything else ready to be uploaded, see parseClusters
 
 		LATEST // keep this last
 	};

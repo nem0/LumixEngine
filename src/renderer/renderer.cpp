@@ -179,7 +179,6 @@ struct FrameData {
 	struct ShaderToCompile {
 		Shader* shader;
 		StableHash content_hash;
-		gpu::VertexDecl decl;
 		gpu::ProgramHandle program;
 		ShaderKey key;
 	};
@@ -497,7 +496,6 @@ struct RendererImpl final : Renderer {
 		, m_sort_keys(m_allocator)
 		, m_sort_key_map(m_allocator)
 		, m_semantic_defines(m_allocator)
-		, m_pulling_semantic_defines(m_allocator)
 		, m_free_frames(m_allocator)
 		, m_renderbuffers(m_allocator)
 		, m_frame_thread(*this)
@@ -710,83 +708,70 @@ struct RendererImpl final : Renderer {
 		res.append(a, tmp, "\n");
 	}
 
-	const char* getSemanticDefines(Span<const AttributeSemantic> attributes, const gpu::VertexDecl& decl, u32 vertex_stride, bool vertex_pulling) override {
-		// the layout is part of the defines only for vertex pulling
+	const char* getSemanticDefines(Span<const AttributeSemantic> attributes, const VertexDecl& decl, u32 vertex_stride) override {
+		// the layout of vertices is part of the defines
 		u8 key[256];
 		u32 key_size = 0;
+		// the callers validate what they read from files, a violation here is a bug
 		ASSERT(attributes.length() <= 16);
+		ASSERT(decl.isValid());
 		memcpy(key, attributes.begin(), attributes.length());
 		key_size += attributes.length();
-		if (vertex_pulling) {
-			ASSERT(decl.attributes_count <= gpu::VertexDecl::MAX_ATTRIBUTES);
-			memcpy(key + key_size, &vertex_stride, sizeof(vertex_stride));
-			key_size += sizeof(vertex_stride);
-			for (u32 i = 0; i < decl.attributes_count; ++i) {
-				const gpu::Attribute& attr = decl.attributes[i];
-				key[key_size++] = attr.byte_offset;
-				key[key_size++] = attr.components_count;
-				key[key_size++] = (u8)attr.type;
-				key[key_size++] = attr.flags;
-			}
+		memcpy(key + key_size, &vertex_stride, sizeof(vertex_stride));
+		key_size += sizeof(vertex_stride);
+		for (u32 i = 0; i < decl.attributes_count; ++i) {
+			const VertexAttribute& attr = decl.attributes[i];
+			key[key_size++] = attr.byte_offset;
+			key[key_size++] = attr.components_count;
+			key[key_size++] = (u8)attr.type;
+			key[key_size++] = attr.flags;
 		}
 		const RuntimeHash hash(key, key_size);
-		HashMap<RuntimeHash, String>& defines = vertex_pulling ? m_pulling_semantic_defines : m_semantic_defines;
-		auto iter = defines.find(hash);
+		auto iter = m_semantic_defines.find(hash);
 		if (!iter.isValid()) {
 			String s(m_allocator);
-			if (vertex_pulling) s.append("#define VERTEX_PULLING\n");
-			u32 first_empty = attributes.length();
+			// the mesh has the attribute
 			for (u32 i = 0; i < attributes.length(); ++i) {
 				switch (attributes[i]) {
 					case AttributeSemantic::COUNT: ASSERT(false); break;
-					case AttributeSemantic::NONE: first_empty = minimum(first_empty, i); break;
+					case AttributeSemantic::NONE: break;
 					case AttributeSemantic::POSITION: break;
 
-					case AttributeSemantic::NORMAL: add(s, "#define NORMAL_ATTR ", i); break;
-					case AttributeSemantic::TANGENT: add(s, "#define TANGENT_ATTR ", i); break;
-					case AttributeSemantic::BITANGENT: add(s, "#define BITANGENT_ATTR ", i); break;
-					case AttributeSemantic::COLOR0: add(s, "#define COLOR0_ATTR ", i); break;
-					case AttributeSemantic::COLOR1: add(s, "#define COLOR1_ATTR ", i); break;
-					case AttributeSemantic::JOINTS: add(s, "#define INDICES_ATTR ", i); break;
-					case AttributeSemantic::WEIGHTS: add(s, "#define WEIGHTS_ATTR ", i); break;
-					case AttributeSemantic::TEXCOORD0: add(s, "#define UV0_ATTR ", i); break;
-					case AttributeSemantic::TEXCOORD1: add(s, "#define UV1_ATTR ", i); break;
-					case AttributeSemantic::AO: add(s, "#define AO_ATTR ", i); break;
+					case AttributeSemantic::NORMAL: add(s, "#define NORMAL_ATTR ", 1); break;
+					case AttributeSemantic::TANGENT: add(s, "#define TANGENT_ATTR ", 1); break;
+					case AttributeSemantic::BITANGENT: add(s, "#define BITANGENT_ATTR ", 1); break;
+					case AttributeSemantic::COLOR0: add(s, "#define COLOR0_ATTR ", 1); break;
+					case AttributeSemantic::COLOR1: add(s, "#define COLOR1_ATTR ", 1); break;
+					case AttributeSemantic::JOINTS: add(s, "#define INDICES_ATTR ", 1); break;
+					case AttributeSemantic::WEIGHTS: add(s, "#define WEIGHTS_ATTR ", 1); break;
+					case AttributeSemantic::TEXCOORD0: add(s, "#define UV0_ATTR ", 1); break;
+					case AttributeSemantic::TEXCOORD1: add(s, "#define UV1_ATTR ", 1); break;
+					case AttributeSemantic::AO: add(s, "#define AO_ATTR ", 1); break;
 				}
 			}
 
-			if (vertex_pulling) {
-				first_empty = 0;
-				// layout of vertices, see vertex_pulling.hlsli. Attributes that the mesh does not have have 0 components.
-				static const char* names[] = { "POSITION", "NORMAL", "TANGENT", "BITANGENT", "COLOR0", "COLOR1", "JOINTS", "WEIGHTS", "TEXCOORD0", "TEXCOORD1", "AO" };
-				static_assert(lengthOf(names) == (u32)AttributeSemantic::COUNT);
-				add(s, "#define VERTEX_STRIDE ", vertex_stride);
-				for (u32 semantic = 0; semantic < (u32)AttributeSemantic::COUNT; ++semantic) {
-					u32 offset = 0, type = 0, components = 0, normalized = 0;
-					for (u32 i = 0; i < decl.attributes_count && i < attributes.length(); ++i) {
-						if ((u32)attributes[i] != semantic) continue;
-						const gpu::Attribute& attr = decl.attributes[i];
-						offset = attr.byte_offset;
-						type = (u32)attr.type;
-						components = attr.components_count;
-						normalized = (attr.flags & gpu::Attribute::NORMALIZED) ? 1 : 0;
-					}
-					StaticString<96> name("#define PULL_", names[semantic]);
-					add(s, StaticString<96>(name, "_OFFSET ").data, offset);
-					add(s, StaticString<96>(name, "_TYPE ").data, type);
-					add(s, StaticString<96>(name, "_COMPONENTS ").data, components);
-					add(s, StaticString<96>(name, "_NORMALIZED ").data, normalized);
+			// layout of vertices, see vertex_pulling.hlsli. Attributes that the mesh does not have have 0 components.
+			static const char* names[] = { "POSITION", "NORMAL", "TANGENT", "BITANGENT", "COLOR0", "COLOR1", "JOINTS", "WEIGHTS", "TEXCOORD0", "TEXCOORD1", "AO" };
+			static_assert(lengthOf(names) == (u32)AttributeSemantic::COUNT);
+			add(s, "#define VERTEX_STRIDE ", vertex_stride);
+			for (u32 semantic = 0; semantic < (u32)AttributeSemantic::COUNT; ++semantic) {
+				u32 offset = 0, type = 0, components = 0, normalized = 0;
+				for (u32 i = 0; i < decl.attributes_count && i < attributes.length(); ++i) {
+					if ((u32)attributes[i] != semantic) continue;
+					const VertexAttribute& attr = decl.attributes[i];
+					offset = attr.byte_offset;
+					type = (u32)attr.type;
+					components = attr.components_count;
+					normalized = (attr.flags & VertexAttribute::NORMALIZED) ? 1 : 0;
 				}
+				StaticString<96> name("#define PULL_", names[semantic]);
+				add(s, StaticString<96>(name, "_OFFSET ").data, offset);
+				add(s, StaticString<96>(name, "_TYPE ").data, type);
+				add(s, StaticString<96>(name, "_COMPONENTS ").data, components);
+				add(s, StaticString<96>(name, "_NORMALIZED ").data, normalized);
 			}
-			add(s, "#define INSTANCE0_ATTR ", first_empty + 0);
-			add(s, "#define INSTANCE1_ATTR ", first_empty + 1);
-			add(s, "#define INSTANCE2_ATTR ", first_empty + 2);
-			add(s, "#define INSTANCE3_ATTR ", first_empty + 3);
-			add(s, "#define INSTANCE4_ATTR ", first_empty + 4);
-			add(s, "#define INSTANCE5_ATTR ", first_empty + 5);
-			add(s, "#define INSTANCE6_ATTR ", first_empty + 6);
 
-			iter = defines.insert(hash, static_cast<String&&>(s));
+			iter = m_semantic_defines.insert(hash, static_cast<String&&>(s));
 		}
 		return iter.value().c_str();
 	}
@@ -1276,7 +1261,7 @@ struct RendererImpl final : Renderer {
 	int getShaderDefinesCount() const override { return m_shader_defines.size(); }
 	const char* getShaderDefine(int define_idx) const override { return m_shader_defines[define_idx]; }
 
-	gpu::ProgramHandle queueShaderCompile(Shader& shader, const ShaderKey& key, gpu::VertexDecl decl) override {
+	gpu::ProgramHandle queueShaderCompile(Shader& shader, const ShaderKey& key) override {
 		ASSERT(shader.isReady());
 		jobs::MutexGuard lock(m_cpu_frame->shader_mutex);
 		
@@ -1286,8 +1271,8 @@ struct RendererImpl final : Renderer {
 			}
 		}
 		gpu::ProgramHandle program = gpu::allocProgramHandle();
-		shader.compile(program, key, decl, m_cpu_frame->begin_frame_draw_stream);
-		m_cpu_frame->to_compile_shaders.push({&shader, shader.m_content_hash, decl, program, key});
+		shader.compile(program, key, m_cpu_frame->begin_frame_draw_stream);
+		m_cpu_frame->to_compile_shaders.push({&shader, shader.m_content_hash, program, key});
 		return program;
 	}
 
@@ -1461,8 +1446,6 @@ struct RendererImpl final : Renderer {
 
 		m_cpu_frame->draw_stream.useProgram(gpu::INVALID_PROGRAM);
 		m_cpu_frame->draw_stream.bindIndexBuffer(gpu::INVALID_BUFFER);
-		m_cpu_frame->draw_stream.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-		m_cpu_frame->draw_stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 		for (u32 i = 0; i < (u32)UniformBuffer::COUNT; ++i) {
 			m_cpu_frame->draw_stream.bindUniformBuffer(i, gpu::INVALID_BUFFER, 0, 0);
 		}
@@ -1580,7 +1563,6 @@ struct RendererImpl final : Renderer {
 	AtomicI32 m_screenshot_state = (i32)ScreenshotState::NONE;
 	jobs::Counter m_init_signal;
 	HashMap<RuntimeHash, String> m_semantic_defines;
-	HashMap<RuntimeHash, String> m_pulling_semantic_defines;
 
 	Array<RenderPlugin*> m_plugins;
 	EvoxRender m_render_script;

@@ -6,38 +6,10 @@
 
 #include "engine/shaders/vertex_pulling.hlsli"
 
-#define ATTR(X) TEXCOORD##X
+// Vertices and instances are pulled by the vertex shader, see vertex_pulling.hlsli
 struct VSInput {
-	#ifdef VERTEX_PULLING
-		uint vertex_id : SV_VertexID;
-	#else
-		float3 position : ATTR(0);
-		float3 normal : ATTR(NORMAL_ATTR);
-		
-		#ifdef UV0_ATTR
-			float2 uv : ATTR(UV0_ATTR);
-		#endif
-
-		#ifdef AO_ATTR
-			float ao : ATTR(AO_ATTR);
-		#endif
-		
-		#ifdef TANGENT_ATTR
-			float3 tangent : ATTR(TANGENT_ATTR);
-		#endif
-		
-		#ifdef INDICES_ATTR
-			uint4 indices : ATTR(INDICES_ATTR);
-			float4 weights : ATTR(WEIGHTS_ATTR);
-		#endif
-	#endif
-	
-	#ifdef MESH_PARTICLE
-		// layout of particles is defined by the particle system
-		float4 i_rot_lod : ATTR(INSTANCE0_ATTR);
-		float4 i_pos_scale : ATTR(INSTANCE1_ATTR);
-	#elif defined AUTOINSTANCED || defined INSTANCED || defined DYNAMIC || defined SKINNED || defined GRASS
-		// the instance is pulled, see loadInstance
+	uint vertex_id : SV_VertexID;
+	#if defined AUTOINSTANCED || defined INSTANCED || defined MESH_PARTICLE || defined DYNAMIC || defined SKINNED || defined GRASS
 		uint instance_id : SV_InstanceID;
 	#endif
 	#if defined AUTOINSTANCED || defined DYNAMIC || defined SKINNED
@@ -83,6 +55,7 @@ struct VSOutput {
 	cbuffer ModelState : register(b4) {
 		float3 position;
 		uint material_index;
+		uint u_particle_stride;	// in bytes
 	};
 #elif defined INSTANCED
 	cbuffer ModelState : register(b4) {
@@ -105,7 +78,7 @@ struct VSOutput {
 
 Surface getSurface(VSOutput input, uint material_index);
 
-// Instance data of the draw. Everything, but mesh particles, is pulled by the instance index, see vertex_pulling.hlsli.
+// Instance data of the draw is pulled by the instance index, see vertex_pulling.hlsli.
 #if defined AUTOINSTANCED
 	// 48 bytes
 	struct Instance {
@@ -147,10 +120,13 @@ Surface getSurface(VSOutput input, uint material_index);
 		float4 pos_scale;
 	};
 
+	// the first two outputs of the emitter, the stride is the size of all outputs
 	Instance loadInstance(VSInput input) {
+		ByteAddressBuffer buffer = bindless_buffers[u_instance_buffer];
+		const uint offset = pullInstanceAddress(input.instance_id, u_particle_stride);
 		Instance r;
-		r.rot_lod = input.i_rot_lod;
-		r.pos_scale = input.i_pos_scale;
+		r.rot_lod = asfloat(buffer.Load4(offset));
+		r.pos_scale = asfloat(buffer.Load4(offset + 16));
 		return r;
 	}
 #elif defined GRASS
@@ -233,19 +209,15 @@ Surface getSurface(VSOutput input, uint material_index);
 	}
 #endif
 
-#ifdef VERTEX_PULLING
-	#define VTX(x) vtx.x
-#else
-	#define VTX(x) input.x
-#endif
-
 // Depth and shadow passes read only the position, the interpolants below are for the pixel shader of colour passes and alpha cutout
 #if defined DEPTH && !defined ALPHA_CUTOUT
 	#define DEPTH_ONLY_VS
 #endif
 
 VSOutput mainVS(VSInput input) {
-	#ifdef VERTEX_PULLING
+	#ifdef CLUSTER_MESH
+		VSVertex vtx = pullVertex(input.vertex_id, input.instance_id);
+	#else
 		VSVertex vtx = pullVertex(input.vertex_id);
 	#endif
 	#ifdef DEPTH_ONLY_VS
@@ -264,20 +236,20 @@ VSOutput mainVS(VSInput input) {
 	#endif
 	#ifndef DEPTH_ONLY_VS
 		#ifdef AO_ATTR
-			output.ao = VTX(ao);
+			output.ao = vtx.ao;
 		#endif
 		#ifdef UV0_ATTR
-			output.uv = VTX(uv);
+			output.uv = vtx.uv;
 		#endif
 	#endif
 	#ifdef AUTOINSTANCED
-		float3 p = VTX(position).xyz * inst.scale.xyz;
+		float3 p = vtx.position.xyz * inst.scale.xyz;
 		output.pos_ws = inst.pos_lod.xyz + rotateByQuat(inst.rot, p);
 		output.position = mul(float4(output.pos_ws, 1), Pass_ws_to_ndc);
 		#ifndef DEPTH_ONLY_VS
-			output.normal = rotateByQuat(inst.rot, VTX(normal));
+			output.normal = rotateByQuat(inst.rot, vtx.normal);
 			#ifdef TANGENT_ATTR
-				output.tangent = rotateByQuat(inst.rot, VTX(tangent));
+				output.tangent = rotateByQuat(inst.rot, vtx.tangent);
 			#endif
 		#endif
 		
@@ -288,12 +260,12 @@ VSOutput mainVS(VSInput input) {
 		float4 rot_quat = float4(inst.rot_lod.xyz, 0);
 		rot_quat.w = sqrt(saturate(1 - dot(rot_quat.xyz, rot_quat.xyz)));
 		#ifndef DEPTH_ONLY_VS
-			output.normal = rotateByQuat(rot_quat, VTX(normal));
+			output.normal = rotateByQuat(rot_quat, vtx.normal);
 			#ifdef TANGENT_ATTR
-				output.tangent = rotateByQuat(rot_quat, VTX(tangent));
+				output.tangent = rotateByQuat(rot_quat, vtx.tangent);
 			#endif
 		#endif
-		float3 p = VTX(position) * inst.pos_scale.w;
+		float3 p = vtx.position * inst.pos_scale.w;
 		#ifdef MESH_PARTICLE
 			output.pos_ws = position + inst.pos_scale.xyz + rotateByQuat(rot_quat, p);
 		#else
@@ -302,14 +274,14 @@ VSOutput mainVS(VSInput input) {
 		output.position = mul(float4(output.pos_ws, 1), Pass_ws_to_ndc);
 	#elif defined GRASS
 		#ifndef DEPTH_ONLY_VS
-			output.normal = rotateByQuat(inst.rot, VTX(normal));
+			output.normal = rotateByQuat(inst.rot, vtx.normal);
 			#ifdef TANGENT_ATTR
-				output.tangent = rotateByQuat(inst.rot, VTX(tangent));
+				output.tangent = rotateByQuat(inst.rot, vtx.tangent);
 			#endif
 		#endif
-		float3 p = VTX(position);
+		float3 p = vtx.position;
 		output.pos_y = p.y;
-		output.pos_ws = inst.pos_scale.xyz + rotateByQuat(inst.rot, VTX(position) * inst.pos_scale.w);
+		output.pos_ws = inst.pos_scale.xyz + rotateByQuat(inst.rot, vtx.position * inst.pos_scale.w);
 		output.pos_ws += u_grass_origin;
 		#ifdef COLOR0_ATTR
 			//output.color = input.color;
@@ -320,36 +292,36 @@ VSOutput mainVS(VSInput input) {
 			output.cluster_id = (uint)inst.pos_lod.w; // written by nanite.hlsl
 		#endif
 		#ifndef DEPTH_ONLY_VS
-			output.normal = rotateByQuat(inst.rot, VTX(normal));
+			output.normal = rotateByQuat(inst.rot, vtx.normal);
 			#ifdef TANGENT_ATTR
-				output.tangent = rotateByQuat(inst.rot, VTX(tangent));
+				output.tangent = rotateByQuat(inst.rot, vtx.tangent);
 			#endif
 		#endif
-		output.pos_ws = inst.pos_lod.xyz + rotateByQuat(inst.rot, VTX(position) * inst.scale.xyz);
+		output.pos_ws = inst.pos_lod.xyz + rotateByQuat(inst.rot, vtx.position * inst.scale.xyz);
 		output.position = mul(float4(output.pos_ws, 1), Pass_ws_to_ndc);
 		#ifndef DEPTH_ONLY_VS
-			output.prev_ndcpos_no_jitter = float4(inst.prev_pos_lod.xyz + rotateByQuat(inst.prev_rot, VTX(position) * inst.prev_scale.xyz), 1);
+			output.prev_ndcpos_no_jitter = float4(inst.prev_pos_lod.xyz + rotateByQuat(inst.prev_rot, vtx.position * inst.prev_scale.xyz), 1);
 			output.prev_ndcpos_no_jitter = mul(output.prev_ndcpos_no_jitter, mul(Global_ws_to_ndc_no_jitter, Global_reprojection));
 		#endif
 	#elif defined SKINNED
-		float2x4 dq = mul(getBones(inst, VTX(indices).x), VTX(weights).x);
-		float w = dot(getBones(inst, VTX(indices).y)[0], getBones(inst, VTX(indices).x)[0]) < 0 ? -VTX(weights).y : VTX(weights).y;
-		dq += mul(getBones(inst, VTX(indices).y), w);
-		w = dot(getBones(inst, VTX(indices).z)[0], getBones(inst, VTX(indices).x)[0]) < 0 ? -VTX(weights).z : VTX(weights).z;
-		dq += mul(getBones(inst, VTX(indices).z), w);
-		w = dot(getBones(inst, VTX(indices).w)[0], getBones(inst, VTX(indices).x)[0]) < 0 ? -VTX(weights).w : VTX(weights).w;
-		dq += mul(getBones(inst, VTX(indices).w), w);
+		float2x4 dq = mul(getBones(inst, vtx.indices.x), vtx.weights.x);
+		float w = dot(getBones(inst, vtx.indices.y)[0], getBones(inst, vtx.indices.x)[0]) < 0 ? -vtx.weights.y : vtx.weights.y;
+		dq += mul(getBones(inst, vtx.indices.y), w);
+		w = dot(getBones(inst, vtx.indices.z)[0], getBones(inst, vtx.indices.x)[0]) < 0 ? -vtx.weights.z : vtx.weights.z;
+		dq += mul(getBones(inst, vtx.indices.z), w);
+		w = dot(getBones(inst, vtx.indices.w)[0], getBones(inst, vtx.indices.x)[0]) < 0 ? -vtx.weights.w : vtx.weights.w;
+		dq += mul(getBones(inst, vtx.indices.w), w);
 	
 		dq *= 1 / length(dq[0]);
 
 		#ifndef DEPTH_ONLY_VS
-			output.normal = rotateByQuat(inst.rot, rotateByQuat(dq[0], VTX(normal)));
+			output.normal = rotateByQuat(inst.rot, rotateByQuat(dq[0], vtx.normal));
 			#ifdef TANGENT_ATTR
-				output.tangent = rotateByQuat(inst.rot, rotateByQuat(dq[0], VTX(tangent)));
+				output.tangent = rotateByQuat(inst.rot, rotateByQuat(dq[0], vtx.tangent));
 			#endif
 		#endif
 		float3 mpos;
-		mpos = VTX(position);
+		mpos = vtx.position;
 		output.pos_ws = rotateByQuat(inst.rot, transformByDualQuat(dq, mpos)) * inst.scale + inst.pos;
 		output.position = mul(float4(output.pos_ws, 1), Pass_ws_to_ndc);
 		// TODO previous frame bone positions
@@ -360,12 +332,12 @@ VSOutput mainVS(VSInput input) {
 	#else
 		#ifndef DEPTH_ONLY_VS
 			float3x3 rot_mtx = (float3x3)model_mtx;
-			output.normal =  mul(VTX(normal), rot_mtx);
+			output.normal =  mul(vtx.normal, rot_mtx);
 			#ifdef TANGENT_ATTR
-				output.tangent = mul(VTX(tangent), rot_mtx);
+				output.tangent = mul(vtx.tangent, rot_mtx);
 			#endif
 		#endif
-		output.pos_ws = transformPosition(VTX(position), model_mtx).xyz;
+		output.pos_ws = transformPosition(vtx.position, model_mtx).xyz;
 		output.position = mul(float4(output.pos_ws, 1), Pass_ws_to_ndc);
 	#endif
 	return output;

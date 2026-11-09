@@ -7,13 +7,18 @@
 #include "engine/shaders/common.hlsli"
 
 struct VSInput {
-	float3 i_position : TEXCOORD0;
-	float i_scale : TEXCOORD1;
-	float4 i_color : TEXCOORD2;
-	float i_rot : TEXCOORD3;
-	float i_frame : TEXCOORD4;
-	float i_emission : TEXCOORD5;
 	uint vertex_id : SV_VertexID;
+	uint instance_id : SV_InstanceID;
+};
+
+// a particle, outputs of the emitter in this order, it is pulled by the vertex shader
+struct Particle {
+	float3 position;
+	float scale;
+	float4 color;
+	float rot;
+	float frame;
+	float emission;
 };
 
 struct VSOutput {
@@ -26,29 +31,47 @@ struct VSOutput {
 cbuffer Model : register(b4) {
 	float4x4 u_model;
 	uint u_material_index;
+	uint u_particles;			// bindless
+	uint u_particles_offset;	// in bytes
+	uint u_particles_stride;	// in bytes
+}
+
+Particle loadParticle(uint instance_id) {
+	ByteAddressBuffer buffer = bindless_buffers[u_particles];
+	const uint offset = u_particles_offset + instance_id * u_particles_stride;
+	const float4 d0 = asfloat(buffer.Load4(offset));
+	const float4 d1 = asfloat(buffer.Load4(offset + 16));
+	const float3 d2 = asfloat(buffer.Load3(offset + 32));
+	Particle p;
+	p.position = d0.xyz;
+	p.scale = d0.w;
+	p.color = d1;
+	p.rot = d2.x;
+	p.frame = d2.y;
+	p.emission = d2.z;
+	return p;
 }
 
 VSOutput mainVS(VSInput input) {
+	const Particle particle = loadParticle(input.instance_id);
 	MaterialData material = getMaterialData(u_material_index);
 	float2 pos = float2(input.vertex_id & 1, (input.vertex_id & 2) * 0.5);
-	uint frame = uint(input.i_frame);
+	uint frame = uint(particle.frame);
 	VSOutput output;
 	output.uv = (pos + float2(frame % material.u_frames_cols, frame / material.u_frames_cols)) / float2(material.u_frames_cols, material.u_frames_rows);
 
-	float3 dir = normalize(input.i_position);
-
-	float c = cos(input.i_rot);
-	float s = sin(input.i_rot);
+	float c = cos(particle.rot);
+	float s = sin(particle.rot);
 	float2x2 rotm = float2x2(c, s, -s, c);
 	pos = mul(rotm, pos * 2 - 1);
-	pos *= input.i_scale;
+	pos *= particle.scale;
 	
-	output.color = input.i_color;
-	output.emission = input.i_emission;
+	output.color = particle.color;
+	output.emission = particle.emission;
 	#ifdef WORLD_SPACE
-		float4 pos_vs = transformPosition(input.i_position - Global_camera_world_pos.xyz, Pass_ws_to_vs);
+		float4 pos_vs = transformPosition(particle.position - Global_camera_world_pos.xyz, Pass_ws_to_vs);
 	#else
-		float4 pos_vs = transformPosition(input.i_position, u_model, Pass_ws_to_vs);
+		float4 pos_vs = transformPosition(particle.position, u_model, Pass_ws_to_vs);
 	#endif
 	pos_vs +=  + float4(pos.xy, 0, 0);
 	output.position = transformPosition(pos_vs, Pass_vs_to_ndc);

@@ -11,6 +11,7 @@
 
 #include "engine/plugin.h"
 #include "gpu/gpu.h"
+#include "vertex_decl.h"
 
 
 //@ module RenderModule renderer "Render"
@@ -47,13 +48,13 @@ struct ProceduralGeometry {
 	ProceduralGeometry(IAllocator& allocator) 
 		: vertex_data(allocator)
 		, index_data(allocator)
-		, vertex_decl(gpu::PrimitiveType::TRIANGLES)
 	{}
 
 	Material* material = nullptr;
 	OutputMemoryStream vertex_data;
 	OutputMemoryStream index_data;
-	gpu::VertexDecl vertex_decl;
+	VertexDecl vertex_decl;
+	gpu::PrimitiveType primitive_type = gpu::PrimitiveType::TRIANGLES;
 	gpu::DataType index_type;
 	gpu::BufferHandle vertex_buffer = gpu::INVALID_BUFFER;
 	gpu::BufferHandle index_buffer = gpu::INVALID_BUFFER;
@@ -535,7 +536,8 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 
 	virtual void setProceduralGeometry(EntityRef entity
 		, Span<const u8> vertex_data
-		, const gpu::VertexDecl& vertex_decl
+		, const VertexDecl& vertex_decl
+		, gpu::PrimitiveType primitive_type
 		, Span<const u8> index_data
 		, gpu::DataType index_type) = 0;
 	//@ component ProceduralGeometry id procedural_geom

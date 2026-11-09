@@ -592,7 +592,8 @@ struct PipelineImpl final : Pipeline {
 		u32 region_cap;
 		u32 cone_culling;
 		u32 cluster_count;
-		u32 padding[6];
+		u32 index_stride;	// indices of a cluster in the index buffer, the index count of the draw
+		u32 padding[5];
 	};
 	static_assert(sizeof(ClusterMeshDesc) == 128);
 
@@ -672,10 +673,6 @@ struct PipelineImpl final : Pipeline {
 		, m_buffers(m_allocator)
 		, m_views(m_allocator)
 		, m_render_states(m_allocator)
-		, m_base_vertex_decl(gpu::PrimitiveType::TRIANGLES)
-		, m_base_line_vertex_decl(gpu::PrimitiveType::LINES)
-		, m_decal_decl(gpu::PrimitiveType::TRIANGLES)
-		, m_2D_decl(gpu::PrimitiveType::TRIANGLES)
 		, m_instance_data(m_allocator)
 		, m_material_override_refresh_queue(m_allocator)
 	{
@@ -730,9 +727,9 @@ struct PipelineImpl final : Pipeline {
 
 		// decals pull vertices of the cube (float3 positions) and their instances, see decal.hlsl
 		const AttributeSemantic cube_semantics[] = { AttributeSemantic::POSITION };
-		gpu::VertexDecl cube_decl(gpu::PrimitiveType::TRIANGLES);
-		cube_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
-		m_cube_pulling_defines = m_renderer.getSemanticDefines(Span(cube_semantics), cube_decl, 12, true);
+		VertexDecl cube_decl;
+		cube_decl.addAttribute(0, 3, AttributeType::FLOAT, 0);
+		m_cube_pulling_defines = m_renderer.getSemanticDefines(Span(cube_semantics), cube_decl, 12);
 
 
 		if (m_type == PipelineType::PREVIEW) m_clear_color = { 0.2f, 0.2f, 0.2f };
@@ -1176,11 +1173,9 @@ struct PipelineImpl final : Pipeline {
 		if (!shader.isReady()) return;
 
 		DrawStream& stream = m_renderer.getDrawStream();
-		const gpu::ProgramHandle program = shader.getProgram(state, gpu::VertexDecl(gpu::PrimitiveType::TRIANGLE_STRIP), define_mask, "");
+		const gpu::ProgramHandle program = shader.getProgram(state, gpu::PrimitiveType::TRIANGLE_STRIP, define_mask, "");
 		stream.useProgram(program);
 		stream.bindIndexBuffer(gpu::INVALID_BUFFER);
-		stream.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-		stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 		stream.drawArrays(indices_offset, indices_count);
 	}
 
@@ -1437,9 +1432,8 @@ struct PipelineImpl final : Pipeline {
 					}
 				)#";
 
-			gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
 			m_blit_screen_program = gpu::allocProgramHandle();
-			stream.createProgram(m_blit_screen_program, gpu::StateFlags::NONE, decl, src, gpu::ShaderType::SURFACE, nullptr, 0, "blit to screen");
+			stream.createProgram(m_blit_screen_program, gpu::StateFlags::NONE, gpu::PrimitiveType::TRIANGLE_STRIP, src, gpu::ShaderType::SURFACE, nullptr, 0, "blit to screen");
 		}
 
 		stream.setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
@@ -1607,7 +1601,7 @@ struct PipelineImpl final : Pipeline {
 			};
 			const Array<DebugTriangle>& tris = m_module->getDebugTriangles();
 			const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::CULL_BACK;
-			const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(state, m_base_vertex_decl, 0, "");
+			const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(state, gpu::PrimitiveType::TRIANGLES, 0, "");
 			UniformPool& uniform_pool = m_renderer.getUniformPool();
 			TransientPool& transient_pool = m_renderer.getTransientPool();
 			const TransientSlice vb = alloc(transient_pool, sizeof(BaseVertex) * tris.size() * 3);
@@ -1646,7 +1640,7 @@ struct PipelineImpl final : Pipeline {
 			};
 			const Array<DebugLine>& lines = m_module->getDebugLines();
 			const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
-			const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(state, m_base_line_vertex_decl, 0, "");
+			const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(state, gpu::PrimitiveType::LINES, 0, "");
 			UniformPool& uniform_pool = m_renderer.getUniformPool();
 			TransientPool& transient_pool = m_renderer.getTransientPool();
 			const TransientSlice vb = alloc(transient_pool, sizeof(BaseVertex) * lines.size() * 2);
@@ -1707,7 +1701,7 @@ struct PipelineImpl final : Pipeline {
 
 		gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
 		if (is_3d) state = state | gpu::StateFlags::DEPTH_FN_GREATER; 
-		const gpu::ProgramHandle program = m_draw2d_shader->getProgram(state, m_2D_decl, 0, "");
+		const gpu::ProgramHandle program = m_draw2d_shader->getProgram(state, gpu::PrimitiveType::TRIANGLES, 0, "");
 
 		stream.pushDebugGroup("draw2d");
 		// vertices are pulled by the vertex shader
@@ -1780,7 +1774,6 @@ struct PipelineImpl final : Pipeline {
 			if(terrains.empty()) return;
 
 			World& world = m_module->getWorld();
-			gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
 			for (const Terrain* terrain : terrains) {
 				if (!terrain->m_heightmap) continue;
 				if (!terrain->m_heightmap->isReady()) continue;
@@ -1793,7 +1786,7 @@ struct PipelineImpl final : Pipeline {
 				const Vec3 scale = terrain->getScale();
 				const Vec2 hm_size = terrain->getSize();
 				Shader* shader = terrain->m_material->getShader();
-				const gpu::ProgramHandle program = shader->getProgram(state | terrain->m_material->m_render_states, decl, define_mask | terrain->m_material->getDefineMask(), "");
+				const gpu::ProgramHandle program = shader->getProgram(state | terrain->m_material->m_render_states, gpu::PrimitiveType::TRIANGLE_STRIP, define_mask | terrain->m_material->getDefineMask(), "");
 				const Material* material = terrain->m_material;
 				if (isinf(pos.x) || isinf(pos.y) || isinf(pos.z)) continue;
 
@@ -1822,8 +1815,6 @@ struct PipelineImpl final : Pipeline {
 				stream.useProgram(program);
 				// TODO indexed rendering 
 				stream.bindIndexBuffer(gpu::INVALID_BUFFER);
-				stream.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-				stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 
 				for (;;) {
 					// round 
@@ -1900,6 +1891,7 @@ struct PipelineImpl final : Pipeline {
 				for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
 					const Mesh& mesh = model->getMesh(i);
 					const MeshMaterial& mesh_mat = model->getMeshMaterial(i);
+					if (!mesh.index_buffer_handle) continue; // cluster meshes have no plain index buffer
 
 					Material* material = mesh_mat.material;
 					u32 mask = material->getDefineMask() | define_mask;
@@ -1925,8 +1917,7 @@ struct PipelineImpl final : Pipeline {
 						};
 						TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
 						stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-						stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-						gpu::ProgramHandle program = mesh_mat.material->getShader()->getProgram(material->m_render_states | state, pullingDecl(mesh), mask, mesh.pulling_semantics_defines);
+						gpu::ProgramHandle program = mesh_mat.material->getShader()->getProgram(material->m_render_states | state, mesh.primitive_type, mask, mesh.semantics_defines);
 						stream.useProgram(program);
 					}
 					else {
@@ -1958,7 +1949,7 @@ struct PipelineImpl final : Pipeline {
 						memcpy(bones.ptr, dq_pose.begin(), dq_pose.byte_size());
 						// instance data is pulled by the vertex shader
 						bindMeshVertices(stream, mesh, inst_buf);
-						gpu::ProgramHandle program = mesh_mat.material->getShader()->getProgram(material->m_render_states | state, pullingDecl(mesh), gpu::VertexDecl(gpu::PrimitiveType::NONE), mask, mesh.pulling_semantics_defines);
+						gpu::ProgramHandle program = mesh_mat.material->getShader()->getProgram(material->m_render_states | state, mesh.primitive_type, mask, mesh.semantics_defines);
 						stream.useProgram(program);
 					}
 
@@ -1986,7 +1977,6 @@ struct PipelineImpl final : Pipeline {
 
 		m_renderer.pushJob("grass", [this, cp, define_mask, state](DrawStream& stream){
 			// instances are pulled by vertex shaders
-			const gpu::VertexDecl grass_instance_decl(gpu::PrimitiveType::NONE);
 			const HashMap<EntityRef, Terrain*>& terrains = m_module->getTerrains();
 			const World& world = m_module->getWorld();
 			const float global_lod_multiplier = m_renderer.getLODMultiplier();
@@ -2019,7 +2009,7 @@ struct PipelineImpl final : Pipeline {
 						ASSERT(shader->isReady());
 
  
-						gpu::ProgramHandle program = shader->getProgram(state | material->m_render_states, pullingDecl(mesh), grass_instance_decl, define_mask | material->getDefineMask(), mesh.pulling_semantics_defines);
+						gpu::ProgramHandle program = shader->getProgram(state | material->m_render_states, mesh.primitive_type, define_mask | material->getDefineMask(), mesh.semantics_defines);
 						stream.useProgram(program);
 						stream.bindIndexBuffer(mesh.index_buffer_handle);
 						
@@ -2070,8 +2060,6 @@ struct PipelineImpl final : Pipeline {
 			profiler::pushInt("Culled", culled_count);
 			profiler::pushInt("Instances", total_instance_count);
 
-			stream.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-			stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 		});
 	}
 
@@ -2294,7 +2282,7 @@ struct PipelineImpl final : Pipeline {
 
 			bucket.stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 			const gpu::StateFlags state = pg.material->m_render_states | render_state;
-			const gpu::ProgramHandle program = pg.material->getShader()->getProgram(state, gpu::VertexDecl(pg.vertex_decl.primitive_type), bucket.define_mask | pg.material->getDefineMask(), "");
+			const gpu::ProgramHandle program = pg.material->getShader()->getProgram(state, pg.primitive_type, bucket.define_mask | pg.material->getDefineMask(), "");
 
 			const u32 stride = pg.vertex_decl.getStride();
 			
@@ -2372,7 +2360,7 @@ struct PipelineImpl final : Pipeline {
 		m_cluster_slots = m_type == PipelineType::SCENE_VIEW || m_type == PipelineType::GAME_VIEW ? CLUSTER_SLOTS : CLUSTER_SLOTS_SMALL;
 		const Renderer::MemRef instances_mem = { m_cluster_slots * CLUSTER_INSTANCE_SIZE, nullptr, false };
 		m_cluster_instances = m_renderer.createBuffer(instances_mem, gpu::BufferFlags::SHADER_BUFFER, "cluster instances");
-		const Renderer::MemRef cluster_indirect_mem = { CLUSTER_COMMANDS_OFFSET + m_cluster_slots * 24, nullptr, false };
+		const Renderer::MemRef cluster_indirect_mem = { CLUSTER_COMMANDS_OFFSET + CLUSTER_REGIONS * 24, nullptr, false };
 		m_cluster_indirect = m_renderer.createBuffer(cluster_indirect_mem, gpu::BufferFlags::SHADER_BUFFER, "cluster indirect");
 		m_cluster_scratch_capacity = m_cluster_slots == CLUSTER_SLOTS ? CLUSTER_SCRATCH : CLUSTER_SCRATCH_SMALL;
 		const Renderer::MemRef scratch_mem = { m_cluster_scratch_capacity * sizeof(u32), nullptr, false };
@@ -2419,8 +2407,6 @@ struct PipelineImpl final : Pipeline {
 		bindMeshVertices(stream, mesh, gpu::INVALID_BUFFER, 0);
 	}
 
-	// Vertices of meshes are pulled by vertex shaders (see surface_base.hlsli), meshes have no per-vertex attributes in the input assembler.
-	static gpu::VertexDecl pullingDecl(const Mesh& mesh) { return gpu::VertexDecl(mesh.vertex_decl.primitive_type); }
 
 	// the only per draw data of vertex pulling are buffers
 	// `instances` is pulled instance data of the draw (from the offset in bytes), if there is any
@@ -2474,11 +2460,12 @@ struct PipelineImpl final : Pipeline {
 		u32 dynamic_define = 1 << m_dynamic_define_idx;
 		// instances of cluster draws are addressed by the draw id of indirect commands, not by SV_InstanceID
 		dynamic_define |= 1 << m_renderer.getShaderDefineIdx("INDIRECT_INSTANCE");
+		// vertices of clusters are packed, see vertex_pulling.hlsli
+		dynamic_define |= 1 << m_renderer.getShaderDefineIdx("CLUSTER_MESH");
 		if (m_debug_show == DebugShow::MESH_CLUSTERS) dynamic_define |= 1 << m_renderer.getShaderDefineIdx("CLUSTER_DEBUG");
 		if (m_debug_show == DebugShow::MESH_TRIANGLES) dynamic_define |= (1 << m_renderer.getShaderDefineIdx("CLUSTER_DEBUG")) | (1 << m_renderer.getShaderDefineIdx("CLUSTER_DEBUG_TRIANGLES"));
 
 		// instances are pulled by vertex shaders too
-		const gpu::VertexDecl no_instance_decl(gpu::PrimitiveType::NONE);
 
 		const i32 end = model.getClusterMeshesEnd();
 
@@ -2526,6 +2513,7 @@ struct PipelineImpl final : Pipeline {
 			desc.region_base = base;
 			desc.region_cap = cap;
 			desc.cluster_count = mesh.cluster_count;
+			desc.index_stride = mesh.cluster_index_stride;
 			// back facing clusters are culled only if the draw culls back faces too (shadow views can cull front faces or none), and
 			// not in orthographic views, where the clusters do not face the position of the camera
 			const gpu::StateFlags draw_state = mesh_mat.material->m_render_states | view.buckets[bucket_idx].state;
@@ -2568,8 +2556,7 @@ struct PipelineImpl final : Pipeline {
 			const Material* material = mesh_mat.material;
 			const gpu::StateFlags state = material->m_render_states | bucket.state;
 			// vertices are pulled by the vertex shader, there are no per-vertex attributes in the input assembler
-			const gpu::VertexDecl pulling_decl(mesh.vertex_decl.primitive_type);
-			const gpu::ProgramHandle program = material->getShader()->getProgram(state, pulling_decl, no_instance_decl, bucket.define_mask | dynamic_define | material->getDefineMask(), mesh.pulling_semantics_defines);
+			const gpu::ProgramHandle program = material->getShader()->getProgram(state, mesh.primitive_type, bucket.define_mask | dynamic_define | material->getDefineMask(), mesh.semantics_defines);
 
 			Mesh::VertexBufferBinding vertex_buffer_binding = { gpu::getBindlessHandle(mesh.vertex_buffer_handle).value, gpu::getBindlessHandle(m_cluster_instances).value, 0, 0 };
 			const TransientSlice layout_ub = alloc(uniform_pool, &vertex_buffer_binding, sizeof(vertex_buffer_binding));
@@ -2579,7 +2566,8 @@ struct PipelineImpl final : Pipeline {
 			bucket.stream.bindUniformBuffer(UniformBuffer::VERTEX_BUFFER, layout_ub.buffer, layout_ub.offset, layout_ub.size);
 			bucket.stream.barrier(m_cluster_instances, gpu::BarrierType::READ);
 			bucket.stream.bindIndirectBuffer(m_cluster_indirect);
-			bucket.stream.drawIndirectCount(gpu::DataType::U32, CLUSTER_COMMANDS_OFFSET + base * 24, cap, region * sizeof(u32));
+			// one instanced draw: the instance is a selected cluster, the instance count is written by the culling
+			bucket.stream.drawIndirect(gpu::DataType::U16, CLUSTER_COMMANDS_OFFSET + region * 24);
 
 			bucket.stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
 			bucket.stream.bindIndexBuffer(gpu::INVALID_BUFFER);
@@ -2832,10 +2820,6 @@ struct PipelineImpl final : Pipeline {
 			// models with clusters are always drawn with clusters
 			if (m->hasClusters()) {
 				if (m_cluster_shader->isReady()) {
-					if (!m_cluster_draw_logged) {
-						m_cluster_draw_logged = true;
-						logInfo(m->getPath(), ": drawing ", im.instances.size(), " instances with clusters");
-					}
 					encodeClusterModel(stream, view, iter.key(), im);
 				}
 				else if (m_cluster_shader->isFailure() && !m_cluster_shader_failure_logged) {
@@ -2988,7 +2972,6 @@ struct PipelineImpl final : Pipeline {
 			stream.memoryBarrier(culled_buffer);
 
 			// instances are pulled by vertex shaders, SV_InstanceID does not include the start instance of the indirect draws
-			const gpu::VertexDecl no_instance_decl(gpu::PrimitiveType::NONE);
 			const u32 instanced_define = (1 << m_renderer.getShaderDefineIdx("INSTANCED")) | (1 << m_renderer.getShaderDefineIdx("INDIRECT_INSTANCE"));
 			for (i32 i = 0; i < m->getMeshCount(); ++i) {
 				const Mesh& mesh = m->getMesh(i);
@@ -3001,7 +2984,7 @@ struct PipelineImpl final : Pipeline {
 				const Material* material = mesh_mat.material;
 				Shader* shader = material->getShader();
 				const gpu::StateFlags state = material->m_render_states | bucket.state;
-				const gpu::ProgramHandle program = shader->getProgram(state, pullingDecl(mesh), no_instance_decl, instanced_define_mask | material->getDefineMask(), mesh.pulling_semantics_defines);
+				const gpu::ProgramHandle program = shader->getProgram(state, mesh.primitive_type, instanced_define_mask | material->getDefineMask(), mesh.semantics_defines);
 
 				MaterialIndex material_index = material->getIndex();
 				TransientSlice ub_slice = alloc(uniform_pool, &material_index, sizeof(material_index));
@@ -3113,7 +3096,6 @@ struct PipelineImpl final : Pipeline {
 		const DVec3 camera_pos = view.cp.pos;
 		
 		// instances are pulled by vertex shaders too
-		const gpu::VertexDecl no_instance_decl(gpu::PrimitiveType::NONE);
 
 		UniformPool& uniform_pool = m_renderer.getUniformPool();
 		TransientPool& transient_pool = m_renderer.getTransientPool();
@@ -3166,45 +3148,39 @@ struct PipelineImpl final : Pipeline {
 						const Transform tr = world.getTransform(*particle_system.m_entity);
 						const Vec3 lpos = Vec3(tr.pos - camera_pos);
 						const gpu::StateFlags state = material->m_render_states | render_state;
-						gpu::VertexDecl inst_decl(gpu::PrimitiveType::TRIANGLE_STRIP);
-						inst_decl.addAttribute(0, 4, gpu::AttributeType::U32, gpu::Attribute::INSTANCED);
-						u32 stride = inst_decl.getStride();
-
-						gpu::ProgramHandle program = material->getShader()->getProgram(state, inst_decl, define_mask | material->getDefineMask(), "");
+						gpu::ProgramHandle program = material->getShader()->getProgram(state, gpu::PrimitiveType::TRIANGLE_STRIP, define_mask | material->getDefineMask(), "");
 						const TransientSlice point_slice = emitter.slice;
 						const Matrix mtx(lpos, tr.rot);
 
-						struct {
-							Matrix mtx;
-							MaterialIndex material_index;
-						} ub_data = {
-							mtx,
-							material->getIndex()
-						};
-						const TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
-						stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 						stream->useProgram(program);
 						stream->bindIndexBuffer(gpu::INVALID_BUFFER);
-						stream->bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
 
+						// points are pulled by the vertex shader, see ribbon.hlsl
 						u32 points_offset = 0;
-						u32 offset = 0;
-						const gpu::VertexDecl& decl = emitter.resource_emitter.vertex_decl;
-						TransientSlice slice = alloc(transient_pool, sizeof(u32) * 4 * emitter.ribbons.size());
-						u32* inst_data = (u32*)slice.ptr;
+						const u32 vertex_stride = emitter.resource_emitter.vertex_stride;
 						for (const auto& ribbon : emitter.ribbons) {
-							inst_data[0] = gpu::getBindlessHandle(point_slice.buffer).value;
-							inst_data[1] = point_slice.offset + points_offset;
-							inst_data[2] = ribbon.offset;
-							inst_data[3] = ribbon.length;
-							stream->bindVertexBuffer(1, slice.buffer, slice.offset + offset, stride);
-							// TODO instanced draw / indirect instanced
-							if(ribbon.length > 1) {
+							if (ribbon.length > 1) {
+								struct {
+									Matrix mtx;
+									MaterialIndex material_index;
+									u32 points_buffer;
+									u32 points_offset;
+									u32 ribbon_offset;
+									u32 ribbon_max_length;
+								} ub_data = {
+									mtx,
+									material->getIndex(),
+									gpu::getBindlessHandle(point_slice.buffer).value,
+									point_slice.offset + points_offset,
+									ribbon.offset,
+									ribbon.length
+								};
+								const TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
+								stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+								// TODO instanced draw / indirect instanced
 								stream->drawArraysInstanced(2 * ribbon.length, 1);
 							}
-							offset += 4 * sizeof(u32);
-							points_offset += ribbon.length * decl.getStride();
-							inst_data += 4;
+							points_offset += ribbon.length * vertex_stride;
 						}
 						break;
 					}
@@ -3218,49 +3194,43 @@ struct PipelineImpl final : Pipeline {
 						const Transform tr = world.getTransform(*particle_system.m_entity);
 						const Vec3 lpos = Vec3(tr.pos - camera_pos);
 						const gpu::StateFlags state = material->m_render_states | render_state;
-						gpu::VertexDecl inst_decl(gpu::PrimitiveType::TRIANGLE_STRIP);
-						inst_decl.addAttribute(0, 4, gpu::AttributeType::U32, gpu::Attribute::INSTANCED);
-						u32 stride = inst_decl.getStride();
-
-						gpu::ProgramHandle program = material->getShader()->getProgram(state, inst_decl, define_mask | material->getDefineMask(), "");
+						gpu::ProgramHandle program = material->getShader()->getProgram(state, gpu::PrimitiveType::TRIANGLE_STRIP, define_mask | material->getDefineMask(), "");
 						const TransientSlice point_slice = emitter.slice;
 						const Matrix mtx(lpos, tr.rot);
 
-						struct {
-							Matrix mtx;
-							MaterialIndex material_index;
-							u32 tube_segments;
-						} ub_data = {
-							mtx,
-							material->getIndex(),
-							tube_segments
-						};
-						const TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
-						stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 						stream->useProgram(program);
 						stream->bindIndexBuffer(gpu::INVALID_BUFFER);
-						stream->bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
 
+						// points are pulled by the vertex shader
 						u32 points_offset = 0;
-						u32 offset = 0;
-						const gpu::VertexDecl& decl = emitter.resource_emitter.vertex_decl;
-						TransientSlice slice = alloc(transient_pool, sizeof(u32) * 4 * emitter.ribbons.size());
-						u32* inst_data = (u32*)slice.ptr;
+						const u32 vertex_stride = emitter.resource_emitter.vertex_stride;
 						for (const auto& ribbon : emitter.ribbons) {
-							inst_data[0] = gpu::getBindlessHandle(point_slice.buffer).value;
-							inst_data[1] = point_slice.offset + points_offset;
-							inst_data[2] = ribbon.offset;
-							inst_data[3] = emitter.resource_emitter.max_ribbon_length;
-							stream->bindVertexBuffer(1, slice.buffer, slice.offset + offset, stride);
-							if(ribbon.length > 1) {
+							if (ribbon.length > 1) {
+								struct {
+									Matrix mtx;
+									MaterialIndex material_index;
+									u32 tube_segments;
+									u32 points_buffer;
+									u32 points_offset;
+									u32 ribbon_offset;
+									u32 ribbon_max_length;
+								} ub_data = {
+									mtx,
+									material->getIndex(),
+									tube_segments,
+									gpu::getBindlessHandle(point_slice.buffer).value,
+									point_slice.offset + points_offset,
+									ribbon.offset,
+									emitter.resource_emitter.max_ribbon_length
+								};
+								const TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
+								stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 								// For tube: each ring transition needs (tube_segments + 1) * 2 vertices
 								const u32 ring_transitions = ribbon.length - 1;
 								const u32 vertex_count = ring_transitions * (tube_segments + 1) * 2;
 								stream->drawArraysInstanced(vertex_count, 1);
 							}
-							offset += 4 * sizeof(u32);
-							points_offset += ribbon.length * decl.getStride();
-							inst_data += 4;
+							points_offset += ribbon.length * vertex_stride;
 						}
 						break;
 					}
@@ -3276,18 +3246,19 @@ struct PipelineImpl final : Pipeline {
 
 						const Transform tr = world.getTransform(*particle_system.m_entity);
 						const Vec3 lpos = Vec3(tr.pos - camera_pos);
-						const gpu::VertexDecl& inst_decl = emitter.resource_emitter.vertex_decl;
 						const gpu::StateFlags state = material->m_render_states | render_state;
 						const u32 defines = mesh_particle_define_mask | material->getDefineMask();
 						Shader* shader = material->getShader();
-						gpu::ProgramHandle program = shader->getProgram(state, pullingDecl(mesh), inst_decl, defines, mesh.pulling_semantics_defines);
+						gpu::ProgramHandle program = shader->getProgram(state, mesh.primitive_type, defines, mesh.semantics_defines);
 
 						struct UBData {
 							Vec3 pos;
 							MaterialIndex material_index;
+							u32 particle_stride;
 						} ub_data = {
 							lpos,
-							material->getIndex()
+							material->getIndex(),
+							emitter.resource_emitter.vertex_stride
 						};
 
 						TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
@@ -3295,8 +3266,8 @@ struct PipelineImpl final : Pipeline {
 						stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 						stream->useProgram(program);
 						stream->bindIndexBuffer(mesh.index_buffer_handle);
-						bindMeshVertices(*stream, mesh);
-						stream->bindVertexBuffer(1, emitter.slice.buffer, emitter.slice.offset, inst_decl.getStride());
+						// particles are pulled instances
+						bindMeshVertices(*stream, mesh, emitter.slice);
 						stream->drawIndexedInstanced(mesh.indices_count, particles_count, mesh.index_type);
 						break;
 					}
@@ -3309,26 +3280,30 @@ struct PipelineImpl final : Pipeline {
 
 						const Transform tr = world.getTransform(*particle_system.m_entity);
 						const Vec3 lpos = Vec3(tr.pos - camera_pos);
-						const gpu::VertexDecl& decl = emitter.resource_emitter.vertex_decl;
 						const gpu::StateFlags state = material->m_render_states | render_state;
-						gpu::ProgramHandle program = material->getShader()->getProgram(state, decl, define_mask | material->getDefineMask(), "");
+						gpu::ProgramHandle program = material->getShader()->getProgram(state, gpu::PrimitiveType::TRIANGLE_STRIP, define_mask | material->getDefineMask(), "");
 						const TransientSlice slice = emitter.slice;
 						const Matrix mtx(lpos, tr.rot);
 
+						// particles are pulled by the vertex shader, see particles.hlsl
 						struct {
 							Matrix mtx;
 							MaterialIndex material_index;
+							u32 particles_buffer;
+							u32 particles_offset;
+							u32 particles_stride;
 						} ub_data = {
 							mtx,
-							material->getIndex()
+							material->getIndex(),
+							gpu::getBindlessHandle(slice.buffer).value,
+							slice.offset,
+							emitter.resource_emitter.vertex_stride
 						};
 
 						const TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
 						stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 						stream->useProgram(program);
 						stream->bindIndexBuffer(gpu::INVALID_BUFFER);
-						stream->bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-						stream->bindVertexBuffer(1, slice.buffer, slice.offset, decl.getStride());
 						stream->drawArraysInstanced(4, particles_count);
 						break;
 					}
@@ -3348,16 +3323,13 @@ struct PipelineImpl final : Pipeline {
 						Shader* shader = material->getShader();
 						const gpu::StateFlags state = material->m_render_states | render_state;
 						const u32 defines = autoinstanced_define_mask | material->getDefineMask();
-						const gpu::ProgramHandle program = shader->getProgram(state, pullingDecl(mesh), no_instance_decl, defines, mesh.pulling_semantics_defines);
+						const gpu::ProgramHandle program = shader->getProgram(state, mesh.primitive_type, defines, mesh.semantics_defines);
 
 						bindMeshVertices(*stream, mesh, instances.slice);
 						gpu::Drawcall& dc = stream->draw();
 						dc = {
 							.program = program,
 							.index_buffer = mesh.index_buffer_handle,
-							.vertex_buffers = { gpu::INVALID_BUFFER, gpu::INVALID_BUFFER },
-							.vertex_buffer_offsets = { 0, 0 },
-							.vertex_buffer_sizes = { 0, 0 },
 							.indices_count = mesh.indices_count,
 							.instances_count = total_count,
 							.index_type = mesh.index_type,
@@ -3411,7 +3383,7 @@ struct PipelineImpl final : Pipeline {
 							}
 
 							const u32 defines = dynamic_define_mask | material->getDefineMask();
-							const gpu::ProgramHandle program = shader->getProgram(state, pullingDecl(mesh), no_instance_decl, defines, mesh.pulling_semantics_defines);
+							const gpu::ProgramHandle program = shader->getProgram(state, mesh.primitive_type, defines, mesh.semantics_defines);
 					
 							stream->useProgram(program);
 							stream->bindIndexBuffer(mesh.index_buffer_handle);
@@ -3447,7 +3419,7 @@ struct PipelineImpl final : Pipeline {
 							}
 
 							const u32 defines = autoinstanced_define_mask | material->getDefineMask();
-							const gpu::ProgramHandle program = shader->getProgram(state, pullingDecl(mesh), no_instance_decl, defines, mesh.pulling_semantics_defines);
+							const gpu::ProgramHandle program = shader->getProgram(state, mesh.primitive_type, defines, mesh.semantics_defines);
 
 							stream->useProgram(program);
 							stream->bindIndexBuffer(mesh.index_buffer_handle);
@@ -3511,7 +3483,7 @@ struct PipelineImpl final : Pipeline {
 
 						Shader* shader = mesh_mat.material->getShader();
 						const Mesh& mesh = mi->meshes[mesh_idx];
-						const gpu::ProgramHandle program = shader->getProgram(state, pullingDecl(mesh), no_instance_decl, defines, mesh.pulling_semantics_defines);
+						const gpu::ProgramHandle program = shader->getProgram(state, mesh.primitive_type, defines, mesh.semantics_defines);
 						stream->useProgram(program);
 						stream->bindIndexBuffer(mesh.index_buffer_handle);
 						bindMeshVertices(*stream, mesh, instance_buffer);
@@ -3561,7 +3533,7 @@ struct PipelineImpl final : Pipeline {
 						state = state & ~gpu::StateFlags::CULL_FRONT | gpu::StateFlags::CULL_BACK;
 						const u32 nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
 						if (nonintersecting_count) {
-							stream->useProgram(material->getShader()->getProgram(state, m_decal_decl, define_mask | material->getDefineMask(), m_cube_pulling_defines));
+							stream->useProgram(material->getShader()->getProgram(state, gpu::PrimitiveType::TRIANGLES, define_mask | material->getDefineMask(), m_cube_pulling_defines));
 							bindPulledBuffers(*stream, m_cube_vb, slice.buffer, slice.offset);
 							stream->drawIndexedInstanced(36, nonintersecting_count, gpu::DataType::U16);
 						}
@@ -3570,7 +3542,7 @@ struct PipelineImpl final : Pipeline {
 							state = state & ~gpu::StateFlags::DEPTH_FUNCTION;
 							state = state & ~gpu::StateFlags::CULL_BACK;
 							state = state | gpu::StateFlags::CULL_FRONT;
-							stream->useProgram(material->getShader()->getProgram(state, m_decal_decl, define_mask | material->getDefineMask(), m_cube_pulling_defines));
+							stream->useProgram(material->getShader()->getProgram(state, gpu::PrimitiveType::TRIANGLES, define_mask | material->getDefineMask(), m_cube_pulling_defines));
 							const u32 offs = slice.offset + sizeof(DecalData) * nonintersecting_count;
 							bindPulledBuffers(*stream, m_cube_vb, slice.buffer, offs);
 							stream->drawIndexedInstanced(36, count - nonintersecting_count, gpu::DataType::U16);
@@ -3623,7 +3595,7 @@ struct PipelineImpl final : Pipeline {
 						state = state & ~gpu::StateFlags::CULL_FRONT | gpu::StateFlags::CULL_BACK;
 						const u32 nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
 						if (nonintersecting_count) {
-							stream->useProgram(material->getShader()->getProgram(state, m_decal_decl, define_mask | material->getDefineMask(), m_cube_pulling_defines));
+							stream->useProgram(material->getShader()->getProgram(state, gpu::PrimitiveType::TRIANGLES, define_mask | material->getDefineMask(), m_cube_pulling_defines));
 							bindPulledBuffers(*stream, m_cube_vb, slice.buffer, slice.offset);
 							stream->drawIndexedInstanced(36, nonintersecting_count, gpu::DataType::U16);
 						}
@@ -3632,7 +3604,7 @@ struct PipelineImpl final : Pipeline {
 							state = state & ~gpu::StateFlags::DEPTH_FUNCTION;
 							state = state & ~gpu::StateFlags::CULL_BACK;
 							state = state | gpu::StateFlags::CULL_FRONT;
-							stream->useProgram(material->getShader()->getProgram(state, m_decal_decl, define_mask | material->getDefineMask(), m_cube_pulling_defines));
+							stream->useProgram(material->getShader()->getProgram(state, gpu::PrimitiveType::TRIANGLES, define_mask | material->getDefineMask(), m_cube_pulling_defines));
 							const u32 offs = slice.offset + sizeof(DecalData) * nonintersecting_count;
 							bindPulledBuffers(*stream, m_cube_vb, slice.buffer, offs);
 							stream->drawIndexedInstanced(36, count - nonintersecting_count, gpu::DataType::U16);
@@ -4591,7 +4563,6 @@ struct PipelineImpl final : Pipeline {
 		CLUSTER_COMMANDS_OFFSET = 3 * CLUSTER_REGIONS * sizeof(u32) // counters (of selected clusters, of clusters culled by cones, of visited nodes and clusters) are stored before draw commands
 	};
 	u32 m_cluster_slots = 0;
-	bool m_cluster_draw_logged = false;
 	bool m_cluster_shader_failure_logged = false;
 	AtomicI32 m_cluster_slot_offset = 0;
 	AtomicI32 m_cluster_region_offset = 0;
@@ -4607,11 +4578,6 @@ struct PipelineImpl final : Pipeline {
 	CameraParams m_cluster_frozen_cp;
 	float m_cluster_frozen_height = 1.f;
 	AtomicI32 m_cluster_scratch_offset = 0;
-	// no attributes, vertices of debug shapes are pulled
-	gpu::VertexDecl m_base_vertex_decl;
-	gpu::VertexDecl m_base_line_vertex_decl;
-	gpu::VertexDecl m_2D_decl; // no attributes, vertices of draw2d are pulled
-	gpu::VertexDecl m_decal_decl; // no attributes, decals pull everything
 	const char* m_cube_pulling_defines = "";
 	gpu::BufferHandle m_cube_vb;
 	gpu::BufferHandle m_cube_ib;

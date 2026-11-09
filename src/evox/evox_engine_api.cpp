@@ -168,14 +168,15 @@ static void setMesh(ex_runtime*, ex_call_frame frame) {
 		panic(frame, "Renderer module not found");
 		return;
 	}
-	gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
-	decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
-	decl.addAttribute(12, 2, gpu::AttributeType::FLOAT, 0);
-	decl.addAttribute(20, 3, gpu::AttributeType::FLOAT, 0);
-	decl.addAttribute(32, 3, gpu::AttributeType::FLOAT, 0);
+	VertexDecl decl;
+	decl.addAttribute(0, 3, AttributeType::FLOAT, 0);
+	decl.addAttribute(12, 2, AttributeType::FLOAT, 0);
+	decl.addAttribute(20, 3, AttributeType::FLOAT, 0);
+	decl.addAttribute(32, 3, AttributeType::FLOAT, 0);
 	renderer->setProceduralGeometry(EntityRef{entity_index}
 		, Span<const u8>(vertices.data, vertex_count * sizeof(MeshVertex))
 		, decl
+		, gpu::PrimitiveType::TRIANGLES
 		, Span<const u8>(indices.data, u32(indices.length) * sizeof(u32))
 		, gpu::DataType::U32);
 	EX_RESULT(frame, u8(1));

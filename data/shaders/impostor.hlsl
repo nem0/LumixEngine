@@ -30,13 +30,7 @@ struct VSOutput {
 	float4 position : SV_POSITION;
 };
 struct VSInput {
-	#ifdef VERTEX_PULLING
-		uint vertex_id : SV_VertexID;
-	#else
-		float3 position : TEXCOORD0;
-		float2 uv  : TEXCOORD1;
-	#endif
-	#define ATTR(X) TEXCOORD##X
+	uint vertex_id : SV_VertexID;
 	#if defined INSTANCED || defined AUTOINSTANCED
 		uint instance_id : SV_InstanceID;
 	#endif
@@ -94,17 +88,9 @@ float2 dirToGrid(float3 vec) {
 }
 
 
-#ifdef VERTEX_PULLING
-	#define VTX(x) vtx.x
-#else
-	#define VTX(x) input.x
-#endif
-
 #ifdef USE_MATRIX
 	VSOutput mainVS(VSInput input) {
-		#ifdef VERTEX_PULLING
-			VSVertex vtx = pullVertex(input.vertex_id);
-		#endif
+		VSVertex vtx = pullVertex(input.vertex_id);
 		VSOutput output;
 		float3x3 to_model_space = (float3x3)model_mtx;
 		#ifdef DEPTH
@@ -127,13 +113,13 @@ float2 dirToGrid(float3 vec) {
 			output.shadow_coefs /= dot(output.shadow_coefs, 1);
 		#endif
 		float2 grid = dirToGrid(normalize(vd));
-		output.uv = VTX(uv) / 9 + int2(grid * 9) / 9.0;
+		output.uv = vtx.uv / 9 + int2(grid * 9) / 9.0;
 
 		#ifdef DEPTH
 			// move to avoid selfshadow
-			float3 p = u_center.xyz + mul(VTX(position) + float3(0, 0, u_center.y) - u_center.xyz, tangent_space);
+			float3 p = u_center.xyz + mul(vtx.position + float3(0, 0, u_center.y) - u_center.xyz, tangent_space);
 		#else
-			float3 p = u_center.xyz + mul(VTX(position) - u_center.xyz, tangent_space);
+			float3 p = u_center.xyz + mul(vtx.position - u_center.xyz, tangent_space);
 		#endif
 		p = transformPosition(p, model_mtx).xyz;
 		
@@ -147,9 +133,7 @@ float2 dirToGrid(float3 vec) {
 	}
 #else
 	VSOutput mainVS(VSInput input) {
-		#ifdef VERTEX_PULLING
-			VSVertex vtx = pullVertex(input.vertex_id);
-		#endif
+		VSVertex vtx = pullVertex(input.vertex_id);
 		VSOutput output;
 		float3x3 tangent_space;
 
@@ -183,13 +167,13 @@ float2 dirToGrid(float3 vec) {
 			output.shadow_coefs /= dot(output.shadow_coefs, 1);
 		#endif
 		float2 grid = dirToGrid(normalize(vd));
-		output.uv = VTX(uv) / 9 + int2(grid * 9) / 9.0;
+		output.uv = vtx.uv / 9 + int2(grid * 9) / 9.0;
 
 		#ifdef DEPTH
 			// move to avoid selfshadow
-			float3 p = u_center.xyz + mul(VTX(position) + float3(0, 0, u_center.y) - u_center.xyz, tangent_space);
+			float3 p = u_center.xyz + mul(vtx.position + float3(0, 0, u_center.y) - u_center.xyz, tangent_space);
 		#else
-			float3 p = u_center.xyz + mul(VTX(position) - u_center.xyz, tangent_space);
+			float3 p = u_center.xyz + mul(vtx.position - u_center.xyz, tangent_space);
 		#endif
 		p *= scale;
 		output.tangent = tangent_space[0];

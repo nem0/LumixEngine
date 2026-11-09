@@ -9,6 +9,7 @@
 #include "meshoptimizer/meshoptimizer.h"
 
 #include <float.h>
+#include <math.h>
 
 namespace Lumix {
 
@@ -16,6 +17,7 @@ namespace {
 
 constexpr u32 MAX_CLUSTER_VERTICES = 64;
 constexpr u32 MAX_CLUSTER_TRIANGLES = 128;
+constexpr float UV_STEP = 1.f / 16384.f;	// the largest step of quantized UVs, unless the range of a cluster is too large for 16 bits
 constexpr u32 CLUSTERS_PER_GROUP = 4;
 constexpr u32 MAX_GROUP_SIZE = 32;	// clusters in a group, the upper levels have small clusters
 constexpr u32 INVALID_INDEX = 0xffFFffFF;
@@ -205,15 +207,6 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 	const u32 leaf_clusters = current.size();
 	out.leaf_cluster_count = leaf_clusters;
 	Array<u32> level_ranges(allocator);	// [first cluster, number of clusters] of the levels, the clusters that a level has made
-	// how many leaf clusters can be culled by their normal cone at all (cutoff 1: the normals spread too much), and how many triangles are in them
-	u32 cone_clusters = 0, cone_triangles = 0, leaf_triangles = 0;
-	for (u32 id : current) {
-		const MeshClusterGPU& c = out.clusters[id];
-		leaf_triangles += c.index_count / 3;
-		if (c.cone_cutoff < 1.f) { ++cone_clusters; cone_triangles += c.index_count / 3; }
-	}
-	u32 stuck_groups = 0, simplified_groups = 0, levels = 0;
-	double position_error_sum = 0, attribute_error_sum = 0;	// of the simplified groups, to see if the attributes dominate the error
 
 	// Vertices of meshes are split by normals and UVs (flat shading, atlas tiles), so that the surface is open in index space at every
 	// seam. The simplifier treats that as borders, or at least restricts collapses at them, and groups can't be simplified. So the grouping and
@@ -306,10 +299,6 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 		Array<u32> next(allocator);
 		bool progress = false;
 		const u32 level_first_cluster = out.clusters.size();
-		// errors of the groups of this level, logged for big meshes: they show where the error grows
-		float level_error = 0, level_position_error = 0, level_attribute_error = 0, level_error_sum = 0;
-		u32 level_groups = 0, level_stuck = 0, level_triangles = 0, level_degenerate = 0, level_logged = 0;
-		const u32 level_input = current.size();
 		for (u32 p = 0; p < partition_count; ++p) {
 			const u32 from = partition_start[p];
 			const u32 member_count = partition_start[p + 1] - from;
@@ -379,12 +368,9 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 			const size_t simplified_count = meshopt_simplify(simplified.begin(), local_indices.begin(), local_indices.size(), &local_positions[0].x, local_positions.size(), sizeof(Vec3), target_count, FLT_MAX, (partition_count == 1 ? 0u : (u32)meshopt_SimplifyLockBorder) | meshopt_SimplifyErrorAbsolute, &simplify_error); // the only group has no neighbours that its border has to match
 			if (simplified_count < 3 || simplified_count > local_indices.size() * 0.95f) {
 				// stuck, the clusters stay as they are and are tried again with different neighbours in the next level
-				++stuck_groups;
-				++level_stuck;
 				carry_over();
 				continue;
 			}
-			++simplified_groups;
 
 			const ClusterSphere group_sphere = mergeSpheres(out.clusters, sorted, from, member_count);
 
@@ -396,8 +382,6 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 				sort(uv_ratios.begin(), uv_ratios.end());
 				uv_per_unit = uv_ratios[uv_ratios.size() / 2];
 			}
-			float normal_error = 0;	// the largest angle between the normal of a chosen wedge and the normal of its simplified triangle, radians
-			float uv_error = 0;		// the largest difference of the UV length of an edge of a simplified triangle to the expected one, world units
 			// The error of attributes of the group: wrong attributes are wrong on the triangle that has them, and no wider than it: a sliver along a
 			// crease can have a wrong normal and UVs of the other side, but it is as wide as its smallest height, so that is how far the error shows.
 			// (Measured against the average edge of the group, that was a sliver of 0.0006 that made the whole level inaccurate.)
@@ -408,10 +392,8 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 				Vec3 n = cross(local_positions[simplified[t + 1]] - local_positions[simplified[t]], local_positions[simplified[t + 2]] - local_positions[simplified[t]]);
 				const float len = length(n);
 				n = len > 0 ? n * (1.f / len) : Vec3(0, 0, 0);
-				++level_triangles;
 				if (len == 0) {
 					// no area, it is not seen and has no normal to choose a wedge by. Dropped, so that its arbitrary wedges do not get to the next level
-					++level_degenerate;
 					continue;
 				}
 				u32 corner[3];
@@ -439,7 +421,6 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 					if (normals.length() && len > 0 && seam[simplified[t + k]]) {
 						const float angle = acosf(clamp(dot(normals[corner[k]], n), -1.f, 1.f));
 						triangle_angle = maximum(triangle_angle, angle);
-						normal_error = maximum(normal_error, angle);
 					}
 				}
 				mesh_indices.push(corner[0]);
@@ -453,7 +434,6 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 						const float expected = uv_per_unit * length(pos[a] - pos[b]);
 						const float mismatch = fabsf(uv_length - expected) / uv_per_unit;
 						triangle_uv = maximum(triangle_uv, mismatch);
-						uv_error = maximum(uv_error, mismatch);
 					}
 				}
 				if (triangle_angle > 0 || triangle_uv > 0) {
@@ -466,24 +446,8 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 			}
 			if (mesh_indices.size() < 3) {
 				// nothing left but triangles without an area
-				--simplified_groups;
-				++stuck_groups;
-				++level_stuck;
 				carry_over();
 				continue;
-			}
-
-			// (for the log:)
-			float edge_sum = 0;
-			for (u32 t = 0; t + 2 < (u32)simplified_count; ++t) edge_sum += length(local_positions[simplified[t + (t % 3 == 2 ? -2 : 1)]] - local_positions[simplified[t]]);
-			const float average_edge = (float)(edge_sum / maximum((u32)simplified_count, 1u));
-			if (leaf_clusters >= 2000 && attribute_error > 1e-3f && level_logged < 2) {
-				// the groups that have a large error of attributes
-				++level_logged;
-				u32 seam_vertices = 0;
-				for (u8 v : seam) seam_vertices += v;
-				logInfo("    level ", level, " group of ", member_count, " clusters: normal angle ", normal_error, ", uv error ", uv_error, ", uv per unit ", uv_per_unit, ", average edge ", average_edge, ", attribute error ", attribute_error,
-					", seam vertices ", seam_vertices, " of ", (u32)seam.size(), ", position error ", simplify_error, ", triangles in ", (u32)local_indices.size() / 3, " out ", (u32)mesh_indices.size() / 3);
 			}
 
 			// The errors of positions add up from level to level. The error of attributes is measured on each level, it does not add up, but it
@@ -495,13 +459,6 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 				group_attribute_error = maximum(group_attribute_error, out.clusters[sorted[from + i]].attribute_error);
 			}
 			group_error += simplify_error;
-			++level_groups;
-			level_error = maximum(level_error, group_error + group_attribute_error);	// with the weight 1
-			level_error_sum += group_error + group_attribute_error;
-			level_position_error = maximum(level_position_error, simplify_error);
-			level_attribute_error = maximum(level_attribute_error, attribute_error);
-			position_error_sum += simplify_error;
-			attribute_error_sum += attribute_error;
 
 			for (u32 i = 0; i < member_count; ++i) {
 				MeshClusterGPU& c = out.clusters[sorted[from + i]];
@@ -515,12 +472,10 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 			progress = true;
 		}
 
-		if (leaf_clusters >= 2000) logInfo("  level ", level, ": ", level_input, " clusters, ", level_groups, " groups simplified, ", level_stuck, " stuck, group error: largest ", level_error, ", mean ", (float)(level_error_sum / maximum(level_groups, 1u)), ", largest of positions ", level_position_error, ", of attributes ", level_attribute_error, ", simplified triangles ", level_triangles, " of them without an area ", level_degenerate);
 		if ((u32)out.clusters.size() > level_first_cluster) {
 			level_ranges.push(level_first_cluster);
 			level_ranges.push((u32)out.clusters.size() - level_first_cluster);
 		}
-		++levels;
 		if (!progress) break;
 		current.swap(next);
 	}
@@ -529,8 +484,245 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 	buildNodes(out, 0, leaf_clusters);
 	for (u32 i = 0; i + 1 < (u32)level_ranges.size(); i += 2) buildNodes(out, level_ranges[i], level_ranges[i + 1]);
 
-	// a healthy hierarchy ends with one (or very few) clusters at the top, and has about as many clusters in all levels together as twice the leaves
-	logInfo("Cluster DAG: ", leaf_clusters, " leaf clusters, ", (u32)out.clusters.size(), " in total, ", (u32)current.size(), " at the top, ", levels, " levels, ", simplified_groups, " groups simplified, ", stuck_groups, " stuck, ", cone_clusters, " leaf clusters with a cone (", cone_triangles, " of ", leaf_triangles, " triangles), tree of ", (u32)out.nodes.size(), " nodes and ", (u32)out.roots.size(), " roots, error of groups: position ", (float)(position_error_sum / maximum(simplified_groups, 1u)), ", attributes ", (float)(attribute_error_sum / maximum(simplified_groups, 1u)));
+	return true;
+}
+
+static constexpr float QUAT_RANGE = 0.70710678f; // the three smaller components of a unit quaternion are not larger than 1 / sqrt(2)
+
+u32 packClusterFrame(const Vec3& normal, const Vec3* tangent) {
+	Vec3 n = normal;
+	const float normal_length = length(n);
+	n = normal_length > 0 ? n * (1.f / normal_length) : Vec3(0, 1, 0);
+
+	// the tangent is made perpendicular to the normal, which stays exactly as it is
+	Vec3 t = tangent ? *tangent : Vec3(0, 0, 0);
+	t = t - n * dot(n, t);
+	float tangent_length = length(t);
+	if (tangent_length < 1e-4f) {
+		t = fabsf(n.x) < 0.9f ? cross(n, Vec3(1, 0, 0)) : cross(n, Vec3(0, 1, 0));
+		tangent_length = length(t);
+	}
+	t = t * (1.f / tangent_length);
+	const Vec3 b = cross(n, t);
+
+	// rotation with columns t, b, n (a right handed frame), as a quaternion (x, y, z, w)
+	const float m00 = t.x, m01 = b.x, m02 = n.x;
+	const float m10 = t.y, m11 = b.y, m12 = n.y;
+	const float m20 = t.z, m21 = b.z, m22 = n.z;
+	float q[4];
+	const float trace = m00 + m11 + m22;
+	if (trace > 0) {
+		const float s = sqrtf(trace + 1.f) * 2.f;
+		q[3] = 0.25f * s;
+		q[0] = (m21 - m12) / s;
+		q[1] = (m02 - m20) / s;
+		q[2] = (m10 - m01) / s;
+	}
+	else if (m00 > m11 && m00 > m22) {
+		const float s = sqrtf(1.f + m00 - m11 - m22) * 2.f;
+		q[3] = (m21 - m12) / s;
+		q[0] = 0.25f * s;
+		q[1] = (m01 + m10) / s;
+		q[2] = (m02 + m20) / s;
+	}
+	else if (m11 > m22) {
+		const float s = sqrtf(1.f + m11 - m00 - m22) * 2.f;
+		q[3] = (m02 - m20) / s;
+		q[0] = (m01 + m10) / s;
+		q[1] = 0.25f * s;
+		q[2] = (m12 + m21) / s;
+	}
+	else {
+		const float s = sqrtf(1.f + m22 - m00 - m11) * 2.f;
+		q[3] = (m10 - m01) / s;
+		q[0] = (m02 + m20) / s;
+		q[1] = (m12 + m21) / s;
+		q[2] = 0.25f * s;
+	}
+	const float q_length = sqrtf(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
+	for (float& v : q) v /= q_length;
+
+	// smallest three: the largest component is left out (it is positive, the sign of the whole quaternion does not matter)
+	u32 largest = 0;
+	for (u32 i = 1; i < 4; ++i) {
+		if (fabsf(q[i]) > fabsf(q[largest])) largest = i;
+	}
+	const float sign = q[largest] < 0 ? -1.f : 1.f;
+	u32 packed = largest << 30;
+	u32 shift = 0;
+	for (u32 i = 0; i < 4; ++i) {
+		if (i == largest) continue;
+		const float v = clamp(q[i] * sign / QUAT_RANGE, -1.f, 1.f);
+		const i32 iv = (i32)floorf(v * 511.f + 0.5f);
+		packed |= (u32(iv) & 0x3ff) << shift;
+		shift += 10;
+	}
+	return packed;
+}
+
+void unpackClusterFrame(u32 packed, Vec3& normal, Vec3& tangent) {
+	const u32 largest = packed >> 30;
+	float abc[3];
+	for (u32 i = 0; i < 3; ++i) {
+		const i32 v = (i32)((packed >> (i * 10)) & 0x3ff);
+		abc[i] = float(v >= 512 ? v - 1024 : v) * (QUAT_RANGE / 511.f);
+	}
+	const float d = sqrtf(maximum(0.f, 1.f - (abc[0] * abc[0] + abc[1] * abc[1] + abc[2] * abc[2])));
+	float q[4];
+	u32 next = 0;
+	for (u32 i = 0; i < 4; ++i) q[i] = i == largest ? d : abc[next++];
+	const float x = q[0], y = q[1], z = q[2], w = q[3];
+	normal = Vec3(2 * (x * z + w * y), 2 * (y * z - w * x), 1 - 2 * (x * x + y * y));
+	tangent = Vec3(1 - 2 * (y * y + z * z), 2 * (x * y + w * z), 2 * (x * z - w * y));
+}
+
+bool packClusterVertices(const ClusterVertexSource& source, MeshClusters& out, IAllocator& allocator) {
+	PROFILE_FUNCTION();
+	if (!source.positions || !source.normals || source.vertex_count == 0 || out.clusters.empty()) return false;
+	const u32 vertex_count = source.vertex_count;
+	const u32 cluster_count = (u32)out.clusters.size();
+
+	// The lattice: a power of two, so that integers are exact in float and in the shader. Integers must be exact in float too, so they are below 2^24.
+	double max_coordinate = 0;
+	for (u32 i = 0; i < vertex_count; ++i) {
+		const Vec3 p = source.positions[i];
+		max_coordinate = maximum(max_coordinate, (double)maximum(fabsf(p.x), maximum(fabsf(p.y), fabsf(p.z))));
+	}
+	float step = 1.f / 16384.f;
+	while (max_coordinate / step >= 16777216.0) step *= 2.f;
+	Array<i32> lattice(allocator);
+	lattice.resize(vertex_count * 3);
+	for (u32 i = 0; i < vertex_count; ++i) {
+		const Vec3 p = source.positions[i];
+		lattice[i * 3 + 0] = (i32)floor((double)p.x / step + 0.5);
+		lattice[i * 3 + 1] = (i32)floor((double)p.y / step + 0.5);
+		lattice[i * 3 + 2] = (i32)floor((double)p.z / step + 0.5);
+	}
+
+	out.attribute_flags = 0;
+	if (source.uvs) out.attribute_flags |= (u32)ClusterAttribute::UV;
+	if (source.ao) out.attribute_flags |= (u32)ClusterAttribute::AO;
+	if (source.colors) out.attribute_flags |= (u32)ClusterAttribute::COLOR;
+	if (source.tangents) out.attribute_flags |= (u32)ClusterAttribute::TANGENT;
+	out.attribute_stride = 4 + (source.uvs ? 4 : 0) + (source.ao ? 4 : 0) + (source.colors ? 4 : 0);
+
+	out.vertex_headers.clear();
+	out.vertex_words.clear();
+	out.local_indices.resize(out.indices.size());
+	out.vertex_count = 0;
+	out.leaf_vertex_count = 0;
+
+	Array<u32> local_of(allocator);	// mesh vertex -> vertex of the cluster that is processed
+	local_of.resize(vertex_count);
+	for (u32& l : local_of) l = INVALID_INDEX;
+	Array<u32> vertices(allocator);	// vertices of the cluster that is processed
+
+	const u64 header_bits = u64(cluster_count) * sizeof(MeshClusterVertexGPU) * 8;
+	u64 bit_cursor = 0;
+	auto write_bits = [&](u32 value, u32 count) {
+		if (count == 0) return;
+		const u32 word = (u32)(bit_cursor >> 5);
+		const u32 shift = (u32)(bit_cursor & 31);
+		while ((u32)out.vertex_words.size() < word + 2) out.vertex_words.push(0);
+		out.vertex_words[word] |= value << shift;
+		if (shift + count > 32) out.vertex_words[word + 1] |= value >> (32 - shift);
+		bit_cursor += count;
+	};
+
+	for (u32 ci = 0; ci < cluster_count; ++ci) {
+		const MeshClusterGPU& cluster = out.clusters[ci];
+		vertices.clear();
+		for (u32 k = 0; k < cluster.index_count; ++k) {
+			const u32 g = out.indices[cluster.first_index + k];
+			if (local_of[g] == INVALID_INDEX) {
+				local_of[g] = (u32)vertices.size();
+				vertices.push(g);
+			}
+			out.local_indices[cluster.first_index + k] = (u16)local_of[g];
+		}
+		if ((u32)vertices.size() > MeshClusters::MAX_CLUSTER_VERTICES) {
+			logError("Cluster ", ci, " has ", (u32)vertices.size(), " vertices");
+			return false;
+		}
+		for (u32 g : vertices) local_of[g] = INVALID_INDEX;
+
+		MeshClusterVertexGPU header;
+		memset(&header, 0, sizeof(header));
+		i32 mn[3] = { 0x7fffFFFF, 0x7fffFFFF, 0x7fffFFFF };
+		i32 mx[3] = { -0x7fffFFFF, -0x7fffFFFF, -0x7fffFFFF };
+		Vec2 uv_min(FLT_MAX, FLT_MAX), uv_max(-FLT_MAX, -FLT_MAX);
+		for (u32 g : vertices) {
+			for (u32 a = 0; a < 3; ++a) {
+				mn[a] = minimum(mn[a], lattice[g * 3 + a]);
+				mx[a] = maximum(mx[a], lattice[g * 3 + a]);
+			}
+			if (source.uvs) {
+				uv_min = Vec2(minimum(uv_min.x, source.uvs[g].x), minimum(uv_min.y, source.uvs[g].y));
+				uv_max = Vec2(maximum(uv_max.x, source.uvs[g].x), maximum(uv_max.y, source.uvs[g].y));
+			}
+		}
+		u32 bits[3];
+		for (u32 a = 0; a < 3; ++a) {
+			const u32 range = u32(mx[a] - mn[a]);
+			bits[a] = 0;
+			while (bits[a] < 32 && (range >> bits[a]) != 0) ++bits[a];
+			if (bits[a] > MeshClusters::MAX_POSITION_BITS) {
+				logError("Cluster ", ci, " is too large for its positions");
+				return false;
+			}
+			header.pos_start[a] = mn[a];
+		}
+		header.vertex_count = (u32)vertices.size();
+		header.pos_bit_offset = (u32)(header_bits + bit_cursor);
+		header.pos_step = step;
+
+		// UVs: the fewest bits per axis that keep the step at most UV_STEP, at most 16
+		u32 uv_bits[2] = { 0, 0 };
+		if (source.uvs) {
+			header.uv_min[0] = uv_min.x;
+			header.uv_min[1] = uv_min.y;
+			header.uv_extent[0] = uv_max.x - uv_min.x;
+			header.uv_extent[1] = uv_max.y - uv_min.y;
+			for (u32 a = 0; a < 2; ++a) {
+				while (uv_bits[a] < 16 && header.uv_extent[a] > UV_STEP * float((1u << uv_bits[a]) - 1)) ++uv_bits[a];
+			}
+		}
+		header.uv_bits = uv_bits[0] | (uv_bits[1] << 8);
+
+		// bits of a vertex after its position: the frame, UV, AO (only the first of 4 channels) and the color
+		const u32 attribute_bits = 32 + (source.uvs ? uv_bits[0] + uv_bits[1] : 0) + (source.ao ? 8 : 0) + (source.colors ? 32 : 0);
+		header.pos_bits = bits[0] | (bits[1] << 8) | (bits[2] << 16) | (attribute_bits << 24);
+		if (header_bits + bit_cursor + u64((u32)vertices.size()) * (bits[0] + bits[1] + bits[2] + attribute_bits) >= (1ull << 32)) {
+			logError("Vertices of clusters are larger than 512 MB");
+			return false;
+		}
+
+		for (u32 g : vertices) {
+			for (u32 a = 0; a < 3; ++a) write_bits(u32(lattice[g * 3 + a] - mn[a]), bits[a]);
+
+			// the attributes follow the position of the vertex, in the same bit stream
+			const Vec3 tangent = source.tangents ? source.tangents[g] : Vec3(0, 0, 0);
+			write_bits(packClusterFrame(source.normals[g], source.tangents ? &tangent : nullptr), 32);
+			if (source.uvs) {
+				for (u32 a = 0; a < 2; ++a) {
+					const float extent = header.uv_extent[a];
+					const float v = (a == 0 ? source.uvs[g].x : source.uvs[g].y) - header.uv_min[a];
+					const float max_q = float((1u << uv_bits[a]) - 1);
+					write_bits(extent > 0 ? (u32)clamp(floorf(v / extent * max_q + 0.5f), 0.f, max_q) : 0, uv_bits[a]);
+				}
+			}
+			if (source.ao) write_bits(source.ao[g] & 0xff, 8);
+			if (source.colors) write_bits(source.colors[g], 32);
+		}
+		out.vertex_count += (u32)vertices.size();
+		out.vertex_headers.push(header);
+		if (ci + 1 == out.leaf_cluster_count) out.leaf_vertex_count = out.vertex_count;
+	}
+
+	// shaders read two words at any bit
+	const u32 words = (u32)((bit_cursor + 31) >> 5) + 2;
+	while ((u32)out.vertex_words.size() < words) out.vertex_words.push(0);
+
 	return true;
 }
 

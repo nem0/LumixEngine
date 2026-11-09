@@ -121,8 +121,7 @@ struct ParticleScriptRunner {
 		blob.read(emitter_count);
 		if (emitter_count != 1) return false;
 
-		gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
-		blob.read(decl);
+		blob.read<u32>(); // vertex stride
 		blob.readString(); // material
 		blob.readString(); // mesh
 
@@ -1473,7 +1472,7 @@ bool testParticleSystemMovePreservesTrail() {
 	)", compiled));
 	// Strip the material dependency: this test only executes particle bytecode.
 	InputMemoryStream blob(compiled);
-	blob.skip(sizeof(ParticleSystemResource::Header) + sizeof(u32) + sizeof(gpu::VertexDecl));
+	blob.skip(sizeof(ParticleSystemResource::Header) + sizeof(u32) + sizeof(u32));
 	fs->content.write(compiled.data(), blob.getPosition());
 	blob.readString();
 	fs->content.writeString("");

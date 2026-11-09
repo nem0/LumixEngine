@@ -20,7 +20,7 @@ struct Model;
 //@ object
 struct LUMIX_RENDERER_API ParticleSystemResource final : Resource {
 	enum class Version : u32 {
-		NOT_SUPPORTED_BEFORE = 17,
+		NOT_SUPPORTED_BEFORE = 19, // emitters store vertex stride instead of vertex decl since 20
 
 		LAST
 	};
@@ -66,7 +66,7 @@ struct LUMIX_RENDERER_API ParticleSystemResource final : Resource {
 		Model* model = nullptr;
 		u32 init_emit_count = 0;
 		float emit_per_second = 100;
-		gpu::VertexDecl vertex_decl;
+		u32 vertex_stride = 0;
 	};
 	
 	struct DataStream {

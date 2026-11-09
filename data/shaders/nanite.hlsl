@@ -19,10 +19,12 @@
 //
 // Output:
 //   u_out_instances: 96 bytes for each selected cluster, the layout of the DYNAMIC variant of surface shaders,
-//                    the vertex shader pulls it by the draw id. The lod of the position is the index of the cluster.
-//   u_out_indirect: [counters] ... [at u_command_offset: draw commands, 24 bytes each: draw id (root constant), indexed draw arguments]
+//                    the vertex shader pulls it by the draw id. The lod of the position is the index of the cluster (as float, for CLUSTER_DEBUG),
+//                    and so is the w of the scale (as uint, vertices of clusters are found by it, see vertex_pulling.hlsli).
+//   u_out_indirect: [counters] ... [at u_command_offset: one draw command for each region (mesh), 24 bytes: draw id (root constant), indexed draw arguments]
+//                   The draw is instanced, an instance is a selected cluster, the clusters have the same number of indices (padded with degenerate triangles).
 //                   counters are three blocks of one u32 for each region: selected clusters, clusters culled by their normal cones, nodes and clusters visited.
-// The draw id of each command is its index in u_out_instances, vertex shaders pull the instance by it.
+// The draw id of a command is the first slot of its region in u_out_instances, vertex shaders pull the instance by draw id + SV_InstanceID.
 
 cbuffer UniformData : register(b4) {
 	float4 u_planes[6];
@@ -72,6 +74,7 @@ struct MeshDesc {
 	uint region_cap;			// number of slots
 	uint cone_culling;			// cull back facing clusters, set only for perspective views of materials that cull back faces
 	uint cluster_count;
+	uint index_stride;			// indices of a cluster in the index buffer (padded), the index count of the draw
 };
 
 MeshDesc loadDesc(uint index) {
@@ -91,7 +94,7 @@ MeshDesc loadDesc(uint index) {
 	r.instances = d.x; r.instances_offset = d.y; r.input_dynamic = d.z; r.instance_count = d.w;
 	r.material_indices = e.x; r.material_indices_offset = e.y; r.material_index = e.z; r.mesh_count = e.w;
 	r.mesh_index = f.x; r.region_index = f.y; r.region_base = f.z; r.region_cap = f.w;
-	r.cone_culling = g.x; r.cluster_count = g.y;
+	r.cone_culling = g.x; r.cluster_count = g.y; r.index_stride = g.z;
 	return r;
 }
 
@@ -202,18 +205,22 @@ void processCluster(MeshDesc desc, Instance instance, float max_scale, uint inst
 	// the index of the cluster is only read by the CLUSTER_DEBUG variant of surface shaders (exact up to 2^24)
 	out_instances.Store4(out_offset, asuint(instance.rot));
 	out_instances.Store4(out_offset + 16, asuint(float4(instance.pos, (float)cluster)));
-	out_instances.Store4(out_offset + 32, asuint(float4(instance.scale, 0)));
+	// the index of the cluster, the vertex shader finds the packed vertices of the cluster by it (CLUSTER_MESH)
+	out_instances.Store4(out_offset + 32, uint4(asuint(instance.scale.x), asuint(instance.scale.y), asuint(instance.scale.z), cluster));
 	out_instances.Store4(out_offset + 48, asuint(instance.prev_rot));
 	out_instances.Store4(out_offset + 64, asuint(float4(instance.prev_pos, (float)cluster)));
 	out_instances.Store4(out_offset + 80, uint4(asuint(instance.prev_scale.x), asuint(instance.prev_scale.y), asuint(instance.prev_scale.z), material_index));
 
-	uint command = u_command_offset + global_slot * 24;
-	indirect.Store(command, global_slot);	// draw id
-	indirect.Store(command + 4, misc.w);	// index count
-	indirect.Store(command + 8, 1);			// instance count
-	indirect.Store(command + 12, misc.z);	// first index
+	// One draw for all the clusters of the mesh, the instance is a selected cluster. The command is written by every thread that selects a cluster
+	// (with the same values), the instance count is the highest slot + 1, it is cleared by PASS0. A mesh without a selected cluster has instance count 0.
+	uint command = u_command_offset + desc.region_index * 24;
+	indirect.Store(command, desc.region_base);	// draw id: the first slot of the region
+	indirect.Store(command + 4, desc.index_stride);
+	indirect.Store(command + 12, 0);		// first index
 	indirect.Store(command + 16, 0);		// base vertex
 	indirect.Store(command + 20, 0);		// base instance
+	uint previous;
+	indirect.InterlockedMax(command + 8, slot + 1, previous);	// instance count
 }
 
 // false if no cluster of the node can be selected, then the node and everything under it is skipped
@@ -249,6 +256,7 @@ void main(uint3 group_id : SV_GroupID, uint3 group_thread_id : SV_GroupThreadID)
 				indirect.Store((u_clear_first + i) * 4, 0);
 				indirect.Store((u_clear_first + i) * 4 + u_command_offset / 3, 0);		// culled by cones
 				indirect.Store((u_clear_first + i) * 4 + u_command_offset / 3 * 2, 0);	// visited
+				indirect.Store(u_command_offset + (u_clear_first + i) * 24 + 8, 0);		// instance count of the draw
 			}
 		}
 	#else

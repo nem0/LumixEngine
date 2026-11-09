@@ -375,10 +375,10 @@ struct ProceduralMeshImporter final : ModelImporter {
 		geom.is_skinned = false;
 		geom.flip_handness = false;
 		geom.name = name;
-		geom.attributes.push({ AttributeSemantic::POSITION, gpu::AttributeType::FLOAT, 3 });
-		geom.attributes.push({ AttributeSemantic::NORMAL, gpu::AttributeType::I8, 4 });
-		geom.attributes.push({ AttributeSemantic::TEXCOORD0, gpu::AttributeType::FLOAT, 2 });
-		geom.attributes.push({ AttributeSemantic::TANGENT, gpu::AttributeType::I8, 4 });
+		geom.attributes.push({ AttributeSemantic::POSITION, AttributeType::FLOAT, 3 });
+		geom.attributes.push({ AttributeSemantic::NORMAL, AttributeType::I8, 4 });
+		geom.attributes.push({ AttributeSemantic::TEXCOORD0, AttributeType::FLOAT, 2 });
+		geom.attributes.push({ AttributeSemantic::TANGENT, AttributeType::I8, 4 });
 
 		geom.vertex_buffer.resize(used.size() * geom.vertex_size);
 		u8* out = geom.vertex_buffer.getMutableData();

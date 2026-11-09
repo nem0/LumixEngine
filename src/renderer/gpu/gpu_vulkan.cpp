@@ -239,7 +239,7 @@ ProgramHandle allocProgramHandle() {
 QueryHandle createQuery(QueryType) {
 	return new Query;
 }
-void createProgram(ProgramHandle, StateFlags, const VertexDecl&, const char*, ShaderType, const char*) {}
+void createProgram(ProgramHandle, StateFlags, PrimitiveType, const char*, ShaderType, const char*) {}
 void createBuffer(BufferHandle, BufferFlags, size_t, const void*, const char*) {}
 void createTexture(TextureHandle, u32, u32, u32, TextureFormat, TextureFlags, const char*) {}
 void createTextureView(TextureHandle, TextureHandle, u32, u32) {}
@@ -282,13 +282,11 @@ RWBindlessHandle getRWBindlessHandle(TextureHandle) {
 	return INVALID_RW_BINDLESS_HANDLE;
 }
 void bindIndexBuffer(BufferHandle) {}
-void bindVertexBuffer(u32, BufferHandle, u32, u32) {}
 void bindUniformBuffer(u32, BufferHandle, size_t, size_t) {}
 void bindIndirectBuffer(BufferHandle) {}
 void bindShaderBuffers(Span<BufferHandle>, Span<const u32>) {}
 void drawArrays(u32, u32) {}
 void drawIndirect(DataType, u32) {}
-void drawIndirectCount(DataType, u32, u32, u32) {}
 void drawIndexed(u32, u32, DataType) {}
 void drawArraysInstanced(u32, u32) {}
 void drawIndexedInstanced(u32, u32, DataType) {}

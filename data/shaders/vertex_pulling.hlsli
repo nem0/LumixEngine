@@ -1,5 +1,4 @@
 // Vertex pulling: vertices are read from a buffer by the vertex shader, there are no per-vertex attributes in the input assembler.
-// Only for shaders compiled with VERTEX_PULLING.
 //
 // The layout of vertices is not data, it is generated into the program by Renderer::getSemanticDefines:
 //   VERTEX_STRIDE
@@ -7,13 +6,12 @@
 //   have the attribute) and PULL_<SEMANTIC>_NORMALIZED
 // so all offsets, formats, alignments and branches below are constants after compilation. The only thing that changes
 // between draws is the buffer.
-#ifdef VERTEX_PULLING
 
 cbuffer VertexBuffer : register(b2) {
 	uint u_vertex_buffer;		// bindless
 	uint u_instance_buffer;		// bindless, instance data of shaders that pull them (DYNAMIC), see Mesh::VertexBufferBinding
 	uint u_instance_offset;		// in bytes
-	uint u_vertex_buffer_padding;
+	uint u_padding;
 };
 
 #ifdef INDIRECT_INSTANCE
@@ -160,6 +158,73 @@ struct VSVertex {
 	float4 weights;
 };
 
+#ifdef CLUSTER_MESH
+// Vertices of clusters, see MeshClusterVertexGPU in mesh_clusters.h. `vertex` is the index of the vertex in its cluster (indices of clusters are
+// local). The cluster is the one of the instance (all selected clusters of a mesh are one instanced draw): its index is in the instance data written
+// by nanite.hlsl (INDIRECT_INSTANCE, DYNAMIC layout).
+// Positions are integers of a lattice of the mesh, relative to the minimum of the cluster, bit packed. Attributes have a fixed stride:
+// the tangent frame as a quaternion (smallest three), the UV as two u16 in the range of the cluster, and the other attributes as they are.
+
+// `count` (at most 32) bits from the bit `bit` of the buffer
+uint pullClusterBits(ByteAddressBuffer data, uint bit, uint count) {
+	if (count == 0) return 0;
+	const uint2 words = data.Load2((bit >> 5) * 4);
+	const uint shift = bit & 31;
+	const uint v = shift == 0 ? words.x : ((words.x >> shift) | (words.y << (32 - shift)));
+	return count >= 32 ? v : v & ((1u << count) - 1);
+}
+
+// the frame is a rotation of (1, 0, 0) to the tangent and (0, 0, 1) to the normal, see packClusterFrame
+void pullClusterFrame(uint packed, out float3 normal, out float3 tangent) {
+	const uint largest = packed >> 30;
+	const float3 abc = float3((int)(packed << 22) >> 22, (int)(packed << 12) >> 22, (int)(packed << 2) >> 22) * (0.70710678 / 511.0);
+	const float d = sqrt(max(0, 1 - dot(abc, abc)));
+	float4 q;
+	if (largest == 0) q = float4(d, abc);
+	else if (largest == 1) q = float4(abc.x, d, abc.y, abc.z);
+	else if (largest == 2) q = float4(abc.x, abc.y, d, abc.z);
+	else q = float4(abc, d);
+	normal = float3(2 * (q.x * q.z + q.w * q.y), 2 * (q.y * q.z - q.w * q.x), 1 - 2 * (q.x * q.x + q.y * q.y));
+	tangent = float3(1 - 2 * (q.y * q.y + q.z * q.z), 2 * (q.x * q.y + q.w * q.z), 2 * (q.x * q.z - q.w * q.y));
+}
+
+VSVertex pullVertex(uint vertex, uint instance_id) {
+	ByteAddressBuffer data = bindless_buffers[u_vertex_buffer];
+	const uint cluster = bindless_buffers[u_instance_buffer].Load(pullInstanceAddress(instance_id, 96) + 44);
+	const uint4 h0 = data.Load4(cluster * 48);			// start of positions, bits
+	const uint4 h1 = data.Load4(cluster * 48 + 16);		// bits of UV, vertex count, bit offset of the first vertex, step
+	const float4 h2 = asfloat(data.Load4(cluster * 48 + 32)); // UV range
+
+	const uint bits_x = h0.w & 0xff, bits_y = (h0.w >> 8) & 0xff, bits_z = (h0.w >> 16) & 0xff;
+	// vertices are interleaved: the position, then the attributes, none of them aligned. The bits of attributes of a vertex are in the top byte
+	const uint position_bits = bits_x + bits_y + bits_z;
+	const uint bit = h1.z + vertex * (position_bits + (h0.w >> 24));
+	int3 lattice = asint(h0.xyz);
+	lattice.x += (int)pullClusterBits(data, bit, bits_x);
+	lattice.y += (int)pullClusterBits(data, bit + bits_x, bits_y);
+	lattice.z += (int)pullClusterBits(data, bit + bits_x + bits_y, bits_z);
+
+	VSVertex v = (VSVertex)0;
+	v.position = float3(lattice) * asfloat(h1.w);
+
+	#ifndef PULL_ONLY_POSITION
+		// order: frame (32 bits), UV (bits of u and v are in h1.x), AO (8 bits), color
+		uint attribute = bit + position_bits;
+		pullClusterFrame(pullClusterBits(data, attribute, 32), v.normal, v.tangent);
+		attribute += 32;
+		#ifdef UV0_ATTR
+			const uint bits_u = h1.x & 0xff, bits_v = (h1.x >> 8) & 0xff;
+			const float2 q = float2(pullClusterBits(data, attribute, bits_u), pullClusterBits(data, attribute + bits_u, bits_v));
+			v.uv = h2.xy + q / max(float2((1u << bits_u) - 1, (1u << bits_v) - 1), 1) * h2.zw;
+			attribute += bits_u + bits_v;
+		#endif
+		#ifdef AO_ATTR
+			v.ao = pullClusterBits(data, attribute, 8) * (1.0 / 255.0);
+		#endif
+	#endif
+	return v;
+}
+#else
 VSVertex pullVertex(uint vertex) {
 	ByteAddressBuffer vb = bindless_buffers[u_vertex_buffer];
 	const uint base = vertex * VERTEX_STRIDE;
@@ -185,6 +250,6 @@ VSVertex pullVertex(uint vertex) {
 	#endif
 	return v;
 }
-
 #endif
+
 

@@ -48,7 +48,7 @@ bool ShaderKey::operator==(const ShaderKey& rhs) const {
 	return memcmp(this, &rhs, sizeof(rhs)) == 0;
 }
 
-void Shader::compile(gpu::ProgramHandle program, const ShaderKey& key, gpu::VertexDecl decl, DrawStream& stream) {
+void Shader::compile(gpu::ProgramHandle program, const ShaderKey& key, DrawStream& stream) {
 	PROFILE_BLOCK("compile_shader");
 	const char* prefixes[36];
 	StaticString<128> defines_code[32];
@@ -63,60 +63,33 @@ void Shader::compile(gpu::ProgramHandle program, const ShaderKey& key, gpu::Vert
 		}
 	}
 
-	stream.createProgram(program, key.state, decl, m_code.c_str(), m_type, prefixes, 1 + defines_count, getPath().c_str());
+	stream.createProgram(program, key.state, (gpu::PrimitiveType)key.primitive_type, m_code.c_str(), m_type, prefixes, 1 + defines_count, getPath().c_str());
 }
 
-gpu::ProgramHandle Shader::getProgram(gpu::StateFlags state, const gpu::VertexDecl& decl, u32 defines, const char* semantic_defines) {
+gpu::ProgramHandle Shader::getProgram(gpu::StateFlags state, gpu::PrimitiveType primitive_type, u32 defines, const char* semantic_defines) {
 	ShaderKey key;
-	key.decl_hash = decl.hash;
+	key.primitive_type = (u32)primitive_type;
 	key.defines = defines;
 	key.state = state;
 	key.semantic_defines = semantic_defines;
 	for (const ProgramPair& p : m_programs) {
 		if (p.key == key) return p.program;
 	}
-	return m_renderer.queueShaderCompile(*this, key, decl);
-}
-
-static gpu::VertexDecl merge(const gpu::VertexDecl& a, const gpu::VertexDecl& b) {
-	gpu::VertexDecl res = a;
-	for (u32 i = 0; i < b.attributes_count; ++i) {
-		res.attributes[res.attributes_count] = b.attributes[i];
-		++res.attributes_count;
-	}
-	res.computeHash();
-	return res;
-}
-
-gpu::ProgramHandle Shader::getProgram(gpu::StateFlags state, const gpu::VertexDecl& decl, const gpu::VertexDecl& decl2, u32 defines, const char* semantic_defines) {
-	ShaderKey key;
-	key.decl_hash = decl.hash ^ decl2.hash;
-	key.defines = defines;
-	key.state = state;
-	key.semantic_defines = semantic_defines;
-
-	for (const ProgramPair& p : m_programs) {
-		if (p.key == key) return p.program;
-	}
-	
-	gpu::VertexDecl merged_decl = merge(decl, decl2);
-
-	return m_renderer.queueShaderCompile(*this, key, merged_decl);
+	return m_renderer.queueShaderCompile(*this, key);
 }
 
 gpu::ProgramHandle Shader::getProgram(u32 defines) {
 	ASSERT(m_type == gpu::ShaderType::COMPUTE);
-	const gpu::VertexDecl dummy_decl(gpu::PrimitiveType::NONE);
 	ShaderKey key;
 	static const char* no_def = "";
-	key.decl_hash = dummy_decl.hash;
+	key.primitive_type = (u32)gpu::PrimitiveType::NONE;
 	key.defines = defines;
 	key.state = gpu::StateFlags::NONE;
 	key.semantic_defines = no_def;
 	for (const ProgramPair& p : m_programs) {
 		if (p.key == key) return p.program;
 	}
-	return m_renderer.queueShaderCompile(*this, key, dummy_decl);
+	return m_renderer.queueShaderCompile(*this, key);
 }
 
 bool Shader::load(Span<const u8> mem) {

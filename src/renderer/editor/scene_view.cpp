@@ -707,10 +707,11 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 
 					for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
 						const Mesh& mesh = model->getMesh(i);
+						if (!mesh.index_buffer_handle) continue; // cluster meshes have no plain index buffer
 						const MeshMaterial& mesh_mat = model->getMeshMaterial(i);
 						const Material* material = mesh_mat.material;
 						const gpu::StateFlags state = material->m_render_states | gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
-						gpu::ProgramHandle program = material->getShader()->getProgram(state, gpu::VertexDecl(mesh.vertex_decl.primitive_type), material->getDefineMask(), mesh.pulling_semantics_defines);
+						gpu::ProgramHandle program = material->getShader()->getProgram(state, mesh.primitive_type, material->getDefineMask(), mesh.semantics_defines);
 
 						struct UB {
 							Matrix mtx;
@@ -742,12 +743,10 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 				memcpy(vb.ptr, vertices.begin(), vertices.byte_size());
 
 				// vertices are pulled by the vertex shader
-				const gpu::VertexDecl lines_decl(gpu::PrimitiveType::LINES);
-				const gpu::VertexDecl tris_decl(gpu::PrimitiveType::TRIANGLES);
 
 				const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
-				gpu::ProgramHandle lines_program = m_debug_shape_shader->getProgram(state, lines_decl, 0, "");
-				gpu::ProgramHandle triangles_program = m_debug_shape_shader->getProgram(state, tris_decl, 0, "");
+				gpu::ProgramHandle lines_program = m_debug_shape_shader->getProgram(state, gpu::PrimitiveType::LINES, 0, "");
+				gpu::ProgramHandle triangles_program = m_debug_shape_shader->getProgram(state, gpu::PrimitiveType::TRIANGLES, 0, "");
 
 				u32 offset = 0;
 				for (const WorldViewImpl::DrawCmd& cmd : m_scene_view.m_view->m_draw_cmds) {
