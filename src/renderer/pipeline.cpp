@@ -147,15 +147,6 @@ LUMIX_FORCE_INLINE SortValue makeAutoInstancedSortValue(u32 batch_idx, u32 insta
 }
 
 
-struct Indirect {
-	u32 draw_id;
-	u32 vertex_count;
-	u32 instance_count;
-	u32 first_index;
-	u32 base_vertex;
-	u32 base_instance;
-};
-
 struct GlobalState {
 	struct SMSlice {
 		Matrix3x4 world_to_slice;
@@ -639,7 +630,6 @@ struct PipelineImpl final : Pipeline {
 		m_draw2d_shader = rm.load<Shader>(Path("engine/shaders/draw2d.hlsl"));
 		m_downscale_depth_shader = rm.load<Shader>(Path("engine/shaders/downscale_depth.hlsl"));
 		m_debug_shape_shader = rm.load<Shader>(Path("engine/shaders/debug_shape.hlsl"));
-		m_instancing_shader = rm.load<Shader>(Path("engine/shaders/instancing.hlsl"));
 		m_cluster_shader = rm.load<Shader>(Path("engine/shaders/nanite.hlsl"));
 		m_scene_cull_shader = rm.load<Shader>(Path("engine/shaders/gpu_scene_cull.hlsl"));
 		m_scene_bins_shader = rm.load<Shader>(Path("engine/shaders/gpu_scene_bins.hlsl"));
@@ -678,8 +668,6 @@ struct PipelineImpl final : Pipeline {
 		const Renderer::MemRef ib_mem = m_renderer.copy(cube_indices, sizeof(cube_indices));
 		m_cube_ib = m_renderer.createBuffer(ib_mem, gpu::BufferFlags::IMMUTABLE, "cube_indices");
 
-		const Renderer::MemRef ind_mem = { 64 * 1024, nullptr, false }; // TODO size
-		m_indirect_buffer = m_renderer.createBuffer(ind_mem, gpu::BufferFlags::SHADER_BUFFER, "indirect");
 		createClusterBuffers();
 
 
@@ -714,7 +702,6 @@ struct PipelineImpl final : Pipeline {
 		m_draw2d_shader->decRefCount();
 		m_downscale_depth_shader->decRefCount();
 		m_debug_shape_shader->decRefCount();
-		m_instancing_shader->decRefCount();
 		m_cluster_shader->decRefCount();
 		m_scene_cull_shader->decRefCount();
 		m_scene_bins_shader->decRefCount();
@@ -722,7 +709,6 @@ struct PipelineImpl final : Pipeline {
 
 		stream.destroy(m_cube_ib);
 		stream.destroy(m_cube_vb);
-		stream.destroy(m_indirect_buffer);
 		if (m_cluster_scratch) stream.destroy(m_cluster_scratch);
 		if (m_cluster_iota) stream.destroy(m_cluster_iota);
 		if (m_scene_cull_counter) stream.destroy(m_scene_cull_counter);
@@ -1057,12 +1043,10 @@ struct PipelineImpl final : Pipeline {
 			view->layer_to_bucket[bucket.layer] = i;
 		}
 
-		if (m_instancing_shader->isReady()) {
-			const HashMap<EntityRef, InstancedModel>& ims = m_module->getInstancedModels();
-			for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
-				if (iter.value().dirty) {
-					m_module->initInstancedModelGPUData(iter.key());
-				}
+		const HashMap<EntityRef, InstancedModel>& ims = m_module->getInstancedModels();
+		for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
+			if (iter.value().dirty) {
+				m_module->initInstancedModelGPUData(iter.key());
 			}
 		}
 
@@ -1072,7 +1056,6 @@ struct PipelineImpl final : Pipeline {
 		m_sort_keys_group.beginJob();
 		m_renderer.pushJob("prepare view", [this, view_ptr](DrawStream& stream) {
 			setupParticles(*view_ptr);
-			encodeInstancedModels(stream, *view_ptr);
 			encodeProceduralGeometry(*view_ptr);
 
 			updateClusterFreeze(*view_ptr);
@@ -1484,7 +1467,6 @@ struct PipelineImpl final : Pipeline {
 		global_state.view_dir = Vec4(m_viewport.rot * Vec3(0, 0, -1), 0);
 		global_state.to_prev_frame_camera_translation = Vec4(Vec3(m_viewport.pos - m_prev_viewport.pos), 1);
 		m_prev_viewport = m_viewport;
-		m_indirect_buffer_offset = 0;
 		m_scene_view_count = 0;
 		pushSceneDrawClear();
 
@@ -1523,8 +1505,6 @@ struct PipelineImpl final : Pipeline {
 		stream.bindUniformBuffer(UniformBuffer::PASS, gpu::INVALID_BUFFER, 0, 0);
 		stream.bindUniformBuffer(UniformBuffer::DRAWCALL, gpu::INVALID_BUFFER, 0, 0);
 		stream.bindUniformBuffer(UniformBuffer::SHADOW, gpu::INVALID_BUFFER, 0, 0);
-		static int tmp[12] = {};
-		stream.update(m_renderer.getInstancedMeshesBuffer(), &tmp, sizeof(tmp));
 
 		ASSERT(m_views.empty());
 		
@@ -2422,7 +2402,7 @@ struct PipelineImpl final : Pipeline {
 		}
 		for (u32 b = 0; b < (u32)bins.size(); ++b) bin_info[b] = bins[b].index_stride;
 
-		// Instances with material overrides: the material index of each mesh of them, the same rule as the CPU path had: the
+		// Instances with material overrides: the material index of each mesh of them, the
 		// override is used if it has the shader of the material of the model, the program of the draw is the one of the model. A mesh of an instance
 		// has an entry only if its material index is not the one of the model.
 		Array<u64> override_keys(m_allocator);
@@ -2781,235 +2761,6 @@ struct PipelineImpl final : Pipeline {
 		m_cluster_frozen_cp = view.cp;
 		m_cluster_frozen_height = m_viewport.h > 1 ? (float)m_viewport.h : 1.f;
 		m_cluster_frozen = true;
-	}
-
-	void encodeInstancedModels(DrawStream& stream, View& view) {
-		PROFILE_FUNCTION();
-		if (!m_instancing_shader->isReady()) return;
-
-		const float global_lod_multiplier = m_renderer.getLODMultiplier();
-		const World& world = m_module->getWorld();
-		const HashMap<EntityRef, InstancedModel>& ims = m_module->getInstancedModels();
-		if (ims.empty()) return;
-		
-		struct UBValues {
-			Vec4 camera_offset;
-			Vec4 lod_distances;
-			IVec4 lod_indices;
-			u32 indirect_offset;
-			float radius;
-			u32 batch_size;
-			float padding;
-			Vec4 camera_planes[6];
-			IVec4 indices_count[32];
-			gpu::RWBindlessHandle culled_buffer;
-			gpu::RWBindlessHandle instanced_data;
-			gpu::RWBindlessHandle indirect_buffer;
-		};
-
-		UBValues ub_values;
-		toPlanes(view.cp, Span(ub_values.camera_planes));
-
-		const gpu::BufferHandle culled_buffer = m_renderer.getInstancedMeshesBuffer();
-		//stream.bindShaderBuffer(m_indirect_buffer, 2, gpu::BindShaderBufferFlags::OUTPUT);
-		const gpu::ProgramHandle gather_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS3"));
-		const gpu::ProgramHandle indirect_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS2"));
-		u32 cull_shader_defines = 1 << m_renderer.getShaderDefineIdx("PASS1");
-		if (!view.cp.is_shadow) cull_shader_defines |= 1 << m_renderer.getShaderDefineIdx("UPDATE_LODS");
-		const gpu::ProgramHandle cull_shader = m_instancing_shader->getProgram(cull_shader_defines);
-		const gpu::ProgramHandle init_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS0"));
-		const gpu::ProgramHandle update_lods_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("UPDATE_LODS"));
-		UniformPool& uniform_pool = m_renderer.getUniformPool();
-
-		for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
-			const InstancedModel& im = iter.value();
-			Model* m = im.model;
-			if (!m || !m->isReady()) continue;
-
-			// models with clusters are drawn by the GPU, as groups of the GPU scene, see runGPUSceneCulling
-			if (m->hasClusters()) continue;
-
-			auto getDrawDistance = [](const Model& model) {
-				const LODMeshIndices* lod_indices = model.getLODIndices();
-				float dist = 0;
-				for (u32 i = 0; i < 4; ++i) {
-					if (lod_indices[i].to != -1) {
-						dist = model.getLODDistances()[i];
-					}
-				}
-				return sqrtf(dist);
-			};
-
-			const float draw_distance = getDrawDistance(*m);
-
-			const Transform origin = world.getTransform(iter.key());
-			const Frustum frustum = view.cp.frustum.getRelative(origin.pos);
-			const float radius = m->getOriginBoundingRadius();
-
-			struct {
-				u32 offset;
-				u32 count;
-				bool visible;
-				TransientSlice ub;
-			} cells[16];
-			u32 cell_count = 0;
-
-			for (u32 i = 0; i < 16; ++i) {
-				const InstancedModel::Grid::Cell& cell = im.grid.cells[i];
-
-				if (cell.instance_count > 0) {
-					const bool visible = frustum.intersectAABBWithOffset(cell.aabb, radius);
-					const Vec3 cell_center = (cell.aabb.max + cell.aabb.min) * 0.5f;
-					const Vec3 cell_half_extents = (cell.aabb.max - cell.aabb.min) * 0.5f;
-					const float cell_radius = length(cell_half_extents);
-					if (length(origin.pos - view.cp.pos + cell_center) - cell_radius < draw_distance) {
-						const bool can_merge = cell_count > 0 && cells[cell_count - 1].visible == visible  && cells[cell_count - 1].offset + cells[cell_count - 1].count == cell.from_instance;
-						if (can_merge) {
-							cells[cell_count - 1].count += cell.instance_count;
-							u32* tmp =(u32*)cells[cell_count - 1].ub.ptr;
-							tmp[1] += cell.instance_count;
-						}
-						else {
-							cells[cell_count].visible = visible;
-							cells[cell_count].count = cell.instance_count;
-							cells[cell_count].offset = cell.from_instance;
-							const TransientSlice ub = alloc(uniform_pool, sizeof(u32) * 2);
-							u32* tmp =(u32*)ub.ptr;
-							tmp[0] = cell.from_instance;
-							tmp[1] = cell.instance_count;
-							cells[cell_count].ub = ub;
-							++cell_count;
-						}
-					}
-				}
-			}
-				
-			if (cell_count == 0) continue;
-
-			Vec4 lod_distances = *(Vec4*)m->getLODDistances() * global_lod_multiplier;
-			if (lod_distances.w < 0) lod_distances.w = FLT_MAX;
-			if (lod_distances.z < 0) lod_distances.z = FLT_MAX;
-			if (lod_distances.y < 0) lod_distances.y = FLT_MAX;
-			if (lod_distances.x < 0) lod_distances.x = FLT_MAX;
-			IVec4 lod_indices;
-			lod_indices.x = m->getLODIndices()[0].to;
-			lod_indices.y = maximum(lod_indices.x, m->getLODIndices()[1].to);
-			lod_indices.z = maximum(lod_indices.y, m->getLODIndices()[2].to);
-			lod_indices.w = maximum(lod_indices.z, m->getLODIndices()[3].to);
-			const u32 instance_count = im.instances.size();
-			
-			const u32 indirect_offset = m_indirect_buffer_offset.add(m->getMeshCount());
-
-			ub_values.camera_offset = Vec4(Vec3(origin.pos - view.cp.pos), 1);
-			ub_values.lod_distances = lod_distances;
-			ub_values.lod_indices = lod_indices;
-			ub_values.indirect_offset = indirect_offset;
-			ub_values.radius = m->getOriginBoundingRadius();
-			ub_values.batch_size = instance_count;
-			ub_values.culled_buffer = gpu::getRWBindlessHandle(culled_buffer);
-			ub_values.instanced_data = gpu::getRWBindlessHandle(im.gpu_data);
-			ub_values.indirect_buffer = gpu::getRWBindlessHandle(m_indirect_buffer);
-			ASSERT((u32)m->getMeshCount() < lengthOf(ub_values.indices_count)); // TODO
-			for (i32 i = 0; i < m->getMeshCount(); ++i) {
-				const Mesh& mesh = m->getMesh(i);
-				ub_values.indices_count[i].x = mesh.indices_count;
-			}
-
-			const TransientSlice drawcall_ub = alloc(uniform_pool, &ub_values, sizeof(ub_values));
-
-			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub.buffer, drawcall_ub.offset, sizeof(UBValues));
-
-			stream.barrier(culled_buffer, gpu::BarrierType::WRITE);
-			stream.barrier(m_indirect_buffer, gpu::BarrierType::WRITE);
-			stream.barrier(culled_buffer, gpu::BarrierType::WRITE);
-			//stream.bindShaderBuffer(culled_buffer, 1, gpu::BindShaderBufferFlags::OUTPUT);
-			stream.useProgram(init_shader);
-			stream.dispatch(1, 1, 1);
-			stream.memoryBarrier(culled_buffer);
-
-			if (view.cp.is_shadow) {
-				stream.barrier(im.gpu_data, gpu::BarrierType::READ);
-				//stream.bindShaderBuffer(im.gpu_data, 0, gpu::BindShaderBufferFlags::NONE);
-			}
-			else {
-				stream.barrier(im.gpu_data, gpu::BarrierType::WRITE);
-				//stream.bindShaderBuffer(im.gpu_data, 0, gpu::BindShaderBufferFlags::OUTPUT);
-				stream.useProgram(update_lods_shader);
-				for (u32 i = 0; i < cell_count; ++i) {
-					if (!cells[i].visible) {
-						stream.bindUniformBuffer(UniformBuffer::DRAWCALL2, cells[i].ub.buffer, cells[i].ub.offset, cells[i].ub.size);
-						stream.dispatch((cells[i].count + 255) / 256, 1, 1);
-					}
-				}
-			}
-				
-			stream.useProgram(cull_shader);
-			for (u32 i = 0; i < cell_count; ++i) {
-				if (cells[i].visible) {
-					stream.bindUniformBuffer(UniformBuffer::DRAWCALL2, cells[i].ub.buffer, cells[i].ub.offset, cells[i].ub.size);
-					stream.dispatch((cells[i].count + 255) / 256, 1, 1);
-				}
-			}
-			stream.memoryBarrier(culled_buffer);
-
-			if (!view.cp.is_shadow) {
-				stream.barrier(im.gpu_data, gpu::BarrierType::READ);
-				//stream.bindShaderBuffer(im.gpu_data, 0, gpu::BindShaderBufferFlags::NONE);
-			}
-
-			stream.useProgram(indirect_shader);
-			stream.dispatch((m->getMeshCount() + 255) / 256, 1, 1);
-			stream.memoryBarrier(m_indirect_buffer);
-
-			stream.useProgram(gather_shader);
-			for (u32 i = 0; i < cell_count; ++i) {
-				if (cells[i].visible) {
-					stream.bindUniformBuffer(UniformBuffer::DRAWCALL2, cells[i].ub.buffer, cells[i].ub.offset, cells[i].ub.size);
-					stream.dispatch((cells[i].count + 255) / 256, 1, 1);
-				}
-			}
-
-			stream.memoryBarrier(culled_buffer);
-
-			// instances are pulled by vertex shaders, SV_InstanceID does not include the start instance of the indirect draws
-			const u32 instanced_define = (1 << m_renderer.getShaderDefineIdx("INSTANCED")) | (1 << m_renderer.getShaderDefineIdx("INDIRECT_INSTANCE"));
-			for (i32 i = 0; i < m->getMeshCount(); ++i) {
-				const Mesh& mesh = m->getMesh(i);
-				const MeshMaterial& mesh_mat = m->getMeshMaterial(i);
-				const u8 bucket_idx = view.layer_to_bucket[mesh_mat.material->getLayer()];
-				if (bucket_idx == 0xff) continue;
-				
-				Bucket& bucket = view.buckets[bucket_idx];
-				const u32 instanced_define_mask = bucket.define_mask | instanced_define;
-				const Material* material = mesh_mat.material;
-				Shader* shader = material->getShader();
-				const gpu::StateFlags state = material->m_render_states | bucket.state;
-				const gpu::ProgramHandle program = shader->getProgram(state, mesh.primitive_type, instanced_define_mask | material->getDefineMask(), mesh.semantics_defines);
-
-				MaterialIndex material_index = material->getIndex();
-				TransientSlice ub_slice = alloc(uniform_pool, &material_index, sizeof(material_index));
-
-				bucket.stream.useProgram(program);
-				bucket.stream.bindIndexBuffer(mesh.index_buffer_handle);
-				bucket.stream.barrier(culled_buffer, gpu::BarrierType::READ);
-				bindMeshVertices(bucket.stream, mesh, culled_buffer, 48);
-				bucket.stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub_slice.buffer, ub_slice.offset, ub_slice.size);
-				
-				bucket.stream.bindIndirectBuffer(m_indirect_buffer);
-				bucket.stream.drawIndirect(mesh.index_type, u32(sizeof(Indirect) * (indirect_offset + i)));
-
-				bucket.stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
-				bucket.stream.bindIndexBuffer(gpu::INVALID_BUFFER);
-			}
-		}
-
-		stream.memoryBarrier(m_indirect_buffer);
-			
-		//stream.bindShaderBuffer(gpu::INVALID_BUFFER, 0, gpu::BindShaderBufferFlags::NONE);
-		//stream.bindShaderBuffer(gpu::INVALID_BUFFER, 1, gpu::BindShaderBufferFlags::NONE);
-		//stream.bindShaderBuffer(gpu::INVALID_BUFFER, 2, gpu::BindShaderBufferFlags::NONE);	
-
-		stream.memoryBarrier(m_indirect_buffer);
 	}
 
 	void computeSkeletonDualQuats(const ModelInstance* mi) {
@@ -4198,9 +3949,9 @@ struct PipelineImpl final : Pipeline {
 								continue;
 							}
 
-							// models with clusters are drawn by the GPU, see runGPUSceneCulling. Their instances are not in the culling system (RenderModule::modelLoaded),
-							// this is only a guard: the meshes of such a model have no indices of their own
-							if (mi.model->hasClusters()) continue;
+							// models with clusters are drawn by the GPU, see runGPUSceneCulling, their instances are not in the culling system
+							// (RenderModule::modelLoaded adds them to the GPU scene, modelUnloaded removes them from both on reload)
+							ASSERT(!mi.model->hasClusters());
 
 							auto create_key = [&](const LODMeshIndices& lod){
 								for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
@@ -4531,7 +4282,6 @@ struct PipelineImpl final : Pipeline {
 	RenderBufferHandle m_output = INVALID_RENDERBUFFER;
 	RenderBufferHandle m_downscaled_depth = INVALID_RENDERBUFFER;
 	Shader* m_debug_shape_shader;
-	Shader* m_instancing_shader;
 	Shader* m_cluster_shader;
 	Shader* m_scene_bins_shader;									// sorts the selected clusters into bins of draws, see gpu_scene_bins.hlsl
 	Shader* m_scene_cull_shader;									// counts the slots of the GPU scene inside a frustum, see runGPUSceneCulling
@@ -4551,8 +4301,6 @@ struct PipelineImpl final : Pipeline {
 	Array<gpu::TextureHandle> m_textures;
 	Array<gpu::BufferHandle> m_buffers;
 	os::Timer m_timer;
-	AtomicI32 m_indirect_buffer_offset = 0;
-	gpu::BufferHandle m_indirect_buffer;
 
 	// buffers of the clusters of the GPU scene, see runGPUSceneCulling
 	enum : u32 {

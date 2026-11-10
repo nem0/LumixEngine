@@ -9,7 +9,7 @@
 // Vertices and instances are pulled by the vertex shader, see vertex_pulling.hlsli
 struct VSInput {
 	uint vertex_id : SV_VertexID;
-	#if defined AUTOINSTANCED || defined INSTANCED || defined MESH_PARTICLE || defined DYNAMIC || defined SKINNED || defined GRASS
+	#if defined AUTOINSTANCED || defined MESH_PARTICLE || defined DYNAMIC || defined SKINNED || defined GRASS
 		uint instance_id : SV_InstanceID;
 	#endif
 	#if defined AUTOINSTANCED || defined DYNAMIC || defined SKINNED
@@ -57,10 +57,6 @@ struct VSOutput {
 		uint material_index;
 		uint u_particle_stride;	// in bytes
 	};
-#elif defined INSTANCED
-	cbuffer ModelState : register(b4) {
-		uint material_index;
-	};
 #elif defined AUTOINSTANCED
 #elif defined GRASS
 	cbuffer ModelState : register(b4) {
@@ -97,21 +93,6 @@ Surface getSurface(VSOutput input, uint material_index);
 		const uint4 last = buffer.Load4(offset + 32);
 		r.scale = float4(asfloat(last.xyz), 1);
 		r.material_index = last.w;
-		return r;
-	}
-#elif defined INSTANCED
-	// 32 bytes
-	struct Instance {
-		float4 rot_lod;
-		float4 pos_scale;
-	};
-
-	Instance loadInstance(VSInput input) {
-		ByteAddressBuffer buffer = bindless_buffers[u_instance_buffer];
-		const uint offset = pullInstanceAddress(input.instance_id, 32);
-		Instance r;
-		r.rot_lod = asfloat(buffer.Load4(offset));
-		r.pos_scale = asfloat(buffer.Load4(offset + 16));
 		return r;
 	}
 #elif defined MESH_PARTICLE
@@ -225,7 +206,7 @@ VSOutput mainVS(VSInput input) {
 	#else
 		VSOutput output;
 	#endif
-	#if defined AUTOINSTANCED || defined INSTANCED || defined MESH_PARTICLE || defined GRASS || defined DYNAMIC || defined SKINNED
+	#if defined AUTOINSTANCED || defined MESH_PARTICLE || defined GRASS || defined DYNAMIC || defined SKINNED
 		Instance inst = loadInstance(input);
 	#endif
 	#ifdef HAS_MATERIAL_INDEX_ATTR
@@ -256,7 +237,7 @@ VSOutput mainVS(VSInput input) {
 	#ifdef HAS_LOD
 			output.lod = inst.pos_lod.w;
 		#endif
-	#elif defined INSTANCED || defined MESH_PARTICLE
+	#elif defined MESH_PARTICLE
 		float4 rot_quat = float4(inst.rot_lod.xyz, 0);
 		rot_quat.w = sqrt(saturate(1 - dot(rot_quat.xyz, rot_quat.xyz)));
 		#ifndef DEPTH_ONLY_VS

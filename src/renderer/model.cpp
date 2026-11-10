@@ -542,11 +542,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		int data_size;
 		file.read(data_size);
 		if (data_size == 0) {
-			// vertices of meshes with clusters are in the clusters, see parseClusters
-			if (version < FileVersion::CLUSTER_VERTICES) {
-				logError(m_path, ": has no geometry data");
-				return false;
-			}
+			// vertices of meshes with clusters are in the clusters, see parseClusters (it fails if a mesh has no vertices)
 			continue;
 		}
 		Renderer::MemRef vertices_mem = m_renderer.allocate(data_size);

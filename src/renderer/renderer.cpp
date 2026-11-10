@@ -689,7 +689,6 @@ struct RendererImpl final : Renderer {
 				gpu::destroy(frame->uniform_pool.m_buffer);
 			}
 			gpu::destroy(m_material_buffer.buffer);
-			gpu::destroy(m_instanced_meshes_buffer);
 			m_profiler.clear();
 			gpu::present();
 			gpu::present();
@@ -806,7 +805,6 @@ struct RendererImpl final : Renderer {
 			}
 		}
 
-		m_instanced_meshes_buffer = gpu::allocBufferHandle();
 		jobs::Signal signal;
 		jobs::runLambda([this, flags]() {
 			PROFILE_BLOCK("init_render");
@@ -832,7 +830,6 @@ struct RendererImpl final : Renderer {
 				frame->uniform_pool.init();
 				jobs::turnGreen(&frame->can_setup);
 			}
-			gpu::createBuffer(m_instanced_meshes_buffer, gpu::BufferFlags::SHADER_BUFFER, 64 * 1024 * 1024, nullptr, "instanced_meshes");
 			m_profiler.init();
 		}, &m_init_signal, 1);
 
@@ -1107,10 +1104,6 @@ struct RendererImpl final : Renderer {
 		m_material_buffer.data[idx].next_free = m_material_buffer.first_free;
 		m_material_buffer.first_free = idx;
 		m_material_buffer.map.erase(hash);
-	}
-
-	gpu::BufferHandle getInstancedMeshesBuffer() override {
-		return m_instanced_meshes_buffer;
 	}
 
 	gpu::BufferHandle createBuffer(const MemRef& memory, gpu::BufferFlags flags, const char* debug_name) override
@@ -1608,7 +1601,6 @@ struct RendererImpl final : Renderer {
 	u32 m_material_reload_counter = 0;
 
 	Array<Renderbuffer> m_renderbuffers;
-	gpu::BufferHandle m_instanced_meshes_buffer = gpu::INVALID_BUFFER;
 	// built-in postprocesses, the rest (film grain, DOF, bloom, SSAO, TAA, ...) are scripts in data/scripts/core/postprocess
 	// environment
 	CubemapSky m_cubemap_sky;
