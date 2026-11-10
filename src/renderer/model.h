@@ -168,10 +168,7 @@ struct LUMIX_RENDERER_API Model final : Resource {
 		CLUSTERS, // baked cluster DAGs of the first LOD, see parseClusters
 		// 2 was LATEST while models were written with clusters but without stride, keep it that way
 		STRIDE = 3, // vertex stride of each mesh is stored, it is padded to 4 bytes
-		CLUSTER_CONES = 4, // clusters have a normal cone (MeshClusterGPU is 80 bytes)
-		CLUSTER_NODES = 5, // a tree of nodes over the clusters of each mesh, see MeshClusters
-		CLUSTER_ATTRIBUTE_ERRORS = 6, // clusters (96 bytes) and nodes (64 bytes) have the error of attributes apart from the error of positions
-		CLUSTER_VERTICES = 7, // clusters of the first LOD have their own, packed vertices and u16 indices, the meshes have no vertices of their own, see parseClusters
+		// 4-8 were intermediate formats of clusters, models with clusters of these versions are rejected (see parseClusters), the numbers are not reused
 
 		CLUSTER_INTERLEAVED = 9, // clusters have one buffer of headers and interleaved, packed vertices and everything else ready to be uploaded, see parseClusters
 

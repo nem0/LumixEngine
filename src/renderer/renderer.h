@@ -159,7 +159,6 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual TransientPool& getTransientPool() = 0;
 	virtual UniformPool& getUniformPool() = 0;
 	
-	virtual gpu::BufferHandle getInstancedMeshesBuffer() = 0;
 	virtual gpu::BufferHandle createBuffer(const MemRef& memory, gpu::BufferFlags flags, const char* debug_name) = 0;
 	virtual gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const MemRef& memory, const char* debug_name) = 0;
 

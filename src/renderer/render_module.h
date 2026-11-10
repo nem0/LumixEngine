@@ -239,18 +239,6 @@ struct InstancedModel {
 		float scale;
 	};
 
-	struct Grid {
-		struct Cell {
-			AABB aabb;
-			u32 from_instance;
-			u32 instance_count;
-		};
-
-		AABB aabb;
-		Cell cells[4 * 4];
-	};
-
-	Grid grid;
 	Model* model = nullptr;
 	Array<InstanceData> instances;
 	gpu::BufferHandle gpu_data = gpu::INVALID_BUFFER;
@@ -259,6 +247,7 @@ struct InstancedModel {
 	u32 gpu_group = 0xffFFffFF;	// the group of the GPU scene (gpu_scene.h) if the model has clusters
 	const Model* gpu_group_model = nullptr;
 	bool dirty = false;
+	bool warned_no_clusters = false;
 };
 
 struct MeshInstance

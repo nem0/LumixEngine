@@ -31,28 +31,13 @@ struct VSOutput {
 };
 struct VSInput {
 	uint vertex_id : SV_VertexID;
-	#if defined INSTANCED || defined AUTOINSTANCED
+	#if defined AUTOINSTANCED
 		uint instance_id : SV_InstanceID;
 	#endif
 };
 
 // instances are pulled, see vertex_pulling.hlsli
-#ifdef INSTANCED
-	// 32 bytes
-	struct Instance {
-		float4 rot_lod;
-		float4 pos_scale;
-	};
-
-	Instance loadInstance(VSInput input) {
-		ByteAddressBuffer buffer = bindless_buffers[u_instance_buffer];
-		const uint offset = pullInstanceAddress(input.instance_id, 32);
-		Instance r;
-		r.rot_lod = asfloat(buffer.Load4(offset));
-		r.pos_scale = asfloat(buffer.Load4(offset + 16));
-		return r;
-	}
-#elif defined AUTOINSTANCED
+#ifdef AUTOINSTANCED
 	// 48 bytes
 	struct Instance {
 		float4 rot;
@@ -71,8 +56,7 @@ struct VSInput {
 	}
 #endif
 
-#ifdef INSTANCED
-#elif defined AUTOINSTANCED
+#ifdef AUTOINSTANCED
 #else
 	#define USE_MATRIX
 	cbuffer ModelState : register(b4) {
@@ -138,17 +122,10 @@ float2 dirToGrid(float3 vec) {
 		float3x3 tangent_space;
 
 		const Instance inst = loadInstance(input);
-		#if defined INSTANCED
-			float3 instance_pos = inst.pos_scale.xyz;
-			float scale = inst.pos_scale.w;
-			float4 to_model_space = float4(inst.rot_lod.xyz, sqrt(1 - dot(inst.rot_lod.xyz, inst.rot_lod.xyz)));
-			output.lod = inst.rot_lod.w;
-		#else
-			float3 instance_pos = inst.pos_lod.xyz;
-			float3 scale = inst.scale.xyz;
-			float4 to_model_space = inst.rot * float4(1, 1, 1, -1);
-			output.lod = inst.pos_lod.w;
-		#endif
+		float3 instance_pos = inst.pos_lod.xyz;
+		float3 scale = inst.scale.xyz;
+		float4 to_model_space = inst.rot * float4(1, 1, 1, -1);
+		output.lod = inst.pos_lod.w;
 
 		#ifdef DEPTH
 			float3 N = normalize(Global_light_dir.xyz);
