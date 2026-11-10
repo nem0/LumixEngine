@@ -10,6 +10,7 @@ void runParticleScriptCompilerTests();
 void runParticleScriptCollectorTests();
 void runUITokenizerTests();
 void runUITests();
+void runUIEvoxExpandTests();
 void runUIStyleTests();
 void runUILayoutTests();
 void runEditorUtilsTests();
@@ -49,6 +50,7 @@ int main(int argc, char* argv[]) {
 	runParticleScriptCollectorTests();
 	runUITokenizerTests();
 	runUITests();
+	runUIEvoxExpandTests();
 	runUIStyleTests();
 	runUILayoutTests();
 	runEditorUtilsTests();

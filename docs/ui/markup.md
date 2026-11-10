@@ -41,6 +41,25 @@
 
 The markup language also supports CSS-like [style] blocks for defining reusable styles. See [Style documentation](style.md) for details.
 
+## Generating markup with Evox
+
+An `[evox] { ... }` block is [Evox](../evox.md) code that emits markup. It is replaced by the emitted markup when the asset is compiled, the game never sees it.
+
+```c++
+[box $root] {
+    [evox] {
+        for i in 0..4 {
+            emit(`[box $slot_{i} left={i * 60} width=50 height=50] {{}`);
+        }
+    }
+}
+```
+
+- The body is the body of a function, imports are not available.
+- `emit(...)` takes any number of strings, numbers and bools and joins them without a separator.
+- A backtick string interpolates `{expression}`. `{{` is a literal `{`, a lone `}` is literal, so `{{}` emits `{}`.
+- Errors are reported with the line of your file and fail the compilation of the asset.
+
 ## Grammar
 
 ### Tokens

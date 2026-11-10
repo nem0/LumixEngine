@@ -29,8 +29,10 @@
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/sprite.h"
+#include "ui/editor/ui_evox_expand.inl"
 
 namespace Lumix {
+
 
 struct UIEditorWindow : AssetEditorWindow {
 	static inline const char* s_autocomplete_words[] = {
@@ -87,7 +89,7 @@ struct UIEditorWindow : AssetEditorWindow {
 		: AssetEditorWindow(app)
 		, m_app(app)
 		, m_path(path)
-		, m_stored_text(app.getAllocator())
+		, m_parsed_text(app.getAllocator())
 		, m_autocomplete_list(app.getAllocator())
 		, m_source_map(app.getAllocator())
 	{
@@ -106,10 +108,7 @@ struct UIEditorWindow : AssetEditorWindow {
 		if (app.getEngine().getFileSystem().getContentSync(path, blob)) {
 			StringView v((const char*)blob.data(), (u32)blob.size());
 			m_editor->setText(v);
-			m_stored_text.resize((u32)blob.size());
-			memcpy(m_stored_text.getMutableData(), blob.data(), blob.size());
-			StringView text(m_stored_text.c_str(), m_stored_text.length());
-			m_parse_success = m_document->parse(text, m_path.c_str(), &m_source_map);
+			parseText(v);
 			m_needs_layout = true;
 		}
 	}
@@ -128,19 +127,26 @@ struct UIEditorWindow : AssetEditorWindow {
 		OutputMemoryStream blob(m_app.getAllocator());
 		m_editor->serializeText(blob);
 		m_app.getAssetBrowser().saveResource(m_path, blob);
-		m_stored_text.resize((u32)blob.size());
-		memcpy(m_stored_text.getMutableData(), blob.data(), blob.size());
 		m_dirty = false;
 		refresh();
+	}
+
+	// parses text after its [evox] blocks are expanded. The expansion keeps the lines of the text, the source map
+	// is for m_parsed_text
+	void parseText(StringView text) {
+		m_parsed_text.resize(0);
+		if (!expandEvox(m_app.getAllocator(), text, m_path.c_str(), m_parsed_text)) {
+			m_parse_success = false;
+			m_source_map.clear();
+			return;
+		}
+		m_parse_success = m_document->parse(StringView(m_parsed_text.c_str(), m_parsed_text.length()), m_path.c_str(), &m_source_map);
 	}
 
 	void refresh() {
 		OutputMemoryStream blob(m_app.getAllocator());
 		m_editor->serializeText(blob);
-		m_stored_text.resize((u32)blob.size());
-		memcpy(m_stored_text.getMutableData(), blob.data(), blob.size());
-		StringView text(m_stored_text.c_str(), m_stored_text.length());
-		m_parse_success = m_document->parse(text, m_path.c_str(), &m_source_map);
+		parseText(StringView((const char*)blob.data(), (u64)blob.size()));
 		m_needs_layout = true;
 		// element indices are rebuilt by the parse
 		m_hovered_element_idx = 0xFFFFFFF;
@@ -253,12 +259,31 @@ struct UIEditorWindow : AssetEditorWindow {
 		if (m_dirty) return;
 		if (element_idx >= (u32)m_source_map.elements.size()) return;
 		const ui::SourceMap::Range range = m_source_map.elements[element_idx];
-		// the source map is for the parsed text, which the editor shows unless it has unsaved changes
-		const StringView text(m_stored_text.c_str(), m_stored_text.length());
+		// the source map is for the parsed text, which is the text of the editor (unless it has unsaved changes) with its
+		// [evox] blocks expanded: lines are the same, but a column of generated markup is not a column of the editor text
+		const StringView text(m_parsed_text.c_str(), m_parsed_text.length());
 		u32 from_line, from_col, to_line, to_col;
 		offsetToLineColumn(text, range.begin, from_line, from_col);
 		offsetToLineColumn(text, range.end, to_line, to_col);
+		// the editor has no unsaved changes here, so its text is the text that was parsed
+		OutputMemoryStream blob(m_app.getAllocator());
+		m_editor->serializeText(blob);
+		const StringView original((const char*)blob.data(), (u64)blob.size());
+		from_col = minimum(from_col, lineLength(original, from_line));
+		to_col = minimum(to_col, lineLength(original, to_line));
 		m_editor->setSelection(from_line, from_col, to_line, to_col, true);
+	}
+
+	static u32 lineLength(StringView text, u32 line) {
+		u32 current = 0;
+		u64 i = 0;
+		while (i < text.length && current < line) {
+			if (text.data[i] == '\n') ++current;
+			++i;
+		}
+		u32 length = 0;
+		while (i + length < text.length && text.data[i + length] != '\n') ++length;
+		return length;
 	}
 
 	static void offsetToLineColumn(StringView text, u32 offset, u32& line, u32& column) {
@@ -367,7 +392,7 @@ struct UIEditorWindow : AssetEditorWindow {
 	Path m_path;
 	UniquePtr<CodeEditor> m_editor;
 	ExternalFileChangeDialog m_external_change;
-	String m_stored_text;
+	String m_parsed_text; // the text of the editor with expanded [evox] blocks, what the source map is for
 	Array<String> m_autocomplete_list;
 	ui::SourceMap m_source_map;
 	u32 m_autocomplete_selection_idx = 0;
@@ -404,7 +429,30 @@ struct UIAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		m_app.getAssetBrowser().addWindow(win.move());
 	}
 
-	bool compile(const Path& src) override { return m_app.getAssetCompiler().copyCompile(src); }
+	// [evox] blocks are expanded here, the compiled resource is plain markup. It's also parsed once so that errors are
+	// reported when the asset is compiled, not when the game loads it
+	bool compile(const Path& src) override {
+		IAllocator& allocator = m_app.getAllocator();
+		OutputMemoryStream content(allocator);
+		if (!m_app.getEngine().getFileSystem().getContentSync(src, content)) {
+			logError("Failed to read ", src);
+			return false;
+		}
+
+		String expanded(allocator);
+		if (!expandEvox(allocator, StringView((const char*)content.data(), content.size()), src.c_str(), expanded)) {
+			return false;
+		}
+		
+		{
+			ui::Document document(nullptr, allocator); // no managers, nothing is loaded
+			if (!document.parse(StringView(expanded.c_str(), expanded.length()), src.c_str())) {
+				logError(src, ": invalid UI document");
+				return false;
+			}
+		}
+		return m_app.getAssetCompiler().writeCompiledResource(src, Span((const u8*)expanded.c_str(), expanded.length()));
+	}
 	bool canCreateResource() const override { return true; }
 	const char* getDefaultExtension() const override { return "ui"; }
 	void createResource(OutputMemoryStream& content) override {
