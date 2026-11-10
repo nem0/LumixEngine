@@ -301,6 +301,8 @@ void drawArraysInstanced(u32 indices_count, u32 instances_count);
 void drawIndexedInstanced(u32 indices_count, u32 instances_count, DataType index_type);
 void draw(const Drawcall& draw);
 void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z);
+// the groups are read from the indirect buffer (bindIndirectBuffer) at the byte offset: three u32 (x, y, z)
+void dispatchIndirect(u32 indirect_buffer_offset);
 
 void copy(TextureHandle dst, TextureHandle src, u32 dst_x, u32 dst_y);
 void copy(BufferHandle dst, BufferHandle src, u32 dst_offset, u32 src_offset, u32 size);

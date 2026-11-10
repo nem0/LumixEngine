@@ -681,8 +681,10 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 		file.read(mesh.attributes_semantic);
 
 		bool valid_semantics = mesh.vertex_decl.isValid();
-		for (AttributeSemantic semantic : mesh.attributes_semantic) valid_semantics = valid_semantics && (u32)semantic < (u32)AttributeSemantic::COUNT;
-		if (file.hasOverflow() || !valid_semantics || mesh.leaf_cluster_count > cluster_count || mesh.tree_depth > 64) {
+		// unused entries of the array are NONE
+		for (AttributeSemantic semantic : mesh.attributes_semantic) valid_semantics = valid_semantics && ((u32)semantic < (u32)AttributeSemantic::COUNT || semantic == AttributeSemantic::NONE);
+		// a draw has index_stride indices per cluster, from the sequential index buffer of the pipeline (65536 entries)
+		if (file.hasOverflow() || !valid_semantics || mesh.leaf_cluster_count > cluster_count || mesh.tree_depth > 64 || index_stride == 0 || index_stride > 65536) {
 			logError(m_path, ": invalid clusters");
 			return false;
 		}
@@ -714,7 +716,12 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 		const char* path = m_path.c_str();
 		mesh.cluster_buffer = m_renderer.createBuffer(m_renderer.copy(clusters, (u32)clusters_size), gpu::BufferFlags::IMMUTABLE, path);
 		mesh.node_buffer = m_renderer.createBuffer(m_renderer.copy(nodes, (u32)nodes_size), gpu::BufferFlags::IMMUTABLE, path);
-		mesh.cluster_index_buffer = m_renderer.createBuffer(m_renderer.copy(indices, (u32)indices_size), gpu::BufferFlags::IMMUTABLE, path);
+		// vertex shaders read the indices from this buffer as 32 bit words (see pullVertex in vertex_pulling.hlsli), the size is a multiple of 4
+		const u32 indices_padded_size = ((u32)indices_size + 3) & ~3u;
+		Renderer::MemRef indices_mem = m_renderer.allocate(indices_padded_size);
+		memcpy(indices_mem.data, indices, (size_t)indices_size);
+		memset((u8*)indices_mem.data + indices_size, 0, indices_padded_size - (size_t)indices_size);
+		mesh.cluster_index_buffer = m_renderer.createBuffer(indices_mem, gpu::BufferFlags::IMMUTABLE, path);
 		mesh.vertex_buffer_handle = m_renderer.createBuffer(m_renderer.copy(vertex_data, vertex_data_size), gpu::BufferFlags::IMMUTABLE, path);
 		if (!mesh.cluster_buffer || !mesh.cluster_index_buffer || !mesh.node_buffer || !mesh.vertex_buffer_handle) {
 			logError(m_path, ": failed to create cluster buffers");

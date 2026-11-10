@@ -12,6 +12,12 @@ cbuffer VertexBuffer : register(b2) {
 	uint u_instance_buffer;		// bindless, instance data of shaders that pull them (DYNAMIC), see Mesh::VertexBufferBinding
 	uint u_instance_offset;		// in bytes
 	uint u_padding;
+	#ifdef CLUSTER_MESH
+		uint u_cluster_meshes;			// bindless, the mesh table of the GPU scene (GPUSceneMesh, 64 bytes)
+		uint u_padding1;
+		uint u_padding2;
+		uint u_padding3;
+	#endif
 };
 
 #ifdef INDIRECT_INSTANCE
@@ -159,9 +165,8 @@ struct VSVertex {
 };
 
 #ifdef CLUSTER_MESH
-// Vertices of clusters, see MeshClusterVertexGPU in mesh_clusters.h. `vertex` is the index of the vertex in its cluster (indices of clusters are
-// local). The cluster is the one of the instance (all selected clusters of a mesh are one instanced draw): its index is in the instance data written
-// by nanite.hlsl (INDIRECT_INSTANCE, DYNAMIC layout).
+// Vertices of clusters, see MeshClusterVertexGPU in mesh_clusters.h. The instance data of a draw is written by gpu_scene_bins.hlsl (INDIRECT_INSTANCE,
+// DYNAMIC layout), an instance is a selected cluster.
 // Positions are integers of a lattice of the mesh, relative to the minimum of the cluster, bit packed. Attributes have a fixed stride:
 // the tangent frame as a quaternion (smallest three), the UV as two u16 in the range of the cluster, and the other attributes as they are.
 
@@ -188,9 +193,23 @@ void pullClusterFrame(uint packed, out float3 normal, out float3 tangent) {
 	tangent = float3(1 - 2 * (q.y * q.y + q.z * q.z), 2 * (q.x * q.y + q.w * q.z), 2 * (q.x * q.z - q.w * q.y));
 }
 
-VSVertex pullVertex(uint vertex, uint instance_id) {
-	ByteAddressBuffer data = bindless_buffers[u_vertex_buffer];
-	const uint cluster = bindless_buffers[u_instance_buffer].Load(pullInstanceAddress(instance_id, 96) + 44);
+// `corner` is the number of the index in the draw (SV_VertexID of a draw with a sequential index buffer). A draw has the clusters of many meshes (the bins of
+// gpu_scene_bins.hlsl) and all of its instances draw the same range of indices, so the vertex of the corner is found here: the mesh of the instance is in its
+// prev_pos.w (an index of the mesh table of the GPU scene, u_cluster_meshes), which has the buffers of its vertices and indices, the cluster is in its
+// scale.w. The draw has as many indices as the largest mesh of its bin, the corners after the ones of the mesh are degenerate triangles.
+VSVertex pullVertex(uint corner, uint instance_id) {
+	const uint instance_address = pullInstanceAddress(instance_id, 96);
+	const uint cluster = bindless_buffers[u_instance_buffer].Load(instance_address + 44);
+	const uint mesh = bindless_buffers[u_instance_buffer].Load(instance_address + 76);
+	ByteAddressBuffer mesh_table = bindless_buffers[u_cluster_meshes];
+	const uint index_stride = mesh_table.Load(mesh * 64 + 28);
+	const uint2 mesh_buffers = mesh_table.Load2(mesh * 64 + 44);	// vertices, indices
+	// the clusters of a draw are of different meshes: the buffers differ between the vertices of a wave
+	ByteAddressBuffer data = bindless_buffers[NonUniformResourceIndex(mesh_buffers.x)];
+	ByteAddressBuffer indices = bindless_buffers[NonUniformResourceIndex(mesh_buffers.y)];
+	const uint index_address = (cluster * index_stride + corner) * 2;
+	const uint index_word = indices.Load(index_address & ~3u);
+	const uint vertex = corner >= index_stride ? 0 : ((index_address & 2) ? (index_word >> 16) : (index_word & 0xffff));
 	const uint4 h0 = data.Load4(cluster * 48);			// start of positions, bits
 	const uint4 h1 = data.Load4(cluster * 48 + 16);		// bits of UV, vertex count, bit offset of the first vertex, step
 	const float4 h2 = asfloat(data.Load4(cluster * 48 + 32)); // UV range

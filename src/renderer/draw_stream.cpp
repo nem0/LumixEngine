@@ -44,6 +44,7 @@ enum class DrawStream::Instruction : u8 {
 	DRAW_INDIRECT,
 	BIND_SHADER_BUFFER,
 	DISPATCH,
+	DISPATCH_INDIRECT,
 	CREATE_BUFFER,
 	CREATE_TEXTURE,
 	COPY_TEXTURE,
@@ -320,6 +321,11 @@ void DrawStream::dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z) 
 	submitCached();
 	const IVec3 v(num_groups_x, num_groups_y, num_groups_z);
 	write(Instruction::DISPATCH, v);
+}
+
+void DrawStream::dispatchIndirect(u32 indirect_buffer_offset) {
+	submitCached();
+	write(Instruction::DISPATCH_INDIRECT, indirect_buffer_offset);
 }
 
 void DrawStream::merge(DrawStream& rhs) {
@@ -914,6 +920,11 @@ void DrawStream::run() {
 				case Instruction::DISPATCH: {
 					READ(IVec3, size);
 					gpu::dispatch(size.x, size.y, size.z);
+					break;
+				}
+				case Instruction::DISPATCH_INDIRECT: {
+					READ(u32, offset);
+					gpu::dispatchIndirect(offset);
 					break;
 				}
 				case Instruction::FUNCTION: {
