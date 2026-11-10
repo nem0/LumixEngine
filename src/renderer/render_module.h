@@ -224,6 +224,7 @@ struct ModelInstance {
 	Flags flags = Flags::NONE;
 	u16 mesh_count = 0;
 	bool dirty = true;
+	u32 gpu_slot = 0xffFFffFF;	// in GPUScene, valid while the instance is in the culling system
 };
 
 struct InstancedModel {
@@ -254,6 +255,9 @@ struct InstancedModel {
 	Array<InstanceData> instances;
 	gpu::BufferHandle gpu_data = gpu::INVALID_BUFFER;
 	u32 gpu_capacity = 0;
+	u32 gpu_count = 0;			// the number of instances that are in gpu_data
+	u32 gpu_group = 0xffFFffFF;	// the group of the GPU scene (gpu_scene.h) if the model has clusters
+	const Model* gpu_group_model = nullptr;
 	bool dirty = false;
 };
 
@@ -468,6 +472,9 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual Span<ModelInstance> getModelInstances() = 0;
 	// resets per-mesh state of material overrides after a material/shader unload, call before rendering a pipeline
 	virtual void invalidateStaleMaterialOverrides() = 0;
+	// uploads the changes of the GPU scene (struct GPUScene), call before rendering a pipeline, more than once in a frame is fine
+	virtual void flushGPUScene() = 0;
+	virtual struct GPUScene& getGPUScene() = 0;
 	virtual void setModelInstanceLOD(EntityRef entity, u32 lod) = 0;
 	virtual CullResult* getRenderables(const ShiftedFrustum& frustum, RenderableTypes type) const = 0;
 	virtual CullResult* getRenderables(const ShiftedFrustum& frustum) const = 0;

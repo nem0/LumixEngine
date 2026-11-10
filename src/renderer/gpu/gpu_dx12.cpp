@@ -1984,7 +1984,7 @@ void shutdown() {
 		if (w.latency_waitable) CloseHandle(w.latency_waitable);
 		w.swapchain->Release();
 	}
-	
+
 	d3d->root_signature->Release();
 	d3d->timestamp_query_heap->Release();
 	d3d->stats_query_heap->Release();
@@ -3312,6 +3312,35 @@ void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z) {
 	if (setPipelineStateCompute()) {
 		d3d->cmd_list->Dispatch(num_groups_x, num_groups_y, num_groups_z);
 	}
+}
+
+void dispatchIndirect(u32 indirect_buffer_offset) {
+	CHECK(d3d->current_program);
+	if (!d3d->current_indirect_buffer || !d3d->current_indirect_buffer->resource) {
+		logError("Indirect dispatch without an indirect buffer");
+		return;
+	}
+	if (!setPipelineStateCompute()) return;
+
+	// a command is the three groups, a signature that only dispatches needs no root signature
+	static ID3D12CommandSignature* signature = [&]() {
+		D3D12_INDIRECT_ARGUMENT_DESC arg_desc = {};
+		arg_desc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
+
+		D3D12_COMMAND_SIGNATURE_DESC desc = {};
+		desc.NodeMask = 1;
+		desc.ByteStride = sizeof(u32) * 3;
+		desc.NumArgumentDescs = 1;
+		desc.pArgumentDescs = &arg_desc;
+		ID3D12CommandSignature* result = nullptr;
+		if (FAILED(d3d->device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(&result)))) {
+			logError("Failed to create the command signature of indirect dispatches");
+		}
+		return result;
+	}();
+	if (!signature) return;
+
+	d3d->cmd_list->ExecuteIndirect(signature, 1, d3d->current_indirect_buffer->resource, indirect_buffer_offset, nullptr, 0);
 }
 
 BindlessHandle getBindlessHandle(TextureHandle texture) {

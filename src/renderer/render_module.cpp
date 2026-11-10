@@ -23,6 +23,7 @@
 #include "renderer/culling_system.h"
 #include "renderer/draw_stream.h"
 #include "renderer/font.h"
+#include "renderer/gpu_scene.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/particle_system.h"
@@ -1423,6 +1424,7 @@ struct RenderModuleImpl final : RenderModule {
 				im.gpu_capacity = im.instances.capacity();
 			}
 		}
+		im.gpu_count = im.instances.size();
 
 		im.dirty = false;
 	}
@@ -1430,6 +1432,7 @@ struct RenderModuleImpl final : RenderModule {
 	void destroyInstancedModel(EntityRef entity) override {
 		Model* m = m_instanced_models[entity].model;
 		if (m) m->decRefCount();
+		if (m_instanced_models[entity].gpu_group != GPUSceneConst::INVALID_SLOT) m_gpu_scene.freeGroup(m_instanced_models[entity].gpu_group);
 		if (m_instanced_models[entity].gpu_data) m_renderer.getEndFrameDrawStream().destroy(m_instanced_models[entity].gpu_data);
 		m_instanced_models.erase(entity);
 		m_world.onComponentDestroyed(entity, types::instanced_model, this);
@@ -1605,17 +1608,70 @@ struct RenderModuleImpl final : RenderModule {
 #endif
 	}
 
-	void onModelInstanceMoved(EntityRef entity) {
-		if (!m_culling_system->isAdded(entity)) return;
-		
+	// The GPU scene has a slot for every model instance that is in the culling system as a mesh.
+	void gpuSceneUpdate(EntityRef entity) {
+		const ModelInstance& mi = m_model_instances[entity.index];
+		if (mi.gpu_slot == GPUSceneConst::INVALID_SLOT || !mi.model) return;
 		const Transform& tr = m_world.getTransform(entity);
+		const float radius = mi.model->getOriginBoundingRadius() * maximum(tr.scale.x, tr.scale.y, tr.scale.z);
+		m_gpu_scene.update(mi.gpu_slot, tr, radius);
+	}
+
+	void gpuSceneAdd(EntityRef entity) {
 		ModelInstance& mi = m_model_instances[entity.index];
-		m_moved_instances.push(entity);
-		mi.flags |= ModelInstance::MOVED;
-		const Model* model = mi.model;
-		ASSERT(model);
-		const float bounding_radius = model->getOriginBoundingRadius();
-		m_culling_system->set(entity, tr.pos, bounding_radius * maximum(tr.scale.x, tr.scale.y, tr.scale.z));
+		if (mi.gpu_slot == GPUSceneConst::INVALID_SLOT) mi.gpu_slot = m_gpu_scene.alloc(mi.model);
+		gpuSceneUpdate(entity);
+	}
+
+	void gpuSceneRemove(EntityRef entity) {
+		ModelInstance& mi = m_model_instances[entity.index];
+		if (mi.gpu_slot == GPUSceneConst::INVALID_SLOT) return;
+		m_gpu_scene.free(mi.gpu_slot);
+		mi.gpu_slot = GPUSceneConst::INVALID_SLOT;
+	}
+
+	void flushGPUScene() override {
+		syncInstancedModelGroups();
+		m_gpu_scene.flush();
+	}
+
+	// Instanced models with clusters are groups of the GPU scene: made when the model and the buffer of the instances are ready, and kept up to date with
+	// the position of the entity and the buffer (it is made again when the instances change).
+	void syncInstancedModelGroups() {
+		for (auto iter = m_instanced_models.begin(), end = m_instanced_models.end(); iter != end; ++iter) {
+			InstancedModel& im = iter.value();
+			const bool wanted = im.model && im.model->isReady() && im.model->hasClusters() && im.gpu_data && im.gpu_count > 0;
+			if (im.gpu_group != GPUSceneConst::INVALID_SLOT && (!wanted || im.gpu_group_model != im.model)) {
+				m_gpu_scene.freeGroup(im.gpu_group);
+				im.gpu_group = GPUSceneConst::INVALID_SLOT;
+				im.gpu_group_model = nullptr;
+			}
+			if (!wanted) continue;
+			if (im.gpu_group == GPUSceneConst::INVALID_SLOT) {
+				im.gpu_group = m_gpu_scene.allocGroup(im.model);
+				im.gpu_group_model = im.model;
+			}
+			m_gpu_scene.updateGroup(im.gpu_group, m_world.getTransform(iter.key()).pos, im.gpu_data, im.gpu_count);
+		}
+	}
+	GPUScene& getGPUScene() override { return m_gpu_scene; }
+
+	void onModelInstanceMoved(EntityRef entity) {
+		ModelInstance& mi = m_model_instances[entity.index];
+		// an instance is in the culling system, or, if its model has clusters, in the GPU scene (it has a slot)
+		const bool culled = m_culling_system->isAdded(entity);
+		if (!culled && mi.gpu_slot == GPUSceneConst::INVALID_SLOT) return;
+
+		if (culled) {
+			const Transform& tr = m_world.getTransform(entity);
+			m_moved_instances.push(entity);
+			mi.flags |= ModelInstance::MOVED;
+			const Model* model = mi.model;
+			ASSERT(model);
+			const float bounding_radius = model->getOriginBoundingRadius();
+			m_culling_system->set(entity, tr.pos, bounding_radius * maximum(tr.scale.x, tr.scale.y, tr.scale.z));
+		}
+		gpuSceneUpdate(entity);
 
 		if (mi.flags & ModelInstance::IS_BONE_ATTACHMENT_PARENT) {
 			for (auto& attachment : m_bone_attachments) {
@@ -2099,13 +2155,18 @@ struct RenderModuleImpl final : RenderModule {
 			const DVec3 pos = m_world.getPosition(entity);
 			const Vec3& scale = m_world.getScale(entity);
 			const float radius = model_instance.model->getOriginBoundingRadius() * maximum(scale.x, scale.y, scale.z);
-			if (!m_culling_system->isAdded(entity)) {
+			// instances of models with clusters are culled and drawn by the GPU, they have a slot in the GPU scene and are not in the culling system
+			if (model_instance.model->hasClusters()) {
+				if (model_instance.gpu_slot == GPUSceneConst::INVALID_SLOT) gpuSceneAdd(entity);
+			}
+			else if (!m_culling_system->isAdded(entity)) {
 				m_culling_system->add(entity, (u8)RenderableTypes::MESH, pos, radius);
 			}
 		}
 		else
 		{
 			m_culling_system->remove(entity);
+			gpuSceneRemove(entity);
 		}
 	}
 
@@ -2336,7 +2397,38 @@ struct RenderModuleImpl final : RenderModule {
 
 	CullResult* getRenderables(const ShiftedFrustum& frustum, RenderableTypes type) const override
 	{
-		return m_culling_system->cull(frustum, static_cast<u8>(type));
+		CullResult* result = m_culling_system->cull(frustum, static_cast<u8>(type));
+		if (type != RenderableTypes::MESH) return result;
+
+		// Instances of models with clusters are not in the culling system, the GPU culls and draws them (Pipeline::runGPUSceneCulling). The editor (selection by
+		// a rectangle, tools of terrain) asks for meshes in a frustum and wants them too, so they are found by testing every one of them. The pipelines do
+		// not use this function for meshes, they ask for all the types at once.
+		PagedList<CullResult> list(m_engine.getPageAllocator());
+		CullResult* page = nullptr;
+		const Transform* transforms = m_world.getTransforms();
+		for (u32 i = 0, c = m_model_instances.size(); i < c; ++i) {
+			const ModelInstance& mi = m_model_instances[i];
+			if (mi.gpu_slot == GPUSceneConst::INVALID_SLOT || !mi.model) continue;
+			const Transform& tr = transforms[i];
+			const float radius = mi.model->getOriginBoundingRadius() * maximum(tr.scale.x, tr.scale.y, tr.scale.z);
+			const Vec3 center = Vec3(tr.pos - frustum.origin);
+			bool inside = true;
+			for (u32 k = 0; k < lengthOf(frustum.xs) && inside; ++k) {
+				inside = frustum.xs[k] * center.x + frustum.ys[k] * center.y + frustum.zs[k] * center.z + frustum.ds[k] >= -radius;
+			}
+			if (!inside) continue;
+			if (!page || page->header.count == lengthOf(page->entities)) {
+				page = list.push();
+				page->header.type = (u8)RenderableTypes::MESH;
+			}
+			page->entities[page->header.count] = EntityRef((i32)i);
+			++page->header.count;
+		}
+		CullResult* gpu_instances = list.detach();
+		if (!gpu_instances) return result;
+		if (!result) return gpu_instances;
+		result->merge(gpu_instances);
+		return result;
 	}
 
 
@@ -3023,6 +3115,7 @@ struct RenderModuleImpl final : RenderModule {
 		r.pose = nullptr;
 
 		m_culling_system->remove(entity);
+		gpuSceneRemove(entity);
 	}
 
 
@@ -3037,7 +3130,9 @@ struct RenderModuleImpl final : RenderModule {
 		const DVec3 pos = m_world.getPosition(entity);
 		const float radius = bounding_radius * maximum(scale.x, scale.y, scale.z);
 		if(r.flags & ModelInstance::ENABLED) {
-			m_culling_system->add(entity, (u8)RenderableTypes::MESH, pos, radius);
+			// instances of models with clusters are culled and drawn by the GPU, they have a slot in the GPU scene and are not in the culling system
+			if (model->hasClusters()) gpuSceneAdd(entity);
+			else m_culling_system->add(entity, (u8)RenderableTypes::MESH, pos, radius);
 		}
 		ASSERT(!r.pose);
 		u32 num_bones = model->getBones().size();
@@ -3255,6 +3350,7 @@ struct RenderModuleImpl final : RenderModule {
 
 			if (old_model->isReady()) {
 				m_culling_system->remove(entity);
+				gpuSceneRemove(entity);
 			}
 			old_model->decRefCount();
 		}
@@ -3526,6 +3622,7 @@ struct RenderModuleImpl final : RenderModule {
 	Renderer& m_renderer;
 	Engine& m_engine;
 	UniquePtr<CullingSystem> m_culling_system;
+	GPUScene m_gpu_scene;
 
 	EntityPtr m_active_global_light_entity;
 	HashMap<EntityRef, PointLight> m_point_lights;
@@ -3657,6 +3754,7 @@ RenderModuleImpl::RenderModuleImpl(Renderer& renderer,
 	, m_world(world)
 	, m_renderer(renderer)
 	, m_allocator(allocator, "renderer module")
+	, m_gpu_scene(renderer, m_allocator)
 	, m_model_entity_map(m_allocator)
 	, m_model_instances(m_allocator)
 	, m_moved_instances(m_allocator)

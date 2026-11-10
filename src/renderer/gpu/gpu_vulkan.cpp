@@ -292,6 +292,7 @@ void drawArraysInstanced(u32, u32) {}
 void drawIndexedInstanced(u32, u32, DataType) {}
 void draw(const Drawcall&) {}
 void dispatch(u32, u32, u32) {}
+void dispatchIndirect(u32) {}
 void copy(TextureHandle, TextureHandle, u32, u32) {}
 void copy(BufferHandle, BufferHandle, u32, u32, u32) {}
 void copy(BufferHandle, TextureHandle) {}

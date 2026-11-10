@@ -52,6 +52,8 @@ struct DrawStream {
 	void drawArraysInstanced(u32 indices_count, u32 instances_count);
 	void drawIndexedInstanced(u32 indices_count, u32 instances_count, gpu::DataType index_type);
 	void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z);
+	// the groups are in the indirect buffer, see bindIndirectBuffer
+	void dispatchIndirect(u32 indirect_buffer_offset);
 	
 	void barrier(gpu::TextureHandle texture, gpu::BarrierType type);
 	void barrier(gpu::BufferHandle buffer, gpu::BarrierType type);
