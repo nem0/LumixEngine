@@ -2136,6 +2136,15 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 						"\nClusters need additional memory.");
 				}
 				saveUndo(ImGui::Checkbox("##creclusters", &m_meta.create_clusters));
+				if (m_meta.create_clusters) {
+					ImGuiEx::Label("Dilate cluster borders (?)");
+					if (ImGui::IsItemHovered()) {
+						ImGui::SetTooltip("%s", "Coarser levels of clusters grow the open borders of their triangles to keep the area that simplification removes."
+							"\nFor foliage: without it, leaves and other loose pieces thin out much sooner than their size suggests."
+							"\nNeeds more memory, every cluster has its own positions.");
+					}
+					saveUndo(ImGui::Checkbox("##cludilate", &m_meta.cluster_dilate_borders));
+				}
 				ImGuiEx::Label("Create impostor mesh");
 				saveUndo(ImGui::Checkbox("##creimp", &m_meta.create_impostor));
 				if (m_meta.create_impostor) {

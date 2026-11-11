@@ -490,11 +490,11 @@ struct RendererImpl final : Renderer {
 		, m_shader_defines(m_allocator)
 		, m_profiler(m_allocator)
 		, m_layers(m_allocator)
+		, m_cluster_data_free(m_allocator)
+		, m_cluster_data_pending(m_allocator)
 		, m_material_buffer(m_allocator)
 		, m_plugins(m_allocator)
 		, m_render_script(engine, m_allocator)
-		, m_sort_keys(m_allocator)
-		, m_sort_key_map(m_allocator)
 		, m_semantic_defines(m_allocator)
 		, m_free_frames(m_allocator)
 		, m_renderbuffers(m_allocator)
@@ -502,9 +502,6 @@ struct RendererImpl final : Renderer {
 		, m_cubemap_sky(*this)
 		, m_tdao(*this)
 	{
-		m_sort_keys.emplace().hash = 0; // we use sort_key 0 as "null" sort key
-		m_sort_key_map.insert(0, 0);
-
 		RenderModule::reflect();
 
 		m_shader_defines.reserve(32);
@@ -670,6 +667,8 @@ struct RendererImpl final : Renderer {
 		m_model_manager.destroy();
 		m_material_manager.destroy();
 		m_shader_manager.destroy();
+		if (m_cluster_data_buffer) stream.destroy(m_cluster_data_buffer);
+		m_cluster_data_buffer = gpu::INVALID_BUFFER;
 		m_font_manager->destroy();
 		LUMIX_DELETE(m_allocator, m_font_manager);
 		
@@ -696,9 +695,6 @@ struct RendererImpl final : Renderer {
 			gpu::shutdown();
 		}, &counter, 1);
 		jobs::wait(&counter);
-		if (m_sort_key_map.size() != 1) {
-			logWarning("Renderer: sort key map has ", m_sort_key_map.size(), " entries on shutdown (expected 1)");
-		}
 	}
 	
 	static void add(String& res, const char* a, u32 b) {
@@ -1117,6 +1113,108 @@ struct RendererImpl final : Renderer {
 		return handle;
 	}
 
+	struct ClusterDataRange {
+		u32 offset;
+		u32 size;
+		u32 frame; // of the free, only for the pending ones
+	};
+
+	// returns the range to the free ones, which are sorted by offset and never adjacent
+	void releaseClusterData(u32 offset, u32 size) {
+		u32 i = 0;
+		while (i < (u32)m_cluster_data_free.size() && m_cluster_data_free[i].offset < offset) ++i;
+		const bool merge_prev = i > 0 && m_cluster_data_free[i - 1].offset + m_cluster_data_free[i - 1].size == offset;
+		const bool merge_next = i < (u32)m_cluster_data_free.size() && offset + size == m_cluster_data_free[i].offset;
+		if (merge_prev && merge_next) {
+			m_cluster_data_free[i - 1].size += size + m_cluster_data_free[i].size;
+			m_cluster_data_free.erase(i);
+		}
+		else if (merge_prev) {
+			m_cluster_data_free[i - 1].size += size;
+		}
+		else if (merge_next) {
+			m_cluster_data_free[i].offset = offset;
+			m_cluster_data_free[i].size += size;
+		}
+		else {
+			m_cluster_data_free.insert(i, ClusterDataRange{offset, size, 0});
+		}
+	}
+
+	bool allocClusterRange(u32 size, u32 alignment, u32& offset) override {
+		if (size == 0 || alignment == 0) return false;
+		// the ranges are aligned, and their sizes are multiples of 4 as shaders read 32 bit words
+		const u32 aligned_size = (size + CLUSTER_DATA_ALIGN - 1) & ~(CLUSTER_DATA_ALIGN - 1);
+		jobs::MutexGuard lock(m_cluster_data_mutex);
+
+		if (!m_cluster_data_buffer) {
+			m_cluster_data_buffer = createBuffer(MemRef{ CLUSTER_DATA_POOL_SIZE, nullptr, false }, gpu::BufferFlags::SHADER_BUFFER, "cluster data");
+			if (!m_cluster_data_buffer) return false;
+			m_cluster_data_free.push(ClusterDataRange{0, CLUSTER_DATA_POOL_SIZE, 0});
+		}
+
+		// frames in flight may still read what was freed lately
+		for (u32 i = 0; i < (u32)m_cluster_data_pending.size();) {
+			const ClusterDataRange r = m_cluster_data_pending[i];
+			if (m_frame_number - r.frame >= CLUSTER_DATA_FREE_DELAY) {
+				m_cluster_data_pending.swapAndPop(i);
+				releaseClusterData(r.offset, r.size);
+			}
+			else {
+				++i;
+			}
+		}
+
+		// the smallest free range that fits at an aligned offset
+		u32 best = 0xffFFffFF;
+		u64 best_start = 0;
+		for (u32 i = 0; i < (u32)m_cluster_data_free.size(); ++i) {
+			const ClusterDataRange& r = m_cluster_data_free[i];
+			const u64 start = (u64(r.offset) + alignment - 1) / alignment * alignment;
+			if (start + aligned_size > u64(r.offset) + r.size) continue;
+			if (best == 0xffFFffFF || r.size < m_cluster_data_free[best].size) {
+				best = i;
+				best_start = start;
+			}
+		}
+		if (best == 0xffFFffFF) {
+			logError("Buffer of data of clusters is full (", (u32)CLUSTER_DATA_POOL_SIZE >> 20, " MB), a range with ", size, " bytes does not fit");
+			return false;
+		}
+		offset = (u32)best_start;
+		const ClusterDataRange taken = m_cluster_data_free[best];
+		m_cluster_data_free.erase(best);
+		// what is left of the free range, before and after the allocated one
+		const u32 after = u32(u64(taken.offset) + taken.size - (best_start + aligned_size));
+		const u32 before = offset - taken.offset;
+		if (after) m_cluster_data_free.insert(best, ClusterDataRange{u32(best_start + aligned_size), after, 0});
+		if (before) m_cluster_data_free.insert(best, ClusterDataRange{taken.offset, before, 0});
+		return true;
+	}
+
+	bool allocClusterData(const void* data, u32 size, u32& offset) override {
+		if (!allocClusterRange(size, CLUSTER_DATA_ALIGN, offset)) return false;
+		const u32 aligned_size = (size + CLUSTER_DATA_ALIGN - 1) & ~(CLUSTER_DATA_ALIGN - 1);
+
+		MemRef staging = allocate(aligned_size);
+		memcpy(staging.data, data, size);
+		memset((u8*)staging.data + size, 0, aligned_size - size);
+		const gpu::BufferHandle tmp = createBuffer(staging, gpu::BufferFlags::IMMUTABLE, "cluster data staging");
+		DrawStream& stream = getDrawStream();
+		stream.copy(m_cluster_data_buffer, tmp, offset, 0, aligned_size);
+		stream.destroy(tmp);
+		return true;
+	}
+
+	void freeClusterData(u32 offset, u32 size) override {
+		if (size == 0) return;
+		const u32 aligned_size = (size + CLUSTER_DATA_ALIGN - 1) & ~(CLUSTER_DATA_ALIGN - 1);
+		jobs::MutexGuard lock(m_cluster_data_mutex);
+		m_cluster_data_pending.push(ClusterDataRange{offset, aligned_size, m_frame_number});
+	}
+
+	gpu::BufferHandle getClusterDataBuffer() override { return m_cluster_data_buffer; }
+
 	
 	u8 getLayersCount() const override
 	{
@@ -1146,58 +1244,8 @@ struct RendererImpl final : Renderer {
 
 	bool isBuiltinTAAEnabled() const override { return m_builtin_taa_enabled; }
 
-	struct SortKey {
-		union {
-			u32 ref_count = 0;
-			i32 next;
-		};
-		u32 hash;
-	};
-
-	u32 allocSortKey(u32 hash) override {
-		auto iter = m_sort_key_map.find(hash);
-		if (iter.isValid()) {
-			++m_sort_keys[iter.value()].ref_count;
-			return iter.value();
-		}
-
-		if (m_first_free_sort_key >= 0) {
-			const i32 next_free = m_sort_keys[m_first_free_sort_key].next;
-			const u32 key = m_first_free_sort_key;
-			m_first_free_sort_key = next_free;
-			
-			m_sort_keys[key].hash = hash;
-			m_sort_keys[key].ref_count = 1;
-			m_sort_key_map.insert(hash, key);
-
-			return key;
-		}
-
-		SortKey& sort_key = m_sort_keys.emplace();
-		sort_key.ref_count = 1;
-		sort_key.hash = hash;
-		const u32 key = m_sort_keys.size() - 1;
-		m_sort_key_map.insert(hash, key);
-
-		return key;
-	}
-
 	u32 getMaterialReloadCounter() const override { return m_material_reload_counter; }
 	void notifyMaterialReload() override { ++m_material_reload_counter; }
-
-	void freeSortKey(u32 key) override {
-		SortKey& sort_key = m_sort_keys[key];
-		--sort_key.ref_count;
-		if (sort_key.ref_count > 0) return;
-
-		m_sort_key_map.erase(sort_key.hash);
-		sort_key.next = m_first_free_sort_key;
-		m_first_free_sort_key = key;
-	}
-	
-	u32 getMaxSortKey() const override {
-		return m_sort_keys.empty() ? 0 : m_sort_keys.size() - 1;
-	}
 
 	gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const MemRef& memory, const char* debug_name) override
 	{
@@ -1551,6 +1599,15 @@ struct RendererImpl final : Renderer {
 	RenderResourceManager<Texture> m_texture_manager;
 	RenderResourceManager<Material> m_material_manager;
 	u32 m_frame_number = 0;
+	enum : u32 {
+		CLUSTER_DATA_POOL_SIZE = 256 * 1024 * 1024,
+		CLUSTER_DATA_ALIGN = 16,
+		CLUSTER_DATA_FREE_DELAY = 4 // frames
+	};
+	jobs::Mutex m_cluster_data_mutex;
+	gpu::BufferHandle m_cluster_data_buffer = gpu::INVALID_BUFFER;
+	Array<ClusterDataRange> m_cluster_data_free;
+	Array<ClusterDataRange> m_cluster_data_pending;
 	float m_lod_multiplier = 1;
 	StaticString<MAX_PATH> m_screenshot_path;
 	u32 m_screenshot_max_width = 0;
@@ -1595,9 +1652,6 @@ struct RendererImpl final : Renderer {
 		HashMap<RuntimeHash, u32> map;
 	} m_material_buffer;
 
-	Array<SortKey> m_sort_keys;
-	HashMap<u32, u32> m_sort_key_map;
-	i32 m_first_free_sort_key = -1;
 	u32 m_material_reload_counter = 0;
 
 	Array<Renderbuffer> m_renderbuffers;

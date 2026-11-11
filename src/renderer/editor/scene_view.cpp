@@ -692,7 +692,8 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 			DrawStream& stream = pipeline.getRenderer().getDrawStream();
 			pipeline.setUniform(pipeline.toBindless(gbuffer.DS, stream), UniformBuffer::DRAWCALL2);
 			
-			renderer.pushJob("icons", [this, &uniform_pool](DrawStream& stream) {
+			const u32 mesh_instance_define = 1 << renderer.getShaderDefineIdx("MESH_INSTANCE");
+			renderer.pushJob("icons", [this, &uniform_pool, &transient_pool, mesh_instance_define](DrawStream& stream) {
 				const Viewport& vp = m_scene_view.m_view->getViewport();
 				const Matrix camera_mtx({ 0, 0, 0 }, vp.rot);
 
@@ -711,21 +712,39 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 						const MeshMaterial& mesh_mat = model->getMeshMaterial(i);
 						const Material* material = mesh_mat.material;
 						const gpu::StateFlags state = material->m_render_states | gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
-						gpu::ProgramHandle program = material->getShader()->getProgram(state, mesh.primitive_type, material->getDefineMask(), mesh.semantics_defines);
+						gpu::ProgramHandle program = material->getShader()->getProgram(state, mesh.primitive_type, material->getDefineMask() | mesh_instance_define, mesh.semantics_defines);
 
-						struct UB {
-							Matrix mtx;
+						// one instance with the layout of the MESH_INSTANCE variant of surface shaders (the previous state is the current one)
+						struct DynamicInstanceData {
+							Quat rot;
+							Vec3 pos;
+							float lod;
+							Vec3 scale;
+							float padding;
+							Quat prev_rot;
+							Vec3 prev_pos;
+							float prev_lod;
+							Vec3 prev_scale;
 							MaterialIndex material_index;
-						} ub_data = {
-							mtx,
-							material->getIndex()
 						};
-						const TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
-						stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+						static_assert(sizeof(DynamicInstanceData) == 96);
+
+						Vec3 icon_pos, icon_scale;
+						Quat icon_rot;
+						mtx.decompose(icon_pos, icon_rot, icon_scale);
+						const TransientSlice instance = alloc(transient_pool, sizeof(DynamicInstanceData));
+						DynamicInstanceData* idata = (DynamicInstanceData*)instance.ptr;
+						idata->rot = idata->prev_rot = icon_rot;
+						idata->pos = idata->prev_pos = icon_pos;
+						idata->scale = idata->prev_scale = icon_scale;
+						idata->lod = idata->prev_lod = 0;
+						idata->padding = 0;
+						idata->material_index = material->getIndex();
 
 						stream.useProgram(program);
 						stream.bindIndexBuffer(mesh.index_buffer_handle);
-						bindPulledBuffers(stream, uniform_pool, mesh.vertex_buffer_handle);
+						// instance data is pulled by the vertex shader
+						bindPulledBuffers(stream, uniform_pool, mesh.vertex_buffer_handle, instance.buffer, instance.offset);
 						stream.drawIndexed(0, mesh.indices_count, mesh.index_type);
 					}
 				}
@@ -1289,7 +1308,6 @@ void SceneView::onToolbar() {
 		option("Probe clusters", Pipeline::DebugShow::PROBE_CLUSTERS);
 		option("Mesh clusters", Pipeline::DebugShow::MESH_CLUSTERS);
 		option("Mesh triangles", Pipeline::DebugShow::MESH_TRIANGLES);
-		ImGui::Checkbox("Cluster backface culling", &m_pipeline->m_cluster_backface_culling);
 		ImGui::Checkbox("Freeze camera of clusters", &m_pipeline->m_cluster_freeze_camera);
 		ImGui::SliderFloat("Cluster error (px)", &m_pipeline->m_cluster_error_pixels, 0.05f, 8.f, "%.2f", ImGuiSliderFlags_Logarithmic);
 		ImGui::SliderFloat("Cluster attribute error weight", &m_pipeline->m_cluster_attribute_weight, 0.f, 2.f);

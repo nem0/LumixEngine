@@ -132,9 +132,6 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual u8 getLayerIdx(const char* name) = 0;
 	virtual u8 getLayersCount() const = 0;
 	virtual const char* getLayerName(u8 layer) const = 0;
-	virtual u32 allocSortKey(u32 hash) = 0;
-	virtual void freeSortKey(u32 key) = 0;
-	virtual u32 getMaxSortKey() const = 0;
 	// bumped whenever a material or shader is unloaded (e.g. on reload), per-instance data derived from them is stale then
 	virtual u32 getMaterialReloadCounter() const = 0;
 	virtual void notifyMaterialReload() = 0;
@@ -160,6 +157,17 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual UniformPool& getUniformPool() = 0;
 	
 	virtual gpu::BufferHandle createBuffer(const MemRef& memory, gpu::BufferFlags flags, const char* debug_name) = 0;
+
+	// The vertex data, clusters and nodes of all meshes with clusters (see Mesh::cluster_vertex_offset) are ranges of one buffer of a fixed size, created by the first allocation.
+	// `allocClusterData` copies `size` bytes of `data` to a new range and returns its byte offset, or false if the buffer is full. A freed range is reused
+	// after the frames in flight that may read it are done. Can be called from any thread.
+	virtual bool allocClusterData(const void* data, u32 size, u32& offset) = 0;
+	// The same range of the buffer with no data: the caller copies to it (GPUScene does it for the meshes without clusters, see GPUScene::flush). The offset is a multiple of
+	// `alignment` (any positive number), the size is not rounded, free it with freeClusterData.
+	virtual bool allocClusterRange(u32 size, u32 alignment, u32& offset) = 0;
+	virtual void freeClusterData(u32 offset, u32 size) = 0;
+	virtual gpu::BufferHandle getClusterDataBuffer() = 0; // invalid until the first allocation
+
 	virtual gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const MemRef& memory, const char* debug_name) = 0;
 
 	virtual RenderBufferHandle createRenderbuffer(const RenderbufferDesc& desc) = 0;

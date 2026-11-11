@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/atomic.h"
 #include "engine/lumix.h"
 #include "gpu/gpu.h"
 
@@ -26,8 +25,6 @@ struct LUMIX_RENDERER_API Pose {
 	u32 count = 0;
 	Vec3* positions = nullptr;
 	Quat* rotations = nullptr;
-	AtomicI32 frame = 0xffFFffFF;
-	TransientSlice slice = {};
 	
 	private:
 		Pose(const Pose&);

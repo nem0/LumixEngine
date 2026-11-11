@@ -322,21 +322,7 @@ void Model::onBeforeReady()
 	}
 
 	for (u32 i = 0, n = m_meshes.size(); i < n; ++i) {
-		Mesh& mesh = m_meshes[i];
 		MeshMaterial& mesh_mat = m_mesh_material[i];
-		
-		RollingHasher hasher;
-		const Material* material = mesh_mat.material;
-		const Shader* shader = material->getShader();
-		const u32 define_mask = material->getDefineMask();
-		hasher.begin();
-		Mesh* mesh_ptr = &mesh;
-		hasher.update(&mesh_ptr, sizeof(mesh_ptr));
-		hasher.update(&shader, sizeof(shader));
-		hasher.update(&define_mask, sizeof(define_mask));
-		hasher.update(&material->m_render_states, sizeof(material->m_render_states));
-		const RuntimeHash32 hash = hasher.end();
-		mesh_mat.sort_key = m_renderer.allocSortKey(hash.getHashValue());
 		mesh_mat.material_index = mesh_mat.material->getIndex();
 	}
 }
@@ -646,7 +632,7 @@ bool Model::load(Span<const u8> mem)
 //   u32 mesh_count - meshes [0, mesh_count) have clusters, 0 if the model has none
 //   for each mesh: u32 cluster_count, leaf_cluster_count, node_count, root_count, tree_depth, index_stride, leaf_vertex_count, leaf_index_count,
 //                  vertex_data_size, vertex_stride, VertexDecl, AttributeSemantic[VertexDecl::MAX_ATTRIBUTES],
-//                  MeshClusterGPU[cluster_count], MeshNodeGPU[node_count], u32 roots[root_count], u16 indices[cluster_count * index_stride],
+//                  MeshClusterGPU[cluster_count], MeshNodeGPU[node_count], u32 roots[root_count], u8 indices[cluster_count * index_stride],
 //                  u8 vertex_data[vertex_data_size], Vec3 vertices[leaf_vertex_count], u32 indices[leaf_index_count]
 // Everything is ready to be uploaded. The vertex data are the headers of clusters followed by their interleaved, bit packed vertices (see mesh_clusters.h).
 // Meshes with clusters have no vertices and indices of their own (see parseMeshes), the CPU ones (`vertices` and `indices`) are the finest clusters.
@@ -654,12 +640,11 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 	u32 mesh_count;
 	file.read(mesh_count);
 	if (mesh_count > (u32)m_meshes.size()) return false;
-	if (mesh_count > 0 && version < FileVersion::CLUSTER_INTERLEAVED) {
+	if (mesh_count > 0 && version < FileVersion::CLUSTER_U8_INDICES) {
 		logError(m_path, ": clusters of an old version, the model has to be compiled again");
 		return false;
 	}
 
-	u32 total_clusters = 0;
 	for (u32 i = 0; i < mesh_count; ++i) {
 		Mesh& mesh = m_meshes[i];
 		u32 cluster_count, leaf_index_count, leaf_vertex_count, node_count, root_count, index_stride, vertex_data_size;
@@ -687,7 +672,7 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 
 		const u64 clusters_size = u64(cluster_count) * sizeof(MeshClusterGPU);
 		const u64 nodes_size = u64(node_count) * sizeof(MeshNodeGPU) + u64(root_count) * sizeof(u32);
-		const u64 indices_size = u64(cluster_count) * index_stride * sizeof(u16);
+		const u64 indices_size = u64(cluster_count) * index_stride * sizeof(u8);
 		const u64 vertices_size = u64(leaf_vertex_count) * sizeof(Vec3);
 		const u64 cpu_indices_size = u64(leaf_index_count) * sizeof(u32);
 		if (file.hasOverflow() || cluster_count == 0 || node_count == 0 || root_count == 0 || vertex_data_size > 0x7fffFFFF
@@ -710,20 +695,24 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 		mesh.cluster_index_stride = index_stride;
 		mesh.semantics_defines = m_renderer.getSemanticDefines(Span(mesh.attributes_semantic), mesh.vertex_decl, mesh.vb_stride);
 		const char* path = m_path.c_str();
-		mesh.cluster_buffer = m_renderer.createBuffer(m_renderer.copy(clusters, (u32)clusters_size), gpu::BufferFlags::IMMUTABLE, path);
-		mesh.node_buffer = m_renderer.createBuffer(m_renderer.copy(nodes, (u32)nodes_size), gpu::BufferFlags::IMMUTABLE, path);
-		// vertex shaders read the indices from this buffer as 32 bit words (see pullVertex in vertex_pulling.hlsli), the size is a multiple of 4
-		const u32 indices_padded_size = ((u32)indices_size + 3) & ~3u;
-		Renderer::MemRef indices_mem = m_renderer.allocate(indices_padded_size);
-		memcpy(indices_mem.data, indices, (size_t)indices_size);
-		memset((u8*)indices_mem.data + indices_size, 0, indices_padded_size - (size_t)indices_size);
-		mesh.cluster_index_buffer = m_renderer.createBuffer(indices_mem, gpu::BufferFlags::IMMUTABLE, path);
-		mesh.vertex_buffer_handle = m_renderer.createBuffer(m_renderer.copy(vertex_data, vertex_data_size), gpu::BufferFlags::IMMUTABLE, path);
-		if (!mesh.cluster_buffer || !mesh.cluster_index_buffer || !mesh.node_buffer || !mesh.vertex_buffer_handle) {
+		// clusters and nodes follow each other in the file (and in the pool), clusters are 16 byte multiples so that nodes are aligned
+		ASSERT((const u8*)clusters + clusters_size == nodes);
+		const bool tables_uploaded = clusters_size + nodes_size <= 0x7fffFFFF
+			&& m_renderer.allocClusterData(clusters, u32(clusters_size + nodes_size), mesh.cluster_table_offset);
+		if (tables_uploaded) {
+			mesh.cluster_table_size = u32(clusters_size + nodes_size);
+			mesh.node_table_offset = mesh.cluster_table_offset + (u32)clusters_size;
+		}
+		// vertex shaders read the indices (bytes) as 32 bit words (see pullVertex in vertex_pulling.hlsli), ranges of the pool are aligned and padded with zeros
+		const bool indices_uploaded = indices_size <= 0x7fffFFFF && m_renderer.allocClusterData(indices, (u32)indices_size, mesh.cluster_index_offset);
+		if (indices_uploaded) mesh.cluster_index_size = (u32)indices_size;
+		// the vertices are in the buffer shared by all meshes with clusters, mesh.vertex_buffer_handle stays invalid
+		const bool vertices_uploaded = m_renderer.allocClusterData(vertex_data, vertex_data_size, mesh.cluster_vertex_offset);
+		if (vertices_uploaded) mesh.cluster_vertex_size = vertex_data_size;
+		if (!tables_uploaded || !indices_uploaded || !vertices_uploaded) {
 			logError(m_path, ": failed to create cluster buffers");
 			return false;
 		}
-		total_clusters += cluster_count;
 	}
 
 	// Meshes of the first LOD have vertices only in clusters, so all of them must have clusters
@@ -732,7 +721,7 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 		return false;
 	}
 	for (const Mesh& mesh : m_meshes) {
-		if (mesh.indices_count == 0 || !mesh.vertex_buffer_handle) {
+		if (mesh.indices_count == 0 || (!mesh.vertex_buffer_handle && mesh.cluster_vertex_size == 0)) {
 			logError(m_path, ": has no geometry data");
 			return false;
 		}
@@ -740,7 +729,6 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 
 	if (mesh_count > 0) {
 		m_has_clusters = true;
-		logInfo(m_path, ": loaded ", total_clusters, " clusters");
 	}
 	return true;
 }
@@ -748,12 +736,16 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 void Model::destroyClusters() {
 	DrawStream& stream = m_renderer.getDrawStream();
 	for (Mesh& mesh : m_meshes) {
-		if (mesh.cluster_buffer) stream.destroy(mesh.cluster_buffer);
-		if (mesh.node_buffer) stream.destroy(mesh.node_buffer);
-		if (mesh.cluster_index_buffer) stream.destroy(mesh.cluster_index_buffer);
-		mesh.cluster_buffer = gpu::INVALID_BUFFER;
-		mesh.cluster_index_buffer = gpu::INVALID_BUFFER;
-		mesh.node_buffer = gpu::INVALID_BUFFER;
+		if (mesh.cluster_vertex_size) m_renderer.freeClusterData(mesh.cluster_vertex_offset, mesh.cluster_vertex_size);
+		if (mesh.cluster_table_size) m_renderer.freeClusterData(mesh.cluster_table_offset, mesh.cluster_table_size);
+		if (mesh.cluster_index_size) m_renderer.freeClusterData(mesh.cluster_index_offset, mesh.cluster_index_size);
+		mesh.cluster_vertex_offset = 0;
+		mesh.cluster_vertex_size = 0;
+		mesh.cluster_table_offset = 0;
+		mesh.node_table_offset = 0;
+		mesh.cluster_table_size = 0;
+		mesh.cluster_index_offset = 0;
+		mesh.cluster_index_size = 0;
 		mesh.cluster_count = 0;
 		mesh.cluster_index_stride = 0;
 		mesh.node_count = 0;
@@ -771,8 +763,6 @@ void Model::unload()
 		MeshMaterial& m = m_mesh_material[i];
 		removeDependency(*m.material);
 		m.material->decRefCount();
-		m_renderer.freeSortKey(m.sort_key);
-		m.sort_key = 0;
 		if (m.flags && MeshMaterial::OWN_MATERIAL_INDEX) {
 			m_renderer.destroyMaterialConstants(m.material_index);
 		}

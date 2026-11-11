@@ -6,6 +6,7 @@
 #include "engine/engine.h"
 #include "engine/resource_manager.h"
 #include "renderer/draw_stream.h"
+#include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
@@ -49,11 +50,16 @@ GPUScene::GPUScene(Renderer& renderer, IAllocator& allocator)
 	, m_pending(allocator)
 	, m_fresh(allocator)
 	, m_slot_model(allocator)
+	, m_slot_override(allocator)
+	, m_overrides(allocator)
+	, m_draw_groups(allocator)
+	, m_draw_group_map(allocator)
+	, m_variants(allocator)
+	, m_variant_map(allocator)
+	, m_pool_copies(allocator)
 	, m_models(allocator)
 	, m_mesh_table(allocator)
 	, m_model_table(allocator)
-	, m_mesh_models(allocator)
-	, m_mesh_indices(allocator)
 	, m_groups(allocator)
 	, m_free_groups(allocator)
 	, m_group_table(allocator)
@@ -63,6 +69,7 @@ GPUScene::GPUScene(Renderer& renderer, IAllocator& allocator)
 	m_capacity = GPUSceneConst::INITIAL_CAPACITY;
 	ResourceManagerHub& rm = renderer.getEngine().getResourceManager();
 	m_shader = rm.load<Shader>(Path("engine/shaders/gpu_scene.hlsl"));
+	m_skinned_define_idx = (u32)renderer.getShaderDefineIdx("SKINNED");
 }
 
 GPUScene::~GPUScene() {
@@ -71,6 +78,9 @@ GPUScene::~GPUScene() {
 	if (m_mesh_buffer) m_renderer.getEndFrameDrawStream().destroy(m_mesh_buffer);
 	if (m_model_buffer) m_renderer.getEndFrameDrawStream().destroy(m_model_buffer);
 	if (m_group_buffer) m_renderer.getEndFrameDrawStream().destroy(m_group_buffer);
+	if (m_override_buffer) m_renderer.getEndFrameDrawStream().destroy(m_override_buffer);
+	if (m_variant_buffer) m_renderer.getEndFrameDrawStream().destroy(m_variant_buffer);
+	for (u32 i = 0; i < (u32)m_models.size(); ++i) freePools(i);
 	m_shader->decRefCount();
 }
 
@@ -112,6 +122,7 @@ void GPUScene::releaseModel(u32 model_id) {
 	if (model_id == GPUSceneConst::INVALID_MODEL) return;
 	ASSERT(m_models[model_id].instance_count > 0);
 	if (--m_models[model_id].instance_count == 0) {
+		freePools(model_id);
 		m_models[model_id].model = nullptr;
 		m_tables_dirty = true;
 	}
@@ -131,6 +142,8 @@ u32 GPUScene::alloc(const Model* model) {
 		m_pending.resize(m_next_slot);
 		m_fresh.resize(m_next_slot);
 		m_slot_model.resize(m_next_slot);
+		m_slot_override.resize(m_next_slot);
+		m_slot_override[slot] = 0;
 		m_pending[slot] = GPUSceneConst::INVALID_SLOT;
 	}
 	m_slot_model[slot] = model_id;
@@ -148,8 +161,31 @@ GPUScene::Entry& GPUScene::entryFor(u32 slot) {
 	return e;
 }
 
+void GPUScene::setOverrides(u32 slot, Span<const Override> overrides) {
+	ASSERT(slot < m_next_slot);
+	u32 first = 0, last = (u32)m_overrides.size();
+	while (first < last) {	// the first entry of the slot
+		const u32 middle = (first + last) / 2;
+		if (m_overrides[middle].slot < slot) first = middle + 1;
+		else last = middle;
+	}
+	u32 end = first;
+	while (end < (u32)m_overrides.size() && m_overrides[end].slot == slot) ++end;
+	if (end == first && overrides.length() == 0) return;
+
+	if (end > first) m_overrides.eraseRange(first, end - first);	// eraseRange does not take an empty range
+	for (u32 i = 0; i < overrides.length(); ++i) {
+		Override o = overrides[i];
+		o.slot = slot;
+		m_overrides.insert(first + i, o);
+	}
+	m_slot_override[slot] = overrides.length() > 0 ? 1 : 0;
+	m_overrides_dirty = true;
+}
+
 void GPUScene::free(u32 slot) {
 	ASSERT(slot < m_next_slot);
+	setOverrides(slot, Span<const Override>());
 	Entry& e = entryFor(slot);
 	memset(&e.bounds, 0, sizeof(e.bounds));
 	memset(&e.instance, 0, sizeof(e.instance));
@@ -226,7 +262,7 @@ void GPUScene::ensureTableBuffer(gpu::BufferHandle& buffer, u32& capacity, u32 n
 	buffer = m_renderer.createBuffer(Renderer::MemRef{ capacity * entry_size, nullptr, false }, gpu::BufferFlags::SHADER_BUFFER, name);
 }
 
-void GPUScene::update(u32 slot, const Transform& tr, float radius) {
+void GPUScene::update(u32 slot, const Transform& tr, float radius, i32 forced_lod) {
 	Entry& e = entryFor(slot);
 	// a slot that was freed and allocated again has no previous state either, it is fresh
 	e.flags = Entry::HAS_NEW | (m_fresh[slot] ? Entry::TELEPORT : 0);
@@ -245,36 +281,238 @@ void GPUScene::update(u32 slot, const Transform& tr, float radius) {
 	i.p[2] = e.bounds.p[2];
 	i.mesh_id = m_slot_model[slot];
 	i.scale = tr.scale;
+	if (forced_lod >= 0) i.flags = GPUSceneInstance::FORCED_LOD | (u32(minimum(forced_lod, 4)) << 1);
+	if (m_slot_override[slot]) i.flags |= GPUSceneInstance::HAS_OVERRIDE;
+}
+
+static u64 hashDrawGroup(const GPUScene::DrawGroup& k) {
+	u64 h = 1469598103934665603ull;
+	auto mix = [&](u64 v) { h ^= v; h *= 1099511628211ull; };
+	mix((u64)(uintptr)k.shader);
+	mix(k.define_mask);
+	mix((u64)k.state);
+	mix((u64)k.primitive_type);
+	mix(k.layer);
+	mix(k.plain);
+	mix((u64)k.index_type);
+	for (const char* c = k.semantics_defines; c && *c; ++c) mix((u8)*c);
+	return h;
+}
+
+static bool isSameDrawGroup(const GPUScene::DrawGroup& a, const GPUScene::DrawGroup& b) {
+	return a.shader == b.shader && a.define_mask == b.define_mask && a.state == b.state && a.primitive_type == b.primitive_type && a.layer == b.layer && a.plain == b.plain
+		&& a.index_type == b.index_type && equalStrings(a.semantics_defines, b.semantics_defines);
+}
+
+u32 GPUScene::findOrAddDrawGroup(const DrawGroup& key) {
+	const u64 hash = hashDrawGroup(key);
+	const auto found = m_draw_group_map.find(hash);
+	if (found.isValid()) {
+		if (isSameDrawGroup(m_draw_groups[found.value()], key)) return found.value();
+		// two different groups with the same hash
+		for (u32 i = 0; i < (u32)m_draw_groups.size(); ++i) {
+			if (isSameDrawGroup(m_draw_groups[i], key)) return i;
+		}
+	}
+	if (m_draw_groups.size() >= (i32)GPUSceneConst::MAX_DRAW_GROUPS) {
+		static bool reported = false;
+		if (!reported) logError("GPU scene: more than ", GPUSceneConst::MAX_DRAW_GROUPS, " different programs of meshes, the meshes of the other ones are not drawn");
+		reported = true;
+		return GPUSceneConst::INVALID_VARIANT;
+	}
+	const u32 index = m_draw_groups.size();
+	m_draw_groups.push(key);
+	m_draw_groups.back().variant_count = 0;
+	if (!found.isValid()) m_draw_group_map.insert(hash, index);
+	return index;
+}
+
+// The variant (what one command of an indirect draw draws) of a mesh of a model with a material, it is made if it does not exist.
+u32 GPUScene::variantFor(u32 model_id, const Model& model, u32 mesh_idx, const Material* material) {
+	if (!material || !material->isReady() || !material->getShader()) return GPUSceneConst::INVALID_VARIANT;
+	if (mesh_idx >= (u32)model.getMeshCount()) return GPUSceneConst::INVALID_VARIANT;
+	const Mesh& mesh = model.getMesh(mesh_idx);
+	const bool plain = !model.hasClusters();
+	const MeshPool* pool = nullptr;
+	if (plain) {
+		const ModelEntry& entry = m_models[model_id];
+		if (!entry.pools || mesh_idx >= entry.pool_count) return GPUSceneConst::INVALID_VARIANT;
+		pool = &entry.pools[mesh_idx];
+	}
+	else if ((i32)mesh_idx > model.getClusterMeshesEnd()) {
+		return GPUSceneConst::INVALID_VARIANT;
+	}
+
+	DrawGroup key;
+	key.shader = material->getShader();
+	key.define_mask = material->getDefineMask();
+	if (plain && mesh.type == Mesh::SKINNED) key.define_mask |= 1 << m_skinned_define_idx;
+	key.state = material->m_render_states;
+	key.primitive_type = mesh.primitive_type;
+	key.semantics_defines = mesh.semantics_defines;
+	key.layer = (u8)material->getLayer();
+	key.plain = plain;
+	key.index_type = plain ? mesh.index_type : gpu::DataType::U16;
+	key.variant_count = 0;
+	const u32 group = findOrAddDrawGroup(key);
+	if (group == GPUSceneConst::INVALID_VARIANT) return GPUSceneConst::INVALID_VARIANT;
+
+	const Mesh* mesh_key = plain ? &mesh : nullptr;
+	u64 hash = 1469598103934665603ull;
+	hash = (hash ^ group) * 1099511628211ull;
+	hash = (hash ^ (u64)(uintptr)mesh_key) * 1099511628211ull;
+	const u32 index_count = plain ? (u32)mesh.indices_count : (u32)mesh.cluster_index_stride;
+	const auto found = m_variant_map.find(hash);
+	if (found.isValid()) {
+		Variant& v = m_variants[found.value()];
+		if (v.group == group && v.mesh == mesh_key) {
+			// meshes with clusters share a variant, its draw is as long as the longest of them
+			if (index_count > v.index_count) {
+				v.index_count = index_count;
+				m_variants_dirty = true;
+			}
+			return found.value();
+		}
+		// two different variants with the same hash
+		for (u32 i = 0; i < (u32)m_variants.size(); ++i) {
+			if (m_variants[i].group == group && m_variants[i].mesh == mesh_key) return i;
+		}
+	}
+	if (m_variants.size() >= (i32)GPUSceneConst::MAX_VARIANTS) {
+		static bool reported = false;
+		if (!reported) logError("GPU scene: more than ", GPUSceneConst::MAX_VARIANTS, " different meshes with materials, the other ones are not drawn");
+		reported = true;
+		return GPUSceneConst::INVALID_VARIANT;
+	}
+	Variant v;
+	v.group = group;
+	v.index_in_group = m_draw_groups[group].variant_count++;
+	v.mesh = mesh_key;
+	v.first_index = plain ? pool->index_offset / (mesh.areIndices16() ? 2 : 4) : 0;
+	v.base_vertex = plain ? pool->vertex_offset / mesh.vb_stride : 0;
+	v.index_count = index_count;
+	const u32 index = m_variants.size();
+	m_variants.push(v);
+	if (!found.isValid()) m_variant_map.insert(hash, index);
+	m_variants_dirty = true;
+	return index;
+}
+
+bool GPUScene::allocPools(u32 model_id, const Model& model) {
+	ModelEntry& entry = m_models[model_id];
+	if (entry.pools) return true;
+	const u32 count = (u32)model.getMeshCount();
+	if (count == 0) return false;
+	MeshPool* pools = (MeshPool*)m_allocator.allocate(sizeof(MeshPool) * count, alignof(MeshPool));
+	u32 done = 0;
+	bool ok = true;
+	for (u32 i = 0; i < count && ok; ++i) {
+		const Mesh& mesh = model.getMesh(i);
+		MeshPool& p = pools[i];
+		memset(&p, 0, sizeof(p));
+		p.vertex_size = mesh.vertices.size() * mesh.vb_stride;
+		p.index_size = (u32)mesh.indices.size();
+		// vertices are addressed by the base vertex of a command, so they start at a multiple of their size
+		if (!m_renderer.allocClusterRange(p.vertex_size, mesh.vb_stride, p.vertex_offset)) {
+			ok = false;
+		}
+		else if (!m_renderer.allocClusterRange(p.index_size, 4, p.index_offset)) {
+			m_renderer.freeClusterData(p.vertex_offset, p.vertex_size);
+			ok = false;
+		}
+		else {
+			++done;
+		}
+	}
+	if (!ok) {
+		for (u32 i = 0; i < done; ++i) {
+			m_renderer.freeClusterData(pools[i].vertex_offset, pools[i].vertex_size);
+			m_renderer.freeClusterData(pools[i].index_offset, pools[i].index_size);
+		}
+		m_allocator.deallocate(pools);
+		logError("GPU scene: no space for the meshes of ", model.getPath(), ", it is not drawn");
+		return false;
+	}
+	entry.pools = pools;
+	entry.pool_count = count;
+	for (u32 i = 0; i < count; ++i) {
+		const Mesh& mesh = model.getMesh(i);
+		PoolCopy vertex_copy = { mesh.vertex_buffer_handle, pools[i].vertex_offset, pools[i].vertex_size };
+		PoolCopy index_copy = { mesh.index_buffer_handle, pools[i].index_offset, pools[i].index_size };
+		m_pool_copies.push(vertex_copy);
+		m_pool_copies.push(index_copy);
+	}
+	return true;
+}
+
+void GPUScene::freePools(u32 model_id) {
+	ModelEntry& entry = m_models[model_id];
+	if (!entry.pools) return;
+	for (u32 i = 0; i < entry.pool_count; ++i) {
+		m_renderer.freeClusterData(entry.pools[i].vertex_offset, entry.pools[i].vertex_size);
+		m_renderer.freeClusterData(entry.pools[i].index_offset, entry.pools[i].index_size);
+	}
+	m_allocator.deallocate(entry.pools);
+	entry.pools = nullptr;
+	entry.pool_count = 0;
 }
 
 void GPUScene::rebuildModelTables() {
+	++m_mesh_table_version;
+	// the draw groups and variants are made again for the new tables, so is what refers to them
+	m_draw_groups.clear();
+	m_draw_group_map.clear();
+	m_variants.clear();
+	m_variant_map.clear();
+	m_variants_dirty = true;
+	m_overrides_dirty = true;
 	m_mesh_table.clear();
-	m_mesh_models.clear();
-	m_mesh_indices.clear();
 	m_max_tree_depth = 0;
 	m_model_table.resize(m_models.size());
 	for (u32 id = 0, c = m_models.size(); id < c; ++id) {
 		GPUSceneModel& entry = m_model_table[id];
+		memset(&entry, 0, sizeof(entry));
 		entry.first_mesh = m_mesh_table.size();
-		entry.mesh_count = 0;
 		const Model* model = m_models[id].model;
-		if (!model || !model->isReady() || !model->hasClusters()) continue;
+		if (!model || !model->isReady()) continue;
+		if (!model->hasClusters()) {
+			if (!model->canUseGPUScene() || !allocPools(id, *model)) continue;
+			// all the meshes of all the LODs, drawn one by one
+			entry.flags = GPUSceneModel::PLAIN;
+			const LODMeshIndices* lods = model->getLODIndices();
+			auto pack = [&](u32 l) { return lods[l].to >= lods[l].from && lods[l].from >= 0 ? u32(lods[l].from) | (u32(lods[l].to + 1) << 16) : 0u; };
+			for (u32 l = 0; l < 4; ++l) {
+				entry.lod[l] = pack(l);
+				entry.lod_distance[l] = model->getLODDistances()[l];
+			}
+			entry.lod4 = pack(4);
+			for (i32 i = 0, count = model->getMeshCount(); i < count; ++i) {
+				GPUSceneMesh& m = m_mesh_table.emplace();
+				memset(&m, 0, sizeof(m));
+				m.index_in_model = (u32)i;
+				const MeshMaterial& mesh_mat = model->getMeshMaterial(i);
+				m.material = (u32)mesh_mat.material_index;
+				m.variant = variantFor(id, *model, i, mesh_mat.material);
+				++entry.mesh_count;
+			}
+			continue;
+		}
 
+		// a model that is not complete has no meshes in the table rather than some
 		const i32 end = model->getClusterMeshesEnd();
+		bool complete = true;
 		for (i32 i = 0; i <= end; ++i) {
 			const Mesh& mesh = model->getMesh(i);
-			if (!mesh.cluster_buffer || !mesh.node_buffer || mesh.cluster_count == 0) {
-				// the model is not complete, it has no meshes in the table rather than some
-				m_mesh_table.resize(entry.first_mesh);
-				m_mesh_models.resize(entry.first_mesh);
-				m_mesh_indices.resize(entry.first_mesh);
-				entry.mesh_count = 0;
-				break;
-			}
+			complete = complete && mesh.cluster_table_size != 0 && mesh.cluster_count != 0 && mesh.cluster_vertex_size != 0 && mesh.cluster_index_size != 0;
+		}
+		if (!complete) continue;
+
+		for (i32 i = 0; i <= end; ++i) {
+			const Mesh& mesh = model->getMesh(i);
 			GPUSceneMesh& m = m_mesh_table.emplace();
 			memset(&m, 0, sizeof(m));
-			m.clusters = gpu::getBindlessHandle(mesh.cluster_buffer).value;
-			m.nodes = gpu::getBindlessHandle(mesh.node_buffer).value;
+			m.clusters = mesh.cluster_table_offset;
+			m.nodes = mesh.node_table_offset;
 			m.cluster_count = mesh.cluster_count;
 			m.node_count = mesh.node_count;
 			m.root_count = mesh.root_count;
@@ -283,10 +521,12 @@ void GPUScene::rebuildModelTables() {
 			m.index_stride = mesh.cluster_index_stride;
 			m.leaf_cluster_count = mesh.leaf_cluster_count;
 			m.flat_groups = (mesh.cluster_count + GPUSceneConst::CLUSTER_THREADS - 1) / GPUSceneConst::CLUSTER_THREADS;
-			m.vertices = gpu::getBindlessHandle(mesh.vertex_buffer_handle).value;
-			m.indices = gpu::getBindlessHandle(mesh.cluster_index_buffer).value;
-			m_mesh_models.push(model);
-			m_mesh_indices.push((u32)i);
+			m.vertex_offset = mesh.cluster_vertex_offset;
+			m.indices = mesh.cluster_index_offset;
+			m.index_in_model = (u32)i;
+			const MeshMaterial& mesh_mat = model->getMeshMaterial(i);
+			m.material = (u32)mesh_mat.material_index;
+			m.variant = variantFor(id, *model, i, mesh_mat.material);
 			if (mesh.cluster_count <= GPUSceneConst::FLAT_MAX_CLUSTERS) m.flags |= GPUSceneMesh::FLAT;
 			m_max_tree_depth = maximum(m_max_tree_depth, mesh.tree_depth);
 			++entry.mesh_count;
@@ -309,8 +549,15 @@ void GPUScene::flush() {
 		m_frame = frame;
 	}
 
+	// a material that was unloaded (reloaded) can have a different program now
+	const u32 reload_counter = m_renderer.getMaterialReloadCounter();
+	if (reload_counter != m_registry_reload_counter) {
+		m_registry_reload_counter = reload_counter;
+		m_tables_dirty = true;
+	}
+
 	const bool grown = m_gpu_capacity != m_capacity;
-	if (m_entries.empty() && !grown && !m_tables_dirty && !m_groups_dirty) return;
+	if (m_entries.empty() && !grown && !m_tables_dirty && !m_groups_dirty && !m_overrides_dirty && !m_variants_dirty && m_pool_copies.empty()) return;
 	PROFILE_FUNCTION();
 
 	// the tables of the static data of models
@@ -356,6 +603,66 @@ void GPUScene::flush() {
 		}
 	}
 	const gpu::BufferHandle group_buffer = m_group_buffer;
+
+	// the table of material overrides
+	TransientSlice override_slice = {};
+	u32 override_bytes = 0;
+	if (m_overrides_dirty) {
+		m_overrides_dirty = false;
+		// their variants, the model of a slot has its pools and the mesh table was made
+		for (Override& o : m_overrides) {
+			o.variant = GPUSceneConst::INVALID_VARIANT;
+			const u32 model_id = m_slot_model[o.slot];
+			if (model_id == GPUSceneConst::INVALID_MODEL || !m_models[model_id].model || !m_models[model_id].model->isReady()) continue;
+			o.variant = variantFor(model_id, *m_models[model_id].model, o.mesh, o.material);
+		}
+		ensureTableBuffer(m_override_buffer, m_override_capacity, maximum(m_overrides.size(), 1u), 16, "gpu scene overrides");
+		override_bytes = m_overrides.size() * 16;
+		if (override_bytes) {
+			override_slice = Lumix::alloc(m_renderer.getTransientPool(), override_bytes);
+			u32* out = (u32*)override_slice.ptr;
+			for (const Override& o : m_overrides) {
+				out[0] = o.slot;
+				out[1] = o.mesh;
+				out[2] = o.material_index;
+				out[3] = o.variant;
+				out += 4;
+			}
+		}
+	}
+	const gpu::BufferHandle override_buffer = m_override_buffer;
+
+	// the table of variants, after everything that makes variants
+	TransientSlice variant_slice = {};
+	u32 variant_bytes = 0;
+	if (m_variants_dirty) {
+		m_variants_dirty = false;
+		ensureTableBuffer(m_variant_buffer, m_variant_capacity, maximum(m_variants.size(), 1u), 16, "gpu scene variants");
+		variant_bytes = m_variants.size() * 16;
+		if (variant_bytes) {
+			variant_slice = Lumix::alloc(m_renderer.getTransientPool(), variant_bytes);
+			u32* out = (u32*)variant_slice.ptr;
+			for (const Variant& v : m_variants) {
+				out[0] = v.group | (v.index_in_group << 16);
+				out[1] = v.first_index;
+				out[2] = v.base_vertex;
+				out[3] = v.index_count;
+				out += 4;
+			}
+		}
+	}
+	const gpu::BufferHandle variant_buffer = m_variant_buffer;
+
+	// the copies of the vertices and indices of the meshes to the ranges of the buffer of cluster data
+	TransientSlice pool_copy_slice = {};
+	const u32 pool_copy_count = m_pool_copies.size();
+	if (pool_copy_count) {
+		pool_copy_slice = Lumix::alloc(m_renderer.getTransientPool(), pool_copy_count * sizeof(PoolCopy));
+		memcpy(pool_copy_slice.ptr, m_pool_copies.begin(), pool_copy_count * sizeof(PoolCopy));
+		m_pool_copies.clear();
+	}
+	const gpu::BufferHandle pool_buffer = m_renderer.getClusterDataBuffer();
+	const PoolCopy* pool_copies = (const PoolCopy*)pool_copy_slice.ptr;
 
 	for (const Entry& e : m_entries) {
 		if ((e.flags & Entry::HAS_NEW) && !(e.flags & Entry::TELEPORT)) m_moved_now.push(e.slot);
@@ -412,6 +719,17 @@ void GPUScene::flush() {
 		if (group_bytes) {
 			stream.barrier(group_slice.buffer, gpu::BarrierType::READ);
 			stream.copy(group_buffer, group_slice.buffer, 0, group_slice.offset, group_bytes);
+		}
+		if (override_bytes) {
+			stream.barrier(override_slice.buffer, gpu::BarrierType::READ);
+			stream.copy(override_buffer, override_slice.buffer, 0, override_slice.offset, override_bytes);
+		}
+		if (variant_bytes) {
+			stream.barrier(variant_slice.buffer, gpu::BarrierType::READ);
+			stream.copy(variant_buffer, variant_slice.buffer, 0, variant_slice.offset, variant_bytes);
+		}
+		for (u32 i = 0; i < pool_copy_count; ++i) {
+			stream.copy(pool_buffer, pool_copies[i].src, pool_copies[i].dst_offset, 0, pool_copies[i].size);
 		}
 		if (count == 0) return;
 

@@ -54,7 +54,7 @@ namespace UniformBuffer {
 
 // Binds buffers that vertex shaders pull their data from, see vertex_pulling.hlsli.
 // `vertices` are vertices of a mesh, `instances` are optional instance data from the offset in bytes.
-LUMIX_RENDERER_API void bindPulledBuffers(struct DrawStream& stream, struct UniformPool& pool, gpu::BufferHandle vertices, gpu::BufferHandle instances = gpu::INVALID_BUFFER, u32 instances_offset = 0);
+LUMIX_RENDERER_API void bindPulledBuffers(struct DrawStream& stream, struct UniformPool& pool, gpu::BufferHandle vertices, gpu::BufferHandle instances = gpu::INVALID_BUFFER, u32 instances_offset = 0, gpu::BufferHandle bones = gpu::INVALID_BUFFER);
 
 struct BucketDesc {
 	enum Sort {
@@ -196,8 +196,6 @@ struct LUMIX_RENDERER_API Pipeline {
 
 	DebugShow m_debug_show = DebugShow::NONE;
 	struct RenderPlugin* m_debug_show_plugin = nullptr;
-	// culls clusters that face away from the camera (their normal cones, nanite.hlsl), for measuring, can be changed at run time
-	bool m_cluster_backface_culling = true;
 	// the largest error of a cluster on the screen, in pixels. Smaller values switch to coarser clusters later, can be changed at run time
 	float m_cluster_error_pixels = 1.f;
 	// how much the error of attributes (normals and UVs that simplified triangles took from other places) counts next to the error of positions,

@@ -3373,7 +3373,7 @@ RWBindlessHandle getRWBindlessHandle(BufferHandle buffer) {
 	return RWBindlessHandle(buffer->heap_id + 1);
 }
 
-void drawIndirect(DataType index_type, u32 indirect_buffer_offset) {
+void drawIndirect(DataType index_type, u32 indirect_buffer_offset, u32 count) {
 	CHECK(d3d->current_program);
 	if (!d3d->current_indirect_buffer || !d3d->current_indirect_buffer->resource) {
 		logError("Indirect draw without an indirect buffer");
@@ -3418,7 +3418,7 @@ void drawIndirect(DataType index_type, u32 indirect_buffer_offset) {
 		return result;
 	}();
 
-	d3d->cmd_list->ExecuteIndirect(signature, 1, d3d->current_indirect_buffer->resource, indirect_buffer_offset, nullptr, 0);
+	d3d->cmd_list->ExecuteIndirect(signature, count, d3d->current_indirect_buffer->resource, indirect_buffer_offset, nullptr, 0);
 }
 
 void draw(const Drawcall& draw) {

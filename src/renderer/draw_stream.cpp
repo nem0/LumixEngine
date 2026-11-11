@@ -146,6 +146,7 @@ struct BufferBarrierData {
 struct DrawIndirectData {
 	gpu::DataType index_type;
 	u32 indirect_buffer_offset;
+	u32 count;
 };
 
 struct ReadTextureData {
@@ -532,9 +533,9 @@ void DrawStream::bindIndirectBuffer(gpu::BufferHandle buffer) {
 }
 
 
-void DrawStream::drawIndirect(gpu::DataType index_type, u32 indirect_buffer_offset) {
+void DrawStream::drawIndirect(gpu::DataType index_type, u32 indirect_buffer_offset, u32 count) {
 	submitCached();
-	DrawIndirectData data = { index_type, indirect_buffer_offset };
+	DrawIndirectData data = { index_type, indirect_buffer_offset, count };
 	write(Instruction::DRAW_INDIRECT, data);
 }
 
@@ -715,7 +716,7 @@ void DrawStream::run() {
 				}
 				case Instruction::DRAW_INDIRECT: {
 					READ(DrawIndirectData, data);
-					gpu::drawIndirect(data.index_type, data.indirect_buffer_offset);
+					gpu::drawIndirect(data.index_type, data.indirect_buffer_offset, data.count);
 					break;
 				}
 				case Instruction::MEMORY_BARRIER: {

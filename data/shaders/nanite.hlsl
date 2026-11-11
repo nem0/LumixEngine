@@ -13,7 +13,7 @@
 // children to the next level. The nodes of a level are in a list in `u_scratch`, there are two lists per group, which are swapped, and there are
 // never more nodes in a list than nodes in the mesh. The lists of a group are taken from the scratch buffer with a counter.
 //
-// The clusters that are selected are appended to a list (u_selected), gpu_scene_bins.hlsl sorts them into draws.
+// The clusters that are selected are appended to a list (u_selected), gpu_scene_variants.hlsl sorts them into draws.
 
 cbuffer UniformData : register(b4) {
 	float4 u_planes[6];
@@ -31,13 +31,12 @@ cbuffer UniformData : register(b4) {
 	uint u_selected;		// rw bindless: [0] selected clusters, [4] scratch u32 allocated, from 16 entries of 16 bytes (instance, mesh, cluster, group)
 	uint u_counts;			// bindless, counters of the culling of instances: [4] flat items, [8] tree items
 	int3 u_cam_p;			// the camera in the fixed point of the GPU scene, the positions of instances are relative to it
-	uint u_scene_flags;		// bit 0: cull clusters that face away
+	uint u_padding;
 	float3 u_cam_frac;		// -camera_offset of the instances
 	uint u_meshes;			// bindless, GPUSceneMesh[], 64 bytes
 	uint u_scene_instances;	// bindless, the instances of the GPU scene, 96 bytes
-	uint u_mesh_view;		// bindless, bin and material index of each mesh of the mesh table, the bit 31 of the material is set if the clusters of the mesh are culled by cones
-	uint u_mesh_view_offset;	// bytes
 	uint u_groups;			// bindless, GPUSceneGroup[] of the instanced models
+	uint u_cluster_data;	// bindless, the buffer with the clusters and nodes of all meshes, see MeshDesc
 };
 
 // threads of a group, GPUSceneConst::CLUSTER_THREADS
@@ -48,13 +47,12 @@ cbuffer UniformData : register(b4) {
 
 struct MeshDesc {
 	float4 camera_offset;		// -cam_frac
-	uint clusters;				// bindless, MeshClusterGPU[]
-	uint nodes;					// bindless, MeshNodeGPU[node_count], then the indices of root_count roots
+	uint clusters;				// byte offset in u_cluster_data of MeshClusterGPU[]
+	uint nodes;					// byte offset in u_cluster_data of MeshNodeGPU[node_count], then the indices of root_count roots
 	uint node_count;
 	uint root_count;
 	uint roots_offset;			// byte offset of the roots in nodes
 	uint cluster_count;
-	uint cone_culling;			// cull back facing clusters, set only for perspective views of materials that cull back faces
 	uint mesh_index;			// in the mesh table
 };
 
@@ -67,9 +65,6 @@ MeshDesc loadSceneDesc(uint mesh) {
 	r.camera_offset = float4(-u_cam_frac, 1);
 	r.clusters = a.x; r.nodes = a.y; r.cluster_count = a.z; r.node_count = a.w;
 	r.root_count = b.x; r.roots_offset = b.y;
-	// cones are culled if the view does (bit 0 of the flags) and the draw of the mesh culls back faces (the bit 31 of its material in the table of the bins)
-	r.cone_culling = 0;
-	if (u_scene_flags & 1) r.cone_culling = bindless_buffers[u_mesh_view].Load(u_mesh_view_offset + mesh * 8 + 4) >> 31;
 	r.mesh_index = mesh;
 	return r;
 }
@@ -122,13 +117,13 @@ bool insideFrustum(float3 center, float radius) {
 
 // Tests a cluster and appends it to the list of selected clusters if it is selected.
 void processCluster(MeshDesc desc, Instance instance, float max_scale, uint instance_idx, uint cluster, uint group_ref) {
-	ByteAddressBuffer clusters = bindless_buffers[desc.clusters];
-	uint offset = cluster * 96;
+	ByteAddressBuffer clusters = bindless_buffers[u_cluster_data];
+	uint offset = desc.clusters + cluster * 80;
 	float4 bounds = asfloat(clusters.Load4(offset));
 	float4 lod_bounds = asfloat(clusters.Load4(offset + 16));
 	float4 parent_bounds = asfloat(clusters.Load4(offset + 32));
 	uint4 misc = clusters.Load4(offset + 48);
-	const float2 attribute_errors = asfloat(clusters.Load2(offset + 80)); // of the cluster and of its parent
+	const float2 attribute_errors = asfloat(clusters.Load2(offset + 64)); // of the cluster and of its parent
 	// the error of a cluster is the one of its positions and the one of its attributes, which counts as much as the weight says
 	float error = (asfloat(misc.x) + u_attribute_weight * attribute_errors.x) * max_scale;
 	// clusters without a parent have FLT_MAX error
@@ -148,15 +143,6 @@ void processCluster(MeshDesc desc, Instance instance, float max_scale, uint inst
 	float radius = bounds.w * max_scale;
 	if (!insideFrustum(center, radius)) return;
 
-	// back facing clusters: all triangles face away from the camera. Positions are relative to the camera. The cone is rotated like
-	// a normal, so it is only right for uniform positive scale, other instances are not culled.
-	float4 cone = asfloat(clusters.Load4(offset + 64)); // xyz: axis, w: cutoff
-	float min_scale = min(instance.scale.x, min(instance.scale.y, instance.scale.z));
-	[branch] if (desc.cone_culling && cone.w < 1.0 && min_scale > 0 && max_scale - min_scale < max_scale * 0.001) {
-		float3 axis = rotateByQuat(instance.rot, cone.xyz);
-		if (dot(center, axis) >= cone.w * length(center) + radius) return;
-	}
-
 	RWByteAddressBuffer selected = bindless_rw_buffers[u_selected];
 	uint at;
 	selected.InterlockedAdd(0, 1, at);
@@ -167,7 +153,6 @@ void processCluster(MeshDesc desc, Instance instance, float max_scale, uint inst
 bool isNodeNeeded(float4 bounds, float4 lod_bounds, float min_error, float max_parent_error, float min_attribute_error, float max_parent_attribute_error, Instance instance, float max_scale) {
 	const float3 cull_pos = instance.pos + u_cull_offset.xyz;
 	float3 center = cull_pos + rotateByQuat(instance.rot, bounds.xyz * instance.scale);
-	if (!insideFrustum(center, bounds.w * max_scale)) return false;
 
 	// The distance of a cluster is measured from the sphere of its lod bounds (or the one of its parent), which is inside the lod sphere of the node:
 	// it is not nearer than the nearest point of the node sphere and not farther than the farthest one.
@@ -176,11 +161,12 @@ bool isNodeNeeded(float4 bounds, float4 lod_bounds, float min_error, float max_p
 	float to_center = length(lod_center);
 	float near_dist = u_is_ortho ? 1 : max(to_center - lod_radius, 1e-4);
 	float far_dist = u_is_ortho ? 1 : to_center + lod_radius;
+	bool needed = insideFrustum(center, bounds.w * max_scale);
 	// none of the clusters is accurate enough (the smallest error of positions and the smallest of attributes are not of the same cluster, the sum is a lower bound)
-	if ((min_error + u_attribute_weight * min_attribute_error) * max_scale > u_lod_k * far_dist) return false;
+	if ((min_error + u_attribute_weight * min_attribute_error) * max_scale > u_lod_k * far_dist) needed = false;
 	// the parents of all the clusters are accurate enough, they are drawn instead (clusters without a parent have FLT_MAX); the sum of the largest ones is an upper bound
-	if (max_parent_error < 1e30 && (max_parent_error + u_attribute_weight * max_parent_attribute_error) * max_scale <= u_lod_k * near_dist) return false;
-	return true;
+	if (max_parent_error < 1e30 && (max_parent_error + u_attribute_weight * max_parent_attribute_error) * max_scale <= u_lod_k * near_dist) needed = false;
+	return needed;
 }
 
 groupshared uint g_current_count;
@@ -209,7 +195,7 @@ void main(uint3 group_id : SV_GroupID, uint3 group_thread_id : SV_GroupThreadID)
 		const uint cluster = item.z + group_thread_id.x;
 		if (cluster < desc.cluster_count) processCluster(desc, instance, max_scale, instance_idx, cluster, item.w);
 	#else
-		ByteAddressBuffer nodes = bindless_buffers[desc.nodes];
+		ByteAddressBuffer nodes = bindless_buffers[u_cluster_data];
 		RWByteAddressBuffer scratch = bindless_rw_buffers[u_scratch];
 
 		// the lists of nodes of the group are allocated from the scratch buffer
@@ -225,7 +211,7 @@ void main(uint3 group_id : SV_GroupID, uint3 group_thread_id : SV_GroupThreadID)
 
 		// the roots are the first nodes to visit
 		for (uint r = group_thread_id.x; r < desc.root_count; r += GROUP_SIZE) {
-			scratch.Store(scratch_base + r * 4, nodes.Load(desc.roots_offset + r * 4));
+			scratch.Store(scratch_base + r * 4, nodes.Load(desc.nodes + desc.roots_offset + r * 4));
 		}
 		if (group_thread_id.x == 0) {
 			g_current_count = desc.root_count;
@@ -244,7 +230,7 @@ void main(uint3 group_id : SV_GroupID, uint3 group_thread_id : SV_GroupThreadID)
 
 			for (uint i = group_thread_id.x; i < count; i += GROUP_SIZE) {
 				const uint node_id = scratch.Load(from + i * 4);
-				const uint node_offset = node_id * 64;
+				const uint node_offset = desc.nodes + node_id * 64;
 				const float4 bounds = asfloat(nodes.Load4(node_offset));
 				const float4 lod_bounds = asfloat(nodes.Load4(node_offset + 16));
 				const uint4 misc = nodes.Load4(node_offset + 32); // min error, max parent error, first, count and flags

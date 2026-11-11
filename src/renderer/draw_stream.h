@@ -47,7 +47,7 @@ struct DrawStream {
 	
 	gpu::Drawcall& draw();
 	void drawArrays(u32 offset, u32 count);
-	void drawIndirect(gpu::DataType index_type, u32 indirect_buffer_offset);
+	void drawIndirect(gpu::DataType index_type, u32 indirect_buffer_offset, u32 count = 1);
 	void drawIndexed(u32 offset, u32 count, gpu::DataType type);
 	void drawArraysInstanced(u32 indices_count, u32 instances_count);
 	void drawIndexedInstanced(u32 indices_count, u32 instances_count, gpu::DataType index_type);

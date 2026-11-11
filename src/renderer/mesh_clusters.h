@@ -8,7 +8,7 @@
 
 namespace Lumix {
 
-// One node of a mesh's cluster DAG, also the GPU layout (96 bytes), read by data/shaders/nanite.hlsl.
+// One node of a mesh's cluster DAG, also the GPU layout (80 bytes), read by data/shaders/nanite.hlsl.
 // Clusters of all DAG levels reference the vertices of the original mesh, so no new vertices are created.
 //
 // A cluster is drawn if its `error` is small enough on the screen and the `error` of its parent is not.
@@ -25,8 +25,6 @@ struct MeshClusterGPU {
 	float parent_error;		// FLT_MAX if the cluster has no parent
 	u32 first_index;		// into MeshClusters::indices
 	u32 index_count;
-	Vec3 cone_axis;			// average normal of the triangles, front faces are counter clockwise
-	float cone_cutoff;		// the cluster is back facing if dot(center - camera, cone_axis) >= cone_cutoff * length(center - camera) + radius, 1 if never
 	// `error` is the error of positions. The error of attributes (normals and UVs that the triangles took from other places) is separate, the
 	// error that is compared to the screen is `error + weight * attribute_error`, the weight is chosen when rendering. Both never get smaller
 	// from a cluster to its parent, so that the cut is valid for every weight.
@@ -35,6 +33,7 @@ struct MeshClusterGPU {
 	float padding0;
 	float padding1;
 };
+static_assert(sizeof(MeshClusterGPU) == 80);
 
 // A node of the tree over the clusters of a mesh (64 bytes, the GPU layout, read by data/shaders/nanite.hlsl). The clusters of every level of the
 // DAG have their own tree, the trees are built over runs of consecutive clusters. The shader walks the trees from the roots and skips a node,
@@ -63,7 +62,7 @@ struct MeshNodeGPU {
 //   - then its attributes, not aligned: the frame (normal and tangent, 32 bits), the UV (uv_bits per axis), AO (8 bits) and color (32 bits), if the mesh has them
 // so the vertex `local` of a cluster starts at the bit `pos_bit_offset + local * (bits of x + y + z + attribute bits)`, where the number of the
 // attribute bits is in the top byte of pos_bits.
-// The indices of the clusters are u16, local to the cluster.
+// The indices of the clusters are local to the cluster: u16 while they are built, bytes in the model file and on the GPU.
 struct MeshClusterVertexGPU {
 	i32 pos_start[3];		// lattice position of the minimum of the cluster
 	u32 pos_bits;			// bits of x | bits of y << 8 | bits of z << 16 | bits of attributes of a vertex << 24
@@ -97,7 +96,7 @@ inline u32 readClusterBits(const u32* words, u64 bit, u32 count) {
 
 struct MeshClusters {
 	explicit MeshClusters(IAllocator& allocator)
-		: clusters(allocator), indices(allocator), nodes(allocator), roots(allocator)
+		: clusters(allocator), indices(allocator), index_positions(allocator), nodes(allocator), roots(allocator)
 		, vertex_headers(allocator), local_indices(allocator), vertex_words(allocator)
 	{}
 
@@ -108,6 +107,7 @@ struct MeshClusters {
 
 	Array<MeshClusterGPU> clusters;
 	Array<u32> indices;			// indices of vertices of the mesh, used while the clusters are built. See local_indices
+	Array<Vec3> index_positions;	// if the borders of the clusters are dilated (see buildMeshClusters): the position that the vertex of each entry of `indices` has in its cluster, otherwise empty
 	Array<MeshNodeGPU> nodes;
 	Array<u32> roots;			// indices of the roots of the trees (one for each level)
 	u32 leaf_index_count = 0; // the first leaf_index_count indices are the finest clusters, they contain every triangle once

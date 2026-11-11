@@ -210,7 +210,6 @@ struct ModelInstance {
 		IS_BONE_ATTACHMENT_PARENT = 1 << 0,
 		ENABLED = 1 << 1,
 		VALID = 1 << 2,
-		MOVED = 1 << 3,
 	};
 
 	Model* model = nullptr;
@@ -219,12 +218,12 @@ struct ModelInstance {
 	Pose* pose = nullptr;
 	EntityPtr next_model = INVALID_ENTITY;
 	EntityPtr prev_model = INVALID_ENTITY;
-	float lod = 4;
-	Transform prev_frame_transform;
+	i32 forced_lod = -1;	// the LOD chosen by setModelInstanceLOD (previews), -1: by distance
 	Flags flags = Flags::NONE;
 	u16 mesh_count = 0;
-	bool dirty = true;
-	u32 gpu_slot = 0xffFFffFF;	// in GPUScene, valid while the instance is in the culling system
+	bool dirty = true;			// the materials of the instance (overrides) are not resolved yet, see RenderModule::refreshMaterialOverrides
+	bool override_queued = false;
+	u32 gpu_slot = 0xffFFffFF;	// in GPUScene, valid while the instance is enabled and its model can be drawn from the GPU scene (Model::canUseGPUScene)
 };
 
 struct InstancedModel {
@@ -395,7 +394,6 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual ShiftedFrustum getCameraFrustum(EntityRef entity, Vec2 viewport_min_px, Vec2 viewport_max_px) const = 0;
 	virtual Engine& getEngine() const = 0;
 	virtual IAllocator& getAllocator() = 0;
-	virtual u32 computeSortKey(const Material& material, const Mesh& mesh) const = 0;
 
 	virtual Pose* lockPose(EntityRef entity) = 0;
 	virtual void unlockPose(EntityRef entity, bool changed) = 0;

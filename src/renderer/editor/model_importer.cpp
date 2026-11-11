@@ -1477,7 +1477,7 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 		const Array<u32>& indices = hasAutoLOD(meta, 0) ? *geom.autolod_indices[0].get() : geom.indices;
 		MeshClusters* clusters = LUMIX_NEW(m_allocator, MeshClusters)(m_allocator);
 		results.push(clusters);
-		if (!buildMeshClusters(Span<const Vec3>(positions[i].begin(), positions[i].size()), Span<const Vec3>(normals[i].begin(), normals[i].size()), Span<const Vec2>(uvs[i].begin(), uvs[i].size()), Span<const u32>(indices.begin(), indices.size()), *clusters, m_allocator)) {
+		if (!buildMeshClusters(Span<const Vec3>(positions[i].begin(), positions[i].size()), Span<const Vec3>(normals[i].begin(), normals[i].size()), Span<const Vec2>(uvs[i].begin(), uvs[i].size()), Span<const u32>(indices.begin(), indices.size()), meta.cluster_dilate_borders, *clusters, m_allocator)) {
 			failed = true;
 			break;
 		}
@@ -1550,12 +1550,17 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 			// The padding is made of degenerate triangles of the vertex 0, which the rasterizer drops and the vertex cache already holds.
 			u32 index_stride = 3;
 			for (const MeshClusterGPU& cluster : clusters->clusters) index_stride = maximum(index_stride, cluster.index_count);
-			Array<u16> padded_indices(m_allocator);
+			// indices are local to a cluster, which has at most MeshClusters::MAX_CLUSTER_VERTICES vertices, they are written as bytes
+			static_assert(MeshClusters::MAX_CLUSTER_VERTICES <= 256);
+			Array<u8> padded_indices(m_allocator);
 			padded_indices.resize(cluster_count * index_stride);
 			memset(padded_indices.begin(), 0, padded_indices.byte_size());
 			for (u32 c = 0; c < cluster_count; ++c) {
 				const MeshClusterGPU& cluster = clusters->clusters[c];
-				memcpy(padded_indices.begin() + c * index_stride, clusters->local_indices.begin() + cluster.first_index, cluster.index_count * sizeof(u16));
+				for (u32 k = 0; k < cluster.index_count; ++k) {
+					ASSERT(clusters->local_indices[cluster.first_index + k] < 256);
+					padded_indices[c * index_stride + k] = (u8)clusters->local_indices[cluster.first_index + k];
+				}
 			}
 
 			// the finest clusters on the CPU side (physics, picking, bounds), positions are the ones of the lattice, the same as on the GPU

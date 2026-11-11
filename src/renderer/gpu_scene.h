@@ -3,6 +3,7 @@
 #include "engine/lumix.h"
 
 #include "core/array.h"
+#include "core/hash_map.h"
 #include "core/math.h"
 #include "renderer/gpu/gpu.h"
 
@@ -10,6 +11,8 @@ namespace Lumix {
 
 struct DrawStream;
 struct Renderer;
+struct Material;
+struct Mesh;
 struct Model;
 struct Shader;
 struct Transform;
@@ -29,15 +32,22 @@ namespace GPUSceneConst {
 	constexpr u32 INVALID_MODEL = 0xffFFffFF;
 	// meshes with up to that many clusters are tested cluster by cluster (flat), groups of CLUSTER_THREADS clusters, see pipeline.cpp
 	constexpr u32 FLAT_MAX_CLUSTERS = 512;
+	// A variant is what one command of an indirect draw draws: a mesh (meshes with clusters share one for all the meshes with the same program) with a material
+	// program. Variants of the same program (and layer) are a draw group, which is drawn by one indirect call of one command for each variant.
+	constexpr u32 MAX_VARIANTS = 8192;
+	constexpr u32 MAX_DRAW_GROUPS = 2048;
+	constexpr u32 INVALID_VARIANT = 0xffFFffFF;
 	constexpr u32 CLUSTER_THREADS = 64;
 }
 
 // Static data of a mesh with clusters, 64 bytes, read by the passes that select clusters. The meshes of a model are consecutive (GPUSceneModel).
 // Same layout in gpu_scene_cull.hlsl.
 struct GPUSceneMesh {
+	// The mesh of a model without clusters (GPUSceneModel::PLAIN) has only the last three fields, its vertices and indices are in ranges of the buffer of cluster data
+	// (drawn by one command of an indirect draw for each mesh and material), the other fields are 0
 	enum Flags : u32 { FLAT = 1 << 0 };
-	u32 clusters;			// bindless, MeshClusterGPU[]
-	u32 nodes;				// bindless, MeshNodeGPU[node_count], then the indices of root_count roots
+	u32 clusters;			// byte offset in the buffer of cluster data (Renderer::getClusterDataBuffer) of MeshClusterGPU[]
+	u32 nodes;				// byte offset in the same buffer of MeshNodeGPU[node_count], then the indices of root_count roots
 	u32 cluster_count;
 	u32 node_count;
 	u32 root_count;
@@ -47,9 +57,11 @@ struct GPUSceneMesh {
 	u32 leaf_cluster_count;
 	u32 flags;
 	u32 flat_groups;		// groups of a flat mesh for an instance
-	u32 vertices;			// bindless, the headers of the clusters followed by their packed vertices (vertex_pulling.hlsli)
-	u32 indices;			// bindless, u16 indices local to a cluster, cluster `c` starts at c * index_stride
-	u32 padding[3];
+	u32 vertex_offset;		// byte offset in the buffer of vertices of clusters (Renderer::getClusterDataBuffer) of the headers of the clusters followed by their packed vertices (vertex_pulling.hlsli)
+	u32 indices;			// byte offset in the same buffer of u8 indices local to a cluster, cluster `c` starts at c * index_stride
+	u32 variant;			// of the material of the model, INVALID_VARIANT if it is not drawn (see GPUScene::getVariantBuffer)
+	u32 index_in_model;		// the index of the mesh in its model
+	u32 material;			// the material index of the material of the model
 };
 static_assert(sizeof(GPUSceneMesh) == 64);
 
@@ -65,11 +77,20 @@ struct GPUSceneGroup {
 };
 static_assert(sizeof(GPUSceneGroup) == 32);
 
-// The meshes of a model of the table of models, 8 bytes. A model without clusters has no meshes.
+// The meshes of a model of the table of models, 48 bytes, the same layout in gpu_scene_cull.hlsl. A model that can not be drawn from the scene has no meshes.
+// A model with clusters has the meshes of its first LOD. A PLAIN model has all its meshes (the mesh `i` of the model is first_mesh + i), the
+// meshes of the LOD `l` are lod[l]: the first mesh in the low 16 bits and the last + 1 in the high 16 bits (0: the LOD has no meshes). The LOD of an
+// instance is the first one with squared distance < lod_distance[l] (the last LOD if there is none), see emitPlain in gpu_scene_cull.hlsl.
 struct GPUSceneModel {
+	enum Flags : u32 { PLAIN = 1 << 0 };
 	u32 first_mesh;
 	u32 mesh_count;
+	u32 flags;
+	u32 lod4;
+	u32 lod[4];
+	float lod_distance[4];
 };
+static_assert(sizeof(GPUSceneModel) == 48);
 
 // Hot part: what a pass that tests every instance needs. radius < 0 marks a free or disabled slot.
 // Same layout in gpu_scene.hlsl.
@@ -79,8 +100,12 @@ struct GPUSceneBounds {
 };
 static_assert(sizeof(GPUSceneBounds) == 16);
 
-// Cold part: read for visible instances only. The layout of the DYNAMIC instance (see nanite.hlsl, 96 bytes) with positions in fixed point.
+// Cold part: read for visible instances only. The layout of the MESH_INSTANCE instance (see nanite.hlsl, 96 bytes) with positions in fixed point.
 struct GPUSceneInstance {
+	enum Flags : u32 {
+		FORCED_LOD = 1 << 0,	// the LOD is in the bits 1..3
+		HAS_OVERRIDE = 1 << 4	// the slot has entries in the table of material overrides (GPUScene::setOverrides)
+	};
 	Quat rot;
 	i32 p[3];
 	u32 mesh_id;
@@ -121,13 +146,60 @@ struct GPUScene {
 	u32 alloc(const Model* model);
 	void free(u32 slot);
 	// `radius`: of the sphere around the position of the instance that contains the whole instance, in world units
-	void update(u32 slot, const Transform& transform, float radius);
+	// `forced_lod`: the LOD of the instance if it is not chosen by the distance (-1: by the distance), only for models without clusters
+	void update(u32 slot, const Transform& transform, float radius, i32 forced_lod = -1);
+
+	// Materials of instances that are not the ones of their model: one entry for each mesh of a slot that has its own material, sorted by slot and mesh
+	// (the index of the mesh in its model). The table is the same for all the views, each entry has its variant (see below). A slot that has entries has the flag
+	// HAS_OVERRIDE after its next update().
+	struct Override {
+		u32 slot;
+		u32 mesh;
+		u32 material_index;
+		const Material* material;
+		u32 variant;	// made by flush()
+	};
+	// replaces all the entries of the slot (they are sorted by mesh), the slot is freed with no entries
+	void setOverrides(u32 slot, Span<const Override> overrides);
+	u32 getOverrideCount() const { return m_overrides.size(); }
+	const Override& getOverride(u32 i) const { return m_overrides[i]; }
+	gpu::BufferHandle getOverridesBuffer() const { return m_override_buffer; }	// 16 bytes each: slot, mesh, material index, variant. valid after flush()
+
+	// Draw groups and variants, see GPUSceneConst::MAX_VARIANTS. They are made by flush() for the meshes of the mesh table and for the entries of the table of overrides,
+	// and stay the same until the tables are rebuilt (a model enters or leaves, a material is unloaded), the pipelines only read them.
+	struct DrawGroup {
+		Shader* shader;
+		u32 define_mask;				// of the material, with SKINNED
+		gpu::StateFlags state;			// of the material
+		gpu::PrimitiveType primitive_type;
+		const char* semantics_defines;
+		u8 layer;
+		bool plain;						// meshes without clusters, otherwise the group has clusters
+		gpu::DataType index_type;		// of the commands
+		u32 variant_count;				// the commands of the group are consecutive
+	};
+	u32 getDrawGroupCount() const { return m_draw_groups.size(); }
+	const DrawGroup& getDrawGroup(u32 i) const { return m_draw_groups[i]; }
+	u32 getVariantCount() const { return m_variants.size(); }
+	// 16 bytes each: x = group | index in the group << 16, first index (in indices, of the index buffer of the draw), base vertex, index count. Valid after flush().
+	gpu::BufferHandle getVariantBuffer() const { return m_variant_buffer; }
 
 	// Instanced models with clusters. A group is not a slot: its instances stay in the buffer of the instanced model, the origin is the position of the entity.
 	// The model has an entry in the table of models while the group exists. Changes reach the GPU with the next flush().
 	u32 allocGroup(const Model* model);
 	void updateGroup(u32 group, const DVec3& origin, gpu::BufferHandle instances, u32 instance_count);
 	void freeGroup(u32 group);
+	// The bones of skinned instances of the frame: the CPU converts the poses of the instances once per frame (Pipeline::prepareSkinnedPoses) into one buffer
+	// of dual quaternions (32 bytes each) and a table of the byte offset of the bones of each slot (u32, 0 for the slots without bones).
+	struct FrameBones {
+		u32 frame = 0xffFFffFF;
+		gpu::BufferHandle bones = gpu::INVALID_BUFFER;
+		u32 bones_offset = 0;
+		gpu::BufferHandle table = gpu::INVALID_BUFFER;
+		u32 table_offset = 0;
+	};
+	FrameBones& getFrameBones() { return m_frame_bones; }
+
 	gpu::BufferHandle getGroupTableBuffer() const { return m_group_buffer; }	// GPUSceneGroup[] of the groups that have instances, valid after flush()
 	u32 getGroupCount() const { return m_group_table.size(); }
 	u32 getGroupInstanceCount() const { return m_group_instances; }		// of all the groups
@@ -135,17 +207,9 @@ struct GPUScene {
 
 	// The table of models: an entry exists while at least one slot (or group) has the model. Entries of the same model have the same id as long as
 	// it has an instance, ids of models without instances are reused.
-	u32 getModelId(const Model* model) const;
-	u32 getSlotModelId(u32 slot) const { return m_slot_model[slot]; }
 	u32 getModelTableSize() const { return m_models.size(); }		// the highest id + 1
-	// the meshes of the model in the mesh table (consecutive, the mesh `i` of the model is first + i), valid after flush()
-	u32 getModelFirstMesh(u32 id) const { return m_model_table[id].first_mesh; }
-	u32 getModelMeshCount(u32 id) const { return m_model_table[id].mesh_count; }
 	u32 getMaxTreeDepth() const { return m_max_tree_depth; }	// of the meshes of the mesh table
-	// the entries of the mesh table: the model and the index of the mesh in it
-	u32 getMeshCount() const { return m_mesh_table.size(); }
-	const Model* getMeshModel(u32 mesh) const { return m_mesh_models[mesh]; }
-	u32 getMeshIndexInModel(u32 mesh) const { return m_mesh_indices[mesh]; }
+	u32 getMeshTableVersion() const { return m_mesh_table_version; }	// changes whenever the mesh table is rebuilt
 
 	// Writes what changed since the last call to the GPU buffers. Safe to call many times in a frame (every pipeline does).
 	void flush();
@@ -176,6 +240,7 @@ private:
 	void grow(u32 min_capacity);
 	Entry& entryFor(u32 slot);
 
+	FrameBones m_frame_bones;
 	Renderer& m_renderer;
 	IAllocator& m_allocator;
 	Shader* m_shader = nullptr;
@@ -190,12 +255,55 @@ private:
 	Array<u32> m_pending;			// for each slot: its index in m_entries or INVALID_SLOT
 	Array<u32> m_fresh;				// for each slot: 1 until its first update (teleport)
 	Array<u32> m_slot_model;		// for each slot: its id in the table of models
+	Array<u8> m_slot_override;		// for each slot: 1 if it has entries in m_overrides
+	Array<Override> m_overrides;
+	gpu::BufferHandle m_override_buffer = gpu::INVALID_BUFFER;
+	u32 m_override_capacity = 0;
+	bool m_overrides_dirty = true;	// the first flush makes the buffer
+	// the vertices and indices of a mesh without clusters, a copy in the buffer of cluster data (the model keeps its own buffers for the other uses of it)
+	struct MeshPool {
+		u32 vertex_offset;
+		u32 vertex_size;
+		u32 index_offset;
+		u32 index_size;
+	};
 	struct ModelEntry {
 		const Model* model = nullptr;
 		u32 instance_count = 0;
+		MeshPool* pools = nullptr;		// a model without clusters while it is in the table, for each mesh
+		u32 pool_count = 0;
 	};
 	Array<ModelEntry> m_models;		// by id, the first MAX_MODELS entries
 
+	struct Variant {
+		u32 group;
+		u32 index_in_group;
+		const Mesh* mesh;	// of a variant of meshes without clusters
+		u32 first_index;
+		u32 base_vertex;
+		u32 index_count;
+	};
+	struct PoolCopy {
+		gpu::BufferHandle src;
+		u32 dst_offset;
+		u32 size;
+	};
+	bool allocPools(u32 model_id, const Model& model);
+	void freePools(u32 model_id);
+	u32 findOrAddDrawGroup(const DrawGroup& key);
+	u32 variantFor(u32 model_id, const Model& model, u32 mesh_idx, const Material* material);
+	Array<DrawGroup> m_draw_groups;
+	HashMap<u64, u32> m_draw_group_map;
+	Array<Variant> m_variants;
+	HashMap<u64, u32> m_variant_map;
+	Array<PoolCopy> m_pool_copies;	// pending copies from the buffers of the meshes to the ranges of the pool
+	gpu::BufferHandle m_variant_buffer = gpu::INVALID_BUFFER;
+	u32 m_variant_capacity = 0;
+	bool m_variants_dirty = true;
+	u32 m_registry_reload_counter = 0;
+	u32 m_skinned_define_idx = 0;
+
+	u32 getModelId(const Model* model) const;
 	u32 acquireModel(const Model* model);	// the id of the model in the table, it is made if there is none, INVALID_MODEL if the table is full
 	void releaseModel(u32 model_id);
 	void rebuildGroupTable();
@@ -222,13 +330,12 @@ private:
 	void rebuildModelTables();
 	Array<GPUSceneMesh> m_mesh_table;
 	Array<GPUSceneModel> m_model_table;
-	Array<const Model*> m_mesh_models;	// for each entry of m_mesh_table
-	Array<u32> m_mesh_indices;
 	gpu::BufferHandle m_mesh_buffer = gpu::INVALID_BUFFER;
 	gpu::BufferHandle m_model_buffer = gpu::INVALID_BUFFER;
 	u32 m_mesh_capacity = 0;		// of the buffers, in entries
 	u32 m_model_capacity = 0;
 	bool m_tables_dirty = false;
+	u32 m_mesh_table_version = 0;
 	u32 m_max_tree_depth = 0;
 	Array<u32> m_moved_now;			// slots written in the frame of the last flush, their previous state has to catch up in the next frame
 };

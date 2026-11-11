@@ -31,38 +31,26 @@ struct VSOutput {
 };
 struct VSInput {
 	uint vertex_id : SV_VertexID;
-	#if defined AUTOINSTANCED
-		uint instance_id : SV_InstanceID;
-	#endif
+	uint instance_id : SV_InstanceID;
 };
 
 // instances are pulled, see vertex_pulling.hlsli
-#ifdef AUTOINSTANCED
-	// 48 bytes
-	struct Instance {
-		float4 rot;
-		float4 pos_lod;
-		float4 scale;
-	};
+// 96 bytes, the layout of surface_base.hlsli (the previous frame and the material are not used)
+struct Instance {
+	float4 rot;
+	float4 pos_lod;
+	float4 scale;
+};
 
-	Instance loadInstance(VSInput input) {
-		ByteAddressBuffer buffer = bindless_buffers[u_instance_buffer];
-		const uint offset = pullInstanceAddress(input.instance_id, 48);
-		Instance r;
-		r.rot = asfloat(buffer.Load4(offset));
-		r.pos_lod = asfloat(buffer.Load4(offset + 16));
-		r.scale = float4(asfloat(buffer.Load3(offset + 32)), 1);
-		return r;
-	}
-#endif
-
-#ifdef AUTOINSTANCED
-#else
-	#define USE_MATRIX
-	cbuffer ModelState : register(b4) {
-		row_major float4x4 model_mtx;
-	};
-#endif
+Instance loadInstance(VSInput input) {
+	ByteAddressBuffer buffer = bindless_buffers[u_instance_buffer];
+	const uint offset = pullInstanceAddress(input.instance_id, 96);
+	Instance r;
+	r.rot = asfloat(buffer.Load4(offset));
+	r.pos_lod = asfloat(buffer.Load4(offset + 16));
+	r.scale = float4(asfloat(buffer.Load3(offset + 32)), 1);
+	return r;
+}
 
 float2 dirToGrid(float3 vec) {
 	vec.y = min(vec.y, -0.001);
@@ -72,95 +60,54 @@ float2 dirToGrid(float3 vec) {
 }
 
 
-#ifdef USE_MATRIX
-	VSOutput mainVS(VSInput input) {
+VSOutput mainVS(VSInput input) {
+	#ifdef POOLED_VERTICES
+		VSVertex vtx = pullVertex(input.vertex_id + pullBaseVertex(input.instance_id));
+	#else
 		VSVertex vtx = pullVertex(input.vertex_id);
-		VSOutput output;
-		float3x3 to_model_space = (float3x3)model_mtx;
-		#ifdef DEPTH
-			float3 N = normalize(Global_light_dir.xyz);
-		#else
-			float3 instance_pos = mul(float4(0, 0, 0, 1), model_mtx).xyz;
-			float3 N = normalize(instance_pos);
-		#endif
-		
-		float3x3 tangent_space;
-		tangent_space[0] = normalize(cross(N, float3(0, 1, 0)));
-		tangent_space[1] = normalize(cross(tangent_space[0], N));
-		tangent_space[2] = cross(tangent_space[0], tangent_space[1]);
+	#endif
+	VSOutput output;
+	float3x3 tangent_space;
 
-		float3 vd = float3(N.x, N.y, N.z);
-		vd = mul(vd, to_model_space);
-		#if !defined DEPTH && defined HAS_SELFSHADOW
-			float3 ld = mul(-Global_light_dir.xyz, to_model_space);
-			output.shadow_coefs = max(float4(ld.x, -ld.z, -ld.x, ld.z), 0);
-			output.shadow_coefs /= dot(output.shadow_coefs, 1);
-		#endif
-		float2 grid = dirToGrid(normalize(vd));
-		output.uv = vtx.uv / 9 + int2(grid * 9) / 9.0;
+	const Instance inst = loadInstance(input);
+	float3 instance_pos = inst.pos_lod.xyz;
+	float3 scale = inst.scale.xyz;
+	float4 to_model_space = inst.rot * float4(1, 1, 1, -1);
+	output.lod = inst.pos_lod.w;
 
-		#ifdef DEPTH
-			// move to avoid selfshadow
-			float3 p = u_center.xyz + mul(vtx.position + float3(0, 0, u_center.y) - u_center.xyz, tangent_space);
-		#else
-			float3 p = u_center.xyz + mul(vtx.position - u_center.xyz, tangent_space);
-		#endif
-		p = transformPosition(p, model_mtx).xyz;
-		
-		output.lod = 1;
-		output.tangent = tangent_space[0];
-		output.normal = tangent_space[2];
-		output.pos_ws = float4(p, 1);
+	#ifdef DEPTH
+		float3 N = normalize(Global_light_dir.xyz);
+	#else
+		float3 N = normalize(instance_pos);
+	#endif
+	tangent_space[0] = normalize(cross(N, float3(0, 1, 0)));
+	tangent_space[1] = normalize(cross(tangent_space[0], N));
+	tangent_space[2] = cross(tangent_space[0], tangent_space[1]);
 
-		output.position = mul(output.pos_ws, Pass_ws_to_ndc);
-		return output;
-	}
-#else
-	VSOutput mainVS(VSInput input) {
-		VSVertex vtx = pullVertex(input.vertex_id);
-		VSOutput output;
-		float3x3 tangent_space;
+	float3 vd = float3(N.x, N.y, N.z);
+	vd = rotateByQuat(to_model_space, vd);
+	#if !defined DEPTH && defined HAS_SELFSHADOW
+		float3 ld = rotateByQuat(to_model_space, -Global_light_dir.xyz);
+		output.shadow_coefs = max(float4(ld.x, -ld.z, -ld.x, ld.z), 0);
+		output.shadow_coefs /= dot(output.shadow_coefs, 1);
+	#endif
+	float2 grid = dirToGrid(normalize(vd));
+	output.uv = vtx.uv / 9 + int2(grid * 9) / 9.0;
 
-		const Instance inst = loadInstance(input);
-		float3 instance_pos = inst.pos_lod.xyz;
-		float3 scale = inst.scale.xyz;
-		float4 to_model_space = inst.rot * float4(1, 1, 1, -1);
-		output.lod = inst.pos_lod.w;
+	#ifdef DEPTH
+		// move to avoid selfshadow
+		float3 p = u_center.xyz + mul(vtx.position + float3(0, 0, u_center.y) - u_center.xyz, tangent_space);
+	#else
+		float3 p = u_center.xyz + mul(vtx.position - u_center.xyz, tangent_space);
+	#endif
+	p *= scale;
+	output.tangent = tangent_space[0];
+	output.normal = tangent_space[2];
+	output.pos_ws = float4(instance_pos + p, 1);
 
-		#ifdef DEPTH
-			float3 N = normalize(Global_light_dir.xyz);
-		#else
-			float3 N = normalize(instance_pos);
-		#endif
-		tangent_space[0] = normalize(cross(N, float3(0, 1, 0)));
-		tangent_space[1] = normalize(cross(tangent_space[0], N));
-		tangent_space[2] = cross(tangent_space[0], tangent_space[1]);
-
-		float3 vd = float3(N.x, N.y, N.z);
-		vd = rotateByQuat(to_model_space, vd);
-		#if !defined DEPTH && defined HAS_SELFSHADOW
-			float3 ld = rotateByQuat(to_model_space, -Global_light_dir.xyz);
-			output.shadow_coefs = max(float4(ld.x, -ld.z, -ld.x, ld.z), 0);
-			output.shadow_coefs /= dot(output.shadow_coefs, 1);
-		#endif
-		float2 grid = dirToGrid(normalize(vd));
-		output.uv = vtx.uv / 9 + int2(grid * 9) / 9.0;
-
-		#ifdef DEPTH
-			// move to avoid selfshadow
-			float3 p = u_center.xyz + mul(vtx.position + float3(0, 0, u_center.y) - u_center.xyz, tangent_space);
-		#else
-			float3 p = u_center.xyz + mul(vtx.position - u_center.xyz, tangent_space);
-		#endif
-		p *= scale;
-		output.tangent = tangent_space[0];
-		output.normal = tangent_space[2];
-		output.pos_ws = float4(instance_pos + p, 1);
-
-		output.position = mul(output.pos_ws, Pass_ws_to_ndc);
-		return output;
-	}
-#endif
+	output.position = mul(output.pos_ws, Pass_ws_to_ndc);
+	return output;
+}
 
 Surface getSurface(VSOutput input) {
 	Surface data;

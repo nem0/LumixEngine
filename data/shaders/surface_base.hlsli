@@ -4,15 +4,20 @@
 	#define HAS_LOD
 #endif
 
+// the instance data of a draw are pulled (see below), a draw without any of the variants is a MESH_INSTANCE one
+#if !defined SKINNED && !defined MESH_PARTICLE && !defined GRASS && !defined MESH_INSTANCE
+	#define MESH_INSTANCE
+#endif
+
 #include "engine/shaders/vertex_pulling.hlsli"
 
 // Vertices and instances are pulled by the vertex shader, see vertex_pulling.hlsli
 struct VSInput {
 	uint vertex_id : SV_VertexID;
-	#if defined AUTOINSTANCED || defined MESH_PARTICLE || defined DYNAMIC || defined SKINNED || defined GRASS
+	#if defined MESH_PARTICLE || defined MESH_INSTANCE || defined SKINNED || defined GRASS
 		uint instance_id : SV_InstanceID;
 	#endif
-	#if defined AUTOINSTANCED || defined DYNAMIC || defined SKINNED
+	#if defined MESH_INSTANCE || defined SKINNED
 		#define HAS_MATERIAL_INDEX_ATTR
 	#endif
 };
@@ -26,7 +31,7 @@ struct VSOutput {
 	#ifdef TANGENT_ATTR
 		float3 tangent : TEXCOORD3;
 	#endif
-	#if defined DYNAMIC || defined SKINNED
+	#if defined MESH_INSTANCE || defined SKINNED
 		float4 prev_ndcpos_no_jitter : TEXCOORD4;
 	#endif
 	#ifdef HAS_LOD
@@ -57,45 +62,19 @@ struct VSOutput {
 		uint material_index;
 		uint u_particle_stride;	// in bytes
 	};
-#elif defined AUTOINSTANCED
 #elif defined GRASS
 	cbuffer ModelState : register(b4) {
 		float3 u_grass_origin;
 		float u_distance;
 		uint material_index;
 	};
-#elif defined DYNAMIC
-#else
-	cbuffer ModelState : register(b4) {
-		row_major float4x4 model_mtx;
-		uint material_index;
-	};
+#elif defined MESH_INSTANCE
 #endif
 
 Surface getSurface(VSOutput input, uint material_index);
 
 // Instance data of the draw is pulled by the instance index, see vertex_pulling.hlsli.
-#if defined AUTOINSTANCED
-	// 48 bytes
-	struct Instance {
-		float4 rot;
-		float4 pos_lod;
-		float4 scale;
-		uint material_index;
-	};
-
-	Instance loadInstance(VSInput input) {
-		ByteAddressBuffer buffer = bindless_buffers[u_instance_buffer];
-		const uint offset = pullInstanceAddress(input.instance_id, 48);
-		Instance r;
-		r.rot = asfloat(buffer.Load4(offset));
-		r.pos_lod = asfloat(buffer.Load4(offset + 16));
-		const uint4 last = buffer.Load4(offset + 32);
-		r.scale = float4(asfloat(last.xyz), 1);
-		r.material_index = last.w;
-		return r;
-	}
-#elif defined MESH_PARTICLE
+#if defined MESH_PARTICLE
 	struct Instance {
 		float4 rot_lod;
 		float4 pos_scale;
@@ -125,7 +104,7 @@ Surface getSurface(VSOutput input, uint material_index);
 		r.rot = asfloat(buffer.Load4(offset + 16));
 		return r;
 	}
-#elif defined DYNAMIC
+#elif defined MESH_INSTANCE
 	// 96 bytes: rotation, position and lod, scale, the same for the previous frame, material index
 	struct Instance {
 		float4 rot;
@@ -135,6 +114,7 @@ Surface getSurface(VSOutput input, uint material_index);
 		float4 prev_pos_lod;
 		float4 prev_scale;
 		uint material_index;
+		uint base_vertex;		// the word of prev_pos_lod.w, for POOLED_VERTICES
 	};
 
 	Instance loadInstance(VSInput input) {
@@ -146,16 +126,16 @@ Surface getSurface(VSOutput input, uint material_index);
 		r.scale = asfloat(buffer.Load4(offset + 32));
 		r.prev_rot = asfloat(buffer.Load4(offset + 48));
 		r.prev_pos_lod = asfloat(buffer.Load4(offset + 64));
+		r.base_vertex = asuint(r.prev_pos_lod.w);
 		const uint4 last = buffer.Load4(offset + 80);
 		r.prev_scale = float4(asfloat(last.xyz), 0);
 		r.material_index = last.w;
 		return r;
 	}
 #elif defined SKINNED
-	// 92 bytes
+	// 96 bytes, the layout of MESH_INSTANCE: the word after the scale is the offset of the bones of the instance in bytes (u_bones_buffer)
 	struct Instance {
 		uint material_index;
-		uint bones_buffer;		// bindless
 		uint bones_offset;
 		float3 pos;
 		float4 rot;
@@ -163,29 +143,31 @@ Surface getSurface(VSOutput input, uint material_index);
 		float3 prev_pos;
 		float4 prev_rot;
 		float3 prev_scale;
+		uint base_vertex;		// the word after prev_pos, for POOLED_VERTICES
 	};
 
 	Instance loadInstance(VSInput input) {
 		ByteAddressBuffer buffer = bindless_buffers[u_instance_buffer];
-		const uint offset = pullInstanceAddress(input.instance_id, 92);
+		const uint offset = pullInstanceAddress(input.instance_id, 96);
 		Instance r;
-		const uint3 ids = buffer.Load3(offset);
-		r.material_index = ids.x;
-		r.bones_buffer = ids.y;
-		r.bones_offset = ids.z;
-		r.pos = asfloat(buffer.Load3(offset + 12));
-		r.rot = asfloat(buffer.Load4(offset + 24));
-		r.scale = asfloat(buffer.Load3(offset + 40));
-		r.prev_pos = asfloat(buffer.Load3(offset + 52));
-		r.prev_rot = asfloat(buffer.Load4(offset + 64));
-		r.prev_scale = asfloat(buffer.Load3(offset + 80));
+		r.rot = asfloat(buffer.Load4(offset));
+		r.base_vertex = buffer.Load(offset + 76);
+		r.pos = asfloat(buffer.Load3(offset + 16));
+		const uint4 scale = buffer.Load4(offset + 32);
+		r.scale = asfloat(scale.xyz);
+		r.bones_offset = scale.w;
+		r.prev_rot = asfloat(buffer.Load4(offset + 48));
+		r.prev_pos = asfloat(buffer.Load3(offset + 64));
+		const uint4 last = buffer.Load4(offset + 80);
+		r.prev_scale = asfloat(last.xyz);
+		r.material_index = last.w;
 		return r;
 	}
 
 	float2x4 getBones(Instance inst, uint bone_index) {
 		uint offset = inst.bones_offset + bone_index * 32;
-		float4 a = asfloat(bindless_buffers[inst.bones_buffer].Load4(offset));
-		float4 b = asfloat(bindless_buffers[inst.bones_buffer].Load4(offset + 16));
+		float4 a = asfloat(bindless_buffers[u_bones_buffer].Load4(offset));
+		float4 b = asfloat(bindless_buffers[u_bones_buffer].Load4(offset + 16));
 		return float2x4(a, b);
 	}
 #endif
@@ -196,8 +178,14 @@ Surface getSurface(VSOutput input, uint material_index);
 #endif
 
 VSOutput mainVS(VSInput input) {
+	#if defined MESH_PARTICLE || defined GRASS || defined MESH_INSTANCE || defined SKINNED
+		Instance inst = loadInstance(input);
+	#endif
 	#ifdef CLUSTER_MESH
 		VSVertex vtx = pullVertex(input.vertex_id, input.instance_id);
+	#elif defined POOLED_VERTICES
+		// the vertices of the meshes are in one buffer, the vertex id of a draw does not have the base vertex of its command: it is in the instance
+		VSVertex vtx = pullVertex(input.vertex_id + inst.base_vertex);
 	#else
 		VSVertex vtx = pullVertex(input.vertex_id);
 	#endif
@@ -205,9 +193,6 @@ VSOutput mainVS(VSInput input) {
 		VSOutput output = (VSOutput)0;
 	#else
 		VSOutput output;
-	#endif
-	#if defined AUTOINSTANCED || defined MESH_PARTICLE || defined GRASS || defined DYNAMIC || defined SKINNED
-		Instance inst = loadInstance(input);
 	#endif
 	#ifdef HAS_MATERIAL_INDEX_ATTR
 		output.i_material_index = inst.material_index;
@@ -223,21 +208,7 @@ VSOutput mainVS(VSInput input) {
 			output.uv = vtx.uv;
 		#endif
 	#endif
-	#ifdef AUTOINSTANCED
-		float3 p = vtx.position.xyz * inst.scale.xyz;
-		output.pos_ws = inst.pos_lod.xyz + rotateByQuat(inst.rot, p);
-		output.position = mul(float4(output.pos_ws, 1), Pass_ws_to_ndc);
-		#ifndef DEPTH_ONLY_VS
-			output.normal = rotateByQuat(inst.rot, vtx.normal);
-			#ifdef TANGENT_ATTR
-				output.tangent = rotateByQuat(inst.rot, vtx.tangent);
-			#endif
-		#endif
-		
-	#ifdef HAS_LOD
-			output.lod = inst.pos_lod.w;
-		#endif
-	#elif defined MESH_PARTICLE
+	#if defined MESH_PARTICLE
 		float4 rot_quat = float4(inst.rot_lod.xyz, 0);
 		rot_quat.w = sqrt(saturate(1 - dot(rot_quat.xyz, rot_quat.xyz)));
 		#ifndef DEPTH_ONLY_VS
@@ -268,7 +239,7 @@ VSOutput mainVS(VSInput input) {
 			//output.color = input.color;
 		#endif
 		output.position = mul(float4(output.pos_ws, 1), Pass_ws_to_ndc);
-	#elif defined DYNAMIC
+	#elif defined MESH_INSTANCE
 		#ifdef CLUSTER_DEBUG
 			output.cluster_id = (uint)inst.pos_lod.w; // written by nanite.hlsl
 		#endif
@@ -310,16 +281,6 @@ VSOutput mainVS(VSInput input) {
 			float3 prevpos = rotateByQuat(inst.prev_rot, transformByDualQuat(dq, mpos)) * inst.prev_scale + inst.prev_pos;
 			output.prev_ndcpos_no_jitter = mul(float4(prevpos, 1), mul(Global_ws_to_ndc_no_jitter, Global_reprojection));
 		#endif
-	#else
-		#ifndef DEPTH_ONLY_VS
-			float3x3 rot_mtx = (float3x3)model_mtx;
-			output.normal =  mul(vtx.normal, rot_mtx);
-			#ifdef TANGENT_ATTR
-				output.tangent = mul(vtx.tangent, rot_mtx);
-			#endif
-		#endif
-		output.pos_ws = transformPosition(vtx.position, model_mtx).xyz;
-		output.position = mul(float4(output.pos_ws, 1), Pass_ws_to_ndc);
 	#endif
 	return output;
 }
@@ -345,7 +306,7 @@ Surface getSurfaceEx(VSOutput input) {
 		data.albedo = float3(h & 255u, (h >> 8) & 255u, (h >> 16) & 255u) / 255.0 * 0.8 + 0.1;
 	#endif
 	float4 p = mul(float4(input.pos_ws, 1), Global_ws_to_ndc_no_jitter);
-	#if defined DYNAMIC || defined SKINNED
+	#if defined MESH_INSTANCE || defined SKINNED
 		float2 prev_pos_projected = input.prev_ndcpos_no_jitter.xy / input.prev_ndcpos_no_jitter.w;
 		data.motion = prev_pos_projected.xy - p.xy / p.w;
 	#else

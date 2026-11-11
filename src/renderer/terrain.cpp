@@ -118,7 +118,6 @@ void Terrain::createGrass(const Vec2& center, u32 frame) {
 								ASSERT(false);
 								break;
 						}
-						instances.push(inst);
 						aabb.addPoint(p.xyz());
 					}
 				}
