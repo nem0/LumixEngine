@@ -242,8 +242,6 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 		out.leaf_cluster_count = out.clusters.size();
 	}
 	close_level();
-	logInfo("Clusters: ", level_ranges.size() / 2 + 1, " levels, ", group_count, " groups, ", out.clusters.size(), " clusters, ", out.leaf_cluster_count, " of them in the finest level");
-
 	// the trees over the clusters of the levels: the finest clusters, then the ones that each level has made
 	buildNodes(out, 0, out.leaf_cluster_count);
 	for (u32 i = 0; i + 1 < (u32)level_ranges.size(); i += 2) buildNodes(out, level_ranges[i], level_ranges[i + 1]);
