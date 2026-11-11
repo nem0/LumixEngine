@@ -295,7 +295,8 @@ void bindIndirectBuffer(BufferHandle buffer);
 void bindShaderBuffers(Span<BufferHandle> buffers, Span<const u32> strides);
 
 void drawArrays(u32 offset, u32 count);
-void drawIndirect(DataType index_type, u32 indirect_buffer_offset);
+// `count` commands, one after another from the offset
+void drawIndirect(DataType index_type, u32 indirect_buffer_offset, u32 count = 1);
 void drawIndexed(u32 offset, u32 count, DataType type);
 void drawArraysInstanced(u32 indices_count, u32 instances_count);
 void drawIndexedInstanced(u32 indices_count, u32 instances_count, DataType index_type);

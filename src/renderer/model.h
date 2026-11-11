@@ -63,7 +63,6 @@ struct MeshMaterial {
 		OWN_MATERIAL_INDEX = 1 << 0,
 	};
 	Material* material;
-	u32 sort_key;
 	MaterialIndex material_index;
 	Flags flags;
 };
@@ -123,12 +122,12 @@ struct LUMIX_RENDERER_API Mesh {
 	// the only per draw data of vertex pulling, a uniform buffer
 	struct VertexBufferBinding {
 		u32 vertex_buffer;		// bindless handle
-		u32 instance_buffer;	// bindless handle, instance data pulled by shaders (DYNAMIC variant), 0 if not used
+		u32 instance_buffer;	// bindless handle, instance data pulled by shaders (MESH_INSTANCE variant), 0 if not used
 		u32 instance_offset;	// in bytes
-		u32 padding;
+		u32 bones_buffer;		// bindless handle, dual quaternions of the bones of skinned meshes (SKINNED variant), 0 if not used
 	};
 	Renderer& renderer;
-	float lod = 0;
+	float lod = 0;	// the LOD the mesh belongs to
 
 	gpu::BufferHandle vertex_buffer_handle;
 	u32 vb_stride;
@@ -137,16 +136,23 @@ struct LUMIX_RENDERER_API Mesh {
 	u32 indices_count;
 
 	// cluster DAG for GPU driven LOD, see mesh_clusters.h, baked by the model importer
-	// Meshes with clusters have no vertices and indices of their own: vertex_buffer_handle is one buffer with the headers of clusters followed by their
+	// Meshes with clusters have no vertices and indices of their own: their vertex data are the headers of clusters followed by their
 	// bit packed vertices (position and then attributes, interleaved, see mesh_clusters.h; vb_stride and the vertex decl only say which attributes there are),
-	// and cluster_index_buffer has u16 indices local to a cluster,
+	// and the indices are u8 and local to a cluster,
 	// cluster `c` starts at c * cluster_index_stride, so that all selected clusters of a mesh are drawn by one instanced draw.
 	// The CPU `vertices` and `indices` are made of the finest clusters.
-	gpu::BufferHandle cluster_buffer = gpu::INVALID_BUFFER;
-	gpu::BufferHandle cluster_index_buffer = gpu::INVALID_BUFFER;
+	// The vertex data, the clusters, the nodes and the indices are not buffers of the mesh (vertex_buffer_handle is invalid), they are ranges of the buffer shared
+	// by all meshes with clusters (see Renderer::allocClusterData): the vertex data are `cluster_vertex_size` bytes from `cluster_vertex_offset`, the clusters
+	// and then the nodes are `cluster_table_size` bytes from `cluster_table_offset`, the indices are `cluster_index_size` bytes from `cluster_index_offset`.
+	u32 cluster_index_offset = 0;
+	u32 cluster_index_size = 0;
+	u32 cluster_vertex_offset = 0;
+	u32 cluster_vertex_size = 0;
+	u32 cluster_table_offset = 0;	// MeshClusterGPU[cluster_count]
+	u32 node_table_offset = 0;		// MeshNodeGPU[node_count], then root_count u32 indices of roots, see MeshClusters, right after the clusters
+	u32 cluster_table_size = 0;
 	u32 cluster_count = 0;
-	u32 cluster_index_stride = 0; // indices of every cluster in cluster_index_buffer are padded (with degenerate triangles) to this count, see Model::loadClusters
-	gpu::BufferHandle node_buffer = gpu::INVALID_BUFFER; // MeshNodeGPU[node_count], then root_count u32 indices of roots, see MeshClusters
+	u32 cluster_index_stride = 0; // indices of every cluster are padded (with degenerate triangles) to this count, see Model::loadClusters
 	u32 node_count = 0;
 	u32 root_count = 0;
 	u32 tree_depth = 0;			// levels of the deepest tree, a leaf node is the last one
@@ -171,6 +177,8 @@ struct LUMIX_RENDERER_API Model final : Resource {
 		// 4-8 were intermediate formats of clusters, models with clusters of these versions are rejected (see parseClusters), the numbers are not reused
 
 		CLUSTER_INTERLEAVED = 9, // clusters have one buffer of headers and interleaved, packed vertices and everything else ready to be uploaded, see parseClusters
+		CLUSTER_NO_CONE = 10, // clusters have no normal cones (80 bytes instead of 96)
+		CLUSTER_U8_INDICES = 11, // indices local to a cluster are bytes, models of older versions with clusters are rejected
 
 		LATEST // keep this last
 	};
@@ -203,14 +211,6 @@ struct LUMIX_RENDERER_API Model final : Resource {
 
 	ResourceType getType() const override { return TYPE; }
 
-	u32 getLODMeshIndices(float squared_distance) const {
-		if (squared_distance < m_lod_distances[0]) return 0;
-		if (squared_distance < m_lod_distances[1]) return 1;
-		if (squared_distance < m_lod_distances[2]) return 2;
-		if (squared_distance < m_lod_distances[3]) return 3;
-		return 4;
-	}
-
 	Mesh& getMesh(u32 index) { return m_meshes[index]; }
 	const Mesh& getMesh(u32 index) const { return m_meshes[index]; }
 	Span<MeshMaterial> getMeshMaterials() { return m_mesh_material; }
@@ -240,8 +240,22 @@ struct LUMIX_RENDERER_API Model final : Resource {
 	const SOATransform& getInverseBindPose() { return m_inverse_bind; }
 	LocalRigidTransform getInverseBindTransform(i32 bone_idx) const;
 	Span<const i16> getParents() const { return m_parents; }
-	// true if all meshes of the first LOD have cluster DAGs, see Mesh::cluster_buffer
+	// true if all meshes of the first LOD have cluster DAGs, see Mesh::cluster_table_offset
 	bool hasClusters() const { return m_has_clusters; }
+	// true if the instances of the model are culled and drawn by the GPU (GPUScene): models with clusters, and models of meshes with buffers of their own (rigid or
+	// skinned), which are drawn by one indirect draw for each mesh and material
+	bool canUseGPUScene() const {
+		if (m_has_clusters) return true;
+		if (m_meshes.empty()) return false;
+		for (const Mesh& mesh : m_meshes) {
+			if (!mesh.vertex_buffer_handle || !mesh.index_buffer_handle || mesh.indices_count == 0) return false;
+		}
+		return true;
+	}
+	bool hasSkinnedMeshes() const {
+		for (const Mesh& mesh : m_meshes) if (mesh.type == Mesh::SKINNED) return true;
+		return false;
+	}
 	// index of the last mesh that is rendered when using clusters, further meshes are lower LODs which clusters replace
 	i32 getClusterMeshesEnd() const { return m_lod_indices[0].to >= 0 ? m_lod_indices[0].to : (i32)m_meshes.size() - 1; }
 
