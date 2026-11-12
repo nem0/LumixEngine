@@ -46,7 +46,7 @@ struct GPUSceneMesh {
 	// The mesh of a model without clusters (GPUSceneModel::PLAIN) has only the last three fields, its vertices and indices are in ranges of the buffer of cluster data
 	// (drawn by one command of an indirect draw for each mesh and material), the other fields are 0
 	enum Flags : u32 { FLAT = 1 << 0 };
-	u32 clusters;			// byte offset in the buffer of cluster data (Renderer::getClusterDataBuffer) of MeshClusterGPU[]
+	u32 cluster_groups;		// byte offset in the buffer of cluster data (Renderer::getClusterDataBuffer) of u32[cluster_count]: the group of each cluster. The clusters are in the payloads of the groups
 	u32 nodes;				// byte offset in the same buffer of MeshNodeGPU[node_count], then the indices of root_count roots
 	u32 cluster_count;
 	u32 node_count;
@@ -57,11 +57,11 @@ struct GPUSceneMesh {
 	u32 leaf_cluster_count;
 	u32 flags;
 	u32 flat_groups;		// groups of a flat mesh for an instance
-	u32 vertex_offset;		// byte offset in the buffer of vertices of clusters (Renderer::getClusterDataBuffer) of the headers of the clusters followed by their packed vertices (vertex_pulling.hlsli)
-	u32 indices;			// byte offset in the same buffer of u8 indices local to a cluster, cluster `c` starts at c * index_stride
-	u32 variant;			// of the material of the model, INVALID_VARIANT if it is not drawn (see GPUScene::getVariantBuffer)
+	u32 padding0;
+	u32 indices;			// byte offset in the same buffer of MeshGroupAddressGPU[], where the clusters, vertices and the u8 indices (local to a cluster, `index_stride` for each) of each group are
+	u32 material_entry;		// the entry of the mesh in the default material set of its model (GPUScene::getMaterialSetBuffer): its variant and material index
 	u32 index_in_model;		// the index of the mesh in its model
-	u32 material;			// the material index of the material of the model
+	u32 padding;
 };
 static_assert(sizeof(GPUSceneMesh) == 64);
 
@@ -103,9 +103,9 @@ static_assert(sizeof(GPUSceneBounds) == 16);
 // Cold part: read for visible instances only. The layout of the MESH_INSTANCE instance (see nanite.hlsl, 96 bytes) with positions in fixed point.
 struct GPUSceneInstance {
 	enum Flags : u32 {
-		FORCED_LOD = 1 << 0,	// the LOD is in the bits 1..3
-		HAS_OVERRIDE = 1 << 4	// the slot has entries in the table of material overrides (GPUScene::setOverrides)
+		FORCED_LOD = 1 << 0		// the LOD is in the bits 1..3
 	};
+	static constexpr u32 NO_MATERIAL_SET = 0xffFFffFF;
 	Quat rot;
 	i32 p[3];
 	u32 mesh_id;
@@ -113,7 +113,7 @@ struct GPUSceneInstance {
 	u32 flags;
 	Quat prev_rot;
 	i32 prev_p[3];
-	u32 padding0;
+	u32 material_set;	// the first entry of the material set of the instance (GPUScene::setOverrides), NO_MATERIAL_SET: it has the materials of its model
 	Vec3 prev_scale;
 	u32 padding1;
 };
@@ -149,21 +149,20 @@ struct GPUScene {
 	// `forced_lod`: the LOD of the instance if it is not chosen by the distance (-1: by the distance), only for models without clusters
 	void update(u32 slot, const Transform& transform, float radius, i32 forced_lod = -1);
 
-	// Materials of instances that are not the ones of their model: one entry for each mesh of a slot that has its own material, sorted by slot and mesh
-	// (the index of the mesh in its model). The table is the same for all the views, each entry has its variant (see below). A slot that has entries has the flag
-	// HAS_OVERRIDE after its next update().
+	// Materials of instances that are not the ones of their model: the meshes of a slot that have their own material (`mesh` is the index of the mesh in its model).
+	// The slot gets a material set: the variant and material index of every mesh of its model, the meshes without an override have the ones of the model. Slots of the
+	// same model with the same overrides share a set. The same for all the views, the sets have their variants (see below). The set reaches the instance with its
+	// next update() (material_set).
 	struct Override {
-		u32 slot;
 		u32 mesh;
 		u32 material_index;
 		const Material* material;
-		u32 variant;	// made by flush()
 	};
-	// replaces all the entries of the slot (they are sorted by mesh), the slot is freed with no entries
+	// replaces the overrides of the slot (sorted by mesh, the model of the slot is ready), the slot is freed with no overrides, no overrides: the materials of the model
 	void setOverrides(u32 slot, Span<const Override> overrides);
-	u32 getOverrideCount() const { return m_overrides.size(); }
-	const Override& getOverride(u32 i) const { return m_overrides[i]; }
-	gpu::BufferHandle getOverridesBuffer() const { return m_override_buffer; }	// 16 bytes each: slot, mesh, material index, variant. valid after flush()
+	// 8 bytes for each entry of the sets: variant (INVALID_VARIANT: not drawn), material index. All the materials of the meshes are here, the default set of
+	// each model in the table (the materials of the model, GPUSceneMesh::material_entry) and the sets of overrides. Valid after flush()
+	gpu::BufferHandle getMaterialSetBuffer() const { return m_set_buffer; }
 
 	// Draw groups and variants, see GPUSceneConst::MAX_VARIANTS. They are made by flush() for the meshes of the mesh table and for the entries of the table of overrides,
 	// and stay the same until the tables are rebuilt (a model enters or leaves, a material is unloaded), the pipelines only read them.
@@ -255,11 +254,34 @@ private:
 	Array<u32> m_pending;			// for each slot: its index in m_entries or INVALID_SLOT
 	Array<u32> m_fresh;				// for each slot: 1 until its first update (teleport)
 	Array<u32> m_slot_model;		// for each slot: its id in the table of models
-	Array<u8> m_slot_override;		// for each slot: 1 if it has entries in m_overrides
-	Array<Override> m_overrides;
-	gpu::BufferHandle m_override_buffer = gpu::INVALID_BUFFER;
-	u32 m_override_capacity = 0;
-	bool m_overrides_dirty = true;	// the first flush makes the buffer
+	Array<u32> m_slot_set;			// for each slot: its material set or INVALID_SLOT
+	// A material set is a range of m_set_entries, one for each mesh of the model. The entries of the meshes without an override are the materials of the model
+	// (`own` is false), they are read again when the sets are made again.
+	struct SetEntry {
+		const Material* material;	// of an own entry, the instances that use the set have it (it has no reference of the set)
+		u32 material_index;
+		u32 variant;
+		bool own;
+	};
+	struct MaterialSet {
+		const Model* model = nullptr;	// null: the set is free, its range is reused for a model with as many meshes
+		u32 model_id = GPUSceneConst::INVALID_MODEL;
+		u32 first = 0;
+		u32 count = 0;
+		u32 refs = 0;
+		u64 hash = 0;
+	};
+	Array<MaterialSet> m_sets;
+	Array<SetEntry> m_set_entries;
+	Array<u32> m_free_sets;
+	HashMap<u64, u32> m_set_map;
+	gpu::BufferHandle m_set_buffer = gpu::INVALID_BUFFER;
+	u32 m_set_capacity = 0;
+	bool m_sets_dirty = true;		// the first flush makes the buffer
+	void releaseSet(u32 set);
+	// the set of the model with the overrides (none: the default set of the model), it is made if there is none. Its refs are the ones of the caller.
+	u32 acquireSet(u32 model_id, const Model* model, u32 count, Span<const Override> overrides);
+	bool sameSet(const MaterialSet& set, u32 model_id, Span<const Override> overrides) const;
 	// the vertices and indices of a mesh without clusters, a copy in the buffer of cluster data (the model keeps its own buffers for the other uses of it)
 	struct MeshPool {
 		u32 vertex_offset;
@@ -272,6 +294,7 @@ private:
 		u32 instance_count = 0;
 		MeshPool* pools = nullptr;		// a model without clusters while it is in the table, for each mesh
 		u32 pool_count = 0;
+		u32 default_set = GPUSceneConst::INVALID_SLOT;	// the set with the materials of the model, while the model is in the table and ready
 	};
 	Array<ModelEntry> m_models;		// by id, the first MAX_MODELS entries
 

@@ -242,7 +242,7 @@ float3 getViewDirection(float2 screen_uv) {
 }
 
 // get world-space position of pixel at `screen_uv`
-float3 getPositionWS(uint depth_buffer, float2 screen_uv) {
+float3 getPositionWS(TextureHandle depth_buffer, float2 screen_uv) {
 	float z = sampleBindlessLod(LinearSamplerClamp, depth_buffer, screen_uv, 0).r;
 	float4 pos_ndc = float4(toScreenUV(screen_uv) * 2 - 1, z, 1.0);
 	float4 pos_ws = mul(pos_ndc, Global_ndc_to_ws);
@@ -250,7 +250,7 @@ float3 getPositionWS(uint depth_buffer, float2 screen_uv) {
 }
 
 // get world-space position of pixel at `tex_coord`, also returns its NDC depth
-float3 getPositionWS(uint depth_buffer, float2 screen_uv, out float ndc_depth) {
+float3 getPositionWS(TextureHandle depth_buffer, float2 screen_uv, out float ndc_depth) {
 	float z = sampleBindlessLod(LinearSamplerClamp, depth_buffer, screen_uv, 0).r;
 	float4 pos_ndc = float4(toScreenUV(screen_uv) * 2 - 1, z, 1.0);
 	float4 pos_ws = mul(pos_ndc, Global_ndc_to_ws);
@@ -258,7 +258,7 @@ float3 getPositionWS(uint depth_buffer, float2 screen_uv, out float ndc_depth) {
 	return pos_ws.xyz / pos_ws.w;
 }
 
-Surface unpackSurface(float2 uv, uint gbuffer0, uint gbuffer1, uint gbuffer2, uint gbuffer3, uint gbuffer_depth, out float ndc_depth) {
+Surface unpackSurface(float2 uv, TextureHandle gbuffer0, TextureHandle gbuffer1, TextureHandle gbuffer2, TextureHandle gbuffer3, TextureHandle gbuffer_depth, out float ndc_depth) {
 	float4 gb0 = sampleBindless(LinearSamplerClamp, gbuffer0, uv);
 	float4 gb1 = sampleBindless(LinearSamplerClamp, gbuffer1, uv);
 	float4 gb2 = sampleBindless(LinearSamplerClamp, gbuffer2, uv);
@@ -417,7 +417,7 @@ float hash(float2 st) {
 	return frac(sin(dot(st.xy, float2(12.9898,78.233))) * 43758.5453123);
 }
 
-float getShadowSimple(uint shadowmap, float3 wpos) {
+float getShadowSimple(TextureHandle shadowmap, float3 wpos) {
 	float4 pos = float4(wpos, 1);
 
 	for (int slice = 0; slice < 4; ++slice) {
@@ -433,7 +433,7 @@ float getShadowSimple(uint shadowmap, float3 wpos) {
 	return 1;
 }
 
-float getShadow(uint shadowmap, float3 wpos, float3 N, float2 frag_coord) {
+float getShadow(TextureHandle shadowmap, float3 wpos, float3 N, float2 frag_coord) {
 	float NdL = saturate(dot(N, Global_light_dir.xyz));
 	float4 pos = float4(wpos, 1);
 	
@@ -552,7 +552,7 @@ AtlasTile getShadowAtlasTile(uint atlas_idx) {
 }
 
 // TODO clean this up
-float3 pointLightsLighting(Cluster cluster, Surface surface, uint shadow_atlas, float2 frag_coord) {
+float3 pointLightsLighting(Cluster cluster, Surface surface, TextureHandle shadow_atlas, float2 frag_coord) {
 	float3 res = 0;
 	for (int i = cluster.offset; i < cluster.offset + cluster.lights_count; ++i) {
 		Light light = b_lights[b_cluster_map[i]];
@@ -700,7 +700,7 @@ float3 env_brdf_approx(float3 F0, float roughness, float NoV) {
 	return F0 * AB.x + AB.y;
 }
 
-float3 reflProbesLighting(Cluster cluster, Surface surface, uint reflection_probes) {
+float3 reflProbesLighting(Cluster cluster, Surface surface, TextureCubeArrayHandle reflection_probes) {
 	int from = cluster.offset + cluster.lights_count + cluster.env_probes_count;
 	int to = from + cluster.refl_probes_count;
 	float ndotv = abs(dot(surface.N , surface.V)) + 1e-5f;
@@ -753,7 +753,7 @@ float distanceInFog(float3 a, float3 b) {
 	return length(a - b);
 }
 
-float3 computeLighting(Cluster cluster, Surface surface, float3 light_direction, float3 light, uint shadowmap, uint shadow_atlas, uint reflection_probes, float2 frag_coord) {
+float3 computeLighting(Cluster cluster, Surface surface, float3 light_direction, float3 light, TextureHandle shadowmap, TextureHandle shadow_atlas, TextureCubeArrayHandle reflection_probes, float2 frag_coord) {
 	float shadow = min(surface.shadow, getShadow(shadowmap, surface.pos_ws, surface.N, frag_coord));
 
 	float dist = max(0, (Global_fog_top - surface.pos_ws.y - Global_camera_world_pos.y) * Global_light_dir.y);

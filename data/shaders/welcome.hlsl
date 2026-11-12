@@ -7,7 +7,7 @@ struct VSInput {
 cbuffer ImGuiState : register(b4) {
 	float2 c_scale;
 	float2 c_offset;
-	uint c_texture;
+	TextureHandle c_texture;
 	float c_time;
 	uint c_vertices;
 	uint c_vertices_offset;

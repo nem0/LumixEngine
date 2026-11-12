@@ -80,7 +80,7 @@ VSOutput mainVS(VSInput input) {
 cbuffer Textures : register(b5) {
 	TextureHandle u_shadowmap;
 	TextureHandle u_depthbuffer;
-	TextureHandle u_reflection_probes;
+	TextureCubeArrayHandle u_reflection_probes;
 	TextureHandle u_bg;
 };
 
