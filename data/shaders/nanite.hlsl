@@ -37,6 +37,11 @@ cbuffer UniformData : register(b4) {
 	uint u_scene_instances;	// bindless, the instances of the GPU scene, 96 bytes
 	uint u_groups;			// bindless, GPUSceneGroup[] of the instanced models
 	uint u_cluster_data;	// bindless, the buffer with the clusters and nodes of all meshes, see MeshDesc
+	uint u_padding1;
+	uint u_feedback;		// rw bindless, 8 bytes for each group of the meshes that stream: the stamp of the frame in which a cluster of it was drawn, then the one of the last frame that needed its children
+	uint u_frame;			// the stamp of this frame
+	uint u_feedback_capacity;	// groups in u_feedback, 0 if there is none
+	uint u_padding2;
 };
 
 // threads of a group, GPUSceneConst::CLUSTER_THREADS
@@ -47,13 +52,14 @@ cbuffer UniformData : register(b4) {
 
 struct MeshDesc {
 	float4 camera_offset;		// -cam_frac
-	uint clusters;				// byte offset in u_cluster_data of MeshClusterGPU[]
+	uint cluster_groups;		// byte offset in u_cluster_data of the group of each cluster (u32), the clusters are in the payloads of the groups
 	uint nodes;					// byte offset in u_cluster_data of MeshNodeGPU[node_count], then the indices of root_count roots
 	uint node_count;
 	uint root_count;
 	uint roots_offset;			// byte offset of the roots in nodes
 	uint cluster_count;
 	uint mesh_index;			// in the mesh table
+	uint groups;				// byte offset in u_cluster_data of the table of groups (MeshGroupAddressGPU, 32 bytes): record address, header address, stream, indices, first cluster, count, flags
 };
 
 // the description of a mesh of the mesh table of the GPU scene (GPUSceneMesh), `mesh` is its index in the table
@@ -63,8 +69,9 @@ MeshDesc loadSceneDesc(uint mesh) {
 	const uint2 b = meshes.Load2(mesh * 64 + 16);		// root count, roots offset
 	MeshDesc r;
 	r.camera_offset = float4(-u_cam_frac, 1);
-	r.clusters = a.x; r.nodes = a.y; r.cluster_count = a.z; r.node_count = a.w;
+	r.cluster_groups = a.x; r.nodes = a.y; r.cluster_count = a.z; r.node_count = a.w;
 	r.root_count = b.x; r.roots_offset = b.y;
+	r.groups = meshes.Load(mesh * 64 + 48);
 	r.mesh_index = mesh;
 	return r;
 }
@@ -118,12 +125,22 @@ bool insideFrustum(float3 center, float radius) {
 // Tests a cluster and appends it to the list of selected clusters if it is selected.
 void processCluster(MeshDesc desc, Instance instance, float max_scale, uint instance_idx, uint cluster, uint group_ref) {
 	ByteAddressBuffer clusters = bindless_buffers[u_cluster_data];
-	uint offset = desc.clusters + cluster * 80;
+	// Streaming: the record of a cluster is in the payload of its group, which is not loaded if the flags say so (then the clusters of the group are not drawn)
+	const uint group = clusters.Load(desc.cluster_groups + cluster * 4);
+	const uint4 group_address = clusters.Load4(desc.groups + group * 32 + 16);	// first cluster, cluster count, flags
+	const uint own_flags = group_address.z;
+	if ((own_flags & 1) == 0) return;
+	uint offset = clusters.Load(desc.groups + group * 32) + (cluster - group_address.x) * 80;
 	float4 bounds = asfloat(clusters.Load4(offset));
 	float4 lod_bounds = asfloat(clusters.Load4(offset + 16));
 	float4 parent_bounds = asfloat(clusters.Load4(offset + 32));
 	uint4 misc = clusters.Load4(offset + 48);
 	const float2 attribute_errors = asfloat(clusters.Load2(offset + 64)); // of the cluster and of its parent
+	// A cluster whose children (the group it was refined to) are not loaded is drawn as if it was accurate enough, if its parent is not drawn instead. The parent decides
+	// the same for all clusters of the group, so there are no holes and no overlaps.
+	const uint refined_group = clusters.Load(offset + 76);	// the group of its children
+	const uint child_flags = refined_group == 0xffffffffu ? 1u : clusters.Load(desc.groups + refined_group * 32 + 24);
+	const bool refined = (child_flags & 1) != 0;
 	// the error of a cluster is the one of its positions and the one of its attributes, which counts as much as the weight says
 	float error = (asfloat(misc.x) + u_attribute_weight * attribute_errors.x) * max_scale;
 	// clusters without a parent have FLT_MAX error
@@ -135,13 +152,23 @@ void processCluster(MeshDesc desc, Instance instance, float max_scale, uint inst
 	// the cluster is drawn if it is accurate enough and its parent is not
 	float3 lod_center = cull_pos + rotateByQuat(instance.rot, lod_bounds.xyz * instance.scale);
 	float3 parent_center = cull_pos + rotateByQuat(instance.rot, parent_bounds.xyz * instance.scale);
-	if (!isErrorSmall(error, lod_center, lod_bounds.w * max_scale)) return;
+	const bool error_small = isErrorSmall(error, lod_center, lod_bounds.w * max_scale);
+	if (refined && !error_small) return;
 	if (isErrorSmall(parent_error, parent_center, parent_bounds.w * max_scale)) return;
 
 	// frustum culling
 	float3 center = cull_pos + rotateByQuat(instance.rot, bounds.xyz * instance.scale);
 	float radius = bounds.w * max_scale;
 	if (!insideFrustum(center, radius)) return;
+
+	// the feedback of streaming: the group is used, and if the cluster is only drawn because its children are not loaded and it is not accurate enough, they are needed
+	if (u_feedback_capacity != 0) {
+		RWByteAddressBuffer feedback = bindless_rw_buffers[u_feedback];
+		const uint own_id = own_flags >> 8;
+		if (own_id < u_feedback_capacity) feedback.Store(own_id * 8, u_frame);
+		const uint child_id = child_flags >> 8;
+		if (!refined && !error_small && child_id < u_feedback_capacity) feedback.Store(child_id * 8 + 4, u_frame);
+	}
 
 	RWByteAddressBuffer selected = bindless_rw_buffers[u_selected];
 	uint at;
@@ -150,7 +177,7 @@ void processCluster(MeshDesc desc, Instance instance, float max_scale, uint inst
 }
 
 // false if no cluster of the node can be selected, then the node and everything under it is skipped
-bool isNodeNeeded(float4 bounds, float4 lod_bounds, float min_error, float max_parent_error, float min_attribute_error, float max_parent_attribute_error, Instance instance, float max_scale) {
+bool isNodeNeeded(float4 bounds, float4 lod_bounds, float min_error, float max_parent_error, float min_attribute_error, float max_parent_attribute_error, bool unrefined, Instance instance, float max_scale) {
 	const float3 cull_pos = instance.pos + u_cull_offset.xyz;
 	float3 center = cull_pos + rotateByQuat(instance.rot, bounds.xyz * instance.scale);
 
@@ -163,7 +190,8 @@ bool isNodeNeeded(float4 bounds, float4 lod_bounds, float min_error, float max_p
 	float far_dist = u_is_ortho ? 1 : to_center + lod_radius;
 	bool needed = insideFrustum(center, bounds.w * max_scale);
 	// none of the clusters is accurate enough (the smallest error of positions and the smallest of attributes are not of the same cluster, the sum is a lower bound)
-	if ((min_error + u_attribute_weight * min_attribute_error) * max_scale > u_lod_k * far_dist) needed = false;
+	// (not if a cluster of the node has no loaded children: it is drawn however coarse it is)
+	if (!unrefined && (min_error + u_attribute_weight * min_attribute_error) * max_scale > u_lod_k * far_dist) needed = false;
 	// the parents of all the clusters are accurate enough, they are drawn instead (clusters without a parent have FLT_MAX); the sum of the largest ones is an upper bound
 	if (max_parent_error < 1e30 && (max_parent_error + u_attribute_weight * max_parent_attribute_error) * max_scale <= u_lod_k * near_dist) needed = false;
 	return needed;
@@ -235,7 +263,7 @@ void main(uint3 group_id : SV_GroupID, uint3 group_thread_id : SV_GroupThreadID)
 				const float4 lod_bounds = asfloat(nodes.Load4(node_offset + 16));
 				const uint4 misc = nodes.Load4(node_offset + 32); // min error, max parent error, first, count and flags
 				const float2 attribute_errors = asfloat(nodes.Load2(node_offset + 48)); // the smallest and the largest of parents
-				if (!isNodeNeeded(bounds, lod_bounds, asfloat(misc.x), asfloat(misc.y), attribute_errors.x, attribute_errors.y, instance, max_scale)) continue;
+				if (!isNodeNeeded(bounds, lod_bounds, asfloat(misc.x), asfloat(misc.y), attribute_errors.x, attribute_errors.y, nodes.Load(node_offset + 56) != 0, instance, max_scale)) continue;
 
 				const uint child_count = misc.w & 0x7fffffffu;
 				if (misc.w & 0x80000000u) {

@@ -14,7 +14,7 @@ cbuffer Textures : register(b4) {
 	TextureHandle u_gbuffer_depth;
 	TextureHandle u_shadowmap;
 	TextureHandle u_shadow_atlas;
-	TextureHandle u_reflection_probes;
+	TextureCubeArrayHandle u_reflection_probes;
 };
 
 VSOutput mainVS(uint vertexID : SV_VertexID) {

@@ -447,6 +447,10 @@ struct PipelineImpl final : Pipeline {
 		gpu::BindlessHandle groups;		// the groups of instanced models of the GPU scene
 		gpu::BindlessHandle cluster_data;	// the buffer with clusters and nodes of all meshes
 		u32 padding1;
+		gpu::RWBindlessHandle feedback;	// streaming of clusters, see Renderer::getClusterFeedbackBuffer
+		u32 frame;						// the stamp of this frame, ids are appended to the feedback once per frame
+		u32 feedback_capacity;			// ids that the feedback accepts, 0: no feedback
+		u32 padding2;
 	};
 	static_assert(sizeof(ClusterViewUniforms) % 16 == 0);
 
@@ -2177,8 +2181,8 @@ struct PipelineImpl final : Pipeline {
 		gpu::RWBindlessHandle args;
 		gpu::BindlessHandle groups;
 		gpu::BindlessHandle bone_table;
-		gpu::BindlessHandle overrides;
-		u32 override_count;
+		gpu::BindlessHandle material_sets;
+		u32 padding1;
 		u32 command_base;
 		u32 bone_table_offset;
 		u32 padding[3];
@@ -2204,7 +2208,7 @@ struct PipelineImpl final : Pipeline {
 
 	// Says which draw groups of the scene the view draws (the ones with a layer that has a bucket in the view) and where their commands are: the commands of the
 	// groups that are drawn follow each other. The result is a u32 for each draw group, its first command in this view or 0xffffffff if the view does not draw it.
-	// The variants, the table of meshes and the overrides do not depend on the view, they are in the GPU scene. The buffer of the result is invalid if there is
+	// The variants, the table of meshes and the material sets do not depend on the view, they are in the GPU scene. The buffer of the result is invalid if there is
 	// nothing to draw.
 	TransientSlice makeSceneViewGroups(View& view, GPUScene& scene) {
 		const u32 group_count = scene.getDrawGroupCount();
@@ -2284,7 +2288,7 @@ struct PipelineImpl final : Pipeline {
 		// nothing is drawn until everything is ready
 		if (!m_scene_cull_shader->isReady() || !m_scene_variants_shader->isReady() || !m_cluster_shader->isReady()) return;
 		if (!m_scene_cull_counter || !m_scene_cull_args || !scene.isUploaded()) return;
-		if (!scene.getModelTableBuffer() || !scene.getMeshTableBuffer() || !scene.getGroupTableBuffer() || !scene.getOverridesBuffer() || !scene.getVariantBuffer()) return;
+		if (!scene.getModelTableBuffer() || !scene.getMeshTableBuffer() || !scene.getGroupTableBuffer() || !scene.getMaterialSetBuffer() || !scene.getVariantBuffer()) return;
 		if (!m_scene_flat_items || !m_scene_tree_items || !m_scene_selected || !m_scene_counters || !m_scene_commands || !m_scene_out) return;	// created by ensureSceneWorkBuffers when the frame is set up
 		if (!m_cluster_scratch || !m_cluster_iota) return;
 
@@ -2432,6 +2436,13 @@ struct PipelineImpl final : Pipeline {
 		cu.counts = gpu::getBindlessHandle(m_scene_cull_counter);
 		cu.groups = gpu::getBindlessHandle(scene.getGroupTableBuffer());
 		cu.cluster_data = gpu::getBindlessHandle(m_renderer.getClusterDataBuffer());
+		const gpu::BufferHandle feedback = m_renderer.getClusterFeedbackBuffer();
+		if (feedback) {
+			cu.feedback = gpu::getRWBindlessHandle(feedback);
+			cu.feedback_capacity = m_renderer.getClusterFeedbackCapacity();
+			cu.frame = m_renderer.frameNumber() + 1;
+			stream.barrier(feedback, gpu::BarrierType::WRITE);
+		}
 
 		stream.barrier(m_renderer.getClusterDataBuffer(), gpu::BarrierType::READ);
 		stream.barrier(m_scene_flat_items, gpu::BarrierType::READ);
@@ -2479,8 +2490,7 @@ struct PipelineImpl final : Pipeline {
 			draw_ub.out = gpu::getRWBindlessHandle(m_scene_out);
 			draw_ub.args = gpu::getRWBindlessHandle(m_scene_cull_args);
 			draw_ub.groups = gpu::getBindlessHandle(scene.getGroupTableBuffer());
-			draw_ub.overrides = gpu::getBindlessHandle(scene.getOverridesBuffer());
-			draw_ub.override_count = scene.getOverrideCount();
+			draw_ub.material_sets = gpu::getBindlessHandle(scene.getMaterialSetBuffer());
 			draw_ub.command_base = command_base;
 			const GPUScene::FrameBones& frame_bones = scene.getFrameBones();
 			if (frame_bones.table && frame_bones.bones) {
@@ -2493,7 +2503,7 @@ struct PipelineImpl final : Pipeline {
 			stream.barrier(group_base.buffer, gpu::BarrierType::READ);
 			stream.barrier(scene.getVariantBuffer(), gpu::BarrierType::READ);
 			stream.barrier(scene.getMeshTableBuffer(), gpu::BarrierType::READ);
-			stream.barrier(scene.getOverridesBuffer(), gpu::BarrierType::READ);
+			stream.barrier(scene.getMaterialSetBuffer(), gpu::BarrierType::READ);
 			if (frame_bones.table) stream.barrier(frame_bones.table, gpu::BarrierType::READ);
 			stream.barrier(scene.getGroupTableBuffer(), gpu::BarrierType::READ);
 			stream.barrier(scene.getInstancesBuffer(), gpu::BarrierType::READ);

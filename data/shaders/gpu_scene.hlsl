@@ -4,7 +4,8 @@
 //
 // u_bounds:    16 bytes per slot, int3 position (fixed point), float radius (< 0: the slot is free)
 // u_instances: 96 bytes per slot, float4 rot, int3 p, uint mesh_id, float3 scale, uint flags,
-//                                 float4 prev_rot, int3 prev_p, uint, float3 prev_scale, uint
+//                                 float4 prev_rot, int3 prev_p, uint material_set, float3 prev_scale, uint
+//              material_set: the first entry of the material set of the instance in the material sets (gpu_scene_variants.hlsl), 0xffffffff: it has the materials of its model
 //
 // An entry with HAS_NEW writes the new state of the slot and moves the old one to prev_*, unless TELEPORT is set, then prev_* is the new state.
 // An entry without HAS_NEW is a slot that changed in the last frame and not in this one: its previous state catches up with the current one,
@@ -40,6 +41,7 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 	uint4 n0 = entries.Load4(e + 32);		// rot
 	uint4 n1 = entries.Load4(e + 48);		// p, mesh_id
 	uint4 n2 = entries.Load4(e + 64);		// scale, flags
+	const uint new_set = entries.Load(e + 108);	// material set (the word after prev_p)
 	const uint b = slot * 16;
 	const uint o = slot * 96;
 
@@ -47,11 +49,12 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 	const uint4 old_bounds = bounds.Load4(b);
 	const uint4 old0 = instances.Load4(o);
 	const uint4 old2 = instances.Load4(o + 32);
+	const uint old_set = instances.Load(o + 76);
 
 	if ((flags & HAS_NEW) == 0) {
 		// catch up: previous = current
 		instances.Store4(o + 48, old0);
-		instances.Store4(o + 64, uint4(old_bounds.xyz, 0));
+		instances.Store4(o + 64, uint4(old_bounds.xyz, old_set));
 		instances.Store4(o + 80, uint4(old2.xyz, 0));
 		return;
 	}
@@ -62,12 +65,12 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 	instances.Store4(o + 32, n2);
 	if (flags & TELEPORT) {
 		instances.Store4(o + 48, n0);
-		instances.Store4(o + 64, uint4(new_bounds.xyz, 0));
+		instances.Store4(o + 64, uint4(new_bounds.xyz, new_set));
 		instances.Store4(o + 80, uint4(n2.xyz, 0));
 	}
 	else {
 		instances.Store4(o + 48, old0);
-		instances.Store4(o + 64, uint4(old_bounds.xyz, 0));
+		instances.Store4(o + 64, uint4(old_bounds.xyz, new_set));
 		instances.Store4(o + 80, uint4(old2.xyz, 0));
 	}
 }

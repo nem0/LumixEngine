@@ -21,11 +21,12 @@
 // u_commands (rw): a draw command for each variant, 24 bytes: draw id (the first slot), index count, instance count, first index, base vertex, base instance.
 //                  The commands of a view start at the byte u_command_base, each view that is drawn has its own, since the draws are executed after the
 //                  passes of all the views. The command of a variant is the one number `group_base[group] + index in the group` of them.
-// u_meshes: the mesh table of the scene (GPUSceneMesh, 64 bytes), its variant, index in the model and material index are at 52
+// u_meshes: the mesh table of the scene (GPUSceneMesh, 64 bytes), its entry in the default set of its model (u_sets) and its index in the model are at 52
 // u_variants: 16 bytes for each variant, x = group | index in the group << 16, first index, base vertex, index count
 // u_group_base: from u_group_base_offset, u32 for each draw group: its first command in this view, 0xffffffff if the group is not drawn in it
-// u_overrides: the materials of instances that have their own (GPUScene::setOverrides): u_override_count entries of 16 bytes sorted by slot and then mesh: slot,
-//              index of the mesh in its model, material index, variant. Only slots with the flag HAS_OVERRIDE (16, the flags of the instance) are searched.
+// u_sets: the material sets, 8 bytes for each mesh of a model, variant and material index. Every model has a default set with its own materials (the mesh table
+//         has the entry of each mesh), instances that have their own materials (GPUScene::setOverrides) have another set. The set of an instance starts at the
+//         entry that is in its word at 76 (0xffffffff: the instance has the materials of its model), the entry of a mesh is `first + index of the mesh in its model`.
 
 #define MAX_VARIANTS 8192
 #define SCENE_POS_UNIT (1.0 / 1024.0)
@@ -48,30 +49,12 @@ cbuffer UniformData : register(b4) {
 	uint u_args;				// rw bindless, dispatch arguments
 	uint u_groups;				// bindless, GPUSceneGroup[] (gpu_scene.h), for the clusters of instanced models
 	uint u_bone_table;			// bindless, u32 for each slot: the byte offset of its bones in the bones buffer (0: none), 0 if there are no bones
-	uint u_overrides;			// bindless
-	uint u_override_count;
+	uint u_sets;				// bindless
+	uint u_padding1;
 	uint u_command_base;		// byte offset of the commands of the view in u_commands
 	uint u_bone_table_offset;	// in bytes
 	uint3 u_padding2;
 };
-
-// the variant and the material index of a mesh of an instance, they are not changed if it has no override (binary search), `mesh` is the index in its model
-void findOverride(uint slot, uint mesh, inout uint variant, inout uint material) {
-	ByteAddressBuffer overrides = bindless_buffers[u_overrides];
-	int low = 0;
-	int high = (int)u_override_count - 1;
-	while (low <= high) {
-		const int middle = (low + high) >> 1;
-		const uint4 entry = overrides.Load4(middle * 16);
-		if (entry.x == slot && entry.y == mesh) {
-			material = entry.z;
-			variant = entry.w;
-			return;
-		}
-		if (entry.x < slot || (entry.x == slot && entry.y < mesh)) low = middle + 1;
-		else high = middle - 1;
-	}
-}
 
 #define COUNTS_AT 64
 #define CURSORS_AT (64 + MAX_VARIANTS * 4)
@@ -148,11 +131,16 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 		const uint index = thread_id.y * 65535 * 64 + thread_id.x;
 		if (index >= selected_count) return;
 		const uint4 entry = selected.Load4(16 + index * 16);	// slot, mesh, cluster
-		const uint3 mesh_info = bindless_buffers[u_meshes].Load3(entry.y * 64 + 52);	// variant, index of the mesh in its model, material index
-		uint variant = mesh_info.x;
-		uint material = mesh_info.z;
-		// a slot of the scene can have its own material
-		if (entry.w == 0 && u_override_count != 0 && (bindless_buffers[u_instances].Load(entry.x * 96 + 44) & 16) != 0) findOverride(entry.x, mesh_info.y, variant, material);
+		const uint2 mesh_info = bindless_buffers[u_meshes].Load2(entry.y * 64 + 52);	// its entry in the default set of its model, index of the mesh in its model
+		uint set_entry = mesh_info.x;
+		// a slot of the scene can have its own materials, its material set has the entry of every mesh of the model
+		if (entry.w == 0) {
+			const uint set = bindless_buffers[u_instances].Load(entry.x * 96 + 76);
+			if (set != 0xffffffff) set_entry = set + mesh_info.y;
+		}
+		const uint2 set_data = bindless_buffers[u_sets].Load2(set_entry * 8);
+		const uint variant = set_data.x;	// 0xffffffff: the mesh is not drawn
+		const uint material = set_data.y;
 		if (variant == 0xffffffff) return;	// the mesh is not drawn
 		// the group of the variant is not drawn in this view
 		if (bindless_buffers[u_group_base].Load(u_group_base_offset + (bindless_buffers[u_variants].Load(variant * 16) & 0xffff) * 4) == 0xffffffff) return;

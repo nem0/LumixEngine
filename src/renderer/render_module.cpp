@@ -542,7 +542,7 @@ struct RenderModuleImpl final : RenderModule {
 		m_override_queue.push(entity);
 	}
 
-	// The entries of the table of material overrides of the GPU scene for the slot of the instance: a mesh has one if its material is resolved and is not the
+	// The material overrides of the GPU scene for the slot of the instance: a mesh has one if its material is resolved and is not the
 	// one of the model. The entries of materials that are not resolved are not there (the mesh is drawn with the material of the model until they are).
 	void syncMaterialOverrides(EntityRef entity) {
 		ModelInstance& mi = m_model_instances[entity.index];
@@ -556,12 +556,12 @@ struct RenderModuleImpl final : RenderModule {
 				const MeshMaterial& model_mat = mi.model->getMeshMaterial(mesh);
 				if (!own.material || !model_mat.material || u32(own.material_index) == 0 || !own.material->isReady()) continue;
 				if (own.material_index == model_mat.material_index) continue;
-				GPUScene::Override o = { 0, mesh, (u32)own.material_index, own.material };
+				GPUScene::Override o = { mesh, (u32)own.material_index, own.material };
 				entries.push(o);
 			}
 		}
 		m_gpu_scene.setOverrides(mi.gpu_slot, Span<const GPUScene::Override>(entries.begin(), entries.size()));
-		gpuSceneUpdate(entity);	// the flag of the slot
+		gpuSceneUpdate(entity);	// the material set of the slot
 	}
 
 	// Resolves the material overrides of the queued instances once their materials are ready (the queue keeps the others), and makes their entries.

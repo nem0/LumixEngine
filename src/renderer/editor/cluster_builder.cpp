@@ -19,7 +19,7 @@ namespace Lumix {
 namespace {
 
 // the sizes meshoptimizer recommends for meshlets (its triangle count is a multiple of 4, and 124 leaves room for hardware that needs a few spare slots)
-constexpr u32 MAX_CLUSTER_VERTICES = 64;
+constexpr u32 MAX_CLUSTER_VERTICES = MeshClusters::MAX_CLUSTER_VERTICES;
 constexpr u32 MAX_CLUSTER_TRIANGLES = 124;
 constexpr float UV_STEP = 1.f / 16384.f;	// the largest step of quantized UVs, unless the range of a cluster is too large for 16 bits
 constexpr u32 INVALID_INDEX = 0xffFFffFF;
@@ -197,6 +197,13 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 		}
 	};
 	auto output = [&](clodGroup group, const clodCluster* clusters, size_t count) -> int {
+		// the id that is returned is the number of the group, the clusters of the group made by this call are consecutive
+		MeshGroupGPU group_entry;
+		group_entry.first_cluster = out.clusters.size();
+		group_entry.cluster_count = (u32)count;
+		group_entry.page = 0;
+		group_entry.flags = 0;
+		out.groups.push(group_entry);
 		if (group.depth != level) {
 			if (level == 0) {
 				// the finest clusters are the first ones, they contain every triangle once
@@ -214,6 +221,8 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 			memset(&cluster, 0, sizeof(cluster));
 			cluster.first_index = out.indices.size();
 			cluster.index_count = (u32)c.index_count;
+			cluster.group = group_count;
+			cluster.refined_group = c.refined >= 0 ? (u32)c.refined : MeshClusters::NO_GROUP;
 			for (size_t j = 0; j < c.index_count; ++j) {
 				out.indices.push(c.indices[j]);
 				if (dilate_borders) out.index_positions.push(cluster_positions[c.indices[j]]);
@@ -379,8 +388,11 @@ bool packClusterVertices(const ClusterVertexSource& source, MeshClusters& out, I
 	Array<u32> vertices(allocator);	// vertices of the cluster that is processed
 	Array<i32> cluster_lattice(allocator);	// the positions of the vertices of the cluster, 3 for each, in the lattice
 
-	const u64 header_bits = u64(cluster_count) * sizeof(MeshClusterVertexGPU) * 8;
+	// the stream has a piece for each group, every piece starts at a 32 bit boundary (it is what the address of a group points to), the headers are not in it
 	u64 bit_cursor = 0;
+	u64 group_start_bit = 0;
+	u32 current_group = MeshClusters::NO_GROUP;
+	auto align_cursor = [&]() { bit_cursor = (bit_cursor + 31) & ~u64(31); };
 	auto write_bits = [&](u32 value, u32 count) {
 		if (count == 0) return;
 		const u32 word = (u32)(bit_cursor >> 5);
@@ -393,6 +405,17 @@ bool packClusterVertices(const ClusterVertexSource& source, MeshClusters& out, I
 
 	for (u32 ci = 0; ci < cluster_count; ++ci) {
 		const MeshClusterGPU& cluster = out.clusters[ci];
+		if (cluster.group >= (u32)out.groups.size() || (current_group != MeshClusters::NO_GROUP && cluster.group < current_group)) {
+			logError("Cluster ", ci, " has an invalid group");
+			return false;
+		}
+		if (cluster.group != current_group) {
+			align_cursor();
+			if (current_group != MeshClusters::NO_GROUP) out.groups[current_group].stream_size = u32(bit_cursor / 8 - out.groups[current_group].stream_offset);
+			current_group = cluster.group;
+			group_start_bit = bit_cursor;
+			out.groups[current_group].stream_offset = (u32)(bit_cursor / 8);
+		}
 		vertices.clear();
 		cluster_lattice.clear();
 		for (u32 k = 0; k < cluster.index_count; ++k) {
@@ -442,7 +465,7 @@ bool packClusterVertices(const ClusterVertexSource& source, MeshClusters& out, I
 			header.pos_start[a] = mn[a];
 		}
 		header.vertex_count = (u32)vertices.size();
-		header.pos_bit_offset = (u32)(header_bits + bit_cursor);
+		header.pos_bit_offset = (u32)(bit_cursor - group_start_bit);
 		header.pos_step = step;
 
 		// UVs: the fewest bits per axis that keep the step at most UV_STEP, at most 16
@@ -461,7 +484,7 @@ bool packClusterVertices(const ClusterVertexSource& source, MeshClusters& out, I
 		// bits of a vertex after its position: the frame, UV, AO (only the first of 4 channels) and the color
 		const u32 attribute_bits = 32 + (source.uvs ? uv_bits[0] + uv_bits[1] : 0) + (source.ao ? 8 : 0) + (source.colors ? 32 : 0);
 		header.pos_bits = bits[0] | (bits[1] << 8) | (bits[2] << 16) | (attribute_bits << 24);
-		if (header_bits + bit_cursor + u64((u32)vertices.size()) * (bits[0] + bits[1] + bits[2] + attribute_bits) >= (1ull << 32)) {
+		if (bit_cursor + u64((u32)vertices.size()) * (bits[0] + bits[1] + bits[2] + attribute_bits) >= (1ull << 32)) {
 			logError("Vertices of clusters are larger than 512 MB");
 			return false;
 		}
@@ -492,6 +515,7 @@ bool packClusterVertices(const ClusterVertexSource& source, MeshClusters& out, I
 	// shaders read two words at any bit
 	const u32 words = (u32)((bit_cursor + 31) >> 5) + 2;
 	while ((u32)out.vertex_words.size() < words) out.vertex_words.push(0);
+	if (current_group != MeshClusters::NO_GROUP) out.groups[current_group].stream_size = words * 4 - out.groups[current_group].stream_offset;
 
 	return true;
 }

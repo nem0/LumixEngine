@@ -3,6 +3,8 @@
 #include "core/log.h"
 #include "core/path.h"
 #include "core/profiler.h"
+#include "core/sort.h"
+#include "core/stack_array.h"
 #include "engine/engine.h"
 #include "engine/resource_manager.h"
 #include "renderer/draw_stream.h"
@@ -50,8 +52,11 @@ GPUScene::GPUScene(Renderer& renderer, IAllocator& allocator)
 	, m_pending(allocator)
 	, m_fresh(allocator)
 	, m_slot_model(allocator)
-	, m_slot_override(allocator)
-	, m_overrides(allocator)
+	, m_slot_set(allocator)
+	, m_sets(allocator)
+	, m_set_entries(allocator)
+	, m_free_sets(allocator)
+	, m_set_map(allocator)
 	, m_draw_groups(allocator)
 	, m_draw_group_map(allocator)
 	, m_variants(allocator)
@@ -78,7 +83,7 @@ GPUScene::~GPUScene() {
 	if (m_mesh_buffer) m_renderer.getEndFrameDrawStream().destroy(m_mesh_buffer);
 	if (m_model_buffer) m_renderer.getEndFrameDrawStream().destroy(m_model_buffer);
 	if (m_group_buffer) m_renderer.getEndFrameDrawStream().destroy(m_group_buffer);
-	if (m_override_buffer) m_renderer.getEndFrameDrawStream().destroy(m_override_buffer);
+	if (m_set_buffer) m_renderer.getEndFrameDrawStream().destroy(m_set_buffer);
 	if (m_variant_buffer) m_renderer.getEndFrameDrawStream().destroy(m_variant_buffer);
 	for (u32 i = 0; i < (u32)m_models.size(); ++i) freePools(i);
 	m_shader->decRefCount();
@@ -123,6 +128,8 @@ void GPUScene::releaseModel(u32 model_id) {
 	ASSERT(m_models[model_id].instance_count > 0);
 	if (--m_models[model_id].instance_count == 0) {
 		freePools(model_id);
+		if (m_models[model_id].default_set != GPUSceneConst::INVALID_SLOT) releaseSet(m_models[model_id].default_set);
+		m_models[model_id].default_set = GPUSceneConst::INVALID_SLOT;
 		m_models[model_id].model = nullptr;
 		m_tables_dirty = true;
 	}
@@ -142,8 +149,8 @@ u32 GPUScene::alloc(const Model* model) {
 		m_pending.resize(m_next_slot);
 		m_fresh.resize(m_next_slot);
 		m_slot_model.resize(m_next_slot);
-		m_slot_override.resize(m_next_slot);
-		m_slot_override[slot] = 0;
+		m_slot_set.resize(m_next_slot);
+		m_slot_set[slot] = GPUSceneConst::INVALID_SLOT;
 		m_pending[slot] = GPUSceneConst::INVALID_SLOT;
 	}
 	m_slot_model[slot] = model_id;
@@ -161,26 +168,121 @@ GPUScene::Entry& GPUScene::entryFor(u32 slot) {
 	return e;
 }
 
+static u64 hashOverrides(const Model* model, Span<const GPUScene::Override> overrides) {
+	u64 h = 1469598103934665603ull;
+	auto mix = [&](u64 v) { h ^= v; h *= 1099511628211ull; };
+	mix((u64)(uintptr)model);
+	for (const GPUScene::Override& o : overrides) {
+		mix(o.mesh);
+		mix(o.material_index);
+		mix((u64)(uintptr)o.material);
+	}
+	return h;
+}
+
+bool GPUScene::sameSet(const MaterialSet& set, u32 model_id, Span<const Override> overrides) const {
+	if (!set.model || set.model_id != model_id) return false;
+	u32 next = 0;
+	for (u32 i = 0; i < set.count; ++i) {
+		const SetEntry& e = m_set_entries[set.first + i];
+		if (!e.own) continue;
+		if (next >= overrides.length()) return false;
+		const Override& o = overrides[next++];
+		if (o.mesh != i || o.material != e.material || o.material_index != e.material_index) return false;
+	}
+	return next == overrides.length();
+}
+
+void GPUScene::releaseSet(u32 id) {
+	MaterialSet& set = m_sets[id];
+	ASSERT(set.refs > 0);
+	if (--set.refs > 0) return;
+	const auto found = m_set_map.find(set.hash);
+	if (found.isValid() && found.value() == id) m_set_map.erase(set.hash);
+	for (u32 i = 0; i < set.count; ++i) m_set_entries[set.first + i] = SetEntry{};
+	set.model = nullptr;
+	set.model_id = GPUSceneConst::INVALID_MODEL;
+	m_free_sets.push(id);
+}
+
+// overrides: normalized by setOverrides (meshes < count, unique, sorted by mesh)
+u32 GPUScene::acquireSet(u32 model_id, const Model* model, u32 count, Span<const Override> overrides) {
+	u32 set = GPUSceneConst::INVALID_SLOT;
+	const u64 hash = hashOverrides(model, overrides);
+	const auto found = m_set_map.find(hash);
+	if (found.isValid()) {
+		if (sameSet(m_sets[found.value()], model_id, overrides)) {
+			set = found.value();
+		}
+		else {
+			// two different sets with the same hash
+			for (u32 i = 0; i < (u32)m_sets.size() && set == GPUSceneConst::INVALID_SLOT; ++i) {
+				if (sameSet(m_sets[i], model_id, overrides)) set = i;
+			}
+		}
+	}
+	if (set != GPUSceneConst::INVALID_SLOT) return set;
+
+	// the range of a free set with as many entries, or a new one
+	for (u32 i = 0; i < (u32)m_free_sets.size(); ++i) {
+		if (m_sets[m_free_sets[i]].count != count) continue;
+		set = m_free_sets[i];
+		m_free_sets.swapAndPop(i);
+		break;
+	}
+	if (set == GPUSceneConst::INVALID_SLOT) {
+		set = m_sets.size();
+		MaterialSet& added = m_sets.emplace();
+		added.first = m_set_entries.size();
+		added.count = count;
+		m_set_entries.resize(added.first + count);
+	}
+	MaterialSet& s = m_sets[set];
+	s.model = model;
+	s.model_id = model_id;
+	s.refs = 0;
+	s.hash = hash;
+	for (u32 i = 0; i < count; ++i) m_set_entries[s.first + i] = SetEntry{};
+	for (const Override& o : overrides) {
+		if (o.mesh >= count) continue;
+		SetEntry& e = m_set_entries[s.first + o.mesh];
+		e.material = o.material;
+		e.material_index = o.material_index;
+		e.own = true;
+	}
+	if (!found.isValid()) m_set_map.insert(hash, set);
+	m_sets_dirty = true;
+	return set;
+}
+
 void GPUScene::setOverrides(u32 slot, Span<const Override> overrides) {
 	ASSERT(slot < m_next_slot);
-	u32 first = 0, last = (u32)m_overrides.size();
-	while (first < last) {	// the first entry of the slot
-		const u32 middle = (first + last) / 2;
-		if (m_overrides[middle].slot < slot) first = middle + 1;
-		else last = middle;
+	const u32 model_id = m_slot_model[slot];
+	const Model* model = model_id == GPUSceneConst::INVALID_MODEL ? nullptr : m_models[model_id].model;
+	const u32 count = model ? (u32)model->getMeshCount() : 0;
+	// normalize the overrides (valid meshes, one per mesh - the last one wins, sorted by mesh), so the hash and sameSet see the same overrides for the same set
+	StackArray<Override, 16> normalized(m_allocator);
+	for (const Override& o : overrides) {
+		if (o.mesh >= count) continue;
+		bool replaced = false;
+		for (Override& n : normalized) {
+			if (n.mesh != o.mesh) continue;
+			n = o;
+			replaced = true;
+			break;
+		}
+		if (!replaced) normalized.push(o);
 	}
-	u32 end = first;
-	while (end < (u32)m_overrides.size() && m_overrides[end].slot == slot) ++end;
-	if (end == first && overrides.length() == 0) return;
+	sort(normalized.begin(), normalized.end(), [](const Override& a, const Override& b) { return a.mesh < b.mesh; });
 
-	if (end > first) m_overrides.eraseRange(first, end - first);	// eraseRange does not take an empty range
-	for (u32 i = 0; i < overrides.length(); ++i) {
-		Override o = overrides[i];
-		o.slot = slot;
-		m_overrides.insert(first + i, o);
-	}
-	m_slot_override[slot] = overrides.length() > 0 ? 1 : 0;
-	m_overrides_dirty = true;
+	u32 set = GPUSceneConst::INVALID_SLOT;
+	if (count > 0 && !normalized.empty()) set = acquireSet(model_id, model, count, Span<const Override>(normalized.begin(), normalized.size()));
+
+	const u32 old = m_slot_set[slot];
+	if (old == set) return;
+	if (set != GPUSceneConst::INVALID_SLOT) ++m_sets[set].refs;
+	if (old != GPUSceneConst::INVALID_SLOT) releaseSet(old);
+	m_slot_set[slot] = set;
 }
 
 void GPUScene::free(u32 slot) {
@@ -282,7 +384,7 @@ void GPUScene::update(u32 slot, const Transform& tr, float radius, i32 forced_lo
 	i.mesh_id = m_slot_model[slot];
 	i.scale = tr.scale;
 	if (forced_lod >= 0) i.flags = GPUSceneInstance::FORCED_LOD | (u32(minimum(forced_lod, 4)) << 1);
-	if (m_slot_override[slot]) i.flags |= GPUSceneInstance::HAS_OVERRIDE;
+	i.material_set = m_slot_set[slot] == GPUSceneConst::INVALID_SLOT ? GPUSceneInstance::NO_MATERIAL_SET : m_sets[m_slot_set[slot]].first;
 }
 
 static u64 hashDrawGroup(const GPUScene::DrawGroup& k) {
@@ -465,7 +567,7 @@ void GPUScene::rebuildModelTables() {
 	m_variants.clear();
 	m_variant_map.clear();
 	m_variants_dirty = true;
-	m_overrides_dirty = true;
+	m_sets_dirty = true;
 	m_mesh_table.clear();
 	m_max_tree_depth = 0;
 	m_model_table.resize(m_models.size());
@@ -474,7 +576,20 @@ void GPUScene::rebuildModelTables() {
 		memset(&entry, 0, sizeof(entry));
 		entry.first_mesh = m_mesh_table.size();
 		const Model* model = m_models[id].model;
+		ModelEntry& model_entry = m_models[id];
+		// the default set has the entry of every mesh of the model, it is made again if the model has another number of meshes
+		if (model_entry.default_set != GPUSceneConst::INVALID_SLOT && (!model || (u32)model->getMeshCount() != m_sets[model_entry.default_set].count)) {
+			releaseSet(model_entry.default_set);
+			model_entry.default_set = GPUSceneConst::INVALID_SLOT;
+		}
 		if (!model || !model->isReady()) continue;
+		const u32 mesh_count = (u32)model->getMeshCount();
+		if (mesh_count == 0) continue;
+		if (model_entry.default_set == GPUSceneConst::INVALID_SLOT) {
+			model_entry.default_set = acquireSet(id, model, mesh_count, Span<const Override>());
+			++m_sets[model_entry.default_set].refs;
+		}
+		const u32 default_first = m_sets[model_entry.default_set].first;
 		if (!model->hasClusters()) {
 			if (!model->canUseGPUScene() || !allocPools(id, *model)) continue;
 			// all the meshes of all the LODs, drawn one by one
@@ -490,9 +605,7 @@ void GPUScene::rebuildModelTables() {
 				GPUSceneMesh& m = m_mesh_table.emplace();
 				memset(&m, 0, sizeof(m));
 				m.index_in_model = (u32)i;
-				const MeshMaterial& mesh_mat = model->getMeshMaterial(i);
-				m.material = (u32)mesh_mat.material_index;
-				m.variant = variantFor(id, *model, i, mesh_mat.material);
+				m.material_entry = default_first + (u32)i;
 				++entry.mesh_count;
 			}
 			continue;
@@ -503,7 +616,7 @@ void GPUScene::rebuildModelTables() {
 		bool complete = true;
 		for (i32 i = 0; i <= end; ++i) {
 			const Mesh& mesh = model->getMesh(i);
-			complete = complete && mesh.cluster_table_size != 0 && mesh.cluster_count != 0 && mesh.cluster_vertex_size != 0 && mesh.cluster_index_size != 0;
+			complete = complete && mesh.cluster_table_size != 0 && mesh.cluster_count != 0 && mesh.cluster_group_size != 0;
 		}
 		if (!complete) continue;
 
@@ -511,7 +624,7 @@ void GPUScene::rebuildModelTables() {
 			const Mesh& mesh = model->getMesh(i);
 			GPUSceneMesh& m = m_mesh_table.emplace();
 			memset(&m, 0, sizeof(m));
-			m.clusters = mesh.cluster_table_offset;
+			m.cluster_groups = mesh.cluster_group_ids_offset;
 			m.nodes = mesh.node_table_offset;
 			m.cluster_count = mesh.cluster_count;
 			m.node_count = mesh.node_count;
@@ -521,12 +634,9 @@ void GPUScene::rebuildModelTables() {
 			m.index_stride = mesh.cluster_index_stride;
 			m.leaf_cluster_count = mesh.leaf_cluster_count;
 			m.flat_groups = (mesh.cluster_count + GPUSceneConst::CLUSTER_THREADS - 1) / GPUSceneConst::CLUSTER_THREADS;
-			m.vertex_offset = mesh.cluster_vertex_offset;
-			m.indices = mesh.cluster_index_offset;
+			m.indices = mesh.cluster_group_offset;
 			m.index_in_model = (u32)i;
-			const MeshMaterial& mesh_mat = model->getMeshMaterial(i);
-			m.material = (u32)mesh_mat.material_index;
-			m.variant = variantFor(id, *model, i, mesh_mat.material);
+			m.material_entry = default_first + (u32)i;
 			if (mesh.cluster_count <= GPUSceneConst::FLAT_MAX_CLUSTERS) m.flags |= GPUSceneMesh::FLAT;
 			m_max_tree_depth = maximum(m_max_tree_depth, mesh.tree_depth);
 			++entry.mesh_count;
@@ -557,7 +667,7 @@ void GPUScene::flush() {
 	}
 
 	const bool grown = m_gpu_capacity != m_capacity;
-	if (m_entries.empty() && !grown && !m_tables_dirty && !m_groups_dirty && !m_overrides_dirty && !m_variants_dirty && m_pool_copies.empty()) return;
+	if (m_entries.empty() && !grown && !m_tables_dirty && !m_groups_dirty && !m_sets_dirty && !m_variants_dirty && m_pool_copies.empty()) return;
 	PROFILE_FUNCTION();
 
 	// the tables of the static data of models
@@ -604,33 +714,41 @@ void GPUScene::flush() {
 	}
 	const gpu::BufferHandle group_buffer = m_group_buffer;
 
-	// the table of material overrides
-	TransientSlice override_slice = {};
-	u32 override_bytes = 0;
-	if (m_overrides_dirty) {
-		m_overrides_dirty = false;
-		// their variants, the model of a slot has its pools and the mesh table was made
-		for (Override& o : m_overrides) {
-			o.variant = GPUSceneConst::INVALID_VARIANT;
-			const u32 model_id = m_slot_model[o.slot];
-			if (model_id == GPUSceneConst::INVALID_MODEL || !m_models[model_id].model || !m_models[model_id].model->isReady()) continue;
-			o.variant = variantFor(model_id, *m_models[model_id].model, o.mesh, o.material);
+	// the material sets: the variants of their meshes (the model of a set has its pools and the mesh table was made), the materials of the meshes without an override
+	// are the ones of the model
+	TransientSlice set_slice = {};
+	u32 set_bytes = 0;
+	if (m_sets_dirty) {
+		m_sets_dirty = false;
+		for (const MaterialSet& set : m_sets) {
+			if (!set.model) continue;
+			const Model* model = m_models[set.model_id].model;
+			const bool ready = model && model->isReady();
+			for (u32 i = 0; i < set.count; ++i) {
+				SetEntry& e = m_set_entries[set.first + i];
+				e.variant = GPUSceneConst::INVALID_VARIANT;
+				if (!ready || i >= (u32)model->getMeshCount()) continue;
+				if (!e.own) {
+					const MeshMaterial& mesh_mat = model->getMeshMaterial(i);
+					e.material = mesh_mat.material;
+					e.material_index = (u32)mesh_mat.material_index;
+				}
+				e.variant = variantFor(set.model_id, *model, i, e.material);
+			}
 		}
-		ensureTableBuffer(m_override_buffer, m_override_capacity, maximum(m_overrides.size(), 1u), 16, "gpu scene overrides");
-		override_bytes = m_overrides.size() * 16;
-		if (override_bytes) {
-			override_slice = Lumix::alloc(m_renderer.getTransientPool(), override_bytes);
-			u32* out = (u32*)override_slice.ptr;
-			for (const Override& o : m_overrides) {
-				out[0] = o.slot;
-				out[1] = o.mesh;
-				out[2] = o.material_index;
-				out[3] = o.variant;
-				out += 4;
+		ensureTableBuffer(m_set_buffer, m_set_capacity, maximum(m_set_entries.size(), 1u), 8, "gpu scene material sets");
+		set_bytes = m_set_entries.size() * 8;
+		if (set_bytes) {
+			set_slice = Lumix::alloc(m_renderer.getTransientPool(), set_bytes);
+			u32* out = (u32*)set_slice.ptr;
+			for (const SetEntry& e : m_set_entries) {
+				out[0] = e.variant;
+				out[1] = e.material_index;
+				out += 2;
 			}
 		}
 	}
-	const gpu::BufferHandle override_buffer = m_override_buffer;
+	const gpu::BufferHandle set_buffer = m_set_buffer;
 
 	// the table of variants, after everything that makes variants
 	TransientSlice variant_slice = {};
@@ -720,9 +838,9 @@ void GPUScene::flush() {
 			stream.barrier(group_slice.buffer, gpu::BarrierType::READ);
 			stream.copy(group_buffer, group_slice.buffer, 0, group_slice.offset, group_bytes);
 		}
-		if (override_bytes) {
-			stream.barrier(override_slice.buffer, gpu::BarrierType::READ);
-			stream.copy(override_buffer, override_slice.buffer, 0, override_slice.offset, override_bytes);
+		if (set_bytes) {
+			stream.barrier(set_slice.buffer, gpu::BarrierType::READ);
+			stream.copy(set_buffer, set_slice.buffer, 0, set_slice.offset, set_bytes);
 		}
 		if (variant_bytes) {
 			stream.barrier(variant_slice.buffer, gpu::BarrierType::READ);

@@ -346,9 +346,9 @@ Surface getSurfaceEx(VSOutput input) {
 	}
 #else
 	cbuffer Drawcall2 : register(b5) {
-		uint u_shadowmap;
-		uint u_shadow_atlas;
-		uint u_reflection_probes;
+		TextureHandle u_shadowmap;
+		TextureHandle u_shadow_atlas;
+		TextureCubeArrayHandle u_reflection_probes;
 	};
 
 	float4 mainPS(VSOutput input, float4 frag_coord : SV_POSITION) : SV_TARGET{

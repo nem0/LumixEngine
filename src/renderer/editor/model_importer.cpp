@@ -1568,13 +1568,12 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 			Array<u32> cpu_indices(m_allocator);
 			cpu_vertices.resize(clusters->leaf_vertex_count);
 			cpu_indices.resize(clusters->leaf_index_count);
-			const u32 stream_bit_base = u32(u64(cluster_count) * sizeof(MeshClusterVertexGPU) * 8);
 			u32 first_vertex = 0;
 			for (u32 c = 0; c < clusters->leaf_cluster_count; ++c) {
 				const MeshClusterGPU& cluster = clusters->clusters[c];
 				const MeshClusterVertexGPU& header = clusters->vertex_headers[c];
 				for (u32 v = 0; v < header.vertex_count; ++v) {
-					cpu_vertices[first_vertex + v] = decodeClusterPosition(header, clusters->vertex_words.begin(), stream_bit_base, v);
+					cpu_vertices[first_vertex + v] = decodeClusterPosition(header, clusters->vertex_words.begin(), clusters->groups[cluster.group].stream_offset * 8, v);
 				}
 				for (u32 k = 0; k < cluster.index_count; ++k) {
 					cpu_indices[cluster.first_index + k] = first_vertex + clusters->local_indices[cluster.first_index + k];
@@ -1612,6 +1611,9 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 			write(clusters->vertex_words.begin(), clusters->vertex_words.byte_size());
 			write(cpu_vertices.begin(), cpu_vertices.byte_size());
 			write(cpu_indices.begin(), cpu_indices.byte_size());
+			// the groups of clusters (streaming units), see MeshGroupGPU
+			write((u32)clusters->groups.size());
+			write(clusters->groups.begin(), clusters->groups.byte_size());
 			total_clusters += cluster_count;
 			packed_bytes += padded_indices.byte_size() + vertex_data_size;
 			unpacked_bytes += u64(m_geometries[meshes[i]->geometry_idx].vertex_buffer.size()) + clusters->indices.byte_size();

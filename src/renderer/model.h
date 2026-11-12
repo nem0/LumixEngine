@@ -13,6 +13,7 @@
 #include "engine/resource.h"
 #include "gpu/gpu.h"
 #include "vertex_decl.h"
+#include "mesh_clusters.h"
 
 
 namespace Lumix {
@@ -144,13 +145,15 @@ struct LUMIX_RENDERER_API Mesh {
 	// The vertex data, the clusters, the nodes and the indices are not buffers of the mesh (vertex_buffer_handle is invalid), they are ranges of the buffer shared
 	// by all meshes with clusters (see Renderer::allocClusterData): the vertex data are `cluster_vertex_size` bytes from `cluster_vertex_offset`, the clusters
 	// and then the nodes are `cluster_table_size` bytes from `cluster_table_offset`, the indices are `cluster_index_size` bytes from `cluster_index_offset`.
-	u32 cluster_index_offset = 0;
-	u32 cluster_index_size = 0;
-	u32 cluster_vertex_offset = 0;
-	u32 cluster_vertex_size = 0;
+	// The payload of the groups of clusters (the vertex stream and the indices) is streamed, see cluster_stream: it is in ranges of the buffer of cluster data while it is loaded.
+	// The owner of the stream is the mesh, it is freed with the clusters (Model::destroyClusters).
+	ClusterStream* cluster_stream = nullptr;
 	u32 cluster_table_offset = 0;	// MeshClusterGPU[cluster_count]
 	u32 node_table_offset = 0;		// MeshNodeGPU[node_count], then root_count u32 indices of roots, see MeshClusters, right after the clusters
-	u32 cluster_table_size = 0;
+	u32 cluster_table_size = 0;		// of the range that has the nodes with the roots and (16 byte aligned) the group of each cluster
+	u32 cluster_group_ids_offset = 0;	// u32[cluster_count], MeshClusterGPU::group of each cluster, the end of the range of the table
+	u32 cluster_group_offset = 0;	// MeshGroupAddressGPU[], a range of its own
+	u32 cluster_group_size = 0;
 	u32 cluster_count = 0;
 	u32 cluster_index_stride = 0; // indices of every cluster are padded (with degenerate triangles) to this count, see Model::loadClusters
 	u32 node_count = 0;
@@ -179,6 +182,7 @@ struct LUMIX_RENDERER_API Model final : Resource {
 		CLUSTER_INTERLEAVED = 9, // clusters have one buffer of headers and interleaved, packed vertices and everything else ready to be uploaded, see parseClusters
 		CLUSTER_NO_CONE = 10, // clusters have no normal cones (80 bytes instead of 96)
 		CLUSTER_U8_INDICES = 11, // indices local to a cluster are bytes, models of older versions with clusters are rejected
+		CLUSTER_GROUPS = 12, // clusters have group ids and every mesh has a table of groups (streaming units), models of older versions with clusters are rejected
 
 		LATEST // keep this last
 	};
