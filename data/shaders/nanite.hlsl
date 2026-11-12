@@ -38,11 +38,24 @@ cbuffer UniformData : register(b4) {
 	uint u_groups;			// bindless, GPUSceneGroup[] of the instanced models
 	uint u_cluster_data;	// bindless, the buffer with the clusters and nodes of all meshes, see MeshDesc
 	uint u_padding1;
-	uint u_feedback;		// rw bindless, 8 bytes for each group of the meshes that stream: the stamp of the frame in which a cluster of it was drawn, then the one of the last frame that needed its children
+	uint u_feedback;		// rw bindless, the feedback of streaming, see FEEDBACK_* (the CPU reads back the lists, they are reset every frame)
 	uint u_frame;			// the stamp of this frame
 	uint u_feedback_capacity;	// groups in u_feedback, 0 if there is none
 	uint u_padding2;
 };
+
+// The layout of the feedback buffer, the same as in renderer.cpp (FEEDBACK_*):
+//   [0] number of requests (may be more than the capacity, the extra ones are dropped), [4] unused,
+//   [8] number of selected clusters in all views of the frame, [12] how many of them did not fit in the list of selected clusters, [16] triangles of the clusters that fit (these are drawn), the counters are only for the profiler,
+//   FEEDBACK_REQUESTS: requests, 8 bytes: the id of the group that is needed (its children are not loaded and the cluster is too coarse), the priority (float, larger is more needed),
+//   FEEDBACK_BITS: a bit for each id, set if a cluster of the group was selected in the frame (the CPU reads back the ones of the ids that exist),
+//   FEEDBACK_STAMPS: 4 bytes for each id, the stamp of the frame in which the id was appended to the requests, so it is not appended twice in a frame (GPU only).
+// The CPU resets the counters and the bits every frame.
+#define FEEDBACK_REQUEST_CAPACITY 4096
+#define FEEDBACK_REQUESTS 32
+#define FEEDBACK_BITS (FEEDBACK_REQUESTS + FEEDBACK_REQUEST_CAPACITY * 8)
+#define FEEDBACK_MAX_IDS (1 << 20)
+#define FEEDBACK_STAMPS (FEEDBACK_BITS + FEEDBACK_MAX_IDS / 8)
 
 // threads of a group, GPUSceneConst::CLUSTER_THREADS
 #define GROUP_SIZE 64
@@ -164,16 +177,39 @@ void processCluster(MeshDesc desc, Instance instance, float max_scale, uint inst
 	// the feedback of streaming: the group is used, and if the cluster is only drawn because its children are not loaded and it is not accurate enough, they are needed
 	if (u_feedback_capacity != 0) {
 		RWByteAddressBuffer feedback = bindless_rw_buffers[u_feedback];
+		// a bit for the used group, a request is appended once per frame (the stamps after FEEDBACK_STAMPS tell if it was), the CPU reads them back
 		const uint own_id = own_flags >> 8;
-		if (own_id < u_feedback_capacity) feedback.Store(own_id * 8, u_frame);
+		if (own_id < u_feedback_capacity) {
+			uint unused;
+			feedback.InterlockedOr(FEEDBACK_BITS + (own_id >> 5) * 4, 1u << (own_id & 31), unused);
+		}
 		const uint child_id = child_flags >> 8;
-		if (!refined && !error_small && child_id < u_feedback_capacity) feedback.Store(child_id * 8 + 4, u_frame);
+		if (!refined && !error_small && child_id < u_feedback_capacity) {
+			uint old;
+			feedback.InterlockedExchange(FEEDBACK_STAMPS + child_id * 4, u_frame, old);
+			if (old != u_frame) {
+				uint at;
+				feedback.InterlockedAdd(0, 1, at);
+				// how many times too coarse the cluster is, the CPU loads the most needed pages first
+				const float dist = u_is_ortho ? 1 : max(length(lod_center) - lod_bounds.w * max_scale, 1e-4);
+				const float priority = min(error / (u_lod_k * dist), 1e30);
+				if (at < FEEDBACK_REQUEST_CAPACITY) feedback.Store2(FEEDBACK_REQUESTS + at * 8, uint2(child_id, asuint(priority)));
+			}
+		}
 	}
 
 	RWByteAddressBuffer selected = bindless_rw_buffers[u_selected];
 	uint at;
 	selected.InterlockedAdd(0, 1, at);
 	if (at < u_selected_capacity) selected.Store4(16 + at * 16, uint4(instance_idx, desc.mesh_index, cluster, group_ref));
+	// counted for the profiler, in all views of the frame
+	if (u_feedback_capacity != 0) {
+		RWByteAddressBuffer feedback = bindless_rw_buffers[u_feedback];
+		uint unused;
+		feedback.InterlockedAdd(8, 1, unused);
+		if (at >= u_selected_capacity) feedback.InterlockedAdd(12, 1, unused);
+		else feedback.InterlockedAdd(16, misc.w / 3, unused);
+	}
 }
 
 // false if no cluster of the node can be selected, then the node and everything under it is skipped
