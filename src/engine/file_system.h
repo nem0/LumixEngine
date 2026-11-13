@@ -20,6 +20,7 @@ LUMIX_ENGINE_API bool getNextFile(FileIterator* iterator, os::FileInfo* info);
 
 struct LUMIX_ENGINE_API FileSystem {
 	using ContentCallback = Delegate<void(Span<const u8>, bool)>;
+	using StreamCallback = Delegate<void(u64, Span<const u8>, bool)>;
 
 	struct LUMIX_ENGINE_API AsyncHandle {
 		static AsyncHandle invalid() { return AsyncHandle(0xffFFffFF); };
@@ -27,6 +28,8 @@ struct LUMIX_ENGINE_API FileSystem {
 		u32 value;
 		bool isValid() const { return value != 0xffFFffFF; }
 	};
+
+	enum class StreamHandle : u32 {};
 
 	static UniquePtr<FileSystem> create(const char* engine_data_dir, struct IAllocator& allocator);
 	static UniquePtr<FileSystem> createPacked(const char* pak_path, struct IAllocator& allocator);
@@ -53,6 +56,10 @@ struct LUMIX_ENGINE_API FileSystem {
 	[[nodiscard]] virtual bool getContentSync(const struct Path& file, struct OutputMemoryStream& content) = 0;
 	virtual AsyncHandle getContent(const Path& file, const ContentCallback& callback) = 0;
 	virtual void cancel(AsyncHandle handle) = 0;
+
+	virtual StreamHandle openStreaming(const Path& file) = 0;
+	virtual void stream(StreamHandle handle, u64 user_data, u64 offset, u64 size, StreamCallback& callback) = 0;
+	virtual void close(StreamHandle handle) = 0;
 };
 
 } // namespace Lumix

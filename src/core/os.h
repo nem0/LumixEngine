@@ -165,7 +165,9 @@ struct Monitor {
 	
 struct LUMIX_CORE_API InputFile final : IInputStream {
 	InputFile();
+	InputFile(InputFile&& rhs);
 	~InputFile();
+	void operator =(InputFile&& rhs);
 
 	[[nodiscard]] bool open(const char* path);
 	void close();

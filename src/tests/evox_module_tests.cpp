@@ -125,6 +125,9 @@ struct EvoxDiscoveryFileSystem : FileSystem {
 		return AsyncHandle(0);
 	}
 	void cancel(AsyncHandle) override { pending = false; }
+	StreamHandle openStreaming(const Path&) override { return {}; }
+	void stream(StreamHandle, u64, u64, u64, StreamCallback&) override {}
+	void close(StreamHandle) override {}
 	void processCallbacks() override {
 		if (!pending) return;
 		pending = false;
