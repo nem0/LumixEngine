@@ -1545,10 +1545,11 @@ struct RendererImpl final : Renderer {
 			static const u32 free_counter = profiler::createCounter("Cluster pool free (MB)", 0);
 			static const u32 largest_counter = profiler::createCounter("Cluster pool largest range (MB)", 0);
 			static const u32 pending_counter = profiler::createCounter("Cluster pool pending free (MB)", 0);
-			static const u32 ids_counter = profiler::createCounter("Cluster feedback group ids", 0);
+			static const u32 ids_counter = profiler::createCounter("Cluster feedback page ids", 0);
 			static const u32 requests_counter = profiler::createCounter("Cluster feedback requests", 0);
-			static const u32 used_counter = profiler::createCounter("Cluster feedback used groups", 0);
+			static const u32 used_counter = profiler::createCounter("Cluster feedback used pages", 0);
 			static const u32 dropped_counter = profiler::createCounter("Cluster feedback dropped entries", 0);
+			static const u32 root_bytes_counter = profiler::createCounter("Cluster roots (MB)", 0);
 			static const u32 selected_counter = profiler::createCounter("Clusters selected (all views)", 0);
 			static const u32 triangles_counter = profiler::createCounter("Cluster triangles (all views)", 0);
 			static const u32 selected_dropped_counter =profiler::createCounter("Clusters selected, over capacity", 0);
@@ -1556,8 +1557,10 @@ struct RendererImpl final : Renderer {
 			u64 bytes = 0;
 			u64 resident = 0;	// what is in the buffer as long as the meshes are loaded: the tables and the permanent pages
 			u32 loaded_pages = 0;
+			u64 root_bytes = 0;
 			for (const ClusterStream* s : m_streams) {
 				bytes += s->streamed_bytes;
+				root_bytes += s->root_bytes;
 				resident += s->table_bytes;
 				for (const ClusterStream::Page& page : s->pages) {
 					if (page.loaded && !page.permanent) ++loaded_pages;
@@ -1574,6 +1577,7 @@ struct RendererImpl final : Renderer {
 				jobs::MutexGuard cluster_lock(m_cluster_data_mutex);
 				for (const ClusterDataRange& r : m_cluster_data_free) free_bytes += r.size;
 			}
+			profiler::pushCounter(root_bytes_counter, float(double(root_bytes) / MB));
 			profiler::pushCounter(backlog_counter, (float)backlog);
 			profiler::pushCounter(limited_counter, m_stream_loads >= STREAM_LOADS_PER_FRAME ? 1.f : 0.f);
 			profiler::pushCounter(resident_counter, float(double(resident) / MB));
@@ -1584,8 +1588,7 @@ struct RendererImpl final : Renderer {
 			profiler::pushCounter(requests_counter, (float)m_stream_feedback_requests);
 			profiler::pushCounter(used_counter, (float)m_stream_feedback_used);
 			profiler::pushCounter(dropped_counter, (float)m_stream_feedback_dropped);
-			profiler::pushCounter(selected_counter, (float)m_clusters_selected);
-			profiler::pushCounter(triangles_counter, (float)m_clusters_triangles);
+			profiler::pushCounter(selected_counter, (float)m_clusters_selected);			profiler::pushCounter(triangles_counter, (float)m_clusters_triangles);
 			profiler::pushCounter(selected_dropped_counter,(float)m_clusters_selected_dropped);
 			profiler::pushCounter(feedback_age_counter, (float)(stamp - m_feedback_stamp));
 			profiler::pushCounter(streamed_counter, float(double(bytes) / (1024.0 * 1024.0)));
@@ -1593,9 +1596,6 @@ struct RendererImpl final : Renderer {
 			profiler::pushCounter(loads_counter, (float)m_stream_loads);
 			profiler::pushCounter(evictions_counter, (float)m_stream_evictions);
 			profiler::pushCounter(wanted_counter, (float)m_stream_wanted.size());
-			if (m_stream_loads || m_stream_evictions) {
-				logInfo("Cluster streaming: ", m_stream_loads, " pages loaded, ", m_stream_evictions, " evicted, ", loaded_pages, " pages (", u32(bytes >> 10), " KB) streamed in, ", (u32)m_stream_wanted.size(), " wanted, pool free ", u32(getClusterDataFreeBytes() >> 10), " KB, largest range ", getLargestClusterFreeRange() >> 10, " KB, budget ", u32(m_stream_budget >> 10), " KB");
-			}
 		}
 
 		if (m_stream_id_end > 0) {
@@ -2041,7 +2041,7 @@ struct RendererImpl final : Renderer {
 	u32 m_stream_feedback_dropped = 0;		// entries that did not fit in the lists
 	u32 m_clusters_selected = 0;			// clusters selected by the culling in all views of a frame, from the same feedback
 	u32 m_clusters_selected_dropped = 0;	// the ones that did not fit in the list of selected clusters
-	u32 m_clusters_triangles = 0;			// triangles of the selected clusters that fit in the list (the drawn ones)
+	u32 m_clusters_triangles = 0;		// triangles of the selected clusters that fit in the list (the drawn ones)
 	u32 m_stream_loads = 0;
 	u32 m_stream_evictions = 0;
 	u32 m_feedback_stamp = 0;				// the stamp of the frame in which the last feedback of the GPU was processed

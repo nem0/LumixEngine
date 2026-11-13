@@ -246,7 +246,7 @@ struct ClusterStream {
 	u32 node_table_offset = NONE;					// the same for the nodes
 	u32 table_bytes = 0;							// in the buffer as long as the mesh is loaded: the nodes, the roots, the groups of the clusters and the table of group addresses
 	u32 streamed_bytes = 0;							// of the loaded pages that are not permanent
-	u32 root_bytes = 0;								// payload of the groups that have no parent, they are always loaded: the least that a mesh needs
+	u32 root_bytes = 0;							// payload of the groups that have no parent, they are always loaded: the least that a mesh needs
 };
 
 } // namespace Lumix
