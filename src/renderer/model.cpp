@@ -770,18 +770,6 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 			return false;
 		}
 		m_renderer.registerClusterStream(stream);
-		{
-			u32 permanent_pages = 0;
-			u64 permanent_bytes = 0, total_bytes = 0;
-			for (u32 p = 0; p < (u32)stream->pages.size(); ++p) {
-				total_bytes += stream->pageBytes(p);
-				if (stream->pages[p].permanent) {
-					++permanent_pages;
-					permanent_bytes += stream->pageBytes(p);
-				}
-			}
-			logInfo(m_path, " mesh ", i, ": ", cluster_count, " clusters, ", group_count, " groups, ", (u32)stream->pages.size(), " pages (", permanent_pages, " permanent, ", u32(permanent_bytes >> 10), " of ", u32(total_bytes >> 10), " KB, roots ", u32(stream->root_bytes >> 10), " KB), feedback ids from ", id_base == ClusterStream::NONE ? 0xffFFffFFu : id_base);
-		}
 	}
 
 	// Meshes of the first LOD have vertices only in clusters, so all of them must have clusters

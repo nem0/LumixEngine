@@ -2379,6 +2379,7 @@ struct PipelineImpl final : Pipeline {
 		stream.barrier(m_scene_cull_args, gpu::BarrierType::WRITE);
 		stream.barrier(m_scene_selected, gpu::BarrierType::WRITE);
 		stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub_slice.buffer, ub_slice.offset, sizeof(ub));
+		stream.beginProfileBlock("scene instance culling", 0, false);
 		stream.useProgram(m_scene_cull_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS0")));
 		stream.dispatch(1, 1, 1);
 		stream.memoryBarrier(m_scene_cull_counter);
@@ -2392,9 +2393,11 @@ struct PipelineImpl final : Pipeline {
 		stream.memoryBarrier(m_scene_flat_items);
 		stream.memoryBarrier(m_scene_tree_items);
 		stream.memoryBarrier(m_scene_selected);
+		stream.endProfileBlock();
 
 		// the instances of instanced models: one thread for each, they add their work to the same lists
 		if (scene.getGroupInstanceCount() > 0) {
+			stream.beginProfileBlock("scene group instance culling", 0, false);
 			stream.barrier(scene.getGroupTableBuffer(), gpu::BarrierType::READ);
 			for (const gpu::BufferHandle instances : scene.getGroupInstanceBuffers()) stream.barrier(instances, gpu::BarrierType::READ);
 			stream.useProgram(m_scene_cull_shader->getProgram(1 << m_renderer.getShaderDefineIdx("GROUPS")));
@@ -2403,15 +2406,18 @@ struct PipelineImpl final : Pipeline {
 			stream.memoryBarrier(m_scene_cull_counter);
 			stream.memoryBarrier(m_scene_flat_items);
 			stream.memoryBarrier(m_scene_tree_items);
+			stream.endProfileBlock();
 		}
 
 		// the selection of clusters: the groups of its dispatches come from the counters of the work, computed by the GPU
+		stream.beginProfileBlock("scene cluster args", 0, false);
 		stream.barrier(m_scene_cull_args, gpu::BarrierType::WRITE);
 		stream.barrier(m_scene_selected, gpu::BarrierType::WRITE);
 		stream.useProgram(m_scene_cull_shader->getProgram(1 << m_renderer.getShaderDefineIdx("ARGS")));
 		stream.dispatch(1, 1, 1);
 		stream.memoryBarrier(m_scene_cull_args);
 		stream.memoryBarrier(m_scene_selected);
+		stream.endProfileBlock();
 
 		ClusterViewUniforms cu;
 		memset(&cu, 0, sizeof(cu));
@@ -2454,14 +2460,18 @@ struct PipelineImpl final : Pipeline {
 		cu.items = gpu::getBindlessHandle(m_scene_flat_items);
 		TransientSlice cu_slice = alloc(m_renderer.getUniformPool(), &cu, sizeof(cu));
 		stream.bindUniformBuffer(UniformBuffer::DRAWCALL, cu_slice.buffer, cu_slice.offset, sizeof(cu));
+		stream.beginProfileBlock("cluster selection flat", 0, false);
 		stream.useProgram(m_cluster_shader->getProgram(1 << m_renderer.getShaderDefineIdx("FLAT")));
 		stream.dispatchIndirect(16);
+		stream.endProfileBlock();
 
 		cu.items = gpu::getBindlessHandle(m_scene_tree_items);
 		cu_slice = alloc(m_renderer.getUniformPool(), &cu, sizeof(cu));
 		stream.bindUniformBuffer(UniformBuffer::DRAWCALL, cu_slice.buffer, cu_slice.offset, sizeof(cu));
+		stream.beginProfileBlock("cluster selection tree", 0, false);
 		stream.useProgram(m_cluster_shader->getProgram(0));
 		stream.dispatchIndirect(32);
+		stream.endProfileBlock();
 
 		stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
 		stream.memoryBarrier(m_scene_selected);
@@ -2514,30 +2524,38 @@ struct PipelineImpl final : Pipeline {
 			stream.barrier(m_scene_cull_args, gpu::BarrierType::WRITE);
 			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, draw_ub_slice.buffer, draw_ub_slice.offset, sizeof(draw_ub));
 
+			stream.beginProfileBlock("variants clear", 0, false);
 			stream.useProgram(program("CLEAR"));
 			stream.dispatch(1, 1, 1);
 			stream.memoryBarrier(m_scene_counters);
 			stream.useProgram(program("BIN_ARGS"));
 			stream.dispatch(1, 1, 1);
 			stream.memoryBarrier(m_scene_cull_args);
+			stream.endProfileBlock();
 
+			stream.beginProfileBlock("variants count", 0, false);
 			stream.useProgram(program("COUNT"));
 			stream.bindIndirectBuffer(m_scene_cull_args);
 			stream.dispatchIndirect(48);
 			stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
 			stream.memoryBarrier(m_scene_counters);
+			stream.endProfileBlock();
 
+			stream.beginProfileBlock("variants scan", 0, false);
 			stream.useProgram(program("SCAN"));
 			stream.dispatch(1, 1, 1);
 			stream.memoryBarrier(m_scene_counters);
 			stream.memoryBarrier(m_scene_commands);
+			stream.endProfileBlock();
 
+			stream.beginProfileBlock("variants scatter", 0, false);
 			stream.useProgram(program("SCATTER"));
 			stream.bindIndirectBuffer(m_scene_cull_args);
 			stream.dispatchIndirect(48);
 			stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
 			stream.memoryBarrier(m_scene_out);
 			stream.memoryBarrier(m_scene_counters);
+			stream.endProfileBlock();
 
 			// One indirect call for each draw group the view draws, the instance counts are written by the GPU: the commands are the ones of SCAN. Vertex shaders pull the
 			// instances by the draw id, the vertices of the clusters by their meshes (CLUSTER_MESH)
