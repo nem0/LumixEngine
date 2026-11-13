@@ -49,7 +49,7 @@ struct LUMIX_EDITOR_API AssetCompiler {
 	// `Resource` dependencies are automatically handled elsewhere
 	virtual void registerDependency(const Path& included_from, const Path& dependency) = 0;
 	virtual void addResource(ResourceType type, const Path& path) = 0;
-	virtual bool writeCompiledResource(const Path& path, Span<const u8> data) = 0;
+	virtual bool writeCompiledResource(const Path& path, Span<const u8> data, bool try_compress = true) = 0;
 	virtual bool copyCompile(const Path& src) = 0;
 	virtual DelegateList<void(const Path&)>& listChanged() = 0;
 	virtual DelegateList<void(Resource&, bool)>& resourceCompiled() = 0;

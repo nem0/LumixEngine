@@ -227,14 +227,14 @@ struct AssetCompilerImpl : AssetCompiler {
 		}
 
 		ASSERT(tmp.size() < 0xffFFffFF);
-		return writeCompiledResource(src, Span(tmp.data(), (u32)tmp.size()));
+		return writeCompiledResource(src, Span(tmp.data(), (u32)tmp.size()), true);
 	}
 
-	bool writeCompiledResource(const Path& path, Span<const u8> data) override {
+	bool writeCompiledResource(const Path& path, Span<const u8> data, bool try_compress) override {
 		PROFILE_FUNCTION();
 		constexpr u32 COMPRESSION_SIZE_LIMIT = 4096;
 		OutputMemoryStream compressed(m_allocator);
-		if (data.length() > COMPRESSION_SIZE_LIMIT) {
+		if (try_compress && data.length() > COMPRESSION_SIZE_LIMIT) {
 			if (!m_app.getEngine().compress(data, compressed)) {
 				logWarning("Could not compress ", path, ", using uncompressed file.");
 				compressed.clear();
@@ -251,7 +251,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		CompiledResourceHeader header;
 		header.decompressed_size = data.length();
 		const u32 compressed_size = (u32)compressed.size();
-		if (data.length() > COMPRESSION_SIZE_LIMIT && compressed_size > 0 && compressed_size < i32(data.length() / 4 * 3)) {
+		if (try_compress && data.length() > COMPRESSION_SIZE_LIMIT && compressed_size > 0 && compressed_size < i32(data.length() / 4 * 3)) {
 			header.flags |= CompiledResourceHeader::COMPRESSED;
 			(void)file.write(&header, sizeof(header));
 			(void)file.write(compressed.data(), compressed_size);

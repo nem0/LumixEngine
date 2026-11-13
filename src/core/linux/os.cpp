@@ -338,6 +338,20 @@ InputFile::InputFile() {
 	static_assert(sizeof(m_handle) >= sizeof(FILE*), "");
 }
 
+InputFile::InputFile(InputFile&& rhs)
+	: m_handle(rhs.m_handle)
+{
+	rhs.m_handle = nullptr;
+}
+
+void InputFile::operator =(InputFile&& rhs) {
+	if (&rhs == this) return;
+
+	close();
+	m_handle = rhs.m_handle;
+	rhs.m_handle = nullptr;
+}
+
 
 OutputFile::OutputFile() {
 	m_is_error = false;

@@ -45,6 +45,9 @@ struct MemoryFileSystem : FileSystem {
 	bool hasWork() override { return false; }
 	AsyncHandle getContent(const Path&, const ContentCallback&) override { return AsyncHandle::invalid(); }
 	void cancel(AsyncHandle) override {}
+	StreamHandle openStreaming(const Path&) override { return {}; }
+	void stream(StreamHandle, u64, u64, u64, StreamCallback&) override {}
+	void close(StreamHandle) override {}
 };
 
 // Test helper that exposes internal compiler functionality for testing

@@ -1845,7 +1845,7 @@ bool ModelImporter::writeModel(const Path& src, const ModelMeta& meta) {
 	if (!writeClusters(meta)) return false;
 
 	AssetCompiler& compiler = m_app.getAssetCompiler();
-	return compiler.writeCompiledResource(Path(src), Span(m_out_file.data(), m_out_file.size()));
+	return compiler.writeCompiledResource(Path(src), Span(m_out_file.data(), m_out_file.size()), !m_bake_clusters);
 }
 
 bool ModelImporter::writeAnimations(const Path& src, const ModelMeta& meta) {
