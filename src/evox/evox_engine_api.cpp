@@ -1,6 +1,7 @@
 #include "core/debug.h"
 #include "core/log.h"
 #include "core/os.h"
+#include "core/profiler.h"
 #include "core/string.h"
 #include "engine/engine.h"
 #include "engine/input_system.h"
@@ -187,6 +188,29 @@ static void logErrorString(ex_string_view v) {
 
 static void logInfoString(ex_string_view v) {
 	logInfo(StringView(v.begin, (u64)v.length));
+}
+
+// profiler blocks and counters opened by scripts. Names are evox string literals (cstr): static and NUL-terminated, so the profiler can keep the pointer.
+static u32 s_script_open_blocks = 0;
+
+static void profilerBegin(const char* name) {
+	profiler::beginBlock(name);
+	++s_script_open_blocks;
+}
+
+static void profilerEnd() {
+	if (s_script_open_blocks == 0) {
+		logError("profiler.endBlock without profiler.beginBlock");
+		return;
+	}
+	--s_script_open_blocks;
+	profiler::endBlock();
+}
+
+static void profilerCounter(const char* name, float value) {
+	u32 counter = profiler::getCounterHandle(name);
+	if (counter == profiler::INVALID_COUNTER) counter = profiler::createCounter(name, 0);
+	profiler::pushCounter(counter, value);
 }
 
 static void inputGetInput(ex_runtime*, ex_call_frame frame) {
@@ -868,6 +892,11 @@ void registerImguiModule(NativeFunctionMap& functions) {
 
 } // namespace
 
+// ends the profiler blocks a failed script left open, so that the blocks of the C++ code stay balanced
+void closeScriptProfilerBlocks() {
+	for (; s_script_open_blocks > 0; --s_script_open_blocks) profiler::endBlock();
+}
+
 void gatherCoreFunctions(NativeFunctionMap& functions) {
 	generated::registerGeneratedEngineImport(functions);
 	registerImguiModule(functions);
@@ -888,6 +917,10 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	// log
 	functions.insert({"core:log", "logErrorString"}, &wrap<logErrorString>);
 	functions.insert({"core:log", "logInfoString"}, &wrap<logInfoString>);
+	// profiler
+	functions.insert({"core:profiler", "beginBlock"}, &wrap<profilerBegin>);
+	functions.insert({"core:profiler", "endBlock"}, &wrap<profilerEnd>);
+	functions.insert({"core:profiler", "counter"}, &wrap<profilerCounter>);
 	// entity
 	functions.insert({"core:entity", "destroy"}, &evox_entity_destroy);
 	functions.insert({"core:entity", "isValid"}, &wrap<evox_entity_isValid>);

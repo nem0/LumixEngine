@@ -27,6 +27,7 @@ namespace Lumix {
 
 namespace Evox {
 	void gatherCoreFunctions(HashMap<NativeFunctionKey, ex_native_fn, NativeFunctionKeyHash>& functions);
+	void closeScriptProfilerBlocks();
 }
 
 static constexpr const char* EVOX_DATA_ATTRIBUTE_TYPE = "core:attributes.Data";
@@ -597,7 +598,10 @@ struct EvoxModuleImpl : EvoxModule {
 
 		const ex_type* dt_type = ex_primitive_type_from_kind(system.m_runtime, EX_TYPE_F32);
 		const ex_call_result result = ex_task_resume(system.m_task, dt_type, &time_delta, sizeof(time_delta));
-		if (result != EX_CALL_RESULT_SUSPENDED && result != EX_CALL_RESULT_OK) logEvoxMainFailure(system.m_task, result);
+		if (result != EX_CALL_RESULT_SUSPENDED && result != EX_CALL_RESULT_OK) {
+			Evox::closeScriptProfilerBlocks();
+			logEvoxMainFailure(system.m_task, result);
+		}
 	}
 
 	void onRuntimeCreated() override {

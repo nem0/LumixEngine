@@ -1,0 +1,8 @@
+// Profiler blocks and counters shown in Studio's profiler window, inside the evox module's update.
+// Names must be string literals: the profiler keeps the pointer, so a built string would dangle.
+// Every beginBlock needs an endBlock on the same frame; blocks a failing script leaves open are closed by the engine.
+
+extern fn beginBlock(name : cstr) : void;
+extern fn endBlock() : void;
+// Adds a point to the counter graph with this name.
+extern fn counter(name : cstr, value : f32) : void;
