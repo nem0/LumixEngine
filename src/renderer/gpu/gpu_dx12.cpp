@@ -46,7 +46,8 @@
 namespace Lumix::gpu {
 
 static constexpr u32 NUM_BACKBUFFERS = 2;
-static constexpr u32 SCRATCH_BUFFER_SIZE = 8 * 1024 * 1024;
+static constexpr u32 BUFFER_SCRATCH_BUFFER_SIZE = 8 * 1024 * 1024;
+static constexpr u32 TEXTURE_SCRATCH_BUFFER_SIZE = 8 * 1024 * 1024;
 static constexpr u32 MAX_SRV_DESCRIPTORS = 16 * 1024;
 static constexpr u32 TIMESTAMP_QUERY_COUNT = 2048;
 static constexpr u32 STATS_QUERY_COUNT = 128;
@@ -1098,10 +1099,14 @@ struct Frame {
 		if (device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&cmd_allocator)) != S_OK) return false;
 		if (device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)) != S_OK) return false;
 
-		scratch_buffer = createBuffer(device, nullptr, SCRATCH_BUFFER_SIZE, D3D12_HEAP_TYPE_UPLOAD, "scratch buffer");
+		scratch_buffer = createBuffer(device, nullptr, BUFFER_SCRATCH_BUFFER_SIZE, D3D12_HEAP_TYPE_UPLOAD, "scratch buffer");
 
 		scratch_buffer->Map(0, nullptr, (void**)&scratch_buffer_begin);
 		scratch_buffer_ptr = scratch_buffer_begin;
+
+		texture_scratch_buffer = createBuffer(device, nullptr, TEXTURE_SCRATCH_BUFFER_SIZE, D3D12_HEAP_TYPE_UPLOAD, "texture scratch buffer");
+		texture_scratch_buffer->Map(0, nullptr, (void**)&texture_scratch_buffer_begin);
+		texture_scratch_buffer_ptr = texture_scratch_buffer_begin;
 
 		timestamp_query_buffer = createBuffer(device, nullptr, sizeof(u64) * TIMESTAMP_QUERY_COUNT, D3D12_HEAP_TYPE_READBACK, "timestamps");
 		stats_query_buffer = createBuffer(device, nullptr, sizeof(D3D12_QUERY_DATA_PIPELINE_STATISTICS) * STATS_QUERY_COUNT, D3D12_HEAP_TYPE_READBACK, "stats");
@@ -1127,6 +1132,9 @@ struct Frame {
 	ID3D12Resource* scratch_buffer = nullptr;
 	u8* scratch_buffer_ptr = nullptr;
 	u8* scratch_buffer_begin = nullptr;
+	ID3D12Resource* texture_scratch_buffer = nullptr;
+	u8* texture_scratch_buffer_ptr = nullptr;
+	u8* texture_scratch_buffer_begin = nullptr;
 	ID3D12CommandAllocator* cmd_allocator = nullptr;
 	Array<IUnknown*> to_release;
 	Array<u32> to_heap_release;
@@ -1567,6 +1575,7 @@ void Frame::clear() {
 	to_heap_release.clear();
 
 	scratch_buffer->Release();
+	texture_scratch_buffer->Release();
 	timestamp_query_buffer->Release();
 	stats_query_buffer->Release();
 }
@@ -1665,19 +1674,32 @@ void update(TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, T
 
 	const u32 tmp_row_pitch = layout.Footprint.RowPitch;
 
-	ID3D12Resource* staging = createBuffer(d3d->device, nullptr, total_bytes, D3D12_HEAP_TYPE_UPLOAD, "staging");
-	if (!staging) {
-		texture->setState(d3d->cmd_list, prev_state);
-		return;
-	}
+	const u64 scratch_offset = (u64(d3d->frame->texture_scratch_buffer_ptr - d3d->frame->texture_scratch_buffer_begin) + D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT - 1) & ~u64(D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT - 1);
+	// small uploads use the per-frame texture scratch buffer (no allocation), big textures get their own
+	// staging buffer so they don't eat the scratch buffer used by many small uploads
+	constexpr u64 MAX_SCRATCH_TEXTURE_BYTES = TEXTURE_SCRATCH_BUFFER_SIZE / 8;
+	const bool use_scratch = total_bytes <= MAX_SCRATCH_TEXTURE_BYTES && scratch_offset + total_bytes <= TEXTURE_SCRATCH_BUFFER_SIZE;
+	ID3D12Resource* staging;
 	u8* tmp;
-
-	const HRESULT map_hr = staging->Map(0, nullptr, (void**)&tmp);
-	if (FAILED(map_hr)) {
-		logDeviceRemoved(d3d->device, map_hr, "staging Map");
-		d3d->frame->to_release.push(staging);
-		texture->setState(d3d->cmd_list, prev_state);
-		return;
+	if (use_scratch) {
+		staging = d3d->frame->texture_scratch_buffer;
+		layout.Offset = scratch_offset;
+		tmp = d3d->frame->texture_scratch_buffer_begin + scratch_offset;
+		d3d->frame->texture_scratch_buffer_ptr = tmp + total_bytes;
+	}
+	else {
+		staging = createBuffer(d3d->device, nullptr, total_bytes, D3D12_HEAP_TYPE_UPLOAD, "staging");
+		if (!staging) {
+			texture->setState(d3d->cmd_list, prev_state);
+			return;
+		}
+		const HRESULT map_hr = staging->Map(0, nullptr, (void**)&tmp);
+		if (FAILED(map_hr)) {
+			logDeviceRemoved(d3d->device, map_hr, "staging Map");
+			d3d->frame->to_release.push(staging);
+			texture->setState(d3d->cmd_list, prev_state);
+			return;
+		}
 	}
 
 	const u32 src_pitch = fd.getRowPitch(w);
@@ -1685,7 +1707,7 @@ void update(TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, T
 		memcpy(&tmp[i * tmp_row_pitch], &((u8*)buf)[i * src_pitch], src_pitch);
 	}
 
-	staging->Unmap(0, nullptr);
+	if (!use_scratch) staging->Unmap(0, nullptr);
 
 	D3D12_BOX box;
 	box.left = 0;
@@ -1705,7 +1727,7 @@ void update(TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, T
 
 	texture->setState(d3d->cmd_list, prev_state);
 
-	d3d->frame->to_release.push(staging);
+	if (!use_scratch) d3d->frame->to_release.push(staging);
 }
 
 void copy(BufferHandle dst_handle, TextureHandle src_handle) {
@@ -2679,6 +2701,7 @@ u32 present() {
 	
 	d3d->frame->begin();
 	d3d->frame->scratch_buffer_ptr = d3d->frame->scratch_buffer_begin;
+	d3d->frame->texture_scratch_buffer_ptr = d3d->frame->texture_scratch_buffer_begin;
 	d3d->frame->cmd_allocator->Reset();
 	d3d->cmd_list->Reset(d3d->frame->cmd_allocator, nullptr);
 	// transient SRV table of the previous frame is not valid anymore
@@ -3545,7 +3568,7 @@ void update(BufferHandle buffer, const void* data, size_t size) {
 	CHECK(buffer);
 
 	u8* dst = d3d->frame->scratch_buffer_ptr;
-	CHECK(size + dst <= d3d->frame->scratch_buffer_begin + SCRATCH_BUFFER_SIZE);
+	CHECK(size + dst <= d3d->frame->scratch_buffer_begin + BUFFER_SCRATCH_BUFFER_SIZE);
 	memcpy(dst, data, size);
 	UINT64 src_offset = dst - d3d->frame->scratch_buffer_begin;
 	D3D12_RESOURCE_STATES prev_state = buffer->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_COPY_DEST);
