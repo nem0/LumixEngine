@@ -19,6 +19,7 @@ Sprite::Sprite(const Path& path, ResourceManager& manager, IAllocator& allocator
 void Sprite::unload() {
 	if (!m_texture) return;
 	
+	removeDependency(*m_texture);
 	m_texture->decRefCount();
 	m_texture = nullptr;
 }
@@ -26,6 +27,7 @@ void Sprite::unload() {
 
 void Sprite::setTexture(const Path& path) {
 	if (m_texture) {
+		removeDependency(*m_texture);
 		m_texture->decRefCount();
 	}
 
@@ -33,6 +35,8 @@ void Sprite::setTexture(const Path& path) {
 		m_texture = nullptr;
 	} else {
 		m_texture = getResourceManager().getOwner().load<Texture>(path);
+		// the sprite is ready only when its texture is, it draws nothing before that
+		if (m_texture) addDependency(*m_texture);
 	}
 }
 
