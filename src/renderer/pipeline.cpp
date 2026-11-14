@@ -582,7 +582,7 @@ struct PipelineImpl final : Pipeline {
 		, m_renderer(renderer)
 		, m_type(type)
 		, m_module(nullptr)
-		, m_draw2d(m_allocator)
+		, m_draw2d(m_allocator, &renderer.getFontManager())
 		, m_output(INVALID_RENDERBUFFER)
 		, m_shadow_atlas(m_allocator)
 		, m_textures(m_allocator)
@@ -606,7 +606,7 @@ struct PipelineImpl final : Pipeline {
 		m_instancing_shader = rm.load<Shader>(Path("engine/shaders/instancing.hlsl"));
 		m_flatten_shader = rm.load<Shader>(Path("engine/shaders/flatten_cube.hlsl"));
 		
-		m_draw2d.clear({1, 1});
+		m_draw2d.clear();
 
 		float cube_verts[] = {
 			-1, -1, -1,
@@ -821,13 +821,6 @@ struct PipelineImpl final : Pipeline {
 
 			//findExtraShadowcasterPlanes(light_forward, camera_frustum, &cp.frustum);
 		}
-	}
-
-	Vec2 getAtlasSize() const {
-		const Texture* atlas_texture = m_renderer.getFontManager().getAtlasTexture();
-		if (!atlas_texture) return {1, 1};
-		if (!atlas_texture->isReady()) return {1, 1};
-		return {(float)atlas_texture->width, (float)atlas_texture->height};
 	}
 
 	bool bakeShadow(const PointLight& light, u32 atlas_idx) {
@@ -1391,7 +1384,7 @@ struct PipelineImpl final : Pipeline {
 				m_module->clearDebugLines();
 				m_module->clearDebugTriangles();
 			}
-			m_draw2d.clear(getAtlasSize());
+			m_draw2d.clear();
 			return false;
 		}
 
@@ -1589,7 +1582,7 @@ struct PipelineImpl final : Pipeline {
 		matrix.setOrtho(0, (float)display_size.x, (float)display_size.y, 0, 0, 1, false);
 		m_renderer.setRenderTargets(Span(&input, 1));
 		renderUIHelper(m_draw2d, false, matrix, display_size);
-		m_draw2d.clear(getAtlasSize());
+		m_draw2d.clear();
 	}
 
 	void renderUIHelper(const Draw2D& data, bool is_3d, const Matrix& matrix, const IVec2& size) {
@@ -3969,7 +3962,7 @@ struct PipelineImpl final : Pipeline {
 	float getRenderToDisplayRatio() const override { return m_render_to_display_scale; }
 	void setRenderToDisplayRatio(float scale) override { m_render_to_display_scale = maximum(scale, 1.f); }
 
-	void clearDraw2D() override { return m_draw2d.clear(getAtlasSize()); }
+	void clearDraw2D() override { m_draw2d.clear(); }
 	Draw2D& getDraw2D() override { return m_draw2d; }
 	
 	gpu::TextureHandle getOutput() override { 

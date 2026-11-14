@@ -44,6 +44,7 @@ static StaticString<128> formatAttributeValue(const Attribute& attr) {
 		case AttributeName::VISIBLE: out.append(attr.visible ? "true" : "false"); break;
 		case AttributeName::WRAP: out.append(attr.wrap ? "true" : "false"); break;
 		case AttributeName::CLIPPING: out.append(attr.clip ? "true" : "false"); break;
+		case AttributeName::FONT_SCALE:
 		case AttributeName::FONT_SIZE: out.append(attr.font_size); break;
 		case AttributeName::OPACITY: out.append(attr.opacity); break;
 		case AttributeName::GROW: out.append(attr.grow); break;

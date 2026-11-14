@@ -10,6 +10,7 @@ namespace Lumix
 {
 
 struct Font;
+struct FontManager;
 
 struct LUMIX_RENDERER_API Draw2D {
 	struct Cmd {
@@ -26,9 +27,14 @@ struct LUMIX_RENDERER_API Draw2D {
 		Color color; 
 	};
 
-	Draw2D(IAllocator& allocator);
+	// if font_manager is given, atlas used for shapes and text is kept up to date, even if it's rebuilt in the middle of a frame
+	Draw2D(IAllocator& allocator, FontManager* font_manager = nullptr);
+	Draw2D(const Draw2D&) = delete;
+	void operator=(const Draw2D&) = delete;
+	~Draw2D();
 
-	void clear(Vec2 atlas_size);
+	void clear();
+	void setAtlas(gpu::TextureHandle atlas, Vec2 size) { m_atlas_handle = atlas; m_atlas_size = size; }
 	void pushClipRect(const Vec2& from, const Vec2& to);
 	void popClipRect();
 	void addLine(const Vec2& from, const Vec2& to, Color color, float width);
@@ -48,7 +54,11 @@ private:
 		Vec2 to;
 	};
 
-	Vec2 m_atlas_size;
+	// atlas shapes are recorded against
+	gpu::TextureHandle m_atlas_handle = gpu::INVALID_TEXTURE;
+	Vec2 m_atlas_size = Vec2(1, 1);
+	FontManager* m_font_manager = nullptr;
+	friend struct FontManager;
 	Array<Cmd> m_cmds;
 	Array<u32> m_indices;
 	Array<Vertex> m_vertices;

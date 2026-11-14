@@ -74,6 +74,7 @@ enum class AttributeName : u8 {
 	PADDING_RIGHT,
 	PADDING_BOTTOM,
 	PADDING_LEFT,
+	FONT_SCALE, // multiplies rasterized glyph size only, em units still follow font-size
 
 	INVALID
 };

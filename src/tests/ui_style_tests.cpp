@@ -40,6 +40,7 @@ static bool sameAttributeValue(const ui::Attribute& a, const ui::Attribute& b) {
 		case ui::AttributeName::BG_COLOR: return a.color == b.color;
 		case ui::AttributeName::GROW: return a.grow == b.grow;
 		case ui::AttributeName::OPACITY: return a.opacity == b.opacity;
+		case ui::AttributeName::FONT_SCALE:
 		case ui::AttributeName::FONT_SIZE: return a.font_size == b.font_size;
 		default: return a.value == b.value;
 	}

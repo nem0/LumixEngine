@@ -89,6 +89,11 @@ struct UIModuleImpl : UIModule {
 		bool is_ready = false;
 	};
 
+	static FontManager* getRendererFontManager(Engine& engine) {
+		Renderer* renderer = (Renderer*)engine.getSystemManager().getSystem("renderer");
+		return renderer ? &renderer->getFontManager() : nullptr;
+	}
+
 	UIModuleImpl(UISystem& system, World& world, IAllocator& allocator)
 		: m_system(system)
 		, m_world(world)
@@ -98,7 +103,7 @@ struct UIModuleImpl : UIModule {
 		, m_sprite_manager(m_system.getEngine())
 		, m_document(&m_font_manager, m_allocator, &m_image_manager, &m_sprite_manager)
 		, m_ui_3d_components(m_allocator)
-		, m_draw_2d(m_allocator)
+		, m_draw_2d(m_allocator, getRendererFontManager(m_system.getEngine()))
 	{
 		float dpi_scale = os::getDPI() / 96.0f;
 		m_document.setDPIScale(dpi_scale);
@@ -293,9 +298,6 @@ struct UIModuleImpl : UIModule {
 	}
 
 	void render3D(Pipeline& pipeline) override {
-		const Texture* atlas_texture = pipeline.getRenderer().getFontManager().getAtlasTexture();
-		const Vec2 atlas_size = atlas_texture ? Vec2((float)atlas_texture->width, (float)atlas_texture->height) : Vec2(1, 1);
-
 		for (UI3DComponent* component : m_ui_3d_components) {
 			if (!component->is_ready) continue;
 			if (component->virtual_size.x <= 0 || component->virtual_size.y <= 0) continue;
@@ -305,7 +307,7 @@ struct UIModuleImpl : UIModule {
 				component->document.computeLayout(component->virtual_size);
 			}
 
-			m_draw_2d.clear(atlas_size);
+			m_draw_2d.clear();
 			component->document.render(m_draw_2d);
 			pipeline.render3DUI(component->entity, m_draw_2d, component->virtual_size, component->orient_to_camera);
 		}

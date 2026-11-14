@@ -2339,7 +2339,8 @@ bool testPathColorAttributeRejected() {
 
 bool testDraw2DMeshWithTextureKeepsUV() {
 	Draw2D draw(getGlobalAllocator());
-	draw.clear(Vec2(64, 64));
+	draw.setAtlas(gpu::INVALID_TEXTURE, Vec2(64, 64));
+	draw.clear();
 	const gpu::TextureHandle tex = (gpu::TextureHandle)0x1;
 	const Color white(255, 255, 255, 255);
 	Draw2D::Vertex vertices[] = {

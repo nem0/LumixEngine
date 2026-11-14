@@ -89,6 +89,7 @@ AttributeName parseAttributeName(StringView str) {
 			if (len == 3 && memcmp(s, "fit", 3) == 0) return AttributeName::FIT;
 			if (len == 4 && memcmp(s, "font", 4) == 0) return AttributeName::FONT;
 			if (len == 9 && memcmp(s, "font-size", 9) == 0) return AttributeName::FONT_SIZE;
+			if (len == 10 && memcmp(s, "font-scale", 10) == 0) return AttributeName::FONT_SCALE;
 			break;
 		case 'g': if (len == 4 && memcmp(s, "grow", 4) == 0) return AttributeName::GROW; break;
 		case 'h': if (len == 6 && memcmp(s, "height", 6) == 0) return AttributeName::HEIGHT; break;
@@ -200,6 +201,7 @@ const char* attributeNameToString(AttributeName name) {
 		case AttributeName::ID: return "id";
 		case AttributeName::CLASS: return "class";
 		case AttributeName::FONT_SIZE: return "font-size";
+		case AttributeName::FONT_SCALE: return "font-scale";
 		case AttributeName::FONT: return "font";
 		case AttributeName::WIDTH: return "width";
 		case AttributeName::HEIGHT: return "height";
@@ -328,6 +330,7 @@ static bool parseTypedAttributeValue(Document& doc, AttributeName name, StringVi
 			out.grow = grow;
 			return true;
 		}
+		case AttributeName::FONT_SCALE:
 		case AttributeName::FONT_SIZE: {
 			float font_size = 12.0f;
 			const char* end = fromCString(value, font_size);
@@ -2008,6 +2011,7 @@ static void layoutChildren(Document& doc, Element& parent) {
 struct ParentContext {
 	// inheritable
 	float font_size = 12;
+	float font_scale = 1;
 	StringView font;
 	Color color = Color::BLACK;
 	Align align = Align::LEFT;
@@ -3150,6 +3154,7 @@ static void loadResources(Document& doc, u32 element_index, const ParentContext&
 	for (const Attribute& attr : elem.attributes) {
 		switch (attr.type) {
 			case AttributeName::FONT: ctx.font = attr.value; break;
+			case AttributeName::FONT_SCALE: ctx.font_scale = attr.font_size; break;
 			case AttributeName::FONT_SIZE:
 				elem.font_size = attr.font_size * doc.m_scale;
 				ctx.font_size = elem.font_size;
@@ -3174,7 +3179,7 @@ static void loadResources(Document& doc, u32 element_index, const ParentContext&
 	if (!has_bg_image) elem.setSpriteHandle(nullptr);
 
 	if (!ctx.font.empty() && doc.m_font_manager) {
-		elem.setFontHandle(doc.m_font_manager->loadFont(ctx.font, (i32)ctx.font_size));
+		elem.setFontHandle(doc.m_font_manager->loadFont(ctx.font, (i32)(ctx.font_size * ctx.font_scale)));
 	}
 
 	for (u32 child_idx : elem.children) {

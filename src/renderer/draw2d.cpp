@@ -1,25 +1,32 @@
 #include "draw2d.h"
 #include "font.h"
 #include "core/string.h"
+#include "renderer/texture.h"
 
 
 namespace Lumix {
 
 
-Draw2D::Draw2D(IAllocator& allocator) 
+Draw2D::Draw2D(IAllocator& allocator, FontManager* font_manager)
 	: m_cmds(allocator)
 	, m_indices(allocator)
 	, m_vertices(allocator)
 	, m_clip_queue(allocator)
+	, m_font_manager(font_manager)
 {
-	clear({1, 1});
+	if (m_font_manager) m_font_manager->registerDraw2D(*this);
+	clear();
 }
 
-void Draw2D::clear(Vec2 atlas_size) {
+Draw2D::~Draw2D() {
+	if (m_font_manager) m_font_manager->unregisterDraw2D(*this);
+}
+
+void Draw2D::clear() {
+	if (m_font_manager) m_font_manager->getAtlasTexture(); // builds atlas if dirty, which calls setAtlas
 	m_cmds.clear();
 	m_indices.clear();
 	m_vertices.clear();
-	m_atlas_size = atlas_size;
 	Cmd& cmd = m_cmds.emplace();
 	cmd.texture = gpu::INVALID_TEXTURE;
 	cmd.indices_count = 0;
@@ -67,7 +74,7 @@ void Draw2D::popClipRect() {
 void Draw2D::addLine(const Vec2& p0, const Vec2& p1, Color color, float width) {
 	Cmd* cmd = &m_cmds.back();
 
-	if (cmd->texture && cmd->indices_count != 0) {
+	if (cmd->texture != m_atlas_handle && cmd->indices_count != 0) {
 		cmd = &m_cmds.emplace();
 		const Rect& r = m_clip_queue.back();
 		cmd->clip_pos = r.from;
@@ -79,7 +86,7 @@ void Draw2D::addLine(const Vec2& p0, const Vec2& p1, Color color, float width) {
 	Vec2 from = p0 + Vec2(0.5f);
 	Vec2 to = p1 + Vec2(0.5f);
 
-	cmd->texture = gpu::INVALID_TEXTURE;
+	cmd->texture = m_atlas_handle;
 	const Vec2 uv = Vec2(0.5f) / m_atlas_size;
 	const Vec2 dir = normalize(to - from);
 	const Vec2 n = Vec2(dir.y, -dir.x) * (width * 0.5f);
@@ -114,7 +121,7 @@ void Draw2D::addRect(const Vec2& from, const Vec2& to, Color color, float width)
 void Draw2D::addRectFilled(const Vec2& from, const Vec2& to, Color color) {
 	Cmd* cmd = &m_cmds.back();
 
-	if (cmd->texture && cmd->indices_count != 0) {
+	if (cmd->texture != m_atlas_handle && cmd->indices_count != 0) {
 		cmd = &m_cmds.emplace();
 		const Rect& r = m_clip_queue.back();
 		cmd->clip_pos = r.from;
@@ -123,7 +130,7 @@ void Draw2D::addRectFilled(const Vec2& from, const Vec2& to, Color color) {
 		cmd->index_offset = m_indices.size();
 	}
 
-	cmd->texture = gpu::INVALID_TEXTURE;
+	cmd->texture = m_atlas_handle;
 	const u32 voff = m_vertices.size();
 	m_indices.push(voff);
 	m_indices.push(voff + 1);
@@ -144,6 +151,8 @@ void Draw2D::addRectFilled(const Vec2& from, const Vec2& to, Color color) {
 }
 
 void Draw2D::addMesh(gpu::TextureHandle texture, Span<const Vertex> vertices, Span<const u32> indices, const Vec2& offset, float scale) {
+	const bool is_white = texture == gpu::INVALID_TEXTURE;
+	if (is_white) texture = m_atlas_handle;
 	Cmd* cmd = &m_cmds.back();
 
 	if (cmd->texture != texture && cmd->indices_count != 0) {
@@ -161,7 +170,7 @@ void Draw2D::addMesh(gpu::TextureHandle texture, Span<const Vertex> vertices, Sp
 
 	const Vec2 white_uv = Vec2(0.5f) / m_atlas_size;
 	for (const Vertex& v : vertices) {
-		const Vec2 uv = texture != gpu::INVALID_TEXTURE ? v.uv : white_uv;
+		const Vec2 uv = is_white ? white_uv : v.uv;
 		m_vertices.push({v.pos * scale + offset, uv, v.color});
 	}
 
@@ -200,9 +209,11 @@ void Draw2D::addImage(gpu::TextureHandle tex, const Vec2& from, const Vec2& to, 
 
 void Draw2D::addText(const Font& font, const Vec2& pos, Color color, StringView str) {
 	if (str.empty()) return;
+	ensureGlyphs(font, str.begin(), str.end()); // can rebuild the atlas into a new texture
+	const gpu::TextureHandle atlas_handle = m_atlas_handle;
 	Cmd* cmd = &m_cmds.back();
 
-	if (cmd->texture && cmd->indices_count != 0) {
+	if (cmd->texture != atlas_handle && cmd->indices_count != 0) {
 		cmd = &m_cmds.emplace();
 		const Rect& r = m_clip_queue.back();
 		cmd->clip_pos = r.from;
@@ -211,19 +222,23 @@ void Draw2D::addText(const Font& font, const Vec2& pos, Color color, StringView 
 		cmd->index_offset = m_indices.size();
 	}
 
-	cmd->texture = gpu::INVALID_TEXTURE;
-	
+	cmd->texture = atlas_handle;
+
 	Vec2 p = pos;
 	p.x = float(int(p.x));
 	p.y = float(int(p.y));
 
 	bool prev_was_space = false;
-	for (const char c : str) {
+	const char* it = str.begin();
+	const char* const str_end = str.end();
+	while (it != str_end) {
+		const char c = *it;
+		const u32 codepoint = nextCodepoint(it, str_end);
 		if (c == '\r') continue;
 		bool is_whitespace = isWhitespace(c);
 		if (is_whitespace && prev_was_space) continue;
 	
-		const Glyph* glyph = findGlyph(font, c);
+		const Glyph* glyph = findGlyph(font, codepoint);
 		if (!glyph) {
 			p.x += 16;
 			continue;
@@ -249,53 +264,7 @@ void Draw2D::addText(const Font& font, const Vec2& pos, Color color, StringView 
 }
 
 void Draw2D::addText(const Font& font, const Vec2& pos, Color color, const char* str) {
-	if (!str || !str[0]) return;
-	Cmd* cmd = &m_cmds.back();
-
-	if (cmd->texture && cmd->indices_count != 0) {
-		cmd = &m_cmds.emplace();
-		const Rect& r = m_clip_queue.back();
-		cmd->clip_pos = r.from;
-		cmd->clip_size = r.to - r.from;
-		cmd->indices_count = 0;
-		cmd->index_offset = m_indices.size();
-	}
-
-	cmd->texture = gpu::INVALID_TEXTURE;
-	
-	Vec2 p = pos;
-	p.x = float(int(p.x));
-	p.y = float(int(p.y));
-
-	bool prev_was_space = false;
-	for (const char* c = str; *c; ++c) {
-		if (*c == '\r') continue;
-		bool is_whitespace = isWhitespace(*c);
-		if (is_whitespace && prev_was_space) continue;
-	
-		const Glyph* glyph = findGlyph(font, *c);
-		if (!glyph) {
-			p.x += 16;
-			continue;
-		}
-		prev_was_space = is_whitespace;
-		const u32 voff = m_vertices.size();
-		m_indices.push(voff);
-		m_indices.push(voff + 1);
-		m_indices.push(voff + 2);
-
-		m_indices.push(voff);
-		m_indices.push(voff + 2);
-		m_indices.push(voff + 3);
-
-		m_vertices.push({ p + Vec2(glyph->x0, glyph->y0), { glyph->u0, glyph->v0 }, color });
-		m_vertices.push({ p + Vec2(glyph->x1, glyph->y0), { glyph->u1, glyph->v0 }, color });
-		m_vertices.push({ p + Vec2(glyph->x1, glyph->y1), { glyph->u1, glyph->v1 }, color });
-		m_vertices.push({ p + Vec2(glyph->x0, glyph->y1), { glyph->u0, glyph->v1 }, color });
-		
-		p.x += glyph->advance_x;
-		cmd->indices_count += 6;
-	}
+	addText(font, pos, color, StringView(str));
 }
 
 } // namespace Lumix

@@ -5,6 +5,7 @@
 #include "core/stream.h"
 #include "core/string.h"
 #include "font.h"
+#include "renderer/draw2d.h"
 #include "renderer/texture.h"
 #include "renderer/renderer.h"
 
@@ -43,8 +44,41 @@ void release(Font& font) { font.resource->removeRef(font); }
 const Glyph* findGlyph(const Font& font, u32 codepoint) {
 	font.resource->buildIfDirty();
 	auto iter = font.glyphs.find(codepoint);
-	if (!iter.isValid()) return nullptr;
+	if (!iter.isValid()) {
+		if (codepoint < 0x20) return nullptr;
+		// first use of this glyph, normally ensureGlyphs already added it
+		font.resource->addGlyph(const_cast<Font&>(font), codepoint);
+		font.resource->buildIfDirty();
+		iter = font.glyphs.find(codepoint);
+		if (!iter.isValid()) return nullptr;
+	}
 	return &iter.value();
+}
+
+Texture* getAtlasTexture(const Font& font) {
+	return static_cast<FontManager&>(font.resource->getResourceManager()).getAtlasTexture();
+}
+
+u32 nextCodepoint(const char*& p, const char* end) {
+	const u8 c = (u8)*p++;
+	if (c < 0x80) return c;
+	const u32 extra = c >= 0xF0 ? 3 : (c >= 0xE0 ? 2 : (c >= 0xC0 ? 1 : 0));
+	if (extra == 0) return 0xFFFD;
+	u32 cp = c & (0x3F >> extra);
+	for (u32 i = 0; i < extra; ++i) {
+		if (p == end || ((u8)*p & 0xC0) != 0x80) return 0xFFFD;
+		cp = (cp << 6) | ((u8)*p++ & 0x3F);
+	}
+	return cp;
+}
+
+void ensureGlyphs(const Font& font, const char* str, const char* end) {
+	for (const char* c = str; c != end && *c;) {
+		const u32 cp = nextCodepoint(c, end);
+		if (cp < 0x20 || font.glyphs.find(cp).isValid()) continue;
+		font.resource->addGlyph(const_cast<Font&>(font), cp);
+	}
+	font.resource->buildIfDirty();
 }
 
 SplitWord splitFirstWord(const Font& font, StringView text) {
@@ -68,13 +102,13 @@ SplitWord splitFirstWord(const Font& font, StringView text) {
 }
 
 Vec2 measureTextA(const Font& font, const char* str, const char* str_end) {
-	font.resource->buildIfDirty();
+	ensureGlyphs(font, str, str_end);
 	Vec2 res;
 	res.x = 0;
 	res.y = font.height;
 	const char* c = str;
 	bool prev_was_space = false;
-	while (*c && c != str_end) {
+	while (c != str_end && *c) {
 		if (*c == '\r') {
 			++c;
 			continue;
@@ -92,12 +126,11 @@ Vec2 measureTextA(const Font& font, const char* str, const char* str_end) {
 			continue;
 		}
 		prev_was_space = false;
-		auto iter = font.glyphs.find(*c);
+		auto iter = font.glyphs.find(nextCodepoint(c, str_end));
 		if (iter.isValid()) {
 			const Glyph& glyph = iter.value();
 			res.x += glyph.advance_x;
 		}
-		++c;
 	}
 	return res;
 }
@@ -150,11 +183,22 @@ static void blit(const ToChar& tc, const IVec2& size, Array<u32>* out) {
 	}
 }
 
+void FontManager::registerDraw2D(Draw2D& draw2d) {
+	m_draw2ds.push(&draw2d);
+	if (m_atlas_texture && m_atlas_texture->isReady()) draw2d.setAtlas(m_atlas_texture->handle, Vec2((float)m_atlas_texture->width, (float)m_atlas_texture->height));
+}
+void FontManager::unregisterDraw2D(Draw2D& draw2d) { m_draw2ds.eraseItem(&draw2d); }
+
 Texture* FontManager::getAtlasTexture() {
 	if (m_dirty) build();
 	return m_atlas_texture;
 }
 
+// TODO incremental atlas: build() re-rasterizes every glyph of every font and repacks the whole atlas
+// each time a new glyph is added, which is slow and forces Draw2D::addText to pin commands to the atlas they
+// were recorded with. Instead keep the pixel buffer and stbrp context between builds, rasterize and pack only new glyphs
+// (existing rects never move), upload only the dirty rect, and repack/grow only when the atlas is full.
+// Reserve a rect for the white pixel so no glyph can take it.
 bool FontManager::build() {
 	PROFILE_FUNCTION();
 	ASSERT(m_dirty);
@@ -321,6 +365,7 @@ bool FontManager::build() {
 		m_atlas_texture = LUMIX_NEW(m_allocator, Texture)(Path("draw2d_atlas"), texture_manager, m_renderer, m_allocator);
 	}
 	m_atlas_texture->create(w, h, gpu::TextureFormat::RGBA8, pixels.begin(), pixels.byte_size());
+	for (Draw2D* draw2d : m_draw2ds) draw2d->setAtlas(m_atlas_texture->handle, Vec2((float)w, (float)h));
 
 	return true;
 }
@@ -361,7 +406,7 @@ Font* FontResource::addRef(int font_size)
 	font->resource = this;
 	font->font_size = font_size;
 	for(u32 cp = 0x20; cp < 0xff; ++cp) {
-		Glyph c;
+		Glyph c = {};
 		c.codepoint = cp;
 		font->glyphs.insert(cp, c);
 	}
@@ -373,6 +418,13 @@ Font* FontResource::addRef(int font_size)
 void FontResource::buildIfDirty() {
 	auto& manager = (FontManager&)m_resource_manager;
 	if (manager.m_dirty) manager.build();
+}
+
+void FontResource::addGlyph(Font& font, u32 codepoint) {
+	Glyph c = {};
+	c.codepoint = codepoint;
+	font.glyphs.insert(codepoint, c);
+	((FontManager&)m_resource_manager).m_dirty = true;
 }
 
 
@@ -395,6 +447,7 @@ FontManager::FontManager(Renderer& renderer, IAllocator& allocator)
 	, m_renderer(renderer)
 	, m_atlas_texture(nullptr)
 	, m_fonts(allocator)
+	, m_draw2ds(allocator)
 {
 	build();
 }
@@ -402,6 +455,7 @@ FontManager::FontManager(Renderer& renderer, IAllocator& allocator)
 
 FontManager::~FontManager()
 {
+	for (Draw2D* draw2d : m_draw2ds) draw2d->m_font_manager = nullptr;
 	for (Font* font : m_fonts) {
 		LUMIX_DELETE(m_allocator, font);
 	}

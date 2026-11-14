@@ -15,6 +15,7 @@ namespace Lumix
 
 
 struct Font;
+struct Draw2D;
 struct Renderer;
 struct Texture;
 
@@ -34,6 +35,9 @@ struct SplitWord {
 
 LUMIX_RENDERER_API Vec2 measureTextA(const Font& font, const char* str, const char* str_end);
 LUMIX_RENDERER_API const Glyph* findGlyph(const Font& font, u32 codepoint);
+LUMIX_RENDERER_API Texture* getAtlasTexture(const Font& font);
+LUMIX_RENDERER_API u32 nextCodepoint(const char*& p, const char* end);
+LUMIX_RENDERER_API void ensureGlyphs(const Font& font, const char* str, const char* end);
 LUMIX_RENDERER_API float getAdvanceY(const Font& font);
 LUMIX_RENDERER_API float getDescender(const Font& font);
 LUMIX_RENDERER_API float getAscender(const Font& font);
@@ -54,6 +58,7 @@ struct LUMIX_RENDERER_API FontResource final : Resource
 	Font* addRef(int font_size);
 	void removeRef(Font& font);
 	void buildIfDirty();
+	void addGlyph(Font& font, u32 codepoint);
 
 	TagAllocator m_allocator;
 	OutputMemoryStream m_file_data;
@@ -62,14 +67,15 @@ struct LUMIX_RENDERER_API FontResource final : Resource
 };
 
 
-struct LUMIX_RENDERER_API FontManager final : ResourceManager
-{
+struct LUMIX_RENDERER_API FontManager final : ResourceManager {
 friend struct FontResource;
 public:
 	FontManager(Renderer& renderer, IAllocator& allocator);
 	~FontManager();
 
 	Texture* getAtlasTexture();
+	void registerDraw2D(Draw2D& draw2d);
+	void unregisterDraw2D(Draw2D& draw2d);
 
 private:
 	Resource* createResource(const Path& path) override;
@@ -81,6 +87,7 @@ private:
 	Renderer& m_renderer;
 	Texture* m_atlas_texture;
 	Array<Font*> m_fonts;
+	Array<Draw2D*> m_draw2ds;
 	bool m_dirty = true;
 };
 
