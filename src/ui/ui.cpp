@@ -3306,7 +3306,9 @@ void Document::injectEvent(const InputSystem::Event& event) {
 				flushLayout(); // an earlier event (:hover) or a script may have changed the layout, don't hit test the old bounds
 				Vec2 pos(event.data.axis.x_abs, event.data.axis.y_abs);
 				StackArray<u32, 16> new_hovered_path(m_allocator);
-				for (u32 idx : m_root.children) {
+				// topmost first (the last in document order is drawn last), like getActionTargetAt: an overlay must hide what is under it
+				for (i32 root_i = (i32)m_root.children.size() - 1; root_i >= 0; --root_i) {
+					const u32 idx = m_root.children[root_i];
 					Element* root = &m_elements[idx];
 					if (!root->visible) continue;
 					if (!contains(*root, pos, m_font_manager)) continue;
@@ -3315,7 +3317,8 @@ void Document::injectEvent(const InputSystem::Event& event) {
 					Element* elem = root;
 					for (;;) {
 						bool found_child = false;
-						for (u32 child_id : elem->children) {
+						for (i32 child_i = (i32)elem->children.size() - 1; child_i >= 0; --child_i) {
+							const u32 child_id = elem->children[child_i];
 							Element* child = &m_elements[child_id];
 							if (!child->visible) continue;
 							if (contains(*child, pos, m_font_manager)) {
