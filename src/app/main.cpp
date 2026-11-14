@@ -66,6 +66,18 @@ struct Runner final
 		m_viewport.h = client_size.y;
 	}
 
+	// "real" = native monitor resolution, "used" = client area we render to
+	void logResolution() {
+		os::Monitor monitors[16];
+		const u32 count = os::getMonitors(Span(monitors));
+		for (u32 i = 0; i < count; ++i) {
+			const os::Rect& r = monitors[i].monitor_rect;
+			logInfo("Monitor ", i, (monitors[i].primary ? " (primary)" : ""), ": real resolution ", r.width, "x", r.height);
+		}
+		const os::Point used = os::getWindowClientSize(m_engine->getMainWindow());
+		logInfo("Window: used resolution ", used.x, "x", used.y, ", DPI ", os::getDPI());
+	}
+
 	void initRenderPipeline() {
 		m_viewport.fov = degreesToRadians(60.f);
 		m_viewport.far = 10'000.f;
@@ -190,6 +202,7 @@ struct Runner final
 		m_engine->getFileSystem().processCallbacks();
 
 		onResize();
+		logResolution();
 		m_engine->startGame(*m_world);
 
 		os::showWindow(m_window);

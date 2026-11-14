@@ -1201,6 +1201,18 @@ void abort() {
 }
 
 void init() {
+	// must happen before any window is created, otherwise Windows virtualizes
+	// the resolution on scaled displays and stretches our output (blurry)
+	// no-op (fails with access denied) if the process is already DPI aware, e.g. in Studio
+	SetProcessDPIAware();
+	if (void* shcore = loadLibrary("shcore.dll")) {
+		using SetProcessDpiAwarenessFn = HRESULT (WINAPI*)(int);
+		auto setter = (SetProcessDpiAwarenessFn)getLibrarySymbol(shcore, "SetProcessDpiAwareness");
+		constexpr int PER_MONITOR_DPI_AWARE = 2; // PROCESS_PER_MONITOR_DPI_AWARE
+		if (setter) setter(PER_MONITOR_DPI_AWARE);
+		unloadLibrary(shcore);
+	}
+
 	G.cursors.arrow = LoadCursor(NULL, IDC_ARROW);
 	G.cursors.text_input = LoadCursor(NULL, IDC_IBEAM);
 	G.cursors.load = LoadCursor(NULL, IDC_WAIT);
@@ -1339,9 +1351,19 @@ WindowState setFullscreen(WindowHandle win) {
 	res.rect = getWindowScreenRect(win);
 	res.style = SetWindowLongPtr((HWND)win, GWL_STYLE, WS_VISIBLE);
 	DEBUG_CHECK(res.style);
-	int w = GetSystemMetrics(SM_CXSCREEN);
-	int h = GetSystemMetrics(SM_CYSCREEN);
-	DEBUG_CHECK(SetWindowPos((HWND)win, HWND_TOP, 0, 0, w, h, SWP_FRAMECHANGED));
+	// use the monitor the window is on, not the primary one
+	MONITORINFO mi = {};
+	mi.cbSize = sizeof(mi);
+	HMONITOR monitor = MonitorFromWindow((HWND)win, MONITOR_DEFAULTTONEAREST);
+	if (monitor && GetMonitorInfoW(monitor, &mi)) {
+		const RECT& r = mi.rcMonitor;
+		DEBUG_CHECK(SetWindowPos((HWND)win, HWND_TOP, r.left, r.top, r.right - r.left, r.bottom - r.top, SWP_FRAMECHANGED));
+	}
+	else {
+		int w = GetSystemMetrics(SM_CXSCREEN);
+		int h = GetSystemMetrics(SM_CYSCREEN);
+		DEBUG_CHECK(SetWindowPos((HWND)win, HWND_TOP, 0, 0, w, h, SWP_FRAMECHANGED));
+	}
 	return res;
 }
 
