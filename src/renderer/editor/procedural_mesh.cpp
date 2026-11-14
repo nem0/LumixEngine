@@ -337,6 +337,8 @@ struct ProceduralMeshImporter final : ModelImporter {
 				if (!indices.empty()) addMesh(lod, material, indices, materials);
 			}
 		}
+		// builds the autolodN index buffers (the writer reads them for every level enabled by autolodN) and bakes AO if the meta asks for it
+		postprocessCommon(meta, filename);
 		return true;
 	}
 
