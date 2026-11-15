@@ -8,6 +8,7 @@
 #include "core/tag_allocator.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
+#include <stb/stb_rect_pack.h>
 
 
 namespace Lumix
@@ -21,10 +22,12 @@ struct Texture;
 
 
 struct Glyph {
+	enum State { EMPTY, MEASURED, RASTERIZED, MISSING, REPACK };
 	u32 codepoint;
 	float u0, v0, u1, v1;
 	float x0, y0, x1, y1;
 	float advance_x;
+	State state = EMPTY;
 };
 
 struct SplitWord {
@@ -53,7 +56,7 @@ struct LUMIX_RENDERER_API FontResource final : Resource
 
 	ResourceType getType() const override { return TYPE; }
 
-	void unload() override { m_file_data.free(); }
+	void unload() override;
 	bool load(Span<const u8> mem) override;
 	Font* addRef(int font_size);
 	void removeRef(Font& font);
@@ -88,7 +91,12 @@ private:
 	Texture* m_atlas_texture;
 	Array<Font*> m_fonts;
 	Array<Draw2D*> m_draw2ds;
+	u32 m_atlas_width = 0;
+	u32 m_atlas_height = 0;
+	stbrp_context m_ctx;
+	Array<stbrp_node> m_nodes;
 	bool m_dirty = true;
+	bool m_repack = false; // atlas space was released (font unloaded/removed), repack from scratch on next build
 };
 
 
