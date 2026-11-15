@@ -5,6 +5,7 @@
 #include "core/log.h"
 #include "core/path.h"
 #include "core/debug.h"
+#include "core/profiler.h"
 #include "editor/action.h"
 #include "editor/studio_app.h"
 #include "editor/asset_browser.h"
@@ -979,6 +980,7 @@ struct EvoxAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 
 	// The runtime loads bytecode only, sources and imports are resolved here.
 	bool compile(const Path& src) override {
+		PROFILE_FUNCTION();
 		IAllocator& allocator = m_app.getAllocator();
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		OutputMemoryStream content(allocator);
@@ -1018,24 +1020,30 @@ struct EvoxAssetPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			OutputMemoryStream render_content(allocator);
 			bool has_render = is_main && fs.getContentSync(Path(EVOX_RENDER_PATH), render_content);
 			// the roots are typechecked together, compiling them one by one would typecheck the first one again
-			if (!ex_module_add_root(module, source, name, &resolveImport, &ctx)) {
+			if (![&]{ PROFILE_BLOCK("evox parse root"); return ex_module_add_root(module, source, name, &resolveImport, &ctx); }()) {
 				stage = "script has errors";
 			}
-			else if (has_render && !ex_module_add_root(module,
-				ex_string_view{(const char*)render_content.data(), (i64)render_content.size()},
-				ex_string_view{EVOX_RENDER_PATH, (i64)stringLength(EVOX_RENDER_PATH)},
-				&resolveImport, &ctx))
+			else if (has_render && ![&]{
+				PROFILE_BLOCK("evox parse render root");
+				return ex_module_add_root(module,
+					ex_string_view{(const char*)render_content.data(), (i64)render_content.size()},
+					ex_string_view{EVOX_RENDER_PATH, (i64)stringLength(EVOX_RENDER_PATH)},
+					&resolveImport, &ctx);
+			}())
 			{
 				stage = "render.evox has errors";
 			}
-			else if (!ex_module_typecheck(module)) {
+			else if (![&]{ PROFILE_BLOCK("evox typecheck"); return ex_module_typecheck(module); }()) {
 				stage = "script has errors";
 			}
-			else if (ex_bytecode* bytecode = ex_bytecode_compile(module, &host, nullptr)) {
+			else if (ex_bytecode* bytecode = [&]{ PROFILE_BLOCK("evox bytecode compile"); return ex_bytecode_compile(module, &host, nullptr); }()) {
 				OutputMemoryStream image(allocator);
-				const ex_result saved = ex_bytecode_save(bytecode, [](void* userdata, const void* data, u64 size) {
-					((OutputMemoryStream*)userdata)->write(data, size);
-				}, &image);
+				const ex_result saved = [&]{
+					PROFILE_BLOCK("evox bytecode save");
+					return ex_bytecode_save(bytecode, [](void* userdata, const void* data, u64 size) {
+						((OutputMemoryStream*)userdata)->write(data, size);
+					}, &image);
+				}();
 				if (saved != EX_RESULT_OK) stage = "failed to serialize bytecode";
 				else if (!m_app.getAssetCompiler().writeCompiledResource(src, Span(image.data(), (u32)image.size()))) stage = "failed to write compiled resource";
 				else success = true;
