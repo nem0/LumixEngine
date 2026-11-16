@@ -46,7 +46,7 @@ struct GPUSceneMesh {
 	// The mesh of a model without clusters (GPUSceneModel::PLAIN) has only the last three fields, its vertices and indices are in ranges of the buffer of cluster data
 	// (drawn by one command of an indirect draw for each mesh and material), the other fields are 0
 	enum Flags : u32 { FLAT = 1 << 0 };
-	u32 cluster_groups;		// byte offset in the buffer of cluster data (Renderer::getClusterDataBuffer) of u32[cluster_count]: the group of each cluster. The clusters are in the payloads of the groups
+	u32 clusters;			// byte offset in the buffer of cluster data (Renderer::getClusterDataBuffer) of MeshClusterGPU[]
 	u32 nodes;				// byte offset in the same buffer of MeshNodeGPU[node_count], then the indices of root_count roots
 	u32 cluster_count;
 	u32 node_count;
@@ -57,8 +57,8 @@ struct GPUSceneMesh {
 	u32 leaf_cluster_count;
 	u32 flags;
 	u32 flat_groups;		// groups of a flat mesh for an instance
-	u32 padding0;
-	u32 indices;			// byte offset in the same buffer of MeshGroupAddressGPU[], where the clusters, vertices and the u8 indices (local to a cluster, `index_stride` for each) of each group are
+	u32 vertex_offset;		// byte offset in the buffer of cluster data (Renderer::getClusterDataBuffer) of MeshClusterVertexGPU[cluster_count], the headers of the clusters (vertex_pulling.hlsli)
+	u32 indices;			// byte offset in the same buffer of MeshGroupAddressGPU[], where the vertices and the u8 indices (local to a cluster, `index_stride` for each) of the clusters of each group are
 	u32 material_entry;		// the entry of the mesh in the default material set of its model (GPUScene::getMaterialSetBuffer): its variant and material index
 	u32 index_in_model;		// the index of the mesh in its model
 	u32 padding;

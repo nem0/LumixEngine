@@ -3,8 +3,6 @@
 #include "core/log.h"
 #include "core/path.h"
 #include "core/profiler.h"
-#include "core/sort.h"
-#include "core/stack_array.h"
 #include "engine/engine.h"
 #include "engine/resource_manager.h"
 #include "renderer/draw_stream.h"
@@ -205,7 +203,6 @@ void GPUScene::releaseSet(u32 id) {
 	m_free_sets.push(id);
 }
 
-// overrides: normalized by setOverrides (meshes < count, unique, sorted by mesh)
 u32 GPUScene::acquireSet(u32 model_id, const Model* model, u32 count, Span<const Override> overrides) {
 	u32 set = GPUSceneConst::INVALID_SLOT;
 	const u64 hash = hashOverrides(model, overrides);
@@ -260,23 +257,8 @@ void GPUScene::setOverrides(u32 slot, Span<const Override> overrides) {
 	const u32 model_id = m_slot_model[slot];
 	const Model* model = model_id == GPUSceneConst::INVALID_MODEL ? nullptr : m_models[model_id].model;
 	const u32 count = model ? (u32)model->getMeshCount() : 0;
-	// normalize the overrides (valid meshes, one per mesh - the last one wins, sorted by mesh), so the hash and sameSet see the same overrides for the same set
-	StackArray<Override, 16> normalized(m_allocator);
-	for (const Override& o : overrides) {
-		if (o.mesh >= count) continue;
-		bool replaced = false;
-		for (Override& n : normalized) {
-			if (n.mesh != o.mesh) continue;
-			n = o;
-			replaced = true;
-			break;
-		}
-		if (!replaced) normalized.push(o);
-	}
-	sort(normalized.begin(), normalized.end(), [](const Override& a, const Override& b) { return a.mesh < b.mesh; });
-
 	u32 set = GPUSceneConst::INVALID_SLOT;
-	if (count > 0 && !normalized.empty()) set = acquireSet(model_id, model, count, Span<const Override>(normalized.begin(), normalized.size()));
+	if (count > 0 && overrides.length() > 0) set = acquireSet(model_id, model, count, overrides);
 
 	const u32 old = m_slot_set[slot];
 	if (old == set) return;
@@ -624,7 +606,7 @@ void GPUScene::rebuildModelTables() {
 			const Mesh& mesh = model->getMesh(i);
 			GPUSceneMesh& m = m_mesh_table.emplace();
 			memset(&m, 0, sizeof(m));
-			m.cluster_groups = mesh.cluster_group_ids_offset;
+			m.clusters = mesh.cluster_table_offset;
 			m.nodes = mesh.node_table_offset;
 			m.cluster_count = mesh.cluster_count;
 			m.node_count = mesh.node_count;
@@ -634,6 +616,7 @@ void GPUScene::rebuildModelTables() {
 			m.index_stride = mesh.cluster_index_stride;
 			m.leaf_cluster_count = mesh.leaf_cluster_count;
 			m.flat_groups = (mesh.cluster_count + GPUSceneConst::CLUSTER_THREADS - 1) / GPUSceneConst::CLUSTER_THREADS;
+			m.vertex_offset = mesh.cluster_header_offset;
 			m.indices = mesh.cluster_group_offset;
 			m.index_in_model = (u32)i;
 			m.material_entry = default_first + (u32)i;

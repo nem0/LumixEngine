@@ -1550,6 +1550,7 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 			// The padding is made of degenerate triangles of the vertex 0, which the rasterizer drops and the vertex cache already holds.
 			u32 index_stride = 3;
 			for (const MeshClusterGPU& cluster : clusters->clusters) index_stride = maximum(index_stride, cluster.index_count);
+			assignClusterPages(*results[i], index_stride);
 			// indices are local to a cluster, which has at most MeshClusters::MAX_CLUSTER_VERTICES vertices, they are written as bytes
 			static_assert(MeshClusters::MAX_CLUSTER_VERTICES <= 256);
 			Array<u8> padded_indices(m_allocator);
@@ -1845,7 +1846,7 @@ bool ModelImporter::writeModel(const Path& src, const ModelMeta& meta) {
 	if (!writeClusters(meta)) return false;
 
 	AssetCompiler& compiler = m_app.getAssetCompiler();
-	return compiler.writeCompiledResource(Path(src), Span(m_out_file.data(), m_out_file.size()), !m_bake_clusters);
+	return compiler.writeCompiledResource(Path(src), Span(m_out_file.data(), m_out_file.size()));
 }
 
 bool ModelImporter::writeAnimations(const Path& src, const ModelMeta& meta) {

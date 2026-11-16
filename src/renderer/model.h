@@ -150,8 +150,8 @@ struct LUMIX_RENDERER_API Mesh {
 	ClusterStream* cluster_stream = nullptr;
 	u32 cluster_table_offset = 0;	// MeshClusterGPU[cluster_count]
 	u32 node_table_offset = 0;		// MeshNodeGPU[node_count], then root_count u32 indices of roots, see MeshClusters, right after the clusters
-	u32 cluster_table_size = 0;		// of the range that has the nodes with the roots and (16 byte aligned) the group of each cluster
-	u32 cluster_group_ids_offset = 0;	// u32[cluster_count], MeshClusterGPU::group of each cluster, the end of the range of the table
+	u32 cluster_table_size = 0;		// of the range that has the clusters, the nodes with the roots and (16 byte aligned) the headers of the clusters
+	u32 cluster_header_offset = 0;	// MeshClusterVertexGPU[cluster_count], the end of the range of the clusters
 	u32 cluster_group_offset = 0;	// MeshGroupAddressGPU[], a range of its own
 	u32 cluster_group_size = 0;
 	u32 cluster_count = 0;

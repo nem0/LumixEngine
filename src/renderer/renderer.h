@@ -165,24 +165,24 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual bool allocClusterData(const void* data, u32 size, u32& offset) = 0;
 	// The same range of the buffer with no data: the caller copies to it (GPUScene does it for the meshes without clusters, see GPUScene::flush). The offset is a multiple of
 	// `alignment` (any positive number), the size is not rounded, free it with freeClusterData.
-	// If there is no room and `reclaim` is set, the renderer unloads streamed pages (see ClusterStream), but their ranges can be allocated again only after the frames in flight, so it can fail now and succeed later.
+	// If there is no room and `reclaim` is set, the renderer unloads streamed pages (see ClusterStream) and tries again, so it can fail only if the data that is never unloaded does not fit.
 	virtual bool allocClusterRange(u32 size, u32 alignment, u32& offset, bool reclaim = true) = 0;
-	// the range can be allocated again after the frames in flight
-	virtual void freeClusterData(u32 offset, u32 size) = 0;
+	// `immediate`: the range can be allocated again at once, not after the frames in flight (only for data that the GPU is not going to use any more, ClusterStream::evictPage)
+	virtual void freeClusterData(u32 offset, u32 size, bool immediate = false) = 0;
 	virtual gpu::BufferHandle getClusterDataBuffer() = 0; // invalid until the first allocation
 	// Copies `size` bytes (a multiple of 4) to the bytes of a range of the buffer that was allocated before (the copy is recorded in the draw stream of the frame, so the GPU executes
 	// it before the passes that are recorded later).
 	virtual void updateClusterData(u32 offset, const void* data, u32 size) = 0;
 
-	// Streaming of the payload of clusters, see ClusterStream. Ids are for the pages of a mesh in the feedback buffer. The GPU sets a bit for each page that was used and
-	// appends the ids of the pages that are needed (with a priority) to a list, once per frame for each id, the renderer reads them back (see FEEDBACK_* in nanite.hlsl). `allocClusterStreamIds` returns ClusterStream::NONE if there
+	// Streaming of the payload of clusters, see ClusterStream. Ids are for the groups of a mesh in the feedback buffer, 8 bytes for each: the stamp of the frame in which a cluster of the group was
+	// drawn, the stamp of the last frame that needed the clusters that the group is refined to (the frame number + 1, 0: never). `allocClusterStreamIds` returns ClusterStream::NONE if there
 	// are not enough ids. Streams are registered when they are complete, unregistering frees the ids. All can be called from any thread.
 	virtual u32 allocClusterStreamIds(u32 count) = 0;
 	virtual void registerClusterStream(ClusterStream* stream) = 0;
 	virtual void unregisterClusterStream(ClusterStream* stream) = 0;
 	virtual bool isClusterStreamingEnabled() const = 0;	// false: everything is loaded with the model (-cluster_stream_off)
 	virtual gpu::BufferHandle getClusterFeedbackBuffer() = 0;	// invalid until the first stream is registered
-	virtual u32 getClusterFeedbackCapacity() = 0;			// ids that the GPU accepts
+	virtual u32 getClusterFeedbackCapacity() = 0;			// groups in it
 
 	virtual gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const MemRef& memory, const char* debug_name) = 0;
 

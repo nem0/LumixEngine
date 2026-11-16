@@ -38,24 +38,11 @@ cbuffer UniformData : register(b4) {
 	uint u_groups;			// bindless, GPUSceneGroup[] of the instanced models
 	uint u_cluster_data;	// bindless, the buffer with the clusters and nodes of all meshes, see MeshDesc
 	uint u_padding1;
-	uint u_feedback;		// rw bindless, the feedback of streaming, see FEEDBACK_* (the CPU reads back the lists, they are reset every frame)
+	uint u_feedback;		// rw bindless, 8 bytes for each group of the meshes that stream: the stamp of the frame in which a cluster of it was drawn, then the one of the last frame that needed its children
 	uint u_frame;			// the stamp of this frame
 	uint u_feedback_capacity;	// groups in u_feedback, 0 if there is none
 	uint u_padding2;
 };
-
-// The layout of the feedback buffer, the same as in renderer.cpp (FEEDBACK_*):
-//   [0] number of requests (may be more than the capacity, the extra ones are dropped), [4] unused,
-//   [8] number of selected clusters in all views of the frame, [12] how many of them did not fit in the list of selected clusters, [16] triangles of the clusters that fit (these are drawn), the counters are only for the profiler,
-//   FEEDBACK_REQUESTS: requests, 8 bytes: the id of the group that is needed (its children are not loaded and the cluster is too coarse), the priority (float, larger is more needed),
-//   FEEDBACK_BITS: a bit for each id, set if a cluster of the group was selected in the frame (the CPU reads back the ones of the ids that exist),
-//   FEEDBACK_STAMPS: 4 bytes for each id, the stamp of the frame in which the id was appended to the requests, so it is not appended twice in a frame (GPU only).
-// The CPU resets the counters and the bits every frame.
-#define FEEDBACK_REQUEST_CAPACITY 4096
-#define FEEDBACK_REQUESTS 32
-#define FEEDBACK_BITS (FEEDBACK_REQUESTS + FEEDBACK_REQUEST_CAPACITY * 8)
-#define FEEDBACK_MAX_IDS (1 << 20)
-#define FEEDBACK_STAMPS (FEEDBACK_BITS + FEEDBACK_MAX_IDS / 8)
 
 // threads of a group, GPUSceneConst::CLUSTER_THREADS
 #define GROUP_SIZE 64
@@ -65,14 +52,14 @@ cbuffer UniformData : register(b4) {
 
 struct MeshDesc {
 	float4 camera_offset;		// -cam_frac
-	uint cluster_groups;		// byte offset in u_cluster_data of the group of each cluster (u32), the clusters are in the payloads of the groups
+	uint clusters;				// byte offset in u_cluster_data of MeshClusterGPU[]
 	uint nodes;					// byte offset in u_cluster_data of MeshNodeGPU[node_count], then the indices of root_count roots
 	uint node_count;
 	uint root_count;
 	uint roots_offset;			// byte offset of the roots in nodes
 	uint cluster_count;
 	uint mesh_index;			// in the mesh table
-	uint groups;				// byte offset in u_cluster_data of the table of groups (MeshGroupAddressGPU, 32 bytes): record address, header address, stream, indices, first cluster, count, flags
+	uint groups;				// byte offset in u_cluster_data of the table of groups (MeshGroupAddressGPU, 16 bytes), the flags are the last word
 };
 
 // the description of a mesh of the mesh table of the GPU scene (GPUSceneMesh), `mesh` is its index in the table
@@ -82,7 +69,7 @@ MeshDesc loadSceneDesc(uint mesh) {
 	const uint2 b = meshes.Load2(mesh * 64 + 16);		// root count, roots offset
 	MeshDesc r;
 	r.camera_offset = float4(-u_cam_frac, 1);
-	r.cluster_groups = a.x; r.nodes = a.y; r.cluster_count = a.z; r.node_count = a.w;
+	r.clusters = a.x; r.nodes = a.y; r.cluster_count = a.z; r.node_count = a.w;
 	r.root_count = b.x; r.roots_offset = b.y;
 	r.groups = meshes.Load(mesh * 64 + 48);
 	r.mesh_index = mesh;
@@ -138,21 +125,18 @@ bool insideFrustum(float3 center, float radius) {
 // Tests a cluster and appends it to the list of selected clusters if it is selected.
 void processCluster(MeshDesc desc, Instance instance, float max_scale, uint instance_idx, uint cluster, uint group_ref) {
 	ByteAddressBuffer clusters = bindless_buffers[u_cluster_data];
-	// Streaming: the record of a cluster is in the payload of its group, which is not loaded if the flags say so (then the clusters of the group are not drawn)
-	const uint group = clusters.Load(desc.cluster_groups + cluster * 4);
-	const uint4 group_address = clusters.Load4(desc.groups + group * 32 + 16);	// first cluster, cluster count, flags
-	const uint own_flags = group_address.z;
-	if ((own_flags & 1) == 0) return;
-	uint offset = clusters.Load(desc.groups + group * 32) + (cluster - group_address.x) * 80;
+	uint offset = desc.clusters + cluster * 80;
 	float4 bounds = asfloat(clusters.Load4(offset));
 	float4 lod_bounds = asfloat(clusters.Load4(offset + 16));
 	float4 parent_bounds = asfloat(clusters.Load4(offset + 32));
 	uint4 misc = clusters.Load4(offset + 48);
 	const float2 attribute_errors = asfloat(clusters.Load2(offset + 64)); // of the cluster and of its parent
-	// A cluster whose children (the group it was refined to) are not loaded is drawn as if it was accurate enough, if its parent is not drawn instead. The parent decides
-	// the same for all clusters of the group, so there are no holes and no overlaps.
-	const uint refined_group = clusters.Load(offset + 76);	// the group of its children
-	const uint child_flags = refined_group == 0xffffffffu ? 1u : clusters.Load(desc.groups + refined_group * 32 + 24);
+	// Streaming: the clusters of a group that is not loaded are not drawn. A cluster whose children (the group it was refined to) are not loaded is drawn as if it was
+	// accurate enough, if its parent is not drawn instead. The parent decides the same for all clusters of the group, so there are no holes and no overlaps.
+	const uint2 group_info = clusters.Load2(offset + 72);	// the group of the cluster, the group of its children
+	const uint own_flags = clusters.Load(desc.groups + group_info.x * 16 + 12);
+	if ((own_flags & 1) == 0) return;
+	const uint child_flags = group_info.y == 0xffffffffu ? 1u : clusters.Load(desc.groups + group_info.y * 16 + 12);
 	const bool refined = (child_flags & 1) != 0;
 	// the error of a cluster is the one of its positions and the one of its attributes, which counts as much as the weight says
 	float error = (asfloat(misc.x) + u_attribute_weight * attribute_errors.x) * max_scale;
@@ -177,39 +161,16 @@ void processCluster(MeshDesc desc, Instance instance, float max_scale, uint inst
 	// the feedback of streaming: the group is used, and if the cluster is only drawn because its children are not loaded and it is not accurate enough, they are needed
 	if (u_feedback_capacity != 0) {
 		RWByteAddressBuffer feedback = bindless_rw_buffers[u_feedback];
-		// a bit for the used group, a request is appended once per frame (the stamps after FEEDBACK_STAMPS tell if it was), the CPU reads them back
 		const uint own_id = own_flags >> 8;
-		if (own_id < u_feedback_capacity) {
-			uint unused;
-			feedback.InterlockedOr(FEEDBACK_BITS + (own_id >> 5) * 4, 1u << (own_id & 31), unused);
-		}
+		if (own_id < u_feedback_capacity) feedback.Store(own_id * 8, u_frame);
 		const uint child_id = child_flags >> 8;
-		if (!refined && !error_small && child_id < u_feedback_capacity) {
-			uint old;
-			feedback.InterlockedExchange(FEEDBACK_STAMPS + child_id * 4, u_frame, old);
-			if (old != u_frame) {
-				uint at;
-				feedback.InterlockedAdd(0, 1, at);
-				// how many times too coarse the cluster is, the CPU loads the most needed pages first
-				const float dist = u_is_ortho ? 1 : max(length(lod_center) - lod_bounds.w * max_scale, 1e-4);
-				const float priority = min(error / (u_lod_k * dist), 1e30);
-				if (at < FEEDBACK_REQUEST_CAPACITY) feedback.Store2(FEEDBACK_REQUESTS + at * 8, uint2(child_id, asuint(priority)));
-			}
-		}
+		if (!refined && !error_small && child_id < u_feedback_capacity) feedback.Store(child_id * 8 + 4, u_frame);
 	}
 
 	RWByteAddressBuffer selected = bindless_rw_buffers[u_selected];
 	uint at;
 	selected.InterlockedAdd(0, 1, at);
 	if (at < u_selected_capacity) selected.Store4(16 + at * 16, uint4(instance_idx, desc.mesh_index, cluster, group_ref));
-	// counted for the profiler, in all views of the frame
-	if (u_feedback_capacity != 0) {
-		RWByteAddressBuffer feedback = bindless_rw_buffers[u_feedback];
-		uint unused;
-		feedback.InterlockedAdd(8, 1, unused);
-		if (at >= u_selected_capacity) feedback.InterlockedAdd(12, 1, unused);
-		else feedback.InterlockedAdd(16, misc.w / 3, unused);
-	}
 }
 
 // false if no cluster of the node can be selected, then the node and everything under it is skipped

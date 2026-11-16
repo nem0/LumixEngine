@@ -43,8 +43,8 @@ struct MeshGroupGPU {
 	enum Flags : u32 { RESIDENT = 1 << 0 };
 	u32 first_cluster;
 	u32 cluster_count;
-	u32 page;				// not used in the model file (zero), ClusterStream::init makes the pages when the model is loaded; the groups of a page are streamed together
-	u32 flags;				// Flags, same as page
+	u32 page;				// the groups of a page are streamed together
+	u32 flags;
 	u32 stream_offset;		// byte offset of the part of the vertex stream of the group, from the start of the stream (4 byte aligned, the stream has no headers)
 	u32 stream_size;		// bytes of it (the last group has some bytes of padding more, shaders read two words at any bit)
 	u32 padding0;
@@ -59,19 +59,12 @@ struct MeshGroupAddressGPU {
 		LOADED = 1 << 0,		// the data of the group is in the buffer, the clusters of a group that is not loaded are not drawn (the parents are, see nanite.hlsl)
 		PERMANENT = 1 << 1		// never unloaded
 	};
-	// The payload of a group is in one range, in this order: MeshClusterGPU for each cluster, MeshClusterVertexGPU for each cluster, the vertex stream, the indices.
-	// The cluster `c` of the group has its record at record_address + (c - first_cluster) * 80, its header at header_address + (c - first_cluster) * 48 and its
-	// indices at index_address + (c - first_cluster) * index_stride. Meaningful only if the group is LOADED.
-	u32 record_address;
-	u32 header_address;
 	u32 stream_address;		// of the vertex stream of the group, positions and attributes of its clusters, see MeshClusterVertexGPU::pos_bit_offset
-	u32 index_address;
+	u32 index_address;		// of the indices of its first cluster, the cluster `c` of the group is at index_address + (c - first_cluster) * index_stride
 	u32 first_cluster;
-	u32 cluster_count;
-	u32 flags;				// Flags, the id of the group in the feedback buffer << 8
-	u32 padding;
+	u32 flags;
 };
-static_assert(sizeof(MeshGroupAddressGPU) == 32);
+static_assert(sizeof(MeshGroupAddressGPU) == 16);
 
 // A node of the tree over the clusters of a mesh (64 bytes, the GPU layout, read by data/shaders/nanite.hlsl). The clusters of every level of the
 // DAG have their own tree, the trees are built over runs of consecutive clusters. The shader walks the trees from the roots and skips a node,
@@ -140,12 +133,14 @@ struct MeshClusters {
 
 	static constexpr u32 LEAF_FLAG = 0x80000000u;
 	static constexpr u32 NODE_FANOUT = 8;
-	static constexpr u32 MAX_CLUSTER_VERTICES = 256;	// indices local to a cluster are bytes, so not more than 256
+	static constexpr u32 MAX_CLUSTER_VERTICES = 64;
 	static constexpr u32 MAX_POSITION_BITS = 25;	// per axis of a cluster
 	static constexpr u32 NO_GROUP = 0xffffFFFFu;
+	static constexpr u32 PAGE_BYTES = 64 * 1024;		// payload (vertex stream and indices) of a page, a group larger than that has a page of its own
+	static constexpr u32 RESIDENT_BYTES = 256 * 1024;	// the coarsest groups up to this payload are RESIDENT
 
 	Array<MeshClusterGPU> clusters;
-	Array<MeshGroupGPU> groups;	// by MeshClusterGPU::group, filled by buildMeshClusters
+	Array<MeshGroupGPU> groups;	// by MeshClusterGPU::group, filled by buildMeshClusters, pages by assignClusterPages
 	Array<u32> indices;			// indices of vertices of the mesh, used while the clusters are built. See local_indices
 	Array<Vec3> index_positions;	// if the borders of the clusters are dilated (see buildMeshClusters): the position that the vertex of each entry of `indices` has in its cluster, otherwise empty
 	Array<MeshNodeGPU> nodes;
@@ -202,30 +197,24 @@ struct ClusterStream {
 
 	explicit ClusterStream(IAllocator& allocator);
 
-	// Copies everything that is needed to load pages, nothing is loaded. `base_id` is the first of the ids of the pages in the feedback buffer, NONE: set it later with setFeedbackBase (the pages are made here).
-	// Only the nodes and what makes the pages stay in the stream, the clusters (records and headers), vertices and indices are in the payloads of the groups.
-	bool init(const MeshClusterGPU* cluster_array, u32 clusters, const MeshClusterVertexGPU* header_array, const MeshNodeGPU* node_array, u32 nodes_count, const MeshGroupGPU* group_array, u32 group_count
+	// Copies everything that is needed to load pages, nothing is loaded. `global_base` is the first of the ids of the groups in the feedback buffer, or NONE.
+	bool init(const MeshClusterGPU* cluster_array, u32 clusters, const MeshNodeGPU* node_array, u32 nodes_count, const MeshGroupGPU* group_array, u32 group_count
 		, const u8* stream_bytes, u32 stream_size, const u8* index_bytes, u32 stride, u32 base_id);
-	// bytes of the payload of a group
-	u32 groupBytes(u32 group) const;
 	// bytes of the range of a page in the buffer of cluster data
 	u32 pageBytes(u32 page) const;
 	// the first page that has a parent group of the page and is not loaded, or NONE
 	u32 firstMissingParentPage(u32 page) const;
 	bool canEvict(u32 page) const;
-	// sets Page::wanted_frame of the pages that have parents of the page, so they are not unloaded before the page is loaded
-	void protectParentPages(u32 page, u32 stamp);
 	// the pages of the parents must be loaded, false if there is no room in the buffer
 	// `can_reclaim`: if there is no room in the buffer the renderer may unload other pages (not when the streamer loads, it does it itself and holds its lock)
 	bool loadPage(Renderer& renderer, u32 page, u32 stamp, bool can_reclaim);
-	void evictPage(Renderer& renderer, u32 page);
+	// `immediate`: the range of the page is reusable at once, see Renderer::freeClusterData
+	void evictPage(Renderer& renderer, u32 page, bool immediate = false);
 	// frees everything that is loaded
 	void release(Renderer& renderer);
 	// recomputes MeshNodeGPU::unrefined and uploads the nodes that changed (if the nodes are uploaded: node_table_offset)
 	void refreshNodes(Renderer& renderer);
 	u32 addressFlags(u32 group) const;
-	// the first id of the pages of this stream in the feedback buffer (one for each page), the flags of the groups have the id of their page
-	void setFeedbackBase(u32 base_id);
 
 	IAllocator& allocator;
 	Array<MeshGroupGPU> groups;
@@ -234,8 +223,8 @@ struct ClusterStream {
 	Array<Page> pages;
 	Array<u8> loaded;								// of each group
 	Array<MeshGroupAddressGPU> addresses;			// the table of the GPU, uploaded to group_table_offset
-	Array<u8> payload;								// the payloads of all groups (see MeshGroupAddressGPU), one after the other, 16 byte aligned: what the pages are copied from
-	Array<u32> group_offset;						// of each group, its offset in payload
+	Array<u8> stream_data;							// all the vertex streams of the groups
+	Array<u8> index_data;							// the indices of all the clusters, index_stride each
 	Array<MeshNodeGPU> nodes;
 	Array<u32> cluster_refined;						// MeshClusterGPU::refined_group of each cluster
 	u32 cluster_count = 0;
@@ -244,9 +233,8 @@ struct ClusterStream {
 	u32 global_base = NONE;
 	u32 group_table_offset = NONE;					// in the buffer of cluster data, NONE until the table is uploaded (0 is a valid offset)
 	u32 node_table_offset = NONE;					// the same for the nodes
-	u32 table_bytes = 0;							// in the buffer as long as the mesh is loaded: the nodes, the roots, the groups of the clusters and the table of group addresses
 	u32 streamed_bytes = 0;							// of the loaded pages that are not permanent
-	u32 root_bytes = 0;							// payload of the groups that have no parent, they are always loaded: the least that a mesh needs
+	u32 root_bytes = 0;								// payload of the groups that have no parent, they are always loaded: the least that a mesh needs
 };
 
 } // namespace Lumix

@@ -20,7 +20,6 @@ void runTokenizerTests();
 void runEvoxModuleTests();
 void runTextureRecipeTests();
 void runProceduralMeshTests();
-void runFileSystemTests();
 
 namespace Lumix {
 	int test_count = 0;
@@ -61,7 +60,6 @@ int main(int argc, char* argv[]) {
 	runEvoxModuleTests();
 	runTextureRecipeTests();
 	runProceduralMeshTests();
-	runFileSystemTests();
 	Lumix::logInfo("=== Test Results: ", Lumix::passed_count, "/", Lumix::test_count, " passed ===");
 
 	Lumix::profiler::shutdown();

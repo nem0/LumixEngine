@@ -694,7 +694,7 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 		u32 group_count = 0;
 		file.read(group_count);
 		const u64 header_bytes = u64(cluster_count) * sizeof(MeshClusterVertexGPU);
-		if (file.hasOverflow() || group_count == 0 || group_count > cluster_count || u64(group_count) * sizeof(MeshGroupGPU) > file.remaining() || vertex_data_size < header_bytes || indices_size > 0x7fffFFFF || indices_size < u64(cluster_count) * index_stride) {
+		if (file.hasOverflow() || group_count == 0 || group_count > cluster_count || u64(group_count) * sizeof(MeshGroupGPU) > file.remaining() || vertex_data_size < header_bytes || indices_size > 0x7fffFFFF) {
 			logError(m_path, ": invalid groups of clusters");
 			return false;
 		}
@@ -711,17 +711,15 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 
 		// The payload of the groups is streamed, see ClusterStream: the stream keeps a copy of it and loads pages into the buffer of cluster data. Only the permanent pages are
 		// loaded now (all of them if streaming is off, -cluster_stream_off). The stream is registered when it is complete, the renderer streams the registered ones.
+		const u32 id_base = m_renderer.allocClusterStreamIds(group_count);
 		ClusterStream* stream = LUMIX_NEW(m_allocator, ClusterStream)(m_allocator);
 		mesh.cluster_stream = stream;
-		if (!stream->init((const MeshClusterGPU*)clusters, cluster_count, (const MeshClusterVertexGPU*)vertex_data, (const MeshNodeGPU*)nodes, node_count, groups.begin(), group_count
-			, (const u8*)vertex_data + header_bytes, (u32)stream_size, (const u8*)indices, index_stride, ClusterStream::NONE))
+		if (!stream->init((const MeshClusterGPU*)clusters, cluster_count, (const MeshNodeGPU*)nodes, node_count, groups.begin(), group_count
+			, (const u8*)vertex_data + header_bytes, (u32)stream_size, (const u8*)indices, index_stride, id_base))
 		{
 			logError(m_path, ": invalid groups of clusters");
 			return false;
 		}
-		// the ids of the feedback are the ones of the pages, which are known now
-		const u32 id_base = m_renderer.allocClusterStreamIds((u32)stream->pages.size());
-		stream->setFeedbackBase(id_base);
 		const u32 stamp = m_renderer.frameNumber() + 1;
 		const bool load_all = !m_renderer.isClusterStreamingEnabled();
 		// the parents of a group are coarser, so they have higher numbers: the pages are loaded from the last one
@@ -732,25 +730,25 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 			}
 		}
 
-		// What stays in the buffer for the whole life of the mesh: the nodes (with `unrefined` of the pages that are loaded), the roots, and then (16 byte aligned) the group
-		// of each cluster, 4 bytes. The clusters (records and headers) are in the payloads of their groups, the shaders find them by the group, see MeshGroupAddressGPU.
-		const u64 nodes_bytes = u64(node_count) * sizeof(MeshNodeGPU) + u64(root_count) * sizeof(u32);
-		const u64 group_ids_at = (nodes_bytes + 15) & ~u64(15);
-		const u64 table_size = group_ids_at + u64(cluster_count) * sizeof(u32);
+		// The clusters, the nodes (with `unrefined` of the pages that are loaded) and the roots follow each other in the range of the table (the shaders find the nodes by the end of the
+		// clusters), then the headers of the clusters (16 byte aligned), so that everything that is read for a cluster before its data is in one range
+		ASSERT((const u8*)clusters + clusters_size == nodes);
+		const u64 headers_at = (clusters_size + nodes_size + 15) & ~u64(15);
+		const u64 table_size = headers_at + header_bytes;
 		bool tables_uploaded = false;
 		if (table_size <= 0x7fffFFFF) {
 			Array<u8> table(m_allocator);
 			table.resize((u32)table_size);
 			memset(table.begin(), 0, table.byte_size());
-			memcpy(table.begin(), stream->nodes.begin(), u64(node_count) * sizeof(MeshNodeGPU));
-			memcpy(table.begin() + u64(node_count) * sizeof(MeshNodeGPU), (const u8*)nodes + u64(node_count) * sizeof(MeshNodeGPU), u64(root_count) * sizeof(u32));
-			u32* group_ids = (u32*)(table.begin() + group_ids_at);
-			for (u32 c = 0; c < cluster_count; ++c) group_ids[c] = ((const MeshClusterGPU*)clusters)[c].group;
+			memcpy(table.begin(), clusters, clusters_size);
+			memcpy(table.begin() + clusters_size, stream->nodes.begin(), u64(node_count) * sizeof(MeshNodeGPU));
+			memcpy(table.begin() + clusters_size + u64(node_count) * sizeof(MeshNodeGPU), (const u8*)nodes + u64(node_count) * sizeof(MeshNodeGPU), u64(root_count) * sizeof(u32));
+			memcpy(table.begin() + headers_at, vertex_data, header_bytes);
 			tables_uploaded = m_renderer.allocClusterData(table.begin(), (u32)table_size, mesh.cluster_table_offset);
 			if (tables_uploaded) {
 				mesh.cluster_table_size = (u32)table_size;
-				mesh.node_table_offset = mesh.cluster_table_offset;
-				mesh.cluster_group_ids_offset = mesh.cluster_table_offset + (u32)group_ids_at;
+				mesh.node_table_offset = mesh.cluster_table_offset + (u32)clusters_size;
+				mesh.cluster_header_offset = mesh.cluster_table_offset + (u32)headers_at;
 				stream->node_table_offset = mesh.node_table_offset;
 			}
 		}
@@ -761,7 +759,6 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 			groups_uploaded = m_renderer.allocClusterData(stream->addresses.begin(), addresses_size, mesh.cluster_group_offset);
 			if (groups_uploaded) {
 				mesh.cluster_group_size = addresses_size;
-				stream->table_bytes = (u32)table_size + addresses_size;
 				stream->group_table_offset = mesh.cluster_group_offset;
 			}
 		}
@@ -770,6 +767,18 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 			return false;
 		}
 		m_renderer.registerClusterStream(stream);
+		{
+			u32 permanent_pages = 0;
+			u64 permanent_bytes = 0, total_bytes = 0;
+			for (u32 p = 0; p < (u32)stream->pages.size(); ++p) {
+				total_bytes += stream->pageBytes(p);
+				if (stream->pages[p].permanent) {
+					++permanent_pages;
+					permanent_bytes += stream->pageBytes(p);
+				}
+			}
+			logInfo(m_path, " mesh ", i, ": ", cluster_count, " clusters, ", group_count, " groups, ", (u32)stream->pages.size(), " pages (", permanent_pages, " permanent, ", u32(permanent_bytes >> 10), " of ", u32(total_bytes >> 10), " KB, roots ", u32(stream->root_bytes >> 10), " KB), feedback ids from ", id_base == ClusterStream::NONE ? 0xffFFffFFu : id_base);
+		}
 	}
 
 	// Meshes of the first LOD have vertices only in clusters, so all of them must have clusters
@@ -815,20 +824,13 @@ ClusterStream::ClusterStream(IAllocator& allocator)
 	, pages(allocator)
 	, loaded(allocator)
 	, addresses(allocator)
-	, payload(allocator)
-	, group_offset(allocator)
+	, stream_data(allocator)
+	, index_data(allocator)
 	, nodes(allocator)
 	, cluster_refined(allocator)
 {}
 
-static u32 align16(u32 v) { return (v + 15) & ~15u; }
-
-u32 ClusterStream::groupBytes(u32 g) const {
-	const MeshGroupGPU& group = groups[g];
-	return group.cluster_count * u32(sizeof(MeshClusterGPU) + sizeof(MeshClusterVertexGPU)) + align16(group.stream_size) + align16(group.cluster_count * index_stride);
-}
-
-bool ClusterStream::init(const MeshClusterGPU* cluster_array, u32 clusters, const MeshClusterVertexGPU* header_array, const MeshNodeGPU* node_array, u32 nodes_count, const MeshGroupGPU* group_array, u32 group_count
+bool ClusterStream::init(const MeshClusterGPU* cluster_array, u32 clusters, const MeshNodeGPU* node_array, u32 nodes_count, const MeshGroupGPU* group_array, u32 group_count
 	, const u8* stream_bytes, u32 stream_size, const u8* index_bytes, u32 stride, u32 base_id)
 {
 	cluster_count = clusters;
@@ -862,10 +864,7 @@ bool ClusterStream::init(const MeshClusterGPU* cluster_array, u32 clusters, cons
 	//    that nothing would ever ask for. They are the coarsest level, or groups that could not be simplified, whatever their size,
 	//  - and the coarsest of the others, as long as the permanent groups are not larger than PERMANENT_BYTES (the groups of a mesh are in the order of the levels, the
 	//    parents of a group have higher numbers).
-	u64 total_payload = 0;
-	for (u32 g = 0; g < group_count; ++g) total_payload += groupBytes(g);
-	if (total_payload > 0x7fffFFFFull) return false;
-	auto payload_bytes = [&](u32 g) -> u64 { return groupBytes(g); };
+	auto payload_bytes = [&](u32 g) -> u64 { return u64(groups[g].stream_size) + u64(groups[g].cluster_count) * index_stride; };
 	Array<u8> permanent(allocator);
 	permanent.resize(group_count);
 	for (u8& p : permanent) p = 0;
@@ -903,32 +902,18 @@ bool ClusterStream::init(const MeshClusterGPU* cluster_array, u32 clusters, cons
 		page_bytes += bytes;
 	}
 
-	// the payloads of the groups, the clusters of a group are consecutive in the arrays of the model
-	payload.resize((u32)total_payload);
-	memset(payload.begin(), 0, payload.byte_size());
-	group_offset.resize(group_count);
-	u32 at = 0;
-	for (u32 g = 0; g < group_count; ++g) {
-		const MeshGroupGPU& group = groups[g];
-		group_offset[g] = at;
-		u8* dst = payload.begin() + at;
-		memcpy(dst, cluster_array + group.first_cluster, u64(group.cluster_count) * sizeof(MeshClusterGPU));
-		dst += group.cluster_count * sizeof(MeshClusterGPU);
-		memcpy(dst, header_array + group.first_cluster, u64(group.cluster_count) * sizeof(MeshClusterVertexGPU));
-		dst += group.cluster_count * sizeof(MeshClusterVertexGPU);
-		memcpy(dst, stream_bytes + group.stream_offset, group.stream_size);
-		dst += align16(group.stream_size);
-		memcpy(dst, index_bytes + u64(group.first_cluster) * index_stride, u64(group.cluster_count) * index_stride);
-		at += groupBytes(g);
-	}
+	stream_data.resize(stream_size);
+	memcpy(stream_data.begin(), stream_bytes, stream_size);
+	index_data.resize(u64(cluster_count) * index_stride);
+	memcpy(index_data.begin(), index_bytes, u64(cluster_count) * index_stride);
 
 	loaded.resize(group_count);
 	for (u8& l : loaded) l = 0;
 	addresses.resize(group_count);
 	for (u32 g = 0; g < group_count; ++g) {
-		memset(&addresses[g], 0, sizeof(addresses[g]));
+		addresses[g].stream_address = 0;
+		addresses[g].index_address = 0;
 		addresses[g].first_cluster = groups[g].first_cluster;
-		addresses[g].cluster_count = groups[g].cluster_count;
 		addresses[g].flags = addressFlags(g);
 	}
 	return true;
@@ -939,20 +924,18 @@ u32 ClusterStream::addressFlags(u32 g) const {
 	if (loaded[g]) flags |= MeshGroupAddressGPU::LOADED;
 	if (pages[groups[g].page].permanent) flags |= MeshGroupAddressGPU::PERMANENT;
 	// the id of the group in the feedback buffer, shaders ignore ids that are out of the buffer
-	const u32 id = global_base == NONE ? 0xffFFffu : minimum(global_base + groups[g].page, 0xffFFffu);
+	const u32 id = global_base == NONE ? 0xffFFffu : minimum(global_base + g, 0xffFFffu);
 	return flags | (id << 8);
-}
-
-void ClusterStream::setFeedbackBase(u32 base_id) {
-	global_base = base_id;
-	for (u32 g = 0; g < (u32)groups.size(); ++g) addresses[g].flags = addressFlags(g);
 }
 
 u32 ClusterStream::pageBytes(u32 page_index) const {
 	const Page& page = pages[page_index];
-	// the payloads of the groups of a page are consecutive in `payload`
-	const u32 last = page.first_group + page.group_count - 1;
-	return group_offset[last] + groupBytes(last) - group_offset[page.first_group];
+	const MeshGroupGPU& first = groups[page.first_group];
+	const MeshGroupGPU& last = groups[page.first_group + page.group_count - 1];
+	// the vertex streams of the groups of a page and then their indices, as they are in the model
+	const u32 stream_bytes = last.stream_offset + last.stream_size - first.stream_offset;
+	const u32 index_bytes = (last.first_cluster + last.cluster_count - first.first_cluster) * index_stride;
+	return (stream_bytes + index_bytes + 15) & ~15u;
 }
 
 u32 ClusterStream::firstMissingParentPage(u32 page_index) const {
@@ -964,15 +947,6 @@ u32 ClusterStream::firstMissingParentPage(u32 page_index) const {
 		}
 	}
 	return NONE;
-}
-
-void ClusterStream::protectParentPages(u32 page_index, u32 stamp) {
-	const Page& page = pages[page_index];
-	for (u32 g = page.first_group; g < page.first_group + page.group_count; ++g) {
-		for (u32 i = 0; i < parent_count[g]; ++i) {
-			pages[groups[parents[parent_first[g] + i]].page].wanted_frame = stamp;
-		}
-	}
 }
 
 bool ClusterStream::canEvict(u32 page_index) const {
@@ -992,20 +966,25 @@ bool ClusterStream::loadPage(Renderer& renderer, u32 page_index, u32 stamp, bool
 	Page& page = pages[page_index];
 	ASSERT(!page.loaded);
 	ASSERT(firstMissingParentPage(page_index) == NONE);
-	const u32 first_offset = group_offset[page.first_group];
+	const MeshGroupGPU& first = groups[page.first_group];
+	const MeshGroupGPU& last = groups[page.first_group + page.group_count - 1];
+	const u32 stream_bytes = last.stream_offset + last.stream_size - first.stream_offset;
+	const u32 index_bytes = (last.first_cluster + last.cluster_count - first.first_cluster) * index_stride;
 	const u32 size = pageBytes(page_index);
 	u32 offset;
 	if (!renderer.allocClusterRange(size, 16, offset, can_reclaim)) return false;
-	renderer.updateClusterData(offset, payload.begin() + first_offset, size);
+
+	Array<u8> payload(allocator);
+	payload.resize(size);
+	memset(payload.begin(), 0, size);
+	memcpy(payload.begin(), stream_data.begin() + first.stream_offset, stream_bytes);
+	memcpy(payload.begin() + stream_bytes, index_data.begin() + u64(first.first_cluster) * index_stride, index_bytes);
+	renderer.updateClusterData(offset, payload.begin(), size);
 
 	for (u32 g = page.first_group; g < page.first_group + page.group_count; ++g) {
-		const u32 count = groups[g].cluster_count;
-		const u32 base = offset + (group_offset[g] - first_offset);
 		loaded[g] = 1;
-		addresses[g].record_address = base;
-		addresses[g].header_address = base + count * u32(sizeof(MeshClusterGPU));
-		addresses[g].stream_address = addresses[g].header_address + count * u32(sizeof(MeshClusterVertexGPU));
-		addresses[g].index_address = addresses[g].stream_address + align16(groups[g].stream_size);
+		addresses[g].stream_address = offset + (groups[g].stream_offset - first.stream_offset);
+		addresses[g].index_address = offset + stream_bytes + (groups[g].first_cluster - first.first_cluster) * index_stride;
 		addresses[g].flags = addressFlags(g);
 	}
 	page.loaded = true;
@@ -1013,13 +992,17 @@ bool ClusterStream::loadPage(Renderer& renderer, u32 page_index, u32 stamp, bool
 	page.pool_size = size;
 	page.loaded_frame = stamp;
 	if (!page.permanent) streamed_bytes += size;
+	if (group_table_offset != NONE) {
+		static u32 logged = 0;
+		if (logged++ < 12) logInfo("Cluster page ", page_index, ": groups ", page.first_group, "..", page.first_group + page.group_count - 1, ", clusters from ", first.first_cluster, ", pool offset ", offset, ", ", size, " bytes, stream ", stream_bytes, ", indices ", index_bytes, ", first group stream address ", addresses[page.first_group].stream_address, ", index address ", addresses[page.first_group].index_address);
+	}
 	// the table of the GPU after the payload: both are copies in the stream of the frame, in this order
 	if (group_table_offset != NONE) renderer.updateClusterData(group_table_offset + page.first_group * (u32)sizeof(MeshGroupAddressGPU), &addresses[page.first_group], page.group_count * (u32)sizeof(MeshGroupAddressGPU));
 	refreshNodes(renderer);
 	return true;
 }
 
-void ClusterStream::evictPage(Renderer& renderer, u32 page_index) {
+void ClusterStream::evictPage(Renderer& renderer, u32 page_index, bool immediate) {
 	Page& page = pages[page_index];
 	ASSERT(page.loaded && !page.permanent);
 	for (u32 g = page.first_group; g < page.first_group + page.group_count; ++g) {
@@ -1031,7 +1014,7 @@ void ClusterStream::evictPage(Renderer& renderer, u32 page_index) {
 	page.loaded = false;
 	streamed_bytes -= page.pool_size;
 	refreshNodes(renderer);
-	renderer.freeClusterData(page.pool_offset, page.pool_size);
+	renderer.freeClusterData(page.pool_offset, page.pool_size, immediate);
 	page.pool_offset = 0;
 	page.pool_size = 0;
 }
@@ -1087,7 +1070,7 @@ void Model::destroyClusters() {
 		if (mesh.cluster_group_size) m_renderer.freeClusterData(mesh.cluster_group_offset, mesh.cluster_group_size);
 		mesh.cluster_group_offset = 0;
 		mesh.cluster_group_size = 0;
-		mesh.cluster_group_ids_offset = 0;
+		mesh.cluster_header_offset = 0;
 		mesh.cluster_table_offset = 0;
 		mesh.node_table_offset = 0;
 		mesh.cluster_table_size = 0;

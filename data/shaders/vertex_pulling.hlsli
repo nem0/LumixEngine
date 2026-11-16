@@ -211,17 +211,17 @@ VSVertex pullVertex(uint corner, uint instance_id) {
 	const uint mesh = bindless_buffers[u_instance_buffer].Load(instance_address + 76);
 	ByteAddressBuffer mesh_table = bindless_buffers[u_cluster_meshes];
 	const uint index_stride = mesh_table.Load(mesh * 64 + 28);
-	const uint groups_at = mesh_table.Load(mesh * 64 + 48);	// byte offset of the table of groups in u_vertex_buffer
+	const uint2 mesh_offsets = mesh_table.Load2(mesh * 64 + 44);	// byte offsets of the headers of the clusters and of the table of groups in u_vertex_buffer
 	// the vertices, indices and everything else of all meshes are in one buffer, a mesh has its ranges of it
 	ByteAddressBuffer data = bindless_buffers[u_vertex_buffer];
-	// the data of a cluster is where its group is: the group of each cluster is in the table that the mesh has (the first field of the mesh table)
-	const uint group_id = data.Load(mesh_table.Load(mesh * 64) + cluster * 4);
-	const uint4 group_address = data.Load4(groups_at + group_id * 32 + 4);	// header address, stream address, index address, first cluster
-	const uint base = group_address.y;
-	const uint index_address = group_address.z + (cluster - group_address.w) * index_stride + corner;
+	// the data of a cluster is where its group is: the group is in the cluster table (MeshClusterGPU::group, byte 72 of 80)
+	const uint group_id = data.Load(mesh_table.Load(mesh * 64) + cluster * 80 + 72);
+	const uint4 group_address = data.Load4(mesh_offsets.y + group_id * 16);	// stream, indices of the first cluster, first cluster, flags
+	const uint base = group_address.x;
+	const uint index_address = group_address.y + (cluster - group_address.z) * index_stride + corner;
 	const uint index_word = data.Load(index_address & ~3u);
 	const uint vertex = corner >= index_stride ? 0 : ((index_word >> ((index_address & 3) * 8)) & 0xff);
-	const uint header = group_address.x + (cluster - group_address.w) * 48;
+	const uint header = mesh_offsets.x + cluster * 48;
 	const uint4 h0 = data.Load4(header);			// start of positions, bits
 	const uint4 h1 = data.Load4(header + 16);		// bits of UV, vertex count, bit offset of the first vertex (in the stream of its group), step
 	const float4 h2 = asfloat(data.Load4(header + 32)); // UV range

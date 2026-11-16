@@ -19,7 +19,7 @@ namespace Lumix {
 namespace {
 
 // the sizes meshoptimizer recommends for meshlets (its triangle count is a multiple of 4, and 124 leaves room for hardware that needs a few spare slots)
-constexpr u32 MAX_CLUSTER_VERTICES = MeshClusters::MAX_CLUSTER_VERTICES;
+constexpr u32 MAX_CLUSTER_VERTICES = 64;
 constexpr u32 MAX_CLUSTER_TRIANGLES = 124;
 constexpr float UV_STEP = 1.f / 16384.f;	// the largest step of quantized UVs, unless the range of a cluster is too large for 16 bits
 constexpr u32 INVALID_INDEX = 0xffFFffFF;
@@ -518,6 +518,41 @@ bool packClusterVertices(const ClusterVertexSource& source, MeshClusters& out, I
 	if (current_group != MeshClusters::NO_GROUP) out.groups[current_group].stream_size = words * 4 - out.groups[current_group].stream_offset;
 
 	return true;
+}
+
+void assignClusterPages(MeshClusters& out, u32 index_stride) {
+	const u32 group_count = (u32)out.groups.size();
+	if (group_count == 0) return;
+	// the payload of a group: its piece of the vertex stream and the indices of its clusters
+	auto payload_bytes = [&](u32 g) -> u64 {
+		const MeshGroupGPU& group = out.groups[g];
+		return u64(group.stream_size) + u64(group.cluster_count) * index_stride;
+	};
+
+	// groups are in the order of the levels, so the coarsest ones are the last
+	u32 first_resident = group_count;
+	u64 resident_bytes = 0;
+	while (first_resident > 0) {
+		const u64 bytes = payload_bytes(first_resident - 1);
+		if (resident_bytes + bytes > MeshClusters::RESIDENT_BYTES && first_resident < group_count) break;
+		resident_bytes += bytes;
+		--first_resident;
+	}
+
+	u32 page = 0;
+	u64 page_bytes = 0;
+	for (u32 g = 0; g < group_count; ++g) {
+		const u64 bytes = payload_bytes(g);
+		// the resident groups never share a page with the others
+		const bool starts_resident = g == first_resident;
+		if (g > 0 && (starts_resident || (page_bytes > 0 && page_bytes + bytes > MeshClusters::PAGE_BYTES))) {
+			++page;
+			page_bytes = 0;
+		}
+		out.groups[g].page = page;
+		out.groups[g].flags = g >= first_resident ? (u32)MeshGroupGPU::RESIDENT : 0;
+		page_bytes += bytes;
+	}
 }
 
 } // namespace Lumix
