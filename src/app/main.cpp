@@ -37,6 +37,28 @@
 
 using namespace Lumix;
 
+// -resolution <width> <height>: the render resolution instead of the size of the window, the output is scaled to the window (benchmarks render 4K in a hidden window)
+static bool getForcedResolution(int& width, int& height) {
+	char tmp[4096];
+	if (!os::getCommandLine(Span(tmp))) return false;
+	CommandLineParser parser(tmp);
+	while (parser.next()) {
+		if (!parser.currentEquals("-resolution")) continue;
+		int values[2] = {};
+		for (int i = 0; i < 2; ++i) {
+			if (!parser.next()) return false;
+			char value[32];
+			parser.getCurrent(value, sizeof(value));
+			for (const char* c = value; *c >= '0' && *c <= '9'; ++c) values[i] = values[i] * 10 + (*c - '0');
+		}
+		if (values[0] <= 0 || values[1] <= 0) return false;
+		width = values[0];
+		height = values[1];
+		return true;
+	}
+	return false;
+}
+
 struct Runner final
 {
 	Runner() 
@@ -62,6 +84,11 @@ struct Runner final
 		if (!m_engine.get()) return;
 		if (m_engine->getMainWindow() == os::INVALID_WINDOW) return;
 
+		if (m_forced_width > 0) {
+			m_viewport.w = m_forced_width;
+			m_viewport.h = m_forced_height;
+			return;
+		}
 		const os::Point client_size = os::getWindowClientSize(m_engine->getMainWindow());
 		m_viewport.w = client_size.x;
 		m_viewport.h = client_size.y;
@@ -213,8 +240,13 @@ struct Runner final
 		m_engine->getFileSystem().mount(data_dir, "");
 		m_imgui.m_engine = m_engine.get();
 
+		// -hidden: the window is never shown (benchmarks): the app does not take the focus or the mouse, the GPU renders the same
+		m_hidden = CommandLineParser::isOn("-hidden");
+		getForcedResolution(m_forced_width, m_forced_height);
+		if (m_hidden) m_focused = false;
 		os::InitWindowArgs init_window_args;
 		init_window_args.name = LUMIX_APP_TITLE;
+		init_window_args.is_hidden = m_hidden;
 		m_window = os::createWindow(init_window_args);
 		m_engine->setMainWindow(m_window);
 
@@ -233,7 +265,7 @@ struct Runner final
 
 		if (!m_startup_world.isEmpty()) loadWorld();
 		
-		os::showCursor(false);
+		if (m_focused) os::showCursor(false);
 		while (m_engine->getFileSystem().hasWork()) {
 			os::sleep(10);
 			m_engine->getFileSystem().processCallbacks();
@@ -244,7 +276,7 @@ struct Runner final
 		logResolution();
 		m_engine->startGame(*m_world);
 
-		os::showWindow(m_window);
+		if (!m_hidden) os::showWindow(m_window);
 		m_imgui.init();
 	}
 
@@ -361,6 +393,9 @@ struct Runner final
 	Viewport m_viewport;
 	bool m_finished = false;
 	bool m_focused = true;
+	bool m_hidden = false;
+	int m_forced_width = 0;
+	int m_forced_height = 0;
 	bool m_mouse_captured = false;
 	bool m_is_ingame_cursor = false;
 

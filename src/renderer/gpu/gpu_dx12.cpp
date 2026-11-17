@@ -2371,9 +2371,19 @@ bool init(void* hwnd, InitFlags flags) {
 	}
 
 	if (isFlagSet(flags, InitFlags::STABLE_POWER_STATE)) {
-		logInfo("GPU: trying to enable stable power state");
-		d3d->device->SetStablePowerState(TRUE);
-		logInfo("GPU: stable power state is enabled");
+		// It only works with the developer mode of Windows on. Without it the call fails and REMOVES THE DEVICE, so check first.
+		DWORD developer_mode = 0;
+		DWORD developer_mode_size = sizeof(developer_mode);
+		const LSTATUS reg_result = RegGetValueW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock", L"AllowDevelopmentWithoutDevLicense", RRF_RT_REG_DWORD, nullptr, &developer_mode, &developer_mode_size);
+		if (reg_result != ERROR_SUCCESS || developer_mode == 0) {
+			logError("GPU: the stable power state needs the developer mode of Windows (Settings / System / For developers), it is off, so the GPU clocks are not stable.");
+		}
+		else {
+			logInfo("GPU: trying to enable stable power state");
+			const HRESULT stable_hr = d3d->device->SetStablePowerState(TRUE);
+			if (SUCCEEDED(stable_hr)) logInfo("GPU: stable power state is enabled");
+			else logError("GPU: could not enable stable power state (HRESULT ", (u32)stable_hr, "), the GPU clocks are not stable.");
+		}
 	}
 
 	return true;

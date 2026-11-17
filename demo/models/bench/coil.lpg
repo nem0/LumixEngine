@@ -1,0 +1,10 @@
+// High poly coil for the nanite benchmark (scripts/run_nanite_tests.bat): about 290k triangles.
+// A thin tube (radius 4 cm) swept along a helix of 40 turns, 2 m tall. Long thin geometry with a lot of silhouette is the
+// opposite of the rock: simplifying it removes detail that is visible everywhere, and clusters of it overlap a lot.
+import "core:procedural_geom"
+
+fn main() : Mesh {
+    const path = spiral(2.0, 0.6, 0.6, 40.0, 150);
+    const profile = circle(0.04, 24);
+    return extrude(profile, path);
+}

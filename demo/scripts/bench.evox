@@ -1,0 +1,288 @@
+// Benchmark: the camera turns one full circle while GPU timings are sampled, then a CSV is written and the app quits.
+// Started from main.evox when `-bench <file>` is on the command line, e.g.
+//
+//   app.exe -window -data_dir <demo dir> -world maps/demo/demo.unv -bench nanite/bench.csv
+//           [-bench_warmup 300] [-bench_frames 600] [-bench_cam x y z yaw_deg pitch_deg]
+//           [-bench_spawn <rock|coil|terrain> <count_x> <count_z> <spacing>]
+//
+// -bench_spawn adds a sun with shadows and a grid of count_x * count_z instances of one of the high poly meshes of
+// models/bench/ (rock.lpg, coil.lpg, terrain.lpg), centered at the origin, every instance with its own yaw. Run it without
+// -world, so the world is empty and only those meshes are rendered. Without -bench_cam the camera is then at (0, 5, 0), in
+// the middle of the grid. The warmup starts when the model is loaded.
+//
+// <file> is relative to the saved games directory (see core:savedgames). Without -bench_cam the camera of the
+// world is used (turning around its position). GPU scopes only keep their last 100 samples, so they are sampled
+// every 50 frames and averaged here.
+import "core:engine/engine"
+import "core:world"
+import "core:entity"
+import "core:log"
+import "core:dvec3"
+import "core:quat" as quat
+import "core:renderer/module"
+import "core:renderer/camera"
+import "core:renderer/environment"
+import "core:renderer/model"
+import "core:renderer/model_instance"
+import "core:commandline" as commandline
+import "core:string"
+import "core:profiler" as profiler
+import "core:savedgames" as savedgames
+
+const MAX_SCOPES : isize = 128;
+var g_sum : [128]f64 = undefined;
+var g_min : [128]f64 = undefined;
+var g_max : [128]f64 = undefined;
+var g_samples : [128]i32 = undefined;
+
+var g_out : [32768]u8 = undefined;
+var g_len : isize = 0;
+var g_spawned : i32 = 0;
+
+fn append(text : []const u8) : void {
+	var i : isize = 0;
+	while i < text.length {
+		if g_len < 32768 {
+			g_out[g_len] = text[i];
+			g_len += 1;
+		}
+		i += 1;
+	}
+}
+
+// Evox string literals have no escape sequences
+fn endLine() : void {
+	if g_len < 32768 {
+		g_out[g_len] = 10;
+		g_len += 1;
+	}
+}
+
+fn appendFloat(value : f64, decimals : u32) : void {
+	var tmp : [64]u8 = undefined;
+	append(formatFloat(tmp[0:], value, decimals));
+}
+
+fn sample() : void {
+	const count = profiler.gpuScopeCount();
+	var i : u32 = 0;
+	while i < count and (i as isize) < MAX_SCOPES {
+		const avg = profiler.gpuScopeTime(i, 0) as f64;
+		if avg > 0 {
+			const s = i as isize;
+			g_sum[s] += avg;
+			const lo = profiler.gpuScopeTime(i, 1) as f64;
+			const hi = profiler.gpuScopeTime(i, 2) as f64;
+			if g_samples[s] == 0 or lo < g_min[s] { g_min[s] = lo; }
+			if hi > g_max[s] { g_max[s] = hi; }
+			g_samples[s] += 1;
+		}
+		i += 1;
+	}
+}
+
+fn writeReport(path : []const u8, frames : i32, total_time : f64) : void {
+	g_len = 0;
+	append("kind,name,avg,min,max");
+	endLine();
+	append("frame_ms,frame (wall clock),");
+	appendFloat(total_time * 1000.0 / (frames as f64), 4);
+	append(",,");
+	endLine();
+	append("info,instances,");
+	appendFloat(g_spawned as f64, 0);
+	append(",,");
+	endLine();
+
+	var name : [64]u8 = undefined;
+	const count = profiler.gpuScopeCount();
+	var i : u32 = 0;
+	while i < count and (i as isize) < MAX_SCOPES {
+		const s = i as isize;
+		const n = profiler.gpuScopeName(i, name[0:]);
+		if n > 0 and g_samples[s] > 0 {
+			append("gpu_ms,");
+			append(name[0:n as isize]);
+			append(",");
+			appendFloat(g_sum[s] / (g_samples[s] as f64) * 1000.0, 4);
+			append(",");
+			appendFloat(g_min[s] * 1000.0, 4);
+			append(",");
+			appendFloat(g_max[s] * 1000.0, 4);
+			endLine();
+		}
+		i += 1;
+	}
+
+	const counters = profiler.counterCount();
+	i = 0;
+	while i < counters {
+		const n = profiler.counterName(i, name[0:]);
+		if n > 0 {
+			append("counter,");
+			append(name[0:n as isize]);
+			append(",");
+			appendFloat(profiler.counterValue(i) as f64, 4);
+			append(",,");
+			endLine();
+		}
+		i += 1;
+	}
+
+	if savedgames.writeBlob(path, g_out[0:g_len]) {
+		var full : [512]u8 = undefined;
+		const n = savedgames.fullpath(path, full[0:]);
+		if n > 0 { logInfo("Benchmark written to ", full[0:n as isize]); }
+		else { logInfo("Benchmark written"); }
+	}
+	else {
+		logError("Could not write the benchmark to ", path);
+	}
+}
+
+// Spawns a grid of count_x * count_z instances of the model, returns the first one (if any was created).
+fn spawn(world : World, path : []const u8, count_x : i32, count_z : i32, spacing : f64) : ?ModelInstance {
+	var first : ?ModelInstance = null;
+	var ix : i32 = 0;
+	while ix < count_x {
+		var iz : i32 = 0;
+		while iz < count_z {
+			const x = ((ix as f64) - ((count_x - 1) as f64) * 0.5) * spacing;
+			const z = ((iz as f64) - ((count_z - 1) as f64) * 0.5) * spacing;
+			const e = world.createEntity();
+			e.setPosition(DVec3{x, 0.0, z});
+			// a different yaw for every instance, deterministic
+			const degrees = (ix * 37 + iz * 101) % 360;
+			e.setRotation(quat.makeQuatFromYaw((degrees as f32) * 0.017453292));
+			if const created = e.createModelInstance() {
+				var mi = created;
+				mi.setPath(path);
+				if first == null { first = mi; }
+				g_spawned += 1;
+			}
+			iz += 1;
+		}
+		ix += 1;
+	}
+	return first;
+}
+
+// Yields until the model of the instance is loaded (or failed to load, or it takes too long).
+fn waitForModel(mi : ModelInstance) : void {
+	var frames : i32 = 0;
+	while frames < 3600 {
+		if const model = mi.getModel() {
+			if model.isReady() or model.isFailure() { return; }
+		}
+		const dt : f32 = yield;
+		frames += 1;
+	}
+	logError("Benchmark: the model was not loaded in 3600 frames");
+}
+
+fn run(engine : Engine, world : World) : void {
+	var path_buffer : [256]u8 = undefined;
+	var path : []const u8 = "bench.csv";
+	const path_len = commandline.flagString("-bench", path_buffer[0:]);
+	if path_len > 0 { path = path_buffer[0:path_len as isize]; }
+
+	const warmup = commandline.flagNumber("-bench_warmup", 1, 300.0) as i32;
+	const frames = commandline.flagNumber("-bench_frames", 1, 600.0) as i32;
+
+	var i : isize = 0;
+	while i < MAX_SCOPES {
+		g_sum[i] = 0.0;
+		g_min[i] = 0.0;
+		g_max[i] = 0.0;
+		g_samples[i] = 0;
+		i += 1;
+	}
+
+	var renderer = world.renderer() else {
+		logError("Benchmark: the world has no render module");
+		engine.quit(1);
+		return;
+	};
+	var camera : Entity = undefined;
+	if const active = renderer.getActiveCamera() {
+		camera = active;
+	}
+	else {
+		camera = world.createEntity();
+		camera.setName("Benchmark camera");
+		if const component = camera.createCamera() {
+			renderer.setActiveCamera(camera);
+		}
+	}
+
+	var spawned = false;
+	if commandline.isFlagOn("-bench_spawn") {
+		var name_buffer : [64]u8 = undefined;
+		const name_len = commandline.flagString("-bench_spawn", name_buffer[0:]);
+		var model : []const u8 = "";
+		if name_len > 0 {
+			const name : []const u8 = name_buffer[0:name_len as isize];
+			match name {
+				case "rock": model = "models/bench/rock.lpg";
+				case "coil": model = "models/bench/coil.lpg";
+				case "terrain": model = "models/bench/terrain.lpg";
+				case:
+			}
+		}
+		if model == "" { logError("Benchmark: -bench_spawn needs one of rock, coil, terrain"); }
+
+		const sun = world.createEntity();
+		sun.setName("Benchmark sun");
+		sun.setRotation(quat.makeQuatFromYaw(0.6) * quat.makeQuatFromPitch(-0.9));
+		if const environment = sun.createEnvironment() {
+			environment.setCastShadows(true);
+		}
+
+		const count_x = commandline.flagNumber("-bench_spawn", 2, 10.0) as i32;
+		const count_z = commandline.flagNumber("-bench_spawn", 3, 10.0) as i32;
+		const spacing = commandline.flagNumber("-bench_spawn", 4, 5.0);
+		if model != "" {
+			if const first = spawn(world, model, count_x, count_z, spacing) {
+				spawned = true;
+				waitForModel(first);
+			}
+		}
+		var count_text : [64]u8 = undefined;
+		logInfo("Benchmark spawned ", formatFloat(count_text[0:], g_spawned as f64, 0), " instances");
+	}
+
+	var yaw0 : f32 = 0.0;
+	var pitch : f32 = 0.0;
+	if spawned and not commandline.isFlagOn("-bench_cam") {
+		camera.setPosition(DVec3{0.0, 5.0, 0.0});
+	}
+	if commandline.isFlagOn("-bench_cam") {
+		const x = commandline.flagNumber("-bench_cam", 1, 0.0);
+		const y = commandline.flagNumber("-bench_cam", 2, 0.0);
+		const z = commandline.flagNumber("-bench_cam", 3, 0.0);
+		yaw0 = (commandline.flagNumber("-bench_cam", 4, 0.0) * 0.017453292519943295) as f32;
+		pitch = (commandline.flagNumber("-bench_cam", 5, 0.0) * 0.017453292519943295) as f32;
+		camera.setPosition(DVec3{x, y, z});
+	}
+
+	logInfo("Benchmark started");
+	var frame : i32 = 0;
+	var total_time : f64 = 0.0;
+	while true {
+		const dt : f32 = yield;
+		frame += 1;
+		if frame <= warmup { continue; }
+
+		const measured = frame - warmup;
+		const angle : f32 = yaw0 + 6.2831853 * (measured as f32) / (frames as f32);
+		camera.setRotation(quat.makeQuatFromYaw(angle) * quat.makeQuatFromPitch(pitch));
+		total_time += dt as f64;
+		if measured % 50 == 0 { sample(); }
+		if measured >= frames {
+			sample();
+			writeReport(path, frames, total_time);
+			engine.quit(0);
+			// keep yielding until the app exits
+		}
+	}
+}

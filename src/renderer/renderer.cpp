@@ -807,6 +807,7 @@ struct RendererImpl final : Renderer {
 	void initBegin() override {
 		PROFILE_FUNCTION();
 		gpu::InitFlags flags = gpu::InitFlags::NONE;
+		bool no_vsync = false;
 		
 		char cmd_line[4096];
 		os::getCommandLine(Span(cmd_line));
@@ -818,6 +819,10 @@ struct RendererImpl final : Renderer {
 			else if (cmd_line_parser.currentEquals("-gpu_stable_power_state")) {
 				flags = flags | gpu::InitFlags::STABLE_POWER_STATE;
 			}
+			else if (cmd_line_parser.currentEquals("-no_vsync")) {
+				// for benchmarks: the GPU is not idle between frames, so it does not drop its clocks
+				no_vsync = true;
+			}
 			else if (cmd_line_parser.currentEquals("-dred")) {
 				flags = flags | gpu::InitFlags::DRED;
 			}
@@ -827,7 +832,7 @@ struct RendererImpl final : Renderer {
 		}
 
 		jobs::Signal signal;
-		jobs::runLambda([this, flags]() {
+		jobs::runLambda([this, flags, no_vsync]() {
 			PROFILE_BLOCK("init_render");
 			os::WindowHandle window_handle = m_engine.getMainWindow();
 			if (window_handle == os::INVALID_WINDOW) {
@@ -837,6 +842,7 @@ struct RendererImpl final : Renderer {
 			if (!gpu::init(window_handle, flags)) {
 				os::messageBox("Failed to initialize renderer. More info in log.");
 			}
+			if (no_vsync) gpu::enableVSync(false);
 
 			gpu::MemoryStats mem_stats;
 			if (gpu::getMemoryStats(mem_stats)) {
@@ -1451,11 +1457,15 @@ struct RendererImpl final : Renderer {
 			if (!m_feedback_incoming.empty()) memcpy(m_feedback_local.begin(), m_feedback_incoming.begin(), m_feedback_incoming.size());
 			m_feedback_incoming.clear();
 		}
-		if (!m_feedback_local.empty()) processClusterFeedback(stamp);
+		if (!m_feedback_local.empty()) {
+			PROFILE_BLOCK("cluster feedback");
+			processClusterFeedback(stamp);
+		}
 		m_feedback_local.clear();
 
 		// the models that are loaded need room for their tables and permanent pages, the streamed pages must not take all of it
 		if (m_cluster_data_buffer) {
+			PROFILE_BLOCK("cluster headroom");
 			for (u32 i = 0; i < STREAM_LOADS_PER_FRAME && getClusterDataFreeBytes() < STREAM_HEADROOM; ++i) {
 				if (!evictLeastRecentlyUsedPage(stamp, false)) break;
 			}

@@ -42,6 +42,15 @@ struct Array {
 		m_size = new_size;
 	}
 
+	// use memory owned by someone else (e.g. one block shared by many arrays), array must be empty
+	// the memory is never freed by the array, but a later reserve() moves to memory owned by the array
+	void adopt(T* memory, size_t capacity) {
+		if (m_data || m_size) return;
+		m_data = memory;
+		m_capacity = capacity;
+		m_external = true;
+	}
+
 	void reserve(size_t new_capacity) {
 		if (new_capacity <= m_capacity) return;
 
@@ -50,9 +59,18 @@ struct Array {
 			OFBX_PLACEMENT_NEW(new_data + i) T(static_cast<T&&>(m_data[i]));
 			m_data[i].~T();
 		}
-		free(m_data);
+		if (!m_external) free(m_data);
+		m_external = false;
 		m_data = new_data;
 		m_capacity = new_capacity;
+	}
+
+	// resize without constructing new elements, only for trivially constructible/destructible T
+	// that is going to be fully overwritten right away (e.g. bulk data read from file)
+	void resize_uninitialized(size_t new_size) {
+		static_assert(__is_trivially_constructible(T) && __is_trivially_destructible(T), "T must be trivial");
+		if (new_size > m_capacity) reserve(new_size);
+		m_size = new_size;
 	}
 
 	void grow() {
@@ -82,7 +100,8 @@ struct Array {
 		for (size_t i = 0; i < m_size; ++i) {
 			m_data[i].~T();
 		}
-		free(m_data);
+		if (!m_external) free(m_data);
+		m_external = false;
 		m_data = nullptr;
 		m_size = 0;
 		m_capacity = 0;
@@ -91,6 +110,7 @@ struct Array {
 	T* m_data = nullptr;
 	size_t m_size = 0;
 	size_t m_capacity = 0;
+	bool m_external = false;
 };
 
 template <typename Key, typename Value, typename Hasher>
@@ -670,10 +690,30 @@ struct ParseDataJob {
 	void* data = nullptr;
 	bool error = false;
 	F f;
+	// output memory is carved from one shared block, see parseObjects()
+	size_t reserve_bytes = 0;
+	void (*adopt)(void* array, void* memory, size_t bytes) = nullptr;
 };
 
+template <typename T> struct TElemType;
+template <> struct TElemType<float> { using Type = float; };
+template <> struct TElemType<double> { using Type = double; };
+template <> struct TElemType<int> { using Type = int; };
+template <> struct TElemType<i64> { using Type = i64; };
+template <> struct TElemType<u64> { using Type = u64; };
+template <> struct TElemType<DVec2> { using Type = double; };
+template <> struct TElemType<DVec3> { using Type = double; };
+template <> struct TElemType<DVec4> { using Type = double; };
+template <> struct TElemType<FVec2> { using Type = float; };
+template <> struct TElemType<FVec3> { using Type = float; };
+template <> struct TElemType<FVec4> { using Type = float; };
+
+static size_t getBinaryArrayCount(const Property& prop);
 template <typename T> [[nodiscard]] bool pushJob(Array<ParseDataJob>& jobs, Property& prop, Array<T>& data) {
 	ParseDataJob& job = jobs.emplace_back();
+	// output memory is allocated by the caller in one block, to avoid allocator contention inside jobs
+	job.reserve_bytes = (getBinaryArrayCount(prop) * sizeof(typename TElemType<T>::Type) / sizeof(T)) * sizeof(T);
+	job.adopt = [](void* array, void* memory, size_t bytes){ ((Array<T>*)array)->adopt((T*)memory, bytes / sizeof(T)); };
 	job.property = &prop;
 	job.data = (void*)&data;
 	job.f = [](Property* prop, void* data){ return parseVecData(*prop, (Array<T>*)data); };
@@ -712,6 +752,14 @@ struct Property : IElementProperty
 	DataView value;
 	Property* next = nullptr;
 };
+
+static size_t getBinaryArrayCount(const Property& prop) {
+	if (!prop.value.is_binary) return 0;
+	switch (prop.type) {
+		case 'l': case 'd': case 'f': case 'i': return prop.getCount();
+		default: return 0;
+	}
+}
 
 struct Element : IElement
 {
@@ -2251,6 +2299,8 @@ struct Scene : IScene
 		for(Object* ptr : m_all_objects) {
 			ptr->~Object();
 		}
+		m_data.clear();
+		free(m_job_block);
 	}
 
 	bool finalize();
@@ -2271,6 +2321,7 @@ struct Scene : IScene
 	Array<Light*> m_lights;
 	Array<Connection> m_connections;
 	Array<u8> m_data;
+	void* m_job_block = nullptr; // memory of arrays parsed by jobs, see parseObjects()
 	Array<TakeInfo> m_take_infos;
 	Array<Video> m_videos;
 	Allocator m_allocator;
@@ -3058,19 +3109,6 @@ template <typename T> static bool parseMemoryLinked(const Property& property, T*
 	return true;
 }
 
-template <typename T> struct TElemType;
-template <> struct TElemType<float> { using Type = float; };
-template <> struct TElemType<double> { using Type = double; };
-template <> struct TElemType<int> { using Type = int; };
-template <> struct TElemType<i64> { using Type = i64; };
-template <> struct TElemType<u64> { using Type = u64; };
-template <> struct TElemType<DVec2> { using Type = double; };
-template <> struct TElemType<DVec3> { using Type = double; };
-template <> struct TElemType<DVec4> { using Type = double; };
-template <> struct TElemType<FVec2> { using Type = float; };
-template <> struct TElemType<FVec3> { using Type = float; };
-template <> struct TElemType<FVec4> { using Type = float; };
-
 template <typename T> bool typeMatch(u8 type);
 template <> bool typeMatch<int>(u8 type) { return type == Property::INTEGER || type == Property::ARRAY_INT; }
 template <> bool typeMatch<float>(u8 type) { return type == Property::FLOAT || type == Property::ARRAY_FLOAT; }
@@ -3193,7 +3231,7 @@ template <typename T> static bool parseArray(const Property& property, Array<T>*
 		default: return false;
 	}
 	u32 count = property.getCount();
-	out->resize(count * elem_size / sizeof(T));
+	out->resize_uninitialized(count * elem_size / sizeof(T));
 	if (count == 0) return true;
 
 	return parseMemory(property, out->data(), int(sizeof((*out)[0]) * out->size()));
@@ -3890,6 +3928,24 @@ static bool parseObjects(const Element& root, Scene& scene, u16 flags, Allocator
 		}
 	}
 
+	{
+		// allocate output of all parse jobs at once, it is much faster than many small allocations,
+		// especially when other threads are allocating too
+		size_t total = 0;
+		for (const ParseDataJob& job : jobs) total += (job.reserve_bytes + 15) & ~(size_t)15;
+		if (total) {
+			u8* block = (u8*)malloc(total);
+			scene.m_job_block = block;
+			if (!block) { Error::s_message = "Out of memory"; return false; }
+			size_t offset = 0;
+			for (ParseDataJob& job : jobs) {
+				if (!job.reserve_bytes) continue;
+				job.adopt(job.data, block + offset, job.reserve_bytes);
+				offset += (job.reserve_bytes + 15) & ~(size_t)15;
+			}
+		}
+	}
+
 	if (!jobs.empty()) {
 		(*job_processor)([](void* ptr){
 			ParseDataJob* job = (ParseDataJob*)ptr;
@@ -4398,8 +4454,28 @@ IScene* load(const u8* data, usize size, u16 flags, JobProcessor job_processor, 
 		new Scene
 	};
 
-	scene->m_data.resize(size);
-	memcpy(&scene->m_data[0], data, size);
+	scene->m_data.resize_uninitialized(size);
+		{
+		// copy in parallel: the destination is fresh memory, so this is dominated by page faults
+		struct CopyJob { u8* dst; const u8* src; usize size; };
+		const usize chunk = 4 * 1024 * 1024;
+		const u32 chunks = (u32)((size + chunk - 1) / chunk);
+		if (job_processor && chunks > 1) {
+			Array<CopyJob> copy_jobs;
+			for (u32 i = 0; i < chunks; ++i) {
+				const usize offset = i * chunk;
+				copy_jobs.push_back({ &scene->m_data[0] + offset, data + offset, size - offset < chunk ? size - offset : chunk });
+			}
+			(*job_processor)([](void* ptr) {
+				CopyJob* job = (CopyJob*)ptr;
+				memcpy(job->dst, job->src, job->size);
+			}, job_user_ptr, copy_jobs.data(), (u32)sizeof(CopyJob), chunks);
+			copy_jobs.clear();
+		}
+		else {
+			memcpy(&scene->m_data[0], data, size);
+		}
+	}
 
 	const bool is_binary = size >= 18 && strncmp((const char*)data, "Kaydara FBX Binary", 18) == 0;
 	OptionalError<Element*> root(nullptr);

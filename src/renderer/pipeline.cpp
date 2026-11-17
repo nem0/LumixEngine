@@ -135,6 +135,7 @@ struct GlobalState {
 	Matrix camera_prev_view_projection_no_jitter;
 	Matrix camera_inv_view_projection;
 	Matrix camera_reprojection;
+	Matrix camera_ws_to_prev_ndc_no_jitter;	// camera_reprojection * camera_view_projection_no_jitter, the vertex shaders of meshes do it for every vertex otherwise
 	Vec4 cam_world_pos;
 	Vec4 view_dir;
 	Vec4 fog_scattering;
@@ -1048,6 +1049,7 @@ struct PipelineImpl final : Pipeline {
 		cp.frustum = vp.getFrustum();
 		cp.lod_multiplier = m_module->getCameraLODMultiplier(vp.fov, vp.is_ortho);
 		cp.is_shadow = true;
+		cp.shadow_slice = (i32)slice;
 		cp.view = vp.getView(cp.pos);
 		cp.projection = vp.getProjectionNoJitter();
 		return cp;
@@ -1311,6 +1313,7 @@ struct PipelineImpl final : Pipeline {
 		global_state.time = m_timer.getTimeSinceStart();
 		global_state.frame_time_delta = m_timer.getTimeSinceTick();
 		global_state.camera_reprojection = computeReprojection(m_viewport, m_prev_viewport);
+		global_state.camera_ws_to_prev_ndc_no_jitter = global_state.camera_reprojection * global_state.camera_view_projection_no_jitter;
 		m_timer.tick();
 		global_state.reflection_probes_bindless = gpu::getBindlessHandle(m_module->getReflectionProbesTexture());
 		global_state.shadow_atlas_bindless = m_shadow_atlas.texture ? gpu::getBindlessHandle(m_shadow_atlas.texture) : gpu::INVALID_BINDLESS_HANDLE;
@@ -2362,6 +2365,14 @@ struct PipelineImpl final : Pipeline {
 		const TransientSlice ub_slice = alloc(m_renderer.getUniformPool(), &ub, sizeof(ub));
 
 		// the culling of instances: it clears the counters and writes the groups of its own dispatch, then it generates the work of the clusters
+		// blocks of shadow views have their own names, with the cascade of the main light (a frame has several views and the main one is the one that counts)
+		const bool is_shadow = view.cp.is_shadow;
+		auto scope_name = [&](const char* name) -> StaticString<64> {
+			if (!is_shadow) return StaticString<64>(name);
+			if (view.cp.shadow_slice < 0) return StaticString<64>(name, " (shadow)");
+			return StaticString<64>(name, " (shadow ", view.cp.shadow_slice, ")");
+		};
+		stream.beginProfileBlock(scope_name("scene instance cull"), 0, false);
 		stream.barrier(scene.getBoundsBuffer(), gpu::BarrierType::READ);
 		stream.barrier(scene.getInstancesBuffer(), gpu::BarrierType::READ);
 		stream.barrier(scene.getModelTableBuffer(), gpu::BarrierType::READ);
@@ -2398,7 +2409,10 @@ struct PipelineImpl final : Pipeline {
 			stream.memoryBarrier(m_scene_tree_items);
 		}
 
+		stream.endProfileBlock();	// scene instance cull
+
 		// the selection of clusters: the groups of its dispatches come from the counters of the work, computed by the GPU
+		stream.beginProfileBlock(scope_name("cluster cull"), 0, false);
 		stream.barrier(m_scene_cull_args, gpu::BarrierType::WRITE);
 		stream.barrier(m_scene_selected, gpu::BarrierType::WRITE);
 		stream.useProgram(m_scene_cull_shader->getProgram(1 << m_renderer.getShaderDefineIdx("ARGS")));
@@ -2459,6 +2473,7 @@ struct PipelineImpl final : Pipeline {
 		stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
 		stream.memoryBarrier(m_scene_selected);
 		stream.memoryBarrier(m_cluster_scratch);
+		stream.endProfileBlock();	// cluster cull
 
 		// Sorts the selected clusters and meshes of the view into variants on the GPU (gpu_scene_variants.hlsl): the GPU counts, assigns the slots of the variants and writes the
 		// instance data of the draws and their commands. It also records the draws of the groups the view draws into the buckets of the view, one indirect call with
@@ -2493,6 +2508,7 @@ struct PipelineImpl final : Pipeline {
 			const TransientSlice draw_ub_slice = alloc(m_renderer.getUniformPool(), &draw_ub, sizeof(draw_ub));
 
 			auto program = [&](const char* define) { return m_scene_variants_shader->getProgram(1 << m_renderer.getShaderDefineIdx(define)); };
+			stream.beginProfileBlock(scope_name("scene variants"), 0, false);
 			stream.barrier(group_base.buffer, gpu::BarrierType::READ);
 			stream.barrier(scene.getVariantBuffer(), gpu::BarrierType::READ);
 			stream.barrier(scene.getMeshTableBuffer(), gpu::BarrierType::READ);
@@ -2531,6 +2547,7 @@ struct PipelineImpl final : Pipeline {
 			stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
 			stream.memoryBarrier(m_scene_out);
 			stream.memoryBarrier(m_scene_counters);
+			stream.endProfileBlock();	// scene variants
 
 			// One indirect call for each draw group the view draws, the instance counts are written by the GPU: the commands are the ones of SCAN. Vertex shaders pull the
 			// instances by the draw id, the vertices of the clusters by their meshes (CLUSTER_MESH)

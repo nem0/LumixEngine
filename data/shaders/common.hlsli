@@ -118,6 +118,7 @@ cbuffer GlobalState : register(b0) {
 	float4x4 Global_prev_ws_to_ndc_no_jitter;
 	float4x4 Global_ndc_to_ws;
 	float4x4 Global_reprojection;
+	float4x4 Global_ws_to_prev_ndc_no_jitter; // mul(Global_ws_to_ndc_no_jitter, Global_reprojection)
 	float4 Global_camera_world_pos;
 	float4 Global_view_dir;
 	float4 Global_fog_scattering;

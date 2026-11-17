@@ -41,6 +41,10 @@ struct LUMIX_EDITOR_API AssetCompiler {
 	virtual bool compile(const Path& path) = 0;
 	virtual u32 compileAll() = 0;
 	virtual bool isCompiling() const = 0;
+	// true until the scan of the project resources is done (the resource list is complete after that)
+	virtual bool isScanning() const = 0;
+	// number of resources that failed to compile the last time they were compiled
+	virtual u32 getFailedCount() const = 0;
 	virtual bool getMeta(const Path& res, OutputMemoryStream& blob) = 0;
 	virtual void updateMeta(const Path& resource, Span<const u8> data) const = 0;
 	virtual const HashMap<FilePathHash, ResourceItem>& lockResources() = 0;

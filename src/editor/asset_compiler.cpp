@@ -673,6 +673,8 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 
 	bool isCompiling() const override { return m_batch_remaining_count > 0; }
+	bool isScanning() const override { return m_scan_counter > 0 || m_save_list_after_scan; }
+	u32 getFailedCount() const override { return m_failed.size(); }
 
 	bool compile(const Path& src) override
 	{

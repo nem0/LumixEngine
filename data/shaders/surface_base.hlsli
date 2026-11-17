@@ -1,9 +1,5 @@
 // you can include this file and implement getSurface function for custom surface shaders
 
-#if !defined GRASS
-	#define HAS_LOD
-#endif
-
 // the instance data of a draw are pulled (see below), a draw without any of the variants is a MESH_INSTANCE one
 #if !defined SKINNED && !defined MESH_PARTICLE && !defined GRASS && !defined MESH_INSTANCE
 	#define MESH_INSTANCE
@@ -33,9 +29,6 @@ struct VSOutput {
 	#endif
 	#if defined MESH_INSTANCE || defined SKINNED
 		float4 prev_ndcpos_no_jitter : TEXCOORD4;
-	#endif
-	#ifdef HAS_LOD
-		float lod : TEXCOORD5;
 	#endif
 	#ifdef AO_ATTR
 		float ao : TEXCOORD6;
@@ -197,9 +190,6 @@ VSOutput mainVS(VSInput input) {
 	#ifdef HAS_MATERIAL_INDEX_ATTR
 		output.i_material_index = inst.material_index;
 	#endif
-	#ifdef HAS_LOD
-		output.lod = 0;
-	#endif
 	#ifndef DEPTH_ONLY_VS
 		#ifdef AO_ATTR
 			output.ao = vtx.ao;
@@ -253,7 +243,7 @@ VSOutput mainVS(VSInput input) {
 		output.position = mul(float4(output.pos_ws, 1), Pass_ws_to_ndc);
 		#ifndef DEPTH_ONLY_VS
 			output.prev_ndcpos_no_jitter = float4(inst.prev_pos_lod.xyz + rotateByQuat(inst.prev_rot, vtx.position * inst.prev_scale.xyz), 1);
-			output.prev_ndcpos_no_jitter = mul(output.prev_ndcpos_no_jitter, mul(Global_ws_to_ndc_no_jitter, Global_reprojection));
+			output.prev_ndcpos_no_jitter = mul(output.prev_ndcpos_no_jitter, Global_ws_to_prev_ndc_no_jitter);
 		#endif
 	#elif defined SKINNED
 		float2x4 dq = mul(getBones(inst, vtx.indices.x), vtx.weights.x);
@@ -279,7 +269,7 @@ VSOutput mainVS(VSInput input) {
 		// TODO previous frame bone positions
 		#ifndef DEPTH_ONLY_VS
 			float3 prevpos = rotateByQuat(inst.prev_rot, transformByDualQuat(dq, mpos)) * inst.prev_scale + inst.prev_pos;
-			output.prev_ndcpos_no_jitter = mul(float4(prevpos, 1), mul(Global_ws_to_ndc_no_jitter, Global_reprojection));
+			output.prev_ndcpos_no_jitter = mul(float4(prevpos, 1), Global_ws_to_prev_ndc_no_jitter);
 		#endif
 	#endif
 	return output;
@@ -318,9 +308,6 @@ Surface getSurfaceEx(VSOutput input) {
 
 #ifdef DEPTH
 	void mainPS(VSOutput input) {
-		#ifdef HAS_LOD
-			if (ditherLOD(input.lod, input.position.xy)) discard;
-		#endif
 		#ifdef ALPHA_CUTOUT
 			Surface surface = getSurfaceEx(input);
 			if(surface.alpha < 0.5) discard;
@@ -333,10 +320,6 @@ Surface getSurfaceEx(VSOutput input) {
 	#else
 		GBufferOutput mainPS(VSOutput input) {
 	#endif
-		#ifdef HAS_LOD
-			if (ditherLOD(input.lod, input.position.xy)) discard;
-		#endif
-
 		Surface surface = getSurfaceEx(input);
 		#ifdef ALPHA_CUTOUT
 			if(surface.alpha < 0.5) discard;
@@ -352,10 +335,6 @@ Surface getSurfaceEx(VSOutput input) {
 	};
 
 	float4 mainPS(VSOutput input, float4 frag_coord : SV_POSITION) : SV_TARGET{
-		#ifdef HAS_LOD
-			if (ditherLOD(input.lod, input.position.xy)) discard;
-		#endif
-		
 		Surface data = getSurfaceEx(input);
 		data.pos_ws = input.pos_ws.xyz;
 	

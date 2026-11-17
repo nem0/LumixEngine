@@ -22,6 +22,7 @@ struct CameraParams {
 	DVec3 pos;
 	float lod_multiplier;
 	bool is_shadow;
+	i32 shadow_slice = -1;	// the cascade of the shadow map of the main light (Pipeline::getShadowCamera), -1 for other cameras
 	Matrix view;
 	Matrix projection;
 };
