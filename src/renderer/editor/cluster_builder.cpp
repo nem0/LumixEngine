@@ -18,9 +18,10 @@ namespace Lumix {
 
 namespace {
 
-// the sizes meshoptimizer recommends for meshlets (its triangle count is a multiple of 4, and 124 leaves room for hardware that needs a few spare slots)
-constexpr u32 MAX_CLUSTER_VERTICES = 64;
-constexpr u32 MAX_CLUSTER_TRIANGLES = 124;
+// the sizes of a cluster. The indices of a cluster are bytes, so it has at most 256 vertices (UE has 256 vertices and 128 triangles too). meshoptimizer recommends 64 and 124
+// for mesh shaders, but unwelded geometry such as leaves has about as many vertices as triangles, so 64 vertices stop it at about 65 triangles.
+constexpr u32 MAX_CLUSTER_VERTICES = 256;
+constexpr u32 MAX_CLUSTER_TRIANGLES = 128;
 constexpr float UV_STEP = 1.f / 16384.f;	// the largest step of quantized UVs, unless the range of a cluster is too large for 16 bits
 constexpr u32 INVALID_INDEX = 0xffFFffFF;
 

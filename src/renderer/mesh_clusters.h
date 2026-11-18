@@ -128,7 +128,7 @@ struct MeshClusters {
 
 	static constexpr u32 LEAF_FLAG = 0x80000000u;
 	static constexpr u32 NODE_FANOUT = 8;
-	static constexpr u32 MAX_CLUSTER_VERTICES = 64;
+	static constexpr u32 MAX_CLUSTER_VERTICES = 256;
 	static constexpr u32 MAX_POSITION_BITS = 25;	// per axis of a cluster
 	static constexpr u32 NO_GROUP = 0xffffFFFFu;
 
