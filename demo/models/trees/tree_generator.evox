@@ -64,11 +64,16 @@ fn lengthOf(level : i32) : f32 {
     return 0.4;
 }
 
-// A direction that is perpendicular to dir and does not twist along a branch (the reference axis is fixed).
-fn sideOf(dir : vec3.Vec3) : vec3.Vec3 {
-    var ref : vec3.Vec3 = { 0.0, 1.0, 0.0 };
-    if math.abs(dir.y) > 0.9 { ref = { 1.0, 0.0, 0.0 }; }
+// A direction that is perpendicular to dir and to `up`: it does not twist along a branch (the reference axis is fixed).
+fn sideAround(dir : vec3.Vec3, up : vec3.Vec3) : vec3.Vec3 {
+    var ref = up;
+    if math.abs(vec3.dot(dir, up)) > 0.9 { ref = vec3.Vec3 { 1.0, 0.0, 0.0 }; }
     return vec3.normalizeSafe(vec3.cross(ref, dir));
+}
+
+// The same, perpendicular to the vertical: horizontal.
+fn sideOf(dir : vec3.Vec3) : vec3.Vec3 {
+    return sideAround(dir, vec3.Vec3 { 0.0, 1.0, 0.0 });
 }
 
 // Invert the texture's U warp at each ring. A row of vertices then follows
@@ -386,7 +391,8 @@ fn leaf(m : *Mesh, origin : vec3.Vec3, dir : vec3.Vec3, axis : vec3.Vec3,
 // Radius in metres around the center of the terminal shoots.
 const CROWN_CORE_RADIUS : f32 = 1.50;
 
-fn dressTwig(m : *Mesh, b : Branch, crown_center : vec3.Vec3, points : array.Array(vec3.Vec3), dirs : array.Array(vec3.Vec3)) : void {
+// `up` is the direction that the leaves lie across: they are horizontal if it is the vertical, which is what makes the blades of a tree face the sky.
+fn dressTwig(m : *Mesh, b : Branch, crown_center : vec3.Vec3, up : vec3.Vec3, points : array.Array(vec3.Vec3), dirs : array.Array(vec3.Vec3)) : void {
     const rows = points.size as i32 - 1;
     const count = random.randRange(4, 8) as i32;
     const start = random.randFloatRange(0.08, 0.36);
@@ -405,8 +411,8 @@ fn dressTwig(m : *Mesh, b : Branch, crown_center : vec3.Vec3, points : array.Arr
         const radial = side * math.cos(azimuth) + vec3.cross(twig, side) * math.sin(azimuth);
         const base = points.values[row] * (1-frac) + points.values[row+1] * frac
             + radial * (0.83 * b.radius * (1 - 0.67 * t));
-        const dir = vec3.normalizeSafe(radial + twig * (0.42 + 0.55 * along) + vec3.Vec3 {0, -0.14, 0});
-        const flat = -sideOf(dir);
+        const dir = vec3.normalizeSafe(radial + twig * (0.42 + 0.55 * along) - up * 0.14);	// the leaves hang a little
+        const flat = -sideAround(dir, up);
         const roll = 0.35 * rnd();
         const axis = flat * math.cos(roll) + vec3.cross(dir, flat) * math.sin(roll);
         // Leaves of a shoot are about as big as each other (±10%) and get smaller towards the tip.
@@ -420,26 +426,110 @@ fn dressTwig(m : *Mesh, b : Branch, crown_center : vec3.Vec3, points : array.Arr
     }
 }
 
-// Test the entire shoot, including its leaves. A branch starting near the
-// center can still carry a spray on the outside of the crown.
-fn reachSquared(mesh : Mesh, first : isize, center : vec3.Vec3) : f32 {
-    var reach : f32 = 0;
-    for j in first..mesh.vertices.size {
-        reach = math.max(reach, vec3.distanceSquared(mesh.vertices.values[j].position, center));
+// The foliage is made of sprays: a branch of the level SPRAY_LEVEL with its twigs and leaves. A few shapes of sprays, in tiers of density, are built once in
+// their own space (they start at the origin and grow along +y) and then placed at every branch of that level, turned a little around their axis and a bit scaled, like
+// instances of a model would be: placeCopy is the only place that copies, an instance of a part of a model could take its place.
+const SPRAY_LEVEL : i32 = 3;
+const SPRAY_SHAPES : i32 = 4;
+const SPRAY_TIERS : i32 = 4;
+const SPRAY_RADIUS : f32 = 0.014;	// at the base, a spray is not as thick as the branch that carries it where they meet, which is inside of it
+const SPRAY_WEIGHT : f32 = 3.0;		// how much foliage a spray puts into the grid of the light at each of its nine points, see LIGHT_CELL
+
+// The shapes of sprays are the bands of the tilt of the axis of the place from the vertical, so that the leaves of every shape can be made for the tilt that it has:
+// 0 to 40 degrees, 40 to 55, 55 to 70 and more than 70 (the sprays that point to the side or down). The band is found by the vertical component of the direction.
+fn sprayShapeOf(dir : vec3.Vec3) : i32 {
+    if dir.y > 0.766 { return 0; }
+    if dir.y > 0.574 { return 1; }
+    if dir.y > 0.342 { return 2; }
+    return 3;
+}
+
+// The vertical in the space of a spray of the shape. A spray is placed with its x axis horizontal, so the vertical has no x: it is cos(tilt) along the axis of the
+// spray and -sin(tilt) along z, where `tilt` is the angle between the axis and the vertical, the middle of the band of the shape (30, 48, 62 and 80 degrees). The
+// leaves are made with this up, so they lie across the horizontal, and face the sky, once the spray is in place; how well depends on how far its tilt is from the middle.
+fn sprayUp(shape : i32) : vec3.Vec3 {
+    if shape == 0 { return vec3.Vec3 { 0.0, 0.8660, -0.5000 }; }
+    if shape == 1 { return vec3.Vec3 { 0.0, 0.6691, -0.7431 }; }
+    if shape == 2 { return vec3.Vec3 { 0.0, 0.4695, -0.8829 }; }
+    return vec3.Vec3 { 0.0, 0.1736, -0.9848 };
+}
+
+fn sprayLength(form : Form) : f32 {
+    return form == Form.UPRIGHT ? lengthOf(SPRAY_LEVEL) * 0.80 : lengthOf(SPRAY_LEVEL);
+}
+
+// The share of the twigs that a tier leaves out: 0 is a full spray, the last tier has one twig.
+fn sprayPrune(tier : i32) : f32 {
+    if tier == 0 { return 0.0; }
+    if tier == 1 { return 0.4; }
+    if tier == 2 { return 0.75; }
+    return 0.9;
+}
+
+// A spray in the space of the mesh `src` is added to `dst`: the point (x, y, z) goes to origin + (ex * x + ey * y + ez * z) * scale. The axes are the columns of a rotation.
+fn placeCopy(dst : *Mesh, src : Mesh, origin : vec3.Vec3, ex : vec3.Vec3, ey : vec3.Vec3, ez : vec3.Vec3, scale : f32) : void {
+    const offset = dst.vertices.size as u32;
+    for j in 0..src.vertices.size {
+        var v = src.vertices.values[j];
+        v.position = origin + (ex * v.position.x + ey * v.position.y + ez * v.position.z) * scale;
+        v.normal = ex * v.normal.x + ey * v.normal.y + ez * v.normal.z;
+        v.tangent = ex * v.tangent.x + ey * v.tangent.y + ez * v.tangent.z;
+        array.push(&dst.vertices, v);
     }
-    return reach;
+    for j in 0..src.indices.size { array.push(&dst.indices, offset + src.indices.values[j]); }
 }
 
-fn appendLateral(wood : *Mesh, lateral : Mesh) : void {
-    const offset = wood.vertices.size as u32;
-    for j in 0..lateral.vertices.size { array.push(&wood.vertices, lateral.vertices.values[j]); }
-    for j in 0..lateral.indices.size { array.push(&wood.indices, offset + lateral.indices.values[j]); }
+// Builds a spray without the share `prune` of its twigs. `vertical` is the vertical in its space (sprayUp), the leaves are made across it.
+fn buildSpray(wood : *Mesh, leaves : *Mesh, fields : bark.RidgeFields, form : Form, prune : f32, vertical : vec3.Vec3) : void {
+    var points = array.init(vec3.Vec3);
+    var dirs = array.init(vec3.Vec3);
+    var radii = array.init(f32);
+    var twigs = array.init(Branch);
+    const root : Branch = { { 0.0, 0.0, 0.0 }, { 0.0, 1.0, 0.0 }, sprayLength(form), SPRAY_RADIUS, SPRAY_LEVEL };
+    growBranch(wood, root, fields, form, &points, &dirs, &radii);
+
+    // the twigs: spread around the branch by the golden angle, leaning away from it
+    const rows = rowsOf(SPRAY_LEVEL);
+    const count = twigsOf(form);
+    const turn = random.randFloat() * 6.2831853;
+    for k in 0..count {
+        const t = 0.2 + 0.75 * ((k as f32 + random.randFloat()) / count as f32);
+        const idx = (t * rows as f32) as isize;
+        const p = points.values[idx];
+        const d = dirs.values[idx];
+        const side = sideOf(d);
+        const up = vec3.cross(d, side);
+        const phi = turn + k as f32 * 2.3999632 + rnd() * 0.4;
+        var lean = 0.55 + 0.35 * rnd() + 0.08 * SPRAY_LEVEL as f32;
+        if form == Form.UPRIGHT { lean += 0.22; }
+        const around = side * math.cos(phi) + up * math.sin(phi);
+        const dir = vec3.normalizeSafe(d * math.cos(lean) + around * math.sin(lean) + vec3.Vec3 { 0.0, 0.2, 0.0 });
+        var length = lengthOf(SPRAY_LEVEL + 1) * (0.8 + 0.4 * random.randFloat());
+        if form == Form.UPRIGHT { length *= 0.80; }
+        const radius = math.max(radii.values[idx] * 0.5, length / 80.0);
+        const twig : Branch = { p, dir, length, radius, SPRAY_LEVEL + 1 };
+        array.push(&twigs, twig);
+    }
+
+    // the sprays are thinned by twig, the same twigs of every shape go
+    const far : vec3.Vec3 = { 1000.0, 0.0, 0.0 };	// the leaves are not thinned by the distance from the center of the crown
+    for k in 0..count {
+        const phase = k as f32 * 0.618034 + 0.137;
+        if phase - math.floor(phase) >= prune {
+            growBranch(wood, twigs.values[k], fields, form, &points, &dirs, &radii);
+            dressTwig(leaves, twigs.values[k], far, vertical, points, dirs);
+        }
+    }
+    array.deinit(&twigs);
+    array.deinit(&points);
+    array.deinit(&dirs);
+    array.deinit(&radii);
 }
 
-// How much light the twigs get is estimated on a grid of the foliage: the twigs are put into the cells, and the twigs that have a lot of them between
-// them and the sky (straight up and towards the sun) are the first ones to die, so the crown is a shell of foliage around a hollow inside.
+// How much light the sprays get is estimated on a grid of the foliage: the sprays are put into the cells, and the sprays that have a lot of them between
+// them and the sky are the first ones to be thinned, so the crown is a shell of foliage around a hollow inside.
 const LIGHT_CELL : f32 = 0.35;
-const LIGHT_ABSORPTION : f32 = 0.025;	// how much one twig of a cell dims the light that goes through the cell
+const LIGHT_ABSORPTION : f32 = 0.035;	// how much one unit of the density of a cell dims the light that goes through the cell
 
 // The index of the cell of the grid that has the point, -1 outside of it. The grid starts at `lo` and has nx * ny * nz cells.
 fn cellOf(p : vec3.Vec3, lo : vec3.Vec3, nx : i32, ny : i32, nz : i32) : i32 {
@@ -482,7 +572,6 @@ fn generate(seed : u32, form : Form, material : []const u8) : Mesh {
     array.reserve(&leaves.indices, 2050000);
 
     var branches = array.init(Branch);
-    var laterals = array.init(Mesh);
     var points = array.init(vec3.Vec3);
     var dirs = array.init(vec3.Vec3);
     var radii = array.init(f32);
@@ -496,15 +585,9 @@ fn generate(seed : u32, form : Form, material : []const u8) : Mesh {
     var i : isize = 0;
     while i < branches.size {
         const b = branches.values[i];
-        if b.level == LAST_LEVEL { break; }
+        if b.level == SPRAY_LEVEL { break; }	// from here the branches are the places of sprays
         i += 1;
-        if b.level == LAST_LEVEL - 1 {
-            // Keep the parent until we know which of its children survive.
-            var lateral = empty();
-            growBranch(&lateral, b, fields, form, &points, &dirs, &radii);
-            array.push(&laterals, lateral);
-        }
-        else { growBranch(&wood, b, fields, form, &points, &dirs, &radii); }
+        growBranch(&wood, b, fields, form, &points, &dirs, &radii);
         const rows = rowsOf(b.level);
 
         // children: spread around the branch by the golden angle, leaning away from it, from the upper part of it
@@ -514,7 +597,6 @@ fn generate(seed : u32, form : Form, material : []const u8) : Mesh {
             else if b.level == 1 { count = 6; }
             else if b.level == 2 { count = 5; }
         }
-        if b.level == LAST_LEVEL - 1 { count = twigsOf(form); }
         const turn = random.randFloat() * 6.2831853;
         for k in 0..count {
             const low : f32 = b.level == 0 ? crown_base : 0.2;
@@ -569,18 +651,27 @@ fn generate(seed : u32, form : Form, material : []const u8) : Mesh {
         }
     }
 
-    const twigs = branches.values[i:branches.size];
-    var crown_center : vec3.Vec3 = {0, 0, 0};
-    for j in 0..twigs.length { crown_center = crown_center + twigs[j].origin; }
-    crown_center = crown_center / twigs.length as f32;
-    const siblings = twigsOf(form);
+    const places = branches.values[i:branches.size];
 
-    // the grid of the foliage: three points of every twig
-    var lo : vec3.Vec3 = twigs[0].origin;
-    var hi : vec3.Vec3 = twigs[0].origin;
-    for j in 0..twigs.length {
-        const a = twigs[j].origin;
-        const e = a + twigs[j].dir * twigs[j].length;
+    // the sprays: every shape in every tier of density, built once
+    var spray_wood = array.init(Mesh);
+    var spray_leaves = array.init(Mesh);
+    for tier in 0..SPRAY_TIERS {
+        for shape in 0..SPRAY_SHAPES {
+            var sw = empty();
+            var sl = empty();
+            buildSpray(&sw, &sl, fields, form, sprayPrune(tier), sprayUp(shape));
+            array.push(&spray_wood, sw);
+            array.push(&spray_leaves, sl);
+        }
+    }
+
+    // the grid of the foliage: nine points of every place, in three rings around its axis, where the twigs are
+    var lo : vec3.Vec3 = places[0].origin;
+    var hi : vec3.Vec3 = places[0].origin;
+    for j in 0..places.length {
+        const a = places[j].origin;
+        const e = a + places[j].dir * places[j].length;
         lo = vec3.Vec3 { math.min(lo.x, math.min(a.x, e.x)), math.min(lo.y, math.min(a.y, e.y)), math.min(lo.z, math.min(a.z, e.z)) };
         hi = vec3.Vec3 { math.max(hi.x, math.max(a.x, e.x)), math.max(hi.y, math.max(a.y, e.y)), math.max(hi.z, math.max(a.z, e.z)) };
     }
@@ -591,67 +682,60 @@ fn generate(seed : u32, form : Form, material : []const u8) : Mesh {
     var density = array.init(f32);
     const empty_cell : f32 = 0;
     for c in 0..(nx * ny * nz) { array.push(&density, empty_cell); }
-    for j in 0..twigs.length {
+    for j in 0..places.length {
+        const first = sideOf(places[j].dir);
+        const second = vec3.cross(places[j].dir, first);
         for s in 0..3 {
-            const c = cellOf(twigs[j].origin + twigs[j].dir * (twigs[j].length * (0.3 + 0.35 * s as f32)), lo, nx, ny, nz);
-            if c >= 0 { density.values[c] += 1.0; }
+            const u = 0.3 + 0.35 * s as f32;
+            for a in 0..3 {
+                const angle = a as f32 * 2.0943951;
+                const radial = first * math.cos(angle) + second * math.sin(angle);
+                const c = cellOf(places[j].origin + places[j].dir * (places[j].length * u) + radial * (places[j].length * 0.4 * (0.5 + 0.5 * u)), lo, nx, ny, nz);
+                if c >= 0 { density.values[c] += SPRAY_WEIGHT; }
+            }
         }
     }
-    // the light of every twig, 1 in the open and close to 0 under a lot of foliage
-    var lights = array.init(f32);
+
+    // the sprays are placed: the more light a place gets, the fuller the spray
     const sky : vec3.Vec3 = { 0.0, 1.0, 0.0 };
-    for j in 0..twigs.length {
-        const tip = twigs[j].origin + twigs[j].dir * twigs[j].length;
-        const own = cellOf(tip, lo, nx, ny, nz);
+    for j in 0..places.length {
+        const place = places[j];
+        const mid = place.origin + place.dir * (place.length * 0.65);
+        const own = cellOf(mid, lo, nx, ny, nz);
         // the sky is a hemisphere: straight up and five rays 40 degrees from it, evenly around it, so no side is favoured
-        var shade = shadowAlong(density, tip, sky, lo, nx, ny, nz, own);
+        var shade = shadowAlong(density, mid, sky, lo, nx, ny, nz, own);
         for k in 0..5 {
             const azimuth = k as f32 * 1.2566371 + 0.3;
             const ray = vec3.Vec3 { 0.6428 * math.cos(azimuth), 0.7660, 0.6428 * math.sin(azimuth) };
-            shade += shadowAlong(density, tip, ray, lo, nx, ny, nz, own);
+            shade += shadowAlong(density, mid, ray, lo, nx, ny, nz, own);
         }
         shade = shade / 6.0;
         const open = 1.0 / (1.0 + LIGHT_ABSORPTION * shade);
-        array.push(&lights, open * open);
-    }
+        const keep = 1.0 - 0.92 * (1 - bark.smooth(0.08, 0.35, open * open));	// the share of the twigs that live here
 
-    for parent in 0..laterals.size {
-        const lateral = laterals.values[parent];
-        var keep_parent = reachSquared(lateral, 0, crown_center) >= CROWN_CORE_RADIUS * CROWN_CORE_RADIUS;
-        for child in 0..siblings {
-            const twig_index = parent * siblings as isize + child as isize;
-            const twig = twigs[twig_index];
-            const wood_start = wood.vertices.size;
-            const index_start = wood.indices.size;
-            const leaf_start = leaves.vertices.size;
-            const leaf_indices = leaves.indices.size;
-            growBranch(&wood, twig, fields, form, &points, &dirs, &radii);
-            dressTwig(&leaves, twig, crown_center, points, dirs);
-
-            // the twigs that get little light die; the meadow tree is thinned by the distance from the center of the crown, as it was
-            var prune = 0.92 * (1 - bark.smooth(0.08, 0.35, lights.values[twig_index]));
-            if meadow {
-                const reach = math.sqrt(math.max(reachSquared(wood, wood_start, crown_center),
-                    reachSquared(leaves, leaf_start, crown_center)));
-                prune = 0.92 * (1 - bark.smooth(0.95, CROWN_CORE_RADIUS, reach));
-            }
-            // Thin sibling groups together, with a little variation between
-            // siblings. This leaves both open forks and occasional fine wood.
-            const phase = parent as f32 * 0.618034 + child as f32 * 0.041;
-            if phase - math.floor(phase) < prune {
-                wood.vertices.size = wood_start;
-                wood.indices.size = index_start;
-                leaves.vertices.size = leaf_start;
-                leaves.indices.size = leaf_indices;
-            }
-            else { keep_parent = true; }
+        // the random numbers are always drawn, so that a place does not change what the others get
+        const shape = sprayShapeOf(place.dir);
+        const roll = 0.3 * rnd();	// a little, so that the leaves stay horizontal
+        const size = math.sqrt(place.length / sprayLength(form));
+        const gone = j as f32 * 0.618034;
+        // a place in deep shade has no spray at all, in most of the cases
+        if keep >= 0.12 or gone - math.floor(gone) >= 0.7 {
+            const tier = keep > 0.8 ? 0 : (keep > 0.45 ? 1 : (keep > 0.18 ? 2 : 3));
+            const first = sideOf(place.dir);
+            const ex = first * math.cos(roll) + vec3.cross(place.dir, first) * math.sin(roll);
+            const ez = vec3.cross(ex, place.dir);
+            const which = tier * SPRAY_SHAPES + shape;
+            placeCopy(&wood, spray_wood.values[which], place.origin, ex, place.dir, ez, size);
+            placeCopy(&leaves, spray_leaves.values[which], place.origin, ex, place.dir, ez, size);
         }
-        if keep_parent { appendLateral(&wood, lateral); }
-        deinit(&laterals.values[parent]);
     }
-    array.deinit(&laterals);
+    for j in 0..spray_wood.size {
+        deinit(&spray_wood.values[j]);
+        deinit(&spray_leaves.values[j]);
+    }
+    array.deinit(&spray_wood);
+    array.deinit(&spray_leaves);
     array.deinit(&density);
-    array.deinit(&lights);
 
     array.deinit(&branches);
     array.deinit(&points);
