@@ -172,20 +172,12 @@ struct LODMeshIndices
 struct LUMIX_RENDERER_API Model final : Resource {
 	using BoneMap = HashMap<BoneNameHash, int>;
 
+	// The version of the file format. Increase it whenever the format changes, models of other versions are rejected (see load).
+	// The numbers up to 14 were used by older formats, they must not be used again.
 	enum class FileVersion : u32 {
-		ROOT_MOTION_BONE,
-		CLUSTERS, // baked cluster DAGs of the first LOD, see parseClusters
-		// 2 was LATEST while models were written with clusters but without stride, keep it that way
-		STRIDE = 3, // vertex stride of each mesh is stored, it is padded to 4 bytes
-		// 4-8 were intermediate formats of clusters, models with clusters of these versions are rejected (see parseClusters), the numbers are not reused
+		FIRST_SUPPORTED = 14,
 
-		CLUSTER_INTERLEAVED = 9, // clusters have one buffer of headers and interleaved, packed vertices and everything else ready to be uploaded, see parseClusters
-		CLUSTER_NO_CONE = 10, // clusters have no normal cones (80 bytes instead of 96)
-		CLUSTER_U8_INDICES = 11, // indices local to a cluster are bytes, models of older versions with clusters are rejected
-		CLUSTER_GROUPS = 12, // clusters have group ids and every mesh has a table of groups (streaming units), models of older versions with clusters are rejected
-		CLUSTER_GROUP_TABLE = 13, // a group has 16 bytes (no page and flags, pages are made when the model is loaded), models of older versions with clusters are rejected
-
-		LATEST // keep this last
+		LATEST
 	};
 	
 #pragma pack(1)
@@ -271,9 +263,9 @@ private:
 	void operator=(const Model&);
 
 	bool parseBones(InputMemoryStream& file);
-	bool parseMeshes(InputMemoryStream& file, FileVersion version);
+	bool parseMeshes(InputMemoryStream& file);
 	bool parseLODs(InputMemoryStream& file);
-	bool parseClusters(InputMemoryStream& file, FileVersion version);
+	bool parseClusters(InputMemoryStream& file);
 	void destroyClusters();
 	int getBoneIdx(const char* name);
 

@@ -74,3 +74,10 @@ autolod2 = 0.25
   - Otherwise `autolodN` (a simplification ratio, 0-1) generates it from level 0 with mesh simplification. Each material is simplified separately.
 
 A level with neither is a compile error. If the recipe has parts for a level and `autolodN` is also set, the recipe wins.
+
+## Clusters
+
+A recipe model gets clusters like an imported model, for GPU driven LOD of instanced models (`mesh_clusters.h`). Two more keys of the meta file, also checkboxes in the *Import settings* of the editor:
+
+- `create_clusters` (default `true`) bakes the clusters. Clusters need additional memory.
+- `cluster_dilate_borders` (default `false`) lets the coarser levels of clusters grow the open borders of their triangles, to keep the area that simplification removes. Use it for foliage, where leaves and other loose pieces would thin out much sooner than their size suggests. It needs more memory, every cluster has its own positions.

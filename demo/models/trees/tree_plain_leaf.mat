@@ -1,0 +1,13 @@
+shader "/engine/shaders/standard.hlsl"
+backface_culling false
+layer "default"
+define "ALPHA_CUTOUT"
+texture "/models/trees/tree_leaf.ltct"
+texture "/models/trees/tree_leaf_normal.ltct"
+texture "/models/trees/tree_leaf_roughness.ltct"
+texture ""
+uniform "Material color", { 1.000000, 1.000000, 1.000000, 1.000000 }
+uniform "Roughness", 0.520000
+uniform "Metallic", 0.000000
+uniform "Emission", 0.000000
+uniform "Translucency", 0.000000

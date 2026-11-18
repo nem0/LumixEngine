@@ -1,0 +1,4 @@
+
+lod_count = 1
+cluster_dilate_borders = true
+lod0_distance = 10000.000000

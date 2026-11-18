@@ -1471,6 +1471,7 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 
 	// build before writing anything, so that a failure leaves no half written data
 	Array<MeshClusters*> results(m_allocator);
+	Array<MeshPages*> page_results(m_allocator);	// the pages of each mesh, see buildMeshPages
 	bool failed = false;
 	for (u32 i = 0; i < (u32)meshes.size(); ++i) {
 		const ImportGeometry& geom = m_geometries[meshes[i]->geometry_idx];
@@ -1491,6 +1492,17 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 		source.ao = aos[i].empty() ? nullptr : aos[i].begin();
 		source.colors = colors[i].empty() ? nullptr : colors[i].begin();
 		if (!packClusterVertices(source, *clusters, m_allocator)) {
+			failed = true;
+			break;
+		}
+
+		// the pages are streaming units of the payload of the groups, their size depends on the stride of the indices that is written below
+		u32 page_index_stride = 3;
+		for (const MeshClusterGPU& cluster : clusters->clusters) page_index_stride = maximum(page_index_stride, cluster.index_count);
+		MeshPages* page_data = LUMIX_NEW(m_allocator, MeshPages)(m_allocator);
+		page_results.push(page_data);
+		if (!buildMeshPages(clusters->clusters.begin(), (u32)clusters->clusters.size(), clusters->groups.begin(), (u32)clusters->groups.size(), page_index_stride, *page_data, m_allocator)) {
+			logError("Failed to make pages of clusters of a model");
 			failed = true;
 			break;
 		}
@@ -1614,6 +1626,14 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 			// the groups of clusters (streaming units), see MeshGroupGPU
 			write((u32)clusters->groups.size());
 			write(clusters->groups.begin(), clusters->groups.byte_size());
+			// the pages (streaming units made of groups), see MeshPages
+			const MeshPages& page_data = *page_results[i];
+			write((u32)page_data.pages.size());
+			write(page_data.root_bytes);
+			write((u32)page_data.parents.size());
+			write(page_data.pages.begin(), page_data.pages.byte_size());
+			write(page_data.parents.begin(), page_data.parents.byte_size());
+			write(page_data.children.begin(), page_data.children.byte_size());
 			total_clusters += cluster_count;
 			packed_bytes += padded_indices.byte_size() + vertex_data_size;
 			unpacked_bytes += u64(m_geometries[meshes[i]->geometry_idx].vertex_buffer.size()) + clusters->indices.byte_size();
@@ -1624,6 +1644,7 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 		logError("Failed to build clusters of a model");
 	}
 	for (MeshClusters* clusters : results) LUMIX_DELETE(m_allocator, clusters);
+	for (MeshPages* page_data : page_results) LUMIX_DELETE(m_allocator, page_data);
 	return !failed;
 }
 

@@ -38,10 +38,10 @@ cbuffer UniformData : register(b4) {
 	uint u_groups;			// bindless, GPUSceneGroup[] of the instanced models
 	uint u_cluster_data;	// bindless, the buffer with the clusters and nodes of all meshes, see MeshDesc
 	uint u_padding1;
-	uint u_feedback;		// rw bindless, 8 bytes for each group of the meshes that stream: the stamp of the frame in which a cluster of it was drawn, then the one of the last frame that needed its children
-	uint u_frame;			// the stamp of this frame
-	uint u_feedback_capacity;	// groups in u_feedback, 0 if there is none
+	uint u_feedback;		// rw bindless, one bit for each page of the meshes that stream: a cluster of a group of the page was drawn (if it is loaded) or a group of the page is needed (if it is not), the CPU clears the bits after reading them
 	uint u_padding2;
+	uint u_feedback_capacity;	// groups in u_feedback, 0 if there is none
+	uint u_padding3;
 };
 
 // threads of a group, GPUSceneConst::CLUSTER_THREADS
@@ -122,6 +122,13 @@ bool insideFrustum(float3 center, float radius) {
 	return true;
 }
 
+// Sets the bit of a group in the feedback. Most of the clusters of a frame find it set already, so it is read first and the atomic is only done if it is needed.
+void markFeedback(RWByteAddressBuffer feedback, uint id) {
+	const uint address = (id >> 5) * 4;
+	const uint bit = 1u << (id & 31);
+	if ((feedback.Load(address) & bit) == 0) feedback.InterlockedOr(address, bit);
+}
+
 // Tests a cluster and appends it to the list of selected clusters if it is selected.
 void processCluster(MeshDesc desc, Instance instance, float max_scale, uint instance_idx, uint cluster, uint group_ref) {
 	ByteAddressBuffer clusters = bindless_buffers[u_cluster_data];
@@ -158,13 +165,14 @@ void processCluster(MeshDesc desc, Instance instance, float max_scale, uint inst
 	float radius = bounds.w * max_scale;
 	if (!insideFrustum(center, radius)) return;
 
-	// the feedback of streaming: the group is used, and if the cluster is only drawn because its children are not loaded and it is not accurate enough, they are needed
+	// the feedback of streaming: the group is used, and if the cluster is only drawn because its children are not loaded and it is not accurate enough, they are needed.
+	// The ids in the groups are the ones of their pages. The page is loaded in the first case and it is not in the second, so one bit is enough, the CPU tells them apart by the state of the page.
 	if (u_feedback_capacity != 0) {
 		RWByteAddressBuffer feedback = bindless_rw_buffers[u_feedback];
 		const uint own_id = own_flags >> 8;
-		if (own_id < u_feedback_capacity) feedback.Store(own_id * 8, u_frame);
+		if (own_id < u_feedback_capacity) markFeedback(feedback, own_id);
 		const uint child_id = child_flags >> 8;
-		if (!refined && !error_small && child_id < u_feedback_capacity) feedback.Store(child_id * 8 + 4, u_frame);
+		if (!refined && !error_small && child_id < u_feedback_capacity) markFeedback(feedback, child_id);
 	}
 
 	RWByteAddressBuffer selected = bindless_rw_buffers[u_selected];

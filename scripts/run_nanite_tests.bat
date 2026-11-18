@@ -1,7 +1,8 @@
 @echo off
 REM Builds studio.exe and app.exe, compiles the resources of the demo project (studio.exe --compile_all_resources) and runs
 REM the nanite benchmark (demo/scripts/bench.evox) on the high poly meshes of demo/models/bench (rock, coil, terrain),
-REM each with cluster streaming on and off.
+REM each with cluster streaming on and off. The app is started twice, once per streaming mode, and runs the three meshes one
+REM after another in that launch (-bench_spawn, -bench_spawn2, -bench_spawn3).
 REM
 REM Usage: run_nanite_tests.bat [config] [-- extra app arguments]
 REM   config  RelWithDebInfo (default) or Debug
@@ -10,11 +11,11 @@ REM
 REM The scenes are rendered at 4K (-resolution 3840 2160, the window stays small) and the grids are dense, so that the passes of the clusters have millions of
 REM triangles at the default error of clusters (1 px): at the size of the default window they take 0.2-0.5 ms and nothing about them can be measured.
 REM The window is never shown (-hidden), so the app takes neither the focus nor the mouse and the machine stays usable during the runs.
-REM The runs are without vsync (-no_vsync) and with 2000 frames (-bench_frames, extra arguments win over it). With vsync the GPU
+REM The runs are without vsync (-no_vsync) and with 100 warmup frames (-bench_warmup, cluster streaming needs about 100 to settle, 10-50 give streaming runs 7-37% too fast geom pass times) and 50 measured frames (-bench_frames, extra arguments win over it). With vsync the GPU
 REM is idle most of every frame, so it drops its clocks and the timings are 3-4 times longer and full of spikes. Without it the GPU
 REM stays busy at its top clocks. (-gpu_stable_power_state would lock the clocks, but it needs the developer mode of Windows.)
 REM
-REM Every run is an empty world with a sun, a grid of instances of one mesh and a camera turning around in the middle of it
+REM Every scene is an empty world with a sun, a grid of instances of one mesh and a camera turning around in the middle of it
 REM (see bench.evox). Results are CSV files in "%USERPROFILE%\Saved Games\nanite_bench\" (<mesh>_<streaming|no_streaming>.csv).
 REM Resources are compiled by Studio because the app can't compile them (scripts, models, shaders).
 
@@ -93,11 +94,10 @@ if not !rc!==0 (
 set out_dir=%USERPROFILE%\Saved Games\nanite_bench
 if not exist "%out_dir%" mkdir "%out_dir%"
 
-REM mesh, instances along x and z, distance between instances (m)
+REM scenes of every launch: mesh, instances along x and z, distance between instances (m)
 set failed=0
-call :scene rock 30 30 2.5
-call :scene coil 30 30 2.5
-call :scene terrain 9 9 8
+call :run streaming ""
+call :run no_streaming "-cluster_stream_off"
 
 echo.
 echo ==== Results (%out_dir%) ====
@@ -106,7 +106,7 @@ for %%M in (rock coil terrain) do (
     echo.
     echo --- %%M, %%N ---
     if exist "%out_dir%\%%M_%%N.csv" (
-      findstr /i /b /c:"info," /c:"frame_ms" /c:"gpu_ms,frame" /c:"gpu_ms,geom pass" /c:"gpu_ms,shadow pass" /c:"gpu_ms,prepare view" /c:"gpu_ms,scene instance cull" /c:"gpu_ms,cluster cull" /c:"gpu_ms,scene variants" /c:"gpu_ms,render bucket" /c:"gpu_ms,fill clusters" /c:"counter,GPU triangles: " /c:"counter,Cluster" "%out_dir%\%%M_%%N.csv"
+      findstr /i /b /c:"info," /c:"frame_ms" /c:"gpu_ms,frame" /c:"gpu_ms,geom pass" /c:"gpu_ms,shadow pass" /c:"gpu_ms,prepare view" /c:"gpu_ms,scene instance cull" /c:"gpu_ms,cluster cull" /c:"gpu_ms,scene variants" /c:"gpu_ms,render bucket" /c:"gpu_ms,fill clusters" /c:"counter,GPU triangles: " /c:"counter,Cluster" /c:"counter_avg,Cluster" "%out_dir%\%%M_%%N.csv"
     ) else (
       echo no result
     )
@@ -117,26 +117,21 @@ popd
 if not "%failed%"=="0" exit /b 1
 exit /b 0
 
-REM :scene <mesh> <count_x> <count_z> <spacing>
-:scene
-call :run %~1_streaming "%~1 %~2 %~3 %~4" ""
-call :run %~1_no_streaming "%~1 %~2 %~3 %~4" "-cluster_stream_off"
-exit /b 0
-
-REM :run <name> <-bench_spawn arguments> <extra app flags>
+REM :run <streaming|no_streaming> <extra app flags>
+REM one launch of the app, it runs the three scenes one after another and writes <mesh>_<mode>.csv for each
 :run
-set name=%~1
-set spawn=%~2
-set flags=%~3
-set csv=%out_dir%\%name%.csv
-if exist "%csv%" del "%csv%"
+set mode=%~1
+set flags=%~2
+for %%M in (rock coil terrain) do if exist "%out_dir%\%%M_%mode%.csv" del "%out_dir%\%%M_%mode%.csv"
 echo.
-echo Running "%name%"...
+echo Running "%mode%" (rock, coil, terrain)...
 pushd "%~dp0..\data"
-"%app%" -window -data_dir "%~dp0..\demo" -bench nanite_bench/%name%.csv -bench_spawn %spawn% %flags% %extra% -no_vsync -hidden -resolution 3840 2160 -bench_frames 2000
+"%app%" -window -data_dir "%~dp0..\demo" -bench "nanite_bench/*_%mode%.csv" -bench_spawn rock 30 30 2.5 -bench_spawn2 coil 30 30 2.5 -bench_spawn3 terrain 9 9 8 %flags% %extra% -no_vsync -hidden -resolution 3840 2160 -bench_warmup 100 -bench_frames 50
 popd
-if not exist "%csv%" (
-  echo "%name%" produced no result. See %bin%\lumix_app.log
-  set failed=1
+for %%M in (rock coil terrain) do (
+  if not exist "%out_dir%\%%M_%mode%.csv" (
+    echo "%%M_%mode%" produced no result. See %bin%\lumix_app.log
+    set failed=1
+  )
 )
 exit /b 0

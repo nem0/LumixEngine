@@ -1007,7 +1007,8 @@ struct Frame {
 	};
 
 	struct BufferRead {
-		ID3D12Resource* staging;
+		ID3D12Resource* staging;	// own buffer of the read, nullptr if the read is in readback_buffer of the frame (at `offset`)
+		u64 offset;
 		BufferReadCallback callback;
 		u32 size;
 	};
@@ -1072,6 +1073,13 @@ struct Frame {
 	Array<Query*> to_resolve_stats;
 	Array<TextureRead> texture_reads;
 	Array<BufferRead> buffer_reads;
+	// Linear allocator of buffer reads (like scratch_buffer for uploads): a read takes the next range, all of them are
+	// done when the frame is begun again (the GPU has finished, the callbacks are called) and the allocator starts over.
+	// A read that does not fit gets its own buffer, and the buffer is recreated big enough for all the reads of the frame when it begins.
+	ID3D12Resource* readback_buffer = nullptr;
+	u64 readback_capacity = 0;
+	u64 readback_used = 0;
+	u64 readback_requested = 0;	// everything the reads of the frame wanted, fitting or not
 	ID3D12Resource* timestamp_query_buffer;
 	ID3D12Resource* stats_query_buffer;
 	u8* timestamp_query_buffer_ptr;
@@ -1492,20 +1500,40 @@ void Frame::begin() {
 	}
 	texture_reads.clear();
 
+	u8* arena = nullptr;
 	for (const BufferRead& read : buffer_reads) {
 		u8* src = nullptr;
-		const HRESULT hr = read.staging->Map(0, nullptr, (void**)&src);
+		HRESULT hr = S_OK;
+		if (read.staging) {
+			hr = read.staging->Map(0, nullptr, (void**)&src);
+		}
+		else {
+			if (!arena) hr = readback_buffer->Map(0, nullptr, (void**)&arena);
+			if (arena) src = arena + read.offset;
+		}
 		if (src && hr == S_OK) {
 			read.callback.invoke(Span<const u8>(src, read.size));
-			read.staging->Unmap(0, nullptr);
+			if (read.staging) read.staging->Unmap(0, nullptr);
 		}
 		else {
 			logError("Failed to map buffer readback buffer");
 			read.callback.invoke(Span<const u8>());
 		}
-		read.staging->Release();
+		if (read.staging) read.staging->Release();
 	}
+	if (arena) readback_buffer->Unmap(0, nullptr);
 	buffer_reads.clear();
+
+	// everything is read, the allocator starts over (bigger if the reads of the last use of the frame did not fit)
+	readback_used = 0;
+	if (readback_requested > readback_capacity) {
+		if (readback_buffer) readback_buffer->Release();
+		readback_capacity = 64 * 1024;
+		while (readback_capacity < readback_requested) readback_capacity *= 2;
+		readback_buffer = createBuffer(d3d->device, nullptr, readback_capacity, D3D12_HEAP_TYPE_READBACK, "buffer readback");
+		if (!readback_buffer) readback_capacity = 0;
+	}
+	readback_requested = 0;
 }
 
 void Frame::clear() {
@@ -1517,6 +1545,11 @@ void Frame::clear() {
 		
 	to_release.clear();
 	to_heap_release.clear();
+
+	for (const BufferRead& r : buffer_reads) if (r.staging) r.staging->Release();
+	buffer_reads.clear();
+	if (readback_buffer) readback_buffer->Release();
+	readback_buffer = nullptr;
 
 	scratch_buffer->Release();
 	texture_scratch_buffer->Release();
@@ -1853,17 +1886,34 @@ void readBuffer(BufferHandle buffer, u32 offset, u32 size, BufferReadCallback ca
 		callback.invoke(Span<const u8>());
 		return;
 	}
-	ID3D12Resource* staging = createBuffer(d3d->device, nullptr, size, D3D12_HEAP_TYPE_READBACK, "buffer staging");
-	if (!staging) {
+	// the next range of the readback buffer of the frame (linear allocator), or an own buffer if it does not fit (creating a
+	// committed resource is slow, the readback buffer of the frame is bigger the next time it is used)
+	Frame& read_frame = *d3d->frame;
+	const u64 aligned_size = (u64(size) + 255) & ~u64(255);
+	ID3D12Resource* staging = nullptr;	// own buffer
+	ID3D12Resource* dst = nullptr;
+	u64 dst_offset = 0;
+	if (read_frame.readback_buffer && read_frame.readback_used + aligned_size <= read_frame.readback_capacity) {
+		dst = read_frame.readback_buffer;
+		dst_offset = read_frame.readback_used;
+		read_frame.readback_used += aligned_size;
+	}
+	else {
+		staging = createBuffer(d3d->device, nullptr, size, D3D12_HEAP_TYPE_READBACK, "buffer staging");
+		dst = staging;
+	}
+	read_frame.readback_requested += aligned_size;
+	if (!dst) {
 		callback.invoke(Span<const u8>()); // device removed, report failure
 		return;
 	}
 	const D3D12_RESOURCE_STATES prev_state = buffer->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_COPY_SOURCE);
-	d3d->cmd_list->CopyBufferRegion(staging, 0, buffer->resource, offset, size);
+	d3d->cmd_list->CopyBufferRegion(dst, dst_offset, buffer->resource, offset, size);
 	buffer->setState(d3d->cmd_list, prev_state);
 
 	Frame::BufferRead& wait = d3d->frame->buffer_reads.emplace();
 	wait.staging = staging;
+	wait.offset = dst_offset;
 	wait.callback = callback;
 	wait.size = size;
 }

@@ -444,7 +444,7 @@ static int getAttributeOffset(Mesh& mesh, AttributeSemantic attr)
 }
 
 
-bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
+bool Model::parseMeshes(InputMemoryStream& file)
 {
 	int object_count = 0;
 	file.read(object_count);
@@ -472,16 +472,14 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 
 		StringView mesh_name((const char*)tmp, str_size);
 
-		if (version >= FileVersion::STRIDE) {
-			// vertices are padded to 4 bytes, so that vertex pulling can use wide aligned loads
-			u32 stride;
-			file.read(stride);
-			if (stride < vb_stride || stride > 255) {
-				logError(m_path, ": invalid vertex stride");
-				return false;
-			}
-			vb_stride = stride;
+		// vertices are padded to 4 bytes, so that vertex pulling can use wide aligned loads
+		u32 stride;
+		file.read(stride);
+		if (stride < vb_stride || stride > 255) {
+			logError(m_path, ": invalid vertex stride");
+			return false;
 		}
+		vb_stride = stride;
 
 		m_meshes.emplace(vertex_decl, vb_stride, mesh_name, semantics, m_renderer, m_allocator);
 		m_mesh_material.emplace(material);
@@ -499,7 +497,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 			return false;
 		}
 		file.read(indices_count);
-		if (indices_count < 0 || (indices_count == 0 && version < FileVersion::CLUSTERS)) {
+		if (indices_count < 0) {
 			logError(m_path, ": has no geometry data");
 			return false;
 		}
@@ -608,20 +606,18 @@ bool Model::load(Span<const u8> mem)
 		return false;
 	}
 
-	if(header.version > FileVersion::LATEST)
+	if (header.version != FileVersion::LATEST)
 	{
-		logWarning("Unsupported version of model ", getPath());
+		logWarning("Unsupported version of model ", getPath(), ", the model has to be compiled again");
 		return false;
 	}
 
-	if (header.version > FileVersion::ROOT_MOTION_BONE) {
-		file.read(m_root_motion_bone);
-	}
+	file.read(m_root_motion_bone);
 
-	if (parseMeshes(file, (FileVersion)header.version)
+	if (parseMeshes(file)
 		&& parseBones(file)
 		&& parseLODs(file)
-		&& (header.version < FileVersion::CLUSTERS || parseClusters(file, (FileVersion)header.version)))
+		&& parseClusters(file))
 	{
 		return true;
 	}
@@ -634,29 +630,26 @@ bool Model::load(Span<const u8> mem)
 //   for each mesh: u32 cluster_count, leaf_cluster_count, node_count, root_count, tree_depth, index_stride, leaf_vertex_count, leaf_index_count,
 //                  vertex_data_size, vertex_stride, VertexDecl, AttributeSemantic[VertexDecl::MAX_ATTRIBUTES],
 //                  MeshClusterGPU[cluster_count], MeshNodeGPU[node_count], u32 roots[root_count], u8 indices[cluster_count * index_stride],
-//                  u8 vertex_data[vertex_data_size], Vec3 vertices[leaf_vertex_count], u32 indices[leaf_index_count]
+//                  u8 vertex_data[vertex_data_size], Vec3 vertices[leaf_vertex_count], u32 indices[leaf_index_count],
+//                  u32 group_count, MeshGroupGPU[group_count], u32 page_count, root_bytes, edge_count, MeshPageFile[page_count], u32 parents[edge_count], u32 children[edge_count]
 // Everything is ready to be uploaded. The vertex data are the headers of clusters followed by their interleaved, bit packed vertices (see mesh_clusters.h).
 // Meshes with clusters have no vertices and indices of their own (see parseMeshes), the CPU ones (`vertices` and `indices`) are the finest clusters.
-bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
+bool Model::parseClusters(InputMemoryStream& file) {
 	u32 mesh_count;
 	file.read(mesh_count);
 	if (mesh_count > (u32)m_meshes.size()) return false;
-	if (mesh_count > 0 && version < FileVersion::CLUSTER_GROUP_TABLE) {
-		logError(m_path, ": clusters of an old version, the model has to be compiled again");
-		return false;
-	}
 
 	for (u32 i = 0; i < mesh_count; ++i) {
 		Mesh& mesh = m_meshes[i];
-		u32 cluster_count, leaf_index_count, leaf_vertex_count, node_count, root_count, index_stride, vertex_data_size;
-		file.read(cluster_count);
+		u32 leaf_vertex_count, vertex_data_size;
+		file.read(mesh.cluster_count);
 		file.read(mesh.leaf_cluster_count);
-		file.read(node_count);
-		file.read(root_count);
+		file.read(mesh.node_count);
+		file.read(mesh.root_count);
 		file.read(mesh.tree_depth);
-		file.read(index_stride);
+		file.read(mesh.cluster_index_stride);
 		file.read(leaf_vertex_count);
-		file.read(leaf_index_count);
+		file.read(mesh.indices_count);
 		file.read(vertex_data_size);
 		file.read(mesh.vb_stride);
 		file.read(mesh.vertex_decl);
@@ -665,18 +658,18 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 		bool valid_semantics = mesh.vertex_decl.isValid();
 		// unused entries of the array are NONE
 		for (AttributeSemantic semantic : mesh.attributes_semantic) valid_semantics = valid_semantics && ((u32)semantic < (u32)AttributeSemantic::COUNT || semantic == AttributeSemantic::NONE);
-		// a draw has index_stride indices per cluster, from the sequential index buffer of the pipeline (65536 entries)
-		if (file.hasOverflow() || !valid_semantics || mesh.leaf_cluster_count > cluster_count || mesh.tree_depth > 64 || index_stride == 0 || index_stride > 65536) {
+		// a draw has cluster_index_stride indices per cluster, from the sequential index buffer of the pipeline (65536 entries)
+		if (file.hasOverflow() || !valid_semantics || mesh.leaf_cluster_count > mesh.cluster_count || mesh.tree_depth > 64 || mesh.cluster_index_stride == 0 || mesh.cluster_index_stride > 65536) {
 			logError(m_path, ": invalid clusters");
 			return false;
 		}
 
-		const u64 clusters_size = u64(cluster_count) * sizeof(MeshClusterGPU);
-		const u64 nodes_size = u64(node_count) * sizeof(MeshNodeGPU) + u64(root_count) * sizeof(u32);
-		const u64 indices_size = u64(cluster_count) * index_stride * sizeof(u8);
+		const u64 clusters_size = u64(mesh.cluster_count) * sizeof(MeshClusterGPU);
+		const u64 nodes_size = u64(mesh.node_count) * sizeof(MeshNodeGPU) + u64(mesh.root_count) * sizeof(u32);
+		const u64 indices_size = u64(mesh.cluster_count) * mesh.cluster_index_stride * sizeof(u8);
 		const u64 vertices_size = u64(leaf_vertex_count) * sizeof(Vec3);
-		const u64 cpu_indices_size = u64(leaf_index_count) * sizeof(u32);
-		if (file.hasOverflow() || cluster_count == 0 || node_count == 0 || root_count == 0 || vertex_data_size > 0x7fffFFFF
+		const u64 cpu_indices_size = u64(mesh.indices_count) * sizeof(u32);
+		if (file.hasOverflow() || mesh.cluster_count == 0 || mesh.node_count == 0 || mesh.root_count == 0 || vertex_data_size > 0x7fffFFFF
 			|| clusters_size + nodes_size + indices_size + vertex_data_size + vertices_size + cpu_indices_size > file.remaining()) return false;
 		const void* clusters = file.skip(clusters_size);
 		const void* nodes = file.skip(nodes_size);
@@ -687,14 +680,13 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 		memcpy(mesh.vertices.begin(), file.skip(vertices_size), vertices_size);
 		mesh.indices.resize(cpu_indices_size);
 		memcpy(mesh.indices.getMutableData(), file.skip(cpu_indices_size), cpu_indices_size);
-		mesh.indices_count = leaf_index_count;
 		mesh.index_type = gpu::DataType::U32;
 
 		// the table of groups (streaming units, see MeshGroupGPU), the vertex data are the headers of all clusters and then the stream
 		u32 group_count = 0;
 		file.read(group_count);
-		const u64 header_bytes = u64(cluster_count) * sizeof(MeshClusterVertexGPU);
-		if (file.hasOverflow() || group_count == 0 || group_count > cluster_count || u64(group_count) * sizeof(MeshGroupGPU) > file.remaining() || vertex_data_size < header_bytes || indices_size > 0x7fffFFFF) {
+		const u64 header_bytes = u64(mesh.cluster_count) * sizeof(MeshClusterVertexGPU);
+		if (file.hasOverflow() || group_count == 0 || group_count > mesh.cluster_count || u64(group_count) * sizeof(MeshGroupGPU) > file.remaining() || vertex_data_size < header_bytes || indices_size > 0x7fffFFFF) {
 			logError(m_path, ": invalid groups of clusters");
 			return false;
 		}
@@ -703,19 +695,28 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 		memcpy(groups.begin(), file.skip(u64(group_count) * sizeof(MeshGroupGPU)), groups.byte_size());
 		const u64 stream_size = vertex_data_size - header_bytes;
 
-		mesh.cluster_count = cluster_count;
-		mesh.node_count = node_count;
-		mesh.root_count = root_count;
-		mesh.cluster_index_stride = index_stride;
+		// the pages, see MeshPages (the importer made them, only the sizes are checked)
+		MeshPagesView page_data;
+		file.read(page_data.page_count);
+		file.read(page_data.root_bytes);
+		file.read(page_data.edge_count);
+		if (file.hasOverflow() || page_data.page_count == 0 || page_data.page_count > group_count || u64(page_data.page_count) * sizeof(MeshPageFile) + u64(page_data.edge_count) * 2 * sizeof(u32) > file.remaining()) {
+			logError(m_path, ": invalid pages of clusters");
+			return false;
+		}
+		// the stream copies them, they are not copied here
+		page_data.pages = (const MeshPageFile*)file.skip(u64(page_data.page_count) * sizeof(MeshPageFile));
+		page_data.parents = (const u32*)file.skip(u64(page_data.edge_count) * sizeof(u32));
+		page_data.children = (const u32*)file.skip(u64(page_data.edge_count) * sizeof(u32));
+
 		mesh.semantics_defines = m_renderer.getSemanticDefines(Span(mesh.attributes_semantic), mesh.vertex_decl, mesh.vb_stride);
 
 		// The payload of the groups is streamed, see ClusterStream: the stream keeps a copy of it and loads pages into the buffer of cluster data. Only the permanent pages are
 		// loaded now (all of them if streaming is off, -cluster_stream_off). The stream is registered when it is complete, the renderer streams the registered ones.
-		const u32 id_base = m_renderer.allocClusterStreamIds(group_count);
 		ClusterStream* stream = LUMIX_NEW(m_allocator, ClusterStream)(m_allocator);
 		mesh.cluster_stream = stream;
-		if (!stream->init((const MeshClusterGPU*)clusters, cluster_count, (const MeshNodeGPU*)nodes, node_count, groups.begin(), group_count
-			, (const u8*)vertex_data + header_bytes, (u32)stream_size, (const u8*)indices, index_stride, id_base))
+		if (!stream->init((const MeshClusterGPU*)clusters, mesh.cluster_count, (const MeshNodeGPU*)nodes, mesh.node_count, groups.begin(), group_count
+			, page_data, (const u8*)vertex_data + header_bytes, (u32)stream_size, (const u8*)indices, mesh.cluster_index_stride, m_renderer))
 		{
 			logError(m_path, ": invalid groups of clusters");
 			return false;
@@ -741,8 +742,8 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 			table.resize((u32)table_size);
 			memset(table.begin(), 0, table.byte_size());
 			memcpy(table.begin(), clusters, clusters_size);
-			memcpy(table.begin() + clusters_size, stream->nodes.begin(), u64(node_count) * sizeof(MeshNodeGPU));
-			memcpy(table.begin() + clusters_size + u64(node_count) * sizeof(MeshNodeGPU), (const u8*)nodes + u64(node_count) * sizeof(MeshNodeGPU), u64(root_count) * sizeof(u32));
+			memcpy(table.begin() + clusters_size, stream->nodes.begin(), u64(mesh.node_count) * sizeof(MeshNodeGPU));
+			memcpy(table.begin() + clusters_size + u64(mesh.node_count) * sizeof(MeshNodeGPU), (const u8*)nodes + u64(mesh.node_count) * sizeof(MeshNodeGPU), u64(mesh.root_count) * sizeof(u32));
 			memcpy(table.begin() + headers_at, vertex_data, header_bytes);
 			tables_uploaded = m_renderer.allocClusterData(table.begin(), (u32)table_size, mesh.cluster_table_offset);
 			if (tables_uploaded) {
@@ -777,7 +778,7 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 					permanent_bytes += stream->pageBytes(p);
 				}
 			}
-			logInfo(m_path, " mesh ", i, ": ", cluster_count, " clusters, ", group_count, " groups, ", (u32)stream->pages.size(), " pages (", permanent_pages, " permanent, ", u32(permanent_bytes >> 10), " of ", u32(total_bytes >> 10), " KB, roots ", u32(stream->root_bytes >> 10), " KB), feedback ids from ", id_base == ClusterStream::NONE ? 0xffFFffFFu : id_base);
+			logInfo(m_path, " mesh ", i, ": ", mesh.cluster_count, " clusters, ", group_count, " groups, ", (u32)stream->pages.size(), " pages (", permanent_pages, " permanent, ", u32(permanent_bytes >> 10), " of ", u32(total_bytes >> 10), " KB, roots ", u32(stream->root_bytes >> 10), " KB), feedback ids of the pages from ", stream->global_base == ClusterStream::NONE ? 0xffFFffFFu : stream->global_base);
 		}
 	}
 
@@ -799,29 +800,12 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 	return true;
 }
 
-// edges key[i] -> value[i] as a list for each key, without duplicates: the values of the key `k` are list[first[k] .. first[k] + count[k])
-static void buildAdjacency(const Array<u32>& key, const Array<u32>& value, u32 key_count, Array<u32>& first, Array<u32>& count, Array<u32>& list) {
-	first.resize(key_count + 1);
-	count.resize(key_count);
-	for (u32& f : first) f = 0;
-	for (u32& c : count) c = 0;
-	for (u32 k : key) ++first[k + 1];
-	for (u32 i = 0; i < key_count; ++i) first[i + 1] += first[i];
-	list.resize(key.size());
-	for (u32 i = 0; i < (u32)key.size(); ++i) {
-		const u32 k = key[i];
-		bool exists = false;
-		for (u32 j = 0; j < count[k]; ++j) exists = exists || list[first[k] + j] == value[i];
-		if (!exists) list[first[k] + count[k]++] = value[i];
-	}
-}
-
 ClusterStream::ClusterStream(IAllocator& allocator)
 	: allocator(allocator)
 	, groups(allocator)
 	, group_page(allocator)
-	, parent_first(allocator), parent_count(allocator), parents(allocator)
-	, child_first(allocator), child_count(allocator), children(allocator)
+	, page_parents(allocator)
+	, page_children(allocator)
 	, pages(allocator)
 	, loaded(allocator)
 	, addresses(allocator)
@@ -832,12 +816,11 @@ ClusterStream::ClusterStream(IAllocator& allocator)
 {}
 
 bool ClusterStream::init(const MeshClusterGPU* cluster_array, u32 clusters, const MeshNodeGPU* node_array, u32 nodes_count, const MeshGroupGPU* group_array, u32 group_count
-	, const u8* stream_bytes, u32 stream_size, const u8* index_bytes, u32 stride, u32 base_id)
+	, const MeshPagesView& page_data, const u8* stream_bytes, u32 stream_size, const u8* index_bytes, u32 stride, Renderer& renderer)
 {
 	cluster_count = clusters;
 	node_count = nodes_count;
 	index_stride = stride;
-	global_base = base_id;
 
 	groups.resize(group_count);
 	group_page.resize(group_count);
@@ -849,64 +832,43 @@ bool ClusterStream::init(const MeshClusterGPU* cluster_array, u32 clusters, cons
 	nodes.resize(node_count);
 	memcpy(nodes.begin(), node_array, u64(node_count) * sizeof(MeshNodeGPU));
 	cluster_refined.resize(cluster_count);
-	Array<u32> child_of(allocator), parent_of(allocator);	// edges: the refined group (the child) and the group of the cluster that was made from it (the parent)
 	for (u32 i = 0; i < cluster_count; ++i) {
 		cluster_refined[i] = cluster_array[i].refined_group;
 		if (cluster_array[i].group >= group_count) return false;
-		if (cluster_array[i].refined_group == MeshClusters::NO_GROUP) continue;
-		if (cluster_array[i].refined_group >= group_count) return false;
-		child_of.push(cluster_array[i].refined_group);
-		parent_of.push(cluster_array[i].group);
+		if (cluster_array[i].refined_group != MeshClusters::NO_GROUP && cluster_array[i].refined_group >= group_count) return false;
 	}
-	buildAdjacency(child_of, parent_of, group_count, parent_first, parent_count, parents);
-	buildAdjacency(parent_of, child_of, group_count, child_first, child_count, children);
 
-	// Pages are made here. Permanent groups are never unloaded:
-	//  - the groups that have no parent (their clusters have no parent error): nothing coarser covers their part of the mesh, so without them the mesh would have holes
-	//    that nothing would ever ask for. They are the coarsest level, or groups that could not be simplified, whatever their size,
-	//  - and the coarsest of the others, as long as the permanent groups are not larger than PERMANENT_BYTES (the groups of a mesh are in the order of the levels, the
-	//    parents of a group have higher numbers).
-	auto payload_bytes = [&](u32 g) -> u64 { return u64(groups[g].stream_size) + u64(groups[g].cluster_count) * index_stride; };
-	Array<u8> permanent(allocator);
-	permanent.resize(group_count);
-	for (u8& p : permanent) p = 0;
-	for (u32 i = 0; i < cluster_count; ++i) {
-		if (cluster_array[i].parent_error >= 1e30f) permanent[cluster_array[i].group] = 1;
+	// The pages are made by the importer (buildMeshPages), and are valid: they have all the groups in order, a page needs the pages that have higher numbers.
+	const u32 page_count = page_data.page_count;
+	pages.resize(page_count);
+	for (u32 p = 0; p < page_count; ++p) {
+		const MeshPageFile& file_page = page_data.pages[p];
+		Page& page = pages[p];
+		page.first_group = file_page.first_group;
+		page.group_count = file_page.group_count;
+		page.permanent = file_page.permanent != 0;
+		page.parent_first = file_page.parent_first;
+		page.parent_count = file_page.parent_count;
+		page.child_first = file_page.child_first;
+		page.child_count = file_page.child_count;
+		for (u32 g = page.first_group; g < page.first_group + page.group_count; ++g) group_page[g] = p;
 	}
-	u64 permanent_bytes = 0;
-	for (u32 g = 0; g < group_count; ++g) {
-		if (permanent[g]) permanent_bytes += payload_bytes(g);
-	}
-	root_bytes = (u32)minimum(permanent_bytes, (u64)0xffFFffFFu);
-	for (u32 g = group_count; g > 0;) {
-		--g;
-		if (permanent[g]) continue;
-		const u64 bytes = payload_bytes(g);
-		if (permanent_bytes + bytes > PERMANENT_BYTES) break;
-		permanent[g] = 1;
-		permanent_bytes += bytes;
-	}
-	pages.clear();
-	u64 page_bytes = 0;
-	for (u32 g = 0; g < group_count; ++g) {
-		const u64 bytes = payload_bytes(g);
-		const bool is_permanent = permanent[g] != 0;
-		if (pages.empty() || pages[pages.size() - 1].permanent != is_permanent || (page_bytes > 0 && page_bytes + bytes > PAGE_BYTES)) {
-			Page page;
-			page.first_group = g;
-			page.permanent = is_permanent;
-			pages.push(page);
-			page_bytes = 0;
-		}
-		pages[pages.size() - 1].group_count++;
-		group_page[g] = (u32)pages.size() - 1;
-		page_bytes += bytes;
-	}
+
+	page_parents.resize(page_data.edge_count);
+	memcpy(page_parents.begin(), page_data.parents, u64(page_data.edge_count) * sizeof(u32));
+
+	page_children.resize(page_data.edge_count);
+	memcpy(page_children.begin(), page_data.children, u64(page_data.edge_count) * sizeof(u32));
+
+	root_bytes = page_data.root_bytes;
 
 	stream_data.resize(stream_size);
 	memcpy(stream_data.begin(), stream_bytes, stream_size);
 	index_data.resize(u64(cluster_count) * index_stride);
 	memcpy(index_data.begin(), index_bytes, u64(cluster_count) * index_stride);
+
+	// the feedback has an id for each page (a bit), the shaders get it from the address of every group of the page, see addressFlags
+	global_base = renderer.allocClusterStreamIds((u32)pages.size());
 
 	loaded.resize(group_count);
 	for (u8& l : loaded) l = 0;
@@ -924,8 +886,8 @@ u32 ClusterStream::addressFlags(u32 g) const {
 	u32 flags = 0;
 	if (loaded[g]) flags |= MeshGroupAddressGPU::LOADED;
 	if (pages[group_page[g]].permanent) flags |= MeshGroupAddressGPU::PERMANENT;
-	// the id of the group in the feedback buffer, shaders ignore ids that are out of the buffer
-	const u32 id = global_base == NONE ? 0xffFFffu : minimum(global_base + g, 0xffFFffu);
+	// the id of the page of the group in the feedback buffer, shaders ignore ids that are out of the buffer
+	const u32 id = global_base == NONE ? 0xffFFffu : minimum(global_base + group_page[g], 0xffFFffu);
 	return flags | (id << 8);
 }
 
@@ -940,25 +902,25 @@ u32 ClusterStream::pageBytes(u32 page_index) const {
 }
 
 u32 ClusterStream::firstMissingParentPage(u32 page_index) const {
-	const Page& page = pages[page_index];
-	for (u32 g = page.first_group; g < page.first_group + page.group_count; ++g) {
-		for (u32 i = 0; i < parent_count[g]; ++i) {
-			const u32 parent = parents[parent_first[g] + i];
-			if (!loaded[parent] && group_page[parent] != page_index) return group_page[parent];
-		}
+	for (u32 i = 0; i < pages[page_index].parent_count; ++i) {
+		const u32 parent = page_parents[pages[page_index].parent_first + i];
+		if (!pages[parent].loaded) return parent;
 	}
 	return NONE;
+}
+
+void ClusterStream::markParentPagesWanted(u32 page_index, u32 stamp) {
+	for (u32 i = 0; i < pages[page_index].parent_count; ++i) {
+		pages[page_parents[pages[page_index].parent_first + i]].wanted_frame = stamp;
+	}
 }
 
 bool ClusterStream::canEvict(u32 page_index) const {
 	const Page& page = pages[page_index];
 	if (!page.loaded || page.permanent) return false;
 	// the groups of the page must not be parents of loaded groups of other pages
-	for (u32 g = page.first_group; g < page.first_group + page.group_count; ++g) {
-		for (u32 i = 0; i < child_count[g]; ++i) {
-			const u32 child = children[child_first[g] + i];
-			if (loaded[child] && group_page[child] != page_index) return false;
-		}
+	for (u32 i = 0; i < pages[page_index].child_count; ++i) {
+		if (pages[page_children[pages[page_index].child_first + i]].loaded) return false;
 	}
 	return true;
 }

@@ -174,8 +174,8 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	// it before the passes that are recorded later).
 	virtual void updateClusterData(u32 offset, const void* data, u32 size) = 0;
 
-	// Streaming of the payload of clusters, see ClusterStream. Ids are for the groups of a mesh in the feedback buffer, 8 bytes for each: the stamp of the frame in which a cluster of the group was
-	// drawn, the stamp of the last frame that needed the clusters that the group is refined to (the frame number + 1, 0: never). `allocClusterStreamIds` returns ClusterStream::NONE if there
+	// Streaming of the payload of clusters, see ClusterStream. Ids are for the pages of a mesh in the feedback buffer, one bit for each: set if a cluster of a group of the page was drawn (the page is loaded) or if
+	// the clusters that a group of the page is refined to were needed (it is not loaded), since the last readback. `allocClusterStreamIds` returns ClusterStream::NONE if there
 	// are not enough ids. Streams are registered when they are complete, unregistering frees the ids. All can be called from any thread.
 	virtual u32 allocClusterStreamIds(u32 count) = 0;
 	virtual void registerClusterStream(ClusterStream* stream) = 0;

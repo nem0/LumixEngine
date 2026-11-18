@@ -315,12 +315,18 @@ Surface getSurfaceEx(VSOutput input) {
 	}
 #elif defined DEFERRED || defined GRASS
 	#ifdef CLUSTER_DEBUG_TRIANGLES
+		// the debug view does not flip normals: the compiler does not accept SV_IsFrontFace next to SV_PrimitiveID
 		GBufferOutput mainPS(VSOutput input, uint primitive_id : SV_PrimitiveID) {
 			g_primitive_id = primitive_id;
+			bool is_front = true;
 	#else
-		GBufferOutput mainPS(VSOutput input) {
+		GBufferOutput mainPS(VSOutput input, bool is_front : SV_IsFrontFace) {
 	#endif
 		Surface surface = getSurfaceEx(input);
+		#ifndef GRASS
+			// double sided materials: the normal of a back face points away from the viewer
+			if (!is_front) surface.N = -surface.N;
+		#endif
 		#ifdef ALPHA_CUTOUT
 			if(surface.alpha < 0.5) discard;
 		#endif
@@ -334,8 +340,10 @@ Surface getSurfaceEx(VSOutput input) {
 		TextureCubeArrayHandle u_reflection_probes;
 	};
 
-	float4 mainPS(VSOutput input, float4 frag_coord : SV_POSITION) : SV_TARGET{
+	float4 mainPS(VSOutput input, float4 frag_coord : SV_POSITION, bool is_front : SV_IsFrontFace) : SV_TARGET{
 		Surface data = getSurfaceEx(input);
+		// double sided materials: the normal of a back face points away from the viewer
+		if (!is_front) data.N = -data.N;
 		data.pos_ws = input.pos_ws.xyz;
 	
 		float linear_depth = dot(data.pos_ws.xyz, Pass_view_dir.xyz);

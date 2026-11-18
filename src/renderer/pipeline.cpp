@@ -449,9 +449,9 @@ struct PipelineImpl final : Pipeline {
 		gpu::BindlessHandle cluster_data;	// the buffer with clusters and nodes of all meshes
 		u32 padding1;
 		gpu::RWBindlessHandle feedback;	// streaming of clusters, see Renderer::getClusterFeedbackBuffer
-		u32 frame;						// the stamp of the frame in the feedback
-		u32 feedback_capacity;			// groups in the feedback, 0: no feedback
 		u32 padding2;
+		u32 feedback_capacity;			// groups in the feedback, 0: no feedback
+		u32 padding3;
 	};
 	static_assert(sizeof(ClusterViewUniforms) % 16 == 0);
 
@@ -2447,7 +2447,6 @@ struct PipelineImpl final : Pipeline {
 		if (feedback) {
 			cu.feedback = gpu::getRWBindlessHandle(feedback);
 			cu.feedback_capacity = m_renderer.getClusterFeedbackCapacity();
-			cu.frame = m_renderer.frameNumber() + 1;
 			stream.barrier(feedback, gpu::BarrierType::WRITE);
 		}
 

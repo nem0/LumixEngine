@@ -632,6 +632,22 @@ struct Plugin final : ProceduralMeshEditor, EditorAssetPlugin {
 				ImGui::EndCombo();
 			}
 
+			ImGuiEx::Label("Create clusters (?)");
+			if (ImGui::IsItemHovered()) {
+				ImGui::SetTooltip("%s", "Bakes clusters, so that instanced models can use continuous GPU driven LOD instead of LOD meshes."
+					"\nClusters need additional memory.");
+			}
+			changed |= ImGui::Checkbox("##creclusters", &m_meta.create_clusters);
+			if (m_meta.create_clusters) {
+				ImGuiEx::Label("Dilate cluster borders (?)");
+				if (ImGui::IsItemHovered()) {
+					ImGui::SetTooltip("%s", "Coarser levels of clusters grow the open borders of their triangles to keep the area that simplification removes."
+						"\nFor foliage: without it, leaves and other loose pieces thin out much sooner than their size suggests."
+						"\nNeeds more memory, every cluster has its own positions.");
+				}
+				changed |= ImGui::Checkbox("##cludilate", &m_meta.cluster_dilate_borders);
+			}
+
 			ImGui::SeparatorText("LODs");
 			ImGuiEx::Label("LOD count");
 			if (ImGui::SliderInt("##lodcount", (i32*)&m_meta.lod_count, 1, 4)) {

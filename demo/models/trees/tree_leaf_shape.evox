@@ -1,0 +1,28 @@
+import "std:math" as math
+
+comptime VARIANTS = 4;
+comptime TILE = 256;
+comptime HEIGHT = 512;
+
+// Half-widths along a lance-shaped blade, measured from stalk to tip.
+fn widthAt(j : i32) : f32 {
+    const w : [13]f32 = [0, 0.22, 0.54, 0.78, 0.91, 0.97, 0.96,
+        0.90, 0.80, 0.65, 0.49, 0.30, 0];
+    return w[j];
+}
+
+// A cubic margin rounds the shoulders between mesh stations. Stagger the
+// widest point slightly on the two sides of the midrib and between growth stages.
+fn margin(v : f32, side : f32, variant : i32) : f32 {
+    const t = v + (0.019 + 0.002 * variant as f32) * side * math.sin(6.283185 * v);
+    const s = math.min(t * 12, 11.99999);
+    const j = math.floor(s) as i32;
+    const f = s - j as f32;
+    const a = widthAt(j);
+    const b = widthAt(j+1);
+    const before = widthAt(math.max(j-1,0));
+    const after = widthAt(math.min(j+2,12));
+    const m = 0.5 * (b - before);
+    const n = 0.5 * (after - a);
+    return a + f * (m + f * (3*(b-a) - 2*m - n + f * (2*(a-b) + m + n)));
+}

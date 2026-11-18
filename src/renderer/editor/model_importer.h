@@ -176,7 +176,7 @@ protected:
 	void computeNormals(OutputMemoryStream& unindexed_triangles, u32 vertex_size, u32 normal_offset);
 
 
-	// pads vertices to multiples of 4 bytes, see Model::FileVersion::STRIDE
+	// pads vertices to multiples of 4 bytes, so that vertex pulling can use wide aligned loads
 	void padVertices();
 
 	// compute AO, auto LODs, etc.
