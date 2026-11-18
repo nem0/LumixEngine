@@ -31,10 +31,6 @@ struct ClusterVertexSource {
 // vertex_words and the numbers that go with them. Positions are rounded to a lattice, the same for the whole mesh.
 bool packClusterVertices(const ClusterVertexSource& source, MeshClusters& out, IAllocator& allocator);
 
-// Assigns the groups (made by buildMeshClusters) to pages and marks the coarsest ones RESIDENT, see MeshGroupGPU. Needs the packed vertices (packClusterVertices) to know the
-// size of the payload of a group: its part of the vertex stream and its clusters' indices, `index_stride` bytes each (the same as the importer writes).
-void assignClusterPages(MeshClusters& out, u32 index_stride);
-
 // the packing of a tangent frame, see ClusterAttribute. Exposed for tests
 u32 packClusterFrame(const Vec3& normal, const Vec3* tangent);
 void unpackClusterFrame(u32 packed, Vec3& normal, Vec3& tangent);

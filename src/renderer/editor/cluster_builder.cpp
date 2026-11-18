@@ -201,8 +201,8 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 		MeshGroupGPU group_entry;
 		group_entry.first_cluster = out.clusters.size();
 		group_entry.cluster_count = (u32)count;
-		group_entry.page = 0;
-		group_entry.flags = 0;
+		group_entry.stream_offset = 0;
+		group_entry.stream_size = 0;
 		out.groups.push(group_entry);
 		if (group.depth != level) {
 			if (level == 0) {
@@ -520,39 +520,5 @@ bool packClusterVertices(const ClusterVertexSource& source, MeshClusters& out, I
 	return true;
 }
 
-void assignClusterPages(MeshClusters& out, u32 index_stride) {
-	const u32 group_count = (u32)out.groups.size();
-	if (group_count == 0) return;
-	// the payload of a group: its piece of the vertex stream and the indices of its clusters
-	auto payload_bytes = [&](u32 g) -> u64 {
-		const MeshGroupGPU& group = out.groups[g];
-		return u64(group.stream_size) + u64(group.cluster_count) * index_stride;
-	};
-
-	// groups are in the order of the levels, so the coarsest ones are the last
-	u32 first_resident = group_count;
-	u64 resident_bytes = 0;
-	while (first_resident > 0) {
-		const u64 bytes = payload_bytes(first_resident - 1);
-		if (resident_bytes + bytes > MeshClusters::RESIDENT_BYTES && first_resident < group_count) break;
-		resident_bytes += bytes;
-		--first_resident;
-	}
-
-	u32 page = 0;
-	u64 page_bytes = 0;
-	for (u32 g = 0; g < group_count; ++g) {
-		const u64 bytes = payload_bytes(g);
-		// the resident groups never share a page with the others
-		const bool starts_resident = g == first_resident;
-		if (g > 0 && (starts_resident || (page_bytes > 0 && page_bytes + bytes > MeshClusters::PAGE_BYTES))) {
-			++page;
-			page_bytes = 0;
-		}
-		out.groups[g].page = page;
-		out.groups[g].flags = g >= first_resident ? (u32)MeshGroupGPU::RESIDENT : 0;
-		page_bytes += bytes;
-	}
-}
 
 } // namespace Lumix

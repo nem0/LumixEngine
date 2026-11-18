@@ -37,20 +37,15 @@ struct MeshClusterGPU {
 static_assert(sizeof(MeshClusterGPU) == 80);
 
 // A group of sibling clusters, they are consecutive in MeshClusters::clusters. The unit of streaming: the vertex stream and the indices of the clusters of a group
-// are contiguous, and the groups of a page are consecutive. A group may be streamed in only after the group of its parent (the coarser clusters),
-// the groups that are RESIDENT (the coarsest ones) are never streamed out, so every mesh can always be drawn.
+// are contiguous. A group may be streamed in only after the group of its parent (the coarser clusters). Pages and the groups that are never streamed out are decided
+// when the model is loaded, see ClusterStream.
 struct MeshGroupGPU {
-	enum Flags : u32 { RESIDENT = 1 << 0 };
 	u32 first_cluster;
 	u32 cluster_count;
-	u32 page;				// the groups of a page are streamed together
-	u32 flags;
 	u32 stream_offset;		// byte offset of the part of the vertex stream of the group, from the start of the stream (4 byte aligned, the stream has no headers)
 	u32 stream_size;		// bytes of it (the last group has some bytes of padding more, shaders read two words at any bit)
-	u32 padding0;
-	u32 padding1;
 };
-static_assert(sizeof(MeshGroupGPU) == 32);
+static_assert(sizeof(MeshGroupGPU) == 16);
 
 // What the shaders know of a group (the group table of a mesh in the buffer of cluster data, indexed by MeshClusterGPU::group). The addresses are bytes from the start of
 // the buffer, so that the data of a group can be anywhere in it.
@@ -136,11 +131,9 @@ struct MeshClusters {
 	static constexpr u32 MAX_CLUSTER_VERTICES = 64;
 	static constexpr u32 MAX_POSITION_BITS = 25;	// per axis of a cluster
 	static constexpr u32 NO_GROUP = 0xffffFFFFu;
-	static constexpr u32 PAGE_BYTES = 64 * 1024;		// payload (vertex stream and indices) of a page, a group larger than that has a page of its own
-	static constexpr u32 RESIDENT_BYTES = 256 * 1024;	// the coarsest groups up to this payload are RESIDENT
 
 	Array<MeshClusterGPU> clusters;
-	Array<MeshGroupGPU> groups;	// by MeshClusterGPU::group, filled by buildMeshClusters, pages by assignClusterPages
+	Array<MeshGroupGPU> groups;	// by MeshClusterGPU::group, filled by buildMeshClusters
 	Array<u32> indices;			// indices of vertices of the mesh, used while the clusters are built. See local_indices
 	Array<Vec3> index_positions;	// if the borders of the clusters are dilated (see buildMeshClusters): the position that the vertex of each entry of `indices` has in its cluster, otherwise empty
 	Array<MeshNodeGPU> nodes;
@@ -171,16 +164,16 @@ inline Vec3 decodeClusterPosition(const MeshClusterVertexGPU& header, const u32*
 struct Renderer;
 
 // The residency of the groups of one mesh with clusters. The tables (clusters, nodes, headers, the table of group addresses) of a mesh are always in the buffer of cluster data, the
-// payload of the groups (vertex stream and indices) is loaded and unloaded in pages (MeshGroupGPU::page) while the game runs. The GPU says which ones it needs (see nanite.hlsl and
+// payload of the groups (vertex stream and indices) is loaded and unloaded in pages (ClusterStream::Page) while the game runs. The GPU says which ones it needs (see nanite.hlsl and
 // Renderer::getClusterFeedbackBuffer), the renderer loads them (RendererImpl::updateClusterStreaming).
 //
 // Invariant: a group is loaded only if every group that has a cluster refined from it (MeshClusterGPU::refined_group == the group) is loaded, the groups of its "parents". Without it
 // both the clusters of the group and the coarser ones would be drawn, see processCluster in nanite.hlsl. So a page is loaded after the pages of its parents, and a page is unloaded only
-// if the groups that it has are not parents of loaded groups of other pages. The groups that are RESIDENT never unload, they have no parents but themselves.
+// if the groups that it has are not parents of loaded groups of other pages. The groups of permanent pages never unload.
 struct ClusterStream {
 	static constexpr u32 NONE = 0xffFFffFFu;
-	// The pages are made when the model is loaded (the pages of the model file, MeshGroupGPU::page, are not used), so these can be changed without importing again
-	static constexpr u32 PAGE_BYTES = 32 * 1024;		// payload of a page, a group that is larger has a page of its own
+	// The pages are made when the model is loaded (the model file has none), so these can be changed without importing again
+	static constexpr u32 PAGE_BYTES = 128 * 1024;		// payload of a page, a group that is larger has a page of its own
 	static constexpr u32 PERMANENT_BYTES = 16 * 1024;	// the coarsest groups up to this payload (at least one group) are never unloaded
 
 	struct Page {
@@ -218,6 +211,7 @@ struct ClusterStream {
 
 	IAllocator& allocator;
 	Array<MeshGroupGPU> groups;
+	Array<u32> group_page;							// of each group, its index in `pages`
 	Array<u32> parent_first, parent_count, parents;	// of each group, the groups that have a cluster refined from it (lists, see buildAdjacency in model.cpp)
 	Array<u32> child_first, child_count, children;	// of each group, the groups that its clusters are refined from
 	Array<Page> pages;

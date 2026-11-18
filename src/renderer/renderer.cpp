@@ -1235,14 +1235,21 @@ struct RendererImpl final : Renderer {
 		if (!allocClusterRange(size, CLUSTER_DATA_ALIGN, offset, true)) return false;
 		const u32 aligned_size = (size + CLUSTER_DATA_ALIGN - 1) & ~(CLUSTER_DATA_ALIGN - 1);
 
-		MemRef staging = allocate(aligned_size);
-		memcpy(staging.data, data, size);
-		memset((u8*)staging.data + size, 0, aligned_size - size);
-		const gpu::BufferHandle tmp = createBuffer(staging, gpu::BufferFlags::IMMUTABLE, "cluster data staging");
-		DrawStream& stream = getDrawStream();
-		stream.copy(m_cluster_data_buffer, tmp, offset, 0, aligned_size);
-		stream.destroy(tmp);
+		uploadClusterData(offset, data, size, aligned_size);
 		return true;
+	}
+
+	// Copies the data to the buffer of cluster data through the transient buffer of the frame, so no GPU resource is created per upload.
+	// `copy_size` (a multiple of 4, at least `size`) bytes are written, the part after `size` is zeroed.
+	// The frame is taken once, so the slice and the stream always belong to the same one.
+	void uploadClusterData(u32 offset, const void* data, u32 size, u32 copy_size) {
+		jobs::wait(&m_cpu_frame->can_setup);
+		FrameData& frame = *m_cpu_frame;
+		const TransientSlice slice = frame.transient_pool.alloc(copy_size);
+		memcpy(slice.ptr, data, size);
+		if (copy_size > size) memset(slice.ptr + size, 0, copy_size - size);
+		frame.draw_stream.barrier(slice.buffer, gpu::BarrierType::READ);
+		frame.draw_stream.copy(m_cluster_data_buffer, slice.buffer, offset, slice.offset, copy_size);
 	}
 
 	void freeClusterData(u32 offset, u32 size, bool immediate) override {
@@ -1257,12 +1264,7 @@ struct RendererImpl final : Renderer {
 
 	void updateClusterData(u32 offset, const void* data, u32 size) override {
 		ASSERT(size % 4 == 0 && m_cluster_data_buffer);
-		MemRef staging = allocate(size);
-		memcpy(staging.data, data, size);
-		const gpu::BufferHandle tmp = createBuffer(staging, gpu::BufferFlags::IMMUTABLE, "cluster data staging");
-		DrawStream& stream = getDrawStream();
-		stream.copy(m_cluster_data_buffer, tmp, offset, 0, size);
-		stream.destroy(tmp);
+		uploadClusterData(offset, data, size, size);
 	}
 
 	// ---- streaming of clusters, see ClusterStream
@@ -1418,7 +1420,7 @@ struct RendererImpl final : Renderer {
 			for (u32 g = 0; g < (u32)s->groups.size(); ++g) {
 				const u32 id = s->global_base + g;
 				if (id >= ids) break;
-				const u32 page_index = s->groups[g].page;
+				const u32 page_index = s->group_page[g];
 				ClusterStream::Page& page = s->pages[page_index];
 				page.last_used = maximum(page.last_used, feedback[id * 2]);
 				const u32 requested = feedback[id * 2 + 1];
@@ -1453,9 +1455,9 @@ struct RendererImpl final : Renderer {
 
 		{
 			MutexGuard guard(m_feedback_mutex);
-			m_feedback_local.resize(m_feedback_incoming.size());
-			if (!m_feedback_incoming.empty()) memcpy(m_feedback_local.begin(), m_feedback_incoming.begin(), m_feedback_incoming.size());
-			m_feedback_incoming.clear();
+			// swapped, not copied (up to 8 MB), both keep their capacity so nothing is allocated; m_feedback_local is empty here
+			m_feedback_local.clear();
+			if (!m_feedback_incoming.empty()) m_feedback_local.swap(m_feedback_incoming);
 		}
 		if (!m_feedback_local.empty()) {
 			PROFILE_BLOCK("cluster feedback");

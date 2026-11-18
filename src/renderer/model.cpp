@@ -641,7 +641,7 @@ bool Model::parseClusters(InputMemoryStream& file, FileVersion version) {
 	u32 mesh_count;
 	file.read(mesh_count);
 	if (mesh_count > (u32)m_meshes.size()) return false;
-	if (mesh_count > 0 && version < FileVersion::CLUSTER_GROUPS) {
+	if (mesh_count > 0 && version < FileVersion::CLUSTER_GROUP_TABLE) {
 		logError(m_path, ": clusters of an old version, the model has to be compiled again");
 		return false;
 	}
@@ -819,6 +819,7 @@ static void buildAdjacency(const Array<u32>& key, const Array<u32>& value, u32 k
 ClusterStream::ClusterStream(IAllocator& allocator)
 	: allocator(allocator)
 	, groups(allocator)
+	, group_page(allocator)
 	, parent_first(allocator), parent_count(allocator), parents(allocator)
 	, child_first(allocator), child_count(allocator), children(allocator)
 	, pages(allocator)
@@ -839,6 +840,7 @@ bool ClusterStream::init(const MeshClusterGPU* cluster_array, u32 clusters, cons
 	global_base = base_id;
 
 	groups.resize(group_count);
+	group_page.resize(group_count);
 	memcpy(groups.begin(), group_array, u64(group_count) * sizeof(MeshGroupGPU));
 	for (const MeshGroupGPU& g : groups) {
 		if (g.cluster_count == 0 || u64(g.first_cluster) + g.cluster_count > cluster_count || u64(g.stream_offset) + g.stream_size > stream_size || (g.stream_offset & 3) != 0) return false;
@@ -897,8 +899,7 @@ bool ClusterStream::init(const MeshClusterGPU* cluster_array, u32 clusters, cons
 			page_bytes = 0;
 		}
 		pages[pages.size() - 1].group_count++;
-		groups[g].page = (u32)pages.size() - 1;
-		groups[g].flags = is_permanent ? (u32)MeshGroupGPU::RESIDENT : 0;
+		group_page[g] = (u32)pages.size() - 1;
 		page_bytes += bytes;
 	}
 
@@ -922,7 +923,7 @@ bool ClusterStream::init(const MeshClusterGPU* cluster_array, u32 clusters, cons
 u32 ClusterStream::addressFlags(u32 g) const {
 	u32 flags = 0;
 	if (loaded[g]) flags |= MeshGroupAddressGPU::LOADED;
-	if (pages[groups[g].page].permanent) flags |= MeshGroupAddressGPU::PERMANENT;
+	if (pages[group_page[g]].permanent) flags |= MeshGroupAddressGPU::PERMANENT;
 	// the id of the group in the feedback buffer, shaders ignore ids that are out of the buffer
 	const u32 id = global_base == NONE ? 0xffFFffu : minimum(global_base + g, 0xffFFffu);
 	return flags | (id << 8);
@@ -943,7 +944,7 @@ u32 ClusterStream::firstMissingParentPage(u32 page_index) const {
 	for (u32 g = page.first_group; g < page.first_group + page.group_count; ++g) {
 		for (u32 i = 0; i < parent_count[g]; ++i) {
 			const u32 parent = parents[parent_first[g] + i];
-			if (!loaded[parent] && groups[parent].page != page_index) return groups[parent].page;
+			if (!loaded[parent] && group_page[parent] != page_index) return group_page[parent];
 		}
 	}
 	return NONE;
@@ -956,7 +957,7 @@ bool ClusterStream::canEvict(u32 page_index) const {
 	for (u32 g = page.first_group; g < page.first_group + page.group_count; ++g) {
 		for (u32 i = 0; i < child_count[g]; ++i) {
 			const u32 child = children[child_first[g] + i];
-			if (loaded[child] && groups[child].page != page_index) return false;
+			if (loaded[child] && group_page[child] != page_index) return false;
 		}
 	}
 	return true;
