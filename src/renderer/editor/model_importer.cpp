@@ -431,8 +431,7 @@ bool ModelImporter::writeSubmodels(const Path& src, const ModelMeta& meta) {
 
 		Path path(m_geometries[i].name, ".fbx:", src);
 
-		AssetCompiler& compiler = m_app.getAssetCompiler();
-		if (!compiler.writeCompiledResource(path, Span(m_out_file.data(), (i32)m_out_file.size()))) {
+		if (!compileModelFile(path, m_out_file.size())) {
 			return false;
 		}
 	}
@@ -1398,10 +1397,26 @@ bool ModelImporter::areClusterAttributesSupported(const ImportGeometry& geom) {
 	return has_position && has_normal;
 }
 
+namespace {
+
+// The payloads of the pages of a mesh (see MeshPageFile), the importer writes them after the tables of all meshes
+struct PagePayloads {
+	explicit PagePayloads(IAllocator& allocator) : data(allocator), at(allocator), size(allocator), field(allocator) {}
+
+	Array<u8> data;		// the payloads of all pages of the mesh, one after another
+	Array<u32> at;		// of each page, where its payload is in `data`
+	Array<u32> size;
+	Array<u64> field;	// of each page, where MeshPageFile::file_offset is in the output file
+};
+
+}
+
 bool ModelImporter::writeClusters(const ModelMeta& meta) {
 	PROFILE_FUNCTION();
+	m_resident_end = m_out_file.size();
 	if (!m_bake_clusters) {
 		write((u32)0);
+		m_resident_end = m_out_file.size();
 		return true;
 	}
 
@@ -1472,6 +1487,7 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 	// build before writing anything, so that a failure leaves no half written data
 	Array<MeshClusters*> results(m_allocator);
 	Array<MeshPages*> page_results(m_allocator);	// the pages of each mesh, see buildMeshPages
+	Array<PagePayloads*> payloads(m_allocator);	// the payloads of the pages of each mesh, they are written after the tables
 	bool failed = false;
 	for (u32 i = 0; i < (u32)meshes.size(); ++i) {
 		const ImportGeometry& geom = m_geometries[meshes[i]->geometry_idx];
@@ -1610,17 +1626,15 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 			write(index_stride);
 			write(clusters->leaf_vertex_count);
 			write(clusters->leaf_index_count);
-			write(vertex_data_size);
+			write((u32)clusters->vertex_words.byte_size());	// the size of the stream of vertices, it is in the payloads of pages
 			write(clusters->attribute_stride);
 			write(decl);
 			write(semantics, sizeof(semantics));
 			write(clusters->clusters.begin(), clusters->clusters.byte_size());
 			write(clusters->nodes.begin(), clusters->nodes.byte_size());
 			write(clusters->roots.begin(), clusters->roots.byte_size());
-			write(padded_indices.begin(), padded_indices.byte_size());
-			// the buffer of vertices: headers followed by the interleaved positions and attributes
+			// the headers of the vertices are in the tables, the interleaved positions and attributes and the indices are in the payloads of pages
 			write(clusters->vertex_headers.begin(), clusters->vertex_headers.byte_size());
-			write(clusters->vertex_words.begin(), clusters->vertex_words.byte_size());
 			write(cpu_vertices.begin(), cpu_vertices.byte_size());
 			write(cpu_indices.begin(), cpu_indices.byte_size());
 			// the groups of clusters (streaming units), see MeshGroupGPU
@@ -1631,12 +1645,51 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 			write((u32)page_data.pages.size());
 			write(page_data.root_bytes);
 			write((u32)page_data.parents.size());
+			const u64 pages_at = m_out_file.size();
 			write(page_data.pages.begin(), page_data.pages.byte_size());
 			write(page_data.parents.begin(), page_data.parents.byte_size());
 			write(page_data.children.begin(), page_data.children.byte_size());
+
+			// The payload of a page: the vertex streams of its groups, then the indices of their clusters, padded to 16 bytes. The same as ClusterStream::pageBytes and
+			// ClusterStream::loadPage expect, it is copied to the buffer of cluster data as it is.
+			PagePayloads* page_payloads = LUMIX_NEW(m_allocator, PagePayloads)(m_allocator);
+			payloads.push(page_payloads);
+			for (u32 p = 0; p < (u32)page_data.pages.size(); ++p) {
+				const MeshPageFile& page = page_data.pages[p];
+				const MeshGroupGPU& first = clusters->groups[page.first_group];
+				const MeshGroupGPU& last = clusters->groups[page.first_group + page.group_count - 1];
+				const u32 stream_bytes = last.stream_offset + last.stream_size - first.stream_offset;
+				const u32 index_bytes = (last.first_cluster + last.cluster_count - first.first_cluster) * index_stride;
+				const u32 size = (stream_bytes + index_bytes + 15) & ~15u;
+				ASSERT(u64(first.stream_offset) + stream_bytes <= clusters->vertex_words.byte_size());
+				ASSERT(u64(last.first_cluster + last.cluster_count) * index_stride <= padded_indices.byte_size());
+				const u32 at = (u32)page_payloads->data.size();
+				page_payloads->data.resize(at + size);
+				u8* payload = page_payloads->data.begin() + at;
+				memset(payload, 0, size);
+				memcpy(payload, (const u8*)clusters->vertex_words.begin() + first.stream_offset, stream_bytes);
+				memcpy(payload + stream_bytes, padded_indices.begin() + u64(first.first_cluster) * index_stride, index_bytes);
+				page_payloads->at.push(at);
+				page_payloads->size.push(size);
+				page_payloads->field.push(pages_at + u64(p) * sizeof(MeshPageFile) + offsetof(MeshPageFile, file_offset));
+			}
 			total_clusters += cluster_count;
 			packed_bytes += padded_indices.byte_size() + vertex_data_size;
 			unpacked_bytes += u64(m_geometries[meshes[i]->geometry_idx].vertex_buffer.size()) + clusters->indices.byte_size();
+		}
+		// The payloads of the pages follow the tables: first the permanent ones, they are read with the model, then the others, which are read when they are needed.
+		for (u32 pass = 0; pass < 2; ++pass) {
+			if (pass == 1) m_resident_end = m_out_file.size();
+			for (u32 i = 0; i < (u32)payloads.size(); ++i) {
+				const PagePayloads& page_payloads = *payloads[i];
+				const MeshPages& page_data = *page_results[i];
+				for (u32 p = 0; p < (u32)page_data.pages.size(); ++p) {
+					if ((page_data.pages[p].permanent != 0) != (pass == 0)) continue;
+					const u64 offset = m_out_file.size();
+					write(page_payloads.data.begin() + page_payloads.at[p], page_payloads.size[p]);
+					memcpy(m_out_file.getMutableData() + page_payloads.field[p], &offset, sizeof(offset));
+				}
+			}
 		}
 		logInfo("Baked ", total_clusters, " clusters, vertices and indices of the first LOD: ", packed_bytes, " bytes (", unpacked_bytes, " before)");
 	}
@@ -1645,6 +1698,7 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 	}
 	for (MeshClusters* clusters : results) LUMIX_DELETE(m_allocator, clusters);
 	for (MeshPages* page_data : page_results) LUMIX_DELETE(m_allocator, page_data);
+	for (PagePayloads* page_payloads : payloads) LUMIX_DELETE(m_allocator, page_payloads);
 	return !failed;
 }
 
@@ -1851,8 +1905,7 @@ bool ModelImporter::writeDummyModel(const Path& src) {
 	write((u32)0);
 	write((u32)0); // clusters
 
-	AssetCompiler& compiler = m_app.getAssetCompiler();
-	return compiler.writeCompiledResource(Path(src), Span(m_out_file.data(), m_out_file.size()));
+	return compileModelFile(Path(src), m_out_file.size());
 }
 
 bool ModelImporter::writeModel(const Path& src, const ModelMeta& meta) {
@@ -1870,8 +1923,17 @@ bool ModelImporter::writeModel(const Path& src, const ModelMeta& meta) {
 	writeLODs(meta);
 	if (!writeClusters(meta)) return false;
 
-	AssetCompiler& compiler = m_app.getAssetCompiler();
-	return compiler.writeCompiledResource(Path(src), Span(m_out_file.data(), m_out_file.size()));
+	return compileModelFile(Path(src), m_resident_end);
+}
+
+bool ModelImporter::compileModelFile(const Path& path, u64 resident_end) {
+	ASSERT(resident_end >= sizeof(Model::FileHeader) && resident_end <= m_out_file.size());
+	Model::FileHeader header;
+	memcpy(&header, m_out_file.data(), sizeof(header));
+	header.resident_size = resident_end - sizeof(header);
+	header.payload_size = m_out_file.size() - resident_end;
+	memcpy(m_out_file.getMutableData(), &header, sizeof(header));
+	return m_app.getAssetCompiler().writeCompiledResource(path, Span(m_out_file.data(), m_out_file.size()), false);
 }
 
 bool ModelImporter::writeAnimations(const Path& src, const ModelMeta& meta) {

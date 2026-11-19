@@ -162,9 +162,13 @@ inline Vec3 decodeClusterPosition(const MeshClusterVertexGPU& header, const u32*
 }
 
 struct Renderer;
+struct Model;
 
 // The pages of a mesh as they are in the model file, made by the importer (buildMeshPages). A page is the unit of loading and unloading, it has consecutive groups. The groups
 // are in the order of the levels (the finest first), so a group that a group is refined to (its "parent", coarser) has a higher number, and so has its page.
+// The payload of a page (the vertex streams of its groups, then the indices of their clusters, padded to 16 bytes, see ClusterStream::pageBytes) is in the model file at
+// `file_offset` (from the start of the file, after the compiled resource header), the permanent ones are in the part of the file that is read with the model,
+// the others are read when the renderer needs them (Model::requestClusterPage). The payload is exactly what is copied to the buffer of cluster data.
 struct MeshPageFile {
 	u32 first_group;
 	u32 group_count;
@@ -173,8 +177,10 @@ struct MeshPageFile {
 	u32 parent_count;
 	u32 child_first;	// the pages that need the page are MeshPages::children[child_first .. child_first + child_count)
 	u32 child_count;
+	u32 priority;		// static, the bits of a float (they compare as integers): the largest error that the page removes (the parent error of its clusters), so a page that makes a bigger visible change is streamed first. 0 in old files, 0xffFFffFF for permanent pages
+	u64 file_offset;	// of the payload in the model file, set when the importer writes the payloads (they follow the tables)
 };
-static_assert(sizeof(MeshPageFile) == 28);
+static_assert(sizeof(MeshPageFile) == 40);
 
 // The importer makes valid pages, the loader does not check them.
 struct MeshPages {
@@ -198,7 +204,8 @@ struct MeshPagesView {
 
 // The residency of the groups of one mesh with clusters. The tables (clusters, nodes, headers, the table of group addresses) of a mesh are always in the buffer of cluster data, the
 // payload of the groups (vertex stream and indices) is loaded and unloaded in pages (ClusterStream::Page) while the game runs. The GPU says which ones it needs (see nanite.hlsl and
-// Renderer::getClusterFeedbackBuffer), the renderer loads them (RendererImpl::updateClusterStreaming).
+// Renderer::getClusterFeedbackBuffer), the renderer reads them from the model file (Model::requestClusterPage, the payload is not kept in memory) and uploads them when they
+// arrive (RendererImpl::updateClusterStreaming).
 //
 // Invariant: a group is loaded only if every group that has a cluster refined from it (MeshClusterGPU::refined_group == the group) is loaded, the groups of its "parents". Without it
 // both the clusters of the group and the coarser ones would be drawn, see processCluster in nanite.hlsl. So a page is loaded after the pages of its parents, and a page is unloaded only
@@ -225,14 +232,19 @@ struct ClusterStream {
 		u32 parent_count = 0;
 		u32 child_first = 0;	// the pages that need this page, in page_children
 		u32 child_count = 0;
+		u64 file_offset = 0;	// of the payload in the model file, see MeshPageFile
+		bool reading = false;	// a read of the payload from the file is in flight (Model::requestClusterPage)
+		u8* read_data = nullptr;	// the payload that was read, waits for the parents of the page and for room in the buffer, owned by the stream (allocator)
+		u32 read_failed = 0;	// the frame stamp of the last failed read (zero: never), the page is not requested again for a while
+		u32 priority = 0;		// see MeshPageFile::priority, the higher it is the earlier the page is read and the later it is unloaded
 	};
 
 	explicit ClusterStream(IAllocator& allocator);
 
 	// Copies everything that is needed to load pages, nothing is loaded. Allocates the ids of the pages in the feedback buffer (`global_base` is the first, or NONE).
-	// The pages are not checked, the importer made them.
+	// The pages are not checked, the importer made them. `stream_size` is the size of the vertex streams of all groups (in the pages), `stride` is the index stride.
 	bool init(const MeshClusterGPU* cluster_array, u32 clusters, const MeshNodeGPU* node_array, u32 nodes_count, const MeshGroupGPU* group_array, u32 group_count
-		, const MeshPagesView& page_data, const u8* stream_bytes, u32 stream_size, const u8* index_bytes, u32 stride, Renderer& renderer);
+		, const MeshPagesView& page_data, u32 stream_size, u32 stride, Renderer& renderer);
 	// bytes of the range of a page in the buffer of cluster data
 	u32 pageBytes(u32 page) const;
 	// the first parent page (see page_parents) that is not loaded, or NONE
@@ -241,11 +253,14 @@ struct ClusterStream {
 	void markParentPagesWanted(u32 page, u32 stamp);
 	bool canEvict(u32 page) const;
 	// the pages of the parents must be loaded, false if there is no room in the buffer
+	// `data` is the payload of the page, pageBytes(page) bytes (the same as in the model file), it is copied to the buffer
 	// `can_reclaim`: if there is no room in the buffer the renderer may unload other pages (not when the streamer loads, it does it itself and holds its lock)
-	bool loadPage(Renderer& renderer, u32 page, u32 stamp, bool can_reclaim);
+	bool loadPage(Renderer& renderer, u32 page, u32 stamp, bool can_reclaim, const u8* data);
+	// frees the payload that was read for the page, if there is one
+	void dropReadData(u32 page);
 	// `immediate`: the range of the page is reusable at once, see Renderer::freeClusterData
 	void evictPage(Renderer& renderer, u32 page, bool immediate = false);
-	// frees everything that is loaded
+	// frees everything that is loaded and the payloads that were read
 	void release(Renderer& renderer);
 	// recomputes MeshNodeGPU::unrefined and uploads the nodes that changed (if the nodes are uploaded: node_table_offset)
 	void refreshNodes(Renderer& renderer);
@@ -260,18 +275,20 @@ struct ClusterStream {
 	Array<Page> pages;
 	Array<u8> loaded;								// of each group
 	Array<MeshGroupAddressGPU> addresses;			// the table of the GPU, uploaded to group_table_offset
-	Array<u8> stream_data;							// all the vertex streams of the groups
-	Array<u8> index_data;							// the indices of all the clusters, index_stride each
 	Array<MeshNodeGPU> nodes;
 	Array<u32> cluster_refined;						// MeshClusterGPU::refined_group of each cluster
 	u32 cluster_count = 0;
 	u32 node_count = 0;
 	u32 index_stride = 0;
 	u32 global_base = NONE;
-	u32 feedback_from = 0;							// the feedback is ignored before this frame stamp: ids are reused, the bits of the stream that had them before can still be in the buffer or in a readback that is on its way
+	u64 generation = 0;								// unique among all registered streams (set by Renderer::registerClusterStream), tells a stream from another one that has the same address
+	u32 feedback_from = 0;						// the feedback is ignored before this frame stamp: ids are reused, the bits of the stream that had them before can still be in the buffer or in a readback that is on its way
 	u32 group_table_offset = NONE;					// in the buffer of cluster data, NONE until the table is uploaded (0 is a valid offset)
 	u32 node_table_offset = NONE;					// the same for the nodes
 	u32 streamed_bytes = 0;							// of the loaded pages that are not permanent
+	u32 staged_bytes = 0;							// of the payloads that were read and are not uploaded yet (Page::read_data)
+	Model* owner = nullptr;							// reads the pages from its file, set when the stream is complete
+	u32 mesh_index = 0;								// of the mesh in `owner`
 	u32 root_bytes = 0;								// payload of the groups that have no parent, they are always loaded: the least that a mesh needs
 };
 

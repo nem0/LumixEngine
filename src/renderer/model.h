@@ -172,13 +172,17 @@ struct LODMeshIndices
 struct LUMIX_RENDERER_API Model final : Resource {
 	using BoneMap = HashMap<BoneNameHash, int>;
 
-	// The version of the file format. Increase it whenever the format changes, models of other versions are rejected (see load).
-	// The numbers up to 14 were used by older formats, they must not be used again.
+	// The version of the file format. Increase it whenever the format changes, models of other versions are rejected (see doLoad).
+	// The numbers up to 15 were used by older formats, they must not be used again.
 	enum class FileVersion : u32 {
-		FIRST_SUPPORTED = 14,
+		FIRST_SUPPORTED = 15, // the payload of pages of clusters was in the part of the file that is read at once
 
 		LATEST
 	};
+
+	// The file is read in parts (see doLoad): the header, then `resident_size` bytes that are read with the model (meshes, skeleton, LODs, the tables of clusters and the payloads
+	// of the pages that are never unloaded), the rest is the payload of the other pages of clusters, it is read when the renderer needs it (requestClusterPage).
+	// Offsets in the file (ClusterStream::Page::file_offset) are from the start of the header, after the compiled resource header. The file is not compressed.
 	
 #pragma pack(1)
 	struct FileHeader {
@@ -186,6 +190,8 @@ struct LUMIX_RENDERER_API Model final : Resource {
 
 		u32 magic = FileHeader::MAGIC;
 		FileVersion version = FileVersion::LATEST;
+		u64 resident_size = 0;	// bytes that follow the header and are read with the model
+		u64 payload_size = 0;	// bytes after them, the payloads of the pages of clusters that can be unloaded
 	};
 #pragma pack()
 
@@ -255,6 +261,9 @@ struct LUMIX_RENDERER_API Model final : Resource {
 	}
 	// index of the last mesh that is rendered when using clusters, further meshes are lower LODs which clusters replace
 	i32 getClusterMeshesEnd() const { return m_lod_indices[0].to >= 0 ? m_lod_indices[0].to : (i32)m_meshes.size() - 1; }
+	// Reads the payload of a page of clusters of the mesh from the file, the result goes to Renderer::onClusterPageRead (in a later frame, from the main thread).
+	// The model is not unloaded before it arrives.
+	void requestClusterPage(u32 mesh_index, u32 page_index);
 
 	static constexpr u32 MAX_LOD_COUNT = 4;
 
@@ -262,15 +271,22 @@ private:
 	Model(const Model&);
 	void operator=(const Model&);
 
+	// `data` is the part of the file after the header that is read with the model (FileHeader::resident_size)
+	bool parseResident(Span<const u8> data);
 	bool parseBones(InputMemoryStream& file);
 	bool parseMeshes(InputMemoryStream& file);
 	bool parseLODs(InputMemoryStream& file);
-	bool parseClusters(InputMemoryStream& file);
+	// `resident` is all the data that is read with the model, the payloads of the permanent pages are in it
+	bool parseClusters(InputMemoryStream& file, Span<const u8> resident);
+	// loads the pages that are not permanent from `payload`, the data of the file after the resident part, which is at `payload_at` in the file (streaming is off, all is loaded with the model)
+	bool loadStreamedPages(Span<const u8> payload, u64 payload_at);
+	template <typename T> void stream(u64 offset, u64 size, T&& callback);
 	void destroyClusters();
 	int getBoneIdx(const char* name);
 
 	void unload() override;
 	bool load(Span<const u8> mem) override;
+	void doLoad() override;
 
 	TagAllocator m_allocator;
 	Renderer& m_renderer;
@@ -289,6 +305,7 @@ private:
 	BoneNameHash m_root_motion_bone;
 	int m_first_nonroot_bone_index;
 	bool m_has_clusters = false;
+	FileSystem::StreamHandle m_stream_handle = {};	// the file is open while the model has clusters that stream pages
 };
 
 

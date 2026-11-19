@@ -9,7 +9,9 @@
 #include "core/path.h"
 #include "core/profiler.h"
 #include "core/stream.h"
+#include "core/string.h"
 #include "engine/component_types.h"
+#include "engine/file_system.h"
 #include "engine/file_system.h"
 #include "engine/resource_manager.h"
 #include "renderer/draw_stream.h"
@@ -593,55 +595,46 @@ bool Model::parseLODs(InputMemoryStream& file)
 }
 
 
-bool Model::load(Span<const u8> mem)
-{
-	PROFILE_FUNCTION();
-	FileHeader header;
-	InputMemoryStream file(mem);
-	file.read(header);
-
-	if (header.magic != FileHeader::MAGIC)
-	{
-		logWarning("Corrupted model ", getPath());
-		return false;
-	}
-
-	if (header.version != FileVersion::LATEST)
-	{
-		logWarning("Unsupported version of model ", getPath(), ", the model has to be compiled again");
-		return false;
-	}
-
-	file.read(m_root_motion_bone);
-
-	if (parseMeshes(file)
-		&& parseBones(file)
-		&& parseLODs(file)
-		&& parseClusters(file))
-	{
-		return true;
-	}
-
+bool Model::load(Span<const u8>) {
+	logError("Models must be loaded through the streaming path: ", getPath());
 	return false;
+}
+
+bool Model::parseResident(Span<const u8> data) {
+	PROFILE_FUNCTION();
+	InputMemoryStream file(data);
+	file.read(m_root_motion_bone);
+	return parseMeshes(file) && parseBones(file) && parseLODs(file) && parseClusters(file, data) && !file.hasOverflow();
+}
+
+// loads the page from `data`, the part of the file that starts at `data_at`, false if the whole payload of the page is not in it
+static bool loadPageFrom(Renderer& renderer, ClusterStream& stream, u32 page_index, u32 stamp, Span<const u8> data, u64 data_at) {
+	const ClusterStream::Page& page = stream.pages[page_index];
+	const u64 bytes = stream.pageBytes(page_index);
+	const u64 size = data.length();
+	if (page.file_offset < data_at || page.file_offset - data_at > size || bytes > size - (page.file_offset - data_at)) return false;
+	return stream.loadPage(renderer, page_index, stamp, true, data.begin() + (page.file_offset - data_at));
 }
 
 // Cluster DAGs of the meshes of the first LOD, baked by the model importer (see ModelImporter::writeClusters):
 //   u32 mesh_count - meshes [0, mesh_count) have clusters, 0 if the model has none
 //   for each mesh: u32 cluster_count, leaf_cluster_count, node_count, root_count, tree_depth, index_stride, leaf_vertex_count, leaf_index_count,
-//                  vertex_data_size, vertex_stride, VertexDecl, AttributeSemantic[VertexDecl::MAX_ATTRIBUTES],
-//                  MeshClusterGPU[cluster_count], MeshNodeGPU[node_count], u32 roots[root_count], u8 indices[cluster_count * index_stride],
-//                  u8 vertex_data[vertex_data_size], Vec3 vertices[leaf_vertex_count], u32 indices[leaf_index_count],
+//                  stream_size, vertex_stride, VertexDecl, AttributeSemantic[VertexDecl::MAX_ATTRIBUTES],
+//                  MeshClusterGPU[cluster_count], MeshNodeGPU[node_count], u32 roots[root_count], MeshClusterVertexGPU headers[cluster_count],
+//                  Vec3 vertices[leaf_vertex_count], u32 indices[leaf_index_count],
 //                  u32 group_count, MeshGroupGPU[group_count], u32 page_count, root_bytes, edge_count, MeshPageFile[page_count], u32 parents[edge_count], u32 children[edge_count]
-// Everything is ready to be uploaded. The vertex data are the headers of clusters followed by their interleaved, bit packed vertices (see mesh_clusters.h).
+//   then the payloads of the permanent pages of all meshes (see MeshPageFile).
+// That is all that is read with the model (FileHeader::resident_size). The payloads of the other pages follow it in the file, they are read when they are needed. The payload of
+// a page is the vertex streams of its groups (bit packed vertices, see mesh_clusters.h) and then the indices of their clusters (bytes), the same as in the buffer of cluster data.
 // Meshes with clusters have no vertices and indices of their own (see parseMeshes), the CPU ones (`vertices` and `indices`) are the finest clusters.
-bool Model::parseClusters(InputMemoryStream& file) {
+bool Model::parseClusters(InputMemoryStream& file, Span<const u8> resident) {
 	u32 mesh_count;
 	file.read(mesh_count);
 	if (mesh_count > (u32)m_meshes.size()) return false;
 
 	for (u32 i = 0; i < mesh_count; ++i) {
 		Mesh& mesh = m_meshes[i];
-		u32 leaf_vertex_count, vertex_data_size;
+		u32 leaf_vertex_count, stream_size;
 		file.read(mesh.cluster_count);
 		file.read(mesh.leaf_cluster_count);
 		file.read(mesh.node_count);
@@ -650,7 +643,7 @@ bool Model::parseClusters(InputMemoryStream& file) {
 		file.read(mesh.cluster_index_stride);
 		file.read(leaf_vertex_count);
 		file.read(mesh.indices_count);
-		file.read(vertex_data_size);
+		file.read(stream_size);
 		file.read(mesh.vb_stride);
 		file.read(mesh.vertex_decl);
 		file.read(mesh.attributes_semantic);
@@ -666,15 +659,14 @@ bool Model::parseClusters(InputMemoryStream& file) {
 
 		const u64 clusters_size = u64(mesh.cluster_count) * sizeof(MeshClusterGPU);
 		const u64 nodes_size = u64(mesh.node_count) * sizeof(MeshNodeGPU) + u64(mesh.root_count) * sizeof(u32);
-		const u64 indices_size = u64(mesh.cluster_count) * mesh.cluster_index_stride * sizeof(u8);
+		const u64 header_bytes = u64(mesh.cluster_count) * sizeof(MeshClusterVertexGPU);
 		const u64 vertices_size = u64(leaf_vertex_count) * sizeof(Vec3);
 		const u64 cpu_indices_size = u64(mesh.indices_count) * sizeof(u32);
-		if (file.hasOverflow() || mesh.cluster_count == 0 || mesh.node_count == 0 || mesh.root_count == 0 || vertex_data_size > 0x7fffFFFF
-			|| clusters_size + nodes_size + indices_size + vertex_data_size + vertices_size + cpu_indices_size > file.remaining()) return false;
+		if (file.hasOverflow() || mesh.cluster_count == 0 || mesh.node_count == 0 || mesh.root_count == 0 || stream_size > 0x7fffFFFF || u64(mesh.cluster_count) * mesh.cluster_index_stride > 0x7fffFFFF
+			|| clusters_size + nodes_size + header_bytes + vertices_size + cpu_indices_size > file.remaining()) return false;
 		const void* clusters = file.skip(clusters_size);
 		const void* nodes = file.skip(nodes_size);
-		const void* indices = file.skip(indices_size);
-		const void* vertex_data = file.skip(vertex_data_size);
+		const void* headers = file.skip(header_bytes);
 
 		mesh.vertices.resize(leaf_vertex_count);
 		memcpy(mesh.vertices.begin(), file.skip(vertices_size), vertices_size);
@@ -682,18 +674,16 @@ bool Model::parseClusters(InputMemoryStream& file) {
 		memcpy(mesh.indices.getMutableData(), file.skip(cpu_indices_size), cpu_indices_size);
 		mesh.index_type = gpu::DataType::U32;
 
-		// the table of groups (streaming units, see MeshGroupGPU), the vertex data are the headers of all clusters and then the stream
+		// the table of groups (streaming units, see MeshGroupGPU)
 		u32 group_count = 0;
 		file.read(group_count);
-		const u64 header_bytes = u64(mesh.cluster_count) * sizeof(MeshClusterVertexGPU);
-		if (file.hasOverflow() || group_count == 0 || group_count > mesh.cluster_count || u64(group_count) * sizeof(MeshGroupGPU) > file.remaining() || vertex_data_size < header_bytes || indices_size > 0x7fffFFFF) {
+		if (file.hasOverflow() || group_count == 0 || group_count > mesh.cluster_count || u64(group_count) * sizeof(MeshGroupGPU) > file.remaining()) {
 			logError(m_path, ": invalid groups of clusters");
 			return false;
 		}
 		Array<MeshGroupGPU> groups(m_allocator);
 		groups.resize(group_count);
 		memcpy(groups.begin(), file.skip(u64(group_count) * sizeof(MeshGroupGPU)), groups.byte_size());
-		const u64 stream_size = vertex_data_size - header_bytes;
 
 		// the pages, see MeshPages (the importer made them, only the sizes are checked)
 		MeshPagesView page_data;
@@ -711,21 +701,24 @@ bool Model::parseClusters(InputMemoryStream& file) {
 
 		mesh.semantics_defines = m_renderer.getSemanticDefines(Span(mesh.attributes_semantic), mesh.vertex_decl, mesh.vb_stride);
 
-		// The payload of the groups is streamed, see ClusterStream: the stream keeps a copy of it and loads pages into the buffer of cluster data. Only the permanent pages are
-		// loaded now (all of them if streaming is off, -cluster_stream_off). The stream is registered when it is complete, the renderer streams the registered ones.
+		// The payload of the groups is streamed, see ClusterStream: pages are loaded into the buffer of cluster data. Only the permanent pages are loaded now (their payload is
+		// in the data that was read with the model), the others are read from the file when the GPU needs them (or when the model is loaded if streaming is off, see doLoad).
+		// The stream is registered when it is complete, the renderer streams the registered ones.
 		ClusterStream* stream = LUMIX_NEW(m_allocator, ClusterStream)(m_allocator);
 		mesh.cluster_stream = stream;
 		if (!stream->init((const MeshClusterGPU*)clusters, mesh.cluster_count, (const MeshNodeGPU*)nodes, mesh.node_count, groups.begin(), group_count
-			, page_data, (const u8*)vertex_data + header_bytes, (u32)stream_size, (const u8*)indices, mesh.cluster_index_stride, m_renderer))
+			, page_data, stream_size, mesh.cluster_index_stride, m_renderer))
 		{
 			logError(m_path, ": invalid groups of clusters");
 			return false;
 		}
+		stream->owner = this;
+		stream->mesh_index = i;
 		const u32 stamp = m_renderer.frameNumber() + 1;
-		const bool load_all = !m_renderer.isClusterStreamingEnabled();
 		// the parents of a group are coarser, so they have higher numbers: the pages are loaded from the last one
 		for (u32 p = (u32)stream->pages.size(); p-- > 0;) {
-			if ((load_all || stream->pages[p].permanent) && !stream->loadPage(m_renderer, p, stamp, true)) {
+			if (!stream->pages[p].permanent) continue;
+			if (!loadPageFrom(m_renderer, *stream, p, stamp, resident, sizeof(FileHeader))) {
 				logError(m_path, ": failed to create cluster buffers");
 				return false;
 			}
@@ -744,7 +737,7 @@ bool Model::parseClusters(InputMemoryStream& file) {
 			memcpy(table.begin(), clusters, clusters_size);
 			memcpy(table.begin() + clusters_size, stream->nodes.begin(), u64(mesh.node_count) * sizeof(MeshNodeGPU));
 			memcpy(table.begin() + clusters_size + u64(mesh.node_count) * sizeof(MeshNodeGPU), (const u8*)nodes + u64(mesh.node_count) * sizeof(MeshNodeGPU), u64(mesh.root_count) * sizeof(u32));
-			memcpy(table.begin() + headers_at, vertex_data, header_bytes);
+			memcpy(table.begin() + headers_at, headers, header_bytes);
 			tables_uploaded = m_renderer.allocClusterData(table.begin(), (u32)table_size, mesh.cluster_table_offset);
 			if (tables_uploaded) {
 				mesh.cluster_table_size = (u32)table_size;
@@ -782,6 +775,9 @@ bool Model::parseClusters(InputMemoryStream& file) {
 		}
 	}
 
+	// the rest of the data that was read with the model is the payloads of the permanent pages, they are loaded
+	file.skip(file.remaining());
+
 	// Meshes of the first LOD have vertices only in clusters, so all of them must have clusters
 	if (mesh_count > 0 && mesh_count != (u32)(getClusterMeshesEnd() + 1)) {
 		logError(m_path, ": not all meshes of the first LOD have clusters");
@@ -800,6 +796,23 @@ bool Model::parseClusters(InputMemoryStream& file) {
 	return true;
 }
 
+bool Model::loadStreamedPages(Span<const u8> payload, u64 payload_at) {
+	const u32 stamp = m_renderer.frameNumber() + 1;
+	for (Mesh& mesh : m_meshes) {
+		ClusterStream* stream = mesh.cluster_stream;
+		if (!stream) continue;
+		// the parents of a group are coarser, so they have higher numbers: the pages are loaded from the last one
+		for (u32 p = (u32)stream->pages.size(); p-- > 0;) {
+			if (stream->pages[p].loaded) continue;
+			if (!loadPageFrom(m_renderer, *stream, p, stamp, payload, payload_at)) {
+				logError(m_path, ": failed to create cluster buffers");
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
 ClusterStream::ClusterStream(IAllocator& allocator)
 	: allocator(allocator)
 	, groups(allocator)
@@ -809,14 +822,12 @@ ClusterStream::ClusterStream(IAllocator& allocator)
 	, pages(allocator)
 	, loaded(allocator)
 	, addresses(allocator)
-	, stream_data(allocator)
-	, index_data(allocator)
 	, nodes(allocator)
 	, cluster_refined(allocator)
 {}
 
 bool ClusterStream::init(const MeshClusterGPU* cluster_array, u32 clusters, const MeshNodeGPU* node_array, u32 nodes_count, const MeshGroupGPU* group_array, u32 group_count
-	, const MeshPagesView& page_data, const u8* stream_bytes, u32 stream_size, const u8* index_bytes, u32 stride, Renderer& renderer)
+	, const MeshPagesView& page_data, u32 stream_size, u32 stride, Renderer& renderer)
 {
 	cluster_count = clusters;
 	node_count = nodes_count;
@@ -842,7 +853,8 @@ bool ClusterStream::init(const MeshClusterGPU* cluster_array, u32 clusters, cons
 	const u32 page_count = page_data.page_count;
 	pages.resize(page_count);
 	for (u32 p = 0; p < page_count; ++p) {
-		const MeshPageFile& file_page = page_data.pages[p];
+		MeshPageFile file_page;
+		memcpy(&file_page, page_data.pages + p, sizeof(file_page));	// the file does not align it
 		Page& page = pages[p];
 		page.first_group = file_page.first_group;
 		page.group_count = file_page.group_count;
@@ -851,6 +863,8 @@ bool ClusterStream::init(const MeshClusterGPU* cluster_array, u32 clusters, cons
 		page.parent_count = file_page.parent_count;
 		page.child_first = file_page.child_first;
 		page.child_count = file_page.child_count;
+		page.file_offset = file_page.file_offset;
+		page.priority = file_page.priority;
 		for (u32 g = page.first_group; g < page.first_group + page.group_count; ++g) group_page[g] = p;
 	}
 
@@ -861,11 +875,6 @@ bool ClusterStream::init(const MeshClusterGPU* cluster_array, u32 clusters, cons
 	memcpy(page_children.begin(), page_data.children, u64(page_data.edge_count) * sizeof(u32));
 
 	root_bytes = page_data.root_bytes;
-
-	stream_data.resize(stream_size);
-	memcpy(stream_data.begin(), stream_bytes, stream_size);
-	index_data.resize(u64(cluster_count) * index_stride);
-	memcpy(index_data.begin(), index_bytes, u64(cluster_count) * index_stride);
 
 	// the feedback has an id for each page (a bit), the shaders get it from the address of every group of the page, see addressFlags
 	global_base = renderer.allocClusterStreamIds((u32)pages.size());
@@ -919,30 +928,27 @@ bool ClusterStream::canEvict(u32 page_index) const {
 	const Page& page = pages[page_index];
 	if (!page.loaded || page.permanent) return false;
 	// the groups of the page must not be parents of loaded groups of other pages
+	// (a page that is being read or waits for its upload needs the page as well, it is not loaded without it)
 	for (u32 i = 0; i < pages[page_index].child_count; ++i) {
-		if (pages[page_children[pages[page_index].child_first + i]].loaded) return false;
+		const Page& child = pages[page_children[pages[page_index].child_first + i]];
+		if (child.loaded || child.reading || child.read_data) return false;
 	}
 	return true;
 }
 
-bool ClusterStream::loadPage(Renderer& renderer, u32 page_index, u32 stamp, bool can_reclaim) {
+bool ClusterStream::loadPage(Renderer& renderer, u32 page_index, u32 stamp, bool can_reclaim, const u8* data) {
 	Page& page = pages[page_index];
+	ASSERT(data);
 	ASSERT(!page.loaded);
 	ASSERT(firstMissingParentPage(page_index) == NONE);
 	const MeshGroupGPU& first = groups[page.first_group];
 	const MeshGroupGPU& last = groups[page.first_group + page.group_count - 1];
 	const u32 stream_bytes = last.stream_offset + last.stream_size - first.stream_offset;
-	const u32 index_bytes = (last.first_cluster + last.cluster_count - first.first_cluster) * index_stride;
 	const u32 size = pageBytes(page_index);
 	u32 offset;
 	if (!renderer.allocClusterRange(size, 16, offset, can_reclaim)) return false;
-
-	Array<u8> payload(allocator);
-	payload.resize(size);
-	memset(payload.begin(), 0, size);
-	memcpy(payload.begin(), stream_data.begin() + first.stream_offset, stream_bytes);
-	memcpy(payload.begin() + stream_bytes, index_data.begin() + u64(first.first_cluster) * index_stride, index_bytes);
-	renderer.updateClusterData(offset, payload.begin(), size);
+	// `data` is the page as it is in the file: the vertex streams of the groups and then their indices, see pageBytes
+	renderer.updateClusterData(offset, data, size);
 
 	for (u32 g = page.first_group; g < page.first_group + page.group_count; ++g) {
 		loaded[g] = 1;
@@ -955,14 +961,18 @@ bool ClusterStream::loadPage(Renderer& renderer, u32 page_index, u32 stamp, bool
 	page.pool_size = size;
 	page.loaded_frame = stamp;
 	if (!page.permanent) streamed_bytes += size;
-	if (group_table_offset != NONE) {
-		static u32 logged = 0;
-		if (logged++ < 12) logInfo("Cluster page ", page_index, ": groups ", page.first_group, "..", page.first_group + page.group_count - 1, ", clusters from ", first.first_cluster, ", pool offset ", offset, ", ", size, " bytes, stream ", stream_bytes, ", indices ", index_bytes, ", first group stream address ", addresses[page.first_group].stream_address, ", index address ", addresses[page.first_group].index_address);
-	}
 	// the table of the GPU after the payload: both are copies in the stream of the frame, in this order
 	if (group_table_offset != NONE) renderer.updateClusterData(group_table_offset + page.first_group * (u32)sizeof(MeshGroupAddressGPU), &addresses[page.first_group], page.group_count * (u32)sizeof(MeshGroupAddressGPU));
 	refreshNodes(renderer);
 	return true;
+}
+
+void ClusterStream::dropReadData(u32 page_index) {
+	Page& page = pages[page_index];
+	if (!page.read_data) return;
+	allocator.deallocate(page.read_data);
+	page.read_data = nullptr;
+	staged_bytes -= pageBytes(page_index);
 }
 
 void ClusterStream::evictPage(Renderer& renderer, u32 page_index, bool immediate) {
@@ -983,12 +993,15 @@ void ClusterStream::evictPage(Renderer& renderer, u32 page_index, bool immediate
 }
 
 void ClusterStream::release(Renderer& renderer) {
-	for (Page& page : pages) {
+	for (u32 p = 0; p < (u32)pages.size(); ++p) {
+		Page& page = pages[p];
+		dropReadData(p);
 		if (!page.loaded) continue;
 		renderer.freeClusterData(page.pool_offset, page.pool_size);
 		page.loaded = false;
 	}
 	streamed_bytes = 0;
+	staged_bytes = 0;
 }
 
 void ClusterStream::refreshNodes(Renderer& renderer) {
@@ -1050,6 +1063,11 @@ void Model::destroyClusters() {
 
 void Model::unload()
 {
+	// the reads that are in flight are ignored when they finish, see requestClusterPage
+	if ((u32)m_stream_handle != 0) {
+		m_resource_manager.getOwner().getFileSystem().close(m_stream_handle);
+		m_stream_handle = {};
+	}
 	for (int i = 0, n = m_mesh_material.size(); i < n; ++i) {
 		MeshMaterial& m = m_mesh_material[i];
 		removeDependency(*m.material);
@@ -1074,6 +1092,134 @@ void Model::unload()
 	m_bones.clear();
 	m_allocator.deallocate(m_inverse_bind.px);
 	m_inverse_bind = {};
+}
+
+// Reads `size` bytes of the file at `offset`, the callback is called from the main thread, with the data (valid only during the call). The model is not unloaded
+// before the callback finishes, the callback checks that the model was not unloaded and loaded again meanwhile.
+template <typename T>
+void Model::stream(u64 offset, u64 size, T&& callback) {
+	FileSystem& fs = getResourceManager().getOwner().getFileSystem();
+	struct Wrap {
+		T callback;
+		Model& model;
+		static void cb(u64 user_data, Span<const u8> data, bool success) {
+			Wrap* r = (Wrap*)user_data;
+			Model& model = r->model;
+			r->callback(data, success);
+			LUMIX_DELETE(model.m_allocator, r);
+			model.decRefCount();
+		}
+	};
+	Wrap* r = LUMIX_NEW(m_allocator, Wrap)(static_cast<T&&>(callback), *this);
+	incRefCount();
+	fs.stream(m_stream_handle, (u64)(uintptr)r, offset, size, &Wrap::cb);
+}
+
+void Model::requestClusterPage(u32 mesh_index, u32 page_index) {
+	ASSERT((u32)m_stream_handle != 0);
+	ClusterStream* cluster_stream = m_meshes[mesh_index].cluster_stream;
+	const FileSystem::StreamHandle handle = m_stream_handle;
+	const u64 offset = cluster_stream->pages[page_index].file_offset;
+	const u32 bytes = cluster_stream->pageBytes(page_index);
+	const u64 generation = cluster_stream->generation;
+	stream(offset, bytes, [this, handle, cluster_stream, generation, mesh_index, page_index](Span<const u8> data, bool success) {
+		// the renderer counts the reads that are in flight, so it is told about the ones that are not current as well (with no stream)
+		const bool current = m_stream_handle == handle && m_desired_state == State::READY && mesh_index < (u32)m_meshes.size() && m_meshes[mesh_index].cluster_stream == cluster_stream;
+		m_renderer.onClusterPageRead(current ? cluster_stream : nullptr, generation, page_index, data, success);
+	});
+}
+
+// The file is read in parts (see FileHeader): the header, then everything that is needed to make the model ready, the rest is read later by requestClusterPage.
+void Model::doLoad() {
+	if (m_desired_state == State::READY) return;
+	m_desired_state = State::READY;
+	ASSERT(m_current_state != State::READY);
+
+	const bool is_tile = startsWith(m_path, ".lumix/asset_tiles/");
+	FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
+	if (is_tile) {
+		m_stream_handle = fs.openStreaming(m_path);
+	}
+	else {
+		const Path res_path(".lumix/resources/", m_path.getHash(), ".res");
+		m_stream_handle = fs.openStreaming(res_path);
+	}
+	const FileSystem::StreamHandle handle = m_stream_handle;
+
+	// the callbacks of a model that was unloaded (or unloaded and loaded again) are ignored, see Model::unload
+	auto finish = [this, handle](bool success) {
+		if (m_stream_handle != handle || m_desired_state != State::READY) return;
+		// the file is needed later only if pages are streamed
+		if (!success || !m_has_clusters || !m_renderer.isClusterStreamingEnabled()) {
+			m_resource_manager.getOwner().getFileSystem().close(handle);
+			m_stream_handle = {};
+		}
+		ASSERT(m_empty_dep_count > 0);
+		--m_empty_dep_count;
+		if (!success) {
+			logError("Failed to load model ", getPath());
+			++m_failed_dep_count;
+		}
+		checkState();
+	};
+
+	stream(0, sizeof(FileHeader), [this, handle, finish, is_tile](Span<const u8> data, bool success) {
+		if (m_stream_handle != handle || m_desired_state != State::READY) return;
+		if (!success) {
+			// the same as Resource::fileLoaded: the resource may be compiled now
+			ResourceManagerHub& hub = m_resource_manager.getOwner();
+			if (!m_hooked && hub.isHooked() && hub.onBeforeLoad(*this) == ResourceManagerHub::LoadHook::Action::DEFERRED) {
+				hub.getFileSystem().close(handle);
+				m_stream_handle = {};
+				m_hooked = true;
+				incRefCount(); // for the asset compiler hook
+				logInfo("Trying to reload ", getPath(), " because resource manager has been hooked");
+				return;
+			}
+			logError("Could not open ", getPath());
+			finish(false);
+			return;
+		}
+
+		InputMemoryStream file(data);
+		FileHeader header;
+		if (!file.read(header) || header.magic != FileHeader::MAGIC) {
+			logWarning("Corrupted model ", getPath());
+			finish(false);
+			return;
+		}
+		if (header.version <= FileVersion::FIRST_SUPPORTED || header.version > FileVersion::LATEST) {
+			logWarning("Unsupported version of model ", getPath(), ", the model has to be compiled again");
+			finish(false);
+			return;
+		}
+		// the data are read at once, in memory (spans have 32 bit sizes)
+		const bool load_all = m_renderer.isClusterStreamingEnabled() ? false : header.payload_size > 0;
+		if (header.resident_size > 0x7fffFFFFull || (load_all && header.payload_size > 0x7fffFFFFull)) {
+			logError("Model ", getPath(), " is too large");
+			finish(false);
+			return;
+		}
+		m_file_size = sizeof(FileHeader) + header.resident_size + header.payload_size + (is_tile ? 0 : sizeof(CompiledResourceHeader));
+
+		stream(sizeof(FileHeader), header.resident_size, [this, handle, header, load_all, finish](Span<const u8> data, bool success) {
+			if (m_stream_handle != handle || m_desired_state != State::READY) return;
+			if (!success || !parseResident(data)) {
+				finish(false);
+				return;
+			}
+			if (!load_all || !m_has_clusters) {
+				finish(true);
+				return;
+			}
+			// streaming is off (-cluster_stream_off): the model is ready when all the pages are loaded
+			const u64 payload_at = sizeof(FileHeader) + header.resident_size;
+			stream(payload_at, header.payload_size, [this, handle, payload_at, finish](Span<const u8> payload, bool success) {
+				if (m_stream_handle != handle || m_desired_state != State::READY) return;
+				finish(success && loadStreamedPages(payload, payload_at));
+			});
+		});
+	});
 }
 
 

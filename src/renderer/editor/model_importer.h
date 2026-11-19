@@ -163,6 +163,9 @@ protected:
 	static bool areClusterAttributesSupported(const ImportGeometry& geom);
 	// Writes the vertices of the clusters of the first LOD (packed, see packClusterVertices) instead of the ones writeGeometry wrote
 	bool writeClusters(const ModelMeta& meta);
+	// Writes m_out_file as the compiled resource of the model. `resident_end` is the end of the part of the file that is read with the model, the rest is streamed (see
+	// Model::FileHeader), the header is filled in here. The file is not compressed, it is read at offsets.
+	bool compileModelFile(const Path& path, u64 resident_end);
 	void writeGeometry(const ModelMeta& meta);
 	void writeGeometry(u32 geom_idx, const ModelMeta& meta);
 	void writeSkeleton(const ModelMeta& meta);
@@ -188,6 +191,7 @@ protected:
 	OutputMemoryStream m_out_file;
 	bool m_bake_clusters = false;
 	u64 m_vertex_data_offset = 0; // where the vertex buffers of meshes are in m_out_file, set by writeGeometry
+	u64 m_resident_end = 0; // where the payloads of streamed pages of clusters start in m_out_file (the end of the file if there are none), set by writeClusters
 	struct Shader* m_impostor_shadow_shader = nullptr;
 
 	// importers must fill these members

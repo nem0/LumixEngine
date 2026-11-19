@@ -42,6 +42,18 @@ cbuffer UniformData : register(b4) {
 	uint u_padding2;
 	uint u_feedback_capacity;	// groups in u_feedback, 0 if there is none
 	uint u_padding3;
+	// Occlusion culling with the pyramid of depths (hzb.hlsl). The rows of the matrices (projection * rotation of the camera) transform positions relative to the camera of the
+	// culling. The previous frame is the camera and the pyramid of the previous frame: its positions are the ones of the current frame + u_prev_delta.
+	float4 u_prev_vp[4];
+	float4 u_cur_vp[4];
+	float4 u_prev_delta;	// xyz: the camera of the culling - the camera of the previous frame
+	uint u_hzb_mode;		// 0: no occlusion culling. 1: the first pass of a frame: clusters hidden in the previous frame are not selected. 2: the second pass: only clusters that the first
+							// pass skipped and that the pyramid of the depth of the first pass does not hide
+	uint u_hzb_prev;		// bindless texture, the pyramid of the previous frame
+	uint u_hzb_cur;			// bindless texture, the pyramid made after the first pass of this frame
+	uint u_hzb_mips;		// the levels of the full resolution pyramid (the first one, level 0, is not in the textures)
+	float2 u_hzb_size;		// of the level 0, the size of the depth buffer
+	float2 u_hzb_padding;
 };
 
 // threads of a group, GPUSceneConst::CLUSTER_THREADS
@@ -122,6 +134,65 @@ bool insideFrustum(float3 center, float radius) {
 	return true;
 }
 
+#define HZB_DETAIL_LEVELS 2
+// The pyramid has no level 0 (hzb.hlsl): its first level is half of the size of the depth buffer, so clusters whose rectangle is 4 pixels or smaller are tested at the
+// level 1 (a texel is 2 x 2 pixels). It culled the same as with level 0, in the benchmarks (nanite_bench) with half of the cost of building the pyramid.
+#define HZB_MIN_MIP 1
+
+// True if the sphere (relative to the camera of the culling) is certainly behind what the pyramid has: every pixel that it can cover has a nearer depth than the
+// nearest point of the sphere. `previous`: the pyramid and the camera of the previous frame, otherwise the ones of this frame. False if it is not sure (the sphere
+// may touch the near plane).
+bool isOccluded(float3 center, float radius, bool previous) {
+	const float3 c = previous ? center + u_prev_delta.xyz : center;
+	const float4 p = float4(c, 1);
+	float4 clip;
+	float4 row0, row1;
+	if (previous) {
+		clip = float4(dot(u_prev_vp[0], p), dot(u_prev_vp[1], p), dot(u_prev_vp[2], p), dot(u_prev_vp[3], p));
+		row0 = u_prev_vp[0];
+		row1 = u_prev_vp[1];
+	}
+	else {
+		clip = float4(dot(u_cur_vp[0], p), dot(u_cur_vp[1], p), dot(u_cur_vp[2], p), dot(u_cur_vp[3], p));
+		row0 = u_cur_vp[0];
+		row1 = u_cur_vp[1];
+	}
+	// The sphere is bounded in the space of the view: the distance along the view direction of its points is in [w - r, w + r] (w = clip.w), the nearest of them gives the largest
+	// rectangle and the nearest depth. The scales of the projection are the lengths of the rows of the rotation (the projection of the camera is symmetric).
+	const float w_near = clip.w - radius;
+	if (w_near <= 1e-4) return false; // it may touch the near plane
+	const float w_far = clip.w + radius;
+	const float2 scale = float2(length(row0.xyz), length(row1.xyz)) * radius;
+	const float2 n_max = clip.xy + scale;
+	const float2 n_min = clip.xy - scale;
+	const float2 ndc_max = n_max / float2(n_max.x > 0 ? w_near : w_far, n_max.y > 0 ? w_near : w_far);
+	const float2 ndc_min = n_min / float2(n_min.x < 0 ? w_near : w_far, n_min.y < 0 ? w_near : w_far);
+	// the depth is reversed, larger is nearer, the nearest point of the sphere
+	const float nearest = clip.z / w_near;
+	const float2 uv_a = toScreenUV(ndc_min * 0.5 + 0.5);
+	const float2 uv_b = toScreenUV(ndc_max * 0.5 + 0.5);
+	float2 mn = saturate(min(uv_a, uv_b));
+	float2 mx = saturate(max(uv_a, uv_b));
+
+	// The level where the rectangle covers 2 to 4 texels in a row, so at most 5 (HZB_DETAIL_LEVELS finer than the one with 1 texel): the texels of a coarser level cover much more
+	// than the rectangle, the farthest depth of a larger area hides much less (a tiny cluster behind the surface of its own mesh is often next to its silhouette).
+	// With 2 x 2 texels (the level without the bias) a test culled less than half of what this one does.
+	const float2 size_px = (mx - mn) * u_hzb_size;
+	const uint mip = min((uint)max(ceil(log2(max(max(size_px.x, size_px.y), 1.0))) - HZB_DETAIL_LEVELS, HZB_MIN_MIP), u_hzb_mips - 1);
+	const int2 mip_size = max(int2(u_hzb_size) >> mip, 1);
+	// A texel of a level covers the pixels [i << mip, (i + 1) << mip) (the last one also the rest of an odd size, see hzb.hlsl), so the texels are found from the pixels,
+	// scaling the uv by the size of the level would drift away from them at the far edges when the size is not a multiple of 1 << mip.
+	const int2 t0 = min(int2(mn * u_hzb_size) >> mip, mip_size - 1);
+	const int2 t1 = min(int2(mx * u_hzb_size) >> mip, mip_size - 1);
+	Texture2D<float4> hzb = bindless_textures[previous ? u_hzb_prev : u_hzb_cur];
+	float farthest = 1e30;
+	for (int y = t0.y; y <= t1.y; ++y) {
+		for (int x = t0.x; x <= t1.x; ++x) farthest = min(farthest, hzb.Load(int3(x, y, mip - HZB_MIN_MIP)).r);	// the texture starts at the level HZB_MIN_MIP
+	}
+	// a margin for the rounding and for the 24 bits of the depth buffer
+	return farthest > nearest * 1.0005 + 1e-6;
+}
+
 // Sets the bit of a group in the feedback. Most of the clusters of a frame find it set already, so it is read first and the atomic is only done if it is needed.
 void markFeedback(RWByteAddressBuffer feedback, uint id) {
 	const uint address = (id >> 5) * 4;
@@ -164,6 +235,20 @@ void processCluster(MeshDesc desc, Instance instance, float max_scale, uint inst
 	float3 center = cull_pos + rotateByQuat(instance.rot, bounds.xyz * instance.scale);
 	float radius = bounds.w * max_scale;
 	if (!insideFrustum(center, radius)) return;
+
+	// Occlusion culling in two passes. The first pass does not select what the previous frame hid, the second one selects only these clusters, and only if the depth of the
+	// first pass of this frame does not hide them: together they select exactly the clusters that are not hidden by this frame's depth. The test of the previous frame is at
+	// one place, so that both passes get the same result from it (a cluster must not be skipped by both).
+	if (u_hzb_mode != 0) {
+		const bool hidden_before = isOccluded(center, radius, true);
+		if (u_hzb_mode == 1) {
+			if (hidden_before) return;
+		}
+		else {
+			if (!hidden_before) return;
+			if (isOccluded(center, radius, false)) return;
+		}
+	}
 
 	// the feedback of streaming: the group is used, and if the cluster is only drawn because its children are not loaded and it is not accurate enough, they are needed.
 	// The ids in the groups are the ones of their pages. The page is loaded in the first case and it is not in the second, so one bit is enough, the CPU tells them apart by the state of the page.

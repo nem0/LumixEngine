@@ -850,8 +850,8 @@ static void scriptAddBucket(ex_runtime*, ex_call_frame frame) {
 	++ctx->bucket_count;
 }
 
-// Culls the scene for the camera into the buckets added since the last cull, returns the view for renderBucket.
-static void scriptCull(ex_runtime*, ex_call_frame frame) {
+// Culls the scene for the camera into the buckets added since the last cull, returns the view for renderBucket. `occlusion`: see Pipeline::cull.
+static void cullView(ex_call_frame& frame, bool occlusion) {
 	EvoxRenderContext* ctx = readContext(frame);
 	if (!ctx) return;
 	EX_ARG(frame, u32, camera_handle);
@@ -872,7 +872,35 @@ static void scriptCull(ex_runtime*, ex_call_frame frame) {
 	}
 	const u32 count = ctx->bucket_count;
 	ctx->bucket_count = 0;
-	EX_RESULT(frame, ctx->pipeline->cull(*camera, Span<const BucketDesc>(descs, count)));
+	EX_RESULT(frame, ctx->pipeline->cull(*camera, Span<const BucketDesc>(descs, count), occlusion));
+}
+
+static void scriptCull(ex_runtime*, ex_call_frame frame) { cullView(frame, false); }
+static void scriptCullOcclusion(ex_runtime*, ex_call_frame frame) { cullView(frame, true); }
+
+// Makes the pyramid of depths of the occlusion culling from a depth buffer, see Pipeline::buildHZB.
+static void scriptBuildHZB(ex_runtime*, ex_call_frame frame) {
+	EvoxRenderContext* ctx = readContext(frame);
+	if (!ctx) return;
+	EX_ARG(frame, u32, depth);
+	EX_ARG(frame, u8, final);
+	if (depth == 0) {
+		panic(frame, "Invalid render buffer");
+		return;
+	}
+	ctx->pipeline->buildHZB(fromScript(depth), final != 0);
+}
+
+// The second pass of the occlusion culling of a view made by cullOcclusion, see Pipeline::renderPostCull
+static void scriptRenderPostCull(ex_runtime*, ex_call_frame frame) {
+	EvoxRenderContext* ctx = readContext(frame);
+	if (!ctx) return;
+	EX_ARG(frame, u32, view);
+	if (ctx->pipeline->getBucketCount(view) == 0) {
+		panic(frame, "Invalid view");
+		return;
+	}
+	ctx->pipeline->renderPostCull(view);
 }
 
 // space separated shader defines
@@ -1279,6 +1307,9 @@ void registerRenderFunctions(HashMap<NativeFunctionKey, ex_native_fn, NativeFunc
 	functions.insert({"core:render", "customOrthoCamera"}, &scriptCustomOrthoCamera);
 	functions.insert({"core:render", "addBucket"}, &scriptAddBucket);
 	functions.insert({"core:render", "cull"}, &scriptCull);
+	functions.insert({"core:render", "cullOcclusion"}, &scriptCullOcclusion);
+	functions.insert({"core:render", "buildHZB"}, &scriptBuildHZB);
+	functions.insert({"core:render", "renderPostCull"}, &scriptRenderPostCull);
 	functions.insert({"core:render", "renderGrass"}, &scriptRenderGrass);
 	functions.insert({"core:render", "renderTerrains"}, &scriptRenderTerrains);
 	functions.insert({"core:render", "renderEntities"}, &scriptRenderEntities);

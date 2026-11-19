@@ -591,6 +591,25 @@ bool buildMeshPages(const MeshClusterGPU* clusters, u32 cluster_count, const Mes
 		page_bytes += bytes;
 	}
 
+	// The priority of a page: the largest error that it removes, that is the parent error of the clusters of its groups (the error of what is drawn until the page is loaded).
+	// Non-negative floats compare as integers. Permanent pages are never requested.
+	Array<float> page_error(allocator);
+	page_error.resize((u32)out.pages.size());
+	for (float& e : page_error) e = 0;
+	for (u32 i = 0; i < cluster_count; ++i) {
+		const float e = clusters[i].parent_error;
+		if (e >= 1e30f || !(e > 0)) continue;
+		float& page_max = page_error[group_page[clusters[i].group]];
+		page_max = maximum(page_max, e);
+	}
+	for (u32 p = 0; p < (u32)out.pages.size(); ++p) {
+		if (out.pages[p].permanent) {
+			out.pages[p].priority = 0xffFFffFFu;
+			continue;
+		}
+		memcpy(&out.pages[p].priority, &page_error[p], sizeof(u32));
+	}
+
 	// the edges between the pages (a page is loaded and unloaded as a whole, so the ones inside of a page are not needed)
 	Array<u32> child_page(allocator), parent_page(allocator);
 	for (u32 i = 0; i < cluster_count; ++i) {

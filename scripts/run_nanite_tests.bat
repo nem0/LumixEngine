@@ -1,8 +1,8 @@
 @echo off
 REM Builds studio.exe and app.exe, compiles the resources of the demo project (studio.exe --compile_all_resources) and runs
-REM the nanite benchmark (demo/scripts/bench.evox) on the high poly meshes of demo/models/bench (rock, coil, terrain),
-REM each with cluster streaming on and off. The app is started twice, once per streaming mode, and runs the three meshes one
-REM after another in that launch (-bench_spawn, -bench_spawn2, -bench_spawn3).
+REM the nanite benchmark (demo/scripts/bench.evox) on the high poly meshes of demo/models/bench (rock, coil, terrain, tree_plain),
+REM each with cluster streaming on and off. The app is started twice, once per streaming mode, and runs the four meshes one
+REM after another in that launch (-bench_spawn ... -bench_spawn4).
 REM
 REM Usage: run_nanite_tests.bat [config] [-- extra app arguments]
 REM   config  RelWithDebInfo (default) or Debug
@@ -101,7 +101,7 @@ call :run no_streaming "-cluster_stream_off"
 
 echo.
 echo ==== Results (%out_dir%) ====
-for %%M in (rock coil terrain) do (
+for %%M in (rock coil terrain tree_plain) do (
   for %%N in (streaming no_streaming) do (
     echo.
     echo --- %%M, %%N ---
@@ -122,13 +122,13 @@ REM one launch of the app, it runs the three scenes one after another and writes
 :run
 set mode=%~1
 set flags=%~2
-for %%M in (rock coil terrain) do if exist "%out_dir%\%%M_%mode%.csv" del "%out_dir%\%%M_%mode%.csv"
+for %%M in (rock coil terrain tree_plain) do if exist "%out_dir%\%%M_%mode%.csv" del "%out_dir%\%%M_%mode%.csv"
 echo.
-echo Running "%mode%" (rock, coil, terrain)...
+echo Running "%mode%" (rock, coil, terrain, tree_plain)...
 pushd "%~dp0..\data"
-"%app%" -window -data_dir "%~dp0..\demo" -bench "nanite_bench/*_%mode%.csv" -bench_spawn rock 30 30 2.5 -bench_spawn2 coil 30 30 2.5 -bench_spawn3 terrain 9 9 8 %flags% %extra% -no_vsync -hidden -resolution 3840 2160 -bench_warmup 100 -bench_frames 50
+"%app%" -window -data_dir "%~dp0..\demo" -bench "nanite_bench/*_%mode%.csv" -bench_spawn rock 30 30 2.5 -bench_spawn2 coil 30 30 2.5 -bench_spawn3 terrain 9 9 8 -bench_spawn4 tree_plain 20 20 6 %flags% %extra% -no_vsync -hidden -resolution 3840 2160 -bench_warmup 100 -bench_frames 50
 popd
-for %%M in (rock coil terrain) do (
+for %%M in (rock coil terrain tree_plain) do (
   if not exist "%out_dir%\%%M_%mode%.csv" (
     echo "%%M_%mode%" produced no result. See %bin%\lumix_app.log
     set failed=1

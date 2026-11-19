@@ -259,6 +259,16 @@ fn renderOpaquePlugins(ctx : Context) : void {
 // it culls the scene for the camera into them and returns a view for `renderBucket`. A bucket index is the order of `addBucket`.
 extern fn addBucket(ctx : Context, layer : []const u8, define : []const u8, sort : BucketSort, state : u64) : void;
 extern fn cull(ctx : Context, camera : ViewCamera) : u32;
+// Occlusion culling in two passes, for the main camera only (other cameras are culled like with `cull`). The view that `cullOcclusion` returns draws the clusters that the
+// depth buffer of the previous frame does not hide when it is rendered with `renderBucket`. The rest is drawn by this, after the opaque geometry that the buckets draw:
+//   buildHZB(depth, false)  the depth buffer is made into a pyramid,
+//   (set the render targets again, the pyramid used the depth buffer as a texture)
+//   renderPostCull(view)                 draws what was skipped and is visible in that pyramid,
+//   buildHZB(depth, true)   after everything opaque has been drawn: the pyramid that the next frame culls with.
+// Without these calls the clusters hidden in the previous frame are missing.
+extern fn cullOcclusion(ctx : Context, camera : ViewCamera) : u32;
+extern fn buildHZB(ctx : Context, depth : RenderBuffer, final : bool) : void;
+extern fn renderPostCull(ctx : Context, view : u32) : void;
 // Draw grass and terrains for the camera. `defines` are space separated shader defines (e.g. "GRASS DEPTH").
 extern fn renderGrass(ctx : Context, camera : ViewCamera, state : u64, defines : []const u8) : void;
 extern fn renderTerrains(ctx : Context, camera : ViewCamera, state : u64, define : []const u8) : void;

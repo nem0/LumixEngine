@@ -34,7 +34,7 @@ cbuffer UniformData : register(b4) {
 	uint u_flat_items;		// rw bindless, 16 bytes: mesh, slot, first cluster, 0
 	uint u_tree_items;		// rw bindless, the same
 	uint u_item_capacity;	// of each list
-	uint u_padding2;
+	uint u_post;			// 1 in the second pass of the occlusion culling of a view: it selects only clusters (the first pass has drawn the meshes without clusters already)
 	uint u_selected;		// rw bindless, the list of selected clusters of nanite.hlsl (ARGS clears its counters)
 	uint u_groups;			// bindless, GPUSceneGroup[], 32 bytes
 	uint u_group_count;
@@ -154,7 +154,9 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 		const uint model = bindless_buffers[u_instances].Load(slot * 96 + 28);
 		if (model >= u_model_count) return;
 
-		if (bindless_buffers[u_models].Load(model * 48 + 8) != 0) emitPlain(model, slot, center, bindless_buffers[u_instances].Load(slot * 96 + 44));
+		if (bindless_buffers[u_models].Load(model * 48 + 8) != 0) {
+			if (u_post == 0) emitPlain(model, slot, center, bindless_buffers[u_instances].Load(slot * 96 + 44));
+		}
 		else emitWork(counter, model, slot, 0);
 	#endif
 }

@@ -452,6 +452,16 @@ struct PipelineImpl final : Pipeline {
 		u32 padding2;
 		u32 feedback_capacity;			// groups in the feedback, 0: no feedback
 		u32 padding3;
+		// occlusion culling, see nanite.hlsl
+		Vec4 prev_vp[4];
+		Vec4 cur_vp[4];
+		Vec4 prev_delta;
+		u32 hzb_mode;
+		gpu::BindlessHandle hzb_prev;
+		gpu::BindlessHandle hzb_cur;
+		u32 hzb_mips;
+		float hzb_size[2];
+		float hzb_padding[2];
 	};
 	static_assert(sizeof(ClusterViewUniforms) % 16 == 0);
 
@@ -474,6 +484,17 @@ struct PipelineImpl final : Pipeline {
 		CameraParams cp;
 		u8 layer_to_bucket[255];
 		jobs::Signal ready;
+
+		// Occlusion culling in two passes (Pipeline::cull with `occlusion`), the values are copied when the view is made and when the pyramid of the frame is built: the
+		// culling runs in jobs, the pipeline changes them.
+		bool occlusion = false;			// the first pass skips the clusters that the pyramid of the previous frame hides, renderPostCull draws the visible ones
+		bool hzb_prev_valid = false;	// there is a pyramid of the previous frame (without it nothing is skipped)
+		gpu::TextureHandle hzb_prev = gpu::INVALID_TEXTURE;
+		gpu::TextureHandle hzb_cur = gpu::INVALID_TEXTURE;	// the pyramid made after the first pass
+		Vec4 hzb_prev_vp[4];
+		DVec3 hzb_prev_pos;
+		u32 hzb_mips = 0;
+		IVec2 hzb_size = IVec2(0, 0);
 	};
 
 	PipelineImpl(Renderer& renderer, PipelineType type, IAllocator& allocator)
@@ -498,6 +519,7 @@ struct PipelineImpl final : Pipeline {
 		m_debug_shape_shader = rm.load<Shader>(Path("engine/shaders/debug_shape.hlsl"));
 		m_cluster_shader = rm.load<Shader>(Path("engine/shaders/nanite.hlsl"));
 		m_scene_cull_shader = rm.load<Shader>(Path("engine/shaders/gpu_scene_cull.hlsl"));
+		m_hzb_shader = rm.load<Shader>(Path("engine/shaders/hzb.hlsl"));
 		m_scene_variants_shader = rm.load<Shader>(Path("engine/shaders/gpu_scene_variants.hlsl"));
 		m_flatten_shader = rm.load<Shader>(Path("engine/shaders/flatten_cube.hlsl"));
 		
@@ -569,6 +591,10 @@ struct PipelineImpl final : Pipeline {
 		m_debug_shape_shader->decRefCount();
 		m_cluster_shader->decRefCount();
 		m_scene_cull_shader->decRefCount();
+		m_hzb_shader->decRefCount();
+		for (gpu::TextureHandle t : m_hzb) {
+			if (t) stream.destroy(t);
+		}
 		m_scene_variants_shader->decRefCount();
 		m_flatten_shader->decRefCount();
 
@@ -874,7 +900,7 @@ struct PipelineImpl final : Pipeline {
 		stream.clear(flags, &color.x, depth);
 	}
 
-	u32 cull(const CameraParams& cp, Span<const BucketDesc> buckets) override {
+	u32 cull(const CameraParams& cp, Span<const BucketDesc> buckets, bool occlusion = false) override {
 		PROFILE_FUNCTION();
 
 		UniquePtr<View>& view = m_views.emplace();
@@ -882,6 +908,28 @@ struct PipelineImpl final : Pipeline {
 		view = UniquePtr<View>::create(allocator, allocator, m_renderer.getEngine().getPageAllocator());
 		view->cp = cp;
 		memset(view->layer_to_bucket, 0xff, sizeof(view->layer_to_bucket));
+
+		// Occlusion culling: the pyramids are created here, the culling of the view (a job) uses the one of the previous frame. A camera that is not the main one (shadows, ortho
+		// cameras, the frozen camera of the clusters) is culled as before. Without a pyramid of the previous frame the first pass skips nothing.
+		// While the camera of the clusters is frozen the pyramids are not updated: the one the frozen camera made in its last frame is what the culling tests with (first pass only,
+		// there is no second pass), so the occlusion culling is frozen with the rest of the culling. m_cluster_frozen is set by the culling job of the frame the freezing starts in,
+		// that frame is still culled and its pyramid is made as usual.
+		const bool hzb_frozen = m_cluster_frozen && m_cluster_freeze_camera;
+		if (occlusion && !cp.is_shadow && cp.projection.columns[3].w != 1.f && ensureOcclusionPyramids()) {
+			view->occlusion = true;
+			view->hzb_prev_valid = m_hzb_prev_valid;
+			view->hzb_prev = m_hzb[m_hzb_prev];
+			view->hzb_cur = m_hzb[1 - m_hzb_prev];
+			view->hzb_prev_pos = m_hzb_prev_pos;
+			for (u32 i = 0; i < 4; ++i) view->hzb_prev_vp[i] = m_hzb_prev_vp[i];
+			view->hzb_size = m_hzb_size;
+			view->hzb_mips = m_hzb_mips;
+			if (!hzb_frozen) {
+				m_hzb_frame_cp = cp;
+				m_hzb_frame_cp_valid = true;
+				m_hzb_cur_built = false;
+			}
+		}
 
 		view->buckets.reserve(buckets.length());
 		for (const BucketDesc& desc : buckets) {
@@ -953,6 +1001,113 @@ struct PipelineImpl final : Pipeline {
 			jobs::wait(&view->ready);
 			Bucket& bucket = view->buckets[bucket_idx];
 			stream.merge(bucket.stream);
+		});
+	}
+
+	// rows of the matrix, so that the shader gets `clip = float4(dot(rows[0], p), dot(rows[1], p), dot(rows[2], p), dot(rows[3], p))` for a position `p` (w = 1)
+	static void setMatrixRows(const Matrix& m, Vec4* rows) {
+		rows[0] = Vec4(m.columns[0].x, m.columns[1].x, m.columns[2].x, m.columns[3].x);
+		rows[1] = Vec4(m.columns[0].y, m.columns[1].y, m.columns[2].y, m.columns[3].y);
+		rows[2] = Vec4(m.columns[0].z, m.columns[1].z, m.columns[2].z, m.columns[3].z);
+		rows[3] = Vec4(m.columns[0].w, m.columns[1].w, m.columns[2].w, m.columns[3].w);
+	}
+
+	// The two pyramids of depths (R32F, all the levels but the first one, the texture is half of the size of the viewport and its mip i is the level i + 1 of nanite.hlsl): the one
+	// that the frame before made (m_hzb[m_hzb_prev]) and the one of this frame. Made again if the size of the viewport changed. False if the shaders are not ready.
+	bool ensureOcclusionPyramids() {
+		if (!m_hzb_shader->isReady()) return false;
+		const IVec2 size(maximum(m_viewport.w, 1), maximum(m_viewport.h, 1));
+		if (maximum(size.x, size.y) < 2) return false;
+		if (m_hzb[0] && m_hzb[1] && m_hzb_size == size) return true;
+		DrawStream& end_frame_stream = m_renderer.getEndFrameDrawStream();
+		for (gpu::TextureHandle& t : m_hzb) {
+			if (t) end_frame_stream.destroy(t);
+			t = m_renderer.createTexture(maximum(size.x >> 1, 1), maximum(size.y >> 1, 1), 1, gpu::TextureFormat::R32F, gpu::TextureFlags::COMPUTE_WRITE, Renderer::MemRef(), "occlusion pyramid");
+		}
+		m_hzb_size = size;
+		m_hzb_mips = 1 + log2((u32)maximum(size.x, size.y));
+		m_hzb_prev = 0;
+		m_hzb_prev_valid = false;
+		return m_hzb[0] && m_hzb[1];
+	}
+
+	void buildHZB(RenderBufferHandle depth, bool final) override {
+		if (!m_hzb_frame_cp_valid || !m_hzb[0] || !m_hzb[1] || !m_hzb_shader->isReady() || depth == INVALID_RENDERBUFFER) return;
+		if (m_hzb_size != IVec2(m_viewport.w, m_viewport.h)) return;	// the size changed since the view was culled
+
+		DrawStream& stream = m_renderer.getDrawStream();
+		DrawStream& end_frame_stream = m_renderer.getEndFrameDrawStream();
+		const u32 target = 1 - m_hzb_prev;
+		const gpu::TextureHandle tex = m_hzb[target];
+
+		stream.beginProfileBlock(final ? "occlusion pyramid (final)" : "occlusion pyramid", 0, false);
+		// the texture starts at the pyramid level 1: its mip `i` is the level `i + 1` (half of the size of the depth buffer for i = 0)
+		gpu::TextureHandle views[16];
+		const u32 mips = minimum(m_hzb_mips - 1, (u32)lengthOf(views));
+		for (u32 i = 0; i < mips; ++i) {
+			views[i] = gpu::allocTextureHandle();
+			stream.createTextureView(views[i], tex, 0, i);
+			end_frame_stream.destroy(views[i]);
+		}
+
+		struct {
+			u32 mode;
+			u32 src;
+			u32 dst;
+			u32 levels;
+			u32 src_size[2];
+			u32 dst_size[2];
+			u32 dst1;
+			u32 dst2;
+			u32 dst3;
+			u32 dst4;
+		} ub = {};
+		stream.barrier(tex, gpu::BarrierType::WRITE);
+		// Several levels in a dispatch, a group per texel of the last level that the dispatch makes (see hzb.hlsl). The source level s (0: the depth buffer) makes the levels
+		// s + 1 ... s + count, in the mips s ... s + count - 1 of the texture.
+		for (u32 s = 0; s < mips;) {
+			const u32 count = minimum(s == 0 ? 5u : 4u, mips - s);
+			if (s > 0) stream.memoryBarrier(tex);	// the mip s - 1 is written
+			ub.mode = s == 0 ? 0 : 1;
+			ub.levels = count;
+			ub.src = s == 0 ? toBindless(depth, stream).value : gpu::getRWBindlessHandle(views[s - 1]).value;
+			ub.src_size[0] = maximum((u32)m_hzb_size.x >> s, 1u);
+			ub.src_size[1] = maximum((u32)m_hzb_size.y >> s, 1u);
+			ub.dst = gpu::getRWBindlessHandle(views[s]).value;
+			ub.dst1 = count > 1 ? gpu::getRWBindlessHandle(views[s + 1]).value : 0;
+			ub.dst2 = count > 2 ? gpu::getRWBindlessHandle(views[s + 2]).value : 0;
+			ub.dst3 = count > 3 ? gpu::getRWBindlessHandle(views[s + 3]).value : 0;
+			ub.dst4 = count > 4 ? gpu::getRWBindlessHandle(views[s + 4]).value : 0;
+			ub.dst_size[0] = maximum(ub.src_size[0] >> count, 1u);
+			ub.dst_size[1] = maximum(ub.src_size[1] >> count, 1u);
+			setUniform(ub);
+			dispatch(*m_hzb_shader, ub.dst_size[0], ub.dst_size[1], 1);
+			s += count;
+		}
+		stream.barrier(tex, gpu::BarrierType::READ);
+		stream.endProfileBlock();
+
+		if (final) {
+			// the next frame culls with it: this one is the previous frame for it
+			m_hzb_prev = target;
+			m_hzb_prev_valid = true;
+			m_hzb_prev_pos = m_hzb_frame_cp.pos;
+			setMatrixRows(m_hzb_frame_cp.projection * m_hzb_frame_cp.view, m_hzb_prev_vp);
+			m_hzb_frame_cp_valid = false;
+			m_hzb_cur_built = false;
+		}
+		else {
+			m_hzb_cur_built = true;
+		}
+	}
+
+	void renderPostCull(u32 view_idx) override {
+		View* view = m_views[view_idx].get();
+		// without the pyramids nothing was skipped by the first pass
+		if (!view->occlusion || !view->hzb_prev_valid || !m_hzb_cur_built) return;
+		m_renderer.pushJob("cull post pass", [this, view](DrawStream& stream) {
+			jobs::wait(&view->ready);
+			runGPUSceneCulling(stream, *view, true);
 		});
 	}
 
@@ -2275,8 +2430,11 @@ struct PipelineImpl final : Pipeline {
 	// it for every view of a frame, these are the only draws of the model instances and instanced models of the GPU scene. If something is not ready (the shaders of the first frames,
 	// more than SCENE_VIEWS views in a frame) the instances of the view are not drawn. The main view culls from the frozen camera of the clusters if there is one. Views use the buffers one after another (their passes are executed in the order of the views), what the draws
 	// need, which are executed later, is not shared: the instances of the draws are taken from a counter of the frame and the commands of a view are its own.
-	void runGPUSceneCulling(DrawStream& stream, View& view) {
+	// `post`: the second pass of the occlusion culling of the view (View::occlusion): it selects the clusters that the first one skipped and that are visible in the pyramid of
+	// the depth of the first pass, and draws them into `stream`, which has the current targets (the first pass draws into the buckets).
+	void runGPUSceneCulling(DrawStream& stream, View& view, bool post = false) {
 		GPUScene& scene = m_module->getGPUScene();
+		if (post && (!view.occlusion || !view.hzb_prev_valid)) return;
 		if (m_cluster_shader->isFailure() && !m_cluster_shader_failure_logged) {
 			m_cluster_shader_failure_logged = true;
 			logError("Cluster shader nanite.hlsl failed to load, models with clusters are not drawn");
@@ -2324,7 +2482,7 @@ struct PipelineImpl final : Pipeline {
 			gpu::RWBindlessHandle flat_items;
 			gpu::RWBindlessHandle tree_items;
 			u32 item_capacity;
-			u32 padding2;
+			u32 post;				// the second pass of the occlusion culling
 			gpu::RWBindlessHandle selected;
 			gpu::BindlessHandle groups;
 			u32 group_count;
@@ -2350,6 +2508,7 @@ struct PipelineImpl final : Pipeline {
 		ub.flat_items = gpu::getRWBindlessHandle(m_scene_flat_items);
 		ub.tree_items = gpu::getRWBindlessHandle(m_scene_tree_items);
 		ub.item_capacity = m_scene_work_items;
+		ub.post = post ? 1 : 0;
 		ub.selected = gpu::getRWBindlessHandle(m_scene_selected);
 		ub.groups = gpu::getBindlessHandle(scene.getGroupTableBuffer());
 		ub.group_count = scene.getGroupCount();
@@ -2368,6 +2527,7 @@ struct PipelineImpl final : Pipeline {
 		// blocks of shadow views have their own names, with the cascade of the main light (a frame has several views and the main one is the one that counts)
 		const bool is_shadow = view.cp.is_shadow;
 		auto scope_name = [&](const char* name) -> StaticString<64> {
+			if (post) return StaticString<64>(name, " (post)");
 			if (!is_shadow) return StaticString<64>(name);
 			if (view.cp.shadow_slice < 0) return StaticString<64>(name, " (shadow)");
 			return StaticString<64>(name, " (shadow ", view.cp.shadow_slice, ")");
@@ -2448,6 +2608,22 @@ struct PipelineImpl final : Pipeline {
 			cu.feedback = gpu::getRWBindlessHandle(feedback);
 			cu.feedback_capacity = m_renderer.getClusterFeedbackCapacity();
 			stream.barrier(feedback, gpu::BarrierType::WRITE);
+		}
+
+		// occlusion culling (nanite.hlsl): the first pass tests with the pyramid of the previous frame, the second one with the pyramid of the depth of the first pass too
+		if (view.occlusion && view.hzb_prev_valid && view.hzb_prev && view.hzb_cur && (post || !view.cp.is_shadow)) {
+			cu.hzb_mode = post ? 2 : 1;
+			const Matrix cur_vp = cull_cp.projection * cull_cp.view;
+			setMatrixRows(cur_vp, cu.cur_vp);
+			for (u32 i = 0; i < 4; ++i) cu.prev_vp[i] = view.hzb_prev_vp[i];
+			cu.prev_delta = Vec4(Vec3(cull_cp.pos - view.hzb_prev_pos), 0);
+			cu.hzb_prev = gpu::getBindlessHandle(view.hzb_prev);
+			cu.hzb_cur = gpu::getBindlessHandle(view.hzb_cur);
+			cu.hzb_mips = view.hzb_mips;
+			cu.hzb_size[0] = (float)view.hzb_size.x;
+			cu.hzb_size[1] = (float)view.hzb_size.y;
+			stream.barrier(view.hzb_prev, gpu::BarrierType::READ);
+			if (post) stream.barrier(view.hzb_cur, gpu::BarrierType::READ);
 		}
 
 		stream.barrier(m_renderer.getClusterDataBuffer(), gpu::BarrierType::READ);
@@ -2579,6 +2755,8 @@ struct PipelineImpl final : Pipeline {
 				if (group_bases[g] == 0xffFFffFF) continue;
 				const GPUScene::DrawGroup& group = scene.getDrawGroup(g);
 				Bucket& bucket = view.buckets[view.layer_to_bucket[group.layer]];
+				// the second pass draws from the job that culls it, the draws of the first one are in the buckets of the view
+				DrawStream& draw = post ? stream : bucket.stream;
 				const u32 define_mask = group.define_mask | bucket.define_mask;
 				const gpu::StateFlags state = group.state | bucket.state;
 				const u32 command_offset = command_base + group_bases[g] * 24;
@@ -2586,30 +2764,30 @@ struct PipelineImpl final : Pipeline {
 					// the vertices and indices of the meshes are in the buffer of cluster data, a command has the first index and the base vertex of its mesh
 					const bool skinned = (group.define_mask & (1u << m_skinned_define_idx)) != 0;
 					const gpu::ProgramHandle plain_program = group.shader->getProgram(state, group.primitive_type, define_mask | (skinned ? (indirect_define | pooled_define) : plain_mesh_define), group.semantics_defines);
-					bucket.stream.useProgram(plain_program);
-					bucket.stream.bindIndexBuffer(m_renderer.getClusterDataBuffer());
-					Lumix::bindPulledBuffers(bucket.stream, uniform_pool, m_renderer.getClusterDataBuffer(), m_scene_out, 0, frame_bones.bones);
-					bucket.stream.barrier(m_scene_out, gpu::BarrierType::READ);
-					bucket.stream.barrier(m_renderer.getClusterDataBuffer(), gpu::BarrierType::READ);
-					if (skinned && frame_bones.bones) bucket.stream.barrier(frame_bones.bones, gpu::BarrierType::READ);
-					bucket.stream.bindIndirectBuffer(m_scene_commands);
-					bucket.stream.drawIndirect(group.index_type, command_offset, group.variant_count);
-					bucket.stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
-					bucket.stream.bindIndexBuffer(gpu::INVALID_BUFFER);
+					draw.useProgram(plain_program);
+					draw.bindIndexBuffer(m_renderer.getClusterDataBuffer());
+					Lumix::bindPulledBuffers(draw, uniform_pool, m_renderer.getClusterDataBuffer(), m_scene_out, 0, frame_bones.bones);
+					draw.barrier(m_scene_out, gpu::BarrierType::READ);
+					draw.barrier(m_renderer.getClusterDataBuffer(), gpu::BarrierType::READ);
+					if (skinned && frame_bones.bones) draw.barrier(frame_bones.bones, gpu::BarrierType::READ);
+					draw.bindIndirectBuffer(m_scene_commands);
+					draw.drawIndirect(group.index_type, command_offset, group.variant_count);
+					draw.bindIndirectBuffer(gpu::INVALID_BUFFER);
+					draw.bindIndexBuffer(gpu::INVALID_BUFFER);
 					continue;
 				}
 				const gpu::ProgramHandle cluster_program = group.shader->getProgram(state, group.primitive_type, define_mask | mesh_instance_define, group.semantics_defines);
 				const TransientSlice layout_ub = alloc(uniform_pool, &vertex_buffer_binding, sizeof(vertex_buffer_binding));
-				bucket.stream.useProgram(cluster_program);
-				bucket.stream.bindIndexBuffer(m_cluster_iota);
-				bucket.stream.bindUniformBuffer(UniformBuffer::VERTEX_BUFFER, layout_ub.buffer, layout_ub.offset, layout_ub.size);
-				bucket.stream.barrier(m_scene_out, gpu::BarrierType::READ);
-				bucket.stream.barrier(scene.getMeshTableBuffer(), gpu::BarrierType::READ);
-				bucket.stream.barrier(m_renderer.getClusterDataBuffer(), gpu::BarrierType::READ);
-				bucket.stream.bindIndirectBuffer(m_scene_commands);
-				bucket.stream.drawIndirect(gpu::DataType::U16, command_offset, group.variant_count);
-				bucket.stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
-				bucket.stream.bindIndexBuffer(gpu::INVALID_BUFFER);
+				draw.useProgram(cluster_program);
+				draw.bindIndexBuffer(m_cluster_iota);
+				draw.bindUniformBuffer(UniformBuffer::VERTEX_BUFFER, layout_ub.buffer, layout_ub.offset, layout_ub.size);
+				draw.barrier(m_scene_out, gpu::BarrierType::READ);
+				draw.barrier(scene.getMeshTableBuffer(), gpu::BarrierType::READ);
+				draw.barrier(m_renderer.getClusterDataBuffer(), gpu::BarrierType::READ);
+				draw.bindIndirectBuffer(m_scene_commands);
+				draw.drawIndirect(gpu::DataType::U16, command_offset, group.variant_count);
+				draw.bindIndirectBuffer(gpu::INVALID_BUFFER);
+				draw.bindIndexBuffer(gpu::INVALID_BUFFER);
 			}
 		}
 	}
@@ -3676,6 +3854,20 @@ struct PipelineImpl final : Pipeline {
 	Shader* m_blit_shader = nullptr;
 	Shader* m_draw2d_shader = nullptr;
 	Shader* m_downscale_depth_shader = nullptr;
+	Shader* m_hzb_shader = nullptr;									// the pyramid of depths of the occlusion culling, see buildHZB
+
+	// Occlusion culling of the main view in two passes (see Pipeline::cull with `occlusion`). Two pyramids of depths: m_hzb[m_hzb_prev] was made by the frame before (at the end of its
+	// opaque geometry, with its camera), the other is made after the first pass of this frame and again at the end of the frame, when it becomes the previous one.
+	gpu::TextureHandle m_hzb[2] = { gpu::INVALID_TEXTURE, gpu::INVALID_TEXTURE };
+	u32 m_hzb_prev = 0;
+	u32 m_hzb_mips = 0;
+	IVec2 m_hzb_size = IVec2(0, 0);
+	bool m_hzb_prev_valid = false;
+	Vec4 m_hzb_prev_vp[4];											// rows of projection * view (rotation) of the camera of the previous pyramid
+	DVec3 m_hzb_prev_pos = DVec3(0, 0, 0);
+	CameraParams m_hzb_frame_cp;									// the camera of the view of this frame that is culled with occlusion
+	bool m_hzb_frame_cp_valid = false;
+	bool m_hzb_cur_built = false;									// the pyramid after the first pass of this frame is made
 	gpu::ProgramHandle m_blit_screen_program = gpu::INVALID_PROGRAM;
 	Array<UniquePtr<View>> m_views;
 	jobs::Signal m_buckets_ready;

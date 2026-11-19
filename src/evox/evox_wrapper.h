@@ -3,6 +3,7 @@
 #include "core/math.h"
 #include "core/metaprogramming.h"
 #include "evox/capi.h"
+#include <string.h> // memcpy
 #include <tuple> // TODO remove
 
 namespace Lumix::Evox {

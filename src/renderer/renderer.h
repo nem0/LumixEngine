@@ -181,6 +181,10 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual void registerClusterStream(ClusterStream* stream) = 0;
 	virtual void unregisterClusterStream(ClusterStream* stream) = 0;
 	virtual bool isClusterStreamingEnabled() const = 0;	// false: everything is loaded with the model (-cluster_stream_off)
+	// The result of Model::requestClusterPage, called from the main thread when the file system is done (`data` is valid only during the call). `stream` is null if the model was
+	// unloaded meanwhile. `generation` is ClusterStream::generation at the time of the request, the read is ignored if the stream at the address is another one (it was freed and
+	// the address was reused). The payload is kept until the page is uploaded, which waits for the pages that it needs.
+	virtual void onClusterPageRead(ClusterStream* stream, u64 generation, u32 page, Span<const u8> data, bool success) = 0;
 	virtual gpu::BufferHandle getClusterFeedbackBuffer() = 0;	// invalid until the first stream is registered
 	virtual u32 getClusterFeedbackCapacity() = 0;			// groups in it
 
