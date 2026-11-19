@@ -215,6 +215,9 @@ void clodBuild(clodConfig config, clodMesh mesh, Output output)
 #include <math.h>
 #include <string.h>
 
+#include "core/profiler.h"
+namespace profiler = Lumix::profiler; // for PROFILE_BLOCK
+
 #include <algorithm>
 #include <vector>
 
@@ -753,15 +756,21 @@ void clodBuild(clodConfig config, clodMesh mesh, void* output_context, clodOutpu
 	assert(mesh.attribute_count * sizeof(float) <= mesh.vertex_attributes_stride);
 	assert(mesh.attribute_protect_mask < (1u << (mesh.vertex_attributes_stride / sizeof(float))));
 
+	PROFILE_BLOCK("clodBuild");
+
 	std::vector<unsigned char> locks(mesh.vertex_count);
 
 	// for cluster connectivity, we need a position-only remap that maps vertices with the same position to the same index
 	std::vector<unsigned int> remap(mesh.vertex_count);
-	meshopt_generatePositionRemap(&remap[0], mesh.vertex_positions, mesh.vertex_count, mesh.vertex_positions_stride);
+	{
+		PROFILE_BLOCK("clod position remap");
+		meshopt_generatePositionRemap(&remap[0], mesh.vertex_positions, mesh.vertex_count, mesh.vertex_positions_stride);
+	}
 
 	// set up protect bits on UV seams for permissive mode
 	if (mesh.attribute_protect_mask)
 	{
+		PROFILE_BLOCK("clod protect seams");
 		size_t max_attributes = mesh.vertex_attributes_stride / sizeof(float);
 
 		for (size_t i = 0; i < mesh.vertex_count; ++i)
@@ -780,11 +789,14 @@ void clodBuild(clodConfig config, clodMesh mesh, void* output_context, clodOutpu
 	// initial clusterization splits the original mesh
 	std::vector<unsigned int> cluster_indices;
 	std::vector<Cluster> clusters;
-	clusterize(clusters, cluster_indices, config, mesh, mesh.indices, mesh.index_count);
+	{
+		PROFILE_BLOCK("clod initial clusterize");
+		clusterize(clusters, cluster_indices, config, mesh, mesh.indices, mesh.index_count);
 
-	// compute initial precise bounds; subsequent bounds will be using group-merged bounds
-	for (Cluster& cluster : clusters)
-		cluster.bounds = boundsCompute(mesh, cluster_indices.data() + cluster.index_offset, cluster.index_count, 0.f);
+		// compute initial precise bounds; subsequent bounds will be using group-merged bounds
+		for (Cluster& cluster : clusters)
+			cluster.bounds = boundsCompute(mesh, cluster_indices.data() + cluster.index_offset, cluster.index_count, 0.f);
+	}
 
 	std::vector<Cluster> pending;
 	std::vector<unsigned int> pending_indices;
@@ -799,15 +811,25 @@ void clodBuild(clodConfig config, clodMesh mesh, void* output_context, clodOutpu
 	// merge and simplify clusters until we can't merge anymore
 	while (clusters.size() > 1)
 	{
-		std::vector<unsigned int> group_offsets = partition(clusters, config, mesh, cluster_indices, remap);
+		PROFILE_BLOCK("clod level");
+
+		std::vector<unsigned int> group_offsets;
+		{
+			PROFILE_BLOCK("clod partition");
+			group_offsets = partition(clusters, config, mesh, cluster_indices, remap);
+		}
 
 		pending.clear();
 		pending_indices.clear();
 
 		// mark boundaries between groups with a lock bit to avoid gaps in simplified result
-		lockBoundary(locks, clusters.data(), group_offsets.data(), group_offsets.size() - 1, cluster_indices, remap, mesh.vertex_lock);
+		{
+			PROFILE_BLOCK("clod lock boundary");
+			lockBoundary(locks, clusters.data(), group_offsets.data(), group_offsets.size() - 1, cluster_indices, remap, mesh.vertex_lock);
+		}
 
 		// every group needs to be simplified now
+		PROFILE_BLOCK("clod groups");
 		for (size_t i = 0; i + 1 < group_offsets.size(); ++i)
 		{
 			const Cluster* group = clusters.data() + group_offsets[i];
@@ -824,10 +846,14 @@ void clodBuild(clodConfig config, clodMesh mesh, void* output_context, clodOutpu
 			clodBounds bounds = boundsMerge(&group[0].bounds, group_size, sizeof(Cluster));
 
 			float error = 0.f;
-			simplify(simplified, config, mesh, merged, locks, target_size, &error);
+			{
+				PROFILE_BLOCK("clod simplify");
+				simplify(simplified, config, mesh, merged, locks, target_size, &error);
+			}
 			if (simplified.size() > merged.size() * config.simplify_threshold)
 			{
 				bounds.error = FLT_MAX; // terminal group, won't simplify further
+				PROFILE_BLOCK("clod output group");
 				outputGroup(config, mesh, group, group_size, cluster_indices, bounds, depth, output_context, output_callback);
 				continue; // simplification is stuck; abandon the merge
 			}
@@ -836,15 +862,25 @@ void clodBuild(clodConfig config, clodMesh mesh, void* output_context, clodOutpu
 			bounds.error = std::max(bounds.error * config.simplify_error_merge_previous, error) + error * config.simplify_error_merge_additive;
 
 			// output the new group with all clusters; the resulting id will be recorded in new clusters as clodCluster::refined
-			int refined = outputGroup(config, mesh, group, group_size, cluster_indices, bounds, depth, output_context, output_callback);
+			int refined;
+			{
+				PROFILE_BLOCK("clod output group");
+				refined = outputGroup(config, mesh, group, group_size, cluster_indices, bounds, depth, output_context, output_callback);
+			}
 
 			// now that we've output the group with the original clusters, we need to dilate simplified clusters if requested
 			if (config.simplify_dilate_borders)
+			{
+				PROFILE_BLOCK("clod dilate borders");
 				dilateBorders(mesh, merged, simplified, locks, remap, bounds, dilate_offsets, dilate_table);
+			}
 
 			// enqueue new clusters for further processing
 			size_t cluster_offset = pending.size();
-			clusterize(pending, pending_indices, config, mesh, simplified.data(), simplified.size(), refined);
+			{
+				PROFILE_BLOCK("clod clusterize group");
+				clusterize(pending, pending_indices, config, mesh, simplified.data(), simplified.size(), refined);
+			}
 
 			// update cluster group bounds to the group-merged bounds; this ensures that we compute the group bounds for whatever group this cluster will be part of conservatively
 			for (size_t j = cluster_offset; j < pending.size(); ++j)

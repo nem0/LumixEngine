@@ -1434,6 +1434,7 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 	Array<Array<Vec2>> uvs(m_allocator);
 	Array<Array<u32>> aos(m_allocator);
 	Array<Array<u32>> colors(m_allocator);
+	profiler::beginBlock("read cluster attributes");
 	const u8* vertex_data = m_out_file.data() + m_vertex_data_offset;
 	for (const ImportMesh* mesh : meshes) {
 		const ImportGeometry& geom = m_geometries[mesh->geometry_idx];
@@ -1483,12 +1484,14 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 		}
 		vertex_data += geom.vertex_buffer.size();
 	}
+	profiler::endBlock();
 
 	// build before writing anything, so that a failure leaves no half written data
 	Array<MeshClusters*> results(m_allocator);
 	Array<MeshPages*> page_results(m_allocator);	// the pages of each mesh, see buildMeshPages
 	Array<PagePayloads*> payloads(m_allocator);	// the payloads of the pages of each mesh, they are written after the tables
 	bool failed = false;
+	profiler::beginBlock("build clusters of meshes");
 	for (u32 i = 0; i < (u32)meshes.size(); ++i) {
 		const ImportGeometry& geom = m_geometries[meshes[i]->geometry_idx];
 		const Array<u32>& indices = hasAutoLOD(meta, 0) ? *geom.autolod_indices[0].get() : geom.indices;
@@ -1523,10 +1526,12 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 			break;
 		}
 	}
+	profiler::endBlock();
 
 	if (!failed) {
 		// The vertices of the first LOD are only in the clusters (packed), so their vertex buffers are empty: the vertex blocks of these meshes are
 		// replaced by blocks of size 0, they are the first ones, see writeGeometry
+		profiler::beginBlock("strip vertex blocks");
 		u64 blocks_end = m_vertex_data_offset;
 		for (const ImportMesh* mesh : meshes) blocks_end += sizeof(i32) + m_geometries[mesh->geometry_idx].vertex_buffer.size();
 		OutputMemoryStream stripped(m_allocator);
@@ -1535,6 +1540,7 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 		for (u32 i = 0; i < (u32)meshes.size(); ++i) stripped.write((i32)0);
 		stripped.write(m_out_file.data() + blocks_end, m_out_file.size() - blocks_end);
 		m_out_file = static_cast<OutputMemoryStream&&>(stripped);
+		profiler::endBlock();
 
 		write((u32)meshes.size());
 		u32 total_clusters = 0;
@@ -1580,6 +1586,7 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 			for (const MeshClusterGPU& cluster : clusters->clusters) index_stride = maximum(index_stride, cluster.index_count);
 			// indices are local to a cluster, which has at most MeshClusters::MAX_CLUSTER_VERTICES vertices, they are written as bytes
 			static_assert(MeshClusters::MAX_CLUSTER_VERTICES <= 256);
+			profiler::beginBlock("pad cluster indices");
 			Array<u8> padded_indices(m_allocator);
 			padded_indices.resize(cluster_count * index_stride);
 			memset(padded_indices.begin(), 0, padded_indices.byte_size());
@@ -1591,7 +1598,10 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 				}
 			}
 
+			profiler::endBlock();
+
 			// the finest clusters on the CPU side (physics, picking, bounds), positions are the ones of the lattice, the same as on the GPU
+			profiler::beginBlock("decode cpu geometry");
 			Array<Vec3> cpu_vertices(m_allocator);
 			Array<u32> cpu_indices(m_allocator);
 			cpu_vertices.resize(clusters->leaf_vertex_count);
@@ -1608,6 +1618,7 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 				}
 				first_vertex += header.vertex_count;
 			}
+			profiler::endBlock();
 
 			// the trees are balanced (see buildNodes), the first child leads to a leaf as deep as any
 			u32 tree_depth = 0;
@@ -1652,6 +1663,7 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 
 			// The payload of a page: the vertex streams of its groups, then the indices of their clusters, padded to 16 bytes. The same as ClusterStream::pageBytes and
 			// ClusterStream::loadPage expect, it is copied to the buffer of cluster data as it is.
+			profiler::beginBlock("build page payloads");
 			PagePayloads* page_payloads = LUMIX_NEW(m_allocator, PagePayloads)(m_allocator);
 			payloads.push(page_payloads);
 			for (u32 p = 0; p < (u32)page_data.pages.size(); ++p) {
@@ -1673,11 +1685,13 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 				page_payloads->size.push(size);
 				page_payloads->field.push(pages_at + u64(p) * sizeof(MeshPageFile) + offsetof(MeshPageFile, file_offset));
 			}
+			profiler::endBlock();
 			total_clusters += cluster_count;
 			packed_bytes += padded_indices.byte_size() + vertex_data_size;
 			unpacked_bytes += u64(m_geometries[meshes[i]->geometry_idx].vertex_buffer.size()) + clusters->indices.byte_size();
 		}
 		// The payloads of the pages follow the tables: first the permanent ones, they are read with the model, then the others, which are read when they are needed.
+		profiler::beginBlock("write page payloads");
 		for (u32 pass = 0; pass < 2; ++pass) {
 			if (pass == 1) m_resident_end = m_out_file.size();
 			for (u32 i = 0; i < (u32)payloads.size(); ++i) {
@@ -1691,6 +1705,7 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 				}
 			}
 		}
+		profiler::endBlock();
 		logInfo("Baked ", total_clusters, " clusters, vertices and indices of the first LOD: ", packed_bytes, " bytes (", unpacked_bytes, " before)");
 	}
 	else {

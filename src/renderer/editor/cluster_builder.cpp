@@ -253,8 +253,11 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 	}
 	close_level();
 	// the trees over the clusters of the levels: the finest clusters, then the ones that each level has made
-	buildNodes(out, 0, out.leaf_cluster_count);
-	for (u32 i = 0; i + 1 < (u32)level_ranges.size(); i += 2) buildNodes(out, level_ranges[i], level_ranges[i + 1]);
+	{
+		PROFILE_BLOCK("build cluster nodes");
+		buildNodes(out, 0, out.leaf_cluster_count);
+		for (u32 i = 0; i + 1 < (u32)level_ranges.size(); i += 2) buildNodes(out, level_ranges[i], level_ranges[i + 1]);
+	}
 
 	return true;
 }
@@ -540,6 +543,7 @@ static void buildAdjacency(const Array<u32>& key, const Array<u32>& value, u32 k
 }
 
 bool buildMeshPages(const MeshClusterGPU* clusters, u32 cluster_count, const MeshGroupGPU* groups, u32 group_count, u32 index_stride, MeshPages& out, IAllocator& allocator) {
+	PROFILE_FUNCTION();
 	out.pages.clear();
 	out.parents.clear();
 	out.children.clear();
