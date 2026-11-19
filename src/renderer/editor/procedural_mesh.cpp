@@ -336,7 +336,7 @@ struct ProceduralMeshImporter final : ModelImporter {
 					if (part.lod != lod || part.material != material) continue;
 					for (u32 i = 0; i < part.index_count; ++i) indices.push(m_mesh.indices[part.first_index + i]);
 				}
-				if (!indices.empty()) addMesh(lod, material, indices, materials);
+				if (!indices.empty()) addMesh(lod, material, indices, materials, meta.bake_vertex_ao);
 			}
 		}
 		// builds the autolodN index buffers (the writer reads them for every level enabled by autolodN) and bakes AO if the meta asks for it
@@ -345,7 +345,7 @@ struct ProceduralMeshImporter final : ModelImporter {
 	}
 
 	// Creates the geometry and mesh of one material of a level. Only the vertices used by the material are kept.
-	void addMesh(u32 lod, u32 material, const Array<u32>& indices, Array<u32>& materials) {
+	void addMesh(u32 lod, u32 material, const Array<u32>& indices, Array<u32>& materials, bool has_ao) {
 		// the default material is named after the recipe, others after the recipe and their name
 		String name(m_name, m_allocator);
 		if (material > 0) name.append("_", m_mesh.material_names[material].c_str());
@@ -381,6 +381,11 @@ struct ProceduralMeshImporter final : ModelImporter {
 		geom.attributes.push({ AttributeSemantic::NORMAL, AttributeType::I8, 4 });
 		geom.attributes.push({ AttributeSemantic::TEXCOORD0, AttributeType::FLOAT, 2 });
 		geom.attributes.push({ AttributeSemantic::TANGENT, AttributeType::I8, 4 });
+		// AO attribute is filled by ModelImporter::bakeVertexAO, it must exist in the layout before that
+		if (has_ao) {
+			geom.attributes.push({ AttributeSemantic::AO, AttributeType::U8, 4 });
+			geom.vertex_size += sizeof(u32);
+		}
 
 		geom.vertex_buffer.resize(used.size() * geom.vertex_size);
 		u8* out = geom.vertex_buffer.getMutableData();
@@ -392,6 +397,10 @@ struct ProceduralMeshImporter final : ModelImporter {
 			memcpy(out, &normal, sizeof(normal)); out += sizeof(normal);
 			memcpy(out, &v.uv, sizeof(v.uv)); out += sizeof(v.uv);
 			memcpy(out, &tangent, sizeof(tangent)); out += sizeof(tangent);
+			if (has_ao) {
+				const u32 ao = 0xffffFFFF; // no occlusion until baked
+				memcpy(out, &ao, sizeof(ao)); out += sizeof(ao);
+			}
 		}
 		geom.indices.resize((u32)indices.size());
 		for (u32 i = 0, c = (u32)indices.size(); i < c; ++i) geom.indices[i] = remap[indices[i]];

@@ -1688,9 +1688,14 @@ void ModelImporter::bakeVertexAO(float min_ao) {
 		ImportGeometry& geom = m_geometries[mesh.geometry_idx];
 		const u8* positions = geom.vertex_buffer.data();
 		u32 ao_offset = 0;
+		bool has_ao = false;
 		for (const AttributeDesc& desc :  geom.attributes) {
-			if (desc.semantic == AttributeSemantic::AO) break;
+			if (desc.semantic == AttributeSemantic::AO) { has_ao = true; break; }
 			ao_offset += desc.num_components * getSize(desc.type);
+		}
+		if (!has_ao) {
+			logError("Can't bake vertex AO, mesh ", mesh.name, " has no AO attribute");
+			continue;
 		}
 
 		u8* AOs = geom.vertex_buffer.getMutableData() + ao_offset;

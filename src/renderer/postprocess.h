@@ -60,7 +60,7 @@ struct TDAO : public RenderPlugin {
 	Shader* m_shader = nullptr;
 	float m_xz_range = 100;
 	float m_y_range = 200;
-	float m_intensity = 0.9f;
+	float m_intensity = 0.5f;
 	bool m_enabled = true;
 	float m_scale = 0.01f;
 	

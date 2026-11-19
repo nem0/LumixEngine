@@ -1,4 +1,6 @@
 
 lod_count = 1
 cluster_dilate_borders = true
+bake_vertex_ao = true
+min_bake_vertex_ao = 0.500000
 lod0_distance = 10000.000000
