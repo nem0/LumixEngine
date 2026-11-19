@@ -970,7 +970,7 @@ struct PipelineImpl final : Pipeline {
 
 			// Model instances that the GPU scene can draw (meshes with clusters or with buffers of their own, skinned too) and instanced models with clusters are
 			// culled and drawn by the GPU. They are not in the culling system, so this does not depend on its result (it is empty if there are no lights or decals in the view).
-			runGPUSceneCulling(stream, *view_ptr);
+			runGPUSceneCulling(stream, view_ptr);
 
 			if (view_ptr->renderables) {
 				if (view_ptr->renderables->header.count != 0 || view_ptr->renderables->header.next) {
@@ -1107,7 +1107,7 @@ struct PipelineImpl final : Pipeline {
 		if (!view->occlusion || !view->hzb_prev_valid || !m_hzb_cur_built) return;
 		m_renderer.pushJob("cull post pass", [this, view](DrawStream& stream) {
 			jobs::wait(&view->ready);
-			runGPUSceneCulling(stream, *view, true);
+			runGPUSceneCulling(stream, view, true);
 		});
 	}
 
@@ -1816,6 +1816,8 @@ struct PipelineImpl final : Pipeline {
 		});
 	}
 	
+	// Draws the meshes of the given entities like the main view draws them (the GPU scene culls them, selects the clusters and draws), with the state and the define of the call.
+	// Entities that the GPU scene does not draw (no model instance, a model that is not ready) are skipped.
 	void renderEntities(Span<const EntityRef> entities, gpu::StateFlags state, const char* define) override {
 		PROFILE_FUNCTION();
 		if (entities.size() == 0) return;
@@ -1824,113 +1826,29 @@ struct PipelineImpl final : Pipeline {
 		// the job runs later, so it gets its own copy of the list
 		EntityRef* list = (EntityRef*)m_renderer.getCurrentFrameAllocator().allocate(sizeof(EntityRef) * count, alignof(EntityRef));
 		for (u32 i = 0; i < count; ++i) list[i] = entities[i];
+		const CameraParams cp = getMainCamera();
 
-		m_renderer.pushJob("render entities", [this, list, count, state, define_mask](DrawStream& stream) {
-			UniformPool& uniform_pool = m_renderer.getUniformPool();
-			TransientPool& transient_pool = m_renderer.getTransientPool();
+		m_renderer.pushJob("render entities", [this, list, count, state, define_mask, cp](DrawStream& stream){
+			GPUScene& scene = m_module->getGPUScene();
 			const World& world = m_module->getWorld();
-			const u32 skinned_define = 1 << m_renderer.getShaderDefineIdx("SKINNED");
-			const u32 mesh_instance_define = 1 << m_mesh_instance_define_idx;
-			const DVec3 view_pos = m_viewport.pos;
-			Array<DualQuat> dq_pose(m_renderer.getAllocator());
-			for (u32 ei = 0; ei < count; ++ei) {
-				const EntityRef e = list[ei];
-				if (!world.hasComponent(e, types::model_instance)) continue;
-
-				const Model* model = m_module->getModelInstanceModel(e);
-				if (!model || !model->isReady()) continue;
-
-				const Pose* pose = m_module->lockPose(e);
-				for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
-					const Mesh& mesh = model->getMesh(i);
-					const MeshMaterial& mesh_mat = model->getMeshMaterial(i);
-					if (!mesh.index_buffer_handle) continue; // cluster meshes have no plain index buffer
-
-					Material* material = mesh_mat.material;
-					u32 mask = material->getDefineMask() | define_mask;
-					dq_pose.clear();
-					if (pose && pose->count > 0 && mesh.type == Mesh::SKINNED) {
-						mask |= skinned_define;
-						dq_pose.reserve(pose->count);
-						for (int j = 0, c = pose->count; j < c; ++j) {
-							const LocalRigidTransform& inv_bind = model->getInverseBindTransform(j);
-							const LocalRigidTransform tmp = {pose->positions[j], pose->rotations[j]};
-							dq_pose.push((tmp * inv_bind).toDualQuat());
-						}
-					}
-
-					if (dq_pose.empty()) {
-						// one instance with the layout of the MESH_INSTANCE variant of surface shaders (the previous state is the current one)
-						struct DynamicInstanceData {
-							Quat rot;
-							Vec3 pos;
-							float lod;
-							Vec3 scale;
-							float padding;
-							Quat prev_rot;
-							Vec3 prev_pos;
-							float prev_lod;
-							Vec3 prev_scale;
-							MaterialIndex material_index;
-						};
-						static_assert(sizeof(DynamicInstanceData) == 96);
-
-						const Transform tr = world.getTransform(e);
-						TransientSlice inst_buf = alloc(transient_pool, sizeof(DynamicInstanceData));
-						DynamicInstanceData* idata = (DynamicInstanceData*)inst_buf.ptr;
-						idata->rot = idata->prev_rot = tr.rot;
-						idata->pos = idata->prev_pos = Vec3(tr.pos - view_pos);
-						idata->scale = idata->prev_scale = tr.scale;
-						idata->lod = idata->prev_lod = 0;
-						idata->padding = 0;
-						idata->material_index = material->getIndex();
-
-						mask |= mesh_instance_define;
-						// instance data is pulled by the vertex shader
-						bindPulledBuffers(stream, mesh.vertex_buffer_handle, inst_buf.buffer, inst_buf.offset);
-						gpu::ProgramHandle program = mesh_mat.material->getShader()->getProgram(material->m_render_states | state, mesh.primitive_type, mask, mesh.semantics_defines);
-						stream.useProgram(program);
-					}
-					else {
-						// the layout of the MESH_INSTANCE variant, the word after the scale is the offset of the bones in the buffer of bones of the draw
-						struct SkinnedInstanceData {
-							Quat rot;
-							Vec3 pos;
-							float lod;
-							Vec3 scale;
-							u32 bones_offset;
-							Quat prev_rot;
-							Vec3 prev_pos;
-							float prev_lod;
-							Vec3 prev_scale;
-							MaterialIndex material_index;
-						};
-						static_assert(sizeof(SkinnedInstanceData) == 96);
-
-						TransientSlice inst_buf = alloc(transient_pool, sizeof(SkinnedInstanceData));
-						TransientSlice bones = alloc(transient_pool, dq_pose.byte_size());
-						SkinnedInstanceData* idata = (SkinnedInstanceData*)inst_buf.ptr;
-
-						Transform tr = world.getTransform(e);
-						idata->pos = idata->prev_pos = Vec3(tr.pos - view_pos);
-						idata->rot = idata->prev_rot = tr.rot;
-						idata->scale = idata->prev_scale = tr.scale;
-						idata->lod = idata->prev_lod = 0;
-						idata->bones_offset = bones.offset;
-						idata->material_index = material->getIndex();
-
-						memcpy(bones.ptr, dq_pose.begin(), dq_pose.byte_size());
-						// instance data is pulled by the vertex shader (SKINNED is in the mask, it has the layout of MESH_INSTANCE, but must not have the define)
-						bindPulledBuffers(stream, mesh.vertex_buffer_handle, inst_buf.buffer, inst_buf.offset, bones.buffer);
-						gpu::ProgramHandle program = mesh_mat.material->getShader()->getProgram(material->m_render_states | state, mesh.primitive_type, mask, mesh.semantics_defines);
-						stream.useProgram(program);
-					}
-
-					stream.bindIndexBuffer(mesh.index_buffer_handle);
-					stream.drawIndexed(0, mesh.indices_count, mesh.index_type);
-				}
-				m_module->unlockPose(e, false);
+			const u32 words = (scene.getCapacity() + 31) / 32;
+			if (words == 0) return;
+			SceneEntityDraw draw;
+			draw.cp = cp;
+			draw.define_mask = define_mask;
+			draw.state = state;
+			draw.filter = alloc(m_renderer.getTransientPool(), words * sizeof(u32));
+			u32* bits = (u32*)draw.filter.ptr;
+			memset(bits, 0, words * sizeof(u32));
+			bool any = false;
+			for (u32 i = 0; i < count; ++i) {
+				if (!world.hasComponent(list[i], types::model_instance)) continue;
+				const u32 slot = m_module->getModelInstance(list[i])->gpu_slot;
+				if (slot >= scene.getCapacity()) continue;
+				bits[slot >> 5] |= 1u << (slot & 31);
+				any = true;
 			}
+			if (any) runGPUSceneCulling(stream, nullptr, false, &draw);
 		});
 	}
 
@@ -2361,7 +2279,7 @@ struct PipelineImpl final : Pipeline {
 	// groups that are drawn follow each other. The result is a u32 for each draw group, its first command in this view or 0xffffffff if the view does not draw it.
 	// The variants, the table of meshes and the material sets do not depend on the view, they are in the GPU scene. The buffer of the result is invalid if there is
 	// nothing to draw.
-	TransientSlice makeSceneViewGroups(View& view, GPUScene& scene) {
+	TransientSlice makeSceneViewGroups(const View* view, GPUScene& scene) {
 		const u32 group_count = scene.getDrawGroupCount();
 		if (!m_scene_variants_shader->isReady() || group_count == 0 || scene.getVariantCount() == 0) return {};
 
@@ -2370,7 +2288,7 @@ struct PipelineImpl final : Pipeline {
 		u32 commands = 0;
 		for (u32 g = 0; g < group_count; ++g) {
 			const GPUScene::DrawGroup& group = scene.getDrawGroup(g);
-			if (view.layer_to_bucket[group.layer] == 0xff) {
+			if (view && view->layer_to_bucket[group.layer] == 0xff) {
 				group_base[g] = 0xffFFffFF;
 				continue;
 			}
@@ -2432,9 +2350,20 @@ struct PipelineImpl final : Pipeline {
 	// need, which are executed later, is not shared: the instances of the draws are taken from a counter of the frame and the commands of a view are its own.
 	// `post`: the second pass of the occlusion culling of the view (View::occlusion): it selects the clusters that the first one skipped and that are visible in the pyramid of
 	// the depth of the first pass, and draws them into `stream`, which has the current targets (the first pass draws into the buckets).
-	void runGPUSceneCulling(DrawStream& stream, View& view, bool post = false) {
+	// `entities`: renderEntities. Only the slots in the filter are culled in, there is no view: the camera is the main one and everything is drawn into `stream` with the
+	// state and the defines of the call, instead of the buckets of a view.
+	struct SceneEntityDraw {
+		CameraParams cp;
+		TransientSlice filter;	// a bit for each slot
+		u32 define_mask;
+		gpu::StateFlags state;
+	};
+
+	void runGPUSceneCulling(DrawStream& stream, View* view_ptr, bool post = false, const SceneEntityDraw* entities = nullptr) {
 		GPUScene& scene = m_module->getGPUScene();
-		if (post && (!view.occlusion || !view.hzb_prev_valid)) return;
+		if (post && (!view_ptr || !view_ptr->occlusion || !view_ptr->hzb_prev_valid)) return;
+		const CameraParams& view_cp = entities ? entities->cp : view_ptr->cp;
+		const bool occlusion_view = view_ptr && view_ptr->occlusion && view_ptr->hzb_prev_valid && view_ptr->hzb_prev && view_ptr->hzb_cur;
 		if (m_cluster_shader->isFailure() && !m_cluster_shader_failure_logged) {
 			m_cluster_shader_failure_logged = true;
 			logError("Cluster shader nanite.hlsl failed to load, models with clusters are not drawn");
@@ -2447,7 +2376,7 @@ struct PipelineImpl final : Pipeline {
 		if (!m_cluster_scratch || !m_cluster_iota) return;
 
 		// the draw groups of the view are known before the clusters are selected
-		const TransientSlice group_base = makeSceneViewGroups(view, scene);
+		const TransientSlice group_base = makeSceneViewGroups(view_ptr, scene);
 		if (!group_base.buffer) return;
 		// the draws of a view are executed after the passes of all the views, each view has its own commands
 		const i32 view_slot = m_scene_view_count.inc();
@@ -2461,9 +2390,9 @@ struct PipelineImpl final : Pipeline {
 
 		// The camera that culls the instances and chooses the levels of detail is the frozen one (the main view only) if the camera of the clusters is frozen,
 		// the instances are drawn from the camera of the view: their positions are relative to it, the culling adds the difference of the cameras (u_cull_offset)
-		const bool frozen = !view.cp.is_shadow && m_cluster_frozen;
-		const CameraParams& cull_cp = frozen ? m_cluster_frozen_cp : view.cp;
-		const GPUSceneView scene_view = makeGPUSceneView(view.cp.pos);
+		const bool frozen = !entities && !view_cp.is_shadow && m_cluster_frozen;
+		const CameraParams& cull_cp = frozen ? m_cluster_frozen_cp : view_cp;
+		const GPUSceneView scene_view = makeGPUSceneView(view_cp.pos);
 		const GPUSceneView cull_view = frozen ? makeGPUSceneView(cull_cp.pos) : scene_view;
 		struct Uniforms {
 			Vec4 planes[6];
@@ -2489,8 +2418,11 @@ struct PipelineImpl final : Pipeline {
 			u32 group_instances;
 			float lod_ref[3];		// where the LODs of models without clusters are chosen from, relative to the camera of the culling
 			float lod_scale;
+			gpu::BindlessHandle filter;	// bit for each slot, FILTER variant only
+			u32 filter_offset;
+			u32 padding[2];
 		};
-		static_assert(sizeof(Uniforms) == 208);
+		static_assert(sizeof(Uniforms) == 224);
 		Uniforms ub;
 		memset(&ub, 0, sizeof(ub));
 		toPlanes(cull_cp, Span(ub.planes));
@@ -2514,6 +2446,11 @@ struct PipelineImpl final : Pipeline {
 		ub.group_count = scene.getGroupCount();
 		ub.group_instances = scene.getGroupInstanceCount();
 		ub.selected_capacity = m_scene_selected_capacity;
+		if (entities) {
+			ub.filter = gpu::getBindlessHandle(entities->filter.buffer);
+			ub.filter_offset = entities->filter.offset;
+			stream.barrier(entities->filter.buffer, gpu::BarrierType::READ);
+		}
 		{
 			const Vec3 lod_ref = Vec3(m_viewport.pos - cull_cp.pos);
 			ub.lod_ref[0] = lod_ref.x;
@@ -2525,12 +2462,12 @@ struct PipelineImpl final : Pipeline {
 
 		// the culling of instances: it clears the counters and writes the groups of its own dispatch, then it generates the work of the clusters
 		// blocks of shadow views have their own names, with the cascade of the main light (a frame has several views and the main one is the one that counts)
-		const bool is_shadow = view.cp.is_shadow;
+		const bool is_shadow = view_cp.is_shadow;
 		auto scope_name = [&](const char* name) -> StaticString<64> {
 			if (post) return StaticString<64>(name, " (post)");
 			if (!is_shadow) return StaticString<64>(name);
-			if (view.cp.shadow_slice < 0) return StaticString<64>(name, " (shadow)");
-			return StaticString<64>(name, " (shadow ", view.cp.shadow_slice, ")");
+			if (view_cp.shadow_slice < 0) return StaticString<64>(name, " (shadow)");
+			return StaticString<64>(name, " (shadow ", view_cp.shadow_slice, ")");
 		};
 		stream.beginProfileBlock(scope_name("scene instance cull"), 0, false);
 		stream.barrier(scene.getBoundsBuffer(), gpu::BarrierType::READ);
@@ -2548,7 +2485,7 @@ struct PipelineImpl final : Pipeline {
 		stream.memoryBarrier(m_scene_cull_counter);
 		stream.memoryBarrier(m_scene_cull_args);
 		stream.memoryBarrier(m_scene_selected);
-		stream.useProgram(m_scene_cull_shader->getProgram(0));
+		stream.useProgram(m_scene_cull_shader->getProgram(entities ? 1 << m_renderer.getShaderDefineIdx("FILTER") : 0));
 		stream.bindIndirectBuffer(m_scene_cull_args);
 		stream.dispatchIndirect(0);
 		stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
@@ -2558,7 +2495,7 @@ struct PipelineImpl final : Pipeline {
 		stream.memoryBarrier(m_scene_selected);
 
 		// the instances of instanced models: one thread for each, they add their work to the same lists
-		if (scene.getGroupInstanceCount() > 0) {
+		if (!entities && scene.getGroupInstanceCount() > 0) {
 			stream.barrier(scene.getGroupTableBuffer(), gpu::BarrierType::READ);
 			for (const gpu::BufferHandle instances : scene.getGroupInstanceBuffers()) stream.barrier(instances, gpu::BarrierType::READ);
 			stream.useProgram(m_scene_cull_shader->getProgram(1 << m_renderer.getShaderDefineIdx("GROUPS")));
@@ -2583,11 +2520,11 @@ struct PipelineImpl final : Pipeline {
 		ClusterViewUniforms cu;
 		memset(&cu, 0, sizeof(cu));
 		toPlanes(cull_cp, Span(cu.planes));
-		cu.cull_offset = frozen ? Vec4(Vec3(view.cp.pos - m_cluster_frozen_cp.pos), 0) : Vec4(0, 0, 0, 0);
+		cu.cull_offset = frozen ? Vec4(Vec3(view_cp.pos - m_cluster_frozen_cp.pos), 0) : Vec4(0, 0, 0, 0);
 		const Matrix& projection = cull_cp.projection;
 		const float lod_multiplier = maximum(m_renderer.getLODMultiplier(), 0.01f);
 		const float viewport_height = frozen ? m_cluster_frozen_height : (m_viewport.h > 1 ? (float)m_viewport.h : 1.f);
-		cu.lod_k = 2.f * maximum(m_cluster_error_pixels * (view.cp.is_shadow ? m_cluster_shadow_error_scale : 1.f), 0.01f) / (viewport_height * maximum(fabsf(projection.columns[1].y), 1e-6f) * lod_multiplier);
+		cu.lod_k = 2.f * maximum(m_cluster_error_pixels * (view_cp.is_shadow ? m_cluster_shadow_error_scale : 1.f), 0.01f) / (viewport_height * maximum(fabsf(projection.columns[1].y), 1e-6f) * lod_multiplier);
 		cu.is_ortho = projection.columns[3].w == 1.f ? 1 : 0;
 		cu.attribute_weight = maximum(m_cluster_attribute_weight, 0.f);
 		cu.scratch = gpu::getRWBindlessHandle(m_cluster_scratch);
@@ -2611,7 +2548,8 @@ struct PipelineImpl final : Pipeline {
 		}
 
 		// occlusion culling (nanite.hlsl): the first pass tests with the pyramid of the previous frame, the second one with the pyramid of the depth of the first pass too
-		if (view.occlusion && view.hzb_prev_valid && view.hzb_prev && view.hzb_cur && (post || !view.cp.is_shadow)) {
+		if (occlusion_view && (post || !view_cp.is_shadow)) {
+			View& view = *view_ptr;
 			cu.hzb_mode = post ? 2 : 1;
 			const Matrix cur_vp = cull_cp.projection * cull_cp.view;
 			setMatrixRows(cur_vp, cu.cur_vp);
@@ -2754,11 +2692,11 @@ struct PipelineImpl final : Pipeline {
 			for (u32 g = 0, c = scene.getDrawGroupCount(); g < c; ++g) {
 				if (group_bases[g] == 0xffFFffFF) continue;
 				const GPUScene::DrawGroup& group = scene.getDrawGroup(g);
-				Bucket& bucket = view.buckets[view.layer_to_bucket[group.layer]];
-				// the second pass draws from the job that culls it, the draws of the first one are in the buckets of the view
-				DrawStream& draw = post ? stream : bucket.stream;
-				const u32 define_mask = group.define_mask | bucket.define_mask;
-				const gpu::StateFlags state = group.state | bucket.state;
+				// the second pass and the entities draw from the job that culls them, the draws of the first pass are in the buckets of the view
+				Bucket* bucket = entities ? nullptr : view_ptr->buckets.begin() + view_ptr->layer_to_bucket[group.layer];
+				DrawStream& draw = (post || entities) ? stream : bucket->stream;
+				const u32 define_mask = group.define_mask | (entities ? entities->define_mask : bucket->define_mask);
+				const gpu::StateFlags state = group.state | (entities ? entities->state : bucket->state);
 				const u32 command_offset = command_base + group_bases[g] * 24;
 				if (group.plain) {
 					// the vertices and indices of the meshes are in the buffer of cluster data, a command has the first index and the base vertex of its mesh

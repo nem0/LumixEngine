@@ -15,6 +15,7 @@
 //         clusters (nanite.hlsl, SCENE_LISTS)
 //   otherwise: one thread per slot, positions are fixed point, the camera-relative position is exact:
 //     float3(p - cam_p) * unit - cam_frac
+//   FILTER (with the last variant): only the slots with a bit set in u_filter are culled in (renderEntities), a variant of its own so that other views do not pay for it.
 // Planes are relative to the camera, as the ones of nanite.hlsl.
 
 cbuffer UniformData : register(b4) {
@@ -41,6 +42,8 @@ cbuffer UniformData : register(b4) {
 	uint u_group_instances;	// of all the groups
 	float3 u_lod_ref;		// the point the LODs are chosen from, relative to the camera of the culling
 	float u_lod_scale;		// squared distances are multiplied by it
+	uint u_filter;			// bindless, a bit for each slot (FILTER)
+	uint u_filter_offset;	// in bytes
 };
 
 #define MESH_FLAT 1
@@ -142,6 +145,9 @@ void main(uint3 thread_id : SV_DispatchThreadID) {
 	#else
 		const uint slot = thread_id.y * 65535 * 64 + thread_id.x;
 		if (slot >= u_capacity) return;
+		#ifdef FILTER
+			if ((bindless_buffers[u_filter].Load(u_filter_offset + (slot >> 5) * 4) & (1u << (slot & 31))) == 0) return;
+		#endif
 
 		const uint4 b = bindless_buffers[u_bounds].Load4(slot * 16);
 		const float radius = asfloat(b.w);

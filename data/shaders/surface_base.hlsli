@@ -170,6 +170,11 @@ Surface getSurface(VSOutput input, uint material_index);
 	#define DEPTH_ONLY_VS
 #endif
 
+// a surface shader can change the pulled vertex: #define CUSTOM_VERTEX before including this file and implement customVertex after it
+#ifdef CUSTOM_VERTEX
+	void customVertex(inout VSVertex vtx, VSInput input);
+#endif
+
 VSOutput mainVS(VSInput input) {
 	#if defined MESH_PARTICLE || defined GRASS || defined MESH_INSTANCE || defined SKINNED
 		Instance inst = loadInstance(input);
@@ -181,6 +186,9 @@ VSOutput mainVS(VSInput input) {
 		VSVertex vtx = pullVertex(input.vertex_id + inst.base_vertex);
 	#else
 		VSVertex vtx = pullVertex(input.vertex_id);
+	#endif
+	#ifdef CUSTOM_VERTEX
+		customVertex(vtx, input);
 	#endif
 	#ifdef DEPTH_ONLY_VS
 		VSOutput output = (VSOutput)0;
