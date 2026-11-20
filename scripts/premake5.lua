@@ -429,7 +429,7 @@ plugin_defs.renderer = function()
 	filter {}
 
 	if build_studio then
-		files { "../external/meshoptimizer/**.*", "../external/mikktspace/**.*", "../external/openfbx/**.*" }
+		files { "../external/meshoptimizer/**.*", "../external/mikktspace/**.*", "../external/ufbx/**.*" }
 	end
 	includedirs { "../src", "../external/freetype/include", "../external/", "../external/dx12/", "../external/pix/include/WinPixEventRuntime" }
 	defines { "BUILDING_RENDERER" }

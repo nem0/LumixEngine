@@ -39,7 +39,7 @@
 #include "fbx_importer.h"
 #include "game_view.h"
 #include "model_meta.h"
-#include "openfbx/ofbx.h"
+#include "ufbx/ufbx.h"
 #include "renderer/culling_system.h"
 #include "renderer/editor/composite_texture.h"
 #include "renderer/editor/model_importer.h"
@@ -2059,12 +2059,17 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		
 		void onFBXLoaded(Span<const u8> data, bool success) {
 			m_fbx_async_handle = FileSystem::AsyncHandle::invalid();
-			ofbx::IScene* fbx_scene = ofbx::load(data.begin(), data.length(), (u16)ofbx::LoadFlags::IGNORE_GEOMETRY);
+			ufbx_load_opts opts = {};
+			opts.ignore_geometry = true;
+			opts.ignore_animation = true;
+			opts.ignore_embedded = true;
+			ufbx_error error;
+			ufbx_scene* fbx_scene = ufbx_load_memory(data.begin(), data.length(), &opts, &error);
 			if (!fbx_scene) return;
 
-			m_has_meshes = fbx_scene->getMeshCount() > 0;
+			m_has_meshes = fbx_scene->meshes.count > 0;
 
-			fbx_scene->destroy();
+			ufbx_free_scene(fbx_scene);
 		}
 
 		void deserialize(InputMemoryStream& blob) override { 
@@ -2706,6 +2711,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			if (!importer->parseSimple(Path(path))) {
 				logError("Failed to parse ", path);
 				destroyFBXImporter(*importer);
+				scan_counter.dec();
 				return;
 			}
 
