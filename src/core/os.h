@@ -513,6 +513,17 @@ enum class Keycode : u8 {
 	PA1 = 0xFD,
 	OEM_CLEAR = 0xFE,
 
+	NUMROW0 = '0',
+	NUMROW1 = '1',
+	NUMROW2 = '2',
+	NUMROW3 = '3',
+	NUMROW4 = '4',
+	NUMROW5 = '5',
+	NUMROW6 = '6',
+	NUMROW7 = '7',
+	NUMROW8 = '8',
+	NUMROW9 = '9',
+
 	A = 'A',
 	B = 'B',
 	C = 'C',
