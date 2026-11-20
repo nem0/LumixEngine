@@ -1,0 +1,104 @@
+import "models/trees/tree_leaf_shape" as blade
+import "core:texture_recipe"
+import "core:vec4"
+import "std:math" as math
+
+comptime WIDTH = blade.VARIANTS * blade.TILE;
+
+fn smooth(lo : f32, hi : f32, x : f32) : f32 {
+    const t = recipeClamp((x - lo) / (hi - lo));
+    return t * t * (3 - 2 * t);
+}
+
+struct Fields {
+    pigment : Image;
+    cells : Image;
+    grain : Image;
+}
+
+fn fields() : Fields {
+    return Fields {valueNoise(48, 28, 141), valueNoise(162, 93, 94),
+        valueNoise(WIDTH, blade.HEIGHT, 331)};
+}
+
+struct Surface {
+    color : Vec4;
+    height : f32;
+    roughness : f32;
+}
+
+fn surface(x : u32, y : u32, f : Fields) : Surface {
+    const variant = x / blade.TILE;
+    const u = ((x % blade.TILE) as f32 + 0.5) / blade.TILE as f32;
+    const t = (y as f32 + 0.5) / blade.HEIGHT as f32;
+    const side = 2.3 * (u - 0.5);
+    const sign : f32 = side < 0 ? -1 : 1;
+    const width = blade.margin(t, sign, variant as i32);
+    const edge = width - math.abs(side);
+    const alpha = smooth(-0.0045, 0.0045, edge);
+    const patch = sample(f.pigment, x as f32 * 48 / WIDTH as f32, t * 28, true).x - 0.5;
+    const grain = getPixel(f.grain, x, y).x - 0.5;
+    const bow = math.sin(t * math.pi) * math.sin(t * 5.4 + variant as f32) * 0.024;
+    const q = math.abs(side - bow);
+
+    // Lateral veins travel outward at first, then arc toward the tip.
+    // Stagger their origins on opposite sides of the midrib.
+    const starts : [7]f32 = [0.075, 0.166, 0.273, 0.377, 0.502, 0.638, 0.756];
+    var lateral : f32 = 0;
+    var forks : f32 = 0;
+    for i in 0..7 {
+        const start = starts[i] + 0.022 * sign * math.sin(1.9 * i as f32 + variant as f32);
+        const rise = 0.19 - 0.064 * start;
+        const span = 0.94 * blade.margin(start + rise, sign, variant as i32);
+        const a = q / span;
+        const path = start + rise * a * (0.72 + 0.28 * a) + 0.085 * a * a * a * a;
+        const offset = t - path;
+        const weight = 1 - smooth(0.65, 1.03, a);
+        lateral = math.max(lateral, weight * (1 - smooth(0.0004, 0.0025, math.abs(offset))));
+        const branch = a - 0.49;
+        const fork = offset - branch * (0.14 - 0.06 * branch);
+        forks = math.max(forks, smooth(0, 0.05, branch) * (1 - smooth(0.19, 0.47, branch))
+            * (1 - smooth(0.0003, 0.0021, math.abs(fork))));
+    }
+    const rib_width = 0.022 * (1 - t) + 0.004;
+    const midrib = 1 - smooth(0.22 * rib_width, rib_width, q);
+    const rim = 1 - smooth(0.009, 0.045, edge);
+    const cell = sample(f.cells, x as f32 * 0.15 + patch, y as f32 * 0.16 - 3.8 * q, true).x;
+    // Irregular closed areoles fill the spaces between larger veins.
+    const cx = side * 6.5 + 0.38 * patch;
+    const cy = t * 23 - 1.9 * q + 0.30 * cell;
+    const ix = math.floor(cx) as i32;
+    const iy = math.floor(cy) as i32;
+    var nearest : f32 = 10;
+    var second : f32 = 10;
+    for j in 0..3 {
+        for i in 0..3 {
+            const col = ix + i - 1;
+            const row = iy + j - 1;
+            const sx = samplePixel(f.cells, col + 26 * variant as i32, row, true).x;
+            const sy = samplePixel(f.cells, col + 39, row + 13 * variant as i32, true).x;
+            const dx = cx - col as f32 - 0.14 - 0.72 * sx;
+            const dy = cy - row as f32 - 0.14 - 0.72 * sy;
+            const dist = dx * dx + dy * dy;
+            if dist < nearest { second = nearest; nearest = dist; }
+            else if dist < second { second = dist; }
+        }
+    }
+    const network = (1 - smooth(0.007, 0.077, second - nearest))
+        * smooth(0.07, 0.43, q) * (1 - rim) * (0.62 + 0.65 * patch);
+    const pigment = 0.064 * patch + 0.027 * (cell - 0.5) + 0.020 * grain;
+    const palettes : [4]Vec4 = [Vec4 {0.285, 0.330, 0.075, 1}, Vec4 {0.313, 0.348, 0.085, 1},
+        Vec4 {0.269, 0.305, 0.067, 1}, Vec4 {0.334, 0.367, 0.096, 1}];
+    const base = palettes[variant];
+    const pale = recipeClamp(midrib * (0.89 - 0.62 * t) + 0.32 * lateral + 0.13 * forks + 0.13 * network);
+    const color = Vec4 {
+        (base.x + pigment) * (1 - pale) + 0.64 * pale,
+        (base.y + 0.91 * pigment) * (1 - pale) + 0.63 * pale,
+        (base.z + 0.52 * pigment) * (1 - pale) + 0.31 * pale, alpha};
+    // Height in atlas texels. A shallow ridge catches light along each vein.
+    const height = 1.05 * midrib * (1 - 0.76 * t) + 0.54 * lateral + 0.23 * forks
+        + 0.065 * network + 0.15 * (cell - 0.5) + 0.023 * grain;
+    const rough = recipeClamp(0.79 + 0.08 * patch + 0.025 * (cell - 0.5)
+        + 0.20 * pale + 0.070 * rim - 0.013 * variant as f32);
+    return Surface {color, height, rough};
+}

@@ -1,3 +1,4 @@
+// import core:profiler as profiler
 // Profiler blocks and counters shown in Studio's profiler window, inside the evox module's update.
 // Names must be string literals: the profiler keeps the pointer, so a built string would dangle.
 // Every beginBlock needs an endBlock on the same frame; blocks a failing script leaves open are closed by the engine.
@@ -6,3 +7,17 @@ extern fn beginBlock(name : cstr) : void;
 extern fn endBlock() : void;
 // Adds a point to the counter graph with this name.
 extern fn counter(name : cstr, value : f32) : void;
+
+// Profiler results for benchmark scripts (see demo/scripts/bench.evox).
+
+// GPU scopes (passes) with timings of the last 100 frames they were measured in
+extern fn gpuScopeCount() : u32;
+// copies the name to buffer, returns its length, -1 if the index is invalid or the name does not fit
+extern fn gpuScopeName(index : u32, buffer : []u8) : i32;
+// seconds, which: 0 average, 1 min, 2 max (0 if the scope has no samples)
+extern fn gpuScopeTime(index : u32, which : u32) : f32;
+
+// counters with their last values
+extern fn counterCount() : u32;
+extern fn counterName(index : u32, buffer : []u8) : i32;
+extern fn counterValue(index : u32) : f32;

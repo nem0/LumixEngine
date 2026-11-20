@@ -114,6 +114,64 @@ fn integerToString(val : $T) : String {
 	return res;
 }
 
+// Formats value with `decimals` digits after the point (at most 9, rounded half up) into buffer and returns the
+// part of the buffer that was written. buffer must have at least 32 bytes. NaN is "nan", values that do not fit
+// into a 64 bit integer after scaling (including infinities) are "big" or "-big".
+fn formatFloat(buffer : []u8, value : f64, decimals : u32) : []const u8 {
+	if buffer.length < 32 { panic("formatFloat requires a buffer of at least 32 bytes"); }
+	if value != value { return copyText(buffer, "nan"); }
+
+	var places : u32 = decimals > 9 ? 9 : decimals;
+	var scale : f64 = 1.0;
+	var i : u32 = 0;
+	while i < places {
+		scale *= 10.0;
+		i += 1;
+	}
+
+	const magnitude : f64 = value < 0.0 ? 0.0 - value : value;
+	const scaled : f64 = magnitude * scale + 0.5;
+	if scaled >= 9000000000000000000.0 { return copyText(buffer, value < 0.0 ? "-big" : "big"); }
+
+	var n : u64 = scaled as u64;
+	// no "-0.00" for small negative values that round to zero
+	const negative = value < 0.0 and n != 0;
+	var pos : isize = buffer.length - 1;
+	i = 0;
+	while i < places {
+		buffer[pos] = ('0' + (n % 10)) as u8;
+		pos -= 1;
+		n /= 10;
+		i += 1;
+	}
+	if places > 0 {
+		buffer[pos] = '.';
+		pos -= 1;
+	}
+	if n == 0 {
+		buffer[pos] = '0';
+		pos -= 1;
+	} else {
+		while n > 0 {
+			buffer[pos] = ('0' + (n % 10)) as u8;
+			pos -= 1;
+			n /= 10;
+		}
+	}
+	if negative {
+		buffer[pos] = '-';
+		pos -= 1;
+	}
+	return buffer[pos + 1:];
+}
+
+fn copyText(buffer : []u8, text : []const u8) : []const u8 {
+	for i in 0..text.length {
+		buffer[i] = text[i];
+	}
+	return buffer[0:text.length];
+}
+
 //fn buildString(buffer : []u8, args : ...any) : []const u8 {
 //	panic("TODO");
 //	return null;

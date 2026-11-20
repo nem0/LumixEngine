@@ -1,0 +1,13 @@
+import "models/trees/tree_bark_surface" as bark
+import "core:texture_recipe"
+import "core:vec4"
+
+fn main() : Texture2D {
+    var albedo = create(bark.SIZE, bark.SIZE, 4);
+    mapWith(albedo, bark.makeFields(),
+        fn(x : u32, y : u32, value : Vec4, fields : bark.Fields) : Vec4 {
+            const gray = bark.surface(x, y, fields).y;
+            return Vec4 {gray + 0.024, gray + 0.009, gray - 0.018, 1};
+        });
+    return texture2D(albedo);
+}

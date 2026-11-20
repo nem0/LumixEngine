@@ -4,6 +4,9 @@ import "core:ui/module"
 import "core:world"
 import "core:engine/engine"
 
+import "core:commandline" as commandline
+
+import "scripts/bench" as bench
 import "scripts/player" as player
 import "scripts/free_camera" as free_camera
 import "maps/demo/demo" as demo
@@ -142,6 +145,11 @@ fn handleMenu(world : World) : void {
 }
 
 fn main(engine : Engine, world : World) : void {
+	// benchmark mode: see scripts/bench.evox
+	if commandline.isFlagOn("-bench") {
+		bench.run(engine, world);
+		return;
+	}
 	g_input = engine.input();
 	player.init(world, g_input);
 

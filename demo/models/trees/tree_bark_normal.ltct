@@ -1,0 +1,13 @@
+import "models/trees/tree_bark_surface" as bark
+import "core:texture_recipe"
+import "core:vec4"
+
+fn main() : Texture2D {
+    var height = create(bark.SIZE, bark.SIZE, 1);
+    mapWith(height, bark.makeFields(),
+        fn(x : u32, y : u32, value : Vec4, fields : bark.Fields) : Vec4 {
+            return bark.surface(x, y, fields);
+        });
+
+    return bark.normalFromHeight(height);
+}

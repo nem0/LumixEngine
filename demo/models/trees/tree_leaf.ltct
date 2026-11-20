@@ -1,0 +1,14 @@
+import "models/trees/tree_leaf_surface" as leaf
+import "models/trees/tree_leaf_shape" as blade
+import "core:texture_recipe"
+import "core:vec4"
+
+fn main() : Texture2D {
+    const atlas = create(leaf.WIDTH, blade.HEIGHT, 4);
+    mapWith(atlas, leaf.fields(),
+        fn(x : u32, y : u32, value : Vec4, f : leaf.Fields) : Vec4 {
+            const s = leaf.surface(x, y, f);
+            return s.color;
+        });
+    return texture2D(atlas);
+}

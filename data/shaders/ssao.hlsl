@@ -25,7 +25,7 @@ static const float2 PATTERN[4] = {
 };
 
 // https://www.iquilezles.org/www/articles/texture/texture.htm
-float4 getTexel(uint tex, float2 p, float2 rcp_size) {
+float4 getTexel(TextureHandle tex, float2 p, float2 rcp_size) {
 	p = p / rcp_size + 0.5;
 
 	float2 i = floor(p);

@@ -421,6 +421,20 @@ InputFile::InputFile()
 	static_assert(sizeof(m_handle) >= sizeof(HANDLE), "");
 }
 
+InputFile::InputFile(InputFile&& rhs)
+	: m_handle(rhs.m_handle)
+{
+	rhs.m_handle = (void*)INVALID_HANDLE_VALUE;
+}
+
+void InputFile::operator =(InputFile&& rhs) {
+	if (&rhs == this) return;
+
+	close();
+	m_handle = rhs.m_handle;
+	rhs.m_handle = (void*)INVALID_HANDLE_VALUE;
+}
+
 
 OutputFile::OutputFile()
 {

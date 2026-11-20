@@ -1,0 +1,13 @@
+shader "/engine/shaders/standard.hlsl"
+backface_culling true
+layer "default"
+
+texture "/models/trees/tree_bark.ltct"
+texture "/models/trees/tree_bark_normal.ltct"
+texture ""
+texture ""
+uniform "Material color", { 1.000000, 1.000000, 1.000000, 1.000000 }
+uniform "Roughness", 0.900000
+uniform "Metallic", 0.000000
+uniform "Emission", 0.000000
+uniform "Translucency", 0.000000

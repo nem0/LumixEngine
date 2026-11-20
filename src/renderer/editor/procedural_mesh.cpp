@@ -259,8 +259,10 @@ struct Recipe {
 			for (i64 i = 0; i < part_count; ++i) {
 				const ExPart& part = parts[i];
 				const i32 material = findMaterial(part.material);
-				if (material < 0 || part.lod >= lod_count) {
-					error.append("Recipe returned invalid part (a material name of 1-64 characters without / \\ : . and a level below lod_count in the meta file)");
+				// recipes can return more levels than the meta file uses, e.g. a model that only uses clusters has one level
+				if (material >= 0 && part.lod >= lod_count) continue;
+				if (material < 0) {
+					error.append("Recipe returned invalid part (a material name of 1-64 characters without / \\ : .)");
 					return false;
 				}
 				if (part.first_index > index_count || part.index_count > index_count - part.first_index || part.index_count % 3 != 0) {
@@ -334,7 +336,7 @@ struct ProceduralMeshImporter final : ModelImporter {
 					if (part.lod != lod || part.material != material) continue;
 					for (u32 i = 0; i < part.index_count; ++i) indices.push(m_mesh.indices[part.first_index + i]);
 				}
-				if (!indices.empty()) addMesh(lod, material, indices, materials);
+				if (!indices.empty()) addMesh(lod, material, indices, materials, meta.bake_vertex_ao);
 			}
 		}
 		// builds the autolodN index buffers (the writer reads them for every level enabled by autolodN) and bakes AO if the meta asks for it
@@ -343,7 +345,7 @@ struct ProceduralMeshImporter final : ModelImporter {
 	}
 
 	// Creates the geometry and mesh of one material of a level. Only the vertices used by the material are kept.
-	void addMesh(u32 lod, u32 material, const Array<u32>& indices, Array<u32>& materials) {
+	void addMesh(u32 lod, u32 material, const Array<u32>& indices, Array<u32>& materials, bool has_ao) {
 		// the default material is named after the recipe, others after the recipe and their name
 		String name(m_name, m_allocator);
 		if (material > 0) name.append("_", m_mesh.material_names[material].c_str());
@@ -375,10 +377,15 @@ struct ProceduralMeshImporter final : ModelImporter {
 		geom.is_skinned = false;
 		geom.flip_handness = false;
 		geom.name = name;
-		geom.attributes.push({ AttributeSemantic::POSITION, gpu::AttributeType::FLOAT, 3 });
-		geom.attributes.push({ AttributeSemantic::NORMAL, gpu::AttributeType::I8, 4 });
-		geom.attributes.push({ AttributeSemantic::TEXCOORD0, gpu::AttributeType::FLOAT, 2 });
-		geom.attributes.push({ AttributeSemantic::TANGENT, gpu::AttributeType::I8, 4 });
+		geom.attributes.push({ AttributeSemantic::POSITION, AttributeType::FLOAT, 3 });
+		geom.attributes.push({ AttributeSemantic::NORMAL, AttributeType::I8, 4 });
+		geom.attributes.push({ AttributeSemantic::TEXCOORD0, AttributeType::FLOAT, 2 });
+		geom.attributes.push({ AttributeSemantic::TANGENT, AttributeType::I8, 4 });
+		// AO attribute is filled by ModelImporter::bakeVertexAO, it must exist in the layout before that
+		if (has_ao) {
+			geom.attributes.push({ AttributeSemantic::AO, AttributeType::U8, 4 });
+			geom.vertex_size += sizeof(u32);
+		}
 
 		geom.vertex_buffer.resize(used.size() * geom.vertex_size);
 		u8* out = geom.vertex_buffer.getMutableData();
@@ -390,6 +397,10 @@ struct ProceduralMeshImporter final : ModelImporter {
 			memcpy(out, &normal, sizeof(normal)); out += sizeof(normal);
 			memcpy(out, &v.uv, sizeof(v.uv)); out += sizeof(v.uv);
 			memcpy(out, &tangent, sizeof(tangent)); out += sizeof(tangent);
+			if (has_ao) {
+				const u32 ao = 0xffffFFFF; // no occlusion until baked
+				memcpy(out, &ao, sizeof(ao)); out += sizeof(ao);
+			}
 		}
 		geom.indices.resize((u32)indices.size());
 		for (u32 i = 0, c = (u32)indices.size(); i < c; ++i) geom.indices[i] = remap[indices[i]];
@@ -628,6 +639,22 @@ struct Plugin final : ProceduralMeshEditor, EditorAssetPlugin {
 					}
 				}
 				ImGui::EndCombo();
+			}
+
+			ImGuiEx::Label("Create clusters (?)");
+			if (ImGui::IsItemHovered()) {
+				ImGui::SetTooltip("%s", "Bakes clusters, so that instanced models can use continuous GPU driven LOD instead of LOD meshes."
+					"\nClusters need additional memory.");
+			}
+			changed |= ImGui::Checkbox("##creclusters", &m_meta.create_clusters);
+			if (m_meta.create_clusters) {
+				ImGuiEx::Label("Dilate cluster borders (?)");
+				if (ImGui::IsItemHovered()) {
+					ImGui::SetTooltip("%s", "Coarser levels of clusters grow the open borders of their triangles to keep the area that simplification removes."
+						"\nFor foliage: without it, leaves and other loose pieces thin out much sooner than their size suggests."
+						"\nNeeds more memory, every cluster has its own positions.");
+				}
+				changed |= ImGui::Checkbox("##cludilate", &m_meta.cluster_dilate_borders);
 			}
 
 			ImGui::SeparatorText("LODs");

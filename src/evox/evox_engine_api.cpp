@@ -1,3 +1,4 @@
+#include "core/command_line_parser.h"
 #include "core/debug.h"
 #include "core/log.h"
 #include "core/os.h"
@@ -15,6 +16,9 @@
 #include "evox/evox_capi.gen.h"
 #include "evox/evox_wrapper.h"
 #include "renderer/render_module.h"
+#include <float.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -169,14 +173,15 @@ static void setMesh(ex_runtime*, ex_call_frame frame) {
 		panic(frame, "Renderer module not found");
 		return;
 	}
-	gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
-	decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
-	decl.addAttribute(12, 2, gpu::AttributeType::FLOAT, 0);
-	decl.addAttribute(20, 3, gpu::AttributeType::FLOAT, 0);
-	decl.addAttribute(32, 3, gpu::AttributeType::FLOAT, 0);
+	VertexDecl decl;
+	decl.addAttribute(0, 3, AttributeType::FLOAT, 0);
+	decl.addAttribute(12, 2, AttributeType::FLOAT, 0);
+	decl.addAttribute(20, 3, AttributeType::FLOAT, 0);
+	decl.addAttribute(32, 3, AttributeType::FLOAT, 0);
 	renderer->setProceduralGeometry(EntityRef{entity_index}
 		, Span<const u8>(vertices.data, vertex_count * sizeof(MeshVertex))
 		, decl
+		, gpu::PrimitiveType::TRIANGLES
 		, Span<const u8>(indices.data, u32(indices.length) * sizeof(u32))
 		, gpu::DataType::U32);
 	EX_RESULT(frame, u8(1));
@@ -875,6 +880,99 @@ static bool evox_sentry_sendFeedback(ex_string_view message, ex_string_view emai
 		, StringView(attachment_path.begin, (u64)attachment_path.length));
 }
 
+// core:commandline and core:profiler, used by benchmark scripts (demo/scripts/bench.evox)
+
+// copies the `index`-th token after `flag` on the command line (index 0 is the flag itself), false if there is none
+static bool getCommandLineToken(ex_string_view flag, u32 index, Span<char> out) {
+	char flag_str[128];
+	if (flag.length < 0 || (u64)flag.length >= sizeof(flag_str)) return false;
+	memcpy(flag_str, flag.begin, (size_t)flag.length);
+	flag_str[flag.length] = 0;
+
+	char cmd_line[4096];
+	if (!os::getCommandLine(Span(cmd_line))) return false;
+	CommandLineParser parser(cmd_line);
+	while (parser.next()) {
+		if (!parser.currentEquals(flag_str)) continue;
+		for (u32 i = 0; i < index; ++i) {
+			if (!parser.next()) return false;
+		}
+		parser.getCurrent(out.begin(), out.length());
+		return true;
+	}
+	return false;
+}
+
+static bool evox_commandline_isFlagOn(ex_string_view flag) {
+	char tmp[2];
+	return getCommandLineToken(flag, 0, Span(tmp));
+}
+
+// the number after the flag, `default_value` if there is none
+static double evox_commandline_flagNumber(ex_string_view flag, u32 index, double default_value) {
+	char tmp[64];
+	if (index == 0 || !getCommandLineToken(flag, index, Span(tmp))) return default_value;
+	return atof(tmp);
+}
+
+// copies the token after the flag to the buffer, returns its length or -1 if there is none or it does not fit
+static i32 evox_commandline_flagString(ex_string_view flag, ex_slice buffer) {
+	char tmp[1024];
+	if (!getCommandLineToken(flag, 1, Span(tmp))) return -1;
+	const u64 len = strlen(tmp);
+	if (buffer.length < 0 || len > (u64)buffer.length || (len > 0 && !buffer.data)) return -1;
+	memcpy(buffer.data, tmp, (size_t)len);
+	return (i32)len;
+}
+
+static u32 evox_profiler_gpuScopeCount() {
+	return profiler::getGPUScopeStats(Span<profiler::GPUScopeStats>());
+}
+
+static bool getGPUScope(u32 index, profiler::GPUScopeStats& out) {
+	profiler::GPUScopeStats stats[256];
+	const u32 n = profiler::getGPUScopeStats(Span(stats));
+	if (index >= n) return false;
+	out = stats[index];
+	return true;
+}
+
+static i32 copyToSlice(const char* value, ex_slice buffer) {
+	const u64 len = strlen(value);
+	if (buffer.length < 0 || len > (u64)buffer.length || (len > 0 && !buffer.data)) return -1;
+	memcpy(buffer.data, value, (size_t)len);
+	return (i32)len;
+}
+
+static i32 evox_profiler_gpuScopeName(u32 index, ex_slice buffer) {
+	profiler::GPUScopeStats stats;
+	return getGPUScope(index, stats) ? copyToSlice(stats.name, buffer) : -1;
+}
+
+// seconds, which: 0 average, 1 min, 2 max over the last (up to 100) samples of the scope, 0 if it has no samples
+static float evox_profiler_gpuScopeTime(u32 index, u32 which) {
+	profiler::GPUScopeStats stats;
+	if (!getGPUScope(index, stats)) return 0;
+	const float value = which == 0 ? stats.avg : which == 1 ? stats.min : stats.max;
+	return value == value && value < FLT_MAX ? value : 0; // NaN and FLT_MAX mean no samples
+}
+
+static u32 evox_profiler_counterCount() {
+	return profiler::getCounters(Span<profiler::Counter>());
+}
+
+static i32 evox_profiler_counterName(u32 index, ex_slice buffer) {
+	profiler::Counter counters[256];
+	const u32 n = minimum(profiler::getCounters(Span(counters)), (u32)lengthOf(counters));
+	return index < n ? copyToSlice(counters[index].name, buffer) : -1;
+}
+
+static float evox_profiler_counterValue(u32 index) {
+	profiler::Counter counters[256];
+	const u32 n = minimum(profiler::getCounters(Span(counters)), (u32)lengthOf(counters));
+	return index < n ? counters[index].last_value : 0;
+}
+
 void registerImguiModule(NativeFunctionMap& functions) {
 	functions.insert({"core:imgui", "begin"}, &wrap<imguiBegin>);
 	functions.insert({"core:imgui", "textUnformatted"}, &wrap<imguiTextUnformatted>);
@@ -914,6 +1012,17 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	functions.insert({"core:savedgames", "exists"}, &wrap<evox_storage_exists>);
 	functions.insert({"core:savedgames", "remove"}, &wrap<evox_storage_remove>);
 	functions.insert({"core:sentry", "sendFeedback"}, &wrap<evox_sentry_sendFeedback>);
+	// commandline
+	functions.insert({"core:commandline", "isFlagOn"}, &wrap<evox_commandline_isFlagOn>);
+	functions.insert({"core:commandline", "flagNumber"}, &wrap<evox_commandline_flagNumber>);
+	functions.insert({"core:commandline", "flagString"}, &wrap<evox_commandline_flagString>);
+	// profiler
+	functions.insert({"core:profiler", "gpuScopeCount"}, &wrap<evox_profiler_gpuScopeCount>);
+	functions.insert({"core:profiler", "gpuScopeName"}, &wrap<evox_profiler_gpuScopeName>);
+	functions.insert({"core:profiler", "gpuScopeTime"}, &wrap<evox_profiler_gpuScopeTime>);
+	functions.insert({"core:profiler", "counterCount"}, &wrap<evox_profiler_counterCount>);
+	functions.insert({"core:profiler", "counterName"}, &wrap<evox_profiler_counterName>);
+	functions.insert({"core:profiler", "counterValue"}, &wrap<evox_profiler_counterValue>);
 	// log
 	functions.insert({"core:log", "logErrorString"}, &wrap<logErrorString>);
 	functions.insert({"core:log", "logInfoString"}, &wrap<logInfoString>);

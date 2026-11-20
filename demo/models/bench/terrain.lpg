@@ -1,0 +1,35 @@
+// High poly terrain patch for the nanite benchmark (scripts/run_nanite_tests.bat): about 520k triangles.
+// A 20 x 20 m height field grid (4 cm between vertices), heights up to about 1.5 m made of several octaves of sines.
+// A big surface seen at all distances at once: the cut through the cluster hierarchy changes across the patch.
+import "core:procedural_geom"
+import "core:vec2" as vec2
+import "core:vec3" as vec3
+import "std:math" as math
+
+const SIZE : f32 = 10.0;    // half of the edge, in meters
+
+fn height(x : f32, z : f32) : f32 {
+    var h : f32 = 0.8 * math.sin(0.35 * x) * math.cos(0.27 * z);
+    h += 0.4 * math.sin(0.9 * x + 0.7 * z);
+    h += 0.2 * math.sin(2.3 * x - 1.9 * z);
+    h += 0.1 * math.sin(5.1 * x + 4.3 * z);
+    h += 0.05 * math.sin(11.7 * x - 9.1 * z);
+    h += 0.025 * math.sin(23.0 * x + 19.0 * z);
+    return h;
+}
+
+// grid() lies in the XY plane facing +Z, the patch lies in XZ facing +Y (y of the grid is -z, to keep the winding)
+fn shape(position : *vec3.Vec3, normal : *vec3.Vec3, tangent : *vec3.Vec3, uv : *vec2.Vec2) : void {
+    const x = position.x * SIZE;
+    const z = -position.y * SIZE;
+    const e : f32 = 0.01;
+    const hx = (height(x + e, z) - height(x - e, z)) / (2.0 * e);
+    const hz = (height(x, z + e) - height(x, z - e)) / (2.0 * e);
+    position.* = vec3.Vec3 { x, height(x, z), z };
+    normal.* = vec3.normalizeSafe(vec3.Vec3 { -hx, 1.0, -hz });
+    tangent.* = vec3.normalizeSafe(vec3.Vec3 { 1.0, hx, 0.0 });
+}
+
+fn main() : Mesh {
+    return map(grid(512, 512), shape);
+}

@@ -1,0 +1,27 @@
+import "models/trees/tree_leaf_surface" as leaf
+import "models/trees/tree_leaf_shape" as blade
+import "core:texture_recipe"
+import "core:vec4"
+import "std:math" as math
+
+fn main() : Texture2D {
+    const atlas = create(leaf.WIDTH, blade.HEIGHT, 1);
+    mapWith(atlas, leaf.fields(),
+        fn(x : u32, y : u32, value : Vec4, f : leaf.Fields) : Vec4 {
+            const s = leaf.surface(x, y, f);
+            return Vec4 {s.height, 0, 0, 1};
+        });
+    const normals = create(leaf.WIDTH, blade.HEIGHT, 2);
+    mapWith(normals, atlas,
+        fn(x : u32, y : u32, value : Vec4, h : Image) : Vec4 {
+            const ix = x as i32;
+            const iy = y as i32;
+            const start = (x / blade.TILE * blade.TILE) as i32;
+            const dx = samplePixel(h, math.min(ix + 1, start + blade.TILE - 1), iy, false).x
+                - samplePixel(h, math.max(ix - 1, start), iy, false).x;
+            const dy = samplePixel(h, ix, iy + 1, false).x - samplePixel(h, ix, iy - 1, false).x;
+            const inv = 1.0 / math.sqrt(4 + dx * dx + dy * dy);
+            return Vec4 {0.5 - 0.5 * dx * inv, 0.5 + 0.5 * dy * inv, 0, 1};
+        });
+    return texture2D(normals);
+}

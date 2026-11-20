@@ -852,6 +852,7 @@ struct ProfilerUIImpl final : ProfilerUI {
 				if (vtab("GPU", tab == 1)) tab = 1;
 				if (vtab("Memory", tab == 2)) tab = 2;
 				if (vtab("Resources", tab == 3)) tab = 3;
+				if (vtab("Counters", tab == 4)) tab = 4;
 			}
 			ImGui::EndChild();
 			ImGui::PopStyleColor();
@@ -862,6 +863,7 @@ struct ProfilerUIImpl final : ProfilerUI {
 					case 1: GPUUI(); break;
 					case 2: m_memory_ui.gui(); break;
 					case 3: resourcesUI(); break;
+					case 4: countersTabUI(); break;
 				}
 			}
 			ImGui::EndChild();
@@ -877,6 +879,35 @@ struct ProfilerUIImpl final : ProfilerUI {
 	const char* getThreadName(u32 thread_id) const {
 		auto iter = m_threads.find(thread_id);
 		return iter.isValid() ? iter.value().name : "Unknown";
+	}
+
+	// the current value of every counter, as they are pushed (it does not depend on the recorded data), the graphs are in the flamegraph
+	void countersTabUI() {
+		if (m_app.checkShortcut(m_focus_filter)) ImGui::SetKeyboardFocusHere();
+		m_filter.gui("Filter", -1, false, &m_focus_filter);
+
+		profiler::Counter counters[256];
+		const u32 count = minimum(profiler::getCounters(Span(counters)), (u32)lengthOf(counters));
+
+		if (!ImGui::BeginTable("counters_table", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable)) return;
+		ImGui::TableSetupColumn("Counter", ImGuiTableColumnFlags_WidthStretch);
+		ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 160.f);
+		ImGui::TableHeadersRow();
+
+		for (u32 i = 0; i < count; ++i) {
+			const profiler::Counter& counter = counters[i];
+			if (!m_filter.pass(counter.name)) continue;
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			ImGui::TextUnformatted(counter.name);
+			ImGui::TableNextColumn();
+			char text[32];
+			// whole numbers (triangle or cluster counts) without decimals
+			if (counter.last_value == floorf(counter.last_value) && fabsf(counter.last_value) < 2e9f) toCStringPretty((i32)counter.last_value, Span(text));
+			else toCString(counter.last_value, Span(text), 3);
+			ImGui::TextUnformatted(text);
+		}
+		ImGui::EndTable();
 	}
 
 	void resourcesUI() {

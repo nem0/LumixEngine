@@ -1,0 +1,398 @@
+import "core:texture_recipe"
+import "core:vec4"
+import "std:math" as math
+
+comptime SIZE = 2048;
+
+struct Noise {
+    t : Image;
+    w : i32;
+    h : i32;
+}
+
+fn makeNoise(w : u32, h : u32, seed : u32) : Noise {
+    return Noise {valueNoise(w, h, seed), w as i32, h as i32};
+}
+
+fn noise2(n : Noise, u : f32, v : f32) : f32 {
+    const px = u * n.w as f32;
+    const py = v * n.h as f32;
+    const x0 = math.floor(px) as i32;
+    const y0 = math.floor(py) as i32;
+    var fx = px - x0 as f32;
+    var fy = py - y0 as f32;
+    fx = fx * fx * (3.0 - 2.0 * fx);
+    fy = fy * fy * (3.0 - 2.0 * fy);
+    const a = samplePixel(n.t, x0, y0, true).x;
+    const b = samplePixel(n.t, x0 + 1, y0, true).x;
+    const c = samplePixel(n.t, x0, y0 + 1, true).x;
+    const d = samplePixel(n.t, x0 + 1, y0 + 1, true).x;
+    return (a * (1.0 - fx) + b * fx) * (1.0 - fy) + (c * (1.0 - fx) + d * fx) * fy;
+}
+
+fn smooth(edge0 : f32, edge1 : f32, x : f32) : f32 {
+    var t = (x - edge0) / (edge1 - edge0);
+    if t < 0 { t = 0; }
+    if t > 1 { t = 1; }
+    return t * t * (3 - 2 * t);
+}
+
+// Scatter one tilted plate per lattice cell. Distances to the two nearest
+// centers give a rounded plate face and a tapered joint where the faces meet.
+fn makeSites(w : u32, h : u32, seed : u32) : Image {
+    var sites = create(w, h, 4);
+    var random = RecipeRandom {seed, 362436069};
+    for y in 0..h {
+        for x in 0..w {
+            const sx = recipeRandom(&random);
+            const sy = recipeRandom(&random);
+            const tone = recipeRandom(&random);
+            const tilt = recipeRandom(&random);
+            setPixel(sites, x, y, Vec4 {sx, sy, tone, tilt});
+        }
+    }
+    return sites;
+}
+
+// x is distance from the joint, y is the plate's tone, z is its face gradient.
+fn plate(sites : Image, u : f32, v : f32) : Vec4 {
+    const px = u * sites.width as f32;
+    const py = v * sites.height as f32;
+    const ix = math.floor(px) as i32;
+    const iy = math.floor(py) as i32;
+    var nearest : f32 = 16;
+    var next : f32 = 16;
+    var near_dx : f32 = 0;
+    var next_dx : f32 = 0;
+    var tone : f32 = 0;
+    var slope : f32 = 0;
+    for j in 0..3 {
+        for i in 0..3 {
+            const cx = ix + i - 1;
+            const cy = iy + j - 1;
+            const site = samplePixel(sites, cx, cy, true);
+            const dx = px - (cx as f32 + 0.15 + 0.7 * site.x);
+            const dy = py - (cy as f32 + 0.15 + 0.7 * site.y);
+            const lean = dx + (site.w - 0.5) * dy * 0.5;
+            const distance = lean * lean + dy * dy;
+            if distance < nearest {
+                next = nearest;
+                next_dx = near_dx;
+                near_dx = lean;
+                nearest = distance;
+                tone = site.z;
+                slope = dx * (site.w - 0.5) + dy * 0.6;
+            }
+            else if distance < next { next = distance; next_dx = lean; }
+        }
+    }
+    // The lattice is stretched along V. Account for the boundary direction so
+    // a joint across the grain stays thin. Long side fissures cut deeper.
+    const across = math.abs(next_dx - near_dx);
+    const side = smooth(0.18, 0.78, across);
+    const edge = (next - nearest) / (0.20 + 1.8 * across);
+    return Vec4 {edge, tone, slope, side};
+}
+
+// Short splinters overlap the bark. Their lower ends lie flush with the
+// underlying plate, while the upper ends lift and expose a chipped lip.
+fn crust(sites : Image, u : f32, v : f32) : f32 {
+    const px = u * sites.width as f32;
+    const py = v * sites.height as f32;
+    const ix = math.floor(px) as i32;
+    const iy = math.floor(py) as i32;
+    var top : f32 = 0;
+    for j in 0..3 {
+        for i in 0..3 {
+            const cx = ix + i - 1;
+            const cy = iy + j - 1;
+            const site = samplePixel(sites, cx, cy, true);
+            const dy = (py - (cy as f32 + 0.25 + 0.5 * site.y)) / (0.35 + 0.6 * site.w);
+            const dx = px - (cx as f32 + 0.25 + 0.5 * site.x) + dy * (site.w - 0.5) * 0.5;
+            const side = math.abs(dx) / (0.23 + 0.33 * site.z);
+            const outline = math.max(side + 0.4 * dy * dy, math.abs(dy) + 0.20 * side);
+            const lip = (1.0 - smooth(0.78, 1.0, outline)) * (0.49 + 0.46 * dy);
+            top = math.max(top, lip * (0.32 + 0.68 * site.z));
+        }
+    }
+    return top;
+}
+
+struct Fields {
+    plates : Image;
+    scales : Image;
+    drift : Noise;
+    chips : Noise;
+    grit : Noise;
+    fibers : Noise;
+    dust : Image;
+}
+
+fn makeFields() : Fields {
+    return Fields {makeSites(76, 10, 223), makeSites(189, 79, 419),
+        makeNoise(14, 9, 101), makeNoise(101, 74, 103), makeNoise(680, 590, 108),
+        makeNoise(227, 64, 106), valueNoise(SIZE, SIZE, 109)};
+}
+
+// R is physical relief, G is base-color brightness.
+fn surface(x : u32, y : u32, fields : Fields) : Vec4 {
+    const u = (x as f32 + 0.5) / SIZE as f32;
+    const v = (y as f32 + 0.5) / SIZE as f32;
+    const drift = noise2(fields.drift, u, v) - 0.5;
+    const chip = noise2(fields.chips, u, v) - 0.5;
+    const grit = noise2(fields.grit, u, v) - 0.5;
+    const dust = getPixel(fields.dust, x, y).x - 0.5;
+    const wu = u + 0.018 * drift + 0.006 * chip + 0.0022 * grit;
+    const wv = v + 0.025 * drift + 0.009 * chip;
+    const base = plate(fields.plates, wu, wv);
+    const face = smooth(0.008, 0.15, base.x);
+    const opening = smooth(-0.29, 0.17, chip + 0.7 * drift + 0.25 * grit);
+    const cleft = (1.0 - face) * (0.14 + 0.86 * base.w) * (0.43 + 0.57 * opening);
+
+    const flake = crust(fields.scales, wu + 0.0025 * grit, wv + 0.006 * chip);
+    const fiber = noise2(fields.fibers, wu + 0.003 * base.y, wv) - 0.5;
+    const crust_height = flake * (0.55 + 0.45 * face);
+    // Carry the slope across the plate shoulders so the long ridges still
+    // catch light when narrow cracks and small flakes blend into lower mips.
+    const shoulder = smooth(0.025, 0.46, base.x) * (0.35 + 0.65 * base.w);
+    const height = 0.40 - 0.44 * cleft + 0.36 * shoulder + 0.065 * base.y + 0.15 * base.z
+        + 0.31 * crust_height + 0.12 * fiber + 0.032 * grit;
+    const tone = 0.51 - 0.34 * cleft + 0.085 * (base.y - 0.5) + 0.17 * crust_height
+        + 0.14 * fiber + 0.19 * grit + 0.14 * dust + 0.10 * chip;
+    return Vec4 {height, tone, 0, 1};
+}
+
+fn normalFromHeight(height : Image) : Texture2D {
+    // The surface goes up where the height goes up, the normal leans the other way. Image x is U, which is the tangent of the shader.
+    // Image y is V, which is against the bitangent of the shader (cross(tangent, normal)), so the sign of the slope of y is not flipped.
+    var normal = create(height.width, height.height, 2);
+    mapWith(normal, height,
+        fn(x : u32, y : u32, value : Vec4, h : Image) : Vec4 {
+            const ix = x as i32;
+            const iy = y as i32;
+            const dx = samplePixel(h, ix + 1, iy, true).x - samplePixel(h, ix - 1, iy, true).x;
+            const dy = samplePixel(h, ix, iy + 1, true).x - samplePixel(h, ix, iy - 1, true).x;
+            const strength = 2.8 * h.width as f32 / SIZE as f32;
+            const nx = -dx * strength;
+            const ny = dy * strength;
+            const len = math.sqrt(nx * nx + ny * ny + 1.0);
+            return Vec4 {recipeClamp(nx / len * 0.5 + 0.5), recipeClamp(ny / len * 0.5 + 0.5), 0, 1};
+        });
+    return texture2D(normal);
+}
+
+// Each Set 2 span starts with twelve full-height square stamps, followed by distance
+// extension, edge detection and a smooth bevel. Work in texture space so
+// the same pattern can be evaluated by all three material outputs.
+comptime MOSS_SIZE = 4096;
+struct RidgeFields {
+    ribs : Image;
+    pockets : Image;
+    clouds : Noise;
+    warp : Noise;
+}
+
+struct MossFields {
+    ridges : RidgeFields;
+    plates : Image;
+    fibers : Noise;
+    grain : Noise;
+    leaves : Image;
+}
+
+comptime RIDGES = 24;
+
+fn ridgeFields() : RidgeFields {
+    return RidgeFields {makeSites(RIDGES, 1, 771), makeSites(RIDGES, 8, 318),
+        makeNoise(13, 10, 137), makeNoise(73, 48, 177)};
+}
+
+fn mossFields() : MossFields {
+    return MossFields {ridgeFields(), makeSites(224, 19, 382),
+        makeNoise(296, 30, 522), makeNoise(754, 618, 491), makeSites(520, 480, 914)};
+}
+
+struct MossSample {
+    color : Vec4;
+    height : f32;
+    roughness : f32;
+}
+
+// Distance extension meets halfway between neighboring stamp ends. Evaluating
+// that boundary directly avoids rasterizing the intermediate binary mask.
+fn ribEdge(f : RidgeFields, i : i32) : f32 {
+    const left = samplePixel(f.ribs, i, 0, true);
+    const right = samplePixel(f.ribs, i + 1, 0, true);
+    return i as f32 + 1.0 + 0.25 * 0.95 * (left.x - right.x) + 0.38 * (left.y - 0.5);
+}
+
+// An elongated, tapered depression along the seam, with a short blunt end.
+fn pocket(f : RidgeFields, seam : i32, lateral : f32, v : f32) : f32 {
+    const row = math.floor(v) as i32;
+    var cut : f32 = 0;
+    for j in 0..3 {
+        const cy = row + j - 1;
+        const site = samplePixel(f.pockets, seam, cy, true);
+        const dy = (v - cy as f32 - site.y) / (0.23 + 0.43 * site.z);
+        const dx = (lateral - (site.x - 0.5) * 0.12 - 0.045 * dy)
+            / (0.042 + 0.32 * site.w * site.w);
+        const outline = math.abs(dx) + 0.72 * dy * dy;
+        cut = math.max(cut, (1 - smooth(0.28, 1, outline)) * (0.36 + 0.85 * site.z));
+    }
+    return cut;
+}
+
+// Three tapered leaves around each tuft, as in the circular splatter before
+// the moss tile sampler. Random orientation breaks up the lattice.
+fn leafTuft(f : MossFields, u : f32, v : f32) : f32 {
+    const px = u * f.leaves.width as f32;
+    const py = v * f.leaves.height as f32;
+    const ix = math.floor(px) as i32;
+    const iy = math.floor(py) as i32;
+    const site = samplePixel(f.leaves, ix, iy, true);
+    const dx = px - ix as f32 - 0.5 - 0.13 * (site.x - 0.5);
+    const dy = py - iy as f32 - 0.5 - 0.13 * (site.y - 0.5);
+    const angle = 6.283185 * site.w;
+    var along = dx * math.cos(angle) + dy * math.sin(angle);
+    var across = dy * math.cos(angle) - dx * math.sin(angle);
+    var tip : f32 = 0;
+    for i in 0..3 {
+        const t = recipeClamp(along / (0.31 + 0.12 * site.z));
+        const width = 0.024 + 0.105 * (1 - math.abs(2 * t - 1));
+        const leaf = (1 - smooth(0.25, 1, math.abs(across) / width))
+            * smooth(0, 0.14, t) * (1 - smooth(0.78, 1, t));
+        tip = math.max(tip, leaf);
+        const rotated = -0.5 * along + 0.866 * across;
+        across = -0.866 * along - 0.5 * across;
+        along = rotated;
+    }
+    return tip;
+}
+
+// Seam, crest and pocket locations in the same unwrapped UV space as tree.lpg.
+fn warpedU(f : RidgeFields, u : f32, v : f32, warp : f32) : f32 {
+    const cloud = noise2(f.clouds, u * 2, v * 2);
+    return u * 2 + 0.014 * (cloud - 0.5) + 0.0012 * warp;
+}
+
+struct Ridge {
+    height : f32;
+    hollow : f32;
+    gray : f32;
+}
+
+fn ridgeAt(f : RidgeFields, px : f32, v : f32, warp : f32) : Ridge {
+    var i = math.floor(px) as i32;
+    if px < ribEdge(f, i - 1) { i -= 1; }
+    else if px > ribEdge(f, i) { i += 1; }
+    const left = ribEdge(f, i - 1);
+    const right = ribEdge(f, i);
+    const t = (px - left) / (right - left);
+    var seam = i - 1;
+    var lateral = px - left;
+    if t > 0.5 { seam = i; lateral = px - right; }
+    const gray = 1 - 0.63 * samplePixel(f.ribs, i, 0, true).z;
+    const crown = math.sqrt(recipeClamp(4 * t * (1 - t)));
+    const hollow = pocket(f, seam, lateral + 0.07 * warp, v * 8);
+
+    return Ridge {0.19 + 0.48 * crown + 0.06 * gray, hollow, gray};
+}
+
+fn mossSurface(x : u32, y : u32, f : MossFields, base_color : bool) : MossSample {
+    const u = (x as f32 + 0.5) / MOSS_SIZE as f32;
+    const v = (y as f32 + 0.5) / MOSS_SIZE as f32;
+    const tile_u = u * 2;
+    const tile_v = v * 2;
+    const warp = noise2(f.ridges.warp, tile_u, tile_v) - 0.5;
+    const grain = noise2(f.grain, tile_u, tile_v) - 0.5;
+    const wu = warpedU(f.ridges, u, v, warp);
+    const profile = ridgeAt(f.ridges, wu * 12, v, warp);
+    const gray = profile.gray;
+    const rib = profile.height;
+    const hollow = profile.hollow;
+
+    // Slender lifted pieces interrupt the rind. Use a longer grain for the
+    // tears, and an independent cloud to leave intact stretches between them.
+    const tear = noise2(f.fibers, wu + 0.0021 * warp, tile_v);
+    const plate_u = wu + 0.0028 * warp + 0.0009 * grain;
+    const slab = plate(f.plates, plate_u * 0.5, v + 0.004 * warp);
+    const drift = noise2(f.ridges.clouds, wu * 3, tile_v + 0.41);
+    const island = smooth(0.48, 0.60, drift + 0.35 * (slab.y - 0.5)
+        + 0.18 * (tear - 0.5) + 0.15 * warp);
+    const skin = island * smooth(0.01, 0.13, slab.x);
+    const rind = skin * (0.033 + 0.07 * slab.y + 0.06 * slab.z);
+    // Long splinter edges open into the softer face and die out at plate ends.
+    const split = (1 - smooth(0.008, 0.14, slab.x)) * slab.w * (0.30 + 0.70 * tear);
+    const wood_h = rib - 0.42 * hollow + rind - 0.13 * split + 0.064 * tear + 0.026 * grain;
+
+    // Both surfaces are evaluated in the same height range. A tuft is visible
+    // only where its own bed rises through the cut in the wood.
+    const cloud_bed = noise2(f.ridges.clouds, tile_u + 0.37, tile_v + 0.29);
+    const tuft_noise = noise2(f.grain, u * 2, v * 2) - 0.5;
+    const tip = leafTuft(f, tile_u + 0.0006 * warp, tile_v);
+    const bed = 0.16 + 0.15 * cloud_bed + 0.07 * warp
+        + 0.065 * grain + 0.04 * tuft_noise + 0.033 * tip;
+    const clearance = wood_h - bed;
+    const moss = 1 - smooth(-0.028, 0.028, clearance);
+    const relief = math.max(wood_h, bed) + 1.4 * rib;
+    const roughness = (0.67 + 0.15 * skin + 0.05 * tear) * (1 - moss)
+        + (0.88 + 0.07 * tip) * moss;
+    if base_color == false { return MossSample {Vec4 {0, 0, 0, 1}, relief, roughness}; }
+
+    // Cut fiber ends form pale slivers down the walls of a recess. Broken
+    // splinters expose the same wood higher on a rib, away from the moss.
+    const strand = noise2(f.fibers, plate_u * 3, tile_v);
+    const speckle = noise2(f.grain, plate_u * 2, tile_v);
+    const splinter = smooth(0.64, 0.83, strand + 0.31 * (tear - 0.5)
+        + 0.22 * warp) * smooth(0.34, 0.70, drift + 0.35 * slab.z);
+    const wall = (1 - smooth(0.085, 0.39, clearance + 0.12 * (tear - 0.5))) * (1 - 0.72 * skin);
+    const worn = recipeClamp(wall + splinter * 0.83 + 0.17 * (strand - 0.5));
+    const patina = smooth(0.54, 0.70, drift + 0.28 * warp + 0.27 * grain
+        + 0.14 * (slab.y - 0.5)) * (1 - worn);
+    const chips = smooth(0.62, 0.82, speckle + 0.40 * grain) * (0.4 + 0.6 * skin);
+    const texture = 0.095 * (gray - 0.65) + 0.12 * (tear - 0.5)
+        + 0.095 * (slab.y - 0.5) + 0.09 * grain + 0.08 * chips - 0.18 * split;
+    const wood_red = 0.49 - 0.040 * patina + texture;
+    const wood_green = 0.468 - 0.027 * patina + texture;
+    const wood_blue = 0.420 - 0.010 * patina + texture;
+    const sap = 0.60 + 0.17 * (strand - 0.5) + 0.17 * grain + 0.10 * (tear - 0.5);
+    const leaf = 0.27 + 0.15 * cloud_bed + 0.13 * grain + 0.15 * tuft_noise
+        + 0.25 * smooth(0.25, 0.70, tip + 0.4 * tuft_noise);
+    const color = Vec4 {
+        ((1 - worn) * wood_red + worn * (sap + 0.015)) * (1 - moss) + leaf * 0.82 * moss,
+        ((1 - worn) * wood_green + worn * (sap - 0.010)) * (1 - moss) + leaf * 0.83 * moss,
+        ((1 - worn) * wood_blue + worn * (sap - 0.066)) * (1 - moss) + leaf * 0.48 * moss, 1};
+    return MossSample {color, relief, roughness};
+}
+
+fn lichenFields() : Fields {
+    return Fields {makeSites(32, 20, 82), makeSites(68, 57, 948),
+        makeNoise(12, 14, 642), makeNoise(71, 84, 411), makeNoise(540, 570, 102),
+        makeNoise(176, 69, 431), valueNoise(SIZE, SIZE, 311)};
+}
+
+fn lichenSurface(x : u32, y : u32, f : Fields) : Vec4 {
+    const u = (x as f32 + 0.5) / SIZE as f32;
+    const v = (y as f32 + 0.5) / SIZE as f32;
+    const swell = noise2(f.drift, u, v);
+    const chip = noise2(f.chips, u, v) - 0.5;
+    const grain = noise2(f.grit, u, v) - 0.5;
+    const dust = getPixel(f.dust, x, y).x - 0.5;
+    const wu = u + 0.028 * swell + 0.009 * chip + 0.002 * grain;
+    const wv = v + 0.025 * swell - 0.008 * chip;
+    const slab = plate(f.plates, wu, wv);
+    const face = smooth(0.012, 0.16, slab.x);
+    const lip = crust(f.scales, wu, wv);
+    const fiber = noise2(f.fibers, wu, wv) - 0.5;
+    const wood = 0.16 + 0.22 * swell + face * (0.14 + 0.17 * slab.y + 0.19 * slab.z)
+        + 0.15 * lip + 0.07 * fiber + 0.045 * grain;
+    // Colonies follow a separate noise field and spill across adjacent slabs.
+    const colony = noise2(f.drift, v + 0.37, u + 0.21) + 0.43 * chip + 0.22 * grain + 0.11 * lip;
+    const pale = smooth(0.63, 0.72, colony);
+    const pigment = 0.19 + 0.14 * face + 0.14 * slab.y + 0.09 * fiber + 0.08 * dust;
+    const chalk = 0.72 + 0.16 * grain + 0.10 * dust;
+    return Vec4 {(pigment + 0.035) * (1 - pale) + chalk * pale,
+        (pigment - 0.006) * (1 - pale) + (chalk - 0.008) * pale,
+        (pigment - 0.036) * (1 - pale) + (chalk - 0.05) * pale,
+        wood + pale * (0.029 + 0.025 * grain)};
+}

@@ -1,0 +1,8 @@
+// import core:commandline as commandline
+
+// true if the flag is on the command line
+extern fn isFlagOn(flag : []const u8) : bool;
+// the index-th number after the flag (1 is the one right after it), default_value if there is none
+extern fn flagNumber(flag : []const u8, index : u32, default_value : f64) : f64;
+// copies the word after the flag to buffer, returns its length, -1 if there is none or it does not fit
+extern fn flagString(flag : []const u8, buffer : []u8) : i32;

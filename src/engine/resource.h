@@ -99,7 +99,7 @@ protected:
 	ResourceManager& m_resource_manager;
 
 protected:
-	void doLoad();
+	virtual void doLoad();
 	void fileLoaded(Span<const u8> mem, bool success);
 	void onStateChanged(State old_state, State new_state, Resource&);
 

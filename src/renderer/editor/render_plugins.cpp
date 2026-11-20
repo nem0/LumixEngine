@@ -39,7 +39,7 @@
 #include "fbx_importer.h"
 #include "game_view.h"
 #include "model_meta.h"
-#include "openfbx/ofbx.h"
+#include "ufbx/ufbx.h"
 #include "renderer/culling_system.h"
 #include "renderer/editor/composite_texture.h"
 #include "renderer/editor/model_importer.h"
@@ -2059,12 +2059,17 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		
 		void onFBXLoaded(Span<const u8> data, bool success) {
 			m_fbx_async_handle = FileSystem::AsyncHandle::invalid();
-			ofbx::IScene* fbx_scene = ofbx::load(data.begin(), data.length(), (u16)ofbx::LoadFlags::IGNORE_GEOMETRY);
+			ufbx_load_opts opts = {};
+			opts.ignore_geometry = true;
+			opts.ignore_animation = true;
+			opts.ignore_embedded = true;
+			ufbx_error error;
+			ufbx_scene* fbx_scene = ufbx_load_memory(data.begin(), data.length(), &opts, &error);
 			if (!fbx_scene) return;
 
-			m_has_meshes = fbx_scene->getMeshCount() > 0;
+			m_has_meshes = fbx_scene->meshes.count > 0;
 
-			fbx_scene->destroy();
+			ufbx_free_scene(fbx_scene);
 		}
 
 		void deserialize(InputMemoryStream& blob) override { 
@@ -2129,6 +2134,22 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				saveUndo(ImGui::Checkbox("##ignoreanim", &m_meta.ignore_animations));
 				ImGuiEx::Label("Ignore material colors");
 				saveUndo(ImGui::Checkbox("##ignorematcol", &m_meta.ignore_material_colors));
+				ImGuiEx::Label("Create clusters (?)");
+				if (ImGui::IsItemHovered()) {
+					ImGui::SetTooltip("%s", "Bakes clusters, so that instanced models can use continuous GPU driven LOD instead of LOD meshes."
+						"\nNot used by skinned models, models with an impostor and models with less than 4096 triangles."
+						"\nClusters need additional memory.");
+				}
+				saveUndo(ImGui::Checkbox("##creclusters", &m_meta.create_clusters));
+				if (m_meta.create_clusters) {
+					ImGuiEx::Label("Dilate cluster borders (?)");
+					if (ImGui::IsItemHovered()) {
+						ImGui::SetTooltip("%s", "Coarser levels of clusters grow the open borders of their triangles to keep the area that simplification removes."
+							"\nFor foliage: without it, leaves and other loose pieces thin out much sooner than their size suggests."
+							"\nNeeds more memory, every cluster has its own positions.");
+					}
+					saveUndo(ImGui::Checkbox("##cludilate", &m_meta.cluster_dilate_borders));
+				}
 				ImGuiEx::Label("Create impostor mesh");
 				saveUndo(ImGui::Checkbox("##creimp", &m_meta.create_impostor));
 				if (m_meta.create_impostor) {
@@ -2690,6 +2711,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			if (!importer->parseSimple(Path(path))) {
 				logError("Failed to parse ", path);
 				destroyFBXImporter(*importer);
+				scan_counter.dec();
 				return;
 			}
 
@@ -2965,7 +2987,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 			)#";
 
 			m_downscale_program = gpu::allocProgramHandle();
-			stream.createProgram(m_downscale_program, gpu::StateFlags::NONE, gpu::VertexDecl(gpu::PrimitiveType::NONE), downscale_src, gpu::ShaderType::COMPUTE, nullptr, 0, "downscale");
+			stream.createProgram(m_downscale_program, gpu::StateFlags::NONE, gpu::PrimitiveType::NONE, downscale_src, gpu::ShaderType::COMPUTE, nullptr, 0, "downscale");
 		}
 
 		ASSERT(src_w % dst_w == 0);
@@ -3253,7 +3275,7 @@ struct ShaderCodeEditorWindow : AssetEditorWindow {
 				else if (m_shader->isEmpty()) ImGui::TextUnformatted("Loading...");
 				else {
 					if (!m_program) {
-						m_program = m_shader->m_programs.empty() ? m_shader->getProgram(gpu::StateFlags::NONE, gpu::VertexDecl(gpu::PrimitiveType::TRIANGLES), 0, nullptr) : m_shader->m_programs[0].program;
+						m_program = m_shader->m_programs.empty() ? m_shader->getProgram(gpu::StateFlags::NONE, gpu::PrimitiveType::TRIANGLES, 0, nullptr) : m_shader->m_programs[0].program;
 						m_shader->m_renderer.getDrawStream().requestDisassembly(m_program);
 					}
 					if (m_disassembly.length() == 0) {
@@ -3411,12 +3433,58 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 		str.removePrefix(begin - str.data);
 	}
 
+	// Appends the included file to `compiled`. Includes inside of it are appended too, recursively.
+	// Annotations (`//@`) are processed only in the shader itself.
+	bool appendInclude(const Path& src, StringView path, u32 depth, OutputMemoryStream& compiled) {
+		if (depth >= 16) {
+			logError(src, ": includes of ", path, " are nested too deep, is there a cycle?");
+			return false;
+		}
+
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		OutputMemoryStream content(m_app.getAllocator());
+		if (!fs.getContentSync(Path(path), content)) {
+			logError(src, ": Failed to open/read include ", path);
+			return false;
+		}
+		// the shader must be compiled again when the include changes
+		m_app.getAssetCompiler().registerDependency(src, Path(path));
+		if (content.empty()) return true;
+
+		compiled << "#line 1 \"" << path << "\"\n";
+		StringView rest((const char*)content.data(), (u32)content.size());
+		const char* end = rest.end();
+		u32 line_idx = 0;
+		for (;;) {
+			++line_idx;
+			StringView line = getLine(rest);
+			if (line.data == end) break;
+
+			StringView trimmed = line;
+			skipWhitespaces(trimmed);
+			if (startsWith(trimmed, "#include \"")) {
+				StringView nested;
+				nested.data = trimmed.data + 10;
+				const char* nested_end = nested.data + 1;
+				while (nested_end < end && *nested_end != '"') ++nested_end;
+				nested.length = nested_end - nested.data;
+
+				if (!appendInclude(src, nested, depth + 1, compiled)) return false;
+				compiled << "#line " << line_idx + 1 << " \"" << path << "\"\n";
+			}
+			else {
+				compiled << line << "\n";
+			}
+		}
+		return true;
+	}
+
 	bool compile(const Path& src) override {
 		// load
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		OutputMemoryStream src_data(m_app.getAllocator());
 		if (!fs.getContentSync(src, src_data)) return false;
-		
+
 		// parse
 		struct TextureSlot {
 			TextureSlot(IAllocator& allocator) : name(allocator), define(allocator) {}
@@ -3447,18 +3515,8 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin {
 				while (path_end < preprocess_end && *path_end != '"') ++path_end;
 				path.length = path_end - path.data;
 
-				OutputMemoryStream include_content(m_app.getAllocator());
-				if (!fs.getContentSync(Path(path), include_content)) {
-					logError(src, ": Failed to open/read include ", path);
-					return false;
-				}
-				
-				if (!include_content.empty()) {
-					include_content << "\n";
-					compiled << "#line 1 \"" << path << "\"\n";
-					compiled.write(include_content.data(), include_content.size());
-					compiled << "#line " << line_idx + 1 << " \"" << src << "\"\n";
-				}
+				if (!appendInclude(src, path, 0, compiled)) return false;
+				compiled << "#line " << line_idx + 1 << " \"" << src << "\"\n";
 			}
 			else if (startsWith(line, "//@")) {
 				line.removePrefix(3);
@@ -3890,7 +3948,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin {
 		if (m_app.checkShortcut(m_generate_action, true)) generateProbes(false, world);
 
 		if (m_ibl_filter_shader->isReady() && !m_ibl_filter_program) {
-			m_ibl_filter_program = m_ibl_filter_shader->getProgram(gpu::StateFlags::NONE, gpu::VertexDecl(gpu::PrimitiveType::TRIANGLE_STRIP), 0, "");
+			m_ibl_filter_program = m_ibl_filter_shader->getProgram(gpu::StateFlags::NONE, gpu::PrimitiveType::TRIANGLE_STRIP, 0, "");
 		}
 
 		if (m_done_counter != m_probe_counter) {
@@ -5055,8 +5113,6 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 
 		stream.useProgram(program);
 		stream.bindIndexBuffer(ib.buffer);
-		stream.bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(ImDrawVert));
-		stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 
 		for (int i = 0, c = cmd_list->CmdBuffer.size(); i < c; ++i) {
 			const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[i];
@@ -5064,8 +5120,6 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 				if (ImDrawCallback_ResetRenderState == pcmd->UserCallback) {
 					stream.useProgram(program);
 					stream.bindIndexBuffer(ib.buffer);
-					stream.bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(ImDrawVert));
-					stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 				}
 				else {
 					pcmd->UserCallback(cmd_list, pcmd);
@@ -5083,6 +5137,8 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 				uniform_data->texture_handle = gpu::getBindlessHandle(tex);
 				static os::Timer timer;
 				uniform_data->time = timer.getTimeSinceStart();
+				uniform_data->vertices = gpu::getBindlessHandle(vb.buffer).value;
+				uniform_data->vertices_offset = vb.offset;
 				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 
 				const u32 h = u32(clamp((pcmd->ClipRect.w - pcmd->ClipRect.y), 0.f, 65535.f));
@@ -5111,6 +5167,8 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		Vec2 offset;
 		gpu::BindlessHandle texture_handle;
 		float time;
+		u32 vertices; // bindless
+		u32 vertices_offset;
 	};
 
 	void imguiUpdateTexture(ImTextureData& tex) {
@@ -5171,9 +5229,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			if (new_program) {
 				const char* src =
 					R"#(struct VSInput {
-							float2 pos : TEXCOORD0;
-							float2 uv : TEXCOORD1;
-							float4 color : TEXCOORD2;
+							uint vertex_id : SV_VertexID;
 						};
 
 						cbuffer ImGuiState : register(b4) {
@@ -5181,6 +5237,8 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 							float2 c_offset;
 							uint c_texture;
 							float c_time;
+							uint c_vertices;
+							uint c_vertices_offset;
 						};
 
 						struct VSOutput {
@@ -5190,10 +5248,15 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 						};
 
 						VSOutput mainVS(VSInput input) {
+							// vertices are pulled: float2 position, float2 uv, RGBA8 color, 20 bytes each
+							ByteAddressBuffer vb = bindless_buffers[c_vertices];
+							const uint offset = c_vertices_offset + input.vertex_id * 20;
+							const float4 pos_uv = asfloat(vb.Load4(offset));
+							const uint packed = vb.Load(offset + 16);
 							VSOutput output;
-							output.color = input.color;
-							output.uv = input.uv;
-							float2 p = input.pos * c_scale + c_offset;
+							output.color = float4(packed & 0xff, (packed >> 8) & 0xff, (packed >> 16) & 0xff, packed >> 24) / 255.0;
+							output.uv = pos_uv.zw;
+							float2 p = pos_uv.xy * c_scale + c_offset;
 							output.position = float4(p.xy, 0, 1);
 							return output;
 						}
@@ -5206,12 +5269,9 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 							);
 						}
 					)#";
-				gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
-				decl.addAttribute(0, 2, gpu::AttributeType::FLOAT, 0);
-				decl.addAttribute(8, 2, gpu::AttributeType::FLOAT, 0);
-				decl.addAttribute(16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+				// vertices are pulled by the vertex shader
 				const gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
-				stream.createProgram(program, state, decl, src, gpu::ShaderType::SURFACE, nullptr, 0, "imgui shader");
+				stream.createProgram(program, state, gpu::PrimitiveType::TRIANGLES, src, gpu::ShaderType::SURFACE, nullptr, 0, "imgui shader");
 			}
 
 			if (draw_data->Textures != nullptr) {

@@ -11,6 +11,7 @@
 
 #include "engine/plugin.h"
 #include "gpu/gpu.h"
+#include "vertex_decl.h"
 
 
 //@ module RenderModule renderer "Render"
@@ -47,13 +48,13 @@ struct ProceduralGeometry {
 	ProceduralGeometry(IAllocator& allocator) 
 		: vertex_data(allocator)
 		, index_data(allocator)
-		, vertex_decl(gpu::PrimitiveType::TRIANGLES)
 	{}
 
 	Material* material = nullptr;
 	OutputMemoryStream vertex_data;
 	OutputMemoryStream index_data;
-	gpu::VertexDecl vertex_decl;
+	VertexDecl vertex_decl;
+	gpu::PrimitiveType primitive_type = gpu::PrimitiveType::TRIANGLES;
 	gpu::DataType index_type;
 	gpu::BufferHandle vertex_buffer = gpu::INVALID_BUFFER;
 	gpu::BufferHandle index_buffer = gpu::INVALID_BUFFER;
@@ -209,7 +210,6 @@ struct ModelInstance {
 		IS_BONE_ATTACHMENT_PARENT = 1 << 0,
 		ENABLED = 1 << 1,
 		VALID = 1 << 2,
-		MOVED = 1 << 3,
 	};
 
 	Model* model = nullptr;
@@ -218,11 +218,12 @@ struct ModelInstance {
 	Pose* pose = nullptr;
 	EntityPtr next_model = INVALID_ENTITY;
 	EntityPtr prev_model = INVALID_ENTITY;
-	float lod = 4;
-	Transform prev_frame_transform;
+	i32 forced_lod = -1;	// the LOD chosen by setModelInstanceLOD (previews), -1: by distance
 	Flags flags = Flags::NONE;
 	u16 mesh_count = 0;
-	bool dirty = true;
+	bool dirty = true;			// the materials of the instance (overrides) are not resolved yet, see RenderModule::refreshMaterialOverrides
+	bool override_queued = false;
+	u32 gpu_slot = 0xffFFffFF;	// in GPUScene, valid while the instance is enabled and its model can be drawn from the GPU scene (Model::canUseGPUScene)
 };
 
 struct InstancedModel {
@@ -237,23 +238,15 @@ struct InstancedModel {
 		float scale;
 	};
 
-	struct Grid {
-		struct Cell {
-			AABB aabb;
-			u32 from_instance;
-			u32 instance_count;
-		};
-
-		AABB aabb;
-		Cell cells[4 * 4];
-	};
-
-	Grid grid;
 	Model* model = nullptr;
 	Array<InstanceData> instances;
 	gpu::BufferHandle gpu_data = gpu::INVALID_BUFFER;
 	u32 gpu_capacity = 0;
+	u32 gpu_count = 0;			// the number of instances that are in gpu_data
+	u32 gpu_group = 0xffFFffFF;	// the group of the GPU scene (gpu_scene.h) if the model has clusters
+	const Model* gpu_group_model = nullptr;
 	bool dirty = false;
+	bool warned_no_clusters = false;
 };
 
 struct MeshInstance
@@ -401,7 +394,6 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual ShiftedFrustum getCameraFrustum(EntityRef entity, Vec2 viewport_min_px, Vec2 viewport_max_px) const = 0;
 	virtual Engine& getEngine() const = 0;
 	virtual IAllocator& getAllocator() = 0;
-	virtual u32 computeSortKey(const Material& material, const Mesh& mesh) const = 0;
 
 	virtual Pose* lockPose(EntityRef entity) = 0;
 	virtual void unlockPose(EntityRef entity, bool changed) = 0;
@@ -468,6 +460,9 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual Span<ModelInstance> getModelInstances() = 0;
 	// resets per-mesh state of material overrides after a material/shader unload, call before rendering a pipeline
 	virtual void invalidateStaleMaterialOverrides() = 0;
+	// uploads the changes of the GPU scene (struct GPUScene), call before rendering a pipeline, more than once in a frame is fine
+	virtual void flushGPUScene() = 0;
+	virtual struct GPUScene& getGPUScene() = 0;
 	virtual void setModelInstanceLOD(EntityRef entity, u32 lod) = 0;
 	virtual CullResult* getRenderables(const ShiftedFrustum& frustum, RenderableTypes type) const = 0;
 	virtual CullResult* getRenderables(const ShiftedFrustum& frustum) const = 0;
@@ -536,7 +531,8 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 
 	virtual void setProceduralGeometry(EntityRef entity
 		, Span<const u8> vertex_data
-		, const gpu::VertexDecl& vertex_decl
+		, const VertexDecl& vertex_decl
+		, gpu::PrimitiveType primitive_type
 		, Span<const u8> index_data
 		, gpu::DataType index_type) = 0;
 	//@ component ProceduralGeometry id procedural_geom
