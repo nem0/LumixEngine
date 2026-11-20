@@ -340,8 +340,9 @@ void* Allocator::reallocate(void* user, size_t new_size, size_t old_size, size_t
 namespace Lumix {
 void configureCrashReport(CrashReportFlags) {}
 void setCrashReportLogPath(const char*) {}
+const char* getCrashReportLogPath() { return ""; }
 void setCrashReportCallback(CrashReportCallback) {}
-bool sendFeedback(IAllocator&, StringView, StringView, StringView) { return false; }
+bool sendFeedback(IAllocator&, StringView, StringView, Span<const StringView>) { return false; }
 void installUnhandledExceptionHandler() {}
 void clearHardwareBreakpoint(u32) {
 	ASSERT(false);

@@ -92,14 +92,16 @@ enum class CrashReportFlags : u32 {
 
 LUMIX_CORE_API void configureCrashReport(CrashReportFlags flags);
 LUMIX_CORE_API void setCrashReportLogPath(const char* path);
+// The full path of the log file set by setCrashReportLogPath, empty when there is none.
+LUMIX_CORE_API const char* getCrashReportLogPath();
 // Called on the crashing thread to add text to the crash report (e.g. the call stack of a running script).
 // Must not allocate or lock; writes a null-terminated string of at most out_size bytes to out.
 using CrashReportCallback = void (*)(char* out, u32 out_size);
 LUMIX_CORE_API void setCrashReportCallback(CrashReportCallback callback);
 
-// Sends user feedback to Sentry. Blocks until the upload ends. `email` and `attachment_path` can be empty,
-// the attachment can be any file up to 5 MiB. Works regardless of CrashReportFlags.
-LUMIX_CORE_API bool sendFeedback(IAllocator& allocator, StringView message, StringView email, StringView attachment_path);
+// Sends user feedback to Sentry. Blocks until the upload ends. `email` and `attachment_paths` can be empty,
+// there can be up to 8 attachments, each any file up to 5 MiB. Works regardless of CrashReportFlags.
+LUMIX_CORE_API bool sendFeedback(IAllocator& allocator, StringView message, StringView email, Span<const StringView> attachment_paths);
 
 LUMIX_CORE_API void installUnhandledExceptionHandler();
 LUMIX_CORE_API void clearHardwareBreakpoint(u32 breakpoint_idx);

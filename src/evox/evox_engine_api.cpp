@@ -190,6 +190,24 @@ static void logInfoString(ex_string_view v) {
 	logInfo(StringView(v.begin, (u64)v.length));
 }
 
+// logFilePath(buffer : []u8) : i32
+// copies the full path on disk of the engine log file into buffer, without a terminator, and returns its length; -1 if there is no log file or it does not fit
+static void evox_log_filePath(ex_runtime*, ex_call_frame frame) {
+	EX_ARG(frame, ex_slice, buffer);
+	if (buffer.length < 0 || (buffer.length > 0 && !buffer.data)) {
+		panic(frame, "Invalid buffer");
+		return;
+	}
+	const char* path = getCrashReportLogPath();
+	const i64 length = (i64)stringLength(path);
+	if (length == 0 || length > buffer.length) {
+		EX_RESULT(frame, i32(-1));
+		return;
+	}
+	memcpy(buffer.data, path, (size_t)length);
+	EX_RESULT(frame, (i32)length);
+}
+
 // profiler blocks and counters opened by scripts. Names are evox string literals (cstr): static and NUL-terminated, so the profiler can keep the pointer.
 static u32 s_script_open_blocks = 0;
 
@@ -868,11 +886,22 @@ static bool evox_storage_remove(ex_string_view relative) {
 	return getStoragePath(relative, Span(path)) && os::deleteFile(path);
 }
 
-static bool evox_sentry_sendFeedback(ex_string_view message, ex_string_view email, ex_string_view attachment_path) {
+static bool evox_sentry_sendFeedback(ex_string_view message, ex_string_view email, ex_slice attachment_paths) {
+	const u32 MAX_ATTACHMENTS = 8;
+	if (attachment_paths.length < 0 || attachment_paths.length > MAX_ATTACHMENTS || (!attachment_paths.data && attachment_paths.length > 0)) {
+		logError("Feedback: invalid attachment list");
+		return false;
+	}
+	// []const []const u8 is an array of {begin, length}, same layout as ex_string_view
+	const ex_string_view* paths = (const ex_string_view*)attachment_paths.data;
+	StringView views[MAX_ATTACHMENTS];
+	for (i64 i = 0; i < attachment_paths.length; ++i) {
+		views[i] = StringView(paths[i].begin, (u64)paths[i].length);
+	}
 	return sendFeedback(getGlobalAllocator()
 		, StringView(message.begin, (u64)message.length)
 		, StringView(email.begin, (u64)email.length)
-		, StringView(attachment_path.begin, (u64)attachment_path.length));
+		, Span<const StringView>(views, (u32)attachment_paths.length));
 }
 
 void registerImguiModule(NativeFunctionMap& functions) {
@@ -917,6 +946,7 @@ void gatherCoreFunctions(NativeFunctionMap& functions) {
 	// log
 	functions.insert({"core:log", "logErrorString"}, &wrap<logErrorString>);
 	functions.insert({"core:log", "logInfoString"}, &wrap<logInfoString>);
+	functions.insert({"core:log", "logFilePath"}, &evox_log_filePath);
 	// profiler
 	functions.insert({"core:profiler", "beginBlock"}, &wrap<profilerBegin>);
 	functions.insert({"core:profiler", "endBlock"}, &wrap<profilerEnd>);

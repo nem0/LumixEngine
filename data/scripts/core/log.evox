@@ -2,6 +2,8 @@ import "core:string"
 
 extern fn logErrorString(v : []const u8) : void;
 extern fn logInfoString(v : []const u8) : void;
+// the full path on disk of the engine log file, copied into buffer without a terminator; returns its length, -1 if there is no log file or it does not fit
+extern fn logFilePath(buffer : []u8) : i32;
 
 fn logError(args : ...any) : void {
 	for arg in args {

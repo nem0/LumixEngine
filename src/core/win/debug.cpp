@@ -277,26 +277,15 @@ static void sendToSentry(const char* message, const char* exception_type, const 
 
 } // namespace sentry
 
-bool sendFeedback(IAllocator& allocator, StringView message, StringView email, StringView attachment_path) {
+bool sendFeedback(IAllocator& allocator, StringView message, StringView email, Span<const StringView> attachment_paths) {
 	const u64 MAX_FEEDBACK_ATTACHMENT = 5 * 1024 * 1024;
+	const u64 MAX_FEEDBACK_ATTACHMENTS = 8;
 	if (message.size() == 0 || message.size() > 8192 || email.size() > 256) {
 		logError("Feedback: invalid message or email size");
 		return false;
 	}
-
-	os::InputFile file;
-	u64 attachment_size = 0;
-	const bool has_attachment = attachment_path.size() > 0;
-	if (has_attachment) {
-		if (!file.open(StaticString<MAX_PATH>(attachment_path))) {
-			logError("Feedback: failed to open attachment ", attachment_path);
-			return false;
-		}
-		attachment_size = file.size();
-	}
-	defer { if (has_attachment) file.close(); };
-	if (attachment_size > MAX_FEEDBACK_ATTACHMENT) {
-		logError("Feedback: attachment ", attachment_path, " is too big (", attachment_size, " bytes)");
+	if (attachment_paths.length() > MAX_FEEDBACK_ATTACHMENTS) {
+		logError("Feedback: too many attachments (", attachment_paths.length(), ")");
 		return false;
 	}
 
@@ -307,7 +296,7 @@ bool sendFeedback(IAllocator& allocator, StringView message, StringView email, S
 	}
 
 	OutputMemoryStream body(allocator);
-	body.reserve(1024 + message.size() * 2 + attachment_size);
+	body.reserve(1024 + message.size() * 2);
 	body << "{\"event_id\":\"" << StringView(event_id) << "\",\"dsn\":\"https://" << sentry::key << "@" << sentry::host << "/" << sentry::project << "\"}\n";
 	body << "{\"type\":\"feedback\"}\n";
 	body << "{\"event_id\":\"" << StringView(event_id) << "\",\"timestamp\":" << sentry::getUnixTimestamp() << ",\"platform\":\"native\",\"level\":\"info\",\"contexts\":{\"feedback\":{\"message\":\"";
@@ -321,7 +310,35 @@ bool sendFeedback(IAllocator& allocator, StringView message, StringView email, S
 	}
 	body << "}}}\n";
 
-	if (has_attachment) {
+	for (const StringView& attachment_path : attachment_paths) {
+		if (attachment_path.size() == 0) continue;
+		// full sharing: an attachment can be a file another handle writes to, like the log of this process
+		const StaticString<MAX_PATH> attachment_path_z(attachment_path);
+		HANDLE file = CreateFileA(attachment_path_z, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+		if (file == INVALID_HANDLE_VALUE) {
+			logError("Feedback: failed to open attachment ", attachment_path);
+			return false;
+		}
+		defer { CloseHandle(file); };
+		LARGE_INTEGER file_size;
+		if (!GetFileSizeEx(file, &file_size) || file_size.QuadPart < 0) {
+			logError("Feedback: failed to get the size of attachment ", attachment_path);
+			return false;
+		}
+		u64 attachment_size = (u64)file_size.QuadPart;
+		if (attachment_size > MAX_FEEDBACK_ATTACHMENT) {
+			// a log keeps its end, which is where the problem is; any other file is not cut (a half image is useless)
+			const StringView ext(".log");
+			const bool is_log = attachment_path.size() >= ext.size() && StringView(attachment_path.end() - ext.size(), attachment_path.end()) == ext;
+			LARGE_INTEGER tail_start;
+			tail_start.QuadPart = (LONGLONG)(attachment_size - MAX_FEEDBACK_ATTACHMENT);
+			if (!is_log || !SetFilePointerEx(file, tail_start, nullptr, FILE_BEGIN)) {
+				logError("Feedback: attachment ", attachment_path, " is too big (", attachment_size, " bytes)");
+				return false;
+			}
+			attachment_size = MAX_FEEDBACK_ATTACHMENT;
+		}
+
 		// filename without the directory
 		StringView filename = attachment_path;
 		for (const char* c = attachment_path.begin(); c != attachment_path.end(); ++c) {
@@ -330,7 +347,8 @@ bool sendFeedback(IAllocator& allocator, StringView message, StringView email, S
 		body << "{\"type\":\"attachment\",\"length\":" << attachment_size << ",\"filename\":\"";
 		sentry::appendJsonEscaped(out, filename.begin(), filename.end());
 		body << "\"}\n";
-		if (attachment_size > 0 && !file.read(body.skip(attachment_size), attachment_size)) {
+		DWORD bytes_read = 0;
+		if (attachment_size > 0 && (!ReadFile(file, body.skip(attachment_size), (DWORD)attachment_size, &bytes_read, nullptr) || bytes_read != attachment_size)) {
 			logError("Feedback: failed to read attachment ", attachment_path);
 			return false;
 		}
@@ -1210,6 +1228,10 @@ void setCrashReportLogPath(const char* path) {
 	// Resolve relative paths now, before the working directory can change.
 	const DWORD length = GetFullPathNameA(path, sizeof(g_crash_report_log_path), g_crash_report_log_path, nullptr);
 	if (length == 0 || length >= sizeof(g_crash_report_log_path)) g_crash_report_log_path[0] = '\0';
+}
+
+const char* getCrashReportLogPath() {
+	return g_crash_report_log_path;
 }
 
 void installUnhandledExceptionHandler() {
