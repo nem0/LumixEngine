@@ -5260,6 +5260,18 @@ namespace Lumix::Evox::generated {
 		object->setLODMultiplier(value);
 	}
 	
+	static void evox_object_Renderer_isVSyncEnabled_5364763635458124603(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Renderer*, object);
+		auto ret = object->isVSyncEnabled();
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_object_Renderer_enableVsync_8848772898507482253(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, Renderer*, object);
+		EX_ARG(frame, bool, enable);
+		object->enableVsync(enable);
+	}
+	
 	static void evox_object_Renderer_requestScreenshot_2862291973608057301(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, Renderer*, object);
 		EX_STRING_ARG(frame, path);
@@ -6467,6 +6479,8 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:renderer/renderer"), StringView("destroyPipeline")}, &evox_object_Renderer_destroyPipeline_10417378349737653994);
 		functions.insert({StringView("core:renderer/renderer"), StringView("getLODMultiplier")}, &evox_object_Renderer_getLODMultiplier_14506703837845548734);
 		functions.insert({StringView("core:renderer/renderer"), StringView("setLODMultiplier")}, &evox_object_Renderer_setLODMultiplier_2531530158563778094);
+		functions.insert({StringView("core:renderer/renderer"), StringView("isVSyncEnabled")}, &evox_object_Renderer_isVSyncEnabled_5364763635458124603);
+		functions.insert({StringView("core:renderer/renderer"), StringView("enableVsync")}, &evox_object_Renderer_enableVsync_8848772898507482253);
 		functions.insert({StringView("core:renderer/renderer"), StringView("requestScreenshot")}, &evox_object_Renderer_requestScreenshot_2862291973608057301);
 		functions.insert({StringView("core:renderer/renderer"), StringView("getScreenshotState")}, &evox_object_Renderer_getScreenshotState_2467548710941015420);
 		functions.insert({StringView("core:renderer/shader"), StringView("load")}, &evox_resource_load_Shader);

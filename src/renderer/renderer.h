@@ -98,6 +98,10 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	virtual float getLODMultiplier() const = 0;
 	//@ function
 	virtual void setLODMultiplier(float value) = 0;
+	//@ function
+	virtual bool isVSyncEnabled() const = 0;
+	//@ function
+	virtual void enableVsync(bool enable) = 0;
 
 	// Saves the next rendered frame of a game view pipeline (with the in-game UI) as a PNG to an absolute path.
 	// max_width and max_height, if not 0, limit the size of the image: it is averaged down by

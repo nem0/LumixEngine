@@ -10,6 +10,8 @@ extern fn createPipeline(object : Renderer, type_ : PipelineType) : Pipeline;
 extern fn destroyPipeline(object : Renderer, pipeline : Pipeline) : void;
 extern fn getLODMultiplier(object : Renderer) : f32;
 extern fn setLODMultiplier(object : Renderer, value : f32) : void;
+extern fn isVSyncEnabled(object : Renderer) : bool;
+extern fn enableVsync(object : Renderer, enable : bool) : void;
 extern fn requestScreenshot(object : Renderer, path : []const u8, max_width : u32, max_height : u32) : bool;
 extern fn getScreenshotState(object : Renderer) : ScreenshotState;
 
