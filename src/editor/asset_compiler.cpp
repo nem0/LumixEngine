@@ -782,7 +782,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		const float ui_width = maximum(300.f, ImGui::GetIO().DisplaySize.x * 0.33f);
 
 		const ImVec2 pos = ImGui::GetMainViewport()->Pos;
-		ImGui::SetNextWindowPos(ImVec2((ImGui::GetIO().DisplaySize.x - ui_width) * 0.5f + pos.x, 30 + pos.y));
+		ImGui::SetNextWindowPos(ImVec2((ImGui::GetIO().DisplaySize.x - ui_width) * 0.5f + pos.x, maximum(30.f, ImGui::GetMainViewport()->WorkPos.y - pos.y + 4) + pos.y));
 		ImGui::SetNextWindowSize(ImVec2(ui_width, -1));
 		ImGui::SetNextWindowSizeConstraints(ImVec2(-FLT_MAX, 0), ImVec2(FLT_MAX, 200));
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar
