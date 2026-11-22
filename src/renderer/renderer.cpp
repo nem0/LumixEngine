@@ -557,6 +557,8 @@ struct RendererImpl final : Renderer {
 
 	float getLODMultiplier() const override { return m_lod_multiplier; }
 	void setLODMultiplier(float value) override { m_lod_multiplier = maximum(0.f, value); }
+	bool isVSyncEnabled() const override { return gpu::isVSyncEnabled(); }
+	void enableVsync(bool enable) override { gpu::enableVSync(enable); }
 
 	bool requestScreenshot(StringView path, u32 max_width, u32 max_height) override {
 		const ScreenshotState state = getScreenshotState();
