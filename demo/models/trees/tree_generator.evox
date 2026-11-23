@@ -560,6 +560,18 @@ fn shadowAlong(density : array.Array(f32), start : vec3.Vec3, dir : vec3.Vec3, l
 }
 
 fn generate(seed : u32, form : Form, material : []const u8) : Mesh {
+    return generateSized(seed, form, material, false);
+}
+
+// The big tree: the trunk and the branches of the first levels are BIG_SIZE times longer and thicker, and have more children (BIG_COUNT_*), so the crown has about three
+// times more sprays. The detail of everything is the same, the sprays and their leaves are not scaled.
+const BIG_SIZE : f32 = 1.45;
+const BIG_COUNT_0 : i32 = 12;
+const BIG_COUNT_1 : i32 = 10;
+const BIG_COUNT_2 : i32 = 7;
+
+fn generateSized(seed : u32, form : Form, material : []const u8, big : bool) : Mesh {
+    const grow : f32 = big ? BIG_SIZE : 1.0;
     const moss_ridges = form == Form.SPIRAL;
     const meadow = form == Form.MEADOW;
     random.seed(seed, 91823471);
@@ -575,9 +587,9 @@ fn generate(seed : u32, form : Form, material : []const u8) : Mesh {
     var points = array.init(vec3.Vec3);
     var dirs = array.init(vec3.Vec3);
     var radii = array.init(f32);
-    const stem_length : f32 = moss_ridges ? lengthOf(0) : (meadow ? 8.2 : 5.6);
+    const stem_length : f32 = grow * (moss_ridges ? lengthOf(0) : (meadow ? 8.2 : 5.6));
     const crown_base : f32 = moss_ridges ? 0.35 : (meadow ? 0.145 : 0.21);
-    const stem_radius : f32 = moss_ridges ? TRUNK_RADIUS : (meadow ? 0.43 : 0.27);
+    const stem_radius : f32 = grow * (moss_ridges ? TRUNK_RADIUS : (meadow ? 0.43 : 0.27));
     const trunk : Branch = { { 0.0, 0.0, 0.0 }, { 0.0, 1.0, 0.0 }, stem_length, stem_radius, 0 };
     array.push(&branches, trunk);
 
@@ -592,6 +604,11 @@ fn generate(seed : u32, form : Form, material : []const u8) : Mesh {
 
         // children: spread around the branch by the golden angle, leaning away from it, from the upper part of it
         var count = childrenOf(b.level);
+        if big {
+            if b.level == 0 { count = BIG_COUNT_0; }
+            else if b.level == 1 { count = BIG_COUNT_1; }
+            else if b.level == 2 { count = BIG_COUNT_2; }
+        }
         if meadow {
             if b.level == 0 { count = 18; }
             else if b.level == 1 { count = 6; }
@@ -637,6 +654,7 @@ fn generate(seed : u32, form : Form, material : []const u8) : Mesh {
                 dir = vec3.normalizeSafe(dir);
             }
             var length = lengthOf(b.level + 1) * (0.8 + 0.4 * random.randFloat());
+            if b.level + 1 < SPRAY_LEVEL { length *= grow; }	// the places of the sprays keep their size
             if upright_limb { length *= 1.22 - 0.88 * t; }
             else if meadow_limb {
                 length *= leader ? 1.46 : 1.55 + 0.28 * math.sin(math.pi * t) - 1.07 * t;

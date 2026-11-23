@@ -21,6 +21,7 @@
 #include "engine/world.h"
 #include "renderer/draw_stream.h"
 #include "renderer/font.h"
+#include "renderer/gpu_scene_registry.h"
 #include "renderer/material.h"
 #include "renderer/mesh_clusters.h"
 #include "renderer/model.h"
@@ -683,6 +684,12 @@ struct RendererImpl final : Renderer {
 
 	~RendererImpl() {
 		DrawStream& stream = getEndFrameDrawStream();
+		if (m_gpu_scene_registry) {
+			// the worlds are gone, so are the users of the resources
+			destroyGPUSceneRegistry(*m_gpu_scene_registry);
+			LUMIX_DELETE(m_allocator, m_gpu_scene_registry);
+			m_gpu_scene_registry = nullptr;
+		}
 		for (Renderbuffer& rb : m_renderbuffers) {
 			stream.destroy(rb.handle);
 			rb.handle = gpu::INVALID_TEXTURE;
@@ -700,6 +707,8 @@ struct RendererImpl final : Renderer {
 		m_shader_manager.destroy();
 		if (m_cluster_data_buffer) stream.destroy(m_cluster_data_buffer);
 		m_cluster_data_buffer = gpu::INVALID_BUFFER;
+		if (m_cluster_scratch_buffer) stream.destroy(m_cluster_scratch_buffer);
+		m_cluster_scratch_buffer = gpu::INVALID_BUFFER;
 		m_font_manager->destroy();
 		LUMIX_DELETE(m_allocator, m_font_manager);
 		
@@ -1267,6 +1276,19 @@ struct RendererImpl final : Renderer {
 	}
 
 	gpu::BufferHandle getClusterDataBuffer() override { return m_cluster_data_buffer; }
+
+	gpu::BufferHandle getClusterScratchBuffer() override {
+		if (!m_cluster_scratch_buffer) {
+			m_cluster_scratch_buffer = createBuffer(MemRef{ CLUSTER_SCRATCH_CAPACITY * sizeof(u32), nullptr, false }, gpu::BufferFlags::SHADER_BUFFER, "cluster scratch");
+		}
+		return m_cluster_scratch_buffer;
+	}
+	u32 getClusterScratchCapacity() const override { return CLUSTER_SCRATCH_CAPACITY; }
+
+	GPUSceneRegistry& getGPUSceneRegistry() override {
+		if (!m_gpu_scene_registry) m_gpu_scene_registry = LUMIX_NEW(m_allocator, GPUSceneRegistry)(*this, m_allocator);
+		return *m_gpu_scene_registry;
+	}
 
 	void updateClusterData(u32 offset, const void* data, u32 size) override {
 		ASSERT(size % 4 == 0 && m_cluster_data_buffer);
@@ -2049,6 +2071,9 @@ struct RendererImpl final : Renderer {
 	};
 	jobs::Mutex m_cluster_data_mutex;
 	gpu::BufferHandle m_cluster_data_buffer = gpu::INVALID_BUFFER;
+	static constexpr u32 CLUSTER_SCRATCH_CAPACITY = 1 << 22;		// u32 in the scratch buffer of the culling of trees, shared by all the pipelines (16 MB)
+	gpu::BufferHandle m_cluster_scratch_buffer = gpu::INVALID_BUFFER;
+	GPUSceneRegistry* m_gpu_scene_registry = nullptr;
 	Array<ClusterDataRange> m_cluster_data_free;
 	Array<ClusterDataRange> m_cluster_data_pending;
 

@@ -24,6 +24,8 @@
 #include "renderer/draw_stream.h"
 #include "renderer/font.h"
 #include "renderer/gpu_scene.h"
+#include "renderer/gpu_scene_chunks.h"
+#include "core/sort.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/particle_system.h"
@@ -85,6 +87,38 @@ struct RenderModuleImpl final : RenderModule {
 		InstancedModel& im = beginInstancedModelEditing(entity);
 		im.instances.resize(size);
 		value.read(im.instances.begin(), im.instances.byte_size());
+		endInstancedModelEditing(entity);
+	}
+
+	Model* getInstancedModelModel(EntityRef entity) override { return m_instanced_models[entity].model; }
+
+	// Appends `count` instances (identity rotation, scale 1) to the instances of the entity, their transforms are set by setInstancedModelInstanceTransform.
+	void addInstancedModelInstances(EntityRef entity, u32 count) override {
+		InstancedModel& im = beginInstancedModelEditing(entity);
+		const u32 first = im.instances.size();
+		im.instances.resize(first + count);
+		for (u32 i = first; i < first + count; ++i) {
+			InstancedModel::InstanceData& id = im.instances[i];
+			id.rot_quat = Vec3::ZERO;
+			id.lod = 3;
+			id.pos = Vec3::ZERO;
+			id.scale = 1;
+		}
+		endInstancedModelEditing(entity);
+	}
+
+	// `pos` is relative to the entity. The rotation is stored as its xyz, negated if w < 0 (w is rebuilt from them).
+	void setInstancedModelInstanceTransform(EntityRef entity, u32 idx, Vec3 pos, Quat rot, float scale) override {
+		InstancedModel& im = beginInstancedModelEditing(entity);
+		if (idx >= (u32)im.instances.size()) {
+			logError("Instance ", idx, " of an instanced model does not exist");
+			return;
+		}
+		InstancedModel::InstanceData& id = im.instances[idx];
+		id.pos = pos;
+		id.scale = scale;
+		id.rot_quat = Vec3(rot.x, rot.y, rot.z);
+		if (rot.w < 0) id.rot_quat = -id.rot_quat;
 		endInstancedModelEditing(entity);
 	}
 
@@ -163,6 +197,10 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.componentTransformed(types::particle_emitter).unbind<&RenderModuleImpl::onParticleEmitterMoved>(this);
 		m_world.componentTransformed(types::point_light).unbind<&RenderModuleImpl::onPointLightMoved>(this);
 		m_world.componentTransformed(types::bone_attachment).unbind<&RenderModuleImpl::onBoneAttachmentMoved>(this);
+
+		// the slots release the models they have in the resources of the renderer, before the models can go
+		destroyGPUScene(m_gpu_scene);
+		destroyGPUSceneChunks(m_gpu_chunks);
 
 		for (Decal& decal : m_decals) {
 			if (decal.material) decal.material->decRefCount();
@@ -548,7 +586,7 @@ struct RenderModuleImpl final : RenderModule {
 		ModelInstance& mi = m_model_instances[entity.index];
 		if (mi.gpu_slot == GPUSceneConst::INVALID_SLOT) return;
 
-		StackArray<GPUScene::Override, 16> entries(m_allocator);
+		StackArray<GPUMaterialOverride, 16> entries(m_allocator);
 		if (mi.model && mi.model->isReady() && hasMaterialOverride(mi)) {
 			const u32 count = minimum((u32)mi.model->getMeshCount(), (u32)mi.mesh_materials.length());
 			for (u32 mesh = 0; mesh < count; ++mesh) {
@@ -556,12 +594,11 @@ struct RenderModuleImpl final : RenderModule {
 				const MeshMaterial& model_mat = mi.model->getMeshMaterial(mesh);
 				if (!own.material || !model_mat.material || u32(own.material_index) == 0 || !own.material->isReady()) continue;
 				if (own.material_index == model_mat.material_index) continue;
-				GPUScene::Override o = { mesh, (u32)own.material_index, own.material };
+				GPUMaterialOverride o = { mesh, (u32)own.material_index, own.material };
 				entries.push(o);
 			}
 		}
-		m_gpu_scene.setOverrides(mi.gpu_slot, Span<const GPUScene::Override>(entries.begin(), entries.size()));
-		gpuSceneUpdate(entity);	// the material set of the slot
+		setSceneOverrides(m_gpu_scene, mi.gpu_slot, Span<const GPUMaterialOverride>(entries.begin(), entries.size()));
 	}
 
 	// Resolves the material overrides of the queued instances once their materials are ready (the queue keeps the others), and makes their entries.
@@ -1385,6 +1422,59 @@ struct RenderModuleImpl final : RenderModule {
 		m_instanced_models[entity].dirty = true;
 	}
 
+	// Sorts the instances along a Morton curve of their positions (the CPU array keeps its order, the editor refers to instances by their index) and cuts the
+	// result into chunks of consecutive instances, which are near each other.
+	static void makeInstanceChunks(InstancedModel& im, Array<InstancedModel::InstanceData>& sorted, IAllocator& allocator) {
+		im.chunks.clear();
+		const u32 count = im.instances.size();
+		if (count == 0) return;
+
+		Vec3 min = im.instances[0].pos;
+		Vec3 max = min;
+		for (const InstancedModel::InstanceData& i : im.instances) {
+			min = minimum(min, i.pos);
+			max = maximum(max, i.pos);
+		}
+		const Vec3 extent = max - min;
+		const float cell = maximum(extent.x, extent.y, extent.z) / 1023.f + 1e-6f;
+		auto spread = [](u64 v) {
+			// 10 bits to every third bit
+			v = (v | (v << 16)) & 0x030000FF;
+			v = (v | (v << 8)) & 0x0300F00F;
+			v = (v | (v << 4)) & 0x030C30C3;
+			v = (v | (v << 2)) & 0x09249249;
+			return v;
+		};
+		Array<u64> keys(allocator);
+		keys.resize(count);
+		for (u32 i = 0; i < count; ++i) {
+			const Vec3 q = (im.instances[i].pos - min) / cell;
+			const u64 code = spread((u64)q.x) | (spread((u64)q.y) << 1) | (spread((u64)q.z) << 2);
+			keys[i] = (code << 32) | i;
+		}
+		sort(keys.begin(), keys.end());
+
+		sorted.resize(count);
+		for (u32 i = 0; i < count; ++i) sorted[i] = im.instances[u32(keys[i] & 0xffFFffFF)];
+
+		for (u32 first = 0; first < count; first += GPUSceneConst::CHUNK_INSTANCES) {
+			InstancedModel::Chunk& chunk = im.chunks.emplace();
+			chunk.first = first;
+			chunk.count = minimum(count - first, GPUSceneConst::CHUNK_INSTANCES);
+			Vec3 chunk_min = sorted[first].pos;
+			Vec3 chunk_max = chunk_min;
+			chunk.max_scale = 0;
+			for (u32 i = first; i < first + chunk.count; ++i) {
+				chunk_min = minimum(chunk_min, sorted[i].pos);
+				chunk_max = maximum(chunk_max, sorted[i].pos);
+				chunk.max_scale = maximum(chunk.max_scale, sorted[i].scale);
+			}
+			chunk.center = (chunk_min + chunk_max) * 0.5f;
+			chunk.radius = 0;
+			for (u32 i = first; i < first + chunk.count; ++i) chunk.radius = maximum(chunk.radius, length(sorted[i].pos - chunk.center));
+		}
+	}
+
 	void initInstancedModelGPUData(EntityRef entity) override {
 		PROFILE_FUNCTION();
 		InstancedModel& im = m_instanced_models[entity];
@@ -1396,28 +1486,40 @@ struct RenderModuleImpl final : RenderModule {
 			}
 		}
 
-		if (!im.instances.empty()) {
+		Array<InstancedModel::InstanceData> sorted(m_allocator);
+		makeInstanceChunks(im, sorted, m_allocator);
+		if (!sorted.empty()) {
 			if (im.gpu_data) {
-				Renderer::MemRef mem = m_renderer.copy(im.instances.begin(), im.instances.byte_size());
+				Renderer::MemRef mem = m_renderer.copy(sorted.begin(), sorted.byte_size());
 				DrawStream& stream = m_renderer.getDrawStream();
 				stream.update(im.gpu_data, mem.data, mem.size);
 				stream.freeMemory(mem.data, m_renderer.getAllocator());
 			}
 			else {
-				Renderer::MemRef mem = m_renderer.copy(im.instances.begin(), im.instances.capacity() * sizeof(im.instances[0]));
+				const u32 capacity = im.instances.capacity();
+				Renderer::MemRef mem = m_renderer.allocate(capacity * sizeof(InstancedModel::InstanceData));
+				memset(mem.data, 0, mem.size);
+				memcpy(mem.data, sorted.begin(), sorted.byte_size());
 				im.gpu_data = m_renderer.createBuffer(mem, gpu::BufferFlags::SHADER_BUFFER, "instances");
-				im.gpu_capacity = im.instances.capacity();
+				im.gpu_capacity = capacity;
 			}
 		}
 		im.gpu_count = im.instances.size();
+		++im.gpu_version;
 
 		im.dirty = false;
+	}
+
+	void freeInstancedModelSlots(InstancedModel& im) {
+		for (u32 slot : im.gpu_slots) freeSceneChunk(m_gpu_chunks, slot);
+		im.gpu_slots.clear();
+		im.gpu_slots_model = nullptr;
 	}
 
 	void destroyInstancedModel(EntityRef entity) override {
 		Model* m = m_instanced_models[entity].model;
 		if (m) m->decRefCount();
-		if (m_instanced_models[entity].gpu_group != GPUSceneConst::INVALID_SLOT) m_gpu_scene.freeGroup(m_instanced_models[entity].gpu_group);
+		freeInstancedModelSlots(m_instanced_models[entity]);
 		if (m_instanced_models[entity].gpu_data) m_renderer.getEndFrameDrawStream().destroy(m_instanced_models[entity].gpu_data);
 		m_instanced_models.erase(entity);
 		m_world.onComponentDestroyed(entity, types::instanced_model, this);
@@ -1599,13 +1701,13 @@ struct RenderModuleImpl final : RenderModule {
 		if (mi.gpu_slot == GPUSceneConst::INVALID_SLOT || !mi.model) return;
 		const Transform& tr = m_world.getTransform(entity);
 		const float radius = mi.model->getOriginBoundingRadius() * maximum(tr.scale.x, tr.scale.y, tr.scale.z);
-		m_gpu_scene.update(mi.gpu_slot, tr, radius, mi.forced_lod);
+		setSceneTransform(m_gpu_scene, mi.gpu_slot, tr, radius, mi.forced_lod);
 	}
 
 	void gpuSceneAdd(EntityRef entity) {
 		ModelInstance& mi = m_model_instances[entity.index];
 		if (mi.gpu_slot == GPUSceneConst::INVALID_SLOT) {
-			mi.gpu_slot = m_gpu_scene.alloc(mi.model);
+			mi.gpu_slot = allocSceneSlot(m_gpu_scene, *mi.model);
 			// the entries of the table of material overrides belong to the slot
 			if (hasMaterialOverride(mi)) queueMaterialOverrideRefresh(entity);
 		}
@@ -1615,41 +1717,53 @@ struct RenderModuleImpl final : RenderModule {
 	void gpuSceneRemove(EntityRef entity) {
 		ModelInstance& mi = m_model_instances[entity.index];
 		if (mi.gpu_slot == GPUSceneConst::INVALID_SLOT) return;
-		m_gpu_scene.free(mi.gpu_slot);
+		freeSceneSlot(m_gpu_scene, mi.gpu_slot);
 		mi.gpu_slot = GPUSceneConst::INVALID_SLOT;
 	}
 
 	void flushGPUScene() override {
 		refreshMaterialOverrides();
-		syncInstancedModelGroups();
-		m_gpu_scene.flush();
+		syncInstancedModelChunks();
+		uploadGPUScene(m_gpu_scene);
+		uploadGPUSceneChunks(m_gpu_chunks);
 	}
 
-	// Instanced models with clusters are groups of the GPU scene: made when the model and the buffer of the instances are ready, and kept up to date with
-	// the position of the entity and the buffer (it is made again when the instances change).
-	void syncInstancedModelGroups() {
+	// The chunks of instanced models are in the chunk store of the GPU scene (gpu_scene_chunks.h): made when the model and the buffer of the instances are ready, made again when the instances change,
+	// moved with the entity (only its position, as the ray casts do it).
+	void syncInstancedModelChunks() {
 		for (auto iter = m_instanced_models.begin(), end = m_instanced_models.end(); iter != end; ++iter) {
 			InstancedModel& im = iter.value();
-			if (im.model && im.model->isReady() && !im.model->hasClusters() && !im.warned_no_clusters) {
-				// instanced models are drawn only from the GPU scene
-				im.warned_no_clusters = true;
-				logError(im.model->getPath(), ": instanced models without clusters are not drawn, compile the model with clusters");
+			const bool ready = im.model && im.model->isReady();
+			const bool skinned = ready && im.model->hasSkinnedMeshes();
+			if (skinned && !im.warned_skinned) {
+				im.warned_skinned = true;
+				logError(im.model->getPath(), ": instanced models with skinned meshes are not drawn");
 			}
-			const bool wanted = im.model && im.model->isReady() && im.model->hasClusters() && im.gpu_data && im.gpu_count > 0;
-			if (im.gpu_group != GPUSceneConst::INVALID_SLOT && (!wanted || im.gpu_group_model != im.model)) {
-				m_gpu_scene.freeGroup(im.gpu_group);
-				im.gpu_group = GPUSceneConst::INVALID_SLOT;
-				im.gpu_group_model = nullptr;
-			}
+			const bool wanted = ready && !skinned && im.model->canUseGPUScene() && im.gpu_data && im.gpu_count > 0;
+			if (!im.gpu_slots.empty() && (!wanted || im.gpu_slots_model != im.model || im.gpu_slots_version != im.gpu_version)) freeInstancedModelSlots(im);
 			if (!wanted) continue;
-			if (im.gpu_group == GPUSceneConst::INVALID_SLOT) {
-				im.gpu_group = m_gpu_scene.allocGroup(im.model);
-				im.gpu_group_model = im.model;
+
+			const DVec3 origin = m_world.getPosition(iter.key());
+			const bool fresh = im.gpu_slots.empty();
+			if (fresh) {
+				for (const InstancedModel::Chunk& chunk : im.chunks) {
+					im.gpu_slots.push(allocSceneChunk(m_gpu_chunks, *im.model, im.gpu_data, chunk.first, chunk.count));
+				}
+				im.gpu_slots_model = im.model;
+				im.gpu_slots_version = im.gpu_version;
 			}
-			m_gpu_scene.updateGroup(im.gpu_group, m_world.getTransform(iter.key()).pos, im.gpu_data, im.gpu_count);
+			if (fresh || origin.x != im.gpu_origin.x || origin.y != im.gpu_origin.y || origin.z != im.gpu_origin.z) {
+				const float model_radius = im.model->getOriginBoundingRadius();
+				for (u32 i = 0, c = im.gpu_slots.size(); i < c; ++i) {
+					const InstancedModel::Chunk& chunk = im.chunks[i];
+					moveSceneChunk(m_gpu_chunks, im.gpu_slots[i], origin, origin + chunk.center, chunk.radius + model_radius * chunk.max_scale);
+				}
+				im.gpu_origin = origin;
+			}
 		}
 	}
 	GPUScene& getGPUScene() override { return m_gpu_scene; }
+	GPUSceneChunks& getGPUSceneChunks() override { return m_gpu_chunks; }
 
 	void onModelInstanceMoved(EntityRef entity) {
 		ModelInstance& mi = m_model_instances[entity.index];
@@ -3585,6 +3699,7 @@ struct RenderModuleImpl final : RenderModule {
 	Engine& m_engine;
 	UniquePtr<CullingSystem> m_culling_system;
 	GPUScene m_gpu_scene;
+	GPUSceneChunks m_gpu_chunks;
 
 	EntityPtr m_active_global_light_entity;
 	HashMap<EntityRef, PointLight> m_point_lights;
@@ -3717,6 +3832,7 @@ RenderModuleImpl::RenderModuleImpl(Renderer& renderer,
 	, m_renderer(renderer)
 	, m_allocator(allocator, "renderer module")
 	, m_gpu_scene(renderer, m_allocator)
+	, m_gpu_chunks(renderer, m_allocator)
 	, m_model_entity_map(m_allocator)
 	, m_model_instances(m_allocator)
 	, m_override_queue(m_allocator)

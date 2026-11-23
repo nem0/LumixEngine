@@ -112,17 +112,35 @@ Surface getSurface(VSOutput input, uint material_index);
 
 	Instance loadInstance(VSInput input) {
 		ByteAddressBuffer buffer = bindless_buffers[u_instance_buffer];
-		const uint offset = pullInstanceAddress(input.instance_id, 96);
 		Instance r;
-		r.rot = asfloat(buffer.Load4(offset));
-		r.pos_lod = asfloat(buffer.Load4(offset + 16));
-		r.scale = asfloat(buffer.Load4(offset + 32));
-		r.prev_rot = asfloat(buffer.Load4(offset + 48));
-		r.prev_pos_lod = asfloat(buffer.Load4(offset + 64));
-		r.base_vertex = asuint(r.prev_pos_lod.w);
-		const uint4 last = buffer.Load4(offset + 80);
-		r.prev_scale = float4(asfloat(last.xyz), 0);
-		r.material_index = last.w;
+		#ifdef INDIRECT_INSTANCE
+			const uint offset = pullInstanceAddress(input.instance_id, DRAW_INSTANCE_STRIDE);
+			const uint4 rec = buffer.Load4(offset + DRAW_INSTANCE_SLOT);
+			r.base_vertex = rec.y;
+			r.material_index = buffer.Load(offset + DRAW_INSTANCE_MATERIAL);
+			float3 pos, scale, prev_pos, prev_scale;
+			#if defined DEPTH && !defined ALPHA_CUTOUT
+				const bool load_prev = false;
+			#else
+				const bool load_prev = true;
+			#endif
+			pullSceneTransform(rec.x, rec.w, load_prev, r.rot, pos, scale, r.prev_rot, prev_pos, prev_scale);
+			r.pos_lod = float4(pos, (float)rec.z);
+			r.scale = float4(scale, 0);
+			r.prev_pos_lod = float4(prev_pos, 0);
+			r.prev_scale = float4(prev_scale, 0);
+		#else
+			const uint offset = pullInstanceAddress(input.instance_id, 96);
+			r.rot = asfloat(buffer.Load4(offset));
+			r.pos_lod = asfloat(buffer.Load4(offset + 16));
+			r.scale = asfloat(buffer.Load4(offset + 32));
+			r.prev_rot = asfloat(buffer.Load4(offset + 48));
+			r.prev_pos_lod = asfloat(buffer.Load4(offset + 64));
+			r.base_vertex = asuint(r.prev_pos_lod.w);
+			const uint4 last = buffer.Load4(offset + 80);
+			r.prev_scale = float4(asfloat(last.xyz), 0);
+			r.material_index = last.w;
+		#endif
 		return r;
 	}
 #elif defined SKINNED
@@ -141,19 +159,33 @@ Surface getSurface(VSOutput input, uint material_index);
 
 	Instance loadInstance(VSInput input) {
 		ByteAddressBuffer buffer = bindless_buffers[u_instance_buffer];
-		const uint offset = pullInstanceAddress(input.instance_id, 96);
 		Instance r;
-		r.rot = asfloat(buffer.Load4(offset));
-		r.base_vertex = buffer.Load(offset + 76);
-		r.pos = asfloat(buffer.Load3(offset + 16));
-		const uint4 scale = buffer.Load4(offset + 32);
-		r.scale = asfloat(scale.xyz);
-		r.bones_offset = scale.w;
-		r.prev_rot = asfloat(buffer.Load4(offset + 48));
-		r.prev_pos = asfloat(buffer.Load3(offset + 64));
-		const uint4 last = buffer.Load4(offset + 80);
-		r.prev_scale = asfloat(last.xyz);
-		r.material_index = last.w;
+		#ifdef INDIRECT_INSTANCE
+			const uint offset = pullInstanceAddress(input.instance_id, DRAW_INSTANCE_STRIDE);
+			const uint4 rec = buffer.Load4(offset + DRAW_INSTANCE_SLOT);
+			r.base_vertex = rec.y;
+			r.bones_offset = rec.z;
+			r.material_index = buffer.Load(offset + DRAW_INSTANCE_MATERIAL);
+			#if defined DEPTH && !defined ALPHA_CUTOUT
+				const bool load_prev = false;
+			#else
+				const bool load_prev = true;
+			#endif
+			pullSceneTransform(rec.x, rec.w, load_prev, r.rot, r.pos, r.scale, r.prev_rot, r.prev_pos, r.prev_scale);
+		#else
+			const uint offset = pullInstanceAddress(input.instance_id, 96);
+			r.rot = asfloat(buffer.Load4(offset));
+			r.base_vertex = buffer.Load(offset + 76);
+			r.pos = asfloat(buffer.Load3(offset + 16));
+			const uint4 scale = buffer.Load4(offset + 32);
+			r.scale = asfloat(scale.xyz);
+			r.bones_offset = scale.w;
+			r.prev_rot = asfloat(buffer.Load4(offset + 48));
+			r.prev_pos = asfloat(buffer.Load3(offset + 64));
+			const uint4 last = buffer.Load4(offset + 80);
+			r.prev_scale = asfloat(last.xyz);
+			r.material_index = last.w;
+		#endif
 		return r;
 	}
 

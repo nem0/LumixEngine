@@ -35,12 +35,23 @@ struct Instance {
 
 Instance loadInstance(VSInput input) {
 	ByteAddressBuffer buffer = bindless_buffers[u_instance_buffer];
-	const uint offset = pullInstanceAddress(input.instance_id, 96);
 	Instance r;
-	r.rot = asfloat(buffer.Load4(offset));
-	r.pos_lod = asfloat(buffer.Load4(offset + 16));
-	r.scale = float4(asfloat(buffer.Load3(offset + 32)), 1);
-	r.material_index = buffer.Load(offset + 92);
+	#ifdef INDIRECT_INSTANCE
+		const uint offset = pullInstanceAddress(input.instance_id, DRAW_INSTANCE_STRIDE);
+		const uint4 rec = buffer.Load4(offset + DRAW_INSTANCE_SLOT);
+		float3 pos, scale, prev_pos, prev_scale;
+		float4 prev_rot;
+		pullSceneTransform(rec.x, rec.w, false, r.rot, pos, scale, prev_rot, prev_pos, prev_scale);
+		r.pos_lod = float4(pos, 0);
+		r.scale = float4(scale, 1);
+		r.material_index = buffer.Load(offset + DRAW_INSTANCE_MATERIAL);
+	#else
+		const uint offset = pullInstanceAddress(input.instance_id, 96);
+		r.rot = asfloat(buffer.Load4(offset));
+		r.pos_lod = asfloat(buffer.Load4(offset + 16));
+		r.scale = float4(asfloat(buffer.Load3(offset + 32)), 1);
+		r.material_index = buffer.Load(offset + 92);
+	#endif
 	return r;
 }
 

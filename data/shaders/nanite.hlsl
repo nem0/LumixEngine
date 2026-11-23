@@ -1,8 +1,9 @@
 #include "engine/shaders/common.hlsli"
+#include "engine/shaders/gpu_scene_layout.hlsli"
 
-// Selects clusters of meshes (see src/renderer/mesh_clusters.h) for the instances of the GPU scene (src/renderer/gpu_scene.h): its slots and the
-// instances of instanced models. The work comes from the culling of instances (gpu_scene_cull.hlsl): an item is (mesh of the mesh table of the scene,
-// instance, first cluster, group). The instance is a slot, or, if the group is not 0, the number of an instance in the group (+ 1) of an instanced model. The
+// Selects clusters of meshes (see src/renderer/mesh_clusters.h) for the model instances of the GPU scene (src/renderer/gpu_scene.h) and the instances of its chunks of
+// instanced models. The work comes from the culling of model instances (gpu_scene_cull.hlsl): an item is (mesh of the mesh table, slot, first cluster, instance). The
+// instance is 0 for a model instance that is drawn itself, otherwise the index (+ 1) of an instance in the buffer of the instances of the model instance. The
 // number of items of a dispatch is in a counter of the GPU (u_counts), the groups of the dispatch are computed from it.
 //
 // A cluster is selected if its error is small enough on the screen and the error of its parent is not. Meshes with few clusters are done by the
@@ -11,7 +12,8 @@
 // clusters. One thread group takes one instance and walks the trees from their roots, level by level: threads take nodes of the current level,
 // skip a node (and everything under it) if it is outside of the frustum or no cluster of it can be selected at its distance, and add its
 // children to the next level. The nodes of a level are in a list in `u_scratch`, there are two lists per group, which are swapped, and there are
-// never more nodes in a list than nodes in the mesh. The lists of a group are taken from the scratch buffer with a counter.
+// never more nodes in a list than nodes in the mesh. A dispatch has a fixed number of groups (u_tree_groups), each takes many items one after another and has its own
+// slice of the scratch buffer for the lists.
 //
 // The clusters that are selected are appended to a list (u_selected), gpu_scene_variants.hlsl sorts them into draws.
 
@@ -26,18 +28,18 @@ cbuffer UniformData : register(b4) {
 	uint u_items_offset;
 	uint u_item_capacity;	// of the list
 	uint u_scratch;			// rw bindless, lists of nodes
-	uint u_scratch_size;	// u32 in it
+	uint u_scratch_size;	// u32 in it, the slices of the groups (u_tree_groups of them, u_scratch_slice each) are inside it
 	uint u_selected_capacity;	// entries of the list of selected clusters
-	uint u_selected;		// rw bindless: [0] selected clusters, [4] scratch u32 allocated, from 16 entries of 16 bytes (instance, mesh, cluster, group)
+	uint u_selected;		// rw bindless: [0] selected clusters, from 16 entries of 16 bytes (instance, mesh, cluster, group)
 	uint u_counts;			// bindless, counters of the culling of instances: [4] flat items, [8] tree items
 	int3 u_cam_p;			// the camera in the fixed point of the GPU scene, the positions of instances are relative to it
-	uint u_padding;
+	uint u_tree_groups;		// groups of the dispatch of the trees at most (gpu_scene_cull.hlsl, ARGS dispatches min(items, this)), each has a slice of the scratch buffer
 	float3 u_cam_frac;		// -camera_offset of the instances
-	uint u_meshes;			// bindless, GPUSceneMesh[], 64 bytes
-	uint u_scene_instances;	// bindless, the instances of the GPU scene, 96 bytes
-	uint u_groups;			// bindless, GPUSceneGroup[] of the instanced models
+	uint u_meshes;			// bindless, GPUClusterMesh[], 32 bytes
+	uint u_instances;		// bindless, the model instances of the GPU scene, 96 bytes
+	uint u_chunks;			// bindless, the chunks of instanced models (GPUSceneChunk, 32 bytes)
 	uint u_cluster_data;	// bindless, the buffer with the clusters and nodes of all meshes, see MeshDesc
-	uint u_padding1;
+	uint u_scratch_slice;	// u32 of the slice of a group in u_scratch: two lists, each as large as the largest mesh
 	uint u_feedback;		// rw bindless, one bit for each page of the meshes that stream: a cluster of a group of the page was drawn (if it is loaded) or a group of the page is needed (if it is not), the CPU clears the bits after reading them
 	uint u_padding2;
 	uint u_feedback_capacity;	// groups in u_feedback, 0 if there is none
@@ -59,9 +61,6 @@ cbuffer UniformData : register(b4) {
 // threads of a group, GPUSceneConst::CLUSTER_THREADS
 #define GROUP_SIZE 64
 
-// units of positions in the GPU scene, GPUSceneConst::POS_UNIT
-#define SCENE_POS_UNIT (1.0 / 1024.0)
-
 struct MeshDesc {
 	float4 camera_offset;		// -cam_frac
 	uint clusters;				// byte offset in u_cluster_data of MeshClusterGPU[]
@@ -74,16 +73,17 @@ struct MeshDesc {
 	uint groups;				// byte offset in u_cluster_data of the table of groups (MeshGroupAddressGPU, 16 bytes), the flags are the last word
 };
 
-// the description of a mesh of the mesh table of the GPU scene (GPUSceneMesh), `mesh` is its index in the table
+// the description of a mesh of the mesh table of the GPU scene (GPUClusterMesh), `mesh` is its index in the table. The nodes follow the clusters (80 bytes each),
+// the roots follow the nodes (64 bytes each), see gpu_cluster_models.h
 MeshDesc loadSceneDesc(uint mesh) {
 	ByteAddressBuffer meshes = bindless_buffers[u_meshes];
-	const uint4 a = meshes.Load4(mesh * 64);			// clusters, nodes, cluster count, node count
-	const uint2 b = meshes.Load2(mesh * 64 + 16);		// root count, roots offset
+	const uint4 a = meshes.Load4(mesh * CLUSTER_MESH_STRIDE + CLUSTER_MESH_TABLE);			// clusters, group table, cluster count, node count
+	const uint root_count = meshes.Load(mesh * CLUSTER_MESH_STRIDE + CLUSTER_MESH_ROOT_COUNT);
 	MeshDesc r;
 	r.camera_offset = float4(-u_cam_frac, 1);
-	r.clusters = a.x; r.nodes = a.y; r.cluster_count = a.z; r.node_count = a.w;
-	r.root_count = b.x; r.roots_offset = b.y;
-	r.groups = meshes.Load(mesh * 64 + 48);
+	r.clusters = a.x; r.nodes = a.x + a.z * CLUSTER_STRIDE; r.cluster_count = a.z; r.node_count = a.w;
+	r.root_count = root_count; r.roots_offset = a.w * NODE_STRIDE;
+	r.groups = a.y;
 	r.mesh_index = mesh;
 	return r;
 }
@@ -94,27 +94,27 @@ struct Instance {
 	float3 scale;
 };
 
-// `group_ref` is 0 if the instance is a slot of the GPU scene, otherwise the group of an instanced model (+ 1) and `index` is the number of the instance in it
-Instance loadInstance(MeshDesc desc, uint index, uint group_ref) {
+// `slot` is the model instance, `instance` is 0 if the model instance is drawn itself, otherwise the instance + 1 in the buffer of the instances of the chunk, which is `slot`
+Instance loadInstance(MeshDesc desc, uint slot, uint instance) {
 	Instance r;
-	if (group_ref == 0) {
-		// GPU scene: 96 bytes per slot (rot, int3 p, mesh id, scale, ...), positions in fixed point. The difference to the camera is exact,
-		// camera_offset (added below) is -cam_frac.
-		ByteAddressBuffer instances = bindless_buffers[u_scene_instances];
-		const uint offset = index * 96;
-		r.rot = asfloat(instances.Load4(offset));
-		r.pos = float3(asint(instances.Load3(offset + 16)) - u_cam_p) * SCENE_POS_UNIT;
-		r.scale = asfloat(instances.Load3(offset + 32));
+	// positions are in fixed point. The difference to the camera is exact, camera_offset (added below) is -cam_frac.
+	if (instance == 0) {
+		ByteAddressBuffer instances = bindless_buffers[u_instances];
+		const uint offset = slot * INSTANCE_STRIDE;
+		r.pos = float3(asint(instances.Load3(offset + INSTANCE_POS)) - u_cam_p) * SCENE_POS_UNIT;
+		r.rot = asfloat(instances.Load4(offset + INSTANCE_ROT));
+		r.scale = asfloat(instances.Load3(offset + INSTANCE_SCALE));
 	}
 	else {
-		// an instance of an instanced model: 32 bytes in the buffer of its group, relative to the origin of the group, which is in fixed point
-		ByteAddressBuffer groups = bindless_buffers[u_groups];
-		const uint4 origin = groups.Load4((group_ref - 1) * 32);
-		ByteAddressBuffer data = bindless_buffers[groups.Load((group_ref - 1) * 32 + 16)];
-		const float4 rot_lod = asfloat(data.Load4(index * 32));
-		const float4 pos_scale = asfloat(data.Load4(index * 32 + 16));
+		// an instance of a chunk of an instanced model: 32 bytes in the buffer of the instances, relative to the position of the chunk
+		ByteAddressBuffer chunks = bindless_buffers[u_chunks];
+		r.pos = float3(asint(chunks.Load3(slot * CHUNK_STRIDE + CHUNK_P)) - u_cam_p) * SCENE_POS_UNIT;
+		ByteAddressBuffer data = bindless_buffers[NonUniformResourceIndex(chunks.Load(slot * CHUNK_STRIDE + CHUNK_INSTANCE_BUFFER))];
+		const uint instance_at = (instance - 1) * CHUNK_INSTANCE_STRIDE;
+		const float4 rot_lod = asfloat(data.Load4(instance_at + CHUNK_INSTANCE_ROT_LOD));
+		const float4 pos_scale = asfloat(data.Load4(instance_at + CHUNK_INSTANCE_POS_SCALE));
 		r.rot = float4(rot_lod.xyz, sqrt(saturate(1 - dot(rot_lod.xyz, rot_lod.xyz))));
-		r.pos = float3(asint(origin.xyz) - u_cam_p) * SCENE_POS_UNIT + pos_scale.xyz;
+		r.pos += pos_scale.xyz;
 		r.scale = pos_scale.www;
 	}
 	r.pos += desc.camera_offset.xyz;
@@ -201,21 +201,21 @@ void markFeedback(RWByteAddressBuffer feedback, uint id) {
 }
 
 // Tests a cluster and appends it to the list of selected clusters if it is selected.
-void processCluster(MeshDesc desc, Instance instance, float max_scale, uint instance_idx, uint cluster, uint group_ref) {
+void processCluster(MeshDesc desc, Instance instance, float max_scale, uint instance_idx, uint cluster, uint instance_ref) {
 	ByteAddressBuffer clusters = bindless_buffers[u_cluster_data];
-	uint offset = desc.clusters + cluster * 80;
-	float4 bounds = asfloat(clusters.Load4(offset));
-	float4 lod_bounds = asfloat(clusters.Load4(offset + 16));
-	float4 parent_bounds = asfloat(clusters.Load4(offset + 32));
-	uint4 misc = clusters.Load4(offset + 48);
-	const float2 attribute_errors = asfloat(clusters.Load2(offset + 64)); // of the cluster and of its parent
+	uint offset = desc.clusters + cluster * CLUSTER_STRIDE;
+	float4 bounds = asfloat(clusters.Load4(offset + CLUSTER_BOUNDS));
+	float4 lod_bounds = asfloat(clusters.Load4(offset + CLUSTER_LOD_BOUNDS));
+	float4 parent_bounds = asfloat(clusters.Load4(offset + CLUSTER_PARENT_BOUNDS));
+	uint4 misc = clusters.Load4(offset + CLUSTER_MISC);
+	const float2 attribute_errors = asfloat(clusters.Load2(offset + CLUSTER_ATTRIBUTE_ERRORS)); // of the cluster and of its parent
 	// Streaming: the clusters of a group that is not loaded are not drawn. A cluster whose children (the group it was refined to) are not loaded is drawn as if it was
 	// accurate enough, if its parent is not drawn instead. The parent decides the same for all clusters of the group, so there are no holes and no overlaps.
-	const uint2 group_info = clusters.Load2(offset + 72);	// the group of the cluster, the group of its children
-	const uint own_flags = clusters.Load(desc.groups + group_info.x * 16 + 12);
-	if ((own_flags & 1) == 0) return;
-	const uint child_flags = group_info.y == 0xffffffffu ? 1u : clusters.Load(desc.groups + group_info.y * 16 + 12);
-	const bool refined = (child_flags & 1) != 0;
+	const uint2 group_info = clusters.Load2(offset + CLUSTER_GROUPS);	// the group of the cluster, the group of its children
+	const uint own_flags = clusters.Load(desc.groups + group_info.x * GROUP_STRIDE + GROUP_FLAGS);
+	if ((own_flags & GROUP_FLAG_LOADED) == 0) return;
+	const uint child_flags = group_info.y == NO_GROUP ? GROUP_FLAG_LOADED : clusters.Load(desc.groups + group_info.y * GROUP_STRIDE + GROUP_FLAGS);
+	const bool refined = (child_flags & GROUP_FLAG_LOADED) != 0;
 	// the error of a cluster is the one of its positions and the one of its attributes, which counts as much as the weight says
 	float error = (asfloat(misc.x) + u_attribute_weight * attribute_errors.x) * max_scale;
 	// clusters without a parent have FLT_MAX error
@@ -254,16 +254,16 @@ void processCluster(MeshDesc desc, Instance instance, float max_scale, uint inst
 	// The ids in the groups are the ones of their pages. The page is loaded in the first case and it is not in the second, so one bit is enough, the CPU tells them apart by the state of the page.
 	if (u_feedback_capacity != 0) {
 		RWByteAddressBuffer feedback = bindless_rw_buffers[u_feedback];
-		const uint own_id = own_flags >> 8;
+		const uint own_id = own_flags >> GROUP_PAGE_SHIFT;
 		if (own_id < u_feedback_capacity) markFeedback(feedback, own_id);
-		const uint child_id = child_flags >> 8;
+		const uint child_id = child_flags >> GROUP_PAGE_SHIFT;
 		if (!refined && !error_small && child_id < u_feedback_capacity) markFeedback(feedback, child_id);
 	}
 
 	RWByteAddressBuffer selected = bindless_rw_buffers[u_selected];
 	uint at;
-	selected.InterlockedAdd(0, 1, at);
-	if (at < u_selected_capacity) selected.Store4(16 + at * 16, uint4(instance_idx, desc.mesh_index, cluster, group_ref));
+	selected.InterlockedAdd(SELECTED_COUNT, 1, at);
+	if (at < u_selected_capacity) selected.Store4(SELECTED_HEADER + at * SELECTED_STRIDE, uint4(instance_idx, desc.mesh_index, cluster, instance_ref));
 }
 
 // false if no cluster of the node can be selected, then the node and everything under it is skipped
@@ -289,93 +289,96 @@ bool isNodeNeeded(float4 bounds, float4 lod_bounds, float min_error, float max_p
 
 groupshared uint g_current_count;
 groupshared uint g_next_count;
-groupshared uint g_scratch_base;
 
 [numthreads(GROUP_SIZE, 1, 1)]
 void main(uint3 group_id : SV_GroupID, uint3 group_thread_id : SV_GroupThreadID) {
-	const uint group_index = group_id.y * 65535 + group_id.x;
-	// the number of items is in a counter of the GPU, u_item_capacity is the capacity of the list
 	#ifdef FLAT
-		const uint item_count = min(bindless_buffers[u_counts].Load(4), u_item_capacity);
-	#else
-		const uint item_count = min(bindless_buffers[u_counts].Load(8), u_item_capacity);
-	#endif
-	if (group_index >= item_count) return; // the same for all threads of the group
-	const uint4 item = bindless_buffers[u_items].Load4(u_items_offset + group_index * 16); // mesh, instance, first cluster, group
-	const MeshDesc desc = loadSceneDesc(item.x);
-	const uint instance_idx = item.y;
-	Instance instance = loadInstance(desc, instance_idx, item.w);
-	// bounds are spheres, so non-uniform scale is handled by the largest axis
-	float max_scale = max(instance.scale.x, max(instance.scale.y, instance.scale.z));
-
-	#ifdef FLAT
+		const uint group_index = group_id.y * MAX_GROUPS_X + group_id.x;
+		// the number of items is in a counter of the GPU, u_item_capacity is the capacity of the list
+		const uint item_count = min(bindless_buffers[u_counts].Load(COUNTER_FLAT), u_item_capacity);
+		if (group_index >= item_count) return; // the same for all threads of the group
+		const uint4 item = bindless_buffers[u_items].Load4(u_items_offset + group_index * ITEM_STRIDE); // mesh, slot, first cluster, instance
+		const MeshDesc desc = loadSceneDesc(item.x);
+		const uint instance_idx = item.y;
+		Instance instance = loadInstance(desc, instance_idx, item.w);
+		// bounds are spheres, so non-uniform scale is handled by the largest axis
+		float max_scale = max(instance.scale.x, max(instance.scale.y, instance.scale.z));
 		// 64 consecutive clusters of an instance
 		const uint cluster = item.z + group_thread_id.x;
 		if (cluster < desc.cluster_count) processCluster(desc, instance, max_scale, instance_idx, cluster, item.w);
 	#else
+		// Persistent groups: a dispatch has at most u_tree_groups groups, the group g takes the items g, g + groups, g + 2 * groups, ... (FXC does not accept a barrier in a loop that
+		// ends by a value from groupshared memory or an atomic, which a queue of items would need, so the schedule is static). Every group has a slice of the scratch buffer for the
+		// lists of its item, u_scratch_slice u32 for two lists of the largest mesh, so the memory does not depend on the number of items and no item is dropped.
+		// The slice is sized for the largest mesh of the scene, so the number of groups is limited by it (the CPU makes it min(2048, scratch size / slice), about 420 triangles
+		// of the finest level for each node): a mesh with 5M triangles leaves about 190 groups, 30M about 31, and those few groups also take the items of the small meshes. If that is
+		// slow in a scene with a huge mesh and many small ones, give the small meshes their own slices (or LDS) and the huge ones a dispatch of their own.
+		const uint item_count = min(bindless_buffers[u_counts].Load(COUNTER_TREE), u_item_capacity);
+		const uint group_count = max(min(item_count, u_tree_groups), 1u);
 		ByteAddressBuffer nodes = bindless_buffers[u_cluster_data];
 		RWByteAddressBuffer scratch = bindless_rw_buffers[u_scratch];
+		if ((group_id.x + 1) * u_scratch_slice > u_scratch_size) return;	// the slice does not fit, the same for all threads of the group (the CPU makes it fit)
+		const uint scratch_base = group_id.x * u_scratch_slice * 4;
 
-		// the lists of nodes of the group are allocated from the scratch buffer
-		if (group_thread_id.x == 0) {
-			uint allocated;
-			bindless_rw_buffers[u_selected].InterlockedAdd(4, desc.node_count * 2, allocated);
-			g_scratch_base = allocated;
-		}
-		GroupMemoryBarrierWithGroupSync();
-		if (g_scratch_base + desc.node_count * 2 > u_scratch_size) return; // does not fit, the same for all threads of the group
-		const uint scratch_base = g_scratch_base * 4;
-		const uint list_size = desc.node_count * 4;
+		[loop] for (uint group_index = group_id.x; group_index < item_count; group_index += group_count) {
+			const uint4 item = bindless_buffers[u_items].Load4(u_items_offset + group_index * ITEM_STRIDE); // mesh, slot, first cluster, instance
+			const MeshDesc desc = loadSceneDesc(item.x);
+			const uint instance_idx = item.y;
+			Instance instance = loadInstance(desc, instance_idx, item.w);
+			// bounds are spheres, so non-uniform scale is handled by the largest axis
+			float max_scale = max(instance.scale.x, max(instance.scale.y, instance.scale.z));
+			const uint list_size = desc.node_count * 4;	// two lists of the mesh are in the slice
 
-		// the roots are the first nodes to visit
-		for (uint r = group_thread_id.x; r < desc.root_count; r += GROUP_SIZE) {
-			scratch.Store(scratch_base + r * 4, nodes.Load(desc.nodes + desc.roots_offset + r * 4));
-		}
-		if (group_thread_id.x == 0) {
-			g_current_count = desc.root_count;
-			g_next_count = 0;
-		}
-		DeviceMemoryBarrierWithGroupSync();
-
-		// A loop with the depth of the deepest tree of the meshes of the dispatch, a uniform value, so that the synchronizations are in flow
-		// control that is the same for all threads (the shader compiler can not tell that a loop that ends when a value in groupshared memory is
-		// 0 ends for all threads at the same time). Levels after the last one of a shallower tree have no nodes, they cost two synchronizations.
-		uint list = 0;
-		[loop] for (uint depth = 0; depth < u_tree_depth; ++depth) {
-			const uint count = g_current_count; // all threads read it between the same two synchronizations
-			const uint from = scratch_base + list * list_size;
-			const uint to = scratch_base + (1 - list) * list_size;
-
-			for (uint i = group_thread_id.x; i < count; i += GROUP_SIZE) {
-				const uint node_id = scratch.Load(from + i * 4);
-				const uint node_offset = desc.nodes + node_id * 64;
-				const float4 bounds = asfloat(nodes.Load4(node_offset));
-				const float4 lod_bounds = asfloat(nodes.Load4(node_offset + 16));
-				const uint4 misc = nodes.Load4(node_offset + 32); // min error, max parent error, first, count and flags
-				const float2 attribute_errors = asfloat(nodes.Load2(node_offset + 48)); // the smallest and the largest of parents
-				if (!isNodeNeeded(bounds, lod_bounds, asfloat(misc.x), asfloat(misc.y), attribute_errors.x, attribute_errors.y, nodes.Load(node_offset + 56) != 0, instance, max_scale)) continue;
-
-				const uint child_count = misc.w & 0x7fffffffu;
-				if (misc.w & 0x80000000u) {
-					// a leaf: clusters
-					for (uint c = 0; c < child_count; ++c) {
-						processCluster(desc, instance, max_scale, instance_idx, misc.z + c, item.w);
-					}
-				}
-				else {
-					uint at;
-					InterlockedAdd(g_next_count, child_count, at);
-					for (uint c = 0; c < child_count; ++c) scratch.Store(to + (at + c) * 4, misc.z + c);
-				}
+			// the roots are the first nodes to visit
+			for (uint r = group_thread_id.x; r < desc.root_count; r += GROUP_SIZE) {
+				scratch.Store(scratch_base + r * 4, nodes.Load(desc.nodes + desc.roots_offset + r * ROOT_STRIDE));
 			}
-
-			DeviceMemoryBarrierWithGroupSync(); // the nodes of the next level are written
 			if (group_thread_id.x == 0) {
-				g_current_count = g_next_count;
+				g_current_count = desc.root_count;
 				g_next_count = 0;
 			}
-			GroupMemoryBarrierWithGroupSync();
-			list = 1 - list;
+			DeviceMemoryBarrierWithGroupSync();
+
+			// A loop with the depth of the deepest tree of the meshes of the dispatch, a uniform value, so that the synchronizations are in flow
+			// control that is the same for all threads (the shader compiler can not tell that a loop that ends when a value in groupshared memory is
+			// 0 ends for all threads at the same time). Levels after the last one of a shallower tree have no nodes, they cost two synchronizations.
+			uint list = 0;
+			[loop] for (uint depth = 0; depth < u_tree_depth; ++depth) {
+				const uint count = g_current_count; // all threads read it between the same two synchronizations
+				const uint from = scratch_base + list * list_size;
+				const uint to = scratch_base + (1 - list) * list_size;
+
+				for (uint i = group_thread_id.x; i < count; i += GROUP_SIZE) {
+					const uint node_id = scratch.Load(from + i * 4);
+					const uint node_offset = desc.nodes + node_id * NODE_STRIDE;
+					const float4 bounds = asfloat(nodes.Load4(node_offset + NODE_BOUNDS));
+					const float4 lod_bounds = asfloat(nodes.Load4(node_offset + NODE_LOD_BOUNDS));
+					const uint4 misc = nodes.Load4(node_offset + NODE_MISC); // min error, max parent error, first, count and flags
+					const float2 attribute_errors = asfloat(nodes.Load2(node_offset + NODE_ATTRIBUTE_ERRORS)); // the smallest and the largest of parents
+					if (!isNodeNeeded(bounds, lod_bounds, asfloat(misc.x), asfloat(misc.y), attribute_errors.x, attribute_errors.y, nodes.Load(node_offset + NODE_UNREFINED) != 0, instance, max_scale)) continue;
+
+					const uint child_count = misc.w & NODE_COUNT_MASK;
+					if (misc.w & NODE_LEAF_BIT) {
+						// a leaf: clusters
+						for (uint c = 0; c < child_count; ++c) {
+							processCluster(desc, instance, max_scale, instance_idx, misc.z + c, item.w);
+						}
+					}
+					else {
+						uint at;
+						InterlockedAdd(g_next_count, child_count, at);
+						for (uint c = 0; c < child_count; ++c) scratch.Store(to + (at + c) * 4, misc.z + c);
+					}
+				}
+
+				DeviceMemoryBarrierWithGroupSync(); // the nodes of the next level are written
+				if (group_thread_id.x == 0) {
+					g_current_count = g_next_count;
+					g_next_count = 0;
+				}
+				GroupMemoryBarrierWithGroupSync();
+				list = 1 - list;
+			}
 		}
 	#endif
 }

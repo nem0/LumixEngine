@@ -1,14 +1,15 @@
 @echo off
 REM Builds studio.exe and app.exe, compiles the resources of the demo project (studio.exe --compile_all_resources) and runs
-REM the nanite benchmark (demo/scripts/bench.evox) on the high poly meshes of demo/models/bench (rock, coil, terrain, tree_plain),
-REM each with cluster streaming on and off. The app is started twice, once per streaming mode, and runs the four meshes one
-REM after another in that launch (-bench_spawn ... -bench_spawn4).
+REM the nanite benchmark (demo/scripts/bench.evox) on the high poly meshes of demo/models/bench (rock, coil, terrain, tree_plain, tree_plain_big),
+REM each with cluster streaming on and off. The app is started twice, once per streaming mode, and runs the five meshes one
+REM after another in that launch (-bench_spawn ... -bench_spawn5). tree_plain_big is 100 x 100 instances of one instanced model.
 REM
 REM Usage: run_nanite_tests.bat [config] [-- extra app arguments]
 REM   config  RelWithDebInfo (default) or Debug
 REM   extra   arguments for app.exe, e.g. -bench_frames 1200 -bench_cam 0 3 0 90 -20 -cluster_stream_mb 1
 REM
-REM The scenes are rendered at 4K (-resolution 3840 2160, the window stays small) and the grids are dense, so that the passes of the clusters have millions of
+REM Every scene runs twice per streaming mode: at 4K and at 800x600 (results <mesh>_<mode>_800x600.csv).
+REM The 4K scenes are rendered at 3840 x 2160 (-resolution, the window stays small) and the grids are dense, so that the passes of the clusters have millions of
 REM triangles at the default error of clusters (1 px): at the size of the default window they take 0.2-0.5 ms and nothing about them can be measured.
 REM The window is never shown (-hidden), so the app takes neither the focus nor the mouse and the machine stays usable during the runs.
 REM The runs are without vsync (-no_vsync) and with 100 warmup frames (-bench_warmup, cluster streaming needs about 100 to settle, 10-50 give streaming runs 7-37% too fast geom pass times) and 50 measured frames (-bench_frames, extra arguments win over it). With vsync the GPU
@@ -96,13 +97,16 @@ if not exist "%out_dir%" mkdir "%out_dir%"
 
 REM scenes of every launch: mesh, instances along x and z, distance between instances (m)
 set failed=0
-call :run streaming ""
-call :run no_streaming "-cluster_stream_off"
+call :run streaming "" 3840 2160
+call :run no_streaming "-cluster_stream_off" 3840 2160
+REM the same scenes at the size of a small window, the names of the results end with _800x600
+call :run streaming_800x600 "" 800 600
+call :run no_streaming_800x600 "-cluster_stream_off" 800 600
 
 echo.
 echo ==== Results (%out_dir%) ====
-for %%M in (rock coil terrain tree_plain) do (
-  for %%N in (streaming no_streaming) do (
+for %%M in (rock coil terrain tree_plain tree_plain_big) do (
+  for %%N in (streaming no_streaming streaming_800x600 no_streaming_800x600) do (
     echo.
     echo --- %%M, %%N ---
     if exist "%out_dir%\%%M_%%N.csv" (
@@ -117,18 +121,20 @@ popd
 if not "%failed%"=="0" exit /b 1
 exit /b 0
 
-REM :run <streaming|no_streaming> <extra app flags>
-REM one launch of the app, it runs the three scenes one after another and writes <mesh>_<mode>.csv for each
+REM :run <result name suffix: streaming|no_streaming, with _800x600 at a small resolution> <extra app flags> <width> <height>
+REM one launch of the app, it runs the scenes one after another and writes <mesh>_<mode>.csv for each
 :run
 set mode=%~1
 set flags=%~2
-for %%M in (rock coil terrain tree_plain) do if exist "%out_dir%\%%M_%mode%.csv" del "%out_dir%\%%M_%mode%.csv"
+set res_w=%~3
+set res_h=%~4
+for %%M in (rock coil terrain tree_plain tree_plain_big) do if exist "%out_dir%\%%M_%mode%.csv" del "%out_dir%\%%M_%mode%.csv"
 echo.
-echo Running "%mode%" (rock, coil, terrain, tree_plain)...
+echo Running "%mode%" at %res_w%x%res_h% (rock, coil, terrain, tree_plain, tree_plain_big)...
 pushd "%~dp0..\data"
-"%app%" -window -data_dir "%~dp0..\demo" -bench "nanite_bench/*_%mode%.csv" -bench_spawn rock 30 30 2.5 -bench_spawn2 coil 30 30 2.5 -bench_spawn3 terrain 9 9 8 -bench_spawn4 tree_plain 20 20 6 %flags% %extra% -no_vsync -hidden -resolution 3840 2160 -bench_warmup 100 -bench_frames 50
+"%app%" -window -data_dir "%~dp0..\demo" -bench "nanite_bench/*_%mode%.csv" -bench_spawn rock 30 30 2.5 -bench_spawn2 coil 30 30 2.5 -bench_spawn3 terrain 9 9 8 -bench_spawn4 tree_plain 20 20 6 -bench_spawn5 tree_plain_big 100 100 8 %flags% %extra% -no_vsync -hidden -resolution %res_w% %res_h% -bench_warmup 100 -bench_frames 50
 popd
-for %%M in (rock coil terrain tree_plain) do (
+for %%M in (rock coil terrain tree_plain tree_plain_big) do (
   if not exist "%out_dir%\%%M_%mode%.csv" (
     echo "%%M_%mode%" produced no result. See %bin%\lumix_app.log
     set failed=1

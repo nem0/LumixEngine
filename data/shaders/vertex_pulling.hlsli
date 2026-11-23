@@ -1,3 +1,5 @@
+#include "engine/shaders/gpu_scene_layout.hlsli"
+
 // Vertex pulling: vertices are read from a buffer by the vertex shader, there are no per-vertex attributes in the input assembler.
 //
 // The layout of vertices is not data, it is generated into the program by Renderer::getSemanticDefines:
@@ -12,11 +14,15 @@ cbuffer VertexBuffer : register(b2) {
 	uint u_instance_buffer;		// bindless, instance data of shaders that pull them (MESH_INSTANCE), see Mesh::VertexBufferBinding
 	uint u_instance_offset;		// in bytes
 	uint u_bones_buffer;		// bindless, dual quaternions of bones (SKINNED), see Mesh::VertexBufferBinding
-	#ifdef CLUSTER_MESH
-		uint u_cluster_meshes;			// bindless, the mesh table of the GPU scene (GPUSceneMesh, 64 bytes)
-		uint u_padding1;
-		uint u_padding2;
-		uint u_padding3;
+	#ifdef INDIRECT_INSTANCE
+		uint u_cluster_meshes;			// bindless, the mesh table of the GPU scene (GPUClusterMesh, 32 bytes)
+		uint u_scene_instances;			// bindless, GPUScene::instances (96 bytes per slot)
+		uint u_scene_chunks;			// bindless, GPUSceneChunks::chunks (32 bytes per slot)
+		uint u_scene_frame;				// frame number, see GPUSceneInstance::moved_frame
+		int3 u_scene_cam_p;				// camera position in fixed point of the GPU scene
+		uint u_scene_padding;
+		float3 u_scene_cam_frac;
+		uint u_scene_padding2;
 	#endif
 };
 
@@ -36,11 +42,55 @@ uint pullInstanceAddress(uint instance_id, uint stride) {
 	return u_instance_offset + instance_id * stride;
 }
 
+#ifdef INDIRECT_INSTANCE
+	// Pulls the transform of a GPU-scene draw entry directly from GPUScene::instances or GPUSceneChunks::chunks.
+	void pullSceneTransform(uint slot, uint instance_ref, bool load_prev, out float4 rot, out float3 position, out float3 scale, out float4 prev_rot, out float3 prev_position, out float3 prev_scale) {
+		if (instance_ref == 0) {
+			ByteAddressBuffer instances = bindless_buffers[u_scene_instances];
+			const uint at = slot * INSTANCE_STRIDE;
+			rot = asfloat(instances.Load4(at + INSTANCE_ROT));
+			position = float3(asint(instances.Load3(at + INSTANCE_POS)) - u_scene_cam_p) * SCENE_POS_UNIT - u_scene_cam_frac;
+			scale = asfloat(instances.Load3(at + INSTANCE_SCALE));
+			if (load_prev) {
+				if (instances.Load(at + INSTANCE_MOVED_FRAME) == u_scene_frame) {
+					prev_rot = asfloat(instances.Load4(at + INSTANCE_PREV_ROT));
+					prev_position = float3(asint(instances.Load3(at + INSTANCE_PREV_POS)) - u_scene_cam_p) * SCENE_POS_UNIT - u_scene_cam_frac;
+					prev_scale = asfloat(instances.Load3(at + INSTANCE_PREV_SCALE));
+				}
+				else {
+					prev_rot = rot;
+					prev_position = position;
+					prev_scale = scale;
+				}
+			}
+			else {
+				prev_rot = rot;
+				prev_position = position;
+				prev_scale = scale;
+			}
+		}
+		else {
+			ByteAddressBuffer chunks = bindless_buffers[u_scene_chunks];
+			const uint at = slot * CHUNK_STRIDE;
+			ByteAddressBuffer data = bindless_buffers[NonUniformResourceIndex(chunks.Load(at + CHUNK_INSTANCE_BUFFER))];
+			const uint instance_at = (instance_ref - 1) * CHUNK_INSTANCE_STRIDE;
+			const float4 rot_lod = asfloat(data.Load4(instance_at + CHUNK_INSTANCE_ROT_LOD));
+			const float4 pos_scale = asfloat(data.Load4(instance_at + CHUNK_INSTANCE_POS_SCALE));
+			rot = float4(rot_lod.xyz, sqrt(saturate(1 - dot(rot_lod.xyz, rot_lod.xyz))));
+			position = float3(asint(chunks.Load3(at + CHUNK_P)) - u_scene_cam_p) * SCENE_POS_UNIT - u_scene_cam_frac + pos_scale.xyz;
+			scale = pos_scale.www;
+			prev_rot = rot;
+			prev_position = position;
+			prev_scale = scale;
+		}
+	}
+#endif
+
 #ifdef POOLED_VERTICES
 	// The vertices of many meshes are in one buffer and the vertex id of a draw does not have the base vertex of its command (SV_VertexID of D3D), so the
 	// instances (96 bytes, gpu_scene_variants.hlsl) have it, in the word after the previous position
 	uint pullBaseVertex(uint instance_id) {
-		return bindless_buffers[u_instance_buffer].Load(pullInstanceAddress(instance_id, 96) + 76);
+		return bindless_buffers[u_instance_buffer].Load(pullInstanceAddress(instance_id, DRAW_INSTANCE_STRIDE) + DRAW_INSTANCE_BASE_VERTEX);
 	}
 #endif
 
@@ -206,22 +256,26 @@ void pullClusterFrame(uint packed, out float3 normal, out float3 tangent) {
 // prev_pos.w (an index of the mesh table of the GPU scene, u_cluster_meshes), which has the buffers of its vertices and indices, the cluster is in its
 // scale.w. The draw has as many indices as the largest mesh of its variant, the corners after the ones of the mesh are degenerate triangles.
 VSVertex pullVertex(uint corner, uint instance_id) {
-	const uint instance_address = pullInstanceAddress(instance_id, 96);
-	const uint cluster = bindless_buffers[u_instance_buffer].Load(instance_address + 44);
-	const uint mesh = bindless_buffers[u_instance_buffer].Load(instance_address + 76);
+	const uint instance_address = pullInstanceAddress(instance_id, DRAW_INSTANCE_STRIDE);
+	const uint2 mesh_cluster = bindless_buffers[u_instance_buffer].Load2(instance_address + DRAW_INSTANCE_MESH);
+	const uint mesh = mesh_cluster.x;
+	const uint cluster = mesh_cluster.y;
 	ByteAddressBuffer mesh_table = bindless_buffers[u_cluster_meshes];
-	const uint index_stride = mesh_table.Load(mesh * 64 + 28);
-	const uint2 mesh_offsets = mesh_table.Load2(mesh * 64 + 44);	// byte offsets of the headers of the clusters and of the table of groups in u_vertex_buffer
+	const uint4 mesh_info = mesh_table.Load4(mesh * CLUSTER_MESH_STRIDE + CLUSTER_MESH_TABLE);	// the table of the mesh, the table of groups, cluster count, node count
+	const uint root_count = mesh_table.Load(mesh * CLUSTER_MESH_STRIDE + CLUSTER_MESH_ROOT_COUNT);
+	const uint index_stride = mesh_table.Load(mesh * CLUSTER_MESH_STRIDE + CLUSTER_MESH_INDEX_STRIDE);
+	// byte offsets of the headers of the clusters (after the clusters, the nodes and the roots, 16 byte aligned) and of the table of groups in u_vertex_buffer
+	const uint2 mesh_offsets = uint2(mesh_info.x + ((mesh_info.z * CLUSTER_STRIDE + mesh_info.w * NODE_STRIDE + root_count * ROOT_STRIDE + CLUSTER_ALIGNMENT_MASK) & ~(uint)CLUSTER_ALIGNMENT_MASK), mesh_info.y);
 	// the vertices, indices and everything else of all meshes are in one buffer, a mesh has its ranges of it
 	ByteAddressBuffer data = bindless_buffers[u_vertex_buffer];
-	// the data of a cluster is where its group is: the group is in the cluster table (MeshClusterGPU::group, byte 72 of 80)
-	const uint group_id = data.Load(mesh_table.Load(mesh * 64) + cluster * 80 + 72);
-	const uint4 group_address = data.Load4(mesh_offsets.y + group_id * 16);	// stream, indices of the first cluster, first cluster, flags
+	// the data of a cluster is where its group is: the group is in the cluster table (MeshClusterGPU::group, CLUSTER_GROUP)
+	const uint group_id = data.Load(mesh_info.x + cluster * CLUSTER_STRIDE + CLUSTER_GROUP);
+	const uint4 group_address = data.Load4(mesh_offsets.y + group_id * GROUP_STRIDE);	// stream, indices of the first cluster, first cluster, flags
 	const uint base = group_address.x;
 	const uint index_address = group_address.y + (cluster - group_address.z) * index_stride + corner;
 	const uint index_word = data.Load(index_address & ~3u);
 	const uint vertex = corner >= index_stride ? 0 : ((index_word >> ((index_address & 3) * 8)) & 0xff);
-	const uint header = mesh_offsets.x + cluster * 48;
+	const uint header = mesh_offsets.x + cluster * CLUSTER_HEADER_STRIDE;
 	const uint4 h0 = data.Load4(header);			// start of positions, bits
 	const uint4 h1 = data.Load4(header + 16);		// bits of UV, vertex count, bit offset of the first vertex (in the stream of its group), step
 	const float4 h2 = asfloat(data.Load4(header + 32)); // UV range

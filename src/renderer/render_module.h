@@ -223,12 +223,14 @@ struct ModelInstance {
 	u16 mesh_count = 0;
 	bool dirty = true;			// the materials of the instance (overrides) are not resolved yet, see RenderModule::refreshMaterialOverrides
 	bool override_queued = false;
-	u32 gpu_slot = 0xffFFffFF;	// in GPUScene, valid while the instance is enabled and its model can be drawn from the GPU scene (Model::canUseGPUScene)
+	u32 gpu_slot = 0xffFFffFF;	// in the GPU scene, valid while the instance is enabled and its model can be drawn from the GPU scene (Model::canUseGPUScene)
 };
 
 struct InstancedModel {
 	InstancedModel(IAllocator& allocator) 
 		: instances(allocator)
+		, chunks(allocator)
+		, gpu_slots(allocator)
 	{}
 
 	struct InstanceData {
@@ -238,15 +240,28 @@ struct InstancedModel {
 		float scale;
 	};
 
+	// Consecutive instances of gpu_data that are near each other, one chunk of the GPU scene of instanced models (gpu_scene_chunks.h): the GPU tests the sphere of a chunk before its instances.
+	struct Chunk {
+		Vec3 center;		// relative to the entity
+		float radius;		// the distance of the farthest position of an instance from the center
+		float max_scale;	// of its instances
+		u32 first;			// in gpu_data
+		u32 count;
+	};
+
 	Model* model = nullptr;
 	Array<InstanceData> instances;
-	gpu::BufferHandle gpu_data = gpu::INVALID_BUFFER;
+	Array<Chunk> chunks;
+	gpu::BufferHandle gpu_data = gpu::INVALID_BUFFER;	// the instances in the order of the chunks
 	u32 gpu_capacity = 0;
 	u32 gpu_count = 0;			// the number of instances that are in gpu_data
-	u32 gpu_group = 0xffFFffFF;	// the group of the GPU scene (gpu_scene.h) if the model has clusters
-	const Model* gpu_group_model = nullptr;
+	u32 gpu_version = 0;		// changes with gpu_data and the chunks
+	Array<u32> gpu_slots;		// the slot of each chunk in the chunks of the GPU scene
+	const Model* gpu_slots_model = nullptr;
+	u32 gpu_slots_version = 0;
+	DVec3 gpu_origin = DVec3(0);	// the position the slots have
 	bool dirty = false;
-	bool warned_no_clusters = false;
+	bool warned_skinned = false;
 };
 
 struct MeshInstance
@@ -438,6 +453,9 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	virtual void setInstancedModelPath(EntityRef entity, const Path& path) = 0;
 	virtual void setInstancedModelBlob(EntityRef entity, InputMemoryStream& value) = 0;
 	virtual void getInstancedModelBlob(EntityRef entity, OutputMemoryStream& value) = 0;
+	virtual Model* getInstancedModelModel(EntityRef entity) = 0;	//@ function alias getModel
+	virtual void addInstancedModelInstances(EntityRef entity, u32 count) = 0;	//@ function alias addInstances
+	virtual void setInstancedModelInstanceTransform(EntityRef entity, u32 idx, Vec3 pos, Quat rot, float scale) = 0;	//@ function alias setInstanceTransform
 	//@ end
 	virtual const HashMap<EntityRef, InstancedModel>& getInstancedModels() const = 0;
 	virtual InstancedModel& beginInstancedModelEditing(EntityRef entity) = 0;
@@ -463,6 +481,7 @@ struct LUMIX_RENDERER_API RenderModule : IModule
 	// uploads the changes of the GPU scene (struct GPUScene), call before rendering a pipeline, more than once in a frame is fine
 	virtual void flushGPUScene() = 0;
 	virtual struct GPUScene& getGPUScene() = 0;
+	virtual struct GPUSceneChunks& getGPUSceneChunks() = 0;
 	virtual void setModelInstanceLOD(EntityRef entity, u32 lod) = 0;
 	virtual CullResult* getRenderables(const ShiftedFrustum& frustum, RenderableTypes type) const = 0;
 	virtual CullResult* getRenderables(const ShiftedFrustum& frustum) const = 0;

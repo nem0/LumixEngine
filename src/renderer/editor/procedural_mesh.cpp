@@ -55,8 +55,8 @@ static_assert(sizeof(ExPart) == 32);
 static_assert(sizeof(ExArray) == 24);
 static_assert(sizeof(ExMesh) == 80);
 
-static constexpr u32 MAX_VERTICES = 1'000'000;
-static constexpr u32 MAX_INDICES = 3'000'000;
+static constexpr u32 MAX_VERTICES = 4'000'000;
+static constexpr u32 MAX_INDICES = 12'000'000;
 // Material names become material files next to the recipe, so keep the number small.
 static constexpr u32 MAX_MATERIALS = 64;
 static constexpr u32 MAX_MATERIAL_NAME = 64;
@@ -219,7 +219,7 @@ struct Recipe {
 			|| mesh.indices.size <= 0 || mesh.indices.size > MAX_INDICES || mesh.indices.size % 3 != 0 || !mesh.indices.values.data
 			|| mesh.vertices.size > mesh.vertices.values.length || mesh.indices.size > mesh.indices.values.length)
 		{
-			error.append("Recipe returned invalid mesh (1-1000000 vertices and 3-3000000 indices, multiple of 3, required)");
+			error.append("Recipe returned invalid mesh (1-4000000 vertices and 3-12000000 indices, multiple of 3, required)");
 			return false;
 		}
 

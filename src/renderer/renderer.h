@@ -21,6 +21,7 @@ namespace Lumix {
 enum class AttributeSemantic : u8;
 struct GBuffer;
 struct ClusterStream;
+struct GPUSceneRegistry;
 enum class MaterialIndex : u32;
 enum class PipelineType;
 
@@ -167,13 +168,20 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	// `allocClusterData` copies `size` bytes of `data` to a new range and returns its byte offset, or false if the buffer is full. A freed range is reused
 	// after the frames in flight that may read it are done. Can be called from any thread.
 	virtual bool allocClusterData(const void* data, u32 size, u32& offset) = 0;
-	// The same range of the buffer with no data: the caller copies to it (GPUScene does it for the meshes without clusters, see GPUScene::flush). The offset is a multiple of
+	// The same range of the buffer with no data: the caller copies to it (GPUSceneRegistry does it for the meshes without clusters, see flushGPUSceneRegistry). The offset is a multiple of
 	// `alignment` (any positive number), the size is not rounded, free it with freeClusterData.
 	// If there is no room and `reclaim` is set, the renderer unloads streamed pages (see ClusterStream) and tries again, so it can fail only if the data that is never unloaded does not fit.
 	virtual bool allocClusterRange(u32 size, u32 alignment, u32& offset, bool reclaim = true) = 0;
 	// `immediate`: the range can be allocated again at once, not after the frames in flight (only for data that the GPU is not going to use any more, ClusterStream::evictPage)
 	virtual void freeClusterData(u32 offset, u32 size, bool immediate = false) = 0;
 	virtual gpu::BufferHandle getClusterDataBuffer() = 0; // invalid until the first allocation
+	// The scratch buffer of the culling of the trees of clusters (nanite.hlsl): the lists of nodes of its groups. What is in it is dead when a dispatch ends, so all the pipelines and views use
+	// this one buffer: the draw streams are executed one after another and every use has its barriers. Made by the first call, which must be made when the frame is set up (the creation is
+	// recorded in the draw stream of the frame).
+	virtual gpu::BufferHandle getClusterScratchBuffer() = 0;
+	virtual u32 getClusterScratchCapacity() const = 0;	// u32 in it
+	// What the GPU scenes of all worlds share (models, meshes, material sets, draw groups), see gpu_scene_registry.h. Made by the first call.
+	virtual GPUSceneRegistry& getGPUSceneRegistry() = 0;
 	// Copies `size` bytes (a multiple of 4) to the bytes of a range of the buffer that was allocated before (the copy is recorded in the draw stream of the frame, so the GPU executes
 	// it before the passes that are recorded later).
 	virtual void updateClusterData(u32 offset, const void* data, u32 size) = 0;
