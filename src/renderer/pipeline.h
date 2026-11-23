@@ -22,6 +22,7 @@ struct CameraParams {
 	DVec3 pos;
 	float lod_multiplier;
 	bool is_shadow;
+	i32 shadow_slice = -1;	// the cascade of the shadow map of the main light (Pipeline::getShadowCamera), -1 for other cameras
 	Matrix view;
 	Matrix projection;
 };
@@ -43,7 +44,7 @@ namespace UniformBuffer {
 	enum Enum {
 		GLOBAL,
 		PASS,
-		UNUSED_,
+		VERTEX_BUFFER, // see Mesh::VertexBufferBinding
 		SHADOW,
 		DRAWCALL,
 		DRAWCALL2,
@@ -51,6 +52,10 @@ namespace UniformBuffer {
 		COUNT
 	};
 }
+
+// Binds buffers that vertex shaders pull their data from, see vertex_pulling.hlsli.
+// `vertices` are vertices of a mesh, `instances` are optional instance data from the offset in bytes.
+LUMIX_RENDERER_API void bindPulledBuffers(struct DrawStream& stream, struct UniformPool& pool, gpu::BufferHandle vertices, gpu::BufferHandle instances = gpu::INVALID_BUFFER, u32 instances_offset = 0, gpu::BufferHandle bones = gpu::INVALID_BUFFER);
 
 struct BucketDesc {
 	enum Sort {
@@ -147,8 +152,16 @@ struct LUMIX_RENDERER_API Pipeline {
 	virtual void renderEntities(Span<const EntityRef> entities, gpu::StateFlags state, const char* define) = 0;
 	// number of buckets of a view returned by `cull`, 0 for an unknown view
 	virtual u32 getBucketCount(u32 view_idx) const = 0;
-	virtual u32 cull(const CameraParams& cp, Span<const BucketDesc> buckets) = 0;
+	// `occlusion`: the view is culled with the occlusion culling in two passes (the camera has to be the main one, not a shadow): the instances of the GPU scene that the pyramid of
+	// the previous frame hides are not drawn by `renderBucket`, buildHZB and renderPostCull draw what is visible among them. Without them they are lost.
+	virtual u32 cull(const CameraParams& cp, Span<const BucketDesc> buckets, bool occlusion = false) = 0;
 	virtual void renderBucket(u32 view_idx, u32 bucket_idx) const = 0;
+	// Makes the pyramid of depths of `depth` (the pipeline keeps two: the one of the previous frame and the one of this frame). `final`: after all the opaque geometry of the
+	// frame, the pyramid is the one that the next frame culls with. Otherwise it is the one that renderPostCull tests with, made after the first pass of the culling.
+	virtual void buildHZB(RenderBufferHandle depth, bool final) = 0;
+	// The second pass of the occlusion culling of a view made with `occlusion`: selects the clusters that were hidden in the pyramid of the previous frame and are visible in the one of
+	// this frame, and draws them into the current targets (all the buckets of the view). Needs buildHZB(depth, false) before.
+	virtual void renderPostCull(u32 view_idx) = 0;
 	virtual void dispatch(Shader& shader, u32 x, u32 y, u32 z, const char* define = nullptr) = 0;
 
 	// use this to store per pipeline data for e.g. postprocess effects
@@ -183,6 +196,8 @@ struct LUMIX_RENDERER_API Pipeline {
 		LIGHT_CLUSTERS,
 		PROBE_CLUSTERS,
 		VELOCITY,
+		MESH_CLUSTERS, // every cluster of cluster rendered models has its own color
+		MESH_TRIANGLES, // every triangle of cluster rendered models has its own color
 
 		BUILTIN_COUNT,
 		PLUGIN,
@@ -190,6 +205,16 @@ struct LUMIX_RENDERER_API Pipeline {
 
 	DebugShow m_debug_show = DebugShow::NONE;
 	struct RenderPlugin* m_debug_show_plugin = nullptr;
+	// the largest error of a cluster on the screen, in pixels. Smaller values switch to coarser clusters later, can be changed at run time
+	float m_cluster_error_pixels = 1.f;
+	// how much the error of attributes (normals and UVs that simplified triangles took from other places) counts next to the error of positions,
+	// 0: only positions, fewer triangles, but the shading can change when a cluster is replaced by another one. Can be changed at run time.
+	float m_cluster_attribute_weight = 1.f;
+	// The clusters are chosen as the camera of the moment of turning this on sees them (the LOD, the frustum and the faces turned away), while the
+	// frame is drawn with the current camera: fly around to see what the frozen camera selected. The occlusion culling is frozen too, it tests with the
+	// pyramid of depths of the frozen camera. Can be changed at run time.
+	bool m_cluster_freeze_camera = false;
+	float m_cluster_shadow_error_scale = 3.f;	// shadow views accept this many times the error of Cluster error (px)
 
 protected:
 	static inline u32 s_data_type_generator = 0;

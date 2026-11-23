@@ -9,7 +9,7 @@ cbuffer Data : register(b4) {
 };
 
 // https://gist.github.com/TheRealMJP/c83b8c0f46b63f3a88a5986f4fa982b1
-float4 catmullRom(uint tex, float2 uv, float2 texSize) {
+float4 catmullRom(TextureHandle tex, float2 uv, float2 texSize) {
 	float2 samplePos = uv * texSize;
 	float2 texPos1 = floor(samplePos - 0.5) + 0.5;
 
@@ -48,7 +48,7 @@ float4 catmullRom(uint tex, float2 uv, float2 texSize) {
 }
 
 // https://www.iquilezles.org/www/articles/texture/texture.htm
-float4 getTexel(uint tex, float2 p, float2 res) {
+float4 getTexel(TextureHandle tex, float2 p, float2 res) {
 	#if 1
 		return catmullRom(tex, p, res);
 	#else

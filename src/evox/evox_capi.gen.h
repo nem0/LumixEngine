@@ -4503,6 +4503,31 @@ namespace Lumix::Evox::generated {
 		module->setParticleEmitterAutodestroy(EntityRef(entity.index), enable);
 	}
 	
+	static void evox_instanced_model_getModel_7155758594448917458(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, entity);
+		RenderModule* module = static_cast<RenderModule*>(entity.module);
+		auto ret = module->getInstancedModelModel(EntityRef(entity.index));
+		EX_RESULT(frame, u8(ret != nullptr));
+		EX_RESULT(frame, ret);
+	}
+	
+	static void evox_instanced_model_addInstances_4099135031944986145(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, entity);
+		RenderModule* module = static_cast<RenderModule*>(entity.module);
+		EX_ARG(frame, u32, count);
+		module->addInstancedModelInstances(EntityRef(entity.index), count);
+	}
+	
+	static void evox_instanced_model_setInstanceTransform_5276206311306420826(ex_runtime* runtime, ex_call_frame frame) {
+		EX_ARG(frame, ExComponent, entity);
+		RenderModule* module = static_cast<RenderModule*>(entity.module);
+		EX_ARG(frame, u32, idx);
+		EX_ARG(frame, Vec3, pos);
+		EX_ARG(frame, Quat, rot);
+		EX_ARG(frame, float, scale);
+		module->setInstancedModelInstanceTransform(EntityRef(entity.index), idx, pos, rot, scale);
+	}
+	
 	static void evox_instanced_model_getInstancedModelPath_5042885846977672067(ex_runtime* runtime, ex_call_frame frame) {
 		EX_ARG(frame, ExComponent, entity);
 		RenderModule* module = static_cast<RenderModule*>(entity.module);
@@ -6370,6 +6395,9 @@ namespace Lumix::Evox::generated {
 		functions.insert({StringView("core:renderer/particle_emitter"), StringView("setPath")}, &evox_particle_emitter_setParticleEmitterPath_13850250279856496269);
 		functions.insert({StringView("core:renderer/particle_emitter"), StringView("getAutodestroy")}, &evox_particle_emitter_getParticleEmitterAutodestroy_4263130026576218239);
 		functions.insert({StringView("core:renderer/particle_emitter"), StringView("setAutodestroy")}, &evox_particle_emitter_setParticleEmitterAutodestroy_12841861352903192919);
+		functions.insert({StringView("core:renderer/instanced_model"), StringView("getModel")}, &evox_instanced_model_getModel_7155758594448917458);
+		functions.insert({StringView("core:renderer/instanced_model"), StringView("addInstances")}, &evox_instanced_model_addInstances_4099135031944986145);
+		functions.insert({StringView("core:renderer/instanced_model"), StringView("setInstanceTransform")}, &evox_instanced_model_setInstanceTransform_5276206311306420826);
 		functions.insert({StringView("core:renderer/instanced_model"), StringView("getPath")}, &evox_instanced_model_getInstancedModelPath_5042885846977672067);
 		functions.insert({StringView("core:renderer/instanced_model"), StringView("setPath")}, &evox_instanced_model_setInstancedModelPath_11517420952746177454);
 		functions.insert({StringView("core:renderer/model_instance"), StringView("overrideMaterialVec4")}, &evox_model_instance_overrideMaterialVec4_4410224850514097651);

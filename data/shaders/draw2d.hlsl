@@ -4,12 +4,12 @@
 cbuffer DC : register(b4) {
 	float4x4 u_matrix;
 	TextureHandle u_texture;
+	uint u_vertices;		// bindless
+	uint u_vertices_offset;	// in bytes
 };
 
 struct VSInput {
-	float2 position : TEXCOORD0;
-	float2 uv : TEXCOORD1;
-	float4 color : TEXCOORD2;
+	uint vertex_id : SV_VertexID;
 };
 
 struct VSOutput {
@@ -19,10 +19,16 @@ struct VSOutput {
 };
 
 VSOutput mainVS(VSInput input) {
+	// vertices are pulled: float2 position, float2 uv, RGBA8 color, 20 bytes each, see Draw2D::Vertex
+	ByteAddressBuffer vb = bindless_buffers[u_vertices];
+	const uint offset = u_vertices_offset + input.vertex_id * 20;
+	const float4 pos_uv = asfloat(vb.Load4(offset));
+	const uint packed = vb.Load(offset + 16);
+
 	VSOutput output;
-	output.color = input.color;
-	output.uv = input.uv;
-	output.position = transformPosition(float3(input.position, 0), u_matrix);
+	output.color = float4(packed & 0xff, (packed >> 8) & 0xff, (packed >> 16) & 0xff, packed >> 24) / 255.0;
+	output.uv = pos_uv.zw;
+	output.position = transformPosition(float3(pos_uv.xy, 0), u_matrix);
 	return output;
 }
 

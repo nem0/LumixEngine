@@ -44,6 +44,7 @@ enum class DrawStream::Instruction : u8 {
 	DRAW_INDIRECT,
 	BIND_SHADER_BUFFER,
 	DISPATCH,
+	DISPATCH_INDIRECT,
 	CREATE_BUFFER,
 	CREATE_TEXTURE,
 	COPY_TEXTURE,
@@ -65,7 +66,8 @@ enum class DrawStream::Instruction : u8 {
 	END_PROFILE_BLOCK,
 	USER_ALLOC,
 	SET_TEXTURE_DEBUG_NAME,
-	READ_TEXTURE
+	READ_TEXTURE,
+	READ_BUFFER
 };
 
 namespace {
@@ -75,10 +77,8 @@ namespace Dirty {
 		PROGRAM = 0b11 << 2,
 		INDEX_BUFFER = 0b11 << 4,
 		INDIRECT_BUFFER = 0b11 << 6,
-		VERTEX_BUFFER0 = 0b1111 << 8,
-		VERTEX_BUFFER1 = 0b1111 << 12,
 
-		BIND = PROGRAM | INDEX_BUFFER | VERTEX_BUFFER0 | VERTEX_BUFFER1
+		BIND = PROGRAM | INDEX_BUFFER
 	};
 }
 
@@ -146,11 +146,19 @@ struct BufferBarrierData {
 struct DrawIndirectData {
 	gpu::DataType index_type;
 	u32 indirect_buffer_offset;
+	u32 count;
 };
 
 struct ReadTextureData {
 	gpu::TextureHandle texture;
 	gpu::TextureReadCallback callback;
+};
+
+struct ReadBufferCommand {
+	gpu::BufferHandle buffer;
+	u32 offset;
+	u32 size;
+	gpu::BufferReadCallback callback;
 };
 
 struct ReadBufferData {
@@ -219,12 +227,11 @@ struct CreateProgramData {
 	CreateProgramData(IAllocator& allocator) 
 		: source(allocator)
 		, name(allocator)
-		, decl(gpu::PrimitiveType::NONE)
 	{}
 
 	gpu::ProgramHandle program;
 	gpu::StateFlags state;
-	gpu::VertexDecl decl;
+	gpu::PrimitiveType primitive_type = gpu::PrimitiveType::NONE;
 	String source;
 	const char* src;
 	gpu::ShaderType type;
@@ -291,6 +298,11 @@ void DrawStream::readTexture(gpu::TextureHandle texture, gpu::TextureReadCallbac
 	write(Instruction::READ_TEXTURE, data);
 }
 
+void DrawStream::readBuffer(gpu::BufferHandle buffer, u32 offset, u32 size, gpu::BufferReadCallback callback) {
+	ReadBufferCommand data = { buffer, offset, size, callback };
+	write(Instruction::READ_BUFFER, data);
+}
+
 void DrawStream::copy(gpu::BufferHandle dst, gpu::TextureHandle src) {
 	CopyTextureToBufferData data = { dst, src };
 	write(Instruction::COPY_TEXTURE_TO_BUFFER, data);
@@ -310,6 +322,11 @@ void DrawStream::dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z) 
 	submitCached();
 	const IVec3 v(num_groups_x, num_groups_y, num_groups_z);
 	write(Instruction::DISPATCH, v);
+}
+
+void DrawStream::dispatchIndirect(u32 indirect_buffer_offset) {
+	submitCached();
+	write(Instruction::DISPATCH_INDIRECT, indirect_buffer_offset);
 }
 
 void DrawStream::merge(DrawStream& rhs) {
@@ -384,28 +401,9 @@ DrawStream& DrawStream::createSubstream() {
 	return *new (NewPlaceholder(), data) DrawStream(renderer);
 }
 
-static const char* getAttrDefine(u32 idx) {
-	switch (idx) {
-		case 0 : return "#define _HAS_ATTR0\n";
-		case 1 : return "#define _HAS_ATTR1\n";
-		case 2 : return "#define _HAS_ATTR2\n";
-		case 3 : return "#define _HAS_ATTR3\n";
-		case 4 : return "#define _HAS_ATTR4\n";
-		case 5 : return "#define _HAS_ATTR5\n";
-		case 6 : return "#define _HAS_ATTR6\n";
-		case 7 : return "#define _HAS_ATTR7\n";
-		case 8 : return "#define _HAS_ATTR8\n";
-		case 9 : return "#define _HAS_ATTR9\n";
-		case 10 : return "#define _HAS_ATTR10\n";
-		case 11 : return "#define _HAS_ATTR11\n";
-		case 12 : return "#define _HAS_ATTR12\n";
-		default: ASSERT(false); return "";
-	}
-}
-
 void DrawStream::createProgram(gpu::ProgramHandle prog
 	, gpu::StateFlags state
-	, const gpu::VertexDecl& decl
+	, gpu::PrimitiveType primitive_type
 	, const char* src
 	, gpu::ShaderType type
 	, const char** prefixes
@@ -415,12 +413,8 @@ void DrawStream::createProgram(gpu::ProgramHandle prog
 	CreateProgramData* data = LUMIX_NEW(gpu::getAllocator(), CreateProgramData)(gpu::getAllocator());
 	data->program = prog;
 	data->state = state;
-	data->decl = decl;
+	data->primitive_type = primitive_type;
 	data->type = type;
-	data->source = String(gpu::getAllocator());
-	for (u32 i = 0; i < decl.attributes_count; ++i) {
-		data->source.append(getAttrDefine(i)); 
-	}
 	data->source = R"#(
 		#define TextureHandle int
 		#define RWTextureHandle int
@@ -516,12 +510,6 @@ void DrawStream::setCurrentWindow(void* window_handle) {
 	write(Instruction::SET_CURRENT_WINDOW, window_handle);
 }
 
-void DrawStream::bindVertexBuffer(u32 binding_idx, gpu::BufferHandle buffer, u32 buffer_offset, u32 stride) {
-	ASSERT(binding_idx < lengthOf(m_cache.vertex_buffers));
-	m_cache.vertex_buffers[binding_idx] = { buffer, buffer_offset, stride};
-	m_cache.dirty |= binding_idx == 0 ? Dirty::VERTEX_BUFFER0 : Dirty::VERTEX_BUFFER1;
-}
-
 void DrawStream::scissor(u32 x,u32 y,u32 w,u32 h) {
 	IVec4 vec(x, y, w, h);
 	write(Instruction::SCISSOR, vec);
@@ -545,9 +533,9 @@ void DrawStream::bindIndirectBuffer(gpu::BufferHandle buffer) {
 }
 
 
-void DrawStream::drawIndirect(gpu::DataType index_type, u32 indirect_buffer_offset) {
+void DrawStream::drawIndirect(gpu::DataType index_type, u32 indirect_buffer_offset, u32 count) {
 	submitCached();
-	DrawIndirectData data = { index_type, indirect_buffer_offset };
+	DrawIndirectData data = { index_type, indirect_buffer_offset, count };
 	write(Instruction::DRAW_INDIRECT, data);
 }
 
@@ -684,8 +672,6 @@ void DrawStream::submitCached() {
 	if (dirty & Dirty::PROGRAM) WRITE(m_cache.program);
 	if (dirty & Dirty::INDEX_BUFFER) WRITE(m_cache.index_buffer);
 	if (dirty & Dirty::INDIRECT_BUFFER) WRITE(m_cache.indirect_buffer);
-	if (dirty & Dirty::VERTEX_BUFFER0) WRITE(m_cache.vertex_buffers[0]);
-	if (dirty & Dirty::VERTEX_BUFFER1) WRITE(m_cache.vertex_buffers[1]);
 	#undef WRITE
 }
 
@@ -726,19 +712,11 @@ void DrawStream::run() {
 						READ(gpu::BufferHandle, buf);
 						gpu::bindIndirectBuffer(buf);
 					}
-					if (dirty & Dirty::VERTEX_BUFFER0) {
-						READ(Cache::VertexBuffer, buf);
-						gpu::bindVertexBuffer(0, buf.buffer, buf.offset, buf.stride);
-					}
-					if (dirty & Dirty::VERTEX_BUFFER1) {
-						READ(Cache::VertexBuffer, buf);
-						gpu::bindVertexBuffer(1, buf.buffer, buf.offset, buf.stride);
-					}
 					break;
 				}
 				case Instruction::DRAW_INDIRECT: {
 					READ(DrawIndirectData, data);
-					gpu::drawIndirect(data.index_type, data.indirect_buffer_offset);
+					gpu::drawIndirect(data.index_type, data.indirect_buffer_offset, data.count);
 					break;
 				}
 				case Instruction::MEMORY_BARRIER: {
@@ -794,7 +772,7 @@ void DrawStream::run() {
 					READ(CreateProgramData*, data);
 					gpu::createProgram(data->program
 						, data->state
-						, data->decl
+						, data->primitive_type
 						, data->src
 						, data->type
 						, data->name.c_str()
@@ -910,6 +888,11 @@ void DrawStream::run() {
 					gpu::readTexture(data.texture, data.callback);
 					break;
 				}
+				case Instruction::READ_BUFFER: {
+					READ(ReadBufferCommand, data);
+					gpu::readBuffer(data.buffer, data.offset, data.size, data.callback);
+					break;
+				}
 				case Instruction::DESTROY_TEXTURE: {
 					READ(gpu::TextureHandle, texture);
 					gpu::destroy(texture);
@@ -938,6 +921,11 @@ void DrawStream::run() {
 				case Instruction::DISPATCH: {
 					READ(IVec3, size);
 					gpu::dispatch(size.x, size.y, size.z);
+					break;
+				}
+				case Instruction::DISPATCH_INDIRECT: {
+					READ(u32, offset);
+					gpu::dispatchIndirect(offset);
 					break;
 				}
 				case Instruction::FUNCTION: {

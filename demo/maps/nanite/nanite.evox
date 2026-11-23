@@ -1,0 +1,44 @@
+// Nanite benchmark scene: a grid of 100 x 100 high poly trees, one instanced model with COUNT_X * COUNT_Z instances. The world (maps/nanite/nanite.unv) is empty,
+// the trees are spawned here.
+import "core:world"
+import "core:entity"
+import "core:dvec3"
+import "core:vec3"
+import "core:quat" as quat
+import "core:renderer/module"
+import "core:renderer/instanced_model"
+
+const COUNT_X : i32 = 1000;
+const COUNT_Z : i32 = 333;
+const SPACING : f32 = 18.0;
+const MODEL : []const u8 = "models/trees/tree_plain_big.lpg";
+
+fn start(world : World) : void {
+	const e = world.createEntity();
+	e.setName("Trees");
+	e.setPosition(DVec3{0.0, 0.0, 0.0});
+	var im = e.createInstancedModel() else return;
+	im.setPath(MODEL);
+	im.addInstances((COUNT_X * COUNT_Z) as u32);
+
+	var ix : i32 = 0;
+	while ix < COUNT_X {
+		var iz : i32 = 0;
+		while iz < COUNT_Z {
+			const x = ((ix as f32) - ((COUNT_X - 1) as f32) * 0.5) * SPACING;
+			const z = ((iz as f32) - ((COUNT_Z - 1) as f32) * 0.5) * SPACING;
+			// a different yaw for every tree, deterministic
+			const degrees = (ix * 37 + iz * 101) % 360;
+			const rot = quat.makeQuatFromYaw((degrees as f32) * 0.017453292);
+			im.setInstanceTransform((ix * COUNT_Z + iz) as u32, Vec3{x, 0.0, z}, rot, 1.0);
+			iz += 1;
+		}
+		ix += 1;
+	}
+
+	// look at the grid from outside of it
+	var renderer = world.renderer() else return;
+	if const camera = renderer.getActiveCamera() {
+		camera.setPosition(DVec3{0.0, 25.0, 960.0});
+	}
+}

@@ -35,6 +35,7 @@
 	[box .world on-click=physics_stress_test] { Physics stress test }
 	[box .world on-click=instanced_models] { Instanced models }
 	[box .world on-click=anim_stress_test] { Animation stress test }
+	[box .world on-click=nanite] { Nanite }
 }
 
 [box $demo_welcome width=100% height=100% align-items=center justify-content=center] {

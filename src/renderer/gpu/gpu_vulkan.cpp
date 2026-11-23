@@ -239,7 +239,7 @@ ProgramHandle allocProgramHandle() {
 QueryHandle createQuery(QueryType) {
 	return new Query;
 }
-void createProgram(ProgramHandle, StateFlags, const VertexDecl&, const char*, ShaderType, const char*) {}
+void createProgram(ProgramHandle, StateFlags, PrimitiveType, const char*, ShaderType, const char*) {}
 void createBuffer(BufferHandle, BufferFlags, size_t, const void*, const char*) {}
 void createTexture(TextureHandle, u32, u32, u32, TextureFormat, TextureFlags, const char*) {}
 void createTextureView(TextureHandle, TextureHandle, u32, u32) {}
@@ -282,21 +282,22 @@ RWBindlessHandle getRWBindlessHandle(TextureHandle) {
 	return INVALID_RW_BINDLESS_HANDLE;
 }
 void bindIndexBuffer(BufferHandle) {}
-void bindVertexBuffer(u32, BufferHandle, u32, u32) {}
 void bindUniformBuffer(u32, BufferHandle, size_t, size_t) {}
 void bindIndirectBuffer(BufferHandle) {}
 void bindShaderBuffers(Span<BufferHandle>, Span<const u32>) {}
 void drawArrays(u32, u32) {}
-void drawIndirect(DataType, u32) {}
+void drawIndirect(DataType, u32, u32) {}
 void drawIndexed(u32, u32, DataType) {}
 void drawArraysInstanced(u32, u32) {}
 void drawIndexedInstanced(u32, u32, DataType) {}
 void draw(const Drawcall&) {}
 void dispatch(u32, u32, u32) {}
+void dispatchIndirect(u32) {}
 void copy(TextureHandle, TextureHandle, u32, u32) {}
 void copy(BufferHandle, BufferHandle, u32, u32, u32) {}
 void copy(BufferHandle, TextureHandle) {}
 void readTexture(TextureHandle, TextureReadCallback) {}
+void readBuffer(BufferHandle, u32, u32, BufferReadCallback) {}
 void* getDX12Device() { return nullptr; }
 void* getDX12CommandList() { return nullptr; }
 void* getDX12Resource(TextureHandle) { return nullptr; }

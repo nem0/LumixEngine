@@ -692,7 +692,8 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 			DrawStream& stream = pipeline.getRenderer().getDrawStream();
 			pipeline.setUniform(pipeline.toBindless(gbuffer.DS, stream), UniformBuffer::DRAWCALL2);
 			
-			renderer.pushJob("icons", [this, &uniform_pool](DrawStream& stream) {
+			const u32 mesh_instance_define = 1 << renderer.getShaderDefineIdx("MESH_INSTANCE");
+			renderer.pushJob("icons", [this, &uniform_pool, &transient_pool, mesh_instance_define](DrawStream& stream) {
 				const Viewport& vp = m_scene_view.m_view->getViewport();
 				const Matrix camera_mtx({ 0, 0, 0 }, vp.rot);
 
@@ -707,25 +708,43 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 
 					for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
 						const Mesh& mesh = model->getMesh(i);
+						if (!mesh.index_buffer_handle) continue; // cluster meshes have no plain index buffer
 						const MeshMaterial& mesh_mat = model->getMeshMaterial(i);
 						const Material* material = mesh_mat.material;
 						const gpu::StateFlags state = material->m_render_states | gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
-						gpu::ProgramHandle program = material->getShader()->getProgram(state, mesh.vertex_decl, material->getDefineMask(), mesh.semantics_defines);
+						gpu::ProgramHandle program = material->getShader()->getProgram(state, mesh.primitive_type, material->getDefineMask() | mesh_instance_define, mesh.semantics_defines);
 
-						struct UB {
-							Matrix mtx;
+						// one instance with the layout of the MESH_INSTANCE variant of surface shaders (the previous state is the current one)
+						struct DynamicInstanceData {
+							Quat rot;
+							Vec3 pos;
+							float lod;
+							Vec3 scale;
+							float padding;
+							Quat prev_rot;
+							Vec3 prev_pos;
+							float prev_lod;
+							Vec3 prev_scale;
 							MaterialIndex material_index;
-						} ub_data = {
-							mtx,
-							material->getIndex()
 						};
-						const TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
-						stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+						static_assert(sizeof(DynamicInstanceData) == 96);
+
+						Vec3 icon_pos, icon_scale;
+						Quat icon_rot;
+						mtx.decompose(icon_pos, icon_rot, icon_scale);
+						const TransientSlice instance = alloc(transient_pool, sizeof(DynamicInstanceData));
+						DynamicInstanceData* idata = (DynamicInstanceData*)instance.ptr;
+						idata->rot = idata->prev_rot = icon_rot;
+						idata->pos = idata->prev_pos = icon_pos;
+						idata->scale = idata->prev_scale = icon_scale;
+						idata->lod = idata->prev_lod = 0;
+						idata->padding = 0;
+						idata->material_index = material->getIndex();
 
 						stream.useProgram(program);
 						stream.bindIndexBuffer(mesh.index_buffer_handle);
-						stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-						stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+						// instance data is pulled by the vertex shader
+						bindPulledBuffers(stream, uniform_pool, mesh.vertex_buffer_handle, instance.buffer, instance.offset);
 						stream.drawIndexed(0, mesh.indices_count, mesh.index_type);
 					}
 				}
@@ -741,28 +760,26 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 			renderer.pushJob("gizmos", [&vertices, this, &transient_pool, &uniform_pool](DrawStream& stream) {
 				TransientSlice vb = alloc(transient_pool, vertices.byte_size());
 				memcpy(vb.ptr, vertices.begin(), vertices.byte_size());
-				const TransientSlice ub = alloc(uniform_pool, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
 
-				gpu::VertexDecl lines_decl(gpu::PrimitiveType::LINES);
-				lines_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
-				lines_decl.addAttribute(12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
-
-				gpu::VertexDecl tris_decl(gpu::PrimitiveType::TRIANGLES);
-				tris_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
-				tris_decl.addAttribute(12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+				// vertices are pulled by the vertex shader
 
 				const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
-				gpu::ProgramHandle lines_program = m_debug_shape_shader->getProgram(state, lines_decl, 0, "");
-				gpu::ProgramHandle triangles_program = m_debug_shape_shader->getProgram(state, tris_decl, 0, "");
+				gpu::ProgramHandle lines_program = m_debug_shape_shader->getProgram(state, gpu::PrimitiveType::LINES, 0, "");
+				gpu::ProgramHandle triangles_program = m_debug_shape_shader->getProgram(state, gpu::PrimitiveType::TRIANGLES, 0, "");
 
 				u32 offset = 0;
-				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 				for (const WorldViewImpl::DrawCmd& cmd : m_scene_view.m_view->m_draw_cmds) {
+					struct {
+						Matrix mtx;
+						u32 vertices; // bindless
+						u32 vertices_offset;
+					} ub_data = { Matrix::IDENTITY, gpu::getBindlessHandle(vb.buffer).value, vb.offset + offset };
+					const TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
+					stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+
 					const gpu::ProgramHandle program = cmd.lines ? lines_program : triangles_program;
 					stream.useProgram(program);
 					stream.bindIndexBuffer(gpu::INVALID_BUFFER);
-					stream.bindVertexBuffer(0, vb.buffer, vb.offset + offset, sizeof(WorldView::Vertex));
-					stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 					stream.drawArrays(0, cmd.vertex_count);
 
 					offset += cmd.vertex_count * sizeof(WorldView::Vertex);
@@ -822,6 +839,8 @@ SceneView::SceneView(StudioApp& app)
 	m_debug_show_actions[(u32)Pipeline::DebugShow::VELOCITY].create("Debug view", "Velocity", "Velocity", "debug_view_velocity", "");
 	m_debug_show_actions[(u32)Pipeline::DebugShow::LIGHT_CLUSTERS].create("Debug view", "Light clusters", "Light clusters", "debug_view_light_clusters", "");
 	m_debug_show_actions[(u32)Pipeline::DebugShow::PROBE_CLUSTERS].create("Debug view", "Probe clusters", "Probe clusters", "debug_view_probe_clusters", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::MESH_CLUSTERS].create("Debug view", "Mesh clusters", "Mesh clusters", "debug_view_mesh_clusters", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::MESH_TRIANGLES].create("Debug view", "Mesh triangles", "Mesh triangles", "debug_view_mesh_triangles", "");
 
 	Gizmo::Config& gizmo_cfg = m_app.getGizmoConfig();
 	m_app.getSettings().registerOption("gizmo_position_step", &gizmo_cfg.step_config.position, "Scene view", "Grid size when aligning on a grid");
@@ -1287,6 +1306,12 @@ void SceneView::onToolbar() {
 		option("Velocity", Pipeline::DebugShow::VELOCITY);
 		option("Light clusters", Pipeline::DebugShow::LIGHT_CLUSTERS);
 		option("Probe clusters", Pipeline::DebugShow::PROBE_CLUSTERS);
+		option("Mesh clusters", Pipeline::DebugShow::MESH_CLUSTERS);
+		option("Mesh triangles", Pipeline::DebugShow::MESH_TRIANGLES);
+		ImGui::Checkbox("Freeze camera of clusters", &m_pipeline->m_cluster_freeze_camera);
+		ImGui::SliderFloat("Cluster error (px)", &m_pipeline->m_cluster_error_pixels, 0.05f, 8.f, "%.2f", ImGuiSliderFlags_Logarithmic);
+		ImGui::SliderFloat("Cluster attribute error weight", &m_pipeline->m_cluster_attribute_weight, 0.f, 2.f);
+		ImGui::SliderFloat("Cluster error scale in shadows", &m_pipeline->m_cluster_shadow_error_scale, 1.f, 8.f, "%.2f");
 		Renderer& renderer = m_pipeline->getRenderer();
 		for (Lumix::RenderPlugin* plugin : renderer.getPlugins()) {
 			plugin->debugUI(*m_pipeline);

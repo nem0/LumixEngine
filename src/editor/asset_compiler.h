@@ -41,6 +41,10 @@ struct LUMIX_EDITOR_API AssetCompiler {
 	virtual bool compile(const Path& path) = 0;
 	virtual u32 compileAll() = 0;
 	virtual bool isCompiling() const = 0;
+	// true until the scan of the project resources is done (the resource list is complete after that)
+	virtual bool isScanning() const = 0;
+	// number of resources that failed to compile the last time they were compiled
+	virtual u32 getFailedCount() const = 0;
 	virtual bool getMeta(const Path& res, OutputMemoryStream& blob) = 0;
 	virtual void updateMeta(const Path& resource, Span<const u8> data) const = 0;
 	virtual const HashMap<FilePathHash, ResourceItem>& lockResources() = 0;
@@ -49,7 +53,8 @@ struct LUMIX_EDITOR_API AssetCompiler {
 	// `Resource` dependencies are automatically handled elsewhere
 	virtual void registerDependency(const Path& included_from, const Path& dependency) = 0;
 	virtual void addResource(ResourceType type, const Path& path) = 0;
-	virtual bool writeCompiledResource(const Path& path, Span<const u8> data) = 0;
+	// `try_compress` false: the file is never compressed, so it can be read at offsets (see FileSystem::openStreaming)
+	virtual bool writeCompiledResource(const Path& path, Span<const u8> data, bool try_compress = true) = 0;
 	virtual bool copyCompile(const Path& src) = 0;
 	virtual DelegateList<void(const Path&)>& listChanged() = 0;
 	virtual DelegateList<void(Resource&, bool)>& resourceCompiled() = 0;

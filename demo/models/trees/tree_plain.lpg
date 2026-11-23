@@ -1,0 +1,6 @@
+import "models/trees/tree_generator" as tree
+import "core:procedural_geom"
+
+fn main() : Mesh {
+    return tree.generate(20240608, tree.Form.UPRIGHT, "bark");
+}

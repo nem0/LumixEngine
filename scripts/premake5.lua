@@ -414,7 +414,7 @@ end
 plugin_defs.renderer = function()
 	files { "../src/renderer/**.h", "../src/renderer/**.cpp", "../src/renderer/**.c", "../data/shaders/**.*" }
 	excludes {
-		"../external/meshoptimizer/clusterizer.cpp", "../external/meshoptimizer/overdrawanalyzer.cpp",
+		"../external/meshoptimizer/overdrawanalyzer.cpp",
 		"../external/meshoptimizer/overdrawoptimizer.cpp", "../external/meshoptimizer/spatialorder.cpp",
 		"../external/meshoptimizer/stripifier.cpp", "../external/meshoptimizer/vcacheanalyzer.cpp",
 		"../external/meshoptimizer/vcacheoptimizer.cpp", "../external/meshoptimizer/vertexcodec.cpp",
@@ -429,7 +429,7 @@ plugin_defs.renderer = function()
 	filter {}
 
 	if build_studio then
-		files { "../external/meshoptimizer/**.*", "../external/mikktspace/**.*", "../external/openfbx/**.*" }
+		files { "../external/meshoptimizer/**.*", "../external/mikktspace/**.*", "../external/ufbx/**.*" }
 	end
 	includedirs { "../src", "../external/freetype/include", "../external/", "../external/dx12/", "../external/pix/include/WinPixEventRuntime" }
 	defines { "BUILDING_RENDERER" }

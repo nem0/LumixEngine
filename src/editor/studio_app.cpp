@@ -857,7 +857,39 @@ struct StudioAppImpl final : StudioApp {
 	}
 
 
+	// --compile_all_resources: compiles everything that is not compiled yet (or is out of date) and exits, the exit code is 1
+	// if some resources failed to compile. Needs a project (-data_dir), standalone apps use the compiled resources.
+	// It runs its own minimal loop (no GUI, the main window stays hidden), see compileAllResourcesFrame.
+	void compileAllResourcesFrame() {
+		PROFILE_FUNCTION();
+		m_asset_compiler->update();
+		// the project is loaded in onInit, the scan starts there and is waited for in the first update
+		if (m_compile_all_frame++ > 0) updateCompileAllResources();
+		m_engine->update(*m_editor->getWorld());
+		profiler::frame();
+		m_events.clear();
+		os::sleep(1);
+	}
+
+	void updateCompileAllResources() {
+		if (m_compile_all_state == CompileAllState::SCANNING) {
+			if (m_asset_compiler->isScanning() || m_asset_compiler->isCompiling()) return;
+			m_compile_all_state = CompileAllState::COMPILING;
+			m_asset_compiler->compileAll();
+			return;
+		}
+		if (m_asset_compiler->isScanning() || m_asset_compiler->isCompiling()) return;
+		const u32 failed = m_asset_compiler->getFailedCount();
+		if (failed) logError(failed, " resources failed to compile.");
+		else logInfo("All resources compiled.");
+		exitWithCode(failed ? 1 : 0);
+	}
+
 	void onIdle() {
+		if (m_compile_all_resources) {
+			compileAllResourcesFrame();
+			return;
+		}
 		PROFILE_FUNCTION();
 		profiler::blockColor(Color(0x7f, 0x7f, 0x7f, 0xff).abgr());
 
@@ -3457,6 +3489,10 @@ struct StudioAppImpl final : StudioApp {
 	bool m_export_compiling = false;
 	bool m_entity_selection_changed = false;
 	bool m_finished;
+	enum class CompileAllState { SCANNING, COMPILING };
+	bool m_compile_all_resources = CommandLineParser::isOn("--compile_all_resources");
+	CompileAllState m_compile_all_state = CompileAllState::SCANNING;
+	u32 m_compile_all_frame = 0;
 	bool m_deferred_game_mode_exit;
 	int m_exit_code;
 

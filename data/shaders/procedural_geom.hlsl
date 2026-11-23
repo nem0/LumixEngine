@@ -16,6 +16,7 @@
 cbuffer Drawcall : register(b4) {
 	float4x4 u_ls_to_ws;
 	uint u_material_index;
+	uint u_vertices;	// bindless
 };
 
 struct VSOutput {
@@ -26,21 +27,25 @@ struct VSOutput {
 	float4 position : SV_POSITION;
 };
 
-#define ATTR(X) TEXCOORD##X
 struct VSInput {
-	float3 position : ATTR(0);
-	float2 uv : ATTR(1);
-	float3 normal : ATTR(2);
-	float3 tangent : ATTR(3);
+	uint vertex_id : SV_VertexID;
 };
 
 VSOutput mainVS(VSInput input) {
+	// vertices are pulled, 44 bytes each: float3 position, float2 uv, float3 normal, float3 tangent, see core:procedural_geom.Vertex
+	ByteAddressBuffer vb = bindless_buffers[u_vertices];
+	const uint offset = input.vertex_id * 44;
+	const float3 position = asfloat(vb.Load3(offset));
+	const float2 uv = asfloat(vb.Load2(offset + 12));
+	const float3 normal = asfloat(vb.Load3(offset + 20));
+	const float3 tangent = asfloat(vb.Load3(offset + 32));
+
 	VSOutput output;
-	output.pos_ws = transformPosition(input.position, u_ls_to_ws).xyz;
+	output.pos_ws = transformPosition(position, u_ls_to_ws).xyz;
 	output.position = transformPosition(output.pos_ws, Pass_ws_to_ndc);
-	output.normal = mul(input.normal, (float3x3)u_ls_to_ws);
-	output.tangent = mul(input.tangent, (float3x3)u_ls_to_ws);
-	output.uv = input.uv;
+	output.normal = mul(normal, (float3x3)u_ls_to_ws);
+	output.tangent = mul(tangent, (float3x3)u_ls_to_ws);
+	output.uv = uv;
 	return output;
 }
 

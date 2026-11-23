@@ -4,9 +4,13 @@ import "core:ui/module"
 import "core:world"
 import "core:engine/engine"
 
+import "core:commandline" as commandline
+
+import "scripts/bench" as bench
 import "scripts/player" as player
 import "scripts/free_camera" as free_camera
 import "maps/demo/demo" as demo
+import "maps/nanite/nanite" as nanite
 import "maps/particles/lightning" as lightning
 import "maps/particles/move" as particle_move
 import "maps/particles/clutter_sphere" as clutter_sphere
@@ -22,6 +26,7 @@ enum WorldType {
 	Particles,
 	NavigationStressTest,
 	NavigationStressTest2,
+	Nanite,
 	Other
 }
 
@@ -43,6 +48,7 @@ fn startWorld(world : World, kind : WorldType) : void {
 			}
 		case .NavigationStressTest: bot.init(world);
 		case .NavigationStressTest2: bot2.init(world);
+		case .Nanite: nanite.start(world);
 		case .Particles:
 			if const moving = world.findByName("world_space_particle") {
 				if const clutter = world.findByName("clutter") {
@@ -131,6 +137,7 @@ fn handleMenu(world : World) : void {
 			case "physics_stress_test": selected = "maps/physics_stress_test/physics_stress_test.unv";
 			case "instanced_models": selected = "maps/instanced_models/instanced_models.unv";
 			case "anim_stress_test": selected = "maps/anim_stress_test/anim_stress_test.unv";
+			case "nanite": selected = "maps/nanite/nanite.unv"; kind = .Nanite;
 			case:
 		}
 	}
@@ -142,6 +149,11 @@ fn handleMenu(world : World) : void {
 }
 
 fn main(engine : Engine, world : World) : void {
+	// benchmark mode: see scripts/bench.evox
+	if commandline.isFlagOn("-bench") {
+		bench.run(engine, world);
+		return;
+	}
 	g_input = engine.input();
 	player.init(world, g_input);
 
@@ -155,6 +167,7 @@ fn main(engine : Engine, world : World) : void {
 		case "maps/particles/particles.unv": world_type = .Particles;
 		case "maps/navigation_stress_test/navigation_stress_test.unv": world_type = .NavigationStressTest;
 		case "maps/navigation_stress_test/navigation_stress_test2.unv": world_type = .NavigationStressTest2;
+		case "maps/nanite/nanite.unv": world_type = .Nanite;
 		case: world_type = .Other;
 	}
 
@@ -183,6 +196,7 @@ fn main(engine : Engine, world : World) : void {
 				clutter_sphere.update(dt);
 			case .NavigationStressTest: bot.update();
 			case .NavigationStressTest2: bot2.update();
+			case .Nanite:
 			case .Other:
 		}
 	}

@@ -58,55 +58,6 @@ static constexpr u32 SRV_ROOT_PARAMETER_INDEX = 8;
 static constexpr u32 UNIFORM_BLOCK_COUNT = 6;
 static constexpr u32 ALL_UNIFORM_BLOCKS_DIRTY = (1 << UNIFORM_BLOCK_COUNT) - 1;
 
-static DXGI_FORMAT getDXGIFormat(const Attribute& attr) {
-	const bool as_int = attr.flags & Attribute::AS_INT;
-	switch (attr.type) {
-		case AttributeType::FLOAT:
-			switch (attr.components_count) {
-				case 1: return DXGI_FORMAT_R32_FLOAT;
-				case 2: return DXGI_FORMAT_R32G32_FLOAT;
-				case 3: return DXGI_FORMAT_R32G32B32_FLOAT;
-				case 4: return DXGI_FORMAT_R32G32B32A32_FLOAT;
-			}
-			break;
-
-		case AttributeType::I8: 
-			switch(attr.components_count) {
-				case 1: return as_int ? DXGI_FORMAT_R8_SINT : DXGI_FORMAT_R8_SNORM;
-				case 2: return as_int ? DXGI_FORMAT_R8G8_SINT : DXGI_FORMAT_R8G8_SNORM;
-				case 4: return as_int ? DXGI_FORMAT_R8G8B8A8_SINT : DXGI_FORMAT_R8G8B8A8_SNORM;
-			}
-			break;
-		case AttributeType::U8: 
-			switch(attr.components_count) {
-				case 1: return as_int ? DXGI_FORMAT_R8_UINT : DXGI_FORMAT_R8_UNORM;
-				case 2: return as_int ? DXGI_FORMAT_R8G8_UINT : DXGI_FORMAT_R8G8_UNORM;
-				case 4: return as_int ? DXGI_FORMAT_R8G8B8A8_UINT : DXGI_FORMAT_R8G8B8A8_UNORM;
-			}
-			break;
-		case AttributeType::I16: 
-			switch(attr.components_count) {
-				case 4: return as_int ? DXGI_FORMAT_R16G16B16A16_SINT : DXGI_FORMAT_R16G16B16A16_SNORM;
-			}
-			break;
-		case AttributeType::U16: 
-			switch(attr.components_count) {
-				case 4: return as_int ? DXGI_FORMAT_R16G16B16A16_UINT : DXGI_FORMAT_R16G16B16A16_UNORM;
-			}
-			break;
-		case AttributeType::U32:
-			switch(attr.components_count) {
-				case 1: return DXGI_FORMAT_R32_UINT;
-				case 2: return DXGI_FORMAT_R32G32_UINT;
-				case 3: return DXGI_FORMAT_R32G32B32_UINT;
-				case 4: return DXGI_FORMAT_R32G32B32A32_UINT;
-			}
-			break;
-	}
-	ASSERT(false);
-	return DXGI_FORMAT_R32_FLOAT;
-}
-
 static u32 sizeDXTC(u32 w, u32 h, DXGI_FORMAT format) {
 	const bool is_dxt1 = format == DXGI_FORMAT_BC1_UNORM || format == DXGI_FORMAT_BC1_UNORM_SRGB;
 	const bool is_ati = format == DXGI_FORMAT_BC4_UNORM;
@@ -312,12 +263,10 @@ struct Program {
 	ID3DBlob* vs = nullptr;
 	ID3DBlob* ps = nullptr;
 	ID3DBlob* cs = nullptr;
-	D3D12_INPUT_ELEMENT_DESC attributes[16];
-	u32 attribute_count = 0;
 	StateFlags state;
 	D3D12_PRIMITIVE_TOPOLOGY primitive_topology;
 	D3D12_PRIMITIVE_TOPOLOGY_TYPE primitive_topology_type;
-	// `pso_hash` is source hash + vertex layout, it is not used as a key of the shader bytecode cache
+	// `pso_hash` is source hash, it is not used as a key of the shader bytecode cache
 	// for CS, there's 1:1 mapping from `pso_hash` to PSO
 	// for VS/PS, there's 1:1 mapping from `pso_hash` and RT formats to PSO
 	StableHash pso_hash;
@@ -383,26 +332,13 @@ struct ShaderCompiler {
 		: m_allocator(allocator, "shader compiler")
 		, m_cache(m_allocator) {}
 
-	bool compile(const VertexDecl& decl
-		, const char* src
+	bool compile(const char* src
 		, ShaderType type
 		, const char* name
 		, Program& program)
 	{
 		PROFILE_FUNCTION();
 		profiler::pushString(name);
-		program.attribute_count = decl.attributes_count;
-		for (u8 i = 0; i < decl.attributes_count; ++i) {
-			const Attribute& attr = decl.attributes[i];
-			const bool instanced = attr.flags & Attribute::INSTANCED;
-			program.attributes[i].AlignedByteOffset = attr.byte_offset;
-			program.attributes[i].Format = getDXGIFormat(attr);
-			program.attributes[i].SemanticIndex = i;
-			program.attributes[i].SemanticName = "TEXCOORD";
-			program.attributes[i].InputSlot = instanced ? 1 : 0;
-			program.attributes[i].InputSlotClass = instanced ? D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA : D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
-			program.attributes[i].InstanceDataStepRate = instanced ? 1 : 0;
-		}
 
 		RollingStableHasher hasher;
 		hasher.begin();
@@ -413,21 +349,7 @@ struct ShaderCompiler {
 		}
 
 		const StableHash hash = hasher.end64();
-
-		// same shader can be used with different vertex layouts, so the layout is a part of the PSO key
-		RollingStableHasher pso_hasher;
-		pso_hasher.begin();
-		pso_hasher.update(&hash, sizeof(hash));
-		pso_hasher.update(&program.attribute_count, sizeof(program.attribute_count));
-		for (u32 i = 0; i < program.attribute_count; ++i) {
-			const D3D12_INPUT_ELEMENT_DESC& attr = program.attributes[i];
-			pso_hasher.update(&attr.Format, sizeof(attr.Format));
-			pso_hasher.update(&attr.InputSlot, sizeof(attr.InputSlot));
-			pso_hasher.update(&attr.AlignedByteOffset, sizeof(attr.AlignedByteOffset));
-			pso_hasher.update(&attr.InputSlotClass, sizeof(attr.InputSlotClass));
-			pso_hasher.update(&attr.InstanceDataStepRate, sizeof(attr.InstanceDataStepRate));
-		}
-		program.pso_hash = pso_hasher.end64();
+		program.pso_hash = hash;
 
 		if (type == ShaderType::SURFACE) {
 			auto iter = m_cache.find(hash);
@@ -770,9 +692,6 @@ struct PSOCache {
 		desc.NodeMask = 1;
 		desc.SampleMask = 0xffFFffFF;
 
-		desc.InputLayout.NumElements = p.attribute_count;
-		desc.InputLayout.pInputElementDescs = p.attributes;
-
 		desc.DSVFormat = fb.ds_format;
 		desc.NumRenderTargets = fb.count;
 		for (u32 i = 0; i < fb.count; ++i) {
@@ -782,7 +701,9 @@ struct PSOCache {
 		ID3D12PipelineState* pso;
 		HRESULT hr = device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pso));
 		if (FAILED(hr)) {
-			logError("Failed to create graphics PSO, hr = ", (u32)hr);
+			logError("Failed to create graphics PSO of ", p.name, ", hr = ", (u32)hr
+				, ", topology type = ", (u32)desc.PrimitiveTopologyType, ", render targets = ", fb.count, ", ds format = ", (u32)fb.ds_format
+				, ", rt0 format = ", fb.count ? (u32)fb.formats[0] : 0u, ", state = ", (u64)state);
 			pso = nullptr; // cache the failure, otherwise we'd retry and log every frame
 		}
 		cache.insert(hash, pso);
@@ -1085,12 +1006,20 @@ struct Frame {
 		u32 dst_total_bytes;
 	};
 
+	struct BufferRead {
+		ID3D12Resource* staging;	// own buffer of the read, nullptr if the read is in readback_buffer of the frame (at `offset`)
+		u64 offset;
+		BufferReadCallback callback;
+		u32 size;
+	};
+
 	Frame(IAllocator& allocator)
 		: to_release(allocator)
 		, to_heap_release(allocator)
 		, to_resolve(allocator)
 		, to_resolve_stats(allocator)
 		, texture_reads(allocator)
+		, buffer_reads(allocator)
 	{}
 
 	void clear();
@@ -1143,6 +1072,14 @@ struct Frame {
 	Array<Query*> to_resolve;
 	Array<Query*> to_resolve_stats;
 	Array<TextureRead> texture_reads;
+	Array<BufferRead> buffer_reads;
+	// Linear allocator of buffer reads (like scratch_buffer for uploads): a read takes the next range, all of them are
+	// done when the frame is begun again (the GPU has finished, the callbacks are called) and the allocator starts over.
+	// A read that does not fit gets its own buffer, and the buffer is recreated big enough for all the reads of the frame when it begins.
+	ID3D12Resource* readback_buffer = nullptr;
+	u64 readback_capacity = 0;
+	u64 readback_used = 0;
+	u64 readback_requested = 0;	// everything the reads of the frame wanted, fitting or not
 	ID3D12Resource* timestamp_query_buffer;
 	ID3D12Resource* stats_query_buffer;
 	u8* timestamp_query_buffer_ptr;
@@ -1562,6 +1499,41 @@ void Frame::begin() {
 		read.staging->Release();
 	}
 	texture_reads.clear();
+
+	u8* arena = nullptr;
+	for (const BufferRead& read : buffer_reads) {
+		u8* src = nullptr;
+		HRESULT hr = S_OK;
+		if (read.staging) {
+			hr = read.staging->Map(0, nullptr, (void**)&src);
+		}
+		else {
+			if (!arena) hr = readback_buffer->Map(0, nullptr, (void**)&arena);
+			if (arena) src = arena + read.offset;
+		}
+		if (src && hr == S_OK) {
+			read.callback.invoke(Span<const u8>(src, read.size));
+			if (read.staging) read.staging->Unmap(0, nullptr);
+		}
+		else {
+			logError("Failed to map buffer readback buffer");
+			read.callback.invoke(Span<const u8>());
+		}
+		if (read.staging) read.staging->Release();
+	}
+	if (arena) readback_buffer->Unmap(0, nullptr);
+	buffer_reads.clear();
+
+	// everything is read, the allocator starts over (bigger if the reads of the last use of the frame did not fit)
+	readback_used = 0;
+	if (readback_requested > readback_capacity) {
+		if (readback_buffer) readback_buffer->Release();
+		readback_capacity = 64 * 1024;
+		while (readback_capacity < readback_requested) readback_capacity *= 2;
+		readback_buffer = createBuffer(d3d->device, nullptr, readback_capacity, D3D12_HEAP_TYPE_READBACK, "buffer readback");
+		if (!readback_buffer) readback_capacity = 0;
+	}
+	readback_requested = 0;
 }
 
 void Frame::clear() {
@@ -1573,6 +1545,11 @@ void Frame::clear() {
 		
 	to_release.clear();
 	to_heap_release.clear();
+
+	for (const BufferRead& r : buffer_reads) if (r.staging) r.staging->Release();
+	buffer_reads.clear();
+	if (readback_buffer) readback_buffer->Release();
+	readback_buffer = nullptr;
 
 	scratch_buffer->Release();
 	texture_scratch_buffer->Release();
@@ -1903,6 +1880,44 @@ void readTexture(TextureHandle texture, TextureReadCallback callback) {
 	memcpy(wait.layouts, layouts, sizeof(layouts[0]) * wait.num_layouts);
 }
 
+void readBuffer(BufferHandle buffer, u32 offset, u32 size, BufferReadCallback callback) {
+	if (!buffer || !buffer->resource || size == 0 || u64(offset) + size > buffer->size) {
+		logError("Buffer read requested on an invalid or destroyed buffer, or out of its range");
+		callback.invoke(Span<const u8>());
+		return;
+	}
+	// the next range of the readback buffer of the frame (linear allocator), or an own buffer if it does not fit (creating a
+	// committed resource is slow, the readback buffer of the frame is bigger the next time it is used)
+	Frame& read_frame = *d3d->frame;
+	const u64 aligned_size = (u64(size) + 255) & ~u64(255);
+	ID3D12Resource* staging = nullptr;	// own buffer
+	ID3D12Resource* dst = nullptr;
+	u64 dst_offset = 0;
+	if (read_frame.readback_buffer && read_frame.readback_used + aligned_size <= read_frame.readback_capacity) {
+		dst = read_frame.readback_buffer;
+		dst_offset = read_frame.readback_used;
+		read_frame.readback_used += aligned_size;
+	}
+	else {
+		staging = createBuffer(d3d->device, nullptr, size, D3D12_HEAP_TYPE_READBACK, "buffer staging");
+		dst = staging;
+	}
+	read_frame.readback_requested += aligned_size;
+	if (!dst) {
+		callback.invoke(Span<const u8>()); // device removed, report failure
+		return;
+	}
+	const D3D12_RESOURCE_STATES prev_state = buffer->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_COPY_SOURCE);
+	d3d->cmd_list->CopyBufferRegion(dst, dst_offset, buffer->resource, offset, size);
+	buffer->setState(d3d->cmd_list, prev_state);
+
+	Frame::BufferRead& wait = d3d->frame->buffer_reads.emplace();
+	wait.staging = staging;
+	wait.offset = dst_offset;
+	wait.callback = callback;
+	wait.size = size;
+}
+
 void beginQuery(QueryHandle query) {
 	checkThread();
 	CHECK(query);
@@ -2041,7 +2056,7 @@ void shutdown() {
 		if (w.latency_waitable) CloseHandle(w.latency_waitable);
 		w.swapchain->Release();
 	}
-	
+
 	d3d->root_signature->Release();
 	d3d->timestamp_query_heap->Release();
 	d3d->stats_query_heap->Release();
@@ -2063,6 +2078,9 @@ void shutdown() {
 	FreeLibrary(d3d->dxgi_dll);
 	d3d.destroy();
 }
+
+// index of the root constant b6 in createRootSignature
+static constexpr u32 ROOT_PARAMETER_DRAW_ID = 9;
 
 ID3D12RootSignature* createRootSignature() {
 	PROFILE_FUNCTION();
@@ -2090,7 +2108,12 @@ ID3D12RootSignature* createRootSignature() {
 		{D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, {{lengthOf(bindless_srv_desc_ranges), bindless_srv_desc_ranges}}, D3D12_SHADER_VISIBILITY_ALL},
 		{D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, {{1, &sampler_desc_range}}, D3D12_SHADER_VISIBILITY_ALL},
 		{D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE, {{1, &srv_desc_range}}, D3D12_SHADER_VISIBILITY_ALL},
+		{D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS, {{0, 0}}, D3D12_SHADER_VISIBILITY_ALL},
 	};
+	// per draw id, filled by indirect draws (see ROOT_PARAMETER_DRAW_ID)
+	rootParameter[ROOT_PARAMETER_DRAW_ID].Constants.ShaderRegister = 6;
+	rootParameter[ROOT_PARAMETER_DRAW_ID].Constants.RegisterSpace = 0;
+	rootParameter[ROOT_PARAMETER_DRAW_ID].Constants.Num32BitValues = 1;
 	rootParameter[0].Descriptor.RegisterSpace = 0;
 	rootParameter[0].Descriptor.ShaderRegister = 0;
 	rootParameter[1].Descriptor.RegisterSpace = 0;
@@ -2398,9 +2421,19 @@ bool init(void* hwnd, InitFlags flags) {
 	}
 
 	if (isFlagSet(flags, InitFlags::STABLE_POWER_STATE)) {
-		logInfo("GPU: trying to enable stable power state");
-		d3d->device->SetStablePowerState(TRUE);
-		logInfo("GPU: stable power state is enabled");
+		// It only works with the developer mode of Windows on. Without it the call fails and REMOVES THE DEVICE, so check first.
+		DWORD developer_mode = 0;
+		DWORD developer_mode_size = sizeof(developer_mode);
+		const LSTATUS reg_result = RegGetValueW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock", L"AllowDevelopmentWithoutDevLicense", RRF_RT_REG_DWORD, nullptr, &developer_mode, &developer_mode_size);
+		if (reg_result != ERROR_SUCCESS || developer_mode == 0) {
+			logError("GPU: the stable power state needs the developer mode of Windows (Settings / System / For developers), it is off, so the GPU clocks are not stable.");
+		}
+		else {
+			logInfo("GPU: trying to enable stable power state");
+			const HRESULT stable_hr = d3d->device->SetStablePowerState(TRUE);
+			if (SUCCEEDED(stable_hr)) logInfo("GPU: stable power state is enabled");
+			else logError("GPU: could not enable stable power state (HRESULT ", (u32)stable_hr, "), the GPU clocks are not stable.");
+		}
 	}
 
 	return true;
@@ -3378,20 +3411,33 @@ void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z) {
 	}
 }
 
-void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride_in_bytes) {
-	if (buffer) {
-		D3D12_VERTEX_BUFFER_VIEW vbv;
-		vbv.BufferLocation = buffer->gpu_address + buffer_offset;
-		vbv.StrideInBytes = stride_in_bytes;
-		vbv.SizeInBytes = UINT(buffer->size - buffer_offset);
-		d3d->cmd_list->IASetVertexBuffers(binding_idx, 1, &vbv);
-	} else {
-		D3D12_VERTEX_BUFFER_VIEW vbv = {};
-		vbv.BufferLocation = 0;
-		vbv.StrideInBytes = stride_in_bytes;
-		vbv.SizeInBytes = 0;
-		d3d->cmd_list->IASetVertexBuffers(binding_idx, 1, &vbv);
+void dispatchIndirect(u32 indirect_buffer_offset) {
+	CHECK(d3d->current_program);
+	if (!d3d->current_indirect_buffer || !d3d->current_indirect_buffer->resource) {
+		logError("Indirect dispatch without an indirect buffer");
+		return;
 	}
+	if (!setPipelineStateCompute()) return;
+
+	// a command is the three groups, a signature that only dispatches needs no root signature
+	static ID3D12CommandSignature* signature = [&]() {
+		D3D12_INDIRECT_ARGUMENT_DESC arg_desc = {};
+		arg_desc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
+
+		D3D12_COMMAND_SIGNATURE_DESC desc = {};
+		desc.NodeMask = 1;
+		desc.ByteStride = sizeof(u32) * 3;
+		desc.NumArgumentDescs = 1;
+		desc.pArgumentDescs = &arg_desc;
+		ID3D12CommandSignature* result = nullptr;
+		if (FAILED(d3d->device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(&result)))) {
+			logError("Failed to create the command signature of indirect dispatches");
+		}
+		return result;
+	}();
+	if (!signature) return;
+
+	d3d->cmd_list->ExecuteIndirect(signature, 1, d3d->current_indirect_buffer->resource, indirect_buffer_offset, nullptr, 0);
 }
 
 BindlessHandle getBindlessHandle(TextureHandle texture) {
@@ -3410,8 +3456,12 @@ RWBindlessHandle getRWBindlessHandle(BufferHandle buffer) {
 	return RWBindlessHandle(buffer->heap_id + 1);
 }
 
-void drawIndirect(DataType index_type, u32 indirect_buffer_offset) {
+void drawIndirect(DataType index_type, u32 indirect_buffer_offset, u32 count) {
 	CHECK(d3d->current_program);
+	if (!d3d->current_indirect_buffer || !d3d->current_indirect_buffer->resource) {
+		logError("Indirect draw without an indirect buffer");
+		return;
+	}
 	if (!setPipelineStateGraphics()) return;
 
 	DXGI_FORMAT dxgi_index_type;
@@ -3433,20 +3483,25 @@ void drawIndirect(DataType index_type, u32 indirect_buffer_offset) {
 	d3d->cmd_list->IASetPrimitiveTopology(d3d->current_program->primitive_topology);
 
 	static ID3D12CommandSignature* signature = [&]() {
-		D3D12_INDIRECT_ARGUMENT_DESC arg_desc = {};
-		arg_desc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+		// a command is: draw id (root constant b6, instance data of shaders is addressed by it), indexed draw arguments
+		D3D12_INDIRECT_ARGUMENT_DESC arg_desc[2] = {};
+		arg_desc[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT;
+		arg_desc[0].Constant.RootParameterIndex = ROOT_PARAMETER_DRAW_ID;
+		arg_desc[0].Constant.DestOffsetIn32BitValues = 0;
+		arg_desc[0].Constant.Num32BitValuesToSet = 1;
+		arg_desc[1].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
 
 		D3D12_COMMAND_SIGNATURE_DESC desc = {};
 		desc.NodeMask = 1;
-		desc.ByteStride = sizeof(u32) * 5;
-		desc.NumArgumentDescs = 1;
-		desc.pArgumentDescs = &arg_desc;
+		desc.ByteStride = sizeof(u32) * 6;
+		desc.NumArgumentDescs = lengthOf(arg_desc);
+		desc.pArgumentDescs = arg_desc;
 		ID3D12CommandSignature* result;
-		d3d->device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(&result));
+		d3d->device->CreateCommandSignature(&desc, d3d->root_signature, IID_PPV_ARGS(&result));
 		return result;
 	}();
 
-	d3d->cmd_list->ExecuteIndirect(signature, 1, d3d->current_indirect_buffer->resource, indirect_buffer_offset, nullptr, 0);
+	d3d->cmd_list->ExecuteIndirect(signature, count, d3d->current_indirect_buffer->resource, indirect_buffer_offset, nullptr, 0);
 }
 
 void draw(const Drawcall& draw) {
@@ -3455,26 +3510,6 @@ void draw(const Drawcall& draw) {
 
 	if (!setPipelineStateGraphics()) return;
 	
-	gpu::BufferHandle vb0 = draw.vertex_buffers[0];
-	const u32 vb0_offset = draw.vertex_buffer_offsets[0];
-	gpu::BufferHandle vb1 = draw.vertex_buffers[1];
-	const u32 vb1_offset = draw.vertex_buffer_offsets[1];
-
-	D3D12_VERTEX_BUFFER_VIEW vbv[] = {
-		{
-			.BufferLocation = vb0->gpu_address + vb0_offset,
-			.SizeInBytes = UINT(vb0->size - vb0_offset),
-			.StrideInBytes = draw.vertex_buffer_sizes[0],
-		},
-		{
-			.BufferLocation = vb1->gpu_address + vb1_offset,
-			.SizeInBytes = UINT(vb1->size - vb1_offset),
-			.StrideInBytes = draw.vertex_buffer_sizes[1],
-		}
-	};
-
-	d->cmd_list->IASetVertexBuffers(0, 2, vbv);
-
 	DXGI_FORMAT dxgi_index_type;
 	u32 offset_shift = 0;
 	switch (draw.index_type) {
@@ -3580,7 +3615,7 @@ void update(BufferHandle buffer, const void* data, size_t size) {
 
 void createProgram(ProgramHandle program
 	, StateFlags state
-	, const VertexDecl& decl
+	, PrimitiveType primitive_type
 	, const char* src
 	, ShaderType type
 	, const char* name)
@@ -3589,7 +3624,7 @@ void createProgram(ProgramHandle program
 	program->name = name;
 	program->state = state;
 	
-	switch (decl.primitive_type) {
+	switch (primitive_type) {
 		case PrimitiveType::NONE:
 		case PrimitiveType::TRIANGLES:
 			program->primitive_topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -3610,7 +3645,7 @@ void createProgram(ProgramHandle program
 		default: ASSERT(0); break;
 	}
 
-	d3d->shader_compiler.compile(decl, src, type, name, *program);
+	d3d->shader_compiler.compile(src, type, name, *program);
 }
 
 } // namespace

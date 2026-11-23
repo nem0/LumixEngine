@@ -12,6 +12,8 @@
 
 #include "engine/resource.h"
 #include "gpu/gpu.h"
+#include "vertex_decl.h"
+#include "mesh_clusters.h"
 
 
 namespace Lumix {
@@ -62,7 +64,6 @@ struct MeshMaterial {
 		OWN_MATERIAL_INDEX = 1 << 0,
 	};
 	Material* material;
-	u32 sort_key;
 	MaterialIndex material_index;
 	Flags flags;
 };
@@ -95,7 +96,7 @@ struct LUMIX_RENDERER_API Mesh {
 		INDICES_16_BIT = 1 << 0
 	};
 
-	Mesh(const gpu::VertexDecl& vertex_decl,
+	Mesh(const VertexDecl& vertex_decl,
 		u8 vb_stride,
 		StringView name,
 		const AttributeSemantic* semantics,
@@ -113,17 +114,52 @@ struct LUMIX_RENDERER_API Mesh {
 	Array<Skin> skin;
 	Flags flags = Flags::NONE;
 	String name;
-	gpu::VertexDecl vertex_decl;
-	AttributeSemantic attributes_semantic[gpu::VertexDecl::MAX_ATTRIBUTES];
+	VertexDecl vertex_decl;
+	gpu::PrimitiveType primitive_type = gpu::PrimitiveType::TRIANGLES;
+	AttributeSemantic attributes_semantic[VertexDecl::MAX_ATTRIBUTES];
+	// defines with the layout of vertices, see vertex_pulling.hlsli
 	const char* semantics_defines = "";
+
+	// the only per draw data of vertex pulling, a uniform buffer
+	struct VertexBufferBinding {
+		u32 vertex_buffer;		// bindless handle
+		u32 instance_buffer;	// bindless handle, instance data pulled by shaders (MESH_INSTANCE variant), 0 if not used
+		u32 instance_offset;	// in bytes
+		u32 bones_buffer;		// bindless handle, dual quaternions of the bones of skinned meshes (SKINNED variant), 0 if not used
+	};
 	Renderer& renderer;
-	float lod = 0;
+	float lod = 0;	// the LOD the mesh belongs to
 
 	gpu::BufferHandle vertex_buffer_handle;
 	u32 vb_stride;
 	gpu::BufferHandle index_buffer_handle;
 	gpu::DataType index_type;
 	u32 indices_count;
+
+	// cluster DAG for GPU driven LOD, see mesh_clusters.h, baked by the model importer
+	// Meshes with clusters have no vertices and indices of their own: their vertex data are the headers of clusters followed by their
+	// bit packed vertices (position and then attributes, interleaved, see mesh_clusters.h; vb_stride and the vertex decl only say which attributes there are),
+	// and the indices are u8 and local to a cluster,
+	// cluster `c` starts at c * cluster_index_stride, so that all selected clusters of a mesh are drawn by one instanced draw.
+	// The CPU `vertices` and `indices` are made of the finest clusters.
+	// The vertex data, the clusters, the nodes and the indices are not buffers of the mesh (vertex_buffer_handle is invalid), they are ranges of the buffer shared
+	// by all meshes with clusters (see Renderer::allocClusterData): the vertex data are `cluster_vertex_size` bytes from `cluster_vertex_offset`, the clusters
+	// and then the nodes are `cluster_table_size` bytes from `cluster_table_offset`, the indices are `cluster_index_size` bytes from `cluster_index_offset`.
+	// The payload of the groups of clusters (the vertex stream and the indices) is streamed, see cluster_stream: it is in ranges of the buffer of cluster data while it is loaded.
+	// The owner of the stream is the mesh, it is freed with the clusters (Model::destroyClusters).
+	ClusterStream* cluster_stream = nullptr;
+	u32 cluster_table_offset = 0;	// MeshClusterGPU[cluster_count]
+	u32 node_table_offset = 0;		// MeshNodeGPU[node_count], then root_count u32 indices of roots, see MeshClusters, right after the clusters
+	u32 cluster_table_size = 0;		// of the range that has the clusters, the nodes with the roots and (16 byte aligned) the headers of the clusters
+	u32 cluster_header_offset = 0;	// MeshClusterVertexGPU[cluster_count], the end of the range of the clusters
+	u32 cluster_group_offset = 0;	// MeshGroupAddressGPU[], a range of its own
+	u32 cluster_group_size = 0;
+	u32 cluster_count = 0;
+	u32 cluster_index_stride = 0; // indices of every cluster are padded (with degenerate triangles) to this count, see Model::loadClusters
+	u32 node_count = 0;
+	u32 root_count = 0;
+	u32 tree_depth = 0;			// levels of the deepest tree, a leaf node is the last one
+	u32 leaf_cluster_count = 0; // the finest clusters, no selection has more clusters than that
 };
 
 struct LODMeshIndices
@@ -136,11 +172,17 @@ struct LODMeshIndices
 struct LUMIX_RENDERER_API Model final : Resource {
 	using BoneMap = HashMap<BoneNameHash, int>;
 
+	// The version of the file format. Increase it whenever the format changes, models of other versions are rejected (see doLoad).
+	// The numbers up to 15 were used by older formats, they must not be used again.
 	enum class FileVersion : u32 {
-		ROOT_MOTION_BONE,
+		FIRST_SUPPORTED = 15, // the payload of pages of clusters was in the part of the file that is read at once
 
-		LATEST // keep this last
+		LATEST
 	};
+
+	// The file is read in parts (see doLoad): the header, then `resident_size` bytes that are read with the model (meshes, skeleton, LODs, the tables of clusters and the payloads
+	// of the pages that are never unloaded), the rest is the payload of the other pages of clusters, it is read when the renderer needs it (requestClusterPage).
+	// Offsets in the file (ClusterStream::Page::file_offset) are from the start of the header, after the compiled resource header. The file is not compressed.
 	
 #pragma pack(1)
 	struct FileHeader {
@@ -148,6 +190,8 @@ struct LUMIX_RENDERER_API Model final : Resource {
 
 		u32 magic = FileHeader::MAGIC;
 		FileVersion version = FileVersion::LATEST;
+		u64 resident_size = 0;	// bytes that follow the header and are read with the model
+		u64 payload_size = 0;	// bytes after them, the payloads of the pages of clusters that can be unloaded
 	};
 #pragma pack()
 
@@ -169,14 +213,6 @@ struct LUMIX_RENDERER_API Model final : Resource {
 	Model(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator);
 
 	ResourceType getType() const override { return TYPE; }
-
-	u32 getLODMeshIndices(float squared_distance) const {
-		if (squared_distance < m_lod_distances[0]) return 0;
-		if (squared_distance < m_lod_distances[1]) return 1;
-		if (squared_distance < m_lod_distances[2]) return 2;
-		if (squared_distance < m_lod_distances[3]) return 3;
-		return 4;
-	}
 
 	Mesh& getMesh(u32 index) { return m_meshes[index]; }
 	const Mesh& getMesh(u32 index) const { return m_meshes[index]; }
@@ -207,6 +243,27 @@ struct LUMIX_RENDERER_API Model final : Resource {
 	const SOATransform& getInverseBindPose() { return m_inverse_bind; }
 	LocalRigidTransform getInverseBindTransform(i32 bone_idx) const;
 	Span<const i16> getParents() const { return m_parents; }
+	// true if all meshes of the first LOD have cluster DAGs, see Mesh::cluster_table_offset
+	bool hasClusters() const { return m_has_clusters; }
+	// true if the instances of the model are culled and drawn by the GPU (GPUScene): models with clusters, and models of meshes with buffers of their own (rigid or
+	// skinned), which are drawn by one indirect draw for each mesh and material
+	bool canUseGPUScene() const {
+		if (m_has_clusters) return true;
+		if (m_meshes.empty()) return false;
+		for (const Mesh& mesh : m_meshes) {
+			if (!mesh.vertex_buffer_handle || !mesh.index_buffer_handle || mesh.indices_count == 0) return false;
+		}
+		return true;
+	}
+	bool hasSkinnedMeshes() const {
+		for (const Mesh& mesh : m_meshes) if (mesh.type == Mesh::SKINNED) return true;
+		return false;
+	}
+	// index of the last mesh that is rendered when using clusters, further meshes are lower LODs which clusters replace
+	i32 getClusterMeshesEnd() const { return m_lod_indices[0].to >= 0 ? m_lod_indices[0].to : (i32)m_meshes.size() - 1; }
+	// Reads the payload of a page of clusters of the mesh from the file, the result goes to Renderer::onClusterPageRead (in a later frame, from the main thread).
+	// The model is not unloaded before it arrives.
+	void requestClusterPage(u32 mesh_index, u32 page_index);
 
 	static constexpr u32 MAX_LOD_COUNT = 4;
 
@@ -214,13 +271,22 @@ private:
 	Model(const Model&);
 	void operator=(const Model&);
 
+	// `data` is the part of the file after the header that is read with the model (FileHeader::resident_size)
+	bool parseResident(Span<const u8> data);
 	bool parseBones(InputMemoryStream& file);
-	bool parseMeshes(InputMemoryStream& file, FileVersion version);
+	bool parseMeshes(InputMemoryStream& file);
 	bool parseLODs(InputMemoryStream& file);
+	// `resident` is all the data that is read with the model, the payloads of the permanent pages are in it
+	bool parseClusters(InputMemoryStream& file, Span<const u8> resident);
+	// loads the pages that are not permanent from `payload`, the data of the file after the resident part, which is at `payload_at` in the file (streaming is off, all is loaded with the model)
+	bool loadStreamedPages(Span<const u8> payload, u64 payload_at);
+	template <typename T> void stream(u64 offset, u64 size, T&& callback);
+	void destroyClusters();
 	int getBoneIdx(const char* name);
 
 	void unload() override;
 	bool load(Span<const u8> mem) override;
+	void doLoad() override;
 
 	TagAllocator m_allocator;
 	Renderer& m_renderer;
@@ -238,6 +304,8 @@ private:
 	AABB m_aabb;
 	BoneNameHash m_root_motion_bone;
 	int m_first_nonroot_bone_index;
+	bool m_has_clusters = false;
+	FileSystem::StreamHandle m_stream_handle = {};	// the file is open while the model has clusters that stream pages
 };
 
 

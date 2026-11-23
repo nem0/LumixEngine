@@ -227,14 +227,14 @@ struct AssetCompilerImpl : AssetCompiler {
 		}
 
 		ASSERT(tmp.size() < 0xffFFffFF);
-		return writeCompiledResource(src, Span(tmp.data(), (u32)tmp.size()));
+		return writeCompiledResource(src, Span(tmp.data(), (u32)tmp.size()), true);
 	}
 
-	bool writeCompiledResource(const Path& path, Span<const u8> data) override {
+	bool writeCompiledResource(const Path& path, Span<const u8> data, bool try_compress) override {
 		PROFILE_FUNCTION();
 		constexpr u32 COMPRESSION_SIZE_LIMIT = 4096;
 		OutputMemoryStream compressed(m_allocator);
-		if (data.length() > COMPRESSION_SIZE_LIMIT) {
+		if (try_compress && data.length() > COMPRESSION_SIZE_LIMIT) {
 			if (!m_app.getEngine().compress(data, compressed)) {
 				logWarning("Could not compress ", path, ", using uncompressed file.");
 				compressed.clear();
@@ -251,7 +251,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		CompiledResourceHeader header;
 		header.decompressed_size = data.length();
 		const u32 compressed_size = (u32)compressed.size();
-		if (data.length() > COMPRESSION_SIZE_LIMIT && compressed_size > 0 && compressed_size < i32(data.length() / 4 * 3)) {
+		if (try_compress && data.length() > COMPRESSION_SIZE_LIMIT && compressed_size > 0 && compressed_size < i32(data.length() / 4 * 3)) {
 			header.flags |= CompiledResourceHeader::COMPRESSED;
 			(void)file.write(&header, sizeof(header));
 			(void)file.write(compressed.data(), compressed_size);
@@ -436,6 +436,7 @@ struct AssetCompilerImpl : AssetCompiler {
 		}
 		if (iter.value().indexOf(included_from) < 0) {
 			iter.value().push(included_from);
+			m_dependencies_dirty = true;
 		}
 	}
 
@@ -672,6 +673,8 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 
 	bool isCompiling() const override { return m_batch_remaining_count > 0; }
+	bool isScanning() const override { return m_scan_counter > 0 || m_save_list_after_scan; }
+	u32 getFailedCount() const override { return m_failed.size(); }
 
 	bool compile(const Path& src) override
 	{
@@ -843,6 +846,19 @@ struct AssetCompilerImpl : AssetCompiler {
 	}
 
 	void update() override {
+		// dependencies are registered when resources are compiled, which can happen at any time. Save them once the
+		// compilation is done, otherwise they would be lost if the editor does not exit cleanly and changes of included files
+		// would not recompile their dependents the next time.
+		if (m_scan_counter == 0 && m_batch_remaining_count == 0) {
+			bool save;
+			{
+				MutexGuard lock(m_dependencies_mutex);
+				save = m_dependencies_dirty;
+				m_dependencies_dirty = false;
+			}
+			if (save) saveResourceList();
+		}
+
 		if (m_save_list_after_scan && m_scan_counter == 0) {
 			m_save_list_after_scan = false;
 			saveResourceList();
@@ -1040,6 +1056,7 @@ struct AssetCompilerImpl : AssetCompiler {
 	Array<Resource*> m_on_init_load; // defer loading resources until we have a project dir
 	AtomicI32 m_scan_counter = 0;
 	bool m_save_list_after_scan = false;
+	bool m_dependencies_dirty = false; // guarded by m_dependencies_mutex
 	os::Timer m_scan_timer;
 
 	u32 m_compile_batch_count = 0;

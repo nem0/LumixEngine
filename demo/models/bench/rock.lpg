@@ -1,0 +1,41 @@
+// High poly rock for the nanite benchmark (scripts/run_nanite_tests.bat): about 300k triangles.
+// A unit sphere displaced along its radius by several octaves of sines, from large lumps to fine grain, so every
+// level of the cluster hierarchy has real detail to keep or drop. Normals come from the displaced surface.
+import "core:procedural_geom"
+import "core:vec2" as vec2
+import "core:vec3" as vec3
+import "std:math" as math
+
+fn height(u : vec3.Vec3) : f32 {
+    var h : f32 = 0.10 * math.sin(3.1 * u.x + 1.7 * u.y) * math.cos(2.3 * u.z + 0.5);
+    h += 0.05 * math.sin(7.3 * u.y + 5.1 * u.z + 1.0);
+    h += 0.025 * math.sin(15.7 * u.x + 11.3 * u.z) * math.cos(13.1 * u.y);
+    h += 0.012 * math.sin(31.0 * u.x + 29.0 * u.y + 23.0 * u.z);
+    h += 0.006 * math.sin(67.0 * u.x - 59.0 * u.y + 61.0 * u.z);
+    h += 0.003 * math.sin(131.0 * u.x + 127.0 * u.y - 113.0 * u.z);
+    return h;
+}
+
+// point of the rock in the direction u (a unit vector)
+fn surface(u : vec3.Vec3) : vec3.Vec3 {
+    return u * (1.0 + height(u));
+}
+
+fn shape(position : *vec3.Vec3, normal : *vec3.Vec3, tangent : *vec3.Vec3, uv : *vec2.Vec2) : void {
+    const u = vec3.normalizeSafe(position.*);
+    const t1 = vec3.normalizeSafe(tangent.*);
+    const t2 = vec3.cross(u, t1);
+    const e : f32 = 0.002;
+    const p0 = surface(u);
+    const p1 = surface(vec3.normalizeSafe(u + t1 * e));
+    const p2 = surface(vec3.normalizeSafe(u + t2 * e));
+    var n = vec3.normalizeSafe(vec3.cross(p1 - p0, p2 - p0));
+    if vec3.dot(n, u) < 0.0 { n = -n; }
+    position.* = p0;
+    normal.* = n;
+    tangent.* = vec3.normalizeSafe(t1 - n * vec3.dot(n, t1));
+}
+
+fn main() : Mesh {
+    return map(sphere(1.0, 480, 320), shape);
+}

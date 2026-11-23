@@ -6,6 +6,7 @@
 #include "core/path.h"
 #include "core/stream.h"
 #include "renderer/gpu/gpu.h"
+#include "renderer/vertex_decl.h"
 
 namespace Lumix {
 
@@ -50,7 +51,7 @@ struct ModelImporter {
 
 	struct AttributeDesc {
 		AttributeSemantic semantic;
-		gpu::AttributeType type;
+		AttributeType type;
 		u8 num_components;
 	};
 
@@ -156,6 +157,15 @@ protected:
 	void writeSubmesh(const Path& src, i32 geom_idx, const ModelMeta& meta);
 	void writeMeshes(const Path& src, const ModelMeta& meta);
 	void writeLODs(const ModelMeta& meta);
+	// Clusters replace the indices of the first LOD: if shouldBakeClusters, writeGeometry does not write them
+	// and writeClusters, which must be called after it, writes them as the finest level of clusters, see Model::parseClusters
+	bool shouldBakeClusters(const ModelMeta& meta) const;
+	static bool areClusterAttributesSupported(const ImportGeometry& geom);
+	// Writes the vertices of the clusters of the first LOD (packed, see packClusterVertices) instead of the ones writeGeometry wrote
+	bool writeClusters(const ModelMeta& meta);
+	// Writes m_out_file as the compiled resource of the model. `resident_end` is the end of the part of the file that is read with the model, the rest is streamed (see
+	// Model::FileHeader), the header is filled in here. The file is not compressed, it is read at offsets.
+	bool compileModelFile(const Path& path, u64 resident_end);
 	void writeGeometry(const ModelMeta& meta);
 	void writeGeometry(u32 geom_idx, const ModelMeta& meta);
 	void writeSkeleton(const ModelMeta& meta);
@@ -169,6 +179,9 @@ protected:
 	void computeNormals(OutputMemoryStream& unindexed_triangles, u32 vertex_size, u32 normal_offset);
 
 
+	// pads vertices to multiples of 4 bytes, so that vertex pulling can use wide aligned loads
+	void padVertices();
+
 	// compute AO, auto LODs, etc.
 	// call this from parse when appropriate
 	void postprocessCommon(const ModelMeta& meta, StringView src_dir);
@@ -176,6 +189,9 @@ protected:
 	StudioApp& m_app;
 	IAllocator& m_allocator;
 	OutputMemoryStream m_out_file;
+	bool m_bake_clusters = false;
+	u64 m_vertex_data_offset = 0; // where the vertex buffers of meshes are in m_out_file, set by writeGeometry
+	u64 m_resident_end = 0; // where the payloads of streamed pages of clusters start in m_out_file (the end of the file if there are none), set by writeClusters
 	struct Shader* m_impostor_shadow_shader = nullptr;
 
 	// importers must fill these members

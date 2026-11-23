@@ -93,6 +93,9 @@ struct Counter {
 	float last_value = -1;
 };
 
+// copies the counters (names and the last pushed values) to `out`, returns the number of all counters, which can be more than `out` holds
+LUMIX_CORE_API u32 getCounters(Span<Counter> out);
+
 struct CounterRecord {
 	u32 counter;
 	float value;

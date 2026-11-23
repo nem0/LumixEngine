@@ -2,10 +2,16 @@
 // import core:renderer/instanced_model as instanced_model
 
 import "core:entity"
+import "core:renderer/model"
+import "core:vec3"
+import "core:quat"
 struct InstancedModel { entity : i32; module : cptr; }
 
 extern fn instancedModel(e : Entity) : ?InstancedModel;
 extern fn createInstancedModel(e : Entity) : ?InstancedModel;
+extern fn getModel(entity : InstancedModel) : ?Model;
+extern fn addInstances(entity : InstancedModel, count : u32) : void;
+extern fn setInstanceTransform(entity : InstancedModel, idx : u32, pos : Vec3, rot : Quat, scale : f32) : void;
 extern fn getPath(entity : InstancedModel) : []const u8;
 extern fn setPath(entity : InstancedModel, path : []const u8) : void;
 

@@ -37,7 +37,9 @@ fn geomPass(ctx : Context) : GeomResult {
 	ctx.addBucket("transparent", "", .DEPTH, depth_test | blend);
 	ctx.addBucket("decal", "", .DEFAULT, depth_test | blend);
 	ctx.addBucket("impostor", "DEFERRED", .DEFAULT, default_state);
-	const view = ctx.cull(camera);
+	// occlusion culling in two passes: this pass draws what the depth of the previous frame does not hide, then the pyramid of the depth that it made is
+	// used to draw what was skipped and is visible, and the final depth is the pyramid for the next frame
+	const view = ctx.cullOcclusion(camera);
 
 	const terrain_state = depth_write | stencilState(255, .ALWAYS, 2, 255, .KEEP, .KEEP, write_stencil);
 	ctx.renderTerrains(camera, terrain_state, "DEFERRED");
@@ -45,6 +47,12 @@ fn geomPass(ctx : Context) : GeomResult {
 	ctx.renderBucket(view, 4);
 	ctx.renderGrass(camera, default_state, "");
 	ctx.renderOpaquePlugins();
+
+	ctx.buildHZB(gbuffer.DS, false);
+	// the pyramid read the depth buffer as a texture
+	ctx.setRenderTargets(targets, gbuffer.DS, .NONE);
+	ctx.renderPostCull(view);
+	ctx.buildHZB(gbuffer.DS, true);
 	ctx.endBlock();
 
 	// decals read the depth and stencil but don't write them

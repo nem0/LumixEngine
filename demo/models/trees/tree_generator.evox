@@ -1,0 +1,763 @@
+// High poly tree for the nanite benchmark (scripts/run_nanite_tests.bat): under one million triangles (the limits of a recipe are 1M and 3M indices).
+// A trunk and four levels of branches (1, 8, 56, 280 and 2520 branches, the meadow tree has its own counts) made of tapered tubes with bark relief, before thinning the smaller shoots inside the crown.
+// The surviving terminal twigs carry individual lance-shaped leaves. Lots of small, thin and disconnected geometry, a lot of silhouette and a few big smooth tubes: the opposite of
+// the rock and the terrain. About 10 m tall (the trunk is 6 m) and 9 m wide. The random numbers are seeded, so the tree is always the same.
+import "models/trees/tree_leaf_shape" as blade
+import "models/trees/tree_bark_surface" as bark
+import "core:array" as array
+import "core:procedural_geom"
+import "core:random" as random
+import "core:vec3" as vec3
+import "std:math" as math
+
+const TRUNK_RADIUS : f32 = 0.46;
+const LAST_LEVEL : i32 = 4;		// the twigs, they have the foliage and no children
+
+struct Branch {
+    origin : vec3.Vec3;
+    dir : vec3.Vec3;
+    length : f32;
+    radius : f32;		// at the base
+    level : i32;
+}
+
+fn rnd() : f32 {
+    return random.randFloatRange(-1.0, 1.0);
+}
+
+// Settings of the levels: 0 is the trunk, 4 are the twigs.
+fn sidesOf(level : i32) : i32 {
+    if level == 0 { return 4 * bark.RIDGES; }
+    if level == 1 { return 2 * bark.RIDGES; }
+    if level == 2 { return 12; }
+    if level == 3 { return 8; }
+    return 5;
+}
+
+fn rowsOf(level : i32) : i32 {
+    if level == 0 { return 60; }
+    if level == 1 { return 40; }
+    if level == 2 { return 20; }
+    if level == 3 { return 10; }
+    return 4;
+}
+
+// The number of children of a branch of the level. The thick levels have few, the foliage is on the twigs (see twigsOf).
+fn childrenOf(level : i32) : i32 {
+    if level == 0 { return 8; }
+    if level == 1 { return 7; }
+    if level == 2 { return 5; }
+    if level == 3 { return 5; }
+    return 0;
+}
+
+// The number of twigs of a branch of the last but one level, the same for all of them: generate finds the twigs of a branch by it.
+fn twigsOf(form : Form) : i32 {
+    return form == Form.MEADOW ? childrenOf(LAST_LEVEL - 1) : 9;
+}
+
+fn lengthOf(level : i32) : f32 {
+    if level == 0 { return 6.0; }
+    if level == 1 { return 3.4; }
+    if level == 2 { return 1.7; }
+    if level == 3 { return 0.85; }
+    return 0.4;
+}
+
+// A direction that is perpendicular to dir and to `up`: it does not twist along a branch (the reference axis is fixed).
+fn sideAround(dir : vec3.Vec3, up : vec3.Vec3) : vec3.Vec3 {
+    var ref = up;
+    if math.abs(vec3.dot(dir, up)) > 0.9 { ref = vec3.Vec3 { 1.0, 0.0, 0.0 }; }
+    return vec3.normalizeSafe(vec3.cross(ref, dir));
+}
+
+// The same, perpendicular to the vertical: horizontal.
+fn sideOf(dir : vec3.Vec3) : vec3.Vec3 {
+    return sideAround(dir, vec3.Vec3 { 0.0, 1.0, 0.0 });
+}
+
+// Invert the texture's U warp at each ring. A row of vertices then follows
+// the actual bottom of a groove even where it wanders across the UV seam.
+fn ribU(f : bark.RidgeFields, s : i32, sides : i32, v : f32) : f32 {
+    const samples = sides / bark.RIDGES;
+    const rib = s / samples;
+    const fraction = (s % samples) as f32 / samples as f32;
+    const left = bark.ribEdge(f, rib - 1);
+    const target = (left + (bark.ribEdge(f, rib) - left) * fraction) / bark.RIDGES as f32;
+    var lo = target - 0.005;
+    var hi = target + 0.005;
+    for j in 0..12 {
+        const mid = (lo + hi) * 0.5;
+        const warp = bark.noise2(f.warp, mid * 2, v * 2) - 0.5;
+        if bark.warpedU(f, mid, v, warp) * 0.5 < target { lo = mid; }
+        else { hi = mid; }
+    }
+    return (lo + hi) * 0.5;
+}
+
+fn finishBarkRingNormals(m : *Mesh, first : u32, sides : i32, rows : i32) : void {
+    const stride = sides + 1;
+    for r in 0..(rows + 1) {
+        const start = first as i32 + r * stride;
+        for s in 0..stride {
+            const col = s % sides;
+            const left = start + (col + sides - 1) % sides;
+            const right = start + (col + 1) % sides;
+            const below = first as i32 + math.max(r - 1, 0) * stride + col;
+            const above = first as i32 + math.min(r + 1, rows) * stride + col;
+            const tangent = vec3.normalizeSafe(m.vertices.values[right].position - m.vertices.values[left].position);
+            const along = m.vertices.values[above].position - m.vertices.values[below].position;
+            m.vertices.values[start + s].normal = vec3.normalizeSafe(vec3.cross(tangent, along));
+            m.vertices.values[start + s].tangent = tangent;
+        }
+    }
+}
+
+// Each root has its own reach and fades into the bole at a different height.
+fn rootFlare(angle : f32, axis : f32, height : f32, rise : f32, reach : f32) : f32 {
+    const foot = math.max(1.0 - height / rise, 0);
+    const lobe = bark.smooth(0.70, 1.0, math.cos(angle - axis + 0.16 * foot));
+    return reach * foot * foot * foot * lobe;
+}
+
+// The stem inclines toward the first scaffold limbs, then the leader changes
+// direction above the fork. Start upright so the basal ring sits on the ground.
+enum Form : u32 { SPIRAL, UPRIGHT, MEADOW }
+
+// Hold a heading for a short run of wood, then round the joint into the next
+// run. Phase varies between limbs without consuming the tree's random stream.
+fn headingVariation(run : f32, phase : f32) : f32 {
+    const warped = run + 0.19 * (math.sin(2.1 * run + phase) - math.sin(phase));
+    const i = math.floor(warped);
+    const blend = bark.smooth(0.18, 0.82, warped - i);
+    const a = 0.68 * math.sin(2.61 * i + phase) + 0.32 * math.sin(1.53 * i - phase);
+    const b = 0.68 * math.sin(2.61 * (i + 1) + phase) + 0.32 * math.sin(1.53 * (i + 1) - phase);
+    return a + (b - a) * blend;
+}
+
+fn trunkDirection(t : f32, form : Form) : vec3.Vec3 {
+    if form == Form.MEADOW {
+        const low = bark.smooth(0, 0.09, t);
+        const fork = bark.smooth(0.12, 0.32, t);
+        const upper = bark.smooth(0.46, 0.73, t);
+        return vec3.normalizeSafe(vec3.Vec3 {
+            -0.82 * low + 1.27 * fork - 0.72 * upper + 0.40 * low * headingVariation(11 * t, 2.8), 1,
+            0.31 * low + 0.14 * fork - 0.83 * upper + 0.32 * low * headingVariation(9 * t, 0.7)});
+    }
+    const lean = bark.smooth(0.0, 0.19, t);
+    const fork = bark.smooth(0.33, 0.55, t);
+    const leader = bark.smooth(0.69, 0.90, t);
+    // The plain tree's stem wanders from run to run instead of being a smooth arc (it starts upright, so the basal ring sits on the ground).
+    const wander = form == Form.UPRIGHT ? bark.smooth(0.0, 0.12, t) : 0.0;
+    return vec3.normalizeSafe(vec3.Vec3 {
+        0.23 * lean - 0.47 * fork + 0.22 * leader + 0.11 * wander * headingVariation(8 * t, 1.9), 1.0,
+        -0.12 * lean + 0.09 * fork + 0.19 * leader + 0.10 * wander * headingVariation(7 * t, 4.4)});
+}
+
+// The exposed bole leans out from the roots and turns back below the
+// lowest scaffold. The two offsets crest at different heights, giving
+// the elbow a different outline from the front and the side.
+fn lowerTrunkOffset(h : f32) : vec3.Vec3 {
+    const elbow = bark.smooth(0.0, 0.94, h) - bark.smooth(1.02, 2.06, h);
+    const shoulder = bark.smooth(0.06, 1.38, h) - bark.smooth(1.40, 2.06, h);
+    return vec3.Vec3 {0.17 * elbow - 0.07 * shoulder, 0, -0.14 * shoulder - 0.04 * elbow};
+}
+
+// The tube of a branch: rows + 1 rings of sides + 1 vertices (the seam is duplicated for the UVs). The radius shrinks to a third
+// towards the tip, the trunk flares at the base, and the bark has some relief. `points`, `dirs` and `radii` get the center, the direction
+// and the radius of every ring, the children grow from them.
+fn growBranch(m : *Mesh, b : Branch, fields : bark.RidgeFields, form : Form, points : *array.Array(vec3.Vec3), dirs : *array.Array(vec3.Vec3), radii : *array.Array(f32)) : void {
+    const rows = rowsOf(b.level);
+    const moss_ridges = form == Form.SPIRAL;
+    const sides = form == Form.MEADOW and b.level == 1 ? 32 : sidesOf(b.level);
+    const step = b.length / (rows as f32);
+    const k : f32 = 0.04 + 0.12 * (b.level as f32);
+    var bend : vec3.Vec3 = { rnd() * k, rnd() * k * 0.5 - 0.04 * (b.level as f32), rnd() * k };
+    array.clear(points);
+    array.clear(dirs);
+    array.clear(radii);
+    const first = m.vertices.size as u32;
+    var p = b.origin;
+    var d = b.dir;
+    const phase = rnd() * 10.0;
+    const meadow_limb = form == Form.MEADOW and b.level == 1;
+    const lateral = vec3.cross(vec3.Vec3 {0, 1, 0}, b.dir);
+    const elbow = 0.25 + 0.09 * math.sin(phase);
+    if meadow_limb {
+        // Leave the trunk at a shallow angle, then turn upward beyond the collar.
+        d = vec3.normalizeSafe(b.dir + vec3.Vec3 {0, -0.33, 0});
+    }
+    const subrings : i32 = b.level == 0 or meadow_limb ? 2 : 1;
+    const ring_count = rows * subrings;
+    var side = sideOf(d);
+    for r in 0..(ring_count + 1) {
+        const t = r as f32 / ring_count as f32;
+        var taper = 1.0 - 0.67 * t;
+        if b.level == 0 and moss_ridges {
+            taper = 1.12 - 0.24 * t - 0.58 * bark.smooth(0.34, 0.97, t);
+        }
+        else if b.level == 0 and form == Form.UPRIGHT {
+            // a little thicker at the base and a faster taper at the top, the tip stays about as thin as with the linear one
+            taper = 1.06 - 0.28 * t - 0.42 * bark.smooth(0.35, 1.0, t);
+        }
+        const radius = b.radius * taper;
+        const h = t * b.length;
+        // old wood has an uneven section: swollen shoulders and flat faces, and healed scars
+        const old_wood = (form == Form.MEADOW and b.level <= 2) or (form == Form.UPRIGHT and b.level <= 1);
+        const wood : f32 = form == Form.UPRIGHT ? (b.level == 0 ? 0.45 : 0.25) : 1.0;	// how strong the unevenness is
+        const ridge_shift : f32 = old_wood ? 0.65 * math.sin(9 * t + phase) : 0.0;
+        // One healed shoot per interval. The oval rim and recessed center
+        // share the parent rings, their texture coordinates and their normals.
+        const scars : f32 = b.level == 0 ? 6.0 : 4.0;
+        const slot = math.floor(t * scars);
+        const scar_angle = phase + 2.40 * slot;
+        const scar_t = (slot + 0.50 + 0.13 * math.sin(scar_angle)) / scars;
+        const scar_y = (t - scar_t) * b.length / (0.85 * radius);
+        var center = p + d * (step * ((r % subrings) as f32 / subrings as f32));
+        // Translate the rings together through the elbow. Rotating each ring
+        // by the full local bend can fold the inside of a tight turn over itself.
+        if b.level == 0 and moss_ridges { center = center + lowerTrunkOffset(h); }
+        if r % subrings == 0 {
+            array.push(points, center);
+            array.push(dirs, d);
+            array.push(radii, radius);
+        }
+        side = vec3.normalizeSafe(side - d * vec3.dot(side, d));
+        const up = vec3.cross(d, side);
+        const v = t * b.length / (2.0 * math.pi * b.radius);
+        // Rotate the rings and their UV seam together so both splinters and
+        // modeled fissures follow the same spiral. Ease the pitch above the fork.
+        var twist : f32 = 0;
+        if moss_ridges and b.level == 0 { twist = 0.91 * h + 0.73 * (1 - math.cos(0.86 * h)); }
+        else if moss_ridges and b.level == 1 { twist = 0.28 * h; }
+        for s in 0..(sides + 1) {
+            var u = (s % sides) as f32 / sides as f32;
+            var relief : f32 = 1.0;
+            if moss_ridges and b.level <= 1 {
+                u = ribU(fields, s % sides, sides, v);
+                const warp = bark.noise2(fields.warp, u * 2, v * 2) - 0.5;
+                const px = bark.warpedU(fields, u, v, warp) * 12;
+                const rib = bark.ridgeAt(fields, px, v, warp);
+                const amplitude : f32 = b.level == 0 ? 0.19 : 0.12;
+                relief += amplitude * (rib.height - 0.60 - 0.32 * rib.hollow);
+            }
+            const around = u * 2.0 * math.pi;
+            const sweep = moss_ridges and b.level == 0 ? 0.15 * math.sin(around * 2 + 0.9 * h) : 0.0;
+            const a = phase + around + twist + sweep;
+            const n = side * math.cos(a) + up * math.sin(a);
+            const tangent = up * math.cos(a) - side * math.sin(a);
+            var distance = radius;
+            if old_wood {
+                if b.level <= 1 and math.abs(scar_y) < 1 {
+                    const ellipse = scar_y * scar_y + 9 * (1 - math.cos(around - scar_angle));
+                    const rim = (1 - bark.smooth(0.45, 1, ellipse)) * bark.smooth(0.04, 0.39, ellipse);
+                    distance += wood * radius * (0.085 * rim - 0.026 * (1 - bark.smooth(0, 0.35, ellipse)));
+                }
+                // Uneven growth leaves one side of a limb swollen while the
+                // opposite face can stay nearly flat. Sample around a circle
+                // so these broad shoulders continue through the UV seam.
+                const run = h / b.radius;
+                const shoulder = bark.noise2(fields.clouds,
+                    phase + 0.13 * math.cos(a) + 0.05 * run,
+                    0.18 * math.sin(a) + 0.043 * run);
+                const rind = bark.noise2(fields.clouds, u + phase + 0.027 * shoulder,
+                    0.093 * run + 0.032 * math.sin(a));
+                distance += wood * radius * (0.38 * (shoulder - 0.5)
+                    + 0.15 * (bark.smooth(0.24, 0.71, rind) - 0.5));
+                distance += wood * radius * (0.063 * math.cos(3 * around + phase + ridge_shift)
+                    + 0.036 * math.sin(5 * around - 1.7 * ridge_shift));
+            }
+            if b.level > 0 {
+                // the base of a branch swells into its parent, the other forms less than the meadow tree
+                // The branch starts on the center line of its parent, which is about twice as thick, and leans away from it: it leaves the parent surface at about 2.4 radii.
+                // The other forms swell from there; the meadow tree keeps its collar as it was.
+                const exit : f32 = form == Form.MEADOW ? 0.0 : 2.4 * b.radius;
+                const reach : f32 = form == Form.MEADOW ? 2.7 * b.radius : 3.5 * b.radius;
+                const collar = 1 - bark.smooth(exit, exit + reach, h);
+                const swell : f32 = form == Form.MEADOW ? 1.0 : 0.85;
+                distance += swell * b.radius * collar * (0.43 + 0.26 * math.cos(around + phase));
+            }
+            if b.level == 0 and moss_ridges {
+                const angle = a - phase;
+                // A healed branch shoulder and a longer root flute interrupt
+                // the circular section without swelling the whole ring.
+                const scar = 1 - bark.smooth(0.05, 0.37, math.abs(h - 1.24));
+                const lip = bark.smooth(0.34, 0.96, math.cos(angle - 1.85 + 0.42 * scar));
+                const flute = rootFlare(angle, 4.75 - 0.35 * t, h, 2.60, 0.47);
+                distance += b.radius * (0.35 * scar * lip + flute);
+                distance += b.radius * (0.045 * math.cos(2 * angle + 0.8 * t)
+                    + rootFlare(angle, 0.27, h, 1.22, 1.02)
+                    + rootFlare(angle, 2.13, h, 0.88, 0.79)
+                    + rootFlare(angle, 3.66, h, 1.39, 1.18)
+                    + rootFlare(angle, 5.20, h, 0.72, 0.62));
+            }
+            else if b.level == 0 {
+                distance += b.radius * (rootFlare(around, 0.5, h, 0.83, 0.48)
+                    + rootFlare(around, 2.64, h, 1.05, 0.62)
+                    + rootFlare(around, 4.72, h, 0.70, 0.43));
+            }
+            if s == sides { u += 1; }
+            // every branch has its own offset in the bark texture, so that neighbours do not show the same ridges at the same place
+            vertex(m, center + n * (distance * relief), n, tangent, u + 0.0731 * phase, v + 0.171 * phase);
+        }
+        if (r + 1) % subrings == 0 {
+            p = p + d * step;
+            if b.level == 0 { d = trunkDirection((r + 1) as f32 / ring_count as f32, form); }
+            else if meadow_limb {
+                const along = (r + 1) as f32 / ring_count as f32;
+                const lift = bark.smooth(elbow - 0.17, elbow + 0.15, along);
+                const spread = bark.smooth(0.49, 0.82, along);
+                const turn = (0.20 + 0.40 * math.sin(phase)) * (lift - 1.65 * spread);
+                const run = along * b.length;
+                const onset = bark.smooth(0, 0.35, run);
+                const sideways = 0.21 * onset * headingVariation(run * 1.75, phase);
+                const rise = 0.15 * onset * headingVariation(run * 1.48, phase + 1.9);
+                d = vec3.normalizeSafe(b.dir + lateral * (turn + sideways) + bend * along
+                    + vec3.Vec3 {0, -0.33 + 1.10 * lift - 0.81 * spread + rise, 0});
+            }
+            else { d = vec3.normalizeSafe(d + bend * step); }
+        }
+    }
+    if b.level <= 1 or (form == Form.MEADOW and b.level == 2) { finishBarkRingNormals(m, first, sides, ring_count); }
+    const stride = (sides + 1) as u32;
+    for r in 0..ring_count {
+        for s in 0..sides {
+            const a = first + (r as u32) * stride + (s as u32);
+            const c = a + stride;
+            triangle(m, a, a + 1, c);
+            triangle(m, a + 1, c + 1, c);
+        }
+    }
+}
+
+// Four midrib spans support a folded blade. The outline has three points
+// per span to follow the tapered margin.
+fn leaf(m : *Mesh, origin : vec3.Vec3, dir : vec3.Vec3, axis : vec3.Vec3,
+    length : f32, width : f32, variant : i32, keep : bool) : void {
+    const normal = vec3.normalizeSafe(vec3.cross(axis, dir));
+    const curl = random.randFloatRange(-0.23, -0.06);
+    const skew = rnd() * 0.085;
+    const fold = random.randFloatRange(0.18, 0.28);
+    // Draw the same shape parameters for every bud so thinning one twig
+    // preserves the placement and shape of the remaining foliage.
+    if keep == false { return; }
+    var centers : [5]u32 = undefined;
+    var left : [13]u32 = undefined;
+    var right : [13]u32 = undefined;
+    for j in 0..13 {
+        const t = j as f32 / 12;
+        const spine = origin + dir * (length * t) + normal * (length * curl * t * t)
+            + axis * (length * skew * t * t);
+        const along = vec3.normalizeSafe(dir + normal * (2 * curl * t) + axis * (2 * skew * t));
+        const across = vec3.normalizeSafe(axis - along * vec3.dot(axis, along));
+        const face = vec3.normalizeSafe(vec3.cross(across, along));
+        const tile_center = (variant as f32 + 0.5) / blade.VARIANTS as f32;
+        const v = 0.001 + 0.998 * t;
+        if j % 3 == 0 {
+            centers[j / 3] = m.vertices.size as u32;
+            vertex(m, spine, face, across, tile_center, v);
+        }
+        if j == 0 or j == 12 {
+            left[j] = centers[j / 3];
+            right[j] = left[j];
+        }
+        else {
+            // Keep the folded mesh just outside the rounded cutout.
+            const envelope = math.min(blade.widthAt(j) + 0.20, 1.12);
+            const uv_radius = envelope / (2.3 * blade.VARIANTS as f32);
+            const w = width * envelope;
+            const offset = w * skew;
+            const camber = face * (fold * w);
+            left[j] = m.vertices.size as u32;
+            vertex(m, spine - across * (w - offset) + camber, vec3.normalizeSafe(face + across * fold), across, tile_center - uv_radius, v);
+            right[j] = m.vertices.size as u32;
+            vertex(m, spine + across * (w + offset) + camber, vec3.normalizeSafe(face - across * fold), across, tile_center + uv_radius, v);
+        }
+    }
+    for k in 0..4 {
+        const center = k == 0 ? centers[1] : centers[k];
+        const end = 3 * (k + 1);
+        for j in (3*k)..end {
+            triangle(m, center, left[j+1], left[j]);
+            triangle(m, center, right[j], right[j+1]);
+        }
+        if k > 0 and end < 12 {
+            triangle(m, center, centers[k+1], left[end]);
+            triangle(m, center, right[end], centers[k+1]);
+        }
+    }
+}
+
+// Radius in metres around the center of the terminal shoots.
+const CROWN_CORE_RADIUS : f32 = 1.50;
+
+// `up` is the direction that the leaves lie across: they are horizontal if it is the vertical, which is what makes the blades of a tree face the sky.
+fn dressTwig(m : *Mesh, b : Branch, crown_center : vec3.Vec3, up : vec3.Vec3, points : array.Array(vec3.Vec3), dirs : array.Array(vec3.Vec3)) : void {
+    const rows = points.size as i32 - 1;
+    const count = random.randRange(4, 8) as i32;
+    const start = random.randFloatRange(0.08, 0.36);
+    const turn = random.randFloat() * 6.2831853;
+    const pitch = random.randFloatRange(2.55, 3.05);
+    const shoot_size = random.randFloatRange(0.83, 1.16);
+    const shoot_variant = random.randRange(0, 2) as i32;
+    for k in 0..count {
+        const along = (k as f32 + random.randFloatRange(0.20, 0.80)) / count as f32;
+        const t = start + (1 - start) * along;
+        const row = math.min((t * rows as f32) as i32, rows - 1);
+        const frac = t * rows as f32 - row as f32;
+        const twig = vec3.normalizeSafe(dirs.values[row] * (1-frac) + dirs.values[row+1] * frac);
+        const side = sideOf(twig);
+        const azimuth = turn + k as f32 * pitch + 0.27 * rnd();
+        const radial = side * math.cos(azimuth) + vec3.cross(twig, side) * math.sin(azimuth);
+        const base = points.values[row] * (1-frac) + points.values[row+1] * frac
+            + radial * (0.83 * b.radius * (1 - 0.67 * t));
+        const dir = vec3.normalizeSafe(radial + twig * (0.42 + 0.55 * along) - up * 0.14);	// the leaves hang a little
+        const flat = -sideAround(dir, up);
+        const roll = 0.35 * rnd();
+        const axis = flat * math.cos(roll) + vec3.cross(dir, flat) * math.sin(roll);
+        // Leaves of a shoot are about as big as each other (±10%) and get smaller towards the tip.
+        const size = shoot_size * random.randFloatRange(0.19, 0.23) * (1 - 0.24 * along * along);
+        var variant = shoot_variant;
+        if along > 0.83 { variant = 3; }
+        else if random.randFloat() < 0.35 { variant = random.randRange(0, 2) as i32; }
+        const distance = vec3.length(base - crown_center);
+        const thinning = 0.85 * (1 - bark.smooth(0.85, CROWN_CORE_RADIUS, distance));
+        leaf(m, base, dir, axis, size, size * random.randFloatRange(0.191, 0.226), variant, along >= thinning);
+    }
+}
+
+// The foliage is made of sprays: a branch of the level SPRAY_LEVEL with its twigs and leaves. A few shapes of sprays, in tiers of density, are built once in
+// their own space (they start at the origin and grow along +y) and then placed at every branch of that level, turned a little around their axis and a bit scaled, like
+// instances of a model would be: placeCopy is the only place that copies, an instance of a part of a model could take its place.
+const SPRAY_LEVEL : i32 = 3;
+const SPRAY_SHAPES : i32 = 4;
+const SPRAY_TIERS : i32 = 4;
+const SPRAY_RADIUS : f32 = 0.014;	// at the base, a spray is not as thick as the branch that carries it where they meet, which is inside of it
+const SPRAY_WEIGHT : f32 = 3.0;		// how much foliage a spray puts into the grid of the light at each of its nine points, see LIGHT_CELL
+
+// The shapes of sprays are the bands of the tilt of the axis of the place from the vertical, so that the leaves of every shape can be made for the tilt that it has:
+// 0 to 40 degrees, 40 to 55, 55 to 70 and more than 70 (the sprays that point to the side or down). The band is found by the vertical component of the direction.
+fn sprayShapeOf(dir : vec3.Vec3) : i32 {
+    if dir.y > 0.766 { return 0; }
+    if dir.y > 0.574 { return 1; }
+    if dir.y > 0.342 { return 2; }
+    return 3;
+}
+
+// The vertical in the space of a spray of the shape. A spray is placed with its x axis horizontal, so the vertical has no x: it is cos(tilt) along the axis of the
+// spray and -sin(tilt) along z, where `tilt` is the angle between the axis and the vertical, the middle of the band of the shape (30, 48, 62 and 80 degrees). The
+// leaves are made with this up, so they lie across the horizontal, and face the sky, once the spray is in place; how well depends on how far its tilt is from the middle.
+fn sprayUp(shape : i32) : vec3.Vec3 {
+    if shape == 0 { return vec3.Vec3 { 0.0, 0.8660, -0.5000 }; }
+    if shape == 1 { return vec3.Vec3 { 0.0, 0.6691, -0.7431 }; }
+    if shape == 2 { return vec3.Vec3 { 0.0, 0.4695, -0.8829 }; }
+    return vec3.Vec3 { 0.0, 0.1736, -0.9848 };
+}
+
+fn sprayLength(form : Form) : f32 {
+    return form == Form.UPRIGHT ? lengthOf(SPRAY_LEVEL) * 0.80 : lengthOf(SPRAY_LEVEL);
+}
+
+// The share of the twigs that a tier leaves out: 0 is a full spray, the last tier has one twig.
+fn sprayPrune(tier : i32) : f32 {
+    if tier == 0 { return 0.0; }
+    if tier == 1 { return 0.4; }
+    if tier == 2 { return 0.75; }
+    return 0.9;
+}
+
+// A spray in the space of the mesh `src` is added to `dst`: the point (x, y, z) goes to origin + (ex * x + ey * y + ez * z) * scale. The axes are the columns of a rotation.
+fn placeCopy(dst : *Mesh, src : Mesh, origin : vec3.Vec3, ex : vec3.Vec3, ey : vec3.Vec3, ez : vec3.Vec3, scale : f32) : void {
+    const offset = dst.vertices.size as u32;
+    for j in 0..src.vertices.size {
+        var v = src.vertices.values[j];
+        v.position = origin + (ex * v.position.x + ey * v.position.y + ez * v.position.z) * scale;
+        v.normal = ex * v.normal.x + ey * v.normal.y + ez * v.normal.z;
+        v.tangent = ex * v.tangent.x + ey * v.tangent.y + ez * v.tangent.z;
+        array.push(&dst.vertices, v);
+    }
+    for j in 0..src.indices.size { array.push(&dst.indices, offset + src.indices.values[j]); }
+}
+
+// Builds a spray without the share `prune` of its twigs. `vertical` is the vertical in its space (sprayUp), the leaves are made across it.
+fn buildSpray(wood : *Mesh, leaves : *Mesh, fields : bark.RidgeFields, form : Form, prune : f32, vertical : vec3.Vec3) : void {
+    var points = array.init(vec3.Vec3);
+    var dirs = array.init(vec3.Vec3);
+    var radii = array.init(f32);
+    var twigs = array.init(Branch);
+    const root : Branch = { { 0.0, 0.0, 0.0 }, { 0.0, 1.0, 0.0 }, sprayLength(form), SPRAY_RADIUS, SPRAY_LEVEL };
+    growBranch(wood, root, fields, form, &points, &dirs, &radii);
+
+    // the twigs: spread around the branch by the golden angle, leaning away from it
+    const rows = rowsOf(SPRAY_LEVEL);
+    const count = twigsOf(form);
+    const turn = random.randFloat() * 6.2831853;
+    for k in 0..count {
+        const t = 0.2 + 0.75 * ((k as f32 + random.randFloat()) / count as f32);
+        const idx = (t * rows as f32) as isize;
+        const p = points.values[idx];
+        const d = dirs.values[idx];
+        const side = sideOf(d);
+        const up = vec3.cross(d, side);
+        const phi = turn + k as f32 * 2.3999632 + rnd() * 0.4;
+        var lean = 0.55 + 0.35 * rnd() + 0.08 * SPRAY_LEVEL as f32;
+        if form == Form.UPRIGHT { lean += 0.22; }
+        const around = side * math.cos(phi) + up * math.sin(phi);
+        const dir = vec3.normalizeSafe(d * math.cos(lean) + around * math.sin(lean) + vec3.Vec3 { 0.0, 0.2, 0.0 });
+        var length = lengthOf(SPRAY_LEVEL + 1) * (0.8 + 0.4 * random.randFloat());
+        if form == Form.UPRIGHT { length *= 0.80; }
+        const radius = math.max(radii.values[idx] * 0.5, length / 80.0);
+        const twig : Branch = { p, dir, length, radius, SPRAY_LEVEL + 1 };
+        array.push(&twigs, twig);
+    }
+
+    // the sprays are thinned by twig, the same twigs of every shape go
+    const far : vec3.Vec3 = { 1000.0, 0.0, 0.0 };	// the leaves are not thinned by the distance from the center of the crown
+    for k in 0..count {
+        const phase = k as f32 * 0.618034 + 0.137;
+        if phase - math.floor(phase) >= prune {
+            growBranch(wood, twigs.values[k], fields, form, &points, &dirs, &radii);
+            dressTwig(leaves, twigs.values[k], far, vertical, points, dirs);
+        }
+    }
+    array.deinit(&twigs);
+    array.deinit(&points);
+    array.deinit(&dirs);
+    array.deinit(&radii);
+}
+
+// How much light the sprays get is estimated on a grid of the foliage: the sprays are put into the cells, and the sprays that have a lot of them between
+// them and the sky are the first ones to be thinned, so the crown is a shell of foliage around a hollow inside.
+const LIGHT_CELL : f32 = 0.35;
+const LIGHT_ABSORPTION : f32 = 0.035;	// how much one unit of the density of a cell dims the light that goes through the cell
+
+// The index of the cell of the grid that has the point, -1 outside of it. The grid starts at `lo` and has nx * ny * nz cells.
+fn cellOf(p : vec3.Vec3, lo : vec3.Vec3, nx : i32, ny : i32, nz : i32) : i32 {
+    const x = math.floor((p.x - lo.x) / LIGHT_CELL) as i32;
+    const y = math.floor((p.y - lo.y) / LIGHT_CELL) as i32;
+    const z = math.floor((p.z - lo.z) / LIGHT_CELL) as i32;
+    if x < 0 or y < 0 or z < 0 or x >= nx or y >= ny or z >= nz { return -1; }
+    return (y * nz + z) * nx + x;
+}
+
+// The sum of the densities of the cells on the way from `start` in the direction, not counting the cell `own`.
+fn shadowAlong(density : array.Array(f32), start : vec3.Vec3, dir : vec3.Vec3, lo : vec3.Vec3, nx : i32, ny : i32, nz : i32, own : i32) : f32 {
+    var sum : f32 = 0;
+    var last = own;
+    var p = start;
+    var steps = 0;
+    while steps < 64 {
+        p = p + dir * LIGHT_CELL;
+        const c = cellOf(p, lo, nx, ny, nz);
+        if c < 0 { break; }
+        if c != last {
+            sum += density.values[c];
+            last = c;
+        }
+        steps += 1;
+    }
+    return sum;
+}
+
+fn generate(seed : u32, form : Form, material : []const u8) : Mesh {
+    return generateSized(seed, form, material, false);
+}
+
+// The big tree: the trunk and the branches of the first levels are BIG_SIZE times longer and thicker, and have more children (BIG_COUNT_*), so the crown has about three
+// times more sprays. The detail of everything is the same, the sprays and their leaves are not scaled.
+const BIG_SIZE : f32 = 1.45;
+const BIG_COUNT_0 : i32 = 12;
+const BIG_COUNT_1 : i32 = 10;
+const BIG_COUNT_2 : i32 = 7;
+
+fn generateSized(seed : u32, form : Form, material : []const u8, big : bool) : Mesh {
+    const grow : f32 = big ? BIG_SIZE : 1.0;
+    const moss_ridges = form == Form.SPIRAL;
+    const meadow = form == Form.MEADOW;
+    random.seed(seed, 91823471);
+    const fields = bark.ridgeFields();
+    var wood = empty();
+    var leaves = empty();
+    array.reserve(&wood.vertices, 223000);
+    array.reserve(&wood.indices, 977000);
+    array.reserve(&leaves.vertices, 730000);
+    array.reserve(&leaves.indices, 2050000);
+
+    var branches = array.init(Branch);
+    var points = array.init(vec3.Vec3);
+    var dirs = array.init(vec3.Vec3);
+    var radii = array.init(f32);
+    const stem_length : f32 = grow * (moss_ridges ? lengthOf(0) : (meadow ? 8.2 : 5.6));
+    const crown_base : f32 = moss_ridges ? 0.35 : (meadow ? 0.145 : 0.21);
+    const stem_radius : f32 = grow * (moss_ridges ? TRUNK_RADIUS : (meadow ? 0.43 : 0.27));
+    const trunk : Branch = { { 0.0, 0.0, 0.0 }, { 0.0, 1.0, 0.0 }, stem_length, stem_radius, 0 };
+    array.push(&branches, trunk);
+
+    // the branches are processed in the order they were made, so the children of a level come after all of the level
+    var i : isize = 0;
+    while i < branches.size {
+        const b = branches.values[i];
+        if b.level == SPRAY_LEVEL { break; }	// from here the branches are the places of sprays
+        i += 1;
+        growBranch(&wood, b, fields, form, &points, &dirs, &radii);
+        const rows = rowsOf(b.level);
+
+        // children: spread around the branch by the golden angle, leaning away from it, from the upper part of it
+        var count = childrenOf(b.level);
+        if big {
+            if b.level == 0 { count = BIG_COUNT_0; }
+            else if b.level == 1 { count = BIG_COUNT_1; }
+            else if b.level == 2 { count = BIG_COUNT_2; }
+        }
+        if meadow {
+            if b.level == 0 { count = 18; }
+            else if b.level == 1 { count = 6; }
+            else if b.level == 2 { count = 5; }
+        }
+        const turn = random.randFloat() * 6.2831853;
+        for k in 0..count {
+            const low : f32 = b.level == 0 ? crown_base : 0.2;
+            const t = low + (0.95 - low) * (((k as f32) + random.randFloat()) / (count as f32));
+            const idx = (t * (rows as f32)) as isize;
+            const p = points.values[idx];
+            const d = dirs.values[idx];
+            const side = sideOf(d);
+            const up = vec3.cross(d, side);
+            const phi = turn + (k as f32) * 2.3999632 + rnd() * 0.4;
+            var lean = 0.55 + 0.35 * rnd() + 0.08 * (b.level as f32);
+            const upright_limb = form == Form.UPRIGHT and b.level == 0;
+            // the plain tree: branches spread wider, the limbs on the upper part of the trunk are not almost parallel to it (about 43 degrees instead of 22 at the top)
+            if form == Form.UPRIGHT { lean += 0.22; }
+            if upright_limb { lean *= 1.30 - 0.35 * t; }
+            // Stagger limbs around a common vertical axis even where the trunk
+            // changes direction. Adjacent sprays overlap across height bands.
+            const meadow_limb = meadow and b.level == 0;
+            const leader = meadow_limb and (k == 2 or k == 7 or k == 11);
+            if meadow_limb {
+                lean = leader ? 0.54 + 0.12 * rnd() : 1.39 - 0.46 * t + 0.12 * rnd();
+            }
+            const around = side * math.cos(phi) + up * math.sin(phi);
+            var dir = vec3.normalizeSafe(d * math.cos(lean) + around * math.sin(lean) + vec3.Vec3 { 0.0, 0.2, 0.0 });
+            if meadow_limb {
+                dir = vec3.normalizeSafe(vec3.Vec3 {math.cos(phi)*math.sin(lean), math.cos(lean), math.sin(phi)*math.sin(lean)} + d * 0.08);
+            }
+            if meadow and b.level > 0 {
+                // Low branches fan sideways and turn up at the tips.
+                const floor_y = -0.12 - 0.48 * bark.smooth(2.0, 4.5, p.y);
+                if b.level == 1 {
+                    // Sweep the outer sprays of the low scaffolds down into
+                    // the skirt; keep enough clearance above the ground.
+                    dir.y -= 0.64 * (1 - bark.smooth(2.2, 4.6, b.origin.y))
+                        * bark.smooth(0.30, 0.85, t);
+                }
+                dir.y = math.max(dir.y, floor_y);
+                dir = vec3.normalizeSafe(dir);
+            }
+            var length = lengthOf(b.level + 1) * (0.8 + 0.4 * random.randFloat());
+            if b.level + 1 < SPRAY_LEVEL { length *= grow; }	// the places of the sprays keep their size
+            if upright_limb { length *= 1.22 - 0.88 * t; }
+            else if meadow_limb {
+                length *= leader ? 1.46 : 1.55 + 0.28 * math.sin(math.pi * t) - 1.07 * t;
+            }
+            else if meadow and b.level == 1 { length *= 1.20; }
+            else if form == Form.UPRIGHT { length *= 0.80; }
+            // A child is half as thick as the parent where it grows, and the parent tapers to a third, so a branch that grows near the tip of a thin parent
+            // would be a hair after four levels. No branch is thinner than 1/80 of its length.
+            const radius = math.max(radii.values[idx] * (leader ? 0.72 : 0.5), length / 80.0);
+            const child : Branch = { p, dir, length, radius, b.level + 1 };
+            array.push(&branches, child);
+        }
+    }
+
+    const places = branches.values[i:branches.size];
+
+    // the sprays: every shape in every tier of density, built once
+    var spray_wood = array.init(Mesh);
+    var spray_leaves = array.init(Mesh);
+    for tier in 0..SPRAY_TIERS {
+        for shape in 0..SPRAY_SHAPES {
+            var sw = empty();
+            var sl = empty();
+            buildSpray(&sw, &sl, fields, form, sprayPrune(tier), sprayUp(shape));
+            array.push(&spray_wood, sw);
+            array.push(&spray_leaves, sl);
+        }
+    }
+
+    // the grid of the foliage: nine points of every place, in three rings around its axis, where the twigs are
+    var lo : vec3.Vec3 = places[0].origin;
+    var hi : vec3.Vec3 = places[0].origin;
+    for j in 0..places.length {
+        const a = places[j].origin;
+        const e = a + places[j].dir * places[j].length;
+        lo = vec3.Vec3 { math.min(lo.x, math.min(a.x, e.x)), math.min(lo.y, math.min(a.y, e.y)), math.min(lo.z, math.min(a.z, e.z)) };
+        hi = vec3.Vec3 { math.max(hi.x, math.max(a.x, e.x)), math.max(hi.y, math.max(a.y, e.y)), math.max(hi.z, math.max(a.z, e.z)) };
+    }
+    lo = lo - vec3.Vec3 { LIGHT_CELL, LIGHT_CELL, LIGHT_CELL };
+    const nx = ((hi.x - lo.x) / LIGHT_CELL) as i32 + 2;
+    const ny = ((hi.y - lo.y) / LIGHT_CELL) as i32 + 2;
+    const nz = ((hi.z - lo.z) / LIGHT_CELL) as i32 + 2;
+    var density = array.init(f32);
+    const empty_cell : f32 = 0;
+    for c in 0..(nx * ny * nz) { array.push(&density, empty_cell); }
+    for j in 0..places.length {
+        const first = sideOf(places[j].dir);
+        const second = vec3.cross(places[j].dir, first);
+        for s in 0..3 {
+            const u = 0.3 + 0.35 * s as f32;
+            for a in 0..3 {
+                const angle = a as f32 * 2.0943951;
+                const radial = first * math.cos(angle) + second * math.sin(angle);
+                const c = cellOf(places[j].origin + places[j].dir * (places[j].length * u) + radial * (places[j].length * 0.4 * (0.5 + 0.5 * u)), lo, nx, ny, nz);
+                if c >= 0 { density.values[c] += SPRAY_WEIGHT; }
+            }
+        }
+    }
+
+    // the sprays are placed: the more light a place gets, the fuller the spray
+    const sky : vec3.Vec3 = { 0.0, 1.0, 0.0 };
+    for j in 0..places.length {
+        const place = places[j];
+        const mid = place.origin + place.dir * (place.length * 0.65);
+        const own = cellOf(mid, lo, nx, ny, nz);
+        // the sky is a hemisphere: straight up and five rays 40 degrees from it, evenly around it, so no side is favoured
+        var shade = shadowAlong(density, mid, sky, lo, nx, ny, nz, own);
+        for k in 0..5 {
+            const azimuth = k as f32 * 1.2566371 + 0.3;
+            const ray = vec3.Vec3 { 0.6428 * math.cos(azimuth), 0.7660, 0.6428 * math.sin(azimuth) };
+            shade += shadowAlong(density, mid, ray, lo, nx, ny, nz, own);
+        }
+        shade = shade / 6.0;
+        const open = 1.0 / (1.0 + LIGHT_ABSORPTION * shade);
+        const keep = 1.0 - 0.92 * (1 - bark.smooth(0.08, 0.35, open * open));	// the share of the twigs that live here
+
+        // the random numbers are always drawn, so that a place does not change what the others get
+        const shape = sprayShapeOf(place.dir);
+        const roll = 0.3 * rnd();	// a little, so that the leaves stay horizontal
+        const size = math.sqrt(place.length / sprayLength(form));
+        const gone = j as f32 * 0.618034;
+        // a place in deep shade has no spray at all, in most of the cases
+        if keep >= 0.12 or gone - math.floor(gone) >= 0.7 {
+            const tier = keep > 0.8 ? 0 : (keep > 0.45 ? 1 : (keep > 0.18 ? 2 : 3));
+            const first = sideOf(place.dir);
+            const ex = first * math.cos(roll) + vec3.cross(place.dir, first) * math.sin(roll);
+            const ez = vec3.cross(ex, place.dir);
+            const which = tier * SPRAY_SHAPES + shape;
+            placeCopy(&wood, spray_wood.values[which], place.origin, ex, place.dir, ez, size);
+            placeCopy(&leaves, spray_leaves.values[which], place.origin, ex, place.dir, ez, size);
+        }
+    }
+    for j in 0..spray_wood.size {
+        deinit(&spray_wood.values[j]);
+        deinit(&spray_leaves.values[j]);
+    }
+    array.deinit(&spray_wood);
+    array.deinit(&spray_leaves);
+    array.deinit(&density);
+
+    array.deinit(&branches);
+    array.deinit(&points);
+    array.deinit(&dirs);
+    array.deinit(&radii);
+    return merge(withMaterial(wood, material), withMaterial(leaves, "leaf"));
+}

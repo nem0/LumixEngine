@@ -24,8 +24,11 @@
 #include "engine/world.h"
 #include "evox_render.h"
 #include "font.h"
+#include "gpu_scene.h"
+#include "gpu_scene_chunks.h"
 #include "gpu/gpu.h"
 #include "material.h"
+#include "mesh_clusters.h"
 #include "model.h"
 #include "particle_system.h"
 #include "pipeline.h"
@@ -41,9 +44,6 @@ namespace Lumix {
 namespace {
 
 enum class DrawCommandTypes : u8 {
-	MESH,
-	AUTOINSTANCED,
-	SKINNED,
 	DECAL,
 	CURVE_DECAL,
 	PARTICLES,
@@ -63,16 +63,11 @@ static LUMIX_FORCE_INLINE u32 floatFlip(u32 float_bits_value) {
 
 // sort key:
 // bucket 64-56
-// instanced_flag 55
-// depth bits 31 - 0; if bucket is depth sorted, must be not instanced
-// mesh key 31 - 8; if bucket is not depth sorted and not instanced
-// instancer 31 - 16; if instanced
-// instance group 15 - 0; if instanced
+// depth bits 31 - 0; if bucket is depth sorted
+// mesh key 31 - 8; if bucket is not depth sorted
 
 static constexpr u64 SORT_KEY_BUCKET_SHIFT = 56;
-static constexpr u64 SORT_KEY_INSTANCED_FLAG = (u64)1 << 55;
 
-static constexpr u64 SORT_VALUE_INSTANCER_SHIFT = 16;
 static constexpr u64 SORT_VALUE_EMITTER_SHIFT = 40;
 static constexpr u32 SORT_VALUE_TYPE_MASK = (1 << 5) - 1;
 static constexpr u64 SORT_VALUE_MESH_IDX_SHIFT = 40;
@@ -88,19 +83,6 @@ LUMIX_FORCE_INLINE SortKey makeDecalSortKey(const Material* material, u8 bucket)
 
 LUMIX_FORCE_INLINE SortKey makeParticleSortKey(const Material* material, u8 bucket) {
 	return SortKey(material->getSortKey() | ((u64)bucket << SORT_KEY_BUCKET_SHIFT));
-}
-
-LUMIX_FORCE_INLINE SortKey makeMeshSortKey(const MeshMaterial& mesh_math, u8 bucket) {
- 	return SortKey(mesh_math.sort_key | ((u64)bucket << SORT_KEY_BUCKET_SHIFT));
-}
-
-LUMIX_FORCE_INLINE SortKey makeDepthSortKey(float depth_squared, u8 bucket) {
-	const u32 depth_bits = floatFlip(*(u32*)&depth_squared);
-	return SortKey(depth_bits | ((u64)bucket << SORT_KEY_BUCKET_SHIFT));
-}
-
-LUMIX_FORCE_INLINE SortKey makeAutoInstancedSortKey(i32 instancer_index, u8 bucket) {
-	return SortKey(instancer_index | SORT_KEY_INSTANCED_FLAG | ((u64)bucket << SORT_KEY_BUCKET_SHIFT));
 }
 
 // sort value makers
@@ -132,26 +114,6 @@ LUMIX_FORCE_INLINE SortValue makeCurveDecalSortValue(EntityPtr entity) {
 	return SortValue(entity.index | (u64(DrawCommandTypes::CURVE_DECAL) << SORT_VALUE_TYPE_SHIFT));
 }
 
-LUMIX_FORCE_INLINE SortValue makeSkinnedSortValue(EntityPtr entity, u32 mesh_idx) {
-	return SortValue(entity.index | (u64(DrawCommandTypes::SKINNED) << SORT_VALUE_TYPE_SHIFT) | ((u64)mesh_idx << SORT_VALUE_MESH_IDX_SHIFT));
-}
-
-LUMIX_FORCE_INLINE SortValue makeMeshSortValue(EntityPtr entity, u32 mesh_idx) {
-	return SortValue(entity.index | (u64(DrawCommandTypes::MESH) << SORT_VALUE_TYPE_SHIFT) | ((u64)mesh_idx << SORT_VALUE_MESH_IDX_SHIFT));
-}
-
-LUMIX_FORCE_INLINE SortValue makeAutoInstancedSortValue(u32 batch_idx, u32 instancer_idx) {
-	return SortValue(batch_idx | (instancer_idx << SORT_VALUE_INSTANCER_SHIFT) | (u64(DrawCommandTypes::AUTOINSTANCED) << SORT_VALUE_TYPE_SHIFT));
-}
-
-
-struct Indirect {
-	u32 vertex_count;
-	u32 instance_count;
-	u32 first_index;
-	u32 base_vertex;
-	u32 base_instance;
-};
 
 struct GlobalState {
 	struct SMSlice {
@@ -174,6 +136,7 @@ struct GlobalState {
 	Matrix camera_prev_view_projection_no_jitter;
 	Matrix camera_inv_view_projection;
 	Matrix camera_reprojection;
+	Matrix camera_ws_to_prev_ndc_no_jitter;	// camera_reprojection * camera_view_projection_no_jitter, the vertex shaders of meshes do it for every vertex otherwise
 	Vec4 cam_world_pos;
 	Vec4 view_dir;
 	Vec4 fog_scattering;
@@ -273,6 +236,17 @@ struct ShadowAtlas {
 static const float SHADOW_CAM_FAR = 500.0f;
 
 } // anonymous namespace
+
+void bindPulledBuffers(DrawStream& stream, UniformPool& pool, gpu::BufferHandle vertices, gpu::BufferHandle instances, u32 instances_offset, gpu::BufferHandle bones) {
+	const Mesh::VertexBufferBinding binding = {
+		gpu::getBindlessHandle(vertices).value,
+		instances ? gpu::getBindlessHandle(instances).value : 0,
+		instances_offset,
+		bones ? gpu::getBindlessHandle(bones).value : 0
+	};
+	const TransientSlice slice = alloc(pool, &binding, sizeof(binding));
+	stream.bindUniformBuffer(UniformBuffer::VERTEX_BUFFER, slice.buffer, slice.offset, slice.size);
+}
 
 // use to wait for all jobs in the group to finish
 struct JobsGroup {
@@ -451,113 +425,50 @@ struct PipelineImpl final : Pipeline {
 		Array<u64> values;
 	};
 
-	// group the instances so the whole group is just one element when sorting
-	struct AutoInstancer {
-		struct alignas(4096) Page {
-			struct Header {
-				Page* next = nullptr;;
-				u32 count = 0;
-			};
-
-			struct Group {
-				u64 renderables[14];
-				Group* next = nullptr;
-				u32 count = 0;
-				u32 offset = 0;
-			};
-
-			Header header;
-			Group groups[(PageAllocator::PAGE_SIZE - sizeof(Header)) / sizeof(Group)];
-		};
-		
-		static_assert(sizeof(Page) == PageAllocator::PAGE_SIZE);
-
-		AutoInstancer(ArenaAllocator& allocator, PageAllocator& page_allocator)
-			: instances(allocator)
-			, page_allocator(page_allocator)
-		{
-			last_page = first_page = getNewPage();
-		}
-
-		AutoInstancer(AutoInstancer&& rhs)
-			: instances(rhs.instances.move())
-			, last_page(rhs.last_page)
-			, first_page(rhs.first_page)
-			, page_allocator(rhs.page_allocator)
-		{
-			ASSERT(rhs.first_page == rhs.last_page);
-			rhs.last_page = rhs.first_page = nullptr;
-		}
-
-		void operator=(AutoInstancer&&) = delete;
-
-		void init(u32 count) {
-			instances.resize(count);
-			memset(instances.begin(), 0, instances.byte_size());
-		}
-
-		~AutoInstancer() {
-			Page* p = first_page;
-			while (p) {
-				Page* next = p->header.next;
-				page_allocator.deallocate(p);
-				p = next;
-			}
-		}
-
-		void add(u32 sort_key, u64 renderable) {
-			Page::Group* g = instances[sort_key].end;
-			if (!g || g->count == lengthOf(g->renderables)) {
-				Page::Group* n = getNewGroup();
-				if (g) {
-					n->offset = g->offset + g->count;
-					g->next = n;
-				}
-				else {
-					ASSERT(!instances[sort_key].begin);
-					instances[sort_key].begin = n;
-				}
-				g = n;
-				instances[sort_key].end = g;
-			}
-
-			g->renderables[g->count] = renderable;
-			++g->count;
-		}
-
-		Page* getNewPage() {
-			void* mem = page_allocator.allocate();
-			Page* p = new (NewPlaceholder(), mem) Page;
-			return p;
-		}
-
-		Page::Group* getNewGroup() {
-			if (last_page->header.count == lengthOf(last_page->groups)) {
-				Page* p = getNewPage();
-				last_page->header.next = p;
-				last_page = p;
-			}
-			Page::Group* g = &last_page->groups[last_page->header.count];
-			++last_page->header.count;
-			return g;
-		}
-
-		struct Instances {
-			Page::Group* begin;
-			Page::Group* end;
-			TransientSlice slice;
-		};
-
-		Array<Instances> instances;
-		Page* last_page = nullptr;
-		Page* first_page = nullptr;
-		PageAllocator& page_allocator;
+	// The uniforms of nanite.hlsl
+	struct ClusterViewUniforms {
+		Vec4 planes[6];
+		Vec4 cull_offset;		// camera of the culling - camera of the drawing, added to the positions that culling tests
+		float lod_k;
+		u32 is_ortho;
+		float attribute_weight;
+		u32 tree_depth;
+		gpu::BindlessHandle items;
+		u32 items_offset;
+		u32 item_capacity;
+		gpu::RWBindlessHandle scratch;
+		u32 scratch_size;
+		u32 selected_capacity;
+		gpu::RWBindlessHandle selected;
+		gpu::BindlessHandle counts;
+		i32 cam_p[3];			// the camera in the fixed point of the GPU scene
+		u32 tree_groups;		// groups of the dispatch of the trees at most, each has a slice of the scratch buffer
+		float cam_frac[3];
+		gpu::BindlessHandle meshes;
+		gpu::BindlessHandle instances;	// the model instances of the GPU scene
+		gpu::BindlessHandle chunks;		// the chunks of instanced models
+		gpu::BindlessHandle cluster_data;	// the buffer with clusters and nodes of all meshes
+		u32 scratch_slice;		// u32 of the slice of a group in the scratch buffer: two lists of the largest mesh
+		gpu::RWBindlessHandle feedback;	// streaming of clusters, see Renderer::getClusterFeedbackBuffer
+		u32 padding2;
+		u32 feedback_capacity;			// groups in the feedback, 0: no feedback
+		u32 padding3;
+		// occlusion culling, see nanite.hlsl
+		Vec4 prev_vp[4];
+		Vec4 cur_vp[4];
+		Vec4 prev_delta;
+		u32 hzb_mode;
+		gpu::BindlessHandle hzb_prev;
+		gpu::BindlessHandle hzb_cur;
+		u32 hzb_mips;
+		float hzb_size[2];
+		float hzb_padding[2];
 	};
-	
+	static_assert(sizeof(ClusterViewUniforms) % 16 == 0);
+
 	struct View {
 		View(ArenaAllocator& allocator, PageAllocator& page_allocator) 
 			: sorter(allocator, page_allocator)
-			, instancers(allocator)
 			, buckets(allocator)
 		{}
 		~View() {
@@ -569,12 +480,22 @@ struct PipelineImpl final : Pipeline {
 		void operator=(View&&) = delete;
 
 		Array<Bucket> buckets;
-		Array<AutoInstancer> instancers;
 		Sorter sorter;
 		CullResult* renderables = nullptr;
 		CameraParams cp;
 		u8 layer_to_bucket[255];
 		jobs::Signal ready;
+
+		// Occlusion culling in two passes (Pipeline::cull with `occlusion`), the values are copied when the view is made and when the pyramid of the frame is built: the
+		// culling runs in jobs, the pipeline changes them.
+		bool occlusion = false;			// the first pass skips the clusters that the pyramid of the previous frame hides, renderPostCull draws the visible ones
+		bool hzb_prev_valid = false;	// there is a pyramid of the previous frame (without it nothing is skipped)
+		gpu::TextureHandle hzb_prev = gpu::INVALID_TEXTURE;
+		gpu::TextureHandle hzb_cur = gpu::INVALID_TEXTURE;	// the pyramid made after the first pass
+		Vec4 hzb_prev_vp[4];
+		DVec3 hzb_prev_pos;
+		u32 hzb_mips = 0;
+		IVec2 hzb_size = IVec2(0, 0);
 	};
 
 	PipelineImpl(Renderer& renderer, PipelineType type, IAllocator& allocator)
@@ -589,13 +510,7 @@ struct PipelineImpl final : Pipeline {
 		, m_buffers(m_allocator)
 		, m_views(m_allocator)
 		, m_render_states(m_allocator)
-		, m_base_vertex_decl(gpu::PrimitiveType::TRIANGLES)
-		, m_base_line_vertex_decl(gpu::PrimitiveType::LINES)
-		, m_decal_decl(gpu::PrimitiveType::TRIANGLES)
-		, m_curve_decal_decl(gpu::PrimitiveType::TRIANGLES)
-		, m_2D_decl(gpu::PrimitiveType::TRIANGLES)
 		, m_instance_data(m_allocator)
-		, m_material_override_refresh_queue(m_allocator)
 	{
 		m_viewport.w = m_viewport.h = 800;
 		ResourceManagerHub& rm = renderer.getEngine().getResourceManager();
@@ -603,7 +518,10 @@ struct PipelineImpl final : Pipeline {
 		m_draw2d_shader = rm.load<Shader>(Path("engine/shaders/draw2d.hlsl"));
 		m_downscale_depth_shader = rm.load<Shader>(Path("engine/shaders/downscale_depth.hlsl"));
 		m_debug_shape_shader = rm.load<Shader>(Path("engine/shaders/debug_shape.hlsl"));
-		m_instancing_shader = rm.load<Shader>(Path("engine/shaders/instancing.hlsl"));
+		m_cluster_shader = rm.load<Shader>(Path("engine/shaders/nanite.hlsl"));
+		m_scene_cull_shader = rm.load<Shader>(Path("engine/shaders/gpu_scene_cull.hlsl"));
+		m_hzb_shader = rm.load<Shader>(Path("engine/shaders/hzb.hlsl"));
+		m_scene_variants_shader = rm.load<Shader>(Path("engine/shaders/gpu_scene_variants.hlsl"));
 		m_flatten_shader = rm.load<Shader>(Path("engine/shaders/flatten_cube.hlsl"));
 		
 		m_draw2d.clear();
@@ -639,37 +557,20 @@ struct PipelineImpl final : Pipeline {
 		const Renderer::MemRef ib_mem = m_renderer.copy(cube_indices, sizeof(cube_indices));
 		m_cube_ib = m_renderer.createBuffer(ib_mem, gpu::BufferFlags::IMMUTABLE, "cube_indices");
 
-		const Renderer::MemRef ind_mem = { 64 * 1024, nullptr, false }; // TODO size
-		m_indirect_buffer = m_renderer.createBuffer(ind_mem, gpu::BufferFlags::SHADER_BUFFER, "indirect");
+		createClusterBuffers();
 
-		m_base_vertex_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
-		m_base_vertex_decl.addAttribute(12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
 
-		m_base_line_vertex_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
-		m_base_line_vertex_decl.addAttribute(12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
 
-		m_decal_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
-		m_decal_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		m_decal_decl.addAttribute(12, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		m_decal_decl.addAttribute(28, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		m_decal_decl.addAttribute(40, 2, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		m_decal_decl.addAttribute(48, 1, gpu::AttributeType::U32, gpu::Attribute::INSTANCED);
+		// decals pull vertices of the cube (float3 positions) and their instances, see decal.hlsl
+		const AttributeSemantic cube_semantics[] = { AttributeSemantic::POSITION };
+		VertexDecl cube_decl;
+		cube_decl.addAttribute(0, 3, AttributeType::FLOAT, 0);
+		m_cube_pulling_defines = m_renderer.getSemanticDefines(Span(cube_semantics), cube_decl, 12);
 
-		m_curve_decal_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, 0);
-		m_curve_decal_decl.addAttribute(0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		m_curve_decal_decl.addAttribute(12, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		m_curve_decal_decl.addAttribute(28, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		m_curve_decal_decl.addAttribute(40, 2, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		m_curve_decal_decl.addAttribute(48, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-
-		m_2D_decl.addAttribute(0, 2, gpu::AttributeType::FLOAT, 0);
-		m_2D_decl.addAttribute(8, 2, gpu::AttributeType::FLOAT, 0);
-		m_2D_decl.addAttribute(16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
 
 		if (m_type == PipelineType::PREVIEW) m_clear_color = { 0.2f, 0.2f, 0.2f };
 
-		m_autoinstanced_define_idx = m_renderer.getShaderDefineIdx("AUTOINSTANCED");
-		m_dynamic_define_idx = m_renderer.getShaderDefineIdx("DYNAMIC");
+		m_mesh_instance_define_idx = m_renderer.getShaderDefineIdx("MESH_INSTANCE");
 		m_skinned_define_idx = m_renderer.getShaderDefineIdx("SKINNED");
 		m_mesh_particle_define_idx = m_renderer.getShaderDefineIdx("MESH_PARTICLE");
 	}
@@ -689,12 +590,27 @@ struct PipelineImpl final : Pipeline {
 		m_draw2d_shader->decRefCount();
 		m_downscale_depth_shader->decRefCount();
 		m_debug_shape_shader->decRefCount();
-		m_instancing_shader->decRefCount();
+		m_cluster_shader->decRefCount();
+		m_scene_cull_shader->decRefCount();
+		m_hzb_shader->decRefCount();
+		for (gpu::TextureHandle t : m_hzb) {
+			if (t) stream.destroy(t);
+		}
+		m_scene_variants_shader->decRefCount();
 		m_flatten_shader->decRefCount();
 
 		stream.destroy(m_cube_ib);
 		stream.destroy(m_cube_vb);
-		stream.destroy(m_indirect_buffer);
+		if (m_cluster_iota) stream.destroy(m_cluster_iota);
+		if (m_scene_cull_counter) stream.destroy(m_scene_cull_counter);
+		if (m_scene_cull_args) stream.destroy(m_scene_cull_args);
+		if (m_scene_flat_items) stream.destroy(m_scene_flat_items);
+		if (m_scene_tree_items) stream.destroy(m_scene_tree_items);
+		if (m_scene_chunk_items) stream.destroy(m_scene_chunk_items);
+		if (m_scene_selected) stream.destroy(m_scene_selected);
+		if (m_scene_counters) stream.destroy(m_scene_counters);
+		if (m_scene_commands) stream.destroy(m_scene_commands);
+		if (m_scene_out) stream.destroy(m_scene_out);
 		stream.destroy(m_shadow_atlas.texture);
 		stream.destroy(m_cluster_buffers.clusters.buffer);
 		stream.destroy(m_cluster_buffers.lights.buffer);
@@ -985,7 +901,7 @@ struct PipelineImpl final : Pipeline {
 		stream.clear(flags, &color.x, depth);
 	}
 
-	u32 cull(const CameraParams& cp, Span<const BucketDesc> buckets) override {
+	u32 cull(const CameraParams& cp, Span<const BucketDesc> buckets, bool occlusion = false) override {
 		PROFILE_FUNCTION();
 
 		UniquePtr<View>& view = m_views.emplace();
@@ -993,6 +909,28 @@ struct PipelineImpl final : Pipeline {
 		view = UniquePtr<View>::create(allocator, allocator, m_renderer.getEngine().getPageAllocator());
 		view->cp = cp;
 		memset(view->layer_to_bucket, 0xff, sizeof(view->layer_to_bucket));
+
+		// Occlusion culling: the pyramids are created here, the culling of the view (a job) uses the one of the previous frame. A camera that is not the main one (shadows, ortho
+		// cameras, the frozen camera of the clusters) is culled as before. Without a pyramid of the previous frame the first pass skips nothing.
+		// While the camera of the clusters is frozen the pyramids are not updated: the one the frozen camera made in its last frame is what the culling tests with (first pass only,
+		// there is no second pass), so the occlusion culling is frozen with the rest of the culling. m_cluster_frozen is set by the culling job of the frame the freezing starts in,
+		// that frame is still culled and its pyramid is made as usual.
+		const bool hzb_frozen = m_cluster_frozen && m_cluster_freeze_camera;
+		if (occlusion && !cp.is_shadow && cp.projection.columns[3].w != 1.f && ensureOcclusionPyramids()) {
+			view->occlusion = true;
+			view->hzb_prev_valid = m_hzb_prev_valid;
+			view->hzb_prev = m_hzb[m_hzb_prev];
+			view->hzb_cur = m_hzb[1 - m_hzb_prev];
+			view->hzb_prev_pos = m_hzb_prev_pos;
+			for (u32 i = 0; i < 4; ++i) view->hzb_prev_vp[i] = m_hzb_prev_vp[i];
+			view->hzb_size = m_hzb_size;
+			view->hzb_mips = m_hzb_mips;
+			if (!hzb_frozen) {
+				m_hzb_frame_cp = cp;
+				m_hzb_frame_cp_valid = true;
+				m_hzb_cur_built = false;
+			}
+		}
 
 		view->buckets.reserve(buckets.length());
 		for (const BucketDesc& desc : buckets) {
@@ -1012,12 +950,10 @@ struct PipelineImpl final : Pipeline {
 			view->layer_to_bucket[bucket.layer] = i;
 		}
 
-		if (m_instancing_shader->isReady()) {
-			const HashMap<EntityRef, InstancedModel>& ims = m_module->getInstancedModels();
-			for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
-				if (iter.value().dirty) {
-					m_module->initInstancedModelGPUData(iter.key());
-				}
+		const HashMap<EntityRef, InstancedModel>& ims = m_module->getInstancedModels();
+		for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
+			if (iter.value().dirty) {
+				m_module->initInstancedModelGPUData(iter.key());
 			}
 		}
 
@@ -1027,10 +963,15 @@ struct PipelineImpl final : Pipeline {
 		m_sort_keys_group.beginJob();
 		m_renderer.pushJob("prepare view", [this, view_ptr](DrawStream& stream) {
 			setupParticles(*view_ptr);
-			encodeInstancedModels(stream, *view_ptr);
 			encodeProceduralGeometry(*view_ptr);
 
-			view_ptr->renderables = m_module->getRenderables(view_ptr->cp.frustum);
+			updateClusterFreeze(*view_ptr);
+			// with the frozen camera the instances of its frustum are culled, as the clusters are
+			view_ptr->renderables = m_module->getRenderables(!view_ptr->cp.is_shadow && m_cluster_frozen ? m_cluster_frozen_cp.frustum : view_ptr->cp.frustum);
+
+			// Model instances that the GPU scene can draw (meshes with clusters or with buffers of their own, skinned too) and instanced models with clusters are
+			// culled and drawn by the GPU. They are not in the culling system, so this does not depend on its result (it is empty if there are no lights or decals in the view).
+			runGPUSceneCulling(stream, view_ptr);
 
 			if (view_ptr->renderables) {
 				if (view_ptr->renderables->header.count != 0 || view_ptr->renderables->header.next) {
@@ -1044,10 +985,8 @@ struct PipelineImpl final : Pipeline {
 				
 			if (!view_ptr->sorter.keys.empty()) {
 				radixSort(view_ptr->sorter.keys.begin(), view_ptr->sorter.values.begin(), view_ptr->sorter.keys.size());
-				// Wait for all createSortKeys jobs to finish, ensuring no more pose processing jobs will be created.
+				// Wait for all createSortKeys jobs to finish
 				m_sort_keys_group.wait(); 
-				// Wait for all pose processing jobs to finish, because we use the pose transient slices in createCommands.
-				jobs::wait(&m_poses_done);
 				createCommands(*view_ptr);
 			}
 			
@@ -1063,6 +1002,113 @@ struct PipelineImpl final : Pipeline {
 			jobs::wait(&view->ready);
 			Bucket& bucket = view->buckets[bucket_idx];
 			stream.merge(bucket.stream);
+		});
+	}
+
+	// rows of the matrix, so that the shader gets `clip = float4(dot(rows[0], p), dot(rows[1], p), dot(rows[2], p), dot(rows[3], p))` for a position `p` (w = 1)
+	static void setMatrixRows(const Matrix& m, Vec4* rows) {
+		rows[0] = Vec4(m.columns[0].x, m.columns[1].x, m.columns[2].x, m.columns[3].x);
+		rows[1] = Vec4(m.columns[0].y, m.columns[1].y, m.columns[2].y, m.columns[3].y);
+		rows[2] = Vec4(m.columns[0].z, m.columns[1].z, m.columns[2].z, m.columns[3].z);
+		rows[3] = Vec4(m.columns[0].w, m.columns[1].w, m.columns[2].w, m.columns[3].w);
+	}
+
+	// The two pyramids of depths (R32F, all the levels but the first one, the texture is half of the size of the viewport and its mip i is the level i + 1 of nanite.hlsl): the one
+	// that the frame before made (m_hzb[m_hzb_prev]) and the one of this frame. Made again if the size of the viewport changed. False if the shaders are not ready.
+	bool ensureOcclusionPyramids() {
+		if (!m_hzb_shader->isReady()) return false;
+		const IVec2 size(maximum(m_viewport.w, 1), maximum(m_viewport.h, 1));
+		if (maximum(size.x, size.y) < 2) return false;
+		if (m_hzb[0] && m_hzb[1] && m_hzb_size == size) return true;
+		DrawStream& end_frame_stream = m_renderer.getEndFrameDrawStream();
+		for (gpu::TextureHandle& t : m_hzb) {
+			if (t) end_frame_stream.destroy(t);
+			t = m_renderer.createTexture(maximum(size.x >> 1, 1), maximum(size.y >> 1, 1), 1, gpu::TextureFormat::R32F, gpu::TextureFlags::COMPUTE_WRITE, Renderer::MemRef(), "occlusion pyramid");
+		}
+		m_hzb_size = size;
+		m_hzb_mips = 1 + log2((u32)maximum(size.x, size.y));
+		m_hzb_prev = 0;
+		m_hzb_prev_valid = false;
+		return m_hzb[0] && m_hzb[1];
+	}
+
+	void buildHZB(RenderBufferHandle depth, bool final) override {
+		if (!m_hzb_frame_cp_valid || !m_hzb[0] || !m_hzb[1] || !m_hzb_shader->isReady() || depth == INVALID_RENDERBUFFER) return;
+		if (m_hzb_size != IVec2(m_viewport.w, m_viewport.h)) return;	// the size changed since the view was culled
+
+		DrawStream& stream = m_renderer.getDrawStream();
+		DrawStream& end_frame_stream = m_renderer.getEndFrameDrawStream();
+		const u32 target = 1 - m_hzb_prev;
+		const gpu::TextureHandle tex = m_hzb[target];
+
+		stream.beginProfileBlock(final ? "occlusion pyramid (final)" : "occlusion pyramid", 0, false);
+		// the texture starts at the pyramid level 1: its mip `i` is the level `i + 1` (half of the size of the depth buffer for i = 0)
+		gpu::TextureHandle views[16];
+		const u32 mips = minimum(m_hzb_mips - 1, (u32)lengthOf(views));
+		for (u32 i = 0; i < mips; ++i) {
+			views[i] = gpu::allocTextureHandle();
+			stream.createTextureView(views[i], tex, 0, i);
+			end_frame_stream.destroy(views[i]);
+		}
+
+		struct {
+			u32 mode;
+			u32 src;
+			u32 dst;
+			u32 levels;
+			u32 src_size[2];
+			u32 dst_size[2];
+			u32 dst1;
+			u32 dst2;
+			u32 dst3;
+			u32 dst4;
+		} ub = {};
+		stream.barrier(tex, gpu::BarrierType::WRITE);
+		// Several levels in a dispatch, a group per texel of the last level that the dispatch makes (see hzb.hlsl). The source level s (0: the depth buffer) makes the levels
+		// s + 1 ... s + count, in the mips s ... s + count - 1 of the texture.
+		for (u32 s = 0; s < mips;) {
+			const u32 count = minimum(s == 0 ? 5u : 4u, mips - s);
+			if (s > 0) stream.memoryBarrier(tex);	// the mip s - 1 is written
+			ub.mode = s == 0 ? 0 : 1;
+			ub.levels = count;
+			ub.src = s == 0 ? toBindless(depth, stream).value : gpu::getRWBindlessHandle(views[s - 1]).value;
+			ub.src_size[0] = maximum((u32)m_hzb_size.x >> s, 1u);
+			ub.src_size[1] = maximum((u32)m_hzb_size.y >> s, 1u);
+			ub.dst = gpu::getRWBindlessHandle(views[s]).value;
+			ub.dst1 = count > 1 ? gpu::getRWBindlessHandle(views[s + 1]).value : 0;
+			ub.dst2 = count > 2 ? gpu::getRWBindlessHandle(views[s + 2]).value : 0;
+			ub.dst3 = count > 3 ? gpu::getRWBindlessHandle(views[s + 3]).value : 0;
+			ub.dst4 = count > 4 ? gpu::getRWBindlessHandle(views[s + 4]).value : 0;
+			ub.dst_size[0] = maximum(ub.src_size[0] >> count, 1u);
+			ub.dst_size[1] = maximum(ub.src_size[1] >> count, 1u);
+			setUniform(ub);
+			dispatch(*m_hzb_shader, ub.dst_size[0], ub.dst_size[1], 1);
+			s += count;
+		}
+		stream.barrier(tex, gpu::BarrierType::READ);
+		stream.endProfileBlock();
+
+		if (final) {
+			// the next frame culls with it: this one is the previous frame for it
+			m_hzb_prev = target;
+			m_hzb_prev_valid = true;
+			m_hzb_prev_pos = m_hzb_frame_cp.pos;
+			setMatrixRows(m_hzb_frame_cp.projection * m_hzb_frame_cp.view, m_hzb_prev_vp);
+			m_hzb_frame_cp_valid = false;
+			m_hzb_cur_built = false;
+		}
+		else {
+			m_hzb_cur_built = true;
+		}
+	}
+
+	void renderPostCull(u32 view_idx) override {
+		View* view = m_views[view_idx].get();
+		// without the pyramids nothing was skipped by the first pass
+		if (!view->occlusion || !view->hzb_prev_valid || !m_hzb_cur_built) return;
+		m_renderer.pushJob("cull post pass", [this, view](DrawStream& stream) {
+			jobs::wait(&view->ready);
+			runGPUSceneCulling(stream, view, true);
 		});
 	}
 
@@ -1092,11 +1138,9 @@ struct PipelineImpl final : Pipeline {
 		if (!shader.isReady()) return;
 
 		DrawStream& stream = m_renderer.getDrawStream();
-		const gpu::ProgramHandle program = shader.getProgram(state, gpu::VertexDecl(gpu::PrimitiveType::TRIANGLE_STRIP), define_mask, "");
+		const gpu::ProgramHandle program = shader.getProgram(state, gpu::PrimitiveType::TRIANGLE_STRIP, define_mask, "");
 		stream.useProgram(program);
 		stream.bindIndexBuffer(gpu::INVALID_BUFFER);
-		stream.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-		stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 		stream.drawArrays(indices_offset, indices_count);
 	}
 
@@ -1161,6 +1205,7 @@ struct PipelineImpl final : Pipeline {
 		cp.frustum = vp.getFrustum();
 		cp.lod_multiplier = m_module->getCameraLODMultiplier(vp.fov, vp.is_ortho);
 		cp.is_shadow = true;
+		cp.shadow_slice = (i32)slice;
 		cp.view = vp.getView(cp.pos);
 		cp.projection = vp.getProjectionNoJitter();
 		return cp;
@@ -1353,9 +1398,8 @@ struct PipelineImpl final : Pipeline {
 					}
 				)#";
 
-			gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
 			m_blit_screen_program = gpu::allocProgramHandle();
-			stream.createProgram(m_blit_screen_program, gpu::StateFlags::NONE, decl, src, gpu::ShaderType::SURFACE, nullptr, 0, "blit to screen");
+			stream.createProgram(m_blit_screen_program, gpu::StateFlags::NONE, gpu::PrimitiveType::TRIANGLE_STRIP, src, gpu::ShaderType::SURFACE, nullptr, 0, "blit to screen");
 		}
 
 		stream.setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
@@ -1389,6 +1433,9 @@ struct PipelineImpl final : Pipeline {
 		}
 
 		m_module->invalidateStaleMaterialOverrides();
+		m_module->flushGPUScene();	// resolves the material overrides that became ready too
+		ensureSceneWorkBuffers();
+		prepareSkinnedPoses();
 
 		m_renderer.waitCanSetup();
 
@@ -1422,6 +1469,7 @@ struct PipelineImpl final : Pipeline {
 		global_state.time = m_timer.getTimeSinceStart();
 		global_state.frame_time_delta = m_timer.getTimeSinceTick();
 		global_state.camera_reprojection = computeReprojection(m_viewport, m_prev_viewport);
+		global_state.camera_ws_to_prev_ndc_no_jitter = global_state.camera_reprojection * global_state.camera_view_projection_no_jitter;
 		m_timer.tick();
 		global_state.reflection_probes_bindless = gpu::getBindlessHandle(m_module->getReflectionProbesTexture());
 		global_state.shadow_atlas_bindless = m_shadow_atlas.texture ? gpu::getBindlessHandle(m_shadow_atlas.texture) : gpu::INVALID_BINDLESS_HANDLE;
@@ -1434,7 +1482,8 @@ struct PipelineImpl final : Pipeline {
 		global_state.view_dir = Vec4(m_viewport.rot * Vec3(0, 0, -1), 0);
 		global_state.to_prev_frame_camera_translation = Vec4(Vec3(m_viewport.pos - m_prev_viewport.pos), 1);
 		m_prev_viewport = m_viewport;
-		m_indirect_buffer_offset = 0;
+		m_scene_view_count = 0;
+		pushSceneDrawClear();
 
 		if(m_module) {
 			const EntityPtr env_entity = m_module->getActiveEnvironment();
@@ -1471,8 +1520,6 @@ struct PipelineImpl final : Pipeline {
 		stream.bindUniformBuffer(UniformBuffer::PASS, gpu::INVALID_BUFFER, 0, 0);
 		stream.bindUniformBuffer(UniformBuffer::DRAWCALL, gpu::INVALID_BUFFER, 0, 0);
 		stream.bindUniformBuffer(UniformBuffer::SHADOW, gpu::INVALID_BUFFER, 0, 0);
-		static int tmp[12] = {};
-		stream.update(m_renderer.getInstancedMeshesBuffer(), &tmp, sizeof(tmp));
 
 		ASSERT(m_views.empty());
 		
@@ -1492,7 +1539,6 @@ struct PipelineImpl final : Pipeline {
 		if (m_type == PipelineType::GAME_VIEW && !only_2d) m_renderer.saveScreenshotIfRequested(getOutput(), m_display_size);
 
 		m_views.clear();
-		refreshMaterialOverrides();
 
 		return true;
 	}
@@ -1508,11 +1554,16 @@ struct PipelineImpl final : Pipeline {
 			};
 			const Array<DebugTriangle>& tris = m_module->getDebugTriangles();
 			const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::CULL_BACK;
-			const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(state, m_base_vertex_decl, 0, "");
+			const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(state, gpu::PrimitiveType::TRIANGLES, 0, "");
 			UniformPool& uniform_pool = m_renderer.getUniformPool();
 			TransientPool& transient_pool = m_renderer.getTransientPool();
 			const TransientSlice vb = alloc(transient_pool, sizeof(BaseVertex) * tris.size() * 3);
-			const TransientSlice ub = alloc(uniform_pool, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
+			struct {
+				Matrix mtx;
+				u32 vertices; // bindless
+				u32 vertices_offset;
+			} ub_data = { Matrix::IDENTITY, gpu::getBindlessHandle(vb.buffer).value, vb.offset };
+			const TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
 			BaseVertex* vertices = (BaseVertex*)vb.ptr;
 			for (u32 i = 0, c = tris.size(); i < c; ++i) {
 				vertices[3 * i + 0].color = tris[i].color.abgr();
@@ -1524,11 +1575,9 @@ struct PipelineImpl final : Pipeline {
 			}
 			m_module->clearDebugTriangles();
 
-			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, sizeof(Matrix));
+			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 			stream.useProgram(program);
 			stream.bindIndexBuffer(gpu::INVALID_BUFFER);
-			stream.bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
-			stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 			stream.drawArrays(0, vb.size / sizeof(BaseVertex));
 		});
 	}
@@ -1544,11 +1593,16 @@ struct PipelineImpl final : Pipeline {
 			};
 			const Array<DebugLine>& lines = m_module->getDebugLines();
 			const gpu::StateFlags state = gpu::StateFlags::DEPTH_FN_GREATER | gpu::StateFlags::DEPTH_WRITE;
-			const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(state, m_base_line_vertex_decl, 0, "");
+			const gpu::ProgramHandle program = m_debug_shape_shader->getProgram(state, gpu::PrimitiveType::LINES, 0, "");
 			UniformPool& uniform_pool = m_renderer.getUniformPool();
 			TransientPool& transient_pool = m_renderer.getTransientPool();
 			const TransientSlice vb = alloc(transient_pool, sizeof(BaseVertex) * lines.size() * 2);
-			const TransientSlice ub = alloc(uniform_pool, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
+			struct {
+				Matrix mtx;
+				u32 vertices; // bindless
+				u32 vertices_offset;
+			} ub_data = { Matrix::IDENTITY, gpu::getBindlessHandle(vb.buffer).value, vb.offset };
+			const TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
 			BaseVertex* vertices = (BaseVertex*)vb.ptr;
 			for (u32 i = 0, c = lines.size(); i < c; ++i) {
 				vertices[2 * i + 0].color = lines[i].color.abgr();
@@ -1558,11 +1612,9 @@ struct PipelineImpl final : Pipeline {
 			}
 			m_module->clearDebugLines();
 
-			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, sizeof(Matrix));
+			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 			stream.useProgram(program);
 			stream.bindIndexBuffer(gpu::INVALID_BUFFER);
-			stream.bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
-			stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 			stream.drawArrays(0, vb.size / sizeof(BaseVertex));
 		});
 	}
@@ -1602,21 +1654,24 @@ struct PipelineImpl final : Pipeline {
 
 		gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
 		if (is_3d) state = state | gpu::StateFlags::DEPTH_FN_GREATER; 
-		const gpu::ProgramHandle program = m_draw2d_shader->getProgram(state, m_2D_decl, 0, "");
+		const gpu::ProgramHandle program = m_draw2d_shader->getProgram(state, gpu::PrimitiveType::TRIANGLES, 0, "");
 
 		stream.pushDebugGroup("draw2d");
+		// vertices are pulled by the vertex shader
 		struct {
 			Matrix mtx;
 			gpu::BindlessHandle texture;
+			u32 vertices;
+			u32 vertices_offset;
 		} ubdata = {
 			matrix,
-			gpu::BindlessHandle()
+			gpu::BindlessHandle(),
+			gpu::getBindlessHandle(vtx_buffer_mem.buffer).value,
+			vtx_buffer_mem.offset
 		};
 		u32 elem_offset = 0;
 		stream.useProgram(program);
 		stream.bindIndexBuffer(idx_buffer_mem.buffer);
-		stream.bindVertexBuffer(0, vtx_buffer_mem.buffer, vtx_buffer_mem.offset, 20);
-		stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 
 		for (Draw2D::Cmd& cmd : data.getCmds()) {
 			if(cmd.clip_size.x < 0) {
@@ -1672,7 +1727,6 @@ struct PipelineImpl final : Pipeline {
 			if(terrains.empty()) return;
 
 			World& world = m_module->getWorld();
-			gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
 			for (const Terrain* terrain : terrains) {
 				if (!terrain->m_heightmap) continue;
 				if (!terrain->m_heightmap->isReady()) continue;
@@ -1685,7 +1739,7 @@ struct PipelineImpl final : Pipeline {
 				const Vec3 scale = terrain->getScale();
 				const Vec2 hm_size = terrain->getSize();
 				Shader* shader = terrain->m_material->getShader();
-				const gpu::ProgramHandle program = shader->getProgram(state | terrain->m_material->m_render_states, decl, define_mask | terrain->m_material->getDefineMask(), "");
+				const gpu::ProgramHandle program = shader->getProgram(state | terrain->m_material->m_render_states, gpu::PrimitiveType::TRIANGLE_STRIP, define_mask | terrain->m_material->getDefineMask(), "");
 				const Material* material = terrain->m_material;
 				if (isinf(pos.x) || isinf(pos.y) || isinf(pos.z)) continue;
 
@@ -1714,8 +1768,6 @@ struct PipelineImpl final : Pipeline {
 				stream.useProgram(program);
 				// TODO indexed rendering 
 				stream.bindIndexBuffer(gpu::INVALID_BUFFER);
-				stream.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-				stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 
 				for (;;) {
 					// round 
@@ -1765,6 +1817,8 @@ struct PipelineImpl final : Pipeline {
 		});
 	}
 	
+	// Draws the meshes of the given entities like the main view draws them (the GPU scene culls them, selects the clusters and draws), with the state and the define of the call.
+	// Entities that the GPU scene does not draw (no model instance, a model that is not ready) are skipped.
 	void renderEntities(Span<const EntityRef> entities, gpu::StateFlags state, const char* define) override {
 		PROFILE_FUNCTION();
 		if (entities.size() == 0) return;
@@ -1773,100 +1827,29 @@ struct PipelineImpl final : Pipeline {
 		// the job runs later, so it gets its own copy of the list
 		EntityRef* list = (EntityRef*)m_renderer.getCurrentFrameAllocator().allocate(sizeof(EntityRef) * count, alignof(EntityRef));
 		for (u32 i = 0; i < count; ++i) list[i] = entities[i];
+		const CameraParams cp = getMainCamera();
 
-		m_renderer.pushJob("render entities", [this, list, count, state, define_mask](DrawStream& stream) {
-			UniformPool& uniform_pool = m_renderer.getUniformPool();
-			TransientPool& transient_pool = m_renderer.getTransientPool();
+		m_renderer.pushJob("render entities", [this, list, count, state, define_mask, cp](DrawStream& stream){
+			GPUScene& scene = m_module->getGPUScene();
 			const World& world = m_module->getWorld();
-			const u32 skinned_define = 1 << m_renderer.getShaderDefineIdx("SKINNED");
-			const DVec3 view_pos = m_viewport.pos;
-			Array<DualQuat> dq_pose(m_renderer.getAllocator());
-			for (u32 ei = 0; ei < count; ++ei) {
-				const EntityRef e = list[ei];
-				if (!world.hasComponent(e, types::model_instance)) continue;
-
-				const Model* model = m_module->getModelInstanceModel(e);
-				if (!model || !model->isReady()) continue;
-
-				const Pose* pose = m_module->lockPose(e);
-				for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
-					const Mesh& mesh = model->getMesh(i);
-					const MeshMaterial& mesh_mat = model->getMeshMaterial(i);
-
-					Material* material = mesh_mat.material;
-					u32 mask = material->getDefineMask() | define_mask;
-					const Matrix mtx = world.getRelativeMatrix(e, view_pos);
-					dq_pose.clear();
-					if (pose && pose->count > 0 && mesh.type == Mesh::SKINNED) {
-						mask |= skinned_define;
-						dq_pose.reserve(pose->count);
-						for (int j = 0, c = pose->count; j < c; ++j) {
-							const LocalRigidTransform& inv_bind = model->getInverseBindTransform(j);
-							const LocalRigidTransform tmp = {pose->positions[j], pose->rotations[j]};
-							dq_pose.push((tmp * inv_bind).toDualQuat());
-						}
-					}
-
-					if (dq_pose.empty()) {
-						struct UBData {
-							Matrix mtx;
-							MaterialIndex material_index;
-						} ub_data = {
-							mtx,
-							material->getIndex()
-						};
-						TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
-						stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
-						stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-						gpu::ProgramHandle program = mesh_mat.material->getShader()->getProgram(material->m_render_states | state, mesh.vertex_decl, mask, mesh.semantics_defines);
-						stream.useProgram(program);
-					}
-					else {
-						struct SkinnedInstanceData {
-							IVec3 idata;
-							Vec3 pos;
-							Quat rot;
-							Vec3 scale;
-							Vec3 prev_pos;
-							Quat prev_rot;
-							Vec3 prev_scale;
-						};
-
-						TransientSlice inst_buf = alloc(transient_pool, sizeof(SkinnedInstanceData));
-						TransientSlice bones = alloc(transient_pool, dq_pose.byte_size());
-						SkinnedInstanceData* idata = (SkinnedInstanceData*)inst_buf.ptr;
-
-						Transform tr = world.getTransform(e);
-						idata->pos = Vec3(tr.pos - view_pos);
-						idata->prev_pos = idata->pos;
-						idata->rot = tr.rot;
-						idata->prev_rot = idata->rot;
-						idata->scale = tr.scale;
-						idata->prev_scale = idata->scale;
-						idata->idata.x = (i32)material->getIndex();
-						idata->idata.y = gpu::getBindlessHandle(bones.buffer).value;
-						idata->idata.z = bones.offset;
-
-						memcpy(bones.ptr, dq_pose.begin(), dq_pose.byte_size());
-						gpu::VertexDecl skinned_instanced_decl(gpu::PrimitiveType::NONE);
-						skinned_instanced_decl.addAttribute(0, 3, gpu::AttributeType::U32, gpu::Attribute::INSTANCED); // material index, bones_buffer, bones_buffer_offset
-						skinned_instanced_decl.addAttribute(12, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // pos
-						skinned_instanced_decl.addAttribute(24, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // rot
-						skinned_instanced_decl.addAttribute(40, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // scale
-						skinned_instanced_decl.addAttribute(52, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // prev_pos
-						skinned_instanced_decl.addAttribute(64, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // prev_rot
-						skinned_instanced_decl.addAttribute(80, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // prev_scale
-						stream.bindVertexBuffer(1, inst_buf.buffer, inst_buf.offset, inst_buf.size);
-						gpu::ProgramHandle program = mesh_mat.material->getShader()->getProgram(material->m_render_states | state, mesh.vertex_decl, skinned_instanced_decl, mask, mesh.semantics_defines);
-						stream.useProgram(program);
-					}
-
-					stream.bindIndexBuffer(mesh.index_buffer_handle);
-					stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-					stream.drawIndexed(0, mesh.indices_count, mesh.index_type);
-				}
-				m_module->unlockPose(e, false);
+			const u32 words = (scene.capacity + 31) / 32;
+			if (words == 0) return;
+			SceneEntityDraw draw;
+			draw.cp = cp;
+			draw.define_mask = define_mask;
+			draw.state = state;
+			draw.filter = alloc(m_renderer.getTransientPool(), words * sizeof(u32));
+			u32* bits = (u32*)draw.filter.ptr;
+			memset(bits, 0, words * sizeof(u32));
+			bool any = false;
+			for (u32 i = 0; i < count; ++i) {
+				if (!world.hasComponent(list[i], types::model_instance)) continue;
+				const u32 slot = m_module->getModelInstance(list[i])->gpu_slot;
+				if (slot >= scene.capacity) continue;
+				bits[slot >> 5] |= 1u << (slot & 31);
+				any = true;
 			}
+			if (any) runGPUSceneCulling(stream, nullptr, false, &draw);
 		});
 	}
 
@@ -1884,9 +1867,7 @@ struct PipelineImpl final : Pipeline {
 		define_mask |= 1 << m_renderer.getShaderDefineIdx("GRASS");
 
 		m_renderer.pushJob("grass", [this, cp, define_mask, state](DrawStream& stream){
-			gpu::VertexDecl grass_instance_decl(gpu::PrimitiveType::NONE);
-			grass_instance_decl.addAttribute(0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-			grass_instance_decl.addAttribute(16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+			// instances are pulled by vertex shaders
 			const HashMap<EntityRef, Terrain*>& terrains = m_module->getTerrains();
 			const World& world = m_module->getWorld();
 			const float global_lod_multiplier = m_renderer.getLODMultiplier();
@@ -1919,10 +1900,9 @@ struct PipelineImpl final : Pipeline {
 						ASSERT(shader->isReady());
 
  
-						gpu::ProgramHandle program = shader->getProgram(state | material->m_render_states, mesh.vertex_decl, grass_instance_decl, define_mask | material->getDefineMask(), mesh.semantics_defines);
+						gpu::ProgramHandle program = shader->getProgram(state | material->m_render_states, mesh.primitive_type, define_mask | material->getDefineMask(), mesh.semantics_defines);
 						stream.useProgram(program);
 						stream.bindIndexBuffer(mesh.index_buffer_handle);
-						stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
 						
 						for (const Terrain::GrassQuad& quad : quads) {
 							if (quad.instances_count == 0) continue;
@@ -1959,7 +1939,7 @@ struct PipelineImpl final : Pipeline {
 
 							const TransientSlice drawcall_ub = alloc(uniform_pool, &drawcall_data, sizeof(drawcall_data));
 							stream.bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub.buffer, drawcall_ub.offset, drawcall_ub.size);
-							stream.bindVertexBuffer(1, quad.instances, 0, sizeof(Vec4) * 2);
+							bindPulledBuffers(stream, mesh.vertex_buffer_handle, quad.instances, 0);
 							stream.drawIndexedInstanced(mesh.indices_count, instance_count, mesh.index_type);
 							++quad_count;
 							total_instance_count += instance_count;
@@ -1971,8 +1951,6 @@ struct PipelineImpl final : Pipeline {
 			profiler::pushInt("Culled", culled_count);
 			profiler::pushInt("Instances", total_instance_count);
 
-			stream.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-			stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 		});
 	}
 
@@ -2185,22 +2163,22 @@ struct PipelineImpl final : Pipeline {
 			struct {
 				Matrix mtx;
 				MaterialIndex material_index;
+				u32 vertices; // bindless, vertices are pulled by the vertex shader
 			} ub_data = {
 				world.getRelativeMatrix(iter.key(), camera_pos),
-				pg.material->getIndex()
+				pg.material->getIndex(),
+				gpu::getBindlessHandle(pg.vertex_buffer).value
 			};
 			const TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
 
 			bucket.stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 			const gpu::StateFlags state = pg.material->m_render_states | render_state;
-			const gpu::ProgramHandle program = pg.material->getShader()->getProgram(state, pg.vertex_decl, bucket.define_mask | pg.material->getDefineMask(), "");
+			const gpu::ProgramHandle program = pg.material->getShader()->getProgram(state, pg.primitive_type, bucket.define_mask | pg.material->getDefineMask(), "");
 
 			const u32 stride = pg.vertex_decl.getStride();
 			
 			bucket.stream.useProgram(program);
 			bucket.stream.bindIndexBuffer(pg.index_buffer);
-			bucket.stream.bindVertexBuffer(0, pg.vertex_buffer, 0, stride);
-			bucket.stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 
 			if (pg.index_buffer) {
 				const u32 count = (u32)pg.index_data.size() / (pg.index_type == gpu::DataType::U16 ? 2 : 4);
@@ -2213,239 +2191,640 @@ struct PipelineImpl final : Pipeline {
 		}	
 	}
 
-	void encodeInstancedModels(DrawStream& stream, View& view) {
-		PROFILE_FUNCTION();
-		if (!m_instancing_shader->isReady()) return;
+	void createClusterBuffers() {
+		// the scratch buffer of the culling of trees is the one of the renderer, it is made now if this is the first pipeline (it must be made when the frame is set up)
+		m_renderer.getClusterScratchBuffer();
 
-		const float global_lod_multiplier = m_renderer.getLODMultiplier();
-		const World& world = m_module->getWorld();
-		const HashMap<EntityRef, InstancedModel>& ims = m_module->getInstancedModels();
-		if (ims.empty()) return;
-		
-		struct UBValues {
-			Vec4 camera_offset;
-			Vec4 lod_distances;
-			IVec4 lod_indices;
-			u32 indirect_offset;
-			float radius;
-			u32 batch_size;
-			float padding;
-			Vec4 camera_planes[6];
-			IVec4 indices_count[32];
-			gpu::RWBindlessHandle culled_buffer;
-			gpu::RWBindlessHandle instanced_data;
-			gpu::RWBindlessHandle indirect_buffer;
-		};
+		// 0, 1, 2, ...: the index buffer of the draws of clusters, see pullVertex in vertex_pulling.hlsli
+		Renderer::MemRef iota_mem = m_renderer.allocate(65536 * sizeof(u16));
+		u16* iota = (u16*)iota_mem.data;
+		for (u32 i = 0; i < 65536; ++i) iota[i] = (u16)i;
+		m_cluster_iota = m_renderer.createBuffer(iota_mem, gpu::BufferFlags::IMMUTABLE, "cluster iota");
 
-		UBValues ub_values;
-		toPlanes(view.cp, Span(ub_values.camera_planes));
-
-		const gpu::BufferHandle culled_buffer = m_renderer.getInstancedMeshesBuffer();
-		//stream.bindShaderBuffer(m_indirect_buffer, 2, gpu::BindShaderBufferFlags::OUTPUT);
-		const gpu::ProgramHandle gather_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS3"));
-		const gpu::ProgramHandle indirect_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS2"));
-		u32 cull_shader_defines = 1 << m_renderer.getShaderDefineIdx("PASS1");
-		if (!view.cp.is_shadow) cull_shader_defines |= 1 << m_renderer.getShaderDefineIdx("UPDATE_LODS");
-		const gpu::ProgramHandle cull_shader = m_instancing_shader->getProgram(cull_shader_defines);
-		const gpu::ProgramHandle init_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("PASS0"));
-		const gpu::ProgramHandle update_lods_shader = m_instancing_shader->getProgram(1 << m_renderer.getShaderDefineIdx("UPDATE_LODS"));
-		UniformPool& uniform_pool = m_renderer.getUniformPool();
-
-		for (auto iter = ims.begin(), end = ims.end(); iter != end; ++iter) {
-			const InstancedModel& im = iter.value();
-			Model* m = im.model;
-			if (!m || !m->isReady()) continue;
-
-			auto getDrawDistance = [](const Model& model) {
-				const LODMeshIndices* lod_indices = model.getLODIndices();
-				float dist = 0;
-				for (u32 i = 0; i < 4; ++i) {
-					if (lod_indices[i].to != -1) {
-						dist = model.getLODDistances()[i];
-					}
-				}
-				return sqrtf(dist);
-			};
-
-			const float draw_distance = getDrawDistance(*m);
-
-			const Transform origin = world.getTransform(iter.key());
-			const Frustum frustum = view.cp.frustum.getRelative(origin.pos);
-			const float radius = m->getOriginBoundingRadius();
-
-			struct {
-				u32 offset;
-				u32 count;
-				bool visible;
-				TransientSlice ub;
-			} cells[16];
-			u32 cell_count = 0;
-
-			for (u32 i = 0; i < 16; ++i) {
-				const InstancedModel::Grid::Cell& cell = im.grid.cells[i];
-
-				if (cell.instance_count > 0) {
-					const bool visible = frustum.intersectAABBWithOffset(cell.aabb, radius);
-					const Vec3 cell_center = (cell.aabb.max + cell.aabb.min) * 0.5f;
-					const Vec3 cell_half_extents = (cell.aabb.max - cell.aabb.min) * 0.5f;
-					const float cell_radius = length(cell_half_extents);
-					if (length(origin.pos - view.cp.pos + cell_center) - cell_radius < draw_distance) {
-						const bool can_merge = cell_count > 0 && cells[cell_count - 1].visible == visible  && cells[cell_count - 1].offset + cells[cell_count - 1].count == cell.from_instance;
-						if (can_merge) {
-							cells[cell_count - 1].count += cell.instance_count;
-							u32* tmp =(u32*)cells[cell_count - 1].ub.ptr;
-							tmp[1] += cell.instance_count;
-						}
-						else {
-							cells[cell_count].visible = visible;
-							cells[cell_count].count = cell.instance_count;
-							cells[cell_count].offset = cell.from_instance;
-							const TransientSlice ub = alloc(uniform_pool, sizeof(u32) * 2);
-							u32* tmp =(u32*)ub.ptr;
-							tmp[0] = cell.from_instance;
-							tmp[1] = cell.instance_count;
-							cells[cell_count].ub = ub;
-							++cell_count;
-						}
-					}
-				}
-			}
-				
-			if (cell_count == 0) continue;
-
-			Vec4 lod_distances = *(Vec4*)m->getLODDistances() * global_lod_multiplier;
-			if (lod_distances.w < 0) lod_distances.w = FLT_MAX;
-			if (lod_distances.z < 0) lod_distances.z = FLT_MAX;
-			if (lod_distances.y < 0) lod_distances.y = FLT_MAX;
-			if (lod_distances.x < 0) lod_distances.x = FLT_MAX;
-			IVec4 lod_indices;
-			lod_indices.x = m->getLODIndices()[0].to;
-			lod_indices.y = maximum(lod_indices.x, m->getLODIndices()[1].to);
-			lod_indices.z = maximum(lod_indices.y, m->getLODIndices()[2].to);
-			lod_indices.w = maximum(lod_indices.z, m->getLODIndices()[3].to);
-			const u32 instance_count = im.instances.size();
-			
-			const u32 indirect_offset = m_indirect_buffer_offset.add(m->getMeshCount());
-
-			ub_values.camera_offset = Vec4(Vec3(origin.pos - view.cp.pos), 1);
-			ub_values.lod_distances = lod_distances;
-			ub_values.lod_indices = lod_indices;
-			ub_values.indirect_offset = indirect_offset;
-			ub_values.radius = m->getOriginBoundingRadius();
-			ub_values.batch_size = instance_count;
-			ub_values.culled_buffer = gpu::getRWBindlessHandle(culled_buffer);
-			ub_values.instanced_data = gpu::getRWBindlessHandle(im.gpu_data);
-			ub_values.indirect_buffer = gpu::getRWBindlessHandle(m_indirect_buffer);
-			ASSERT((u32)m->getMeshCount() < lengthOf(ub_values.indices_count)); // TODO
-			for (i32 i = 0; i < m->getMeshCount(); ++i) {
-				const Mesh& mesh = m->getMesh(i);
-				ub_values.indices_count[i].x = mesh.indices_count;
-			}
-
-			gpu::VertexDecl instanced_decl(gpu::PrimitiveType::NONE);
-			instanced_decl.addAttribute(0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-			instanced_decl.addAttribute(16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-
-			const TransientSlice drawcall_ub = alloc(uniform_pool, &ub_values, sizeof(ub_values));
-
-			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub.buffer, drawcall_ub.offset, sizeof(UBValues));
-
-			stream.barrier(culled_buffer, gpu::BarrierType::WRITE);
-			stream.barrier(m_indirect_buffer, gpu::BarrierType::WRITE);
-			stream.barrier(culled_buffer, gpu::BarrierType::WRITE);
-			//stream.bindShaderBuffer(culled_buffer, 1, gpu::BindShaderBufferFlags::OUTPUT);
-			stream.useProgram(init_shader);
-			stream.dispatch(1, 1, 1);
-			stream.memoryBarrier(culled_buffer);
-
-			if (view.cp.is_shadow) {
-				stream.barrier(im.gpu_data, gpu::BarrierType::READ);
-				//stream.bindShaderBuffer(im.gpu_data, 0, gpu::BindShaderBufferFlags::NONE);
-			}
-			else {
-				stream.barrier(im.gpu_data, gpu::BarrierType::WRITE);
-				//stream.bindShaderBuffer(im.gpu_data, 0, gpu::BindShaderBufferFlags::OUTPUT);
-				stream.useProgram(update_lods_shader);
-				for (u32 i = 0; i < cell_count; ++i) {
-					if (!cells[i].visible) {
-						stream.bindUniformBuffer(UniformBuffer::DRAWCALL2, cells[i].ub.buffer, cells[i].ub.offset, cells[i].ub.size);
-						stream.dispatch((cells[i].count + 255) / 256, 1, 1);
-					}
-				}
-			}
-				
-			stream.useProgram(cull_shader);
-			for (u32 i = 0; i < cell_count; ++i) {
-				if (cells[i].visible) {
-					stream.bindUniformBuffer(UniformBuffer::DRAWCALL2, cells[i].ub.buffer, cells[i].ub.offset, cells[i].ub.size);
-					stream.dispatch((cells[i].count + 255) / 256, 1, 1);
-				}
-			}
-			stream.memoryBarrier(culled_buffer);
-
-			if (!view.cp.is_shadow) {
-				stream.barrier(im.gpu_data, gpu::BarrierType::READ);
-				//stream.bindShaderBuffer(im.gpu_data, 0, gpu::BindShaderBufferFlags::NONE);
-			}
-
-			stream.useProgram(indirect_shader);
-			stream.dispatch((m->getMeshCount() + 255) / 256, 1, 1);
-			stream.memoryBarrier(m_indirect_buffer);
-
-			stream.useProgram(gather_shader);
-			for (u32 i = 0; i < cell_count; ++i) {
-				if (cells[i].visible) {
-					stream.bindUniformBuffer(UniformBuffer::DRAWCALL2, cells[i].ub.buffer, cells[i].ub.offset, cells[i].ub.size);
-					stream.dispatch((cells[i].count + 255) / 256, 1, 1);
-				}
-			}
-
-			stream.memoryBarrier(culled_buffer);
-
-			const u32 instanced_define = 1 << m_renderer.getShaderDefineIdx("INSTANCED");
-			for (i32 i = 0; i < m->getMeshCount(); ++i) {
-				const Mesh& mesh = m->getMesh(i);
-				const MeshMaterial& mesh_mat = m->getMeshMaterial(i);
-				const u8 bucket_idx = view.layer_to_bucket[mesh_mat.material->getLayer()];
-				if (bucket_idx == 0xff) continue;
-				
-				Bucket& bucket = view.buckets[bucket_idx];
-				const u32 instanced_define_mask = bucket.define_mask | instanced_define;
-				const Material* material = mesh_mat.material;
-				Shader* shader = material->getShader();
-				const gpu::StateFlags state = material->m_render_states | bucket.state;
-				const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, instanced_define_mask | material->getDefineMask(), mesh.semantics_defines);
-
-				MaterialIndex material_index = material->getIndex();
-				TransientSlice ub_slice = alloc(uniform_pool, &material_index, sizeof(material_index));
-
-				bucket.stream.useProgram(program);
-				bucket.stream.bindIndexBuffer(mesh.index_buffer_handle);
-				bucket.stream.bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-				bucket.stream.bindVertexBuffer(1, culled_buffer, 48, 32);
-				bucket.stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub_slice.buffer, ub_slice.offset, ub_slice.size);
-				
-				bucket.stream.bindIndirectBuffer(m_indirect_buffer);
-				bucket.stream.drawIndirect(mesh.index_type, u32(sizeof(Indirect) * (indirect_offset + i)));
-
-				bucket.stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
-				bucket.stream.bindIndexBuffer(gpu::INVALID_BUFFER);
-				bucket.stream.bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-				bucket.stream.bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-			}
-		}
-
-		stream.memoryBarrier(m_indirect_buffer);
-			
-		//stream.bindShaderBuffer(gpu::INVALID_BUFFER, 0, gpu::BindShaderBufferFlags::NONE);
-		//stream.bindShaderBuffer(gpu::INVALID_BUFFER, 1, gpu::BindShaderBufferFlags::NONE);
-		//stream.bindShaderBuffer(gpu::INVALID_BUFFER, 2, gpu::BindShaderBufferFlags::NONE);	
-
-		stream.memoryBarrier(m_indirect_buffer);
+		// the counters of the work items: [1] flat items, [2] tree items
+		const Renderer::MemRef counter_mem = { 16, nullptr, false };
+		m_scene_cull_counter = m_renderer.createBuffer(counter_mem, gpu::BufferFlags::SHADER_BUFFER, "gpu scene cull counter");
+		// the groups of the indirect dispatches: model instances, flat items, tree items, variants (48), instances of chunks (64)
+		const Renderer::MemRef args_mem = { 80, nullptr, false };
+		m_scene_cull_args = m_renderer.createBuffer(args_mem, gpu::BufferFlags::SHADER_BUFFER, "gpu scene cull args");
 	}
 
-	void computeSkeletonDualQuats(const ModelInstance* mi) {
-		DualQuat* output = (DualQuat*)mi->pose->slice.ptr;
+	// Lists of the work of clusters that the culling of instances generates, 16 bytes each. Buffers are created into the draw stream of the renderer
+	// in the order of calls, so this must be called when the frame is set up, not from a job (the job would use the buffers before they exist).
+	void ensureSceneWorkBuffers() {
+		if (m_scene_flat_items) return;
+		const bool large = m_type == PipelineType::SCENE_VIEW || m_type == PipelineType::GAME_VIEW;	// previews show one model
+		m_scene_work_items = large ? SCENE_WORK_ITEMS : SCENE_WORK_ITEMS_SMALL;
+		m_scene_selected_capacity = large ? SCENE_SELECTED : SCENE_SELECTED_SMALL;
+		m_scene_draw_slots = large ? SCENE_DRAW_SLOTS : SCENE_DRAW_SLOTS_SMALL;
+		const Renderer::MemRef items_mem = { m_scene_work_items * 16, nullptr, false };
+		m_scene_flat_items = m_renderer.createBuffer(items_mem, gpu::BufferFlags::SHADER_BUFFER, "gpu scene flat items");
+		m_scene_tree_items = m_renderer.createBuffer(items_mem, gpu::BufferFlags::SHADER_BUFFER, "gpu scene tree items");
+		m_scene_chunk_capacity = large ? SCENE_CHUNK_ITEMS : SCENE_CHUNK_ITEMS_SMALL;
+		const Renderer::MemRef chunk_items_mem = { m_scene_chunk_capacity * 16, nullptr, false };
+		m_scene_chunk_items = m_renderer.createBuffer(chunk_items_mem, gpu::BufferFlags::SHADER_BUFFER, "gpu scene chunk items");
+		const Renderer::MemRef selected_mem = { 16 + m_scene_selected_capacity * 16, nullptr, false };
+		m_scene_selected = m_renderer.createBuffer(selected_mem, gpu::BufferFlags::SHADER_BUFFER, "gpu scene selected clusters");
+		const Renderer::MemRef counters_mem = { 64 + GPUSceneConst::MAX_VARIANTS * 12, nullptr, false };
+		m_scene_counters = m_renderer.createBuffer(counters_mem, gpu::BufferFlags::SHADER_BUFFER, "gpu scene variant counters");
+		const Renderer::MemRef commands_mem = { SCENE_VIEWS * GPUSceneConst::MAX_VARIANTS * 24, nullptr, false };
+		m_scene_commands = m_renderer.createBuffer(commands_mem, gpu::BufferFlags::SHADER_BUFFER, "gpu scene commands");
+		const Renderer::MemRef out_mem = { m_scene_draw_slots * 20, nullptr, false };
+		m_scene_out = m_renderer.createBuffer(out_mem, gpu::BufferFlags::SHADER_BUFFER, "gpu scene draw instances");
+	}
+
+
+	struct SceneVariantsUniforms {
+		i32 cam_p[3];
+		u32 selected_capacity;
+		float cam_frac[3];
+		u32 out_capacity;
+		gpu::RWBindlessHandle selected;
+		gpu::BindlessHandle instances;
+		gpu::RWBindlessHandle counters;
+		gpu::RWBindlessHandle commands;
+		gpu::BindlessHandle meshes;
+		gpu::BindlessHandle variants;
+		u32 variant_count;
+		gpu::BindlessHandle group_base;
+		u32 group_base_offset;
+		gpu::RWBindlessHandle out;
+		gpu::RWBindlessHandle args;
+		u32 frame;					// see GPUSceneInstance::moved_frame
+		gpu::BindlessHandle bone_table;
+		gpu::BindlessHandle material_sets;
+		gpu::BindlessHandle lod_models;	// GPULodModel[]
+		u32 command_base;
+		u32 bone_table_offset;
+		gpu::BindlessHandle chunks;	// the chunks of instanced models
+		u32 padding[2];
+	};
+	static_assert(sizeof(SceneVariantsUniforms) == 112);
+
+	// At the start of a frame all the instances of the draws of the GPU scene are free, the views of the frame take them one after another.
+	void pushSceneDrawClear() {
+		if (!m_scene_counters || !m_scene_variants_shader) return;
+		m_renderer.pushJob("clear scene draws", [this](DrawStream& stream) {
+			if (!m_scene_variants_shader->isReady()) return;
+			SceneVariantsUniforms ub;
+			memset(&ub, 0, sizeof(ub));
+			ub.counters = gpu::getRWBindlessHandle(m_scene_counters);
+			const TransientSlice ub_slice = alloc(m_renderer.getUniformPool(), &ub, sizeof(ub));
+			stream.barrier(m_scene_counters, gpu::BarrierType::WRITE);
+			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub_slice.buffer, ub_slice.offset, sizeof(ub));
+			stream.useProgram(m_scene_variants_shader->getProgram(1 << m_renderer.getShaderDefineIdx("FRAME_CLEAR")));
+			stream.dispatch(1, 1, 1);
+			stream.memoryBarrier(m_scene_counters);
+		});
+	}
+
+	// Says which draw groups of the scene the view draws (the ones with a layer that has a bucket in the view) and where their commands are: the commands of the
+	// groups that are drawn follow each other. The result is a u32 for each draw group, its first command in this view or 0xffffffff if the view does not draw it.
+	// The variants, the table of meshes and the material sets do not depend on the view, they are in the GPU scene. The buffer of the result is invalid if there is
+	// nothing to draw.
+	TransientSlice makeSceneViewGroups(const View* view, const GPUSceneRegistry& res) {
+		const u32 group_count = res.draw_groups.size();
+		if (!m_scene_variants_shader->isReady() || group_count == 0 || res.variants.size() == 0) return {};
+
+		const TransientSlice slice = alloc(m_renderer.getTransientPool(), group_count * sizeof(u32));
+		u32* group_base = (u32*)slice.ptr;
+		u32 commands = 0;
+		for (u32 g = 0; g < group_count; ++g) {
+			const GPUDrawGroup& group = res.draw_groups[g];
+			// a free group has no variants
+			if (group.variant_count == 0 || (view && view->layer_to_bucket[group.layer] == 0xff)) {
+				group_base[g] = 0xffFFffFF;
+				continue;
+			}
+			group_base[g] = commands;
+			commands += group.variant_count;
+		}
+		return slice;
+	}
+
+	// Converts the poses of all the skinned instances of the GPU scene into dual quaternions once in a frame (all views draw from them): one buffer of bones
+	// and a table with the offset of the bones of each slot, see GPUSceneFrameBones. Animation is evaluated by the CPU, the GPU only skins.
+	void prepareSkinnedPoses() {
+		PROFILE_FUNCTION();
+		GPUScene& scene = m_module->getGPUScene();
+		GPUSceneFrameBones& frame_bones = scene.frame_bones;
+		const u32 frame = m_renderer.frameNumber();
+		if (frame_bones.frame == frame) return;
+		frame_bones.frame = frame;
+		frame_bones.bones = frame_bones.table = gpu::INVALID_BUFFER;
+
+		struct Item {
+			const ModelInstance* mi;
+			u32 slot;
+			u32 offset;
+		};
+		Array<Item> items(m_allocator);
+		u32 total = 0;
+		const Span<const ModelInstance> instances = m_module->getModelInstances();
+		for (u32 i = 0, c = instances.length(); i < c; ++i) {
+			const ModelInstance& mi = instances[i];
+			if (mi.gpu_slot == GPUSceneConst::INVALID_SLOT || !mi.model || !mi.model->isReady() || !mi.pose || mi.pose->count == 0) continue;
+			if (!mi.model->hasSkinnedMeshes()) continue;
+			items.push({ &mi, mi.gpu_slot, total * (u32)sizeof(DualQuat) });
+			total += mi.pose->count;
+		}
+		if (items.empty()) return;
+
+		TransientPool& pool = m_renderer.getTransientPool();
+		const TransientSlice bones = alloc(pool, total * sizeof(DualQuat));
+		const u32 table_bytes = maximum(scene.capacity, 1u) * 4;
+		const TransientSlice table = alloc(pool, table_bytes);
+		memset(table.ptr, 0, table_bytes);
+		for (const Item& item : items) {
+			if (item.slot < scene.capacity) ((u32*)table.ptr)[item.slot] = bones.offset + item.offset;
+		}
+		jobs::forEach(items.size(), 1, [&](u32 i, u32){
+			PROFILE_BLOCK("compute gpu pose");
+			computeSkeletonDualQuats(items[i].mi, (DualQuat*)(bones.ptr + items[i].offset));
+		});
+		frame_bones.bones = bones.buffer;
+		frame_bones.bones_offset = bones.offset;
+		frame_bones.table = table.buffer;
+		frame_bones.table_offset = table.offset;
+	}
+
+	// Culls the instances of the GPU scene for a view, selects their clusters and sorts them into variants on the GPU, and records the draws of the groups. It does
+	// it for every view of a frame, these are the only draws of the model instances and instanced models of the GPU scene. If something is not ready (the shaders of the first frames,
+	// more than SCENE_VIEWS views in a frame) the instances of the view are not drawn. The main view culls from the frozen camera of the clusters if there is one. Views use the buffers one after another (their passes are executed in the order of the views), what the draws
+	// need, which are executed later, is not shared: the instances of the draws are taken from a counter of the frame and the commands of a view are its own.
+	// `post`: the second pass of the occlusion culling of the view (View::occlusion): it selects the clusters that the first one skipped and that are visible in the pyramid of
+	// the depth of the first pass, and draws them into `stream`, which has the current targets (the first pass draws into the buckets).
+	// `entities`: renderEntities. Only the slots in the filter are culled in, there is no view: the camera is the main one and everything is drawn into `stream` with the
+	// state and the defines of the call, instead of the buckets of a view.
+	struct SceneEntityDraw {
+		CameraParams cp;
+		TransientSlice filter;	// a bit for each slot
+		u32 define_mask;
+		gpu::StateFlags state;
+	};
+
+	void runGPUSceneCulling(DrawStream& stream, View* view_ptr, bool post = false, const SceneEntityDraw* entities = nullptr) {
+		GPUScene& scene = m_module->getGPUScene();
+		const GPUSceneChunks& scene_chunks = m_module->getGPUSceneChunks();
+		const GPUSceneRegistry& res = scene.registry;
+		if (post && (!view_ptr || !view_ptr->occlusion || !view_ptr->hzb_prev_valid)) return;
+		const CameraParams& view_cp = entities ? entities->cp : view_ptr->cp;
+		const bool occlusion_view = view_ptr && view_ptr->occlusion && view_ptr->hzb_prev_valid && view_ptr->hzb_prev && view_ptr->hzb_cur;
+		if (m_cluster_shader->isFailure() && !m_cluster_shader_failure_logged) {
+			m_cluster_shader_failure_logged = true;
+			logError("Cluster shader nanite.hlsl failed to load, models with clusters are not drawn");
+		}
+		// nothing is drawn until everything is ready
+		if (!m_scene_cull_shader->isReady() || !m_scene_variants_shader->isReady() || !m_cluster_shader->isReady()) return;
+		if (!m_scene_cull_counter || !m_scene_cull_args || !isGPUSceneUploaded(scene) || !isGPUSceneChunksUploaded(scene_chunks)) return;
+		const gpu::BufferHandle model_table = res.clusters.model_table.buffer;
+		const gpu::BufferHandle mesh_table = res.clusters.mesh_table.buffer;
+		const gpu::BufferHandle lod_table = res.lod.model_table.buffer;
+		const gpu::BufferHandle set_table = res.set_table.buffer;
+		const gpu::BufferHandle variant_table = res.variant_table.buffer;
+		if (!model_table || !mesh_table || !lod_table || !set_table || !variant_table) return;
+		if (!m_scene_flat_items || !m_scene_tree_items || !m_scene_chunk_items || !m_scene_selected || !m_scene_counters || !m_scene_commands || !m_scene_out) return;	// created by ensureSceneWorkBuffers when the frame is set up
+		const gpu::BufferHandle cluster_scratch = m_renderer.getClusterScratchBuffer();
+		if (!cluster_scratch || !m_cluster_iota) return;
+
+		// the draw groups of the view are known before the clusters are selected
+		const TransientSlice group_base = makeSceneViewGroups(view_ptr, res);
+		if (!group_base.buffer) return;
+		// the draws of a view are executed after the passes of all the views, each view has its own commands
+		const i32 view_slot = m_scene_view_count.inc();
+		if (view_slot >= SCENE_VIEWS) {
+			static bool reported = false;
+			if (!reported) logError("GPU scene: more than ", (u32)SCENE_VIEWS, " views in a frame, the model instances of the GPU scene are not drawn in the others");
+			reported = true;
+			return;
+		}
+		const u32 command_base = (u32)view_slot * GPUSceneConst::MAX_VARIANTS * 24;
+
+		// The camera that culls the model instances and chooses the levels of detail is the frozen one (the main view only) if the camera of the clusters is frozen,
+		// the model instances are drawn from the camera of the view: their positions are relative to it, the culling adds the difference of the cameras (u_cull_offset)
+		const bool frozen = !entities && !view_cp.is_shadow && m_cluster_frozen;
+		const CameraParams& cull_cp = frozen ? m_cluster_frozen_cp : view_cp;
+		// the dispatch of the trees has a fixed number of groups that take the items one after another, each has a slice of the scratch buffer for the two lists of the largest mesh
+		const u32 scratch_slice = maximum(2 * getMaxNodeCount(res.clusters), 1u);
+		const u32 tree_groups = minimum((u32)SCENE_TREE_GROUPS, m_renderer.getClusterScratchCapacity() / scratch_slice);
+		if (tree_groups == 0) {
+			static bool reported = false;
+			if (!reported) logError("GPU scene: a mesh has more nodes than the scratch buffer of the clusters can hold, models with clusters are not drawn");
+			reported = true;
+		}
+		const GPUSceneView scene_view = makeGPUSceneView(view_cp.pos);
+		const GPUSceneView cull_view = frozen ? makeGPUSceneView(cull_cp.pos) : scene_view;
+		struct Uniforms {
+			Vec4 planes[6];
+			i32 cam_p[3];
+			float unit;
+			float cam_frac[3];
+			u32 capacity;
+			gpu::BindlessHandle bounds;
+			gpu::RWBindlessHandle counter;
+			gpu::RWBindlessHandle args;
+			u32 selected_capacity;
+			gpu::BindlessHandle instances;
+			u32 model_count;
+			gpu::BindlessHandle models;			// GPUClusterModel[]
+			gpu::BindlessHandle meshes;			// GPUClusterMesh[]
+			gpu::RWBindlessHandle flat_items;
+			gpu::RWBindlessHandle tree_items;
+			u32 item_capacity;
+			u32 post;				// the second pass of the occlusion culling
+			gpu::RWBindlessHandle selected;
+			gpu::RWBindlessHandle chunk_items;
+			u32 chunk_capacity;
+			gpu::BindlessHandle lod_models;	// GPULodModel[]
+			float lod_ref[3];		// where the LODs of models without clusters are chosen from, relative to the camera of the culling
+			float lod_scale;
+			gpu::BindlessHandle filter;	// bit for each slot, FILTER variant only
+			u32 filter_offset;
+			u32 lod_model_count;
+			u32 padding;
+			gpu::BindlessHandle chunk_bounds;	// GPUSceneBounds[], the chunks of instanced models (gpu_scene_chunks.h)
+			gpu::BindlessHandle chunks;			// GPUSceneChunk[]
+			u32 chunk_slots;
+			u32 tree_groups;		// groups of the dispatch of the trees of nanite.hlsl at most
+		};
+		static_assert(sizeof(Uniforms) == 240);
+		Uniforms ub;
+		memset(&ub, 0, sizeof(ub));
+		toPlanes(cull_cp, Span(ub.planes));
+		memcpy(ub.cam_p, cull_view.cam_p, sizeof(ub.cam_p));
+		memcpy(ub.cam_frac, cull_view.cam_frac, sizeof(ub.cam_frac));
+		ub.unit = cull_view.unit;
+		ub.capacity = scene.capacity;
+		ub.bounds = gpu::getBindlessHandle(scene.bounds);
+		ub.counter = gpu::getRWBindlessHandle(m_scene_cull_counter);
+		ub.args = gpu::getRWBindlessHandle(m_scene_cull_args);
+		ub.instances = gpu::getBindlessHandle(scene.instances);
+		ub.model_count = res.clusters.entries.size();
+		ub.models = gpu::getBindlessHandle(model_table);
+		ub.lod_models = gpu::getBindlessHandle(lod_table);
+		ub.lod_model_count = res.lod.entries.size();
+		ub.chunk_bounds = gpu::getBindlessHandle(scene_chunks.bounds.buffer);
+		ub.chunks = gpu::getBindlessHandle(scene_chunks.chunks.buffer);
+		ub.chunk_slots = scene_chunks.next_slot;
+		ub.meshes = gpu::getBindlessHandle(mesh_table);
+		ub.flat_items = gpu::getRWBindlessHandle(m_scene_flat_items);
+		ub.tree_items = gpu::getRWBindlessHandle(m_scene_tree_items);
+		ub.item_capacity = m_scene_work_items;
+		ub.post = post ? 1 : 0;
+		ub.selected = gpu::getRWBindlessHandle(m_scene_selected);
+		ub.chunk_items = gpu::getRWBindlessHandle(m_scene_chunk_items);
+		ub.chunk_capacity = m_scene_chunk_capacity;
+		ub.selected_capacity = m_scene_selected_capacity;
+		ub.tree_groups = tree_groups;
+		if (entities) {
+			ub.filter = gpu::getBindlessHandle(entities->filter.buffer);
+			ub.filter_offset = entities->filter.offset;
+			stream.barrier(entities->filter.buffer, gpu::BarrierType::READ);
+		}
+		{
+			const Vec3 lod_ref = Vec3(m_viewport.pos - cull_cp.pos);
+			ub.lod_ref[0] = lod_ref.x;
+			ub.lod_ref[1] = lod_ref.y;
+			ub.lod_ref[2] = lod_ref.z;
+			ub.lod_scale = 1.f / maximum(m_renderer.getLODMultiplier(), 0.01f);
+		}
+		const TransientSlice ub_slice = alloc(m_renderer.getUniformPool(), &ub, sizeof(ub));
+
+		// the culling of model instances: it clears the counters and writes the groups of its own dispatch, then it generates the work of the clusters, the chunks of
+		// instanced models that are visible generate the work of their instances, which are culled by the next pass
+		// blocks of shadow views have their own names, with the cascade of the main light (a frame has several views and the main one is the one that counts)
+		const bool is_shadow = view_cp.is_shadow;
+		auto scope_name = [&](const char* name) -> StaticString<64> {
+			if (post) return StaticString<64>(name, " (post)");
+			if (!is_shadow) return StaticString<64>(name);
+			if (view_cp.shadow_slice < 0) return StaticString<64>(name, " (shadow)");
+			return StaticString<64>(name, " (shadow ", view_cp.shadow_slice, ")");
+		};
+		auto define = [&](const char* name) { return 1u << m_renderer.getShaderDefineIdx(name); };
+		stream.beginProfileBlock(scope_name("scene instance cull"), 0, false);
+		stream.barrier(scene.bounds, gpu::BarrierType::READ);
+		stream.barrier(scene.instances, gpu::BarrierType::READ);
+		stream.barrier(scene_chunks.bounds.buffer, gpu::BarrierType::READ);
+		stream.barrier(scene_chunks.chunks.buffer, gpu::BarrierType::READ);
+		stream.barrier(model_table, gpu::BarrierType::READ);
+		stream.barrier(mesh_table, gpu::BarrierType::READ);
+		stream.barrier(lod_table, gpu::BarrierType::READ);
+		stream.barrier(m_scene_flat_items, gpu::BarrierType::WRITE);
+		stream.barrier(m_scene_tree_items, gpu::BarrierType::WRITE);
+		stream.barrier(m_scene_chunk_items, gpu::BarrierType::WRITE);
+		stream.barrier(m_scene_cull_counter, gpu::BarrierType::WRITE);
+		stream.barrier(m_scene_cull_args, gpu::BarrierType::WRITE);
+		stream.barrier(m_scene_selected, gpu::BarrierType::WRITE);
+		stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub_slice.buffer, ub_slice.offset, sizeof(ub));
+		stream.useProgram(m_scene_cull_shader->getProgram(define("PASS0")));
+		stream.dispatch(1, 1, 1);
+		stream.memoryBarrier(m_scene_cull_counter);
+		stream.memoryBarrier(m_scene_cull_args);
+		stream.memoryBarrier(m_scene_selected);
+		stream.useProgram(m_scene_cull_shader->getProgram(entities ? define("FILTER") : 0));
+		stream.bindIndirectBuffer(m_scene_cull_args);
+		stream.dispatchIndirect(0);
+		stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
+		stream.memoryBarrier(m_scene_cull_counter);
+		stream.memoryBarrier(m_scene_flat_items);
+		stream.memoryBarrier(m_scene_tree_items);
+		stream.memoryBarrier(m_scene_chunk_items);
+		stream.memoryBarrier(m_scene_selected);
+
+		// the chunks of instanced models (not for the entities, which are drawn by their own slots): the chunks that are visible make the work of their instances, a group for
+		// each 64 of them, which add their work to the same lists
+		if (!entities && scene_chunks.next_slot > 0) {
+			stream.useProgram(m_scene_cull_shader->getProgram(define("CHUNK_CULL")));
+			const u32 chunk_groups = (scene_chunks.next_slot + 63) / 64;
+			stream.dispatch(minimum(chunk_groups, 65535u), (chunk_groups + 65534) / 65535, 1);
+			stream.memoryBarrier(m_scene_cull_counter);
+			stream.memoryBarrier(m_scene_chunk_items);
+		}
+		if (!entities && !scene_chunks.instance_buffers.empty()) {
+			for (const GPUSceneInstanceBuffer& b : scene_chunks.instance_buffers) stream.barrier(b.buffer, gpu::BarrierType::READ);
+			stream.barrier(m_scene_cull_args, gpu::BarrierType::WRITE);
+			stream.useProgram(m_scene_cull_shader->getProgram(define("CHUNK_INSTANCE_ARGS")));
+			stream.dispatch(1, 1, 1);
+			stream.memoryBarrier(m_scene_cull_args);
+			stream.useProgram(m_scene_cull_shader->getProgram(define("CHUNK_INSTANCE_CULL")));
+			stream.bindIndirectBuffer(m_scene_cull_args);
+			stream.dispatchIndirect(64);
+			stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
+			stream.memoryBarrier(m_scene_cull_counter);
+			stream.memoryBarrier(m_scene_flat_items);
+			stream.memoryBarrier(m_scene_tree_items);
+			stream.memoryBarrier(m_scene_selected);
+		}
+
+		stream.endProfileBlock();	// scene instance cull
+
+		// the selection of clusters: the groups of its dispatches come from the counters of the work, computed by the GPU
+		stream.beginProfileBlock(scope_name("cluster cull"), 0, false);
+		stream.barrier(m_scene_cull_args, gpu::BarrierType::WRITE);
+		stream.barrier(m_scene_selected, gpu::BarrierType::WRITE);
+		stream.useProgram(m_scene_cull_shader->getProgram(define("ARGS")));
+		stream.dispatch(1, 1, 1);
+		stream.memoryBarrier(m_scene_cull_args);
+		stream.memoryBarrier(m_scene_selected);
+
+		ClusterViewUniforms cu;
+		memset(&cu, 0, sizeof(cu));
+		toPlanes(cull_cp, Span(cu.planes));
+		cu.cull_offset = frozen ? Vec4(Vec3(view_cp.pos - m_cluster_frozen_cp.pos), 0) : Vec4(0, 0, 0, 0);
+		const Matrix& projection = cull_cp.projection;
+		const float lod_multiplier = maximum(m_renderer.getLODMultiplier(), 0.01f);
+		const float viewport_height = frozen ? m_cluster_frozen_height : (m_viewport.h > 1 ? (float)m_viewport.h : 1.f);
+		cu.lod_k = 2.f * maximum(m_cluster_error_pixels * (view_cp.is_shadow ? m_cluster_shadow_error_scale : 1.f), 0.01f) / (viewport_height * maximum(fabsf(projection.columns[1].y), 1e-6f) * lod_multiplier);
+		cu.is_ortho = projection.columns[3].w == 1.f ? 1 : 0;
+		cu.attribute_weight = maximum(m_cluster_attribute_weight, 0.f);
+		cu.scratch = gpu::getRWBindlessHandle(cluster_scratch);
+		cu.scratch_size = m_renderer.getClusterScratchCapacity();	// in u32
+		cu.tree_groups = tree_groups;
+		cu.scratch_slice = scratch_slice;
+		cu.item_capacity = m_scene_work_items;			// of the lists, the counts are in counters
+		cu.tree_depth = getMaxTreeDepth(res.clusters);
+		memcpy(cu.cam_p, scene_view.cam_p, sizeof(cu.cam_p));
+		memcpy(cu.cam_frac, scene_view.cam_frac, sizeof(cu.cam_frac));
+		cu.selected_capacity = m_scene_selected_capacity;
+		cu.meshes = gpu::getBindlessHandle(mesh_table);
+		cu.instances = gpu::getBindlessHandle(scene.instances);
+		cu.chunks = gpu::getBindlessHandle(scene_chunks.chunks.buffer);
+		cu.selected = gpu::getRWBindlessHandle(m_scene_selected);
+		cu.counts = gpu::getBindlessHandle(m_scene_cull_counter);
+		cu.cluster_data = gpu::getBindlessHandle(m_renderer.getClusterDataBuffer());
+		const gpu::BufferHandle feedback = m_renderer.getClusterFeedbackBuffer();
+		if (feedback) {
+			cu.feedback = gpu::getRWBindlessHandle(feedback);
+			cu.feedback_capacity = m_renderer.getClusterFeedbackCapacity();
+			stream.barrier(feedback, gpu::BarrierType::WRITE);
+		}
+
+		// occlusion culling (nanite.hlsl): the first pass tests with the pyramid of the previous frame, the second one with the pyramid of the depth of the first pass too
+		if (occlusion_view && (post || !view_cp.is_shadow)) {
+			View& view = *view_ptr;
+			cu.hzb_mode = post ? 2 : 1;
+			const Matrix cur_vp = cull_cp.projection * cull_cp.view;
+			setMatrixRows(cur_vp, cu.cur_vp);
+			for (u32 i = 0; i < 4; ++i) cu.prev_vp[i] = view.hzb_prev_vp[i];
+			cu.prev_delta = Vec4(Vec3(cull_cp.pos - view.hzb_prev_pos), 0);
+			cu.hzb_prev = gpu::getBindlessHandle(view.hzb_prev);
+			cu.hzb_cur = gpu::getBindlessHandle(view.hzb_cur);
+			cu.hzb_mips = view.hzb_mips;
+			cu.hzb_size[0] = (float)view.hzb_size.x;
+			cu.hzb_size[1] = (float)view.hzb_size.y;
+			stream.barrier(view.hzb_prev, gpu::BarrierType::READ);
+			if (post) stream.barrier(view.hzb_cur, gpu::BarrierType::READ);
+		}
+
+		stream.barrier(m_renderer.getClusterDataBuffer(), gpu::BarrierType::READ);
+		stream.barrier(m_scene_flat_items, gpu::BarrierType::READ);
+		stream.barrier(m_scene_tree_items, gpu::BarrierType::READ);
+		stream.barrier(m_scene_cull_counter, gpu::BarrierType::READ);
+		stream.barrier(cluster_scratch, gpu::BarrierType::WRITE);
+		stream.bindIndirectBuffer(m_scene_cull_args);
+
+		cu.items = gpu::getBindlessHandle(m_scene_flat_items);
+		TransientSlice cu_slice = alloc(m_renderer.getUniformPool(), &cu, sizeof(cu));
+		stream.bindUniformBuffer(UniformBuffer::DRAWCALL, cu_slice.buffer, cu_slice.offset, sizeof(cu));
+		stream.useProgram(m_cluster_shader->getProgram(define("FLAT")));
+		stream.dispatchIndirect(16);
+
+		cu.items = gpu::getBindlessHandle(m_scene_tree_items);
+		cu_slice = alloc(m_renderer.getUniformPool(), &cu, sizeof(cu));
+		stream.bindUniformBuffer(UniformBuffer::DRAWCALL, cu_slice.buffer, cu_slice.offset, sizeof(cu));
+		stream.useProgram(m_cluster_shader->getProgram(0));
+		stream.dispatchIndirect(32);
+
+		stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
+		stream.memoryBarrier(m_scene_selected);
+		stream.memoryBarrier(cluster_scratch);
+		stream.endProfileBlock();	// cluster cull
+
+		// Sorts the selected clusters and meshes of the view into variants on the GPU (gpu_scene_variants.hlsl): the GPU counts, assigns the slots of the variants and writes the
+		// instance data of the draws and their commands. It also records the draws of the groups the view draws into the buckets of the view, one indirect call with
+		// the commands of all the variants of a group.
+		{
+
+			SceneVariantsUniforms draw_ub;
+			memset(&draw_ub, 0, sizeof(draw_ub));
+			memcpy(draw_ub.cam_p, scene_view.cam_p, sizeof(draw_ub.cam_p));
+			memcpy(draw_ub.cam_frac, scene_view.cam_frac, sizeof(draw_ub.cam_frac));
+			draw_ub.selected_capacity = m_scene_selected_capacity;
+			draw_ub.out_capacity = m_scene_draw_slots;
+			draw_ub.selected = gpu::getRWBindlessHandle(m_scene_selected);
+			draw_ub.instances = gpu::getBindlessHandle(scene.instances);
+			draw_ub.chunks = gpu::getBindlessHandle(scene_chunks.chunks.buffer);
+			draw_ub.counters = gpu::getRWBindlessHandle(m_scene_counters);
+			draw_ub.commands = gpu::getRWBindlessHandle(m_scene_commands);
+			draw_ub.meshes = gpu::getBindlessHandle(mesh_table);
+			draw_ub.variants = gpu::getBindlessHandle(variant_table);
+			draw_ub.variant_count = res.variants.size();
+			draw_ub.group_base = gpu::getBindlessHandle(group_base.buffer);
+			draw_ub.group_base_offset = group_base.offset;
+			draw_ub.out = gpu::getRWBindlessHandle(m_scene_out);
+			draw_ub.args = gpu::getRWBindlessHandle(m_scene_cull_args);
+			draw_ub.frame = m_renderer.frameNumber();
+			draw_ub.material_sets = gpu::getBindlessHandle(set_table);
+			draw_ub.lod_models = gpu::getBindlessHandle(lod_table);
+			draw_ub.command_base = command_base;
+			const GPUSceneFrameBones& frame_bones = scene.frame_bones;
+			if (frame_bones.table && frame_bones.bones) {
+				draw_ub.bone_table = gpu::getBindlessHandle(frame_bones.table);
+				draw_ub.bone_table_offset = frame_bones.table_offset;
+			}
+			const TransientSlice draw_ub_slice = alloc(m_renderer.getUniformPool(), &draw_ub, sizeof(draw_ub));
+
+			auto program = [&](const char* name) { return m_scene_variants_shader->getProgram(define(name)); };
+			stream.beginProfileBlock(scope_name("scene variants"), 0, false);
+			stream.barrier(group_base.buffer, gpu::BarrierType::READ);
+			stream.barrier(variant_table, gpu::BarrierType::READ);
+			stream.barrier(mesh_table, gpu::BarrierType::READ);
+			stream.barrier(lod_table, gpu::BarrierType::READ);
+			stream.barrier(set_table, gpu::BarrierType::READ);
+			if (frame_bones.table) stream.barrier(frame_bones.table, gpu::BarrierType::READ);
+			stream.barrier(scene.instances, gpu::BarrierType::READ);
+			stream.barrier(scene_chunks.chunks.buffer, gpu::BarrierType::READ);
+			stream.barrier(m_scene_selected, gpu::BarrierType::WRITE);
+			stream.barrier(m_scene_counters, gpu::BarrierType::WRITE);
+			stream.barrier(m_scene_commands, gpu::BarrierType::WRITE);
+			stream.barrier(m_scene_out, gpu::BarrierType::WRITE);
+			stream.barrier(m_scene_cull_args, gpu::BarrierType::WRITE);
+			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, draw_ub_slice.buffer, draw_ub_slice.offset, sizeof(draw_ub));
+
+			stream.useProgram(program("CLEAR"));
+			stream.dispatch(1, 1, 1);
+			stream.memoryBarrier(m_scene_counters);
+			stream.useProgram(program("BIN_ARGS"));
+			stream.dispatch(1, 1, 1);
+			stream.memoryBarrier(m_scene_cull_args);
+
+			stream.useProgram(program("COUNT"));
+			stream.bindIndirectBuffer(m_scene_cull_args);
+			stream.dispatchIndirect(48);
+			stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
+			stream.memoryBarrier(m_scene_counters);
+
+			stream.useProgram(program("SCAN"));
+			stream.dispatch(1, 1, 1);
+			stream.memoryBarrier(m_scene_counters);
+			stream.memoryBarrier(m_scene_commands);
+
+			stream.useProgram(program("SCATTER"));
+			stream.bindIndirectBuffer(m_scene_cull_args);
+			stream.dispatchIndirect(48);
+			stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
+			stream.memoryBarrier(m_scene_out);
+			stream.memoryBarrier(m_scene_counters);
+			stream.endProfileBlock();	// scene variants
+
+			// One indirect call for each draw group the view draws, the instance counts are written by the GPU: the commands are the ones of SCAN. Vertex shaders pull the
+			// instances by the draw id, the vertices of the clusters by their meshes (CLUSTER_MESH)
+			u32 mesh_instance_define = 1 << m_mesh_instance_define_idx;
+			mesh_instance_define |= define("INDIRECT_INSTANCE");
+			mesh_instance_define |= define("CLUSTER_MESH");
+			if (m_debug_show == DebugShow::MESH_CLUSTERS) mesh_instance_define |= define("CLUSTER_DEBUG");
+			if (m_debug_show == DebugShow::MESH_TRIANGLES) mesh_instance_define |= define("CLUSTER_DEBUG") | define("CLUSTER_DEBUG_TRIANGLES");
+
+			// Draws of meshes without clusters pull the same instances by the draw id, without CLUSTER_MESH. The SKINNED variant has the layout of
+			// MESH_INSTANCE but is chosen by its own define, with both the shader is not skinned.
+			const u32 indirect_define = define("INDIRECT_INSTANCE");
+			const u32 pooled_define = define("POOLED_VERTICES");	// the base vertex of the command is in the instance
+			const u32 lod_mesh_define = (1 << m_mesh_instance_define_idx) | indirect_define | pooled_define;
+
+			// the layout of VertexBuffer in vertex_pulling.hlsli with INDIRECT_INSTANCE
+			struct SceneVertexBufferBinding {
+				Mesh::VertexBufferBinding binding;
+				u32 meshes;				// bindless, the mesh table
+				u32 scene_instances;	// bindless, GPUScene::instances
+				u32 scene_chunks;		// bindless, GPUSceneChunks::chunks
+				u32 frame;				// renderer frame number (GPUSceneInstance::moved_frame)
+				i32 cam_p[3];
+				u32 padding;
+				float cam_frac[3];
+				u32 padding2;
+			};
+			static_assert(sizeof(SceneVertexBufferBinding) == 64);
+			SceneVertexBufferBinding vertex_buffer_binding = {};
+			vertex_buffer_binding.binding = { gpu::getBindlessHandle(m_renderer.getClusterDataBuffer()).value, gpu::getBindlessHandle(m_scene_out).value, 0, 0 };
+			vertex_buffer_binding.meshes = gpu::getBindlessHandle(mesh_table).value;
+			vertex_buffer_binding.scene_instances = gpu::getBindlessHandle(scene.instances).value;
+			vertex_buffer_binding.scene_chunks = gpu::getBindlessHandle(scene_chunks.chunks.buffer).value;
+			vertex_buffer_binding.frame = m_renderer.frameNumber();
+			memcpy(vertex_buffer_binding.cam_p, scene_view.cam_p, sizeof(vertex_buffer_binding.cam_p));
+			memcpy(vertex_buffer_binding.cam_frac, scene_view.cam_frac, sizeof(vertex_buffer_binding.cam_frac));
+
+			const u32* group_bases = (const u32*)group_base.ptr;
+			UniformPool& uniform_pool = m_renderer.getUniformPool();
+			for (u32 g = 0, c = res.draw_groups.size(); g < c; ++g) {
+				if (group_bases[g] == 0xffFFffFF) continue;
+				const GPUDrawGroup& group = res.draw_groups[g];
+				// the second pass and the entities draw from the job that culls them, the draws of the first pass are in the buckets of the view
+				Bucket* bucket = entities ? nullptr : view_ptr->buckets.begin() + view_ptr->layer_to_bucket[group.layer];
+				DrawStream& draw = (post || entities) ? stream : bucket->stream;
+				const u32 define_mask = group.define_mask | (entities ? entities->define_mask : bucket->define_mask);
+				const gpu::StateFlags state = group.state | (entities ? entities->state : bucket->state);
+				const u32 command_offset = command_base + group_bases[g] * 24;
+				if (group.lod) {
+					// the vertices and indices of the meshes are in the buffer of cluster data, a command has the first index and the base vertex of its mesh
+					const bool skinned = (group.define_mask & (1u << m_skinned_define_idx)) != 0;
+					const gpu::ProgramHandle lod_program = group.shader->getProgram(state, group.primitive_type, define_mask | (skinned ? (indirect_define | pooled_define) : lod_mesh_define), group.semantics_defines);
+					SceneVertexBufferBinding lod_binding = vertex_buffer_binding;
+					lod_binding.binding.bones_buffer = frame_bones.bones ? gpu::getBindlessHandle(frame_bones.bones).value : 0;
+					const TransientSlice layout_ub = alloc(uniform_pool, &lod_binding, sizeof(lod_binding));
+					draw.useProgram(lod_program);
+					draw.bindIndexBuffer(m_renderer.getClusterDataBuffer());
+					draw.bindUniformBuffer(UniformBuffer::VERTEX_BUFFER, layout_ub.buffer, layout_ub.offset, layout_ub.size);
+					draw.barrier(m_scene_out, gpu::BarrierType::READ);
+					draw.barrier(scene.instances, gpu::BarrierType::READ);
+					draw.barrier(scene_chunks.chunks.buffer, gpu::BarrierType::READ);
+					for (const GPUSceneInstanceBuffer& b : scene_chunks.instance_buffers) draw.barrier(b.buffer, gpu::BarrierType::READ);
+					draw.barrier(m_renderer.getClusterDataBuffer(), gpu::BarrierType::READ);
+					if (skinned && frame_bones.bones) draw.barrier(frame_bones.bones, gpu::BarrierType::READ);
+					draw.bindIndirectBuffer(m_scene_commands);
+					draw.drawIndirect(group.index_type, command_offset, group.variant_count);
+					draw.bindIndirectBuffer(gpu::INVALID_BUFFER);
+					draw.bindIndexBuffer(gpu::INVALID_BUFFER);
+					continue;
+				}
+				const gpu::ProgramHandle cluster_program = group.shader->getProgram(state, group.primitive_type, define_mask | mesh_instance_define, group.semantics_defines);
+				const TransientSlice layout_ub = alloc(uniform_pool, &vertex_buffer_binding, sizeof(vertex_buffer_binding));
+				draw.useProgram(cluster_program);
+				draw.bindIndexBuffer(m_cluster_iota);
+				draw.bindUniformBuffer(UniformBuffer::VERTEX_BUFFER, layout_ub.buffer, layout_ub.offset, layout_ub.size);
+				draw.barrier(m_scene_out, gpu::BarrierType::READ);
+				draw.barrier(scene.instances, gpu::BarrierType::READ);
+				draw.barrier(scene_chunks.chunks.buffer, gpu::BarrierType::READ);
+				for (const GPUSceneInstanceBuffer& b : scene_chunks.instance_buffers) draw.barrier(b.buffer, gpu::BarrierType::READ);
+				draw.barrier(mesh_table, gpu::BarrierType::READ);
+				draw.barrier(m_renderer.getClusterDataBuffer(), gpu::BarrierType::READ);
+				draw.bindIndirectBuffer(m_scene_commands);
+				draw.drawIndirect(gpu::DataType::U16, command_offset, group.variant_count);
+				draw.bindIndirectBuffer(gpu::INVALID_BUFFER);
+				draw.bindIndexBuffer(gpu::INVALID_BUFFER);
+			}
+		}
+	}
+
+	// the only per draw data of vertex pulling are buffers
+	// `instances` is pulled instance data of the draw (from the offset in bytes), if there is any
+	void bindPulledBuffers(DrawStream& stream, gpu::BufferHandle vertices, gpu::BufferHandle instances, u32 instances_offset, gpu::BufferHandle bones = gpu::INVALID_BUFFER) {
+		Lumix::bindPulledBuffers(stream, m_renderer.getUniformPool(), vertices, instances, instances_offset, bones);
+	}
+
+	// Remembers the camera of the main view when the freezing of the camera of the clusters is turned on, forgets it when it is turned off.
+	void updateClusterFreeze(const View& view) {
+		if (view.cp.is_shadow) return;
+		if (!m_cluster_freeze_camera) {
+			m_cluster_frozen = false;
+			return;
+		}
+		if (m_cluster_frozen) return;
+		m_cluster_frozen_cp = view.cp;
+		m_cluster_frozen_height = m_viewport.h > 1 ? (float)m_viewport.h : 1.f;
+		m_cluster_frozen = true;
+	}
+
+	void computeSkeletonDualQuats(const ModelInstance* mi, DualQuat* output) {
 		ASSERT((uintptr)output % 16 == 0); // we store with f4Stream, which needs aligned memory
 
 		const Quat* rotations = mi->pose->rotations;
@@ -2523,34 +2902,10 @@ struct PipelineImpl final : Pipeline {
 
 		const World& world = m_module->getWorld();
 		const ShiftedFrustum frustum = view.cp.frustum;
-		ModelInstance* LUMIX_RESTRICT model_instances = m_module->getModelInstances().begin();
 		const Transform* LUMIX_RESTRICT transforms = world.getTransforms(); 
 		const DVec3 camera_pos = view.cp.pos;
 		
-		gpu::VertexDecl skinned_instanced_decl(gpu::PrimitiveType::NONE);
-		skinned_instanced_decl.addAttribute(0, 3, gpu::AttributeType::U32, gpu::Attribute::INSTANCED); // material index, bones_buffer, bones_buffer_offset
-		skinned_instanced_decl.addAttribute(12, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // pos
-		skinned_instanced_decl.addAttribute(24, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // rot
-		skinned_instanced_decl.addAttribute(40, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // scale
-		skinned_instanced_decl.addAttribute(52, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // prev_pos
-		skinned_instanced_decl.addAttribute(64, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // prev_rot
-		skinned_instanced_decl.addAttribute(80, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // prev_scale
-		const u32 skinned_instance_stride = skinned_instanced_decl.getStride();
-		
-		gpu::VertexDecl dyn_instance_decl(gpu::PrimitiveType::NONE);
-		dyn_instance_decl.addAttribute(0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		dyn_instance_decl.addAttribute(16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		dyn_instance_decl.addAttribute(32, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		dyn_instance_decl.addAttribute(48, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		dyn_instance_decl.addAttribute(64, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		dyn_instance_decl.addAttribute(80, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		dyn_instance_decl.addAttribute(92, 1, gpu::AttributeType::U32, gpu::Attribute::INSTANCED);
-
-		gpu::VertexDecl instanced_decl(gpu::PrimitiveType::NONE);
-		instanced_decl.addAttribute(0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		instanced_decl.addAttribute(16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		instanced_decl.addAttribute(32, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		instanced_decl.addAttribute(44, 1, gpu::AttributeType::U32, gpu::Attribute::INSTANCED);
+		// instances are pulled by vertex shaders too
 
 		UniformPool& uniform_pool = m_renderer.getUniformPool();
 		TransientPool& transient_pool = m_renderer.getTransientPool();
@@ -2565,10 +2920,7 @@ struct PipelineImpl final : Pipeline {
 			if (to > keys_count) to = keys_count;
 
 			u32 define_mask;
-			u32 autoinstanced_define_mask;
 			u32 mesh_particle_define_mask;
-			u32 dynamic_define_mask;
-			u32 skinned_define_mask;
 			gpu::StateFlags render_state;
 			DrawStream* stream = nullptr;
 			u8 prev_bucket = (sort_keys[from] >> SORT_KEY_BUCKET_SHIFT) + 1; // make sure it's different from the first bucket, so first iteration is properly initialized
@@ -2582,9 +2934,6 @@ struct PipelineImpl final : Pipeline {
 					prev_bucket = bucket;
 					stream = view.buckets[bucket].substreams[batch_idx];
 					define_mask = view.buckets[bucket].define_mask;
-					autoinstanced_define_mask = define_mask | (1 << m_autoinstanced_define_idx);
-					dynamic_define_mask = define_mask | (1 << m_dynamic_define_idx);
-					skinned_define_mask = define_mask | (1 << m_skinned_define_idx);
 					mesh_particle_define_mask = define_mask | (1 << m_mesh_particle_define_idx);
 					render_state = view.buckets[bucket].state;
 				}
@@ -2599,45 +2948,39 @@ struct PipelineImpl final : Pipeline {
 						const Transform tr = world.getTransform(*particle_system.m_entity);
 						const Vec3 lpos = Vec3(tr.pos - camera_pos);
 						const gpu::StateFlags state = material->m_render_states | render_state;
-						gpu::VertexDecl inst_decl(gpu::PrimitiveType::TRIANGLE_STRIP);
-						inst_decl.addAttribute(0, 4, gpu::AttributeType::U32, gpu::Attribute::INSTANCED);
-						u32 stride = inst_decl.getStride();
-
-						gpu::ProgramHandle program = material->getShader()->getProgram(state, inst_decl, define_mask | material->getDefineMask(), "");
+						gpu::ProgramHandle program = material->getShader()->getProgram(state, gpu::PrimitiveType::TRIANGLE_STRIP, define_mask | material->getDefineMask(), "");
 						const TransientSlice point_slice = emitter.slice;
 						const Matrix mtx(lpos, tr.rot);
 
-						struct {
-							Matrix mtx;
-							MaterialIndex material_index;
-						} ub_data = {
-							mtx,
-							material->getIndex()
-						};
-						const TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
-						stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 						stream->useProgram(program);
 						stream->bindIndexBuffer(gpu::INVALID_BUFFER);
-						stream->bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
 
+						// points are pulled by the vertex shader, see ribbon.hlsl
 						u32 points_offset = 0;
-						u32 offset = 0;
-						const gpu::VertexDecl& decl = emitter.resource_emitter.vertex_decl;
-						TransientSlice slice = alloc(transient_pool, sizeof(u32) * 4 * emitter.ribbons.size());
-						u32* inst_data = (u32*)slice.ptr;
+						const u32 vertex_stride = emitter.resource_emitter.vertex_stride;
 						for (const auto& ribbon : emitter.ribbons) {
-							inst_data[0] = gpu::getBindlessHandle(point_slice.buffer).value;
-							inst_data[1] = point_slice.offset + points_offset;
-							inst_data[2] = ribbon.offset;
-							inst_data[3] = ribbon.length;
-							stream->bindVertexBuffer(1, slice.buffer, slice.offset + offset, stride);
-							// TODO instanced draw / indirect instanced
-							if(ribbon.length > 1) {
+							if (ribbon.length > 1) {
+								struct {
+									Matrix mtx;
+									MaterialIndex material_index;
+									u32 points_buffer;
+									u32 points_offset;
+									u32 ribbon_offset;
+									u32 ribbon_max_length;
+								} ub_data = {
+									mtx,
+									material->getIndex(),
+									gpu::getBindlessHandle(point_slice.buffer).value,
+									point_slice.offset + points_offset,
+									ribbon.offset,
+									ribbon.length
+								};
+								const TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
+								stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
+								// TODO instanced draw / indirect instanced
 								stream->drawArraysInstanced(2 * ribbon.length, 1);
 							}
-							offset += 4 * sizeof(u32);
-							points_offset += ribbon.length * decl.getStride();
-							inst_data += 4;
+							points_offset += ribbon.length * vertex_stride;
 						}
 						break;
 					}
@@ -2651,49 +2994,43 @@ struct PipelineImpl final : Pipeline {
 						const Transform tr = world.getTransform(*particle_system.m_entity);
 						const Vec3 lpos = Vec3(tr.pos - camera_pos);
 						const gpu::StateFlags state = material->m_render_states | render_state;
-						gpu::VertexDecl inst_decl(gpu::PrimitiveType::TRIANGLE_STRIP);
-						inst_decl.addAttribute(0, 4, gpu::AttributeType::U32, gpu::Attribute::INSTANCED);
-						u32 stride = inst_decl.getStride();
-
-						gpu::ProgramHandle program = material->getShader()->getProgram(state, inst_decl, define_mask | material->getDefineMask(), "");
+						gpu::ProgramHandle program = material->getShader()->getProgram(state, gpu::PrimitiveType::TRIANGLE_STRIP, define_mask | material->getDefineMask(), "");
 						const TransientSlice point_slice = emitter.slice;
 						const Matrix mtx(lpos, tr.rot);
 
-						struct {
-							Matrix mtx;
-							MaterialIndex material_index;
-							u32 tube_segments;
-						} ub_data = {
-							mtx,
-							material->getIndex(),
-							tube_segments
-						};
-						const TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
-						stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 						stream->useProgram(program);
 						stream->bindIndexBuffer(gpu::INVALID_BUFFER);
-						stream->bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
 
+						// points are pulled by the vertex shader
 						u32 points_offset = 0;
-						u32 offset = 0;
-						const gpu::VertexDecl& decl = emitter.resource_emitter.vertex_decl;
-						TransientSlice slice = alloc(transient_pool, sizeof(u32) * 4 * emitter.ribbons.size());
-						u32* inst_data = (u32*)slice.ptr;
+						const u32 vertex_stride = emitter.resource_emitter.vertex_stride;
 						for (const auto& ribbon : emitter.ribbons) {
-							inst_data[0] = gpu::getBindlessHandle(point_slice.buffer).value;
-							inst_data[1] = point_slice.offset + points_offset;
-							inst_data[2] = ribbon.offset;
-							inst_data[3] = emitter.resource_emitter.max_ribbon_length;
-							stream->bindVertexBuffer(1, slice.buffer, slice.offset + offset, stride);
-							if(ribbon.length > 1) {
+							if (ribbon.length > 1) {
+								struct {
+									Matrix mtx;
+									MaterialIndex material_index;
+									u32 tube_segments;
+									u32 points_buffer;
+									u32 points_offset;
+									u32 ribbon_offset;
+									u32 ribbon_max_length;
+								} ub_data = {
+									mtx,
+									material->getIndex(),
+									tube_segments,
+									gpu::getBindlessHandle(point_slice.buffer).value,
+									point_slice.offset + points_offset,
+									ribbon.offset,
+									emitter.resource_emitter.max_ribbon_length
+								};
+								const TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
+								stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 								// For tube: each ring transition needs (tube_segments + 1) * 2 vertices
 								const u32 ring_transitions = ribbon.length - 1;
 								const u32 vertex_count = ring_transitions * (tube_segments + 1) * 2;
 								stream->drawArraysInstanced(vertex_count, 1);
 							}
-							offset += 4 * sizeof(u32);
-							points_offset += ribbon.length * decl.getStride();
-							inst_data += 4;
+							points_offset += ribbon.length * vertex_stride;
 						}
 						break;
 					}
@@ -2709,18 +3046,19 @@ struct PipelineImpl final : Pipeline {
 
 						const Transform tr = world.getTransform(*particle_system.m_entity);
 						const Vec3 lpos = Vec3(tr.pos - camera_pos);
-						const gpu::VertexDecl& inst_decl = emitter.resource_emitter.vertex_decl;
 						const gpu::StateFlags state = material->m_render_states | render_state;
 						const u32 defines = mesh_particle_define_mask | material->getDefineMask();
 						Shader* shader = material->getShader();
-						gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, inst_decl, defines, mesh.semantics_defines);
+						gpu::ProgramHandle program = shader->getProgram(state, mesh.primitive_type, defines, mesh.semantics_defines);
 
 						struct UBData {
 							Vec3 pos;
 							MaterialIndex material_index;
+							u32 particle_stride;
 						} ub_data = {
 							lpos,
-							material->getIndex()
+							material->getIndex(),
+							emitter.resource_emitter.vertex_stride
 						};
 
 						TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
@@ -2728,8 +3066,8 @@ struct PipelineImpl final : Pipeline {
 						stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 						stream->useProgram(program);
 						stream->bindIndexBuffer(mesh.index_buffer_handle);
-						stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-						stream->bindVertexBuffer(1, emitter.slice.buffer, emitter.slice.offset, inst_decl.getStride());
+						// particles are pulled instances
+						bindPulledBuffers(*stream, mesh.vertex_buffer_handle, emitter.slice.buffer, emitter.slice.offset);
 						stream->drawIndexedInstanced(mesh.indices_count, particles_count, mesh.index_type);
 						break;
 					}
@@ -2742,215 +3080,31 @@ struct PipelineImpl final : Pipeline {
 
 						const Transform tr = world.getTransform(*particle_system.m_entity);
 						const Vec3 lpos = Vec3(tr.pos - camera_pos);
-						const gpu::VertexDecl& decl = emitter.resource_emitter.vertex_decl;
 						const gpu::StateFlags state = material->m_render_states | render_state;
-						gpu::ProgramHandle program = material->getShader()->getProgram(state, decl, define_mask | material->getDefineMask(), "");
+						gpu::ProgramHandle program = material->getShader()->getProgram(state, gpu::PrimitiveType::TRIANGLE_STRIP, define_mask | material->getDefineMask(), "");
 						const TransientSlice slice = emitter.slice;
 						const Matrix mtx(lpos, tr.rot);
 
+						// particles are pulled by the vertex shader, see particles.hlsl
 						struct {
 							Matrix mtx;
 							MaterialIndex material_index;
+							u32 particles_buffer;
+							u32 particles_offset;
+							u32 particles_stride;
 						} ub_data = {
 							mtx,
-							material->getIndex()
+							material->getIndex(),
+							gpu::getBindlessHandle(slice.buffer).value,
+							slice.offset,
+							emitter.resource_emitter.vertex_stride
 						};
 
 						const TransientSlice ub = alloc(uniform_pool, &ub_data, sizeof(ub_data));
 						stream->bindUniformBuffer(UniformBuffer::DRAWCALL, ub.buffer, ub.offset, ub.size);
 						stream->useProgram(program);
 						stream->bindIndexBuffer(gpu::INVALID_BUFFER);
-						stream->bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-						stream->bindVertexBuffer(1, slice.buffer, slice.offset, decl.getStride());
 						stream->drawArraysInstanced(4, particles_count);
-						break;
-					}
-					case DrawCommandTypes::AUTOINSTANCED: {
-						const u32 group_idx = renderables[i] & 0xffFF;
-						const u32 instancer_idx = (renderables[i] >> SORT_VALUE_INSTANCER_SHIFT) & 0xffFF;
-						const AutoInstancer::Instances& instances = view.instancers[instancer_idx].instances[group_idx];
-						const u32 total_count = instances.end->offset + instances.end->count;
-						const u64 renderable = instances.begin->renderables[0];
-						const u32 entity_index = u32(renderable & 0xffFFffFF);
-						const u32 mesh_idx = u32(renderable >> SORT_VALUE_MESH_IDX_SHIFT);
-						const ModelInstance& mi = model_instances[entity_index];
-						const Mesh& mesh = mi.model->getMesh(mesh_idx);
-						const MeshMaterial& mesh_mat = mi.mesh_materials[mesh_idx];
-
-						const Material* material = mesh_mat.material;
-						Shader* shader = material->getShader();
-						const gpu::StateFlags state = material->m_render_states | render_state;
-						const u32 defines = autoinstanced_define_mask | material->getDefineMask();
-						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, defines, mesh.semantics_defines);
-					
-						gpu::Drawcall& dc = stream->draw();
-						dc = {
-							.program = program,
-							.index_buffer = mesh.index_buffer_handle,
-							.vertex_buffers = { mesh.vertex_buffer_handle, instances.slice.buffer },
-							.vertex_buffer_offsets = { 0, instances.slice.offset },
-							.vertex_buffer_sizes = { mesh.vb_stride, 48 },
-							.indices_count = mesh.indices_count,
-							.instances_count = total_count,
-							.index_type = mesh.index_type,
-						};
-						break;
-					}
-					case DrawCommandTypes::MESH: {
-						const u32 mesh_idx = u32(renderables[i] >> SORT_VALUE_MESH_IDX_SHIFT);
-						ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
-						const Mesh& mesh = mi->meshes[mesh_idx];
-						const MeshMaterial& mesh_mat = mi->mesh_materials[mesh_idx];
-						const float mesh_lod = mesh.lod;
-						const Material* material = mesh_mat.material;
-						Shader* shader = material->getShader();
-						const gpu::StateFlags state = material->m_render_states | render_state;
-
-						if (mi->flags & ModelInstance::MOVED) {
-							const i32 start_i = i;
-							const u64 key = sort_keys[i];
-							while (i < to && sort_keys[i] == key) {
-								++i;
-							}
-
-							const u32 count = u32(i - start_i);
-							const TransientSlice slice = alloc(transient_pool, count * (sizeof(Vec4) * 6));
-							u8* instance_data = slice.ptr;
-
-							for (i32 j = start_i; j < start_i + (i32)count; ++j) {
-								const EntityRef e { i32(renderables[j] & 0xFFffFFff) };
-								const Transform& tr = transforms[e.index];
-								const Vec3 pos_ws = Vec3(tr.pos - camera_pos);
-								const float lod_d = model_instances[e.index].lod - mesh_lod;
-								ModelInstance* mi2 = &model_instances[e.index];
-								const Transform prev_tr = mi2->prev_frame_transform;
-								const Vec3 prev_pos_ws = Vec3(prev_tr.pos - camera_pos);
-							
-								#define WRITE(X) memcpy(instance_data, &X, sizeof(X)); instance_data += sizeof(X)
-								WRITE(tr.rot);
-								WRITE(pos_ws);
-								WRITE(lod_d);
-								WRITE(tr.scale);
-								instance_data += sizeof(float); // padding
-							
-								WRITE(prev_tr.rot);
-								WRITE(prev_pos_ws);
-								WRITE(lod_d);
-								WRITE(prev_tr.scale);
-								const MaterialIndex material_index = mi2->mesh_materials[mesh_idx].material_index;
-								WRITE(material_index);
-								#undef WRITE
-							}
-
-							const u32 defines = dynamic_define_mask | material->getDefineMask();
-							const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, dyn_instance_decl, defines, mesh.semantics_defines);
-					
-							stream->useProgram(program);
-							stream->bindIndexBuffer(mesh.index_buffer_handle);
-							stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-							stream->bindVertexBuffer(1, slice.buffer, slice.offset, sizeof(Vec4) * 6);
-							stream->drawIndexedInstanced(mesh.indices_count, count, mesh.index_type);
-							--i;
-						}
-						else {
-							// Only depth sorted meshes get here (the rest is autoinstanced). Their key is the distance of the entity, not its mesh:
-							// neighbours with the same key can be other meshes at the same distance (e.g. two shells around one planet), never merge them.
-							CHECK(view.buckets[bucket].sort == BucketDesc::DEPTH);
-							int start_i = i;
-							++i;
-							const u32 count = u32(i - start_i);
-							const TransientSlice slice = alloc(transient_pool, count * (sizeof(Vec4) * 3));
-							u8* instance_data = slice.ptr;
-							for (int j = start_i; j < start_i + (i32)count; ++j) {
-								const EntityRef e { i32(renderables[j] & 0xFFffFFff) };
-								const Transform& tr = transforms[e.index];
-								const Vec3 lpos = Vec3(tr.pos - camera_pos);
-								const float lod_d = model_instances[e.index].lod - mesh_lod;
-								memcpy(instance_data, &tr.rot, sizeof(tr.rot));
-								instance_data += sizeof(tr.rot);
-								memcpy(instance_data, &lpos, sizeof(lpos));
-								instance_data += sizeof(lpos);
-								memcpy(instance_data, &lod_d, sizeof(lod_d));
-								instance_data += sizeof(lod_d);
-								memcpy(instance_data, &tr.scale, sizeof(tr.scale));
-								instance_data += sizeof(tr.scale);
-								MaterialIndex material_index = material->getIndex();
-								memcpy(instance_data, &material_index, sizeof(material_index));
-								instance_data += sizeof(material_index);
-							}
-
-							const u32 defines = autoinstanced_define_mask | material->getDefineMask();
-							const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, instanced_decl, defines, mesh.semantics_defines);
-
-							stream->useProgram(program);
-							stream->bindIndexBuffer(mesh.index_buffer_handle);
-							stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-							stream->bindVertexBuffer(1, slice.buffer, slice.offset, instanced_decl.getStride());
-							stream->drawIndexedInstanced(mesh.indices_count, count, mesh.index_type);
-							--i;
-						}
-						break;
-					}
-					case DrawCommandTypes::SKINNED: {
-						const u32 mesh_idx = u32(renderables[i] >> SORT_VALUE_MESH_IDX_SHIFT);
-						ModelInstance* LUMIX_RESTRICT mi = &model_instances[entity.index];
-						const MeshMaterial& mesh_mat = mi->mesh_materials[mesh_idx];
-						u32 defines = skinned_define_mask | mesh_mat.material->getDefineMask();
-						const gpu::StateFlags state = mesh_mat.material->m_render_states | render_state;
-
-						const u32 start_i = i;
-						const u64 key = sort_keys[i];
-						while (i < to && sort_keys[i] == key) {
-							++i;
-						}
-						const u32 num_instances = i - start_i;
-						--i;
-						
-						struct SkinnedInstanceData {
-							IVec3 idata;
-							Vec3 pos;
-							Quat rot;
-							Vec3 scale;
-							Vec3 prev_pos;
-							Quat prev_rot;
-							Vec3 prev_scale;
-						};
-
-						const TransientSlice instance_buffer = alloc(transient_pool, sizeof(SkinnedInstanceData) * num_instances);
-						for (u32 j = start_i; j <= i; ++j) {
-							SkinnedInstanceData* skin_draw_data = (SkinnedInstanceData*)instance_buffer.ptr + j - start_i;
-
-							const EntityRef e {int(renderables[j] & 0xFFffFFff)};
-							ModelInstance* mi2 = &model_instances[e.index];
-							const Transform& tr = transforms[e.index];
-							
-							const Vec3 rel_pos = Vec3(tr.pos - camera_pos);
-							const Material& material = *mi2->mesh_materials[mesh_idx].material;
-
-							skin_draw_data->pos = rel_pos;
-							skin_draw_data->rot = tr.rot;
-							skin_draw_data->scale = tr.scale;
-
-							const Vec3 prev_rel_pos = Vec3(mi2->prev_frame_transform.pos - camera_pos);
-							skin_draw_data->prev_pos = prev_rel_pos;
-							skin_draw_data->prev_rot = mi2->prev_frame_transform.rot;
-							skin_draw_data->prev_scale = mi2->prev_frame_transform.scale;
-
-							const TransientSlice bones_slice = mi2->pose->slice;
-
-							skin_draw_data->idata.x = (i32)material.getIndex();
-							skin_draw_data->idata.y = gpu::getBindlessHandle(bones_slice.buffer).value;
-							skin_draw_data->idata.z = bones_slice.offset;
-						}
-
-						Shader* shader = mesh_mat.material->getShader();
-						const Mesh& mesh = mi->meshes[mesh_idx];
-						const gpu::ProgramHandle program = shader->getProgram(state, mesh.vertex_decl, skinned_instanced_decl, defines, mesh.semantics_defines);
-						stream->useProgram(program);
-						stream->bindIndexBuffer(mesh.index_buffer_handle);
-						stream->bindVertexBuffer(0, mesh.vertex_buffer_handle, 0, mesh.vb_stride);
-						stream->bindVertexBuffer(1, instance_buffer.buffer, instance_buffer.offset, skinned_instance_stride);
-						stream->drawIndexedInstanced(mesh.indices_count, num_instances, mesh.index_type);
 						break;
 					}
 					case DrawCommandTypes::DECAL: {
@@ -2991,14 +3145,13 @@ struct PipelineImpl final : Pipeline {
 						}
 
 						stream->bindIndexBuffer(m_cube_ib);
-						stream->bindVertexBuffer(0, m_cube_vb, 0, 12);
 
 						gpu::StateFlags state = material->m_render_states | render_state;
 						state = state & ~gpu::StateFlags::CULL_FRONT | gpu::StateFlags::CULL_BACK;
 						const u32 nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
 						if (nonintersecting_count) {
-							stream->useProgram(material->getShader()->getProgram(state, m_decal_decl, define_mask | material->getDefineMask(), ""));
-							stream->bindVertexBuffer(1, slice.buffer, slice.offset, sizeof(DecalData));
+							stream->useProgram(material->getShader()->getProgram(state, gpu::PrimitiveType::TRIANGLES, define_mask | material->getDefineMask(), m_cube_pulling_defines));
+							bindPulledBuffers(*stream, m_cube_vb, slice.buffer, slice.offset);
 							stream->drawIndexedInstanced(36, nonintersecting_count, gpu::DataType::U16);
 						}
 
@@ -3006,9 +3159,9 @@ struct PipelineImpl final : Pipeline {
 							state = state & ~gpu::StateFlags::DEPTH_FUNCTION;
 							state = state & ~gpu::StateFlags::CULL_BACK;
 							state = state | gpu::StateFlags::CULL_FRONT;
-							stream->useProgram(material->getShader()->getProgram(state, m_decal_decl, define_mask | material->getDefineMask(), ""));
+							stream->useProgram(material->getShader()->getProgram(state, gpu::PrimitiveType::TRIANGLES, define_mask | material->getDefineMask(), m_cube_pulling_defines));
 							const u32 offs = slice.offset + sizeof(DecalData) * nonintersecting_count;
-							stream->bindVertexBuffer(1, slice.buffer, offs, sizeof(DecalData));
+							bindPulledBuffers(*stream, m_cube_vb, slice.buffer, offs);
 							stream->drawIndexedInstanced(36, count - nonintersecting_count, gpu::DataType::U16);
 						}
 						--i;
@@ -3054,14 +3207,13 @@ struct PipelineImpl final : Pipeline {
 						}
 
 						stream->bindIndexBuffer(m_cube_ib);
-						stream->bindVertexBuffer(0, m_cube_vb, 0, 12);
 
 						gpu::StateFlags state = material->m_render_states | render_state;
 						state = state & ~gpu::StateFlags::CULL_FRONT | gpu::StateFlags::CULL_BACK;
 						const u32 nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
 						if (nonintersecting_count) {
-							stream->useProgram(material->getShader()->getProgram(state, m_curve_decal_decl, define_mask | material->getDefineMask(), ""));
-							stream->bindVertexBuffer(1, slice.buffer, slice.offset, 64);
+							stream->useProgram(material->getShader()->getProgram(state, gpu::PrimitiveType::TRIANGLES, define_mask | material->getDefineMask(), m_cube_pulling_defines));
+							bindPulledBuffers(*stream, m_cube_vb, slice.buffer, slice.offset);
 							stream->drawIndexedInstanced(36, nonintersecting_count, gpu::DataType::U16);
 						}
 
@@ -3069,9 +3221,9 @@ struct PipelineImpl final : Pipeline {
 							state = state & ~gpu::StateFlags::DEPTH_FUNCTION;
 							state = state & ~gpu::StateFlags::CULL_BACK;
 							state = state | gpu::StateFlags::CULL_FRONT;
-							stream->useProgram(material->getShader()->getProgram(state, m_curve_decal_decl, define_mask | material->getDefineMask(), ""));
-							const u32 offs = slice.offset + sizeof(float) * 16 * nonintersecting_count;
-							stream->bindVertexBuffer(1, slice.buffer, offs, 64);
+							stream->useProgram(material->getShader()->getProgram(state, gpu::PrimitiveType::TRIANGLES, define_mask | material->getDefineMask(), m_cube_pulling_defines));
+							const u32 offs = slice.offset + sizeof(DecalData) * nonintersecting_count;
+							bindPulledBuffers(*stream, m_cube_vb, slice.buffer, offs);
 							stream->drawIndexedInstanced(36, count - nonintersecting_count, gpu::DataType::U16);
 						}
 						--i;
@@ -3469,122 +3621,8 @@ struct PipelineImpl final : Pipeline {
 		});
 	}
 
-	void refreshMaterialOverrides() {
-		Span<ModelInstance> instances = m_module->getModelInstances();
-		for (EntityRef e : m_material_override_refresh_queue) {
-			ModelInstance& mi = instances[e.index];
-			if (!mi.dirty) continue;
-			
-			ASSERT(mi.model->isReady());
-			const bool has_override = mi.mesh_materials.begin() != mi.model->getMeshMaterials().begin();
-			if (!has_override) {
-				mi.dirty = false;
-				continue;
-			}
-
-			bool updated = true;
-			for (u32 i = 0; i < mi.mesh_count; ++i) {
-				MeshMaterial& mat = mi.mesh_materials[i];
-				if (!mat.material) {
-					mat.material = mi.model->getMeshMaterial(i).material;
-					mat.material->incRefCount();
-				}
-				if (!mat.material->isReady()) {
-					updated = false;
-					break;
-				}
-				
-				if (mat.sort_key == 0) {
-					mat.sort_key = m_module->computeSortKey(*mat.material, mi.meshes[i]);
-				}
-				if ((u32)mat.material_index == 0) {
-					mat.material_index = mat.material->getIndex();
-					mat.flags = mat.flags & ~MeshMaterial::OWN_MATERIAL_INDEX;
-				}
-			}
-
-			if (updated) mi.dirty = false;
-		}
-		m_material_override_refresh_queue.clear();
-	}
-
-	void queueMaterialOverrideRefresh(EntityRef e) {
-		jobs::MutexGuard guard(m_material_override_refresh_mutex);
-		m_material_override_refresh_queue.push(e);
-	}
-
-	struct PoseProcessor {
-		struct Batch {
-			u32 count = 0;
-			ModelInstance* elements[128];
-			PipelineImpl* pipeline;
-		};
-
-		PipelineImpl& pipeline;
-		ArenaAllocator& allocator;
-		Batch* batch = nullptr;
-
-		PoseProcessor(PipelineImpl& pipeline, ArenaAllocator& allocator)
-			: allocator(allocator)
-			, pipeline(pipeline)
-		{}
-
-		~PoseProcessor() {
-			if (batch) processBatch();
-		}
-
-		void push(ModelInstance* mi) {
-			if (!batch) {
-				batch = LUMIX_NEW(allocator, Batch);
-				batch->pipeline = &pipeline;
-			}
-
-			batch->elements[batch->count] = mi;
-			++batch->count;
-			if (batch->count == lengthOf(batch->elements)) {
-				processBatch();
-			}
-		}
-
-		void processBatch() {
-			jobs::run(batch, [](void* ptr){
-				PROFILE_BLOCK("compute gpu pose");
-				Batch* batch = (Batch*)ptr;
-				u32 num_bones = 0;
-				for (u32 i = 0; i < batch->count; ++i) {
-					num_bones += batch->elements[i]->pose->count;
-				}
-
-				profiler::pushInt("bones", num_bones);
-				TransientPool& pool = batch->pipeline->m_renderer.getTransientPool();
-				TransientSlice slice = alloc(pool, num_bones * sizeof(DualQuat)); 
-				u32 offset = 0;
-				for (u32 i = 0; i < batch->count; ++i) {
-					ModelInstance& mi = *batch->elements[i];
-					mi.pose->slice = slice;
-					mi.pose->slice.ptr += offset;
-					mi.pose->slice.offset += offset;
-					batch->pipeline->computeSkeletonDualQuats(&mi);
-					offset += mi.pose->count * sizeof(DualQuat);
-				}
-			}, &pipeline.m_poses_done);
-			batch = nullptr;
-		}
-	};
-
 	void createSortKeys(PipelineImpl::View& view) {
 		PagedListIterator<const CullResult> iterator(view.renderables);
-
-		view.instancers.reserve(jobs::getWorkersCount());
-		ArenaAllocator& allocator = m_renderer.getCurrentFrameAllocator();
-		for (u8 i = 0; i < jobs::getWorkersCount(); ++i) {
-			view.instancers.emplace(allocator, m_renderer.getEngine().getPageAllocator());
-		}
-
-		const float global_lod_multiplier = m_renderer.getLODMultiplier();
-		const float global_lod_multiplier_rcp = 1 / global_lod_multiplier;
-		const float time_delta = m_renderer.getEngine().getLastTimeDelta();
-		AtomicI32 worker_idx = 0;
 
 		u32 bucket_map[255];
 		for (u32 i = 0; i < 255; ++i) {
@@ -3596,24 +3634,12 @@ struct PipelineImpl final : Pipeline {
 				bucket_map[i] |= 0x100;
 			}
 		}
-		TransientPool& transient_pool = m_renderer.getTransientPool();
-		u32 frame_number = m_renderer.frameNumber() % 0xffFFffFF; // we keep 0xffFFffFF to mark invalid data
 
 		jobs::runOnWorkers([&](){
 			PROFILE_BLOCK("create keys");
 			
-			PoseProcessor pose_processor(*this, m_renderer.getCurrentFrameAllocator());
-
 			int total = 0;
-			ModelInstance* LUMIX_RESTRICT model_instances = m_module->getModelInstances().begin();
-			const Transform* LUMIX_RESTRICT transforms = m_module->getWorld().getTransforms();
-			const DVec3 camera_pos = view.cp.pos;
-			const DVec3 lod_ref_point = m_viewport.pos;
 			Sorter::Inserter inserter(view.sorter);
-
-			const i32 instancer_idx = worker_idx.inc();
-			AutoInstancer& instancer = view.instancers[instancer_idx];
-			instancer.init(m_renderer.getMaxSortKey() + 1);
 
 			for(;;) {
 				const CullResult* page = iterator.next();
@@ -3652,90 +3678,8 @@ struct PipelineImpl final : Pipeline {
 						}
 						break;
 					}
-					case RenderableTypes::MESH: {
-						const bool is_shadow = view.cp.is_shadow;
-						for (int i = 0, c = page->header.count; i < c; ++i) {
-							const EntityRef e = renderables[i];
-							const DVec3 pos = transforms[e.index].pos;
-							ModelInstance& mi = model_instances[e.index];
-
-							const float squared_length = float(squaredLength(pos - lod_ref_point));
-							const u32 lod_idx = mi.model->getLODMeshIndices(squared_length * global_lod_multiplier_rcp);
-
-							if (mi.dirty) {
-								queueMaterialOverrideRefresh(e);
-								continue;
-							}
-
-							auto create_key = [&](const LODMeshIndices& lod){
-								for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
-									const MeshMaterial& mesh_mat = mi.mesh_materials[mesh_idx];
-									const u32 bucket = bucket_map[mesh_mat.material->getLayer()];
-									const u32 mesh_sort_key = mesh_mat.sort_key;
-									if (bucket == 0xffFFffFF) continue; // layer is not drawn in this view
-									if (mi.meshes[mesh_idx].type == Mesh::SKINNED) {
-										// TODO do this only once per model, not for each mesh
-										for (;;) {
-											u32 frame = (u32)mi.pose->frame;
-											if (frame == frame_number) break;
-											if (mi.pose->frame.compareExchange(frame_number, frame)) {
-												pose_processor.push(&mi);
-												break;
-											}
-										}
-										
-										SortValue value = makeSkinnedSortValue(e, mesh_idx);
-										SortKey key = makeMeshSortKey(mesh_mat, bucket);
-										inserter.push(key, value);
-									}
-									else if (mi.flags & ModelInstance::MOVED && !is_shadow) {
-										// moved and unmoved meshes can't be drawn in single drawcall as they need different instance data
-										// but autoinstancer groups all instances of a mesh in single drawcall
-										// so we don't autoinstance moved meshes, only unmoved
-										SortValue value = makeMeshSortValue(e, mesh_idx);
-										SortKey key = makeMeshSortKey(mesh_mat, bucket);
-										inserter.push(key, value);
-									}
-									else if (bucket < 0xff) {
-										const u64 value = e.index | ((u64)mesh_idx << SORT_VALUE_MESH_IDX_SHIFT);
-										instancer.add(mesh_sort_key, value);
-									} else if (bucket < 0xffFF) {
-										// depth sorted
-										const DVec3 pos = transforms[e.index].pos;
-										const DVec3 rel_pos = pos - camera_pos;
-										const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
-										SortValue value = makeMeshSortValue(e, mesh_idx);
-										SortKey key = makeDepthSortKey(squared_length, bucket);
-										inserter.push(key, value);
-									}
-								}
-							};
-
-							// first time this instance is seen (e.g. just spawned), use the correct lod without transition
-							if (mi.lod < 0) mi.lod = float(lod_idx);
-
-							if (mi.lod != lod_idx) {
-								const float d = lod_idx - mi.lod;
-								const float ad = fabsf(d);
-									
-								if (ad <= time_delta) {
-									mi.lod = float(lod_idx);
-									create_key(mi.model->getLODIndices()[lod_idx]);
-								}
-								else {
-									if (!is_shadow) mi.lod += d / ad * time_delta;
-									const u32 cur_lod_idx = u32(mi.lod);
-									create_key(mi.model->getLODIndices()[cur_lod_idx]);
-									if (cur_lod_idx < 3) create_key(mi.model->getLODIndices()[cur_lod_idx + 1]);
-								}
-							}
-							else {
-								const LODMeshIndices& lod = mi.model->getLODIndices()[lod_idx];
-								create_key(lod);
-							}
-						}
-						break;
-					}
+					// meshes are drawn by the GPU, see runGPUSceneCulling, they are not in the culling system
+					case RenderableTypes::MESH:
 					case RenderableTypes::PARTICLES:
 					case RenderableTypes::COUNT:
 						ASSERT(false);
@@ -3743,67 +3687,6 @@ struct PipelineImpl final : Pipeline {
 				}
 			}
 			profiler::pushInt("count", total);
-
-			for (u32 i = 0, c = (u32)instancer.instances.size(); i < c; ++i) {
-				if (!instancer.instances[i].begin) continue;
-
-				const u64 renderable = instancer.instances[i].begin->renderables[0];
-				const u32 entity_index = renderable & 0xffFFff;
-				const u32 mesh_idx = u32(renderable >> SORT_VALUE_MESH_IDX_SHIFT);
-				const u8 layer = model_instances[entity_index].mesh_materials[mesh_idx].material->getLayer();
-				const u8 bucket = view.layer_to_bucket[layer];
-				SortValue value = makeAutoInstancedSortValue(i, instancer_idx);
-				SortKey key = makeAutoInstancedSortKey(i, bucket);
-				inserter.push(key, value);
-			}
-
-			PROFILE_BLOCK("fill instance data");
-			u32 num_instances = 0;
-			u32 num_meshes = 0;
-			TransientPool& transient_pool = m_renderer.getTransientPool();
-			for (AutoInstancer::Instances& instances : instancer.instances) {
-				const AutoInstancer::Page::Group* group = instances.begin;
-				if (!group) continue;
-
-				++num_meshes;
-				const u32 count = instances.end->offset + instances.end->count;
-				instances.slice = alloc(transient_pool, count * (3 * sizeof(Vec4)));
-				u8* instance_data = instances.slice.ptr;
-				const u32 sort_key = u32(&instances - instancer.instances.begin());
-				const u64 renderable = instances.begin->renderables[0];
-				const u32 entity_index = renderable & 0xffFFff;
-				const u32 mesh_idx = u32(renderable >> SORT_VALUE_MESH_IDX_SHIFT);
-				const ModelInstance& mi = model_instances[entity_index];
-				const Mesh& mesh = mi.model->getMesh(mesh_idx);
-				const MeshMaterial& mesh_mat = mi.model->getMeshMaterial(mesh_idx);
-
-				const float mesh_lod = mesh.lod;
-
-				while (group) {
-					for (u32 i = 0; i < group->count; ++i) {
-						const EntityRef e { (i32)group->renderables[i] };
-						const Transform& tr = transforms[e.index];
-						const Vec3 lpos = Vec3(tr.pos - camera_pos);
-						const float lod_d = model_instances[e.index].lod - mesh_lod;
-						memcpy(instance_data, &tr.rot, sizeof(tr.rot));
-						instance_data += sizeof(tr.rot);
-						memcpy(instance_data, &lpos, sizeof(lpos));
-						instance_data += sizeof(lpos);
-						memcpy(instance_data, &lod_d, sizeof(lod_d));
-						instance_data += sizeof(lod_d);
-						memcpy(instance_data, &tr.scale, sizeof(tr.scale));
-						instance_data += sizeof(tr.scale);
-
-						const MaterialIndex material_index = model_instances[e.index].mesh_materials[mesh_idx].material_index;
-						memcpy(instance_data, &material_index, sizeof(material_index));
-						instance_data += sizeof(material_index);
-					}
-					group = group->next;
-				}
-				num_instances += count;
-			}
-			profiler::pushInt("Instances", num_instances);
-			profiler::pushInt("Meshes", num_meshes);
 		});
 	}
 
@@ -3927,7 +3810,8 @@ struct PipelineImpl final : Pipeline {
 			shift += Histogram::BITS;
 		}
 
-		if (keys == _keys) {
+		// the result is in the temporary memory if an odd number of passes was done (passes in which all keys have the same digit are skipped)
+		if (keys != _keys) {
 			memcpy(_keys, keys, size * sizeof(u64));
 			memcpy(_values, values, size * sizeof(u64));
 		}
@@ -3983,6 +3867,20 @@ struct PipelineImpl final : Pipeline {
 	Shader* m_blit_shader = nullptr;
 	Shader* m_draw2d_shader = nullptr;
 	Shader* m_downscale_depth_shader = nullptr;
+	Shader* m_hzb_shader = nullptr;									// the pyramid of depths of the occlusion culling, see buildHZB
+
+	// Occlusion culling of the main view in two passes (see Pipeline::cull with `occlusion`). Two pyramids of depths: m_hzb[m_hzb_prev] was made by the frame before (at the end of its
+	// opaque geometry, with its camera), the other is made after the first pass of this frame and again at the end of the frame, when it becomes the previous one.
+	gpu::TextureHandle m_hzb[2] = { gpu::INVALID_TEXTURE, gpu::INVALID_TEXTURE };
+	u32 m_hzb_prev = 0;
+	u32 m_hzb_mips = 0;
+	IVec2 m_hzb_size = IVec2(0, 0);
+	bool m_hzb_prev_valid = false;
+	Vec4 m_hzb_prev_vp[4];											// rows of projection * view (rotation) of the camera of the previous pyramid
+	DVec3 m_hzb_prev_pos = DVec3(0, 0, 0);
+	CameraParams m_hzb_frame_cp;									// the camera of the view of this frame that is culled with occlusion
+	bool m_hzb_frame_cp_valid = false;
+	bool m_hzb_cur_built = false;									// the pyramid after the first pass of this frame is made
 	gpu::ProgramHandle m_blit_screen_program = gpu::INVALID_PROGRAM;
 	Array<UniquePtr<View>> m_views;
 	jobs::Signal m_buckets_ready;
@@ -3996,27 +3894,54 @@ struct PipelineImpl final : Pipeline {
 	RenderBufferHandle m_output = INVALID_RENDERBUFFER;
 	RenderBufferHandle m_downscaled_depth = INVALID_RENDERBUFFER;
 	Shader* m_debug_shape_shader;
-	Shader* m_instancing_shader;
+	Shader* m_cluster_shader;
+	Shader* m_scene_variants_shader;									// sorts the selected clusters and meshes into variants of draws, see gpu_scene_variants.hlsl
+	Shader* m_scene_cull_shader;									// counts the slots of the GPU scene inside a frustum, see runGPUSceneCulling
+	gpu::BufferHandle m_scene_cull_counter = gpu::INVALID_BUFFER;
+	gpu::BufferHandle m_scene_cull_args = gpu::INVALID_BUFFER;
+	gpu::BufferHandle m_scene_flat_items = gpu::INVALID_BUFFER;		// work items of clusters generated by the culling of instances, see gpu_scene_cull.hlsl
+	gpu::BufferHandle m_scene_tree_items = gpu::INVALID_BUFFER;
+	gpu::BufferHandle m_scene_chunk_items = gpu::INVALID_BUFFER;	// visible chunks of instanced models, 64 instances for each item, see gpu_scene_cull.hlsl
+	u32 m_scene_chunk_capacity = 0;
+	gpu::BufferHandle m_scene_counters = gpu::INVALID_BUFFER;			// counters of the variants, see gpu_scene_variants.hlsl
+	gpu::BufferHandle m_scene_commands = gpu::INVALID_BUFFER;	// a draw command for each variant of a view
+	gpu::BufferHandle m_scene_out = gpu::INVALID_BUFFER;			// instance data of the draws
+	u32 m_scene_work_items = 0;										// capacities of the buffers of the GPU scene, set when they are created
+	u32 m_scene_selected_capacity = 0;
+	u32 m_scene_draw_slots = 0;
+	gpu::BufferHandle m_scene_selected = gpu::INVALID_BUFFER;		// clusters selected from the work items: three counters, then 16 bytes each (slot, mesh, cluster)
+	AtomicI32 m_scene_view_count = 0;								// views drawn from the GPU scene in this frame
 	Shader* m_flatten_shader;
 	Array<gpu::TextureHandle> m_textures;
 	Array<gpu::BufferHandle> m_buffers;
 	os::Timer m_timer;
-	AtomicI32 m_indirect_buffer_offset = 0;
-	gpu::BufferHandle m_indirect_buffer;
-	gpu::VertexDecl m_base_vertex_decl;
-	gpu::VertexDecl m_base_line_vertex_decl;
-	gpu::VertexDecl m_2D_decl;
-	gpu::VertexDecl m_decal_decl;
-	gpu::VertexDecl m_curve_decal_decl;
+
+	// buffers of the clusters of the GPU scene, see runGPUSceneCulling
+	enum : u32 {
+		SCENE_TREE_GROUPS = 2048,					// groups of the dispatch of the trees of the clusters at most, each has a slice of the scratch buffer (two lists of the largest mesh)
+		SCENE_VIEWS = 32,							// views of a frame that are drawn from the GPU scene, each has its own commands
+		SCENE_DRAW_SLOTS = 1 << 20,					// compact entries of these draws (20 bytes each), scene and game views
+		SCENE_DRAW_SLOTS_SMALL = 1 << 16,			// the same for previews and other small pipelines
+		SCENE_SELECTED = 1 << 20,					// capacity of the list of clusters selected from the lists of work (nanite.hlsl)
+		SCENE_SELECTED_SMALL = 1 << 16,
+		SCENE_WORK_ITEMS = 1 << 20,					// capacity of each list of work items generated by the culling of instances (gpu_scene_cull.hlsl)
+		SCENE_WORK_ITEMS_SMALL = 1 << 16,
+		SCENE_CHUNK_ITEMS = 1 << 18,				// capacity of the list of visible chunks of instanced models (64 instances each)
+		SCENE_CHUNK_ITEMS_SMALL = 1 << 12,
+	};
+	bool m_cluster_shader_failure_logged = false;
+	gpu::BufferHandle m_cluster_iota = gpu::INVALID_BUFFER;			// u16 0..65535, the index buffer of the draws of clusters
+	bool m_cluster_frozen = false;									// the camera that chooses the clusters is m_cluster_frozen_cp, see m_cluster_freeze_camera
+	CameraParams m_cluster_frozen_cp;
+	float m_cluster_frozen_height = 1.f;
+	const char* m_cube_pulling_defines = "";
 	gpu::BufferHandle m_cube_vb;
 	gpu::BufferHandle m_cube_ib;
 	ShadowAtlas m_shadow_atlas;
 	CameraParams m_custom_camera_params;
 	HashMap<u32, void*> m_instance_data;
 	JobsGroup m_sort_keys_group;
-	jobs::Counter m_poses_done;
-	u8 m_autoinstanced_define_idx;
-	u8 m_dynamic_define_idx;
+	u8 m_mesh_instance_define_idx;
 	u8 m_skinned_define_idx;
 	u8 m_mesh_particle_define_idx;
 
@@ -4033,8 +3958,6 @@ struct PipelineImpl final : Pipeline {
 	} m_cluster_buffers;
 	Viewport m_shadow_camera_viewports[4];
 	GlobalState m_global_state;
-	Array<EntityRef> m_material_override_refresh_queue;
-	jobs::Mutex m_material_override_refresh_mutex;
 };
 
 

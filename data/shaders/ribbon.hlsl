@@ -5,7 +5,6 @@
 #include "engine/shaders/common.hlsli"
 
 struct VSInput {
-	uint4 i_data : TEXCOORD0;
 	uint vertex_id : SV_VertexID;
 };
 
@@ -18,6 +17,10 @@ struct VSOutput {
 cbuffer Model : register(b4) {
 	float4x4 u_model;
 	uint u_material_index;
+	uint u_points;			// bindless, points of the emitter
+	uint u_points_offset;	// in bytes, points of the ribbon
+	uint u_ribbon_offset;
+	uint u_ribbon_max_length;
 }
 
 struct PointData {
@@ -41,10 +44,10 @@ PointData getPointData(uint buffer_index, uint buffer_offset, uint point_idx) {
 }
 
 VSOutput mainVS(VSInput input) {
-	uint buffer_idx = input.i_data.x;
-	uint buffer_offset = input.i_data.y;
-	uint ribbon_offset = input.i_data.z;
-	uint ribbon_max_length = input.i_data.w;
+	uint buffer_idx = u_points;
+	uint buffer_offset = u_points_offset;
+	uint ribbon_offset = u_ribbon_offset;
+	uint ribbon_max_length = u_ribbon_max_length;
 	uint pidx = ribbon_offset + (input.vertex_id >> 1);
 	uint prev_pidx = pidx > 0 ? pidx - 1 : 0;
 	PointData prev_pd = getPointData(buffer_idx, buffer_offset, prev_pidx % ribbon_max_length);

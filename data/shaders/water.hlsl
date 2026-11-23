@@ -18,24 +18,42 @@
 //@define "SSR"
 
 #include "engine/shaders/common.hlsli"
-
-#define ATTR(X) TEXCOORD##X
+#include "engine/shaders/vertex_pulling.hlsli"
 
 struct VSInput {
-	float3 position : TEXCOORD0;
-	#ifdef UV0_ATTR
-		float2 uv : ATTR(UV0_ATTR);
-	#endif
-	#ifdef _HAS_ATTR2 
-		//layout(location = 2) in float2 a_masks;
-	#endif
-	#if defined AUTOINSTANCED
-		float4 i_rot : ATTR(INSTANCE0_ATTR);
-		float4 i_pos_lod : ATTR(INSTANCE1_ATTR);
-		float4 i_scale : ATTR(INSTANCE2_ATTR);
-		uint i_material_index : ATTR(INSTANCE3_ATTR);
-	#endif
+	uint vertex_id : SV_VertexID;
+	uint instance_id : SV_InstanceID;
 };
+
+// 96 bytes, the layout of surface_base.hlsli (the previous frame is not used), instances are pulled, see vertex_pulling.hlsli
+struct Instance {
+	float4 rot;
+	float4 pos_lod;
+	float4 scale;
+	uint material_index;
+};
+
+Instance loadInstance(VSInput input) {
+	ByteAddressBuffer buffer = bindless_buffers[u_instance_buffer];
+	Instance r;
+	#ifdef INDIRECT_INSTANCE
+		const uint offset = pullInstanceAddress(input.instance_id, DRAW_INSTANCE_STRIDE);
+		const uint4 rec = buffer.Load4(offset + DRAW_INSTANCE_SLOT);
+		float3 pos, scale, prev_pos, prev_scale;
+		float4 prev_rot;
+		pullSceneTransform(rec.x, rec.w, false, r.rot, pos, scale, prev_rot, prev_pos, prev_scale);
+		r.pos_lod = float4(pos, 0);
+		r.scale = float4(scale, 1);
+		r.material_index = buffer.Load(offset + DRAW_INSTANCE_MATERIAL);
+	#else
+		const uint offset = pullInstanceAddress(input.instance_id, 96);
+		r.rot = asfloat(buffer.Load4(offset));
+		r.pos_lod = asfloat(buffer.Load4(offset + 16));
+		r.scale = float4(asfloat(buffer.Load3(offset + 32)), 1);
+		r.material_index = buffer.Load(offset + 92);
+	#endif
+	return r;
+}
 
 struct VSOutput {
 	float2 uv : TEXCOORD0;
@@ -43,41 +61,29 @@ struct VSOutput {
 	float3 tangent : TEXCOORD2;
 	float3 pos_ws : TEXCOORD3;
 	uint i_material_index : TEXCOORD4;
-	#ifdef _HAS_ATTR2 
-		//float2 masks : TEXCOORD4;
-	#endif
 	float4 position : SV_POSITION;
 };
 
-#ifndef AUTOINSTANCED
-	cbuffer Model : register(b4) {
-		float4x4 u_ls_to_ws;
-	};
-#endif
-
 VSOutput mainVS(VSInput input) {
+	#ifdef CLUSTER_MESH
+		VSVertex vtx = pullVertex(input.vertex_id, input.instance_id);
+	#elif defined POOLED_VERTICES
+		VSVertex vtx = pullVertex(input.vertex_id + pullBaseVertex(input.instance_id));
+	#else
+		VSVertex vtx = pullVertex(input.vertex_id);
+	#endif
 	static const float3 normal = float3(0, 1, 0);
 	static const float3 tangent = float3(1, 0, 0);
 
 	VSOutput output;
-	output.uv = input.uv;
-	output.i_material_index = input.i_material_index;
-	#if defined AUTOINSTANCED
-		output.normal = rotateByQuat(input.i_rot, normal);
-		output.tangent = rotateByQuat(input.i_rot, tangent);
-		float3 p = input.position * input.i_scale.xyz;
-		output.pos_ws = input.i_pos_lod.xyz + rotateByQuat(input.i_rot, p);
-	#elif defined GRASS
-		#error TODO
-	#else
-		output.normal = float3x3(u_ls_to_ws) * normal;
-		output.tangent = float3x3(u_ls_to_ws) * tangent;
-		output.pos_ws = transformPosition(input.position, u_ls_to_ws).xyz;
-	#endif
+	output.uv = vtx.uv;
+	const Instance inst = loadInstance(input);
+	output.i_material_index = inst.material_index;
+	output.normal = rotateByQuat(inst.rot, normal);
+	output.tangent = rotateByQuat(inst.rot, tangent);
+	float3 p = vtx.position * inst.scale.xyz;
+	output.pos_ws = inst.pos_lod.xyz + rotateByQuat(inst.rot, p);
 	
-	#ifdef _HAS_ATTR2 
-		//output.masks = a_masks;
-	#endif
 	output.position = transformPosition(output.pos_ws, Pass_ws_to_ndc);
 	return output;
 }
@@ -85,7 +91,7 @@ VSOutput mainVS(VSInput input) {
 cbuffer Textures : register(b5) {
 	TextureHandle u_shadowmap;
 	TextureHandle u_depthbuffer;
-	TextureHandle u_reflection_probes;
+	TextureCubeArrayHandle u_reflection_probes;
 	TextureHandle u_bg;
 };
 

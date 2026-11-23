@@ -23,6 +23,9 @@
 #include "renderer/culling_system.h"
 #include "renderer/draw_stream.h"
 #include "renderer/font.h"
+#include "renderer/gpu_scene.h"
+#include "renderer/gpu_scene_chunks.h"
+#include "core/sort.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/particle_system.h"
@@ -84,6 +87,38 @@ struct RenderModuleImpl final : RenderModule {
 		InstancedModel& im = beginInstancedModelEditing(entity);
 		im.instances.resize(size);
 		value.read(im.instances.begin(), im.instances.byte_size());
+		endInstancedModelEditing(entity);
+	}
+
+	Model* getInstancedModelModel(EntityRef entity) override { return m_instanced_models[entity].model; }
+
+	// Appends `count` instances (identity rotation, scale 1) to the instances of the entity, their transforms are set by setInstancedModelInstanceTransform.
+	void addInstancedModelInstances(EntityRef entity, u32 count) override {
+		InstancedModel& im = beginInstancedModelEditing(entity);
+		const u32 first = im.instances.size();
+		im.instances.resize(first + count);
+		for (u32 i = first; i < first + count; ++i) {
+			InstancedModel::InstanceData& id = im.instances[i];
+			id.rot_quat = Vec3::ZERO;
+			id.lod = 3;
+			id.pos = Vec3::ZERO;
+			id.scale = 1;
+		}
+		endInstancedModelEditing(entity);
+	}
+
+	// `pos` is relative to the entity. The rotation is stored as its xyz, negated if w < 0 (w is rebuilt from them).
+	void setInstancedModelInstanceTransform(EntityRef entity, u32 idx, Vec3 pos, Quat rot, float scale) override {
+		InstancedModel& im = beginInstancedModelEditing(entity);
+		if (idx >= (u32)im.instances.size()) {
+			logError("Instance ", idx, " of an instanced model does not exist");
+			return;
+		}
+		InstancedModel::InstanceData& id = im.instances[idx];
+		id.pos = pos;
+		id.scale = scale;
+		id.rot_quat = Vec3(rot.x, rot.y, rot.z);
+		if (rot.w < 0) id.rot_quat = -id.rot_quat;
 		endInstancedModelEditing(entity);
 	}
 
@@ -163,6 +198,10 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.componentTransformed(types::point_light).unbind<&RenderModuleImpl::onPointLightMoved>(this);
 		m_world.componentTransformed(types::bone_attachment).unbind<&RenderModuleImpl::onBoneAttachmentMoved>(this);
 
+		// the slots release the models they have in the resources of the renderer, before the models can go
+		destroyGPUScene(m_gpu_scene);
+		destroyGPUSceneChunks(m_gpu_chunks);
+
 		for (Decal& decal : m_decals) {
 			if (decal.material) decal.material->decRefCount();
 		}
@@ -188,7 +227,6 @@ struct RenderModuleImpl final : RenderModule {
 			if (!r.model || !r.model->isReady() || r.mesh_materials.begin() != r.model->getMeshMaterials().begin()) {
 				for (MeshMaterial& m : r.mesh_materials) {
 					if (m.material) m.material->decRefCount();
-					m_renderer.freeSortKey(m.sort_key);
 				}
 				m_allocator.deallocate(r.mesh_materials.begin());
 			}
@@ -531,42 +569,78 @@ struct RenderModuleImpl final : RenderModule {
 	void startGame() override { m_is_game_running = true; }
 	void stopGame() override { m_is_game_running = false; }
 
-	void endFrame() override {
-		for (EntityRef e : m_moved_instances) {
-			if (!m_world.hasEntity(e)) continue;
+	void endFrame() override {}
 
-			m_model_instances[e.index].flags &= ~ModelInstance::MOVED;
-			m_model_instances[e.index].prev_frame_transform = m_world.getTransform(e);
-		}
-		m_moved_instances.clear();
+	// Puts the instance in the queue of the ones whose material overrides have to be resolved (and their entries in the GPU scene made), see refreshMaterialOverrides.
+	void queueMaterialOverrideRefresh(EntityRef entity) {
+		ModelInstance& mi = m_model_instances[entity.index];
+		mi.dirty = true;
+		if (mi.override_queued) return;
+		mi.override_queued = true;
+		m_override_queue.push(entity);
 	}
 
-	// Whether the draw state of an instance with material overrides (sort key, material index) no longer matches its materials.
+	// The material overrides of the GPU scene for the slot of the instance: a mesh has one if its material is resolved and is not the
+	// one of the model. The entries of materials that are not resolved are not there (the mesh is drawn with the material of the model until they are).
+	void syncMaterialOverrides(EntityRef entity) {
+		ModelInstance& mi = m_model_instances[entity.index];
+		if (mi.gpu_slot == GPUSceneConst::INVALID_SLOT) return;
+
+		StackArray<GPUMaterialOverride, 16> entries(m_allocator);
+		if (mi.model && mi.model->isReady() && hasMaterialOverride(mi)) {
+			const u32 count = minimum((u32)mi.model->getMeshCount(), (u32)mi.mesh_materials.length());
+			for (u32 mesh = 0; mesh < count; ++mesh) {
+				const MeshMaterial& own = mi.mesh_materials[mesh];
+				const MeshMaterial& model_mat = mi.model->getMeshMaterial(mesh);
+				if (!own.material || !model_mat.material || u32(own.material_index) == 0 || !own.material->isReady()) continue;
+				if (own.material_index == model_mat.material_index) continue;
+				GPUMaterialOverride o = { mesh, (u32)own.material_index, own.material };
+				entries.push(o);
+			}
+		}
+		setSceneOverrides(m_gpu_scene, mi.gpu_slot, Span<const GPUMaterialOverride>(entries.begin(), entries.size()));
+	}
+
+	// Resolves the material overrides of the queued instances once their materials are ready (the queue keeps the others), and makes their entries.
+	void refreshMaterialOverrides() {
+		u32 kept = 0;
+		for (u32 i = 0; i < (u32)m_override_queue.size(); ++i) {
+			const EntityRef entity = m_override_queue[i];
+			ModelInstance& mi = m_model_instances[entity.index];
+			bool done = true;
+			if (isFlagSet(mi.flags, ModelInstance::VALID) && mi.model && mi.model->isReady() && mi.dirty && mi.mesh_count > 0) {
+				if (hasMaterialOverride(mi)) resolveMaterialOverrides(mi);
+				else mi.dirty = false;
+				if (mi.dirty) done = false;
+				else syncMaterialOverrides(entity);
+			}
+			if (done) mi.override_queued = false;
+			else m_override_queue[kept++] = entity;
+		}
+		m_override_queue.resize(kept);
+	}
+
+	// Whether the draw state of an instance with material overrides (material index) no longer matches its materials.
 	// A mesh material with nothing derived yet is not stale. One that is not ready cannot be checked, so it is stale: it is
 	// being (re)loaded. A ready one is stale only if what would be derived from it now differs from what is stored.
 	bool isMaterialOverrideStale(const ModelInstance& mi) const {
 		for (u32 i = 0, c = mi.mesh_materials.size(); i < c; ++i) {
 			const MeshMaterial& mat = mi.mesh_materials[i];
-			if (!mat.sort_key && u32(mat.material_index) == 0) continue;
+			if (u32(mat.material_index) == 0) continue;	// nothing derived yet
 			if (!mat.material || !mat.material->isReady()) return true;
 			if (i >= mi.mesh_count) return true;
 			// A private copy of the uniforms (OWN_MATERIAL_INDEX) has its own index, so it cannot be compared with the material's. It is not stale just because
 			// some other material was unloaded (a particle emitter going away, say): that made the planet vanish for a frame. A reload of this very material
 			// shows up above, as the material is not ready while it loads.
 			if (!isFlagSet(mat.flags, MeshMaterial::OWN_MATERIAL_INDEX) && u32(mat.material_index) != 0 && u32(mat.material_index) != u32(mat.material->getIndex())) return true;
-			if (mat.sort_key) {
-				const u32 fresh = computeSortKey(*mat.material, mi.meshes[i]);
-				m_renderer.freeSortKey(fresh);
-				if (fresh != mat.sort_key) return true;
-			}
 		}
 		return false;
 	}
 
 	// Material overrides are owned by the model instance, not by the model, so the model's state does not track them.
-	// When a material or shader is reloaded, per-mesh state derived from it (sort key, material index) can be stale and the
+	// When a material or shader is reloaded, per-mesh state derived from it (material index) can be stale and the
 	// instance would keep producing draw commands with it. Drop that state and flag the instance dirty,
-	// Pipeline::refreshMaterialOverrides() rebuilds it once the material is ready.
+	// refreshMaterialOverrides() rebuilds it once the material is ready.
 	// Only instances whose state really is stale are touched: a dirty instance is not drawn until it is refreshed, so
 	// invalidating all of them whenever any material was unloaded (e.g. the models of a new module were swapped) made every
 	// instance with an override (the planet, its clouds and atmosphere, the sky) disappear for a few frames.
@@ -578,20 +652,21 @@ struct RenderModuleImpl final : RenderModule {
 		if (counter == m_material_reload_counter) return;
 		m_material_reload_counter = counter;
 
-		for (ModelInstance& mi : m_model_instances) {
+		for (u32 instance_idx = 0, c = m_model_instances.size(); instance_idx < c; ++instance_idx) {
+			ModelInstance& mi = m_model_instances[instance_idx];
 			if (!isFlagSet(mi.flags, ModelInstance::VALID)) continue;
 			if (!mi.model || !mi.model->isReady()) continue;
 			if (mi.mesh_materials.begin() == mi.model->getMeshMaterials().begin()) continue; // no override
 			if (!isMaterialOverrideStale(mi)) continue;
 
 			for (MeshMaterial& mat : mi.mesh_materials) {
-				if (mat.sort_key) m_renderer.freeSortKey(mat.sort_key);
 				if (mat.flags & MeshMaterial::OWN_MATERIAL_INDEX) m_renderer.destroyMaterialConstants(mat.material_index);
-				mat.sort_key = 0;
 				mat.material_index = MaterialIndex{0};
 				mat.flags = mat.flags & ~MeshMaterial::OWN_MATERIAL_INDEX;
 			}
-			mi.dirty = true;
+			const EntityRef entity((i32)instance_idx);
+			syncMaterialOverrides(entity);	// the entries of the GPU scene have materials that may be gone
+			queueMaterialOverrideRefresh(entity);
 		}
 	}
 
@@ -1013,7 +1088,7 @@ struct RenderModuleImpl final : RenderModule {
 			blob.write(pg.vertex_data.data(), pg.vertex_data.size());
 			blob.write(pg.vertex_decl.attributes_count);
 			blob.write(pg.vertex_decl.attributes, sizeof(pg.vertex_decl.attributes[0]) * pg.vertex_decl.attributes_count);
-			blob.write(pg.vertex_decl.primitive_type);
+			blob.write(pg.primitive_type);
 
 			blob.write((u32)pg.index_data.size());
 			if (pg.index_data.size() > 0) blob.write(pg.index_data.data(), pg.index_data.size());
@@ -1241,9 +1316,13 @@ struct RenderModuleImpl final : RenderModule {
 			pg.vertex_data.resize(data_size);
 			blob.read(pg.vertex_data.getMutableData(), pg.vertex_data.size());
 			blob.read(pg.vertex_decl.attributes_count);
+			if (!pg.vertex_decl.isValid()) {
+				logError("Invalid vertex declaration of procedural geometry");
+				return;
+			}
 			blob.read(pg.vertex_decl.attributes, pg.vertex_decl.attributes_count * sizeof(pg.vertex_decl.attributes[0]));
 			if (version > (i32)RenderModuleVersion::PROCEDURAL_GEOMETRY_PRIMITIVE_TYPE) {
-				blob.read(pg.vertex_decl.primitive_type);
+				blob.read(pg.primitive_type);
 			}
 			if (version > (i32)RenderModuleVersion::PROCEDURAL_GEOMETRY_INDEX_BUFFER) {
 				u32 index_buffer_size;
@@ -1254,7 +1333,6 @@ struct RenderModuleImpl final : RenderModule {
 				}
 				blob.read(pg.index_type);
 			}
-			pg.vertex_decl.computeHash();
 			if (!pg.vertex_data.empty()) {
 				const Renderer::MemRef mem = m_renderer.copy(pg.vertex_data.data(), (u32)pg.vertex_data.size());
 				pg.vertex_buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE, "pg_vb");			
@@ -1344,6 +1422,59 @@ struct RenderModuleImpl final : RenderModule {
 		m_instanced_models[entity].dirty = true;
 	}
 
+	// Sorts the instances along a Morton curve of their positions (the CPU array keeps its order, the editor refers to instances by their index) and cuts the
+	// result into chunks of consecutive instances, which are near each other.
+	static void makeInstanceChunks(InstancedModel& im, Array<InstancedModel::InstanceData>& sorted, IAllocator& allocator) {
+		im.chunks.clear();
+		const u32 count = im.instances.size();
+		if (count == 0) return;
+
+		Vec3 min = im.instances[0].pos;
+		Vec3 max = min;
+		for (const InstancedModel::InstanceData& i : im.instances) {
+			min = minimum(min, i.pos);
+			max = maximum(max, i.pos);
+		}
+		const Vec3 extent = max - min;
+		const float cell = maximum(extent.x, extent.y, extent.z) / 1023.f + 1e-6f;
+		auto spread = [](u64 v) {
+			// 10 bits to every third bit
+			v = (v | (v << 16)) & 0x030000FF;
+			v = (v | (v << 8)) & 0x0300F00F;
+			v = (v | (v << 4)) & 0x030C30C3;
+			v = (v | (v << 2)) & 0x09249249;
+			return v;
+		};
+		Array<u64> keys(allocator);
+		keys.resize(count);
+		for (u32 i = 0; i < count; ++i) {
+			const Vec3 q = (im.instances[i].pos - min) / cell;
+			const u64 code = spread((u64)q.x) | (spread((u64)q.y) << 1) | (spread((u64)q.z) << 2);
+			keys[i] = (code << 32) | i;
+		}
+		sort(keys.begin(), keys.end());
+
+		sorted.resize(count);
+		for (u32 i = 0; i < count; ++i) sorted[i] = im.instances[u32(keys[i] & 0xffFFffFF)];
+
+		for (u32 first = 0; first < count; first += GPUSceneConst::CHUNK_INSTANCES) {
+			InstancedModel::Chunk& chunk = im.chunks.emplace();
+			chunk.first = first;
+			chunk.count = minimum(count - first, GPUSceneConst::CHUNK_INSTANCES);
+			Vec3 chunk_min = sorted[first].pos;
+			Vec3 chunk_max = chunk_min;
+			chunk.max_scale = 0;
+			for (u32 i = first; i < first + chunk.count; ++i) {
+				chunk_min = minimum(chunk_min, sorted[i].pos);
+				chunk_max = maximum(chunk_max, sorted[i].pos);
+				chunk.max_scale = maximum(chunk.max_scale, sorted[i].scale);
+			}
+			chunk.center = (chunk_min + chunk_max) * 0.5f;
+			chunk.radius = 0;
+			for (u32 i = first; i < first + chunk.count; ++i) chunk.radius = maximum(chunk.radius, length(sorted[i].pos - chunk.center));
+		}
+	}
+
 	void initInstancedModelGPUData(EntityRef entity) override {
 		PROFILE_FUNCTION();
 		InstancedModel& im = m_instanced_models[entity];
@@ -1355,80 +1486,40 @@ struct RenderModuleImpl final : RenderModule {
 			}
 		}
 
-		// grid aabb
-		im.grid.aabb = AABB(Vec3(FLT_MAX), Vec3(-FLT_MAX));
-		for (const InstancedModel::InstanceData& id : im.instances) {
-			im.grid.aabb.addPoint(id.pos);
-		}
-
-		// cells aabb
-		const Vec2 cell_size = (im.grid.aabb.max.xz() - im.grid.aabb.min.xz()) * 0.25f;
-		for (u32 j = 0; j < 4; ++j) {
-			for (u32 i = 0; i < 4; ++i) {
-				InstancedModel::Grid::Cell& cell = im.grid.cells[i + j * 4];
-				cell.from_instance = 0;
-				cell.instance_count = 0;
-				cell.aabb.min.x = im.grid.aabb.min.x + cell_size.x * i;
-				cell.aabb.min.y = im.grid.aabb.min.y;
-				cell.aabb.min.z = im.grid.aabb.min.z + cell_size.y * j;
-				cell.aabb.max.x = cell.aabb.min.x + cell_size.x;
-				cell.aabb.max.y = im.grid.aabb.max.y;
-				cell.aabb.max.z = cell.aabb.min.z + cell_size.y;
-				cell.aabb.shrink(-0.01f);
-			}
-		}
-
-		// count
-		for (const InstancedModel::InstanceData& id : im.instances) {
-			for (u32 i = 0; i < 16; ++i) {
-				if (im.grid.cells[i].aabb.contains(id.pos)) {
-					++im.grid.cells[i].instance_count;
-					break;
-				}
-			}
-		}
-
-		// offsets
-		for (u32 i = 1; i < 16; ++i) {
-			im.grid.cells[i].from_instance = im.grid.cells[i - 1].instance_count + im.grid.cells[i - 1].from_instance;
-		}
-
-		for (u32 i = 0; i < 16; ++i) im.grid.cells[i].instance_count = 0;
-
-		// scatter
-		Array<InstancedModel::InstanceData> tmp(m_allocator);
-		tmp.resize(im.instances.size());
-		for (const InstancedModel::InstanceData& id : im.instances) {
-			for (u32 i = 0; i < 16; ++i) {
-				if (im.grid.cells[i].aabb.contains(id.pos)) {
-					tmp[im.grid.cells[i].instance_count + im.grid.cells[i].from_instance] = id;
-					++im.grid.cells[i].instance_count;
-					break;
-				}
-			}
-		}
-		im.instances.swap(tmp);
-
-		if (!im.instances.empty()) {
+		Array<InstancedModel::InstanceData> sorted(m_allocator);
+		makeInstanceChunks(im, sorted, m_allocator);
+		if (!sorted.empty()) {
 			if (im.gpu_data) {
-				Renderer::MemRef mem = m_renderer.copy(im.instances.begin(), im.instances.byte_size());
+				Renderer::MemRef mem = m_renderer.copy(sorted.begin(), sorted.byte_size());
 				DrawStream& stream = m_renderer.getDrawStream();
 				stream.update(im.gpu_data, mem.data, mem.size);
 				stream.freeMemory(mem.data, m_renderer.getAllocator());
 			}
 			else {
-				Renderer::MemRef mem = m_renderer.copy(im.instances.begin(), im.instances.capacity() * sizeof(im.instances[0]));
+				const u32 capacity = im.instances.capacity();
+				Renderer::MemRef mem = m_renderer.allocate(capacity * sizeof(InstancedModel::InstanceData));
+				memset(mem.data, 0, mem.size);
+				memcpy(mem.data, sorted.begin(), sorted.byte_size());
 				im.gpu_data = m_renderer.createBuffer(mem, gpu::BufferFlags::SHADER_BUFFER, "instances");
-				im.gpu_capacity = im.instances.capacity();
+				im.gpu_capacity = capacity;
 			}
 		}
+		im.gpu_count = im.instances.size();
+		++im.gpu_version;
 
 		im.dirty = false;
+	}
+
+	void freeInstancedModelSlots(InstancedModel& im) {
+		for (u32 slot : im.gpu_slots) freeSceneChunk(m_gpu_chunks, slot);
+		im.gpu_slots.clear();
+		im.gpu_slots_model = nullptr;
 	}
 
 	void destroyInstancedModel(EntityRef entity) override {
 		Model* m = m_instanced_models[entity].model;
 		if (m) m->decRefCount();
+		freeInstancedModelSlots(m_instanced_models[entity]);
 		if (m_instanced_models[entity].gpu_data) m_renderer.getEndFrameDrawStream().destroy(m_instanced_models[entity].gpu_data);
 		m_instanced_models.erase(entity);
 		m_world.onComponentDestroyed(entity, types::instanced_model, this);
@@ -1604,17 +1695,81 @@ struct RenderModuleImpl final : RenderModule {
 #endif
 	}
 
-	void onModelInstanceMoved(EntityRef entity) {
-		if (!m_culling_system->isAdded(entity)) return;
-		
+	// The GPU scene has a slot for every enabled model instance whose model Model::canUseGPUScene.
+	void gpuSceneUpdate(EntityRef entity) {
+		const ModelInstance& mi = m_model_instances[entity.index];
+		if (mi.gpu_slot == GPUSceneConst::INVALID_SLOT || !mi.model) return;
 		const Transform& tr = m_world.getTransform(entity);
+		const float radius = mi.model->getOriginBoundingRadius() * maximum(tr.scale.x, tr.scale.y, tr.scale.z);
+		setSceneTransform(m_gpu_scene, mi.gpu_slot, tr, radius, mi.forced_lod);
+	}
+
+	void gpuSceneAdd(EntityRef entity) {
 		ModelInstance& mi = m_model_instances[entity.index];
-		m_moved_instances.push(entity);
-		mi.flags |= ModelInstance::MOVED;
-		const Model* model = mi.model;
-		ASSERT(model);
-		const float bounding_radius = model->getOriginBoundingRadius();
-		m_culling_system->set(entity, tr.pos, bounding_radius * maximum(tr.scale.x, tr.scale.y, tr.scale.z));
+		if (mi.gpu_slot == GPUSceneConst::INVALID_SLOT) {
+			mi.gpu_slot = allocSceneSlot(m_gpu_scene, *mi.model);
+			// the entries of the table of material overrides belong to the slot
+			if (hasMaterialOverride(mi)) queueMaterialOverrideRefresh(entity);
+		}
+		gpuSceneUpdate(entity);
+	}
+
+	void gpuSceneRemove(EntityRef entity) {
+		ModelInstance& mi = m_model_instances[entity.index];
+		if (mi.gpu_slot == GPUSceneConst::INVALID_SLOT) return;
+		freeSceneSlot(m_gpu_scene, mi.gpu_slot);
+		mi.gpu_slot = GPUSceneConst::INVALID_SLOT;
+	}
+
+	void flushGPUScene() override {
+		refreshMaterialOverrides();
+		syncInstancedModelChunks();
+		uploadGPUScene(m_gpu_scene);
+		uploadGPUSceneChunks(m_gpu_chunks);
+	}
+
+	// The chunks of instanced models are in the chunk store of the GPU scene (gpu_scene_chunks.h): made when the model and the buffer of the instances are ready, made again when the instances change,
+	// moved with the entity (only its position, as the ray casts do it).
+	void syncInstancedModelChunks() {
+		for (auto iter = m_instanced_models.begin(), end = m_instanced_models.end(); iter != end; ++iter) {
+			InstancedModel& im = iter.value();
+			const bool ready = im.model && im.model->isReady();
+			const bool skinned = ready && im.model->hasSkinnedMeshes();
+			if (skinned && !im.warned_skinned) {
+				im.warned_skinned = true;
+				logError(im.model->getPath(), ": instanced models with skinned meshes are not drawn");
+			}
+			const bool wanted = ready && !skinned && im.model->canUseGPUScene() && im.gpu_data && im.gpu_count > 0;
+			if (!im.gpu_slots.empty() && (!wanted || im.gpu_slots_model != im.model || im.gpu_slots_version != im.gpu_version)) freeInstancedModelSlots(im);
+			if (!wanted) continue;
+
+			const DVec3 origin = m_world.getPosition(iter.key());
+			const bool fresh = im.gpu_slots.empty();
+			if (fresh) {
+				for (const InstancedModel::Chunk& chunk : im.chunks) {
+					im.gpu_slots.push(allocSceneChunk(m_gpu_chunks, *im.model, im.gpu_data, chunk.first, chunk.count));
+				}
+				im.gpu_slots_model = im.model;
+				im.gpu_slots_version = im.gpu_version;
+			}
+			if (fresh || origin.x != im.gpu_origin.x || origin.y != im.gpu_origin.y || origin.z != im.gpu_origin.z) {
+				const float model_radius = im.model->getOriginBoundingRadius();
+				for (u32 i = 0, c = im.gpu_slots.size(); i < c; ++i) {
+					const InstancedModel::Chunk& chunk = im.chunks[i];
+					moveSceneChunk(m_gpu_chunks, im.gpu_slots[i], origin, origin + chunk.center, chunk.radius + model_radius * chunk.max_scale);
+				}
+				im.gpu_origin = origin;
+			}
+		}
+	}
+	GPUScene& getGPUScene() override { return m_gpu_scene; }
+	GPUSceneChunks& getGPUSceneChunks() override { return m_gpu_chunks; }
+
+	void onModelInstanceMoved(EntityRef entity) {
+		ModelInstance& mi = m_model_instances[entity.index];
+		// a drawn instance has a slot in the GPU scene (the parent of bone attachments moves them even if there is nothing to draw)
+		if (mi.gpu_slot == GPUSceneConst::INVALID_SLOT && !(mi.flags & ModelInstance::IS_BONE_ATTACHMENT_PARENT)) return;
+		gpuSceneUpdate(entity);
 
 		if (mi.flags & ModelInstance::IS_BONE_ATTACHMENT_PARENT) {
 			for (auto& attachment : m_bone_attachments) {
@@ -1914,6 +2069,7 @@ struct RenderModuleImpl final : RenderModule {
 	void getProceduralGeometryBlob(EntityRef entity, OutputMemoryStream& value) {
 		const ProceduralGeometry& pg = m_procedural_geometries[entity];
 		value.write(pg.vertex_decl);
+		value.write(pg.primitive_type);
 		value.write(pg.index_type);
 		value.write((u32)pg.vertex_data.size());
 		if (!pg.vertex_data.empty()) value.write(pg.vertex_data.data(), pg.vertex_data.size());
@@ -1935,6 +2091,12 @@ struct RenderModuleImpl final : RenderModule {
 		}
 		
 		value.read(pg.vertex_decl);
+		if (!pg.vertex_decl.isValid()) {
+			logError("Invalid vertex declaration of procedural geometry");
+			pg.vertex_decl = VertexDecl();
+			return;
+		}
+		value.read(pg.primitive_type);
 		value.read(pg.index_type);
 		u32 size = value.read<u32>();
 		if (size > 0) {
@@ -1972,13 +2134,15 @@ struct RenderModuleImpl final : RenderModule {
 
 	void setProceduralGeometry(EntityRef entity
 		, Span<const u8> vertex_data
-		, const gpu::VertexDecl& vertex_decl
+		, const VertexDecl& vertex_decl
+		, gpu::PrimitiveType primitive_type
 		, Span<const u8> indices
 		, gpu::DataType index_type) override
 	{
 		PROFILE_FUNCTION();
 		ProceduralGeometry& pg = m_procedural_geometries[entity];
 		pg.vertex_decl = vertex_decl;
+		pg.primitive_type = primitive_type;
 		pg.vertex_data.clear();
 		pg.index_data.clear();
 		pg.index_type = index_type;
@@ -2048,7 +2212,7 @@ struct RenderModuleImpl final : RenderModule {
 		ModelInstance& inst = m_model_instances[entity.index];
 		if (!inst.model->isReady()) return nullptr;
 
-		ensureMaterialDataSize(inst, mesh_index + 1);
+		ensureMaterialDataSize(inst, mesh_index + 1, entity);
 
 		MeshMaterial& mat = inst.mesh_materials[mesh_index];
 		if (!mat.material || !mat.material->isReady()) return nullptr;
@@ -2107,16 +2271,14 @@ struct RenderModuleImpl final : RenderModule {
 		{
 			if (!model_instance.model || !model_instance.model->isReady()) return;
 
-			const DVec3 pos = m_world.getPosition(entity);
-			const Vec3& scale = m_world.getScale(entity);
-			const float radius = model_instance.model->getOriginBoundingRadius() * maximum(scale.x, scale.y, scale.z);
-			if (!m_culling_system->isAdded(entity)) {
-				m_culling_system->add(entity, (u8)RenderableTypes::MESH, pos, radius);
+			// instances of models that the GPU scene can draw are culled and drawn by the GPU, they have a slot and are not in the culling system
+			if (model_instance.model->canUseGPUScene()) {
+				if (model_instance.gpu_slot == GPUSceneConst::INVALID_SLOT) gpuSceneAdd(entity);
 			}
 		}
 		else
 		{
-			m_culling_system->remove(entity);
+			gpuSceneRemove(entity);
 		}
 	}
 
@@ -2126,12 +2288,12 @@ struct RenderModuleImpl final : RenderModule {
 		return m.model->getMeshMaterials().begin() != m.mesh_materials.begin();
 	}
 
-	void ensureMaterialDataSize(ModelInstance& m, u32 size) {
+	void ensureMaterialDataSize(ModelInstance& m, u32 size, EntityRef entity) {
 		bool has = hasMaterialOverride(m);
 		const u32 num_existing = m.mesh_materials.size();
 		if (has && num_existing >= size) return;
 		
-		m.dirty = true;
+		queueMaterialOverrideRefresh(entity);
 		MeshMaterial* new_data = (MeshMaterial*)m_allocator.allocate(sizeof(MeshMaterial) * maximum(size, num_existing), alignof(MeshMaterial));
 		if (has) {
 			memcpy(new_data, m.mesh_materials.begin(), sizeof(new_data[0]) * num_existing);
@@ -2151,23 +2313,22 @@ struct RenderModuleImpl final : RenderModule {
 	void setModelInstanceMaterialOverride(EntityRef entity, u32 mesh_idx, const Path& path) override {
 		ModelInstance& mi = m_model_instances[entity.index];
 
-		ensureMaterialDataSize(mi, mesh_idx + 1);
+		ensureMaterialDataSize(mi, mesh_idx + 1, entity);
 
 		MeshMaterial& mat = mi.mesh_materials[mesh_idx];
 		Material* prev_mat = mat.material;
-		if (mat.sort_key) m_renderer.freeSortKey(mat.sort_key);
 		if (mat.flags & MeshMaterial::OWN_MATERIAL_INDEX) m_renderer.destroyMaterialConstants(mat.material_index);
 		
 		mat.material = path.isEmpty() ? nullptr : m_engine.getResourceManager().load<Material>(path);
 		
 		if (prev_mat) prev_mat->decRefCount();
-		mat.sort_key = 0;
 		mat.material_index = MaterialIndex{0};
-		mi.dirty = true;
+		queueMaterialOverrideRefresh(entity);
 		resolveMaterialOverrides(mi);
+		syncMaterialOverrides(entity);
 	}
 
-	// A dirty model instance is not drawn until the pipeline refreshes it (Pipeline::refreshMaterialOverrides), so swapping a material at runtime made the
+	// A dirty model instance is not drawn until the pipeline refreshes it (refreshMaterialOverrides), so swapping a material at runtime made the
 	// mesh vanish for a frame. When the model and all materials are already loaded, do that refresh right here.
 	void resolveMaterialOverrides(ModelInstance& mi) {
 		if (!mi.model || !mi.model->isReady() || !mi.meshes) return;
@@ -2181,7 +2342,6 @@ struct RenderModuleImpl final : RenderModule {
 		}
 		for (u32 i = 0; i < mi.mesh_count; ++i) {
 			MeshMaterial& mat = mi.mesh_materials[i];
-			if (mat.sort_key == 0) mat.sort_key = computeSortKey(*mat.material, mi.meshes[i]);
 			if ((u32)mat.material_index == 0) {
 				mat.material_index = mat.material->getIndex();
 				mat.flags = mat.flags & ~MeshMaterial::OWN_MATERIAL_INDEX;
@@ -2222,7 +2382,8 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 	void setModelInstanceLOD(EntityRef entity, u32 lod) override {
-		m_model_instances[entity.index].lod = float(lod);
+		m_model_instances[entity.index].forced_lod = (i32)lod;
+		gpuSceneUpdate(entity);
 	}
 
 	void setModelInstancePath(EntityRef entity, const Path& path) override
@@ -2347,7 +2508,33 @@ struct RenderModuleImpl final : RenderModule {
 
 	CullResult* getRenderables(const ShiftedFrustum& frustum, RenderableTypes type) const override
 	{
-		return m_culling_system->cull(frustum, static_cast<u8>(type));
+		if (type != RenderableTypes::MESH) return m_culling_system->cull(frustum, static_cast<u8>(type));
+
+		// Instances of models that the GPU scene draws are not in the culling system, the GPU culls and draws them (Pipeline::runGPUSceneCulling). The editor (selection by
+		// a rectangle, tools of terrain) asks for meshes in a frustum and wants them too, so they are found by testing every one of them. The pipelines do
+		// not use this function for meshes, they ask for all the types at once.
+		PagedList<CullResult> list(m_engine.getPageAllocator());
+		CullResult* page = nullptr;
+		const Transform* transforms = m_world.getTransforms();
+		for (u32 i = 0, c = m_model_instances.size(); i < c; ++i) {
+			const ModelInstance& mi = m_model_instances[i];
+			if (mi.gpu_slot == GPUSceneConst::INVALID_SLOT || !mi.model) continue;
+			const Transform& tr = transforms[i];
+			const float radius = mi.model->getOriginBoundingRadius() * maximum(tr.scale.x, tr.scale.y, tr.scale.z);
+			const Vec3 center = Vec3(tr.pos - frustum.origin);
+			bool inside = true;
+			for (u32 k = 0; k < lengthOf(frustum.xs) && inside; ++k) {
+				inside = frustum.xs[k] * center.x + frustum.ys[k] * center.y + frustum.zs[k] * center.z + frustum.ds[k] >= -radius;
+			}
+			if (!inside) continue;
+			if (!page || page->header.count == lengthOf(page->entities)) {
+				page = list.push();
+				page->header.type = (u8)RenderableTypes::MESH;
+			}
+			page->entities[page->header.count] = EntityRef((i32)i);
+			++page->header.count;
+		}
+		return list.detach();
 	}
 
 
@@ -2782,7 +2969,7 @@ struct RenderModuleImpl final : RenderModule {
 		for (auto iter : m_procedural_geometries.iterated()) {
 			const ProceduralGeometry& pg = iter.value();
 			if (pg.vertex_data.empty()) continue;
-			if (pg.vertex_decl.primitive_type != gpu::PrimitiveType::TRIANGLES) continue;
+			if (pg.primitive_type != gpu::PrimitiveType::TRIANGLES) continue;
 
 			const u32 stride = pg.vertex_decl.getStride();
 			const u8* data = pg.vertex_data.data();
@@ -3033,22 +3220,16 @@ struct RenderModuleImpl final : RenderModule {
 		LUMIX_DELETE(m_allocator, r.pose);
 		r.pose = nullptr;
 
-		m_culling_system->remove(entity);
+		gpuSceneRemove(entity);
 	}
 
 
 	void modelLoaded(Model* model, EntityRef entity) {
 		ASSERT(model->isReady());
 		auto& r = m_model_instances[entity.index];
-		// Transform changes while the model was loading were not tracked by the culling system.
-		r.prev_frame_transform = m_world.getTransform(entity);
-
-		float bounding_radius = r.model->getOriginBoundingRadius();
-		const Vec3& scale = m_world.getScale(entity);
-		const DVec3 pos = m_world.getPosition(entity);
-		const float radius = bounding_radius * maximum(scale.x, scale.y, scale.z);
 		if(r.flags & ModelInstance::ENABLED) {
-			m_culling_system->add(entity, (u8)RenderableTypes::MESH, pos, radius);
+			// instances of models that the GPU scene can draw are culled and drawn by the GPU, they have a slot and are not in the culling system
+			if (model->canUseGPUScene()) gpuSceneAdd(entity);
 		}
 		ASSERT(!r.pose);
 		u32 num_bones = model->getBones().size();
@@ -3063,7 +3244,7 @@ struct RenderModuleImpl final : RenderModule {
 			r.mesh_materials = r.model->getMeshMaterials();
 		}
 		else {
-			ensureMaterialDataSize(r, r.mesh_count);
+			ensureMaterialDataSize(r, r.mesh_count, entity);
 		}
 
 		if (r.flags & ModelInstance::IS_BONE_ATTACHMENT_PARENT) {
@@ -3074,27 +3255,9 @@ struct RenderModuleImpl final : RenderModule {
 			}
 		}
 
-		// negative lod means "not yet known", the pipeline snaps it to the correct lod on first use
-		r.lod = -1;
-		
-		r.dirty = r.mesh_materials.begin() != r.model->getMeshMaterials().begin();
+		r.dirty = false;
+		if (hasMaterialOverride(r)) queueMaterialOverrideRefresh(entity);
 	}
-
-	u32 computeSortKey(const Material& material, const Mesh& mesh) const override {
-		ASSERT(material.isReady());
-		RollingHasher hasher;
-		const Shader* shader = material.getShader();
-		const u32 define_mask = material.getDefineMask();
-		hasher.begin();
-		const Mesh* mesh_ptr = &mesh;
-		hasher.update(&mesh_ptr, sizeof(mesh_ptr));
-		hasher.update(&shader, sizeof(shader));
-		hasher.update(&define_mask, sizeof(define_mask));
-		hasher.update(&material.m_render_states, sizeof(material.m_render_states));
-		const RuntimeHash32 hash = hasher.end();
-		return m_renderer.allocSortKey(hash.getHashValue());
-	}
-
 
 	void modelUnloaded(Model* model)
 	{
@@ -3236,7 +3399,6 @@ struct RenderModuleImpl final : RenderModule {
 
 	void setModel(EntityRef entity, Model* model) {
 		auto& r = m_model_instances[entity.index];
-		r.prev_frame_transform = m_world.getTransform(entity);
 		ASSERT(r.flags & ModelInstance::VALID);
 
 		Model* old_model = r.model;
@@ -3249,7 +3411,6 @@ struct RenderModuleImpl final : RenderModule {
 		if (!old_model || !old_model->isReady() || r.mesh_materials.begin() != old_model->getMeshMaterials().begin()) {
 			for (MeshMaterial& m : r.mesh_materials) {
 				if (m.material) m.material->decRefCount();
-				m_renderer.freeSortKey(m.sort_key);
 			}
 			m_allocator.deallocate(r.mesh_materials.begin());
 		}
@@ -3265,7 +3426,7 @@ struct RenderModuleImpl final : RenderModule {
 			removeFromModelEntityMap(old_model, entity);
 
 			if (old_model->isReady()) {
-				m_culling_system->remove(entity);
+				gpuSceneRemove(entity);
 			}
 			old_model->decRefCount();
 		}
@@ -3537,14 +3698,16 @@ struct RenderModuleImpl final : RenderModule {
 	Renderer& m_renderer;
 	Engine& m_engine;
 	UniquePtr<CullingSystem> m_culling_system;
+	GPUScene m_gpu_scene;
+	GPUSceneChunks m_gpu_chunks;
 
 	EntityPtr m_active_global_light_entity;
 	HashMap<EntityRef, PointLight> m_point_lights;
 	HashMap<EntityRef, Decal> m_decals;
 	HashMap<EntityRef, CurveDecal> m_curve_decals;
 	Array<ModelInstance> m_model_instances;
+	Array<EntityRef> m_override_queue;	// instances whose material overrides are not resolved, see refreshMaterialOverrides
 	u32 m_material_reload_counter = 0;
-	Array<EntityRef> m_moved_instances;
 	HashMap<EntityRef, InstancedModel> m_instanced_models;
 	HashMap<EntityRef, Environment> m_environments;
 	HashMap<EntityRef, Camera> m_cameras;
@@ -3668,9 +3831,11 @@ RenderModuleImpl::RenderModuleImpl(Renderer& renderer,
 	, m_world(world)
 	, m_renderer(renderer)
 	, m_allocator(allocator, "renderer module")
+	, m_gpu_scene(renderer, m_allocator)
+	, m_gpu_chunks(renderer, m_allocator)
 	, m_model_entity_map(m_allocator)
 	, m_model_instances(m_allocator)
-	, m_moved_instances(m_allocator)
+	, m_override_queue(m_allocator)
 	, m_instanced_models(m_allocator)
 	, m_cameras(m_allocator) 
 	, m_terrains(m_allocator)
@@ -3716,4 +3881,4 @@ UniquePtr<RenderModule> RenderModule::createInstance(Renderer& renderer,
 
 
 
-} // namespace Lumix
+} // namespace Lumix

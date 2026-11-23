@@ -23,6 +23,7 @@
 #include "renderer/renderer.h"
 #include "ui/ui_system.h"
 #include "imgui_integration.h"
+#include <stdlib.h>
 
 // window title, set with premake's --app-title
 #ifndef LUMIX_APP_TITLE
@@ -35,6 +36,28 @@
 #endif
 
 using namespace Lumix;
+
+// -resolution <width> <height>: the render resolution instead of the size of the window, the output is scaled to the window (benchmarks render 4K in a hidden window)
+static bool getForcedResolution(int& width, int& height) {
+	char tmp[4096];
+	if (!os::getCommandLine(Span(tmp))) return false;
+	CommandLineParser parser(tmp);
+	while (parser.next()) {
+		if (!parser.currentEquals("-resolution")) continue;
+		int values[2] = {};
+		for (int i = 0; i < 2; ++i) {
+			if (!parser.next()) return false;
+			char value[32];
+			parser.getCurrent(value, sizeof(value));
+			for (const char* c = value; *c >= '0' && *c <= '9'; ++c) values[i] = values[i] * 10 + (*c - '0');
+		}
+		if (values[0] <= 0 || values[1] <= 0) return false;
+		width = values[0];
+		height = values[1];
+		return true;
+	}
+	return false;
+}
 
 struct Runner final
 {
@@ -61,6 +84,11 @@ struct Runner final
 		if (!m_engine.get()) return;
 		if (m_engine->getMainWindow() == os::INVALID_WINDOW) return;
 
+		if (m_forced_width > 0) {
+			m_viewport.w = m_forced_width;
+			m_viewport.h = m_forced_height;
+			return;
+		}
 		const os::Point client_size = os::getWindowClientSize(m_engine->getMainWindow());
 		m_viewport.w = client_size.x;
 		m_viewport.h = client_size.y;
@@ -112,6 +140,43 @@ struct Runner final
 		}
 		copyString(m_world->getPartitions()[0].name, m_startup_world); 
 		return true;
+	}
+
+	// Options for testing, they do nothing if they are not on the command line:
+	//   -screenshot <absolute path>   saves a frame as a PNG and quits, after -screenshot_frame <n> frames (300 by default)
+	//   -cam <x> <y> <z> <yaw> <pitch>   the camera of the view (angles in degrees) instead of the one of the world
+	void parseTestOptions() {
+		char cmd_line[4096] = "";
+		if (!os::getCommandLine(Span(cmd_line))) return;
+		CommandLineParser parser(cmd_line);
+		auto next_number = [&](double& value) {
+			char tmp[64];
+			if (!parser.next()) return false;
+			parser.getCurrent(tmp, lengthOf(tmp));
+			value = atof(tmp);
+			return true;
+		};
+		while (parser.next()) {
+			if (parser.currentEquals("-screenshot")) {
+				if (!parser.next()) break;
+				parser.getCurrent(m_test_screenshot_path, lengthOf(m_test_screenshot_path));
+			}
+			else if (parser.currentEquals("-screenshot_frame")) {
+				double frame;
+				if (!next_number(frame)) break;
+				m_test_screenshot_frame = (u32)frame;
+			}
+			else if (parser.currentEquals("-cam")) {
+				double v[5];
+				bool ok = true;
+				for (double& value : v) ok = ok && next_number(value);
+				if (!ok) break;
+				m_test_cam_pos = DVec3(v[0], v[1], v[2]);
+				m_test_cam_yaw = degreesToRadians((float)v[3]);
+				m_test_cam_pitch = degreesToRadians((float)v[4]);
+				m_test_cam = true;
+			}
+		}
 	}
 
 	void loadProject() {
@@ -175,8 +240,13 @@ struct Runner final
 		m_engine->getFileSystem().mount(data_dir, "");
 		m_imgui.m_engine = m_engine.get();
 
+		// -hidden: the window is never shown (benchmarks): the app does not take the focus or the mouse, the GPU renders the same
+		m_hidden = CommandLineParser::isOn("-hidden");
+		getForcedResolution(m_forced_width, m_forced_height);
+		if (m_hidden) m_focused = false;
 		os::InitWindowArgs init_window_args;
 		init_window_args.name = LUMIX_APP_TITLE;
+		init_window_args.is_hidden = m_hidden;
 		m_window = os::createWindow(init_window_args);
 		m_engine->setMainWindow(m_window);
 
@@ -188,13 +258,14 @@ struct Runner final
 		}
 
 		m_world = &m_engine->createWorld();
+		parseTestOptions();
 		initRenderPipeline();
 		
 		loadProject();
 
 		if (!m_startup_world.isEmpty()) loadWorld();
 		
-		os::showCursor(false);
+		if (m_focused) os::showCursor(false);
 		while (m_engine->getFileSystem().hasWork()) {
 			os::sleep(10);
 			m_engine->getFileSystem().processCallbacks();
@@ -205,7 +276,7 @@ struct Runner final
 		logResolution();
 		m_engine->startGame(*m_world);
 
-		os::showWindow(m_window);
+		if (!m_hidden) os::showWindow(m_window);
 		m_imgui.init();
 	}
 
@@ -286,11 +357,28 @@ struct Runner final
 			m_pipeline->getModule()->setCameraScreenSize((EntityRef)camera, w, h);
 		}
 
+		if (m_test_cam) {
+			m_viewport.pos = m_test_cam_pos;
+			m_viewport.rot = Quat(Vec3(0, 1, 0), m_test_cam_yaw) * Quat(Vec3(1, 0, 0), m_test_cam_pitch);
+		}
+
+		// the screenshot is saved by the pipeline at the end of the frame that was requested in
+		++m_test_frame;
+		if (m_test_screenshot_path[0] && !m_test_screenshot_requested && m_test_frame >= m_test_screenshot_frame) {
+			m_test_screenshot_requested = m_renderer->requestScreenshot(m_test_screenshot_path, 0, 0);
+			if (!m_test_screenshot_requested) m_finished = true;
+		}
+
 		m_pipeline->setViewport(m_viewport);
 		m_pipeline->render(false);
 		m_pipeline->blitOutputToScreen();
 		m_imgui.endFrame();
 		m_renderer->frame();
+
+		if (m_test_screenshot_requested) {
+			const ScreenshotState state = m_renderer->getScreenshotState();
+			if (state == ScreenshotState::SAVED || state == ScreenshotState::FAILED || m_test_frame > m_test_screenshot_frame + 600) m_finished = true;
+		}
 	}
 
 	DefaultAllocator m_main_allocator;
@@ -305,8 +393,21 @@ struct Runner final
 	Viewport m_viewport;
 	bool m_finished = false;
 	bool m_focused = true;
+	bool m_hidden = false;
+	int m_forced_width = 0;
+	int m_forced_height = 0;
 	bool m_mouse_captured = false;
 	bool m_is_ingame_cursor = false;
+
+	// see parseTestOptions
+	char m_test_screenshot_path[MAX_PATH] = "";
+	u32 m_test_screenshot_frame = 300;
+	u32 m_test_frame = 0;
+	bool m_test_screenshot_requested = false;
+	bool m_test_cam = false;
+	DVec3 m_test_cam_pos = DVec3(0, 0, 0);
+	float m_test_cam_yaw = 0;
+	float m_test_cam_pitch = 0;
 
 	ImGuiIntegration m_imgui;
 };
@@ -416,8 +517,7 @@ int main(int args, char* argv[]) {
 				return bindless_textures[2052].Sample(NearestSampler, input.uv);
 			}
 		)#";
-	gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLES);
-	gpu::createProgram(shader, gpu::StateFlags::NONE, decl, src, gpu::ShaderType::SURFACE, "shader");
+	gpu::createProgram(shader, gpu::StateFlags::NONE, gpu::PrimitiveType::TRIANGLES, src, gpu::ShaderType::SURFACE, "shader");
 
 	// main loop
 	bool finished = false;

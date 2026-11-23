@@ -3182,29 +3182,18 @@ struct ParticleScriptCompiler {
 		}
 	}
 
-	void fillVertexDecl(const Emitter& emitter, gpu::VertexDecl& decl) {
-		u32 offset = 0;
+	static u32 getVertexStride(const Emitter& emitter) {
+		u32 stride = 0;
 		for (const Variable& o : emitter.m_outputs) {
 			switch (o.type) {
-				case ValueType::VOID: ASSERT(false); break; 
-				case ValueType::FLOAT: 
-					decl.addAttribute(offset, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-					offset += sizeof(float);
-					break;
-				case ValueType::FLOAT2: 
-					decl.addAttribute(offset, 2, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-					offset += sizeof(Vec2);
-					break;
-				case ValueType::FLOAT3: 
-					decl.addAttribute(offset, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-					offset += sizeof(Vec3);
-					break;
-				case ValueType::FLOAT4: 
-					decl.addAttribute(offset, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-					offset += sizeof(Vec4);
-					break;
+				case ValueType::VOID: ASSERT(false); break;
+				case ValueType::FLOAT: stride += sizeof(float); break;
+				case ValueType::FLOAT2: stride += sizeof(Vec2); break;
+				case ValueType::FLOAT3: stride += sizeof(Vec3); break;
+				case ValueType::FLOAT4: stride += sizeof(Vec4); break;
 			}
 		}
+		return stride;
 	}
 
 	bool compile(const Path& path, StringView code, OutputMemoryStream& output) {
@@ -3248,9 +3237,7 @@ struct ParticleScriptCompiler {
 		};
 
 		for (const Emitter& emitter : m_emitters) {
-			gpu::VertexDecl decl(gpu::PrimitiveType::TRIANGLE_STRIP);
-			fillVertexDecl(emitter, decl);
-			output.write(decl);
+			output.write(getVertexStride(emitter));
 			output.writeString(emitter.m_material);
 			output.writeString(emitter.m_mesh);
 			const u32 count = u32(emitter.m_update.size() + emitter.m_emit.size() + emitter.m_output.size());

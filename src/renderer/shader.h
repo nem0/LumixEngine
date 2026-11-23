@@ -20,7 +20,7 @@ struct ShaderKey {
 	bool operator==(const ShaderKey& rhs) const;
 	gpu::StateFlags state;
 	u32 defines;
-	u32 decl_hash; // this does not need to match gpu::VertexDecl::hash
+	u32 primitive_type; // gpu::PrimitiveType
 	const char* semantic_defines;
 };
 
@@ -80,9 +80,8 @@ struct LUMIX_RENDERER_API Shader final : Resource {
 	bool hasDefine(u8 define) const;
 	
 	gpu::ProgramHandle getProgram(u32 defines);
-	gpu::ProgramHandle getProgram(gpu::StateFlags state, const gpu::VertexDecl& decl, u32 defines, const char* attr_defines);
-	gpu::ProgramHandle getProgram(gpu::StateFlags state, const gpu::VertexDecl& decl, const gpu::VertexDecl& decl2, u32 defines, const char* attr_defines);
-	void compile(gpu::ProgramHandle program, const ShaderKey& key, gpu::VertexDecl decl, DrawStream& stream);
+	gpu::ProgramHandle getProgram(gpu::StateFlags state, gpu::PrimitiveType primitive_type, u32 defines, const char* attr_defines);
+	void compile(gpu::ProgramHandle program, const ShaderKey& key, DrawStream& stream);
 	static void toUniformVarName(Span<char> out, const char* in);
 	static void toTextureVarName(Span<char> out, const char* in);
 

@@ -38,9 +38,9 @@ We utilize [meshoptimizer](https://github.com/zeux/meshoptimizer) for automatic 
 ## MikkTSpace
 We utilize [MikkTSpace](https://github.com/mmikk/MikkTSpace) for generating tangent space as it is the de-facto standard. The source code for MikkTSpace is included in our repository under [external/mikktspace](../external/mikktspace/).
 
-## OpenFBX
+## ufbx
 
-We utilize [OpenFBX](https://github.com/nem0/OpenFBX/) for loading FBX files due to its high quality and open-source nature. The source code for OpenFBX is included in our repository under [external/openfbx](../external/openfbx/).
+We utilize [ufbx](https://github.com/ufbx/ufbx) for loading FBX files due to its robustness and single-file simplicity. The source code for ufbx is included in our repository under [external/ufbx](../external/ufbx/).
 
 ## rgbcx
 
