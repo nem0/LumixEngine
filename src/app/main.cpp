@@ -231,7 +231,17 @@ struct Runner final
 		m_imgui.injectEvent(event);
 
 		if (m_engine.get()) {
-			const bool is_mouse_up = event.type == os::Event::Type::MOUSE_BUTTON && !event.mouse_button.down;
+			// a release is only let through if its press was injected, otherwise a click made in another window
+			// (raw mouse is registered with RIDEV_INPUTSINK) would fire on-click buttons under the cursor
+			bool is_mouse_up = false;
+			if (event.type == os::Event::Type::MOUSE_BUTTON) {
+				const u32 bit = 1u << (u32)event.mouse_button.button;
+				if (event.mouse_button.down) { if (m_focused) m_pressed_buttons |= bit; }
+				else {
+					is_mouse_up = (m_pressed_buttons & bit) != 0;
+					m_pressed_buttons &= ~bit;
+				}
+			}
 			const bool is_key_up = event.type == os::Event::Type::KEY && !event.key.down;
 			if (m_focused || is_mouse_up || is_key_up) {
 				InputSystem& input = m_engine->getInputSystem();
@@ -305,6 +315,7 @@ struct Runner final
 	Viewport m_viewport;
 	bool m_finished = false;
 	bool m_focused = true;
+	u32 m_pressed_buttons = 0;
 	bool m_mouse_captured = false;
 	bool m_is_ingame_cursor = false;
 
