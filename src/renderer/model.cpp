@@ -651,7 +651,7 @@ bool Model::parseClusters(InputMemoryStream& file, Span<const u8> resident) {
 		bool valid_semantics = mesh.vertex_decl.isValid();
 		// unused entries of the array are NONE
 		for (AttributeSemantic semantic : mesh.attributes_semantic) valid_semantics = valid_semantics && ((u32)semantic < (u32)AttributeSemantic::COUNT || semantic == AttributeSemantic::NONE);
-		// a draw has cluster_index_stride indices per cluster, from the sequential index buffer of the pipeline (65536 entries)
+		// cluster_index_stride is the largest index count of a cluster; indices are tightly packed and every cluster is drawn by its own command with its own count
 		if (file.hasOverflow() || !valid_semantics || mesh.leaf_cluster_count > mesh.cluster_count || mesh.tree_depth > 64 || mesh.cluster_index_stride == 0 || mesh.cluster_index_stride > 65536) {
 			logError(m_path, ": invalid clusters");
 			return false;
@@ -817,6 +817,7 @@ ClusterStream::ClusterStream(IAllocator& allocator)
 	: allocator(allocator)
 	, groups(allocator)
 	, group_page(allocator)
+	, group_index_count(allocator)
 	, page_parents(allocator)
 	, page_children(allocator)
 	, pages(allocator)
@@ -835,6 +836,8 @@ bool ClusterStream::init(const MeshClusterGPU* cluster_array, u32 clusters, cons
 
 	groups.resize(group_count);
 	group_page.resize(group_count);
+	group_index_count.resize(group_count);
+	for (u32& c : group_index_count) c = 0;
 	memcpy(groups.begin(), group_array, u64(group_count) * sizeof(MeshGroupGPU));
 	for (const MeshGroupGPU& g : groups) {
 		if (g.cluster_count == 0 || u64(g.first_cluster) + g.cluster_count > cluster_count || u64(g.stream_offset) + g.stream_size > stream_size || (g.stream_offset & 3) != 0) return false;
@@ -847,6 +850,7 @@ bool ClusterStream::init(const MeshClusterGPU* cluster_array, u32 clusters, cons
 		cluster_refined[i] = cluster_array[i].refined_group;
 		if (cluster_array[i].group >= group_count) return false;
 		if (cluster_array[i].refined_group != MeshClusters::NO_GROUP && cluster_array[i].refined_group >= group_count) return false;
+		group_index_count[cluster_array[i].group] += cluster_array[i].index_count;
 	}
 
 	// The pages are made by the importer (buildMeshPages), and are valid: they have all the groups in order, a page needs the pages that have higher numbers.
@@ -904,10 +908,22 @@ u32 ClusterStream::pageBytes(u32 page_index) const {
 	const Page& page = pages[page_index];
 	const MeshGroupGPU& first = groups[page.first_group];
 	const MeshGroupGPU& last = groups[page.first_group + page.group_count - 1];
-	// the vertex streams of the groups of a page and then their indices, as they are in the model
+	// the vertex streams of the groups of a page and then their tightly packed u8 indices, as they are in the model file
 	const u32 stream_bytes = last.stream_offset + last.stream_size - first.stream_offset;
-	const u32 index_bytes = (last.first_cluster + last.cluster_count - first.first_cluster) * index_stride;
+	u32 index_bytes = 0;
+	for (u32 g = page.first_group; g < page.first_group + page.group_count; ++g) index_bytes += group_index_count[g];
 	return (stream_bytes + index_bytes + 15) & ~15u;
+}
+
+u32 ClusterStream::pageGpuBytes(u32 page_index) const {
+	const Page& page = pages[page_index];
+	const MeshGroupGPU& first = groups[page.first_group];
+	const MeshGroupGPU& last = groups[page.first_group + page.group_count - 1];
+	// in GPU memory indices are widened to u16 so m_cluster_data_buffer can be bound directly as a hardware U16 index buffer
+	const u32 stream_bytes = last.stream_offset + last.stream_size - first.stream_offset;
+	u32 index_count = 0;
+	for (u32 g = page.first_group; g < page.first_group + page.group_count; ++g) index_count += group_index_count[g];
+	return (stream_bytes + index_count * 2 + 15) & ~15u;
 }
 
 u32 ClusterStream::firstMissingParentPage(u32 page_index) const {
@@ -944,17 +960,30 @@ bool ClusterStream::loadPage(Renderer& renderer, u32 page_index, u32 stamp, bool
 	const MeshGroupGPU& first = groups[page.first_group];
 	const MeshGroupGPU& last = groups[page.first_group + page.group_count - 1];
 	const u32 stream_bytes = last.stream_offset + last.stream_size - first.stream_offset;
-	const u32 size = pageBytes(page_index);
+	u32 index_count = 0;
+	for (u32 g = page.first_group; g < page.first_group + page.group_count; ++g) index_count += group_index_count[g];
+	const u32 size = pageGpuBytes(page_index);
 	u32 offset;
 	if (!renderer.allocClusterRange(size, 16, offset, can_reclaim)) return false;
-	// `data` is the page as it is in the file: the vertex streams of the groups and then their indices, see pageBytes
-	renderer.updateClusterData(offset, data, size);
+	// `data` is the page as it is in the file: vertex streams (4-byte aligned) followed by tightly packed u8 indices; widen indices to u16 on upload
+	if (stream_bytes > 0) renderer.updateClusterData(offset, data, stream_bytes);
+	if (index_count > 0) {
+		const u32 padded_count = (index_count + 1) & ~1u;
+		Array<u16> widened(allocator);
+		widened.resize(padded_count);
+		const u8* src_indices = data + stream_bytes;
+		for (u32 i = 0; i < index_count; ++i) widened[i] = src_indices[i];
+		if (padded_count > index_count) widened[index_count] = 0;
+		renderer.updateClusterData(offset + stream_bytes, widened.begin(), padded_count * sizeof(u16));
+	}
 
+	u32 page_index_cursor = 0;
 	for (u32 g = page.first_group; g < page.first_group + page.group_count; ++g) {
 		loaded[g] = 1;
 		addresses[g].stream_address = offset + (groups[g].stream_offset - first.stream_offset);
-		addresses[g].index_address = offset + stream_bytes + (groups[g].first_cluster - first.first_cluster) * index_stride;
+		addresses[g].index_address = offset + stream_bytes + page_index_cursor * 2;
 		addresses[g].flags = addressFlags(g);
+		page_index_cursor += group_index_count[g];
 	}
 	page.loaded = true;
 	page.pool_offset = offset;

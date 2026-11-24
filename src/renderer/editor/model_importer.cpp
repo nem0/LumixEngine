@@ -1515,12 +1515,10 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 			break;
 		}
 
-		// the pages are streaming units of the payload of the groups, their size depends on the stride of the indices that is written below
-		u32 page_index_stride = 3;
-		for (const MeshClusterGPU& cluster : clusters->clusters) page_index_stride = maximum(page_index_stride, cluster.index_count);
+		// the pages are streaming units of the payload of the groups (tightly packed u8 indices, no degenerate padding)
 		MeshPages* page_data = LUMIX_NEW(m_allocator, MeshPages)(m_allocator);
 		page_results.push(page_data);
-		if (!buildMeshPages(clusters->clusters.begin(), (u32)clusters->clusters.size(), clusters->groups.begin(), (u32)clusters->groups.size(), page_index_stride, *page_data, m_allocator)) {
+		if (!buildMeshPages(clusters->clusters.begin(), (u32)clusters->clusters.size(), clusters->groups.begin(), (u32)clusters->groups.size(), *page_data, m_allocator)) {
 			logError("Failed to make pages of clusters of a model");
 			failed = true;
 			break;
@@ -1546,7 +1544,7 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 		u32 total_clusters = 0;
 		u64 packed_bytes = 0, unpacked_bytes = 0;
 		for (u32 i = 0; i < (u32)results.size(); ++i) {
-			const MeshClusters* clusters = results[i];
+			MeshClusters* clusters = results[i];
 			ASSERT(clusters->local_indices.size() == clusters->indices.size());
 			const u32 cluster_count = (u32)clusters->clusters.size();
 
@@ -1580,27 +1578,8 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 			}
 			ASSERT(offset == clusters->attribute_stride);
 
-			// Every cluster gets the same number of indices, so that one instanced draw can draw any selection of clusters (instance = cluster).
-			// The padding is made of degenerate triangles of the vertex 0, which the rasterizer drops and the vertex cache already holds.
-			u32 index_stride = 3;
-			for (const MeshClusterGPU& cluster : clusters->clusters) index_stride = maximum(index_stride, cluster.index_count);
-			// indices are local to a cluster, which has at most MeshClusters::MAX_CLUSTER_VERTICES vertices, they are written as bytes
-			static_assert(MeshClusters::MAX_CLUSTER_VERTICES <= 256);
-			profiler::beginBlock("pad cluster indices");
-			Array<u8> padded_indices(m_allocator);
-			padded_indices.resize(cluster_count * index_stride);
-			memset(padded_indices.begin(), 0, padded_indices.byte_size());
-			for (u32 c = 0; c < cluster_count; ++c) {
-				const MeshClusterGPU& cluster = clusters->clusters[c];
-				for (u32 k = 0; k < cluster.index_count; ++k) {
-					ASSERT(clusters->local_indices[cluster.first_index + k] < 256);
-					padded_indices[c * index_stride + k] = (u8)clusters->local_indices[cluster.first_index + k];
-				}
-			}
-
-			profiler::endBlock();
-
-			// the finest clusters on the CPU side (physics, picking, bounds), positions are the ones of the lattice, the same as on the GPU
+			// the finest clusters on the CPU side (physics, picking, bounds), positions are the ones of the lattice, the same as on the GPU.
+			// Decoded before rewriting cluster.first_index to group-relative offsets below.
 			profiler::beginBlock("decode cpu geometry");
 			Array<Vec3> cpu_vertices(m_allocator);
 			Array<u32> cpu_indices(m_allocator);
@@ -1617,6 +1596,35 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 					cpu_indices[cluster.first_index + k] = first_vertex + clusters->local_indices[cluster.first_index + k];
 				}
 				first_vertex += header.vertex_count;
+			}
+			profiler::endBlock();
+
+			// Tightly pack cluster u8 indices per group with no degenerate triangle padding; cluster.first_index becomes the group-relative index offset.
+			u32 index_stride = 3;
+			for (const MeshClusterGPU& cluster : clusters->clusters) index_stride = maximum(index_stride, cluster.index_count);
+			static_assert(MeshClusters::MAX_CLUSTER_VERTICES <= 256);
+			profiler::beginBlock("pack cluster indices");
+			Array<u8> packed_indices(m_allocator);
+			packed_indices.reserve(clusters->local_indices.size());
+			Array<u32> group_packed_offset(m_allocator);
+			Array<u32> group_packed_count(m_allocator);
+			group_packed_offset.resize(clusters->groups.size());
+			group_packed_count.resize(clusters->groups.size());
+			for (u32 g = 0; g < (u32)clusters->groups.size(); ++g) {
+				const MeshGroupGPU& grp = clusters->groups[g];
+				group_packed_offset[g] = (u32)packed_indices.size();
+				u32 rel = 0;
+				for (u32 c = grp.first_cluster; c < grp.first_cluster + grp.cluster_count; ++c) {
+					MeshClusterGPU& cluster = clusters->clusters[c];
+					const u32 orig_first = cluster.first_index;
+					cluster.first_index = rel;
+					for (u32 k = 0; k < cluster.index_count; ++k) {
+						ASSERT(clusters->local_indices[orig_first + k] < 256);
+						packed_indices.push((u8)clusters->local_indices[orig_first + k]);
+					}
+					rel += cluster.index_count;
+				}
+				group_packed_count[g] = rel;
 			}
 			profiler::endBlock();
 
@@ -1668,26 +1676,28 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 			payloads.push(page_payloads);
 			for (u32 p = 0; p < (u32)page_data.pages.size(); ++p) {
 				const MeshPageFile& page = page_data.pages[p];
+				const u32 last_g = page.first_group + page.group_count - 1;
 				const MeshGroupGPU& first = clusters->groups[page.first_group];
-				const MeshGroupGPU& last = clusters->groups[page.first_group + page.group_count - 1];
+				const MeshGroupGPU& last = clusters->groups[last_g];
 				const u32 stream_bytes = last.stream_offset + last.stream_size - first.stream_offset;
-				const u32 index_bytes = (last.first_cluster + last.cluster_count - first.first_cluster) * index_stride;
+				const u32 first_idx = group_packed_offset[page.first_group];
+				const u32 index_bytes = group_packed_offset[last_g] + group_packed_count[last_g] - first_idx;
 				const u32 size = (stream_bytes + index_bytes + 15) & ~15u;
 				ASSERT(u64(first.stream_offset) + stream_bytes <= clusters->vertex_words.byte_size());
-				ASSERT(u64(last.first_cluster + last.cluster_count) * index_stride <= padded_indices.byte_size());
+				ASSERT(u64(first_idx) + index_bytes <= packed_indices.byte_size());
 				const u32 at = (u32)page_payloads->data.size();
 				page_payloads->data.resize(at + size);
 				u8* payload = page_payloads->data.begin() + at;
 				memset(payload, 0, size);
 				memcpy(payload, (const u8*)clusters->vertex_words.begin() + first.stream_offset, stream_bytes);
-				memcpy(payload + stream_bytes, padded_indices.begin() + u64(first.first_cluster) * index_stride, index_bytes);
+				memcpy(payload + stream_bytes, packed_indices.begin() + first_idx, index_bytes);
 				page_payloads->at.push(at);
 				page_payloads->size.push(size);
 				page_payloads->field.push(pages_at + u64(p) * sizeof(MeshPageFile) + offsetof(MeshPageFile, file_offset));
 			}
 			profiler::endBlock();
 			total_clusters += cluster_count;
-			packed_bytes += padded_indices.byte_size() + vertex_data_size;
+			packed_bytes += packed_indices.byte_size() + vertex_data_size;
 			unpacked_bytes += u64(m_geometries[meshes[i]->geometry_idx].vertex_buffer.size()) + clusters->indices.byte_size();
 		}
 		// The payloads of the pages follow the tables: first the permanent ones, they are read with the model, then the others, which are read when they are needed.

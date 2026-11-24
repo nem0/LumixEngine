@@ -23,8 +23,8 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOCRYPT
 #include <d3d12.h>
-#include <d3dcompiler.h>
 #include <d3dx12.h>
+#include "dxc/include/dxcapi.h"
 #ifdef LUMIX_DEBUG
 	#include <dxgidebug.h>
 #endif
@@ -33,7 +33,6 @@
 #undef TRANSPARENT // thank you MS
 
 #include "renderer/gpu/renderdoc_app.h"
-#pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "dxgi.lib")
 
 #if defined LUMIX_DEBUG && !defined __clang__
@@ -260,9 +259,9 @@ struct Query {
 struct Program {
 	Program(IAllocator& allocator) : disassembly(allocator) {}
 
-	ID3DBlob* vs = nullptr;
-	ID3DBlob* ps = nullptr;
-	ID3DBlob* cs = nullptr;
+	IDxcBlob* vs = nullptr;
+	IDxcBlob* ps = nullptr;
+	IDxcBlob* cs = nullptr;
 	StateFlags state;
 	D3D12_PRIMITIVE_TOPOLOGY primitive_topology;
 	D3D12_PRIMITIVE_TOPOLOGY_TYPE primitive_topology_type;
@@ -332,6 +331,37 @@ struct ShaderCompiler {
 		: m_allocator(allocator, "shader compiler")
 		, m_cache(m_allocator) {}
 
+	~ShaderCompiler() {
+		if (m_dxc_compiler) m_dxc_compiler->Release();
+		if (m_dxc_utils) m_dxc_utils->Release();
+		if (m_dxc_lib) FreeLibrary(m_dxc_lib);
+	}
+
+	bool ensureDXC() {
+		if (m_dxc_compiler && m_dxc_utils) return true;
+		if (m_dxc_failed) return false;
+		m_dxc_lib = LoadLibraryA("dxcompiler.dll");
+		if (!m_dxc_lib) {
+			logError("Failed to load dxcompiler.dll");
+			m_dxc_failed = true;
+			return false;
+		}
+		auto create_instance = (DxcCreateInstanceProc)GetProcAddress(m_dxc_lib, "DxcCreateInstance");
+		if (!create_instance) {
+			logError("Failed to find DxcCreateInstance in dxcompiler.dll");
+			m_dxc_failed = true;
+			return false;
+		}
+		if (FAILED(create_instance(CLSID_DxcUtils, IID_PPV_ARGS(&m_dxc_utils)))
+			|| FAILED(create_instance(CLSID_DxcCompiler, IID_PPV_ARGS(&m_dxc_compiler))))
+		{
+			logError("Failed to create DXC compiler/utils instances");
+			m_dxc_failed = true;
+			return false;
+		}
+		return true;
+	}
+
 	bool compile(const char* src
 		, ShaderType type
 		, const char* name
@@ -357,7 +387,7 @@ struct ShaderCompiler {
 				program.vs = iter.value();
 			}
 			else {
-				program.vs = compileStage(hash, src, "vs_5_1", name, "mainVS");
+				program.vs = compileStage(hash, src, L"vs_6_0", name, L"mainVS");
 				if (!program.vs) return false;
 			}
 
@@ -368,7 +398,7 @@ struct ShaderCompiler {
 				program.ps = iter.value();
 			}
 			else {
-				program.ps = compileStage(ps_hash, src, "ps_5_1", name, "mainPS");
+				program.ps = compileStage(ps_hash, src, L"ps_6_0", name, L"mainPS");
 				if (!program.ps) return false;
 			}
 			return true;
@@ -381,7 +411,7 @@ struct ShaderCompiler {
 			return true;
 		}
 
-		program.cs = compileStage(hash, src, "cs_5_1", name, "main");
+		program.cs = compileStage(hash, src, L"cs_6_0", name, L"main");
 		if (!program.cs) return false;
 		if (program.cs->GetBufferSize() == 0) {
 			program.cs->Release();
@@ -392,57 +422,85 @@ struct ShaderCompiler {
 		return true;
 	}
 
-	ID3DBlob* compileStage(StableHash hash, const char* src, const char* target, const char* name, const char* entry_point) {
+	IDxcBlob* compileStage(StableHash hash, const char* src, const wchar_t* target, const char* name, const wchar_t* entry_point) {
 		PROFILE_FUNCTION();
-		ID3DBlob* output = NULL;
-		ID3DBlob* errors = NULL;
-		HRESULT hr = D3DCompile(src,
-			strlen(src) + 1,
-			name,
-			NULL,
-			NULL,
-			entry_point,
-			target,
+		MutexGuard guard(m_dxc_mutex);
+		if (!ensureDXC()) return nullptr;
+
+		DxcBuffer source_buf;
+		source_buf.Ptr = src;
+		source_buf.Size = strlen(src);
+		source_buf.Encoding = DXC_CP_UTF8;
+
+		wchar_t wname[MAX_PATH];
+		MultiByteToWideChar(CP_UTF8, 0, name, -1, wname, MAX_PATH);
+
+		const wchar_t* args[] = {
+			wname,
+			L"-E", entry_point,
+			L"-T", target,
+			L"-HV", L"2018",
+			L"-Zpr",
 			#ifdef LUMIX_DEBUG
-				D3DCOMPILE_PACK_MATRIX_ROW_MAJOR | D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES | D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
+				L"-Zi", L"-Od", L"-Qembed_debug",
 			#else
-				D3DCOMPILE_PACK_MATRIX_ROW_MAJOR | D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES,
+				L"-O3",
 			#endif
-			0,
-			&output,
-			&errors);
-		if (errors) {
-			if (SUCCEEDED(hr)) {
-				logInfo("gpu: ", (LPCSTR)errors->GetBufferPointer());
-			} else {
-				logError((LPCSTR)errors->GetBufferPointer());
-			}
-			errors->Release();
-			if (FAILED(hr)) return nullptr;
-		}
-		CHECK(output);
-		if (output->GetBufferSize() == 0) {
-			output->Release();
+		};
+
+		IDxcResult* result = nullptr;
+		HRESULT hr = m_dxc_compiler->Compile(&source_buf, args, (u32)lengthOf(args), nullptr, IID_PPV_ARGS(&result));
+		if (FAILED(hr) || !result) {
+			logError("DXC Compile failed for ", name);
 			return nullptr;
 		}
-		m_cache.insert(hash, output);
 
-		// save disassembled files
-		#if 0
-			ID3DBlob* disassembly;
-			HRESULT res = D3DDisassemble(output->GetBufferPointer(), output->GetBufferSize(), 0, NULL, &disassembly);
-			CHECK(res == S_OK);
-			const char* dism = (const char*)disassembly->GetBufferPointer();
-			//logInfo(name, ": ", StringView(dism, (u32)disassembly->GetBufferSize()));
+		IDxcBlobUtf8* errors = nullptr;
+		result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&errors), nullptr);
 
-			os::OutputFile out;
-			if (out.open(StaticString<MAX_PATH>("hlsl_", Path::getBasename(name), "-", entry_point, ".asm"))) {
-				(void)out.write(dism, disassembly->GetBufferSize());
-				out.close();
+		HRESULT status = S_OK;
+		result->GetStatus(&status);
+		if (errors && errors->GetStringLength() > 0) {
+			if (SUCCEEDED(status)) {
+				logInfo("gpu: ", errors->GetStringPointer());
 			}
-		#endif
+			else {
+				logError(errors->GetStringPointer());
+			}
+		}
+		if (errors) errors->Release();
+
+		if (FAILED(status)) {
+			result->Release();
+			return nullptr;
+		}
+
+		IDxcBlob* output = nullptr;
+		hr = result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&output), nullptr);
+		result->Release();
+		if (FAILED(hr) || !output || output->GetBufferSize() == 0) {
+			if (output) output->Release();
+			return nullptr;
+		}
+
+		m_cache.insert(hash, output);
 		return output;
-	};
+	}
+
+	IDxcBlobUtf8* disassemble(IDxcBlob* blob) {
+		MutexGuard guard(m_dxc_mutex);
+		if (!ensureDXC() || !blob) return nullptr;
+		DxcBuffer buf;
+		buf.Ptr = blob->GetBufferPointer();
+		buf.Size = blob->GetBufferSize();
+		buf.Encoding = 0;
+		IDxcResult* result = nullptr;
+		if (FAILED(m_dxc_compiler->Disassemble(&buf, IID_PPV_ARGS(&result))) || !result) return nullptr;
+		IDxcBlobUtf8* text = nullptr;
+		result->GetOutput(DXC_OUT_DISASSEMBLY, IID_PPV_ARGS(&text), nullptr);
+		result->Release();
+		return text;
+	}
 
 	void saveCache(const char* filename) {
 		const StringView dir = Path::getDir(filename);
@@ -458,11 +516,11 @@ struct ShaderCompiler {
 			return;
 		}
 
-		u32 version = 0;
+		u32 version = 1; // 1 = DXIL (DXC)
 		bool success = file.write(&version, sizeof(version));
 		for (auto iter = m_cache.begin(), end = m_cache.end(); iter != end; ++iter) {
 			const StableHash hash = iter.key();
-			ID3DBlob* blob = iter.value();
+			IDxcBlob* blob = iter.value();
 			const u32 size = (u32)blob->GetBufferSize();
 			success = file.write(&hash, sizeof(hash)) && success;
 			success = file.write(&size, sizeof(size)) && success;
@@ -476,24 +534,33 @@ struct ShaderCompiler {
 
 	void loadCache(const char* filename) {
 		PROFILE_FUNCTION();
+		MutexGuard guard(m_dxc_mutex);
+		if (!ensureDXC()) return;
 		os::InputFile file;
 		if (file.open(filename)) {
 			u32 version;
 			if (!file.read(&version, sizeof(version))) {
 				logError("Could not read ", filename);
+				file.close();
+				return;
 			}
-			ASSERT(version == 0);
+			if (version != 1) {
+				file.close();
+				return;
+			}
+			Array<u8> tmp(m_allocator);
 			StableHash hash;
 			while (file.read(&hash, sizeof(hash))) {
 				u32 size;
 				if (file.read(&size, sizeof(size))) {
-					ID3DBlob* blob;
-					HRESULT res = D3DCreateBlob(size, &blob);
-					if (FAILED(res)) {
-						logError("Failed to create blob");
+					tmp.resize(size);
+					if (!file.read(tmp.begin(), size)) break;
+					IDxcBlobEncoding* blob = nullptr;
+					HRESULT res = m_dxc_utils->CreateBlob(tmp.begin(), size, DXC_CP_ACP, &blob);
+					if (FAILED(res) || !blob) {
+						logError("Failed to create DXC blob");
 						break;
 					}
-					if (!file.read(blob->GetBufferPointer(), size)) break;
 					m_cache.insert(hash, blob);
 				} else {
 					break;
@@ -508,9 +575,14 @@ struct ShaderCompiler {
 	}
 
 	TagAllocator m_allocator;
+	Mutex m_dxc_mutex;
+	HMODULE m_dxc_lib = nullptr;
+	IDxcUtils* m_dxc_utils = nullptr;
+	IDxcCompiler3* m_dxc_compiler = nullptr;
+	bool m_dxc_failed = false;
 	
 	// cache source code -> binary blob
-	HashMap<StableHash, ID3DBlob*> m_cache;
+	HashMap<StableHash, IDxcBlob*> m_cache;
 	// where the cache is loaded from and saved to, empty if the cache is disabled
 	Path m_cache_path;
 };
@@ -3220,30 +3292,27 @@ void viewport(u32 x, u32 y, u32 w, u32 h) {
 
 void requestDisassembly(ProgramHandle program) {
 	if (program->cs) {
-		ID3DBlob* cs_blob;
-		HRESULT hr = D3DDisassemble(program->cs->GetBufferPointer(), program->cs->GetBufferSize(), 0, NULL, &cs_blob);
-		if (FAILED(hr)) return;
+		IDxcBlobUtf8* cs_blob = d3d->shader_compiler.disassemble(program->cs);
+		if (!cs_blob) return;
 		MutexGuard guard(d3d->disassembly_mutex);
 		program->disassembly = "";
-		program->disassembly.append(StringView((const char*)cs_blob->GetBufferPointer(), (u32)cs_blob->GetBufferSize()));
+		program->disassembly.append(StringView(cs_blob->GetStringPointer(), (u32)cs_blob->GetStringLength()));
 		cs_blob->Release();
 		return;
 	}
 
 	if (!program->vs || !program->ps) return;
-	ID3DBlob* vs_blob;
-	ID3DBlob* ps_blob;
-	HRESULT hr = D3DDisassemble(program->vs->GetBufferPointer(), program->vs->GetBufferSize(), 0, NULL, &vs_blob);
-	if (FAILED(hr)) return;
-	hr = D3DDisassemble(program->ps->GetBufferPointer(), program->ps->GetBufferSize(), 0, NULL, &ps_blob);
-	if (FAILED(hr)) {
+	IDxcBlobUtf8* vs_blob = d3d->shader_compiler.disassemble(program->vs);
+	if (!vs_blob) return;
+	IDxcBlobUtf8* ps_blob = d3d->shader_compiler.disassemble(program->ps);
+	if (!ps_blob) {
 		vs_blob->Release();
 		return;
 	}
 	MutexGuard guard(d3d->disassembly_mutex);
 	program->disassembly = "";
-	program->disassembly.append("====VS====\n", StringView((const char*)vs_blob->GetBufferPointer(), (u32)vs_blob->GetBufferSize()));
-	program->disassembly.append("====PS====\n", StringView((const char*)ps_blob->GetBufferPointer(), (u32)ps_blob->GetBufferSize()));
+	program->disassembly.append("====VS====\n", StringView(vs_blob->GetStringPointer(), (u32)vs_blob->GetStringLength()));
+	program->disassembly.append("====PS====\n", StringView(ps_blob->GetStringPointer(), (u32)ps_blob->GetStringLength()));
 	vs_blob->Release();
 	ps_blob->Release();
 }
@@ -3502,6 +3571,56 @@ void drawIndirect(DataType index_type, u32 indirect_buffer_offset, u32 count) {
 	}();
 
 	d3d->cmd_list->ExecuteIndirect(signature, count, d3d->current_indirect_buffer->resource, indirect_buffer_offset, nullptr, 0);
+}
+
+void drawIndirectCount(DataType index_type, u32 indirect_buffer_offset, BufferHandle count_buffer, u32 count_buffer_offset, u32 max_count) {
+	CHECK(d3d->current_program);
+	if (!d3d->current_indirect_buffer || !d3d->current_indirect_buffer->resource || !count_buffer || !count_buffer->resource) {
+		logError("Indirect draw count without indirect/count buffer");
+		return;
+	}
+	if (!setPipelineStateGraphics()) return;
+
+	DXGI_FORMAT dxgi_index_type;
+	switch (index_type) {
+		case DataType::U32:
+			dxgi_index_type = DXGI_FORMAT_R32_UINT;
+			break;
+		case DataType::U16:
+			dxgi_index_type = DXGI_FORMAT_R16_UINT;
+			break;
+	}
+
+	CHECK(d3d->current_index_buffer);
+	D3D12_INDEX_BUFFER_VIEW ibv = {};
+	ibv.BufferLocation = d3d->current_index_buffer->gpu_address;
+	ibv.Format = dxgi_index_type;
+	ibv.SizeInBytes = d3d->current_index_buffer->size;
+	d3d->cmd_list->IASetIndexBuffer(&ibv);
+	d3d->cmd_list->IASetPrimitiveTopology(d3d->current_program->primitive_topology);
+
+	count_buffer->setState(d3d->cmd_list, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT);
+
+	static ID3D12CommandSignature* signature = [&]() {
+		// a command is: draw id (root constant b6 = cluster slot), indexed draw arguments (24 bytes)
+		D3D12_INDIRECT_ARGUMENT_DESC arg_desc[2] = {};
+		arg_desc[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT;
+		arg_desc[0].Constant.RootParameterIndex = ROOT_PARAMETER_DRAW_ID;
+		arg_desc[0].Constant.DestOffsetIn32BitValues = 0;
+		arg_desc[0].Constant.Num32BitValuesToSet = 1;
+		arg_desc[1].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+
+		D3D12_COMMAND_SIGNATURE_DESC desc = {};
+		desc.NodeMask = 1;
+		desc.ByteStride = sizeof(u32) * 6;
+		desc.NumArgumentDescs = lengthOf(arg_desc);
+		desc.pArgumentDescs = arg_desc;
+		ID3D12CommandSignature* result;
+		d3d->device->CreateCommandSignature(&desc, d3d->root_signature, IID_PPV_ARGS(&result));
+		return result;
+	}();
+
+	d3d->cmd_list->ExecuteIndirect(signature, max_count, d3d->current_indirect_buffer->resource, indirect_buffer_offset, count_buffer->resource, count_buffer_offset);
 }
 
 void draw(const Drawcall& draw) {

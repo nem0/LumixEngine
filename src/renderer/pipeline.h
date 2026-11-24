@@ -23,6 +23,7 @@ struct CameraParams {
 	float lod_multiplier;
 	bool is_shadow;
 	i32 shadow_slice = -1;	// the cascade of the shadow map of the main light (Pipeline::getShadowCamera), -1 for other cameras
+	u32 viewport_height = 0;	// target viewport height in pixels (0: fall back to the pipeline's viewport height)
 	Matrix view;
 	Matrix projection;
 };

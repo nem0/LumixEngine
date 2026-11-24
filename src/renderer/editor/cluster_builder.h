@@ -34,7 +34,7 @@ bool packClusterVertices(const ClusterVertexSource& source, MeshClusters& out, I
 // Makes the pages (streaming units made of groups, see ClusterStream) of a mesh, they are stored in the compiled model. `index_stride` is the number of bytes of indices of a
 // cluster in the model file (the payload of a group is its vertex stream and the indices of its clusters).
 // False if the groups and the clusters are not valid (a group is not refined from a group with a lower number).
-bool buildMeshPages(const MeshClusterGPU* clusters, u32 cluster_count, const MeshGroupGPU* groups, u32 group_count, u32 index_stride, MeshPages& out, IAllocator& allocator);
+bool buildMeshPages(const MeshClusterGPU* clusters, u32 cluster_count, const MeshGroupGPU* groups, u32 group_count, MeshPages& out, IAllocator& allocator);
 
 // the packing of a tangent frame, see ClusterAttribute. Exposed for tests
 u32 packClusterFrame(const Vec3& normal, const Vec3* tangent);

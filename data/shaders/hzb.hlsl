@@ -86,11 +86,19 @@ void main(uint3 group_id : SV_GroupID, uint3 local_id : SV_GroupThreadID) {
 
 	// level n + 1: 2 x 2 texels of the block for each of its texels, shared by the threads
 	const uint half_block = (1u << u_levels) >> 1;
+	const float2 inv_src_size = 1.0 / float2(u_src_size);
 	for (uint yy = t.y; yy < half_block; yy += 8) {
 		for (uint xx = t.x; xx < half_block; xx += 8) {
 			const uint2 from = (group_id.xy << u_levels) + uint2(xx, yy) * 2;
-			float d = min(loadSrc(from), loadSrc(from + uint2(1, 0)));
-			d = min(d, min(loadSrc(from + uint2(0, 1)), loadSrc(from + uint2(1, 1))));
+			float d;
+			if (u_mode == 0) {
+				const float4 g = bindless_textures[u_src].GatherRed(LinearSamplerClamp, (float2(from) + 1.0) * inv_src_size);
+				d = min(min(g.x, g.y), min(g.z, g.w));
+			}
+			else {
+				d = min(loadSrc(from), loadSrc(from + uint2(1, 0)));
+				d = min(d, min(loadSrc(from + uint2(0, 1)), loadSrc(from + uint2(1, 1))));
+			}
 			bindless_rw_textures[u_dst][(group_id.xy << (u_levels - 1)) + uint2(xx, yy)] = d;
 			g_a[yy][xx] = d;
 		}

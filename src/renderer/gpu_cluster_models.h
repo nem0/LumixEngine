@@ -27,11 +27,11 @@ static_assert(sizeof(GPUClusterModel) == 8);
 // 16 byte aligned, MeshClusterVertexGPU[cluster_count] (the headers of the clusters, vertex_pulling.hlsli).
 struct GPUClusterMesh {
 	u32 clusters;			// byte offset in the buffer of cluster data (Renderer::getClusterDataBuffer) of the table of the mesh
-	u32 group_table;		// byte offset in the same buffer of MeshGroupAddressGPU[], where the vertices and the u8 indices (local to a cluster, `index_stride` for each) of the clusters of each group are
+	u32 group_table;		// byte offset in the same buffer of MeshGroupAddressGPU[], where the vertices and the u16 indices (local to a cluster, tightly packed, see MeshClusterGPU::first_index) of the clusters of each group are
 	u32 cluster_count;
 	u32 node_count;
 	u32 root_count;
-	u32 index_stride;
+	u32 index_stride;		// the largest index count of a cluster of the mesh (Mesh::cluster_index_stride), the indices are not padded to it
 	u32 material_entry;		// the entry of the mesh in the default material set of its model (GPUSceneRegistry::set_table): its variant and material index
 	u32 index_in_model;		// the index of the mesh in its model
 };

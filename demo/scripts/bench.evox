@@ -37,6 +37,9 @@ import "core:commandline" as commandline
 import "core:string"
 import "core:profiler" as profiler
 import "core:savedgames" as savedgames
+import "core:postprocess/ssao" as ssao
+import "core:postprocess/sss" as sss
+import "core:postprocess/taa" as taa
 
 const MAX_SCOPES : isize = 128;
 var g_sum : [128]f64 = undefined;
@@ -445,11 +448,15 @@ fn run(engine : Engine, world : World) : void {
 
 	const spawn_mode = commandline.isFlagOn("-bench_spawn");
 	if spawn_mode {
+		ssao.g_enabled = false;
+		sss.g_enabled = false;
+		taa.g_enabled = false;
 		const sun = world.createEntity();
 		sun.setName("Benchmark sun");
 		sun.setRotation(quat.makeQuatFromYaw(0.6) * quat.makeQuatFromPitch(-0.9));
 		if const environment = sun.createEnvironment() {
 			environment.setCastShadows(true);
+			environment.setAtmoEnabled(false);
 		}
 	}
 

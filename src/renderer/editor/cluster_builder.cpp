@@ -542,16 +542,20 @@ static void buildAdjacency(const Array<u32>& key, const Array<u32>& value, u32 k
 	}
 }
 
-bool buildMeshPages(const MeshClusterGPU* clusters, u32 cluster_count, const MeshGroupGPU* groups, u32 group_count, u32 index_stride, MeshPages& out, IAllocator& allocator) {
+bool buildMeshPages(const MeshClusterGPU* clusters, u32 cluster_count, const MeshGroupGPU* groups, u32 group_count, MeshPages& out, IAllocator& allocator) {
 	PROFILE_FUNCTION();
 	out.pages.clear();
 	out.parents.clear();
 	out.children.clear();
 	out.root_bytes = 0;
 	if (group_count == 0) return false;
+	Array<u32> group_index_bytes(allocator);
+	group_index_bytes.resize(group_count);
+	for (u32& b : group_index_bytes) b = 0;
 	for (u32 i = 0; i < cluster_count; ++i) {
 		if (clusters[i].group >= group_count) return false;
 		if (clusters[i].refined_group != MeshClusters::NO_GROUP && clusters[i].refined_group >= group_count) return false;
+		group_index_bytes[clusters[i].group] += clusters[i].index_count;
 	}
 
 	// Permanent groups are never unloaded:
@@ -559,7 +563,7 @@ bool buildMeshPages(const MeshClusterGPU* clusters, u32 cluster_count, const Mes
 	//    that nothing would ever ask for. They are the coarsest level, or groups that could not be simplified, whatever their size,
 	//  - and the coarsest of the others, as long as the permanent groups are not larger than PERMANENT_BYTES (the groups of a mesh are in the order of the levels, the
 	//    parents of a group have higher numbers).
-	auto payload_bytes = [&](u32 g) -> u64 { return u64(groups[g].stream_size) + u64(groups[g].cluster_count) * index_stride; };
+	auto payload_bytes = [&](u32 g) -> u64 { return u64(groups[g].stream_size) + u64(group_index_bytes[g]); };
 	Array<u8> permanent(allocator);
 	permanent.resize(group_count);
 	for (u8& p : permanent) p = 0;

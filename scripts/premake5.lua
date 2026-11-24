@@ -619,7 +619,9 @@ if build_studio then
 			-- absolute source paths, postbuild commands are relative to the project location (tmp/vs2022)
 			postbuildcommands {
 				'{COPYFILE} "' .. path.getabsolute("../external/dbghelp/dbghelp.dll") .. '" "%{cfg.targetdir}"',
-				'{COPYFILE} "' .. path.getabsolute("../external/pix/bin/x64/WinPixEventRuntime.dll") .. '" "%{cfg.targetdir}"'
+				'{COPYFILE} "' .. path.getabsolute("../external/pix/bin/x64/WinPixEventRuntime.dll") .. '" "%{cfg.targetdir}"',
+				'{COPYFILE} "' .. path.getabsolute("../external/dxc/bin/x64/dxcompiler.dll") .. '" "%{cfg.targetdir}"',
+				'{COPYFILE} "' .. path.getabsolute("../external/dxc/bin/x64/dxil.dll") .. '" "%{cfg.targetdir}"'
 			}
 		filter "system:linux"
 			links { "dl", "GL", "X11", "rt", "Xi", "gtk-3", "gobject-2.0" }
@@ -666,6 +668,10 @@ if build_app then
 			entrypoint "mainCRTStartup"
 			libdirs { "../external/pix/bin/x64" }
 			links { "psapi", "dxguid", "winmm", "imm32", "version" }
+			postbuildcommands {
+				'{COPYFILE} "' .. path.getabsolute("../external/dxc/bin/x64/dxcompiler.dll") .. '" "%{cfg.targetdir}"',
+				'{COPYFILE} "' .. path.getabsolute("../external/dxc/bin/x64/dxil.dll") .. '" "%{cfg.targetdir}"'
+			}
 		filter "system:linux"
 			links { "GL", "X11", "dl", "rt", "Xi" }
 		filter {}
@@ -707,7 +713,9 @@ if build_tests then
 			links { "psapi", "dxguid", "winmm" }
 			libdirs { "../external/pix/bin/x64" }
 			postbuildcommands {
-				'{COPYFILE} "' .. path.getabsolute("../external/pix/bin/x64/WinPixEventRuntime.dll") .. '" "%{cfg.targetdir}"'
+				'{COPYFILE} "' .. path.getabsolute("../external/pix/bin/x64/WinPixEventRuntime.dll") .. '" "%{cfg.targetdir}"',
+				'{COPYFILE} "' .. path.getabsolute("../external/dxc/bin/x64/dxcompiler.dll") .. '" "%{cfg.targetdir}"',
+				'{COPYFILE} "' .. path.getabsolute("../external/dxc/bin/x64/dxil.dll") .. '" "%{cfg.targetdir}"'
 			}
 		filter "system:linux"
 			links { "GL", "X11", "dl", "rt", "Xi", "vulkan" }

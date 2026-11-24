@@ -42,6 +42,7 @@ enum class DrawStream::Instruction : u8 {
 	TEXTURE_BARRIER,
 	BUFFER_BARRIER,
 	DRAW_INDIRECT,
+	DRAW_INDIRECT_COUNT,
 	BIND_SHADER_BUFFER,
 	DISPATCH,
 	DISPATCH_INDIRECT,
@@ -147,6 +148,14 @@ struct DrawIndirectData {
 	gpu::DataType index_type;
 	u32 indirect_buffer_offset;
 	u32 count;
+};
+
+struct DrawIndirectCountData {
+	gpu::DataType index_type;
+	u32 indirect_buffer_offset;
+	gpu::BufferHandle count_buffer;
+	u32 count_buffer_offset;
+	u32 max_count;
 };
 
 struct ReadTextureData {
@@ -539,6 +548,12 @@ void DrawStream::drawIndirect(gpu::DataType index_type, u32 indirect_buffer_offs
 	write(Instruction::DRAW_INDIRECT, data);
 }
 
+void DrawStream::drawIndirectCount(gpu::DataType index_type, u32 indirect_buffer_offset, gpu::BufferHandle count_buffer, u32 count_buffer_offset, u32 max_count) {
+	submitCached();
+	DrawIndirectCountData data = { index_type, indirect_buffer_offset, count_buffer, count_buffer_offset, max_count };
+	write(Instruction::DRAW_INDIRECT_COUNT, data);
+}
+
 void DrawStream::barrier(gpu::TextureHandle texture, gpu::BarrierType type) {
 	TextureBarrierData data = {texture, type};
 	write(Instruction::TEXTURE_BARRIER, data);
@@ -717,6 +732,11 @@ void DrawStream::run() {
 				case Instruction::DRAW_INDIRECT: {
 					READ(DrawIndirectData, data);
 					gpu::drawIndirect(data.index_type, data.indirect_buffer_offset, data.count);
+					break;
+				}
+				case Instruction::DRAW_INDIRECT_COUNT: {
+					READ(DrawIndirectCountData, data);
+					gpu::drawIndirectCount(data.index_type, data.indirect_buffer_offset, data.count_buffer, data.count_buffer_offset, data.max_count);
 					break;
 				}
 				case Instruction::MEMORY_BARRIER: {

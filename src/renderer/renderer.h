@@ -180,6 +180,9 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	// recorded in the draw stream of the frame).
 	virtual gpu::BufferHandle getClusterScratchBuffer() = 0;
 	virtual u32 getClusterScratchCapacity() const = 0;	// u32 in it
+	// Shared per-cluster 24-byte DrawIndexedIndirect command scratch buffer (filled right before each cluster draw group's ExecuteIndirect).
+	virtual gpu::BufferHandle getClusterCommandsBuffer() = 0;
+	virtual u32 getClusterCommandsCapacity() const = 0;
 	// What the GPU scenes of all worlds share (models, meshes, material sets, draw groups), see gpu_scene_registry.h. Made by the first call.
 	virtual GPUSceneRegistry& getGPUSceneRegistry() = 0;
 	// Copies `size` bytes (a multiple of 4) to the bytes of a range of the buffer that was allocated before (the copy is recorded in the draw stream of the frame, so the GPU executes

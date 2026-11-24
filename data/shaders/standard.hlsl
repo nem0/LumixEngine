@@ -30,6 +30,12 @@ Surface getSurface(VSOutput input, uint material_index) {
 	float4 c = bindless_textures[material.t_albedo].SampleBias(LinearSampler, uv, -1) * material.u_material_color;
 	data.albedo = c.rgb;
 	data.alpha = c.a;
+	#if defined DEPTH && defined ALPHA_CUTOUT
+		#ifdef FUR
+			data.alpha = saturate(data.alpha - input.fur_layer);
+		#endif
+		return data;
+	#endif
 	#ifdef COLOR0_ATTR
 		data.albedo.rgb *= input.color.rgb;
 	#endif

@@ -817,6 +817,7 @@ static void scriptCustomOrthoCamera(ex_runtime*, ex_call_frame frame) {
 	cp.frustum = vp.getFrustum();
 	cp.lod_multiplier = 1;
 	cp.is_shadow = true;
+	cp.viewport_height = (u32)maximum(vp.h, 1);
 	cp.view = vp.getView(cp.pos);
 	cp.projection = vp.getProjectionNoJitter();
 	u32 handle;

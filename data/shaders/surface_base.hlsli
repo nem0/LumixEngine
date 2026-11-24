@@ -27,7 +27,7 @@ struct VSOutput {
 	#ifdef TANGENT_ATTR
 		float3 tangent : TEXCOORD3;
 	#endif
-	#if defined MESH_INSTANCE || defined SKINNED
+	#if (defined MESH_INSTANCE || defined SKINNED) && !defined DEPTH
 		float4 prev_ndcpos_no_jitter : TEXCOORD4;
 	#endif
 	#ifdef AO_ATTR
@@ -108,6 +108,7 @@ Surface getSurface(VSOutput input, uint material_index);
 		float4 prev_scale;
 		uint material_index;
 		uint base_vertex;		// the word of prev_pos_lod.w, for POOLED_VERTICES
+		bool moved;
 	};
 
 	Instance loadInstance(VSInput input) {
@@ -116,16 +117,16 @@ Surface getSurface(VSOutput input, uint material_index);
 		#ifdef INDIRECT_INSTANCE
 			const uint offset = pullInstanceAddress(input.instance_id, DRAW_INSTANCE_STRIDE);
 			const uint4 rec = buffer.Load4(offset + DRAW_INSTANCE_SLOT);
-			r.base_vertex = rec.y;
-			r.material_index = buffer.Load(offset + DRAW_INSTANCE_MATERIAL);
+			r.base_vertex = rec.w;
+			r.material_index = rec.z;
 			float3 pos, scale, prev_pos, prev_scale;
-			#if defined DEPTH && !defined ALPHA_CUTOUT
+			#ifdef DEPTH
 				const bool load_prev = false;
 			#else
 				const bool load_prev = true;
 			#endif
-			pullSceneTransform(rec.x, rec.w, load_prev, r.rot, pos, scale, r.prev_rot, prev_pos, prev_scale);
-			r.pos_lod = float4(pos, (float)rec.z);
+			r.moved = pullSceneTransform(rec.x, rec.y, load_prev, r.rot, pos, scale, r.prev_rot, prev_pos, prev_scale);
+			r.pos_lod = float4(pos, (float)rec.w);
 			r.scale = float4(scale, 0);
 			r.prev_pos_lod = float4(prev_pos, 0);
 			r.prev_scale = float4(prev_scale, 0);
@@ -140,6 +141,7 @@ Surface getSurface(VSOutput input, uint material_index);
 			const uint4 last = buffer.Load4(offset + 80);
 			r.prev_scale = float4(asfloat(last.xyz), 0);
 			r.material_index = last.w;
+			r.moved = true;
 		#endif
 		return r;
 	}
@@ -163,15 +165,15 @@ Surface getSurface(VSOutput input, uint material_index);
 		#ifdef INDIRECT_INSTANCE
 			const uint offset = pullInstanceAddress(input.instance_id, DRAW_INSTANCE_STRIDE);
 			const uint4 rec = buffer.Load4(offset + DRAW_INSTANCE_SLOT);
-			r.base_vertex = rec.y;
-			r.bones_offset = rec.z;
-			r.material_index = buffer.Load(offset + DRAW_INSTANCE_MATERIAL);
-			#if defined DEPTH && !defined ALPHA_CUTOUT
+			r.base_vertex = rec.w;
+			r.bones_offset = buffer.Load(offset + DRAW_INSTANCE_BONES);
+			r.material_index = rec.z;
+			#ifdef DEPTH
 				const bool load_prev = false;
 			#else
 				const bool load_prev = true;
 			#endif
-			pullSceneTransform(rec.x, rec.w, load_prev, r.rot, r.pos, r.scale, r.prev_rot, r.prev_pos, r.prev_scale);
+			pullSceneTransform(rec.x, rec.y, load_prev, r.rot, r.pos, r.scale, r.prev_rot, r.prev_pos, r.prev_scale);
 		#else
 			const uint offset = pullInstanceAddress(input.instance_id, 96);
 			r.rot = asfloat(buffer.Load4(offset));
@@ -197,8 +199,8 @@ Surface getSurface(VSOutput input, uint material_index);
 	}
 #endif
 
-// Depth and shadow passes read only the position, the interpolants below are for the pixel shader of colour passes and alpha cutout
-#if defined DEPTH && !defined ALPHA_CUTOUT
+// Depth and shadow passes read only the position (plus UV for alpha cutout), skipping normals, tangents, AO and previous-frame transforms
+#ifdef DEPTH
 	#define DEPTH_ONLY_VS
 #endif
 
@@ -212,7 +214,7 @@ VSOutput mainVS(VSInput input) {
 		Instance inst = loadInstance(input);
 	#endif
 	#ifdef CLUSTER_MESH
-		VSVertex vtx = pullVertex(input.vertex_id, input.instance_id);
+		VSVertex vtx = pullVertex(input.vertex_id);
 	#elif defined POOLED_VERTICES
 		// the vertices of the meshes are in one buffer, the vertex id of a draw does not have the base vertex of its command: it is in the instance
 		VSVertex vtx = pullVertex(input.vertex_id + inst.base_vertex);
@@ -237,6 +239,8 @@ VSOutput mainVS(VSInput input) {
 		#ifdef UV0_ATTR
 			output.uv = vtx.uv;
 		#endif
+	#elif defined ALPHA_CUTOUT && defined UV0_ATTR
+		output.uv = vtx.uv;
 	#endif
 	#if defined MESH_PARTICLE
 		float4 rot_quat = float4(inst.rot_lod.xyz, 0);
@@ -282,8 +286,10 @@ VSOutput mainVS(VSInput input) {
 		output.pos_ws = inst.pos_lod.xyz + rotateByQuat(inst.rot, vtx.position * inst.scale.xyz);
 		output.position = mul(float4(output.pos_ws, 1), Pass_ws_to_ndc);
 		#ifndef DEPTH_ONLY_VS
-			output.prev_ndcpos_no_jitter = float4(inst.prev_pos_lod.xyz + rotateByQuat(inst.prev_rot, vtx.position * inst.prev_scale.xyz), 1);
-			output.prev_ndcpos_no_jitter = mul(output.prev_ndcpos_no_jitter, Global_ws_to_prev_ndc_no_jitter);
+			const float3 prev_pos_ws = inst.moved
+				? (inst.prev_pos_lod.xyz + rotateByQuat(inst.prev_rot, vtx.position * inst.prev_scale.xyz))
+				: output.pos_ws;
+			output.prev_ndcpos_no_jitter = mul(float4(prev_pos_ws, 1), Global_ws_to_prev_ndc_no_jitter);
 		#endif
 	#elif defined SKINNED
 		float2x4 dq = mul(getBones(inst, vtx.indices.x), vtx.weights.x);
@@ -336,7 +342,7 @@ Surface getSurfaceEx(VSOutput input) {
 		data.albedo = float3(h & 255u, (h >> 8) & 255u, (h >> 16) & 255u) / 255.0 * 0.8 + 0.1;
 	#endif
 	float4 p = mul(float4(input.pos_ws, 1), Global_ws_to_ndc_no_jitter);
-	#if defined MESH_INSTANCE || defined SKINNED
+	#if (defined MESH_INSTANCE || defined SKINNED) && !defined DEPTH
 		float2 prev_pos_projected = input.prev_ndcpos_no_jitter.xy / input.prev_ndcpos_no_jitter.w;
 		data.motion = prev_pos_projected.xy - p.xy / p.w;
 	#else
@@ -349,7 +355,11 @@ Surface getSurfaceEx(VSOutput input) {
 #ifdef DEPTH
 	void mainPS(VSOutput input) {
 		#ifdef ALPHA_CUTOUT
-			Surface surface = getSurfaceEx(input);
+			#ifdef HAS_MATERIAL_INDEX_ATTR
+				Surface surface = getSurface(input, input.i_material_index);
+			#else
+				Surface surface = getSurface(input, material_index);
+			#endif
 			if(surface.alpha < 0.5) discard;
 		#endif
 	}

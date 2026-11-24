@@ -50,7 +50,7 @@ Instance loadInstance(VSInput input) {
 		const uint4 rec = buffer.Load4(offset + DRAW_INSTANCE_SLOT);
 		float3 pos, scale, prev_pos, prev_scale;
 		float4 prev_rot;
-		pullSceneTransform(rec.x, rec.w, false, r.rot, pos, scale, prev_rot, prev_pos, prev_scale);
+		pullSceneTransform(rec.x, rec.y, false, r.rot, pos, scale, prev_rot, prev_pos, prev_scale);
 		r.pos_lod = float4(pos, 0);
 		r.scale = float4(scale, 1);
 	#else

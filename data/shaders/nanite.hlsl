@@ -41,21 +41,21 @@ cbuffer UniformData : register(b4) {
 	uint u_cluster_data;	// bindless, the buffer with the clusters and nodes of all meshes, see MeshDesc
 	uint u_scratch_slice;	// u32 of the slice of a group in u_scratch: two lists, each as large as the largest mesh
 	uint u_feedback;		// rw bindless, one bit for each page of the meshes that stream: a cluster of a group of the page was drawn (if it is loaded) or a group of the page is needed (if it is not), the CPU clears the bits after reading them
-	uint u_padding2;
+	uint u_occluded;		// rw bindless: [0] occluded clusters from pass 1, from 16 entries of 16 bytes (instance, mesh, cluster | error_small_bit, instance_ref)
 	uint u_feedback_capacity;	// groups in u_feedback, 0 if there is none
-	uint u_padding3;
+	uint u_occluded_capacity;	// entries of u_occluded
 	// Occlusion culling with the pyramid of depths (hzb.hlsl). The rows of the matrices (projection * rotation of the camera) transform positions relative to the camera of the
 	// culling. The previous frame is the camera and the pyramid of the previous frame: its positions are the ones of the current frame + u_prev_delta.
 	float4 u_prev_vp[4];
 	float4 u_cur_vp[4];
 	float4 u_prev_delta;	// xyz: the camera of the culling - the camera of the previous frame
-	uint u_hzb_mode;		// 0: no occlusion culling. 1: the first pass of a frame: clusters hidden in the previous frame are not selected. 2: the second pass: only clusters that the first
-							// pass skipped and that the pyramid of the depth of the first pass does not hide
+	uint u_hzb_mode;		// 0: no occlusion culling. 1: the first pass of a frame: clusters hidden in the previous frame are appended to u_occluded. 2: the second pass (POST_OCCLUDED)
 	uint u_hzb_prev;		// bindless texture, the pyramid of the previous frame
 	uint u_hzb_cur;			// bindless texture, the pyramid made after the first pass of this frame
 	uint u_hzb_mips;		// the levels of the full resolution pyramid (the first one, level 0, is not in the textures)
 	float2 u_hzb_size;		// of the level 0, the size of the depth buffer
-	float2 u_hzb_padding;
+	uint u_args;			// rw bindless, indirect dispatch args (POST_ARGS)
+	uint u_hzb_padding;
 };
 
 // threads of a group, GPUSceneConst::CLUSTER_THREADS
@@ -200,6 +200,13 @@ void markFeedback(RWByteAddressBuffer feedback, uint id) {
 	if ((feedback.Load(address) & bit) == 0) feedback.InterlockedOr(address, bit);
 }
 
+// Coarse logarithmic front-to-back distance bin [0 .. 31] from camera-relative cluster center (packed into bits 27..31 of selected.z).
+uint computeDepthBin(float3 center) {
+	const float dist2 = dot(center, center);
+	const float b = (log2(max(dist2, 0.25)) + 2.0) * (31.0 / 18.0);
+	return (uint)clamp(b, 0.0, 31.0);
+}
+
 // Tests a cluster and appends it to the list of selected clusters if it is selected.
 void processCluster(MeshDesc desc, Instance instance, float max_scale, uint instance_idx, uint cluster, uint instance_ref) {
 	ByteAddressBuffer clusters = bindless_buffers[u_cluster_data];
@@ -236,17 +243,17 @@ void processCluster(MeshDesc desc, Instance instance, float max_scale, uint inst
 	float radius = bounds.w * max_scale;
 	if (!insideFrustum(center, radius)) return;
 
-	// Occlusion culling in two passes. The first pass does not select what the previous frame hid, the second one selects only these clusters, and only if the depth of the
-	// first pass of this frame does not hide them: together they select exactly the clusters that are not hidden by this frame's depth. The test of the previous frame is at
-	// one place, so that both passes get the same result from it (a cluster must not be skipped by both).
-	if (u_hzb_mode != 0) {
-		const bool hidden_before = isOccluded(center, radius, true);
-		if (u_hzb_mode == 1) {
-			if (hidden_before) return;
-		}
-		else {
-			if (!hidden_before) return;
-			if (isOccluded(center, radius, false)) return;
+	// Occlusion culling in two passes. The first pass appends clusters hidden by the previous frame to u_occluded instead of drawing them;
+	// the second pass (POST_OCCLUDED) re-tests only u_occluded against the depth pyramid of the first pass, avoiding a full DAG re-traversal.
+	if (u_hzb_mode == 1) {
+		if (isOccluded(center, radius, true)) {
+			RWByteAddressBuffer occluded = bindless_rw_buffers[u_occluded];
+			uint at;
+			occluded.InterlockedAdd(SELECTED_COUNT, 1, at);
+			if (at < u_occluded_capacity) {
+				occluded.Store4(SELECTED_HEADER + at * SELECTED_STRIDE, uint4(instance_idx, desc.mesh_index, cluster | (error_small ? 0x80000000u : 0u), instance_ref));
+			}
+			return;
 		}
 	}
 
@@ -263,7 +270,7 @@ void processCluster(MeshDesc desc, Instance instance, float max_scale, uint inst
 	RWByteAddressBuffer selected = bindless_rw_buffers[u_selected];
 	uint at;
 	selected.InterlockedAdd(SELECTED_COUNT, 1, at);
-	if (at < u_selected_capacity) selected.Store4(SELECTED_HEADER + at * SELECTED_STRIDE, uint4(instance_idx, desc.mesh_index, cluster, instance_ref));
+	if (at < u_selected_capacity) selected.Store4(SELECTED_HEADER + at * SELECTED_STRIDE, uint4(instance_idx, desc.mesh_index, cluster | (computeDepthBin(center) << 27), instance_ref));
 }
 
 // false if no cluster of the node can be selected, then the node and everything under it is skipped
@@ -289,13 +296,61 @@ bool isNodeNeeded(float4 bounds, float4 lod_bounds, float min_error, float max_p
 
 groupshared uint g_current_count;
 groupshared uint g_next_count;
+groupshared uint g_item_index;
 
 [numthreads(GROUP_SIZE, 1, 1)]
 void main(uint3 group_id : SV_GroupID, uint3 group_thread_id : SV_GroupThreadID) {
-	#ifdef FLAT
+	#if defined POST_ARGS
+		if (group_thread_id.x == 0) {
+			bindless_rw_buffers[u_selected].Store4(SELECTED_COUNT, uint4(0, 0, 0, 0));
+			const uint count = min(bindless_rw_buffers[u_occluded].Load(SELECTED_COUNT), u_occluded_capacity);
+			const uint groups = (count + GROUP_SIZE - 1) / GROUP_SIZE;
+			bindless_rw_buffers[u_args].Store3(ARGS_POST, uint3(min(groups, MAX_GROUPS_X), (groups + MAX_GROUPS_X - 1) / MAX_GROUPS_X, 1));
+		}
+	#elif defined POST_OCCLUDED
+		const uint idx = (group_id.y * MAX_GROUPS_X + group_id.x) * GROUP_SIZE + group_thread_id.x;
+		RWByteAddressBuffer occluded = bindless_rw_buffers[u_occluded];
+		const uint count = min(occluded.Load(SELECTED_COUNT), u_occluded_capacity);
+		if (idx >= count) return;
+		const uint4 entry = occluded.Load4(SELECTED_HEADER + idx * SELECTED_STRIDE);
+		const uint instance_idx = entry.x;
+		const uint mesh_index = entry.y;
+		const uint cluster = entry.z & 0x7fffffffu;
+		const bool error_small = (entry.z & 0x80000000u) != 0;
+		const uint instance_ref = entry.w;
+
+		const MeshDesc desc = loadSceneDesc(mesh_index);
+		const Instance instance = loadInstance(desc, instance_idx, instance_ref);
+		const float max_scale = max(instance.scale.x, max(instance.scale.y, instance.scale.z));
+
+		ByteAddressBuffer clusters = bindless_buffers[u_cluster_data];
+		const uint offset = desc.clusters + cluster * CLUSTER_STRIDE;
+		const float4 bounds = asfloat(clusters.Load4(offset + CLUSTER_BOUNDS));
+		const float3 cull_pos = instance.pos + u_cull_offset.xyz;
+		const float3 center = cull_pos + rotateByQuat(instance.rot, bounds.xyz * instance.scale);
+		const float radius = bounds.w * max_scale;
+		if (isOccluded(center, radius, false)) return;
+
+		if (u_feedback_capacity != 0) {
+			const uint2 group_info = clusters.Load2(offset + CLUSTER_GROUPS);
+			const uint own_flags = clusters.Load(desc.groups + group_info.x * GROUP_STRIDE + GROUP_FLAGS);
+			const uint child_flags = group_info.y == NO_GROUP ? GROUP_FLAG_LOADED : clusters.Load(desc.groups + group_info.y * GROUP_STRIDE + GROUP_FLAGS);
+			const bool refined = (child_flags & GROUP_FLAG_LOADED) != 0;
+			RWByteAddressBuffer feedback = bindless_rw_buffers[u_feedback];
+			const uint own_id = own_flags >> GROUP_PAGE_SHIFT;
+			if (own_id < u_feedback_capacity) markFeedback(feedback, own_id);
+			const uint child_id = child_flags >> GROUP_PAGE_SHIFT;
+			if (!refined && !error_small && child_id < u_feedback_capacity) markFeedback(feedback, child_id);
+		}
+
+		RWByteAddressBuffer selected = bindless_rw_buffers[u_selected];
+		uint at;
+		selected.InterlockedAdd(SELECTED_COUNT, 1, at);
+		if (at < u_selected_capacity) selected.Store4(SELECTED_HEADER + at * SELECTED_STRIDE, uint4(instance_idx, mesh_index, cluster | (computeDepthBin(center) << 27), instance_ref));
+	#elif defined FLAT
 		const uint group_index = group_id.y * MAX_GROUPS_X + group_id.x;
 		// the number of items is in a counter of the GPU, u_item_capacity is the capacity of the list
-		const uint item_count = min(bindless_buffers[u_counts].Load(COUNTER_FLAT), u_item_capacity);
+		const uint item_count = min(bindless_rw_buffers[u_counts].Load(COUNTER_FLAT), u_item_capacity);
 		if (group_index >= item_count) return; // the same for all threads of the group
 		const uint4 item = bindless_buffers[u_items].Load4(u_items_offset + group_index * ITEM_STRIDE); // mesh, slot, first cluster, instance
 		const MeshDesc desc = loadSceneDesc(item.x);
@@ -307,20 +362,22 @@ void main(uint3 group_id : SV_GroupID, uint3 group_thread_id : SV_GroupThreadID)
 		const uint cluster = item.z + group_thread_id.x;
 		if (cluster < desc.cluster_count) processCluster(desc, instance, max_scale, instance_idx, cluster, item.w);
 	#else
-		// Persistent groups: a dispatch has at most u_tree_groups groups, the group g takes the items g, g + groups, g + 2 * groups, ... (FXC does not accept a barrier in a loop that
-		// ends by a value from groupshared memory or an atomic, which a queue of items would need, so the schedule is static). Every group has a slice of the scratch buffer for the
-		// lists of its item, u_scratch_slice u32 for two lists of the largest mesh, so the memory does not depend on the number of items and no item is dropped.
-		// The slice is sized for the largest mesh of the scene, so the number of groups is limited by it (the CPU makes it min(2048, scratch size / slice), about 420 triangles
-		// of the finest level for each node): a mesh with 5M triangles leaves about 190 groups, 30M about 31, and those few groups also take the items of the small meshes. If that is
-		// slow in a scene with a huge mesh and many small ones, give the small meshes their own slices (or LDS) and the huge ones a dispatch of their own.
-		const uint item_count = min(bindless_buffers[u_counts].Load(COUNTER_TREE), u_item_capacity);
-		const uint group_count = max(min(item_count, u_tree_groups), 1u);
+		// Persistent groups with dynamic atomic work queue and early-exit tree traversal (SM 6.0 / DXC).
+		RWByteAddressBuffer counts = bindless_rw_buffers[u_counts];
+		const uint item_count = min(counts.Load(COUNTER_TREE), u_item_capacity);
 		ByteAddressBuffer nodes = bindless_buffers[u_cluster_data];
 		RWByteAddressBuffer scratch = bindless_rw_buffers[u_scratch];
 		if ((group_id.x + 1) * u_scratch_slice > u_scratch_size) return;	// the slice does not fit, the same for all threads of the group (the CPU makes it fit)
 		const uint scratch_base = group_id.x * u_scratch_slice * 4;
 
-		[loop] for (uint group_index = group_id.x; group_index < item_count; group_index += group_count) {
+		[loop] for (;;) {
+			if (group_thread_id.x == 0) {
+				counts.InterlockedAdd(COUNTER_TREE_QUEUE, 1, g_item_index);
+			}
+			GroupMemoryBarrierWithGroupSync();
+			const uint group_index = g_item_index;
+			if (group_index >= item_count) break;
+
 			const uint4 item = bindless_buffers[u_items].Load4(u_items_offset + group_index * ITEM_STRIDE); // mesh, slot, first cluster, instance
 			const MeshDesc desc = loadSceneDesc(item.x);
 			const uint instance_idx = item.y;
@@ -339,12 +396,10 @@ void main(uint3 group_id : SV_GroupID, uint3 group_thread_id : SV_GroupThreadID)
 			}
 			DeviceMemoryBarrierWithGroupSync();
 
-			// A loop with the depth of the deepest tree of the meshes of the dispatch, a uniform value, so that the synchronizations are in flow
-			// control that is the same for all threads (the shader compiler can not tell that a loop that ends when a value in groupshared memory is
-			// 0 ends for all threads at the same time). Levels after the last one of a shallower tree have no nodes, they cost two synchronizations.
 			uint list = 0;
 			[loop] for (uint depth = 0; depth < u_tree_depth; ++depth) {
-				const uint count = g_current_count; // all threads read it between the same two synchronizations
+				const uint count = g_current_count;
+				if (count == 0) break;
 				const uint from = scratch_base + list * list_size;
 				const uint to = scratch_base + (1 - list) * list_size;
 

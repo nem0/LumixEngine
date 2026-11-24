@@ -41,7 +41,7 @@ cbuffer UniformData : register(b4) {
 	uint u_flat_items;		// rw bindless, 16 bytes: mesh, slot, first cluster, instance
 	uint u_tree_items;		// rw bindless, the same
 	uint u_item_capacity;	// of each list
-	uint u_post;			// 1 in the second pass of the occlusion culling of a view: it selects only clusters (the first pass has drawn the meshes without clusters already)
+	uint u_clear_occluded;	// 1 in the first pass of occlusion culling: PASS0 clears u_occluded
 	uint u_selected;		// rw bindless, the list of selected clusters of nanite.hlsl
 	uint u_chunk_items;		// rw bindless, 16 bytes: slot, first instance, count, 0
 	uint u_chunk_capacity;
@@ -51,7 +51,7 @@ cbuffer UniformData : register(b4) {
 	uint u_filter;			// bindless, a bit for each slot (FILTER)
 	uint u_filter_offset;	// in bytes
 	uint u_lod_model_count;
-	uint u_padding2;
+	uint u_occluded;		// rw bindless, list of occluded clusters written by pass 1 of nanite.hlsl
 	uint u_chunk_bounds;	// bindless, 16 bytes per chunk, like u_bounds (CHUNK_CULL)
 	uint u_chunks;			// bindless, GPUSceneChunk[], 32 bytes: int3 p, model, instance buffer, first instance, instance count, float instance radius
 	uint u_chunk_slots;		// the chunks the tables have
@@ -105,7 +105,7 @@ void emit(RWByteAddressBuffer counter, uint model, uint slot, float3 center, uin
 	if (model == NO_MODEL) return;
 	if ((model & MODEL_LOD_BIT) != 0) {
 		const uint index = model & ~MODEL_LOD_BIT;
-		if (index < u_lod_model_count && u_post == 0) emitLod(index, slot, center, flags, instance);
+		if (index < u_lod_model_count) emitLod(index, slot, center, flags, instance);
 	}
 	else if (model < u_model_count && u_meshes != 0) {
 		// the work of the clusters of the meshes of the model
@@ -150,6 +150,7 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_id : SV_GroupID, ui
 		if (thread_id.x < COUNTER_COUNT) counter.Store(thread_id.x * 4, 0);
 		if (thread_id.x == 0) {
 			bindless_rw_buffers[u_selected].Store4(SELECTED_COUNT, uint4(0, 0, 0, 0));
+			if (u_clear_occluded != 0) bindless_rw_buffers[u_occluded].Store4(SELECTED_COUNT, uint4(0, 0, 0, 0));
 			const uint groups = (u_capacity + GROUP_THREADS - 1) / GROUP_THREADS;
 			bindless_rw_buffers[u_args].Store3(ARGS_MODEL_INSTANCES, dispatchGroups(groups));
 		}

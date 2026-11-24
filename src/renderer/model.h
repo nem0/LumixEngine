@@ -139,8 +139,8 @@ struct LUMIX_RENDERER_API Mesh {
 	// cluster DAG for GPU driven LOD, see mesh_clusters.h, baked by the model importer
 	// Meshes with clusters have no vertices and indices of their own: their vertex data are the headers of clusters followed by their
 	// bit packed vertices (position and then attributes, interleaved, see mesh_clusters.h; vb_stride and the vertex decl only say which attributes there are),
-	// and the indices are u8 and local to a cluster,
-	// cluster `c` starts at c * cluster_index_stride, so that all selected clusters of a mesh are drawn by one instanced draw.
+	// and the indices are local to a cluster, u8 in the model file and widened to u16 on the GPU, tightly packed per group (MeshClusterGPU::first_index is
+	// relative to its group); every selected cluster is drawn by its own indexed indirect command, with the buffer of cluster data as the index buffer.
 	// The CPU `vertices` and `indices` are made of the finest clusters.
 	// The vertex data, the clusters, the nodes and the indices are not buffers of the mesh (vertex_buffer_handle is invalid), they are ranges of the buffer shared
 	// by all meshes with clusters (see Renderer::allocClusterData): the vertex data are `cluster_vertex_size` bytes from `cluster_vertex_offset`, the clusters
@@ -155,7 +155,7 @@ struct LUMIX_RENDERER_API Mesh {
 	u32 cluster_group_offset = 0;	// MeshGroupAddressGPU[], a range of its own
 	u32 cluster_group_size = 0;
 	u32 cluster_count = 0;
-	u32 cluster_index_stride = 0; // indices of every cluster are padded (with degenerate triangles) to this count, see Model::loadClusters
+	u32 cluster_index_stride = 0; // the largest index count of a cluster of the mesh (indices are not padded), see Model::loadClusters
 	u32 node_count = 0;
 	u32 root_count = 0;
 	u32 tree_depth = 0;			// levels of the deepest tree, a leaf node is the last one
@@ -175,7 +175,7 @@ struct LUMIX_RENDERER_API Model final : Resource {
 	// The version of the file format. Increase it whenever the format changes, models of other versions are rejected (see doLoad).
 	// The numbers up to 15 were used by older formats, they must not be used again.
 	enum class FileVersion : u32 {
-		FIRST_SUPPORTED = 15, // the payload of pages of clusters was in the part of the file that is read at once
+		FIRST_SUPPORTED = 16, // cluster indices were padded to index_stride with degenerate triangles
 
 		LATEST
 	};

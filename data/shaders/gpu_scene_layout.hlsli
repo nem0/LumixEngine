@@ -58,15 +58,15 @@
 #define CHUNK_INSTANCE_ROT_LOD 0
 #define CHUNK_INSTANCE_POS_SCALE 16
 
-// the instance data of a GPU-scene indirect draw (20 bytes), written by gpu_scene_variants.hlsl and read by vertex_pulling.hlsli / surface shaders (INDIRECT_INSTANCE)
-#define DRAW_INSTANCE_STRIDE 20
-#define DRAW_INSTANCE_SLOT 0			// slot in GPUScene::instances (when REF == 0) or GPUSceneChunks::chunks (when REF != 0)
-#define DRAW_INSTANCE_MESH 4			// mesh of the mesh table (CLUSTER_MESH), or base vertex of a mesh without clusters (POOLED_VERTICES)
-#define DRAW_INSTANCE_BASE_VERTEX 4
-#define DRAW_INSTANCE_CLUSTER 8			// cluster index (CLUSTER_MESH), or byte offset of bones (SKINNED)
-#define DRAW_INSTANCE_BONES 8
-#define DRAW_INSTANCE_REF 12			// 0 for a model instance, otherwise instance index + 1 in the chunk's instance buffer
-#define DRAW_INSTANCE_MATERIAL 16		// material index
+// the instance data of a GPU-scene indirect draw (32 bytes), written by gpu_scene_variants.hlsl and read by vertex_pulling.hlsli / surface shaders (INDIRECT_INSTANCE)
+#define DRAW_INSTANCE_STRIDE 32
+#define DRAW_INSTANCE_SLOT 0			// uint4(slot, ref, material, base_vertex / cluster)
+#define DRAW_INSTANCE_REF 4				// 0 for a model instance, otherwise instance index + 1 in the chunk's instance buffer
+#define DRAW_INSTANCE_MATERIAL 8		// material index
+#define DRAW_INSTANCE_BASE_VERTEX 12	// base vertex of a mesh without clusters (POOLED_VERTICES), or cluster index (CLUSTER_MESH, for CLUSTER_DEBUG)
+#define DRAW_INSTANCE_CLUSTER 12
+#define DRAW_INSTANCE_BONES 16			// byte offset of bones (SKINNED), or resolved cluster addresses (CLUSTER_MESH): uint4(stream_base, index_base, header_addr, index_count)
+#define DRAW_INSTANCE_CLUSTER_DATA 16
 
 // the list of selected clusters, from the clusters selected by nanite.hlsl or gpu_scene_cull.hlsl to gpu_scene_variants.hlsl
 #define SELECTED_COUNT 0				// u32
@@ -77,6 +77,7 @@
 #define ITEM_STRIDE 16
 
 // u_counter of gpu_scene_cull.hlsl, u32 each
+#define COUNTER_TREE_QUEUE 0
 #define COUNTER_FLAT 4
 #define COUNTER_TREE 8
 #define COUNTER_CHUNK 12
@@ -84,9 +85,32 @@
 // u_args of gpu_scene_cull.hlsl and gpu_scene_variants.hlsl, 16 bytes each
 #define ARGS_MODEL_INSTANCES 0
 #define ARGS_FLAT 16
+#define ARGS_POST 16
 #define ARGS_TREE 32
 #define ARGS_CHUNK_INSTANCES 64
 #define ARGS_BIN 48
+
+// u_group_base entries (u32 per draw group): NO_COMMAND_GROUP if not drawn in the view, otherwise:
+//   bits 0..15:  first command in this view
+//   bits 16..30: sequential cluster draw group index (when bit 31 is set)
+//   bit 31:      1 if cluster draw group (!group.lod), 0 if LOD draw group
+#define GROUP_BASE_COMMAND_MASK 0xffff
+#define GROUP_BASE_CLUSTER_IDX_SHIFT 16
+#define GROUP_BASE_CLUSTER_IDX_MASK 0x7fff
+#define GROUP_BASE_CLUSTER_BIT 0x80000000
+
+// u_counters layout of gpu_scene_variants.hlsl
+#define MAX_VARIANTS 8192
+#define DEPTH_BINS 32
+#define MAX_DEPTH_BIN_GROUPS 256
+#define DEPTH_BIN_TOTAL (MAX_DEPTH_BIN_GROUPS * DEPTH_BINS)
+#define COUNTERS_OUT_CURSOR_AT 8
+#define COUNTERS_COUNTS_AT 64
+#define COUNTERS_CURSORS_AT (COUNTERS_COUNTS_AT + MAX_VARIANTS * 4)
+#define COUNTERS_BASES_AT (COUNTERS_COUNTS_AT + MAX_VARIANTS * 8)
+#define COUNTERS_BIN_COUNTS_AT (COUNTERS_COUNTS_AT + MAX_VARIANTS * 12)
+#define COUNTERS_BIN_CURSORS_AT (COUNTERS_BIN_COUNTS_AT + DEPTH_BIN_TOTAL * 4)
+#define COUNTERS_BIN_OFFSETS_AT (COUNTERS_BIN_COUNTS_AT + DEPTH_BIN_TOTAL * 8)
 
 // GPUClusterModel, 8 bytes: first mesh, mesh count
 #define CLUSTER_MODEL_STRIDE 8
@@ -120,7 +144,9 @@
 #define CLUSTER_BOUNDS 0
 #define CLUSTER_LOD_BOUNDS 16
 #define CLUSTER_PARENT_BOUNDS 32
-#define CLUSTER_MISC 48					// error, parent error, ...
+#define CLUSTER_MISC 48					// error, parent error, first_index (group-relative), index_count
+#define CLUSTER_FIRST_INDEX 56
+#define CLUSTER_INDEX_COUNT 60
 #define CLUSTER_ATTRIBUTE_ERRORS 64		// of the cluster and of its parent
 #define CLUSTER_GROUPS 72				// the group of the cluster, the group of its children
 #define CLUSTER_GROUP 72
@@ -142,5 +168,25 @@
 
 #define CLUSTER_HEADER_STRIDE 48		// the header of a cluster in u_vertex_buffer, see pullVertex
 #define CLUSTER_ALIGNMENT_MASK 15
+
+// Counters shared by the threads of a wave. Only the threads that call it take part (the active lanes), so it can be called after divergent returns.
+// Single-address appends (one counter for all threads) are not done this way: NVIDIA merges them by itself, wave code for them was measured slower or the same.
+
+// +1 on the counter at `address`, which can be different in each thread. Returns the previous value of the counter for this thread, as InterlockedAdd.
+// If all threads have the same address (the usual case, the entries of a wave are mostly of one instance) they share one atomic, otherwise each does its own.
+// Not a loop over the distinct addresses (WaveReadLaneFirst(address) == address until all are done): that hung the GPU (TDR) on NVIDIA, though its DXIL was right.
+uint waveIncrement(RWByteAddressBuffer buffer, uint address) {
+	uint result = 0;
+	if (WaveActiveAllEqual(address)) {
+		const uint total = WaveActiveCountBits(true);
+		uint base = 0;
+		if (WaveIsFirstLane()) buffer.InterlockedAdd(address, total, base);
+		result = WaveReadLaneFirst(base) + WavePrefixCountBits(true);
+	}
+	else {
+		buffer.InterlockedAdd(address, 1, result);
+	}
+	return result;
+}
 
 #endif

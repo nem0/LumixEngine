@@ -44,30 +44,24 @@ uint pullInstanceAddress(uint instance_id, uint stride) {
 
 #ifdef INDIRECT_INSTANCE
 	// Pulls the transform of a GPU-scene draw entry directly from GPUScene::instances or GPUSceneChunks::chunks.
-	void pullSceneTransform(uint slot, uint instance_ref, bool load_prev, out float4 rot, out float3 position, out float3 scale, out float4 prev_rot, out float3 prev_position, out float3 prev_scale) {
+	// Returns true if previous-frame transform differs from current transform (moved this frame).
+	bool pullSceneTransform(uint slot, uint instance_ref, bool load_prev, out float4 rot, out float3 position, out float3 scale, out float4 prev_rot, out float3 prev_position, out float3 prev_scale) {
 		if (instance_ref == 0) {
 			ByteAddressBuffer instances = bindless_buffers[u_scene_instances];
 			const uint at = slot * INSTANCE_STRIDE;
 			rot = asfloat(instances.Load4(at + INSTANCE_ROT));
 			position = float3(asint(instances.Load3(at + INSTANCE_POS)) - u_scene_cam_p) * SCENE_POS_UNIT - u_scene_cam_frac;
 			scale = asfloat(instances.Load3(at + INSTANCE_SCALE));
-			if (load_prev) {
-				if (instances.Load(at + INSTANCE_MOVED_FRAME) == u_scene_frame) {
-					prev_rot = asfloat(instances.Load4(at + INSTANCE_PREV_ROT));
-					prev_position = float3(asint(instances.Load3(at + INSTANCE_PREV_POS)) - u_scene_cam_p) * SCENE_POS_UNIT - u_scene_cam_frac;
-					prev_scale = asfloat(instances.Load3(at + INSTANCE_PREV_SCALE));
-				}
-				else {
-					prev_rot = rot;
-					prev_position = position;
-					prev_scale = scale;
-				}
+			if (load_prev && instances.Load(at + INSTANCE_MOVED_FRAME) == u_scene_frame) {
+				prev_rot = asfloat(instances.Load4(at + INSTANCE_PREV_ROT));
+				prev_position = float3(asint(instances.Load3(at + INSTANCE_PREV_POS)) - u_scene_cam_p) * SCENE_POS_UNIT - u_scene_cam_frac;
+				prev_scale = asfloat(instances.Load3(at + INSTANCE_PREV_SCALE));
+				return true;
 			}
-			else {
-				prev_rot = rot;
-				prev_position = position;
-				prev_scale = scale;
-			}
+			prev_rot = rot;
+			prev_position = position;
+			prev_scale = scale;
+			return false;
 		}
 		else {
 			ByteAddressBuffer chunks = bindless_buffers[u_scene_chunks];
@@ -82,6 +76,7 @@ uint pullInstanceAddress(uint instance_id, uint stride) {
 			prev_rot = rot;
 			prev_position = position;
 			prev_scale = scale;
+			return false;
 		}
 	}
 #endif
@@ -102,9 +97,11 @@ uint pullInstanceAddress(uint instance_id, uint stride) {
 #define ATTR_U16 4
 #define ATTR_U32 5
 
-// depth and shadow passes need only positions, unless alpha cutout reads the rest
+// depth and shadow passes need only positions, or position + UV for alpha cutout
 #if defined DEPTH && !defined ALPHA_CUTOUT
 	#define PULL_ONLY_POSITION
+#elif defined DEPTH && defined ALPHA_CUTOUT
+	#define PULL_ONLY_POSITION_UV
 #endif
 
 uint pullAttributeSize(uint type) {
@@ -228,12 +225,14 @@ struct VSVertex {
 // Positions are integers of a lattice of the mesh, relative to the minimum of the cluster, bit packed. Attributes have a fixed stride:
 // the tangent frame as a quaternion (smallest three), the UV as two u16 in the range of the cluster, and the other attributes as they are.
 
-// `count` (at most 32) bits from the bit `bit` of the data of a mesh, which start at the byte `base` of the buffer (all meshes are in one buffer)
-uint pullClusterBits(ByteAddressBuffer data, uint base, uint bit, uint count) {
-	const uint2 words = data.Load2(base + (bit >> 5) * 4);
-	const uint shift = bit & 31;
-	const uint v = shift == 0 ? words.x : ((words.x >> shift) | (words.y << (32 - shift)));
-	const uint r = count >= 32 ? v : v & ((1u << count) - 1);
+// `count` (at most 32) bits from relative bit offset `rel_bit` (0..95) inside a 128-bit window `w`
+uint extractClusterBits128(uint4 w, uint rel_bit, uint count) {
+	const uint word_idx = rel_bit >> 5;
+	const uint shift = rel_bit & 31;
+	const uint lo = word_idx == 0 ? w.x : (word_idx == 1 ? w.y : w.z);
+	const uint hi = word_idx == 0 ? w.y : (word_idx == 1 ? w.z : w.w);
+	const uint v = shift == 0 ? lo : ((lo >> shift) | (hi << (32 - shift)));
+	const uint r = count >= 32 ? v : (v & ((1u << count) - 1));
 	return count == 0 ? 0 : r;
 }
 
@@ -251,60 +250,64 @@ void pullClusterFrame(uint packed, out float3 normal, out float3 tangent) {
 	tangent = float3(1 - 2 * (q.y * q.y + q.z * q.z), 2 * (q.x * q.y + q.w * q.z), 2 * (q.x * q.z - q.w * q.y));
 }
 
-// `corner` is the number of the index in the draw (SV_VertexID of a draw with a sequential index buffer). A draw has the clusters of many meshes (the variants of
-// gpu_scene_variants.hlsl) and all of its instances draw the same range of indices, so the vertex of the corner is found here: the mesh of the instance is in its
-// prev_pos.w (an index of the mesh table of the GPU scene, u_cluster_meshes), which has the buffers of its vertices and indices, the cluster is in its
-// scale.w. The draw has as many indices as the largest mesh of its variant, the corners after the ones of the mesh are degenerate triangles.
-VSVertex pullVertex(uint corner, uint instance_id) {
-	const uint instance_address = pullInstanceAddress(instance_id, DRAW_INSTANCE_STRIDE);
-	const uint2 mesh_cluster = bindless_buffers[u_instance_buffer].Load2(instance_address + DRAW_INSTANCE_MESH);
-	const uint mesh = mesh_cluster.x;
-	const uint cluster = mesh_cluster.y;
-	ByteAddressBuffer mesh_table = bindless_buffers[u_cluster_meshes];
-	const uint4 mesh_info = mesh_table.Load4(mesh * CLUSTER_MESH_STRIDE + CLUSTER_MESH_TABLE);	// the table of the mesh, the table of groups, cluster count, node count
-	const uint root_count = mesh_table.Load(mesh * CLUSTER_MESH_STRIDE + CLUSTER_MESH_ROOT_COUNT);
-	const uint index_stride = mesh_table.Load(mesh * CLUSTER_MESH_STRIDE + CLUSTER_MESH_INDEX_STRIDE);
-	// byte offsets of the headers of the clusters (after the clusters, the nodes and the roots, 16 byte aligned) and of the table of groups in u_vertex_buffer
-	const uint2 mesh_offsets = uint2(mesh_info.x + ((mesh_info.z * CLUSTER_STRIDE + mesh_info.w * NODE_STRIDE + root_count * ROOT_STRIDE + CLUSTER_ALIGNMENT_MASK) & ~(uint)CLUSTER_ALIGNMENT_MASK), mesh_info.y);
+// `vertex` is SV_VertexID: the index of the vertex in its cluster, from the cluster's own u16 indices (the buffer of cluster data is the index buffer of the draw,
+// a command per cluster, see gpu_scene_variants.hlsl); `u_draw_id` is the slot of the cluster's instance data in u_instance_buffer (m_scene_out).
+VSVertex pullVertex(uint vertex) {
+	const uint instance_address = pullInstanceAddress(0, DRAW_INSTANCE_STRIDE);
+	// pre-resolved by gpu_scene_variants.hlsl: stream_base, index_base, header_addr, index_count (only stream_base and header_addr are used here)
+	const uint4 cluster_data = bindless_buffers[u_instance_buffer].Load4(instance_address + DRAW_INSTANCE_CLUSTER_DATA);
+	const uint base = cluster_data.x;
 	// the vertices, indices and everything else of all meshes are in one buffer, a mesh has its ranges of it
 	ByteAddressBuffer data = bindless_buffers[u_vertex_buffer];
-	// the data of a cluster is where its group is: the group is in the cluster table (MeshClusterGPU::group, CLUSTER_GROUP)
-	const uint group_id = data.Load(mesh_info.x + cluster * CLUSTER_STRIDE + CLUSTER_GROUP);
-	const uint4 group_address = data.Load4(mesh_offsets.y + group_id * GROUP_STRIDE);	// stream, indices of the first cluster, first cluster, flags
-	const uint base = group_address.x;
-	const uint index_address = group_address.y + (cluster - group_address.z) * index_stride + corner;
-	const uint index_word = data.Load(index_address & ~3u);
-	const uint vertex = corner >= index_stride ? 0 : ((index_word >> ((index_address & 3) * 8)) & 0xff);
-	const uint header = mesh_offsets.x + cluster * CLUSTER_HEADER_STRIDE;
+	const uint header = cluster_data.z;
 	const uint4 h0 = data.Load4(header);			// start of positions, bits
 	const uint4 h1 = data.Load4(header + 16);		// bits of UV, vertex count, bit offset of the first vertex (in the stream of its group), step
-	const float4 h2 = asfloat(data.Load4(header + 32)); // UV range
+	#if !defined PULL_ONLY_POSITION && defined UV0_ATTR
+		const float4 h2 = asfloat(data.Load4(header + 32)); // UV range
+	#endif
 
 	const uint bits_x = h0.w & 0xff, bits_y = (h0.w >> 8) & 0xff, bits_z = (h0.w >> 16) & 0xff;
 	// vertices are interleaved: the position, then the attributes, none of them aligned. The bits of attributes of a vertex are in the top byte
 	const uint position_bits = bits_x + bits_y + bits_z;
 	const uint bit = h1.z + vertex * (position_bits + (h0.w >> 24));
+	const uint4 pos_words = data.Load4(base + (bit >> 5) * 4);
+	const uint pos_rel = bit & 31;
 	int3 lattice = asint(h0.xyz);
-	lattice.x += (int)pullClusterBits(data, base, bit, bits_x);
-	lattice.y += (int)pullClusterBits(data, base, bit + bits_x, bits_y);
-	lattice.z += (int)pullClusterBits(data, base, bit + bits_x + bits_y, bits_z);
+	lattice.x += (int)extractClusterBits128(pos_words, pos_rel, bits_x);
+	lattice.y += (int)extractClusterBits128(pos_words, pos_rel + bits_x, bits_y);
+	lattice.z += (int)extractClusterBits128(pos_words, pos_rel + bits_x + bits_y, bits_z);
 
 	VSVertex v = (VSVertex)0;
 	v.position = float3(lattice) * asfloat(h1.w);
 
 	#ifndef PULL_ONLY_POSITION
-		// order: frame (32 bits), UV (bits of u and v are in h1.x), AO (8 bits), color
-		uint attribute = bit + position_bits;
-		pullClusterFrame(pullClusterBits(data, base, attribute, 32), v.normal, v.tangent);
-		attribute += 32;
-		#ifdef UV0_ATTR
-			const uint bits_u = h1.x & 0xff, bits_v = (h1.x >> 8) & 0xff;
-			const float2 q = float2(pullClusterBits(data, base, attribute, bits_u), pullClusterBits(data, base, attribute + bits_u, bits_v));
-			v.uv = h2.xy + q / max(float2((1u << bits_u) - 1, (1u << bits_v) - 1), 1) * h2.zw;
-			attribute += bits_u + bits_v;
-		#endif
-		#ifdef AO_ATTR
-			v.ao = pullClusterBits(data, base, attribute, 8) * (1.0 / 255.0);
+		#ifdef PULL_ONLY_POSITION_UV
+			#ifdef UV0_ATTR
+				// skip 32-bit tangent frame; UV (<= 32 bits) fits in a single 64-bit Load2
+				const uint uv_bit = bit + position_bits + 32;
+				const uint2 uv_words = data.Load2(base + (uv_bit >> 5) * 4);
+				const uint uv_rel = uv_bit & 31;
+				const uint bits_u = h1.x & 0xff, bits_v = (h1.x >> 8) & 0xff;
+				const uint4 uv_w4 = uint4(uv_words.x, uv_words.y, 0, 0);
+				const float2 q = float2(extractClusterBits128(uv_w4, uv_rel, bits_u), extractClusterBits128(uv_w4, uv_rel + bits_u, bits_v));
+				v.uv = h2.xy + q / max(float2((1u << bits_u) - 1, (1u << bits_v) - 1), 1) * h2.zw;
+			#endif
+		#else
+			// order: frame (32 bits), UV (bits of u and v are in h1.x), AO (8 bits), color — all fit in one 128-bit Load4 window
+			const uint attribute = bit + position_bits;
+			const uint4 attr_words = data.Load4(base + (attribute >> 5) * 4);
+			uint attr_rel = attribute & 31;
+			pullClusterFrame(extractClusterBits128(attr_words, attr_rel, 32), v.normal, v.tangent);
+			attr_rel += 32;
+			#ifdef UV0_ATTR
+				const uint bits_u = h1.x & 0xff, bits_v = (h1.x >> 8) & 0xff;
+				const float2 q = float2(extractClusterBits128(attr_words, attr_rel, bits_u), extractClusterBits128(attr_words, attr_rel + bits_u, bits_v));
+				v.uv = h2.xy + q / max(float2((1u << bits_u) - 1, (1u << bits_v) - 1), 1) * h2.zw;
+				attr_rel += bits_u + bits_v;
+			#endif
+			#ifdef AO_ATTR
+				v.ao = extractClusterBits128(attr_words, attr_rel, 8) * (1.0 / 255.0);
+			#endif
 		#endif
 	#endif
 	return v;
@@ -317,15 +320,21 @@ VSVertex pullVertex(uint vertex) {
 	VSVertex v = (VSVertex)0;
 	v.position = PULL_FLOAT4(POSITION).xyz;
 	#ifndef PULL_ONLY_POSITION
-		v.normal = PULL_FLOAT4(NORMAL).xyz;
-		#ifdef UV0_ATTR
-			v.uv = PULL_FLOAT4(TEXCOORD0).xy;
-		#endif
-		#ifdef AO_ATTR
-			v.ao = PULL_FLOAT4(AO).x;
-		#endif
-		#ifdef TANGENT_ATTR
-			v.tangent = PULL_FLOAT4(TANGENT).xyz;
+		#ifdef PULL_ONLY_POSITION_UV
+			#ifdef UV0_ATTR
+				v.uv = PULL_FLOAT4(TEXCOORD0).xy;
+			#endif
+		#else
+			v.normal = PULL_FLOAT4(NORMAL).xyz;
+			#ifdef UV0_ATTR
+				v.uv = PULL_FLOAT4(TEXCOORD0).xy;
+			#endif
+			#ifdef AO_ATTR
+				v.ao = PULL_FLOAT4(AO).x;
+			#endif
+			#ifdef TANGENT_ATTR
+				v.tangent = PULL_FLOAT4(TANGENT).xyz;
+			#endif
 		#endif
 	#endif
 	#ifdef INDICES_ATTR

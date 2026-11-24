@@ -17,7 +17,8 @@ REM is idle most of every frame, so it drops its clocks and the timings are 3-4 
 REM stays busy at its top clocks. (-gpu_stable_power_state would lock the clocks, but it needs the developer mode of Windows.)
 REM
 REM Every scene is an empty world with a sun, a grid of instances of one mesh and a camera turning around in the middle of it
-REM (see bench.evox). Results are CSV files in "%USERPROFILE%\Saved Games\nanite_bench\" (<mesh>_<streaming|no_streaming>.csv).
+REM (see bench.evox). "counter," lines are the value of the last frame whose GPU query was ready, which can be one or two frames old and the camera turns every frame,
+REM so compare triangle counts with the "counter_avg," lines (average over the measured frames). Results are CSV files in "%USERPROFILE%\Saved Games\nanite_bench\" (<mesh>_<streaming|no_streaming>.csv).
 REM Resources are compiled by Studio because the app can't compile them (scripts, models, shaders).
 
 pushd %~dp0
@@ -110,7 +111,7 @@ for %%M in (rock coil terrain tree_plain tree_plain_big) do (
     echo.
     echo --- %%M, %%N ---
     if exist "%out_dir%\%%M_%%N.csv" (
-      findstr /i /b /c:"info," /c:"frame_ms" /c:"gpu_ms,frame" /c:"gpu_ms,geom pass" /c:"gpu_ms,shadow pass" /c:"gpu_ms,prepare view" /c:"gpu_ms,scene instance cull" /c:"gpu_ms,cluster cull" /c:"gpu_ms,scene variants" /c:"gpu_ms,render bucket" /c:"gpu_ms,fill clusters" /c:"counter,GPU triangles: " /c:"counter,Cluster" /c:"counter_avg,Cluster" "%out_dir%\%%M_%%N.csv"
+      findstr /i /b /c:"info," /c:"frame_ms" /c:"gpu_ms,frame" /c:"gpu_ms,geom pass" /c:"gpu_ms,shadow pass" /c:"gpu_ms,prepare view" /c:"gpu_ms,scene instance cull" /c:"gpu_ms,cluster cull" /c:"gpu_ms,scene variants" /c:"gpu_ms,render bucket" /c:"gpu_ms,fill clusters" /c:"counter,GPU triangles: " /c:"counter_avg,GPU triangles: " /c:"counter,Cluster" /c:"counter_avg,Cluster" "%out_dir%\%%M_%%N.csv"
     ) else (
       echo no result
     )

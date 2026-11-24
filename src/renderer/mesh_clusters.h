@@ -23,7 +23,7 @@ struct MeshClusterGPU {
 	float parent_radius;
 	float error;			// object space geometric error of this cluster
 	float parent_error;		// FLT_MAX if the cluster has no parent
-	u32 first_index;		// into MeshClusters::indices
+	u32 first_index;		// into MeshClusters::indices while building; group-relative index offset in the model file and on the GPU
 	u32 index_count;
 	// `error` is the error of positions. The error of attributes (normals and UVs that the triangles took from other places) is separate, the
 	// error that is compared to the screen is `error + weight * attribute_error`, the weight is chosen when rendering. Both never get smaller
@@ -55,7 +55,7 @@ struct MeshGroupAddressGPU {
 		PERMANENT = 1 << 1		// never unloaded
 	};
 	u32 stream_address;		// of the vertex stream of the group, positions and attributes of its clusters, see MeshClusterVertexGPU::pos_bit_offset
-	u32 index_address;		// of the indices of its first cluster, the cluster `c` of the group is at index_address + (c - first_cluster) * index_stride
+	u32 index_address;		// byte address of the u16 indices of the group, a cluster's indices are at index_address + its first_index * 2
 	u32 first_cluster;
 	u32 flags;
 };
@@ -88,7 +88,8 @@ struct MeshNodeGPU {
 //   - then its attributes, not aligned: the frame (normal and tangent, 32 bits), the UV (uv_bits per axis), AO (8 bits) and color (32 bits), if the mesh has them
 // so the vertex `local` of a cluster starts at the bit `pos_bit_offset + local * (bits of x + y + z + attribute bits)`, where the number of the
 // attribute bits is in the top byte of pos_bits.
-// The indices of the clusters are local to the cluster: u16 while they are built, bytes in the model file and on the GPU.
+// The indices of the clusters are local to the cluster: u16 while they are built, bytes in the model file, u16 again on the GPU (widened on upload,
+// so the buffer of cluster data can be bound as a U16 index buffer).
 struct MeshClusterVertexGPU {
 	i32 pos_start[3];		// lattice position of the minimum of the cluster
 	u32 pos_bits;			// bits of x | bits of y << 8 | bits of z << 16 | bits of attributes of a vertex << 24
@@ -245,8 +246,10 @@ struct ClusterStream {
 	// The pages are not checked, the importer made them. `stream_size` is the size of the vertex streams of all groups (in the pages), `stride` is the index stride.
 	bool init(const MeshClusterGPU* cluster_array, u32 clusters, const MeshNodeGPU* node_array, u32 nodes_count, const MeshGroupGPU* group_array, u32 group_count
 		, const MeshPagesView& page_data, u32 stream_size, u32 stride, Renderer& renderer);
-	// bytes of the range of a page in the buffer of cluster data
+	// bytes of the range of a page in the model file (u8 indices)
 	u32 pageBytes(u32 page) const;
+	// bytes of the range of a page in the GPU cluster data buffer (u16 indices)
+	u32 pageGpuBytes(u32 page) const;
 	// the first parent page (see page_parents) that is not loaded, or NONE
 	u32 firstMissingParentPage(u32 page) const;
 	// sets wanted_frame of the parent pages, so that they are not evicted in this frame
@@ -269,6 +272,7 @@ struct ClusterStream {
 	IAllocator& allocator;
 	Array<MeshGroupGPU> groups;
 	Array<u32> group_page;							// of each group, its index in `pages`
+	Array<u32> group_index_count;					// exact tightly-packed index count of each group (no degenerate padding)
 	// of each page, the other pages that have a group with a cluster refined from a group of the page (the coarser ones) and the pages of the groups that its clusters are
 	// refined from (the finer ones), without duplicates (lists, made from MeshPages in ClusterStream::init)
 	Array<u32> page_parents, page_children;

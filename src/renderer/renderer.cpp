@@ -709,6 +709,8 @@ struct RendererImpl final : Renderer {
 		m_cluster_data_buffer = gpu::INVALID_BUFFER;
 		if (m_cluster_scratch_buffer) stream.destroy(m_cluster_scratch_buffer);
 		m_cluster_scratch_buffer = gpu::INVALID_BUFFER;
+		if (m_cluster_commands_buffer) stream.destroy(m_cluster_commands_buffer);
+		m_cluster_commands_buffer = gpu::INVALID_BUFFER;
 		m_font_manager->destroy();
 		LUMIX_DELETE(m_allocator, m_font_manager);
 		
@@ -1285,6 +1287,14 @@ struct RendererImpl final : Renderer {
 	}
 	u32 getClusterScratchCapacity() const override { return CLUSTER_SCRATCH_CAPACITY; }
 
+	gpu::BufferHandle getClusterCommandsBuffer() override {
+		if (!m_cluster_commands_buffer) {
+			m_cluster_commands_buffer = createBuffer(MemRef{ CLUSTER_COMMANDS_CAPACITY * 24, nullptr, false }, gpu::BufferFlags::SHADER_BUFFER, "cluster indirect commands");
+		}
+		return m_cluster_commands_buffer;
+	}
+	u32 getClusterCommandsCapacity() const override { return CLUSTER_COMMANDS_CAPACITY; }
+
 	GPUSceneRegistry& getGPUSceneRegistry() override {
 		if (!m_gpu_scene_registry) m_gpu_scene_registry = LUMIX_NEW(m_allocator, GPUSceneRegistry)(*this, m_allocator);
 		return *m_gpu_scene_registry;
@@ -1431,7 +1441,7 @@ struct RendererImpl final : Renderer {
 					continue;
 				}
 				stream.markParentPagesWanted(r.page, stamp);
-				if (!m_stream_load_all && !makeStreamRoom(stream.pageBytes(r.page), stamp)) {
+				if (!m_stream_load_all && !makeStreamRoom(stream.pageGpuBytes(r.page), stamp)) {
 					++i;
 					continue;
 				}
@@ -2072,7 +2082,9 @@ struct RendererImpl final : Renderer {
 	jobs::Mutex m_cluster_data_mutex;
 	gpu::BufferHandle m_cluster_data_buffer = gpu::INVALID_BUFFER;
 	static constexpr u32 CLUSTER_SCRATCH_CAPACITY = 1 << 22;		// u32 in the scratch buffer of the culling of trees, shared by all the pipelines (16 MB)
+	static constexpr u32 CLUSTER_COMMANDS_CAPACITY = 262144;	// 256K clusters per draw group * 24 B = 6 MB shared scratch buffer across all pipelines
 	gpu::BufferHandle m_cluster_scratch_buffer = gpu::INVALID_BUFFER;
+	gpu::BufferHandle m_cluster_commands_buffer = gpu::INVALID_BUFFER;
 	GPUSceneRegistry* m_gpu_scene_registry = nullptr;
 	Array<ClusterDataRange> m_cluster_data_free;
 	Array<ClusterDataRange> m_cluster_data_pending;
