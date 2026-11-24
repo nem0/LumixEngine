@@ -459,6 +459,7 @@ struct RendererImpl final : Renderer {
 		, m_free_frames(m_allocator)
 		, m_renderbuffers(m_allocator)
 		, m_frame_thread(*this)
+		, m_gpu_counters_thread(m_allocator)
 		, m_cubemap_sky(*this)
 		, m_tdao(*this)
 	{
@@ -643,6 +644,9 @@ struct RendererImpl final : Renderer {
 		m_frame_thread.finished = true;
 		m_frame_thread.semaphore.signal();
 		m_frame_thread.destroy();
+
+		jobs::wait(&m_init_signal);
+		m_gpu_counters_thread.stop();
 		
 		jobs::Counter counter;
 		jobs::runLambda([this]() {
@@ -766,6 +770,7 @@ struct RendererImpl final : Renderer {
 			}
 			gpu::createBuffer(m_instanced_meshes_buffer, gpu::BufferFlags::SHADER_BUFFER, 64 * 1024 * 1024, nullptr, "instanced_meshes");
 			m_profiler.init();
+			m_gpu_counters_thread.started = m_gpu_counters_thread.create("gpu_counters", true);
 		}, &m_init_signal, 1);
 
 		m_cpu_frame = m_frames[0].get();
@@ -1431,15 +1436,6 @@ struct RendererImpl final : Renderer {
 					break;
 				}
 
-				{
-					static int i = 0;
-					++i;
-					if (i == 10) {
-						i = 0;
-						gpu::pushGPUCounters();
-					}
-				}
-
 				// wait until gpu is done with the frame, so we are sure it's not accessing frame's buffers anymore
 				gpu::waitFrame(f->gpu_frame);
 				
@@ -1475,6 +1471,32 @@ struct RendererImpl final : Renderer {
 		Array<FrameData*> frames;
 		Mutex mutex;
 		volatile bool finished = false;
+	};
+
+	struct GPUCountersThread : Thread {
+		GPUCountersThread(IAllocator& allocator)
+			: Thread(allocator)
+			, stop_semaphore(0, 1)
+		{}
+
+		int task() override {
+			// Poll at a fixed 1 Hz wall-clock cadence off FrameThread so NVML/DXGI queries
+			// never stall frame recycling or cause high-frequency driver polling stutters.
+			while (!stop_semaphore.wait(1000)) {
+				gpu::pushGPUCounters();
+			}
+			return 0;
+		}
+
+		void stop() {
+			if (!started) return;
+			stop_semaphore.signal();
+			destroy();
+			started = false;
+		}
+
+		Semaphore stop_semaphore;
+		bool started = false;
 	};
 
 	Engine& m_engine;
@@ -1513,6 +1535,7 @@ struct RendererImpl final : Renderer {
 
 	GPUProfiler m_profiler;
 	FrameThread m_frame_thread;
+	GPUCountersThread m_gpu_counters_thread;
 
 	struct MaterialBuffer {
 		MaterialBuffer(IAllocator& alloc) 

@@ -29,12 +29,14 @@
 	#include <dxgidebug.h>
 #endif
 #include <dxgi1_6.h>
+#include <dwmapi.h>
 #include <malloc.h>
 #undef TRANSPARENT // thank you MS
 
 #include "renderer/gpu/renderdoc_app.h"
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "dwmapi.lib")
 
 #if defined LUMIX_DEBUG && !defined __clang__
 	#define USE_PIX
@@ -45,7 +47,8 @@
 
 namespace Lumix::gpu {
 
-static constexpr u32 NUM_BACKBUFFERS = 2;
+static constexpr u32 NUM_FRAMES = 2;
+static constexpr u32 NUM_BACKBUFFERS = 3;
 static constexpr u32 BUFFER_SCRATCH_BUFFER_SIZE = 8 * 1024 * 1024;
 static constexpr u32 TEXTURE_SCRATCH_BUFFER_SIZE = 8 * 1024 * 1024;
 static constexpr u32 MAX_SRV_DESCRIPTORS = 16 * 1024;
@@ -903,7 +906,7 @@ struct SRVUAVHeap {
 
 	bool init(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type) {
 		D3D12_DESCRIPTOR_HEAP_DESC desc;
-		desc.NumDescriptors = max_resource_count * 2 + max_transient_count * NUM_BACKBUFFERS;
+		desc.NumDescriptors = max_resource_count * 2 + max_transient_count * NUM_FRAMES;
 		desc.Type = type;
 		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		desc.NodeMask = 1;
@@ -937,7 +940,7 @@ struct SRVUAVHeap {
 
 	void nextFrame() {
 		transient_count = 0;
-		frame = (frame + 1) % NUM_BACKBUFFERS;
+		frame = (frame + 1) % NUM_FRAMES;
 	}
 
 	RingBuffer<u32, 1024> free_list;
@@ -992,7 +995,7 @@ struct RTVDSVHeap {
 
 	void nextFrame() {
 		num_resources = 0;
-		frame = (frame + 1) % NUM_BACKBUFFERS;
+		frame = (frame + 1) % NUM_FRAMES;
 	}
 
 	D3D12_CPU_DESCRIPTOR_HANDLE allocRTV(ID3D12Device* device, ID3D12Resource* resource, const D3D12_RENDER_TARGET_VIEW_DESC& view_desc) {
@@ -1009,7 +1012,7 @@ struct RTVDSVHeap {
 
 	bool init(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type, u32 num_resources) {
 		D3D12_DESCRIPTOR_HEAP_DESC desc;
-		desc.NumDescriptors = num_resources * NUM_BACKBUFFERS;
+		desc.NumDescriptors = num_resources * NUM_FRAMES;
 		desc.Type = type;
 		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 		desc.NodeMask = 1;
@@ -1115,11 +1118,11 @@ struct Frame {
 	}
 
 	bool isFinished() {
-		return fence->GetCompletedValue() == fence_value;
+		return fence->GetCompletedValue() >= fence_value;
 	}
 
 	void wait() {
-		if (fence_value != 0) {
+		if (fence_value != 0 && fence->GetCompletedValue() < fence_value) {
 			PROFILE_BLOCK("wait for gpu");
 			profiler::pushInt("Fence value", (u32)fence_value);
 			fence->SetEventOnCompletion(fence_value, nullptr);
@@ -1163,6 +1166,8 @@ struct D3D {
 		ID3D12Resource* backbuffers[NUM_BACKBUFFERS] = {};
 		IVec2 size = IVec2(800, 600);
 		u64 last_used_frame = 0;
+		bool occluded = false;
+		bool has_latency_token = false;
 	};
 
 	D3D(IAllocator& allocator) 
@@ -1190,6 +1195,7 @@ struct D3D {
 	TagAllocator rendertarget_tag_allocator;
 	DWORD thread;
 	RENDERDOC_API_1_0_2* rdoc_api = nullptr;
+	IDXGIAdapter3* adapter = nullptr;
 	ID3D12Device* device = nullptr;
 	AtomicI32 dred_reported{0};
 	ID3D12RootSignature* root_signature = nullptr;
@@ -1230,9 +1236,8 @@ struct D3D {
 	void* nvml_lib = nullptr;
 	nvmlDevice_t nvml_device;
 
-	bool vsync = true;
-	bool vsync_dirty = false;
-	Mutex vsync_mutex;
+	AtomicI32 vsync{1};
+	bool allow_tearing = false;
 	Mutex disassembly_mutex;
 };
 
@@ -1471,11 +1476,6 @@ void Frame::end(ID3D12CommandQueue* cmd_queue, ID3D12GraphicsCommandList* cmd_li
 
 	HRESULT hr = cmd_list->Close();
 	CHECK(hr == S_OK);
-	// fence_value is 0 the first time this frame is used; waiting for 0 is a no-op and triggers a D3D12 warning
-	if (fence_value != 0) {
-		hr = cmd_queue->Wait(fence, fence_value);
-		CHECK(hr == S_OK);
-	}
 	if (capture_requested) {
 		if (d3d->rdoc_api) {
 			if (!d3d->rdoc_api->IsRemoteAccessConnected()) {
@@ -1947,7 +1947,7 @@ void preinit(IAllocator& allocator, bool load_renderdoc) {
 	d3d->srv_heap.preinit(MAX_SRV_DESCRIPTORS, 1024);
 	if (load_renderdoc) tryLoadRenderDoc();
 
-	for (u32 i = 0; i < NUM_BACKBUFFERS; ++i) {
+	for (u32 i = 0; i < NUM_FRAMES; ++i) {
 		d3d->frames.push(allocator);
 	}
 	d3d->frame = d3d->frames.begin();
@@ -2047,7 +2047,8 @@ void shutdown() {
 	d3d->stats_query_heap->Release();
 	d3d->cmd_queue->Release();
 	d3d->cmd_list->Release();
-	if(d3d->debug) d3d->debug->Release();
+	if (d3d->debug) d3d->debug->Release();
+	if (d3d->adapter) d3d->adapter->Release();
 	d3d->device->Release();
 
 	#ifdef LUMIX_DEBUG
@@ -2134,14 +2135,14 @@ ID3D12RootSignature* createRootSignature() {
 	return res;
 }
 
-[[nodiscard]] static bool createSwapchain(HWND hwnd, D3D::Window& window, bool vsync) {
+[[nodiscard]] static bool createSwapchain(HWND hwnd, D3D::Window& window, bool is_primary) {
 	PROFILE_FUNCTION();
 	DXGI_SWAP_CHAIN_DESC1 sd = {};
 	sd.BufferCount = NUM_BACKBUFFERS;
 	sd.Width = window.size.x;
 	sd.Height = window.size.y;
 	sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	sd.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | (vsync ? 0 : DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING);
+	sd.Flags = (is_primary ? DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT : 0) | (d3d->allow_tearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
 	sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	sd.SampleDesc.Count = 1;
 	sd.SampleDesc.Quality = 0;
@@ -2154,13 +2155,30 @@ ID3D12RootSignature* createRootSignature() {
 	IDXGISwapChain1* swapChain1 = NULL;
 
 	if (CreateDXGIFactory1(IID_PPV_ARGS(&dxgi_factory)) != S_OK) return false;
-	if (dxgi_factory->CreateSwapChainForHwnd(d3d->cmd_queue, (HWND)hwnd, &sd, NULL, NULL, &swapChain1) != S_OK) return false;
-	if (swapChain1->QueryInterface(IID_PPV_ARGS(&window.swapchain)) != S_OK) return false;
+	if (dxgi_factory->CreateSwapChainForHwnd(d3d->cmd_queue, (HWND)hwnd, &sd, NULL, NULL, &swapChain1) != S_OK) {
+		dxgi_factory->Release();
+		return false;
+	}
+	if (swapChain1->QueryInterface(IID_PPV_ARGS(&window.swapchain)) != S_OK) {
+		swapChain1->Release();
+		dxgi_factory->Release();
+		return false;
+	}
+	dxgi_factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_WINDOW_CHANGES | DXGI_MWA_NO_ALT_ENTER);
 
 	swapChain1->Release();
 	dxgi_factory->Release();
-	window.swapchain->SetMaximumFrameLatency(1);
-	window.latency_waitable = window.swapchain->GetFrameLatencyWaitableObject();
+	if (is_primary) {
+		window.swapchain->SetMaximumFrameLatency(1);
+		window.latency_waitable = window.swapchain->GetFrameLatencyWaitableObject();
+		// Acquire the token for the first frame so queued_presents + semaphore_count + has_latency_token == NUM_FRAMES.
+		window.has_latency_token = window.latency_waitable && WaitForSingleObjectEx(window.latency_waitable, 0, FALSE) == WAIT_OBJECT_0;
+	}
+	else {
+		window.latency_waitable = nullptr;
+		window.has_latency_token = false;
+	}
+	window.occluded = false;
 
 	for (u32 i = 0; i < NUM_BACKBUFFERS; ++i) {
 		ID3D12Resource* backbuffer;
@@ -2182,7 +2200,7 @@ bool init(void* hwnd, InitFlags flags) {
 		debug = true;
 	#endif
 
-	d3d->vsync = true;
+	d3d->vsync = 1;
 	d3d->thread = GetCurrentThreadId();
 
 	RECT rect;
@@ -2268,7 +2286,37 @@ bool init(void* hwnd, InitFlags flags) {
 
 		char tmp[256];
 		fromWChar(Span(tmp, tmp + sizeof(tmp)), desc.Description);
-		logInfo("Adapter ", i, ": ", tmp, ", Dedicated Video Memory: ", desc.DedicatedVideoMemory / (1024 * 1024), " MB, Vendor ID: ", desc.VendorId);
+		LARGE_INTEGER umd_version = {};
+		const bool has_umd = SUCCEEDED(adapter->CheckInterfaceSupport(__uuidof(IDXGIDevice), &umd_version));
+		u32 output_count = 0;
+		for (UINT o = 0; ; ++o) {
+			IDXGIOutput* output = nullptr;
+			if (FAILED(adapter->EnumOutputs(o, &output))) break;
+			DXGI_OUTPUT_DESC out_desc = {};
+			if (SUCCEEDED(output->GetDesc(&out_desc))) {
+				DEVMODEW dm = {};
+				dm.dmSize = sizeof(dm);
+				const u32 hz = EnumDisplaySettingsW(out_desc.DeviceName, ENUM_CURRENT_SETTINGS, &dm) ? (u32)dm.dmDisplayFrequency : 0;
+				char out_name[64];
+				fromWChar(Span(out_name), out_desc.DeviceName);
+				const i32 w = out_desc.DesktopCoordinates.right - out_desc.DesktopCoordinates.left;
+				const i32 h = out_desc.DesktopCoordinates.bottom - out_desc.DesktopCoordinates.top;
+				logInfo("  Adapter ", i, " output ", o, ": ", out_name, " ", w, "x", h, " @ ", hz, "Hz, attached=", out_desc.AttachedToDesktop ? 1 : 0);
+			}
+			output->Release();
+			++output_count;
+		}
+		if (has_umd) {
+			logInfo("Adapter ", i, ": ", tmp, ", Dedicated Video Memory: ", desc.DedicatedVideoMemory / (1024 * 1024)
+				, " MB, Vendor ID: ", desc.VendorId
+				, ", Driver: ", (u32)HIWORD(umd_version.HighPart), ".", (u32)LOWORD(umd_version.HighPart), ".", (u32)HIWORD(umd_version.LowPart), ".", (u32)LOWORD(umd_version.LowPart)
+				, ", Outputs: ", output_count);
+		}
+		else {
+			logInfo("Adapter ", i, ": ", tmp, ", Dedicated Video Memory: ", desc.DedicatedVideoMemory / (1024 * 1024)
+				, " MB, Vendor ID: ", desc.VendorId
+				, ", Outputs: ", output_count);
+		}
 
 		// Choose the adapter with the most dedicated video memory (simple heuristic for "best")
 		if (desc.DedicatedVideoMemory > max_dedicated_memory) {
@@ -2292,9 +2340,33 @@ bool init(void* hwnd, InitFlags flags) {
 	fromWChar(Span(tmp, tmp + sizeof(tmp)), selected_desc.Description);
 	logInfo("Selected adapter: ", tmp);
 
+	{
+		BOOL allow_tearing = FALSE;
+		IDXGIFactory5* factory5 = nullptr;
+		if (SUCCEEDED(dxgi_factory->QueryInterface(IID_PPV_ARGS(&factory5)))) {
+			if (FAILED(factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allow_tearing, sizeof(allow_tearing)))) {
+				allow_tearing = FALSE;
+			}
+			factory5->Release();
+		}
+		d3d->allow_tearing = allow_tearing != FALSE;
+		DWM_TIMING_INFO dwm = {};
+		dwm.cbSize = sizeof(dwm);
+		const HRESULT dwm_hr = DwmGetCompositionTimingInfo(nullptr, &dwm);
+		const float dwm_hz = (SUCCEEDED(dwm_hr) && dwm.rateRefresh.uiDenominator > 0)
+			? float(dwm.rateRefresh.uiNumerator) / float(dwm.rateRefresh.uiDenominator)
+			: 0.f;
+		logInfo("DXGI allow_tearing=", allow_tearing ? 1 : 0, ", DWM refresh=", dwm_hz, "Hz (hr=", (u32)dwm_hr, ")");
+	}
+
 	// Now create the device with the selected adapter
 	D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_12_0;
 	hr = api_D3D12CreateDevice(selected_adapter, featureLevel, IID_PPV_ARGS(&d3d->device));
+	if (SUCCEEDED(hr)) {
+		if (FAILED(selected_adapter->QueryInterface(IID_PPV_ARGS(&d3d->adapter)))) {
+			d3d->adapter = nullptr;
+		}
+	}
 
 	selected_adapter->Release();
 	dxgi_factory->Release();
@@ -2365,7 +2437,7 @@ bool init(void* hwnd, InitFlags flags) {
 	
 	resetCommandList();
 
-	if (!createSwapchain((HWND)hwnd, d3d->windows[0], d3d->vsync)) return false;
+	if (!createSwapchain((HWND)hwnd, d3d->windows[0], true)) return false;
 
 	for (TextureHandle& h : d3d->current_framebuffer.attachments) h = INVALID_TEXTURE;
 
@@ -2554,11 +2626,6 @@ bool getMemoryStats(MemoryStats& stats) {
 void setCurrentWindow(void* window_handle) {
 	checkThread();
 
-	bool vsync = []() {
-		MutexGuard guard(d3d->vsync_mutex);
-		return d3d->vsync;
-	}();
-
 	if (!window_handle) {
 		d3d->current_window = &d3d->windows[0];
 		d3d->current_window->last_used_frame = d3d->frame_number;
@@ -2586,7 +2653,7 @@ void setCurrentWindow(void* window_handle) {
 		// window can get bigger than what driver allows for swapchains
 		window.size = minimum(window.size, IVec2(16384));
 
-		if (!createSwapchain((HWND)window_handle, window, vsync)) {
+		if (!createSwapchain((HWND)window_handle, window, false)) {
 			logError("Failed to create swapchain");
 			// a window without a swapchain must not be used by present()
 			window.handle = nullptr;
@@ -2611,33 +2678,45 @@ void waitFrame(u32 frame_idx) {
 }
 
 bool isVSyncEnabled() {
-	MutexGuard guard(d3d->vsync_mutex);
-	return d3d->vsync;
+	return d3d->vsync != 0;
 }
 
 void enableVSync(bool enable) {
-	MutexGuard guard(d3d->vsync_mutex);
-	d3d->vsync = enable;
-	d3d->vsync_dirty = true;
+	d3d->vsync = enable ? 1 : 0;
 }
 
 void pushGPUCounters() {
-	if (!d3d->nvml_lib) return;
+	if (!d3d->adapter && !d3d->nvml_lib) return;
 
-	PROFILE_BLOCK("nvml read stats");
-	u32 clock;
-	nvmlReturn_t result = nvmlDeviceGetClockInfo(d3d->nvml_device, NVML_CLOCK_GRAPHICS, &clock);
-	if (result == NVML_SUCCESS) {
-		static u32 counter = profiler::createCounter("GPU clock (MHz)", 0);
-		profiler::pushCounter(counter, (float)clock);
+	PROFILE_BLOCK("gpu counters");
+	if (d3d->nvml_lib) {
+		u32 clock;
+		nvmlReturn_t result = nvmlDeviceGetClockInfo(d3d->nvml_device, NVML_CLOCK_GRAPHICS, &clock);
+		if (result == NVML_SUCCESS) {
+			static u32 counter = profiler::createCounter("GPU clock (MHz)", 0);
+			profiler::pushCounter(counter, (float)clock);
+		}
 	}
-	nvmlMemory_t mem;
-	result = nvmlDeviceGetMemoryInfo(d3d->nvml_device, &mem);
-	if (result == NVML_SUCCESS) {
-		static u32 used_counter = profiler::createCounter("GPU used memory (GB)", 0);
-		static u32 free_counter = profiler::createCounter("GPU free memory (GB)", 0);
-		profiler::pushCounter(used_counter, (float)(mem.used / 1024.f / 1024 / 1024));
-		profiler::pushCounter(free_counter, (float)(mem.free / 1024.f / 1024 / 1024));
+
+	if (d3d->adapter) {
+		DXGI_QUERY_VIDEO_MEMORY_INFO mem_info = {};
+		if (SUCCEEDED(d3d->adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &mem_info))) {
+			static u32 used_counter = profiler::createCounter("GPU used memory (GB)", 0);
+			static u32 free_counter = profiler::createCounter("GPU free memory (GB)", 0);
+			const u64 free_bytes = mem_info.Budget > mem_info.CurrentUsage ? mem_info.Budget - mem_info.CurrentUsage : 0;
+			profiler::pushCounter(used_counter, float(mem_info.CurrentUsage / (1024.0 * 1024.0 * 1024.0)));
+			profiler::pushCounter(free_counter, float(free_bytes / (1024.0 * 1024.0 * 1024.0)));
+		}
+	}
+	else if (d3d->nvml_lib) {
+		nvmlMemory_t mem;
+		nvmlReturn_t result = nvmlDeviceGetMemoryInfo(d3d->nvml_device, &mem);
+		if (result == NVML_SUCCESS) {
+			static u32 used_counter = profiler::createCounter("GPU used memory (GB)", 0);
+			static u32 free_counter = profiler::createCounter("GPU free memory (GB)", 0);
+			profiler::pushCounter(used_counter, (float)(mem.used / 1024.f / 1024 / 1024));
+			profiler::pushCounter(free_counter, (float)(mem.free / 1024.f / 1024 / 1024));
+		}
 	}
 }
 
@@ -2652,13 +2731,69 @@ static void waitQueueIdle() {
 	fence->Release();
 }
 
+static void logPresentStall(const D3D::Window& window, u32 frame_idx, DWORD wait_res, float present_ms, float wait_ms, bool vsync, HRESULT present_hr) {
+	static u32 present_stall_log_count = 0;
+	if (present_stall_log_count >= 10) return;
+	++present_stall_log_count;
+
+	const HWND hwnd = (HWND)window.handle;
+	RECT rect = {};
+	GetClientRect(hwnd, &rect);
+	const IVec2 size(rect.right - rect.left, rect.bottom - rect.top);
+	const HWND fg = GetForegroundWindow();
+	DWORD fg_pid = 0;
+	if (fg) GetWindowThreadProcessId(fg, &fg_pid);
+	const u32 window_idx = u32(&window - d3d->windows);
+	u32 active_windows = 0;
+	for (const auto& w : d3d->windows) {
+		if (w.handle) ++active_windows;
+	}
+	const Frame& submitted = d3d->frames.begin()[frame_idx];
+	const u64 gpu_fence_completed = submitted.fence->GetCompletedValue();
+	UINT last_present_count = 0;
+	window.swapchain->GetLastPresentCount(&last_present_count);
+	DXGI_FRAME_STATISTICS stats = {};
+	const HRESULT stats_hr = window.swapchain->GetFrameStatistics(&stats);
+	BOOL fullscreen = FALSE;
+	window.swapchain->GetFullscreenState(&fullscreen, nullptr);
+	DWM_TIMING_INFO dwm = {};
+	dwm.cbSize = sizeof(dwm);
+	const HRESULT dwm_hr = DwmGetCompositionTimingInfo(nullptr, &dwm);
+	const HRESULT removed_reason = d3d->device->GetDeviceRemovedReason();
+	logWarning("DX12 present/latency stall (log ", present_stall_log_count, "/10): wait_res=", (u32)wait_res
+		, ", present_ms=", present_ms
+		, ", wait_ms=", wait_ms
+		, ", window=", window_idx, "/", active_windows
+		, ", frame=", d3d->frame_number
+		, ", last_used_frame=", window.last_used_frame
+		, ", vsync=", vsync ? 1 : 0
+		, ", present_hr=", (u32)present_hr
+		, ", fullscreen=", fullscreen ? 1 : 0
+		, ", backbuffer_idx=", (u32)window.swapchain->GetCurrentBackBufferIndex()
+		, ", size=", size.x, "x", size.y
+		, " (swapchain ", window.size.x, "x", window.size.y, ")"
+		, ", visible=", IsWindowVisible(hwnd) ? 1 : 0
+		, ", iconic=", IsIconic(hwnd) ? 1 : 0
+		, ", foreground=", fg == hwnd ? 1 : 0
+		, ", fg_same_proc=", fg_pid == GetCurrentProcessId() ? 1 : 0
+		, ", fg_pid=", (u32)fg_pid
+		, ", fence=", gpu_fence_completed, "/", submitted.fence_value
+		, ", last_present=", (u32)last_present_count
+		, ", stats_hr=", (u32)stats_hr
+		, ", stats_present=", (u32)stats.PresentCount
+		, ", stats_refresh=", (u32)stats.PresentRefreshCount
+		, ", stats_sync=", (u32)stats.SyncRefreshCount
+		, ", dwm_hr=", (u32)dwm_hr
+		, ", dwm_refresh=", (u64)dwm.cRefresh
+		, ", dwm_dropped=", (u64)dwm.cFramesDropped
+		, ", dwm_missed=", (u64)dwm.cFramesMissed
+		, ", device_removed=", (u32)removed_reason);
+}
+
 u32 present() {
 	PROFILE_FUNCTION();
-	d3d->vsync_mutex.enter();
-	const bool vsync = d3d->vsync;
-	const bool vsync_dirty = d3d->vsync_dirty;
-	d3d->vsync_dirty = false;
-	d3d->vsync_mutex.exit();
+	const bool vsync = d3d->vsync != 0;
+
 	for (auto& window : d3d->windows) {
 		if (!window.handle) continue;
 
@@ -2671,6 +2806,84 @@ u32 present() {
 	d3d->frame->end(d3d->cmd_queue, d3d->cmd_list, d3d->timestamp_query_heap, d3d->stats_query_heap);
 	const u32 frame_idx = u32(d3d->frame - d3d->frames.begin());
 
+	bool any_presented = false;
+	bool any_skipped_hidden = false;
+
+	// Present immediately after ExecuteCommandLists + Signal, before Frame::begin() GPU fence wait,
+	// resource destruction, and synchronous readback callbacks.
+	for (auto& window : d3d->windows) {
+		if (!window.handle) continue;
+
+		const bool is_primary = (&window == d3d->windows);
+		if (window.last_used_frame != d3d->frame_number && !is_primary) continue;
+
+		const HWND hwnd = (HWND)window.handle;
+		if (IsIconic(hwnd) || !IsWindowVisible(hwnd)) {
+			any_skipped_hidden = true;
+			continue;
+		}
+
+		if (window.occluded) {
+			const HRESULT test_hr = window.swapchain->Present(0, DXGI_PRESENT_TEST);
+			if (test_hr == DXGI_STATUS_OCCLUDED) {
+				any_skipped_hidden = true;
+				continue;
+			}
+			window.occluded = false;
+		}
+
+		// Primary window holds a latency waitable token acquired at the end of the previous present().
+		// If that wait timed out, try a non-blocking acquire here; otherwise skip Present() so
+		// queued_presents + semaphore_count + has_latency_token == NUM_FRAMES never drifts.
+		if (window.latency_waitable && !window.has_latency_token) {
+			if (WaitForSingleObjectEx(window.latency_waitable, 0, FALSE) != WAIT_OBJECT_0) {
+				continue;
+			}
+			window.has_latency_token = true;
+		}
+
+		any_presented = true;
+		UINT present_count_before = 0;
+		const bool has_present_count_before = window.latency_waitable && SUCCEEDED(window.swapchain->GetLastPresentCount(&present_count_before));
+		const u64 present_t0 = os::Timer::getRawTimestamp();
+		HRESULT present_hr = S_OK;
+		{
+			PROFILE_BLOCK("IDXGISwapChain3::Present");
+			// Only the primary window syncs to VBlank; secondary windows present immediately
+			// so multi-viewport windows never serialize VBlank waits across monitors.
+			if (is_primary && vsync) {
+				present_hr = window.swapchain->Present(1, 0);
+			}
+			else {
+				present_hr = window.swapchain->Present(0, (!vsync && d3d->allow_tearing) ? DXGI_PRESENT_ALLOW_TEARING : 0);
+			}
+		}
+		const float present_ms = float(double(os::Timer::getRawTimestamp() - present_t0) * 1000.0 / double(os::Timer::getFrequency()));
+
+		if (present_hr == DXGI_STATUS_OCCLUDED) {
+			window.occluded = true;
+		}
+		else if (FAILED(present_hr)) {
+			logDeviceRemoved(d3d->device, present_hr, "IDXGISwapChain3::Present");
+		}
+
+		// Consume the latency token only if DXGI actually queued a present so
+		// queued_presents + semaphore_count + has_latency_token == NUM_FRAMES never drifts.
+		UINT present_count_after = 0;
+		if (has_present_count_before && SUCCEEDED(window.swapchain->GetLastPresentCount(&present_count_after))) {
+			if (present_count_after != present_count_before) {
+				window.has_latency_token = false;
+			}
+		}
+		else if (SUCCEEDED(present_hr) && present_hr != DXGI_STATUS_OCCLUDED) {
+			window.has_latency_token = false;
+		}
+
+		if (present_ms > 50.f) {
+			logPresentStall(window, frame_idx, WAIT_OBJECT_0, present_ms, 0.f, vsync, present_hr);
+		}
+	}
+
 	++d3d->frame;
 	if (d3d->frame >= d3d->frames.end()) d3d->frame = d3d->frames.begin();
 
@@ -2680,6 +2893,7 @@ u32 present() {
 
 	for (auto& window : d3d->windows) {
 		if (!window.handle) continue;
+
 		if (window.last_used_frame + 2 < d3d->frame_number && &window != d3d->windows) {
 			// window's last Present was queued before the frame we just submitted, so that frame's
 			// fence covers it; release backbuffers and swapchain once that frame is finished
@@ -2691,6 +2905,8 @@ u32 present() {
 			}
 			if (window.latency_waitable) CloseHandle(window.latency_waitable);
 			window.latency_waitable = nullptr;
+			window.has_latency_token = false;
+			window.occluded = false;
 			submitted.to_release.push(window.swapchain);
 			window.swapchain = nullptr;
 		}
@@ -2708,75 +2924,72 @@ u32 present() {
 	d3d->bound_shader_buffers = {};
 	resetCommandList();
 
+	bool any_waited = false;
 	for (auto& window : d3d->windows) {
 		if (!window.handle) continue;
-		if (window.last_used_frame + 1 != d3d->frame_number && &window != d3d->windows) continue;
-		
-		RECT rect;
-		GetClientRect((HWND)window.handle, &rect);
+		const bool is_primary = (&window == d3d->windows);
+		if (window.last_used_frame + 1 != d3d->frame_number && !is_primary) continue;
 
-		IVec2 size(rect.right - rect.left, rect.bottom - rect.top);
-		// window can get bigger than what driver allows for swapchains
-		size = minimum(size, IVec2(16384));
+		const HWND hwnd = (HWND)window.handle;
+		const bool hidden = IsIconic(hwnd) || !IsWindowVisible(hwnd);
 
-		if (vsync_dirty) {
-			waitQueueIdle();
+		if (!hidden && !window.occluded) {
+			RECT rect;
+			GetClientRect(hwnd, &rect);
 
-			for (ID3D12Resource* res : window.backbuffers) {
-				res->Release();
-			}
-			if (window.latency_waitable) CloseHandle(window.latency_waitable);
-			window.latency_waitable = nullptr;
-			window.swapchain->Release();
-			window.last_used_frame = 0;
-			if (!createSwapchain((HWND)window.handle, window, vsync)) {
-				logError("Failed to create swapchain");
-			}
-			continue;
-		}
+			IVec2 size(rect.right - rect.left, rect.bottom - rect.top);
+			// window can get bigger than what driver allows for swapchains
+			size = minimum(size, IVec2(16384));
 
-		if (vsync) {
-			PROFILE_BLOCK("IDXGISwapChain3::Present");
-			const HRESULT present_hr = window.swapchain->Present(1, 0);
-			if (FAILED(present_hr)) logDeviceRemoved(d3d->device, present_hr, "IDXGISwapChain3::Present");
-		}
-		else {
-			PROFILE_BLOCK("IDXGISwapChain3::Present");
-			const HRESULT present_hr = window.swapchain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
-			if (FAILED(present_hr)) logDeviceRemoved(d3d->device, present_hr, "IDXGISwapChain3::Present");
-		}
+			// resize only after the present, ResizeBuffers discards the content of the backbuffers
+			if (size != window.size && size.x > 0 && size.y > 0) {
+				window.size = size;
 
-		if (window.latency_waitable) {
-			// swapchain has SetMaximumFrameLatency(1), wait until it can accept another frame
-			PROFILE_BLOCK("wait for frame latency");
-			WaitForSingleObjectEx(window.latency_waitable, 1000, TRUE);
-		}
+				waitQueueIdle();
 
-		//DXGI_FRAME_STATISTICS stats;
-		//window.swapchain->GetFrameStatistics(&stats);
+				for (ID3D12Resource*& res : window.backbuffers) {
+					res->Release();
+					res = nullptr;
+				}
 
-		// resize only after the present, ResizeBuffers discards the content of the backbuffers
-		if (size != window.size && size.x != 0) {
-			window.size = size;
-
-			waitQueueIdle();
-
-			for (ID3D12Resource* res : window.backbuffers) {
-				res->Release();
-			}
-
-			HRESULT hr = window.swapchain->ResizeBuffers(0, size.x, size.y, DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | (vsync ? 0 : DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING));
-			CHECK(hr == S_OK);
-
-			for (u32 i = 0; i < NUM_BACKBUFFERS; ++i) {
-				hr = window.swapchain->GetBuffer(i, IID_PPV_ARGS(&window.backbuffers[i]));
+				DXGI_SWAP_CHAIN_DESC1 desc = {};
+				window.swapchain->GetDesc1(&desc);
+				HRESULT hr = window.swapchain->ResizeBuffers(0, size.x, size.y, DXGI_FORMAT_UNKNOWN, desc.Flags);
 				CHECK(hr == S_OK);
-				window.backbuffers[i]->SetName(L"window_rb");
+
+				for (u32 i = 0; i < NUM_BACKBUFFERS; ++i) {
+					hr = window.swapchain->GetBuffer(i, IID_PPV_ARGS(&window.backbuffers[i]));
+					CHECK(hr == S_OK);
+					window.backbuffers[i]->SetName(L"window_rb");
+				}
+			}
+
+			if (window.latency_waitable && !window.has_latency_token) {
+				PROFILE_BLOCK("wait for frame latency");
+				any_waited = true;
+				const u64 wait_t0 = os::Timer::getRawTimestamp();
+				const DWORD wait_res = WaitForSingleObjectEx(window.latency_waitable, 100, FALSE);
+				const float wait_ms = float(double(os::Timer::getRawTimestamp() - wait_t0) * 1000.0 / double(os::Timer::getFrequency()));
+				if (wait_res == WAIT_OBJECT_0) {
+					window.has_latency_token = true;
+				}
+				else if (wait_res == WAIT_TIMEOUT) {
+					logPresentStall(window, frame_idx, wait_res, 0.f, wait_ms, vsync, S_OK);
+					if (SUCCEEDED(d3d->device->GetDeviceRemovedReason())) {
+						if (window.swapchain->Present(0, DXGI_PRESENT_TEST) == DXGI_STATUS_OCCLUDED) {
+							window.occluded = true;
+						}
+					}
+				}
 			}
 		}
 
 		const UINT current_idx = window.swapchain->GetCurrentBackBufferIndex();
 		switchState(d3d->cmd_list, window.backbuffers[current_idx], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	}
+
+	if (!any_presented && !any_waited && any_skipped_hidden) {
+		Sleep(16);
 	}
 
 	return frame_idx;
