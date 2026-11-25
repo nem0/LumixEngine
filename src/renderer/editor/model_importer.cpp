@@ -1490,43 +1490,50 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 	Array<MeshClusters*> results(m_allocator);
 	Array<MeshPages*> page_results(m_allocator);	// the pages of each mesh, see buildMeshPages
 	Array<PagePayloads*> payloads(m_allocator);	// the payloads of the pages of each mesh, they are written after the tables
-	bool failed = false;
+	results.resize(meshes.size());
+	page_results.resize(meshes.size());
+	for (MeshClusters*& c : results) c = nullptr;
+	for (MeshPages*& p : page_results) p = nullptr;
+	AtomicI32 failed = 0;
 	profiler::beginBlock("build clusters of meshes");
-	for (u32 i = 0; i < (u32)meshes.size(); ++i) {
-		const ImportGeometry& geom = m_geometries[meshes[i]->geometry_idx];
-		const Array<u32>& indices = hasAutoLOD(meta, 0) ? *geom.autolod_indices[0].get() : geom.indices;
-		MeshClusters* clusters = LUMIX_NEW(m_allocator, MeshClusters)(m_allocator);
-		results.push(clusters);
-		if (!buildMeshClusters(Span<const Vec3>(positions[i].begin(), positions[i].size()), Span<const Vec3>(normals[i].begin(), normals[i].size()), Span<const Vec2>(uvs[i].begin(), uvs[i].size()), Span<const u32>(indices.begin(), indices.size()), meta.cluster_dilate_borders, *clusters, m_allocator)) {
-			failed = true;
-			break;
-		}
+	jobs::forEach((u32)meshes.size(), 1, [&](u32 from, u32 to) {
+		for (u32 i = from; i < to; ++i) {
+			if (failed != 0) return;
+			const ImportGeometry& geom = m_geometries[meshes[i]->geometry_idx];
+			const Array<u32>& indices = hasAutoLOD(meta, 0) ? *geom.autolod_indices[0].get() : geom.indices;
+			MeshClusters* clusters = LUMIX_NEW(m_allocator, MeshClusters)(m_allocator);
+			results[i] = clusters;
+			if (!buildMeshClusters(Span<const Vec3>(positions[i].begin(), positions[i].size()), Span<const Vec3>(normals[i].begin(), normals[i].size()), Span<const Vec2>(uvs[i].begin(), uvs[i].size()), Span<const u32>(indices.begin(), indices.size()), meta.cluster_dilate_borders, *clusters, m_allocator)) {
+				failed = 1;
+				return;
+			}
 
-		ClusterVertexSource source;
-		source.vertex_count = positions[i].size();
-		source.positions = positions[i].begin();
-		source.normals = normals[i].begin();
-		source.tangents = tangents[i].empty() ? nullptr : tangents[i].begin();
-		source.uvs = uvs[i].empty() ? nullptr : uvs[i].begin();
-		source.ao = aos[i].empty() ? nullptr : aos[i].begin();
-		source.colors = colors[i].empty() ? nullptr : colors[i].begin();
-		if (!packClusterVertices(source, *clusters, m_allocator)) {
-			failed = true;
-			break;
-		}
+			ClusterVertexSource source;
+			source.vertex_count = positions[i].size();
+			source.positions = positions[i].begin();
+			source.normals = normals[i].begin();
+			source.tangents = tangents[i].empty() ? nullptr : tangents[i].begin();
+			source.uvs = uvs[i].empty() ? nullptr : uvs[i].begin();
+			source.ao = aos[i].empty() ? nullptr : aos[i].begin();
+			source.colors = colors[i].empty() ? nullptr : colors[i].begin();
+			if (!packClusterVertices(source, *clusters, m_allocator)) {
+				failed = 1;
+				return;
+			}
 
-		// the pages are streaming units of the payload of the groups (tightly packed u8 indices, no degenerate padding)
-		MeshPages* page_data = LUMIX_NEW(m_allocator, MeshPages)(m_allocator);
-		page_results.push(page_data);
-		if (!buildMeshPages(clusters->clusters.begin(), (u32)clusters->clusters.size(), clusters->groups.begin(), (u32)clusters->groups.size(), *page_data, m_allocator)) {
-			logError("Failed to make pages of clusters of a model");
-			failed = true;
-			break;
+			// the pages are streaming units of the payload of the groups (tightly packed u8 indices, no degenerate padding)
+			MeshPages* page_data = LUMIX_NEW(m_allocator, MeshPages)(m_allocator);
+			page_results[i] = page_data;
+			if (!buildMeshPages(clusters->clusters.begin(), (u32)clusters->clusters.size(), clusters->groups.begin(), (u32)clusters->groups.size(), *page_data, m_allocator)) {
+				logError("Failed to make pages of clusters of a model");
+				failed = 1;
+				return;
+			}
 		}
-	}
+	});
 	profiler::endBlock();
 
-	if (!failed) {
+	if (failed == 0) {
 		// The vertices of the first LOD are only in the clusters (packed), so their vertex buffers are empty: the vertex blocks of these meshes are
 		// replaced by blocks of size 0, they are the first ones, see writeGeometry
 		profiler::beginBlock("strip vertex blocks");
@@ -1674,6 +1681,10 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 			profiler::beginBlock("build page payloads");
 			PagePayloads* page_payloads = LUMIX_NEW(m_allocator, PagePayloads)(m_allocator);
 			payloads.push(page_payloads);
+			page_payloads->data.reserve(u32(clusters->vertex_words.byte_size() + packed_indices.byte_size() + page_data.pages.size() * 15));
+			page_payloads->at.reserve(page_data.pages.size());
+			page_payloads->size.reserve(page_data.pages.size());
+			page_payloads->field.reserve(page_data.pages.size());
 			for (u32 p = 0; p < (u32)page_data.pages.size(); ++p) {
 				const MeshPageFile& page = page_data.pages[p];
 				const u32 last_g = page.first_group + page.group_count - 1;
@@ -1721,10 +1732,14 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 	else {
 		logError("Failed to build clusters of a model");
 	}
-	for (MeshClusters* clusters : results) LUMIX_DELETE(m_allocator, clusters);
-	for (MeshPages* page_data : page_results) LUMIX_DELETE(m_allocator, page_data);
+	for (MeshClusters* clusters : results) {
+		if (clusters) LUMIX_DELETE(m_allocator, clusters);
+	}
+	for (MeshPages* page_data : page_results) {
+		if (page_data) LUMIX_DELETE(m_allocator, page_data);
+	}
 	for (PagePayloads* page_payloads : payloads) LUMIX_DELETE(m_allocator, page_payloads);
-	return !failed;
+	return failed == 0;
 }
 
 void ModelImporter::bakeVertexAO(float min_ao) {
@@ -1749,16 +1764,19 @@ void ModelImporter::bakeVertexAO(float min_ao) {
 		const ImportGeometry& geom = m_geometries[mesh.geometry_idx];
 		const u8* positions = geom.vertex_buffer.data();
 		const i32 vertex_size = geom.vertex_size;
-		const i32 count = geom.indices.size();
+		const i32 tri_count = geom.indices.size() / 3;
 		const u32* indices = geom.indices.data();
 
-		for (i32 i = 0; i < count; i += 3) {
-			Vec3 p[3];
-			memcpy(&p[0], positions + indices[i + 0] * vertex_size, sizeof(p[0]));
-			memcpy(&p[1], positions + indices[i + 1] * vertex_size, sizeof(p[1]));
-			memcpy(&p[2], positions + indices[i + 2] * vertex_size, sizeof(p[2]));
-			voxels.raster(p[0], p[1], p[2]);
-		}
+		jobs::forEach(tri_count, 4096, [&](i32 from, i32 to) {
+			for (i32 t = from; t < to; ++t) {
+				const i32 i = t * 3;
+				Vec3 p[3];
+				memcpy(&p[0], positions + indices[i + 0] * vertex_size, sizeof(p[0]));
+				memcpy(&p[1], positions + indices[i + 1] * vertex_size, sizeof(p[1]));
+				memcpy(&p[2], positions + indices[i + 2] * vertex_size, sizeof(p[2]));
+				voxels.raster(p[0], p[1], p[2]);
+			}
+		});
 	}
 	voxels.computeAO(32);
 	voxels.blurAO();

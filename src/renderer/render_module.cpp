@@ -198,6 +198,21 @@ struct RenderModuleImpl final : RenderModule {
 		m_world.componentTransformed(types::point_light).unbind<&RenderModuleImpl::onPointLightMoved>(this);
 		m_world.componentTransformed(types::bone_attachment).unbind<&RenderModuleImpl::onBoneAttachmentMoved>(this);
 
+		for(auto iter : m_model_entity_map.iterated()) {
+			Model* model = iter.key();
+			model->getObserverCb().unbind<&RenderModuleImpl::modelStateChanged>(this);
+		}
+
+		for(auto iter : m_material_decal_map.iterated()) {
+			Material* mat = iter.key();
+			mat->getObserverCb().unbind<&RenderModuleImpl::decalMaterialStateChanged>(this);
+		}
+
+		for(auto iter : m_material_curve_decal_map.iterated()) {
+			Material* mat = iter.key();
+			mat->getObserverCb().unbind<&RenderModuleImpl::curveDecalMaterialStateChanged>(this);
+		}
+
 		// the slots release the models they have in the resources of the renderer, before the models can go
 		destroyGPUScene(m_gpu_scene);
 		destroyGPUSceneChunks(m_gpu_chunks);
@@ -234,21 +249,6 @@ struct RenderModuleImpl final : RenderModule {
 			if (r.model) r.model->decRefCount();
 			LUMIX_DELETE(m_allocator, r.pose);
 			r.pose = nullptr;
-		}
-		
-		for(auto iter : m_model_entity_map.iterated()) {
-			Model* model = iter.key();
-			model->getObserverCb().unbind<&RenderModuleImpl::modelStateChanged>(this);
-		}
-
-		for(auto iter : m_material_decal_map.iterated()) {
-			Material* mat = iter.key();
-			mat->getObserverCb().unbind<&RenderModuleImpl::decalMaterialStateChanged>(this);
-		}
-
-		for(auto iter : m_material_curve_decal_map.iterated()) {
-			Material* mat = iter.key();
-			mat->getObserverCb().unbind<&RenderModuleImpl::curveDecalMaterialStateChanged>(this);
 		}
 
 		for (const ReflectionProbe& probe : m_reflection_probes) {

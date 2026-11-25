@@ -6,14 +6,15 @@
 // instance is 0 for a model instance that is drawn itself, otherwise the index (+ 1) of an instance in the buffer of the instances of the model instance. The
 // number of items of a dispatch is in a counter of the GPU (u_counts), the groups of the dispatch are computed from it.
 //
-// A cluster is selected if its error is small enough on the screen and the error of its parent is not. Meshes with few clusters are done by the
-// variant FLAT: a group tests 64 consecutive clusters of an instance, one thread each, no synchronizations.
-// The clusters of the other meshes are in trees of nodes (MeshNodeGPU), a node has the smallest error and the largest parent error of its
-// clusters. One thread group takes one instance and walks the trees from their roots, level by level: threads take nodes of the current level,
-// skip a node (and everything under it) if it is outside of the frustum or no cluster of it can be selected at its distance, and add its
-// children to the next level. The nodes of a level are in a list in `u_scratch`, there are two lists per group, which are swapped, and there are
-// never more nodes in a list than nodes in the mesh. A dispatch has a fixed number of groups (u_tree_groups), each takes many items one after another and has its own
-// slice of the scratch buffer for the lists.
+// A cluster is selected if its error is small enough on the screen and the error of its parent is not.
+// Clusters are organized in trees of nodes (MeshNodeGPU); a node stores the smallest error and the largest parent error of its clusters.
+// Tree traversal is breadth-first over global (instance, node) queues in `u_scratch`:
+//   default (0):   1 thread per (instance, mesh) item in u_tree_items; tests its roots and appends child (item, node) pairs to node queue 0
+//                  and leaf clusters to the candidate cluster queue.
+//   ARGS:          computes indirect dispatch groups for node queue 0/1 (u_node_pass = 0/1, clearing the other) or candidate clusters (u_node_pass = 2).
+//   PASS0:         1 thread per (item, node) in the current node queue; tests the node and appends internal children to the next node queue
+//                  or leaf clusters to the candidate cluster queue.
+//   ARGS | PASS0:  1 thread per candidate (item, cluster); runs processCluster.
 //
 // The clusters that are selected are appended to a list (u_selected), gpu_scene_variants.hlsl sorts them into draws.
 
@@ -27,19 +28,19 @@ cbuffer UniformData : register(b4) {
 	uint u_items;			// bindless, 16 bytes items, from u_items_offset
 	uint u_items_offset;
 	uint u_item_capacity;	// of the list
-	uint u_scratch;			// rw bindless, lists of nodes
-	uint u_scratch_size;	// u32 in it, the slices of the groups (u_tree_groups of them, u_scratch_slice each) are inside it
+	uint u_scratch;			// rw bindless, global ping-pong (item, node) queues + candidate (item, cluster) queue
+	uint u_scratch_size;	// u32 in u_scratch
 	uint u_selected_capacity;	// entries of the list of selected clusters
 	uint u_selected;		// rw bindless: [0] selected clusters, from 16 entries of 16 bytes (instance, mesh, cluster, group)
-	uint u_counts;			// bindless, counters of the culling of instances: [4] flat items, [8] tree items
+	uint u_counts;			// rw bindless, counters of gpu_scene_cull.hlsl and tree/cluster queues
 	int3 u_cam_p;			// the camera in the fixed point of the GPU scene, the positions of instances are relative to it
-	uint u_tree_groups;		// groups of the dispatch of the trees at most (gpu_scene_cull.hlsl, ARGS dispatches min(items, this)), each has a slice of the scratch buffer
+	uint u_node_pass;		// 0 or 1: which ping-pong node queue is read in TREE_ARGS / TREE_STEP
 	float3 u_cam_frac;		// -camera_offset of the instances
 	uint u_meshes;			// bindless, GPUClusterMesh[], 32 bytes
 	uint u_instances;		// bindless, the model instances of the GPU scene, 96 bytes
 	uint u_chunks;			// bindless, the chunks of instanced models (GPUSceneChunk, 32 bytes)
 	uint u_cluster_data;	// bindless, the buffer with the clusters and nodes of all meshes, see MeshDesc
-	uint u_scratch_slice;	// u32 of the slice of a group in u_scratch: two lists, each as large as the largest mesh
+	uint u_node_queue_capacity;	// max uint2 entries in each of the two ping-pong node queues in u_scratch
 	uint u_feedback;		// rw bindless, one bit for each page of the meshes that stream: a cluster of a group of the page was drawn (if it is loaded) or a group of the page is needed (if it is not), the CPU clears the bits after reading them
 	uint u_occluded;		// rw bindless: [0] occluded clusters from pass 1, from 16 entries of 16 bytes (instance, mesh, cluster | error_small_bit, instance_ref)
 	uint u_feedback_capacity;	// groups in u_feedback, 0 if there is none
@@ -294,9 +295,16 @@ bool isNodeNeeded(float4 bounds, float4 lod_bounds, float min_error, float max_p
 	return needed;
 }
 
-groupshared uint g_current_count;
-groupshared uint g_next_count;
-groupshared uint g_item_index;
+uint3 dispatchGroups(uint count) {
+	return uint3(min(count, MAX_GROUPS_X), (count + MAX_GROUPS_X - 1) / MAX_GROUPS_X, 1);
+}
+
+uint waveAppend(RWByteAddressBuffer counts, uint counter_offset, uint count) {
+	const uint total = WaveActiveSum(count);
+	uint base = 0;
+	if (WaveIsFirstLane() && total > 0) counts.InterlockedAdd(counter_offset, total, base);
+	return WaveReadLaneFirst(base) + WavePrefixSum(count);
+}
 
 [numthreads(GROUP_SIZE, 1, 1)]
 void main(uint3 group_id : SV_GroupID, uint3 group_thread_id : SV_GroupThreadID) {
@@ -305,7 +313,7 @@ void main(uint3 group_id : SV_GroupID, uint3 group_thread_id : SV_GroupThreadID)
 			bindless_rw_buffers[u_selected].Store4(SELECTED_COUNT, uint4(0, 0, 0, 0));
 			const uint count = min(bindless_rw_buffers[u_occluded].Load(SELECTED_COUNT), u_occluded_capacity);
 			const uint groups = (count + GROUP_SIZE - 1) / GROUP_SIZE;
-			bindless_rw_buffers[u_args].Store3(ARGS_POST, uint3(min(groups, MAX_GROUPS_X), (groups + MAX_GROUPS_X - 1) / MAX_GROUPS_X, 1));
+			bindless_rw_buffers[u_args].Store3(ARGS_POST, dispatchGroups(groups));
 		}
 	#elif defined POST_OCCLUDED
 		const uint idx = (group_id.y * MAX_GROUPS_X + group_id.x) * GROUP_SIZE + group_thread_id.x;
@@ -347,92 +355,121 @@ void main(uint3 group_id : SV_GroupID, uint3 group_thread_id : SV_GroupThreadID)
 		uint at;
 		selected.InterlockedAdd(SELECTED_COUNT, 1, at);
 		if (at < u_selected_capacity) selected.Store4(SELECTED_HEADER + at * SELECTED_STRIDE, uint4(instance_idx, mesh_index, cluster | (computeDepthBin(center) << 27), instance_ref));
-	#elif defined FLAT
-		const uint group_index = group_id.y * MAX_GROUPS_X + group_id.x;
-		// the number of items is in a counter of the GPU, u_item_capacity is the capacity of the list
-		const uint item_count = min(bindless_rw_buffers[u_counts].Load(COUNTER_FLAT), u_item_capacity);
-		if (group_index >= item_count) return; // the same for all threads of the group
-		const uint4 item = bindless_buffers[u_items].Load4(u_items_offset + group_index * ITEM_STRIDE); // mesh, slot, first cluster, instance
+	#elif defined ARGS && defined PASS0
+		// Candidate cluster culling: 1 thread per (item, cluster)
+		const uint idx = (group_id.y * MAX_GROUPS_X + group_id.x) * GROUP_SIZE + group_thread_id.x;
+		RWByteAddressBuffer counts = bindless_rw_buffers[u_counts];
+		const uint cluster_cap = u_scratch_size / 2 - 2 * u_node_queue_capacity;
+		const uint count = min(counts.Load(COUNTER_CANDIDATE_CLUSTERS), cluster_cap);
+		if (idx >= count) return;
+
+		const uint cluster_base = u_node_queue_capacity * 16;
+		const uint2 entry = bindless_rw_buffers[u_scratch].Load2(cluster_base + idx * 8); // tree_item_idx, cluster_id
+		const uint4 item = bindless_buffers[u_items].Load4(u_items_offset + entry.x * ITEM_STRIDE); // mesh, slot, 0, instance
 		const MeshDesc desc = loadSceneDesc(item.x);
-		const uint instance_idx = item.y;
-		Instance instance = loadInstance(desc, instance_idx, item.w);
-		// bounds are spheres, so non-uniform scale is handled by the largest axis
-		float max_scale = max(instance.scale.x, max(instance.scale.y, instance.scale.z));
-		// 64 consecutive clusters of an instance
-		const uint cluster = item.z + group_thread_id.x;
-		if (cluster < desc.cluster_count) processCluster(desc, instance, max_scale, instance_idx, cluster, item.w);
+		const Instance instance = loadInstance(desc, item.y, item.w);
+		const float max_scale = max(instance.scale.x, max(instance.scale.y, instance.scale.z));
+		processCluster(desc, instance, max_scale, item.y, entry.y, item.w);
+	#elif defined ARGS
+		if (group_thread_id.x == 0) {
+			RWByteAddressBuffer counts = bindless_rw_buffers[u_counts];
+			if (u_node_pass == 2) {
+				const uint cluster_cap = u_scratch_size / 2 - 2 * u_node_queue_capacity;
+				const uint count = min(counts.Load(COUNTER_CANDIDATE_CLUSTERS), cluster_cap);
+				const uint groups = (count + GROUP_SIZE - 1) / GROUP_SIZE;
+				bindless_rw_buffers[u_args].Store3(ARGS_TREE, dispatchGroups(groups));
+			}
+			else {
+				const uint cur_counter = u_node_pass == 0 ? COUNTER_NODE_0 : COUNTER_NODE_1;
+				const uint next_counter = u_node_pass == 0 ? COUNTER_NODE_1 : COUNTER_NODE_0;
+				const uint count = min(counts.Load(cur_counter), u_node_queue_capacity);
+				const uint groups = (count + GROUP_SIZE - 1) / GROUP_SIZE;
+				bindless_rw_buffers[u_args].Store3(ARGS_TREE, dispatchGroups(groups));
+				counts.Store(next_counter, 0);
+			}
+		}
+	#elif defined PASS0
+		// BFS node step: 1 thread per (item, node)
+		const uint idx = (group_id.y * MAX_GROUPS_X + group_id.x) * GROUP_SIZE + group_thread_id.x;
+		RWByteAddressBuffer counts = bindless_rw_buffers[u_counts];
+		const uint cur_counter = u_node_pass == 0 ? COUNTER_NODE_0 : COUNTER_NODE_1;
+		const uint count = min(counts.Load(cur_counter), u_node_queue_capacity);
+		if (idx >= count) return;
+
+		RWByteAddressBuffer scratch = bindless_rw_buffers[u_scratch];
+		const uint cur_base = u_node_pass * u_node_queue_capacity * 8;
+		const uint2 entry = scratch.Load2(cur_base + idx * 8); // tree_item_idx, node_id
+		const uint tree_item_idx = entry.x;
+		const uint node_id = entry.y;
+
+		const uint4 item = bindless_buffers[u_items].Load4(u_items_offset + tree_item_idx * ITEM_STRIDE); // mesh, slot, 0, instance
+		const MeshDesc desc = loadSceneDesc(item.x);
+		const Instance instance = loadInstance(desc, item.y, item.w);
+		const float max_scale = max(instance.scale.x, max(instance.scale.y, instance.scale.z));
+
+		ByteAddressBuffer nodes = bindless_buffers[u_cluster_data];
+		const uint node_offset = desc.nodes + node_id * NODE_STRIDE;
+		const float4 bounds = asfloat(nodes.Load4(node_offset + NODE_BOUNDS));
+		const float4 lod_bounds = asfloat(nodes.Load4(node_offset + NODE_LOD_BOUNDS));
+		const uint4 misc = nodes.Load4(node_offset + NODE_MISC); // min error, max parent error, first, count and flags
+		const float2 attribute_errors = asfloat(nodes.Load2(node_offset + NODE_ATTRIBUTE_ERRORS));
+		if (!isNodeNeeded(bounds, lod_bounds, asfloat(misc.x), asfloat(misc.y), attribute_errors.x, attribute_errors.y, nodes.Load(node_offset + NODE_UNREFINED) != 0, instance, max_scale)) return;
+
+		const uint child_count = misc.w & NODE_COUNT_MASK;
+		if (misc.w & NODE_LEAF_BIT) {
+			const uint cluster_cap = u_scratch_size / 2 - 2 * u_node_queue_capacity;
+			const uint cluster_base = u_node_queue_capacity * 16;
+			const uint at = waveAppend(counts, COUNTER_CANDIDATE_CLUSTERS, child_count);
+			for (uint c = 0; c < child_count; ++c) {
+				if (at + c < cluster_cap) scratch.Store2(cluster_base + (at + c) * 8, uint2(tree_item_idx, misc.z + c));
+			}
+		}
+		else {
+			const uint next_counter = u_node_pass == 0 ? COUNTER_NODE_1 : COUNTER_NODE_0;
+			const uint next_base = (1 - u_node_pass) * u_node_queue_capacity * 8;
+			const uint at = waveAppend(counts, next_counter, child_count);
+			for (uint c = 0; c < child_count; ++c) {
+				if (at + c < u_node_queue_capacity) scratch.Store2(next_base + (at + c) * 8, uint2(tree_item_idx, misc.z + c));
+			}
+		}
 	#else
-		// Persistent groups with dynamic atomic work queue and early-exit tree traversal (SM 6.0 / DXC).
+		// TREE_INIT: 1 thread per (instance, mesh) item; tests roots and emits child (item, node) pairs to node queue 0 or leaf clusters to the cluster queue
+		const uint tree_item_idx = (group_id.y * MAX_GROUPS_X + group_id.x) * GROUP_SIZE + group_thread_id.x;
 		RWByteAddressBuffer counts = bindless_rw_buffers[u_counts];
 		const uint item_count = min(counts.Load(COUNTER_TREE), u_item_capacity);
+		if (tree_item_idx >= item_count) return;
+
+		const uint4 item = bindless_buffers[u_items].Load4(u_items_offset + tree_item_idx * ITEM_STRIDE); // mesh, slot, 0, instance
+		const MeshDesc desc = loadSceneDesc(item.x);
+		const Instance instance = loadInstance(desc, item.y, item.w);
+		const float max_scale = max(instance.scale.x, max(instance.scale.y, instance.scale.z));
+
 		ByteAddressBuffer nodes = bindless_buffers[u_cluster_data];
 		RWByteAddressBuffer scratch = bindless_rw_buffers[u_scratch];
-		if ((group_id.x + 1) * u_scratch_slice > u_scratch_size) return;	// the slice does not fit, the same for all threads of the group (the CPU makes it fit)
-		const uint scratch_base = group_id.x * u_scratch_slice * 4;
+		const uint cluster_cap = u_scratch_size / 2 - 2 * u_node_queue_capacity;
+		const uint cluster_base = u_node_queue_capacity * 16;
 
-		[loop] for (;;) {
-			if (group_thread_id.x == 0) {
-				counts.InterlockedAdd(COUNTER_TREE_QUEUE, 1, g_item_index);
-			}
-			GroupMemoryBarrierWithGroupSync();
-			const uint group_index = g_item_index;
-			if (group_index >= item_count) break;
+		for (uint r = 0; r < desc.root_count; ++r) {
+			const uint node_id = nodes.Load(desc.nodes + desc.roots_offset + r * ROOT_STRIDE);
+			const uint node_offset = desc.nodes + node_id * NODE_STRIDE;
+			const float4 bounds = asfloat(nodes.Load4(node_offset + NODE_BOUNDS));
+			const float4 lod_bounds = asfloat(nodes.Load4(node_offset + NODE_LOD_BOUNDS));
+			const uint4 misc = nodes.Load4(node_offset + NODE_MISC);
+			const float2 attribute_errors = asfloat(nodes.Load2(node_offset + NODE_ATTRIBUTE_ERRORS));
+			if (!isNodeNeeded(bounds, lod_bounds, asfloat(misc.x), asfloat(misc.y), attribute_errors.x, attribute_errors.y, nodes.Load(node_offset + NODE_UNREFINED) != 0, instance, max_scale)) continue;
 
-			const uint4 item = bindless_buffers[u_items].Load4(u_items_offset + group_index * ITEM_STRIDE); // mesh, slot, first cluster, instance
-			const MeshDesc desc = loadSceneDesc(item.x);
-			const uint instance_idx = item.y;
-			Instance instance = loadInstance(desc, instance_idx, item.w);
-			// bounds are spheres, so non-uniform scale is handled by the largest axis
-			float max_scale = max(instance.scale.x, max(instance.scale.y, instance.scale.z));
-			const uint list_size = desc.node_count * 4;	// two lists of the mesh are in the slice
-
-			// the roots are the first nodes to visit
-			for (uint r = group_thread_id.x; r < desc.root_count; r += GROUP_SIZE) {
-				scratch.Store(scratch_base + r * 4, nodes.Load(desc.nodes + desc.roots_offset + r * ROOT_STRIDE));
-			}
-			if (group_thread_id.x == 0) {
-				g_current_count = desc.root_count;
-				g_next_count = 0;
-			}
-			DeviceMemoryBarrierWithGroupSync();
-
-			uint list = 0;
-			[loop] for (uint depth = 0; depth < u_tree_depth; ++depth) {
-				const uint count = g_current_count;
-				if (count == 0) break;
-				const uint from = scratch_base + list * list_size;
-				const uint to = scratch_base + (1 - list) * list_size;
-
-				for (uint i = group_thread_id.x; i < count; i += GROUP_SIZE) {
-					const uint node_id = scratch.Load(from + i * 4);
-					const uint node_offset = desc.nodes + node_id * NODE_STRIDE;
-					const float4 bounds = asfloat(nodes.Load4(node_offset + NODE_BOUNDS));
-					const float4 lod_bounds = asfloat(nodes.Load4(node_offset + NODE_LOD_BOUNDS));
-					const uint4 misc = nodes.Load4(node_offset + NODE_MISC); // min error, max parent error, first, count and flags
-					const float2 attribute_errors = asfloat(nodes.Load2(node_offset + NODE_ATTRIBUTE_ERRORS)); // the smallest and the largest of parents
-					if (!isNodeNeeded(bounds, lod_bounds, asfloat(misc.x), asfloat(misc.y), attribute_errors.x, attribute_errors.y, nodes.Load(node_offset + NODE_UNREFINED) != 0, instance, max_scale)) continue;
-
-					const uint child_count = misc.w & NODE_COUNT_MASK;
-					if (misc.w & NODE_LEAF_BIT) {
-						// a leaf: clusters
-						for (uint c = 0; c < child_count; ++c) {
-							processCluster(desc, instance, max_scale, instance_idx, misc.z + c, item.w);
-						}
-					}
-					else {
-						uint at;
-						InterlockedAdd(g_next_count, child_count, at);
-						for (uint c = 0; c < child_count; ++c) scratch.Store(to + (at + c) * 4, misc.z + c);
-					}
+			const uint child_count = misc.w & NODE_COUNT_MASK;
+			if (misc.w & NODE_LEAF_BIT) {
+				const uint at = waveAppend(counts, COUNTER_CANDIDATE_CLUSTERS, child_count);
+				for (uint c = 0; c < child_count; ++c) {
+					if (at + c < cluster_cap) scratch.Store2(cluster_base + (at + c) * 8, uint2(tree_item_idx, misc.z + c));
 				}
-
-				DeviceMemoryBarrierWithGroupSync(); // the nodes of the next level are written
-				if (group_thread_id.x == 0) {
-					g_current_count = g_next_count;
-					g_next_count = 0;
+			}
+			else {
+				const uint at = waveAppend(counts, COUNTER_NODE_0, child_count);
+				for (uint c = 0; c < child_count; ++c) {
+					if (at + c < u_node_queue_capacity) scratch.Store2((at + c) * 8, uint2(tree_item_idx, misc.z + c));
 				}
-				GroupMemoryBarrierWithGroupSync();
-				list = 1 - list;
 			}
 		}
 	#endif

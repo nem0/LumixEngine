@@ -1012,16 +1012,38 @@ bool testAABBTriangleCollision(const AABB& aabb, const Vec3& a, const Vec3& b, c
 	Vec3 v2 = b - aabbcenter;
 	Vec3 v3 = c - aabbcenter;
 
-	const Vec3 us[] = {
-		{1, 0, 0},
-		{0, 1, 0},
-		{0, 0, 1},
-	};
+	float min = minimum(v1.x, v2.x, v3.x);
+	float max = maximum(v1.x, v2.x, v3.x);
+	if (min > halfboxsize.x || max < -halfboxsize.x) return false;
+
+	min = minimum(v1.y, v2.y, v3.y);
+	max = maximum(v1.y, v2.y, v3.y);
+	if (min > halfboxsize.y || max < -halfboxsize.y) return false;
+
+	min = minimum(v1.z, v2.z, v3.z);
+	max = maximum(v1.z, v2.z, v3.z);
+	if (min > halfboxsize.z || max < -halfboxsize.z) return false;
 
 	const Vec3 es[] = {
 		v2 - v1,
 		v3 - v2,
 		v1 - v3
+	};
+
+	Vec3 normal = cross(es[0], es[1]);
+	float d = dot(normal, v1);
+
+	Vec3 vmin;
+	vmin.x = normal.x > 0.0f ? -halfboxsize.x : halfboxsize.x;
+	vmin.y = normal.y > 0.0f ? -halfboxsize.y : halfboxsize.y;
+	vmin.z = normal.z > 0.0f ? -halfboxsize.z : halfboxsize.z;
+	if (dot(normal, vmin) > d) return false;
+	if (dot(normal, -vmin) < d) return false;
+
+	const Vec3 us[] = {
+		{1, 0, 0},
+		{0, 1, 0},
+		{0, 0, 1},
 	};
 
 	auto abs = [](const Vec3& v) {
@@ -1041,28 +1063,7 @@ bool testAABBTriangleCollision(const AABB& aabb, const Vec3& a, const Vec3& b, c
 		}
 	}
 
-	float min = minimum(v1.x, v2.x, v3.x);
-	float max = maximum(v1.x, v2.x, v3.x);
-	if (min > halfboxsize.x || max < -halfboxsize.x) return false;
-
-	min = minimum(v1.y, v2.y, v3.y);
-	max = maximum(v1.y, v2.y, v3.y);
-	if (min > halfboxsize.y || max < -halfboxsize.y) return false;
-
-	min = minimum(v1.z, v2.z, v3.z);
-	max = maximum(v1.z, v2.z, v3.z);
-	if (min > halfboxsize.z || max < -halfboxsize.z) return false;
-
-	Vec3 normal = cross(es[0], es[1]);
-	float d = dot(normal, v1);
-
-	Vec3 vmin;
-	vmin.x = normal.x > 0.0f ? -halfboxsize.x : halfboxsize.x;
-	vmin.y = normal.y > 0.0f ? -halfboxsize.y : halfboxsize.y;
-	vmin.z = normal.z > 0.0f ? -halfboxsize.z : halfboxsize.z;
-
-	if (dot(normal, vmin) > d) return false;
-	return -dot(normal, vmin) >= d;
+	return true;
 }
 
 static bool overlaps(float min1, float max1, float min2, float max2)

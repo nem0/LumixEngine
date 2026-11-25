@@ -77,14 +77,14 @@
 #define ITEM_STRIDE 16
 
 // u_counter of gpu_scene_cull.hlsl, u32 each
-#define COUNTER_TREE_QUEUE 0
-#define COUNTER_FLAT 4
-#define COUNTER_TREE 8
-#define COUNTER_CHUNK 12
-#define COUNTER_COUNT 4
+#define COUNTER_NODE_0 0
+#define COUNTER_TREE 4
+#define COUNTER_CHUNK 8
+#define COUNTER_NODE_1 12
+#define COUNTER_CANDIDATE_CLUSTERS 16
+#define COUNTER_COUNT 5
 // u_args of gpu_scene_cull.hlsl and gpu_scene_variants.hlsl, 16 bytes each
 #define ARGS_MODEL_INSTANCES 0
-#define ARGS_FLAT 16
 #define ARGS_POST 16
 #define ARGS_TREE 32
 #define ARGS_CHUNK_INSTANCES 64

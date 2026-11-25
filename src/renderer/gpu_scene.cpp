@@ -57,6 +57,8 @@ void destroyGPUScene(GPUScene& scene) {
 		if (scene.slot_model[slot] == GPUSceneConst::INVALID_MODEL) continue;
 		releaseGPUMaterialSet(scene.registry, scene.slot_set[slot]);
 		releaseGPUModel(scene.registry, scene.slot_model[slot]);
+		scene.slot_model[slot] = GPUSceneConst::INVALID_MODEL;
+		scene.slot_set[slot] = GPUSceneConst::INVALID_SET;
 	}
 	DrawStream& stream = scene.renderer.getEndFrameDrawStream();
 	if (scene.bounds) stream.destroy(scene.bounds);

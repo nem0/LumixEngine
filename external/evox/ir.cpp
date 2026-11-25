@@ -3106,7 +3106,7 @@ struct BytecodeCompiler {
 		emitBlock(*conditional.true_block);
 		u32 peak = stack_top;
 		if (peak < condition_peak) peak = condition_peak;
-		if (!conditional.false_block) {
+		if (!conditional.false_block || conditional.false_block->ops.empty()) {
 			patchJumpList(false_jumps, code.size());
 			stack_top = peak;
 			return entry_stack_top;
@@ -3599,20 +3599,28 @@ struct BytecodeCompiler {
 		}
 	}
 
-	// Matches an address formed as base + constant byte offset (the shape
-	// produced by struct field access through pointers). The constant folds
-	// into LOAD_PTR/STORE_PTR's immediate offset operand.
+	// Matches an address formed as base + constant byte offset(s) (the shape
+	// produced by struct field access through pointers or nested fields). The
+	// total constant offset folds into LOAD_PTR/STORE_PTR or a direct frame slot.
 	bool tryGetOffsetAddress(const ExIrOp& address, ExIrOp*& base, u32& offset) {
-		if (address.kind != ExIrOpKind::ADD) return false;
-		const auto& add = static_cast<const ExOpBinary&>(address);
-		if (!add.rhs || add.rhs->kind != ExIrOpKind::LOAD_CONST) return false;
-		const auto& constant = static_cast<const ExOpLoadConst&>(*add.rhs);
-		if (!constant.type || constant.type->kind != ResolvedTypeKind::U64) return false;
-		u64 value = 0;
-		memcpy(&value, constant.value, sizeof(value));
-		if (value > 0xffffffffu) return false;
-		base = add.lhs;
-		offset = (u32)value;
+		const ExIrOp* cur = &address;
+		u64 total = 0;
+		bool matched = false;
+		while (cur->kind == ExIrOpKind::ADD) {
+			const auto& add = static_cast<const ExOpBinary&>(*cur);
+			if (!add.rhs || add.rhs->kind != ExIrOpKind::LOAD_CONST) break;
+			const auto& constant = static_cast<const ExOpLoadConst&>(*add.rhs);
+			if (!constant.type || constant.type->kind != ResolvedTypeKind::U64) break;
+			u64 value = 0;
+			memcpy(&value, constant.value, sizeof(value));
+			if (total + value > 0xffffffffu) break;
+			total += value;
+			cur = add.lhs;
+			matched = true;
+		}
+		if (!matched) return false;
+		base = const_cast<ExIrOp*>(cur);
+		offset = (u32)total;
 		return true;
 	}
 
@@ -3745,17 +3753,22 @@ struct BytecodeCompiler {
 			emit(typeByteSize(*copy.type));
 			return frame_offset;
 		}
-		u32 dst = emit(*copy.dst, nullptr);
 		switch (copy.dst->result_mode) {
 			case ExIrOp::ADDRESS: {
+				ExIrOp* dst_base = copy.dst;
+				u32 dst_offset = 0;
+				if (do_optimize) tryGetOffsetAddress(*copy.dst, dst_base, dst_offset);
+				u32 dst = 0;
+				if (!(do_optimize && tryGetDirectFrameValue(*dst_base, dst))) dst = emit(*dst_base, nullptr);
 				emitOp(EX_OP_STORE_PTR);
 				emit(dst);
-				emit(u32(0));
+				emit(dst_offset);
 				emit(src);
 				emit(typeByteSize(*copy.type));
 				return dst;
 			}
 			case ExIrOp::VALUE: {
+				u32 dst = emit(*copy.dst, nullptr);
 				emitOp(EX_OP_COPY);
 				emit(dst);
 				emit(src);
@@ -4545,10 +4558,34 @@ struct BytecodeCompiler {
 				break;
 			}
 			case ExIrOpKind::NOT:
-			case ExIrOpKind::BIT_NOT:
+			case ExIrOpKind::BIT_NOT: {
+				auto& v = *static_cast<ExOpUnary*>(op);
+				optimize(v.operand);
+				break;
+			}
 			case ExIrOpKind::NEG: {
 				auto& v = *static_cast<ExOpUnary*>(op);
 				optimize(v.operand);
+				if (v.operand->kind == ExIrOpKind::LOAD_CONST) {
+					const auto& c = static_cast<const ExOpLoadConst&>(*v.operand);
+					if (c.type && v.operand_type && c.type->kind == v.operand_type->kind) {
+						auto& folded = alloc<ExOpLoadConst>();
+						folded.type = c.type;
+						folded.src_loc = v.src_loc;
+						bool ok = true;
+						switch (c.type->kind) {
+							case ResolvedTypeKind::F32: { float val; memcpy(&val, c.value, 4); val = -val; memcpy(folded.value, &val, 4); break; }
+							case ResolvedTypeKind::F64: { double val; memcpy(&val, c.value, 8); val = -val; memcpy(folded.value, &val, 8); break; }
+							case ResolvedTypeKind::I8:  { i8 val; memcpy(&val, c.value, 1); val = (i8)(0u - (u8)val); memcpy(folded.value, &val, 1); break; }
+							case ResolvedTypeKind::I16: { i16 val; memcpy(&val, c.value, 2); val = (i16)(0u - (u16)val); memcpy(folded.value, &val, 2); break; }
+							case ResolvedTypeKind::I32: { i32 val; memcpy(&val, c.value, 4); val = (i32)(0u - (u32)val); memcpy(folded.value, &val, 4); break; }
+							case ResolvedTypeKind::I64:
+							case ResolvedTypeKind::ISIZE: { i64 val; memcpy(&val, c.value, 8); val = (i64)(0ull - (u64)val); memcpy(folded.value, &val, 8); break; }
+							default: ok = false; break;
+						}
+						if (ok) op = &folded;
+					}
+				}
 				break;
 			}
 			case ExIrOpKind::MUL: {
@@ -4559,23 +4596,50 @@ struct BytecodeCompiler {
 				if (mul.lhs->kind == ExIrOpKind::NEG) lhs_negated = static_cast<ExOpNeg*>(mul.lhs)->operand;
 				ExIrOp* rhs_negated = nullptr;
 				if (mul.rhs->kind == ExIrOpKind::NEG) rhs_negated = static_cast<ExOpNeg*>(mul.rhs)->operand;
-				if (!lhs_negated && !rhs_negated) break;
-
-				auto& inner = alloc<ExOpMul>();
-				inner.lhs = lhs_negated ? lhs_negated : mul.lhs;
-				inner.rhs = rhs_negated ? rhs_negated : mul.rhs;
-				inner.operand_type = mul.operand_type;
-				inner.src_loc = mul.src_loc;
-				if (lhs_negated && rhs_negated) {
-					op = &inner;
-					break;
+				if (lhs_negated || rhs_negated) {
+					auto& inner = alloc<ExOpMul>();
+					inner.lhs = lhs_negated ? lhs_negated : mul.lhs;
+					inner.rhs = rhs_negated ? rhs_negated : mul.rhs;
+					inner.operand_type = mul.operand_type;
+					inner.src_loc = mul.src_loc;
+					if (lhs_negated && rhs_negated) {
+						op = &inner;
+					} else {
+						auto& neg = alloc<ExOpNeg>();
+						neg.operand = &inner;
+						neg.operand_type = mul.operand_type;
+						neg.src_loc = mul.src_loc;
+						op = &neg;
+						break;
+					}
 				}
-
-				auto& neg = alloc<ExOpNeg>();
-				neg.operand = &inner;
-				neg.operand_type = mul.operand_type;
-				neg.src_loc = mul.src_loc;
-				op = &neg;
+				auto& m = *static_cast<ExOpBinary*>(op);
+				if (m.result_mode == ExIrOp::VALUE && m.lhs->kind == ExIrOpKind::LOAD_CONST && m.rhs->kind != ExIrOpKind::LOAD_CONST) {
+					ExIrOp* tmp = m.lhs;
+					m.lhs = m.rhs;
+					m.rhs = tmp;
+				}
+				if (m.result_mode == ExIrOp::VALUE && m.lhs->kind == ExIrOpKind::LOAD_CONST && m.rhs->kind == ExIrOpKind::LOAD_CONST) {
+					const auto& a = static_cast<const ExOpLoadConst&>(*m.lhs);
+					const auto& b = static_cast<const ExOpLoadConst&>(*m.rhs);
+					if (a.type && b.type && m.operand_type && a.type->kind == m.operand_type->kind && b.type->kind == m.operand_type->kind) {
+						auto& folded = alloc<ExOpLoadConst>();
+						folded.type = a.type;
+						folded.src_loc = m.src_loc;
+						bool ok = true;
+						switch (a.type->kind) {
+							case ResolvedTypeKind::F32: { float va, vb, r; memcpy(&va, a.value, 4); memcpy(&vb, b.value, 4); r = va * vb; memcpy(folded.value, &r, 4); break; }
+							case ResolvedTypeKind::F64: { double va, vb, r; memcpy(&va, a.value, 8); memcpy(&vb, b.value, 8); r = va * vb; memcpy(folded.value, &r, 8); break; }
+							case ResolvedTypeKind::I32:
+							case ResolvedTypeKind::U32: { u32 va, vb, r; memcpy(&va, a.value, 4); memcpy(&vb, b.value, 4); r = va * vb; memcpy(folded.value, &r, 4); break; }
+							case ResolvedTypeKind::I64:
+							case ResolvedTypeKind::U64:
+							case ResolvedTypeKind::ISIZE: { u64 va, vb, r; memcpy(&va, a.value, 8); memcpy(&vb, b.value, 8); r = va * vb; memcpy(folded.value, &r, 8); break; }
+							default: ok = false; break;
+						}
+						if (ok) op = &folded;
+					}
+				}
 				break;
 			}
 			case ExIrOpKind::ADD:
@@ -4599,11 +4663,40 @@ struct BytecodeCompiler {
 					sub.rhs = static_cast<ExOpNeg*>(binary.lhs)->operand;
 					rewritten = &sub;
 				}
-				if (!rewritten) break;
-				
-				rewritten->operand_type = binary.operand_type;
-				rewritten->src_loc = binary.src_loc;
-				op = rewritten;
+				if (rewritten) {
+					rewritten->operand_type = binary.operand_type;
+					rewritten->src_loc = binary.src_loc;
+					rewritten->result_mode = binary.result_mode;
+					op = rewritten;
+				}
+				auto& b = *static_cast<ExOpBinary*>(op);
+				if (b.kind == ExIrOpKind::ADD && b.result_mode == ExIrOp::VALUE && b.lhs->kind == ExIrOpKind::LOAD_CONST && b.rhs->kind != ExIrOpKind::LOAD_CONST) {
+					ExIrOp* tmp = b.lhs;
+					b.lhs = b.rhs;
+					b.rhs = tmp;
+				}
+				if (b.result_mode == ExIrOp::VALUE && b.lhs->kind == ExIrOpKind::LOAD_CONST && b.rhs->kind == ExIrOpKind::LOAD_CONST) {
+					const auto& ca = static_cast<const ExOpLoadConst&>(*b.lhs);
+					const auto& cb = static_cast<const ExOpLoadConst&>(*b.rhs);
+					if (ca.type && cb.type && b.operand_type && ca.type->kind == b.operand_type->kind && cb.type->kind == b.operand_type->kind) {
+						auto& folded = alloc<ExOpLoadConst>();
+						folded.type = ca.type;
+						folded.src_loc = b.src_loc;
+						const bool is_add = b.kind == ExIrOpKind::ADD;
+						bool ok = true;
+						switch (ca.type->kind) {
+							case ResolvedTypeKind::F32: { float va, vb, r; memcpy(&va, ca.value, 4); memcpy(&vb, cb.value, 4); r = is_add ? va + vb : va - vb; memcpy(folded.value, &r, 4); break; }
+							case ResolvedTypeKind::F64: { double va, vb, r; memcpy(&va, ca.value, 8); memcpy(&vb, cb.value, 8); r = is_add ? va + vb : va - vb; memcpy(folded.value, &r, 8); break; }
+							case ResolvedTypeKind::I32:
+							case ResolvedTypeKind::U32: { u32 va, vb, r; memcpy(&va, ca.value, 4); memcpy(&vb, cb.value, 4); r = is_add ? va + vb : va - vb; memcpy(folded.value, &r, 4); break; }
+							case ResolvedTypeKind::I64:
+							case ResolvedTypeKind::U64:
+							case ResolvedTypeKind::ISIZE: { u64 va, vb, r; memcpy(&va, ca.value, 8); memcpy(&vb, cb.value, 8); r = is_add ? va + vb : va - vb; memcpy(folded.value, &r, 8); break; }
+							default: ok = false; break;
+						}
+						if (ok) op = &folded;
+					}
+				}
 				break;
 			}
 			case ExIrOpKind::DIV:
@@ -4701,6 +4794,33 @@ struct BytecodeCompiler {
 			case ExIrOpKind::MATERIALIZE_ADDR: {
 				auto& address = *static_cast<ExOpMaterializeAddr*>(op);
 				optimize(address.value);
+				break;
+			}
+			case ExIrOpKind::EXTRACT_VALUE: {
+				auto& extract = *static_cast<ExOpExtractValue*>(op);
+				optimize(extract.value);
+				if (extract.value->kind == ExIrOpKind::LOAD) {
+					auto* load = static_cast<ExOpLoad*>(extract.value);
+					if (load->result_mode == ExIrOp::VALUE && extract.offset + extract.size <= load->size) {
+						if (extract.offset > 0) {
+							static ResolvedType u64_type(ResolvedTypeKind::U64);
+							auto& off = alloc<ExOpLoadConst>();
+							off.type = &u64_type;
+							u64 v = extract.offset;
+							memcpy(off.value, &v, sizeof(v));
+							auto& add = alloc<ExOpAdd>();
+							add.lhs = load->addr;
+							add.rhs = &off;
+							add.operand_type = &u64_type;
+							add.result_mode = ExIrOp::ADDRESS;
+							add.src_loc = extract.src_loc;
+							load->addr = &add;
+						}
+						load->size = extract.size;
+						op = load;
+						optimize(op);
+					}
+				}
 				break;
 			}
 			case ExIrOpKind::BLOCK_EXPR: {

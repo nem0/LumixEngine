@@ -46,7 +46,6 @@ inline u32 clusterRootsOffset(const GPUClusterMesh& m) { return m.node_count * C
 inline u32 clusterHeadersOffset(const GPUClusterMesh& m) {
 	return m.clusters + ((m.cluster_count * CLUSTER_GPU_SIZE + m.node_count * CLUSTER_NODE_GPU_SIZE + m.root_count * 4 + 15) & ~15u);
 }
-// A mesh with up to GPUSceneConst::FLAT_MAX_CLUSTERS clusters is tested cluster by cluster (flat), in groups of GPUSceneConst::CLUSTER_THREADS, see gpu_scene_cull.hlsl.
 
 struct GPUClusterModelEntry {
 	const Model* model;		// null: the id is free

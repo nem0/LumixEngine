@@ -1,18 +1,13 @@
 #include "cluster_builder.h"
 
 #include "core/crt.h"
+#include "core/job_system.h"
 #include "core/log.h"
 #include "core/profiler.h"
 #include "core/sort.h"
 #include "core/string.h"
 
 #include "meshoptimizer/meshoptimizer.h"
-
-// the builder of the DAG of clusters is the one of meshoptimizer (its implementation is in external/meshoptimizer/clusterlod.cpp), see buildMeshClusters
-#include "meshoptimizer/clusterlod.h"
-
-#include <float.h>
-#include <math.h>
 
 namespace Lumix {
 
@@ -22,8 +17,346 @@ namespace {
 // for mesh shaders, but unwelded geometry such as leaves has about as many vertices as triangles, so 64 vertices stop it at about 65 triangles.
 constexpr u32 MAX_CLUSTER_VERTICES = 256;
 constexpr u32 MAX_CLUSTER_TRIANGLES = 128;
+constexpr u32 MIN_CLUSTER_TRIANGLES = MAX_CLUSTER_TRIANGLES / 3;
+constexpr u32 PARTITION_SIZE = 16;
+constexpr float CLUSTER_SPLIT_FACTOR = 2.0f;
+constexpr int OPTIMIZE_CLUSTERS_LEVEL = 1;
+constexpr float SIMPLIFY_RATIO = 0.5f;
+constexpr float SIMPLIFY_THRESHOLD = 0.85f;
+constexpr float SIMPLIFY_ERROR_FACTOR_SLOPPY = 2.0f;
 constexpr float UV_STEP = 1.f / 16384.f;	// the largest step of quantized UVs, unless the range of a cluster is too large for 16 bits
 constexpr u32 INVALID_INDEX = 0xffFFffFF;
+
+// Cluster LOD DAG builder, based on meshoptimizer's clusterlod (MIT License, Copyright (c) 2016-2026 Arseny Kapoulkine).
+
+struct DagBounds {
+	Vec3 center;
+	float radius;
+	float error;
+};
+
+struct DagCluster {
+	u32 index_offset;
+	u32 index_count;
+	int refined;
+	DagBounds bounds;
+};
+
+template <typename T>
+void appendSlice(Array<T>& dst, const T* src, u32 count) {
+	if (count == 0) return;
+	const u32 offset = dst.size();
+	const u32 new_size = offset + count;
+	if (new_size > dst.capacity()) {
+		dst.reserve(maximum(dst.capacity() < 4 ? 4u : dst.capacity() + dst.capacity() / 2, new_size));
+	}
+	dst.resize(new_size);
+	memcpy(dst.data() + offset, src, count * sizeof(T));
+}
+
+DagBounds dagBoundsCompute(const Vec3* positions, u32 vertex_count, const u32* indices, u32 index_count, float error) {
+	const meshopt_Bounds b = meshopt_computeClusterBounds(indices, index_count, &positions[0].x, vertex_count, sizeof(Vec3));
+	return { Vec3(b.center[0], b.center[1], b.center[2]), b.radius, error };
+}
+
+DagBounds dagBoundsMerge(const DagBounds* bounds, u32 count, size_t stride) {
+	const meshopt_Bounds merged = meshopt_computeSphereBounds(&bounds[0].center.x, count, stride, &bounds[0].radius, stride);
+	float error = 0.f;
+	for (u32 i = 0; i < count; ++i) {
+		const auto* b = reinterpret_cast<const DagBounds*>(reinterpret_cast<const char*>(bounds) + i * stride);
+		error = maximum(error, b->error);
+	}
+	return { Vec3(merged.center[0], merged.center[1], merged.center[2]), merged.radius, error };
+}
+
+void clusterize(Array<DagCluster>& clusters, Array<u32>& cluster_indices, const Vec3* positions, u32 vertex_count, const u32* indices, u32 index_count, int refined = -1) {
+	const size_t max_meshlets = meshopt_buildMeshletsBound(index_count, MAX_CLUSTER_VERTICES, MIN_CLUSTER_TRIANGLES);
+	const size_t buffer_size = max_meshlets * sizeof(meshopt_Meshlet) + index_count * (sizeof(u32) + sizeof(u8));
+
+	alignas(meshopt_Meshlet) char buffer_stack[32768];
+	Array<char> buffer_heap(clusters.getAllocator());
+	char* buffer = buffer_stack;
+	if (buffer_size > sizeof(buffer_stack)) {
+		buffer_heap.resize(u32(buffer_size));
+		buffer = buffer_heap.data();
+	}
+
+	auto* meshlets = reinterpret_cast<meshopt_Meshlet*>(buffer);
+	auto* meshlet_vertices = reinterpret_cast<u32*>(meshlets + max_meshlets);
+	auto* meshlet_triangles = reinterpret_cast<u8*>(meshlet_vertices + index_count);
+
+	const u32 meshlet_count = u32(meshopt_buildMeshletsFlex(
+		meshlets, meshlet_vertices, meshlet_triangles, indices, index_count,
+		&positions[0].x, vertex_count, sizeof(Vec3),
+		MAX_CLUSTER_VERTICES, MIN_CLUSTER_TRIANGLES, MAX_CLUSTER_TRIANGLES, 0.f, CLUSTER_SPLIT_FACTOR));
+
+	const u32 cluster_offset = clusters.size();
+	clusters.resize(cluster_offset + meshlet_count);
+
+	u32 index_offset = cluster_indices.size();
+	cluster_indices.resize(index_offset + index_count);
+
+	for (u32 i = 0; i < meshlet_count; ++i) {
+		const meshopt_Meshlet& meshlet = meshlets[i];
+		DagCluster& cluster = clusters[cluster_offset + i];
+
+		meshopt_optimizeMeshletLevel(&meshlet_vertices[meshlet.vertex_offset], meshlet.vertex_count, &meshlet_triangles[meshlet.triangle_offset], meshlet.triangle_count, OPTIMIZE_CLUSTERS_LEVEL);
+
+		cluster.index_offset = index_offset;
+		cluster.index_count = meshlet.triangle_count * 3;
+		for (u32 j = 0; j < cluster.index_count; ++j) {
+			cluster_indices[index_offset + j] = meshlet_vertices[meshlet.vertex_offset + meshlet_triangles[meshlet.triangle_offset + j]];
+		}
+		index_offset += cluster.index_count;
+		cluster.refined = refined;
+	}
+}
+
+Array<u32> partitionClusters(Array<DagCluster>& clusters, const Vec3* positions, const Array<u32>& indices, const Array<u32>& remap) {
+	IAllocator& allocator = clusters.getAllocator();
+	const u32 cluster_count = clusters.size();
+
+	if (cluster_count <= PARTITION_SIZE) {
+		Array<u32> offsets(allocator);
+		offsets.reserve(2);
+		offsets.push(0);
+		offsets.push(cluster_count);
+		return offsets;
+	}
+
+	Array<u32> cluster_counts(allocator);
+	cluster_counts.resize(cluster_count);
+	Array<u32> cluster_indices(allocator);
+	cluster_indices.reserve(indices.size());
+
+	for (u32 i = 0; i < cluster_count; ++i) {
+		const DagCluster& cluster = clusters[i];
+		cluster_counts[i] = cluster.index_count;
+		for (u32 j = 0; j < cluster.index_count; ++j) {
+			cluster_indices.push(remap[indices[cluster.index_offset + j]]);
+		}
+	}
+
+	Array<u32> cluster_part(allocator);
+	cluster_part.resize(cluster_count);
+	const u32 partition_count = u32(meshopt_partitionClusters(
+		cluster_part.data(), cluster_indices.data(), cluster_indices.size(), cluster_counts.data(), cluster_counts.size(),
+		&positions[0].x, remap.size(), sizeof(Vec3), PARTITION_SIZE));
+
+	// sort partitions spatially so neighbouring clusters stay close in the output (buildNodes relies on this)
+	Array<Vec3> partition_point(allocator);
+	partition_point.resize(partition_count);
+	for (u32 i = 0; i < cluster_count; ++i) {
+		partition_point[cluster_part[i]] = clusters[i].bounds.center;
+	}
+
+	Array<u32> partition_remap(allocator);
+	partition_remap.resize(partition_count);
+	meshopt_spatialSortRemap(partition_remap.data(), &partition_point[0].x, partition_count, sizeof(Vec3));
+
+	for (u32 i = 0; i < cluster_count; ++i) {
+		cluster_part[i] = partition_remap[cluster_part[i]];
+	}
+
+	Array<u32> partition_offsets(allocator);
+	partition_offsets.resize(partition_count + 1);
+	memset(partition_offsets.data(), 0, partition_offsets.byte_size());
+	for (u32 i = 0; i < cluster_count; ++i) partition_offsets[cluster_part[i] + 1]++;
+	for (u32 i = 1; i <= partition_count; ++i) partition_offsets[i] += partition_offsets[i - 1];
+
+	Array<u32> write(allocator);
+	partition_offsets.copyTo(write);
+	Array<DagCluster> result(allocator);
+	result.resize(cluster_count);
+	for (u32 i = 0; i < cluster_count; ++i) {
+		result[write[cluster_part[i]]++] = clusters[i];
+	}
+
+	clusters.swap(result);
+	return partition_offsets;
+}
+
+void lockBoundary(Array<u8>& locks, const DagCluster* clusters, const u32* group_offsets, u32 group_count, const Array<u32>& cluster_indices, const Array<u32>& remap) {
+	// bit 7 is temporary storage indicating the vertex was seen by an earlier group
+	for (u8& lock : locks) lock &= ~((1 << 0) | (1 << 7));
+
+	for (u32 i = 0; i < group_count; ++i) {
+		const DagCluster* group = clusters + group_offsets[i];
+		const u32 group_size = group_offsets[i + 1] - group_offsets[i];
+
+		for (u32 j = 0; j < group_size; ++j) {
+			const DagCluster& cluster = group[j];
+			for (u32 k = 0; k < cluster.index_count; ++k) {
+				const u32 r = remap[cluster_indices[cluster.index_offset + k]];
+				locks[r] |= locks[r] >> 7;
+			}
+		}
+
+		for (u32 j = 0; j < group_size; ++j) {
+			const DagCluster& cluster = group[j];
+			for (u32 k = 0; k < cluster.index_count; ++k) {
+				const u32 r = remap[cluster_indices[cluster.index_offset + k]];
+				locks[r] |= 1 << 7;
+			}
+		}
+	}
+
+	for (u32 i = 0, c = locks.size(); i < c; ++i) {
+		const u32 r = remap[i];
+		locks[i] = (locks[r] & 1) | (locks[i] & meshopt_SimplifyVertex_Protect);
+	}
+}
+
+void simplifyFallback(Array<u32>& lod, const Vec3* positions, u32 vertex_count, const Array<u32>& indices, const Array<u8>& locks, u32 target_count, float* error) {
+	struct SloppyVertex {
+		Vec3 pos;
+		u32 id;
+	};
+
+	IAllocator& allocator = lod.getAllocator();
+	const u32 index_count = indices.size();
+	Array<SloppyVertex> subset(allocator);
+	subset.resize(index_count);
+	Array<u8> subset_locks(allocator);
+	subset_locks.resize(index_count);
+	lod.resize(index_count);
+
+	for (u32 i = 0; i < index_count; ++i) {
+		const u32 v = indices[i];
+		ASSERT(v < vertex_count);
+		subset[i] = { positions[v], v };
+		subset_locks[i] = locks[v];
+		lod[i] = i;
+	}
+
+	lod.resize(u32(meshopt_simplifySloppy(lod.data(), lod.data(), lod.size(), &subset[0].pos.x, subset.size(), sizeof(SloppyVertex), subset_locks.data(), target_count, FLT_MAX, error)));
+	*error *= meshopt_simplifyScale(&subset[0].pos.x, subset.size(), sizeof(SloppyVertex));
+
+	for (u32& v : lod) v = subset[v].id;
+}
+
+void simplifyGroup(Array<u32>& lod, const Vec3* positions, u32 vertex_count, const Vec3* normals, const Array<u32>& indices, const Array<u8>& locks, u32 target_count, float* error) {
+	ASSERT(target_count <= u32(indices.size()));
+	lod.resize(indices.size());
+
+	static constexpr float attribute_weights[3] = { 0.5f, 0.5f, 0.5f };
+	const u32 options = meshopt_SimplifySparse | meshopt_SimplifyErrorAbsolute | meshopt_SimplifyErrorClamped | meshopt_SimplifyPermissive;
+
+	lod.resize(u32(meshopt_simplifyWithAttributes(
+		lod.data(), indices.data(), indices.size(),
+		&positions[0].x, vertex_count, sizeof(Vec3),
+		normals ? &normals[0].x : nullptr, normals ? sizeof(Vec3) : 0, normals ? attribute_weights : nullptr, normals ? 3 : 0,
+		locks.data(), target_count, FLT_MAX, options, error)));
+
+	if (u32(lod.size()) > target_count) {
+		simplifyFallback(lod, positions, vertex_count, indices, locks, target_count, error);
+		*error *= SIMPLIFY_ERROR_FACTOR_SLOPPY;
+	}
+
+	// replace degenerate outputs with the first triangle to keep DAG invariants
+	if (lod.empty() && !indices.empty()) {
+		lod.resize(3);
+		memcpy(lod.data(), indices.data(), 3 * sizeof(u32));
+	}
+}
+
+u64* edgeLookup(Array<u64>& table, u64 key) {
+	const u32 mask = table.size() - 1;
+	u32 h = u32((key * 0x9E3779B97F4A7C15ull) >> 32) & mask;
+	while (table[h] != ~0ull && table[h] != key) h = (h + 1) & mask;
+	return &table[h];
+}
+
+float boundaryArea(const Vec3* positions, const Array<u32>& indices, const Array<u8>& locks, const Array<u32>& remap, Array<u64>& table) {
+	memset(table.data(), -1, table.byte_size());
+
+	for (u32 i = 0, c = indices.size(); i < c; i += 3) {
+		for (int e = 0; e < 3; ++e) {
+			const u32 a = remap[indices[i + e]];
+			const u32 b = remap[indices[i + (e == 2 ? 0 : e + 1)]];
+			const u64 id = (u64)a << 32 | b;
+			*edgeLookup(table, id) = id;
+		}
+	}
+
+	float area = 0.f;
+	for (u32 i = 0, c = indices.size(); i < c; i += 3) {
+		bool border = false;
+		for (int e = 0; e < 3; ++e) {
+			const u32 a = remap[indices[i + e]];
+			const u32 b = remap[indices[i + (e == 2 ? 0 : e + 1)]];
+			const u64 id = (u64)b << 32 | a;
+			border |= (locks[a] & locks[b] & 1) == 0 && *edgeLookup(table, id) == ~0ull;
+		}
+		if (!border) continue;
+
+		const Vec3& va = positions[indices[i + 0]];
+		const Vec3& vb = positions[indices[i + 1]];
+		const Vec3& vc = positions[indices[i + 2]];
+		area += length(cross(vb - va, vc - va)) * 0.5f;
+	}
+	return area;
+}
+
+void dilateBorders(Vec3* positions, const Array<u32>& merged, const Array<u32>& simplified, const Array<u8>& locks, const Array<u32>& remap, DagBounds& bounds, Array<Vec4>& dilate_offsets, Array<u64>& edge_table) {
+	u32 table_size = 16;
+	while (table_size < u32(merged.size()) + u32(merged.size()) / 2) table_size *= 2;
+	edge_table.resize(table_size);
+
+	const float old_area = boundaryArea(positions, merged, locks, remap, edge_table);
+	if (old_area == 0.f) return;
+
+	const float new_area = boundaryArea(positions, simplified, locks, remap, edge_table);
+	if (new_area >= old_area || new_area < old_area / 4) return;
+
+	float perimeter = 0.f;
+	for (u32 i = 0, c = simplified.size(); i < c; i += 3) {
+		for (int e = 0; e < 3; ++e) {
+			const u32 ia = simplified[i + e];
+			const u32 ib = simplified[i + (e == 2 ? 0 : e + 1)];
+			const u32 ic = simplified[i + (e + 2) % 3];
+			const u32 a = remap[ia];
+			const u32 b = remap[ib];
+			const u64 id = (u64)b << 32 | a;
+
+			if ((locks[a] & locks[b] & 1) != 0 || *edgeLookup(edge_table, id) != ~0ull) continue;
+
+			const Vec3 ev = positions[ib] - positions[ia];
+			const float el = length(ev);
+			const Vec3 cv = positions[ia] - positions[ic];
+			const float cp = dot(cv, ev) / (el > 0.f ? el * el : 1.f);
+			const Vec3 nv = cv - ev * cp;
+			const float nl = length(nv);
+			const float ns = nl > 0.f ? el / nl : 0.f;
+			const Vec4 delta(nv * ns, el);
+
+			if ((locks[a] & 1) == 0) dilate_offsets[a] += delta;
+			if ((locks[b] & 1) == 0) dilate_offsets[b] += delta;
+			perimeter += el;
+		}
+	}
+
+	const float distance = perimeter > 0.f ? (old_area - new_area) / perimeter : 0.f;
+	for (u32 v : simplified) {
+		const u32 r = remap[v];
+		if (locks[r] & 1) continue;
+
+		Vec3& vi = positions[v];
+		Vec3& vr = positions[r];
+		Vec4& n = dilate_offsets[r];
+
+		if (n.w > 0.f) {
+			const Vec3 dir = Vec3(n.x, n.y, n.z) * (1.f / n.w);
+			const float nn = dot(dir, dir);
+			const float ns = distance / maximum(nn, 0.15f);
+			vr += dir * ns;
+			n = Vec4(0);
+			bounds.radius = maximum(bounds.radius, length(vr - bounds.center));
+		}
+
+		vi = vr;
+	}
+}
 
 struct ClusterSphere {
 	Vec3 center;
@@ -142,54 +475,60 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 	if (indices.length() < 3 || positions.length() == 0) return false;
 	const u32 vertex_count = positions.length();
 
-	// What meshoptimizer's own example (demo/nanite.cpp) does: the simplifier is attribute aware, normals have a weight and UV seams are protected (the UVs have no
-	// weight), it works on the vertices of the mesh as they are, and the result refers to them, so there is nothing to map back.
-	struct Attributes {
-		Vec3 normal;
-		Vec2 uv;
-	};
-	Array<Attributes> attributes(allocator);
-	attributes.resize(vertex_count);
-	for (u32 i = 0; i < vertex_count; ++i) {
-		attributes[i].normal = normals.length() == vertex_count ? normals[i] : Vec3(0, 0, 0);
-		attributes[i].uv = uvs.length() == vertex_count ? uvs[i] : Vec2(0, 0);
-	}
-	const float attribute_weights[3] = { 0.5f, 0.5f, 0.5f };
-
-	clodConfig config = clodDefaultConfig(MAX_CLUSTER_TRIANGLES);
-	config.max_vertices = MAX_CLUSTER_VERTICES;
-	config.partition_sort = true;	// the clusters of a level that are next to each other in the output are close, the trees over them (buildNodes) need that
-
 	// Dilation moves the vertices of the simplified clusters, in the positions that are given to it, from level to level. So the positions are a copy that it can
-	// change, and every cluster takes the positions that its vertices have when the cluster is given to the callback below.
+	// change, and every cluster takes the positions that its vertices have when the cluster is emitted below.
 	Array<Vec3> dilated_positions(allocator);
 	if (dilate_borders) {
 		dilated_positions.resize(vertex_count);
 		memcpy(dilated_positions.begin(), positions.begin(), vertex_count * sizeof(Vec3));
-		config.simplify_dilate_borders = true;
 	}
 	const Vec3* cluster_positions = dilate_borders ? dilated_positions.begin() : positions.begin();
+	const Vec3* mesh_normals = normals.length() == vertex_count ? normals.begin() : nullptr;
 
-	clodMesh mesh = {};
-	mesh.indices = indices.begin();
-	mesh.index_count = indices.length();
-	mesh.vertex_count = vertex_count;
-	mesh.vertex_positions = &cluster_positions[0].x;
-	mesh.vertex_positions_stride = sizeof(Vec3);
-	mesh.vertex_attributes = &attributes[0].normal.x;
-	mesh.vertex_attributes_stride = sizeof(Attributes);
-	mesh.attribute_weights = attribute_weights;
-	mesh.attribute_count = lengthOf(attribute_weights);
-	mesh.attribute_protect_mask = (1 << 3) | (1 << 4);	// the UVs, after the normal
+	Array<u8> locks(allocator);
+	locks.resize(vertex_count);
+	memset(locks.data(), 0, locks.byte_size());
 
-	// The callback gets the clusters of a group, with the error and the bounds of the simplification that the group goes through to make the next level
-	// (the error is FLT_MAX if there is none: the group is the last one, or it could not be simplified). The clusters of a group were made by a group of the level
-	// before, that is what their own error and bounds are. The groups come in the order of the levels, so the clusters of a level are consecutive.
+	// position-only remap mapping vertices with the same position to the same index
+	Array<u32> remap(allocator);
+	remap.resize(vertex_count);
+	{
+		PROFILE_BLOCK("clod position remap");
+		meshopt_generatePositionRemap(remap.data(), &cluster_positions[0].x, vertex_count, sizeof(Vec3));
+	}
+
+	// protect UV seams for permissive simplification
+	if (uvs.length() == vertex_count) {
+		PROFILE_BLOCK("clod protect seams");
+		for (u32 i = 0; i < vertex_count; ++i) {
+			const u32 r = remap[i];
+			if (r != i && uvs[i] != uvs[r]) locks[i] |= meshopt_SimplifyVertex_Protect;
+		}
+	}
+
+	Array<Vec4> dilate_offsets(allocator);
+	if (dilate_borders) {
+		dilate_offsets.resize(vertex_count);
+		memset(dilate_offsets.data(), 0, dilate_offsets.byte_size());
+	}
+
+	Array<u32> cluster_indices(allocator);
+	Array<DagCluster> clusters(allocator);
+	{
+		PROFILE_BLOCK("clod initial clusterize");
+		clusterize(clusters, cluster_indices, cluster_positions, vertex_count, indices.begin(), indices.length());
+		for (DagCluster& cluster : clusters) {
+			cluster.bounds = dagBoundsCompute(cluster_positions, vertex_count, cluster_indices.data() + cluster.index_offset, cluster.index_count, 0.f);
+		}
+	}
+
+	// Emits the clusters of a group, with the error and bounds of the simplification that the group goes through to make the next level
+	// (the error is FLT_MAX if there is none: the group is the last one, or it could not be simplified). Groups are emitted in order of levels, so clusters of a level are consecutive.
 	Array<u32> level_ranges(allocator);	// [first cluster, number of clusters] of the levels above the finest
 	int level = -1;
 	u32 level_first = 0;
-	u32 group_count = 0;
-	Array<clodBounds> group_bounds(allocator);	// the bounds and the error of each group, by the id that the callback returns
+	u32 group_id_counter = 0;
+	Array<DagBounds> group_bounds(allocator);
 	bool leaves_done = false;
 	auto close_level = [&]() {
 		if (level > 0) {
@@ -197,15 +536,15 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 			level_ranges.push(out.clusters.size() - level_first);
 		}
 	};
-	auto output = [&](clodGroup group, const clodCluster* clusters, size_t count) -> int {
-		// the id that is returned is the number of the group, the clusters of the group made by this call are consecutive
+	auto emit_group = [&](const DagCluster* group, u32 count, const DagBounds& simplified, int group_depth) -> int {
+		PROFILE_BLOCK("clod output group");
 		MeshGroupGPU group_entry;
 		group_entry.first_cluster = out.clusters.size();
-		group_entry.cluster_count = (u32)count;
+		group_entry.cluster_count = count;
 		group_entry.stream_offset = 0;
 		group_entry.stream_size = 0;
 		out.groups.push(group_entry);
-		if (group.depth != level) {
+		if (group_depth != level) {
 			if (level == 0) {
 				// the finest clusters are the first ones, they contain every triangle once
 				out.leaf_index_count = out.indices.size();
@@ -213,40 +552,234 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 				leaves_done = true;
 			}
 			close_level();
-			level = group.depth;
+			level = group_depth;
 			level_first = out.clusters.size();
 		}
-		for (size_t i = 0; i < count; ++i) {
-			const clodCluster& c = clusters[i];
+		for (u32 i = 0; i < count; ++i) {
+			const DagCluster& c = group[i];
 			MeshClusterGPU cluster;
 			memset(&cluster, 0, sizeof(cluster));
 			cluster.first_index = out.indices.size();
-			cluster.index_count = (u32)c.index_count;
-			cluster.group = group_count;
+			cluster.index_count = c.index_count;
+			cluster.group = group_id_counter;
 			cluster.refined_group = c.refined >= 0 ? (u32)c.refined : MeshClusters::NO_GROUP;
-			for (size_t j = 0; j < c.index_count; ++j) {
-				out.indices.push(c.indices[j]);
-				if (dilate_borders) out.index_positions.push(cluster_positions[c.indices[j]]);
+			const u32* src_indices = cluster_indices.data() + c.index_offset;
+			for (u32 j = 0; j < c.index_count; ++j) {
+				out.indices.push(src_indices[j]);
+				if (dilate_borders) out.index_positions.push(cluster_positions[src_indices[j]]);
 			}
 			// the bounds of the geometry (as it is in this cluster), for culling
 			const ClusterSphere bounds = computeBounds(cluster_positions, &out.indices[cluster.first_index], cluster.index_count);
 			cluster.center = bounds.center;
 			cluster.radius = bounds.radius;
-			// the bounds and the error of the group that made the cluster, 0 for the original geometry. With dilation the bounds of the cluster are larger than the
-			// ones of its group (they have the dilated vertices), the group is what the error is projected from.
-			const clodBounds lod = c.refined >= 0 ? group_bounds[c.refined] : c.bounds;
-			cluster.lod_center = Vec3(lod.center[0], lod.center[1], lod.center[2]);
+			// the bounds and error of the group that made the cluster, 0 for the original geometry. With dilation the bounds of the cluster are larger than
+			// those of its group (they have the dilated vertices), the group is what the error is projected from.
+			const DagBounds lod = c.refined >= 0 ? group_bounds[c.refined] : c.bounds;
+			cluster.lod_center = lod.center;
 			cluster.lod_radius = lod.radius;
 			cluster.error = lod.error;
-			cluster.parent_center = Vec3(group.simplified.center[0], group.simplified.center[1], group.simplified.center[2]);
-			cluster.parent_radius = group.simplified.radius;
-			cluster.parent_error = group.simplified.error;
+			cluster.parent_center = simplified.center;
+			cluster.parent_radius = simplified.radius;
+			cluster.parent_error = simplified.error;
 			out.clusters.push(cluster);
 		}
-		group_bounds.push(group.simplified);
-		return (int)group_count++;
+		group_bounds.push(simplified);
+		return (int)group_id_counter++;
 	};
-	clodBuild(config, mesh, output);
+
+	Array<DagCluster> pending(allocator);
+	Array<u32> pending_indices(allocator);
+	pending.reserve(clusters.size());
+	pending_indices.reserve(u32(cluster_indices.size() * SIMPLIFY_THRESHOLD));
+
+	struct GroupResult {
+		explicit GroupResult(IAllocator& alloc)
+			: clusters(alloc)
+			, indices(alloc)
+			, merged(alloc)
+			, simplified(alloc)
+		{}
+
+		DagBounds bounds = {};
+		bool stuck = false;
+		int refined = -1;
+		Array<DagCluster> clusters;
+		Array<u32> indices;
+		Array<u32> merged;
+		Array<u32> simplified;
+	};
+
+	int depth = 0;
+	while (clusters.size() > 1) {
+		PROFILE_BLOCK("clod level");
+
+		Array<u32> group_offsets(allocator);
+		{
+			PROFILE_BLOCK("clod partition");
+			group_offsets = partitionClusters(clusters, cluster_positions, cluster_indices, remap);
+		}
+
+		pending.clear();
+		pending_indices.clear();
+
+		const u32 group_count = group_offsets.size() - 1;
+		{
+			PROFILE_BLOCK("clod lock boundary");
+			lockBoundary(locks, clusters.data(), group_offsets.data(), group_count, cluster_indices, remap);
+		}
+
+		Array<GroupResult> results(allocator);
+		results.reserve(group_count);
+		for (u32 i = 0; i < group_count; ++i) results.emplace(allocator);
+
+		PROFILE_BLOCK("clod groups");
+		if (!dilate_borders) {
+			jobs::forEach(group_count, 1, [&](u32 from, u32 to) {
+				Array<u32> merged(allocator);
+				Array<u32> simplified(allocator);
+				merged.reserve((PARTITION_SIZE + PARTITION_SIZE / 3) * MAX_CLUSTER_TRIANGLES * 3);
+
+				for (u32 i = from; i < to; ++i) {
+					const DagCluster* group = clusters.data() + group_offsets[i];
+					const u32 group_size = group_offsets[i + 1] - group_offsets[i];
+
+					merged.clear();
+					for (u32 j = 0; j < group_size; ++j) {
+						appendSlice(merged, cluster_indices.data() + group[j].index_offset, group[j].index_count);
+					}
+
+					const u32 target_size = u32((merged.size() / 3) * SIMPLIFY_RATIO) * 3;
+					DagBounds bounds = dagBoundsMerge(&group[0].bounds, group_size, sizeof(DagCluster));
+
+					float error = 0.f;
+					{
+						PROFILE_BLOCK("clod simplify");
+						simplifyGroup(simplified, cluster_positions, vertex_count, mesh_normals, merged, locks, target_size, &error);
+					}
+
+					GroupResult& res = results[i];
+					if (simplified.size() > merged.size() * SIMPLIFY_THRESHOLD) {
+						bounds.error = FLT_MAX;
+						res.bounds = bounds;
+						res.stuck = true;
+						continue;
+					}
+
+					bounds.error = maximum(bounds.error, error);
+					res.bounds = bounds;
+					res.stuck = false;
+
+					{
+						PROFILE_BLOCK("clod clusterize group");
+						clusterize(res.clusters, res.indices, cluster_positions, vertex_count, simplified.data(), simplified.size());
+					}
+
+					for (DagCluster& c : res.clusters) c.bounds = bounds;
+				}
+			});
+
+			for (u32 i = 0; i < group_count; ++i) {
+				const DagCluster* group = clusters.data() + group_offsets[i];
+				const u32 group_size = group_offsets[i + 1] - group_offsets[i];
+				GroupResult& res = results[i];
+
+				const int refined = emit_group(group, group_size, res.bounds, depth);
+				if (res.stuck) continue;
+
+				const u32 index_offset = pending_indices.size();
+				appendSlice(pending_indices, res.indices.data(), res.indices.size());
+				for (DagCluster& c : res.clusters) {
+					c.index_offset += index_offset;
+					c.refined = refined;
+					pending.push(c);
+				}
+			}
+		}
+		else {
+			// dilateBorders mutates dilated_positions in place, so emit_group must copy pre-dilation positions before dilation runs
+			jobs::forEach(group_count, 1, [&](u32 from, u32 to) {
+				for (u32 i = from; i < to; ++i) {
+					const DagCluster* group = clusters.data() + group_offsets[i];
+					const u32 group_size = group_offsets[i + 1] - group_offsets[i];
+					GroupResult& res = results[i];
+
+					for (u32 j = 0; j < group_size; ++j) {
+						appendSlice(res.merged, cluster_indices.data() + group[j].index_offset, group[j].index_count);
+					}
+
+					const u32 target_size = u32((res.merged.size() / 3) * SIMPLIFY_RATIO) * 3;
+					DagBounds bounds = dagBoundsMerge(&group[0].bounds, group_size, sizeof(DagCluster));
+
+					float error = 0.f;
+					{
+						PROFILE_BLOCK("clod simplify");
+						simplifyGroup(res.simplified, cluster_positions, vertex_count, mesh_normals, res.merged, locks, target_size, &error);
+					}
+
+					if (res.simplified.size() > res.merged.size() * SIMPLIFY_THRESHOLD) {
+						bounds.error = FLT_MAX;
+						res.bounds = bounds;
+						res.stuck = true;
+						continue;
+					}
+
+					bounds.error = maximum(bounds.error, error);
+					res.bounds = bounds;
+					res.stuck = false;
+				}
+			});
+
+			for (u32 i = 0; i < group_count; ++i) {
+				const DagCluster* group = clusters.data() + group_offsets[i];
+				const u32 group_size = group_offsets[i + 1] - group_offsets[i];
+				results[i].refined = emit_group(group, group_size, results[i].bounds, depth);
+			}
+
+			jobs::forEach(group_count, 1, [&](u32 from, u32 to) {
+				Array<u64> dilate_table(allocator);
+				for (u32 i = from; i < to; ++i) {
+					GroupResult& res = results[i];
+					if (res.stuck) continue;
+
+					{
+						PROFILE_BLOCK("clod dilate borders");
+						dilateBorders(dilated_positions.begin(), res.merged, res.simplified, locks, remap, res.bounds, dilate_offsets, dilate_table);
+					}
+
+					{
+						PROFILE_BLOCK("clod clusterize group");
+						clusterize(res.clusters, res.indices, cluster_positions, vertex_count, res.simplified.data(), res.simplified.size(), res.refined);
+					}
+
+					for (DagCluster& c : res.clusters) c.bounds = res.bounds;
+				}
+			});
+
+			for (u32 i = 0; i < group_count; ++i) {
+				GroupResult& res = results[i];
+				if (res.stuck) continue;
+
+				const u32 index_offset = pending_indices.size();
+				appendSlice(pending_indices, res.indices.data(), res.indices.size());
+				for (DagCluster& c : res.clusters) {
+					c.index_offset += index_offset;
+					pending.push(c);
+				}
+			}
+		}
+
+		clusters.swap(pending);
+		cluster_indices.swap(pending_indices);
+		depth++;
+	}
+
+	if (!clusters.empty()) {
+		ASSERT(clusters.size() == 1);
+		DagBounds bounds = clusters[0].bounds;
+		bounds.error = FLT_MAX;
+		emit_group(clusters.data(), clusters.size(), bounds, depth);
+	}
+
 	if (!leaves_done) {
 		out.leaf_index_count = out.indices.size();
 		out.leaf_cluster_count = out.clusters.size();

@@ -1,3 +1,4 @@
+#include "core/job_system.h"
 #include "core/profiler.h"
 #include "renderer/model.h"
 #include "voxels.h"
@@ -80,15 +81,16 @@ bool Voxels::sample(i32 x, i32 y, i32 z, u8* out) const {
 }
 
 bool Voxels::castRay(Vec3 p, Vec3 d) const {
-	Vec3 s = Vec3(m_grid_resolution);
-	auto sample = [&](Vec3 p){
-		IVec3 i(p);
-		return m_voxels[i.x + (i.y + i.z * m_grid_resolution.y) * m_grid_resolution.x];
-	};
+	const u8* voxels = m_voxels.data();
+	const i32 rx = m_grid_resolution.x;
+	const i32 ry = m_grid_resolution.y;
+	const float sx = (float)rx;
+	const float sy = (float)ry;
+	const float sz = (float)m_grid_resolution.z;
 
 	p += d;
-	while (p.x > 0 && p.y > 0 && p.z > 0 && p.x < s.x  && p.y < s.y && p.z < s.z) {
-		if (sample(p)) return true;
+	while (p.x > 0 && p.y > 0 && p.z > 0 && p.x < sx && p.y < sy && p.z < sz) {
+		if (voxels[(i32)p.x + ((i32)p.y + (i32)p.z * ry) * rx]) return true;
 		p += d;
 	}
 	return false;
@@ -120,52 +122,67 @@ float Voxels::computeAO(const Vec3& p, u32 ray_count) {
 }
 
 void Voxels::computeAO(u32 ray_count) {
-	m_ao.resize(m_grid_resolution.x * m_grid_resolution.y * m_grid_resolution.z);
-	for (i32 z = 0; z < m_grid_resolution.z; ++z) {
-		for (i32 y = 0; y < m_grid_resolution.y; ++y) {
-			for (i32 x = 0; x < m_grid_resolution.x; ++x) {
-				float ao = 1;
-				for (u32 d = 0; d < ray_count; ++d) {
-					Vec3 dir = Vec3(randFloat(), randFloat(), randFloat()) * 2.f - 1.f;
-					dir /= maximum(fabsf(dir.x), fabsf(dir.y), fabsf(dir.z));
-					Vec3 p((float)x + 0.5f, (float)y + 0.5f, (float)z + 0.5f);
-					p += dir;
-					if (castRay(p, dir)) {
-						ao -= 1.f / ray_count;
+	PROFILE_FUNCTION();
+	const i32 rx = m_grid_resolution.x;
+	const i32 ry = m_grid_resolution.y;
+	const i32 rz = m_grid_resolution.z;
+	m_ao.resize(rx * ry * rz);
+	const float inv_ray_count = 1.f / ray_count;
+
+	jobs::forEach(rz, 1, [&](i32 from, i32 to) {
+		for (i32 z = from; z < to; ++z) {
+			RandomGenerator rng((u32(z) + 1u) * 521288629u | 1u, (u32(z) + 1u) * 362436069u | 1u);
+			for (i32 y = 0; y < ry; ++y) {
+				for (i32 x = 0; x < rx; ++x) {
+					float ao = 1.f;
+					for (u32 d = 0; d < ray_count; ++d) {
+						Vec3 dir = Vec3(rng.randFloat(), rng.randFloat(), rng.randFloat()) * 2.f - 1.f;
+						const float m = maximum(fabsf(dir.x), fabsf(dir.y), fabsf(dir.z));
+						if (m < 1e-6f) continue;
+						dir /= m;
+						Vec3 p((float)x + 0.5f, (float)y + 0.5f, (float)z + 0.5f);
+						p += dir;
+						if (castRay(p, dir)) {
+							ao -= inv_ray_count;
+						}
 					}
+					m_ao[x + (y + z * ry) * rx] = ao;
 				}
-				m_ao[x + (y + z * m_grid_resolution.y) * m_grid_resolution.x] = ao;
 			}
 		}
-	}
+	});
 }
 
 void Voxels::blurAO() {
+	PROFILE_FUNCTION();
 	Array<float> blurred(m_allocator);
 	blurred.resize(m_ao.size());
+	const i32 rx = m_grid_resolution.x;
+	const i32 ry = m_grid_resolution.y;
+	const i32 rz = m_grid_resolution.z;
 	auto sampleAO = [&](i32 x, i32 y, i32 z){
-		x = clamp(x, 0, m_grid_resolution.x - 1);
-		y = clamp(y, 0, m_grid_resolution.y - 1);
-		z = clamp(z, 0, m_grid_resolution.z - 1);
-		const u32 idx = x + (y + z * m_grid_resolution.y) * m_grid_resolution.x;
-		return m_ao[idx];
+		x = clamp(x, 0, rx - 1);
+		y = clamp(y, 0, ry - 1);
+		z = clamp(z, 0, rz - 1);
+		return m_ao[x + (y + z * ry) * rx];
 	};
-	for (i32 z = 0; z < m_grid_resolution.z; ++z) {
-		for (i32 y = 0; y < m_grid_resolution.y; ++y) {
-			for (i32 x = 0; x < m_grid_resolution.x; ++x) {
-				float v = 0;
-				for (i32 c = -1; c <= 1; ++c) {
-					for (i32 b = -1; b <= 1; ++b) {
-						for (i32 a = -1; a <= 1; ++a) {
-							v += sampleAO(x + a, y + b, z + c);
+	jobs::forEach(rz, 1, [&](i32 from, i32 to) {
+		for (i32 z = from; z < to; ++z) {
+			for (i32 y = 0; y < ry; ++y) {
+				for (i32 x = 0; x < rx; ++x) {
+					float v = 0;
+					for (i32 c = -1; c <= 1; ++c) {
+						for (i32 b = -1; b <= 1; ++b) {
+							for (i32 a = -1; a <= 1; ++a) {
+								v += sampleAO(x + a, y + b, z + c);
+							}
 						}
 					}
+					blurred[x + (y + z * ry) * rx] = v / 9.f;
 				}
-				const u32 idx = x + (y + z * m_grid_resolution.y) * m_grid_resolution.x;
-				blurred[idx] = v / 9.f;
 			}
 		}
-	}
+	});
 	m_ao = blurred.move();
 }
 
@@ -185,42 +202,47 @@ void Voxels::beginRaster(AABB aabb, u32 max_res) {
 }
 
 void Voxels::raster(const Vec3& p0, const Vec3& p1, const Vec3& p2) {
-	auto to_grid = [&](const Vec3& p){
-		return IVec3((p - m_aabb.min) / m_voxel_size + Vec3(0.5f));
-	};
+	const float inv_voxel_size = 1.f / m_voxel_size;
+	const Vec3 mn = minimum(p0, minimum(p1, p2));
+	const Vec3 mx = maximum(p0, maximum(p1, p2));
 
-	auto from_grid = [&](const IVec3& p){
-		return Vec3(p) * m_voxel_size + Vec3(0.5f * m_voxel_size) + m_aabb.min;
-	};
+	i32 min_x = (i32)floorf((mn.x - m_aabb.min.x) * inv_voxel_size);
+	i32 min_y = (i32)floorf((mn.y - m_aabb.min.y) * inv_voxel_size);
+	i32 min_z = (i32)floorf((mn.z - m_aabb.min.z) * inv_voxel_size);
+	i32 max_x = (i32)floorf((mx.x - m_aabb.min.x) * inv_voxel_size);
+	i32 max_y = (i32)floorf((mx.y - m_aabb.min.y) * inv_voxel_size);
+	i32 max_z = (i32)floorf((mx.z - m_aabb.min.z) * inv_voxel_size);
 
-	auto intersect = [&](const Vec3& p0, const Vec3& p1, const Vec3& p2, IVec3 voxel){
-		Vec3 center = from_grid(voxel);
-		Vec3 half(0.5f * m_voxel_size);
-		return testAABBTriangleCollision(AABB(center - half, center + half), p0, p1, p2);
-	};
+	const i32 rx = m_grid_resolution.x;
+	const i32 ry = m_grid_resolution.y;
+	const i32 rz = m_grid_resolution.z;
+	if (max_x < 0 || max_y < 0 || max_z < 0 || min_x >= rx || min_y >= ry || min_z >= rz) return;
 
-	auto setVoxel = [&](i32 i, i32 j, i32 k, u8 value){
-		if (i < 0 || j < 0 || k < 0) return;
-		if (i >= m_grid_resolution.x) return;
-		if (j >= m_grid_resolution.y) return;
-		if (k >= m_grid_resolution.z) return;
+	min_x = maximum(min_x, 0);
+	min_y = maximum(min_y, 0);
+	min_z = maximum(min_z, 0);
+	max_x = minimum(max_x, rx - 1);
+	max_y = minimum(max_y, ry - 1);
+	max_z = minimum(max_z, rz - 1);
 
-		m_voxels[i + j * (m_grid_resolution.x) + k * (m_grid_resolution.x * m_grid_resolution.y)] = value;
-	};
+	u8* voxels = m_voxels.getMutableData();
+	// fast path: whole triangle lies inside a single voxel
+	if (min_x == max_x && min_y == max_y && min_z == max_z) {
+		voxels[min_x + (min_y + min_z * ry) * rx] = 1;
+		return;
+	}
 
-	AABB aabb;
-	aabb.min = aabb.max = p0;
-	aabb.addPoint(p1);
-	aabb.addPoint(p2);
-
-	const IVec3 ming = to_grid(aabb.min - Vec3(m_voxel_size));
-	const IVec3 maxg = to_grid(aabb.max);
-
-	for (i32 k = ming.z; k <= maxg.z; ++k) {
-		for (i32 j = ming.y; j <= maxg.y; ++j) {
-			for (i32 i = ming.x; i <= maxg.x; ++i) {
-				if (intersect(p0, p1, p2, IVec3(i, j, k))) {
-					setVoxel(i, j, k, 1);
+	const Vec3 half(0.5f * m_voxel_size);
+	for (i32 k = min_z; k <= max_z; ++k) {
+		const float cz = m_aabb.min.z + (k + 0.5f) * m_voxel_size;
+		for (i32 j = min_y; j <= max_y; ++j) {
+			const float cy = m_aabb.min.y + (j + 0.5f) * m_voxel_size;
+			const i32 row = (j + k * ry) * rx;
+			for (i32 i = min_x; i <= max_x; ++i) {
+				if (voxels[i + row]) continue;
+				const Vec3 center(m_aabb.min.x + (i + 0.5f) * m_voxel_size, cy, cz);
+				if (testAABBTriangleCollision(AABB(center - half, center + half), p0, p1, p2)) {
+					voxels[i + row] = 1;
 				}
 			}
 		}

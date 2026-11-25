@@ -280,6 +280,82 @@ struct JobsGroup {
 	}
 };
 
+// Counts of the GPU cluster culling (the selected and occluded lists, the work queues), read back some frames after the cull and pushed to the profiler.
+// One instance for each read, it deletes itself in the callback, which runs on the render thread (with an empty span if the read failed).
+struct SceneStatsRead {
+	enum Kind : u32 { SELECTED, OCCLUDED, CULL };								// what is read: selected count, occluded count, the counters of the cull (COUNTER_* of gpu_scene_layout.hlsli)
+	enum Stat : u32 { STAT_SELECTED, STAT_OCCLUDED, STAT_CANDIDATES, STAT_TREE, STAT_CHUNKS, STAT_COUNT };
+	enum View : u32 { VIEW_MAIN, VIEW_SHADOW, VIEW_SHADOW_0, VIEW_SHADOW_3 = VIEW_SHADOW_0 + 3, VIEW_MAIN_POST, VIEW_COUNT };
+
+	static View getView(bool post, bool is_shadow, i32 shadow_slice) {
+		if (post) return VIEW_MAIN_POST;
+		if (!is_shadow) return VIEW_MAIN;
+		if (shadow_slice < 0) return VIEW_SHADOW;
+		return View(VIEW_SHADOW_0 + minimum((u32)shadow_slice, 3u));
+	}
+
+	static void pushStat(Stat stat, View view, u32 value) {
+		#define VIEW_NAMES(p) { p " (main)", p " (shadow)", p " (shadow 0)", p " (shadow 1)", p " (shadow 2)", p " (shadow 3)", p " (main post)" }
+		static const char* const names[STAT_COUNT][VIEW_COUNT] = {
+			VIEW_NAMES("Selected clusters"), VIEW_NAMES("Occluded clusters"), VIEW_NAMES("Candidate clusters"), VIEW_NAMES("Tree items"), VIEW_NAMES("Chunk items")
+		};
+		#undef VIEW_NAMES
+		static u32 ids[STAT_COUNT][VIEW_COUNT];
+		static bool created[STAT_COUNT][VIEW_COUNT] = {};
+		if (!created[stat][view]) {
+			ids[stat][view] = profiler::createCounter(names[stat][view], 0);
+			created[stat][view] = true;
+		}
+		profiler::pushCounter(ids[stat][view], (float)value);
+	}
+
+	// how much a list went over its capacity (the counters count what was appended, the entries beyond the capacity were dropped), zero if all is fine
+	static void pushOverflow(const char* name, u32 count, u32 capacity) {
+		static const char* names[8];
+		static u32 ids[8];
+		u32 i = 0;
+		while (i < 8 && names[i] && names[i] != name) ++i;
+		if (i == 8) return;
+		if (!names[i]) {
+			names[i] = name;
+			ids[i] = profiler::createCounter(name, 0);
+		}
+		profiler::pushCounter(ids[i], count > capacity ? (float)(count - capacity) : 0.f);
+	}
+
+	void onRead(Span<const u8> data) {
+		const u32 words = kind == CULL ? 5 : 1;
+		if (data.length() >= words * sizeof(u32)) {
+			u32 v[5];
+			memcpy(v, data.begin(), words * sizeof(u32));
+			switch (kind) {
+				case SELECTED:
+					pushStat(STAT_SELECTED, view, v[0]);
+					pushOverflow("Selected clusters overflow", v[0], capacity0);
+					break;
+				case OCCLUDED:
+					pushStat(STAT_OCCLUDED, view, v[0]);
+					pushOverflow("Occluded clusters overflow", v[0], capacity0);
+					break;
+				case CULL:
+					pushStat(STAT_CANDIDATES, view, v[4]);		// COUNTER_CANDIDATE_CLUSTERS
+					pushStat(STAT_TREE, view, v[1]);			// COUNTER_TREE
+					pushStat(STAT_CHUNKS, view, v[2]);			// COUNTER_CHUNK
+					pushOverflow("Tree items overflow", v[1], capacity0);
+					pushOverflow("Chunk items overflow", v[2], capacity1);
+					break;
+			}
+		}
+		LUMIX_DELETE(*allocator, this);
+	}
+
+	IAllocator* allocator;
+	Kind kind;
+	View view;
+	u32 capacity0;
+	u32 capacity1;
+};
+
 struct PipelineImpl final : Pipeline {
 	struct Bucket {
 		Bucket(Renderer& renderer) 
@@ -442,13 +518,13 @@ struct PipelineImpl final : Pipeline {
 		gpu::RWBindlessHandle selected;
 		gpu::RWBindlessHandle counts;
 		i32 cam_p[3];			// the camera in the fixed point of the GPU scene
-		u32 tree_groups;		// groups of the dispatch of the trees at most, each has a slice of the scratch buffer
+		u32 node_pass;			// 0 or 1: which ping-pong node queue is read in TREE_ARGS / TREE_STEP
 		float cam_frac[3];
 		gpu::BindlessHandle meshes;
 		gpu::BindlessHandle instances;	// the model instances of the GPU scene
 		gpu::BindlessHandle chunks;		// the chunks of instanced models
 		gpu::BindlessHandle cluster_data;	// the buffer with clusters and nodes of all meshes
-		u32 scratch_slice;		// u32 of the slice of a group in the scratch buffer: two lists of the largest mesh
+		u32 node_queue_capacity;	// max uint2 entries in each of the two ping-pong node queues in scratch
 		gpu::RWBindlessHandle feedback;	// streaming of clusters, see Renderer::getClusterFeedbackBuffer
 		gpu::RWBindlessHandle occluded;	// clusters hidden by pass 1 HZB, re-tested by POST_OCCLUDED
 		u32 feedback_capacity;			// groups in the feedback, 0: no feedback
@@ -604,7 +680,6 @@ struct PipelineImpl final : Pipeline {
 		stream.destroy(m_cube_vb);
 		if (m_scene_cull_counter) stream.destroy(m_scene_cull_counter);
 		if (m_scene_cull_args) stream.destroy(m_scene_cull_args);
-		if (m_scene_flat_items) stream.destroy(m_scene_flat_items);
 		if (m_scene_tree_items) stream.destroy(m_scene_tree_items);
 		if (m_scene_chunk_items) stream.destroy(m_scene_chunk_items);
 		if (m_scene_selected) stream.destroy(m_scene_selected);
@@ -2199,8 +2274,8 @@ struct PipelineImpl final : Pipeline {
 		m_renderer.getClusterScratchBuffer();
 		m_renderer.getClusterCommandsBuffer();
 
-		// the counters of the work items: [1] flat items, [2] tree items
-		const Renderer::MemRef counter_mem = { 16, nullptr, false };
+		// the counters of the work items and tree/cluster queues (COUNTER_COUNT = 6 u32s, 32 bytes aligned)
+		const Renderer::MemRef counter_mem = { 32, nullptr, false };
 		m_scene_cull_counter = m_renderer.createBuffer(counter_mem, gpu::BufferFlags::SHADER_BUFFER, "gpu scene cull counter");
 		// the groups of the indirect dispatches: model instances (0), flat items (16), tree items (32), variants (48), instances of chunks (64)
 		const Renderer::MemRef args_mem = { 80, nullptr, false };
@@ -2210,13 +2285,12 @@ struct PipelineImpl final : Pipeline {
 	// Lists of the work of clusters that the culling of instances generates, 16 bytes each. Buffers are created into the draw stream of the renderer
 	// in the order of calls, so this must be called when the frame is set up, not from a job (the job would use the buffers before they exist).
 	void ensureSceneWorkBuffers() {
-		if (m_scene_flat_items) return;
+		if (m_scene_tree_items) return;
 		const bool large = m_type == PipelineType::SCENE_VIEW || m_type == PipelineType::GAME_VIEW;	// previews show one model
 		m_scene_work_items = large ? SCENE_WORK_ITEMS : SCENE_WORK_ITEMS_SMALL;
 		m_scene_selected_capacity = large ? SCENE_SELECTED : SCENE_SELECTED_SMALL;
 		m_scene_draw_slots = large ? SCENE_DRAW_SLOTS : SCENE_DRAW_SLOTS_SMALL;
 		const Renderer::MemRef items_mem = { m_scene_work_items * 16, nullptr, false };
-		m_scene_flat_items = m_renderer.createBuffer(items_mem, gpu::BufferFlags::SHADER_BUFFER, "gpu scene flat items");
 		m_scene_tree_items = m_renderer.createBuffer(items_mem, gpu::BufferFlags::SHADER_BUFFER, "gpu scene tree items");
 		m_scene_chunk_capacity = large ? SCENE_CHUNK_ITEMS : SCENE_CHUNK_ITEMS_SMALL;
 		const Renderer::MemRef chunk_items_mem = { m_scene_chunk_capacity * 16, nullptr, false };
@@ -2259,7 +2333,8 @@ struct PipelineImpl final : Pipeline {
 		gpu::BindlessHandle cluster_data;
 		u32 cluster_cmd_capacity;
 		u32 depth_bin_groups;
-		u32 padding[3];
+		gpu::RWBindlessHandle scratch;
+		u32 padding[2];
 	};
 	static_assert(sizeof(SceneVariantsUniforms) == 128);
 
@@ -2386,7 +2461,7 @@ struct PipelineImpl final : Pipeline {
 		const gpu::BufferHandle set_table = res.set_table.buffer;
 		const gpu::BufferHandle variant_table = res.variant_table.buffer;
 		if (!model_table || !mesh_table || !lod_table || !set_table || !variant_table) return;
-		if (!m_scene_flat_items || !m_scene_tree_items || !m_scene_chunk_items || !m_scene_selected || !m_scene_occluded || !m_scene_counters || !m_scene_commands || !m_scene_out) return;	// created by ensureSceneWorkBuffers when the frame is set up
+		if (!m_scene_tree_items || !m_scene_chunk_items || !m_scene_selected || !m_scene_occluded || !m_scene_counters || !m_scene_commands || !m_scene_out) return;	// created by ensureSceneWorkBuffers when the frame is set up
 		const gpu::BufferHandle cluster_scratch = m_renderer.getClusterScratchBuffer();
 		const gpu::BufferHandle cluster_commands = m_renderer.getClusterCommandsBuffer();
 		if (!cluster_scratch || !cluster_commands) return;
@@ -2409,14 +2484,7 @@ struct PipelineImpl final : Pipeline {
 		// the model instances are drawn from the camera of the view: their positions are relative to it, the culling adds the difference of the cameras (u_cull_offset)
 		const bool frozen = !entities && !view_cp.is_shadow && m_cluster_frozen;
 		const CameraParams& cull_cp = frozen ? m_cluster_frozen_cp : view_cp;
-		// the dispatch of the trees has a fixed number of groups that take the items one after another, each has a slice of the scratch buffer for the two lists of the largest mesh
-		const u32 scratch_slice = maximum(2 * getMaxNodeCount(res.clusters), 1u);
-		const u32 tree_groups = minimum((u32)SCENE_TREE_GROUPS, m_renderer.getClusterScratchCapacity() / scratch_slice);
-		if (tree_groups == 0) {
-			static bool reported = false;
-			if (!reported) logError("GPU scene: a mesh has more nodes than the scratch buffer of the clusters can hold, models with clusters are not drawn");
-			reported = true;
-		}
+		const u32 node_queue_capacity = m_renderer.getClusterScratchCapacity() / 8; // uint2 entries in each of the two ping-pong node queues (remaining half is the candidate cluster queue)
 		const GPUSceneView scene_view = makeGPUSceneView(view_cp.pos);
 		const GPUSceneView cull_view = frozen ? makeGPUSceneView(cull_cp.pos) : scene_view;
 		const bool is_shadow = view_cp.is_shadow;
@@ -2445,7 +2513,7 @@ struct PipelineImpl final : Pipeline {
 				u32 model_count;
 				gpu::BindlessHandle models;			// GPUClusterModel[]
 				gpu::BindlessHandle meshes;			// GPUClusterMesh[]
-				gpu::RWBindlessHandle flat_items;
+				u32 padding0;
 				gpu::RWBindlessHandle tree_items;
 				u32 item_capacity;
 				u32 clear_occluded;
@@ -2462,7 +2530,7 @@ struct PipelineImpl final : Pipeline {
 				gpu::BindlessHandle chunk_bounds;	// GPUSceneBounds[], the chunks of instanced models (gpu_scene_chunks.h)
 				gpu::BindlessHandle chunks;			// GPUSceneChunk[]
 				u32 chunk_slots;
-				u32 tree_groups;		// groups of the dispatch of the trees of nanite.hlsl at most
+				u32 padding;
 			};
 			static_assert(sizeof(Uniforms) == 240);
 			Uniforms ub;
@@ -2484,7 +2552,6 @@ struct PipelineImpl final : Pipeline {
 			ub.chunks = gpu::getBindlessHandle(scene_chunks.chunks.buffer);
 			ub.chunk_slots = scene_chunks.next_slot;
 			ub.meshes = gpu::getBindlessHandle(mesh_table);
-			ub.flat_items = gpu::getRWBindlessHandle(m_scene_flat_items);
 			ub.tree_items = gpu::getRWBindlessHandle(m_scene_tree_items);
 			ub.item_capacity = m_scene_work_items;
 			ub.clear_occluded = clear_occluded ? 1 : 0;
@@ -2493,7 +2560,6 @@ struct PipelineImpl final : Pipeline {
 			ub.chunk_items = gpu::getRWBindlessHandle(m_scene_chunk_items);
 			ub.chunk_capacity = m_scene_chunk_capacity;
 			ub.selected_capacity = m_scene_selected_capacity;
-			ub.tree_groups = tree_groups;
 			if (entities) {
 				ub.filter = gpu::getBindlessHandle(entities->filter.buffer);
 				ub.filter_offset = entities->filter.offset;
@@ -2519,7 +2585,6 @@ struct PipelineImpl final : Pipeline {
 			stream.barrier(model_table, gpu::BarrierType::READ);
 			stream.barrier(mesh_table, gpu::BarrierType::READ);
 			stream.barrier(lod_table, gpu::BarrierType::READ);
-			stream.barrier(m_scene_flat_items, gpu::BarrierType::WRITE);
 			stream.barrier(m_scene_tree_items, gpu::BarrierType::WRITE);
 			stream.barrier(m_scene_chunk_items, gpu::BarrierType::WRITE);
 			stream.barrier(m_scene_cull_counter, gpu::BarrierType::WRITE);
@@ -2538,7 +2603,6 @@ struct PipelineImpl final : Pipeline {
 			stream.dispatchIndirect(0);
 			stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
 			stream.memoryBarrier(m_scene_cull_counter);
-			stream.memoryBarrier(m_scene_flat_items);
 			stream.memoryBarrier(m_scene_tree_items);
 			stream.memoryBarrier(m_scene_chunk_items);
 			stream.memoryBarrier(m_scene_selected);
@@ -2563,7 +2627,6 @@ struct PipelineImpl final : Pipeline {
 				stream.dispatchIndirect(64);
 				stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
 				stream.memoryBarrier(m_scene_cull_counter);
-				stream.memoryBarrier(m_scene_flat_items);
 				stream.memoryBarrier(m_scene_tree_items);
 				stream.memoryBarrier(m_scene_selected);
 			}
@@ -2602,8 +2665,8 @@ struct PipelineImpl final : Pipeline {
 		cu.attribute_weight = maximum(m_cluster_attribute_weight, 0.f);
 		cu.scratch = gpu::getRWBindlessHandle(cluster_scratch);
 		cu.scratch_size = m_renderer.getClusterScratchCapacity();	// in u32
-		cu.tree_groups = tree_groups;
-		cu.scratch_slice = scratch_slice;
+		cu.node_pass = 0;
+		cu.node_queue_capacity = node_queue_capacity;
 		cu.item_capacity = m_scene_work_items;			// of the lists, the counts are in counters
 		cu.tree_depth = getMaxTreeDepth(res.clusters);
 		memcpy(cu.cam_p, scene_view.cam_p, sizeof(cu.cam_p));
@@ -2659,23 +2722,60 @@ struct PipelineImpl final : Pipeline {
 			stream.memoryBarrier(m_scene_selected);
 		}
 		else {
-			stream.barrier(m_scene_flat_items, gpu::BarrierType::READ);
 			stream.barrier(m_scene_tree_items, gpu::BarrierType::READ);
 			stream.barrier(m_scene_cull_counter, gpu::BarrierType::WRITE);
 			stream.barrier(cluster_scratch, gpu::BarrierType::WRITE);
 			stream.bindIndirectBuffer(m_scene_cull_args);
 
-			cu.items = gpu::getBindlessHandle(m_scene_flat_items);
-			TransientSlice cu_slice = alloc(m_renderer.getUniformPool(), &cu, sizeof(cu));
-			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, cu_slice.buffer, cu_slice.offset, sizeof(cu));
-			stream.useProgram(m_cluster_shader->getProgram(define("FLAT")));
-			stream.dispatchIndirect(16);
-
 			cu.items = gpu::getBindlessHandle(m_scene_tree_items);
-			cu_slice = alloc(m_renderer.getUniformPool(), &cu, sizeof(cu));
-			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, cu_slice.buffer, cu_slice.offset, sizeof(cu));
-			stream.useProgram(m_cluster_shader->getProgram(0));
-			stream.dispatchIndirect(32);
+			cu.node_pass = 0;
+			const TransientSlice cu_tree_slice[3] = {
+				alloc(m_renderer.getUniformPool(), &cu, sizeof(cu)),
+				[&]() { cu.node_pass = 1; return alloc(m_renderer.getUniformPool(), &cu, sizeof(cu)); }(),
+				[&]() { cu.node_pass = 2; return alloc(m_renderer.getUniformPool(), &cu, sizeof(cu)); }()
+			};
+
+			if (cu.tree_depth > 0) {
+				const u32 args_define = define("ARGS");
+				const u32 pass0_define = define("PASS0");
+
+				// Level 0 (roots): 1 thread per (instance, mesh) item
+				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, cu_tree_slice[0].buffer, cu_tree_slice[0].offset, sizeof(cu));
+				stream.useProgram(m_cluster_shader->getProgram(0));
+				stream.dispatchIndirect(32);
+				stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
+				stream.memoryBarrier(cluster_scratch);
+				stream.memoryBarrier(m_scene_cull_counter);
+
+				// Levels 1 .. tree_depth - 1: breadth-first (instance, node) traversal across global ping-pong queues
+				for (u32 level = 1; level < cu.tree_depth; ++level) {
+					const u32 cur = (level - 1) & 1;
+					stream.barrier(m_scene_cull_args, gpu::BarrierType::WRITE);
+					stream.bindUniformBuffer(UniformBuffer::DRAWCALL, cu_tree_slice[cur].buffer, cu_tree_slice[cur].offset, sizeof(cu));
+					stream.useProgram(m_cluster_shader->getProgram(args_define));
+					stream.dispatch(1, 1, 1);
+					stream.memoryBarrier(m_scene_cull_args);
+					stream.memoryBarrier(m_scene_cull_counter);
+
+					stream.bindIndirectBuffer(m_scene_cull_args);
+					stream.useProgram(m_cluster_shader->getProgram(pass0_define));
+					stream.dispatchIndirect(32);
+					stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
+					stream.memoryBarrier(cluster_scratch);
+					stream.memoryBarrier(m_scene_cull_counter);
+				}
+
+				// Leaf clusters: 1 thread per candidate (instance, cluster)
+				stream.barrier(m_scene_cull_args, gpu::BarrierType::WRITE);
+				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, cu_tree_slice[2].buffer, cu_tree_slice[2].offset, sizeof(cu));
+				stream.useProgram(m_cluster_shader->getProgram(args_define));
+				stream.dispatch(1, 1, 1);
+				stream.memoryBarrier(m_scene_cull_args);
+
+				stream.bindIndirectBuffer(m_scene_cull_args);
+				stream.useProgram(m_cluster_shader->getProgram(args_define | pass0_define));
+				stream.dispatchIndirect(32);
+			}
 
 			stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
 			stream.memoryBarrier(m_scene_selected);
@@ -2683,6 +2783,23 @@ struct PipelineImpl final : Pipeline {
 			stream.memoryBarrier(cluster_scratch);
 		}
 		stream.endProfileBlock();	// cluster cull
+
+		// the counts of the cull are read back some frames later and pushed to the profiler (SceneStatsRead), the counters are at 0 in their buffers (gpu_scene_layout.hlsli)
+		{
+			const SceneStatsRead::View stats_view = SceneStatsRead::getView(post, is_shadow, view_cp.shadow_slice);
+			auto read_stat = [&](SceneStatsRead::Kind kind, gpu::BufferHandle buffer, u32 words, u32 capacity0, u32 capacity1) {
+				SceneStatsRead* r = LUMIX_NEW(m_allocator, SceneStatsRead);
+				r->allocator = &m_allocator;
+				r->kind = kind;
+				r->view = stats_view;
+				r->capacity0 = capacity0;
+				r->capacity1 = capacity1;
+				stream.readBuffer(buffer, 0, words * sizeof(u32), makeDelegate<&SceneStatsRead::onRead>(r));
+			};
+			read_stat(SceneStatsRead::SELECTED, m_scene_selected, 1, m_scene_selected_capacity, 0);
+			if (!post) read_stat(SceneStatsRead::CULL, m_scene_cull_counter, 5, m_scene_work_items, m_scene_chunk_capacity);	// the post pass does not touch the counters
+			if (clear_occluded) read_stat(SceneStatsRead::OCCLUDED, m_scene_occluded, 1, m_scene_selected_capacity, 0);
+		}
 
 		// Sorts the selected clusters and meshes of the view into variants on the GPU (gpu_scene_variants.hlsl): the GPU counts, assigns the slots of the variants and writes the
 		// instance data of the draws and their commands. It also records the draws of the groups the view draws into the buckets of the view, one indirect call with
@@ -2703,6 +2820,7 @@ struct PipelineImpl final : Pipeline {
 			draw_ub.cluster_data = gpu::getBindlessHandle(m_renderer.getClusterDataBuffer());
 			draw_ub.cluster_cmd_capacity = cluster_cmds_capacity;
 			draw_ub.depth_bin_groups = !is_shadow ? cluster_group_count : 0;
+			draw_ub.scratch = gpu::getRWBindlessHandle(cluster_scratch);
 			draw_ub.counters = gpu::getRWBindlessHandle(m_scene_counters);
 			draw_ub.commands = gpu::getRWBindlessHandle(m_scene_commands);
 			draw_ub.meshes = gpu::getBindlessHandle(mesh_table);
@@ -2735,6 +2853,7 @@ struct PipelineImpl final : Pipeline {
 			stream.barrier(scene_chunks.chunks.buffer, gpu::BarrierType::READ);
 			stream.barrier(m_scene_selected, gpu::BarrierType::WRITE);
 			stream.barrier(m_scene_counters, gpu::BarrierType::WRITE);
+			stream.barrier(cluster_scratch, gpu::BarrierType::WRITE);
 			stream.barrier(m_scene_commands, gpu::BarrierType::WRITE);
 			stream.barrier(m_scene_out, gpu::BarrierType::WRITE);
 			stream.barrier(m_scene_cull_args, gpu::BarrierType::WRITE);
@@ -2752,6 +2871,7 @@ struct PipelineImpl final : Pipeline {
 			stream.dispatchIndirect(48);
 			stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
 			stream.memoryBarrier(m_scene_counters);
+			stream.memoryBarrier(cluster_scratch);
 
 			stream.useProgram(program("SCAN"));
 			stream.dispatch(1, 1, 1);
@@ -3971,8 +4091,7 @@ struct PipelineImpl final : Pipeline {
 	Shader* m_scene_cull_shader;									// counts the slots of the GPU scene inside a frustum, see runGPUSceneCulling
 	gpu::BufferHandle m_scene_cull_counter = gpu::INVALID_BUFFER;
 	gpu::BufferHandle m_scene_cull_args = gpu::INVALID_BUFFER;
-	gpu::BufferHandle m_scene_flat_items = gpu::INVALID_BUFFER;		// work items of clusters generated by the culling of instances, see gpu_scene_cull.hlsl
-	gpu::BufferHandle m_scene_tree_items = gpu::INVALID_BUFFER;
+	gpu::BufferHandle m_scene_tree_items = gpu::INVALID_BUFFER;		// work items of clusters generated by the culling of instances, see gpu_scene_cull.hlsl
 	gpu::BufferHandle m_scene_chunk_items = gpu::INVALID_BUFFER;	// visible chunks of instanced models, 64 instances for each item, see gpu_scene_cull.hlsl
 	u32 m_scene_chunk_capacity = 0;
 	gpu::BufferHandle m_scene_counters = gpu::INVALID_BUFFER;			// counters of the variants, see gpu_scene_variants.hlsl

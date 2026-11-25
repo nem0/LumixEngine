@@ -2,10 +2,9 @@
 #include "engine/shaders/gpu_scene_layout.hlsli"
 
 // Culls the model instances of the GPU scene (src/renderer/gpu_scene.h) by a frustum (the sphere of each) and generates the work of the culling of clusters (nanite.hlsl)
-// for what is inside: for each mesh with clusters of the model, one item (mesh, slot, first cluster, instance) per group of 64 clusters of a flat mesh, or one item of
-// a mesh with a tree, appended to the list of flat or tree items. `instance` is 0 for a model instance that is drawn itself, otherwise the instance (+ 1) of a chunk of an
-// instanced model, its index in the buffer of the instances of the model instance.
-// Counters (u32): [1] flat items, [2] tree items, [3] chunk items (can be more than fit into the lists).
+// for what is inside: for each mesh with clusters of the model, one item (mesh, slot, 0, instance) is appended to the list of tree items.
+// `instance` is 0 for a model instance that is drawn itself, otherwise the instance (+ 1) of a chunk of an instanced model, its index in the buffer of the instances of the model instance.
+// Counters (u32): [1] tree items, [2] chunk items (can be more than fit into the lists).
 // The id of a model of a model instance (GPUSceneInstance::model) is an index in the table of models with clusters (GPUClusterModel, gpu_cluster_models.h), or, with the bit
 // MODEL_LOD_BIT, in the table of models without clusters (GPULodModel, gpu_lod_models.h).
 // A model without clusters has no work of clusters: its LOD is chosen by the distance to u_lod_ref, and each mesh of the LOD is appended to the
@@ -38,8 +37,8 @@ cbuffer UniformData : register(b4) {
 	uint u_model_count;		// models with clusters
 	uint u_models;			// bindless, GPUClusterModel[], 8 bytes
 	uint u_meshes;			// bindless, GPUClusterMesh[], 32 bytes
-	uint u_flat_items;		// rw bindless, 16 bytes: mesh, slot, first cluster, instance
-	uint u_tree_items;		// rw bindless, the same
+	uint u_padding0;
+	uint u_tree_items;		// rw bindless, 16 bytes: mesh, slot, 0, instance
 	uint u_item_capacity;	// of each list
 	uint u_clear_occluded;	// 1 in the first pass of occlusion culling: PASS0 clears u_occluded
 	uint u_selected;		// rw bindless, the list of selected clusters of nanite.hlsl
@@ -55,11 +54,9 @@ cbuffer UniformData : register(b4) {
 	uint u_chunk_bounds;	// bindless, 16 bytes per chunk, like u_bounds (CHUNK_CULL)
 	uint u_chunks;			// bindless, GPUSceneChunk[], 32 bytes: int3 p, model, instance buffer, first instance, instance count, float instance radius
 	uint u_chunk_slots;		// the chunks the tables have
-	uint u_tree_groups;		// groups of the dispatch of the trees of nanite.hlsl at most
+	uint u_padding;
 };
 
-#define FLAT_MAX_CLUSTERS 512		// GPUSceneConst::FLAT_MAX_CLUSTERS
-#define CLUSTER_THREADS 64
 #define GROUP_THREADS 64			// numthreads of main
 
 // A mesh of a model without clusters is drawn: the entry of the list of selected clusters (slot, mesh in its model, cluster, instance) with no cluster
@@ -112,14 +109,9 @@ void emit(RWByteAddressBuffer counter, uint model, uint slot, float3 center, uin
 		const uint2 meshes = bindless_buffers[u_models].Load2(model * CLUSTER_MODEL_STRIDE);	// first mesh, mesh count
 		for (uint mesh_index = 0; mesh_index < meshes.y; ++mesh_index) {
 			const uint mesh = meshes.x + mesh_index;
-			const uint cluster_count = bindless_buffers[u_meshes].Load(mesh * CLUSTER_MESH_STRIDE + CLUSTER_MESH_CLUSTER_COUNT);
-			const bool flat = cluster_count <= FLAT_MAX_CLUSTERS;
-			const uint count = flat ? (cluster_count + CLUSTER_THREADS - 1) / CLUSTER_THREADS : 1;	// groups of a flat mesh
-			for (uint group = 0; group < count; ++group) {
-				uint at;
-				counter.InterlockedAdd(flat ? COUNTER_FLAT : COUNTER_TREE, 1, at);
-				if (at < u_item_capacity) bindless_rw_buffers[flat ? u_flat_items : u_tree_items].Store4(at * ITEM_STRIDE, uint4(mesh, slot, flat ? group * CLUSTER_THREADS : 0, instance));
-			}
+			uint at;
+			counter.InterlockedAdd(COUNTER_TREE, 1, at);
+			if (at < u_item_capacity) bindless_rw_buffers[u_tree_items].Store4(at * ITEM_STRIDE, uint4(mesh, slot, 0, instance));
 		}
 	}
 }
@@ -135,10 +127,8 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_id : SV_GroupID, ui
 	#if defined ARGS
 		if (thread_id.x == 0) {
 			RWByteAddressBuffer args = bindless_rw_buffers[u_args];
-			const uint flat = min(counter.Load(COUNTER_FLAT), u_item_capacity);
 			const uint tree = min(counter.Load(COUNTER_TREE), u_item_capacity);
-			args.Store3(ARGS_FLAT, dispatchGroups(flat));
-			args.Store3(ARGS_TREE, dispatchGroups(min(tree, u_tree_groups)));	// a group takes more than one item if there are more
+			args.Store3(ARGS_TREE, dispatchGroups((tree + GROUP_THREADS - 1) / GROUP_THREADS));	// TREE_INIT: 1 thread per tree item
 		}
 	#elif defined CHUNK_INSTANCE_ARGS
 		if (thread_id.x == 0) {
