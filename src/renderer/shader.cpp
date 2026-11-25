@@ -50,13 +50,13 @@ bool ShaderKey::operator==(const ShaderKey& rhs) const {
 
 void Shader::compile(gpu::ProgramHandle program, const ShaderKey& key, DrawStream& stream) {
 	PROFILE_BLOCK("compile_shader");
-	const char* prefixes[36];
-	StaticString<128> defines_code[32];
+	const char* prefixes[68];
+	StaticString<128> defines_code[64];
 	int defines_count = 0;
 	prefixes[0] = key.semantic_defines ? key.semantic_defines : "";
 	if (key.defines != 0) {
-		for(int i = 0; i < sizeof(key.defines) * 8; ++i) {
-			if((key.defines & (1 << i)) == 0) continue;
+		for(int i = 0; i < (int)(sizeof(key.defines) * 8); ++i) {
+			if((key.defines & (1ull << i)) == 0) continue;
 			defines_code[defines_count].append("#define ", m_renderer.getShaderDefine(i), "\n");
 			prefixes[defines_count + 1] = defines_code[defines_count];
 			++defines_count;
@@ -66,8 +66,8 @@ void Shader::compile(gpu::ProgramHandle program, const ShaderKey& key, DrawStrea
 	stream.createProgram(program, key.state, (gpu::PrimitiveType)key.primitive_type, m_code.c_str(), m_type, prefixes, 1 + defines_count, getPath().c_str());
 }
 
-gpu::ProgramHandle Shader::getProgram(gpu::StateFlags state, gpu::PrimitiveType primitive_type, u32 defines, const char* semantic_defines) {
-	ShaderKey key;
+gpu::ProgramHandle Shader::getProgram(gpu::StateFlags state, gpu::PrimitiveType primitive_type, u64 defines, const char* semantic_defines) {
+	ShaderKey key = {};
 	key.primitive_type = (u32)primitive_type;
 	key.defines = defines;
 	key.state = state;
@@ -78,9 +78,9 @@ gpu::ProgramHandle Shader::getProgram(gpu::StateFlags state, gpu::PrimitiveType 
 	return m_renderer.queueShaderCompile(*this, key);
 }
 
-gpu::ProgramHandle Shader::getProgram(u32 defines) {
+gpu::ProgramHandle Shader::getProgram(u64 defines) {
 	ASSERT(m_type == gpu::ShaderType::COMPUTE);
-	ShaderKey key;
+	ShaderKey key = {};
 	static const char* no_def = "";
 	key.primitive_type = (u32)gpu::PrimitiveType::NONE;
 	key.defines = defines;

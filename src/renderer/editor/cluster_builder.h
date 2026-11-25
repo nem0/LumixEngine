@@ -14,7 +14,19 @@ namespace Lumix {
 // that is a part of the error of the group.
 // `dilate_borders`: the open borders of simplified clusters grow to keep the area of the surface that simplification removes (for foliage, where the pieces are
 // loose leaves). Then the vertices of a cluster are not the ones of the mesh, they have the positions of MeshClusters::index_positions.
-bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Span<const Vec2> uvs, Span<const u32> indices, bool dilate_borders, MeshClusters& out, IAllocator& allocator);
+// `voxels`: if it is not null, each group of clusters switches from triangles to voxels independently when topology-preserving simplification stalls
+// (leaving more than `stall_threshold` of its triangles) or its error reaches `voxels->error * mesh_diagonal` (or half the group's average edge length when `voxels->error == 0`);
+// voxelized groups are then merged and downsampled upward, see MeshVoxelCluster.
+struct ClusterVoxelSource {
+	float error = 0.01f;			// a fraction of the diagonal of the mesh (0 = automatic, half average triangle edge length)
+	float min_coverage = 0.25f;		// minimum accumulated surface area / (size * size) for a voxel to survive filtering
+	float downsample_scale = 0.25f;	// child coverage multiplier when downsampling 2x coarser (0.25 preserves 2D area, 0.5 preserves 1D twigs)
+	float stall_threshold = 0.65f;	// switch a group to voxels if simplification leaves more than this fraction of its triangles
+	u32 max_resolution = 4000;		// maximum voxels along the longest axis of the mesh (clamped to [64, 4000])
+	const u32* colors = nullptr;	// optional, 4 bytes (u8 x4) of each vertex, the voxels have the average (without the alpha)
+	const u32* ao = nullptr;		// optional, 4 bytes (u8 x4) of each vertex, only the first one is used
+};
+bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Span<const Vec2> uvs, Span<const u32> indices, bool dilate_borders, MeshClusters& out, IAllocator& allocator, const ClusterVoxelSource* voxels = nullptr);
 
 // The vertices of a mesh, as the importer has them.
 struct ClusterVertexSource {

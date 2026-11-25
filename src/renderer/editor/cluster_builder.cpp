@@ -235,7 +235,7 @@ void simplifyFallback(Array<u32>& lod, const Vec3* positions, u32 vertex_count, 
 	for (u32& v : lod) v = subset[v].id;
 }
 
-void simplifyGroup(Array<u32>& lod, const Vec3* positions, u32 vertex_count, const Vec3* normals, const Array<u32>& indices, const Array<u8>& locks, u32 target_count, float* error) {
+void simplifyGroup(Array<u32>& lod, const Vec3* positions, u32 vertex_count, const Vec3* normals, const Array<u32>& indices, const Array<u8>& locks, u32 target_count, bool allow_fallback, float* error) {
 	ASSERT(target_count <= u32(indices.size()));
 	lod.resize(indices.size());
 
@@ -248,7 +248,7 @@ void simplifyGroup(Array<u32>& lod, const Vec3* positions, u32 vertex_count, con
 		normals ? &normals[0].x : nullptr, normals ? sizeof(Vec3) : 0, normals ? attribute_weights : nullptr, normals ? 3 : 0,
 		locks.data(), target_count, FLT_MAX, options, error)));
 
-	if (u32(lod.size()) > target_count) {
+	if (allow_fallback && u32(lod.size()) > target_count) {
 		simplifyFallback(lod, positions, vertex_count, indices, locks, target_count, error);
 		*error *= SIMPLIFY_ERROR_FACTOR_SLOPPY;
 	}
@@ -470,7 +470,342 @@ void buildNodes(MeshClusters& out, u32 first, u32 count) {
 
 } // anonymous namespace
 
-bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Span<const Vec2> uvs, Span<const u32> indices, bool dilate_borders, MeshClusters& out, IAllocator& allocator) {
+// ---- voxel levels, see MeshVoxelCluster ----
+namespace {
+
+constexpr u32 VOXEL_BRICKS_PER_CLUSTER = 64;
+static_assert(VOXEL_BRICKS_PER_CLUSTER <= 64, "voxel_bricks.hlsl uses 64-bit masks and 6-bit brick indices");
+constexpr u32 VOXEL_GROUP_CLUSTERS = 8;		// clusters of a group that is downsampled to the next level
+constexpr float VOXEL_MAX_RESOLUTION = 4000.f;	// the voxels of the finest level along the longest side of the mesh, so that bricks are less than 1024 apart
+constexpr float VOXEL_HALF_DIAGONAL = 0.8660254f;	// the distance from the center of a voxel to its corner, in voxels: the error of a voxel level
+constexpr float VOXEL_MIN_COVERAGE = 0.25f;		// minimum accumulated surface area / (size * size) for a voxel to survive (prevents conservative-overlap and OR-downsample bloat)
+constexpr float VOXEL_STALL_THRESHOLD = 0.65f;	// switch a group to voxels if simplification leaves more than this fraction of its triangles
+
+float computeAvgTriangleEdge(const Vec3* positions, const u32* indices, u32 index_count) {
+	double sum = 0.0;
+	u32 edges = 0;
+	for (u32 t = 0; t + 2 < index_count; t += 3) {
+		const Vec3 p0 = positions[indices[t]], p1 = positions[indices[t + 1]], p2 = positions[indices[t + 2]];
+		sum += length(p1 - p0) + length(p2 - p1) + length(p0 - p2);
+		edges += 3;
+	}
+	return edges > 0 ? float(sum / double(edges)) : 0.f;
+}
+
+// A voxel of the grid of a level, the sums of the attributes of what falls in it. The key orders voxels by the Morton code of their brick, and then by their place in the brick.
+struct Voxel {
+	u64 key;
+	i32 c[3];
+	Vec3 normal;
+	Vec3 color;
+	float ao;
+	float weight;
+};
+
+struct VoxelCluster {
+	u32 first;		// in the voxels of the level
+	u32 count;
+	DagBounds bounds;
+	int refined;
+};
+
+struct VoxelLevel {
+	explicit VoxelLevel(IAllocator& allocator) : voxels(allocator), clusters(allocator) {}
+	Array<Voxel> voxels;			// the voxels of a cluster are consecutive, sorted by key
+	Array<VoxelCluster> clusters;	// ordered by the Morton code of their centers, so the neighbours are close
+};
+
+struct KeyIndex {
+	u64 key;
+	u32 index;
+};
+
+// the 16 low bits of x with two zero bits between them
+u64 spreadBits(u64 x) {
+	x &= 0xffff;
+	x = (x | (x << 32)) & 0x1f00000000ffffull;
+	x = (x | (x << 16)) & 0x1f0000ff0000ffull;
+	x = (x | (x << 8)) & 0x100f00f00f00f00full;
+	x = (x | (x << 4)) & 0x10c30c30c30c30c3ull;
+	x = (x | (x << 2)) & 0x1249249249249249ull;
+	return x;
+}
+
+u64 mortonKey(u32 x, u32 y, u32 z) { return spreadBits(x) | (spreadBits(y) << 1) | (spreadBits(z) << 2); }
+
+u64 voxelKey(i32 x, i32 y, i32 z) {
+	const u64 brick = mortonKey(u32(x >> 2), u32(y >> 2), u32(z >> 2));
+	return (brick << 6) | u32((x & 3) + (y & 3) * 4 + (z & 3) * 16);
+}
+
+// LSD radix sort of the 54 bits that the keys have, stable
+template <typename T>
+void radixSort(Array<T>& items, Array<T>& tmp) {
+	tmp.resize(items.size());
+	for (u32 pass = 0; pass < 6; ++pass) {
+		const u32 shift = pass * 9;
+		u32 counts[513] = {};
+		for (const T& i : items) ++counts[((i.key >> shift) & 511) + 1];
+		for (u32 i = 0; i < 512; ++i) counts[i + 1] += counts[i];
+		for (const T& i : items) tmp[counts[(i.key >> shift) & 511]++] = i;
+		items.swap(tmp);
+	}
+}
+
+// sorts the voxels and adds the ones with the same key up
+void sortAndMergeVoxels(Array<Voxel>& voxels, Array<Voxel>& tmp) {
+	if (voxels.empty()) return;
+	radixSort(voxels, tmp);
+	u32 out = 0;
+	for (u32 i = 0; i < (u32)voxels.size(); ++i) {
+		if (out > 0 && voxels[out - 1].key == voxels[i].key) {
+			Voxel& v = voxels[out - 1];
+			v.normal += voxels[i].normal;
+			v.color += voxels[i].color;
+			v.ao += voxels[i].ao;
+			v.weight += voxels[i].weight;
+		}
+		else {
+			voxels[out++] = voxels[i];
+		}
+	}
+	voxels.resize(out);
+}
+
+struct VoxelSourceAttributes {
+	const Vec3* positions;
+	const Vec3* normals;	// can be null
+	const u32* colors;		// can be null
+	const u32* ao;			// can be null
+};
+
+// Prunes sparse voxels below `min_coverage` (keeping at least the densest voxel if all are below) and clamps surviving coverage to 1.0 so stacked leaves do not inflate downsampling.
+void filterVoxelsByCoverage(Array<Voxel>& voxels, float min_coverage) {
+	if (voxels.empty()) return;
+	u32 best = 0;
+	u32 out = 0;
+	for (u32 i = 0; i < (u32)voxels.size(); ++i) {
+		if (voxels[i].weight > voxels[best].weight) best = i;
+		if (voxels[i].weight >= min_coverage) {
+			Voxel v = voxels[i];
+			if (v.weight > 1.f) {
+				const float s = 1.f / v.weight;
+				v.normal = v.normal * s;
+				v.color = v.color * s;
+				v.ao *= s;
+				v.weight = 1.f;
+			}
+			voxels[out++] = v;
+		}
+	}
+	if (out == 0) {
+		Voxel v = voxels[best];
+		if (v.weight > 1.f) {
+			const float s = 1.f / v.weight;
+			v.normal = v.normal * s;
+			v.color = v.color * s;
+			v.ao *= s;
+			v.weight = 1.f;
+		}
+		voxels[0] = v;
+		out = 1;
+	}
+	voxels.resize(out);
+}
+
+// Area-weighted point-sampled voxelization (stratified barycentric grid per triangle) so grazing edges and sparse leaf cards do not bloat into full cubes.
+void voxelizeTriangles(Array<Voxel>& out, const VoxelSourceAttributes& src, const u32* indices, u32 index_count, const Vec3& origin, float size, i32 max_coord) {
+	const float inv_size = 1.f / size;
+	const float inv_face_area = inv_size * inv_size;
+	for (u32 t = 0; t + 2 < index_count; t += 3) {
+		const u32 i0 = indices[t], i1 = indices[t + 1], i2 = indices[t + 2];
+		const Vec3 p0 = src.positions[i0], p1 = src.positions[i1], p2 = src.positions[i2];
+		const Vec3 e1 = p1 - p0, e2 = p2 - p0;
+		const Vec3 cross_n = cross(e1, e2);
+		const float area = 0.5f * length(cross_n);
+		if (area <= 1e-12f) continue;
+
+		Vec3 normal = src.normals ? src.normals[i0] + src.normals[i1] + src.normals[i2] : cross_n;
+		if (dot(normal, normal) < 1e-20f) normal = cross_n;
+		if (dot(normal, normal) < 1e-20f) normal = Vec3(0, 1, 0);
+		normal = normalize(normal);
+
+		Vec3 color(1, 1, 1);
+		float alpha_scale = 1.f;
+		if (src.colors) {
+			color = Vec3(0, 0, 0);
+			float a_sum = 0.f;
+			const u32 tri[3] = { i0, i1, i2 };
+			for (u32 i : tri) {
+				const u32 c = src.colors[i];
+				color += Vec3(float(c & 0xff), float((c >> 8) & 0xff), float((c >> 16) & 0xff)) * (1.f / 255.f);
+				a_sum += float(c >> 24) * (1.f / 255.f);
+			}
+			color = color * (1.f / 3.f);
+			alpha_scale = clamp(a_sum * (1.f / 3.f), 0.1f, 1.f);
+		}
+		float ao = 1.f;
+		if (src.ao) ao = float((src.ao[i0] & 0xff) + (src.ao[i1] & 0xff) + (src.ao[i2] & 0xff)) * (1.f / (3.f * 255.f));
+
+		const float max_edge = maximum(length(e1), maximum(length(e2), length(p2 - p1)));
+		const u32 n = clamp((u32)ceilf(max_edge * (2.f * inv_size)), 1u, 64u);
+		const float inv_n = 1.f / float(n);
+		const float w = (area * alpha_scale * inv_face_area) / float(n * n);
+		const Vec3 wn = normal * w;
+		const Vec3 wc = color * w;
+		const float wao = ao * w;
+
+		auto emit_sample = [&](float u, float v_bary) {
+			const Vec3 p = p0 + e1 * u + e2 * v_bary;
+			const i32 x = clamp((i32)floorf((p.x - origin.x) * inv_size), 0, max_coord);
+			const i32 y = clamp((i32)floorf((p.y - origin.y) * inv_size), 0, max_coord);
+			const i32 z = clamp((i32)floorf((p.z - origin.z) * inv_size), 0, max_coord);
+			Voxel v;
+			v.key = voxelKey(x, y, z);
+			v.c[0] = x; v.c[1] = y; v.c[2] = z;
+			v.normal = wn;
+			v.color = wc;
+			v.ao = wao;
+			v.weight = w;
+			out.push(v);
+		};
+		for (u32 i = 0; i < n; ++i) {
+			for (u32 j = 0; j < n - i; ++j) {
+				emit_sample((float(i) + (1.f / 3.f)) * inv_n, (float(j) + (1.f / 3.f)) * inv_n);
+				if (i + j + 1 < n) {
+					emit_sample((float(i) + (2.f / 3.f)) * inv_n, (float(j) + (2.f / 3.f)) * inv_n);
+				}
+			}
+		}
+	}
+}
+
+// Downsamples voxels to a grid twice as large, scaling each child's coverage by `scale` (0.25 preserves 2D surface area, 0.5 preserves 1D structures).
+void downsampleVoxels(Array<Voxel>& out, const Voxel* voxels, u32 count, float scale) {
+	for (u32 i = 0; i < count; ++i) {
+		Voxel v = voxels[i];
+		v.c[0] >>= 1; v.c[1] >>= 1; v.c[2] >>= 1;
+		v.key = voxelKey(v.c[0], v.c[1], v.c[2]);
+		v.normal = v.normal * scale;
+		v.color = v.color * scale;
+		v.ao *= scale;
+		v.weight *= scale;
+		out.push(v);
+	}
+}
+
+// Splits the sorted voxels into clusters of at most VOXEL_BRICKS_PER_CLUSTER bricks and appends them to the level, `bounds.error` of them is `error`.
+void appendVoxelClusters(VoxelLevel& level, const Array<Voxel>& voxels, int refined, const Vec3& origin, float size, float error) {
+	u32 begin = 0;
+	const u32 count = (u32)voxels.size();
+	while (begin < count) {
+		u32 end = begin;
+		u32 bricks = 0;
+		u64 brick = ~0ull;
+		while (end < count) {
+			const u64 b = voxels[end].key >> 6;
+			if (b != brick) {
+				if (bricks == VOXEL_BRICKS_PER_CLUSTER) break;
+				++bricks;
+				brick = b;
+			}
+			++end;
+		}
+		VoxelCluster cluster;
+		cluster.first = (u32)level.voxels.size();
+		cluster.count = end - begin;
+		cluster.refined = refined;
+		i32 mn[3] = { 0x7fffFFFF, 0x7fffFFFF, 0x7fffFFFF };
+		i32 mx[3] = { -1, -1, -1 };
+		for (u32 i = begin; i < end; ++i) {
+			level.voxels.push(voxels[i]);
+			for (u32 a = 0; a < 3; ++a) {
+				mn[a] = minimum(mn[a], voxels[i].c[a]);
+				mx[a] = maximum(mx[a], voxels[i].c[a]);
+			}
+		}
+		const Vec3 lo = origin + Vec3((float)mn[0], (float)mn[1], (float)mn[2]) * size;
+		const Vec3 hi = origin + Vec3(float(mx[0] + 1), float(mx[1] + 1), float(mx[2] + 1)) * size;
+		cluster.bounds.center = (lo + hi) * 0.5f;
+		cluster.bounds.radius = length(hi - lo) * 0.5f;
+		cluster.bounds.error = error;
+		level.clusters.push(cluster);
+		begin = end;
+	}
+}
+
+// Orders the clusters of the level by the Morton code of their centers, so that the clusters that are grouped are neighbours.
+void sortVoxelLevel(VoxelLevel& level, VoxelLevel& tmp, const Vec3& origin, float size, IAllocator& allocator) {
+	Array<KeyIndex> order(allocator), order_tmp(allocator);
+	order.resize((u32)level.clusters.size());
+	for (u32 i = 0; i < (u32)level.clusters.size(); ++i) {
+		const Vec3 p = (level.clusters[i].bounds.center - origin) * (1.f / size);
+		order[i].key = mortonKey((u32)clamp(p.x, 0.f, 65535.f), (u32)clamp(p.y, 0.f, 65535.f), (u32)clamp(p.z, 0.f, 65535.f));
+		order[i].index = i;
+	}
+	radixSort(order, order_tmp);
+	tmp.voxels.clear();
+	tmp.clusters.clear();
+	tmp.voxels.reserve((u32)level.voxels.size());
+	for (const KeyIndex& o : order) {
+		VoxelCluster c = level.clusters[o.index];
+		const u32 first = (u32)tmp.voxels.size();
+		for (u32 i = 0; i < c.count; ++i) tmp.voxels.push(level.voxels[c.first + i]);
+		c.first = first;
+		tmp.clusters.push(c);
+	}
+	level.voxels.swap(tmp.voxels);
+	level.clusters.swap(tmp.clusters);
+}
+
+u8 voxelByte(float v) { return (u8)clamp(v * 255.f + 0.5f, 0.f, 255.f); }
+
+// The payload of a cluster, see MeshVoxelCluster. Returns the index of its record.
+u32 packVoxelCluster(MeshClusters& out, const Voxel* voxels, u32 count, const Vec3& origin, float size) {
+	MeshVoxelCluster rec;
+	i32 mn[3] = { 0x7fffFFFF, 0x7fffFFFF, 0x7fffFFFF };
+	for (u32 i = 0; i < count; ++i) {
+		for (u32 a = 0; a < 3; ++a) mn[a] = minimum(mn[a], voxels[i].c[a] >> 2);
+	}
+	rec.first_word = (u32)out.voxel_words.size();
+	rec.base[0] = mn[0] * 4; rec.base[1] = mn[1] * 4; rec.base[2] = mn[2] * 4;
+	rec.size = size;
+	rec.origin = origin;
+	rec.brick_count = 0;
+
+	// bricks
+	u32 i = 0;
+	while (i < count) {
+		const u64 brick = voxels[i].key >> 6;
+		u64 mask = 0;
+		u32 j = i;
+		for (; j < count && (voxels[j].key >> 6) == brick; ++j) mask |= 1ull << (voxels[j].key & 63);
+		const i32 bx = (voxels[i].c[0] >> 2) - mn[0], by = (voxels[i].c[1] >> 2) - mn[1], bz = (voxels[i].c[2] >> 2) - mn[2];
+		ASSERT(bx >= 0 && by >= 0 && bz >= 0 && (u32)bx <= MeshClusters::MAX_VOXEL_BRICK_COORD && (u32)by <= MeshClusters::MAX_VOXEL_BRICK_COORD && (u32)bz <= MeshClusters::MAX_VOXEL_BRICK_COORD);
+		out.voxel_words.push((u32)mask);
+		out.voxel_words.push((u32)(mask >> 32));
+		out.voxel_words.push(u32(bx) | (u32(by) << 10) | (u32(bz) << 20));
+		out.voxel_words.push(i);
+		++rec.brick_count;
+		i = j;
+	}
+	// voxels
+	for (u32 k = 0; k < count; ++k) {
+		const Voxel& v = voxels[k];
+		Vec3 n = v.normal;
+		n = dot(n, n) > 1e-12f ? normalize(n) : Vec3(0, 1, 0);
+		const float inv = 1.f / maximum(v.weight, 1e-6f);
+		out.voxel_words.push(packClusterFrame(n, nullptr));
+		out.voxel_words.push(u32(voxelByte(v.color.x * inv)) | (u32(voxelByte(v.color.y * inv)) << 8) | (u32(voxelByte(v.color.z * inv)) << 16) | (u32(voxelByte(v.ao * inv)) << 24));
+	}
+	rec.word_count = (u32)out.voxel_words.size() - rec.first_word;
+	out.voxel_clusters.push(rec);
+	return (u32)out.voxel_clusters.size() - 1;
+}
+
+} // anonymous namespace
+
+bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Span<const Vec2> uvs, Span<const u32> indices, bool dilate_borders, MeshClusters& out, IAllocator& allocator, const ClusterVoxelSource* voxels) {
 	PROFILE_FUNCTION();
 	if (indices.length() < 3 || positions.length() == 0) return false;
 	const u32 vertex_count = positions.length();
@@ -536,8 +871,7 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 			level_ranges.push(out.clusters.size() - level_first);
 		}
 	};
-	auto emit_group = [&](const DagCluster* group, u32 count, const DagBounds& simplified, int group_depth) -> int {
-		PROFILE_BLOCK("clod output group");
+	auto begin_group = [&](u32 count, int group_depth) {
 		MeshGroupGPU group_entry;
 		group_entry.first_cluster = out.clusters.size();
 		group_entry.cluster_count = count;
@@ -555,6 +889,10 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 			level = group_depth;
 			level_first = out.clusters.size();
 		}
+	};
+	auto emit_group = [&](const DagCluster* group, u32 count, const DagBounds& simplified, int group_depth) -> int {
+		PROFILE_BLOCK("clod output group");
+		begin_group(count, group_depth);
 		for (u32 i = 0; i < count; ++i) {
 			const DagCluster& c = group[i];
 			MeshClusterGPU cluster;
@@ -587,6 +925,188 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 		return (int)group_id_counter++;
 	};
 
+	// Voxel levels (per-group switch). Each group switches from triangles to voxels independently when simplification stalls or its error reaches
+	// `voxels->error * mesh_diagonal` or half its average triangle edge length. All groups share one power-of-2 grid hierarchy
+	// (voxel_origin, size(k) = voxel_base_size * 2^k), so groups entering at different depths merge cleanly upward.
+	Vec3 voxel_origin(0, 0, 0);
+	float voxel_extent = 0.f;
+	float voxel_base_size = 0.f;
+	float voxel_error_threshold = FLT_MAX;
+	const float voxel_min_coverage = voxels ? clamp(voxels->min_coverage, 0.f, 1.f) : VOXEL_MIN_COVERAGE;
+	const float voxel_downsample_scale = voxels ? clamp(voxels->downsample_scale, 0.125f, 1.f) : 0.25f;
+	const float voxel_stall_threshold = voxels ? clamp(voxels->stall_threshold, SIMPLIFY_RATIO, 1.f) : VOXEL_STALL_THRESHOLD;
+	const float voxel_max_resolution = voxels ? clamp(float(voxels->max_resolution), 64.f, VOXEL_MAX_RESOLUTION) : VOXEL_MAX_RESOLUTION;
+	if (voxels) {
+		Vec3 mn(FLT_MAX, FLT_MAX, FLT_MAX), mx(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+		for (u32 i = 0; i < vertex_count; ++i) {
+			mn = minimum(mn, cluster_positions[i]);
+			mx = maximum(mx, cluster_positions[i]);
+		}
+		const Vec3 extent = mx - mn;
+		const float mesh_diagonal = length(extent);
+		const float max_extent = maximum(extent.x, maximum(extent.y, extent.z));
+		// Leave margin around the initial AABB when border dilation is enabled so dilated vertices do not clamp to the grid walls.
+		const float pad = dilate_borders ? max_extent * 0.05f : 0.f;
+		voxel_origin = mn - Vec3(pad);
+		voxel_extent = max_extent + pad * 2.f;
+		if (voxels->error > 0.f && mesh_diagonal > 0.f) {
+			voxel_error_threshold = voxels->error * mesh_diagonal;
+		}
+		if (voxel_extent > 0.f) {
+			// Use the smallest leaf cluster's average edge so fine foliage is not coarsened by large trunk/wall triangles.
+			float min_avg_edge = FLT_MAX;
+			for (const DagCluster& c : clusters) {
+				const float e = computeAvgTriangleEdge(cluster_positions, cluster_indices.data() + c.index_offset, c.index_count);
+				if (e > 0.f) min_avg_edge = minimum(min_avg_edge, e);
+			}
+			if (min_avg_edge == FLT_MAX) min_avg_edge = 0.f;
+			voxel_base_size = maximum(min_avg_edge * 0.5f, voxel_extent / voxel_max_resolution);
+		}
+	}
+	const bool use_voxels = voxels != nullptr && voxel_extent > 0.f && voxel_base_size > 0.f;
+	auto voxel_level_size = [&](u32 k) -> float { return voxel_base_size * float(1u << k); };
+	auto voxel_level_error = [&](u32 k) -> float { return voxel_level_size(k) * VOXEL_HALF_DIAGONAL; };
+	auto choose_voxel_level = [&](float min_error, float group_avg_edge) -> u32 {
+		const float edge_error = group_avg_edge * 0.5f * VOXEL_HALF_DIAGONAL;
+		const float target_error = maximum(min_error, edge_error);
+		u32 k = 0;
+		while (k < 20 && voxel_level_error(k) < target_error) ++k;
+		// Snap to the nearest power-of-2 level in log space without ever violating DAG monotonicity (voxel_level_error >= min_error).
+		if (k > 0 && voxel_level_error(k - 1) >= min_error && target_error < voxel_level_error(k - 1) * 1.41421356f) {
+			--k;
+		}
+		return k;
+	};
+	Array<VoxelLevel> staged_voxel_levels(allocator);
+	auto ensure_staged_level = [&](u32 k) -> VoxelLevel& {
+		while ((u32)staged_voxel_levels.size() <= k) staged_voxel_levels.emplace(allocator);
+		return staged_voxel_levels[k];
+	};
+	// emits the clusters [first, first + count) of the level as a group
+	auto emit_voxel_group = [&](const VoxelLevel& voxel_level, u32 first, u32 count, const DagBounds& simplified, int group_depth, float size) -> int {
+		begin_group(count, group_depth);
+		for (u32 i = 0; i < count; ++i) {
+			const VoxelCluster& c = voxel_level.clusters[first + i];
+			MeshClusterGPU cluster;
+			memset(&cluster, 0, sizeof(cluster));
+			cluster.first_index = packVoxelCluster(out, voxel_level.voxels.begin() + c.first, c.count, voxel_origin, size);
+			cluster.index_count = 0;
+			cluster.group = group_id_counter;
+			cluster.refined_group = (u32)c.refined;
+			cluster.center = c.bounds.center;
+			cluster.radius = c.bounds.radius;
+			const DagBounds lod = group_bounds[c.refined];
+			cluster.lod_center = lod.center;
+			cluster.lod_radius = lod.radius;
+			cluster.error = lod.error;
+			cluster.parent_center = simplified.center;
+			cluster.parent_radius = simplified.radius;
+			cluster.parent_error = simplified.error;
+			out.clusters.push(cluster);
+		}
+		group_bounds.push(simplified);
+		return (int)group_id_counter++;
+	};
+	Array<Voxel> vox_temp(allocator), vox_temp_sort(allocator);
+	auto voxelize_group_to_level = [&](const u32* tri_indices, u32 tri_index_count, int refined, u32 k) {
+		const float size = voxel_level_size(k);
+		const float error = voxel_level_error(k);
+		const i32 max_coord = (i32)(voxel_extent / size) + 1;
+		const VoxelSourceAttributes source = { cluster_positions, mesh_normals, voxels->colors, voxels->ao };
+		vox_temp.clear();
+		voxelizeTriangles(vox_temp, source, tri_indices, tri_index_count, voxel_origin, size, max_coord);
+		sortAndMergeVoxels(vox_temp, vox_temp_sort);
+		filterVoxelsByCoverage(vox_temp, voxel_min_coverage);
+		if (!vox_temp.empty()) {
+			appendVoxelClusters(ensure_staged_level(k), vox_temp, refined, voxel_origin, size, error);
+		}
+		else {
+			group_bounds[refined].error = FLT_MAX;
+			const MeshGroupGPU& g = out.groups[refined];
+			for (u32 ci = 0; ci < g.cluster_count; ++ci) {
+				out.clusters[g.first_cluster + ci].parent_error = FLT_MAX;
+			}
+		}
+	};
+	// Merges all staged per-group voxel levels upward into a single root brick.
+	auto build_staged_voxel_levels = [&](int first_depth) {
+		PROFILE_BLOCK("clod voxels");
+		if (staged_voxel_levels.empty()) return;
+		u32 first_k = (u32)staged_voxel_levels.size();
+		u32 last_k = 0;
+		for (u32 k = 0; k < (u32)staged_voxel_levels.size(); ++k) {
+			if (!staged_voxel_levels[k].clusters.empty()) {
+				first_k = minimum(first_k, k);
+				last_k = maximum(last_k, k);
+			}
+		}
+		if (first_k >= (u32)staged_voxel_levels.size()) return;
+
+		auto has_more_than_one_brick = [&](const VoxelLevel& l) {
+			if (l.clusters.empty()) return false;
+			const VoxelCluster& c = l.clusters[0];
+			const u64 brick = l.voxels[c.first].key >> 6;
+			for (u32 i = 1; i < c.count; ++i) {
+				if ((l.voxels[c.first + i].key >> 6) != brick) return true;
+			}
+			return false;
+		};
+
+		VoxelLevel cur(allocator), next(allocator), tmp_level(allocator);
+		int voxel_depth = first_depth;
+		for (u32 k = first_k; ; ++k) {
+			if (k < (u32)staged_voxel_levels.size() && !staged_voxel_levels[k].clusters.empty()) {
+				const VoxelLevel& src_lvl = staged_voxel_levels[k];
+				for (const VoxelCluster& sc : src_lvl.clusters) {
+					VoxelCluster c = sc;
+					c.first = (u32)cur.voxels.size();
+					for (u32 vi = 0; vi < sc.count; ++vi) cur.voxels.push(src_lvl.voxels[sc.first + vi]);
+					cur.clusters.push(c);
+				}
+			}
+			if (cur.clusters.empty()) {
+				if (k >= last_k) break;
+				continue;
+			}
+			const float size = voxel_level_size(k);
+			sortVoxelLevel(cur, tmp_level, voxel_origin, size, allocator);
+			if (k >= last_k && cur.clusters.size() <= 1 && !has_more_than_one_brick(cur)) {
+				DagBounds bounds = cur.clusters[0].bounds;
+				bounds.error = FLT_MAX;
+				emit_voxel_group(cur, 0, 1, bounds, voxel_depth, size);
+				++voxel_depth;
+				break;
+			}
+			const float next_size = voxel_level_size(k + 1);
+			const float next_error = voxel_level_error(k + 1);
+			next.voxels.clear();
+			next.clusters.clear();
+			for (u32 first = 0; first < (u32)cur.clusters.size(); first += VOXEL_GROUP_CLUSTERS) {
+				const u32 count = minimum(VOXEL_GROUP_CLUSTERS, (u32)cur.clusters.size() - first);
+				const VoxelCluster* group = &cur.clusters[first];
+				// Merge the children's LOD spheres (group_bounds[c.refined]) so the parent sphere always encloses every child's LOD sphere.
+				DagBounds child_lods[VOXEL_GROUP_CLUSTERS];
+				for (u32 ci = 0; ci < count; ++ci) child_lods[ci] = group_bounds[group[ci].refined];
+				DagBounds bounds = dagBoundsMerge(child_lods, count, sizeof(DagBounds));
+				bounds.error = next_error;
+				const int id = emit_voxel_group(cur, first, count, bounds, voxel_depth, size);
+				vox_temp.clear();
+				const VoxelCluster& last = group[count - 1];
+				downsampleVoxels(vox_temp, cur.voxels.begin() + group[0].first, last.first + last.count - group[0].first, voxel_downsample_scale);
+				sortAndMergeVoxels(vox_temp, vox_temp_sort);
+				filterVoxelsByCoverage(vox_temp, voxel_min_coverage);
+				appendVoxelClusters(next, vox_temp, id, voxel_origin, next_size, next_error);
+			}
+			cur.voxels.swap(next.voxels);
+			cur.clusters.swap(next.clusters);
+			++voxel_depth;
+		}
+		u32 bricks = 0;
+		for (const MeshVoxelCluster& v : out.voxel_clusters) bricks += v.brick_count;
+		logInfo("Voxel levels (per-group): base size ", voxel_base_size, ", first_k ", first_k, " (size ", voxel_level_size(first_k), "), ", voxel_depth - first_depth, " levels, ", (u32)out.voxel_clusters.size()
+			, " voxel clusters, ", bricks, " bricks, ", (u32)out.voxel_words.size() * 4, " bytes, triangle clusters below: ", (u32)out.clusters.size() - (u32)out.voxel_clusters.size());
+	};
+
 	Array<DagCluster> pending(allocator);
 	Array<u32> pending_indices(allocator);
 	pending.reserve(clusters.size());
@@ -602,6 +1122,8 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 
 		DagBounds bounds = {};
 		bool stuck = false;
+		bool to_voxels = false;
+		u32 voxel_level = 0;
 		int refined = -1;
 		Array<DagCluster> clusters;
 		Array<u32> indices;
@@ -632,49 +1154,64 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 		results.reserve(group_count);
 		for (u32 i = 0; i < group_count; ++i) results.emplace(allocator);
 
+		auto simplify_and_classify_group = [&](const DagCluster* group, u32 group_size, GroupResult& res) -> bool {
+			for (u32 j = 0; j < group_size; ++j) {
+				appendSlice(res.merged, cluster_indices.data() + group[j].index_offset, group[j].index_count);
+			}
+
+			const u32 target_size = u32((res.merged.size() / 3) * SIMPLIFY_RATIO) * 3;
+			DagBounds bounds = dagBoundsMerge(&group[0].bounds, group_size, sizeof(DagCluster));
+			const float prev_error = bounds.error;
+
+			float error = 0.f;
+			{
+				PROFILE_BLOCK("clod simplify");
+				simplifyGroup(res.simplified, cluster_positions, vertex_count, mesh_normals, res.merged, locks, target_size, !use_voxels, &error);
+			}
+
+			if (use_voxels) {
+				const float group_avg_edge = computeAvgTriangleEdge(cluster_positions, res.merged.data(), res.merged.size());
+				const bool stalled = res.simplified.size() > res.merged.size() * voxel_stall_threshold || res.simplified.size() >= res.merged.size();
+				const float next_error = maximum(prev_error, error);
+				const float err_limit = voxels->error > 0.f ? voxel_error_threshold : group_avg_edge * 0.5f;
+				if (stalled || next_error >= err_limit) {
+					const u32 k = choose_voxel_level(prev_error, group_avg_edge);
+					bounds.error = voxel_level_error(k);
+					res.bounds = bounds;
+					res.stuck = true;
+					res.to_voxels = true;
+					res.voxel_level = k;
+					return false;
+				}
+			}
+			else if (res.simplified.size() > res.merged.size() * SIMPLIFY_THRESHOLD) {
+				bounds.error = FLT_MAX;
+				res.bounds = bounds;
+				res.stuck = true;
+				return false;
+			}
+
+			bounds.error = maximum(bounds.error, error);
+			res.bounds = bounds;
+			res.stuck = false;
+			return true;
+		};
+
 		PROFILE_BLOCK("clod groups");
 		if (!dilate_borders) {
 			jobs::forEach(group_count, 1, [&](u32 from, u32 to) {
-				Array<u32> merged(allocator);
-				Array<u32> simplified(allocator);
-				merged.reserve((PARTITION_SIZE + PARTITION_SIZE / 3) * MAX_CLUSTER_TRIANGLES * 3);
-
 				for (u32 i = from; i < to; ++i) {
 					const DagCluster* group = clusters.data() + group_offsets[i];
 					const u32 group_size = group_offsets[i + 1] - group_offsets[i];
-
-					merged.clear();
-					for (u32 j = 0; j < group_size; ++j) {
-						appendSlice(merged, cluster_indices.data() + group[j].index_offset, group[j].index_count);
-					}
-
-					const u32 target_size = u32((merged.size() / 3) * SIMPLIFY_RATIO) * 3;
-					DagBounds bounds = dagBoundsMerge(&group[0].bounds, group_size, sizeof(DagCluster));
-
-					float error = 0.f;
-					{
-						PROFILE_BLOCK("clod simplify");
-						simplifyGroup(simplified, cluster_positions, vertex_count, mesh_normals, merged, locks, target_size, &error);
-					}
-
 					GroupResult& res = results[i];
-					if (simplified.size() > merged.size() * SIMPLIFY_THRESHOLD) {
-						bounds.error = FLT_MAX;
-						res.bounds = bounds;
-						res.stuck = true;
-						continue;
-					}
-
-					bounds.error = maximum(bounds.error, error);
-					res.bounds = bounds;
-					res.stuck = false;
+					if (!simplify_and_classify_group(group, group_size, res)) continue;
 
 					{
 						PROFILE_BLOCK("clod clusterize group");
-						clusterize(res.clusters, res.indices, cluster_positions, vertex_count, simplified.data(), simplified.size());
+						clusterize(res.clusters, res.indices, cluster_positions, vertex_count, res.simplified.data(), res.simplified.size());
 					}
 
-					for (DagCluster& c : res.clusters) c.bounds = bounds;
+					for (DagCluster& c : res.clusters) c.bounds = res.bounds;
 				}
 			});
 
@@ -684,6 +1221,10 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 				GroupResult& res = results[i];
 
 				const int refined = emit_group(group, group_size, res.bounds, depth);
+				if (res.to_voxels) {
+					voxelize_group_to_level(res.merged.data(), res.merged.size(), refined, res.voxel_level);
+					continue;
+				}
 				if (res.stuck) continue;
 
 				const u32 index_offset = pending_indices.size();
@@ -701,31 +1242,7 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 				for (u32 i = from; i < to; ++i) {
 					const DagCluster* group = clusters.data() + group_offsets[i];
 					const u32 group_size = group_offsets[i + 1] - group_offsets[i];
-					GroupResult& res = results[i];
-
-					for (u32 j = 0; j < group_size; ++j) {
-						appendSlice(res.merged, cluster_indices.data() + group[j].index_offset, group[j].index_count);
-					}
-
-					const u32 target_size = u32((res.merged.size() / 3) * SIMPLIFY_RATIO) * 3;
-					DagBounds bounds = dagBoundsMerge(&group[0].bounds, group_size, sizeof(DagCluster));
-
-					float error = 0.f;
-					{
-						PROFILE_BLOCK("clod simplify");
-						simplifyGroup(res.simplified, cluster_positions, vertex_count, mesh_normals, res.merged, locks, target_size, &error);
-					}
-
-					if (res.simplified.size() > res.merged.size() * SIMPLIFY_THRESHOLD) {
-						bounds.error = FLT_MAX;
-						res.bounds = bounds;
-						res.stuck = true;
-						continue;
-					}
-
-					bounds.error = maximum(bounds.error, error);
-					res.bounds = bounds;
-					res.stuck = false;
+					simplify_and_classify_group(group, group_size, results[i]);
 				}
 			});
 
@@ -733,6 +1250,9 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 				const DagCluster* group = clusters.data() + group_offsets[i];
 				const u32 group_size = group_offsets[i + 1] - group_offsets[i];
 				results[i].refined = emit_group(group, group_size, results[i].bounds, depth);
+				if (results[i].to_voxels) {
+					voxelize_group_to_level(results[i].merged.data(), results[i].merged.size(), results[i].refined, results[i].voxel_level);
+				}
 			}
 
 			jobs::forEach(group_count, 1, [&](u32 from, u32 to) {
@@ -775,10 +1295,22 @@ bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Spa
 
 	if (!clusters.empty()) {
 		ASSERT(clusters.size() == 1);
-		DagBounds bounds = clusters[0].bounds;
-		bounds.error = FLT_MAX;
-		emit_group(clusters.data(), clusters.size(), bounds, depth);
+		if (use_voxels) {
+			const float avg_edge = computeAvgTriangleEdge(cluster_positions, cluster_indices.data() + clusters[0].index_offset, clusters[0].index_count);
+			const u32 k = choose_voxel_level(clusters[0].bounds.error, avg_edge);
+			DagBounds bounds = clusters[0].bounds;
+			bounds.error = voxel_level_error(k);
+			const int refined = emit_group(clusters.data(), clusters.size(), bounds, depth);
+			voxelize_group_to_level(cluster_indices.data() + clusters[0].index_offset, clusters[0].index_count, refined, k);
+			depth++;
+		}
+		else {
+			DagBounds bounds = clusters[0].bounds;
+			bounds.error = FLT_MAX;
+			emit_group(clusters.data(), clusters.size(), bounds, depth);
+		}
 	}
+	if (use_voxels) build_staged_voxel_levels(depth);
 
 	if (!leaves_done) {
 		out.leaf_index_count = out.indices.size();
@@ -952,6 +1484,33 @@ bool packClusterVertices(const ClusterVertexSource& source, MeshClusters& out, I
 			current_group = cluster.group;
 			group_start_bit = bit_cursor;
 			out.groups[current_group].stream_offset = (u32)(bit_cursor / 8);
+		}
+		if (cluster.index_count == 0) {
+			// a cluster of voxels, its payload is in the stream of the group, see MeshVoxelCluster
+			if (cluster.first_index >= (u32)out.voxel_clusters.size()) {
+				logError("Cluster ", ci, " has no triangles and no voxels");
+				return false;
+			}
+			const MeshVoxelCluster& voxel = out.voxel_clusters[cluster.first_index];
+			align_cursor();
+			if (bit_cursor + u64(voxel.word_count) * 32 >= (1ull << 32)) {
+				logError("Vertices of clusters are larger than 512 MB");
+				return false;
+			}
+			MeshClusterVertexGPU header;
+			memset(&header, 0, sizeof(header));
+			header.pos_start[0] = voxel.base[0];
+			header.pos_start[1] = voxel.base[1];
+			header.pos_start[2] = voxel.base[2];
+			header.vertex_count = voxel.brick_count;
+			header.pos_bit_offset = (u32)(bit_cursor - group_start_bit);
+			header.pos_step = voxel.size;
+			header.uv_min[0] = voxel.origin.x;
+			header.uv_min[1] = voxel.origin.y;
+			header.uv_extent[0] = voxel.origin.z;
+			for (u32 w = 0; w < voxel.word_count; ++w) write_bits(out.voxel_words[voxel.first_word + w], 32);
+			out.vertex_headers.push(header);
+			continue;
 		}
 		vertices.clear();
 		cluster_lattice.clear();

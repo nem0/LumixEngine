@@ -905,8 +905,8 @@ static void scriptRenderPostCull(ex_runtime*, ex_call_frame frame) {
 }
 
 // space separated shader defines
-static u32 defineMask(Renderer& renderer, ex_string_view defines) {
-	u32 mask = 0;
+static u64 defineMask(Renderer& renderer, ex_string_view defines) {
+	u64 mask = 0;
 	char name[64];
 	u32 len = 0;
 	for (i64 i = 0; i <= defines.length; ++i) {
@@ -917,7 +917,7 @@ static u32 defineMask(Renderer& renderer, ex_string_view defines) {
 		}
 		if (len) {
 			name[len] = '\0';
-			mask |= 1u << renderer.getShaderDefineIdx(name);
+			mask |= 1ull << renderer.getShaderDefineIdx(name);
 			len = 0;
 		}
 	}
@@ -1232,7 +1232,7 @@ static void scriptDrawState(ex_runtime*, ex_call_frame frame) {
 		panic(frame, "Invalid uniform data");
 		return;
 	}
-	const u32 define_mask = define[0] ? 1u << ctx->pipeline->getRenderer().getShaderDefineIdx(define) : 0;
+	const u64 define_mask = define[0] ? 1ull << ctx->pipeline->getRenderer().getShaderDefineIdx(define) : 0;
 	ctx->pipeline->setUniformRaw(Span<const u8>(uniform.data, (u32)uniform.length));
 	ctx->pipeline->drawArray(0, 3, *shader, define_mask, (gpu::StateFlags)state);
 }

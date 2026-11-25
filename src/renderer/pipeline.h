@@ -124,7 +124,7 @@ struct LUMIX_RENDERER_API Pipeline {
 	virtual void copy(RenderBufferHandle dst, RenderBufferHandle src, IVec2 size, Vec4 r = Vec4(1, 0, 0, 0), Vec4 g = Vec4(0, 1, 0, 0), Vec4 b = Vec4(0, 0, 1, 0)) = 0;
 	virtual void beginBlock(const char* name, bool stats = false) = 0;
 	virtual void endBlock() = 0;
-	virtual void drawArray(u32 indices_offset, u32 indices_count, Shader& shader, u32 define_mask = 0, gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FN_GREATER) = 0;
+	virtual void drawArray(u32 indices_offset, u32 indices_count, Shader& shader, u64 define_mask = 0, gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FN_GREATER) = 0;
 	virtual void clear(gpu::ClearFlags flags, float r, float g, float b, float a, float depth) = 0;
 	// also emits barriers
 	virtual gpu::BindlessHandle toBindless(RenderBufferHandle rb_idx, struct DrawStream& stream) = 0;
@@ -146,7 +146,7 @@ struct LUMIX_RENDERER_API Pipeline {
 	virtual void render2D(RenderBufferHandle input) = 0;
 	// slice 0..3 of the shadow cascades
 	virtual CameraParams getShadowCamera(u32 slice) const = 0;
-	virtual void renderGrass(CameraParams cp, gpu::StateFlags state, u32 define_mask) = 0;
+	virtual void renderGrass(CameraParams cp, gpu::StateFlags state, u64 define_mask) = 0;
 	virtual void renderTerrains(const CameraParams& cp, gpu::StateFlags state, const char* define) = 0;
 	// Draws the meshes of only these entities (non-model entities are skipped) with the view of the pipeline, `define` selects a shader
 	// variant, e.g. "DEPTH" for a depth-only mask. The rest of the scene is not drawn.
@@ -199,6 +199,7 @@ struct LUMIX_RENDERER_API Pipeline {
 		VELOCITY,
 		MESH_CLUSTERS, // every cluster of cluster rendered models has its own color
 		MESH_TRIANGLES, // every triangle of cluster rendered models has its own color
+		VOXEL_BRICKS, // every brick (4x4x4 voxels) of voxel clusters has its own color
 
 		BUILTIN_COUNT,
 		PLUGIN,
@@ -216,6 +217,7 @@ struct LUMIX_RENDERER_API Pipeline {
 	// pyramid of depths of the frozen camera. Can be changed at run time.
 	bool m_cluster_freeze_camera = false;
 	float m_cluster_shadow_error_scale = 3.f;	// shadow views accept this many times the error of Cluster error (px)
+	bool m_voxel_solid_shadow_depth = true;		// shadow passes draw voxel bricks as solid sub-box quads (SOLID_DEPTH) without raymarching
 
 protected:
 	static inline u32 s_data_type_generator = 0;

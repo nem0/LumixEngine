@@ -3,6 +3,7 @@
 #include "core/log.h"
 #include "core/os.h"
 #include "core/profiler.h"
+#include "core/tokenizer.h"
 #include "editor/asset_compiler.h"
 #include "editor/studio_app.h"
 #include "engine/component_types.h"
@@ -24,6 +25,8 @@
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/voxels.h"
+#include "renderer/gpu/gpu.h"
+#include "renderer/texture.h"
 
 namespace Lumix {
 
@@ -31,6 +34,216 @@ static constexpr u32 IMPOSTOR_TILE_SIZE = 512;
 static constexpr u32 IMPOSTOR_COLS = 9;
 
 namespace {
+
+// the colors of a 4x4 block of BC1, `four_colors` is true for the color block of BC3, which never has the 3 colors + transparent mode
+void decodeBC1Block(const u8* block, bool four_colors, u8 (&out)[16][4]) {
+	const u32 c0 = block[0] | (block[1] << 8), c1 = block[2] | (block[3] << 8);
+	u8 colors[4][4];
+	auto unpack = [](u32 c, u8* o) {
+		o[0] = u8(((c >> 11) & 31) * 255 / 31);
+		o[1] = u8(((c >> 5) & 63) * 255 / 63);
+		o[2] = u8((c & 31) * 255 / 31);
+		o[3] = 255;
+	};
+	unpack(c0, colors[0]);
+	unpack(c1, colors[1]);
+	if (c0 > c1 || four_colors) {
+		for (u32 k = 0; k < 3; ++k) {
+			colors[2][k] = u8((2 * colors[0][k] + colors[1][k]) / 3);
+			colors[3][k] = u8((colors[0][k] + 2 * colors[1][k]) / 3);
+		}
+		colors[2][3] = colors[3][3] = 255;
+	}
+	else {
+		for (u32 k = 0; k < 3; ++k) colors[2][k] = u8((colors[0][k] + colors[1][k]) / 2);
+		colors[2][3] = 255;
+		memset(colors[3], 0, 4);
+	}
+	const u32 indices = block[4] | (block[5] << 8) | (block[6] << 16) | ((u32)block[7] << 24);
+	for (u32 i = 0; i < 16; ++i) memcpy(out[i], colors[(indices >> (2 * i)) & 3], 4);
+}
+
+// the alpha of a 4x4 block of BC3
+void decodeBC3Alpha(const u8* block, u8 (&out)[16]) {
+	u32 a[8];
+	a[0] = block[0];
+	a[1] = block[1];
+	if (a[0] > a[1]) {
+		for (u32 i = 1; i < 7; ++i) a[i + 1] = ((7 - i) * a[0] + i * a[1]) / 7;
+	}
+	else {
+		for (u32 i = 1; i < 5; ++i) a[i + 1] = ((5 - i) * a[0] + i * a[1]) / 5;
+		a[6] = 0;
+		a[7] = 255;
+	}
+	u64 bits = 0;
+	for (u32 i = 0; i < 6; ++i) bits |= u64(block[2 + i]) << (8 * i);
+	for (u32 i = 0; i < 16; ++i) out[i] = u8(a[(bits >> (3 * i)) & 7]);
+}
+
+// A tiny version of the diffuse texture of a material, to color voxels. Texels are premultiplied by alpha (so the transparent parts of leaf cards do not darken
+// the color), linear.
+struct VoxelColorTexture {
+	static constexpr u32 MAX_SIZE = 32;
+	struct Texel { float r = 0, g = 0, b = 0, a = 0; };
+	u32 w = 0, h = 0;
+	Texel texels[MAX_SIZE * MAX_SIZE];	// rgb * a, a
+	Vec3 average = Vec3(1);
+	float average_alpha = 1.f;
+
+	static float srgbToLinear(float v) { return v <= 0.04045f ? v / 12.92f : powf((v + 0.055f) / 1.055f, 2.4f); }
+
+	// `pixel(x, y)` returns the color and alpha (0-1) of a pixel of the source image, the color is sRGB if `srgb` is true
+	template <typename F> void build(u32 iw, u32 ih, bool srgb, F&& pixel) {
+		w = minimum(iw, MAX_SIZE);
+		h = minimum(ih, MAX_SIZE);
+		Texel total;
+		for (u32 y = 0; y < h; ++y) {
+			for (u32 x = 0; x < w; ++x) {
+				// box filter
+				const u32 x0 = x * iw / w, x1 = maximum(x0 + 1, (x + 1) * iw / w);
+				const u32 y0 = y * ih / h, y1 = maximum(y0 + 1, (y + 1) * ih / h);
+				Texel sum;
+				for (u32 yy = y0; yy < y1; ++yy) {
+					for (u32 xx = x0; xx < x1; ++xx) {
+						const Vec4 px = pixel(xx, yy);
+						sum.r += (srgb ? srgbToLinear(px.x) : px.x) * px.w;
+						sum.g += (srgb ? srgbToLinear(px.y) : px.y) * px.w;
+						sum.b += (srgb ? srgbToLinear(px.z) : px.z) * px.w;
+						sum.a += px.w;
+					}
+				}
+				const float inv = 1.f / float((x1 - x0) * (y1 - y0));
+				const Texel t = { sum.r * inv, sum.g * inv, sum.b * inv, sum.a * inv };
+				texels[y * w + x] = t;
+				total.r += t.r; total.g += t.g; total.b += t.b; total.a += t.a;
+			}
+		}
+		if (total.a > 1e-4f) average = Vec3(total.r, total.g, total.b) * (1.f / total.a);
+		if (w > 0 && h > 0) average_alpha = clamp(total.a / float(w * h), 0.1f, 1.f);
+	}
+
+	// Reads the compiled texture (see AssetCompiler::writeCompiledResource and Texture::load), so the source of the texture (a recipe can take very long to evaluate)
+	// is never evaluated here. Uses the smallest mip that has at most MAX_SIZE texels on a side. Only BC1, BC3 and RGBA8 are supported, which is what the
+	// compiler makes of color textures.
+	bool loadCompiled(Engine& engine, Span<const u8> file, IAllocator& allocator) {
+		if (file.length() < sizeof(CompiledResourceHeader)) return false;
+		const CompiledResourceHeader* header = (const CompiledResourceHeader*)file.begin();
+		if (header->magic != CompiledResourceHeader::MAGIC || header->version != 0) return false;
+		OutputMemoryStream decompressed(allocator);
+		Span<const u8> payload(file.begin() + sizeof(*header), file.end());
+		if (header->flags & CompiledResourceHeader::COMPRESSED) {
+			decompressed.resize(header->decompressed_size);
+			if (!engine.decompress(payload, Span<u8>(decompressed.getMutableData(), decompressed.size()))) return false;
+			payload = Span<const u8>(decompressed.data(), (u32)decompressed.size());
+		}
+
+		// "lbc", flags, LBCHeader, mips of the first layer one after another
+		if (payload.length() < 3 + sizeof(u32) + sizeof(LBCHeader)) return false;
+		const u8* ptr = payload.begin();
+		if (memcmp(ptr, "lbc", 3) != 0) return false;
+		ptr += 3;
+		u32 flags;
+		memcpy(&flags, ptr, sizeof(flags));
+		ptr += sizeof(flags);
+		LBCHeader lbc;
+		memcpy(&lbc, ptr, sizeof(lbc));
+		ptr += sizeof(lbc);
+		if (lbc.magic != LBCHeader::MAGIC || lbc.version > 0 || lbc.w == 0 || lbc.h == 0 || lbc.mips == 0) return false;
+		if (lbc.format != gpu::TextureFormat::BC1 && lbc.format != gpu::TextureFormat::BC3 && lbc.format != gpu::TextureFormat::RGBA8) return false;
+
+		u32 mip = 0;
+		while (mip + 1 < lbc.mips && maximum(lbc.w >> mip, lbc.h >> mip) > MAX_SIZE) ++mip;
+		u64 offset = 0;
+		for (u32 i = 0; i < mip; ++i) offset += gpu::getSize(lbc.format, maximum(lbc.w >> i, 1u), maximum(lbc.h >> i, 1u));
+		const u32 mw = maximum(lbc.w >> mip, 1u), mh = maximum(lbc.h >> mip, 1u);
+		const u64 size = gpu::getSize(lbc.format, mw, mh);
+		if ((ptr - payload.begin()) + offset + size > payload.length()) return false;
+		const u8* data = ptr + offset;
+
+		Array<u8> rgba(allocator);
+		rgba.resize(mw * mh * 4);
+		if (lbc.format == gpu::TextureFormat::RGBA8) {
+			memcpy(rgba.begin(), data, rgba.byte_size());
+		}
+		else {
+			const bool has_alpha_block = lbc.format == gpu::TextureFormat::BC3;
+			const u32 block_size = has_alpha_block ? 16 : 8;
+			const u32 blocks_x = (mw + 3) / 4;
+			for (u32 by = 0; by < (mh + 3) / 4; ++by) {
+				for (u32 bx = 0; bx < blocks_x; ++bx) {
+					const u8* block = data + (by * blocks_x + bx) * block_size;
+					u8 colors[16][4];
+					u8 alphas[16];
+					if (has_alpha_block) decodeBC3Alpha(block, alphas);
+					decodeBC1Block(block + (has_alpha_block ? 8 : 0), has_alpha_block, colors);
+					for (u32 i = 0; i < 16; ++i) {
+						const u32 x = bx * 4 + (i & 3), y = by * 4 + (i >> 2);
+						if (x >= mw || y >= mh) continue;
+						u8* dst = &rgba[(y * mw + x) * 4];
+						memcpy(dst, colors[i], 3);
+						dst[3] = has_alpha_block ? alphas[i] : colors[i][3];
+					}
+				}
+			}
+		}
+		build(mw, mh, (flags & (u32)Texture::Flags::SRGB) != 0, [&](u32 x, u32 y) {
+			const u8* px = &rgba[(y * mw + x) * 4];
+			return Vec4(px[0] / 255.f, px[1] / 255.f, px[2] / 255.f, px[3] / 255.f);
+		});
+		return true;
+	}
+
+	// bilinear, wrapping
+	Vec3 sample(Vec2 uv) const {
+		const float fx = uv.x * w - 0.5f, fy = uv.y * h - 0.5f;
+		const float flx = floorf(fx), fly = floorf(fy);
+		const float tx = fx - flx, ty = fy - fly;
+		auto texel = [&](float x, float y) {
+			const i32 ix = ((i32)x % (i32)w + (i32)w) % (i32)w;
+			const i32 iy = ((i32)y % (i32)h + (i32)h) % (i32)h;
+			return texels[iy * w + ix];
+		};
+		const Texel a = texel(flx, fly), b = texel(flx + 1, fly), c = texel(flx, fly + 1), d = texel(flx + 1, fly + 1);
+		auto mix = [&](float Texel::*m) { return (a.*m * (1 - tx) + b.*m * tx) * (1 - ty) + (c.*m * (1 - tx) + d.*m * tx) * ty; };
+		const float alpha = mix(&Texel::a);
+		if (alpha < 0.05f) return average;
+		return Vec3(mix(&Texel::r), mix(&Texel::g), mix(&Texel::b)) * (1.f / alpha);
+	}
+};
+
+// The first texture and the color of a .mat file.
+struct VoxelMaterialInfo {
+	StaticString<MAX_PATH> texture;
+	Vec3 color = Vec3(1);
+};
+
+void readVoxelMaterial(Span<const u8> content, const char* path, VoxelMaterialInfo& out) {
+	Tokenizer tokenizer(content, path);
+	bool first_texture = true;
+	for (;;) {
+		const Tokenizer::Token key = tokenizer.tryNextToken();
+		if (!key) return;
+		if (key.type != Tokenizer::Token::IDENTIFIER) continue;
+		if (first_texture && key == "texture") {
+			first_texture = false;
+			StringView value;
+			if (!tokenizer.consume(value)) return;
+			out.texture = StaticString<MAX_PATH>(value);
+		}
+		else if (key == "uniform") {
+			StringView name;
+			if (!tokenizer.consume(name, ",")) return;
+			if (!equalStrings(name, "Material color")) continue;
+			const Tokenizer::Token brace = tokenizer.nextToken();
+			if (!brace || brace.value[0] != '{') continue;
+			float v[4];
+			u32 size;
+			if (!tokenizer.consumeVector(v, size)) return;
+			if (size >= 3) out.color = Vec3(v[0], v[1], v[2]);
+		}
+	}
+}
 
 struct BitWriter {
 	BitWriter(OutputMemoryStream& blob, u32 total_bits)
@@ -453,8 +666,8 @@ void ModelImporter::createImpostorTextures(Model* model, ImpostorTexturesContext
 	Renderer* renderer = (Renderer*)engine.getSystemManager().getSystem("renderer");
 	ASSERT(renderer);
 
-	const u32 capture_define = 1 << renderer->getShaderDefineIdx("DEFERRED");
-	const u32 bake_normals_define = 1 << renderer->getShaderDefineIdx("BAKE_NORMALS");
+	const u64 capture_define = 1ull << renderer->getShaderDefineIdx("DEFERRED");
+	const u64 bake_normals_define = 1ull << renderer->getShaderDefineIdx("BAKE_NORMALS");
 	Array<u32> depth_tmp(m_allocator);
 
 	renderer->pushJob("create impostor textures", [&](DrawStream& stream) {
@@ -1411,7 +1624,7 @@ struct PagePayloads {
 
 }
 
-bool ModelImporter::writeClusters(const ModelMeta& meta) {
+bool ModelImporter::writeClusters(const Path& src, const ModelMeta& meta) {
 	PROFILE_FUNCTION();
 	m_resident_end = m_out_file.size();
 	if (!m_bake_clusters) {
@@ -1434,6 +1647,7 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 	Array<Array<Vec2>> uvs(m_allocator);
 	Array<Array<u32>> aos(m_allocator);
 	Array<Array<u32>> colors(m_allocator);
+	Array<Array<u32>> voxel_colors(m_allocator);	// colors of the voxels of each mesh, from the material if the mesh has no vertex colors
 	profiler::beginBlock("read cluster attributes");
 	const u8* vertex_data = m_out_file.data() + m_vertex_data_offset;
 	for (const ImportMesh* mesh : meshes) {
@@ -1482,6 +1696,56 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 			uvs_dst.resize(vertex_count);
 			for (u32 i = 0; i < vertex_count; ++i) memcpy(&uvs_dst[i], vertex_data + i * geom.vertex_size + uv_offset, sizeof(Vec2));
 		}
+		Array<u32>& voxel_colors_dst = voxel_colors.emplace(m_allocator);
+		if (meta.cluster_voxels && colors_dst.empty() && geom.material_index < (u32)m_materials.size()) {
+			// the texture and color of the material, from its .mat file, the importer knows only the textures of the source file
+			const ImportMaterial& material = m_materials[geom.material_index];
+			FileSystem& fs = m_app.getEngine().getFileSystem();
+			const PathInfo src_info(src);
+			StaticString<MAX_PATH> texture_path(material.textures[ImportTexture::DIFFUSE].src);
+			Vec3 flat = meta.ignore_material_colors ? Vec3(1) : material.diffuse_color;
+			OutputMemoryStream mat_content(m_allocator);
+			const Path mat_path = getMaterialPath(src_info.dir, material.name, meta);
+			if (fs.getContentSync(mat_path, mat_content)) {
+				VoxelMaterialInfo info;
+				readVoxelMaterial(Span<const u8>(mat_content.data(), (u32)mat_content.size()), mat_path.c_str(), info);
+				texture_path = info.texture.data;
+				if (!meta.ignore_material_colors) flat = info.color;
+			}
+			// the model depends on the .mat and the texture: if the texture is not compiled yet, the voxels have the color of the material and the model is compiled
+			// again when the texture is
+			AssetCompiler& compiler = m_app.getAssetCompiler();
+			compiler.registerDependency(src, mat_path);
+			VoxelColorTexture* texture = nullptr;
+			if (!texture_path.empty()) {
+				const Path path = texture_path.data[0] == '/' ? Path(texture_path.data + 1) : Path(src_info.dir, texture_path.data);
+				compiler.registerDependency(src, path);
+				const Path compiled_path(".lumix/resources/", path.getHash(), ".res");
+				const u64 compiled_time = fs.fileExists(compiled_path) ? fs.getLastModified(compiled_path) : 0;
+				const bool up_to_date = compiled_time != 0 && compiled_time >= fs.getLastModified(path) && compiled_time >= fs.getLastModified(Path(path, ".meta"));
+				OutputMemoryStream compiled(m_allocator);
+				if (up_to_date && fs.getContentSync(compiled_path, compiled)) {
+					texture = LUMIX_NEW(m_allocator, VoxelColorTexture);
+					if (!texture->loadCompiled(m_app.getEngine(), Span<const u8>(compiled.data(), (u32)compiled.size()), m_allocator)) {
+						logWarning("Unsupported texture ", path, " to color voxels, only the color of the material is used");
+						LUMIX_DELETE(m_allocator, texture);
+						texture = nullptr;
+					}
+				}
+			}
+			logInfo("Voxel colors of ", src, " ", geom.name.c_str(), ": texture ", texture ? texture_path.data : "none", ", material color ", flat.x, ", ", flat.y, ", ", flat.z);
+			if (texture || flat != Vec3(1)) {
+				voxel_colors_dst.resize(vertex_count);
+				auto to_byte = [](float v) { return (u32)clamp(v * 255.f + 0.5f, 0.f, 255.f); };
+				const u32 alpha_byte = to_byte(texture ? texture->average_alpha : 1.f) << 24;
+				for (u32 i = 0; i < vertex_count; ++i) {
+					Vec3 c = texture ? texture->sample(uvs_dst.empty() ? Vec2(0) : uvs_dst[i]) : Vec3(1);
+					c = Vec3(c.x * flat.x, c.y * flat.y, c.z * flat.z);
+					voxel_colors_dst[i] = to_byte(c.x) | (to_byte(c.y) << 8) | (to_byte(c.z) << 16) | alpha_byte;
+				}
+			}
+			if (texture) LUMIX_DELETE(m_allocator, texture);
+		}
 		vertex_data += geom.vertex_buffer.size();
 	}
 	profiler::endBlock();
@@ -1503,7 +1767,15 @@ bool ModelImporter::writeClusters(const ModelMeta& meta) {
 			const Array<u32>& indices = hasAutoLOD(meta, 0) ? *geom.autolod_indices[0].get() : geom.indices;
 			MeshClusters* clusters = LUMIX_NEW(m_allocator, MeshClusters)(m_allocator);
 			results[i] = clusters;
-			if (!buildMeshClusters(Span<const Vec3>(positions[i].begin(), positions[i].size()), Span<const Vec3>(normals[i].begin(), normals[i].size()), Span<const Vec2>(uvs[i].begin(), uvs[i].size()), Span<const u32>(indices.begin(), indices.size()), meta.cluster_dilate_borders, *clusters, m_allocator)) {
+			ClusterVoxelSource voxel_source;
+			voxel_source.error = meta.cluster_voxel_error;
+			voxel_source.min_coverage = meta.cluster_voxel_min_coverage;
+			voxel_source.downsample_scale = meta.cluster_voxel_downsample_scale;
+			voxel_source.stall_threshold = meta.cluster_voxel_stall_threshold;
+			voxel_source.max_resolution = meta.cluster_voxel_max_resolution;
+			voxel_source.colors = !colors[i].empty() ? colors[i].begin() : voxel_colors[i].empty() ? nullptr : voxel_colors[i].begin();
+			voxel_source.ao = aos[i].empty() ? nullptr : aos[i].begin();
+			if (!buildMeshClusters(Span<const Vec3>(positions[i].begin(), positions[i].size()), Span<const Vec3>(normals[i].begin(), normals[i].size()), Span<const Vec2>(uvs[i].begin(), uvs[i].size()), Span<const u32>(indices.begin(), indices.size()), meta.cluster_dilate_borders, *clusters, m_allocator, meta.cluster_voxels ? &voxel_source : nullptr)) {
 				failed = 1;
 				return;
 			}
@@ -1964,7 +2236,7 @@ bool ModelImporter::writeModel(const Path& src, const ModelMeta& meta) {
 	writeGeometry(meta);
 	writeSkeleton(meta);
 	writeLODs(meta);
-	if (!writeClusters(meta)) return false;
+	if (!writeClusters(src, meta)) return false;
 
 	return compileModelFile(Path(src), m_resident_end);
 }

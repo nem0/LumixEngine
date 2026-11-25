@@ -85,18 +85,18 @@ u32 Material::getCustomFlag(StringView flag_name)
 
 bool Material::isDefined(u8 define_idx) const
 {
-	return (m_define_mask & (1 << define_idx)) != 0;
+	return (m_define_mask & (1ull << define_idx)) != 0;
 }
 
 
 void Material::setDefine(u8 define_idx, bool enabled)
 {
-	u32 old_mask = m_define_mask;
+	u64 old_mask = m_define_mask;
 	if (enabled) {
-		m_define_mask |= 1 << define_idx;
+		m_define_mask |= 1ull << define_idx;
 	}
 	else {
-		m_define_mask &= ~(1 << define_idx);
+		m_define_mask &= ~(1ull << define_idx);
 	}
 	if (old_mask != m_define_mask) updateRenderData(false);
 }
@@ -148,8 +148,8 @@ void Material::serialize(OutputMemoryStream& blob) {
 	blob << "backface_culling " << (isBackfaceCulling() ? "true" : "false") << "\n";
 	blob << "layer \"" << m_renderer.getLayerName(m_layer) << "\"\n";
 
-	for (int i = 0; i < sizeof(m_define_mask) * 8; ++i) {
-		if ((m_define_mask & (1 << i)) == 0) continue;
+	for (int i = 0; i < (int)(sizeof(m_define_mask) * 8); ++i) {
+		if ((m_define_mask & (1ull << i)) == 0) continue;
 		const char* def = m_renderer.getShaderDefine(i);
 		blob << "define \"" << def << "\"\n";
 	}
@@ -253,11 +253,11 @@ void Material::setTexture(u32 i, Texture* texture)
 		{
 			if(m_textures[i])
 			{
-				m_define_mask |= 1 << define_idx;
+				m_define_mask |= 1ull << define_idx;
 			}
 			else
 			{
-				m_define_mask &= ~(1 << define_idx);
+				m_define_mask &= ~(1ull << define_idx);
 			}
 		}
 	}
@@ -292,9 +292,9 @@ void Material::onBeforeReady()
 		const int define_idx = m_shader->m_texture_slots[i].define_idx;
 		if (define_idx >= 0) {
 			if (m_textures[i]) {
-				m_define_mask |= 1 << define_idx;
+				m_define_mask |= 1ull << define_idx;
 			} else {
-				m_define_mask &= ~(1 << define_idx);
+				m_define_mask &= ~(1ull << define_idx);
 			}
 		}
 	}

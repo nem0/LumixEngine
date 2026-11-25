@@ -100,6 +100,14 @@ struct ModelMeta {
 		WRITE_BOOL(create_impostor, false);
 		WRITE_BOOL(create_clusters, true);
 		WRITE_BOOL(cluster_dilate_borders, false);
+		WRITE_BOOL(cluster_voxels, false);
+		if (cluster_voxels) {
+			WRITE_VALUE(cluster_voxel_error, 0.01f);
+			WRITE_VALUE(cluster_voxel_min_coverage, 0.25f);
+			WRITE_VALUE(cluster_voxel_downsample_scale, 0.25f);
+			WRITE_VALUE(cluster_voxel_stall_threshold, 0.65f);
+			WRITE_VALUE(cluster_voxel_max_resolution, 4000u);
+		}
 		WRITE_BOOL(use_mikktspace, false);
 		WRITE_BOOL(force_recompute_normals, false);
 		WRITE_BOOL(force_recompute_tangents, false);
@@ -195,6 +203,12 @@ struct ModelMeta {
 			{ "create_impostor", &create_impostor },
 			{ "create_clusters", &create_clusters },
 			{ "cluster_dilate_borders", &cluster_dilate_borders },
+			{ "cluster_voxels", &cluster_voxels },
+			{ "cluster_voxel_error", &cluster_voxel_error },
+			{ "cluster_voxel_min_coverage", &cluster_voxel_min_coverage },
+			{ "cluster_voxel_downsample_scale", &cluster_voxel_downsample_scale },
+			{ "cluster_voxel_stall_threshold", &cluster_voxel_stall_threshold },
+			{ "cluster_voxel_max_resolution", &cluster_voxel_max_resolution },
 			{ "import_vertex_colors", &import_vertex_colors },
 			{ "use_specular_as_roughness", &use_specular_as_roughness },
 			{ "use_specular_as_metallic", &use_specular_as_metallic },
@@ -382,6 +396,12 @@ struct ModelMeta {
 	bool create_impostor = false;
 	bool create_clusters = true; // bake cluster DAGs of the first LOD for GPU driven LOD, see mesh_clusters.h
 	bool cluster_dilate_borders = false; // coarser levels of clusters grow their open borders to keep the area of the surface, for foliage, see buildMeshClusters
+	bool cluster_voxels = false; // the coarsest levels of clusters are voxels instead of triangles, for foliage and thin geometry, see buildMeshClusters
+	float cluster_voxel_error = 0.01f; // the error (a fraction of the diagonal of the mesh) where voxel levels replace triangle ones
+	float cluster_voxel_min_coverage = 0.25f; // minimum accumulated surface area / (size * size) for a voxel to survive filtering
+	float cluster_voxel_downsample_scale = 0.25f; // child coverage multiplier when downsampling 2x coarser (0.25 preserves 2D area, 0.5 preserves 1D twigs)
+	float cluster_voxel_stall_threshold = 0.65f; // switch a group to voxels if simplification leaves more than this fraction of its triangles
+	u32 cluster_voxel_max_resolution = 4000; // maximum voxels along the longest axis of the mesh (clamped to [64, 4000])
 	u32 lod_count = 1;
 	float min_bake_vertex_ao = 0.f;
 	float anim_translation_error = 1.f;

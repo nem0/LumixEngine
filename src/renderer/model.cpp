@@ -685,6 +685,40 @@ bool Model::parseClusters(InputMemoryStream& file, Span<const u8> resident) {
 		groups.resize(group_count);
 		memcpy(groups.begin(), file.skip(u64(group_count) * sizeof(MeshGroupGPU)), groups.byte_size());
 
+		mesh.voxel_cluster_count = 0;
+		mesh.voxel_brick_count = 0;
+		mesh.voxel_count = 0;
+		mesh.voxel_min_size = 0.f;
+		{
+			const MeshClusterGPU* cl = (const MeshClusterGPU*)clusters;
+			const MeshClusterVertexGPU* hdr = (const MeshClusterVertexGPU*)headers;
+			for (u32 g = 0; g < group_count; ++g) {
+				const MeshGroupGPU& grp = groups[g];
+				u32 grp_bricks = 0;
+				u32 grp_voxel_clusters = 0;
+				for (u32 k = 0; k < grp.cluster_count; ++k) {
+					const u32 ci = grp.first_cluster + k;
+					if (cl[ci].index_count != 0) continue;
+					++grp_voxel_clusters;
+					grp_bricks += hdr[ci].vertex_count;
+					if (hdr[ci].pos_step > 0.f && (mesh.voxel_min_size == 0.f || hdr[ci].pos_step < mesh.voxel_min_size)) {
+						mesh.voxel_min_size = hdr[ci].pos_step;
+					}
+				}
+				if (grp_voxel_clusters > 0) {
+					mesh.voxel_cluster_count += grp_voxel_clusters;
+					mesh.voxel_brick_count += grp_bricks;
+					// Voxel groups store brick_count * 16 bytes of brick records + voxel_count * 8 bytes of attributes (last group has 8 bytes of tail padding).
+					const u32 pad = (g + 1 == group_count && grp.stream_size >= 8) ? 8 : 0;
+					const u32 payload_bytes = grp.stream_size - pad;
+					const u32 brick_bytes = grp_bricks * 16;
+					if (payload_bytes > brick_bytes) {
+						mesh.voxel_count += (payload_bytes - brick_bytes) / 8;
+					}
+				}
+			}
+		}
+
 		// the pages, see MeshPages (the importer made them, only the sizes are checked)
 		MeshPagesView page_data;
 		file.read(page_data.page_count);
@@ -1085,6 +1119,10 @@ void Model::destroyClusters() {
 		mesh.root_count = 0;
 		mesh.tree_depth = 0;
 		mesh.leaf_cluster_count = 0;
+		mesh.voxel_cluster_count = 0;
+		mesh.voxel_brick_count = 0;
+		mesh.voxel_count = 0;
+		mesh.voxel_min_size = 0.f;
 	}
 	m_has_clusters = false;
 }

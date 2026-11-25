@@ -55,7 +55,8 @@ const Model* getGPUModel(const GPUSceneRegistry& res, u32 model_id) {
 static u64 hashDrawGroup(const GPUDrawGroup& key) {
 	u64 hash = hashBegin();
 	hash = hashMix(hash, (u64)(uintptr)key.shader);
-	hash = hashMix(hash, key.define_mask);
+	hash = hashMix(hash, (u32)key.define_mask);
+	hash = hashMix(hash, (u32)(key.define_mask >> 32));
 	hash = hashMix(hash, (u64)key.state);
 	hash = hashMix(hash, (u64)key.primitive_type);
 	hash = hashMix(hash, key.layer);
@@ -160,7 +161,7 @@ static u32 acquireVariant(GPUSceneRegistry& res, u32 model_id, const Model& mode
 	memset(&key, 0, sizeof(key));
 	key.shader = material->getShader();
 	key.define_mask = material->getDefineMask();
-	if (lod && mesh.type == Mesh::SKINNED) key.define_mask |= 1 << res.skinned_define_idx;
+	if (lod && mesh.type == Mesh::SKINNED) key.define_mask |= 1ull << res.skinned_define_idx;
 	key.state = material->m_render_states;
 	key.primitive_type = mesh.primitive_type;
 	key.semantics_defines = mesh.semantics_defines;

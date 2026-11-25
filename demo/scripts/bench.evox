@@ -394,7 +394,8 @@ fn runScene(engine : Engine, world : World, camera : Entity, flag : []const u8, 
 		if frame <= warmup { continue; }
 
 		const measured = frame - warmup;
-		const angle : f32 = yaw0 + 6.2831853 * (measured as f32) / (frames as f32);
+		var angle : f32 = yaw0 + 6.2831853 * (measured as f32) / (frames as f32);
+		if commandline.isFlagOn("-bench_still") { angle = yaw0; }
 		camera.setRotation(quat.makeQuatFromYaw(angle) * quat.makeQuatFromPitch(pitch));
 		total_time += dt as f64;
 		sampleCounters();

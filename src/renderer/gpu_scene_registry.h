@@ -29,7 +29,7 @@ struct GPUMaterialOverride {
 // What one indirect call draws: the variants of the same program, layer and kind of mesh. A free group has variant_count 0.
 struct GPUDrawGroup {
 	Shader* shader;
-	u32 define_mask;				// of the material, with SKINNED
+	u64 define_mask;				// of the material, with SKINNED
 	gpu::StateFlags state;			// of the material
 	gpu::PrimitiveType primitive_type;
 	const char* semantics_defines;

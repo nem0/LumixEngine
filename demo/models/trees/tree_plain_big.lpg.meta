@@ -1,6 +1,9 @@
 
 lod_count = 1
 cluster_dilate_borders = true
+cluster_voxels = true
+cluster_voxel_min_coverage = 0.450000
+cluster_voxel_stall_threshold = 0.250000
 bake_vertex_ao = true
 min_bake_vertex_ao = 0.500000
 lod0_distance = 10000.000000

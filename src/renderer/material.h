@@ -64,7 +64,7 @@ struct LUMIX_RENDERER_API Material final : Resource {
 
 	void setDefine(u8 define_idx, bool enabled);
 	bool isDefined(u8 define_idx) const;
-	u32 getDefineMask() const { return m_define_mask; }
+	u64 getDefineMask() const { return m_define_mask; }
 
 	void setCustomFlag(u32 flag) { m_custom_flags |= flag; }
 	void unsetCustomFlag(u32 flag) { m_custom_flags &= ~flag; }
@@ -100,7 +100,7 @@ private:
 	Texture* m_textures[MAX_TEXTURE_COUNT];
 	u8 m_layer;
 	u32 m_sort_key = 0;
-	u32 m_define_mask;
+	u64 m_define_mask;
 	MaterialIndex m_material_constants = MaterialIndex{0};
 	u32 m_texture_count;
 

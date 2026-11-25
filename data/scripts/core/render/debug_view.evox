@@ -26,7 +26,7 @@ fn showDebugView(ctx : Context, gbuffer : GBuffer, output : RenderBuffer) : bool
 
 	const show = ctx.debugShow();
 	// the cluster colors are written to albedo by surface shaders (CLUSTER_DEBUG)
-	if show == .ALBEDO or show == .MESH_CLUSTERS or show == .MESH_TRIANGLES {
+	if show == .ALBEDO or show == .MESH_CLUSTERS or show == .MESH_TRIANGLES or show == .VOXEL_BRICKS {
 		showChannels(ctx, gbuffer.A, output, red, green, blue);
 		return true;
 	}

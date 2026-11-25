@@ -19,7 +19,7 @@ struct Texture;
 struct ShaderKey {
 	bool operator==(const ShaderKey& rhs) const;
 	gpu::StateFlags state;
-	u32 defines;
+	u64 defines;
 	u32 primitive_type; // gpu::PrimitiveType
 	const char* semantic_defines;
 };
@@ -79,15 +79,15 @@ struct LUMIX_RENDERER_API Shader final : Resource {
 	ResourceType getType() const override { return TYPE; }
 	bool hasDefine(u8 define) const;
 	
-	gpu::ProgramHandle getProgram(u32 defines);
-	gpu::ProgramHandle getProgram(gpu::StateFlags state, gpu::PrimitiveType primitive_type, u32 defines, const char* attr_defines);
+	gpu::ProgramHandle getProgram(u64 defines);
+	gpu::ProgramHandle getProgram(gpu::StateFlags state, gpu::PrimitiveType primitive_type, u64 defines, const char* attr_defines);
 	void compile(gpu::ProgramHandle program, const ShaderKey& key, DrawStream& stream);
 	static void toUniformVarName(Span<char> out, const char* in);
 	static void toTextureVarName(Span<char> out, const char* in);
 
 	TagAllocator m_allocator;
 	Renderer& m_renderer;
-	u32 m_all_defines_mask;
+	u64 m_all_defines_mask;
 	TextureSlot m_texture_slots[16];
 	u32 m_texture_slot_count;
 	Array<Uniform> m_uniforms;
@@ -119,7 +119,9 @@ struct HashFunc<ShaderKey> {
 	}
 
 	static u32 get(const ShaderKey& key) {
-		return mix(HashFunc<u64>::get(((u64*)&key)[0]), HashFunc<u64>::get(((u64*)&key)[1]));
+		u32 h = mix(HashFunc<u64>::get((u64)key.state), HashFunc<u64>::get(key.defines));
+		h = mix(h, key.primitive_type);
+		return mix(h, HashFunc<u64>::get((u64)key.semantic_defines));
 	}
 };
 

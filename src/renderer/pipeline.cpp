@@ -283,8 +283,8 @@ struct JobsGroup {
 // Counts of the GPU cluster culling (the selected and occluded lists, the work queues), read back some frames after the cull and pushed to the profiler.
 // One instance for each read, it deletes itself in the callback, which runs on the render thread (with an empty span if the read failed).
 struct SceneStatsRead {
-	enum Kind : u32 { SELECTED, OCCLUDED, CULL };								// what is read: selected count, occluded count, the counters of the cull (COUNTER_* of gpu_scene_layout.hlsli)
-	enum Stat : u32 { STAT_SELECTED, STAT_OCCLUDED, STAT_CANDIDATES, STAT_TREE, STAT_CHUNKS, STAT_COUNT };
+	enum Kind : u32 { SELECTED, OCCLUDED, CULL, VOXELS, VOXEL_POOL };			// what is read: selected count, occluded count, the counters of the cull (COUNTER_* of gpu_scene_layout.hlsli), the bricks of voxels of a view, the end of the pool of bricks
+	enum Stat : u32 { STAT_SELECTED, STAT_OCCLUDED, STAT_CANDIDATES, STAT_TREE, STAT_CHUNKS, STAT_VOXEL_BRICKS, STAT_COUNT };
 	enum View : u32 { VIEW_MAIN, VIEW_SHADOW, VIEW_SHADOW_0, VIEW_SHADOW_3 = VIEW_SHADOW_0 + 3, VIEW_MAIN_POST, VIEW_COUNT };
 
 	static View getView(bool post, bool is_shadow, i32 shadow_slice) {
@@ -297,7 +297,7 @@ struct SceneStatsRead {
 	static void pushStat(Stat stat, View view, u32 value) {
 		#define VIEW_NAMES(p) { p " (main)", p " (shadow)", p " (shadow 0)", p " (shadow 1)", p " (shadow 2)", p " (shadow 3)", p " (main post)" }
 		static const char* const names[STAT_COUNT][VIEW_COUNT] = {
-			VIEW_NAMES("Selected clusters"), VIEW_NAMES("Occluded clusters"), VIEW_NAMES("Candidate clusters"), VIEW_NAMES("Tree items"), VIEW_NAMES("Chunk items")
+			VIEW_NAMES("Selected clusters"), VIEW_NAMES("Occluded clusters"), VIEW_NAMES("Candidate clusters"), VIEW_NAMES("Tree items"), VIEW_NAMES("Chunk items"), VIEW_NAMES("Voxel bricks")
 		};
 		#undef VIEW_NAMES
 		static u32 ids[STAT_COUNT][VIEW_COUNT];
@@ -324,7 +324,7 @@ struct SceneStatsRead {
 	}
 
 	void onRead(Span<const u8> data) {
-		const u32 words = kind == CULL ? 5 : 1;
+		const u32 words = (kind == CULL || kind == VOXEL_POOL) ? 5 : 1;
 		if (data.length() >= words * sizeof(u32)) {
 			u32 v[5];
 			memcpy(v, data.begin(), words * sizeof(u32));
@@ -336,6 +336,13 @@ struct SceneStatsRead {
 				case OCCLUDED:
 					pushStat(STAT_OCCLUDED, view, v[0]);
 					pushOverflow("Occluded clusters overflow", v[0], capacity0);
+					break;
+				case VOXELS:
+					pushStat(STAT_VOXEL_BRICKS, view, v[0]);
+					break;
+				case VOXEL_POOL:
+					pushOverflow("Voxel bricks overflow", v[0], capacity0);
+					pushOverflow("Occluded voxel bricks overflow", v[4], capacity1);
 					break;
 				case CULL:
 					pushStat(STAT_CANDIDATES, view, v[4]);		// COUNTER_CANDIDATE_CLUSTERS
@@ -369,7 +376,7 @@ struct PipelineImpl final : Pipeline {
 		u8 layer;
 		char layer_name[32];
 		BucketDesc::Sort sort = BucketDesc::DEFAULT;
-		u32 define_mask = 0;
+		u64 define_mask = 0;
 		gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FN_GREATER;
 		DrawStream stream;
 		DrawStream* substreams[32];
@@ -539,7 +546,7 @@ struct PipelineImpl final : Pipeline {
 		u32 hzb_mips;
 		float hzb_size[2];
 		gpu::RWBindlessHandle args;		// indirect dispatch args (POST_ARGS)
-		u32 hzb_padding;
+		gpu::RWBindlessHandle voxel_clusters;	// selected voxel clusters (index_count == 0)
 	};
 	static_assert(sizeof(ClusterViewUniforms) % 16 == 0);
 
@@ -600,7 +607,9 @@ struct PipelineImpl final : Pipeline {
 		m_hzb_shader = rm.load<Shader>(Path("engine/shaders/hzb.hlsl"));
 		m_scene_variants_shader = rm.load<Shader>(Path("engine/shaders/gpu_scene_variants.hlsl"));
 		m_flatten_shader = rm.load<Shader>(Path("engine/shaders/flatten_cube.hlsl"));
-		
+		m_voxel_bricks_shader = rm.load<Shader>(Path("engine/shaders/voxel_bricks.hlsl"));
+		m_voxel_shader = rm.load<Shader>(Path("engine/shaders/voxels.hlsl"));
+
 		m_draw2d.clear();
 
 		float cube_verts[] = {
@@ -633,6 +642,18 @@ struct PipelineImpl final : Pipeline {
 
 		const Renderer::MemRef ib_mem = m_renderer.copy(cube_indices, sizeof(cube_indices));
 		m_cube_ib = m_renderer.createBuffer(ib_mem, gpu::BufferFlags::IMMUTABLE, "cube_indices");
+
+		// the cube of a brick of voxels, the corner is bit 0: x, bit 1: y, bit 2: z of SV_VertexID (voxels.hlsl). The indices are shared, so the vertex shader runs 8 times for a cube
+		const u16 voxel_indices[36] = {
+			0, 2, 1, 1, 2, 3,	// -z
+			4, 5, 6, 5, 7, 6,	// +z
+			0, 1, 4, 1, 5, 4,	// -y
+			2, 6, 3, 3, 6, 7,	// +y
+			0, 4, 2, 2, 4, 6,	// -x
+			1, 3, 5, 3, 7, 5	// +x
+		};
+		const Renderer::MemRef voxel_ib_mem = m_renderer.copy(voxel_indices, sizeof(voxel_indices));
+		m_voxel_cube_ib = m_renderer.createBuffer(voxel_ib_mem, gpu::BufferFlags::IMMUTABLE, "voxel cube indices");
 
 		createClusterBuffers();
 
@@ -675,9 +696,18 @@ struct PipelineImpl final : Pipeline {
 		}
 		m_scene_variants_shader->decRefCount();
 		m_flatten_shader->decRefCount();
+		m_voxel_bricks_shader->decRefCount();
+		m_voxel_shader->decRefCount();
 
 		stream.destroy(m_cube_ib);
 		stream.destroy(m_cube_vb);
+		stream.destroy(m_voxel_cube_ib);
+		if (m_voxel_bricks) stream.destroy(m_voxel_bricks);
+		if (m_voxel_quads) stream.destroy(m_voxel_quads);
+		if (m_voxel_counters) stream.destroy(m_voxel_counters);
+		if (m_voxel_occluded) stream.destroy(m_voxel_occluded);
+		if (m_voxel_clusters) stream.destroy(m_voxel_clusters);
+		if (m_voxel_args) stream.destroy(m_voxel_args);
 		if (m_scene_cull_counter) stream.destroy(m_scene_cull_counter);
 		if (m_scene_cull_args) stream.destroy(m_scene_cull_args);
 		if (m_scene_tree_items) stream.destroy(m_scene_tree_items);
@@ -1016,7 +1046,7 @@ struct PipelineImpl final : Pipeline {
 
 			bucket.sort = desc.sort;
 			if (desc.define) {
-				bucket.define_mask = 1 << m_renderer.getShaderDefineIdx(desc.define);
+				bucket.define_mask = 1ull << m_renderer.getShaderDefineIdx(desc.define);
 			}
 			bucket.state = desc.state;
 		}
@@ -1209,7 +1239,7 @@ struct PipelineImpl final : Pipeline {
 		stream.bindUniformBuffer(UniformBuffer::PASS, ub.buffer, ub.offset, ub.size);
 	}
 
-	void drawArray(u32 indices_offset, u32 indices_count, Shader& shader, u32 define_mask = 0, gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FN_GREATER) override {
+	void drawArray(u32 indices_offset, u32 indices_count, Shader& shader, u64 define_mask = 0, gpu::StateFlags state = gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_FN_GREATER) override {
 		PROFILE_FUNCTION();
 		if (!shader.isReady()) return;
 
@@ -1266,7 +1296,7 @@ struct PipelineImpl final : Pipeline {
 	void dispatch(Shader& shader, u32 x, u32 y, u32 z, const char* define = nullptr) override {
 		if (!shader.isReady()) return;
 
-		gpu::ProgramHandle program = shader.getProgram(define ? 1 << m_renderer.getShaderDefineIdx(define) : 0);
+		gpu::ProgramHandle program = shader.getProgram(define ? 1ull << m_renderer.getShaderDefineIdx(define) : 0);
 		if (!program) return;
 
 		DrawStream& stream = m_renderer.getDrawStream();
@@ -1797,7 +1827,7 @@ struct PipelineImpl final : Pipeline {
 	RenderModule* getModule() const override { return m_module; }
 
 	void renderTerrains(const CameraParams& cp, gpu::StateFlags state, const char* define) override {
-		const u32 define_mask = define ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
+		const u64 define_mask = define ? 1ull << m_renderer.getShaderDefineIdx(define) : 0;
 		m_renderer.pushJob("terrain", [this, cp, state, define_mask](DrawStream& stream){
 			UniformPool& uniform_pool = m_renderer.getUniformPool();
 			TransientPool& transient_pool = m_renderer.getTransientPool();
@@ -1900,7 +1930,7 @@ struct PipelineImpl final : Pipeline {
 	void renderEntities(Span<const EntityRef> entities, gpu::StateFlags state, const char* define) override {
 		PROFILE_FUNCTION();
 		if (entities.size() == 0) return;
-		const u32 define_mask = define ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
+		const u64 define_mask = define ? 1ull << m_renderer.getShaderDefineIdx(define) : 0;
 		const u32 count = entities.size();
 		// the job runs later, so it gets its own copy of the list
 		EntityRef* list = (EntityRef*)m_renderer.getCurrentFrameAllocator().allocate(sizeof(EntityRef) * count, alignof(EntityRef));
@@ -1931,7 +1961,7 @@ struct PipelineImpl final : Pipeline {
 		});
 	}
 
-	void renderGrass(CameraParams cp, gpu::StateFlags state = gpu::StateFlags::NONE, u32 define_mask = 0) override {
+	void renderGrass(CameraParams cp, gpu::StateFlags state = gpu::StateFlags::NONE, u64 define_mask = 0) override {
 		PROFILE_FUNCTION();
 		if (!cp.is_shadow) {
 			for (Terrain* terrain : m_module->getTerrains()) {
@@ -1942,7 +1972,7 @@ struct PipelineImpl final : Pipeline {
 			}
 		}
 
-		define_mask |= 1 << m_renderer.getShaderDefineIdx("GRASS");
+		define_mask |= 1ull << m_renderer.getShaderDefineIdx("GRASS");
 
 		m_renderer.pushJob("grass", [this, cp, define_mask, state](DrawStream& stream){
 			// instances are pulled by vertex shaders
@@ -2304,7 +2334,54 @@ struct PipelineImpl final : Pipeline {
 		m_scene_commands = m_renderer.createBuffer(commands_mem, gpu::BufferFlags::SHADER_BUFFER, "gpu scene commands");
 		const Renderer::MemRef out_mem = { m_scene_draw_slots * 32, nullptr, false };
 		m_scene_out = m_renderer.createBuffer(out_mem, gpu::BufferFlags::SHADER_BUFFER, "gpu scene draw instances");
+		// the bricks of voxel clusters of the views of a frame (voxel_bricks.hlsl), the views take their parts of the pool one after another, the counters have the end of the used part
+		// and the range and the command of each view
+		m_voxel_brick_capacity = large ? VOXEL_BRICKS : VOXEL_BRICKS_SMALL;
+		const Renderer::MemRef bricks_mem = { m_voxel_brick_capacity * 16, nullptr, false };
+		m_voxel_bricks = m_renderer.createBuffer(bricks_mem, gpu::BufferFlags::SHADER_BUFFER, "voxel bricks");
+		m_voxel_quads = m_renderer.createBuffer(bricks_mem, gpu::BufferFlags::SHADER_BUFFER, "voxel brick quads");
+		const Renderer::MemRef voxel_counters_mem = { 64 + SCENE_VIEWS * 64, nullptr, false };
+		m_voxel_counters = m_renderer.createBuffer(voxel_counters_mem, gpu::BufferFlags::SHADER_BUFFER, "voxel brick counters");
+		m_voxel_occluded_capacity = large ? VOXEL_OCCLUDED : VOXEL_OCCLUDED_SMALL;
+		const Renderer::MemRef voxel_occluded_mem = { m_voxel_occluded_capacity * 16, nullptr, false };
+		m_voxel_occluded = m_renderer.createBuffer(voxel_occluded_mem, gpu::BufferFlags::SHADER_BUFFER, "voxel occluded bricks");
+		m_voxel_clusters = m_renderer.createBuffer(selected_mem, gpu::BufferFlags::SHADER_BUFFER, "voxel selected clusters");
+		const Renderer::MemRef voxel_args_mem = { 32, nullptr, false };
+		m_voxel_args = m_renderer.createBuffer(voxel_args_mem, gpu::BufferFlags::SHADER_BUFFER, "voxel dispatch args");
 	}
+
+	// the uniforms of voxel_bricks.hlsl
+	struct VoxelBrickUniforms {
+		Vec4 planes[6];
+		Vec4 prev_vp[4];
+		Vec4 cur_vp[4];
+		Vec4 prev_delta;
+		i32 cam_p[3];
+		u32 selected_capacity;
+		float cam_frac[3];
+		u32 brick_capacity;
+		u32 view_slot;
+		gpu::BindlessHandle selected;
+		gpu::BindlessHandle meshes;
+		gpu::BindlessHandle cluster_data;
+		gpu::RWBindlessHandle bricks;
+		gpu::RWBindlessHandle counters;
+		gpu::BindlessHandle instances;
+		gpu::BindlessHandle chunks;
+		u32 hzb_mode;
+		gpu::BindlessHandle hzb_prev;
+		gpu::BindlessHandle hzb_cur;
+		u32 hzb_mips;
+		float hzb_size[2];
+		gpu::RWBindlessHandle occluded;
+		u32 occluded_capacity;
+		gpu::RWBindlessHandle args;
+		gpu::RWBindlessHandle quads;
+		u32 args_pad[2];
+		Vec4 draw_vp[4];
+		Vec4 draw_delta;
+	};
+	static_assert(sizeof(VoxelBrickUniforms) == 432);
 
 
 	struct SceneVariantsUniforms {
@@ -2349,16 +2426,31 @@ struct PipelineImpl final : Pipeline {
 			const TransientSlice ub_slice = alloc(m_renderer.getUniformPool(), &ub, sizeof(ub));
 			stream.barrier(m_scene_counters, gpu::BarrierType::WRITE);
 			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub_slice.buffer, ub_slice.offset, sizeof(ub));
-			stream.useProgram(m_scene_variants_shader->getProgram(1 << m_renderer.getShaderDefineIdx("FRAME_CLEAR")));
+			stream.useProgram(m_scene_variants_shader->getProgram(1ull << m_renderer.getShaderDefineIdx("FRAME_CLEAR")));
 			stream.dispatch(1, 1, 1);
 			stream.memoryBarrier(m_scene_counters);
+			// the pool of bricks of voxel clusters is empty too
+			if (m_voxel_bricks && m_voxel_counters && m_voxel_bricks_shader->isReady()) {
+				VoxelBrickUniforms voxel_ub;
+				memset(&voxel_ub, 0, sizeof(voxel_ub));
+				voxel_ub.counters = gpu::getRWBindlessHandle(m_voxel_counters);
+				voxel_ub.args = gpu::getRWBindlessHandle(m_voxel_args);
+				const TransientSlice voxel_ub_slice = alloc(m_renderer.getUniformPool(), &voxel_ub, sizeof(voxel_ub));
+				stream.barrier(m_voxel_counters, gpu::BarrierType::WRITE);
+				stream.barrier(m_voxel_args, gpu::BarrierType::WRITE);
+				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, voxel_ub_slice.buffer, voxel_ub_slice.offset, sizeof(voxel_ub));
+				stream.useProgram(m_voxel_bricks_shader->getProgram(1ull << m_renderer.getShaderDefineIdx("FRAME_CLEAR")));
+				stream.dispatch(1, 1, 1);
+				stream.memoryBarrier(m_voxel_counters);
+				stream.memoryBarrier(m_voxel_args);
+			}
 		});
 	}
 
 	struct SceneEntityDraw {
 		CameraParams cp;
 		TransientSlice filter;	// a bit for each slot
-		u32 define_mask;
+		u64 define_mask;
 		gpu::StateFlags state;
 	};
 
@@ -2494,7 +2586,7 @@ struct PipelineImpl final : Pipeline {
 			if (view_cp.shadow_slice < 0) return StaticString<64>(name, " (shadow)");
 			return StaticString<64>(name, " (shadow ", view_cp.shadow_slice, ")");
 		};
-		auto define = [&](const char* name) { return 1u << m_renderer.getShaderDefineIdx(name); };
+		auto define = [&](const char* name) { return 1ull << m_renderer.getShaderDefineIdx(name); };
 
 		const bool clear_occluded = occlusion_view && !post && !is_shadow;
 
@@ -2530,7 +2622,7 @@ struct PipelineImpl final : Pipeline {
 				gpu::BindlessHandle chunk_bounds;	// GPUSceneBounds[], the chunks of instanced models (gpu_scene_chunks.h)
 				gpu::BindlessHandle chunks;			// GPUSceneChunk[]
 				u32 chunk_slots;
-				u32 padding;
+				gpu::RWBindlessHandle voxel_clusters;
 			};
 			static_assert(sizeof(Uniforms) == 240);
 			Uniforms ub;
@@ -2557,6 +2649,7 @@ struct PipelineImpl final : Pipeline {
 			ub.clear_occluded = clear_occluded ? 1 : 0;
 			ub.occluded = gpu::getRWBindlessHandle(m_scene_occluded);
 			ub.selected = gpu::getRWBindlessHandle(m_scene_selected);
+			if (!entities && m_voxel_clusters) ub.voxel_clusters = gpu::getRWBindlessHandle(m_voxel_clusters);
 			ub.chunk_items = gpu::getRWBindlessHandle(m_scene_chunk_items);
 			ub.chunk_capacity = m_scene_chunk_capacity;
 			ub.selected_capacity = m_scene_selected_capacity;
@@ -2590,6 +2683,7 @@ struct PipelineImpl final : Pipeline {
 			stream.barrier(m_scene_cull_counter, gpu::BarrierType::WRITE);
 			stream.barrier(m_scene_cull_args, gpu::BarrierType::WRITE);
 			stream.barrier(m_scene_selected, gpu::BarrierType::WRITE);
+			if (!entities && m_voxel_clusters) stream.barrier(m_voxel_clusters, gpu::BarrierType::WRITE);
 			if (clear_occluded) stream.barrier(m_scene_occluded, gpu::BarrierType::WRITE);
 			stream.bindUniformBuffer(UniformBuffer::DRAWCALL, ub_slice.buffer, ub_slice.offset, sizeof(ub));
 			stream.useProgram(m_scene_cull_shader->getProgram(define("PASS0")));
@@ -2597,6 +2691,7 @@ struct PipelineImpl final : Pipeline {
 			stream.memoryBarrier(m_scene_cull_counter);
 			stream.memoryBarrier(m_scene_cull_args);
 			stream.memoryBarrier(m_scene_selected);
+			if (!entities && m_voxel_clusters) stream.memoryBarrier(m_voxel_clusters);
 			if (clear_occluded) stream.memoryBarrier(m_scene_occluded);
 			stream.useProgram(m_scene_cull_shader->getProgram(entities ? define("FILTER") : 0));
 			stream.bindIndirectBuffer(m_scene_cull_args);
@@ -2649,6 +2744,7 @@ struct PipelineImpl final : Pipeline {
 			stream.barrier(mesh_table, gpu::BarrierType::READ);
 			stream.barrier(m_scene_cull_args, gpu::BarrierType::WRITE);
 			stream.barrier(m_scene_selected, gpu::BarrierType::WRITE);
+			if (!entities && m_voxel_clusters) stream.barrier(m_voxel_clusters, gpu::BarrierType::WRITE);
 			stream.barrier(m_scene_occluded, gpu::BarrierType::WRITE);
 		}
 
@@ -2676,6 +2772,7 @@ struct PipelineImpl final : Pipeline {
 		cu.instances = gpu::getBindlessHandle(scene.instances);
 		cu.chunks = gpu::getBindlessHandle(scene_chunks.chunks.buffer);
 		cu.selected = gpu::getRWBindlessHandle(m_scene_selected);
+		if (!entities && m_voxel_clusters) cu.voxel_clusters = gpu::getRWBindlessHandle(m_voxel_clusters);
 		cu.occluded = gpu::getRWBindlessHandle(m_scene_occluded);
 		cu.occluded_capacity = m_scene_selected_capacity;
 		cu.args = gpu::getRWBindlessHandle(m_scene_cull_args);
@@ -2713,6 +2810,7 @@ struct PipelineImpl final : Pipeline {
 			stream.useProgram(m_cluster_shader->getProgram(define("POST_ARGS")));
 			stream.dispatch(1, 1, 1);
 			stream.memoryBarrier(m_scene_selected);
+			if (!entities && m_voxel_clusters) stream.memoryBarrier(m_voxel_clusters);
 			stream.memoryBarrier(m_scene_cull_args);
 
 			stream.bindIndirectBuffer(m_scene_cull_args);
@@ -2720,6 +2818,7 @@ struct PipelineImpl final : Pipeline {
 			stream.dispatchIndirect(16);
 			stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
 			stream.memoryBarrier(m_scene_selected);
+			if (!entities && m_voxel_clusters) stream.memoryBarrier(m_voxel_clusters);
 		}
 		else {
 			stream.barrier(m_scene_tree_items, gpu::BarrierType::READ);
@@ -2736,8 +2835,8 @@ struct PipelineImpl final : Pipeline {
 			};
 
 			if (cu.tree_depth > 0) {
-				const u32 args_define = define("ARGS");
-				const u32 pass0_define = define("PASS0");
+				const u64 args_define = define("ARGS");
+				const u64 pass0_define = define("PASS0");
 
 				// Level 0 (roots): 1 thread per (instance, mesh) item
 				stream.bindUniformBuffer(UniformBuffer::DRAWCALL, cu_tree_slice[0].buffer, cu_tree_slice[0].offset, sizeof(cu));
@@ -2779,6 +2878,7 @@ struct PipelineImpl final : Pipeline {
 
 			stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
 			stream.memoryBarrier(m_scene_selected);
+			if (!entities && m_voxel_clusters) stream.memoryBarrier(m_voxel_clusters);
 			if (clear_occluded) stream.memoryBarrier(m_scene_occluded);
 			stream.memoryBarrier(cluster_scratch);
 		}
@@ -2888,17 +2988,21 @@ struct PipelineImpl final : Pipeline {
 
 			// One indirect call for each draw group the view draws, the instance counts are written by the GPU: the commands are the ones of SCAN. Vertex shaders pull the
 			// instances by the draw id, the vertices of the clusters by their meshes (CLUSTER_MESH)
-			u32 mesh_instance_define = 1 << m_mesh_instance_define_idx;
+			u64 mesh_instance_define = 1ull << m_mesh_instance_define_idx;
 			mesh_instance_define |= define("INDIRECT_INSTANCE");
 			mesh_instance_define |= define("CLUSTER_MESH");
-			if (m_debug_show == DebugShow::MESH_CLUSTERS) mesh_instance_define |= define("CLUSTER_DEBUG");
-			if (m_debug_show == DebugShow::MESH_TRIANGLES) mesh_instance_define |= define("CLUSTER_DEBUG") | define("CLUSTER_DEBUG_TRIANGLES");
+			u64 cluster_debug_define = 0;
+			if (m_debug_show == DebugShow::MESH_CLUSTERS) cluster_debug_define = define("CLUSTER_DEBUG");
+			if (m_debug_show == DebugShow::MESH_TRIANGLES) cluster_debug_define = define("CLUSTER_DEBUG") | define("CLUSTER_DEBUG_TRIANGLES");
+			mesh_instance_define |= cluster_debug_define;
+			// voxel bricks are colored only in voxels.hlsl, triangle clusters keep their normal look
+			if (m_debug_show == DebugShow::VOXEL_BRICKS) cluster_debug_define = define("CLUSTER_DEBUG") | define("VOXEL_DEBUG_BRICKS");
 
 			// Draws of meshes without clusters pull the same instances by the draw id, without CLUSTER_MESH. The SKINNED variant has the layout of
 			// MESH_INSTANCE but is chosen by its own define, with both the shader is not skinned.
-			const u32 indirect_define = define("INDIRECT_INSTANCE");
-			const u32 pooled_define = define("POOLED_VERTICES");	// the base vertex of the command is in the instance
-			const u32 lod_mesh_define = (1 << m_mesh_instance_define_idx) | indirect_define | pooled_define;
+			const u64 indirect_define = define("INDIRECT_INSTANCE");
+			const u64 pooled_define = define("POOLED_VERTICES");	// the base vertex of the command is in the instance
+			const u64 lod_mesh_define = (1ull << m_mesh_instance_define_idx) | indirect_define | pooled_define;
 
 			// the layout of VertexBuffer in vertex_pulling.hlsli with INDIRECT_INSTANCE
 			struct SceneVertexBufferBinding {
@@ -2930,12 +3034,12 @@ struct PipelineImpl final : Pipeline {
 				// the second pass and the entities draw from the job that culls them, the draws of the first pass are in the buckets of the view
 				Bucket* bucket = entities ? nullptr : view_ptr->buckets.begin() + view_ptr->layer_to_bucket[group.layer];
 				DrawStream& draw = (post || entities) ? stream : bucket->stream;
-				const u32 define_mask = group.define_mask | (entities ? entities->define_mask : bucket->define_mask);
+				const u64 define_mask = group.define_mask | (entities ? entities->define_mask : bucket->define_mask);
 				const gpu::StateFlags state = group.state | (entities ? entities->state : bucket->state);
 				const u32 command_offset = command_base + (group_bases[g] & 0xffffu) * 24;
 				if (group.lod) {
 					// the vertices and indices of the meshes are in the buffer of cluster data, a command has the first index and the base vertex of its mesh
-					const bool skinned = (group.define_mask & (1u << m_skinned_define_idx)) != 0;
+					const bool skinned = (group.define_mask & (1ull << m_skinned_define_idx)) != 0;
 					const gpu::ProgramHandle lod_program = group.shader->getProgram(state, group.primitive_type, define_mask | (skinned ? (indirect_define | pooled_define) : lod_mesh_define), group.semantics_defines);
 					SceneVertexBufferBinding lod_binding = vertex_buffer_binding;
 					lod_binding.binding.bones_buffer = frame_bones.bones ? gpu::getBindlessHandle(frame_bones.bones).value : 0;
@@ -2993,6 +3097,150 @@ struct PipelineImpl final : Pipeline {
 				draw.drawIndirectCount(gpu::DataType::U16, 0, m_scene_commands, command_offset, cluster_cmds_capacity);
 				draw.bindIndirectBuffer(gpu::INVALID_BUFFER);
 				draw.bindIndexBuffer(gpu::INVALID_BUFFER);
+			}
+
+			// The selected clusters that are clusters of voxels (they have no triangles, their commands above draw nothing) are drawn as bricks into the bucket of the default
+			// layer, with the deferred or the depth program of the bucket: voxel_bricks.hlsl makes the list of bricks of this view and voxels.hlsl draws it.
+			if (!entities && view_ptr && m_voxel_bricks && m_voxel_bricks_shader->isReady() && m_voxel_shader->isReady()) {
+				const u8 voxel_bucket_idx = view_ptr->layer_to_bucket[m_renderer.getLayerIdx("default")];
+				const u64 voxel_pass_defines = define("DEPTH") | define("DEFERRED");
+				if (voxel_bucket_idx != 0xff && (view_ptr->buckets[voxel_bucket_idx].define_mask & voxel_pass_defines) != 0) {
+					Bucket& voxel_bucket = view_ptr->buckets[voxel_bucket_idx];
+					VoxelBrickUniforms brick_ub;
+					memset(&brick_ub, 0, sizeof(brick_ub));
+					// the frustum, camera and pyramids of the cluster culling (the frozen camera when m_cluster_frozen is on)
+					memcpy(brick_ub.planes, cu.planes, sizeof(brick_ub.planes));
+					memcpy(brick_ub.prev_vp, cu.prev_vp, sizeof(brick_ub.prev_vp));
+					memcpy(brick_ub.cur_vp, cu.cur_vp, sizeof(brick_ub.cur_vp));
+					brick_ub.prev_delta = cu.prev_delta;
+					brick_ub.hzb_mode = cu.hzb_mode;
+					brick_ub.hzb_prev = cu.hzb_prev;
+					brick_ub.hzb_cur = cu.hzb_cur;
+					brick_ub.hzb_mips = cu.hzb_mips;
+					brick_ub.hzb_size[0] = cu.hzb_size[0];
+					brick_ub.hzb_size[1] = cu.hzb_size[1];
+					brick_ub.occluded = gpu::getRWBindlessHandle(m_voxel_occluded);
+					brick_ub.occluded_capacity = m_voxel_occluded_capacity;
+					memcpy(brick_ub.cam_p, cull_view.cam_p, sizeof(brick_ub.cam_p));
+					memcpy(brick_ub.cam_frac, cull_view.cam_frac, sizeof(brick_ub.cam_frac));
+					brick_ub.instances = gpu::getBindlessHandle(scene.instances);
+					brick_ub.chunks = gpu::getBindlessHandle(scene_chunks.chunks.buffer);
+					brick_ub.selected_capacity = m_scene_selected_capacity;
+					brick_ub.brick_capacity = m_voxel_brick_capacity;
+					brick_ub.view_slot = (u32)view_slot;
+					brick_ub.selected = gpu::getBindlessHandle(m_voxel_clusters);
+					brick_ub.meshes = gpu::getBindlessHandle(mesh_table);
+					brick_ub.cluster_data = gpu::getBindlessHandle(m_renderer.getClusterDataBuffer());
+					brick_ub.bricks = gpu::getRWBindlessHandle(m_voxel_bricks);
+					brick_ub.counters = gpu::getRWBindlessHandle(m_voxel_counters);
+					brick_ub.args = gpu::getRWBindlessHandle(m_voxel_args);
+					brick_ub.quads = gpu::getRWBindlessHandle(m_voxel_quads);
+					setMatrixRows(view_cp.projection * view_cp.view, brick_ub.draw_vp);
+					brick_ub.draw_delta = Vec4(frozen ? Vec3(m_cluster_frozen_cp.pos - view_cp.pos) : Vec3(0, 0, 0), view_cp.projection.columns[3].w == 1.f ? 1.f : 0.f);
+					const TransientSlice brick_ub_slice = alloc(uniform_pool, &brick_ub, sizeof(brick_ub));
+
+					auto brick_program = [&](const char* name) { return m_voxel_bricks_shader->getProgram(define(name)); };
+					stream.beginProfileBlock(scope_name("voxel bricks"), 0, false);
+					stream.barrier(m_voxel_clusters, gpu::BarrierType::READ);
+					stream.barrier(m_voxel_bricks, gpu::BarrierType::WRITE);
+					stream.barrier(m_voxel_quads, gpu::BarrierType::WRITE);
+					stream.barrier(m_voxel_counters, gpu::BarrierType::WRITE);
+					stream.barrier(m_voxel_occluded, gpu::BarrierType::WRITE);
+					stream.barrier(m_voxel_args, gpu::BarrierType::WRITE);
+					stream.barrier(scene.instances, gpu::BarrierType::READ);
+					stream.barrier(scene_chunks.chunks.buffer, gpu::BarrierType::READ);
+					for (const GPUSceneInstanceBuffer& b : scene_chunks.instance_buffers) stream.barrier(b.buffer, gpu::BarrierType::READ);
+					if (cu.hzb_mode == 1) stream.barrier(view_ptr->hzb_prev, gpu::BarrierType::READ);
+					if (cu.hzb_mode == 2) stream.barrier(view_ptr->hzb_cur, gpu::BarrierType::READ);
+					stream.barrier(mesh_table, gpu::BarrierType::READ);
+					stream.barrier(m_renderer.getClusterDataBuffer(), gpu::BarrierType::READ);
+					stream.bindUniformBuffer(UniformBuffer::DRAWCALL, brick_ub_slice.buffer, brick_ub_slice.offset, sizeof(brick_ub));
+					stream.useProgram(brick_program("CLEAR"));
+					stream.dispatch(1, 1, 1);
+					stream.memoryBarrier(m_voxel_counters);
+					stream.barrier(m_voxel_args, gpu::BarrierType::READ);
+					stream.useProgram(brick_program("EXPAND"));
+					stream.bindIndirectBuffer(m_voxel_args);
+					stream.dispatchIndirect(0);
+					stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
+					stream.memoryBarrier(m_voxel_counters);
+					stream.memoryBarrier(m_voxel_bricks);
+					stream.memoryBarrier(m_voxel_quads);
+					stream.memoryBarrier(m_voxel_occluded);
+					if (post) {
+						// the bricks that the first pass found hidden and that the pyramid of this frame does not hide
+						stream.useProgram(brick_program("RETEST"));
+						stream.bindIndirectBuffer(m_voxel_args);
+						stream.dispatchIndirect(16);
+						stream.bindIndirectBuffer(gpu::INVALID_BUFFER);
+						stream.memoryBarrier(m_voxel_counters);
+						stream.memoryBarrier(m_voxel_bricks);
+						stream.memoryBarrier(m_voxel_quads);
+					}
+					if (cu.hzb_mode == 1) stream.barrier(m_voxel_args, gpu::BarrierType::WRITE);
+					stream.useProgram(brick_program("ARGS"));
+					stream.dispatch(1, 1, 1);
+					stream.memoryBarrier(m_voxel_counters);
+					if (cu.hzb_mode == 1) stream.memoryBarrier(m_voxel_args);
+					stream.endProfileBlock();	// voxel bricks
+					// the bricks of the view (the instance count of its command) and the end of the pool, which says if it overflowed
+					const u32 view_counters_at = 64 + (u32)view_slot * 64;
+					{
+						SceneStatsRead* r = LUMIX_NEW(m_allocator, SceneStatsRead);
+						r->allocator = &m_allocator;
+						r->kind = SceneStatsRead::VOXELS;
+						r->view = SceneStatsRead::getView(post, is_shadow, view_cp.shadow_slice);
+						r->capacity0 = m_voxel_brick_capacity;
+						r->capacity1 = 0;
+						stream.readBuffer(m_voxel_counters, view_counters_at + 16 + 8, sizeof(u32), makeDelegate<&SceneStatsRead::onRead>(r));
+						SceneStatsRead* pool = LUMIX_NEW(m_allocator, SceneStatsRead);
+						pool->allocator = &m_allocator;
+						pool->kind = SceneStatsRead::VOXEL_POOL;
+						pool->view = r->view;
+						pool->capacity0 = m_voxel_brick_capacity;
+						pool->capacity1 = m_voxel_occluded_capacity;
+						stream.readBuffer(m_voxel_counters, 0, 5 * sizeof(u32), makeDelegate<&SceneStatsRead::onRead>(pool));
+					}
+
+					// the uniforms of voxels.hlsl
+					struct VoxelDrawUniforms {
+						gpu::BindlessHandle bricks;
+						gpu::BindlessHandle cluster_data;
+						gpu::BindlessHandle instances;
+						gpu::BindlessHandle chunks;
+						i32 cam_p[3];
+						gpu::BindlessHandle quads;
+						float cam_frac[3];
+						u32 padding2;
+					};
+					static_assert(sizeof(VoxelDrawUniforms) == 48);
+					VoxelDrawUniforms voxel_ub;
+					memset(&voxel_ub, 0, sizeof(voxel_ub));
+					voxel_ub.bricks = gpu::getBindlessHandle(m_voxel_bricks);
+					voxel_ub.quads = gpu::getBindlessHandle(m_voxel_quads);
+					voxel_ub.cluster_data = gpu::getBindlessHandle(m_renderer.getClusterDataBuffer());
+					voxel_ub.instances = gpu::getBindlessHandle(scene.instances);
+					voxel_ub.chunks = gpu::getBindlessHandle(scene_chunks.chunks.buffer);
+					memcpy(voxel_ub.cam_p, scene_view.cam_p, sizeof(voxel_ub.cam_p));
+					memcpy(voxel_ub.cam_frac, scene_view.cam_frac, sizeof(voxel_ub.cam_frac));
+					const TransientSlice voxel_ub_slice = alloc(uniform_pool, &voxel_ub, sizeof(voxel_ub));
+					DrawStream& voxel_draw = post ? stream : voxel_bucket.stream;
+					const u64 voxel_defines = voxel_bucket.define_mask | cluster_debug_define | (is_shadow && m_voxel_solid_shadow_depth ? define("SOLID_DEPTH") : 0);
+					voxel_draw.useProgram(m_voxel_shader->getProgram(voxel_bucket.state | gpu::StateFlags::CULL_BACK, gpu::PrimitiveType::TRIANGLES, voxel_defines, ""));
+					voxel_draw.bindIndexBuffer(m_voxel_cube_ib);
+					voxel_draw.bindUniformBuffer(UniformBuffer::DRAWCALL, voxel_ub_slice.buffer, voxel_ub_slice.offset, sizeof(voxel_ub));
+					voxel_draw.barrier(m_voxel_bricks, gpu::BarrierType::READ);
+					voxel_draw.barrier(m_voxel_quads, gpu::BarrierType::READ);
+					voxel_draw.barrier(m_renderer.getClusterDataBuffer(), gpu::BarrierType::READ);
+					voxel_draw.barrier(scene.instances, gpu::BarrierType::READ);
+					voxel_draw.barrier(scene_chunks.chunks.buffer, gpu::BarrierType::READ);
+					for (const GPUSceneInstanceBuffer& b : scene_chunks.instance_buffers) voxel_draw.barrier(b.buffer, gpu::BarrierType::READ);
+					voxel_draw.barrier(m_voxel_counters, gpu::BarrierType::READ);
+					voxel_draw.bindIndirectBuffer(m_voxel_counters);
+					voxel_draw.drawIndirect(gpu::DataType::U16, view_counters_at + 16, 1);
+					voxel_draw.bindIndirectBuffer(gpu::INVALID_BUFFER);
+					voxel_draw.bindIndexBuffer(gpu::INVALID_BUFFER);
+				}
 			}
 		}
 	}
@@ -3111,8 +3359,8 @@ struct PipelineImpl final : Pipeline {
 			if (from >= keys_count) return;
 			if (to > keys_count) to = keys_count;
 
-			u32 define_mask;
-			u32 mesh_particle_define_mask;
+			u64 define_mask;
+			u64 mesh_particle_define_mask;
 			gpu::StateFlags render_state;
 			DrawStream* stream = nullptr;
 			u8 prev_bucket = (sort_keys[from] >> SORT_KEY_BUCKET_SHIFT) + 1; // make sure it's different from the first bucket, so first iteration is properly initialized
@@ -3126,7 +3374,7 @@ struct PipelineImpl final : Pipeline {
 					prev_bucket = bucket;
 					stream = view.buckets[bucket].substreams[batch_idx];
 					define_mask = view.buckets[bucket].define_mask;
-					mesh_particle_define_mask = define_mask | (1 << m_mesh_particle_define_idx);
+					mesh_particle_define_mask = define_mask | (1ull << m_mesh_particle_define_idx);
 					render_state = view.buckets[bucket].state;
 				}
 
@@ -3239,7 +3487,7 @@ struct PipelineImpl final : Pipeline {
 						const Transform tr = world.getTransform(*particle_system.m_entity);
 						const Vec3 lpos = Vec3(tr.pos - camera_pos);
 						const gpu::StateFlags state = material->m_render_states | render_state;
-						const u32 defines = mesh_particle_define_mask | material->getDefineMask();
+						const u64 defines = mesh_particle_define_mask | material->getDefineMask();
 						Shader* shader = material->getShader();
 						gpu::ProgramHandle program = shader->getProgram(state, mesh.primitive_type, defines, mesh.semantics_defines);
 
@@ -4103,6 +4351,17 @@ struct PipelineImpl final : Pipeline {
 	gpu::BufferHandle m_scene_selected = gpu::INVALID_BUFFER;		// clusters selected from the work items: three counters, then 16 bytes each (slot, mesh, cluster)
 	gpu::BufferHandle m_scene_occluded = gpu::INVALID_BUFFER;		// clusters hidden by pass 1 HZB, re-tested in pass 2 (POST_OCCLUDED)
 	AtomicI32 m_scene_view_count = 0;								// views drawn from the GPU scene in this frame
+	Shader* m_voxel_bricks_shader;									// expands the selected voxel clusters to bricks, see voxel_bricks.hlsl
+	Shader* m_voxel_shader;											// draws the bricks, see voxels.hlsl
+	gpu::BufferHandle m_voxel_bricks = gpu::INVALID_BUFFER;			// the bricks of each view (16 bytes each)
+	gpu::BufferHandle m_voxel_quads = gpu::INVALID_BUFFER;			// precomputed screen-space quad bounds per brick (16 bytes each)
+	gpu::BufferHandle m_voxel_counters = gpu::INVALID_BUFFER;		// counters and draw commands of each view
+	gpu::BufferHandle m_voxel_cube_ib = gpu::INVALID_BUFFER;
+	u32 m_voxel_brick_capacity = 0;									// bricks of a view
+	gpu::BufferHandle m_voxel_occluded = gpu::INVALID_BUFFER;		// the bricks that the pass 1 of the main view found hidden, tested again in pass 2 (RETEST)
+	gpu::BufferHandle m_voxel_clusters = gpu::INVALID_BUFFER;		// selected voxel clusters (index_count == 0) written by nanite.hlsl
+	gpu::BufferHandle m_voxel_args = gpu::INVALID_BUFFER;			// indirect dispatch args for EXPAND (0) and RETEST (16)
+	u32 m_voxel_occluded_capacity = 0;
 	Shader* m_flatten_shader;
 	Array<gpu::TextureHandle> m_textures;
 	Array<gpu::BufferHandle> m_buffers;
@@ -4120,6 +4379,10 @@ struct PipelineImpl final : Pipeline {
 		SCENE_WORK_ITEMS_SMALL = 1 << 16,
 		SCENE_CHUNK_ITEMS = 1 << 18,				// capacity of the list of visible chunks of instanced models (64 instances each)
 		SCENE_CHUNK_ITEMS_SMALL = 1 << 12,
+		VOXEL_BRICKS = 1 << 21,						// bricks of voxel clusters that the views of a frame draw at most (16 bytes each)
+		VOXEL_BRICKS_SMALL = 1 << 16,
+		VOXEL_OCCLUDED = 1 << 20,					// bricks that the main view finds hidden in the first pass, for the second one (16 bytes each)
+		VOXEL_OCCLUDED_SMALL = 1 << 14,
 	};
 	bool m_cluster_shader_failure_logged = false;
 	bool m_cluster_frozen = false;									// the camera that chooses the clusters is m_cluster_frozen_cp, see m_cluster_freeze_camera

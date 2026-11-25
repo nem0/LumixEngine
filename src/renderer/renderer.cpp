@@ -534,7 +534,7 @@ struct RendererImpl final : Renderer {
 	{
 		RenderModule::reflect();
 
-		m_shader_defines.reserve(32);
+		m_shader_defines.reserve(MAX_SHADER_DEFINES);
 		m_num_shader_defines = 0;
 
 		bool try_load_renderdoc = CommandLineParser::isOn("-renderdoc");
@@ -1812,7 +1812,7 @@ struct RendererImpl final : Renderer {
 		}
 
 		m_shader_defines.emplace(define);
-		ASSERT(m_shader_defines.size() <= 32); // reserved in constructor
+		ASSERT(m_shader_defines.size() <= MAX_SHADER_DEFINES); // reserved in constructor
 		m_num_shader_defines = (i32)m_shader_defines.size();
 		return u8(m_shader_defines.size() - 1);
 	}

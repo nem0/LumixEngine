@@ -56,7 +56,7 @@ cbuffer UniformData : register(b4) {
 	uint u_hzb_mips;		// the levels of the full resolution pyramid (the first one, level 0, is not in the textures)
 	float2 u_hzb_size;		// of the level 0, the size of the depth buffer
 	uint u_args;			// rw bindless, indirect dispatch args (POST_ARGS)
-	uint u_hzb_padding;
+	uint u_voxel_clusters;	// rw bindless, list of selected voxel clusters (index_count == 0)
 };
 
 // threads of a group, GPUSceneConst::CLUSTER_THREADS
@@ -244,6 +244,8 @@ void processCluster(MeshDesc desc, Instance instance, float max_scale, uint inst
 	float radius = bounds.w * max_scale;
 	if (!insideFrustum(center, radius)) return;
 
+	const bool is_voxel = misc.w == 0;
+
 	// Occlusion culling in two passes. The first pass appends clusters hidden by the previous frame to u_occluded instead of drawing them;
 	// the second pass (POST_OCCLUDED) re-tests only u_occluded against the depth pyramid of the first pass, avoiding a full DAG re-traversal.
 	if (u_hzb_mode == 1) {
@@ -252,7 +254,7 @@ void processCluster(MeshDesc desc, Instance instance, float max_scale, uint inst
 			uint at;
 			occluded.InterlockedAdd(SELECTED_COUNT, 1, at);
 			if (at < u_occluded_capacity) {
-				occluded.Store4(SELECTED_HEADER + at * SELECTED_STRIDE, uint4(instance_idx, desc.mesh_index, cluster | (error_small ? 0x80000000u : 0u), instance_ref));
+				occluded.Store4(SELECTED_HEADER + at * SELECTED_STRIDE, uint4(instance_idx, desc.mesh_index, cluster | (error_small ? 0x80000000u : 0u) | (is_voxel ? 0x40000000u : 0u), instance_ref));
 			}
 			return;
 		}
@@ -268,10 +270,18 @@ void processCluster(MeshDesc desc, Instance instance, float max_scale, uint inst
 		if (!refined && !error_small && child_id < u_feedback_capacity) markFeedback(feedback, child_id);
 	}
 
-	RWByteAddressBuffer selected = bindless_rw_buffers[u_selected];
-	uint at;
-	selected.InterlockedAdd(SELECTED_COUNT, 1, at);
-	if (at < u_selected_capacity) selected.Store4(SELECTED_HEADER + at * SELECTED_STRIDE, uint4(instance_idx, desc.mesh_index, cluster | (computeDepthBin(center) << 27), instance_ref));
+	if (is_voxel && u_voxel_clusters != 0) {
+		RWByteAddressBuffer vclusters = bindless_rw_buffers[u_voxel_clusters];
+		uint at;
+		vclusters.InterlockedAdd(SELECTED_COUNT, 1, at);
+		if (at < u_selected_capacity) vclusters.Store4(SELECTED_HEADER + at * SELECTED_STRIDE, uint4(instance_idx, desc.mesh_index, cluster | (computeDepthBin(center) << 27), instance_ref));
+	}
+	else {
+		RWByteAddressBuffer selected = bindless_rw_buffers[u_selected];
+		uint at;
+		selected.InterlockedAdd(SELECTED_COUNT, 1, at);
+		if (at < u_selected_capacity) selected.Store4(SELECTED_HEADER + at * SELECTED_STRIDE, uint4(instance_idx, desc.mesh_index, cluster | (computeDepthBin(center) << 27), instance_ref));
+	}
 }
 
 // false if no cluster of the node can be selected, then the node and everything under it is skipped
@@ -311,6 +321,7 @@ void main(uint3 group_id : SV_GroupID, uint3 group_thread_id : SV_GroupThreadID)
 	#if defined POST_ARGS
 		if (group_thread_id.x == 0) {
 			bindless_rw_buffers[u_selected].Store4(SELECTED_COUNT, uint4(0, 0, 0, 0));
+			if (u_voxel_clusters != 0) bindless_rw_buffers[u_voxel_clusters].Store4(SELECTED_COUNT, uint4(0, 0, 0, 0));
 			const uint count = min(bindless_rw_buffers[u_occluded].Load(SELECTED_COUNT), u_occluded_capacity);
 			const uint groups = (count + GROUP_SIZE - 1) / GROUP_SIZE;
 			bindless_rw_buffers[u_args].Store3(ARGS_POST, dispatchGroups(groups));
@@ -323,7 +334,8 @@ void main(uint3 group_id : SV_GroupID, uint3 group_thread_id : SV_GroupThreadID)
 		const uint4 entry = occluded.Load4(SELECTED_HEADER + idx * SELECTED_STRIDE);
 		const uint instance_idx = entry.x;
 		const uint mesh_index = entry.y;
-		const uint cluster = entry.z & 0x7fffffffu;
+		const uint cluster = entry.z & 0x3fffffffu;
+		const bool is_voxel = (entry.z & 0x40000000u) != 0;
 		const bool error_small = (entry.z & 0x80000000u) != 0;
 		const uint instance_ref = entry.w;
 
@@ -351,10 +363,18 @@ void main(uint3 group_id : SV_GroupID, uint3 group_thread_id : SV_GroupThreadID)
 			if (!refined && !error_small && child_id < u_feedback_capacity) markFeedback(feedback, child_id);
 		}
 
-		RWByteAddressBuffer selected = bindless_rw_buffers[u_selected];
-		uint at;
-		selected.InterlockedAdd(SELECTED_COUNT, 1, at);
-		if (at < u_selected_capacity) selected.Store4(SELECTED_HEADER + at * SELECTED_STRIDE, uint4(instance_idx, mesh_index, cluster | (computeDepthBin(center) << 27), instance_ref));
+		if (is_voxel && u_voxel_clusters != 0) {
+			RWByteAddressBuffer vclusters = bindless_rw_buffers[u_voxel_clusters];
+			uint at;
+			vclusters.InterlockedAdd(SELECTED_COUNT, 1, at);
+			if (at < u_selected_capacity) vclusters.Store4(SELECTED_HEADER + at * SELECTED_STRIDE, uint4(instance_idx, mesh_index, cluster | (computeDepthBin(center) << 27), instance_ref));
+		}
+		else {
+			RWByteAddressBuffer selected = bindless_rw_buffers[u_selected];
+			uint at;
+			selected.InterlockedAdd(SELECTED_COUNT, 1, at);
+			if (at < u_selected_capacity) selected.Store4(SELECTED_HEADER + at * SELECTED_STRIDE, uint4(instance_idx, mesh_index, cluster | (computeDepthBin(center) << 27), instance_ref));
+		}
 	#elif defined ARGS && defined PASS0
 		// Candidate cluster culling: 1 thread per (item, cluster)
 		const uint idx = (group_id.y * MAX_GROUPS_X + group_id.x) * GROUP_SIZE + group_thread_id.x;

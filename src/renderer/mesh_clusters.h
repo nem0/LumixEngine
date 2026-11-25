@@ -121,11 +121,34 @@ inline u32 readClusterBits(const u32* words, u64 bit, u32 count) {
 	return count >= 32 ? v : v & ((1u << count) - 1);
 }
 
+// Voxel clusters. A cluster with index_count == 0 is a cluster of voxels (the coarsest levels of a mesh that has them, the voxels replace the triangles that can not be simplified
+// further, for foliage and thin geometry). It is the same node of the DAG as the clusters of triangles (bounds, errors, groups), only its payload in the vertex stream of its group
+// is different, and so is the use of its header (MeshClusterVertexGPU):
+//   pos_start = the voxel of the minimum of the cluster's bricks, in the grid of its level, pos_step = the size of a voxel, vertex_count = the number of bricks,
+//   pos_bit_offset = where the payload is in the stream of the group (32 bit aligned), uv_min[0], uv_min[1], uv_extent[0] = the position of the voxel (0, 0, 0) of the grid,
+//   so the minimum corner of a voxel (x, y, z) is (uv_min[0], uv_min[1], uv_extent[0]) + (x, y, z) * pos_step.
+// The payload is brick_count bricks of 4 words, then the attributes of the voxels, 2 words each:
+//   brick: mask (low 32 bits), mask (high 32 bits) of the voxels of the 4 x 4 x 4 brick (bit x + y * 4 + z * 16), the position of the brick in bricks from pos_start (10 bits
+//          each of x, y, z, x in the lowest), the index of the first voxel of the brick in the attributes. The voxels of a brick are in the order of the bits of the mask.
+//   voxel: the frame (packClusterFrame, only the normal), the color (r, g, b, 8 bits each, the lowest first) with the AO in the top 8 bits.
+// While the clusters are built `first_index` of a voxel cluster is its index in MeshClusters::voxel_clusters.
+struct MeshVoxelCluster {
+	u32 first_word;			// in MeshClusters::voxel_words
+	u32 word_count;
+	u32 brick_count;
+	i32 base[3];
+	float size;
+	Vec3 origin;
+};
+
 struct MeshClusters {
 	explicit MeshClusters(IAllocator& allocator)
 		: clusters(allocator), groups(allocator), indices(allocator), index_positions(allocator), nodes(allocator), roots(allocator)
-		, vertex_headers(allocator), local_indices(allocator), vertex_words(allocator)
+		, vertex_headers(allocator), local_indices(allocator), vertex_words(allocator), voxel_clusters(allocator), voxel_words(allocator)
 	{}
+
+	static constexpr u32 VOXEL_BRICK_SIZE = 4;
+	static constexpr u32 MAX_VOXEL_BRICK_COORD = 1023;
 
 	static constexpr u32 LEAF_FLAG = 0x80000000u;
 	static constexpr u32 NODE_FANOUT = 8;
@@ -150,6 +173,10 @@ struct MeshClusters {
 	u32 attribute_flags = 0;	// ClusterAttribute
 	u32 vertex_count = 0;
 	u32 leaf_vertex_count = 0;	// vertices of the finest clusters, they are the first ones
+
+	// voxel clusters, while the clusters are built, see MeshVoxelCluster
+	Array<MeshVoxelCluster> voxel_clusters;
+	Array<u32> voxel_words;
 };
 
 // position of vertex `local` of the cluster `header`, from the vertex stream in which the piece of the group of the cluster starts at the bit `group_bit_base`

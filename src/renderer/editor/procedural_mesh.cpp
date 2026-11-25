@@ -601,6 +601,66 @@ struct Plugin final : ProceduralMeshEditor, EditorAssetPlugin {
 				}
 				ImGui::EndTable();
 			}
+
+			if (m_resource->hasClusters()) {
+				ImGui::SeparatorText("Clusters");
+				u32 total_clusters = 0, total_leaf_clusters = 0, total_nodes = 0, total_pages = 0;
+				u32 total_voxel_clusters = 0, total_bricks = 0, total_voxels = 0;
+				u32 max_levels = 0, max_depth = 0;
+				float min_voxel_size = 0.f;
+				const i32 cluster_end = m_resource->getClusterMeshesEnd();
+				for (i32 i = 0; i <= cluster_end; ++i) {
+					const Mesh& mesh = m_resource->getMesh(i);
+					total_clusters += mesh.cluster_count;
+					total_leaf_clusters += mesh.leaf_cluster_count;
+					total_nodes += mesh.node_count;
+					if (mesh.cluster_stream) total_pages += (u32)mesh.cluster_stream->pages.size();
+					total_voxel_clusters += mesh.voxel_cluster_count;
+					total_bricks += mesh.voxel_brick_count;
+					total_voxels += mesh.voxel_count;
+					max_levels = maximum(max_levels, mesh.root_count);
+					max_depth = maximum(max_depth, mesh.tree_depth);
+					if (mesh.voxel_min_size > 0.f && (min_voxel_size == 0.f || mesh.voxel_min_size < min_voxel_size)) {
+						min_voxel_size = mesh.voxel_min_size;
+					}
+				}
+				ImGuiEx::Label("DAG levels / Tree depth");
+				ImGui::Text("%u / %u", max_levels, max_depth);
+				ImGuiEx::Label("Clusters");
+				ImGui::Text("%u (%u leaf, %u voxel)", total_clusters, total_leaf_clusters, total_voxel_clusters);
+				ImGuiEx::Label("Nodes / Pages");
+				ImGui::Text("%u / %u", total_nodes, total_pages);
+				if (total_voxel_clusters > 0) {
+					ImGuiEx::Label("Voxels");
+					ImGui::Text("%u (%u bricks, min size %.4f)", total_voxels, total_bricks, min_voxel_size);
+				}
+				if (cluster_end > 0 && ImGui::BeginTable("clutbl", 6, ImGuiTableFlags_Resizable)) {
+					ImGui::TableSetupColumn("Mesh");
+					ImGui::TableSetupColumn("Levels / Depth");
+					ImGui::TableSetupColumn("Clusters");
+					ImGui::TableSetupColumn("Voxel cl.");
+					ImGui::TableSetupColumn("Bricks");
+					ImGui::TableSetupColumn("Voxels");
+					ImGui::TableHeadersRow();
+					for (i32 i = 0; i <= cluster_end; ++i) {
+						const Mesh& mesh = m_resource->getMesh(i);
+						ImGui::TableNextRow();
+						ImGui::TableNextColumn();
+						ImGuiEx::TextUnformatted(mesh.name);
+						ImGui::TableNextColumn();
+						ImGui::Text("%u / %u", mesh.root_count, mesh.tree_depth);
+						ImGui::TableNextColumn();
+						ImGui::Text("%u", mesh.cluster_count);
+						ImGui::TableNextColumn();
+						ImGui::Text("%u", mesh.voxel_cluster_count);
+						ImGui::TableNextColumn();
+						ImGui::Text("%u", mesh.voxel_brick_count);
+						ImGui::TableNextColumn();
+						ImGui::Text("%u", mesh.voxel_count);
+					}
+					ImGui::EndTable();
+				}
+			}
 		}
 
 		// Import settings stored in the .meta file next to the recipe. Only what applies to a generated static mesh is shown.
@@ -655,6 +715,43 @@ struct Plugin final : ProceduralMeshEditor, EditorAssetPlugin {
 						"\nNeeds more memory, every cluster has its own positions.");
 				}
 				changed |= ImGui::Checkbox("##cludilate", &m_meta.cluster_dilate_borders);
+				ImGuiEx::Label("Voxel clusters (?)");
+				if (ImGui::IsItemHovered()) {
+					ImGui::SetTooltip("%s", "The coarsest levels of clusters are voxels instead of triangles."
+						"\nFor foliage and thin geometry, which does not simplify well as triangles.");
+				}
+				changed |= ImGui::Checkbox("##cluvoxels", &m_meta.cluster_voxels);
+				if (m_meta.cluster_voxels) {
+					ImGuiEx::Label("Voxel error (?)");
+					if (ImGui::IsItemHovered()) {
+						ImGui::SetTooltip("%s", "Error threshold (fraction of the mesh diagonal) where groups switch from triangles to voxels.\n0 = automatic (half the group's average triangle edge length).");
+					}
+					changed |= ImGui::DragFloat("##cluvoxerr", &m_meta.cluster_voxel_error, 0.001f, 0.0f, 0.5f, "%.4f");
+					ImGuiEx::Label("Voxel min coverage (?)");
+					if (ImGui::IsItemHovered()) {
+						ImGui::SetTooltip("%s", "Minimum accumulated surface area / voxel face area for a voxel to survive filtering.\nLower values keep sparser foliage; higher values prune more aggressively.");
+					}
+					changed |= ImGui::DragFloat("##cluvoxcov", &m_meta.cluster_voxel_min_coverage, 0.01f, 0.0f, 1.0f, "%.2f");
+					ImGuiEx::Label("Voxel downsample scale (?)");
+					if (ImGui::IsItemHovered()) {
+						ImGui::SetTooltip("%s", "Coverage multiplier per child voxel when downsampling 2x coarser.\n0.25 preserves 2D surface area; higher values (e.g. 0.5) help thin 1D twigs survive.");
+					}
+					changed |= ImGui::DragFloat("##cluvoxds", &m_meta.cluster_voxel_downsample_scale, 0.01f, 0.125f, 1.0f, "%.3f");
+					ImGuiEx::Label("Voxel stall threshold (?)");
+					if (ImGui::IsItemHovered()) {
+						ImGui::SetTooltip("%s", "Triangle retention ratio above which simplification is considered stalled and switches the group to voxels.");
+					}
+					changed |= ImGui::DragFloat("##cluvoxstall", &m_meta.cluster_voxel_stall_threshold, 0.01f, 0.5f, 1.0f, "%.2f");
+					ImGuiEx::Label("Voxel max resolution (?)");
+					if (ImGui::IsItemHovered()) {
+						ImGui::SetTooltip("%s", "Maximum voxels along the longest axis of the mesh (64 to 4000).");
+					}
+					int max_res = (int)m_meta.cluster_voxel_max_resolution;
+					if (ImGui::DragInt("##cluvoxres", &max_res, 16.f, 64, 4000)) {
+						m_meta.cluster_voxel_max_resolution = (u32)clamp(max_res, 64, 4000);
+						changed = true;
+					}
+				}
 			}
 
 			ImGui::SeparatorText("LODs");

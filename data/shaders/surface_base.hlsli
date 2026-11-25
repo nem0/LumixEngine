@@ -13,7 +13,7 @@ struct VSInput {
 	#if defined MESH_PARTICLE || defined MESH_INSTANCE || defined SKINNED || defined GRASS
 		uint instance_id : SV_InstanceID;
 	#endif
-	#if defined MESH_INSTANCE || defined SKINNED
+	#if (defined MESH_INSTANCE || defined SKINNED) && !defined MESH_PARTICLE && !defined GRASS
 		#define HAS_MATERIAL_INDEX_ATTR
 	#endif
 };
@@ -27,7 +27,7 @@ struct VSOutput {
 	#ifdef TANGENT_ATTR
 		float3 tangent : TEXCOORD3;
 	#endif
-	#if (defined MESH_INSTANCE || defined SKINNED) && !defined DEPTH
+	#if defined HAS_MATERIAL_INDEX_ATTR && !defined DEPTH
 		float4 prev_ndcpos_no_jitter : TEXCOORD4;
 	#endif
 	#ifdef AO_ATTR
@@ -48,8 +48,7 @@ struct VSOutput {
 	#endif
 };
 
-#ifdef SKINNED
-#elif defined MESH_PARTICLE
+#if defined MESH_PARTICLE
 	cbuffer ModelState : register(b4) {
 		float3 position;
 		uint material_index;
@@ -62,6 +61,7 @@ struct VSOutput {
 		uint material_index;
 	};
 #elif defined MESH_INSTANCE
+#elif defined SKINNED
 #endif
 
 Surface getSurface(VSOutput input, uint material_index);
@@ -342,7 +342,7 @@ Surface getSurfaceEx(VSOutput input) {
 		data.albedo = float3(h & 255u, (h >> 8) & 255u, (h >> 16) & 255u) / 255.0 * 0.8 + 0.1;
 	#endif
 	float4 p = mul(float4(input.pos_ws, 1), Global_ws_to_ndc_no_jitter);
-	#if (defined MESH_INSTANCE || defined SKINNED) && !defined DEPTH
+	#if defined HAS_MATERIAL_INDEX_ATTR && !defined DEPTH
 		float2 prev_pos_projected = input.prev_ndcpos_no_jitter.xy / input.prev_ndcpos_no_jitter.w;
 		data.motion = prev_pos_projected.xy - p.xy / p.w;
 	#else
@@ -390,16 +390,16 @@ Surface getSurfaceEx(VSOutput input) {
 		TextureCubeArrayHandle u_reflection_probes;
 	};
 
-	float4 mainPS(VSOutput input, float4 frag_coord : SV_POSITION, bool is_front : SV_IsFrontFace) : SV_TARGET{
+	float4 mainPS(VSOutput input, bool is_front : SV_IsFrontFace) : SV_TARGET{
 		Surface data = getSurfaceEx(input);
 		// double sided materials: the normal of a back face points away from the viewer
 		if (!is_front) data.N = -data.N;
 		data.pos_ws = input.pos_ws.xyz;
 	
 		float linear_depth = dot(data.pos_ws.xyz, Pass_view_dir.xyz);
-		Cluster cluster = getClusterLinearDepth(linear_depth, frag_coord.xy);
+		Cluster cluster = getClusterLinearDepth(linear_depth, input.position.xy);
 		float4 result;
-		result.rgb = computeLighting(cluster, data, Global_light_dir.xyz, Global_light_color.rgb * Global_light_intensity, u_shadowmap, u_shadow_atlas, u_reflection_probes, frag_coord.xy);
+		result.rgb = computeLighting(cluster, data, Global_light_dir.xyz, Global_light_color.rgb * Global_light_intensity, u_shadowmap, u_shadow_atlas, u_reflection_probes, input.position.xy);
 
 		#ifdef ALPHA_CUTOUT
 			if(data.alpha < 0.5) discard;

@@ -692,7 +692,7 @@ struct SceneView::RenderPlugin : Lumix::RenderPlugin {
 			DrawStream& stream = pipeline.getRenderer().getDrawStream();
 			pipeline.setUniform(pipeline.toBindless(gbuffer.DS, stream), UniformBuffer::DRAWCALL2);
 			
-			const u32 mesh_instance_define = 1 << renderer.getShaderDefineIdx("MESH_INSTANCE");
+			const u64 mesh_instance_define = 1ull << renderer.getShaderDefineIdx("MESH_INSTANCE");
 			renderer.pushJob("icons", [this, &uniform_pool, &transient_pool, mesh_instance_define](DrawStream& stream) {
 				const Viewport& vp = m_scene_view.m_view->getViewport();
 				const Matrix camera_mtx({ 0, 0, 0 }, vp.rot);
@@ -841,6 +841,7 @@ SceneView::SceneView(StudioApp& app)
 	m_debug_show_actions[(u32)Pipeline::DebugShow::PROBE_CLUSTERS].create("Debug view", "Probe clusters", "Probe clusters", "debug_view_probe_clusters", "");
 	m_debug_show_actions[(u32)Pipeline::DebugShow::MESH_CLUSTERS].create("Debug view", "Mesh clusters", "Mesh clusters", "debug_view_mesh_clusters", "");
 	m_debug_show_actions[(u32)Pipeline::DebugShow::MESH_TRIANGLES].create("Debug view", "Mesh triangles", "Mesh triangles", "debug_view_mesh_triangles", "");
+	m_debug_show_actions[(u32)Pipeline::DebugShow::VOXEL_BRICKS].create("Debug view", "Voxel bricks", "Voxel bricks", "debug_view_voxel_bricks", "");
 
 	Gizmo::Config& gizmo_cfg = m_app.getGizmoConfig();
 	m_app.getSettings().registerOption("gizmo_position_step", &gizmo_cfg.step_config.position, "Scene view", "Grid size when aligning on a grid");
@@ -1308,7 +1309,9 @@ void SceneView::onToolbar() {
 		option("Probe clusters", Pipeline::DebugShow::PROBE_CLUSTERS);
 		option("Mesh clusters", Pipeline::DebugShow::MESH_CLUSTERS);
 		option("Mesh triangles", Pipeline::DebugShow::MESH_TRIANGLES);
+		option("Voxel bricks", Pipeline::DebugShow::VOXEL_BRICKS);
 		ImGui::Checkbox("Freeze camera of clusters", &m_pipeline->m_cluster_freeze_camera);
+		ImGui::Checkbox("Voxel solid shadow depth", &m_pipeline->m_voxel_solid_shadow_depth);
 		ImGui::SliderFloat("Cluster error (px)", &m_pipeline->m_cluster_error_pixels, 0.05f, 8.f, "%.2f", ImGuiSliderFlags_Logarithmic);
 		ImGui::SliderFloat("Cluster attribute error weight", &m_pipeline->m_cluster_attribute_weight, 0.f, 2.f);
 		ImGui::SliderFloat("Cluster error scale in shadows", &m_pipeline->m_cluster_shadow_error_scale, 1.f, 8.f, "%.2f");

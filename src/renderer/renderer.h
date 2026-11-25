@@ -82,7 +82,7 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 		bool own = false;
 	};
 
-	enum { MAX_SHADER_DEFINES = 32 };
+	enum { MAX_SHADER_DEFINES = 64 };
 
 	virtual void frame() = 0;
 	virtual u32 frameNumber() const = 0;

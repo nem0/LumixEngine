@@ -54,7 +54,7 @@ cbuffer UniformData : register(b4) {
 	uint u_chunk_bounds;	// bindless, 16 bytes per chunk, like u_bounds (CHUNK_CULL)
 	uint u_chunks;			// bindless, GPUSceneChunk[], 32 bytes: int3 p, model, instance buffer, first instance, instance count, float instance radius
 	uint u_chunk_slots;		// the chunks the tables have
-	uint u_padding;
+	uint u_voxel_clusters;	// rw bindless, list of selected voxel clusters written by nanite.hlsl
 };
 
 #define GROUP_THREADS 64			// numthreads of main
@@ -140,6 +140,7 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_id : SV_GroupID, ui
 		if (thread_id.x < COUNTER_COUNT) counter.Store(thread_id.x * 4, 0);
 		if (thread_id.x == 0) {
 			bindless_rw_buffers[u_selected].Store4(SELECTED_COUNT, uint4(0, 0, 0, 0));
+			if (u_voxel_clusters != 0) bindless_rw_buffers[u_voxel_clusters].Store4(SELECTED_COUNT, uint4(0, 0, 0, 0));
 			if (u_clear_occluded != 0) bindless_rw_buffers[u_occluded].Store4(SELECTED_COUNT, uint4(0, 0, 0, 0));
 			const uint groups = (u_capacity + GROUP_THREADS - 1) / GROUP_THREADS;
 			bindless_rw_buffers[u_args].Store3(ARGS_MODEL_INSTANCES, dispatchGroups(groups));

@@ -162,7 +162,7 @@ protected:
 	bool shouldBakeClusters(const ModelMeta& meta) const;
 	static bool areClusterAttributesSupported(const ImportGeometry& geom);
 	// Writes the vertices of the clusters of the first LOD (packed, see packClusterVertices) instead of the ones writeGeometry wrote
-	bool writeClusters(const ModelMeta& meta);
+	bool writeClusters(const Path& src, const ModelMeta& meta);
 	// Writes m_out_file as the compiled resource of the model. `resident_end` is the end of the part of the file that is read with the model, the rest is streamed (see
 	// Model::FileHeader), the header is filled in here. The file is not compressed, it is read at offsets.
 	bool compileModelFile(const Path& path, u64 resident_end);

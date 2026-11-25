@@ -160,6 +160,10 @@ struct LUMIX_RENDERER_API Mesh {
 	u32 root_count = 0;
 	u32 tree_depth = 0;			// levels of the deepest tree, a leaf node is the last one
 	u32 leaf_cluster_count = 0; // the finest clusters, no selection has more clusters than that
+	u32 voxel_cluster_count = 0;
+	u32 voxel_brick_count = 0;
+	u32 voxel_count = 0;
+	float voxel_min_size = 0.f;
 };
 
 struct LODMeshIndices
