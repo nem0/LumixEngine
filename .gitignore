@@ -26,3 +26,4 @@ scripts/itch_io/
 external/evox/build/
 *.dmp
 vc140.pdb
+external/nsight_perf

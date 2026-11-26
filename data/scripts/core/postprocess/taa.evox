@@ -20,6 +20,7 @@ struct TaaUniform {
 	current : u32;
 	motion_vectors : u32;
 	output : u32;
+	history_out : u32;
 }
 
 fn groups(size : u32) : u32 {
@@ -47,30 +48,29 @@ fn taa(ctx : Context, hdr : RenderBuffer) : RenderBuffer {
 	const height = ctx.height();
 	if not state.history.isValid() or state.width != width or state.height != height {
 		ctx.releaseBuffer(state.history);
-		state.history = ctx.createRenderTarget(width, height, .RGBA16F);
+		state.history = ctx.createRenderTarget(width, height, .R11G11B10F);
 		state.width = width;
 		state.height = height;
 		ctx.clear(state.history, 1, 1, 1, 1);
 	}
 
-	// blend the current frame into the history, the motion vectors say where a pixel was in the previous frame
+	// blend the current frame into the history and write both output and next-frame history in one pass (avoids a 4K blit copy)
 	const display_width = ctx.displayWidth();
 	const display_height = ctx.displayHeight();
-	const blended = ctx.createRenderTarget(width, height, .RGBA16F);
+	const new_history = ctx.createRenderTarget(width, height, .R11G11B10F);
+	const output = ctx.createRenderTarget(width, height, .R11G11B10F);
 	ctx.dispatch(shader, TaaUniform {
 		display_width as f32,
 		display_height as f32,
 		ctx.bindless(state.history),
 		ctx.bindless(hdr),
 		ctx.bindless(ctx.gbufferD()),
-		ctx.rwBindless(blended)
+		ctx.rwBindless(output),
+		ctx.rwBindless(new_history)
 	}, groups(display_width), groups(display_height), 1);
 
-	// the renderer continues with a copy, the blended image is the history of the next frame
-	const output = ctx.createRenderTarget(width, height, .RGBA16F);
-	ctx.blit(blended, output, display_width, display_height);
 	const old_history = state.history;
-	state.history = blended;
+	state.history = new_history;
 	ctx.releaseBuffer(old_history);
 	// an antialiasing effect that returns a new buffer releases its input
 	ctx.releaseBuffer(hdr);
