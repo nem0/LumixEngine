@@ -164,44 +164,13 @@ struct LUMIX_RENDERER_API Renderer : ISystem {
 	
 	virtual gpu::BufferHandle createBuffer(const MemRef& memory, gpu::BufferFlags flags, const char* debug_name) = 0;
 
-	// The vertex data, clusters and nodes of all meshes with clusters (see Mesh::cluster_vertex_offset) are ranges of one buffer of a fixed size, created by the first allocation.
-	// `allocClusterData` copies `size` bytes of `data` to a new range and returns its byte offset, or false if the buffer is full. A freed range is reused
-	// after the frames in flight that may read it are done. Can be called from any thread.
-	virtual bool allocClusterData(const void* data, u32 size, u32& offset) = 0;
-	// The same range of the buffer with no data: the caller copies to it (GPUSceneRegistry does it for the meshes without clusters, see flushGPUSceneRegistry). The offset is a multiple of
-	// `alignment` (any positive number), the size is not rounded, free it with freeClusterData.
-	// If there is no room and `reclaim` is set, the renderer unloads streamed pages (see ClusterStream) and tries again, so it can fail only if the data that is never unloaded does not fit.
-	virtual bool allocClusterRange(u32 size, u32 alignment, u32& offset, bool reclaim = true) = 0;
-	// `immediate`: the range can be allocated again at once, not after the frames in flight (only for data that the GPU is not going to use any more, ClusterStream::evictPage)
-	virtual void freeClusterData(u32 offset, u32 size, bool immediate = false) = 0;
-	virtual gpu::BufferHandle getClusterDataBuffer() = 0; // invalid until the first allocation
-	// The scratch buffer of the culling of the trees of clusters (nanite.hlsl): the lists of nodes of its groups. What is in it is dead when a dispatch ends, so all the pipelines and views use
-	// this one buffer: the draw streams are executed one after another and every use has its barriers. Made by the first call, which must be made when the frame is set up (the creation is
-	// recorded in the draw stream of the frame).
-	virtual gpu::BufferHandle getClusterScratchBuffer() = 0;
-	virtual u32 getClusterScratchCapacity() const = 0;	// u32 in it
-	// Shared per-cluster 24-byte DrawIndexedIndirect command scratch buffer (filled right before each cluster draw group's ExecuteIndirect).
-	virtual gpu::BufferHandle getClusterCommandsBuffer() = 0;
-	virtual u32 getClusterCommandsCapacity() const = 0;
+	// Shared cluster data pool, scratch/command buffers, and page streaming (cluster_streaming.h).
+	virtual struct ClusterStreamer& getClusterStreamer() = 0;
+	// Copies `size` bytes of `data` to `dst` at `dst_offset` (`copy_size` >= `size`, multiple of 4, tail zeroed) through the current frame's transient buffer.
+	// Safe to call from any thread (takes the current frame once so slice and stream match).
+	virtual void uploadToBuffer(gpu::BufferHandle dst, u32 dst_offset, const void* data, u32 size, u32 copy_size) = 0;
 	// What the GPU scenes of all worlds share (models, meshes, material sets, draw groups), see gpu_scene_registry.h. Made by the first call.
 	virtual GPUSceneRegistry& getGPUSceneRegistry() = 0;
-	// Copies `size` bytes (a multiple of 4) to the bytes of a range of the buffer that was allocated before (the copy is recorded in the draw stream of the frame, so the GPU executes
-	// it before the passes that are recorded later).
-	virtual void updateClusterData(u32 offset, const void* data, u32 size) = 0;
-
-	// Streaming of the payload of clusters, see ClusterStream. Ids are for the pages of a mesh in the feedback buffer, one bit for each: set if a cluster of a group of the page was drawn (the page is loaded) or if
-	// the clusters that a group of the page is refined to were needed (it is not loaded), since the last readback. `allocClusterStreamIds` returns ClusterStream::NONE if there
-	// are not enough ids. Streams are registered when they are complete, unregistering frees the ids. All can be called from any thread.
-	virtual u32 allocClusterStreamIds(u32 count) = 0;
-	virtual void registerClusterStream(ClusterStream* stream) = 0;
-	virtual void unregisterClusterStream(ClusterStream* stream) = 0;
-	virtual bool isClusterStreamingEnabled() const = 0;	// false: everything is loaded with the model (-cluster_stream_off)
-	// The result of Model::requestClusterPage, called from the main thread when the file system is done (`data` is valid only during the call). `stream` is null if the model was
-	// unloaded meanwhile. `generation` is ClusterStream::generation at the time of the request, the read is ignored if the stream at the address is another one (it was freed and
-	// the address was reused). The payload is kept until the page is uploaded, which waits for the pages that it needs.
-	virtual void onClusterPageRead(ClusterStream* stream, u64 generation, u32 page, Span<const u8> data, bool success) = 0;
-	virtual gpu::BufferHandle getClusterFeedbackBuffer() = 0;	// invalid until the first stream is registered
-	virtual u32 getClusterFeedbackCapacity() = 0;			// groups in it
 
 	virtual gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const MemRef& memory, const char* debug_name) = 0;
 

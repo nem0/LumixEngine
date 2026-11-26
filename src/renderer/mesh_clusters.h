@@ -8,7 +8,7 @@
 
 namespace Lumix {
 
-// One node of a mesh's cluster DAG, also the GPU layout (80 bytes), read by data/shaders/nanite.hlsl.
+// One node of a mesh's cluster DAG, also the GPU layout (72 bytes), read by data/shaders/nanite.hlsl.
 // Clusters of all DAG levels reference the vertices of the original mesh, so no new vertices are created.
 //
 // A cluster is drawn if its `error` is small enough on the screen and the `error` of its parent is not.
@@ -24,17 +24,17 @@ struct MeshClusterGPU {
 	float error;			// object space geometric error of this cluster
 	float parent_error;		// FLT_MAX if the cluster has no parent
 	u32 first_index;		// into MeshClusters::indices while building; group-relative index offset in the model file and on the GPU
-	u32 index_count;
-	// `error` is the error of positions. The error of attributes (normals and UVs that the triangles took from other places) is separate, the
-	// error that is compared to the screen is `error + weight * attribute_error`, the weight is chosen when rendering. Both never get smaller
-	// from a cluster to its parent, so that the cut is valid for every weight.
-	float attribute_error;
-	float parent_attribute_error;	// 0 if the cluster has no parent
+	u32 index_count;		// lower 16 bits: index count (0 for a voxel cluster); upper 16 bits: sub-mesh / material index in the model
 	// Clusters are streamed in groups (MeshGroupGPU). A group is the set of sibling clusters, the ones that share their parent.
 	u32 group;				// the group of this cluster, an index into MeshClusters::groups
 	u32 refined_group;		// the group of clusters that were simplified to make this cluster (the finer ones, "children"), MeshClusters::NO_GROUP for the finest clusters
 };
-static_assert(sizeof(MeshClusterGPU) == 80);
+static_assert(sizeof(MeshClusterGPU) == 72);
+
+constexpr u32 CLUSTER_INDEX_COUNT_MASK = 0xffffu;
+constexpr u32 CLUSTER_MATERIAL_SHIFT = 16;
+inline u32 clusterIndexCount(const MeshClusterGPU& c) { return c.index_count & CLUSTER_INDEX_COUNT_MASK; }
+inline u32 clusterMaterial(const MeshClusterGPU& c) { return c.index_count >> CLUSTER_MATERIAL_SHIFT; }
 
 // A group of sibling clusters, they are consecutive in MeshClusters::clusters. The unit of streaming: the vertex stream and the indices of the clusters of a group
 // are contiguous. A group may be streamed in only after the group of its parent (the coarser clusters). Pages and the groups that are never streamed out are decided
@@ -61,7 +61,7 @@ struct MeshGroupAddressGPU {
 };
 static_assert(sizeof(MeshGroupAddressGPU) == 16);
 
-// A node of the tree over the clusters of a mesh (64 bytes, the GPU layout, read by data/shaders/nanite.hlsl). The clusters of every level of the
+// A node of the tree over the clusters of a mesh (52 bytes, the GPU layout, read by data/shaders/nanite.hlsl). The clusters of every level of the
 // DAG have their own tree, the trees are built over runs of consecutive clusters. The shader walks the trees from the roots and skips a node,
 // with everything under it, if no cluster of it can be selected: its smallest error is too large for the distance, or the largest error of the
 // parents of its clusters is small enough to be drawn instead of any of them. So the clusters of the levels that are not near the cut are never tested.
@@ -74,11 +74,9 @@ struct MeshNodeGPU {
 	float max_parent_error;	// the largest error of a parent of a cluster of the node, FLT_MAX if a cluster has no parent
 	u32 first;				// of a leaf: the first cluster of a run of consecutive ones. Otherwise the first child node, children are consecutive
 	u32 count_and_flags;	// number of clusters or children, LEAF_FLAG is set in leaves
-	float min_attribute_error;			// the smallest and the largest (of parents) error of attributes of the clusters of the node
-	float max_parent_attribute_error;
 	u32 unrefined;			// 1 if a cluster of the node (or under it) has children that are not loaded: the node can not be skipped because its clusters are too coarse for the distance, see MeshGroupAddressGPU::LOADED
-	float padding1;
 };
+static_assert(sizeof(MeshNodeGPU) == 52);
 
 // Vertices of clusters are not shared between clusters, each cluster has its own (at most MeshClusters::MAX_CLUSTER_VERTICES), so that they can be
 // packed relative to the cluster. The header of a cluster (48 bytes, the GPU layout, read by vertex_pulling.hlsli) says where they are.
@@ -122,16 +120,25 @@ inline u32 readClusterBits(const u32* words, u64 bit, u32 count) {
 }
 
 // Voxel clusters. A cluster with index_count == 0 is a cluster of voxels (the coarsest levels of a mesh that has them, the voxels replace the triangles that can not be simplified
-// further, for foliage and thin geometry). It is the same node of the DAG as the clusters of triangles (bounds, errors, groups), only its payload in the vertex stream of its group
-// is different, and so is the use of its header (MeshClusterVertexGPU):
-//   pos_start = the voxel of the minimum of the cluster's bricks, in the grid of its level, pos_step = the size of a voxel, vertex_count = the number of bricks,
-//   pos_bit_offset = where the payload is in the stream of the group (32 bit aligned), uv_min[0], uv_min[1], uv_extent[0] = the position of the voxel (0, 0, 0) of the grid,
-//   so the minimum corner of a voxel (x, y, z) is (uv_min[0], uv_min[1], uv_extent[0]) + (x, y, z) * pos_step.
+// further, for foliage and thin geometry). It is the same node of the DAG as the clusters of triangles (bounds, errors, groups); its 48-byte header slot stores
+// MeshVoxelClusterHeaderGPU instead of MeshClusterVertexGPU, so the minimum corner of a voxel (x, y, z) is grid_origin + (x, y, z) * voxel_size.
 // The payload is brick_count bricks of 4 words, then the attributes of the voxels, 2 words each:
-//   brick: mask (low 32 bits), mask (high 32 bits) of the voxels of the 4 x 4 x 4 brick (bit x + y * 4 + z * 16), the position of the brick in bricks from pos_start (10 bits
+//   brick: mask (low 32 bits), mask (high 32 bits) of the voxels of the 4 x 4 x 4 brick (bit x + y * 4 + z * 16), the position of the brick in bricks from base_voxel (10 bits
 //          each of x, y, z, x in the lowest), the index of the first voxel of the brick in the attributes. The voxels of a brick are in the order of the bits of the mask.
 //   voxel: the frame (packClusterFrame, only the normal), the color (r, g, b, 8 bits each, the lowest first) with the AO in the top 8 bits.
 // While the clusters are built `first_index` of a voxel cluster is its index in MeshClusters::voxel_clusters.
+struct MeshVoxelClusterHeaderGPU {
+	i32 base_voxel[3];		// minimum brick voxel coord in the grid of its level
+	u32 padding0;
+	u32 padding1;
+	u32 brick_count;		// number of 4x4x4 bricks in the cluster
+	u32 payload_bit_offset;	// 32-bit aligned bit offset of the payload in the cluster's group stream
+	float voxel_size;		// object-space size of a voxel
+	Vec3 grid_origin;		// object-space position of voxel (0, 0, 0) of the grid
+	float padding2;
+};
+static_assert(sizeof(MeshVoxelClusterHeaderGPU) == sizeof(MeshClusterVertexGPU));
+
 struct MeshVoxelCluster {
 	u32 first_word;			// in MeshClusters::voxel_words
 	u32 word_count;
@@ -189,7 +196,7 @@ inline Vec3 decodeClusterPosition(const MeshClusterVertexGPU& header, const u32*
 	return Vec3((float)x, (float)y, (float)z) * header.pos_step;
 }
 
-struct Renderer;
+struct ClusterStreamer;
 struct Model;
 
 // The pages of a mesh as they are in the model file, made by the importer (buildMeshPages). A page is the unit of loading and unloading, it has consecutive groups. The groups
@@ -244,35 +251,53 @@ struct ClusterStream {
 	static constexpr u32 PAGE_BYTES = 128 * 1024;		// payload of a page, a group that is larger has a page of its own
 	static constexpr u32 PERMANENT_BYTES = 16 * 1024;	// the coarsest groups up to this payload (at least one group) are never unloaded
 
+	struct PageLayout {
+		u32 stream_bytes;	// vertex streams of the page's groups
+		u32 index_count;	// total tightly-packed cluster indices of the page's groups
+		u32 file_bytes;		// 16-byte aligned size in model file (u8 indices)
+		u32 gpu_bytes;		// 16-byte aligned size in GPU buffer (u16 indices)
+	};
+
 	struct Page {
+		enum class State : u8 {
+			UNLOADED,
+			READING,	// async file read in flight (Model::requestClusterPage)
+			STAGED,		// read_data allocated, waiting for parent pages / GPU pool room
+			LOADED		// resident in GPU cluster data buffer
+		};
+
 		u32 first_group = 0;
 		u32 group_count = 0;
-		u32 pool_offset = 0;	// of the range of the payload of the page in the buffer of cluster data, if it is loaded
+		u32 stream_bytes = 0;	// vertex streams of the page's groups
+		u32 index_count = 0;	// total tightly-packed cluster indices of the page's groups
+		u32 pool_offset = 0;	// of the range of the payload of the page in the buffer of cluster data, if LOADED
 		u32 pool_size = 0;
 		u32 loaded_frame = 0;
 		u32 last_used = 0;		// the frame stamp of the last time a cluster of a group of the page was drawn (zero: never)
 		u32 wanted_frame = 0;
-		bool pending = false;	// the page is in the list of the pages that are needed (the renderer keeps it until the page is loaded or the request is old)
-		u32 requested = 0;		// the stamp of the last feedback in which a group of the page was needed while it was not loaded (zero: never), the GPU clears its bits after each readback
-		bool loaded = false;
+		u32 requested = 0;		// the stamp of the last feedback in which a group of the page was needed while not loaded (zero: never)
+		State state = State::UNLOADED;
+		bool pending = false;	// queued in ClusterStreamer::m_pending
 		bool permanent = false;
 		u32 parent_first = 0;	// the pages that this page needs (see ClusterStream::page_parents) are page_parents[parent_first .. parent_first + parent_count)
 		u32 parent_count = 0;
 		u32 child_first = 0;	// the pages that need this page, in page_children
 		u32 child_count = 0;
 		u64 file_offset = 0;	// of the payload in the model file, see MeshPageFile
-		bool reading = false;	// a read of the payload from the file is in flight (Model::requestClusterPage)
-		u8* read_data = nullptr;	// the payload that was read, waits for the parents of the page and for room in the buffer, owned by the stream (allocator)
+		u8* read_data = nullptr;	// non-null iff state == State::STAGED, owned by the stream (allocator)
 		u32 read_failed = 0;	// the frame stamp of the last failed read (zero: never), the page is not requested again for a while
 		u32 priority = 0;		// see MeshPageFile::priority, the higher it is the earlier the page is read and the later it is unloaded
+
+		bool isLoaded() const { return state == State::LOADED; }
 	};
 
 	explicit ClusterStream(IAllocator& allocator);
 
 	// Copies everything that is needed to load pages, nothing is loaded. Allocates the ids of the pages in the feedback buffer (`global_base` is the first, or NONE).
-	// The pages are not checked, the importer made them. `stream_size` is the size of the vertex streams of all groups (in the pages), `stride` is the index stride.
+	// The pages are not checked, the importer made them. `stream_size` is the size of the vertex streams of all groups (in the pages).
 	bool init(const MeshClusterGPU* cluster_array, u32 clusters, const MeshNodeGPU* node_array, u32 nodes_count, const MeshGroupGPU* group_array, u32 group_count
-		, const MeshPagesView& page_data, u32 stream_size, u32 stride, Renderer& renderer);
+		, const MeshPagesView& page_data, u32 stream_size, ClusterStreamer& streamer);
+	PageLayout pageLayout(u32 page) const;
 	// bytes of the range of a page in the model file (u8 indices)
 	u32 pageBytes(u32 page) const;
 	// bytes of the range of a page in the GPU cluster data buffer (u16 indices)
@@ -284,16 +309,17 @@ struct ClusterStream {
 	bool canEvict(u32 page) const;
 	// the pages of the parents must be loaded, false if there is no room in the buffer
 	// `data` is the payload of the page, pageBytes(page) bytes (the same as in the model file), it is copied to the buffer
-	// `can_reclaim`: if there is no room in the buffer the renderer may unload other pages (not when the streamer loads, it does it itself and holds its lock)
-	bool loadPage(Renderer& renderer, u32 page, u32 stamp, bool can_reclaim, const u8* data);
+	// `can_reclaim`: if there is no room in the buffer the streamer may unload other pages (not when the streamer loads, it does it itself and holds its lock)
+	bool loadPage(ClusterStreamer& streamer, u32 page, u32 stamp, bool can_reclaim, const u8* data);
 	// frees the payload that was read for the page, if there is one
 	void dropReadData(u32 page);
-	// `immediate`: the range of the page is reusable at once, see Renderer::freeClusterData
-	void evictPage(Renderer& renderer, u32 page, bool immediate = false);
+	// `immediate`: the range of the page is reusable at once, see ClusterStreamer::freeData
+	void evictPage(ClusterStreamer& streamer, u32 page, bool immediate = false);
 	// frees everything that is loaded and the payloads that were read
-	void release(Renderer& renderer);
+	void release(ClusterStreamer& streamer);
 	// recomputes MeshNodeGPU::unrefined and uploads the nodes that changed (if the nodes are uploaded: node_table_offset)
-	void refreshNodes(Renderer& renderer);
+	void refreshNodes(ClusterStreamer& streamer);
+	bool isGroupLoaded(u32 group) const { return pages[group_page[group]].isLoaded(); }
 	u32 addressFlags(u32 group) const;
 
 	IAllocator& allocator;
@@ -304,15 +330,13 @@ struct ClusterStream {
 	// refined from (the finer ones), without duplicates (lists, made from MeshPages in ClusterStream::init)
 	Array<u32> page_parents, page_children;
 	Array<Page> pages;
-	Array<u8> loaded;								// of each group
 	Array<MeshGroupAddressGPU> addresses;			// the table of the GPU, uploaded to group_table_offset
 	Array<MeshNodeGPU> nodes;
 	Array<u32> cluster_refined;						// MeshClusterGPU::refined_group of each cluster
 	u32 cluster_count = 0;
 	u32 node_count = 0;
-	u32 index_stride = 0;
 	u32 global_base = NONE;
-	u64 generation = 0;								// unique among all registered streams (set by Renderer::registerClusterStream), tells a stream from another one that has the same address
+	u64 generation = 0;								// unique among all registered streams (set by ClusterStreamer::registerStream), tells a stream from another one that has the same address
 	u32 feedback_from = 0;						// the feedback is ignored before this frame stamp: ids are reused, the bits of the stream that had them before can still be in the buffer or in a readback that is on its way
 	u32 group_table_offset = NONE;					// in the buffer of cluster data, NONE until the table is uploaded (0 is a valid offset)
 	u32 node_table_offset = NONE;					// the same for the nodes

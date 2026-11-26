@@ -436,6 +436,7 @@ struct ProfilerUIImpl final : ProfilerUI {
 		: m_allocator(app.getAllocator(), "profiler ui")
 		, m_app(app)
 		, m_threads(m_allocator)
+		, m_tabs(m_allocator)
 		, m_data(m_allocator)
 		, m_blocks(m_allocator)
 		, m_counters(m_allocator)
@@ -853,6 +854,9 @@ struct ProfilerUIImpl final : ProfilerUI {
 				if (vtab("Memory", tab == 2)) tab = 2;
 				if (vtab("Resources", tab == 3)) tab = 3;
 				if (vtab("Counters", tab == 4)) tab = 4;
+				for (u32 i = 0; i < (u32)m_tabs.size(); ++i) {
+					if (vtab(m_tabs[i]->getName(), tab == 5 + i)) tab = 5 + i;
+				}
 			}
 			ImGui::EndChild();
 			ImGui::PopStyleColor();
@@ -864,6 +868,9 @@ struct ProfilerUIImpl final : ProfilerUI {
 					case 2: m_memory_ui.gui(); break;
 					case 3: resourcesUI(); break;
 					case 4: countersTabUI(); break;
+					default:
+						if (tab >= 5 && tab - 5 < (u32)m_tabs.size()) m_tabs[tab - 5]->onGUI();
+						break;
 				}
 			}
 			ImGui::EndChild();
@@ -871,6 +878,9 @@ struct ProfilerUIImpl final : ProfilerUI {
 		}
 		ImGui::End();
 	}
+
+	void addTab(Tab& tab) override { m_tabs.push(&tab); }
+	void removeTab(Tab& tab) override { m_tabs.eraseItem(&tab); }
 
 	const char* getName() const override { return "profiler"; }
 	void toggleUI() { m_is_open = !m_is_open; }
@@ -1599,7 +1609,7 @@ struct ProfilerUIImpl final : ProfilerUI {
 			}
 			ImGui::EndTable();
 		}
-		
+
 	}
 
 	void flamegraphUI() {
@@ -1743,6 +1753,7 @@ struct ProfilerUIImpl final : ProfilerUI {
 	u32 m_filtered_count = 0; // number of filtered blocks
 
 	HashMap<u32, ThreadData> m_threads;
+	Array<Tab*> m_tabs;	// the tabs after the built-in ones
 	OutputMemoryStream m_data; // raw profiler data
 	float m_autopause = -33.3333f; // pause profiler if frame takes more than `m_autopause`, disabled if negative
 	Array<Counter> m_counters;

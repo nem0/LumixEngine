@@ -1313,7 +1313,6 @@ void SceneView::onToolbar() {
 		ImGui::Checkbox("Freeze camera of clusters", &m_pipeline->m_cluster_freeze_camera);
 		ImGui::Checkbox("Voxel solid shadow depth", &m_pipeline->m_voxel_solid_shadow_depth);
 		ImGui::SliderFloat("Cluster error (px)", &m_pipeline->m_cluster_error_pixels, 0.05f, 8.f, "%.2f", ImGuiSliderFlags_Logarithmic);
-		ImGui::SliderFloat("Cluster attribute error weight", &m_pipeline->m_cluster_attribute_weight, 0.f, 2.f);
 		ImGui::SliderFloat("Cluster error scale in shadows", &m_pipeline->m_cluster_shadow_error_scale, 1.f, 8.f, "%.2f");
 		Renderer& renderer = m_pipeline->getRenderer();
 		for (Lumix::RenderPlugin* plugin : renderer.getPlugins()) {

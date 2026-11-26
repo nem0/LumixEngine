@@ -323,12 +323,17 @@ extern fn reflectionProbesBindless(ctx : Context) : u32;
 extern fn stencilState(write_mask : u32, func : StencilFuncs, ref : u32, mask : u32, sfail : StencilOps, dpfail : StencilOps, dppass : StencilOps) : u64;
 extern fn drawStateRaw(ctx : Context, shader : Shader, define : []const u8, render_state : u64, uniform : []const byte) : void;
 
-// `draw` with render state, e.g. from `stencilState`.
-fn drawState(ctx : Context, shader : Shader, render_state : u64, uniform : $T) : void {
+// `draw` with render state and shader define, e.g. from `stencilState`.
+fn drawStateDefine(ctx : Context, shader : Shader, define : []const u8, render_state : u64, uniform : $T) : void {
 	var storage : [1]T = undefined;
 	storage[0] = uniform;
 	const items : []T = storage;
-	drawStateRaw(ctx, shader, "", render_state, items as []byte);
+	drawStateRaw(ctx, shader, define, render_state, items as []byte);
+}
+
+// `draw` with render state, e.g. from `stencilState`.
+fn drawState(ctx : Context, shader : Shader, render_state : u64, uniform : $T) : void {
+	drawStateDefine(ctx, shader, "", render_state, uniform);
 }
 
 // GPU buffers of `size` bytes. Their contents are undefined until written. Release one with `releaseStorage`

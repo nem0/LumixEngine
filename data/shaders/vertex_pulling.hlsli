@@ -46,38 +46,22 @@ uint pullInstanceAddress(uint instance_id, uint stride) {
 	// Pulls the transform of a GPU-scene draw entry directly from GPUScene::instances or GPUSceneChunks::chunks.
 	// Returns true if previous-frame transform differs from current transform (moved this frame).
 	bool pullSceneTransform(uint slot, uint instance_ref, bool load_prev, out float4 rot, out float3 position, out float3 scale, out float4 prev_rot, out float3 prev_position, out float3 prev_scale) {
-		if (instance_ref == 0) {
+		loadSceneTransform(u_scene_instances, u_scene_chunks, u_scene_cam_p, u_scene_cam_frac, slot, instance_ref, rot, position, scale);
+		if (instance_ref == 0 && load_prev) {
 			ByteAddressBuffer instances = bindless_buffers[u_scene_instances];
 			const uint at = slot * INSTANCE_STRIDE;
-			rot = asfloat(instances.Load4(at + INSTANCE_ROT));
-			position = float3(asint(instances.Load3(at + INSTANCE_POS)) - u_scene_cam_p) * SCENE_POS_UNIT - u_scene_cam_frac;
-			scale = asfloat(instances.Load3(at + INSTANCE_SCALE));
-			if (load_prev && instances.Load(at + INSTANCE_MOVED_FRAME) == u_scene_frame) {
-				prev_rot = asfloat(instances.Load4(at + INSTANCE_PREV_ROT));
-				prev_position = float3(asint(instances.Load3(at + INSTANCE_PREV_POS)) - u_scene_cam_p) * SCENE_POS_UNIT - u_scene_cam_frac;
-				prev_scale = asfloat(instances.Load3(at + INSTANCE_PREV_SCALE));
+			if (instances.Load(at + INSTANCE_MOVED_FRAME) == u_scene_frame) {
+				const SceneInstancePrevious prev = instances.Load<SceneInstancePrevious>(at + INSTANCE_PREV_ROT);
+				prev_rot = prev.rot;
+				prev_position = float3(prev.p - u_scene_cam_p) * SCENE_POS_UNIT - u_scene_cam_frac;
+				prev_scale = prev.scale;
 				return true;
 			}
-			prev_rot = rot;
-			prev_position = position;
-			prev_scale = scale;
-			return false;
 		}
-		else {
-			ByteAddressBuffer chunks = bindless_buffers[u_scene_chunks];
-			const uint at = slot * CHUNK_STRIDE;
-			ByteAddressBuffer data = bindless_buffers[NonUniformResourceIndex(chunks.Load(at + CHUNK_INSTANCE_BUFFER))];
-			const uint instance_at = (instance_ref - 1) * CHUNK_INSTANCE_STRIDE;
-			const float4 rot_lod = asfloat(data.Load4(instance_at + CHUNK_INSTANCE_ROT_LOD));
-			const float4 pos_scale = asfloat(data.Load4(instance_at + CHUNK_INSTANCE_POS_SCALE));
-			rot = float4(rot_lod.xyz, sqrt(saturate(1 - dot(rot_lod.xyz, rot_lod.xyz))));
-			position = float3(asint(chunks.Load3(at + CHUNK_P)) - u_scene_cam_p) * SCENE_POS_UNIT - u_scene_cam_frac + pos_scale.xyz;
-			scale = pos_scale.www;
-			prev_rot = rot;
-			prev_position = position;
-			prev_scale = scale;
-			return false;
-		}
+		prev_rot = rot;
+		prev_position = position;
+		prev_scale = scale;
+		return false;
 	}
 #endif
 
@@ -236,20 +220,6 @@ uint extractClusterBits128(uint4 w, uint rel_bit, uint count) {
 	return count == 0 ? 0 : r;
 }
 
-// the frame is a rotation of (1, 0, 0) to the tangent and (0, 0, 1) to the normal, see packClusterFrame
-void pullClusterFrame(uint packed, out float3 normal, out float3 tangent) {
-	const uint largest = packed >> 30;
-	const float3 abc = float3((int)(packed << 22) >> 22, (int)(packed << 12) >> 22, (int)(packed << 2) >> 22) * (0.70710678 / 511.0);
-	const float d = sqrt(max(0, 1 - dot(abc, abc)));
-	float4 q;
-	if (largest == 0) q = float4(d, abc);
-	else if (largest == 1) q = float4(abc.x, d, abc.y, abc.z);
-	else if (largest == 2) q = float4(abc.x, abc.y, d, abc.z);
-	else q = float4(abc, d);
-	normal = float3(2 * (q.x * q.z + q.w * q.y), 2 * (q.y * q.z - q.w * q.x), 1 - 2 * (q.x * q.x + q.y * q.y));
-	tangent = float3(1 - 2 * (q.y * q.y + q.z * q.z), 2 * (q.x * q.y + q.w * q.z), 2 * (q.x * q.z - q.w * q.y));
-}
-
 // `vertex` is SV_VertexID: the index of the vertex in its cluster, from the cluster's own u16 indices (the buffer of cluster data is the index buffer of the draw,
 // a command per cluster, see gpu_scene_variants.hlsl); `u_draw_id` is the slot of the cluster's instance data in u_instance_buffer (m_scene_out).
 VSVertex pullVertex(uint vertex) {
@@ -297,7 +267,7 @@ VSVertex pullVertex(uint vertex) {
 			const uint attribute = bit + position_bits;
 			const uint4 attr_words = data.Load4(base + (attribute >> 5) * 4);
 			uint attr_rel = attribute & 31;
-			pullClusterFrame(extractClusterBits128(attr_words, attr_rel, 32), v.normal, v.tangent);
+			unpackClusterFrame(extractClusterBits128(attr_words, attr_rel, 32), v.normal, v.tangent);
 			attr_rel += 32;
 			#ifdef UV0_ATTR
 				const uint bits_u = h1.x & 0xff, bits_v = (h1.x >> 8) & 0xff;

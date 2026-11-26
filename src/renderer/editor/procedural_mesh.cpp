@@ -610,18 +610,18 @@ struct Plugin final : ProceduralMeshEditor, EditorAssetPlugin {
 				float min_voxel_size = 0.f;
 				const i32 cluster_end = m_resource->getClusterMeshesEnd();
 				for (i32 i = 0; i <= cluster_end; ++i) {
-					const Mesh& mesh = m_resource->getMesh(i);
-					total_clusters += mesh.cluster_count;
-					total_leaf_clusters += mesh.leaf_cluster_count;
-					total_nodes += mesh.node_count;
-					if (mesh.cluster_stream) total_pages += (u32)mesh.cluster_stream->pages.size();
-					total_voxel_clusters += mesh.voxel_cluster_count;
-					total_bricks += mesh.voxel_brick_count;
-					total_voxels += mesh.voxel_count;
-					max_levels = maximum(max_levels, mesh.root_count);
-					max_depth = maximum(max_depth, mesh.tree_depth);
-					if (mesh.voxel_min_size > 0.f && (min_voxel_size == 0.f || mesh.voxel_min_size < min_voxel_size)) {
-						min_voxel_size = mesh.voxel_min_size;
+					const Mesh::MeshClusterData& mc = m_resource->getMesh(i).clusters;
+					total_clusters += mc.cluster_count;
+					total_leaf_clusters += mc.leaf_cluster_count;
+					total_nodes += mc.node_count;
+					if (mc.stream) total_pages += (u32)mc.stream->pages.size();
+					total_voxel_clusters += mc.voxel_cluster_count;
+					total_bricks += mc.voxel_brick_count;
+					total_voxels += mc.voxel_count;
+					max_levels = maximum(max_levels, mc.root_count);
+					max_depth = maximum(max_depth, mc.tree_depth);
+					if (mc.voxel_min_size > 0.f && (min_voxel_size == 0.f || mc.voxel_min_size < min_voxel_size)) {
+						min_voxel_size = mc.voxel_min_size;
 					}
 				}
 				ImGuiEx::Label("DAG levels / Tree depth");
@@ -644,19 +644,20 @@ struct Plugin final : ProceduralMeshEditor, EditorAssetPlugin {
 					ImGui::TableHeadersRow();
 					for (i32 i = 0; i <= cluster_end; ++i) {
 						const Mesh& mesh = m_resource->getMesh(i);
+						const Mesh::MeshClusterData& mc = mesh.clusters;
 						ImGui::TableNextRow();
 						ImGui::TableNextColumn();
 						ImGuiEx::TextUnformatted(mesh.name);
 						ImGui::TableNextColumn();
-						ImGui::Text("%u / %u", mesh.root_count, mesh.tree_depth);
+						ImGui::Text("%u / %u", mc.root_count, mc.tree_depth);
 						ImGui::TableNextColumn();
-						ImGui::Text("%u", mesh.cluster_count);
+						ImGui::Text("%u", mc.cluster_count);
 						ImGui::TableNextColumn();
-						ImGui::Text("%u", mesh.voxel_cluster_count);
+						ImGui::Text("%u", mc.voxel_cluster_count);
 						ImGui::TableNextColumn();
-						ImGui::Text("%u", mesh.voxel_brick_count);
+						ImGui::Text("%u", mc.voxel_brick_count);
 						ImGui::TableNextColumn();
-						ImGui::Text("%u", mesh.voxel_count);
+						ImGui::Text("%u", mc.voxel_count);
 					}
 					ImGui::EndTable();
 				}

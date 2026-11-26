@@ -209,9 +209,6 @@ struct LUMIX_RENDERER_API Pipeline {
 	struct RenderPlugin* m_debug_show_plugin = nullptr;
 	// the largest error of a cluster on the screen, in pixels. Smaller values switch to coarser clusters later, can be changed at run time
 	float m_cluster_error_pixels = 1.f;
-	// how much the error of attributes (normals and UVs that simplified triangles took from other places) counts next to the error of positions,
-	// 0: only positions, fewer triangles, but the shading can change when a cluster is replaced by another one. Can be changed at run time.
-	float m_cluster_attribute_weight = 1.f;
 	// The clusters are chosen as the camera of the moment of turning this on sees them (the LOD, the frustum and the faces turned away), while the
 	// frame is drawn with the current camera: fly around to see what the frozen camera selected. The occlusion culling is frozen too, it tests with the
 	// pyramid of depths of the frozen camera. Can be changed at run time.

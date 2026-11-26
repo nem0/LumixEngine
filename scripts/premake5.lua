@@ -13,6 +13,7 @@ newoption { trigger = "app-title", value = "TITLE", description = "Window title 
 newoption { trigger = "static-physx", description = "Link PhysX statically (the default)" }
 newoption { trigger = "with-tests", description = "Build test projects (requires the evox plugin)" }
 newoption { trigger = "plugins", value = "LIST", description = "Comma-separated list of plugins to build" }
+newoption { trigger = "no-nvperf", description = "Do not use the Nsight Perf SDK even if it is in external/nsight_perf (builds that are distributed to players, its license does not allow that)" }
 
 local ALL_PLUGINS = { "physics", "renderer", "audio", "ui", "animation", "navigation", "evox" }
 for _, name in ipairs(ALL_PLUGINS) do
@@ -24,6 +25,11 @@ local build_studio = _OPTIONS["no-studio"] == nil
 local build_vulkan = _OPTIONS["with-vulkan"] ~= nil or os.target() == "linux"
 local build_app = _OPTIONS["no-app"] == nil
 local build_tests = _OPTIONS["with-tests"] ~= nil
+
+-- NVIDIA Nsight Perf SDK (GPU hardware counters in the profiler, see src/renderer/gpu/gpu_nvperf.h). Optional and not part of the repository
+-- (its license does not allow that): unpack the "redist" folder of the SDK to external/nsight_perf and nvperf_grfx_host.dll to external/nsight_perf/bin/x64.
+local nvperf_dir = path.getabsolute("../external/nsight_perf")
+local has_nvperf = _OPTIONS["no-nvperf"] == nil and os.target() == "windows" and os.isfile(nvperf_dir .. "/bin/x64/nvperf_grfx_host.dll") and os.isdir(nvperf_dir .. "/NvPerfUtility/include")
 
 -- Static builds merge core, engine and plugins into one library.
 -- Dynamic builds keep core and engine separate and build each plugin as its own DLL.
@@ -433,6 +439,10 @@ plugin_defs.renderer = function()
 	end
 	includedirs { "../src", "../external/freetype/include", "../external/", "../external/dx12/", "../external/pix/include/WinPixEventRuntime" }
 	defines { "BUILDING_RENDERER" }
+	if has_nvperf then
+		defines { "LUMIX_NVPERF" }
+		includedirs { nvperf_dir .. "/include", nvperf_dir .. "/include/windows-desktop-x64", nvperf_dir .. "/NvPerfUtility/include" }
+	end
 	libdirs { "../external/pix/bin/x64" }
 	linkPluginDeps { CORE_NAME, ENGINE_NAME }
 	linkLib "freetype"
@@ -623,6 +633,9 @@ if build_studio then
 				'{COPYFILE} "' .. path.getabsolute("../external/dxc/bin/x64/dxcompiler.dll") .. '" "%{cfg.targetdir}"',
 				'{COPYFILE} "' .. path.getabsolute("../external/dxc/bin/x64/dxil.dll") .. '" "%{cfg.targetdir}"'
 			}
+			if has_nvperf then
+				postbuildcommands { '{COPYFILE} "' .. nvperf_dir .. '/bin/x64/nvperf_grfx_host.dll" "%{cfg.targetdir}"' }
+			end
 		filter "system:linux"
 			links { "dl", "GL", "X11", "rt", "Xi", "gtk-3", "gobject-2.0" }
 		filter {}
@@ -717,6 +730,9 @@ if build_tests then
 				'{COPYFILE} "' .. path.getabsolute("../external/dxc/bin/x64/dxcompiler.dll") .. '" "%{cfg.targetdir}"',
 				'{COPYFILE} "' .. path.getabsolute("../external/dxc/bin/x64/dxil.dll") .. '" "%{cfg.targetdir}"'
 			}
+			if has_nvperf then
+				postbuildcommands { '{COPYFILE} "' .. nvperf_dir .. '/bin/x64/nvperf_grfx_host.dll" "%{cfg.targetdir}"' }
+			end
 		filter "system:linux"
 			links { "GL", "X11", "dl", "rt", "Xi", "vulkan" }
 		filter {}

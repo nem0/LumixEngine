@@ -1,14 +1,15 @@
 #include "engine/shaders/common.hlsli"
 #include "engine/shaders/gpu_scene_layout.hlsli"
+#include "engine/shaders/hzb_common.hlsli"
 
 // Voxel clusters (clusters without triangles, see MeshVoxelCluster in src/renderer/mesh_clusters.h) of the clusters that nanite.hlsl selected for a view are drawn as bricks:
 // every brick (4 x 4 x 4 voxels, a 64 bit mask) of a selected voxel cluster that is not culled is an instance of a cube that voxels.hlsl ray marches. The passes, in the
-// order of a view (the selected clusters are final after gpu_scene_variants.hlsl, which does not change them):
+// order of a view (the selected clusters are final after nanite.hlsl):
 //   FRAME_CLEAR  once in a frame: the pool of bricks is empty
-//   CLEAR        the view starts its range of the pool
-//   EXPAND       one thread for each selected cluster: if it is a cluster of voxels, it appends its bricks that are in the frustum and not hidden to the pool
+//   CLEAR        the view starts its range of the pool, clears its stats/occluded counter, and writes the dispatch arguments of EXPAND
+//   EXPAND       CLUSTERS_PER_GROUP voxel clusters per group: appends bricks that are in the frustum and not hidden to the pool
 //   RETEST       the second pass of the main view: one thread for each brick that the first pass found hidden, tests it with the pyramid of this frame and appends it to the pool if it is visible
-//   ARGS         the command of the indirect draw of the view (DrawIndexedIndirect of a cube, an instance for each brick of the range of the view)
+//   ARGS         the command of the indirect draw of the view (DrawIndexedIndirect of a quad, an instance for each brick of the range of the view)
 // The pool is shared by the views of a frame, they are executed one after another, so the bricks of a view are consecutive. u_counters: [0] the end of the used part of the pool,
 // the number of bricks that were appended (it can be over the capacity, the bricks that did not fit were dropped); from 64 a block of 64 bytes for each view: [0] the first brick
 // of the view, from 16 the command (draw id, index count, instance count, first index, base vertex, base instance). The draw id is the first brick of the view, the vertex shader
@@ -20,9 +21,7 @@
 
 cbuffer UniformData : register(b4) {
 	float4 u_planes[6];
-	float4 u_prev_vp[4];	// the rows of projection * rotation of the camera of the previous frame
-	float4 u_cur_vp[4];
-	float4 u_prev_delta;	// xyz: the camera of this frame - the camera of the previous frame
+	HZBUniforms u_hzb;
 	int3 u_cam_p;			// the camera in the fixed point of the GPU scene
 	uint u_selected_capacity;
 	float3 u_cam_frac;
@@ -35,130 +34,52 @@ cbuffer UniformData : register(b4) {
 	uint u_counters;		// rw bindless
 	uint u_instances;		// bindless, GPUScene::instances
 	uint u_chunks;			// bindless, GPUSceneChunks::chunks
-	uint u_hzb_mode;
-	uint u_hzb_prev;		// bindless texture, the pyramid of the previous frame (hzb.hlsl)
-	uint u_hzb_cur;
-	uint u_hzb_mips;
-	float2 u_hzb_size;
 	uint u_occluded;		// rw bindless, the bricks that the pyramid of the previous frame hides, 16 bytes each (the same as the pool)
 	uint u_occluded_capacity;
 	uint u_args;			// rw bindless, indirect dispatch args: [0] EXPAND (1 group per voxel cluster), [16] RETEST
 	uint u_quads;			// rw bindless, precomputed screen-space quad bounds per brick (16 bytes each)
-	uint2 u_args_pad;
 	float4 u_draw_vp[4];	// rows of projection * view of the drawing camera
 	float4 u_draw_delta;	// xyz: cull camera - draw camera, w: 1 if ortho
 };
 
 #define GROUP_SIZE 64
-#define BRICK_STRIDE 16
-#define VIEWS_AT 64
-#define VIEW_STRIDE 64
-#define VIEW_COMMAND 16
 #define CUBE_INDEX_COUNT 6
 
-// the transform of a model instance or of an instance of a chunk of an instanced model, relative to the camera
-void loadTransform(uint slot, uint instance_ref, out float4 rot, out float3 position, out float3 scale) {
-	if (instance_ref == 0) {
-		ByteAddressBuffer instances = bindless_buffers[u_instances];
-		const uint at = slot * INSTANCE_STRIDE;
-		rot = asfloat(instances.Load4(at + INSTANCE_ROT));
-		position = float3(asint(instances.Load3(at + INSTANCE_POS)) - u_cam_p) * SCENE_POS_UNIT - u_cam_frac;
-		scale = asfloat(instances.Load3(at + INSTANCE_SCALE));
-	}
-	else {
-		ByteAddressBuffer chunks = bindless_buffers[u_chunks];
-		const uint at = slot * CHUNK_STRIDE;
-		ByteAddressBuffer data = bindless_buffers[NonUniformResourceIndex(chunks.Load(at + CHUNK_INSTANCE_BUFFER))];
-		const uint instance_at = (instance_ref - 1) * CHUNK_INSTANCE_STRIDE;
-		const float4 rot_lod = asfloat(data.Load4(instance_at + CHUNK_INSTANCE_ROT_LOD));
-		const float4 pos_scale = asfloat(data.Load4(instance_at + CHUNK_INSTANCE_POS_SCALE));
-		rot = float4(rot_lod.xyz, sqrt(saturate(1 - dot(rot_lod.xyz, rot_lod.xyz))));
-		position = float3(asint(chunks.Load3(at + CHUNK_P)) - u_cam_p) * SCENE_POS_UNIT - u_cam_frac + pos_scale.xyz;
-		scale = pos_scale.www;
-	}
+uint waveAppendBool(RWByteAddressBuffer counters, uint counter_offset, bool active) {
+	const uint total = WaveActiveCountBits(active);
+	uint base = 0;
+	if (total > 0 && WaveIsFirstLane()) counters.InterlockedAdd(counter_offset, total, base);
+	return WaveReadLaneFirst(base) + WavePrefixCountBits(active);
 }
 
-bool insideFrustum(float3 center, float radius) {
-	for (int i = 0; i < 6; ++i) {
-		if (dot(u_planes[i], float4(center, 1)) < -radius) return false;
-	}
-	return true;
-}
-
-// The same test as in nanite.hlsl (see there): true if the sphere (relative to the camera) is certainly behind what the pyramid has.
-#define HZB_DETAIL_LEVELS 2
-#define HZB_MIN_MIP 1
-bool isOccludedClip(float4 clip, float radius, float2 row_scale, bool previous) {
-	const float w_near = clip.w - radius;
-	if (w_near <= 1e-4) return false;
-	const float w_far = clip.w + radius;
-	const float2 n_max = clip.xy + row_scale;
-	const float2 n_min = clip.xy - row_scale;
-	const float2 ndc_max = n_max / float2(n_max.x > 0 ? w_near : w_far, n_max.y > 0 ? w_near : w_far);
-	const float2 ndc_min = n_min / float2(n_min.x < 0 ? w_near : w_far, n_min.y < 0 ? w_near : w_far);
-	const float nearest = clip.z / w_near;
-	const float2 uv_a = toScreenUV(ndc_min * 0.5 + 0.5);
-	const float2 uv_b = toScreenUV(ndc_max * 0.5 + 0.5);
-	const float2 mn = saturate(min(uv_a, uv_b));
-	const float2 mx = saturate(max(uv_a, uv_b));
-
-	const float2 size_px = (mx - mn) * u_hzb_size;
-	const uint mip = min((uint)max(ceil(log2(max(max(size_px.x, size_px.y), 1.0))) - HZB_DETAIL_LEVELS, HZB_MIN_MIP), u_hzb_mips - 1);
-	const int2 mip_size = max(int2(u_hzb_size) >> mip, 1);
-	const int2 t0 = min(int2(mn * u_hzb_size) >> mip, mip_size - 1);
-	const int2 t1 = min(int2(mx * u_hzb_size) >> mip, mip_size - 1);
-	Texture2D<float4> hzb = bindless_textures[previous ? u_hzb_prev : u_hzb_cur];
-	float farthest = 1e30;
-	for (int y = t0.y; y <= t1.y; ++y) {
-		for (int x = t0.x; x <= t1.x; ++x) farthest = min(farthest, hzb.Load(int3(x, y, mip - HZB_MIN_MIP)).r);
-	}
-	return farthest > nearest * 1.0005 + 1e-6;
-}
-
-bool isOccluded(float3 center, float radius, bool previous) {
-	const float3 c = previous ? center + u_prev_delta.xyz : center;
-	const float4 p = float4(c, 1);
-	float4 clip;
-	float2 row_scale;
-	if (previous) {
-		clip = float4(dot(u_prev_vp[0], p), dot(u_prev_vp[1], p), dot(u_prev_vp[2], p), dot(u_prev_vp[3], p));
-		row_scale = float2(length(u_prev_vp[0].xyz), length(u_prev_vp[1].xyz)) * radius;
-	}
-	else {
-		clip = float4(dot(u_cur_vp[0], p), dot(u_cur_vp[1], p), dot(u_cur_vp[2], p), dot(u_cur_vp[3], p));
-		row_scale = float2(length(u_cur_vp[0].xyz), length(u_cur_vp[1].xyz)) * radius;
-	}
-	return isOccludedClip(clip, radius, row_scale, previous);
-}
-
-uint3 dispatchGroups(uint count) {
-	return uint3(min(count, MAX_GROUPS_X), (count + MAX_GROUPS_X - 1) / MAX_GROUPS_X, 1);
-}
-
-#define EXPAND_GROUP_SIZE 32
-#define CLUSTERS_PER_GROUP 4
-#define THREADS_PER_CLUSTER (EXPAND_GROUP_SIZE / CLUSTERS_PER_GROUP)
+#define EXPAND_GROUP_SIZE 64
+#define CLUSTERS_LOG2 4
+#define CLUSTERS_PER_GROUP (1 << CLUSTERS_LOG2)	// the first threads of the group set up one cluster each, the bricks of all of them are expanded by one thread each (see EXPAND)
 
 #if !defined FRAME_CLEAR && !defined CLEAR && !defined ARGS && !defined RETEST
-groupshared uint g_slot[CLUSTERS_PER_GROUP];
-groupshared uint g_instance[CLUSTERS_PER_GROUP];
-groupshared uint g_header[CLUSTERS_PER_GROUP];
-groupshared uint g_payload[CLUSTERS_PER_GROUP];
-groupshared uint g_brick_count[CLUSTERS_PER_GROUP];
-groupshared float3 g_voxel_scale[CLUSTERS_PER_GROUP];
-groupshared float3 g_base_pos[CLUSTERS_PER_GROUP];
-groupshared float3 g_vx_ws[CLUSTERS_PER_GROUP];
-groupshared float3 g_vy_ws[CLUSTERS_PER_GROUP];
-groupshared float3 g_vz_ws[CLUSTERS_PER_GROUP];
-groupshared float4 g_clip_base[CLUSTERS_PER_GROUP];
-groupshared float4 g_clip_x[CLUSTERS_PER_GROUP];
-groupshared float4 g_clip_y[CLUSTERS_PER_GROUP];
-groupshared float4 g_clip_z[CLUSTERS_PER_GROUP];
-groupshared float2 g_row_scale[CLUSTERS_PER_GROUP];
-groupshared float4 g_draw_base[CLUSTERS_PER_GROUP];
-groupshared float4 g_draw_x[CLUSTERS_PER_GROUP];
-groupshared float4 g_draw_y[CLUSTERS_PER_GROUP];
-groupshared float4 g_draw_z[CLUSTERS_PER_GROUP];
+struct ClusterSetup {
+	uint slot;
+	uint instance;
+	uint header;
+	uint payload;
+	uint brick_count;
+	float3 voxel_scale;
+	float3 base_pos;
+	float3 vx_ws;
+	float3 vy_ws;
+	float3 vz_ws;
+	float4 clip_base;
+	float4 clip_x;
+	float4 clip_y;
+	float4 clip_z;
+	float2 row_scale;
+	float4 draw_base;
+	float4 draw_x;
+	float4 draw_y;
+	float4 draw_z;
+};
+groupshared uint g_scan[CLUSTERS_PER_GROUP];	// inclusive prefix sum of the brick counts of the clusters of the group
+groupshared ClusterSetup g_clusters[CLUSTERS_PER_GROUP];
 #define THREAD_GROUP_SIZE EXPAND_GROUP_SIZE
 #else
 #define THREAD_GROUP_SIZE GROUP_SIZE
@@ -222,27 +143,29 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_id : SV_GroupID, ui
 		if (thread_id.x == 0) {
 			RWByteAddressBuffer counters = bindless_rw_buffers[u_counters];
 			counters.Store(0, 0);
-			counters.Store(16, 0);
+			counters.Store(VOXEL_OCCLUDED_COUNT, 0);
 			if (u_args != 0) bindless_rw_buffers[u_args].Store4(16, uint4(0, 0, 0, 0));
 		}
 	#elif defined CLEAR
 		if (thread_id.x == 0) {
 			RWByteAddressBuffer counters = bindless_rw_buffers[u_counters];
-			counters.Store(VIEWS_AT + u_view_slot * VIEW_STRIDE, counters.Load(0));
-			if (u_hzb_mode == 1) counters.Store(16, 0);
+			const uint at = VOXEL_VIEWS_AT + u_view_slot * VOXEL_VIEW_STRIDE;
+			counters.Store(at, counters.Load(0));
+			counters.Store3(at + VOXEL_VIEW_STATS, uint3(0, 0, 0));
+			if (u_hzb.mode == 1) counters.Store(VOXEL_OCCLUDED_COUNT, 0);
 			const uint vc = min(bindless_buffers[u_selected].Load(SELECTED_COUNT), u_selected_capacity);
 			bindless_rw_buffers[u_args].Store3(0, dispatchGroups((vc + CLUSTERS_PER_GROUP - 1) / CLUSTERS_PER_GROUP));
 		}
 	#elif defined ARGS
 		if (thread_id.x == 0) {
 			RWByteAddressBuffer counters = bindless_rw_buffers[u_counters];
-			const uint at = VIEWS_AT + u_view_slot * VIEW_STRIDE;
+			const uint at = VOXEL_VIEWS_AT + u_view_slot * VOXEL_VIEW_STRIDE;
 			const uint end = min(counters.Load(0), u_brick_capacity);
 			const uint begin = min(counters.Load(at), end);
-			counters.Store4(at + VIEW_COMMAND, uint4(begin, CUBE_INDEX_COUNT, end - begin, 0));
-			counters.Store2(at + VIEW_COMMAND + 16, uint2(0, 0));
-			if (u_hzb_mode == 1) {
-				const uint occ = min(counters.Load(16), u_occluded_capacity);
+			counters.Store4(at + VOXEL_VIEW_COMMAND, uint4(begin, CUBE_INDEX_COUNT, end - begin, 0));
+			counters.Store2(at + VOXEL_VIEW_COMMAND + 16, uint2(0, 0));
+			if (u_hzb.mode == 1) {
+				const uint occ = min(counters.Load(VOXEL_OCCLUDED_COUNT), u_occluded_capacity);
 				const uint retest_groups = (occ + GROUP_SIZE - 1) / GROUP_SIZE;
 				bindless_rw_buffers[u_args].Store3(16, dispatchGroups(retest_groups));
 			}
@@ -250,15 +173,16 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_id : SV_GroupID, ui
 	#elif defined RETEST
 		const uint index = thread_id.y * MAX_GROUPS_X * GROUP_SIZE + thread_id.x;
 		RWByteAddressBuffer counters = bindless_rw_buffers[u_counters];
-		const uint count = min(counters.Load(16), u_occluded_capacity);
+		const uint count = min(counters.Load(VOXEL_OCCLUDED_COUNT), u_occluded_capacity);
 		if (index >= count) return;
 		RWByteAddressBuffer occluded = bindless_rw_buffers[u_occluded];
-		const uint4 brick_entry = occluded.Load4(index * BRICK_STRIDE);	// slot | (b << 26), instance, header, brick record
+		const uint4 brick_entry = occluded.Load4(index * VOXEL_BRICK_STRIDE);	// slot | (b << VOXEL_BRICK_INDEX_SHIFT), instance, header, brick record
 
 		ByteAddressBuffer data = bindless_buffers[u_cluster_data];
-		const int3 base_voxel = asint(data.Load3(brick_entry.z));
-		const float size = asfloat(data.Load(brick_entry.z + 28));
-		const float3 grid_origin = asfloat(data.Load3(brick_entry.z + 32));
+		const VoxelClusterHeader hdr = data.Load<VoxelClusterHeader>(brick_entry.z);
+		const int3 base_voxel = hdr.base_voxel;
+		const float size = hdr.voxel_size;
+		const float3 grid_origin = hdr.grid_origin;
 		const uint3 brick_xyz = data.Load3(brick_entry.w);
 		const int3 brick_coord = int3(brick_xyz.z & 1023, (brick_xyz.z >> 10) & 1023, (brick_xyz.z >> 20) & 1023);
 		float3 sub_min, sub_max;
@@ -266,10 +190,10 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_id : SV_GroupID, ui
 		unpackBrickSubBox(brick_xyz.x, brick_xyz.y, sub_min, sub_max, sub_packed);
 		float4 rot;
 		float3 position, scale;
-		loadTransform(brick_entry.x & 0x03ffffffu, brick_entry.y, rot, position, scale);
+		loadSceneTransform(u_instances, u_chunks, u_cam_p, u_cam_frac, brick_entry.x & VOXEL_BRICK_SLOT_MASK, brick_entry.y, rot, position, scale);
 		const float3 center = position + rotateByQuat(rot, (grid_origin + (float3(base_voxel + brick_coord * 4) + 0.5 * (sub_min + sub_max)) * size) * scale);
 		const float radius = 0.5 * length((sub_max - sub_min) * scale) * size;
-		bool visible = !isOccluded(center, radius, false);
+		bool visible = !isOccludedHZB(u_hzb, center, radius, false);
 		uint4 quad = 0;
 		if (visible) {
 			const float3 p0_ws = position + u_draw_delta.xyz + rotateByQuat(rot, (grid_origin + (float3(base_voxel + brick_coord * 4) + sub_min) * size) * scale);
@@ -287,59 +211,51 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_id : SV_GroupID, ui
 			if (behind_camera) visible = false;
 		}
 
-		const uint wave_vis = WaveActiveCountBits(visible);
-		uint vis_base = 0;
-		if (wave_vis > 0 && WaveIsFirstLane()) counters.InterlockedAdd(0, wave_vis, vis_base);
-		vis_base = WaveReadLaneFirst(vis_base);
-		const uint vis_offset = WavePrefixCountBits(visible);
-
+		const uint at = waveAppendBool(counters, 0, visible);
 		RWByteAddressBuffer bricks = bindless_rw_buffers[u_bricks];
 		RWByteAddressBuffer quads = bindless_rw_buffers[u_quads];
-		if (visible) {
-			const uint at = vis_base + vis_offset;
-			if (at < u_brick_capacity) {
-				bricks.Store4(at * BRICK_STRIDE, brick_entry);
-				quads.Store4(at * BRICK_STRIDE, quad);
-			}
+		if (visible && at < u_brick_capacity) {
+			bricks.Store4(at * VOXEL_BRICK_STRIDE, brick_entry);
+			quads.Store4(at * VOXEL_BRICK_STRIDE, quad);
 		}
 	#else
-		// EXPAND: CLUSTERS_PER_GROUP voxel clusters per 32-thread group (THREADS_PER_CLUSTER threads per cluster).
+		// EXPAND: CLUSTERS_PER_GROUP voxel clusters per group. 1. every thread sets up its cluster (in LDS), 2. prefix sum of the brick counts, 3. the bricks of all the clusters
+		// of the group are numbered and one thread takes a brick at a time (the cluster of a brick is found by a binary search in the sums), so all the lanes work
+		// until the last brick, not until the brick count of the largest cluster of the wave.
 		const uint gtid = group_thread_id.x;
-		const uint sub = gtid / THREADS_PER_CLUSTER;
-		const uint lane = gtid % THREADS_PER_CLUSTER;
-		const uint vc_idx = (group_id.y * MAX_GROUPS_X + group_id.x) * CLUSTERS_PER_GROUP + sub;
+		const uint vc_idx = (group_id.y * MAX_GROUPS_X + group_id.x) * CLUSTERS_PER_GROUP + gtid;
 		ByteAddressBuffer data = bindless_buffers[u_cluster_data];
-		const bool hzb_prev = (u_hzb_mode == 1);
+		const bool hzb_prev = (u_hzb.mode == 1);
 
-		if (lane == 0) {
+		if (gtid < CLUSTERS_PER_GROUP) {
+			const uint sub = gtid;
 			ByteAddressBuffer selected = bindless_buffers[u_selected];
 			const uint selected_count = min(selected.Load(SELECTED_COUNT), u_selected_capacity);
 			if (vc_idx >= selected_count) {
-				g_brick_count[sub] = 0;
+				g_clusters[sub].brick_count = 0;
 			}
 			else {
 				const uint4 entry = selected.Load4(SELECTED_HEADER + vc_idx * SELECTED_STRIDE);	// slot, mesh, cluster, instance
-				const uint cluster = entry.z & 0x07ffffffu;
+				const uint cluster = entry.z & SELECTED_CLUSTER_MASK;
 
 				ByteAddressBuffer meshes = bindless_buffers[u_meshes];
-				const uint4 mesh_info = meshes.Load4(entry.y * CLUSTER_MESH_STRIDE + CLUSTER_MESH_TABLE);	// clusters, group table, cluster count, node count
-				const uint root_count = meshes.Load(entry.y * CLUSTER_MESH_STRIDE + CLUSTER_MESH_ROOT_COUNT);
-				const uint cluster_at = mesh_info.x + cluster * CLUSTER_STRIDE;
+				const ClusterMesh cm = meshes.Load<ClusterMesh>(entry.y * CLUSTER_MESH_STRIDE);
+				const uint cluster_at = cm.clusters + cluster * CLUSTER_STRIDE;
 
-				const uint headers_offset = mesh_info.x + ((mesh_info.z * CLUSTER_STRIDE + mesh_info.w * NODE_STRIDE + root_count * ROOT_STRIDE + CLUSTER_ALIGNMENT_MASK) & ~(uint)CLUSTER_ALIGNMENT_MASK);
+				const uint headers_offset = clusterHeadersOffset(cm);
 				const uint header = headers_offset + cluster * CLUSTER_HEADER_STRIDE;
 				const uint group_idx = data.Load(cluster_at + CLUSTER_GROUP);
-				const uint stream_base = data.Load4(mesh_info.y + group_idx * GROUP_STRIDE).x;
-				const int3 base_voxel = asint(data.Load3(header));
-				const uint4 h1 = data.Load4(header + 16);	// uv bits, the number of bricks, the bit offset of the payload in the stream of the group, the size of a voxel
-				const float3 grid_origin = asfloat(data.Load3(header + 32));
-				const uint brick_count = min(h1.y, 64u);
-				const float size = asfloat(h1.w);
-				const uint payload = stream_base + (h1.z >> 3);
+				const uint stream_base = data.Load4(cm.group_table + group_idx * GROUP_STRIDE).x;
+				const VoxelClusterHeader hdr = data.Load<VoxelClusterHeader>(header);
+				const int3 base_voxel = hdr.base_voxel;
+				const float3 grid_origin = hdr.grid_origin;
+				const uint brick_count = min(hdr.brick_count, 64u);
+				const float size = hdr.voxel_size;
+				const uint payload = stream_base + (hdr.payload_bit_offset >> 3);
 
 				float4 rot;
 				float3 position, scale;
-				loadTransform(entry.x, entry.w, rot, position, scale);
+				loadSceneTransform(u_instances, u_chunks, u_cam_p, u_cam_frac, entry.x, entry.w, rot, position, scale);
 				const float3 voxel_scale = size * scale;
 
 				const float3 base_pos = position + rotateByQuat(rot, (grid_origin + float3(base_voxel) * size) * scale);
@@ -347,70 +263,102 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_id : SV_GroupID, ui
 				const float3 vy_ws = rotateByQuat(rot, float3(0, voxel_scale.y, 0));
 				const float3 vz_ws = rotateByQuat(rot, float3(0, 0, voxel_scale.z));
 
-				g_slot[sub] = entry.x;
-				g_instance[sub] = entry.w;
-				g_header[sub] = header;
-				g_payload[sub] = payload;
-				g_brick_count[sub] = brick_count;
-				g_voxel_scale[sub] = voxel_scale;
-				g_base_pos[sub] = base_pos;
-				g_vx_ws[sub] = vx_ws;
-				g_vy_ws[sub] = vy_ws;
-				g_vz_ws[sub] = vz_ws;
+				ClusterSetup cs;
+				cs.slot = entry.x;
+				cs.instance = entry.w;
+				cs.header = header;
+				cs.payload = payload;
+				cs.brick_count = brick_count;
+				cs.voxel_scale = voxel_scale;
+				cs.base_pos = base_pos;
+				cs.vx_ws = vx_ws;
+				cs.vy_ws = vy_ws;
+				cs.vz_ws = vz_ws;
 
 				const float4 dp0 = float4(base_pos + u_draw_delta.xyz, 1.0);
-				g_draw_base[sub] = float4(dot(u_draw_vp[0], dp0), dot(u_draw_vp[1], dp0), dot(u_draw_vp[2], dp0), dot(u_draw_vp[3], dp0));
-				g_draw_x[sub] = float4(dot(u_draw_vp[0].xyz, vx_ws), dot(u_draw_vp[1].xyz, vx_ws), dot(u_draw_vp[2].xyz, vx_ws), dot(u_draw_vp[3].xyz, vx_ws));
-				g_draw_y[sub] = float4(dot(u_draw_vp[0].xyz, vy_ws), dot(u_draw_vp[1].xyz, vy_ws), dot(u_draw_vp[2].xyz, vy_ws), dot(u_draw_vp[3].xyz, vy_ws));
-				g_draw_z[sub] = float4(dot(u_draw_vp[0].xyz, vz_ws), dot(u_draw_vp[1].xyz, vz_ws), dot(u_draw_vp[2].xyz, vz_ws), dot(u_draw_vp[3].xyz, vz_ws));
+				cs.draw_base = float4(dot(u_draw_vp[0], dp0), dot(u_draw_vp[1], dp0), dot(u_draw_vp[2], dp0), dot(u_draw_vp[3], dp0));
+				cs.draw_x = float4(dot(u_draw_vp[0].xyz, vx_ws), dot(u_draw_vp[1].xyz, vx_ws), dot(u_draw_vp[2].xyz, vx_ws), dot(u_draw_vp[3].xyz, vx_ws));
+				cs.draw_y = float4(dot(u_draw_vp[0].xyz, vy_ws), dot(u_draw_vp[1].xyz, vy_ws), dot(u_draw_vp[2].xyz, vy_ws), dot(u_draw_vp[3].xyz, vy_ws));
+				cs.draw_z = float4(dot(u_draw_vp[0].xyz, vz_ws), dot(u_draw_vp[1].xyz, vz_ws), dot(u_draw_vp[2].xyz, vz_ws), dot(u_draw_vp[3].xyz, vz_ws));
 
-				if (u_hzb_mode != 0 && brick_count > 1) {
-					const float4 vp0 = hzb_prev ? u_prev_vp[0] : u_cur_vp[0];
-					const float4 vp1 = hzb_prev ? u_prev_vp[1] : u_cur_vp[1];
-					const float4 vp2 = hzb_prev ? u_prev_vp[2] : u_cur_vp[2];
-					const float4 vp3 = hzb_prev ? u_prev_vp[3] : u_cur_vp[3];
-					const float4 p0 = float4(hzb_prev ? base_pos + u_prev_delta.xyz : base_pos, 1.0);
-					g_clip_base[sub] = float4(dot(vp0, p0), dot(vp1, p0), dot(vp2, p0), dot(vp3, p0));
-					g_clip_x[sub] = float4(dot(vp0.xyz, vx_ws), dot(vp1.xyz, vx_ws), dot(vp2.xyz, vx_ws), dot(vp3.xyz, vx_ws));
-					g_clip_y[sub] = float4(dot(vp0.xyz, vy_ws), dot(vp1.xyz, vy_ws), dot(vp2.xyz, vy_ws), dot(vp3.xyz, vy_ws));
-					g_clip_z[sub] = float4(dot(vp0.xyz, vz_ws), dot(vp1.xyz, vz_ws), dot(vp2.xyz, vz_ws), dot(vp3.xyz, vz_ws));
-					g_row_scale[sub] = float2(length(vp0.xyz), length(vp1.xyz));
+				cs.clip_base = 0; cs.clip_x = 0; cs.clip_y = 0; cs.clip_z = 0; cs.row_scale = 0;
+				if (u_hzb.mode != 0 && brick_count > 1) {
+					const float4 vp0 = hzb_prev ? u_hzb.prev_vp[0] : u_hzb.cur_vp[0];
+					const float4 vp1 = hzb_prev ? u_hzb.prev_vp[1] : u_hzb.cur_vp[1];
+					const float4 vp2 = hzb_prev ? u_hzb.prev_vp[2] : u_hzb.cur_vp[2];
+					const float4 vp3 = hzb_prev ? u_hzb.prev_vp[3] : u_hzb.cur_vp[3];
+					const float4 p0 = float4(hzb_prev ? base_pos + u_hzb.prev_delta.xyz : base_pos, 1.0);
+					cs.clip_base = float4(dot(vp0, p0), dot(vp1, p0), dot(vp2, p0), dot(vp3, p0));
+					cs.clip_x = float4(dot(vp0.xyz, vx_ws), dot(vp1.xyz, vx_ws), dot(vp2.xyz, vx_ws), dot(vp3.xyz, vx_ws));
+					cs.clip_y = float4(dot(vp0.xyz, vy_ws), dot(vp1.xyz, vy_ws), dot(vp2.xyz, vy_ws), dot(vp3.xyz, vy_ws));
+					cs.clip_z = float4(dot(vp0.xyz, vz_ws), dot(vp1.xyz, vz_ws), dot(vp2.xyz, vz_ws), dot(vp3.xyz, vz_ws));
+					cs.row_scale = float2(length(vp0.xyz), length(vp1.xyz));
 				}
+				g_clusters[sub] = cs;
 			}
 		}
+		if (gtid < CLUSTERS_PER_GROUP) g_scan[gtid] = g_clusters[gtid].brick_count;
 		GroupMemoryBarrierWithGroupSync();
+		[unroll]
+		for (uint off = 1; off < CLUSTERS_PER_GROUP; off <<= 1) {
+			const uint add = (gtid < CLUSTERS_PER_GROUP && gtid >= off) ? g_scan[gtid - off] : 0;
+			GroupMemoryBarrierWithGroupSync();
+			if (gtid < CLUSTERS_PER_GROUP) g_scan[gtid] += add;
+			GroupMemoryBarrierWithGroupSync();
+		}
+		const uint total_bricks = g_scan[CLUSTERS_PER_GROUP - 1];
 
-		const uint brick_count = g_brick_count[sub];
-		const uint max_bc = WaveActiveMax(brick_count);
 		RWByteAddressBuffer counters = bindless_rw_buffers[u_counters];
 		RWByteAddressBuffer bricks = bindless_rw_buffers[u_bricks];
 		RWByteAddressBuffer quads = bindless_rw_buffers[u_quads];
 		RWByteAddressBuffer occluded = bindless_rw_buffers[u_occluded];
 
-		for (uint base_b = 0; base_b < max_bc; base_b += THREADS_PER_CLUSTER) {
-			const uint b = base_b + lane;
+		// total_bricks is the same for the whole group, so the wave operations below are reached by all the lanes
+		for (uint base_b = 0; base_b < total_bricks; base_b += EXPAND_GROUP_SIZE) {
+			const uint idx = base_b + gtid;
+			const bool valid = idx < total_bricks;
+			uint sub = 0;
+			uint b = 0;
+			if (valid) {
+				// the first cluster whose inclusive sum is over idx
+				uint lo = 0;
+				uint hi = CLUSTERS_PER_GROUP - 1;
+				[unroll]
+				for (uint step = 0; step < CLUSTERS_LOG2; ++step) {
+					const uint mid = (lo + hi) >> 1;
+					if (g_scan[mid] > idx) hi = mid; else lo = mid + 1;
+				}
+				sub = lo;
+				b = idx - (sub > 0 ? g_scan[sub - 1] : 0);
+			}
+			const ClusterSetup cs = g_clusters[sub];
 			bool vis = false;
 			bool occ = false;
+			bool stat_cand = false, stat_frustum = false, stat_hzb = false;	// VOXEL_STATS
 			uint4 quad = 0;
-			if (b < brick_count) {
-				const uint3 brick_xyz = data.Load3(g_payload[sub] + b * 16);
+			if (valid) {
+				const uint3 brick_xyz = data.Load3(cs.payload + b * 16);
 				if ((brick_xyz.x | brick_xyz.y) != 0) {
+					stat_cand = true;
 					float3 sub_min, sub_max;
 					uint sub_packed;
 					unpackBrickSubBox(brick_xyz.x, brick_xyz.y, sub_min, sub_max, sub_packed);
 					const float3 bc = float3(brick_xyz.z & 1023, (brick_xyz.z >> 10) & 1023, (brick_xyz.z >> 20) & 1023);
-					if (brick_count == 1) {
+					if (cs.brick_count == 1) {
 						vis = true;
 					}
 					else {
 						const float3 vc = bc * 4.0 + 0.5 * (sub_min + sub_max);
-						const float3 center = g_base_pos[sub] + g_vx_ws[sub] * vc.x + g_vy_ws[sub] * vc.y + g_vz_ws[sub] * vc.z;
-						const float radius = 0.5 * length((sub_max - sub_min) * g_voxel_scale[sub]);
-						if (insideFrustum(center, radius)) {
-							if (u_hzb_mode != 0) {
-								const float4 clip = g_clip_base[sub] + g_clip_x[sub] * vc.x + g_clip_y[sub] * vc.y + g_clip_z[sub] * vc.z;
-								if (isOccludedClip(clip, radius, g_row_scale[sub] * radius, hzb_prev)) {
+						const float3 center = cs.base_pos + cs.vx_ws * vc.x + cs.vy_ws * vc.y + cs.vz_ws * vc.z;
+						const float radius = 0.5 * length((sub_max - sub_min) * cs.voxel_scale);
+						stat_frustum = true;
+						if (insideFrustum(u_planes, center, radius)) {
+							stat_frustum = false;
+							if (u_hzb.mode != 0) {
+								const float4 clip = cs.clip_base + cs.clip_x * vc.x + cs.clip_y * vc.y + cs.clip_z * vc.z;
+								if (isOccludedClip(clip, radius, cs.row_scale * radius, hzb_prev ? u_hzb.prev : u_hzb.cur, u_hzb.size, u_hzb.mips)) {
 									occ = hzb_prev;
+									stat_hzb = true;
 								}
 								else {
 									vis = true;
@@ -424,37 +372,38 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_id : SV_GroupID, ui
 					if (vis) {
 						const float3 lo = bc * 4.0 + sub_min;
 						const float3 ext = sub_max - sub_min;
-						const float4 c0 = g_draw_base[sub] + g_draw_x[sub] * lo.x + g_draw_y[sub] * lo.y + g_draw_z[sub] * lo.z;
+						const float4 c0 = cs.draw_base + cs.draw_x * lo.x + cs.draw_y * lo.y + cs.draw_z * lo.z;
 						bool behind_camera;
-						quad = computeBrickQuad(c0, g_draw_x[sub] * ext.x, g_draw_y[sub] * ext.y, g_draw_z[sub] * ext.z, u_draw_delta.w != 0.0, sub_packed, behind_camera);
+						quad = computeBrickQuad(c0, cs.draw_x * ext.x, cs.draw_y * ext.y, cs.draw_z * ext.z, u_draw_delta.w != 0.0, sub_packed, behind_camera);
 						if (behind_camera) vis = false;
 					}
 				}
 			}
 
-			const uint wave_vis = WaveActiveCountBits(vis);
-			uint wave_vis_base = 0;
-			if (wave_vis > 0 && WaveIsFirstLane()) counters.InterlockedAdd(0, wave_vis, wave_vis_base);
-			wave_vis_base = WaveReadLaneFirst(wave_vis_base);
-			const uint vis_off = WavePrefixCountBits(vis);
-			if (vis) {
-				const uint at = wave_vis_base + vis_off;
-				if (at < u_brick_capacity) {
-					bricks.Store4(at * BRICK_STRIDE, uint4(g_slot[sub] | (b << 26), g_instance[sub], g_header[sub], g_payload[sub] + b * 16));
-					quads.Store4(at * BRICK_STRIDE, quad);
+			#ifdef VOXEL_STATS
+				// per view, words 40, 44, 48 of its block: the bricks of the selected voxel clusters, the ones outside of the frustum, the ones that the pyramid hides
+				// (bricks of clusters with a single brick are not tested)
+				const uint wc = WaveActiveCountBits(stat_cand);
+				const uint wf = WaveActiveCountBits(stat_frustum);
+				const uint wh = WaveActiveCountBits(stat_hzb);
+				if (WaveIsFirstLane()) {
+					const uint stats_at = VOXEL_VIEWS_AT + u_view_slot * VOXEL_VIEW_STRIDE + VOXEL_VIEW_STATS;
+					uint unused;
+					if (wc > 0) counters.InterlockedAdd(stats_at, wc, unused);
+					if (wf > 0) counters.InterlockedAdd(stats_at + 4, wf, unused);
+					if (wh > 0) counters.InterlockedAdd(stats_at + 8, wh, unused);
 				}
+			#endif
+			const uint4 brick_record = uint4(cs.slot | (b << VOXEL_BRICK_INDEX_SHIFT), cs.instance, cs.header, cs.payload + b * 16);
+			const uint vis_at = waveAppendBool(counters, 0, vis);
+			if (vis && vis_at < u_brick_capacity) {
+				bricks.Store4(vis_at * VOXEL_BRICK_STRIDE, brick_record);
+				quads.Store4(vis_at * VOXEL_BRICK_STRIDE, quad);
 			}
 
-			const uint wave_occ = WaveActiveCountBits(occ);
-			uint wave_occ_base = 0;
-			if (wave_occ > 0 && WaveIsFirstLane()) counters.InterlockedAdd(16, wave_occ, wave_occ_base);
-			wave_occ_base = WaveReadLaneFirst(wave_occ_base);
-			const uint occ_off = WavePrefixCountBits(occ);
-			if (occ) {
-				const uint hidden = wave_occ_base + occ_off;
-				if (hidden < u_occluded_capacity) {
-					occluded.Store4(hidden * BRICK_STRIDE, uint4(g_slot[sub] | (b << 26), g_instance[sub], g_header[sub], g_payload[sub] + b * 16));
-				}
+			const uint occ_at = waveAppendBool(counters, VOXEL_OCCLUDED_COUNT, occ);
+			if (occ && occ_at < u_occluded_capacity) {
+				occluded.Store4(occ_at * VOXEL_BRICK_STRIDE, brick_record);
 			}
 		}
 	#endif

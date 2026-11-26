@@ -2411,6 +2411,7 @@ struct StudioAppImpl final : StudioApp {
 	float getFOV() const override { return clamp(m_fov, degreesToRadians(1.f), degreesToRadians(175.f)); }
 	void setFOV(float fov_radians) override { m_fov = fov_radians; }
 	Settings& getSettings() override { return m_settings; }
+	ProfilerUI& getProfilerUI() override { return *m_profiler_ui; }
 
 	void loadSettings(bool user_data_only) {
 		PROFILE_FUNCTION();

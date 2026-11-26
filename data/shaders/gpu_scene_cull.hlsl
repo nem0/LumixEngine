@@ -62,9 +62,10 @@ cbuffer UniformData : register(b4) {
 // A mesh of a model without clusters is drawn: the entry of the list of selected clusters (slot, mesh in its model, cluster, instance) with no cluster
 void emitLod(uint model, uint slot, float3 center, uint flags, uint instance) {
 	ByteAddressBuffer models = bindless_buffers[u_lod_models];
-	const uint far_range = models.Load(model * LOD_MODEL_STRIDE + LOD_MODEL_FAR_RANGE);
-	const uint4 lods = models.Load4(model * LOD_MODEL_STRIDE + LOD_MODEL_LODS);
-	const float4 distances = asfloat(models.Load4(model * LOD_MODEL_STRIDE + LOD_MODEL_DISTANCES));
+	const LodModel lm = models.Load<LodModel>(model * LOD_MODEL_STRIDE);
+	const uint far_range = lm.far_range;
+	const uint4 lods = lm.lods;
+	const float4 distances = lm.distances;
 	const float3 d = center - u_lod_ref;
 	const float d2 = dot(d, d) * u_lod_scale;
 	uint range = far_range;
@@ -90,13 +91,6 @@ void emitLod(uint model, uint slot, float3 center, uint flags, uint instance) {
 	}
 }
 
-bool insideFrustum(float3 center, float radius) {
-	for (int i = 0; i < 6; ++i) {
-		if (dot(u_planes[i], float4(center, 1)) < -radius) return false;
-	}
-	return true;
-}
-
 // what a visible model instance or instance with the model draws
 void emit(RWByteAddressBuffer counter, uint model, uint slot, float3 center, uint flags, uint instance) {
 	if (model == NO_MODEL) return;
@@ -114,11 +108,6 @@ void emit(RWByteAddressBuffer counter, uint model, uint slot, float3 center, uin
 			if (at < u_item_capacity) bindless_rw_buffers[u_tree_items].Store4(at * ITEM_STRIDE, uint4(mesh, slot, 0, instance));
 		}
 	}
-}
-
-// the groups of an indirect dispatch of `count` threads
-uint3 dispatchGroups(uint count) {
-	return uint3(min(count, MAX_GROUPS_X), (count + MAX_GROUPS_X - 1) / MAX_GROUPS_X, 1);
 }
 
 [numthreads(GROUP_THREADS, 1, 1)]
@@ -152,7 +141,7 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_id : SV_GroupID, ui
 		const float radius = asfloat(b.w);
 		if (radius < 0) return;
 		const float3 center = float3(asint(b.xyz) - u_cam_p) * u_unit - u_cam_frac;
-		if (!insideFrustum(center, radius)) return;
+		if (!insideFrustum(u_planes, center, radius)) return;
 
 		// its instances are tested by CHUNK_INSTANCE_CULL, GROUP_THREADS in each item
 		const uint2 range = bindless_buffers[u_chunks].Load2(slot * CHUNK_STRIDE + CHUNK_INSTANCE_RANGE);	// first instance, count
@@ -171,13 +160,11 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_id : SV_GroupID, ui
 		const uint instance = item.y + group_thread_id.x;
 
 		ByteAddressBuffer chunks = bindless_buffers[u_chunks];
-		const uint4 p_model = chunks.Load4(slot * CHUNK_STRIDE + CHUNK_P);
-		const uint instance_buffer = chunks.Load(slot * CHUNK_STRIDE + CHUNK_INSTANCE_BUFFER);
-		const float instance_radius = asfloat(chunks.Load(slot * CHUNK_STRIDE + CHUNK_INSTANCE_RADIUS));
-		const float4 pos_scale = asfloat(bindless_buffers[NonUniformResourceIndex(instance_buffer)].Load4(instance * CHUNK_INSTANCE_STRIDE + CHUNK_INSTANCE_POS_SCALE));
-		const float3 center = float3(asint(p_model.xyz) - u_cam_p) * u_unit - u_cam_frac + pos_scale.xyz;
-		if (!insideFrustum(center, instance_radius * pos_scale.w)) return;
-		emit(counter, p_model.w, slot, center, 0, instance + 1);  // 0 is a model instance that is drawn itself
+		const SceneChunk chunk = chunks.Load<SceneChunk>(slot * CHUNK_STRIDE);
+		const float4 pos_scale = asfloat(bindless_buffers[NonUniformResourceIndex(chunk.instance_buffer)].Load4(instance * CHUNK_INSTANCE_STRIDE + CHUNK_INSTANCE_POS_SCALE));
+		const float3 center = float3(chunk.p - u_cam_p) * u_unit - u_cam_frac + pos_scale.xyz;
+		if (!insideFrustum(u_planes, center, chunk.instance_radius * pos_scale.w)) return;
+		emit(counter, chunk.model, slot, center, 0, instance + 1);  // 0 is a model instance that is drawn itself
 	#else
 		const uint slot = thread_id.y * MAX_GROUPS_X * GROUP_THREADS + thread_id.x;
 		if (slot >= u_capacity) return;
@@ -190,7 +177,7 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_id : SV_GroupID, ui
 		if (radius < 0) return;
 
 		const float3 center = float3(asint(b.xyz) - u_cam_p) * u_unit - u_cam_frac;
-		if (!insideFrustum(center, radius)) return;
+		if (!insideFrustum(u_planes, center, radius)) return;
 
 		ByteAddressBuffer instances = bindless_buffers[u_instances];
 		const uint model = instances.Load(slot * INSTANCE_STRIDE + INSTANCE_MODEL);

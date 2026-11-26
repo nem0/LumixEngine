@@ -1,6 +1,7 @@
 import "core:render"
 import "core:renderer/pipelinetype"
 import "core:renderer/gpu/textureformat"
+import "core:postprocess/atmo" as atmo
 
 // Layout of `Textures` in engine/shaders/lighting.hlsl
 struct LightingUniform {
@@ -12,26 +13,31 @@ struct LightingUniform {
 	shadowmap : u32;
 	shadow_atlas : u32;
 	reflection_probes : u32;
+	atmo : atmo.AtmoUniform;
 }
 
-// Lights the G-buffer, port of Pipeline::lightPass. Returns the HDR image. Draws nothing until the shader is compiled.
+// Lights the G-buffer (and applies atmospheric scattering/fog + sky in the same render pass). Returns the HDR image.
 fn lightPass(ctx : Context, gbuffer : GBuffer, shadowmap : RenderBuffer) : RenderBuffer {
 	const shader = ctx.loadShader("engine/shaders/lighting.hlsl");
 	ctx.beginBlock("light pass_evox");
-	var format = TextureFormat.RGBA16F;
+	const atmo_data = atmo.prepareAtmo(ctx);
+
+	var format = TextureFormat.R11G11B10F;
 	if ctx.pipelineType() == .PROBE {
 		format = .RGBA32F;
 	}
 	const hdr = ctx.createRenderTarget(ctx.width(), ctx.height(), format);
 
-	ctx.setRenderTarget(hdr);
-	const color = ctx.clearColor();
-	ctx.clearTargets(.ALL, color.x, color.y, color.z, 0.0, 0.0);
+	if not atmo_data.active {
+		ctx.setRenderTarget(hdr);
+		const color = ctx.clearColor();
+		ctx.clearTargets(.ALL, color.x, color.y, color.z, 0.0, 0.0);
+	}
 
 	ctx.setRenderTargetWithDepth(hdr, gbuffer.DS, .READONLY_DEPTH);
 	// shade only pixels that were written by the geometry pass (stencil != 0)
-	const state = stencilState(0, .NOT_EQUAL, 0, 255, .KEEP, .KEEP, .REPLACE);
-	ctx.drawState(shader, state, LightingUniform {
+	const geom_state = stencilState(0, .NOT_EQUAL, 0, 255, .KEEP, .KEEP, .REPLACE);
+	ctx.drawStateDefine(shader, atmo_data.lighting_define, geom_state, LightingUniform {
 		ctx.bindless(gbuffer.A),
 		ctx.bindless(gbuffer.B),
 		ctx.bindless(gbuffer.C),
@@ -39,8 +45,16 @@ fn lightPass(ctx : Context, gbuffer : GBuffer, shadowmap : RenderBuffer) : Rende
 		ctx.bindless(gbuffer.DS),
 		ctx.bindless(shadowmap),
 		ctx.shadowAtlasBindless(),
-		ctx.reflectionProbesBindless()
+		ctx.reflectionProbesBindless(),
+		atmo_data.uniform
 	});
+
+	if atmo_data.active {
+		// sky pixels only (stencil == 0): direct RTV write, no depth read or HDR read-modify-write
+		const sky_state = stencilState(0, .EQUAL, 0, 255, .KEEP, .KEEP, .KEEP);
+		ctx.drawStateDefine(atmo_data.sky_shader, atmo_data.sky_define, sky_state, atmo_data.uniform);
+	}
+
 	ctx.endBlock();
 	return hdr;
 }

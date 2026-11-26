@@ -97,6 +97,7 @@ struct LUMIX_EDITOR_API StudioApp {
 	virtual struct PropertyGrid& getPropertyGrid() = 0;
 	virtual struct LogUI& getLogUI() = 0;
 	virtual struct AssetBrowser& getAssetBrowser() = 0;
+	virtual struct ProfilerUI& getProfilerUI() = 0;
 	virtual struct AssetCompiler& getAssetCompiler() = 0;
 	virtual struct FileSelector& getFileSelector() = 0;
 	virtual struct DirSelector& getDirSelector() = 0;

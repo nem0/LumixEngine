@@ -19,8 +19,10 @@
 #include "engine/resource_manager.h"
 #include "core/string.h"
 #include "engine/world.h"
+#include "renderer/cluster_streaming.h"
 #include "renderer/draw_stream.h"
 #include "renderer/font.h"
+#include "renderer/gpu/gpu_nvperf.h"
 #include "renderer/gpu_scene_registry.h"
 #include "renderer/material.h"
 #include "renderer/mesh_clusters.h"
@@ -43,25 +45,6 @@ RenderBufferHandle RenderPlugin::renderAfterTonemap(const GBuffer& gbuffer, Rend
 bool RenderPlugin::tonemap(RenderBufferHandle input, RenderBufferHandle& output, Pipeline& pipeline) { return false; }
 bool RenderPlugin::debugOutput(RenderBufferHandle input, Pipeline& pipeline) { return false; }
 RenderBufferHandle RenderPlugin::renderAA(const GBuffer& gbuffer, RenderBufferHandle input, Pipeline& pipeline) { return INVALID_RENDERBUFFER; }
-
-// -cluster_stream_mb <n>: the budget of the pages of clusters that are streamed (without the permanent ones)
-static u64 getClusterStreamBudget() {
-	u64 mb = 96;
-	char tmp[4096];
-	if (!os::getCommandLine(Span(tmp))) return mb << 20;
-	CommandLineParser parser(tmp);
-	while (parser.next()) {
-		if (!parser.currentEquals("-cluster_stream_mb")) continue;
-		if (!parser.next()) break;
-		char value[32];
-		parser.getCurrent(value, sizeof(value));
-		u64 parsed = 0;
-		for (const char* c = value; *c >= '0' && *c <= '9'; ++c) parsed = parsed * 10 + u64(*c - '0');
-		if (parsed > 0) mb = parsed;
-		break;
-	}
-	return mb << 20;
-}
 
 #ifdef _WIN32
 void initFSR3(Renderer& renderer, IAllocator& allocator);
@@ -499,8 +482,6 @@ struct GPUProfiler
 
 
 struct RendererImpl final : Renderer {
-	struct StreamRef { ClusterStream* stream; u32 page; };	// a page of a stream, see m_stream_pending
-
 	explicit RendererImpl(Engine& engine)
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator(), "renderer")
@@ -514,14 +495,7 @@ struct RendererImpl final : Renderer {
 		, m_shader_defines(m_allocator)
 		, m_profiler(m_allocator)
 		, m_layers(m_allocator)
-		, m_cluster_data_free(m_allocator)
-		, m_cluster_data_pending(m_allocator)
-		, m_streams(m_allocator)
-		, m_stream_id_free(m_allocator)
-		, m_stream_pending(m_allocator)
-		, m_stream_ready(m_allocator)
-		, m_feedback_incoming(m_allocator)
-		, m_feedback_local(m_allocator)
+		, m_cluster_streamer(*this, m_allocator)
 		, m_material_buffer(m_allocator)
 		, m_plugins(m_allocator)
 		, m_render_script(engine, m_allocator)
@@ -705,12 +679,7 @@ struct RendererImpl final : Renderer {
 		m_model_manager.destroy();
 		m_material_manager.destroy();
 		m_shader_manager.destroy();
-		if (m_cluster_data_buffer) stream.destroy(m_cluster_data_buffer);
-		m_cluster_data_buffer = gpu::INVALID_BUFFER;
-		if (m_cluster_scratch_buffer) stream.destroy(m_cluster_scratch_buffer);
-		m_cluster_scratch_buffer = gpu::INVALID_BUFFER;
-		if (m_cluster_commands_buffer) stream.destroy(m_cluster_commands_buffer);
-		m_cluster_commands_buffer = gpu::INVALID_BUFFER;
+		m_cluster_streamer.destroy(stream);
 		m_font_manager->destroy();
 		LUMIX_DELETE(m_allocator, m_font_manager);
 		
@@ -845,6 +814,33 @@ struct RendererImpl final : Renderer {
 			}
 			else if (cmd_line_parser.currentEquals("-gpu_validation")) {
 				flags = flags | gpu::InitFlags::GPU_VALIDATION;
+			}
+			else if (cmd_line_parser.currentEquals("-gpu_counters")) {
+				// -gpu_counters <metric>: records the hardware counter of every profile block to a file, see updateCounterExport
+				if (cmd_line_parser.next()) {
+					cmd_line_parser.getCurrent(m_counter_export.metric, sizeof(m_counter_export.metric));
+					m_counter_export.enabled = true;
+				}
+			}
+			else if (cmd_line_parser.currentEquals("-gpu_counters_out")) {
+				if (cmd_line_parser.next()) cmd_line_parser.getCurrent(m_counter_export.out, sizeof(m_counter_export.out));
+			}
+			else if (cmd_line_parser.currentEquals("-gpu_counters_depth")) {
+				char tmp[16];
+				if (cmd_line_parser.next()) {
+					cmd_line_parser.getCurrent(tmp, sizeof(tmp));
+					fromCString(tmp, m_counter_export.depth);
+				}
+			}
+			else if (cmd_line_parser.currentEquals("-gpu_counters_warmup")) {
+				char tmp[16];
+				if (cmd_line_parser.next()) {
+					cmd_line_parser.getCurrent(tmp, sizeof(tmp));
+					fromCString(tmp, m_counter_export.warmup);
+				}
+			}
+			else if (cmd_line_parser.currentEquals("-gpu_counters_quit")) {
+				m_counter_export.quit = true;
 			}
 		}
 
@@ -1161,531 +1157,21 @@ struct RendererImpl final : Renderer {
 		return handle;
 	}
 
-	struct ClusterDataRange {
-		u32 offset;
-		u32 size;
-		u32 frame; // of the free, only for the pending ones
-	};
+	ClusterStreamer& getClusterStreamer() override { return m_cluster_streamer; }
 
-	// returns the range to the free ones, which are sorted by offset and never adjacent
-	void releaseClusterData(u32 offset, u32 size) {
-		u32 i = 0;
-		while (i < (u32)m_cluster_data_free.size() && m_cluster_data_free[i].offset < offset) ++i;
-		const bool merge_prev = i > 0 && m_cluster_data_free[i - 1].offset + m_cluster_data_free[i - 1].size == offset;
-		const bool merge_next = i < (u32)m_cluster_data_free.size() && offset + size == m_cluster_data_free[i].offset;
-		if (merge_prev && merge_next) {
-			m_cluster_data_free[i - 1].size += size + m_cluster_data_free[i].size;
-			m_cluster_data_free.erase(i);
-		}
-		else if (merge_prev) {
-			m_cluster_data_free[i - 1].size += size;
-		}
-		else if (merge_next) {
-			m_cluster_data_free[i].offset = offset;
-			m_cluster_data_free[i].size += size;
-		}
-		else {
-			m_cluster_data_free.insert(i, ClusterDataRange{offset, size, 0});
-		}
-	}
-
-	bool allocClusterRange(u32 size, u32 alignment, u32& offset, bool reclaim) override {
-		if (size == 0 || alignment == 0) return false;
-		if (tryAllocClusterRange(size, alignment, offset)) return true;
-		if (reclaim && reclaimClusterData(size, alignment) && tryAllocClusterRange(size, alignment, offset)) return true;
-		logError("Buffer of data of clusters is full (", (u32)CLUSTER_DATA_POOL_SIZE >> 20, " MB), a range with ", size, " bytes does not fit");
-		return false;
-	}
-
-	bool tryAllocClusterRange(u32 size, u32 alignment, u32& offset) {
-		if (size == 0 || alignment == 0) return false;
-		// the ranges are aligned, and their sizes are multiples of 4 as shaders read 32 bit words
-		const u32 aligned_size = (size + CLUSTER_DATA_ALIGN - 1) & ~(CLUSTER_DATA_ALIGN - 1);
-		jobs::MutexGuard lock(m_cluster_data_mutex);
-
-		if (!m_cluster_data_buffer) {
-			m_cluster_data_buffer = createBuffer(MemRef{ CLUSTER_DATA_POOL_SIZE, nullptr, false }, gpu::BufferFlags::SHADER_BUFFER, "cluster data");
-			if (!m_cluster_data_buffer) return false;
-			m_cluster_data_free.push(ClusterDataRange{0, CLUSTER_DATA_POOL_SIZE, 0});
-		}
-
-		// frames in flight may still read what was freed lately
-		for (u32 i = 0; i < (u32)m_cluster_data_pending.size();) {
-			const ClusterDataRange r = m_cluster_data_pending[i];
-			if (m_frame_number - r.frame >= CLUSTER_DATA_FREE_DELAY) {
-				m_cluster_data_pending.swapAndPop(i);
-				releaseClusterData(r.offset, r.size);
-			}
-			else {
-				++i;
-			}
-		}
-
-		// the smallest free range that fits at an aligned offset
-		u32 best = 0xffFFffFF;
-		u64 best_start = 0;
-		for (u32 i = 0; i < (u32)m_cluster_data_free.size(); ++i) {
-			const ClusterDataRange& r = m_cluster_data_free[i];
-			const u64 start = (u64(r.offset) + alignment - 1) / alignment * alignment;
-			if (start + aligned_size > u64(r.offset) + r.size) continue;
-			if (best == 0xffFFffFF || r.size < m_cluster_data_free[best].size) {
-				best = i;
-				best_start = start;
-			}
-		}
-		if (best == 0xffFFffFF) {
-			// the caller logs it
-			return false;
-		}
-		offset = (u32)best_start;
-		const ClusterDataRange taken = m_cluster_data_free[best];
-		m_cluster_data_free.erase(best);
-		// what is left of the free range, before and after the allocated one
-		const u32 after = u32(u64(taken.offset) + taken.size - (best_start + aligned_size));
-		const u32 before = offset - taken.offset;
-		if (after) m_cluster_data_free.insert(best, ClusterDataRange{u32(best_start + aligned_size), after, 0});
-		if (before) m_cluster_data_free.insert(best, ClusterDataRange{taken.offset, before, 0});
-		return true;
-	}
-
-	bool allocClusterData(const void* data, u32 size, u32& offset) override {
-		if (!allocClusterRange(size, CLUSTER_DATA_ALIGN, offset, true)) return false;
-		const u32 aligned_size = (size + CLUSTER_DATA_ALIGN - 1) & ~(CLUSTER_DATA_ALIGN - 1);
-
-		uploadClusterData(offset, data, size, aligned_size);
-		return true;
-	}
-
-	// Copies the data to the buffer of cluster data through the transient buffer of the frame, so no GPU resource is created per upload.
-	// `copy_size` (a multiple of 4, at least `size`) bytes are written, the part after `size` is zeroed.
-	// The frame is taken once, so the slice and the stream always belong to the same one.
-	void uploadClusterData(u32 offset, const void* data, u32 size, u32 copy_size) {
+	void uploadToBuffer(gpu::BufferHandle dst, u32 dst_offset, const void* data, u32 size, u32 copy_size) override {
 		jobs::wait(&m_cpu_frame->can_setup);
 		FrameData& frame = *m_cpu_frame;
 		const TransientSlice slice = frame.transient_pool.alloc(copy_size);
 		memcpy(slice.ptr, data, size);
 		if (copy_size > size) memset(slice.ptr + size, 0, copy_size - size);
 		frame.draw_stream.barrier(slice.buffer, gpu::BarrierType::READ);
-		frame.draw_stream.copy(m_cluster_data_buffer, slice.buffer, offset, slice.offset, copy_size);
+		frame.draw_stream.copy(dst, slice.buffer, dst_offset, slice.offset, copy_size);
 	}
-
-	void freeClusterData(u32 offset, u32 size, bool immediate) override {
-		if (size == 0) return;
-		const u32 aligned_size = (size + CLUSTER_DATA_ALIGN - 1) & ~(CLUSTER_DATA_ALIGN - 1);
-		jobs::MutexGuard lock(m_cluster_data_mutex);
-		if (immediate) releaseClusterData(offset, aligned_size);
-		else m_cluster_data_pending.push(ClusterDataRange{offset, aligned_size, m_frame_number});
-	}
-
-	gpu::BufferHandle getClusterDataBuffer() override { return m_cluster_data_buffer; }
-
-	gpu::BufferHandle getClusterScratchBuffer() override {
-		if (!m_cluster_scratch_buffer) {
-			m_cluster_scratch_buffer = createBuffer(MemRef{ CLUSTER_SCRATCH_CAPACITY * sizeof(u32), nullptr, false }, gpu::BufferFlags::SHADER_BUFFER, "cluster scratch");
-		}
-		return m_cluster_scratch_buffer;
-	}
-	u32 getClusterScratchCapacity() const override { return CLUSTER_SCRATCH_CAPACITY; }
-
-	gpu::BufferHandle getClusterCommandsBuffer() override {
-		if (!m_cluster_commands_buffer) {
-			m_cluster_commands_buffer = createBuffer(MemRef{ CLUSTER_COMMANDS_CAPACITY * 24, nullptr, false }, gpu::BufferFlags::SHADER_BUFFER, "cluster indirect commands");
-		}
-		return m_cluster_commands_buffer;
-	}
-	u32 getClusterCommandsCapacity() const override { return CLUSTER_COMMANDS_CAPACITY; }
 
 	GPUSceneRegistry& getGPUSceneRegistry() override {
 		if (!m_gpu_scene_registry) m_gpu_scene_registry = LUMIX_NEW(m_allocator, GPUSceneRegistry)(*this, m_allocator);
 		return *m_gpu_scene_registry;
-	}
-
-	void updateClusterData(u32 offset, const void* data, u32 size) override {
-		ASSERT(size % 4 == 0 && m_cluster_data_buffer);
-		uploadClusterData(offset, data, size, size);
-	}
-
-	// ---- streaming of clusters, see ClusterStream
-	u32 allocClusterStreamIds(u32 count) override {
-		jobs::MutexGuard lock(m_stream_mutex);
-		for (u32 i = 0; i < (u32)m_stream_id_free.size(); ++i) {
-			StreamIds& r = m_stream_id_free[i];
-			if (r.count < count) continue;
-			const u32 first = r.first;
-			r.first += count;
-			r.count -= count;
-			if (r.count == 0) m_stream_id_free.erase(i);
-			return first;
-		}
-		if (m_stream_id_end + count > STREAM_MAX_GROUPS) {
-			static bool reported = false;
-			if (!reported) logError("Out of ids of groups of clusters, meshes that are loaded later are streamed without feedback");
-			reported = true;
-			return ClusterStream::NONE;
-		}
-		const u32 first = m_stream_id_end;
-		m_stream_id_end += count;
-		return first;
-	}
-
-	void registerClusterStream(ClusterStream* stream) override {
-		jobs::MutexGuard lock(m_stream_mutex);
-		// the ids can be the ones of a stream that was unregistered lately, see ClusterStream::feedback_from (bits of the previous owner can still be in the feedback buffer or in a readback that is on its way)
-		stream->feedback_from = m_frame_number + 1 + STREAM_REQUEST_FRAMES;
-		stream->generation = ++m_stream_generation;
-		m_streams.push(stream);
-	}
-
-	void unregisterClusterStream(ClusterStream* stream) override {
-		jobs::MutexGuard lock(m_stream_mutex);
-		const i32 idx = m_streams.indexOf(stream);
-		if (idx >= 0) m_streams.swapAndPop(idx);
-		for (u32 i = m_stream_pending.size(); i > 0;) {
-			--i;
-			if (m_stream_pending[i].stream == stream) m_stream_pending.erase(i);
-		}
-		for (u32 i = m_stream_ready.size(); i > 0;) {
-			--i;
-			if (m_stream_ready[i].stream == stream) m_stream_ready.erase(i);
-		}
-		if (stream->global_base != ClusterStream::NONE) {
-			m_stream_id_free.push(StreamIds{stream->global_base, (u32)stream->pages.size()});
-			stream->global_base = ClusterStream::NONE;
-		}
-	}
-
-	bool isClusterStreamingEnabled() const override { return m_stream_enabled; }
-	gpu::BufferHandle getClusterFeedbackBuffer() override { return m_feedback_buffer; }
-	u32 getClusterFeedbackCapacity() override { return m_feedback_buffer ? (u32)STREAM_MAX_GROUPS : 0; }
-
-	// the render thread calls it when the GPU is done with the copy of the feedback buffer
-	void onClusterFeedback(Span<const u8> data) {
-		MutexGuard guard(m_feedback_mutex);
-		m_feedback_incoming.resize((u32)data.length());
-		if (data.length() > 0) memcpy(m_feedback_incoming.begin(), data.begin(), data.length());
-	}
-
-	void onClusterPageRead(ClusterStream* stream, u64 generation, u32 page_index, Span<const u8> data, bool success) override {
-		jobs::MutexGuard lock(m_stream_mutex);
-		if (m_stream_reads > 0) --m_stream_reads;
-		// the stream is dereferenced only if it is registered, and the generation tells it from a stream that was freed and had the same address
-		if (!stream || m_streams.indexOf(stream) < 0 || stream->generation != generation) return;
-		if (page_index >= (u32)stream->pages.size()) return;
-
-		ClusterStream::Page& page = stream->pages[page_index];
-		page.reading = false;
-		const u32 bytes = stream->pageBytes(page_index);
-		if (!success || data.length() != bytes) {
-			// it is requested again later, if the GPU still needs it
-			page.read_failed = m_frame_number + 1;
-			logError("Failed to read a page of clusters (", bytes, " bytes at ", page.file_offset, ")");
-			return;
-		}
-		if (page.loaded || page.read_data) return;
-		// the data of the file system is valid only during the call
-		page.read_data = (u8*)stream->allocator.allocate(bytes, 16);
-		memcpy(page.read_data, data.begin(), bytes);
-		stream->staged_bytes += bytes;
-		m_stream_ready.push(StreamRef{stream, page_index});
-	}
-
-	u64 getStagedClusterBytes() const {
-		u64 bytes = 0;
-		for (const ClusterStream* s : m_streams) bytes += s->staged_bytes;
-		return bytes;
-	}
-
-	// Starts reading the page from the file, and the pages that it needs (they are uploaded first), unless they are loaded or already read. False if it could not be started now: there
-	// are too many reads in flight or too much waits for the upload, or a read of a page that is needed failed lately.
-	bool requestStreamPage(ClusterStream& stream, u32 page_index, u32 stamp) {
-		ClusterStream::Page& page = stream.pages[page_index];
-		if (page.loaded || page.reading || page.read_data) return true;
-		if (page.read_failed && stamp - page.read_failed < STREAM_RETRY_FRAMES) return false;
-		if (!stream.owner) return false;
-		// making room for the pages that arrive must not evict their parents (they are not in the pending requests, the GPU wants the page instead)
-		stream.markParentPagesWanted(page_index, stamp);
-		for (u32 i = 0; i < page.parent_count; ++i) {
-			if (!requestStreamPage(stream, stream.page_parents[page.parent_first + i], stamp)) return false;
-		}
-		if (m_stream_reads >= STREAM_READS_IN_FLIGHT || getStagedClusterBytes() + stream.pageBytes(page_index) > STREAM_STAGING_BYTES) return false;
-		page.reading = true;
-		++m_stream_reads;
-		stream.owner->requestClusterPage(stream.mesh_index, page_index);
-		return true;
-	}
-
-	// Orders pages by ClusterStream::Page::priority (the highest first), the ones with the same priority by the time of the request (the latest first)
-	void sortStreamRefs(Array<StreamRef>& refs) {
-		if (refs.size() < 2) return;
-		sort(refs.begin(), refs.end(), [](const StreamRef& a, const StreamRef& b) {
-			const ClusterStream::Page& pa = a.stream->pages[a.page];
-			const ClusterStream::Page& pb = b.stream->pages[b.page];
-			if (pa.priority != pb.priority) return pa.priority > pb.priority;
-			return pa.requested > pb.requested;
-		});
-	}
-
-	// Uploads the pages that were read, a page after the pages that it needs. The ones that do not fit stay in memory until they do.
-	void uploadReadPages(u32 stamp) {
-		// a page that arrived before its parent is uploaded in a later pass
-		sortStreamRefs(m_stream_ready);
-		bool progress = true;
-		while (progress && m_stream_loads < STREAM_LOADS_PER_FRAME) {
-			progress = false;
-			for (u32 i = 0; i < (u32)m_stream_ready.size() && m_stream_loads < STREAM_LOADS_PER_FRAME;) {
-				const StreamRef r = m_stream_ready[i];
-				ClusterStream& stream = *r.stream;
-				ClusterStream::Page& page = stream.pages[r.page];
-				if (stream.firstMissingParentPage(r.page) != ClusterStream::NONE) {
-					++i;
-					continue;
-				}
-				stream.markParentPagesWanted(r.page, stamp);
-				if (!m_stream_load_all && !makeStreamRoom(stream.pageGpuBytes(r.page), stamp)) {
-					++i;
-					continue;
-				}
-				if (!stream.loadPage(*this, r.page, stamp, false, page.read_data)) {
-					++i;
-					continue;
-				}
-				stream.dropReadData(r.page);
-				m_stream_ready.erase(i);
-				++m_stream_loads;
-				progress = true;
-			}
-		}
-	}
-
-	u32 getLargestClusterFreeRange() {
-		jobs::MutexGuard lock(m_cluster_data_mutex);
-		u32 largest = 0;
-		for (const ClusterDataRange& r : m_cluster_data_free) largest = maximum(largest, r.size);
-		return largest;
-	}
-
-	// ranges that wait for the frames in flight become free now
-	void flushPendingClusterData() {
-		jobs::MutexGuard lock(m_cluster_data_mutex);
-		for (const ClusterDataRange& r : m_cluster_data_pending) releaseClusterData(r.offset, r.size);
-		m_cluster_data_pending.clear();
-	}
-
-	// An allocation does not fit: frees what can be freed, first the ranges that only wait for the frames in flight, then streamed pages, least recently used first. The
-	// ranges are reused at once, so the clusters that were selected for the frame that is recorded now may read other data: a glitch for a frame, only when the buffer is full.
-	// False if there is no free range of the size after that (what is never unloaded does not fit). Called with no lock held, by the thread that allocates.
-	bool reclaimClusterData(u32 size, u32 alignment) {
-		jobs::MutexGuard lock(m_stream_mutex);
-		const u32 needed = ((size + CLUSTER_DATA_ALIGN - 1) & ~(CLUSTER_DATA_ALIGN - 1)) + alignment;
-		flushPendingClusterData();
-		if (getLargestClusterFreeRange() >= needed) return true;
-		if (!m_stream_enabled) return false;
-		const u32 stamp = m_frame_number + 1;
-		for (u32 i = 0; i < 4096; ++i) {
-			if (!evictLeastRecentlyUsedPage(stamp, true)) break;
-			if (getLargestClusterFreeRange() >= needed) return true;
-		}
-		return getLargestClusterFreeRange() >= size;
-	}
-
-	// Unloads the page that was used the longest time ago and can be unloaded. Pages that are needed in this frame and the ones that were loaded lately stay. False if there is none.
-	// `emergency` (the buffer is full): pages that are needed or loaded lately can go too, and their ranges are reusable at once.
-	bool evictLeastRecentlyUsedPage(u32 stamp, bool emergency) {
-		ClusterStream* best_stream = nullptr;
-		u32 best_page = 0, best_stamp = 0, best_priority = 0;
-		for (ClusterStream* s : m_streams) {
-			for (u32 p = 0; p < (u32)s->pages.size(); ++p) {
-				const ClusterStream::Page& page = s->pages[p];
-				if (!page.loaded || page.permanent) continue;
-				if (!emergency && (page.wanted_frame == stamp || page.loaded_frame + STREAM_MIN_RESIDENCY > stamp)) continue;
-				const u32 used_at = maximum(page.last_used, page.loaded_frame);
-				// the least recently used, of the ones that were used at the same time the one that removes the least error
-				if (best_stream && (used_at > best_stamp || (used_at == best_stamp && page.priority >= best_priority))) continue;
-				if (!s->canEvict(p)) continue;
-				best_stream = s;
-				best_page = p;
-				best_stamp = used_at;
-				best_priority = page.priority;
-			}
-		}
-		if (!best_stream) return false;
-		best_stream->evictPage(*this, best_page, emergency);
-		++m_stream_evictions;
-		return true;
-	}
-
-	// Unloads the least recently used pages until `bytes` fit in the budget.
-	bool makeStreamRoom(u32 bytes, u32 stamp) {
-		for (;;) {
-			u64 used = 0;
-			for (const ClusterStream* s : m_streams) used += s->streamed_bytes;
-			if (used + bytes <= m_stream_budget) return true;
-			if (!evictLeastRecentlyUsedPage(stamp, false)) return false;
-		}
-	}
-
-	// bytes of the buffer of cluster data that are free or will be soon (the ranges freed in the last frames)
-	u64 getClusterDataFreeBytes() {
-		jobs::MutexGuard lock(m_cluster_data_mutex);
-		u64 free = 0;
-		for (const ClusterDataRange& r : m_cluster_data_free) free += r.size;
-		for (const ClusterDataRange& r : m_cluster_data_pending) free += r.size;
-		return free;
-	}
-
-	// The feedback is a bit for each page id (32 in a word) that the GPU set since the previous readback and then cleared: a bit of a loaded page means that a
-	// cluster of it was drawn, a bit of a page that is not loaded means that it is needed. Requests are kept in m_stream_pending, because the bits are only
-	// seen once, until the page is loaded or the request is older than STREAM_REQUEST_FRAMES.
-	void processClusterFeedback(u32 stamp) {
-		const u32 id_count = (u32)m_feedback_local.size() / 4 * 32;
-		const u32* feedback = (const u32*)m_feedback_local.begin();
-
-		u32 used_count = 0, wanted_count = 0;
-		for (ClusterStream* s : m_streams) {
-			// ids of a new stream can still have the bits of the previous owner, see ClusterStream::feedback_from
-			if (s->global_base == ClusterStream::NONE || stamp < s->feedback_from) continue;
-
-			const u32 first_id = s->global_base;
-			const u32 end_id = minimum(first_id + (u32)s->pages.size(), id_count);
-			for (u32 id = first_id; id < end_id;) {
-				const u32 word = feedback[id >> 5] >> (id & 31);
-				if (!word) {
-					id = (id | 31) + 1;	// the rest of the word is empty
-					continue;
-				}
-
-				if (word & 1) {
-					const u32 page_index = id - first_id;
-					ClusterStream::Page& page = s->pages[page_index];
-					if (page.loaded) {
-						page.last_used = maximum(page.last_used, stamp);
-						++used_count;
-					}
-					else {
-						page.requested = stamp;
-						++wanted_count;
-						if (!page.pending) {
-							page.pending = true;
-							m_stream_pending.push(StreamRef{s, page_index});
-						}
-					}
-				}
-				++id;
-			}
-		}
-
-		// drop the requests that are done or old, the rest is wanted (each page is in the list once, see Page::pending)
-		u32 kept = 0;
-		for (const StreamRef r : m_stream_pending) {
-			ClusterStream::Page& page = r.stream->pages[r.page];
-			if (page.loaded || stamp - page.requested > STREAM_REQUEST_FRAMES) {
-				page.pending = false;
-				continue;
-			}
-			m_stream_pending[kept] = r;
-			++kept;
-			page.wanted_frame = stamp;
-		}
-		m_stream_pending.shrink(kept);
-
-		static const u32 used_counter = profiler::createCounter("Cluster feedback bits on loaded pages", 0);
-		static const u32 wanted_counter = profiler::createCounter("Cluster feedback bits on missing pages", 0);
-		profiler::pushCounter(used_counter, (float)used_count);
-		profiler::pushCounter(wanted_counter, (float)wanted_count);
-	}
-
-	void updateClusterStreaming() {
-		PROFILE_FUNCTION();
-		if (!m_stream_enabled) return;
-		jobs::MutexGuard lock(m_stream_mutex);
-		if (m_streams.empty()) return;
-		const u32 stamp = m_frame_number + 1;
-		m_stream_loads = 0;
-		m_stream_evictions = 0;
-
-		if (!m_feedback_buffer) {
-			// zeroed, one bit for each group
-			const u32 size = STREAM_MAX_GROUPS / 8;
-			MemRef mem = allocate(size);
-			memset(mem.data, 0, size);
-			m_feedback_buffer = createBuffer(mem, gpu::BufferFlags::SHADER_BUFFER, "cluster feedback");
-		}
-
-		{
-			MutexGuard guard(m_feedback_mutex);
-			// swapped, not copied (up to 128 KB), both keep their capacity so nothing is allocated; m_feedback_local is empty here
-			m_feedback_local.clear();
-			if (!m_feedback_incoming.empty()) m_feedback_local.swap(m_feedback_incoming);
-		}
-		if (!m_feedback_local.empty()) {
-			PROFILE_BLOCK("cluster feedback");
-			processClusterFeedback(stamp);
-		}
-		m_feedback_local.clear();
-
-		// the pages that were read since the previous frame
-		uploadReadPages(stamp);
-
-		// the models that are loaded need room for their tables and permanent pages, the streamed pages must not take all of it
-		if (m_cluster_data_buffer) {
-			PROFILE_BLOCK("cluster headroom");
-			for (u32 i = 0; i < STREAM_LOADS_PER_FRAME && getClusterDataFreeBytes() < STREAM_HEADROOM; ++i) {
-				if (!evictLeastRecentlyUsedPage(stamp, false)) break;
-			}
-		}
-
-		// the pages that the GPU needs are read from the file (they are uploaded when they arrive, see uploadReadPages), the most important first
-		sortStreamRefs(m_stream_pending);
-		for (const StreamRef& w : m_stream_pending) {
-			if (m_stream_reads >= STREAM_READS_IN_FLIGHT) break;
-			requestStreamPage(*w.stream, w.page, stamp);
-		}
-		if (m_stream_load_all) {
-			// the parents of a group have higher numbers, so the pages are requested from the last one
-			for (ClusterStream* s : m_streams) {
-				for (u32 p = (u32)s->pages.size(); p > 0 && m_stream_reads < STREAM_READS_IN_FLIGHT;) {
-					--p;
-					requestStreamPage(*s, p, stamp);
-				}
-			}
-		}
-
-		// what the profiler shows
-		{
-			static const u32 streamed_counter = profiler::createCounter("Cluster streamed (MB)", 0);
-			static const u32 pages_counter = profiler::createCounter("Cluster pages streamed in", 0);
-			static const u32 loads_counter = profiler::createCounter("Cluster page loads", 0);
-			static const u32 evictions_counter = profiler::createCounter("Cluster page evictions", 0);
-			static const u32 wanted_counter = profiler::createCounter("Cluster pages wanted", 0);
-			static const u32 reads_counter = profiler::createCounter("Cluster page reads in flight", 0);
-			static const u32 staged_counter = profiler::createCounter("Cluster pages staged (MB)", 0);
-			u64 bytes = 0;
-			u32 loaded_pages = 0;
-			for (const ClusterStream* s : m_streams) {
-				bytes += s->streamed_bytes;
-				for (const ClusterStream::Page& page : s->pages) {
-					if (page.loaded && !page.permanent) ++loaded_pages;
-				}
-			}
-			profiler::pushCounter(streamed_counter, float(double(bytes) / (1024.0 * 1024.0)));
-			profiler::pushCounter(pages_counter, (float)loaded_pages);
-			profiler::pushCounter(loads_counter, (float)m_stream_loads);
-			profiler::pushCounter(evictions_counter, (float)m_stream_evictions);
-			profiler::pushCounter(wanted_counter, (float)m_stream_pending.size());
-			profiler::pushCounter(reads_counter, (float)m_stream_reads);
-			profiler::pushCounter(staged_counter, float(double(getStagedClusterBytes()) / (1024.0 * 1024.0)));
-			if (m_stream_loads || m_stream_evictions) {
-				logInfo("Cluster streaming: ", m_stream_loads, " pages loaded, ", m_stream_evictions, " evicted, ", loaded_pages, " pages (", u32(bytes >> 10), " KB) streamed in, ", (u32)m_stream_pending.size(), " wanted");
-			}
-		}
-
-		if (m_stream_id_end > 0 && m_frame_number % STREAM_READBACK_PERIOD == 0) {
-			// the bits of the ids that are in use (words), read and then cleared one after the other on the GPU: what the shaders set later is kept for the next readback
-			const u32 feedback_bytes = ((m_stream_id_end + 31) / 32) * 4;
-			static u32 zeros[STREAM_MAX_GROUPS / 32];
-			getDrawStream().readBuffer(m_feedback_buffer, 0, feedback_bytes, makeDelegate<&RendererImpl::onClusterFeedback>(this));
-			getDrawStream().update(m_feedback_buffer, zeros, feedback_bytes);
-		}
 	}
 
 	
@@ -1984,8 +1470,65 @@ struct RendererImpl final : Renderer {
 			plugin->frame(*this);
 		}
 
-		updateClusterStreaming();
+		m_cluster_streamer.update();
+		updateCounterExport();
+	}
 
+	// -gpu_counters: after the warmup frames records one counter for all profile blocks (the app stalls on the GPU for a few frames)
+	// and writes a CSV: the path of every range and the value. With -gpu_counters_quit the app exits then (exit code 1 if it failed).
+	// NVIDIA GPUs only, needs the Nsight Perf SDK (see gpu/gpu_nvperf.h). Keep the scene static, every nesting level is recorded in another frame.
+	void finishCounterExport(int exit_code) {
+		m_counter_export.stage = CounterExport::Stage::DONE;
+		if (m_counter_export.quit) m_engine.quit(exit_code);
+	}
+
+	void updateCounterExport() {
+		CounterExport& e = m_counter_export;
+		if (!e.enabled || e.stage == CounterExport::Stage::DONE) return;
+
+		char status[512];
+		if (e.stage == CounterExport::Stage::WAIT) {
+			if (m_frame_number < e.warmup) return;
+			if (!gpu::nvperf::init(gpu::getDX12Device()) || !gpu::nvperf::request(e.metric, e.depth)) {
+				gpu::nvperf::getStatus(status, sizeof(status));
+				logError("GPU counters: ", status);
+				finishCounterExport(1);
+				return;
+			}
+			logInfo("GPU counters: recording ", e.metric);
+			e.stage = CounterExport::Stage::RECORDING;
+			return;
+		}
+
+		const gpu::nvperf::State state = gpu::nvperf::getState();
+		if (state == gpu::nvperf::State::FAILED) {
+			gpu::nvperf::getStatus(status, sizeof(status));
+			logError("GPU counters: ", status);
+			finishCounterExport(1);
+		}
+		else if (state == gpu::nvperf::State::DONE) {
+			os::OutputFile file;
+			bool ok = file.open(e.out);
+			if (!ok) {
+				logError("GPU counters: failed to open ", e.out);
+			}
+			else {
+				const StaticString<256> header("metric,", e.metric, "\n");
+				ok = file.write(header.data, stringLength(header.data));
+				const u32 count = gpu::nvperf::getResultCount();
+				for (u32 i = 0; i < count && ok; ++i) {
+					char path[256];
+					double value;
+					if (!gpu::nvperf::getResult(i, path, sizeof(path), &value)) continue;
+					const StaticString<384> line("\"", path, "\",", value, "\n");
+					ok = file.write(line.data, stringLength(line.data));
+				}
+				file.close();
+				if (!ok) logError("GPU counters: failed to write ", e.out);
+				else logInfo("GPU counters: wrote ", e.out);
+			}
+			finishCounterExport(ok ? 0 : 1);
+		}
 	}
 
 	// wait till gpu is done with a frame and reuse it
@@ -2074,51 +1617,18 @@ struct RendererImpl final : Renderer {
 	RenderResourceManager<Texture> m_texture_manager;
 	RenderResourceManager<Material> m_material_manager;
 	u32 m_frame_number = 0;
-	enum : u32 {
-		CLUSTER_DATA_POOL_SIZE = 256 * 1024 * 1024,
-		CLUSTER_DATA_ALIGN = 16,
-		CLUSTER_DATA_FREE_DELAY = 4 // frames
-	};
-	jobs::Mutex m_cluster_data_mutex;
-	gpu::BufferHandle m_cluster_data_buffer = gpu::INVALID_BUFFER;
-	static constexpr u32 CLUSTER_SCRATCH_CAPACITY = 1 << 22;		// u32 in the scratch buffer of the culling of trees, shared by all the pipelines (16 MB)
-	static constexpr u32 CLUSTER_COMMANDS_CAPACITY = 262144;	// 256K clusters per draw group * 24 B = 6 MB shared scratch buffer across all pipelines
-	gpu::BufferHandle m_cluster_scratch_buffer = gpu::INVALID_BUFFER;
-	gpu::BufferHandle m_cluster_commands_buffer = gpu::INVALID_BUFFER;
+	struct CounterExport {
+		enum class Stage { WAIT, RECORDING, DONE };
+		bool enabled = false;
+		bool quit = false;
+		u32 warmup = 200;	// frames
+		u32 depth = 5;		// nesting of profile blocks
+		char metric[160] = "";
+		char out[MAX_PATH] = "gpu_counters.csv";
+		Stage stage = Stage::WAIT;
+	} m_counter_export;
+	ClusterStreamer m_cluster_streamer;
 	GPUSceneRegistry* m_gpu_scene_registry = nullptr;
-	Array<ClusterDataRange> m_cluster_data_free;
-	Array<ClusterDataRange> m_cluster_data_pending;
-
-	// streaming of clusters
-	enum : u32 {
-		STREAM_MAX_GROUPS = 1 << 20,	// groups with ids in the feedback buffer, 128 KB (a bit for each)
-		STREAM_LOADS_PER_FRAME = 16,	// pages uploaded to the buffer of cluster data in a frame
-		STREAM_READS_IN_FLIGHT = 64,	// pages that are being read from the files
-		STREAM_RETRY_FRAMES = 120,		// a page is not requested again for that many frames after a failed read
-		STREAM_READBACK_PERIOD = 1,		// frames
-		STREAM_REQUEST_FRAMES = 16,		// a request is current for that many frames after the GPU made it
-		STREAM_MIN_RESIDENCY = 30		// frames a loaded page stays, unless nothing else can be unloaded
-	};
-	static constexpr u64 STREAM_STAGING_BYTES = 64ull << 20;	// pages that were read and wait for the upload (they wait for their parents or for room in the buffer), no more is read if there is more
-	static constexpr u64 STREAM_HEADROOM = 32ull << 20;	// the streamer keeps this much of the buffer of cluster data free for the models that load (it unloads pages if there is less)
-	struct StreamIds { u32 first; u32 count; };
-	bool m_stream_enabled = !CommandLineParser::isOn("-cluster_stream_off");
-	bool m_stream_load_all = CommandLineParser::isOn("-cluster_stream_all");	// for tests: every page is loaded by the streamer, the budget is ignored
-	u64 m_stream_budget = getClusterStreamBudget();
-	jobs::Mutex m_stream_mutex;
-	Array<ClusterStream*> m_streams;		// the complete ones
-	Array<StreamIds> m_stream_id_free;
-	u32 m_stream_id_end = 0;
-	Array<StreamRef> m_stream_pending;	// pages with a request that is not loaded yet, in the order of the requests (ClusterStream::Page::pending)
-	Array<StreamRef> m_stream_ready;	// pages that were read and are not uploaded yet (ClusterStream::Page::read_data), in the order of arrival
-	u64 m_stream_generation = 0;		// the last ClusterStream::generation
-	u32 m_stream_reads = 0;			// reads of pages that were requested and did not finish
-	u32 m_stream_loads = 0;
-	u32 m_stream_evictions = 0;
-	gpu::BufferHandle m_feedback_buffer = gpu::INVALID_BUFFER;
-	Mutex m_feedback_mutex;
-	Array<u8> m_feedback_incoming;			// written by the render thread
-	Array<u8> m_feedback_local;
 	float m_lod_multiplier = 1;
 	StaticString<MAX_PATH> m_screenshot_path;
 	u32 m_screenshot_max_width = 0;

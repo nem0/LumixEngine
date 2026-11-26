@@ -466,7 +466,7 @@ bool OutputFile::open(const char* path)
 
 bool InputFile::open(const char* path)
 {
-	m_handle = (HANDLE)::CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+	m_handle = (HANDLE)::CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 	return INVALID_HANDLE_VALUE != m_handle;
 }
 

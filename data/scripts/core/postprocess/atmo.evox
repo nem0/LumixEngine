@@ -5,15 +5,19 @@ import "core:renderer/environment"
 import "core:renderer/module"
 import "core:renderer/pipelinetype"
 
-// Per pipeline state: the precomputed tables of the atmosphere, they are recomputed every frame.
+// Per pipeline state: the precomputed tables of the atmosphere. `optical_depth` is cached until its parameters change.
 struct AtmoState {
 	optical_depth : RenderBuffer;
 	inscatter : RenderBuffer;
+	cached_bot : f32;
+	cached_top : f32;
+	cached_dist_rayleigh : f32;
+	cached_dist_mie : f32;
+	optical_depth_valid : bool;
 }
 
-// Layout of the constant buffers of engine/shaders/atmo_optical_depth.hlsl, atmo_scattering.hlsl and atmo.hlsl. The
-// shaders use different handles at the end, they all share this struct (`output`, `optical_depth`, `depth_buffer` and
-// `inscatter` are the handles in the order of atmo.hlsl, the others read the first ones they need).
+// Layout of the constant buffers of engine/shaders/atmo_optical_depth.hlsl, atmo_scattering.hlsl, atmo_sky.hlsl and lighting.hlsl
+// (`AtmoParams` in atmo_common.hlsli). The shaders use different handles at the end and share this struct.
 struct AtmoUniform {
 	bot : f32;
 	top : f32;
@@ -44,22 +48,36 @@ fn flag(value : bool) : f32 {
 	return 0;
 }
 
-// Atmospheric scattering of the active environment: the sky and the fog, drawn into the lit scene before transparent geometry.
-fn atmo(ctx : Context, hdr : RenderBuffer) : RenderBuffer {
+struct AtmoPrepared {
+	active : bool;
+	uniform : AtmoUniform;
+	sky_shader : Shader;
+	lighting_define : []const u8;
+	sky_define : []const u8;
+}
+
+// Prepares the atmosphere LUTs (optical depth & inscatter) and returns the uniform + defines for light_pass.
+fn prepareAtmo(ctx : Context) : AtmoPrepared {
+	var res = AtmoPrepared {
+		false,
+		AtmoUniform {0, 0, 0, 0, Vec4{0,0,0,0}, Vec4{0,0,0,0}, Vec4{0,0,0,0}, Vec4{0,0,0,0}, Vec4{0,0,0,0}, Vec4{0,0,0,0}, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		ctx.loadShader("engine/shaders/atmo_sky.hlsl"),
+		"",
+		""
+	};
 	if ctx.pipelineType() == .PREVIEW {
-		return hdr;
+		return res;
 	}
 	const module = ctx.renderModule();
-	const entity = module.getActiveEnvironment() else return hdr;
-	const env = entity.environment() else return hdr;
+	const entity = module.getActiveEnvironment() else return res;
+	const env = entity.environment() else return res;
 	if not env.getAtmoEnabled() {
-		return hdr;
+		return res;
 	}
 	const optical_depth_shader = ctx.loadShader("engine/shaders/atmo_optical_depth.hlsl");
 	const scattering_shader = ctx.loadShader("engine/shaders/atmo_scattering.hlsl");
-	const atmo_shader = ctx.loadShader("engine/shaders/atmo.hlsl");
-	if not optical_depth_shader.isReady() or not scattering_shader.isReady() or not atmo_shader.isReady() {
-		return hdr;
+	if not optical_depth_shader.isReady() or not scattering_shader.isReady() or not res.sky_shader.isReady() {
+		return res;
 	}
 
 	var state = ctx.state(AtmoState);
@@ -68,7 +86,6 @@ fn atmo(ctx : Context, hdr : RenderBuffer) : RenderBuffer {
 		state.inscatter = ctx.createBuffer(64, 128, .RGBA32F);
 	}
 
-	ctx.beginBlock("atmo_evox");
 	const rayleigh = env.getScatterRayleigh();
 	const mie = env.getScatterMie();
 	const absorb = env.getAbsorbMie();
@@ -95,13 +112,23 @@ fn atmo(ctx : Context, hdr : RenderBuffer) : RenderBuffer {
 		0, 0, 0, 0
 	};
 
-	// optical depth of the atmosphere
-	ctx.beginBlock("precompute_transmittance");
-	uniform.output = ctx.rwBindless(state.optical_depth);
-	ctx.dispatch(optical_depth_shader, uniform, 128 / 16, 128 / 16, 1);
-	ctx.endBlock();
+	const need_optical_depth = not state.optical_depth_valid
+		or state.cached_bot != uniform.bot
+		or state.cached_top != uniform.top
+		or state.cached_dist_rayleigh != uniform.distribution_rayleigh
+		or state.cached_dist_mie != uniform.distribution_mie;
+	if need_optical_depth {
+		ctx.beginBlock("precompute_transmittance");
+		uniform.output = ctx.rwBindless(state.optical_depth);
+		ctx.dispatch(optical_depth_shader, uniform, 128 / 16, 128 / 16, 1);
+		ctx.endBlock();
+		state.cached_bot = uniform.bot;
+		state.cached_top = uniform.top;
+		state.cached_dist_rayleigh = uniform.distribution_rayleigh;
+		state.cached_dist_mie = uniform.distribution_mie;
+		state.optical_depth_valid = true;
+	}
 
-	// light scattered towards the camera, it reads the optical depth
 	ctx.beginBlock("precompute_inscatter");
 	uniform.resolution = Vec4 {64, 128, 1, 0};
 	uniform.output = ctx.rwBindless(state.inscatter);
@@ -109,12 +136,28 @@ fn atmo(ctx : Context, hdr : RenderBuffer) : RenderBuffer {
 	ctx.dispatch(scattering_shader, uniform, 64 / 16, 128 / 16, 1);
 	ctx.endBlock();
 
-	// the sky and the fog, in the lit scene
 	uniform.inscatter = ctx.bindless(state.inscatter);
 	uniform.optical_depth = ctx.bindless(state.optical_depth);
-	uniform.depth_buffer = ctx.bindless(ctx.depth());
-	uniform.output = ctx.rwBindless(hdr);
-	ctx.dispatch(atmo_shader, uniform, (ctx.width() + 15) / 16, (ctx.height() + 15) / 16, 1);
-	ctx.endBlock();
-	return hdr;
+	uniform.depth_buffer = 0;
+	uniform.output = 0;
+
+	res.active = true;
+	res.uniform = uniform;
+	if fog_density > 0 and env.getGodraysEnabled() {
+		res.lighting_define = "ATMO_FULL";
+	}
+	else if fog_density > 0 {
+		res.lighting_define = "ATMO_FOG";
+	}
+	else {
+		res.lighting_define = "ATMO";
+	}
+
+	if env.getCloudsEnabled() or (fog_density > 0 and env.getGodraysEnabled()) {
+		res.sky_define = "FULL";
+	}
+	else if fog_density > 0 {
+		res.sky_define = "FOG";
+	}
+	return res;
 }

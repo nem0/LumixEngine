@@ -46,12 +46,13 @@ struct Fixture {
 };
 
 struct StreamResult {
-	void onStream(u64 ud, Span<const u8> content, bool ok) {
-		++call_count;
-		success = ok;
-		user_data = ud;
-		data.clear();
-		for (u8 b : content) data.push(b);
+	static void callback(u64 ud, Span<const u8> content, bool ok) {
+		auto* r = (StreamResult*)(uintptr)ud;
+		++r->call_count;
+		r->success = ok;
+		r->user_data = ud;
+		r->data.clear();
+		for (u8 b : content) r->data.push(b);
 	}
 
 	u32 call_count = 0;
@@ -59,6 +60,10 @@ struct StreamResult {
 	u64 user_data = 0;
 	Array<u8> data = Array<u8>(getGlobalAllocator());
 };
+
+static void streamTo(FileSystem& fs, FileSystem::StreamHandle h, StreamResult& r, u64 offset, u64 size) {
+	fs.stream(h, (u64)(uintptr)&r, offset, size, &StreamResult::callback);
+}
 
 struct ContentResult {
 	void onContent(Span<const u8> content, bool ok) {
@@ -93,13 +98,11 @@ bool testFileSystemStreamRead() {
 	ASSERT_TRUE((u32)h != 0);
 
 	StreamResult r;
-	FileSystem::StreamCallback cb;
-	cb.bind<&StreamResult::onStream>(&r);
-	f.fs->stream(h, 42, 100, 64, cb);
+	streamTo(*f.fs, h, r, 100, 64);
 	ASSERT_TRUE(f.waitIdle());
 	ASSERT_EQ(1u, r.call_count);
 	ASSERT_TRUE(r.success);
-	ASSERT_EQ(42u, (u32)r.user_data);
+	ASSERT_TRUE(r.user_data == (u64)(uintptr)&r);
 	ASSERT_EQ(64u, (u32)r.data.size());
 	for (u32 i = 0; i < 64; ++i) ASSERT_EQ((u32)expectedByte(100 + i), (u32)r.data[i]);
 
@@ -114,22 +117,18 @@ bool testFileSystemStreamMultipleReads() {
 	const FileSystem::StreamHandle h = f.fs->openStreaming(Path(TEST_FILE));
 
 	StreamResult a, b, c;
-	FileSystem::StreamCallback cb_a, cb_b, cb_c;
-	cb_a.bind<&StreamResult::onStream>(&a);
-	cb_b.bind<&StreamResult::onStream>(&b);
-	cb_c.bind<&StreamResult::onStream>(&c);
 	// out-of-order offsets, each request must get its own data and user_data
-	f.fs->stream(h, 1, 2000, 16, cb_a);
-	f.fs->stream(h, 2, 0, 32, cb_b);
-	f.fs->stream(h, 3, 4000, 96, cb_c);
+	streamTo(*f.fs, h, a, 2000, 16);
+	streamTo(*f.fs, h, b, 0, 32);
+	streamTo(*f.fs, h, c, 4000, 96);
 	ASSERT_TRUE(f.waitIdle());
 
 	ASSERT_EQ(1u, a.call_count);
 	ASSERT_EQ(1u, b.call_count);
 	ASSERT_EQ(1u, c.call_count);
-	ASSERT_EQ(1u, (u32)a.user_data);
-	ASSERT_EQ(2u, (u32)b.user_data);
-	ASSERT_EQ(3u, (u32)c.user_data);
+	ASSERT_TRUE(a.user_data == (u64)(uintptr)&a);
+	ASSERT_TRUE(b.user_data == (u64)(uintptr)&b);
+	ASSERT_TRUE(c.user_data == (u64)(uintptr)&c);
 	ASSERT_TRUE(a.success && b.success && c.success);
 	ASSERT_EQ(16u, (u32)a.data.size());
 	ASSERT_EQ(32u, (u32)b.data.size());
@@ -149,13 +148,11 @@ bool testFileSystemStreamPastEof() {
 	const FileSystem::StreamHandle h = f.fs->openStreaming(Path(TEST_FILE));
 
 	StreamResult r;
-	FileSystem::StreamCallback cb;
-	cb.bind<&StreamResult::onStream>(&r);
-	f.fs->stream(h, 7, TEST_FILE_SIZE - 8, 64, cb);
+	streamTo(*f.fs, h, r, TEST_FILE_SIZE - 8, 64);
 	ASSERT_TRUE(f.waitIdle());
 	ASSERT_EQ(1u, r.call_count);
 	ASSERT_TRUE(!r.success);
-	ASSERT_EQ(7u, (u32)r.user_data);
+	ASSERT_TRUE(r.user_data == (u64)(uintptr)&r);
 
 	f.fs->close(h);
 	ASSERT_TRUE(f.waitIdle());
@@ -168,14 +165,12 @@ bool testFileSystemStreamOpenMissingFile() {
 
 	// reading from a stream whose open failed must report failure, not crash
 	StreamResult r;
-	FileSystem::StreamCallback cb;
-	cb.bind<&StreamResult::onStream>(&r);
-	f.fs->stream(h, 5, 0, 16, cb);
+	streamTo(*f.fs, h, r, 0, 16);
 	f.fs->close(h);
 	ASSERT_TRUE(f.waitIdle());
 	ASSERT_EQ(1u, r.call_count);
 	ASSERT_TRUE(!r.success);
-	ASSERT_EQ(5u, (u32)r.user_data);
+	ASSERT_TRUE(r.user_data == (u64)(uintptr)&r);
 	return true;
 }
 
@@ -186,9 +181,7 @@ bool testFileSystemStreamUsesMounts() {
 	const FileSystem::StreamHandle h = f.fs->openStreaming(Path("engine/", TEST_FILE));
 
 	StreamResult r;
-	FileSystem::StreamCallback cb;
-	cb.bind<&StreamResult::onStream>(&r);
-	f.fs->stream(h, 1, 10, 16, cb);
+	streamTo(*f.fs, h, r, 10, 16);
 	ASSERT_TRUE(f.waitIdle());
 	ASSERT_EQ(1u, r.call_count);
 	ASSERT_TRUE(r.success);
@@ -222,9 +215,7 @@ bool testFileSystemStreamAfterClose() {
 
 	// stream on a closed handle must fail gracefully
 	StreamResult r;
-	FileSystem::StreamCallback cb;
-	cb.bind<&StreamResult::onStream>(&r);
-	f.fs->stream(h, 9, 0, 16, cb);
+	streamTo(*f.fs, h, r, 0, 16);
 	ASSERT_TRUE(f.waitIdle());
 	ASSERT_EQ(1u, r.call_count);
 	ASSERT_TRUE(!r.success);
@@ -237,15 +228,13 @@ bool testFileSystemStreamMixedWithGetContent() {
 	const FileSystem::StreamHandle h = f.fs->openStreaming(Path(TEST_FILE));
 
 	StreamResult sr;
-	FileSystem::StreamCallback scb;
-	scb.bind<&StreamResult::onStream>(&sr);
 	ContentResult cr;
 	FileSystem::ContentCallback ccb;
 	ccb.bind<&ContentResult::onContent>(&cr);
 
-	f.fs->stream(h, 1, 0, 8, scb);
+	streamTo(*f.fs, h, sr, 0, 8);
 	f.fs->getContent(Path(TEST_FILE), ccb);
-	f.fs->stream(h, 2, 8, 8, scb);
+	streamTo(*f.fs, h, sr, 8, 8);
 	ASSERT_TRUE(f.waitIdle());
 	ASSERT_EQ(1u, cr.call_count);
 	ASSERT_TRUE(cr.success);
@@ -312,12 +301,9 @@ bool testFileSystemPakStreamRead() {
 	const FileSystem::StreamHandle b = f.fs->openStreaming(Path("pak_b.bin"));
 
 	StreamResult ra, rb;
-	FileSystem::StreamCallback cba, cbb;
-	cba.bind<&StreamResult::onStream>(&ra);
-	cbb.bind<&StreamResult::onStream>(&rb);
 	// interleaved reads of two entries
-	f.fs->stream(b, 2, 100, 40, cbb);
-	f.fs->stream(a, 1, 10, 20, cba);
+	streamTo(*f.fs, b, rb, 100, 40);
+	streamTo(*f.fs, a, ra, 10, 20);
 	ASSERT_TRUE(f.waitIdle());
 	ASSERT_TRUE(ra.success && rb.success);
 	ASSERT_EQ(20u, (u32)ra.data.size());
@@ -337,13 +323,9 @@ bool testFileSystemPakStreamBounds() {
 	const FileSystem::StreamHandle a = f.fs->openStreaming(Path("pak_a.bin"));
 
 	StreamResult inside, past, huge;
-	FileSystem::StreamCallback c0, c1, c2;
-	c0.bind<&StreamResult::onStream>(&inside);
-	c1.bind<&StreamResult::onStream>(&past);
-	c2.bind<&StreamResult::onStream>(&huge);
-	f.fs->stream(a, 0, 284, 16, c0);          // last 16 bytes of the entry
-	f.fs->stream(a, 0, 290, 16, c1);          // crosses into the next entry, must fail
-	f.fs->stream(a, 0, 8, ~(u64)0, c2);       // overflow, must fail
+	streamTo(*f.fs, a, inside, 284, 16);          // last 16 bytes of the entry
+	streamTo(*f.fs, a, past, 290, 16);            // crosses into the next entry, must fail
+	streamTo(*f.fs, a, huge, 8, ~(u64)0);         // overflow, must fail
 	ASSERT_TRUE(f.waitIdle());
 	ASSERT_TRUE(inside.success);
 	ASSERT_TRUE(!past.success);
@@ -359,9 +341,7 @@ bool testFileSystemPakStreamMissingEntry() {
 	ASSERT_TRUE(f.created);
 	const FileSystem::StreamHandle h = f.fs->openStreaming(Path("not_in_pak.bin"));
 	StreamResult r;
-	FileSystem::StreamCallback cb;
-	cb.bind<&StreamResult::onStream>(&r);
-	f.fs->stream(h, 3, 0, 4, cb);
+	streamTo(*f.fs, h, r, 0, 4);
 	f.fs->close(h);
 	ASSERT_TRUE(f.waitIdle());
 	ASSERT_EQ(1u, r.call_count);
@@ -375,11 +355,8 @@ bool testFileSystemPakStreamCompiledResource() {
 	// offsets of a compiled resource are in the data after its header
 	const FileSystem::StreamHandle h = f.fs->openStreaming(Path("pak_raw.res"));
 	StreamResult r, past;
-	FileSystem::StreamCallback cb, cb_past;
-	cb.bind<&StreamResult::onStream>(&r);
-	cb_past.bind<&StreamResult::onStream>(&past);
-	f.fs->stream(h, 1, 10, 16, cb);
-	f.fs->stream(h, 2, 190, 16, cb_past); // 200 bytes of data, the header is not part of them
+	streamTo(*f.fs, h, r, 10, 16);
+	streamTo(*f.fs, h, past, 190, 16); // 200 bytes of data, the header is not part of them
 	ASSERT_TRUE(f.waitIdle());
 	ASSERT_TRUE(r.success);
 	ASSERT_EQ(16u, (u32)r.data.size());
@@ -396,9 +373,7 @@ bool testFileSystemPakStreamCompressedResourceFails() {
 	ASSERT_TRUE(f.created);
 	const FileSystem::StreamHandle h = f.fs->openStreaming(Path("pak_packed.res"));
 	StreamResult r;
-	FileSystem::StreamCallback cb;
-	cb.bind<&StreamResult::onStream>(&r);
-	f.fs->stream(h, 1, 0, 16, cb);
+	streamTo(*f.fs, h, r, 0, 16);
 	f.fs->close(h);
 	ASSERT_TRUE(f.waitIdle());
 	ASSERT_EQ(1u, r.call_count);
@@ -421,9 +396,7 @@ bool testFileSystemStreamCompiledResource() {
 	ASSERT_TRUE(writeResource(*f.fs, "file_system_stream_test.res", 0));
 	const FileSystem::StreamHandle h = f.fs->openStreaming(Path("file_system_stream_test.res"));
 	StreamResult r;
-	FileSystem::StreamCallback cb;
-	cb.bind<&StreamResult::onStream>(&r);
-	f.fs->stream(h, 1, 20, 8, cb);
+	streamTo(*f.fs, h, r, 20, 8);
 	ASSERT_TRUE(f.waitIdle());
 	ASSERT_TRUE(r.success);
 	for (u32 i = 0; i < 8; ++i) ASSERT_EQ((u32)expectedByte(20 + i), (u32)r.data[i]);
@@ -439,9 +412,7 @@ bool testFileSystemStreamCompressedResourceFails() {
 	ASSERT_TRUE(writeResource(*f.fs, "file_system_stream_test_packed.res", CompiledResourceHeader::COMPRESSED));
 	const FileSystem::StreamHandle h = f.fs->openStreaming(Path("file_system_stream_test_packed.res"));
 	StreamResult r;
-	FileSystem::StreamCallback cb;
-	cb.bind<&StreamResult::onStream>(&r);
-	f.fs->stream(h, 1, 0, 8, cb);
+	streamTo(*f.fs, h, r, 0, 8);
 	f.fs->close(h);
 	ASSERT_TRUE(f.waitIdle());
 	ASSERT_EQ(1u, r.call_count);
@@ -472,22 +443,20 @@ bool testFileSystemStreamInterleavedStreams() {
 	ASSERT_TRUE(a != b);
 
 	StreamResult r[6];
-	FileSystem::StreamCallback cb[6];
-	for (u32 i = 0; i < 6; ++i) cb[i].bind<&StreamResult::onStream>(&r[i]);
 	// alternating reads, the first stream is closed while the second one still has reads queued
-	f.fs->stream(a, 0, 0, 16, cb[0]);
-	f.fs->stream(b, 1, 0, 16, cb[1]);
-	f.fs->stream(a, 2, 100, 16, cb[2]);
-	f.fs->stream(b, 3, 200, 16, cb[3]);
+	streamTo(*f.fs, a, r[0], 0, 16);
+	streamTo(*f.fs, b, r[1], 0, 16);
+	streamTo(*f.fs, a, r[2], 100, 16);
+	streamTo(*f.fs, b, r[3], 200, 16);
 	f.fs->close(a);
-	f.fs->stream(b, 4, 500, 16, cb[4]);
-	f.fs->stream(b, 5, 1000, 24, cb[5]);
+	streamTo(*f.fs, b, r[4], 500, 16);
+	streamTo(*f.fs, b, r[5], 1000, 24);
 	f.fs->close(b);
 	ASSERT_TRUE(f.waitIdle());
 
 	for (u32 i = 0; i < 6; ++i) {
 		ASSERT_EQ(1u, r[i].call_count);
-		ASSERT_EQ(i, (u32)r[i].user_data);
+		ASSERT_TRUE(r[i].user_data == (u64)(uintptr)&r[i]);
 	}
 	ASSERT_TRUE(hasPattern(r[0], 0, 16, 7, 3));
 	ASSERT_TRUE(hasPattern(r[1], 0, 16, 11, 5));
@@ -507,21 +476,19 @@ bool testFileSystemPakStreamInterleavedStreams() {
 	const FileSystem::StreamHandle b = f.fs->openStreaming(Path("pak_b.bin"));
 
 	StreamResult r[6];
-	FileSystem::StreamCallback cb[6];
-	for (u32 i = 0; i < 6; ++i) cb[i].bind<&StreamResult::onStream>(&r[i]);
-	f.fs->stream(a, 0, 0, 16, cb[0]);
-	f.fs->stream(b, 1, 0, 16, cb[1]);
-	f.fs->stream(a, 2, 280, 20, cb[2]);
-	f.fs->stream(b, 3, 480, 20, cb[3]);
+	streamTo(*f.fs, a, r[0], 0, 16);
+	streamTo(*f.fs, b, r[1], 0, 16);
+	streamTo(*f.fs, a, r[2], 280, 20);
+	streamTo(*f.fs, b, r[3], 480, 20);
 	f.fs->close(a);
-	f.fs->stream(b, 4, 250, 16, cb[4]);
-	f.fs->stream(b, 5, 0, 500, cb[5]); // all of the entry
+	streamTo(*f.fs, b, r[4], 250, 16);
+	streamTo(*f.fs, b, r[5], 0, 500); // all of the entry
 	f.fs->close(b);
 	ASSERT_TRUE(f.waitIdle());
 
 	for (u32 i = 0; i < 6; ++i) {
 		ASSERT_EQ(1u, r[i].call_count);
-		ASSERT_EQ(i, (u32)r[i].user_data);
+		ASSERT_TRUE(r[i].user_data == (u64)(uintptr)&r[i]);
 	}
 	// entry e has bytes (i * (e + 3) + e)
 	ASSERT_TRUE(hasPattern(r[0], 0, 16, 3, 0));

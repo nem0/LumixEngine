@@ -19,6 +19,7 @@
 #include "core/tag_allocator.h"
 #include "nvml.h"
 #include "renderer/gpu/gpu.h"
+#include "renderer/gpu/gpu_nvperf.h"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOCRYPT
@@ -387,7 +388,7 @@ struct ShaderCompiler {
 				program.vs = iter.value();
 			}
 			else {
-				program.vs = compileStage(hash, src, L"vs_6_0", name, L"mainVS");
+				program.vs = compileStage(hash, src, L"vs_6_2", name, L"mainVS");
 				if (!program.vs) return false;
 			}
 
@@ -398,7 +399,7 @@ struct ShaderCompiler {
 				program.ps = iter.value();
 			}
 			else {
-				program.ps = compileStage(ps_hash, src, L"ps_6_0", name, L"mainPS");
+				program.ps = compileStage(ps_hash, src, L"ps_6_2", name, L"mainPS");
 				if (!program.ps) return false;
 			}
 			return true;
@@ -411,7 +412,7 @@ struct ShaderCompiler {
 			return true;
 		}
 
-		program.cs = compileStage(hash, src, L"cs_6_0", name, L"main");
+		program.cs = compileStage(hash, src, L"cs_6_2", name, L"main");
 		if (!program.cs) return false;
 		if (program.cs->GetBufferSize() == 0) {
 			program.cs->Release();
@@ -439,7 +440,7 @@ struct ShaderCompiler {
 			wname,
 			L"-E", entry_point,
 			L"-T", target,
-			L"-HV", L"2018",
+			L"-HV", L"2021",
 			L"-Zpr",
 			#ifdef LUMIX_DEBUG
 				L"-Zi", L"-Od", L"-Qembed_debug",
@@ -1498,7 +1499,9 @@ void Frame::end(ID3D12CommandQueue* cmd_queue, ID3D12GraphicsCommandList* cmd_li
 			}
 		#endif
 	}
+	nvperf::beforeSubmit(cmd_queue);
 	cmd_queue->ExecuteCommandLists(1, (ID3D12CommandList* const*)&cmd_list);
+	nvperf::afterSubmit(cmd_queue);	// waits for the GPU when this frame was profiled
 	if (capture_requested) {
 		capture_requested = false;
 		#ifdef USE_PIX
@@ -2110,6 +2113,7 @@ void preinit(IAllocator& allocator, bool load_renderdoc) {
 }
 
 void shutdown() {
+	nvperf::shutdown();
 	if (!d3d->shader_compiler.m_cache_path.isEmpty()) d3d->shader_compiler.saveCache(d3d->shader_compiler.m_cache_path.c_str());
 
 	if (d3d->nvml_lib) {
@@ -2512,6 +2516,8 @@ bool init(void* hwnd, InitFlags flags) {
 }
 
 void pushDebugGroup(const char* msg) {
+	// profile blocks are debug groups, the counters of the Nsight Perf SDK are collected per range (see gpu_nvperf.h)
+	if (nvperf::isRecordingFrame()) nvperf::pushRange(d3d->cmd_list, msg);
 	#ifdef USE_PIX
 		if (d3d->debug_groups_depth < lengthOf(d3d->debug_groups_queue)) {
 			d3d->debug_groups_queue[d3d->debug_groups_depth] = msg;
@@ -2524,6 +2530,7 @@ void pushDebugGroup(const char* msg) {
 }
 
 void popDebugGroup() {
+	if (nvperf::isRecordingFrame()) nvperf::popRange(d3d->cmd_list);
 	#ifdef USE_PIX
 		--d3d->debug_groups_depth;
 		PIXEndEvent(d3d->cmd_list);
@@ -2812,6 +2819,7 @@ u32 present() {
 	// transient SRV table of the previous frame is not valid anymore
 	d3d->bound_shader_buffers = {};
 	resetCommandList();
+	nvperf::frameBegin(d3d->cmd_queue);	// starts a requested counter capture, this frame is the first one recorded with ranges
 
 	for (auto& window : d3d->windows) {
 		if (!window.handle) continue;

@@ -26,6 +26,11 @@ struct ClusterVoxelSource {
 	const u32* colors = nullptr;	// optional, 4 bytes (u8 x4) of each vertex, the voxels have the average (without the alpha)
 	const u32* ao = nullptr;		// optional, 4 bytes (u8 x4) of each vertex, only the first one is used
 };
+struct ClusterSubmesh {
+	Span<const u32> indices;
+	u32 material = 0;
+};
+bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Span<const Vec2> uvs, Span<const ClusterSubmesh> submeshes, bool dilate_borders, MeshClusters& out, IAllocator& allocator, const ClusterVoxelSource* voxels = nullptr);
 bool buildMeshClusters(Span<const Vec3> positions, Span<const Vec3> normals, Span<const Vec2> uvs, Span<const u32> indices, bool dilate_borders, MeshClusters& out, IAllocator& allocator, const ClusterVoxelSource* voxels = nullptr);
 
 // The vertices of a mesh, as the importer has them.
@@ -43,8 +48,7 @@ struct ClusterVertexSource {
 // vertex_words and the numbers that go with them. Positions are rounded to a lattice, the same for the whole mesh.
 bool packClusterVertices(const ClusterVertexSource& source, MeshClusters& out, IAllocator& allocator);
 
-// Makes the pages (streaming units made of groups, see ClusterStream) of a mesh, they are stored in the compiled model. `index_stride` is the number of bytes of indices of a
-// cluster in the model file (the payload of a group is its vertex stream and the indices of its clusters).
+// Makes the pages (streaming units made of groups, see ClusterStream) of a mesh, they are stored in the compiled model (the payload of a group is its vertex stream and the u8 indices of its clusters).
 // False if the groups and the clusters are not valid (a group is not refined from a group with a lower number).
 bool buildMeshPages(const MeshClusterGPU* clusters, u32 cluster_count, const MeshGroupGPU* groups, u32 group_count, MeshPages& out, IAllocator& allocator);
 

@@ -172,9 +172,9 @@ static u32 acquireVariant(GPUSceneRegistry& res, u32 model_id, const Model& mode
 	if (group_id == GPUSceneConst::INVALID_GROUP) return GPUSceneConst::INVALID_VARIANT;
 
 	// meshes with clusters share the variant of their group; its index count is not used by the draws (every selected cluster has its own command with its own
-	// index count, gpu_scene_variants.hlsl), the largest cluster's is stored
+	// index count, gpu_scene_variants.hlsl)
 	const Mesh* mesh_key = lod ? &mesh : nullptr;
-	const u32 index_count = lod ? (u32)mesh.indices_count : (u32)mesh.cluster_index_stride;
+	const u32 index_count = lod ? (u32)mesh.indices_count : 0;
 	const u64 hash = hashMix(hashMix(hashBegin(), group_id), (u64)(uintptr)mesh_key);
 	const auto iter = res.variant_map.find(hash);
 	u32 id = GPUSceneConst::INVALID_VARIANT;

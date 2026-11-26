@@ -6,7 +6,6 @@ import "core:render/lighting" as lighting
 import "core:render/transparent" as transparent
 import "core:render/debug_view" as debug_view
 import "core:render/tonemap" as tonemap
-import "core:postprocess/atmo" as atmo
 import "core:postprocess/ssao" as ssao
 import "core:postprocess/dof" as dof
 import "core:postprocess/bloom" as bloom
@@ -78,7 +77,6 @@ fn renderFrame(ctx : Context) : RenderBuffer {
 	ssao.ssao(ctx);
 	var result = lighting.lightPass(ctx, gbuffer, shadowmap);
 	result = beginChain(ctx, .BEFORE_TRANSPARENT, result);
-	result = apply(ctx, atmo.atmo, result);
 	transparent.transparentPass(ctx, gbuffer, shadowmap, geometry.view, result);
 
 	if ctx.pipelineType() == .PROBE {

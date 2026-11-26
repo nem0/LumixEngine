@@ -10,13 +10,11 @@
 //   BIN_ARGS  the groups of the dispatches of COUNT and SCATTER, from the number of selected clusters (u_args + 48)
 //   COUNT     one thread for each selected cluster or mesh: counts it in its variant (the ones of groups that are not drawn in the view are not counted)
 //   SCAN      one group of threads: the first slot of each variant (a variant is a range of u_out), and its command; variants that do not fit into u_out are cut
-//   SCATTER   one thread for each selected cluster or mesh: writes its instance data (96 bytes, the layout of the MESH_INSTANCE variant of surface shaders,
-//             the same as nanite.hlsl writes) to its place in the variant
-// An entry of the list of selected clusters is (slot, mesh of the mesh table, cluster, instance), the cluster of a mesh without clusters is 0xffffffff and its mesh is
-// the index of the mesh in its model (a model without clusters has no table of meshes). The instance is
-// 0 for a model instance that is drawn itself, otherwise the index + 1 of an instance of a chunk of an instanced model in the buffer of the instances of the model instance. Its instance data has no cluster and no LOD fade (the position and scale words are 0), the scale word has the offset of the bones of skinned meshes.
-// A cluster is found by the draw by its instance: the cluster is in the scale.w, the mesh of the mesh table of the scene in the prev_pos.w
-// (vertex_pulling.hlsli, CLUSTER_MESH), the material index is in the prev_scale.w.
+//   SCATTER   one thread for each selected cluster or mesh: writes its 32-byte draw instance entry (DRAW_INSTANCE_STRIDE, see gpu_scene_layout.hlsli)
+//             to its place in the variant; vertex shaders pull transforms directly from GPUScene::instances / GPUSceneChunks::chunks.
+// An entry of the list of selected clusters is (slot, mesh of the mesh table, cluster | (depth_bin << 27), instance); the cluster of a mesh without clusters is
+// NO_CLUSTER (0xffffffff) and its mesh is the index of the mesh in its model (a model without clusters has no table of meshes). The instance is
+// 0 for a model instance that is drawn itself, otherwise the index + 1 of an instance of a chunk of an instanced model in the buffer of the instances of the model instance.
 //
 // u_counters (rw): [2] the first free slot of u_out, which is shared by all the views of a frame (FRAME_CLEAR empties it when the frame is set up, SCAN takes
 //              the slots of its variants from it), from 64: u32 counts, cursors and first slots of MAX_VARIANTS variants
@@ -41,13 +39,11 @@ cbuffer EmitClusterCommandsUniforms : register(b4) {
 };
 #else
 cbuffer UniformData : register(b4) {
-	int3 u_cam_p;				// the camera in the fixed point of the GPU scene
 	uint u_selected_capacity;	// entries of the list of selected clusters
-	float3 u_cam_frac;
 	uint u_out_capacity;		// instances that fit into u_out
 	uint u_selected;			// rw bindless, nanite.hlsl: [0] number of selected clusters, from 16 entries (slot, mesh, cluster, 0)
 	uint u_instances;			// bindless, the model instances of the GPU scene, 96 bytes
-	uint u_counters;				// rw bindless
+	uint u_counters;			// rw bindless
 	uint u_commands;			// rw bindless
 	uint u_meshes;				// bindless
 	uint u_variants;			// bindless
@@ -56,28 +52,19 @@ cbuffer UniformData : register(b4) {
 	uint u_group_base_offset;	// in bytes
 	uint u_out;					// rw bindless, 32 bytes for each instance of the draws
 	uint u_args;				// rw bindless, dispatch arguments
-	uint u_frame;				// the number of the frame, see GPUSceneInstance::moved_frame
 	uint u_bone_table;			// bindless, u32 for each slot: the byte offset of its bones in the bones buffer (0: none), 0 if there are no bones
 	uint u_sets;				// bindless
-	uint u_lod_models;		// bindless
+	uint u_lod_models;			// bindless
 	uint u_command_base;		// byte offset of the commands of the view in u_commands
 	uint u_bone_table_offset;	// in bytes
 	uint u_chunks;				// bindless, the chunks of instanced models (GPUSceneChunk, 32 bytes)
-	uint u_cluster_data;		// bindless, buffer of cluster data (Renderer::getClusterDataBuffer)
-	uint u_cluster_cmd_capacity;	// max per-cluster indirect commands per cluster draw group (Renderer::getClusterCommandsCapacity)
+	uint u_cluster_data;		// bindless, buffer of cluster data (ClusterStreamer::getDataBuffer)
+	uint u_cluster_cmd_capacity;// max per-cluster indirect commands per cluster draw group (ClusterStreamer::getCommandsCapacity)
 	uint u_depth_bin_groups;	// number of cluster draw groups to front-to-back depth-bin (0 to disable, e.g. shadow views)
 	uint u_scratch;				// rw bindless, per-selected uint2(variant_or_bk, material) cached by COUNT for SCATTER
-	uint2 u_padding2;
+	uint u_padding0;
 };
 #endif
-
-#define OUT_CURSOR_AT COUNTERS_OUT_CURSOR_AT
-#define COUNTS_AT COUNTERS_COUNTS_AT
-#define CURSORS_AT COUNTERS_CURSORS_AT
-#define BASES_AT COUNTERS_BASES_AT
-#define BIN_COUNTS_AT COUNTERS_BIN_COUNTS_AT
-#define BIN_CURSORS_AT COUNTERS_BIN_CURSORS_AT
-#define BIN_OFFSETS_AT COUNTERS_BIN_OFFSETS_AT
 
 // u_commands, a command of an indirect draw: draw id, index count, instance count, first index, base vertex, base instance
 #define COMMAND_STRIDE 24
@@ -111,7 +98,7 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_thread_id : SV_Grou
 		cluster_cmds.Store2(i * 24 + 16, uint2(0u, 0u));
 		return;
 	#elif defined FRAME_CLEAR
-		if (thread_id.x == 0) bindless_rw_buffers[u_counters].Store(OUT_CURSOR_AT, 0);
+		if (thread_id.x == 0) bindless_rw_buffers[u_counters].Store(COUNTERS_OUT_CURSOR_AT, 0);
 		return;
 	#else
 	RWByteAddressBuffer counters = bindless_rw_buffers[u_counters];
@@ -120,19 +107,19 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_thread_id : SV_Grou
 
 	#if defined CLEAR
 		for (uint i = thread_id.x; i < u_variant_count; i += GROUP_SIZE) {
-			counters.Store(COUNTS_AT + i * 4, 0);
-			counters.Store(CURSORS_AT + i * 4, 0);
-			counters.Store(BASES_AT + i * 4, 0);
+			counters.Store(COUNTERS_COUNTS_AT + i * 4, 0);
+			counters.Store(COUNTERS_CURSORS_AT + i * 4, 0);
+			counters.Store(COUNTERS_BASES_AT + i * 4, 0);
 		}
 		const uint bin_count = min(u_depth_bin_groups, (uint)MAX_DEPTH_BIN_GROUPS) * DEPTH_BINS;
 		for (uint b = thread_id.x; b < bin_count; b += GROUP_SIZE) {
-			counters.Store(BIN_COUNTS_AT + b * 4, 0);
-			counters.Store(BIN_CURSORS_AT + b * 4, 0);
+			counters.Store(COUNTERS_BIN_COUNTS_AT + b * 4, 0);
+			counters.Store(COUNTERS_BIN_CURSORS_AT + b * 4, 0);
 		}
 	#elif defined BIN_ARGS
 		if (thread_id.x == 0) {
 			const uint groups = (selected_count + GROUP_SIZE - 1) / GROUP_SIZE;
-			bindless_rw_buffers[u_args].Store3(ARGS_BIN, uint3(min(groups, MAX_GROUPS_X), (groups + MAX_GROUPS_X - 1) / MAX_GROUPS_X, 1));
+			bindless_rw_buffers[u_args].Store3(ARGS_BIN, dispatchGroups(groups));
 		}
 	#elif defined SCAN
 		// every thread takes a range of variants: the sums of the ranges are scanned by the first thread, then each thread gives out the slots of its range
@@ -145,7 +132,7 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_thread_id : SV_Grou
 		for (uint v = first; v < end; ++v) {
 			const uint x = variants.Load(v * VARIANT_STRIDE);
 			if (x == NO_VARIANT) continue;	// a free id
-			if (group_bases.Load(u_group_base_offset + (x & VARIANT_GROUP_MASK) * 4) != NO_COMMAND_GROUP) sum += counters.Load(COUNTS_AT + v * 4);
+			if (group_bases.Load(u_group_base_offset + (x & VARIANT_GROUP_MASK) * 4) != NO_COMMAND_GROUP) sum += counters.Load(COUNTERS_COUNTS_AT + v * 4);
 		}
 		// The first slot of a range is the cursor + the sums of the ranges before it, cut at the capacity (the cut of the serial loop min(base + range, capacity)
 		// gives the same, since the ranges are not negative): a prefix sum in each wave, then one of the sums of the waves.
@@ -158,7 +145,7 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_thread_id : SV_Grou
 		const uint wave_count = GROUP_SIZE / lanes;
 		if (thread_id.x < lanes) {
 			// the first wave scans the sums of the waves, lanes at a time
-			uint carry = counters.Load(OUT_CURSOR_AT);	// what the views before took
+			uint carry = counters.Load(COUNTERS_OUT_CURSOR_AT);	// what the views before took
 			for (uint w0 = 0; w0 < wave_count; w0 += lanes) {
 				const uint w = w0 + thread_id.x;
 				const uint s = w < wave_count ? g_wave_sums[w] : 0;
@@ -166,7 +153,7 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_thread_id : SV_Grou
 				carry += WaveActiveSum(s);
 				if (w < wave_count) g_wave_sums[w] = first_of_wave;
 			}
-			if (thread_id.x == 0) counters.Store(OUT_CURSOR_AT, min(carry, u_out_capacity));	// what does not fit is cut
+			if (thread_id.x == 0) counters.Store(COUNTERS_OUT_CURSOR_AT, min(carry, u_out_capacity));	// what does not fit is cut
 		}
 		GroupMemoryBarrierWithGroupSync();
 		g_sums[thread_id.x] = min(g_wave_sums[wave] + in_wave, u_out_capacity);
@@ -178,21 +165,21 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_thread_id : SV_Grou
 			const uint group_info = group_bases.Load(u_group_base_offset + (variant.x & VARIANT_GROUP_MASK) * 4);
 			if (group_info == NO_COMMAND_GROUP) continue;
 			const uint group_base = group_info & GROUP_BASE_COMMAND_MASK;
-			const uint count = counters.Load(COUNTS_AT + w * 4);
+			const uint count = counters.Load(COUNTERS_COUNTS_AT + w * 4);
 			const uint command = u_command_base + (group_base + (variant.x >> VARIANT_INDEX_SHIFT)) * COMMAND_STRIDE;
 			if ((group_info & GROUP_BASE_CLUSTER_BIT) != 0) {
 				const uint cluster_group_idx = (group_info >> GROUP_BASE_CLUSTER_IDX_SHIFT) & GROUP_BASE_CLUSTER_IDX_MASK;
 				const uint kept = min(min(count, u_out_capacity - base), u_cluster_cmd_capacity);
-				counters.Store(COUNTS_AT + w * 4, kept);
-				counters.Store(BASES_AT + w * 4, base);
+				counters.Store(COUNTERS_COUNTS_AT + w * 4, kept);
+				counters.Store(COUNTERS_BASES_AT + w * 4, base);
 				if (cluster_group_idx < u_depth_bin_groups && cluster_group_idx < MAX_DEPTH_BIN_GROUPS) {
 					uint bin_off = base;
 					uint rem = kept;
 					for (uint b = 0; b < DEPTH_BINS; ++b) {
 						const uint bk = cluster_group_idx * DEPTH_BINS + b;
-						const uint bc = min(counters.Load(BIN_COUNTS_AT + bk * 4), rem);
-						counters.Store(BIN_COUNTS_AT + bk * 4, bc);
-						counters.Store(BIN_OFFSETS_AT + bk * 4, bin_off);
+						const uint bc = min(counters.Load(COUNTERS_BIN_COUNTS_AT + bk * 4), rem);
+						counters.Store(COUNTERS_BIN_COUNTS_AT + bk * 4, bc);
+						counters.Store(COUNTERS_BIN_OFFSETS_AT + bk * 4, bin_off);
 						bin_off += bc;
 						rem -= bc;
 					}
@@ -205,8 +192,8 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_thread_id : SV_Grou
 			}
 			else {
 				const uint kept = min(count, u_out_capacity - base);
-				counters.Store(COUNTS_AT + w * 4, kept);
-				counters.Store(BASES_AT + w * 4, base);
+				counters.Store(COUNTERS_COUNTS_AT + w * 4, kept);
+				counters.Store(COUNTERS_BASES_AT + w * 4, base);
 				commands.Store4(command, uint4(base, variant.w, kept, variant.y));	// draw id, index count, instance count, first index
 				commands.Store2(command + COMMAND_BASE_VERTEX, uint2(variant.z, 0));						// base vertex, base instance
 				base += kept;
@@ -232,7 +219,11 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_thread_id : SV_Grou
 				mesh_info = uint2(bindless_buffers[u_lod_models].Load((model_id & ~MODEL_LOD_BIT) * LOD_MODEL_STRIDE + LOD_MODEL_FIRST_SET) + entry.y, entry.y);
 			}
 			else {
-				mesh_info = bindless_buffers[u_meshes].Load2(entry.y * CLUSTER_MESH_STRIDE + CLUSTER_MESH_SET);
+				const uint cluster_idx = entry.z & SELECTED_CLUSTER_MASK;
+				const uint clusters_offset = bindless_buffers[u_meshes].Load(entry.y * CLUSTER_MESH_STRIDE);
+				const uint mat_idx = bindless_buffers[u_cluster_data].Load(clusters_offset + cluster_idx * CLUSTER_STRIDE + CLUSTER_INDEX_COUNT) >> CLUSTER_MATERIAL_SHIFT;
+				const uint default_first = bindless_buffers[u_meshes].Load(entry.y * CLUSTER_MESH_STRIDE + CLUSTER_MESH_SET);
+				mesh_info = uint2(default_first + mat_idx, mat_idx);
 			}
 			uint set_entry = mesh_info.x;
 			const uint set = in_chunk ? NO_MATERIAL_SET : bindless_buffers[u_instances].Load(entry.x * INSTANCE_STRIDE + INSTANCE_MATERIAL_SET);
@@ -252,9 +243,9 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_thread_id : SV_Grou
 					const bool is_cluster_group = (group_info & GROUP_BASE_CLUSTER_BIT) != 0;
 					cluster_group_idx = (group_info >> GROUP_BASE_CLUSTER_IDX_SHIFT) & GROUP_BASE_CLUSTER_IDX_MASK;
 					const bool lod = entry.z == NO_CLUSTER;
-					bin = entry.z >> 27;
+					bin = entry.z >> SELECTED_DEPTH_BIN_SHIFT;
 					use_depth_bin = is_cluster_group && !lod && cluster_group_idx < u_depth_bin_groups && cluster_group_idx < MAX_DEPTH_BIN_GROUPS;
-					waveIncrement(counters, COUNTS_AT + variant * 4);
+					waveIncrement(counters, COUNTERS_COUNTS_AT + variant * 4);
 					if (use_depth_bin) {
 						const uint bk = cluster_group_idx * DEPTH_BINS + bin;
 						scratch.Store2(index * 8, uint2(bk | 0x80000000u, material));
@@ -273,13 +264,13 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_thread_id : SV_Grou
 				InterlockedAdd(g_bin_counts[bin], 1);
 			}
 			else {
-				waveIncrement(counters, BIN_COUNTS_AT + (cluster_group_idx * DEPTH_BINS + bin) * 4);
+				waveIncrement(counters, COUNTERS_BIN_COUNTS_AT + (cluster_group_idx * DEPTH_BINS + bin) * 4);
 			}
 		}
 		GroupMemoryBarrierWithGroupSync();
 		if (cg != 0xffffffffu && gtid < DEPTH_BINS) {
 			const uint c = g_bin_counts[gtid];
-			if (c > 0) counters.InterlockedAdd(BIN_COUNTS_AT + (cg * DEPTH_BINS + gtid) * 4, c);
+			if (c > 0) counters.InterlockedAdd(COUNTERS_BIN_COUNTS_AT + (cg * DEPTH_BINS + gtid) * 4, c);
 		}
 	#else // SCATTER
 		const uint gtid = group_thread_id.x;
@@ -319,7 +310,7 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_thread_id : SV_Grou
 			const uint c = g_bin_counts[gtid];
 			if (c > 0) {
 				uint base;
-				counters.InterlockedAdd(BIN_CURSORS_AT + (cg * DEPTH_BINS + gtid) * 4, c, base);
+				counters.InterlockedAdd(COUNTERS_BIN_CURSORS_AT + (cg * DEPTH_BINS + gtid) * 4, c, base);
 				g_bin_bases[gtid] = base;
 			}
 		}
@@ -333,19 +324,19 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_thread_id : SV_Grou
 				bin_rank = g_bin_bases[bin] + local_rank;
 			}
 			else {
-				bin_rank = waveIncrement(counters, BIN_CURSORS_AT + key * 4);
+				bin_rank = waveIncrement(counters, COUNTERS_BIN_CURSORS_AT + key * 4);
 			}
-			if (bin_rank >= counters.Load(BIN_COUNTS_AT + key * 4)) return; // did not fit
-			slot = counters.Load(BIN_OFFSETS_AT + key * 4) + bin_rank;
+			if (bin_rank >= counters.Load(COUNTERS_BIN_COUNTS_AT + key * 4)) return; // did not fit
+			slot = counters.Load(COUNTERS_BIN_OFFSETS_AT + key * 4) + bin_rank;
 		}
 		else {
-			const uint rank = waveIncrement(counters, CURSORS_AT + key * 4);
-			if (rank >= counters.Load(COUNTS_AT + key * 4)) return; // did not fit
-			slot = counters.Load(BASES_AT + key * 4) + rank;
+			const uint rank = waveIncrement(counters, COUNTERS_CURSORS_AT + key * 4);
+			if (rank >= counters.Load(COUNTERS_COUNTS_AT + key * 4)) return; // did not fit
+			slot = counters.Load(COUNTERS_BASES_AT + key * 4) + rank;
 		}
 		const uint4 entry = selected.Load4(SELECTED_HEADER + index * SELECTED_STRIDE);	// slot, mesh, cluster, instance
 		const bool lod = entry.z == NO_CLUSTER;
-		const uint cluster = entry.z & 0x07ffffffu;
+		const uint cluster = entry.z & SELECTED_CLUSTER_MASK;
 		RWByteAddressBuffer output = bindless_rw_buffers[u_out];
 		const uint o = slot * DRAW_INSTANCE_STRIDE;
 		if (lod) {
@@ -362,18 +353,17 @@ void main(uint3 thread_id : SV_DispatchThreadID, uint3 group_thread_id : SV_Grou
 			// pre-resolve cluster stream, index and header byte offsets once per visible cluster so vertex pulling skips the indirection chain
 			const uint mesh = entry.y;
 			ByteAddressBuffer mesh_table = bindless_buffers[u_meshes];
-			const uint4 mesh_info = mesh_table.Load4(mesh * CLUSTER_MESH_STRIDE + CLUSTER_MESH_TABLE);
-			const uint root_count = mesh_table.Load(mesh * CLUSTER_MESH_STRIDE + CLUSTER_MESH_ROOT_COUNT);
-			const uint headers_offset = mesh_info.x + ((mesh_info.z * CLUSTER_STRIDE + mesh_info.w * NODE_STRIDE + root_count * ROOT_STRIDE + CLUSTER_ALIGNMENT_MASK) & ~(uint)CLUSTER_ALIGNMENT_MASK);
+			const ClusterMesh cm = mesh_table.Load<ClusterMesh>(mesh * CLUSTER_MESH_STRIDE);
+			const uint headers_offset = clusterHeadersOffset(cm);
 			ByteAddressBuffer cluster_data = bindless_buffers[u_cluster_data];
-			const uint group_id = cluster_data.Load(mesh_info.x + cluster * CLUSTER_STRIDE + CLUSTER_GROUP);
-			const uint4 group_address = cluster_data.Load4(mesh_info.y + group_id * GROUP_STRIDE);
+			const uint group_id = cluster_data.Load(cm.clusters + cluster * CLUSTER_STRIDE + CLUSTER_GROUP);
+			const uint4 group_address = cluster_data.Load4(cm.group_table + group_id * GROUP_STRIDE);
 			const uint stream_base = group_address.x;
-			const uint2 cluster_idx_range = cluster_data.Load2(mesh_info.x + cluster * CLUSTER_STRIDE + CLUSTER_FIRST_INDEX);
+			const uint2 cluster_idx_range = cluster_data.Load2(cm.clusters + cluster * CLUSTER_STRIDE + CLUSTER_FIRST_INDEX);
 			const uint index_base = group_address.y + cluster_idx_range.x * 2;
 			const uint header_addr = headers_offset + cluster * CLUSTER_HEADER_STRIDE;
 			output.Store4(o + DRAW_INSTANCE_SLOT, uint4(entry.x, entry.w, material, cluster));
-			output.Store4(o + DRAW_INSTANCE_CLUSTER_DATA, uint4(stream_base, index_base, header_addr, cluster_idx_range.y));
+			output.Store4(o + DRAW_INSTANCE_CLUSTER_DATA, uint4(stream_base, index_base, header_addr, cluster_idx_range.y & CLUSTER_INDEX_COUNT_MASK));
 		}
 	#endif
 	#endif

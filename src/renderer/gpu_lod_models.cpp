@@ -2,6 +2,7 @@
 
 #include "core/log.h"
 #include "core/span.h"
+#include "renderer/cluster_streaming.h"
 #include "renderer/gpu_scene_registry.h"
 #include "renderer/model.h"
 #include "renderer/renderer.h"
@@ -30,9 +31,10 @@ const GPUMeshPool* getLodPool(const GPULodModels& models, u32 index, u32 mesh_in
 static void freePools(GPUSceneRegistry& res, u32 index) {
 	GPULodModelEntry& entry = res.lod.entries[index];
 	if (!entry.pools) return;
+	ClusterStreamer& streamer = res.renderer.getClusterStreamer();
 	for (u32 i = 0; i < entry.pool_count; ++i) {
-		res.renderer.freeClusterData(entry.pools[i].vertex_offset, entry.pools[i].vertex_size);
-		res.renderer.freeClusterData(entry.pools[i].index_offset, entry.pools[i].index_size);
+		streamer.freeData(entry.pools[i].vertex_offset, entry.pools[i].vertex_size);
+		streamer.freeData(entry.pools[i].index_offset, entry.pools[i].index_size);
 	}
 	res.allocator.deallocate(entry.pools);
 	entry.pools = nullptr;
@@ -44,6 +46,7 @@ static bool allocPools(GPUSceneRegistry& res, u32 index, const Model& model) {
 	if (entry.pools) return true;
 	const u32 count = (u32)model.getMeshCount();
 	if (count == 0) return false;
+	ClusterStreamer& streamer = res.renderer.getClusterStreamer();
 	GPUMeshPool* pools = (GPUMeshPool*)res.allocator.allocate(sizeof(GPUMeshPool) * count, alignof(GPUMeshPool));
 	u32 done = 0;
 	bool ok = true;
@@ -54,11 +57,11 @@ static bool allocPools(GPUSceneRegistry& res, u32 index, const Model& model) {
 		p.vertex_size = mesh.vertices.size() * mesh.vb_stride;
 		p.index_size = (u32)mesh.indices.size();
 		// vertices are addressed by the base vertex of a command, so they start at a multiple of their size
-		if (!res.renderer.allocClusterRange(p.vertex_size, mesh.vb_stride, p.vertex_offset)) {
+		if (!streamer.allocRange(p.vertex_size, mesh.vb_stride, p.vertex_offset)) {
 			ok = false;
 		}
-		else if (!res.renderer.allocClusterRange(p.index_size, 4, p.index_offset)) {
-			res.renderer.freeClusterData(p.vertex_offset, p.vertex_size);
+		else if (!streamer.allocRange(p.index_size, 4, p.index_offset)) {
+			streamer.freeData(p.vertex_offset, p.vertex_size);
 			ok = false;
 		}
 		else {
@@ -67,8 +70,8 @@ static bool allocPools(GPUSceneRegistry& res, u32 index, const Model& model) {
 	}
 	if (!ok) {
 		for (u32 i = 0; i < done; ++i) {
-			res.renderer.freeClusterData(pools[i].vertex_offset, pools[i].vertex_size);
-			res.renderer.freeClusterData(pools[i].index_offset, pools[i].index_size);
+			streamer.freeData(pools[i].vertex_offset, pools[i].vertex_size);
+			streamer.freeData(pools[i].index_offset, pools[i].index_size);
 		}
 		res.allocator.deallocate(pools);
 		logError("GPU scene: no space for the meshes of ", model.getPath(), ", it is not drawn");
@@ -148,7 +151,7 @@ void releaseLodModel(GPUSceneRegistry& res, u32 index) {
 
 void flushLodModels(GPUSceneRegistry& res) {
 	// the copies of the vertices and indices of the meshes to the ranges of the buffer of cluster data
-	const gpu::BufferHandle pool = res.renderer.getClusterDataBuffer();
+	const gpu::BufferHandle pool = res.renderer.getClusterStreamer().getDataBuffer();
 	for (const GPUPoolCopy& copy : res.lod.pool_copies) queueCopy(res.queue, pool, copy.dst_offset, copy.src, 0, copy.size, false);
 	res.lod.pool_copies.clear();
 	mirrorUpload(res.lod.model_table, res.renderer, res.queue);

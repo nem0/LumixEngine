@@ -242,10 +242,13 @@ struct AssetCompilerImpl : AssetCompiler {
 		}
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
+		static AtomicI32 tmp_seq = 0;
+		const i32 seq = tmp_seq.inc();
 		const Path out_path(".lumix/resources/", path.getHash().getHashValue(), ".res");
+		const Path tmp_path(".lumix/resources/", path.getHash().getHashValue(), ".", seq, ".tmp");
 		os::OutputFile file;
-		if(!fs.open(out_path, file)) {
-			logError("Could not create ", out_path);
+		if (!fs.open(tmp_path, file)) {
+			logError("Could not create ", tmp_path);
 			return false;
 		}
 		CompiledResourceHeader header;
@@ -261,7 +264,16 @@ struct AssetCompilerImpl : AssetCompiler {
 			(void)file.write(data.begin(), data.length());
 		}
 		file.close();
-		if (file.isError()) logError("Could not write ", out_path);
+		if (file.isError()) {
+			logError("Could not write ", tmp_path);
+			fs.deleteFile(tmp_path);
+			return false;
+		}
+		if (!fs.moveFile(tmp_path, out_path)) {
+			logError("Could not replace ", out_path);
+			fs.deleteFile(tmp_path);
+			return false;
+		}
 		jobs::MutexGuard guard(m_resources_mutex);
 		auto iter = m_resources.find(path.getHash());
 		if (!iter.isValid()) {
@@ -269,7 +281,7 @@ struct AssetCompilerImpl : AssetCompiler {
 			// If it's not, we don't need to add it to the list
 			m_resources.insert(path.getHash(), {path, getResourceType(path), dirHash(path)});
 		}
-		return !file.isError();
+		return true;
 	}
 
 	static RuntimeHash dirHash(const Path& path) {

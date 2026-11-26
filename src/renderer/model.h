@@ -136,34 +136,27 @@ struct LUMIX_RENDERER_API Mesh {
 	gpu::DataType index_type;
 	u32 indices_count;
 
-	// cluster DAG for GPU driven LOD, see mesh_clusters.h, baked by the model importer
-	// Meshes with clusters have no vertices and indices of their own: their vertex data are the headers of clusters followed by their
-	// bit packed vertices (position and then attributes, interleaved, see mesh_clusters.h; vb_stride and the vertex decl only say which attributes there are),
-	// and the indices are local to a cluster, u8 in the model file and widened to u16 on the GPU, tightly packed per group (MeshClusterGPU::first_index is
-	// relative to its group); every selected cluster is drawn by its own indexed indirect command, with the buffer of cluster data as the index buffer.
-	// The CPU `vertices` and `indices` are made of the finest clusters.
-	// The vertex data, the clusters, the nodes and the indices are not buffers of the mesh (vertex_buffer_handle is invalid), they are ranges of the buffer shared
-	// by all meshes with clusters (see Renderer::allocClusterData): the vertex data are `cluster_vertex_size` bytes from `cluster_vertex_offset`, the clusters
-	// and then the nodes are `cluster_table_size` bytes from `cluster_table_offset`, the indices are `cluster_index_size` bytes from `cluster_index_offset`.
-	// The payload of the groups of clusters (the vertex stream and the indices) is streamed, see cluster_stream: it is in ranges of the buffer of cluster data while it is loaded.
-	// The owner of the stream is the mesh, it is freed with the clusters (Model::destroyClusters).
-	ClusterStream* cluster_stream = nullptr;
-	u32 cluster_table_offset = 0;	// MeshClusterGPU[cluster_count]
-	u32 node_table_offset = 0;		// MeshNodeGPU[node_count], then root_count u32 indices of roots, see MeshClusters, right after the clusters
-	u32 cluster_table_size = 0;		// of the range that has the clusters, the nodes with the roots and (16 byte aligned) the headers of the clusters
-	u32 cluster_header_offset = 0;	// MeshClusterVertexGPU[cluster_count], the end of the range of the clusters
-	u32 cluster_group_offset = 0;	// MeshGroupAddressGPU[], a range of its own
-	u32 cluster_group_size = 0;
-	u32 cluster_count = 0;
-	u32 cluster_index_stride = 0; // the largest index count of a cluster of the mesh (indices are not padded), see Model::loadClusters
-	u32 node_count = 0;
-	u32 root_count = 0;
-	u32 tree_depth = 0;			// levels of the deepest tree, a leaf node is the last one
-	u32 leaf_cluster_count = 0; // the finest clusters, no selection has more clusters than that
-	u32 voxel_cluster_count = 0;
-	u32 voxel_brick_count = 0;
-	u32 voxel_count = 0;
-	float voxel_min_size = 0.f;
+	// Cluster DAG for GPU-driven LOD (mesh_clusters.h), baked by the model importer.
+	// Meshes with clusters have no vertex/index buffers of their own: their tables and streamed group payloads live in ClusterStreamer's shared GPU buffer.
+	struct MeshClusterData {
+		ClusterStream* stream = nullptr;
+		u32 table_offset = 0;		// MeshClusterGPU[cluster_count]
+		u32 node_table_offset = 0;	// MeshNodeGPU[node_count], then root_count u32 indices of roots, right after the clusters
+		u32 table_size = 0;			// range containing clusters, nodes, roots and (16-byte aligned) vertex headers
+		u32 header_offset = 0;		// MeshClusterVertexGPU[cluster_count]
+		u32 group_offset = 0;		// MeshGroupAddressGPU[], a range of its own
+		u32 group_size = 0;
+		u32 cluster_count = 0;
+		u32 node_count = 0;
+		u32 root_count = 0;
+		u32 tree_depth = 0;			// levels of the deepest tree, a leaf node is the last one
+		u32 leaf_cluster_count = 0;	// the finest clusters, no selection has more clusters than that
+		u32 voxel_cluster_count = 0;
+		u32 voxel_brick_count = 0;
+		u32 voxel_count = 0;
+		float voxel_min_size = 0.f;
+	};
+	MeshClusterData clusters;
 };
 
 struct LODMeshIndices
@@ -179,7 +172,7 @@ struct LUMIX_RENDERER_API Model final : Resource {
 	// The version of the file format. Increase it whenever the format changes, models of other versions are rejected (see doLoad).
 	// The numbers up to 15 were used by older formats, they must not be used again.
 	enum class FileVersion : u32 {
-		FIRST_SUPPORTED = 16, // cluster indices were padded to index_stride with degenerate triangles
+		FIRST_SUPPORTED = 18, // combined multi-mesh cluster DAG per model with per-cluster material index
 
 		LATEST
 	};

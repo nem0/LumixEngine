@@ -29,10 +29,6 @@ u32 getMaxTreeDepth(const GPUClusterModels& models) {
 	return 0;
 }
 
-u32 getMaxNodeCount(const GPUClusterModels& models) {
-	return models.max_node_count;
-}
-
 static void addDepth(GPUClusterModels& models, u32 depth, i32 delta) {
 	if (depth >= (u32)models.depth_counts.size()) {
 		const u32 old = models.depth_counts.size();
@@ -64,43 +60,33 @@ static void buildClusterModel(GPUSceneRegistry& res, u32 id) {
 	// a model that is not complete has no meshes in the table rather than some
 	const i32 end = model.getClusterMeshesEnd();
 	if (end < 0) return;
-	for (i32 i = 0; i <= end; ++i) {
-		const Mesh& mesh = model.getMesh(i);
-		if (mesh.cluster_table_size == 0 || mesh.cluster_count == 0 || mesh.cluster_group_size == 0) return;
-	}
-	const u32 mesh_count = u32(end + 1);
+	const Mesh::MeshClusterData& mc = model.getMesh(0).clusters;
+	if (mc.table_size == 0 || mc.cluster_count == 0 || mc.group_size == 0) return;
 
 	entry.default_set = acquireDefaultSet(res, id, model);
 	const u32 default_first = res.sets[entry.default_set].first;
 
-	entry.first_mesh = rangeAlloc(models.mesh_ranges, mesh_count);
-	entry.mesh_count = mesh_count;
+	entry.first_mesh = rangeAlloc(models.mesh_ranges, 1);
+	entry.mesh_count = 1;
 	if (models.mesh_ranges.size * sizeof(GPUClusterMesh) > models.mesh_table.data.size()) mirrorResize(models.mesh_table, models.mesh_ranges.size * sizeof(GPUClusterMesh));
-	GPUClusterMesh* meshes = (GPUClusterMesh*)mirrorWrite(models.mesh_table, entry.first_mesh * sizeof(GPUClusterMesh), mesh_count * sizeof(GPUClusterMesh));
-	memset(meshes, 0, mesh_count * sizeof(GPUClusterMesh));
+	GPUClusterMesh* meshes = (GPUClusterMesh*)mirrorWrite(models.mesh_table, entry.first_mesh * sizeof(GPUClusterMesh), sizeof(GPUClusterMesh));
+	memset(meshes, 0, sizeof(GPUClusterMesh));
 
 	gm.first_mesh = entry.first_mesh;
-	gm.mesh_count = mesh_count;
-	u32 depth = 0;
-	for (u32 i = 0; i < mesh_count; ++i) {
-		const Mesh& mesh = model.getMesh(i);
-		GPUClusterMesh& m = meshes[i];
-		m.clusters = mesh.cluster_table_offset;
-		m.group_table = mesh.cluster_group_offset;
-		m.cluster_count = mesh.cluster_count;
-		m.node_count = mesh.node_count;
-		m.root_count = mesh.root_count;
-		m.index_stride = mesh.cluster_index_stride;
-		m.material_entry = default_first + i;
-		m.index_in_model = i;
-		// the shaders derive these
-		ASSERT(clusterNodesOffset(m) == mesh.node_table_offset);
-		ASSERT(clusterHeadersOffset(m) == mesh.cluster_header_offset);
-		depth = maximum(depth, (u32)mesh.tree_depth);
-		models.max_node_count = maximum(models.max_node_count, (u32)mesh.node_count);
-	}
-	entry.tree_depth = depth;
-	addDepth(models, depth, 1);
+	gm.mesh_count = 1;
+	GPUClusterMesh& m = meshes[0];
+	m.clusters = mc.table_offset;
+	m.group_table = mc.group_offset;
+	m.cluster_count = mc.cluster_count;
+	m.node_count = mc.node_count;
+	m.root_count = mc.root_count;
+	m.material_entry = default_first;
+	m.index_in_model = 0;
+	// the shaders derive these
+	ASSERT(clusterNodesOffset(m) == mc.node_table_offset);
+	ASSERT(clusterHeadersOffset(m) == mc.header_offset);
+	entry.tree_depth = mc.tree_depth;
+	addDepth(models, entry.tree_depth, 1);
 }
 
 u32 addClusterModel(GPUSceneRegistry& res, const Model& model) {

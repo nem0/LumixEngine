@@ -71,7 +71,24 @@
 // the list of selected clusters, from the clusters selected by nanite.hlsl or gpu_scene_cull.hlsl to gpu_scene_variants.hlsl
 #define SELECTED_COUNT 0				// u32
 #define SELECTED_HEADER 16
-#define SELECTED_STRIDE 16				// slot, mesh, cluster, instance
+#define SELECTED_STRIDE 16				// slot, mesh, cluster | (depth_bin << 27), instance
+#define SELECTED_CLUSTER_MASK 0x07ffffffu
+#define SELECTED_DEPTH_BIN_SHIFT 27
+
+// occluded cluster list entry.z flags (nanite.hlsl pass 1 -> POST_OCCLUDED)
+#define OCCLUDED_CLUSTER_MASK 0x3fffffffu
+#define OCCLUDED_VOXEL_BIT 0x40000000u
+#define OCCLUDED_ERROR_SMALL_BIT 0x80000000u
+
+// voxel brick pool / counters layout (voxel_bricks.hlsl, voxels.hlsl)
+#define VOXEL_BRICK_STRIDE 16
+#define VOXEL_BRICK_SLOT_MASK 0x03ffffffu
+#define VOXEL_BRICK_INDEX_SHIFT 26
+#define VOXEL_VIEWS_AT 64
+#define VOXEL_VIEW_STRIDE 64
+#define VOXEL_VIEW_COMMAND 16
+#define VOXEL_VIEW_STATS 40
+#define VOXEL_OCCLUDED_COUNT 16
 
 // the lists of work between the passes, 16 bytes each: flat items, tree items (mesh, slot, first cluster, instance) and chunk items (slot, first instance, count, 0)
 #define ITEM_STRIDE 16
@@ -117,10 +134,6 @@
 
 // GPUClusterMesh, 32 bytes
 #define CLUSTER_MESH_STRIDE 32
-#define CLUSTER_MESH_TABLE 0			// 4 words: byte offset of the clusters, of the table of groups, cluster count, node count
-#define CLUSTER_MESH_CLUSTER_COUNT 8
-#define CLUSTER_MESH_ROOT_COUNT 16
-#define CLUSTER_MESH_INDEX_STRIDE 20
 #define CLUSTER_MESH_SET 24				// 2 words: its entry in the default set of its model, its index in the model
 
 // GPULodModel, 40 bytes
@@ -140,23 +153,16 @@
 #define VARIANT_INDEX_SHIFT 16
 
 // the clusters and nodes of meshes, MeshClusterGPU, MeshNodeGPU, MeshGroupAddressGPU in mesh_clusters.h
-#define CLUSTER_STRIDE 80
+#define CLUSTER_STRIDE 72
 #define CLUSTER_BOUNDS 0
-#define CLUSTER_LOD_BOUNDS 16
-#define CLUSTER_PARENT_BOUNDS 32
-#define CLUSTER_MISC 48					// error, parent error, first_index (group-relative), index_count
 #define CLUSTER_FIRST_INDEX 56
 #define CLUSTER_INDEX_COUNT 60
-#define CLUSTER_ATTRIBUTE_ERRORS 64		// of the cluster and of its parent
-#define CLUSTER_GROUPS 72				// the group of the cluster, the group of its children
-#define CLUSTER_GROUP 72
+#define CLUSTER_INDEX_COUNT_MASK 0xffff
+#define CLUSTER_MATERIAL_SHIFT 16
+#define CLUSTER_GROUPS 64				// the group of the cluster, the group of its children
+#define CLUSTER_GROUP 64
 
-#define NODE_STRIDE 64
-#define NODE_BOUNDS 0
-#define NODE_LOD_BOUNDS 16
-#define NODE_MISC 32					// min error, max parent error, first child, count and leaf bit
-#define NODE_ATTRIBUTE_ERRORS 48		// the smallest and the largest of parents
-#define NODE_UNREFINED 56
+#define NODE_STRIDE 52
 #define NODE_LEAF_BIT 0x80000000
 #define NODE_COUNT_MASK 0x7fffffff
 
@@ -166,8 +172,144 @@
 #define GROUP_PAGE_SHIFT 8				// the page of a group is in the bits above the flags
 #define ROOT_STRIDE 4
 
+// the records at INSTANCE_*, CHUNK_*, LOD_MODEL_* and CLUSTER_MESH_* offsets as structs, for Load<>. GPUSceneInstance is read in two halves: the previous
+// transform is only valid (and loaded) if the instance moved in this frame, see moved_frame.
+struct SceneInstance {		// GPUSceneInstance, the first 48 bytes (INSTANCE_ROT)
+	float4 rot;
+	int3 p;
+	uint model;
+	float3 scale;
+	uint flags;
+};
+
+struct SceneInstancePrevious {	// GPUSceneInstance, the last 48 bytes (INSTANCE_PREV_ROT)
+	float4 rot;
+	int3 p;
+	uint material_set;
+	float3 scale;
+	uint moved_frame;
+};
+
+struct SceneChunk {			// GPUSceneChunk
+	int3 p;
+	uint model;
+	uint instance_buffer;
+	uint first_instance;
+	uint instance_count;
+	float instance_radius;
+};
+
+struct SceneChunkInstance {	// an instance of a chunk, CHUNK_INSTANCE_STRIDE bytes
+	float4 rot_lod;			// rotation xyz and lod
+	float4 pos_scale;		// position relative to the chunk and uniform scale
+};
+
+struct LodModel {			// GPULodModel
+	uint first_set;
+	uint far_range;
+	uint4 lods;
+	float4 distances;
+};
+
+struct ClusterMesh {		// GPUClusterMesh
+	uint clusters;
+	uint group_table;
+	uint cluster_count;
+	uint node_count;
+	uint root_count;
+	uint padding;
+	uint material_entry;
+	uint index_in_model;
+};
+
+// the records at CLUSTER_* and NODE_* offsets as structs, for Load<>: MeshClusterGPU and MeshNodeGPU (members are read one after another without padding, as in C++)
+struct MeshCluster {
+	float4 bounds;				// center, radius
+	float4 lod_bounds;
+	float4 parent_bounds;
+	float error;
+	float parent_error;
+	uint first_index;
+	uint index_count;			// 0 for a voxel cluster
+	uint group;
+	uint refined_group;			// NO_GROUP for the finest clusters
+};
+
+struct MeshNode {
+	float4 bounds;
+	float4 lod_bounds;
+	float min_error;
+	float max_parent_error;
+	uint first;
+	uint count_and_flags;		// NODE_LEAF_BIT, NODE_COUNT_MASK
+	uint unrefined;
+};
+
+struct VoxelClusterHeader {		// MeshVoxelClusterHeaderGPU, 48 bytes (same slot size as MeshClusterVertexGPU)
+	int3 base_voxel;
+	uint padding0;
+	uint padding1;
+	uint brick_count;
+	uint payload_bit_offset;
+	float voxel_size;
+	float3 grid_origin;
+	float padding2;
+};
+
 #define CLUSTER_HEADER_STRIDE 48		// the header of a cluster in u_vertex_buffer, see pullVertex
 #define CLUSTER_ALIGNMENT_MASK 15
+
+uint clusterHeadersOffset(ClusterMesh cm) {
+	return cm.clusters + ((cm.cluster_count * CLUSTER_STRIDE + cm.node_count * NODE_STRIDE + cm.root_count * ROOT_STRIDE + CLUSTER_ALIGNMENT_MASK) & ~(uint)CLUSTER_ALIGNMENT_MASK);
+}
+
+// The groups of an indirect dispatch of `count` thread groups (split into rows of MAX_GROUPS_X).
+uint3 dispatchGroups(uint count) {
+	return uint3(min(count, MAX_GROUPS_X), (count + MAX_GROUPS_X - 1) / MAX_GROUPS_X, 1);
+}
+
+bool insideFrustum(float4 planes[6], float3 center, float radius) {
+	for (int i = 0; i < 6; ++i) {
+		if (dot(planes[i], float4(center, 1)) < -radius) return false;
+	}
+	return true;
+}
+
+// Loads the current transform of a model instance (instance_ref == 0) or chunk instance (instance_ref > 0) relative to (cam_p, cam_frac).
+void loadSceneTransform(uint instances_buf, uint chunks_buf, int3 cam_p, float3 cam_frac, uint slot, uint instance_ref, out float4 rot, out float3 position, out float3 scale) {
+	if (instance_ref == 0) {
+		ByteAddressBuffer instances = bindless_buffers[instances_buf];
+		const SceneInstance cur = instances.Load<SceneInstance>(slot * INSTANCE_STRIDE);
+		rot = cur.rot;
+		position = float3(cur.p - cam_p) * SCENE_POS_UNIT - cam_frac;
+		scale = cur.scale;
+	}
+	else {
+		ByteAddressBuffer chunks = bindless_buffers[chunks_buf];
+		const uint at = slot * CHUNK_STRIDE;
+		ByteAddressBuffer data = bindless_buffers[NonUniformResourceIndex(chunks.Load(at + CHUNK_INSTANCE_BUFFER))];
+		const SceneChunkInstance ci = data.Load<SceneChunkInstance>((instance_ref - 1) * CHUNK_INSTANCE_STRIDE);
+		const float4 rot_lod = ci.rot_lod;
+		const float4 pos_scale = ci.pos_scale;
+		rot = float4(rot_lod.xyz, sqrt(saturate(1 - dot(rot_lod.xyz, rot_lod.xyz))));
+		position = float3(asint(chunks.Load3(at + CHUNK_P)) - cam_p) * SCENE_POS_UNIT - cam_frac + pos_scale.xyz;
+		scale = pos_scale.www;
+	}
+}
+
+// Unpacks a tangent frame packed by packClusterFrame (smallest-three quaternion rotating (1,0,0) -> tangent, (0,0,1) -> normal).
+void unpackClusterFrame(uint packed, out float3 normal, out float3 tangent) {
+	const uint largest = packed >> 30;
+	const float3 abc = float3((int)(packed << 22) >> 22, (int)(packed << 12) >> 22, (int)(packed << 2) >> 22) * (0.70710678 / 511.0);
+	const float d = sqrt(max(0, 1 - dot(abc, abc)));
+	float4 q;
+	if (largest == 0) q = float4(d, abc);
+	else if (largest == 1) q = float4(abc.x, d, abc.y, abc.z);
+	else if (largest == 2) q = float4(abc.x, abc.y, d, abc.z);
+	else q = float4(abc, d);
+	normal = float3(2 * (q.x * q.z + q.w * q.y), 2 * (q.y * q.z - q.w * q.x), 1 - 2 * (q.x * q.x + q.y * q.y));
+	tangent = float3(1 - 2 * (q.y * q.y + q.z * q.z), 2 * (q.x * q.y + q.w * q.z), 2 * (q.x * q.z - q.w * q.y));
+}
 
 // Counters shared by the threads of a wave. Only the threads that call it take part (the active lanes), so it can be called after divergent returns.
 // Single-address appends (one counter for all threads) are not done this way: NVIDIA merges them by itself, wave code for them was measured slower or the same.

@@ -1722,7 +1722,10 @@ bool ModelImporter::writeClusters(const Path& src, const ModelMeta& meta) {
 				compiler.registerDependency(src, path);
 				const Path compiled_path(".lumix/resources/", path.getHash(), ".res");
 				const u64 compiled_time = fs.fileExists(compiled_path) ? fs.getLastModified(compiled_path) : 0;
-				const bool up_to_date = compiled_time != 0 && compiled_time >= fs.getLastModified(path) && compiled_time >= fs.getLastModified(Path(path, ".meta"));
+				bool up_to_date = compiled_time != 0 && compiled_time >= fs.getLastModified(path) && compiled_time >= fs.getLastModified(Path(path, ".meta"));
+				if (!up_to_date && fs.fileExists(path)) {
+					up_to_date = compiler.compile(path);
+				}
 				OutputMemoryStream compiled(m_allocator);
 				if (up_to_date && fs.getContentSync(compiled_path, compiled)) {
 					texture = LUMIX_NEW(m_allocator, VoxelColorTexture);
@@ -1750,62 +1753,97 @@ bool ModelImporter::writeClusters(const Path& src, const ModelMeta& meta) {
 	}
 	profiler::endBlock();
 
-	// build before writing anything, so that a failure leaves no half written data
-	Array<MeshClusters*> results(m_allocator);
-	Array<MeshPages*> page_results(m_allocator);	// the pages of each mesh, see buildMeshPages
-	Array<PagePayloads*> payloads(m_allocator);	// the payloads of the pages of each mesh, they are written after the tables
-	results.resize(meshes.size());
-	page_results.resize(meshes.size());
-	for (MeshClusters*& c : results) c = nullptr;
-	for (MeshPages*& p : page_results) p = nullptr;
-	AtomicI32 failed = 0;
-	profiler::beginBlock("build clusters of meshes");
-	jobs::forEach((u32)meshes.size(), 1, [&](u32 from, u32 to) {
-		for (u32 i = from; i < to; ++i) {
-			if (failed != 0) return;
-			const ImportGeometry& geom = m_geometries[meshes[i]->geometry_idx];
-			const Array<u32>& indices = hasAutoLOD(meta, 0) ? *geom.autolod_indices[0].get() : geom.indices;
-			MeshClusters* clusters = LUMIX_NEW(m_allocator, MeshClusters)(m_allocator);
-			results[i] = clusters;
-			ClusterVoxelSource voxel_source;
-			voxel_source.error = meta.cluster_voxel_error;
-			voxel_source.min_coverage = meta.cluster_voxel_min_coverage;
-			voxel_source.downsample_scale = meta.cluster_voxel_downsample_scale;
-			voxel_source.stall_threshold = meta.cluster_voxel_stall_threshold;
-			voxel_source.max_resolution = meta.cluster_voxel_max_resolution;
-			voxel_source.colors = !colors[i].empty() ? colors[i].begin() : voxel_colors[i].empty() ? nullptr : voxel_colors[i].begin();
-			voxel_source.ao = aos[i].empty() ? nullptr : aos[i].begin();
-			if (!buildMeshClusters(Span<const Vec3>(positions[i].begin(), positions[i].size()), Span<const Vec3>(normals[i].begin(), normals[i].size()), Span<const Vec2>(uvs[i].begin(), uvs[i].size()), Span<const u32>(indices.begin(), indices.size()), meta.cluster_dilate_borders, *clusters, m_allocator, meta.cluster_voxels ? &voxel_source : nullptr)) {
-				failed = 1;
-				return;
-			}
+	// Combine all meshes of the first LOD into a single cluster DAG / node tree, tagging each triangle cluster with its sub-mesh (material) index.
+	const u32 mesh_count = (u32)meshes.size();
+	Array<Vec3> all_positions(m_allocator);
+	Array<Vec3> all_normals(m_allocator);
+	Array<Vec3> all_tangents(m_allocator);
+	Array<Vec2> all_uvs(m_allocator);
+	Array<u32> all_aos(m_allocator);
+	Array<u32> all_colors(m_allocator);
+	Array<u32> all_voxel_colors(m_allocator);
+	Array<Array<u32>> submesh_indices(m_allocator);
+	Array<ClusterSubmesh> submeshes(m_allocator);
 
-			ClusterVertexSource source;
-			source.vertex_count = positions[i].size();
-			source.positions = positions[i].begin();
-			source.normals = normals[i].begin();
-			source.tangents = tangents[i].empty() ? nullptr : tangents[i].begin();
-			source.uvs = uvs[i].empty() ? nullptr : uvs[i].begin();
-			source.ao = aos[i].empty() ? nullptr : aos[i].begin();
-			source.colors = colors[i].empty() ? nullptr : colors[i].begin();
-			if (!packClusterVertices(source, *clusters, m_allocator)) {
-				failed = 1;
-				return;
-			}
+	u32 total_vertices = 0;
+	bool any_tangents = false, any_uvs = false, any_aos = false, any_colors = false, any_voxel_colors = false;
+	for (u32 i = 0; i < mesh_count; ++i) {
+		total_vertices += positions[i].size();
+		any_tangents = any_tangents || !tangents[i].empty();
+		any_uvs = any_uvs || !uvs[i].empty();
+		any_aos = any_aos || !aos[i].empty();
+		any_colors = any_colors || !colors[i].empty();
+		any_voxel_colors = any_voxel_colors || !colors[i].empty() || !voxel_colors[i].empty();
+	}
+	all_positions.reserve(total_vertices);
+	all_normals.reserve(total_vertices);
+	if (any_tangents) all_tangents.reserve(total_vertices);
+	if (any_uvs) all_uvs.reserve(total_vertices);
+	if (any_aos) all_aos.reserve(total_vertices);
+	if (any_colors) all_colors.reserve(total_vertices);
+	if (meta.cluster_voxels && any_voxel_colors) all_voxel_colors.reserve(total_vertices);
+	submesh_indices.reserve(mesh_count);
+	submeshes.reserve(mesh_count);
 
-			// the pages are streaming units of the payload of the groups (tightly packed u8 indices, no degenerate padding)
-			MeshPages* page_data = LUMIX_NEW(m_allocator, MeshPages)(m_allocator);
-			page_results[i] = page_data;
-			if (!buildMeshPages(clusters->clusters.begin(), (u32)clusters->clusters.size(), clusters->groups.begin(), (u32)clusters->groups.size(), *page_data, m_allocator)) {
-				logError("Failed to make pages of clusters of a model");
-				failed = 1;
-				return;
+	for (u32 i = 0; i < mesh_count; ++i) {
+		const u32 v_offset = all_positions.size();
+		const u32 vc = positions[i].size();
+		for (u32 v = 0; v < vc; ++v) {
+			all_positions.push(positions[i][v]);
+			all_normals.push(normals[i][v]);
+			if (any_tangents) all_tangents.push(tangents[i].empty() ? Vec3(0, 0, 0) : tangents[i][v]);
+			if (any_uvs) all_uvs.push(uvs[i].empty() ? Vec2(0, 0) : uvs[i][v]);
+			if (any_aos) all_aos.push(aos[i].empty() ? 0xffFFffFFu : aos[i][v]);
+			if (any_colors) all_colors.push(colors[i].empty() ? 0xffFFffFFu : colors[i][v]);
+			if (meta.cluster_voxels && any_voxel_colors) {
+				const u32 vc_color = !colors[i].empty() ? colors[i][v] : !voxel_colors[i].empty() ? voxel_colors[i][v] : 0xffFFffFFu;
+				all_voxel_colors.push(vc_color);
 			}
 		}
-	});
+		const ImportGeometry& geom = m_geometries[meshes[i]->geometry_idx];
+		const Array<u32>& src_indices = hasAutoLOD(meta, 0) ? *geom.autolod_indices[0].get() : geom.indices;
+		Array<u32>& dst_indices = submesh_indices.emplace(m_allocator);
+		dst_indices.resize(src_indices.size());
+		for (u32 k = 0; k < (u32)src_indices.size(); ++k) dst_indices[k] = src_indices[k] + v_offset;
+		submeshes.push(ClusterSubmesh{ Span<const u32>(dst_indices.begin(), dst_indices.size()), i });
+	}
+
+	// build before writing anything, so that a failure leaves no half written data
+	MeshClusters* clusters = LUMIX_NEW(m_allocator, MeshClusters)(m_allocator);
+	MeshPages* page_data = LUMIX_NEW(m_allocator, MeshPages)(m_allocator);
+	PagePayloads* page_payloads = nullptr;
+	bool ok = false;
+	profiler::beginBlock("build clusters of meshes");
+	{
+		ClusterVoxelSource voxel_source;
+		voxel_source.error = meta.cluster_voxel_error;
+		voxel_source.min_coverage = meta.cluster_voxel_min_coverage;
+		voxel_source.downsample_scale = meta.cluster_voxel_downsample_scale;
+		voxel_source.stall_threshold = meta.cluster_voxel_stall_threshold;
+		voxel_source.max_resolution = meta.cluster_voxel_max_resolution;
+		voxel_source.colors = all_voxel_colors.empty() ? nullptr : all_voxel_colors.begin();
+		voxel_source.ao = all_aos.empty() ? nullptr : all_aos.begin();
+		ok = buildMeshClusters(Span<const Vec3>(all_positions.begin(), all_positions.size()), Span<const Vec3>(all_normals.begin(), all_normals.size()), Span<const Vec2>(all_uvs.begin(), all_uvs.size()), Span<const ClusterSubmesh>(submeshes.begin(), submeshes.size()), meta.cluster_dilate_borders, *clusters, m_allocator, meta.cluster_voxels ? &voxel_source : nullptr);
+		if (ok) {
+			ClusterVertexSource source;
+			source.vertex_count = all_positions.size();
+			source.positions = all_positions.begin();
+			source.normals = all_normals.begin();
+			source.tangents = all_tangents.empty() ? nullptr : all_tangents.begin();
+			source.uvs = all_uvs.empty() ? nullptr : all_uvs.begin();
+			source.ao = all_aos.empty() ? nullptr : all_aos.begin();
+			source.colors = all_colors.empty() ? nullptr : all_colors.begin();
+			ok = packClusterVertices(source, *clusters, m_allocator);
+		}
+		if (ok) {
+			// the pages are streaming units of the payload of the groups (tightly packed u8 indices, no degenerate padding)
+			ok = buildMeshPages(clusters->clusters.begin(), (u32)clusters->clusters.size(), clusters->groups.begin(), (u32)clusters->groups.size(), *page_data, m_allocator);
+			if (!ok) logError("Failed to make pages of clusters of a model");
+		}
+	}
 	profiler::endBlock();
 
-	if (failed == 0) {
+	if (ok) {
 		// The vertices of the first LOD are only in the clusters (packed), so their vertex buffers are empty: the vertex blocks of these meshes are
 		// replaced by blocks of size 0, they are the first ones, see writeGeometry
 		profiler::beginBlock("strip vertex blocks");
@@ -1814,204 +1852,223 @@ bool ModelImporter::writeClusters(const Path& src, const ModelMeta& meta) {
 		OutputMemoryStream stripped(m_allocator);
 		stripped.reserve(m_out_file.size());
 		stripped.write(m_out_file.data(), m_vertex_data_offset);
-		for (u32 i = 0; i < (u32)meshes.size(); ++i) stripped.write((i32)0);
+		for (u32 i = 0; i < mesh_count; ++i) stripped.write((i32)0);
 		stripped.write(m_out_file.data() + blocks_end, m_out_file.size() - blocks_end);
 		m_out_file = static_cast<OutputMemoryStream&&>(stripped);
 		profiler::endBlock();
 
-		write((u32)meshes.size());
-		u32 total_clusters = 0;
-		u64 packed_bytes = 0, unpacked_bytes = 0;
-		for (u32 i = 0; i < (u32)results.size(); ++i) {
-			MeshClusters* clusters = results[i];
-			ASSERT(clusters->local_indices.size() == clusters->indices.size());
-			const u32 cluster_count = (u32)clusters->clusters.size();
+		write(mesh_count);
+		ASSERT(clusters->local_indices.size() == clusters->indices.size());
+		const u32 cluster_count = (u32)clusters->clusters.size();
 
-			// The layout of the vertices for vertex pulling (see vertex_pulling.hlsli, CLUSTER_MESH). The frame (normal and tangent) is one u32,
-			// and so is the UV (two u16), they are unpacked by the shader.
-			AttributeSemantic semantics[VertexDecl::MAX_ATTRIBUTES];
-			for (AttributeSemantic& sem : semantics) sem = AttributeSemantic::NONE;
-			VertexDecl decl;
-			u32 count = 0, offset = 0;
-			semantics[count++] = AttributeSemantic::NORMAL;
+		// The layout of the vertices for vertex pulling (see vertex_pulling.hlsli, CLUSTER_MESH). The frame (normal and tangent) is one u32,
+		// and so is the UV (two u16), they are unpacked by the shader.
+		AttributeSemantic semantics[VertexDecl::MAX_ATTRIBUTES];
+		for (AttributeSemantic& sem : semantics) sem = AttributeSemantic::NONE;
+		VertexDecl decl;
+		u32 count = 0, offset = 0;
+		semantics[count++] = AttributeSemantic::NORMAL;
+		decl.addAttribute(0, 1, AttributeType::U32, 0);
+		if (clusters->attribute_flags & (u32)ClusterAttribute::TANGENT) {
+			semantics[count++] = AttributeSemantic::TANGENT;
 			decl.addAttribute(0, 1, AttributeType::U32, 0);
-			if (clusters->attribute_flags & (u32)ClusterAttribute::TANGENT) {
-				semantics[count++] = AttributeSemantic::TANGENT;
-				decl.addAttribute(0, 1, AttributeType::U32, 0);
-			}
-			offset += 4;
-			if (clusters->attribute_flags & (u32)ClusterAttribute::UV) {
-				semantics[count++] = AttributeSemantic::TEXCOORD0;
-				decl.addAttribute((u8)offset, 1, AttributeType::U32, 0);
-				offset += 4;
-			}
-			if (clusters->attribute_flags & (u32)ClusterAttribute::AO) {
-				semantics[count++] = AttributeSemantic::AO;
-				decl.addAttribute((u8)offset, 4, AttributeType::U8, VertexAttribute::NORMALIZED);
-				offset += 4;
-			}
-			if (clusters->attribute_flags & (u32)ClusterAttribute::COLOR) {
-				semantics[count++] = AttributeSemantic::COLOR0;
-				decl.addAttribute((u8)offset, 4, AttributeType::U8, VertexAttribute::NORMALIZED);
-				offset += 4;
-			}
-			ASSERT(offset == clusters->attribute_stride);
-
-			// the finest clusters on the CPU side (physics, picking, bounds), positions are the ones of the lattice, the same as on the GPU.
-			// Decoded before rewriting cluster.first_index to group-relative offsets below.
-			profiler::beginBlock("decode cpu geometry");
-			Array<Vec3> cpu_vertices(m_allocator);
-			Array<u32> cpu_indices(m_allocator);
-			cpu_vertices.resize(clusters->leaf_vertex_count);
-			cpu_indices.resize(clusters->leaf_index_count);
-			u32 first_vertex = 0;
-			for (u32 c = 0; c < clusters->leaf_cluster_count; ++c) {
-				const MeshClusterGPU& cluster = clusters->clusters[c];
-				const MeshClusterVertexGPU& header = clusters->vertex_headers[c];
-				for (u32 v = 0; v < header.vertex_count; ++v) {
-					cpu_vertices[first_vertex + v] = decodeClusterPosition(header, clusters->vertex_words.begin(), clusters->groups[cluster.group].stream_offset * 8, v);
-				}
-				for (u32 k = 0; k < cluster.index_count; ++k) {
-					cpu_indices[cluster.first_index + k] = first_vertex + clusters->local_indices[cluster.first_index + k];
-				}
-				first_vertex += header.vertex_count;
-			}
-			profiler::endBlock();
-
-			// Tightly pack cluster u8 indices per group with no degenerate triangle padding; cluster.first_index becomes the group-relative index offset.
-			u32 index_stride = 3;
-			for (const MeshClusterGPU& cluster : clusters->clusters) index_stride = maximum(index_stride, cluster.index_count);
-			static_assert(MeshClusters::MAX_CLUSTER_VERTICES <= 256);
-			profiler::beginBlock("pack cluster indices");
-			Array<u8> packed_indices(m_allocator);
-			packed_indices.reserve(clusters->local_indices.size());
-			Array<u32> group_packed_offset(m_allocator);
-			Array<u32> group_packed_count(m_allocator);
-			group_packed_offset.resize(clusters->groups.size());
-			group_packed_count.resize(clusters->groups.size());
-			for (u32 g = 0; g < (u32)clusters->groups.size(); ++g) {
-				const MeshGroupGPU& grp = clusters->groups[g];
-				group_packed_offset[g] = (u32)packed_indices.size();
-				u32 rel = 0;
-				for (u32 c = grp.first_cluster; c < grp.first_cluster + grp.cluster_count; ++c) {
-					MeshClusterGPU& cluster = clusters->clusters[c];
-					const u32 orig_first = cluster.first_index;
-					cluster.first_index = rel;
-					for (u32 k = 0; k < cluster.index_count; ++k) {
-						ASSERT(clusters->local_indices[orig_first + k] < 256);
-						packed_indices.push((u8)clusters->local_indices[orig_first + k]);
-					}
-					rel += cluster.index_count;
-				}
-				group_packed_count[g] = rel;
-			}
-			profiler::endBlock();
-
-			// the trees are balanced (see buildNodes), the first child leads to a leaf as deep as any
-			u32 tree_depth = 0;
-			for (u32 root : clusters->roots) {
-				u32 depth = 1;
-				for (u32 node_index = root; !(clusters->nodes[node_index].count_and_flags & MeshClusters::LEAF_FLAG); ++depth) node_index = clusters->nodes[node_index].first;
-				tree_depth = maximum(tree_depth, depth);
-			}
-
-			const u32 vertex_data_size = u32(u64(cluster_count) * sizeof(MeshClusterVertexGPU) + clusters->vertex_words.byte_size());
-			write(cluster_count);
-			write(clusters->leaf_cluster_count);
-			write((u32)clusters->nodes.size());
-			write((u32)clusters->roots.size());
-			write(tree_depth);
-			write(index_stride);
-			write(clusters->leaf_vertex_count);
-			write(clusters->leaf_index_count);
-			write((u32)clusters->vertex_words.byte_size());	// the size of the stream of vertices, it is in the payloads of pages
-			write(clusters->attribute_stride);
-			write(decl);
-			write(semantics, sizeof(semantics));
-			write(clusters->clusters.begin(), clusters->clusters.byte_size());
-			write(clusters->nodes.begin(), clusters->nodes.byte_size());
-			write(clusters->roots.begin(), clusters->roots.byte_size());
-			// the headers of the vertices are in the tables, the interleaved positions and attributes and the indices are in the payloads of pages
-			write(clusters->vertex_headers.begin(), clusters->vertex_headers.byte_size());
-			write(cpu_vertices.begin(), cpu_vertices.byte_size());
-			write(cpu_indices.begin(), cpu_indices.byte_size());
-			// the groups of clusters (streaming units), see MeshGroupGPU
-			write((u32)clusters->groups.size());
-			write(clusters->groups.begin(), clusters->groups.byte_size());
-			// the pages (streaming units made of groups), see MeshPages
-			const MeshPages& page_data = *page_results[i];
-			write((u32)page_data.pages.size());
-			write(page_data.root_bytes);
-			write((u32)page_data.parents.size());
-			const u64 pages_at = m_out_file.size();
-			write(page_data.pages.begin(), page_data.pages.byte_size());
-			write(page_data.parents.begin(), page_data.parents.byte_size());
-			write(page_data.children.begin(), page_data.children.byte_size());
-
-			// The payload of a page: the vertex streams of its groups, then the indices of their clusters, padded to 16 bytes. The same as ClusterStream::pageBytes and
-			// ClusterStream::loadPage expect, it is copied to the buffer of cluster data as it is.
-			profiler::beginBlock("build page payloads");
-			PagePayloads* page_payloads = LUMIX_NEW(m_allocator, PagePayloads)(m_allocator);
-			payloads.push(page_payloads);
-			page_payloads->data.reserve(u32(clusters->vertex_words.byte_size() + packed_indices.byte_size() + page_data.pages.size() * 15));
-			page_payloads->at.reserve(page_data.pages.size());
-			page_payloads->size.reserve(page_data.pages.size());
-			page_payloads->field.reserve(page_data.pages.size());
-			for (u32 p = 0; p < (u32)page_data.pages.size(); ++p) {
-				const MeshPageFile& page = page_data.pages[p];
-				const u32 last_g = page.first_group + page.group_count - 1;
-				const MeshGroupGPU& first = clusters->groups[page.first_group];
-				const MeshGroupGPU& last = clusters->groups[last_g];
-				const u32 stream_bytes = last.stream_offset + last.stream_size - first.stream_offset;
-				const u32 first_idx = group_packed_offset[page.first_group];
-				const u32 index_bytes = group_packed_offset[last_g] + group_packed_count[last_g] - first_idx;
-				const u32 size = (stream_bytes + index_bytes + 15) & ~15u;
-				ASSERT(u64(first.stream_offset) + stream_bytes <= clusters->vertex_words.byte_size());
-				ASSERT(u64(first_idx) + index_bytes <= packed_indices.byte_size());
-				const u32 at = (u32)page_payloads->data.size();
-				page_payloads->data.resize(at + size);
-				u8* payload = page_payloads->data.begin() + at;
-				memset(payload, 0, size);
-				memcpy(payload, (const u8*)clusters->vertex_words.begin() + first.stream_offset, stream_bytes);
-				memcpy(payload + stream_bytes, packed_indices.begin() + first_idx, index_bytes);
-				page_payloads->at.push(at);
-				page_payloads->size.push(size);
-				page_payloads->field.push(pages_at + u64(p) * sizeof(MeshPageFile) + offsetof(MeshPageFile, file_offset));
-			}
-			profiler::endBlock();
-			total_clusters += cluster_count;
-			packed_bytes += packed_indices.byte_size() + vertex_data_size;
-			unpacked_bytes += u64(m_geometries[meshes[i]->geometry_idx].vertex_buffer.size()) + clusters->indices.byte_size();
 		}
+		offset += 4;
+		if (clusters->attribute_flags & (u32)ClusterAttribute::UV) {
+			semantics[count++] = AttributeSemantic::TEXCOORD0;
+			decl.addAttribute((u8)offset, 1, AttributeType::U32, 0);
+			offset += 4;
+		}
+		if (clusters->attribute_flags & (u32)ClusterAttribute::AO) {
+			semantics[count++] = AttributeSemantic::AO;
+			decl.addAttribute((u8)offset, 4, AttributeType::U8, VertexAttribute::NORMALIZED);
+			offset += 4;
+		}
+		if (clusters->attribute_flags & (u32)ClusterAttribute::COLOR) {
+			semantics[count++] = AttributeSemantic::COLOR0;
+			decl.addAttribute((u8)offset, 4, AttributeType::U8, VertexAttribute::NORMALIZED);
+			offset += 4;
+		}
+		ASSERT(offset == clusters->attribute_stride);
+
+		// the finest clusters on the CPU side (physics, picking, bounds) split per sub-mesh, positions are the ones of the lattice, the same as on the GPU.
+		// Decoded before rewriting cluster.first_index to group-relative offsets below.
+		profiler::beginBlock("decode cpu geometry");
+		Array<Array<Vec3>> cpu_vertices(m_allocator);
+		Array<Array<u32>> cpu_indices(m_allocator);
+		Array<u32> cpu_v_cursor(m_allocator);
+		Array<u32> cpu_i_cursor(m_allocator);
+		cpu_vertices.reserve(mesh_count);
+		cpu_indices.reserve(mesh_count);
+		cpu_v_cursor.resize(mesh_count);
+		cpu_i_cursor.resize(mesh_count);
+		for (u32 i = 0; i < mesh_count; ++i) {
+			cpu_vertices.emplace(m_allocator);
+			cpu_indices.emplace(m_allocator);
+			cpu_v_cursor[i] = 0;
+			cpu_i_cursor[i] = 0;
+		}
+		for (u32 c = 0; c < clusters->leaf_cluster_count; ++c) {
+			const MeshClusterGPU& cluster = clusters->clusters[c];
+			const u32 idx_count = clusterIndexCount(cluster);
+			if (idx_count == 0) continue;
+			const u32 mat = clusterMaterial(cluster);
+			ASSERT(mat < mesh_count);
+			cpu_v_cursor[mat] += clusters->vertex_headers[c].vertex_count;
+			cpu_i_cursor[mat] += idx_count;
+		}
+		for (u32 i = 0; i < mesh_count; ++i) {
+			cpu_vertices[i].resize(cpu_v_cursor[i]);
+			cpu_indices[i].resize(cpu_i_cursor[i]);
+			cpu_v_cursor[i] = 0;
+			cpu_i_cursor[i] = 0;
+		}
+		for (u32 c = 0; c < clusters->leaf_cluster_count; ++c) {
+			const MeshClusterGPU& cluster = clusters->clusters[c];
+			const u32 idx_count = clusterIndexCount(cluster);
+			if (idx_count == 0) continue;
+			const u32 mat = clusterMaterial(cluster);
+			const MeshClusterVertexGPU& header = clusters->vertex_headers[c];
+			Vec3* dst_v = cpu_vertices[mat].begin();
+			u32* dst_i = cpu_indices[mat].begin();
+			const u32 first_vertex = cpu_v_cursor[mat];
+			const u32 first_idx = cpu_i_cursor[mat];
+			for (u32 v = 0; v < header.vertex_count; ++v) {
+				dst_v[first_vertex + v] = decodeClusterPosition(header, clusters->vertex_words.begin(), clusters->groups[cluster.group].stream_offset * 8, v);
+			}
+			for (u32 k = 0; k < idx_count; ++k) {
+				dst_i[first_idx + k] = first_vertex + clusters->local_indices[cluster.first_index + k];
+			}
+			cpu_v_cursor[mat] += header.vertex_count;
+			cpu_i_cursor[mat] += idx_count;
+		}
+		profiler::endBlock();
+
+		// Tightly pack cluster u8 indices per group with no degenerate triangle padding; cluster.first_index becomes the group-relative index offset.
+		static_assert(MeshClusters::MAX_CLUSTER_VERTICES <= 256);
+		profiler::beginBlock("pack cluster indices");
+		Array<u8> packed_indices(m_allocator);
+		packed_indices.reserve(clusters->local_indices.size());
+		Array<u32> group_packed_offset(m_allocator);
+		Array<u32> group_packed_count(m_allocator);
+		group_packed_offset.resize(clusters->groups.size());
+		group_packed_count.resize(clusters->groups.size());
+		for (u32 g = 0; g < (u32)clusters->groups.size(); ++g) {
+			const MeshGroupGPU& grp = clusters->groups[g];
+			group_packed_offset[g] = (u32)packed_indices.size();
+			u32 rel = 0;
+			for (u32 c = grp.first_cluster; c < grp.first_cluster + grp.cluster_count; ++c) {
+				MeshClusterGPU& cluster = clusters->clusters[c];
+				const u32 idx_count = clusterIndexCount(cluster);
+				const u32 orig_first = cluster.first_index;
+				cluster.first_index = rel;
+				for (u32 k = 0; k < idx_count; ++k) {
+					ASSERT(clusters->local_indices[orig_first + k] < 256);
+					packed_indices.push((u8)clusters->local_indices[orig_first + k]);
+				}
+				rel += idx_count;
+			}
+			group_packed_count[g] = rel;
+		}
+		profiler::endBlock();
+
+		// the trees are balanced (see buildNodes), the first child leads to a leaf as deep as any
+		u32 tree_depth = 0;
+		for (u32 root : clusters->roots) {
+			u32 depth = 1;
+			for (u32 node_index = root; !(clusters->nodes[node_index].count_and_flags & MeshClusters::LEAF_FLAG); ++depth) node_index = clusters->nodes[node_index].first;
+			tree_depth = maximum(tree_depth, depth);
+		}
+
+		const u32 vertex_data_size = u32(u64(cluster_count) * sizeof(MeshClusterVertexGPU) + clusters->vertex_words.byte_size());
+		write(cluster_count);
+		write(clusters->leaf_cluster_count);
+		write((u32)clusters->nodes.size());
+		write((u32)clusters->roots.size());
+		write(tree_depth);
+		write((u32)clusters->vertex_words.byte_size());	// the size of the stream of vertices, it is in the payloads of pages
+		write(clusters->attribute_stride);
+		write(decl);
+		write(semantics, sizeof(semantics));
+		write(clusters->clusters.begin(), clusters->clusters.byte_size());
+		write(clusters->nodes.begin(), clusters->nodes.byte_size());
+		write(clusters->roots.begin(), clusters->roots.byte_size());
+		// the headers of the vertices are in the tables, the interleaved positions and attributes and the indices are in the payloads of pages
+		write(clusters->vertex_headers.begin(), clusters->vertex_headers.byte_size());
+		for (u32 i = 0; i < mesh_count; ++i) {
+			write((u32)cpu_vertices[i].size());
+			write((u32)cpu_indices[i].size());
+			write(cpu_vertices[i].begin(), cpu_vertices[i].byte_size());
+			write(cpu_indices[i].begin(), cpu_indices[i].byte_size());
+		}
+		// the groups of clusters (streaming units), see MeshGroupGPU
+		write((u32)clusters->groups.size());
+		write(clusters->groups.begin(), clusters->groups.byte_size());
+		// the pages (streaming units made of groups), see MeshPages
+		write((u32)page_data->pages.size());
+		write(page_data->root_bytes);
+		write((u32)page_data->parents.size());
+		const u64 pages_at = m_out_file.size();
+		write(page_data->pages.begin(), page_data->pages.byte_size());
+		write(page_data->parents.begin(), page_data->parents.byte_size());
+		write(page_data->children.begin(), page_data->children.byte_size());
+
+		// The payload of a page: the vertex streams of its groups, then the indices of their clusters, padded to 16 bytes. The same as ClusterStream::pageBytes and
+		// ClusterStream::loadPage expect, it is copied to the buffer of cluster data as it is.
+		profiler::beginBlock("build page payloads");
+		page_payloads = LUMIX_NEW(m_allocator, PagePayloads)(m_allocator);
+		page_payloads->data.reserve(u32(clusters->vertex_words.byte_size() + packed_indices.byte_size() + page_data->pages.size() * 15));
+		page_payloads->at.reserve(page_data->pages.size());
+		page_payloads->size.reserve(page_data->pages.size());
+		page_payloads->field.reserve(page_data->pages.size());
+		for (u32 p = 0; p < (u32)page_data->pages.size(); ++p) {
+			const MeshPageFile& page = page_data->pages[p];
+			const u32 last_g = page.first_group + page.group_count - 1;
+			const MeshGroupGPU& first = clusters->groups[page.first_group];
+			const MeshGroupGPU& last = clusters->groups[last_g];
+			const u32 stream_bytes = last.stream_offset + last.stream_size - first.stream_offset;
+			const u32 first_idx = group_packed_offset[page.first_group];
+			const u32 index_bytes = group_packed_offset[last_g] + group_packed_count[last_g] - first_idx;
+			const u32 size = (stream_bytes + index_bytes + 15) & ~15u;
+			ASSERT(u64(first.stream_offset) + stream_bytes <= clusters->vertex_words.byte_size());
+			ASSERT(u64(first_idx) + index_bytes <= packed_indices.byte_size());
+			const u32 at = (u32)page_payloads->data.size();
+			page_payloads->data.resize(at + size);
+			u8* payload = page_payloads->data.begin() + at;
+			memset(payload, 0, size);
+			memcpy(payload, (const u8*)clusters->vertex_words.begin() + first.stream_offset, stream_bytes);
+			memcpy(payload + stream_bytes, packed_indices.begin() + first_idx, index_bytes);
+			page_payloads->at.push(at);
+			page_payloads->size.push(size);
+			page_payloads->field.push(pages_at + u64(p) * sizeof(MeshPageFile) + offsetof(MeshPageFile, file_offset));
+		}
+		profiler::endBlock();
+
 		// The payloads of the pages follow the tables: first the permanent ones, they are read with the model, then the others, which are read when they are needed.
 		profiler::beginBlock("write page payloads");
 		for (u32 pass = 0; pass < 2; ++pass) {
 			if (pass == 1) m_resident_end = m_out_file.size();
-			for (u32 i = 0; i < (u32)payloads.size(); ++i) {
-				const PagePayloads& page_payloads = *payloads[i];
-				const MeshPages& page_data = *page_results[i];
-				for (u32 p = 0; p < (u32)page_data.pages.size(); ++p) {
-					if ((page_data.pages[p].permanent != 0) != (pass == 0)) continue;
-					const u64 offset = m_out_file.size();
-					write(page_payloads.data.begin() + page_payloads.at[p], page_payloads.size[p]);
-					memcpy(m_out_file.getMutableData() + page_payloads.field[p], &offset, sizeof(offset));
-				}
+			for (u32 p = 0; p < (u32)page_data->pages.size(); ++p) {
+				if ((page_data->pages[p].permanent != 0) != (pass == 0)) continue;
+				const u64 file_offset = m_out_file.size();
+				write(page_payloads->data.begin() + page_payloads->at[p], page_payloads->size[p]);
+				memcpy(m_out_file.getMutableData() + page_payloads->field[p], &file_offset, sizeof(file_offset));
 			}
 		}
 		profiler::endBlock();
-		logInfo("Baked ", total_clusters, " clusters, vertices and indices of the first LOD: ", packed_bytes, " bytes (", unpacked_bytes, " before)");
+
+		u64 unpacked_bytes = clusters->indices.byte_size();
+		for (u32 i = 0; i < mesh_count; ++i) unpacked_bytes += m_geometries[meshes[i]->geometry_idx].vertex_buffer.size();
+		const u64 packed_bytes = packed_indices.byte_size() + vertex_data_size;
+		logInfo("Baked ", cluster_count, " clusters (", mesh_count, " submeshes), vertices and indices of the first LOD: ", packed_bytes, " bytes (", unpacked_bytes, " before)");
 	}
 	else {
 		logError("Failed to build clusters of a model");
 	}
-	for (MeshClusters* clusters : results) {
-		if (clusters) LUMIX_DELETE(m_allocator, clusters);
-	}
-	for (MeshPages* page_data : page_results) {
-		if (page_data) LUMIX_DELETE(m_allocator, page_data);
-	}
-	for (PagePayloads* page_payloads : payloads) LUMIX_DELETE(m_allocator, page_payloads);
-	return failed == 0;
+	LUMIX_DELETE(m_allocator, clusters);
+	LUMIX_DELETE(m_allocator, page_data);
+	if (page_payloads) LUMIX_DELETE(m_allocator, page_payloads);
+	return ok;
 }
 
 void ModelImporter::bakeVertexAO(float min_ao) {
