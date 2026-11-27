@@ -130,6 +130,7 @@ struct CullingSystemImpl final : CullingSystem
 
 	void add(EntityRef entity, u8 type, const DVec3& pos, float radius) override
 	{
+		ASSERT(!isAdded(entity));
 		if(m_entity_to_cell.size() <= entity.index) {
 			m_entity_to_cell.reserve(entity.index);
 			while(m_entity_to_cell.size() <= entity.index) {

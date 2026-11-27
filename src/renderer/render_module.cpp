@@ -3298,7 +3298,19 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 
+	bool hasCullableComponent(EntityRef entity) const {
+		if (entity.index < m_model_instances.size() && (m_model_instances[entity.index].flags & ModelInstance::VALID)) return true;
+		if (m_point_lights.find(entity).isValid()) return true;
+		if (m_decals.find(entity).isValid()) return true;
+		if (m_curve_decals.find(entity).isValid()) return true;
+		return false;
+	}
+
 	void createPointLight(EntityRef entity) override {
+		if (hasCullableComponent(entity)) {
+			logError("Entity ", entity.index, " already has a cullable renderable component; only one of model_instance, point_light, decal, or curve_decal is supported per entity.");
+			return;
+		}
 		PointLight light;
 		light.entity = entity;
 		light.color = Vec3(1, 1, 1);
@@ -3333,6 +3345,10 @@ struct RenderModuleImpl final : RenderModule {
 
 
 	void createDecal(EntityRef entity) override {
+		if (hasCullableComponent(entity)) {
+			logError("Entity ", entity.index, " already has a cullable renderable component; only one of model_instance, point_light, decal, or curve_decal is supported per entity.");
+			return;
+		}
 		Decal& decal = m_decals.insert(entity);
 		decal.material = nullptr;
 		decal.entity = entity;
@@ -3344,6 +3360,10 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 	void createCurveDecal(EntityRef entity) override {
+		if (hasCullableComponent(entity)) {
+			logError("Entity ", entity.index, " already has a cullable renderable component; only one of model_instance, point_light, decal, or curve_decal is supported per entity.");
+			return;
+		}
 		CurveDecal& decal = m_curve_decals.insert(entity);
 		decal.material = nullptr;
 		decal.entity = entity;
@@ -3412,6 +3432,10 @@ struct RenderModuleImpl final : RenderModule {
 	}
 
 	void createModelInstance(EntityRef entity) override {
+		if (hasCullableComponent(entity)) {
+			logError("Entity ", entity.index, " already has a cullable renderable component; only one of model_instance, point_light, decal, or curve_decal is supported per entity.");
+			return;
+		}
 		while(entity.index >= m_model_instances.size()) {
 			m_model_instances.emplace();
 		}
