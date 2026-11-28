@@ -1566,8 +1566,22 @@ static void refreshOpacity(Document& doc, u32 element_index, float inherited) {
 }
 
 void Element::setOpacity(float value) {
-	upsertAttribute<AttributeName::OPACITY>(*this, clamp(value, 0.f, 1.f), AttributeSource::ELEMENT);
-	for (u32 idx : m_document.m_root.children) refreshOpacity(m_document, idx, 1.0f);
+	const float clamped = clamp(value, 0.f, 1.f);
+	for (const Attribute& attr : attributes) {
+		if (attr.type == AttributeName::OPACITY && attr.source == AttributeSource::ELEMENT) {
+			if (attr.opacity == clamped) return;
+			break;
+		}
+	}
+	upsertAttribute<AttributeName::OPACITY>(*this, clamped, AttributeSource::ELEMENT);
+	if (this == &m_document.m_root) {
+		opacity = clamped;
+		for (u32 idx : m_document.m_root.children) refreshOpacity(m_document, idx, opacity);
+		return;
+	}
+	const u32 self_idx = u32(this - m_document.m_elements.begin());
+	const float parent_opacity = parent >= 0 ? m_document.m_elements[parent].opacity : m_document.m_root.opacity;
+	refreshOpacity(m_document, self_idx, parent_opacity);
 }
 
 // styles are applied lazily in computeLayout, so several calls in a frame cost one style pass
